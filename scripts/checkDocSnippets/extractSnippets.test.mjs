@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {test} from 'node:test';
+import {describe, test} from 'node:test';
 import {extractSnippets} from './extractSnippets.mjs';
 
 const FENCE = '```';
@@ -108,4 +108,77 @@ test('a line whose info string holds a backtick opens no fence, so a marked bloc
 
   assert.deepEqual(snippets, [{file: 'a.md', line: 4, indent: 0, code: 'const a = 1;'}]);
   assert.deepEqual(problems, []);
+});
+
+describe('in a CHANGELOG.md', () => {
+  const changelog = doc(
+    '# CHANGELOG',
+    '',
+    `${FENCE}ts check`,
+    'const preamble = 0;',
+    FENCE,
+    '## [Unreleased]',
+    '',
+    `${FENCE}ts check`,
+    'const unreleased = 1;',
+    FENCE,
+    '',
+    `${FENCE}ts`,
+    '## [not a heading, code]',
+    FENCE,
+    '',
+    `${FENCE}ts check`,
+    'const stillUnreleased = 2;',
+    FENCE,
+    '## [0.22.0] - 2026-09-30',
+    '',
+    `${FENCE}ts check`,
+    'import {Removed} from "somewhere";',
+    FENCE,
+    `${FENCE}js check`,
+    'const typo = 3;',
+    FENCE,
+    '## [Unreleased]',
+    `${FENCE}ts check`,
+    'const afterTheCut = 4;',
+    FENCE,
+  );
+
+  test('keeps the blocks of the Unreleased section, a `## [` line inside a code block included', () => {
+    const {snippets, problems} = extractSnippets(changelog, 'packages/twopoint5d/CHANGELOG.md');
+
+    assert.deepEqual(problems, []);
+    assert.deepEqual(
+      snippets.map(({line, code}) => ({line, code})),
+      [
+        {line: 9, code: 'const unreleased = 1;'},
+        {line: 17, code: 'const stillUnreleased = 2;'},
+      ],
+    );
+  });
+
+  test('skips the blocks of a released section and their markers, and nothing reopens the section after the cut', () => {
+    const {snippets, problems} = extractSnippets(changelog, 'CHANGELOG.md');
+
+    assert.equal(
+      snippets.some(({code}) => code.includes('Removed') || code.includes('afterTheCut') || code.includes('preamble')),
+      false,
+    );
+    assert.deepEqual(problems, []);
+  });
+
+  test('without an Unreleased section has no block to check', () => {
+    const {snippets} = extractSnippets(
+      doc('# CHANGELOG', '## [0.22.0] - 2026-09-30', `${FENCE}ts check`, 'const a = 1;', FENCE),
+      'CHANGELOG.md',
+    );
+
+    assert.deepEqual(snippets, []);
+  });
+
+  test('another Markdown file keeps every block, version headings or not', () => {
+    const {snippets} = extractSnippets(changelog, 'docs/NOTES.md');
+
+    assert.equal(snippets.length, 5);
+  });
 });

@@ -146,8 +146,9 @@ explicit instruction.
   it. A block that stands on its own — imports everything it uses, declares everything
   it names — carries `ts check` as its info string, and `pnpm typecheck` compiles it as
   a module of its own against the built library under the root tsconfig (unused locals
-  and parameters allowed). Released CHANGELOG sections are not marked after the fact;
-  their blocks show the API of their release.
+  and parameters allowed). In a `CHANGELOG.md` the check compiles only the blocks of the
+  `## [Unreleased]` section: a released section is history, its blocks show the API of
+  their release and are not marked after the fact.
 - **Commits** follow [Conventional
   Commits](https://www.conventionalcommits.org/en/v1.0.0/). Code, comments and docs are
   written in English.

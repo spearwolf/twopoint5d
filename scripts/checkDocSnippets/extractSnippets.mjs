@@ -7,11 +7,20 @@
 // block (a four-backtick block that shows Markdown, say) is an example of the marker, not
 // the marker. A marker that is nearly right (`js check`, `ts check strict`) is reported
 // instead of ignored: a typo must not drop a block out of the check without a word.
+//
+// In a `CHANGELOG.md` only the `## [Unreleased]` section counts, up to the next `## [`
+// heading: a released section is history and shows the API of its release, so its
+// blocks are neither compiled nor checked for their marker. A changelog without an
+// Unreleased section has no block to check.
 
 const OPENING_FENCE = /^(\s*)(`{3,})(.*)$/;
 const CLOSING_FENCE = /^\s*(`{3,})\s*$/;
 
 const MARKER = ['ts', 'check'];
+
+const CHANGELOG = 'CHANGELOG.md';
+const VERSION_HEADING = /^## \[/;
+const UNRELEASED_HEADING = /^## \[Unreleased\]/;
 
 /**
  * @param {string} markdown
@@ -25,6 +34,12 @@ export function extractSnippets(markdown, file) {
   const snippets = [];
   const problems = [];
   const lines = markdown.split(/\r?\n/);
+
+  // a pure function: the name of the file tells a changelog, not the file system
+  const isChangelog = file.split(/[\\/]/).pop() === CHANGELOG;
+  // outside a changelog every block counts; inside one only those under `## [Unreleased]`
+  let inScope = !isChangelog;
+  let unreleasedSeen = false;
 
   /**
    * @typedef {object} OpenFence
@@ -41,6 +56,14 @@ export function extractSnippets(markdown, file) {
     const lineNumber = index + 1;
 
     if (open == null) {
+      // a heading inside a code block is code, so the sections are tracked between fences only
+      if (isChangelog && VERSION_HEADING.test(text)) {
+        // the first `## [` heading after `## [Unreleased]` ends the section for good
+        inScope = !unreleasedSeen && UNRELEASED_HEADING.test(text);
+        if (inScope) unreleasedSeen = true;
+        return;
+      }
+
       const match = OPENING_FENCE.exec(text);
       // CommonMark: the info string of a backtick fence holds no backtick, so a line such
       // as "```inline``` prose" opens nothing
@@ -51,9 +74,9 @@ export function extractSnippets(markdown, file) {
 
       const info = rest.trim();
       const words = info.split(/\s+/).filter(Boolean);
-      const marked = words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
+      const marked = inScope && words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
 
-      if (!marked && words.includes('check')) {
+      if (inScope && !marked && words.includes('check')) {
         problems.push({file, line: lineNumber, message: `unknown marker \`${info}\` — only \`ts check\` is checked`});
       }
 
