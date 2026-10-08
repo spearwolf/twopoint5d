@@ -682,8 +682,9 @@ p'   = p_c − L · (h_p − e) / dot(n, L)
 `w = 0` is a direction *towards* the light, so the start value `[-0.4, 1, -0.3, 0]` is a light
 that travels along `[0.4, -1, 0.3]`; `w = 1` is a point light at `[x, y, z]`, and its shadows
 spread. A vertex near or above a point light is brought down along the normal to `0.95` of the
-height of the light first, so its shadow grows long, at most 19 times its distance to the light,
-but stays finite, in the plane and on the far side of the light. The normal need not be a unit
+height of the light first, so its shadow grows long but stays finite, in the plane and on the far
+side of the light: measured across the normal, it lands at most 19 times the offset of the vertex
+from the light beyond the vertex. The normal need not be a unit
 vector.
 
 `ShadowPass` keeps the tint of the kind: `ShadowMask` replaces the color anyway, and the alpha of
@@ -883,7 +884,9 @@ The rules of `bindUniform()` and `unbindUniform()`:
   every binding, so the sprites hold no node after it; afterwards `bindUniform()` and
   `unbindUniform()` do nothing, as `setUniform()` does.
 - **A material handed in.** Bindings write into the uniforms of the material, so they work with a
-  `material` handed in as well — for the uniforms that material holds.
+  `material` handed in as well — for the uniforms that material holds. A material shared by several
+  `FeatureSprites` at different transforms shares its uniforms too, so their bindings overwrite
+  each other and the last `update()` wins.
 
 **The order of `update()`.** With bindings, `update()` first refreshes the world matrix of the
 sprites and their parents and inverts it, then lets every source write its uniform, in the order

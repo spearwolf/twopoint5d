@@ -72,7 +72,8 @@ describe('the pass features', () => {
     });
 
     test('keeps the shadow of a vertex at or above a point light finite, in the plane and on the far side', () => {
-      // above the light: brought down to 0.95 of its height first, then projected — 19 times its offset away
+      // above the light: brought down to 0.95 of its height first, then projected — measured across
+      // the normal, 19 times its offset from the light beyond it: from x = 1 to x = 20
       expectNear(shadow([0, 10, 0, 1], [0, 1, 0, 0], [1, 12, 0]), [20, 0, 0]);
       // exactly at the height of the light
       const atLight = shadow([0, 10, 0, 1], [0, 1, 0, 0], [1, 10, 0]);

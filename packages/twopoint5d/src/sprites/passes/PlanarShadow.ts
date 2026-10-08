@@ -3,7 +3,8 @@ import type {Node} from 'three/webgpu';
 import {defineFeature, MeshOrder} from '../SpriteFeature.js';
 
 // a vertex near or above a point light comes down to this share of the height of the light before
-// it is projected, so that its shadow lands at most 19 times its distance to the light away
+// it is projected, so that its shadow lands at most 19 times its offset from the light — measured
+// across the normal — beyond it
 const MAX_POINT_SHADOW_STRETCH = 20;
 const CLAMPED_SHARE = 1 - 1 / MAX_POINT_SHADOW_STRETCH;
 
