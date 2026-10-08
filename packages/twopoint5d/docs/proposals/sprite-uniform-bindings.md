@@ -26,7 +26,9 @@ handles anyway. A shadow needs the plane and the light.
 
 Beyond the bindings, this proposal lets a pass skip its draw call in a frame its uniforms make
 pointless (§5), turns the light of `PlanarShadow` into a homogeneous one that is either a
-direction or a point, and keeps a point light from stretching a shadow to infinity (§4).
+direction or a point, keeps a point light from stretching a shadow to infinity (§4), and lets a
+pass rename the uniforms of its features, so that one set of sprites throws two shadows from two
+lights without a copy of the shader code (§6).
 
 ## 2. Uniform sources
 
@@ -170,9 +172,11 @@ interface SpritePass {
   // … as today
   /**
    * Whether the pass is drawn in this frame, judged by the uniforms of the sprites after the
-   * bindings are written. Runs in every `update()`; allocates nothing.
+   * bindings are written. `uniform(name)` answers the uniform the features of this pass read under
+   * `name` — through the renaming of the pass (§6), so a renamed copy of a pass judges its own
+   * uniforms. Runs in every `update()`; allocates nothing.
    */
-  readonly visible?: (uniforms: Readonly<Record<string, SpriteUniformNode>>) => boolean;
+  readonly visible?: (uniform: (name: string) => SpriteUniformNode) => boolean;
 }
 
 class FeatureSpritesPass {
@@ -181,8 +185,8 @@ class FeatureSpritesPass {
 }
 ```
 
-- `update()` sets `mesh.visible = mesh.enabled && pass.visible(uniforms)` for every pass with a
-  hook. The `enabled` setter sets `mesh.visible = enabled && <the hook's last answer>`, which is
+- `update()` sets `mesh.visible = mesh.enabled && pass.visible(uniform)` for every pass with a
+  hook; the lookup `uniform` is built once per pass mesh, not per frame. The `enabled` setter sets `mesh.visible = enabled && <the hook's last answer>`, which is
   `true` for a pass without a hook. So a caller who switches a pass off is not switched back on by
   the next `update()`. The docs tell the caller to use `enabled` rather than `visible` on a pass
   mesh.
@@ -195,7 +199,83 @@ class FeatureSpritesPass {
   - `w = 1`: drawn while `h_L > 0`, i.e. the light is above the plane.
 - `ReflectionPass` takes no hook: a mirror image is always defined.
 
-## 6. Left out, documented
+## 6. Several passes of one kind: renaming uniforms
+
+### 6.1 Shadow and reflection together
+
+`passes: [ShadowPass, ReflectionPass]` works without anything of this proposal: their uniforms
+have distinct names (`groundPlane`, `shadowLight`, `shadowColor` against `mirrorPlane`,
+`reflectionColor`), so each binds to a node of its own —
+
+```ts
+sprites.bindUniform('groundPlane', planeOf(ground));
+sprites.bindUniform('shadowLight', lightOf(sun));
+sprites.bindUniform('mirrorPlane', planeOf(water));
+```
+
+— but the two presets share `renderOrder: -1`, and the pair needs an order with the ground
+between them. The reflection lies behind a transparent ground and has to be drawn before it, to
+show through; the shadow lies on the ground, writes no depth and has to be drawn after it, or the
+ground covers it. So: reflection < ground < shadow < sprites, set through
+`sprites.passes['shadow']!.renderOrder` or a `definePass({...ShadowPass, renderOrder})`.
+`docs/sprites.md` states the order under "The scene around them".
+
+### 6.2 Two shadows: `uniformNames`
+
+Uniform names are shared by the kind and every pass, so a second shadow needs uniforms of other
+names. Today that means a feature of one's own with the shader code of `PlanarShadow` copied
+(`MoonShadow` in `docs/sprites.md`). And a copy of the pass alone is a trap:
+`definePass({...ShadowPass, name: 'moonShadow'})` is not refused — `collectSpriteDeclarations`
+takes one feature object once, on purpose, since a feature may come along in the kind and again
+in a pass — and both passes read the same uniforms and draw the same shadow twice.
+
+A pass gets a renaming of the uniforms its features read:
+
+```ts
+interface SpritePass {
+  // … as today
+  /** Uniforms of the features of this pass under other names: declared name → name of the pass. */
+  readonly uniformNames?: Readonly<Record<string, string>>;
+}
+
+const MoonShadowPass = definePass({
+  ...ShadowPass,
+  name: 'moonShadow',
+  uniformNames: {groundPlane: 'moonGround', shadowLight: 'moonLight', shadowColor: 'moonShadowColor'},
+});
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {passes: [ShadowPass, MoonShadowPass]});
+sprites.bindUniform('shadowLight', lightOf(sun));
+sprites.bindUniform('groundPlane', planeOf(ground));
+sprites.bindUniform('moonLight', lightOf(moon));
+sprites.bindUniform('moonGround', planeOf(ground));
+```
+
+- **In the shader.** The material of the pass answers `ctx.uniform(name)` with the uniform
+  `uniformNames[name] ?? name`. The features stay as they are; no shader code is copied.
+- **Declared.** The renamed uniform is declared under its new name, with the start value of the
+  feature. The declarations take a feature once per resolved name rather than once per feature
+  object, so `PlanarShadow` in `ShadowPass` and in `MoonShadowPass` declares `groundPlane` and
+  `moonGround`; the same feature with the same names in the kind and in a pass still declares
+  them once.
+- **Checked.** `definePass()` refuses a key that no feature of the pass declares as a uniform, a
+  target name that is not a non-empty string, and two keys with one target. A target that
+  collides with a uniform of the kind or of another pass is refused by the check that exists:
+  "both declare the uniform".
+- **Only the features of the pass** are renamed. The features of the kind a pass draws with read
+  their uniforms under their own names in every pass — `time` stays one uniform.
+- **Textures are not renamed.** Every pass reads the `colorMap` of the sprites; a texture of a
+  pass's own under a second name waits for a pass that needs one.
+- **The `visible` hook** reads through the renaming (§5), so the hook of `ShadowPass` judges
+  `moonGround` and `moonLight` in `MoonShadowPass`.
+- **The trap stays legal.** Two passes that share a feature and its uniforms on purpose — one
+  `reflectionColor` for two reflections — are not wrong. `docs/sprites.md` names the trap next to
+  `uniformNames`.
+
+Two lights throw two shadows, and where they overlap the ground darkens twice — which, for two
+lights, is close to right.
+
+## 7. Left out, documented
 
 - **Sprites below the plane.** A shadow of a sprite on the far side of the plane should not
   exist; the projection draws one anyway. Only a vertex knows its side, and a sprite crossing the
@@ -204,10 +284,10 @@ class FeatureSpritesPass {
   hangs in the air. Clipping it to the mesh needs a stencil or a clip in the fragment stage in
   the local space of the ground — a proposal of its own.
 - **Overlapping shadows darken twice**, as today (`docs/sprites.md`, "The limits").
-- **Several lights.** One uniform name has one value; a second light needs a feature with names
-  of its own, as `MoonShadow` in `docs/sprites.md` shows. A binding works for those names alike.
+- **A light per sprite.** Uniforms hold for every sprite of a `FeatureSprites`, and a pass brings
+  no data; sprites under different lights are sprites in different meshes.
 
-## 7. Files
+## 8. Files
 
 | File | Change |
 | --- | --- |
@@ -215,16 +295,18 @@ class FeatureSpritesPass {
 | `src/sprites/bindings/planeOf.ts`, `lightOf.ts` | the factories |
 | `src/sprites/bindings/public-api.ts` | re-exported from `src/sprites/public-api.ts` |
 | `src/sprites/FeatureSprites/FeatureSprites.ts` | `bindUniform()`, `unbindUniform()`, the order of `update()`, `dispose()` drops the bindings; `FeatureSpritesPass#enabled` |
-| `src/sprites/passes/definePass.ts`, `passFeatures.ts` | the `visible` hook, checked and frozen |
+| `src/sprites/passes/definePass.ts`, `passFeatures.ts` | the `visible` hook and `uniformNames`, checked and frozen |
+| `src/sprites/spriteDeclarations.ts`, `FeatureSprites/SpriteResources.ts`, `FeatureSprites/FeatureSpritesMaterial.ts` | declarations per feature and resolved name; `ctx.uniform()` of a pass material through `uniformNames` |
 | `src/sprites/passes/PlanarShadow.ts` | `shadowLight`, the homogeneous projection with the clamp |
 | `src/sprites/passes/passPresets.ts` | the hook of `ShadowPass` |
-| `docs/sprites.md` | a section "Binding uniforms to the scene graph" with a `ts check` block; the table of the presets and its formula move to `shadowLight`; `enabled` and the hook in the rules of the passes; §6 as limits |
+| `docs/sprites.md` | a section "Binding uniforms to the scene graph" with a `ts check` block; the table of the presets and its formula move to `shadowLight`; `enabled`, the hook and `uniformNames` in the rules of the passes, the trap of a copied pass next to it; the render order of shadow and reflection together (§6.1) under "The scene around them"; `MoonShadow` becomes a renamed `ShadowPass`; §7 as limits |
 | `CHANGELOG.md` | `[Unreleased]`: the bindings and the hook as additions; `lightDirection` → `shadowLight` amends the still unreleased entry of the pass features instead of a breaking change |
-| `src/sprites/passes/pass-features.spec.ts`, `packages/twopoint5d-testing/test/sprites-shadow-pass.test.js` | move from `lightDirection` to `shadowLight`; the new cases of §8 |
+| `src/sprites/passes/pass-features.spec.ts`, `packages/twopoint5d-testing/test/sprites-shadow-pass.test.js` | move from `lightDirection` to `shadowLight`; the new cases of §9 |
 | `docs/proposals/sprite-features.md` | unchanged — it is kept as it was written; its status block points here for `shadowLight` |
 | `apps/lookbook/src/pages/demos/animated-billboards.astro` | options form instead of a material handed in (passes refuse one), `passes: [ShadowPass]`, `bindUniform('groundPlane', planeOf(plane))`, the light from `lightOf()` |
+| `apps/lookbook/src/pages/demos/sprite-reflection.astro`, `_sprite-reflection.json`, its preview image | the new demo of §10 |
 
-## 8. Tests
+## 9. Tests
 
 - **Vitest, sources** (`bindings/*.spec.ts`):
   - `planeOf()` of a mesh rotated by `-π/2` around X and moved to `y = 2` writes `[0, 1, 0, 2]`;
@@ -243,6 +325,13 @@ class FeatureSpritesPass {
   `update()` sets `visible` from the hook; `enabled = false` survives `update()`; `enabled = true`
   restores the hook's answer. The hook of `ShadowPass` for a light from above, parallel, from
   below, and for a point light above, in and below the plane.
+- **Vitest, `uniformNames`**: `definePass()` refuses an unknown key, an empty target and two keys
+  with one target; `ShadowPass` and a renamed copy on one `FeatureSprites` declare both sets of
+  uniforms, start them with the values of the feature, and `setUniform()` on one leaves the other
+  alone; the material of the copy reads the renamed uniforms (its node graph holds them, not the
+  originals); a target that collides with a uniform of the kind is refused; the hook of the copy
+  judges the renamed uniforms; a plain copy without `uniformNames` shares the uniforms, as
+  documented.
 - **Vitest, `PlanarShadow`** through `evaluateNode`: `w = 0` gives the values of today's
   projection for the start value; `w = 1` the projection from a point; a vertex above a point
   light lands on the side of the shadow, at a finite place.
@@ -251,3 +340,33 @@ class FeatureSpritesPass {
 - **Browser** (`sprites-shadow-pass.test.js`, WebGPU and WebGL 2): a ground mesh moved and
   turned, bound through `planeOf()`, and a point light bound through `lightOf()` — the shadow lies
   where the projection puts it; a light below the ground draws no shadow.
+
+## 10. Lookbook demo: `sprite-reflection`
+
+A demo of `ReflectionPass` and `planeOf()`: bouncing sprites seen head-on in the upper half of the
+window, their mirror image in the lower half, darker — a waterline.
+
+- **Scene.** The mirror is the world plane `y = 0`. The camera stands at `y = 0` and looks along
+  −Z, so the horizon runs through the middle of the window and the mirror is seen edge-on.
+- **Sprites.** The 2D `BouncingSprites` of `animated-sprites` (`~demos/animated-sprites/BouncingSprites`),
+  in an `AnimatedSpriteKind` built in the options form with `passes: [ReflectionPass]`. Their
+  container is centred on 0, so the sprites mesh moves to `position.y = H / 2`: the edge they
+  bounce off lies on the mirror, and each sprite touches its image there.
+- **Upper half.** The camera distance satisfies `tan(fov / 2) · dist = H`, so the container
+  height fills the upper half exactly. On every resize `containerWidth = 2 · aspect · H`, so the
+  sprites fly to the edge of the window at any aspect.
+- **The mirror** is bound, not computed: `waterline` is an `Object3D` at `y = 0` with
+  `rotation.x = -π/2`, and `sprites.bindUniform('mirrorPlane', planeOf(waterline))`. Since the
+  sprites mesh is moved, the plane lies at `y = -H / 2` in its local space — which `planeOf()`
+  works out, and which is the offset a hand-written `setUniform()` gets wrong.
+- **Look.** A background close to black (`rgb(4 4 8)`); `reflectionColor` around
+  `[0.35, 0.38, 0.45, 0.55]` — darker, a little cool, half transparent; a faint horizon line, a
+  thin mesh child of `waterline`.
+- **Interaction** as in `animated-sprites`: *more* and *less* create and free sprites. The orbit
+  controls stay on — tilting the camera shows that the mirror image is geometry and stays right
+  from any angle.
+- **Lookbook duties.** `_sprite-reflection.json` with title, descriptions, url and tags
+  (`FeatureSprites`, `ReflectionPass`, `planeOf`, `AnimatedSpriteKind`, `FrameBasedAnimations`,
+  `TextureStore`, `vanilla`, …), which `pnpm test:scripts` holds to the exports of the library;
+  a preview image through `pnpm lookbook:generate-previews --only=sprite-reflection`, which
+  `pnpm test:scripts` holds to the demo as well.
