@@ -34,7 +34,7 @@ const GROUND_PIXELS_PER_UNIT = 16;
 const WHITE = [255, 255, 255, 255];
 const BLACK = [0, 0, 0, 255];
 const SHADOW_BLUE = [0, 0, 255, 255];
-// the start value of lightDirection
+// the direction the light of the start value of shadowLight travels in: -[-0.4, 1, -0.3]
 const LIGHT = [0.4, -1, 0.3];
 
 /**
@@ -97,7 +97,7 @@ describe('sprites — a shadow pass', function () {
   }
 
   function aimTheShadow(sprites) {
-    sprites.setUniform('lightDirection', 0.5, 0, -1);
+    sprites.setUniform('shadowLight', -0.5, 0, 1, 0);
     sprites.setUniform('groundPlane', 0, 0, 1, 0);
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
   }

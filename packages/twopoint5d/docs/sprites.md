@@ -588,8 +588,9 @@ const sprites = new FeatureSprites(TexturedSpriteKind, {
   passes: [ShadowPass],
 });
 
-// the light falls from above, a little from the left; the ground is the XZ plane of the mesh
-sprites.setUniform('lightDirection', 0.5, -1, 0.3);
+// the light comes from above, a little from the right; it points towards the light.
+// the ground is the XZ plane of the mesh
+sprites.setUniform('shadowLight', -0.5, 1, -0.3, 0);
 sprites.setUniform('groundPlane', 0, 1, 0, 0);
 
 const scene = new Scene();
@@ -646,8 +647,27 @@ is the plane `y = 2`:
 
 | pass | features | uniforms (start value) | what it draws |
 | --- | --- | --- | --- |
-| `ShadowPass` | `PlanarShadow`, `ShadowMask` | `lightDirection` (`[0.4, -1, 0.3]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite projected along `lightDirection` onto `groundPlane`, `p − L · (dot(n, p) − d) / dot(n, L)`, in `shadowColor`, its alpha multiplied by the alpha of the sprite |
+| `ShadowPass` | `PlanarShadow`, `ShadowMask` | `shadowLight` (`[-0.4, 1, -0.3, 0]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite projected from `shadowLight` onto `groundPlane` — along a direction towards the light (`w = 0`) or from a point light (`w = 1`) — in `shadowColor`, its alpha multiplied by the alpha of the sprite |
 | `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included |
+
+**The light of the shadow.** `shadowLight` is a homogeneous light `[x, y, z, w]`. With the plane
+`(n, d)`, the placed vertex `p` and the light `(l, w)`, the shadow is:
+
+```text
+h_p  = dot(n, p) − d                         height of the vertex above the plane
+h_L  = dot(n, l) − w · d                     height of the light
+e    = w · max(h_p − 0.95 · h_L, 0)          how far a vertex reaches above the clamp
+p_c  = p − n · e / dot(n, n)                 the vertex, brought down by e along the normal
+L    = l − w · p_c                           direction from the vertex towards the light
+p'   = p_c − L · (h_p − e) / dot(n, L)
+```
+
+`w = 0` is a direction *towards* the light, so the start value `[-0.4, 1, -0.3, 0]` is a light
+that travels along `[0.4, -1, 0.3]`; `w = 1` is a point light at `[x, y, z]`, and its shadows
+spread. A vertex near or above a point light is brought down along the normal to `0.95` of the
+height of the light first, so its shadow grows long, at most 19 times its distance to the light,
+but stays finite, in the plane and on the far side of the light. The normal need not be a unit
+vector.
 
 `ShadowPass` keeps the tint of the kind: `ShadowMask` replaces the color anyway, and the alpha of
 the tint fades the shadow along with the sprite. It leaves nothing out, so it draws
@@ -656,7 +676,7 @@ mirroring the placed vertex turns the sprite upside down and keeps the frame whe
 
 **Both sides.** A mirror turns the winding of every triangle it draws, and a projection onto the
 ground turns it whenever the shadow falls towards the camera, as it does for a sprite seen from
-the front and above under a light from above and behind it — the start value of `lightDirection`
+the front and above under a light from above and behind it — the start value of `shadowLight`
 is one. three decides what to cull by the `side` of the material and the world matrix of the mesh,
 never by the vertex shader, so with the default `FrontSide` such a reflection or shadow is culled
 and nothing is drawn. Both presets therefore draw with `DoubleSide`, and so does a pass of one's
@@ -738,7 +758,7 @@ The limits:
   the placed vertex in the color stages, and the material hands the color stages no such node.
   `ReflectionPass` fades evenly, by the alpha of `reflectionColor`.
 - **One uniform name, one value.** The uniforms are shared, so two passes that read
-  `lightDirection` read the same light. A second light takes a feature with uniforms of other
+  `shadowLight` read the same light. A second light takes a feature with uniforms of other
   names, as `MoonShadow` above does.
 
 ## Performance

@@ -12,7 +12,7 @@ import {ShadowMask} from './ShadowMask.js';
 
 describe('the pass features', () => {
   test('declare their uniforms, slots and bands', () => {
-    expect(PlanarShadow.uniforms).toEqual({lightDirection: [0.4, -1, 0.3], groundPlane: [0, 1, 0, 0]});
+    expect(PlanarShadow.uniforms).toEqual({shadowLight: [-0.4, 1, -0.3, 0], groundPlane: [0, 1, 0, 0]});
     expect(PlanarShadow.mesh!.order).toBe(MeshOrder.Project);
     expect(ShadowMask.uniforms).toEqual({shadowColor: [0, 0, 0, 0.5]});
     expect(ShadowMask.color!.order).toBe(ColorOrder.Mask);
@@ -43,6 +43,42 @@ describe('the pass features', () => {
     // 2y = 4 is the plane y = 2
     expect(mirror([0, 2, 0, 4], [1, 3, 5])).toEqual([1, 1, 5]);
     expect(mirror([0, 0, -3, 6], [1, 3, 5])).toEqual([1, 3, -9]);
+  });
+
+  describe('PlanarShadow', () => {
+    const shadow = (light: number[], plane: number[], p: [number, number, number]) => {
+      const ctx = {
+        ...stubShaderContext(),
+        uniform: <T extends string>(name: string) =>
+          (name === 'shadowLight'
+            ? vec4(...(light as [number, number, number, number]))
+            : vec4(...(plane as [number, number, number, number]))) as unknown as Node<T>,
+      };
+      return evaluateNode(PlanarShadow.mesh!.transform(vec3(...p) as unknown as Node<'vec3'>, ctx)) as number[];
+    };
+    const expectNear = (actual: number[], expected: number[]) =>
+      expected.forEach((value, i) => expect(actual[i], `component ${i} of ${actual}`).toBeCloseTo(value, 5));
+
+    test('projects along a direction towards the light (w = 0) as the light that travels the other way did', () => {
+      // towards (-0.4, 1, -0.3): the light travels along (0.4, -1, 0.3); 2 units up land 0.8 and 0.6 off
+      expectNear(shadow([-0.4, 1, -0.3, 0], [0, 1, 0, 0], [1, 2, 3]), [1.8, 0, 3.6]);
+      // a normal of any length: 2y = 4 is the plane y = 2
+      expectNear(shadow([-0.4, 1, -0.3, 0], [0, 2, 0, 4], [1, 4, 3]), [1.8, 2, 3.6]);
+    });
+
+    test('projects from a point light (w = 1) onto the plane', () => {
+      // from (0, 10, 0) through (2, 5, 0) down to y = 0
+      expectNear(shadow([0, 10, 0, 1], [0, 1, 0, 0], [2, 5, 0]), [4, 0, 0]);
+    });
+
+    test('keeps the shadow of a vertex at or above a point light finite, in the plane and on the far side', () => {
+      // above the light: brought down to 0.95 of its height first, then projected — 19 times its offset away
+      expectNear(shadow([0, 10, 0, 1], [0, 1, 0, 0], [1, 12, 0]), [20, 0, 0]);
+      // exactly at the height of the light
+      const atLight = shadow([0, 10, 0, 1], [0, 1, 0, 0], [1, 10, 0]);
+      expect(atLight.every(Number.isFinite), `${atLight}`).toBe(true);
+      expectNear(atLight, [20, 0, 0]);
+    });
   });
 
   test('the two passes draw behind the sprites, transparent, without writing depth, from both sides', () => {
