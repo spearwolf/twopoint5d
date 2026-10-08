@@ -2,6 +2,7 @@ import {describe, expect, test} from 'vitest';
 
 import {defineFeature} from '../SpriteFeature.js';
 import {definePass} from './definePass.js';
+import {ShadowPass} from './passPresets.js';
 
 const mask = defineFeature({name: 'mask', uniforms: {shadowColor: [0, 0, 0, 0.5]}, color: {order: 150, transform: (c) => c}});
 
@@ -57,5 +58,28 @@ describe('definePass()', () => {
     const pass = definePass({name: 'p', features: []});
 
     expect(Object.keys(pass)).toEqual(['name', 'features']);
+  });
+
+  describe('uniformNames', () => {
+    test('freezes a copy of the renaming', () => {
+      const names = {groundPlane: 'moonGround'};
+      const pass = definePass({...ShadowPass, name: 'moon', uniformNames: names});
+
+      expect(pass.uniformNames).toEqual({groundPlane: 'moonGround'});
+      expect(pass.uniformNames).not.toBe(names);
+      expect(Object.isFrozen(pass.uniformNames)).toBe(true);
+    });
+
+    test('refuses a name no feature of the pass declares, an empty target and two names with one target', () => {
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {time: 'moonTime'}})).toThrow(
+        'definePass: pass "moon" renames the uniform "time", which no feature of the pass declares',
+      );
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: ''}})).toThrow(
+        'definePass: pass "moon" renames the uniform "groundPlane" to an empty name',
+      );
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: 'moon', shadowLight: 'moon'}})).toThrow(
+        'definePass: pass "moon" renames the uniforms "groundPlane" and "shadowLight" both to "moon"',
+      );
+    });
   });
 });

@@ -5,6 +5,7 @@ import type {MeshBasicMaterial, Vector4} from 'three/webgpu';
 import {Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test} from 'vitest';
 
+import {nodesOf} from '../../testing/spriteGraph.js';
 import {defineSprite} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
 import {BillboardPlacement} from '../features/BillboardPlacement.js';
@@ -535,6 +536,73 @@ describe('FeatureSprites', () => {
 
         expect(geometryDispose.callCount).toBe(1);
         expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+      });
+    });
+
+    describe('uniformNames', () => {
+      const moonShadow = definePass({
+        ...ShadowPass,
+        name: 'moonShadow',
+        uniformNames: {groundPlane: 'moonGround', shadowLight: 'moonLight', shadowColor: 'moonShadowColor'},
+      });
+
+      test('declares the uniforms of a renamed copy next to those of the pass, at the start values of the feature', () => {
+        const sprites = new FeatureSprites(kind, {passes: [ShadowPass, moonShadow]});
+        const value = (name: string) => (sprites.uniforms![name]!.value as Vector4).toArray();
+
+        expect(value('moonLight')).toEqual([-0.4, 1, -0.3, 0]);
+        expect(value('moonGround')).toEqual([0, 1, 0, 0]);
+        sprites.setUniform('moonLight', 0, 10, 0, 1);
+        expect(value('shadowLight')).toEqual([-0.4, 1, -0.3, 0]);
+        sprites.dispose();
+      });
+
+      test('builds the material of the copy from the renamed uniforms, not the originals', () => {
+        const sprites = new FeatureSprites(kind, {passes: [ShadowPass, moonShadow]});
+        const nodes = nodesOf(sprites.passes['moonShadow']!.material.positionNode!);
+        const {uniforms} = sprites;
+
+        expect(nodes.has(uniforms!['moonGround']!)).toBe(true);
+        expect(nodes.has(uniforms!['moonLight']!)).toBe(true);
+        expect(nodes.has(uniforms!['groundPlane']!)).toBe(false);
+        expect(nodesOf(sprites.passes['shadow']!.material.positionNode!).has(uniforms!['groundPlane']!)).toBe(true);
+        sprites.dispose();
+      });
+
+      test('starts a renamed uniform from the options under its new name', () => {
+        const sprites = new FeatureSprites(kind, {passes: [moonShadow], uniforms: {moonShadowColor: [0, 0, 1, 0.3]}});
+
+        expect((sprites.uniforms!['moonShadowColor']!.value as Vector4).toArray()).toEqual([0, 0, 1, 0.3]);
+        sprites.dispose();
+      });
+
+      test('two renamed copies, the reflection and the time of an animated kind live side by side', () => {
+        const sunset = definePass({
+          ...ShadowPass,
+          name: 'sunset',
+          uniformNames: {shadowLight: 'sunsetLight', groundPlane: 'sunsetGround', shadowColor: 'sunsetColor'},
+        });
+        const sprites = new FeatureSprites(AnimatedSpriteKind, {passes: [ShadowPass, moonShadow, sunset, ReflectionPass]});
+
+        expect(Object.keys(sprites.passes)).toEqual(['shadow', 'moonShadow', 'sunset', 'reflection']);
+        expect(sprites.uniforms!['time']).toBeDefined();
+        expect(sprites.uniforms!['sunsetLight']).not.toBe(sprites.uniforms!['moonLight']);
+        sprites.dispose();
+      });
+
+      test('refuses a target that collides with a uniform of the kind', () => {
+        const clash = definePass({...ShadowPass, name: 'clash', uniformNames: {shadowLight: 'time'}});
+
+        expect(() => new FeatureSprites(AnimatedSpriteKind, {passes: [clash]})).toThrow(/both declare the uniform "time"/);
+      });
+
+      test('a plain copy without uniformNames shares the uniforms of the pass it copies', () => {
+        const twin = definePass({...ShadowPass, name: 'twin'});
+        const sprites = new FeatureSprites(kind, {passes: [ShadowPass, twin]});
+        const {uniforms} = sprites;
+
+        expect(nodesOf(sprites.passes['twin']!.material.positionNode!).has(uniforms!['groundPlane']!)).toBe(true);
+        sprites.dispose();
       });
     });
   });

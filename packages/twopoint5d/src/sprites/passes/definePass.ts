@@ -16,6 +16,12 @@ export interface SpritePass {
   readonly material?: Omit<NodeMaterialParameters, 'positionNode' | 'colorNode'>;
   /** Drawn before the sprites with a lower value; a shadow takes a negative one. */
   readonly renderOrder?: number;
+  /**
+   * The uniforms of the features of this pass under other names: declared name → name in this
+   * pass. A renamed copy of a pass — `definePass({...ShadowPass, name, uniformNames})` — reads
+   * uniforms of its own; a copy without it shares the uniforms of the pass it copies.
+   */
+  readonly uniformNames?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -27,11 +33,12 @@ export interface SpritePass {
  */
 export function definePass(pass: SpritePass): SpritePass {
   checkPass(pass, 'definePass');
-  const {without, material} = pass;
+  const {without, material, uniformNames} = pass;
   return Object.freeze({
     ...pass,
     features: Object.freeze([...pass.features]),
     ...(without != null && {without: Object.freeze([...without])}),
     ...(material != null && {material: Object.freeze({...material})}),
+    ...(uniformNames != null && {uniformNames: Object.freeze({...uniformNames})}),
   });
 }

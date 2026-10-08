@@ -1,6 +1,7 @@
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import type {SpritePass} from './definePass.js';
+import {stageFeaturesOf} from './passUniformNames.js';
 
 const DATA_FIELDS = ['attributes', 'methods', 'initialize', 'usageAliases', 'placement'] as const;
 
@@ -29,6 +30,20 @@ export function checkPass(pass: SpritePass, where: string): void {
   for (const name of pass.without ?? []) {
     if (left.has(name)) throw new TypeError(`${where}: pass "${pass.name}" leaves out feature "${name}" twice`);
     left.add(name);
+  }
+  const targets = new Map<string, string>();
+  for (const [name, target] of Object.entries(pass.uniformNames ?? {})) {
+    if (!pass.features.some((feature) => feature.uniforms?.[name] != null)) {
+      throw new TypeError(`${where}: pass "${pass.name}" renames the uniform "${name}", which no feature of the pass declares`);
+    }
+    if (typeof target !== 'string' || target === '') {
+      throw new TypeError(`${where}: pass "${pass.name}" renames the uniform "${name}" to an empty name`);
+    }
+    const first = targets.get(target);
+    if (first != null) {
+      throw new TypeError(`${where}: pass "${pass.name}" renames the uniforms "${first}" and "${name}" both to "${target}"`);
+    }
+    targets.set(target, name);
   }
 }
 
@@ -63,5 +78,5 @@ export function passFeatures(kind: SpriteKind, pass: SpritePass, where: string):
   }
   const without = new Set(pass.without ?? []);
   // the data features of the kind stay: a pass leaves out stages, and they bring none
-  return Object.freeze([...kind.features.filter(({name}) => !without.has(name)), ...pass.features]);
+  return Object.freeze([...kind.features.filter(({name}) => !without.has(name)), ...stageFeaturesOf(pass)]);
 }

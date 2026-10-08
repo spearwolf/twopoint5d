@@ -1,3 +1,4 @@
+import {originOf} from './passes/passUniformNames.js';
 import type {SpriteFeature, SpriteUniformValue} from './SpriteFeature.js';
 
 export interface SpriteDeclarations {
@@ -13,9 +14,9 @@ const isUniformValue = (value: unknown): value is SpriteUniformValue =>
     value.every((v) => typeof v === 'number' && Number.isFinite(v)));
 
 /**
- * The uniforms and textures a set of features declares. One feature that comes along more than
- * once — in a kind and again in a pass — declares its names once; two features that declare the
- * same name are refused, naming both.
+ * The uniforms and textures a set of features declares. One feature that comes along more than once
+ * — in a kind and again in a pass, or as the renamed copy of a pass — declares each name once; two
+ * features that declare the same name are refused, naming both.
  *
  * @internal
  */
@@ -24,8 +25,11 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
   const textures = new Map<string, {feature: SpriteFeature; needsImage: boolean}>();
 
   for (const feature of new Set(features)) {
+    const origin = originOf(feature);
     for (const [name, value] of Object.entries(feature.uniforms ?? {})) {
       const known = uniforms.get(name);
+      // the same feature — or a copy of it — under the same name declares it once
+      if (known != null && originOf(known.feature) === origin) continue;
       if (known != null) {
         throw new Error(`${where}: features "${known.feature.name}" and "${feature.name}" both declare the uniform "${name}"`);
       }
@@ -38,6 +42,7 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
     }
     for (const [name, declaration] of Object.entries(feature.textures ?? {})) {
       const known = textures.get(name);
+      if (known != null && originOf(known.feature) === origin) continue;
       if (known != null) {
         throw new Error(`${where}: features "${known.feature.name}" and "${feature.name}" both declare the texture "${name}"`);
       }

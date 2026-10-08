@@ -5,6 +5,7 @@ import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
+import {stageFeaturesOf} from '../passes/passUniformNames.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import {FeatureSpritesGeometry, type FeatureSpritesGeometryParameters} from './FeatureSpritesGeometry.js';
 import {FeatureSpritesMaterial, type FeatureSpritesMaterialParameters} from './FeatureSpritesMaterial.js';
@@ -101,7 +102,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
       // without passes the material builds and owns its own
       const {textures, uniforms, ...ownParameters} = materialParameters;
       resources = new SpriteResources(
-        [...kind.features, ...passes.flatMap((pass) => pass.features)],
+        [...kind.features, ...passes.flatMap((pass) => stageFeaturesOf(pass))],
         {textures, uniforms},
         WHERE,
       );

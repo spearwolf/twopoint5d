@@ -628,6 +628,15 @@ The rules:
   `setTexture()` of the sprites reach every pass, and the shadow of an animated sprite shows the
   frame the sprite shows, since `time` is one uniform for all of them. Two features — of the kind
   or of any pass — that declare the same name are refused, and so are two passes of one name.
+- **Renamed uniforms.** `uniformNames` maps names the features of the pass declare to names of
+  the pass; the pass draws with copies of its features that declare and read those names, at the
+  start values of the feature. Only the features of the pass are renamed, never those of the kind
+  (`time` stays one uniform), and textures are not renamed. `definePass()` refuses a name no
+  feature of the pass declares, an empty target and two names with one target; a target that
+  collides with a uniform of the kind or of another pass is refused as "both declare the uniform".
+- **A copy shares.** `definePass({...ShadowPass, name: 'twin'})` without `uniformNames` reads the
+  uniforms of `ShadowPass` and draws the same shadow a second time. This is not refused, since two
+  passes may share a uniform on purpose — one `reflectionColor` for two reflections.
 - **Placement.** A placement swap on the sprites reaches every pass material; one the material of
   the sprites refuses reaches none.
 - **`update()` once.** The pass meshes have no `update()` of their own; `update()` of the sprites
@@ -695,58 +704,37 @@ own that mirrors or projects.
   `sprites.passes['reflection']!.material.depthTest = false` — which draws the reflection over
   everything drawn before it.
 
-A pass of one's own is a `definePass()` over features of one's own. This one throws the shadow of
-a second light onto the ground `y = 0`, with uniforms of other names than those of `ShadowPass`,
-so both draw the same sprites:
+A second light throws a second shadow through a renamed copy of `ShadowPass`: the same features,
+uniforms of other names.
 
 ```ts check
-import {ColorOrder, defineFeature, definePass, FeatureSprites, MeshOrder, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
-import {div, mul, sub, vec4} from 'three/tsl';
-import {DoubleSide, type Node} from 'three/webgpu';
+import {definePass, FeatureSprites, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 
-export const MoonShadow = defineFeature({
-  name: 'moonShadow',
-  uniforms: {moonDirection: [-0.3, -1, 0.2], moonShadowColor: [0, 0, 0.1, 0.3]},
-  mesh: {
-    order: MeshOrder.Project,
-    transform: (p, {uniform}) => {
-      // along the light onto y = 0
-      const light = uniform<'vec3'>('moonDirection');
-      return sub(p, mul(light, div(p.y, light.y))) as unknown as Node<'vec3'>;
-    },
-  },
-  color: {
-    order: ColorOrder.Mask,
-    transform: (c, {uniform}) => {
-      const shadow = uniform<'vec4'>('moonShadowColor');
-      return vec4(shadow.rgb, mul(c.a, shadow.a));
-    },
-  },
-});
-
-// without the tint the moon shadow stays as dark as it is while a sprite fades out; in exchange
-// the pass draws only kinds that hold a tint
 export const MoonShadowPass = definePass({
+  ...ShadowPass,
   name: 'moonShadow',
-  features: [MoonShadow],
-  without: ['tint'],
-  // a projection turns the winding whenever the shadow falls towards the camera; the offset pulls
-  // the shadow in front of a ground mesh in y = 0
-  material: {
-    transparent: true,
-    depthWrite: false,
-    side: DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1,
-  },
-  renderOrder: -1,
+  uniformNames: {shadowLight: 'moonLight', groundPlane: 'moonGround', shadowColor: 'moonShadowColor'},
 });
 
-const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 100, passes: [ShadowPass, MoonShadowPass]});
-sprites.setUniform('moonDirection', 0.3, -1, -0.2);
+const sprites = new FeatureSprites(TexturedSpriteKind, {
+  capacity: 100,
+  passes: [ShadowPass, MoonShadowPass],
+  uniforms: {moonShadowColor: [0, 0, 0.1, 0.3]},
+});
+// a point light: its shadows spread
+sprites.setUniform('moonLight', -30, 80, 20, 1);
 sprites.dispose();
 ```
+
+A pass of one's own is a `definePass()` over features of one's own, written as `PlanarShadow`
+and `ShadowMask` are — see "Writing a feature".
+
+**Shadow and reflection together.** `passes: [ShadowPass, ReflectionPass]` needs nothing more: their
+uniforms have distinct names. Their `renderOrder`, though, is -1 for both, and the pair needs the
+order reflection < ground < shadow < sprites. A reflection lies behind a transparent ground and has
+to be drawn before it to show through; a shadow lies on the ground, writes no depth and has to be
+drawn after it, or the ground covers it. Set it through `sprites.passes['shadow']!.renderOrder` or
+`definePass({...ShadowPass, renderOrder})`.
 
 The limits:
 
@@ -758,8 +746,10 @@ The limits:
   the placed vertex in the color stages, and the material hands the color stages no such node.
   `ReflectionPass` fades evenly, by the alpha of `reflectionColor`.
 - **One uniform name, one value.** The uniforms are shared, so two passes that read
-  `shadowLight` read the same light. A second light takes a feature with uniforms of other
-  names, as `MoonShadow` above does.
+  `shadowLight` read the same light. A second light takes a renamed copy of the pass:
+  `uniformNames`, as `MoonShadowPass` above does.
+- **A light per sprite.** Uniforms hold for every sprite of a `FeatureSprites`, and a pass brings
+  no data; sprites under different lights are sprites in different meshes.
 
 ## Performance
 
