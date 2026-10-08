@@ -19,6 +19,12 @@ Status: **implemented** — see [`docs/sprites.md`](../sprites.md). Deviations:
   wins the depth test against a ground mesh in its plane.
 - `lightDirection` of `PlanarShadow` became the homogeneous `shadowLight` — see
   [`sprite-uniform-bindings.md`](sprite-uniform-bindings.md) §4.
+- a pass may bring one placement of its own (§6): `ShadowPass` turns every sprite to the light
+  with `LightFacingPlacement` before it projects it, and `BillboardReflectionPass` places
+  billboards so that their reflection faces the camera; a placement swap of the sprites leaves
+  such a pass alone.
+
+The pool groups of §8 are carried on in [`pool-groups.md`](pool-groups.md).
 
 The sketch below was checked against the sources of `sprites/`, `vertex-objects/` and
 `map2d/TileSprites/` on 2026-10-07 and describes the classes of that day as "today"; it is
