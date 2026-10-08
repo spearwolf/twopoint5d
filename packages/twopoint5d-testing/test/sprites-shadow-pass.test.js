@@ -5,11 +5,24 @@ import {
   Display,
   FeatureSprites,
   FrameBasedAnimations,
+  lightOf,
+  planeOf,
   ShadowPass,
   TextureCoords,
   TexturedSpriteKind,
 } from '@spearwolf/twopoint5d';
-import {Color, Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, RenderTarget, Scene} from 'three/webgpu';
+import {
+  Color,
+  Mesh,
+  MeshBasicNodeMaterial,
+  Object3D,
+  OrthographicCamera,
+  Plane,
+  PlaneGeometry,
+  RenderTarget,
+  Scene,
+  Vector3,
+} from 'three/webgpu';
 import {
   compareWithModel,
   countColor,
@@ -235,5 +248,64 @@ describe('sprites — a shadow pass', function () {
 
     expect(columnsOf(atStart, BLUE).from, 'a shadow of the opaque frame').to.equal(CENTER + 8);
     expect(columnsOf(later, BLUE).from, 'no shadow of the transparent frame').to.equal(-1);
+  });
+
+  it('draws the shadow on a plane bound from a node, for sprites moved in the world', async function () {
+    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+    sprites.setUniform('shadowLight', -0.5, 0, 1, 0);
+    // the sprites move 1 to the left and the sprite 1 to the right: it stands where aimTheShadow() expects it
+    sprites.position.x = -1;
+    const wall = new Object3D(); // its local XY plane is the plane z = 0, the normal towards the camera
+    sprites.bindUniform('groundPlane', planeOf(wall));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(0, 0, 4);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    sprites.dispose();
+    colorMap.dispose();
+
+    expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
+    expect(columnsOf(pixels, BLUE), 'its shadow at x ∈ [0, 2]').to.deep.equal({from: CENTER + 8, to: CENTER + 23});
+  });
+
+  it('spreads the shadow of a point light and draws none for a light behind the plane', async function () {
+    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+    sprites.bindUniform('groundPlane', planeOf(new Plane(new Vector3(0, 0, 1), 0)));
+    // a point 8 in front of the plane, at the left edge of the sprite: the sprite 4 in front of the
+    // plane casts a shadow twice its size, from x = -2 to x = 2 (ortho camera: 32 columns)
+    const lamp = new Object3D();
+    lamp.position.set(-2, 0, 8);
+    sprites.bindUniform('shadowLight', lightOf(lamp));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(-1, 0, 4);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+    const spread = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    lamp.position.set(-2, 0, -3);
+    sprites.update();
+    const behind = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    sprites.dispose();
+    colorMap.dispose();
+
+    // from (-2, 0, 8) through the sprite at z = 4 down to z = 0 doubles it: x ∈ [-2, 2], y ∈ [-2, 2].
+    // The sprite (x ∈ [-2, 0], y ∈ [-1, 1]) covers part of it; above and below the sprite the left
+    // half shows as well, so blue spans every column from x = -2 to x = 2
+    expect(columnsOf(spread, BLUE), 'the spread shadow, x ∈ [-2, 2]').to.deep.equal({from: CENTER - 8, to: CENTER + 23});
+    expect(columnsOf(behind, BLUE).from, 'no shadow from behind the plane').to.equal(-1);
   });
 });
