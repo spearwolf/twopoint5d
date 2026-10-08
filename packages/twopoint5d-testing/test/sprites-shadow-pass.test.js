@@ -250,21 +250,28 @@ describe('sprites — a shadow pass', function () {
     expect(columnsOf(later, BLUE).from, 'no shadow of the transparent frame').to.equal(-1);
   });
 
-  it('draws the shadow on a plane bound from a node, for sprites moved in the world', async function () {
+  it('draws the shadow on a plane bound from a moved and turned node, for sprites moved in the world', async function () {
     const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
     const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     sprites.setUniform('shadowLight', -0.5, 0, 1, 0);
-    // the sprites move 1 to the left and the sprite 1 to the right: it stands where aimTheShadow() expects it
-    sprites.position.x = -1;
-    const wall = new Object3D(); // its local XY plane is the plane z = 0, the normal towards the camera
+    // the sprites stand at (-1, 0, 1) in the world, so the sprite at local (0, 0, 3) is at world
+    // (-1, 0, 4): x ∈ [-2, 0], z = 4
+    sprites.position.set(-1, 0, 1);
+    // the wall lies at z = -1 in the world (z = -2 in the local space of the sprites), turned about its
+    // own normal: the same plane through a rotated matrix
+    const wall = new Object3D();
+    wall.position.z = -1;
+    wall.rotation.z = 0.7;
     sprites.bindUniform('groundPlane', planeOf(wall));
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
-    sprite.setPosition(0, 0, 4);
+    sprite.setPosition(0, 0, 3);
     sprite.setTexCoords(0, 0, 1, 1);
     const scene = new Scene();
     scene.add(sprites);
+    scene.add(wall);
+    wall.updateMatrixWorld(true);
     sprites.update();
 
     const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
@@ -272,8 +279,9 @@ describe('sprites — a shadow pass', function () {
     sprites.dispose();
     colorMap.dispose();
 
+    // the light travels along (0.5, 0, -1): from z = 4 down to the wall at z = -1 is 5 units, 2.5 to the right
     expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
-    expect(columnsOf(pixels, BLUE), 'its shadow at x ∈ [0, 2]').to.deep.equal({from: CENTER + 8, to: CENTER + 23});
+    expect(columnsOf(pixels, BLUE), 'its shadow at x ∈ [0.5, 2.5]').to.deep.equal({from: CENTER + 12, to: CENTER + 27});
   });
 
   it('spreads the shadow of a point light and draws none for a light behind the plane', async function () {
