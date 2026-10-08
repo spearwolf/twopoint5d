@@ -79,15 +79,24 @@ describe('definePass()', () => {
       expect(Object.isFrozen(pass.uniformNames)).toBe(true);
     });
 
-    test('refuses a name no feature of the pass declares, an empty target and two names with one target', () => {
+    test('refuses a name no feature of the pass declares, an empty target, one that is no string and two names with one target', () => {
       expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {time: 'moonTime'}})).toThrow(
         'definePass: pass "moon" renames the uniform "time", which no feature of the pass declares',
       );
       expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: ''}})).toThrow(
         'definePass: pass "moon" renames the uniform "groundPlane" to an empty name',
       );
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: 7 as never}})).toThrow(
+        'definePass: pass "moon" renames the uniform "groundPlane" to a name that is not a string',
+      );
       expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: 'moon', shadowLight: 'moon'}})).toThrow(
         'definePass: pass "moon" renames the uniforms "groundPlane" and "shadowLight" both to "moon"',
+      );
+    });
+
+    test('refuses a member of Object.prototype as a name no feature of the pass declares', () => {
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {toString: 'moonString'}})).toThrow(
+        'definePass: pass "moon" renames the uniform "toString", which no feature of the pass declares',
       );
     });
 

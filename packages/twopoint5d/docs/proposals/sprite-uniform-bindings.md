@@ -14,7 +14,16 @@ scene graph" and "Passes: shadows and reflections". Deviations:
   `constructor` is refused as unknown (§3);
 - the browser test of a bound plane uses a node moved along and turned about its normal, and adds
   it to the scene; that `planeOf()` refreshes a stale world matrix itself is pinned by the Vitest
-  spec instead (§9).
+  spec instead (§9);
+- `planeOf()`, `lightOf()` and `SpriteUniformSource` are exported straight from
+  `src/sprites/public-api.ts`; there is no `src/sprites/bindings/public-api.ts` (§8);
+- the declarations take a uniform once per feature of origin and the name that feature declares
+  it under before the renaming — its *source* name — not per feature of origin and resolved name
+  alone (§6.2): two renamed copies of one pass that give one target to two different uniforms
+  (`{shadowLight: 'x'}` and `{groundPlane: 'x'}`) are refused as "both declare the uniform"
+  instead of merging them into one; `definePass()` and the lookups through `uniformNames` take
+  own keys only, so a member of `Object.prototype` such as `toString` is never a declared or
+  renamed name.
 
 The sketch below is kept as it was written.
 

@@ -632,9 +632,12 @@ The rules:
   the pass; the pass draws with copies of its features that declare and read those names, at the
   start values of the feature. Only the features of the pass are renamed, never those of the kind
   (`time` stays one uniform), and textures are not renamed. `definePass()` refuses a name no
-  feature of the pass declares, an empty target, two names with one target and a target that a
+  feature of the pass declares — a member of `Object.prototype` such as `toString` included — a
+  target that is no string or the empty string, two names with one target and a target that a
   feature of the pass declares under its own name (the identity `{a: 'a'}` is fine); a target that
-  collides with a uniform of the kind or of another pass is refused as "both declare the uniform".
+  collides with a uniform of the kind or of another pass is refused as "both declare the uniform",
+  and so is one target that two renamed copies of one pass give to two different uniforms —
+  `{shadowLight: 'x'}` in one copy of `ShadowPass` and `{groundPlane: 'x'}` in another.
 - **A copy shares.** `definePass({...ShadowPass, name: 'twin'})` without `uniformNames` reads the
   uniforms of `ShadowPass` and draws the same shadow a second time. This is not refused, since two
   passes may share a uniform on purpose — one `reflectionColor` for two reflections.
@@ -735,8 +738,9 @@ sprites.dispose();
 `(uniform: (name: string) => SpriteUniformNode) => boolean`. `update()` of the sprites asks it once
 per frame, for every pass that has one, and the answer decides whether the pass mesh is drawn.
 `uniform(name)` answers the uniform the features of the pass read under `name`, through
-`uniformNames`: the hook of a renamed copy judges the renamed uniforms, and a name no feature of
-the pass declares throws. The hook runs every frame and must allocate nothing, so it reads the
+`uniformNames`: the hook of a renamed copy judges the renamed uniforms. The lookup reaches every
+uniform of the sprites, not only those of the pass — the `time` of an animated kind resolves —
+and throws from `update()` for a name that is no uniform of the sprites at all. The hook runs every frame and must allocate nothing, so it reads the
 `value` of a node and does not build a vector. `definePass()` refuses a `visible` that is no
 function.
 

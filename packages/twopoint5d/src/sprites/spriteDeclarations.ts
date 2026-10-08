@@ -1,4 +1,4 @@
-import {originOf} from './passes/passUniformNames.js';
+import {originOf, sourceNameOf} from './passes/passUniformNames.js';
 import type {SpriteFeature, SpriteUniformValue} from './SpriteFeature.js';
 
 export interface SpriteDeclarations {
@@ -15,8 +15,11 @@ const isUniformValue = (value: unknown): value is SpriteUniformValue =>
 
 /**
  * The uniforms and textures a set of features declares. One feature that comes along more than once
- * — in a kind and again in a pass, or as the renamed copy of a pass — declares each name once; two
- * features that declare the same name are refused, naming both.
+ * — in a kind and again in a pass, or as the renamed copy of a pass — declares each name once, as
+ * long as every copy declares it for the same uniform of that feature: a uniform is taken once per
+ * feature of origin and the name it declares it under. Two features that declare the same name are
+ * refused, naming both, and so are two copies of one feature that rename two different uniforms of
+ * it to one name.
  *
  * @internal
  */
@@ -28,8 +31,14 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
     const origin = originOf(feature);
     for (const [name, value] of Object.entries(feature.uniforms ?? {})) {
       const known = uniforms.get(name);
-      // the same feature — or a copy of it — under the same name declares it once
-      if (known != null && originOf(known.feature) === origin) continue;
+      // the same uniform of the same feature — or of a copy of it — under the same name declares it once
+      if (
+        known != null &&
+        originOf(known.feature) === origin &&
+        sourceNameOf(known.feature, name) === sourceNameOf(feature, name)
+      ) {
+        continue;
+      }
       if (known != null) {
         throw new Error(`${where}: features "${known.feature.name}" and "${feature.name}" both declare the uniform "${name}"`);
       }

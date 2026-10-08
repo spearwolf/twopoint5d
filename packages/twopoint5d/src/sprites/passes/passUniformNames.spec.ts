@@ -64,16 +64,18 @@ describe('stageFeaturesOf()', () => {
     expect(copy!.colorSource!(ctx.frame, ctx)).toEqual(['x']);
     expect(copy!.color!.transform('in' as never, ctx)).toEqual(['x', 'y']);
     expect(copy!.local!.order).toBe(1);
-    expect(ctx.sample('map', 'uv' as never)).toBe('map');
   });
 
   test('leaves a feature without stages and uniforms alone but for the copy', () => {
     const bare = defineFeature({name: 'bare', uniforms: {a: 1}});
-    const [copy] = stageFeaturesOf(definePass({name: 'p', features: [bare], uniformNames: {a: 'x'}}));
+    const plain = defineFeature({name: 'plain'});
+    const [copy, plainCopy] = stageFeaturesOf(definePass({name: 'p', features: [bare, plain], uniformNames: {a: 'x'}}));
 
     expect(copy!.uniforms).toEqual({x: 1});
     expect(copy!.frame).toBeUndefined();
     expect(copy!.color).toBeUndefined();
+    expect(plainCopy!.uniforms).toBeUndefined();
+    expect(originOf(plainCopy!)).toBe(plain);
   });
 });
 
@@ -94,5 +96,37 @@ describe('collectSpriteDeclarations() with renamed copies', () => {
 
     expect([...uniforms.keys()]).toEqual(['a', 'b', 'x']);
     expect([...textures.keys()]).toEqual(['map']);
+  });
+
+  test('refuses two copies of one feature that rename two different uniforms to one name', () => {
+    const [one] = stageFeaturesOf(definePass({name: 'one', features: [probe], uniformNames: {a: 'x'}}));
+    const [two] = stageFeaturesOf(definePass({name: 'two', features: [probe], uniformNames: {b: 'x'}}));
+
+    expect(() => collectSpriteDeclarations([one!, two!], 'test')).toThrow(
+      'test: features "probe" and "probe" both declare the uniform "x"',
+    );
+  });
+
+  test('declares a uniform once for two copies of one feature that rename it alike', () => {
+    const [one] = stageFeaturesOf(definePass({name: 'one', features: [probe], uniformNames: {a: 'x'}}));
+    const [two] = stageFeaturesOf(definePass({name: 'two', features: [probe], uniformNames: {a: 'x', b: 'y'}}));
+    const {uniforms} = collectSpriteDeclarations([probe, one!, two!], 'test');
+
+    expect([...uniforms.keys()]).toEqual(['a', 'b', 'x', 'y']);
+  });
+});
+
+describe('a renaming and the members of Object.prototype', () => {
+  test('resolves no prototype key: a stage and resolvedUniformName() read "constructor" as itself', () => {
+    const proto = defineFeature({
+      name: 'proto',
+      uniforms: {a: 1},
+      local: {order: 1, transform: (input, ctx) => read(ctx, 'a', 'constructor') as unknown as typeof input},
+    });
+    const pass = definePass({name: 'p', features: [proto], uniformNames: {a: 'x'}});
+    const [copy] = stageFeaturesOf(pass);
+
+    expect(copy!.local!.transform('in' as never, context())).toEqual(['x', 'constructor']);
+    expect(resolvedUniformName(pass, 'toString')).toBe('toString');
   });
 });

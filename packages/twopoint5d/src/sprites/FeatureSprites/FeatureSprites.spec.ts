@@ -599,6 +599,15 @@ describe('FeatureSprites', () => {
         expect(() => new FeatureSprites(AnimatedSpriteKind, {passes: [clash]})).toThrow(/both declare the uniform "time"/);
       });
 
+      test('refuses two renamed copies that rename two different uniforms of one feature to one name', () => {
+        const byLight = definePass({...ShadowPass, name: 'byLight', uniformNames: {shadowLight: 'moon'}});
+        const byGround = definePass({...ShadowPass, name: 'byGround', uniformNames: {groundPlane: 'moon'}});
+
+        expect(() => new FeatureSprites(kind, {passes: [byLight, byGround]})).toThrow(
+          'FeatureSprites: features "planarShadow" and "planarShadow" both declare the uniform "moon"',
+        );
+      });
+
       test('a plain copy without uniformNames shares the uniforms of the pass it copies', () => {
         const twin = definePass({...ShadowPass, name: 'twin'});
         const sprites = new FeatureSprites(kind, {passes: [ShadowPass, twin]});
@@ -654,6 +663,26 @@ describe('FeatureSprites', () => {
         sprites.update();
         expect([sprites.passes['shadow']!.visible, sprites.passes['moon']!.visible]).toEqual([true, false]);
         sprites.dispose();
+      });
+
+      test('the lookup of a hook throws from update() for a name that is no uniform of the sprites, and resolves one of the kind', () => {
+        const peek = (name: string): SpritePass =>
+          definePass({name: `peek-${name}`, features: [], visible: (uniform) => uniform(name) != null});
+        const sprites = new FeatureSprites(AnimatedSpriteKind, {passes: [peek('time')]});
+        const unknown = new FeatureSprites(kind, {passes: [peek('nothing')]});
+        const inherited = new FeatureSprites(kind, {passes: [peek('constructor')]});
+
+        sprites.update();
+        expect(sprites.passes['peek-time']!.visible).toBe(true);
+        expect(() => unknown.update()).toThrow(
+          'FeatureSprites: the visible of pass "peek-nothing" reads the uniform "nothing", which no feature of these sprites declares',
+        );
+        expect(() => inherited.update()).toThrow(
+          'FeatureSprites: the visible of pass "peek-constructor" reads the uniform "constructor", which no feature of these sprites declares',
+        );
+        sprites.dispose();
+        unknown.dispose();
+        inherited.dispose();
       });
 
       test('a pass without a hook follows enabled alone', () => {

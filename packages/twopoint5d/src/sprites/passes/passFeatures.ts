@@ -34,15 +34,20 @@ export function checkPass(pass: SpritePass, where: string): void {
     if (left.has(name)) throw new TypeError(`${where}: pass "${pass.name}" leaves out feature "${name}" twice`);
     left.add(name);
   }
+  // own keys only: a member of Object.prototype such as "toString" is no uniform of a feature
+  const declares = (name: string) => pass.features.some(({uniforms}) => uniforms != null && Object.hasOwn(uniforms, name));
   const targets = new Map<string, string>();
   for (const [name, target] of Object.entries(pass.uniformNames ?? {})) {
-    if (!pass.features.some((feature) => feature.uniforms?.[name] != null)) {
+    if (!declares(name)) {
       throw new TypeError(`${where}: pass "${pass.name}" renames the uniform "${name}", which no feature of the pass declares`);
     }
-    if (typeof target !== 'string' || target === '') {
+    if (typeof target !== 'string') {
+      throw new TypeError(`${where}: pass "${pass.name}" renames the uniform "${name}" to a name that is not a string`);
+    }
+    if (target === '') {
       throw new TypeError(`${where}: pass "${pass.name}" renames the uniform "${name}" to an empty name`);
     }
-    if (target !== name && pass.features.some((feature) => feature.uniforms?.[target] != null)) {
+    if (target !== name && declares(target)) {
       throw new TypeError(
         `${where}: pass "${pass.name}" renames the uniform "${name}" to "${target}", which a feature of the pass declares`,
       );

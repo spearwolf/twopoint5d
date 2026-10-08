@@ -164,7 +164,8 @@ export class SpriteResources {
    * Keeps answering it once disposed: the uniforms outlive `dispose()`.
    */
   uniform(name: string, where: string): SpriteUniformNode {
-    const node = this.uniforms[name];
+    // an own entry only: a name such as "constructor" is no uniform
+    const node = Object.hasOwn(this.uniforms, name) ? this.uniforms[name] : undefined;
     if (node == null) throw new Error(`${where} reads the uniform "${name}", which no feature of these sprites declares`);
     return node;
   }
