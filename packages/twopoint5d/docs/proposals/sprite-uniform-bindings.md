@@ -35,16 +35,19 @@ lights without a copy of the shader code (§6).
 A source writes one uniform value per frame, in the local space of the sprites:
 
 ```ts
-export interface SpriteUniformSource {
-  /** The type of the uniform it writes; `bindUniform()` checks it against the uniform. */
-  readonly type: 'vec3' | 'vec4';
-  /**
-   * Writes the value into `out` (`w` is ignored for a `vec3`). `worldToSprites` is the inverse of
-   * `matrixWorld` of the sprites, current for this frame. Allocates nothing.
-   */
-  write(out: Vector4, worldToSprites: Matrix4): void;
-}
+/**
+ * `type` is the type of the uniform it writes; `bindUniform()` checks it against the uniform.
+ * `write()` writes the value into `out` — the vector of the uniform node itself — with
+ * `worldToSprites` the inverse of `matrixWorld` of the sprites, current for this frame. It
+ * allocates nothing.
+ */
+export type SpriteUniformSource =
+  | {readonly type: 'vec3'; write(out: Vector3, worldToSprites: Matrix4): void}
+  | {readonly type: 'vec4'; write(out: Vector4, worldToSprites: Matrix4): void};
 ```
+
+A source writes into the vector of the uniform node and hands no number across a call: V8 boxes
+a fractional argument at every call it leaves un-inlined, and `update()` runs every frame.
 
 Two factories ship with the library. Each source keeps scratch objects of its own, built once.
 
@@ -107,17 +110,17 @@ class FeatureSprites {
 - **Lifecycle.** The nodes and the `Plane` stay the caller's. `dispose()` drops every binding, so
   the sprites hold no node after it. After `dispose()`, `bindUniform()` and `unbindUniform()` do
   nothing, as `setUniform()` does.
-- **A material handed in.** Bindings write through the material, so they work with a material
-  handed in as well — for the uniforms that material holds.
+- **A material handed in.** Bindings write into the uniforms of the material, so they work with a
+  material handed in as well — for the uniforms that material holds.
 
 ### 3.1 The order of `update()`
 
 1. Without bindings and without a pass that has a `visible` hook (§5), `update()` is what it is
    today: `super.update()`, the upload of the geometry.
 2. With bindings: `this.updateWorldMatrix(true, false)`, then `worldToSprites.copy(this.matrixWorld).invert()`
-   into a `Matrix4` of the instance. For every binding `source.write(scratch, worldToSprites)` and
-   `material.setUniform(name, scratch.x, scratch.y, scratch.z, scratch.w)` — the uniforms are
-   shared, so every pass reads the value.
+   into a `Matrix4` of the instance. For every binding `source.write(vector, worldToSprites)`, where
+   `vector` is the `value` of the uniform node, looked up once in `bindUniform()` — the uniforms
+   are shared, so every pass reads the value.
 3. For every pass with a `visible` hook: its visibility for this frame (§5).
 4. `super.update()`.
 
@@ -141,25 +144,27 @@ value `[0.4, -1, 0.3]`, which was the direction the light travels in, now pointi
 With the plane `(n, d)`, the placed vertex `p` and the light `(l, w)`:
 
 ```text
-L    = l − w · p              direction from the vertex towards the light
-h_p  = dot(n, p) − d          height of the vertex above the plane
-h_L  = dot(n, l) − w · d      height of the light above the plane (w = 1), or dot(n, l) (w = 0)
-dot(n, L) = h_L − w · h_p
-
-p'   = p − L · h_p / max(dot(n, L), k · h_L)
+h_p  = dot(n, p) − d                         height of the vertex above the plane
+h_L  = dot(n, l) − w · d                     height of the light (w = 1), or dot(n, l) (w = 0)
+e    = w · max(h_p − (1 − k) · h_L, 0)        how far a vertex reaches above the clamp
+p_c  = p − n · e / dot(n, n)                 the vertex, brought down by e along the normal
+L    = l − w · p_c                           direction from the vertex towards the light
+p'   = p_c − L · (h_p − e) / dot(n, L)
 ```
 
-- For `w = 0`, `dot(n, L) = h_L`, and the `max` changes nothing while `h_L > 0` — which the
-  `visible` hook of `ShadowPass` ensures. The result is the projection of today.
-- For `w = 1`, the vertex is projected from the light onto the plane. As the vertex approaches the
-  height of the light, `dot(n, L)` goes to 0 and the shadow to infinity; above the light it lands
-  on the wrong side. The `max` with `k · h_L` caps the stretch at `h_p / (k · h_L)`: the shadow
-  grows very long but stays finite and on the right side, and it is continuous where the clamp
-  sets in. `k` is a constant of the feature, `0.05` — a stretch of at most 20 for a vertex at the
-  height of the light.
+- For `w = 0`, `e = 0` and `dot(n, L) = h_L`: the result is the projection of today. It is
+  defined while `h_L > 0`, which the `visible` hook of `ShadowPass` ensures.
+- For `w = 1`, the vertex is projected from the light onto the plane. As a vertex approaches the
+  height of the light, `dot(n, L)` goes to 0 and the shadow to infinity; above the light it would
+  land on the wrong side. A vertex above `(1 − k) · h_L` therefore first comes down along the
+  normal to that height, and is projected from there: `dot(n, L) ≥ k · h_L`, so the shadow grows
+  very long but stays finite, on the far side of the light and **in the plane** — clamping the
+  denominator instead would lift the vertex out of the plane. `k` is a constant of the feature,
+  `1 / 20`: a vertex lands at most 19 times its distance to the light away. The shadow is
+  continuous where the clamp sets in.
 - Every term scales with `|n|`, so the normal still need not be a unit vector.
-- The sign of `L` does not change `p'`; it matters for the clamp and for §5 alone, which is why
-  the direction points towards the light.
+- The sign of `l` does not change `p'` for `w = 0`; it matters for §5, which is why the direction
+  points towards the light.
 
 ## 5. A pass that skips its frame
 
@@ -253,11 +258,13 @@ sprites.bindUniform('moonGround', planeOf(ground));
 
 - **In the shader.** The material of the pass answers `ctx.uniform(name)` with the uniform
   `uniformNames[name] ?? name`. The features stay as they are; no shader code is copied.
-- **Declared.** The renamed uniform is declared under its new name, with the start value of the
-  feature. The declarations take a feature once per resolved name rather than once per feature
-  object, so `PlanarShadow` in `ShadowPass` and in `MoonShadowPass` declares `groundPlane` and
-  `moonGround`; the same feature with the same names in the kind and in a pass still declares
-  them once.
+- **Declared.** A pass with `uniformNames` draws with renamed copies of its features, built once
+  per pass and cached: each copy declares its uniforms under the new names, with the start values
+  of the feature, and hands its stages a shader context whose `uniform()` resolves through the
+  renaming. The declarations take a uniform once per feature *of origin* and resolved name, so
+  `PlanarShadow` in `ShadowPass` and its copy in `MoonShadowPass` declare `groundPlane` and
+  `moonGround`, while a feature in the kind and its unrenamed copy in a pass still declare a name
+  once.
 - **Checked.** `definePass()` refuses a key that no feature of the pass declares as a uniform, a
   target name that is not a non-empty string, and two keys with one target. A target that
   collides with a uniform of the kind or of another pass is refused by the check that exists:
@@ -302,7 +309,8 @@ reads `docs/sprites.md` alone knows how to use each feature and where it stops.
 | `src/sprites/bindings/public-api.ts` | re-exported from `src/sprites/public-api.ts` |
 | `src/sprites/FeatureSprites/FeatureSprites.ts` | `bindUniform()`, `unbindUniform()`, the order of `update()`, `dispose()` drops the bindings; `FeatureSpritesPass#enabled` |
 | `src/sprites/passes/definePass.ts`, `passFeatures.ts` | the `visible` hook and `uniformNames`, checked and frozen |
-| `src/sprites/spriteDeclarations.ts`, `FeatureSprites/SpriteResources.ts`, `FeatureSprites/FeatureSpritesMaterial.ts` | declarations per feature and resolved name; `ctx.uniform()` of a pass material through `uniformNames` |
+| `src/sprites/passes/passUniformNames.ts` | the renamed copies of the features of a pass, cached per pass, and the feature each copy came from |
+| `src/sprites/spriteDeclarations.ts` | declarations per feature of origin and resolved name |
 | `src/sprites/passes/PlanarShadow.ts` | `shadowLight`, the homogeneous projection with the clamp |
 | `src/sprites/passes/passPresets.ts` | the hook of `ShadowPass` |
 | `docs/sprites.md` | a section "Binding uniforms to the scene graph" with a `ts check` block; the table of the presets and its formula move to `shadowLight`; `enabled`, the hook and `uniformNames` in the rules of the passes, the trap of a copied pass next to it; the render order of shadow and reflection together (§6.1) under "The scene around them"; `MoonShadow` becomes a renamed `ShadowPass`; §7 as limits |
@@ -367,7 +375,8 @@ window, their mirror image in the lower half, darker — a waterline.
   works out, and which is the offset a hand-written `setUniform()` gets wrong.
 - **Look.** A background close to black (`rgb(4 4 8)`); `reflectionColor` around
   `[0.35, 0.38, 0.45, 0.55]` — darker, a little cool, half transparent; a faint horizon line, a
-  thin mesh child of `waterline`.
+  `Line` along X at `y = 0` in world space — a strip in the plane of `waterline` would be seen
+  edge-on and vanish.
 - **Interaction** as in `animated-sprites`: *more* and *less* create and free sprites. The orbit
   controls stay on — tilting the camera shows that the mirror image is geometry and stays right
   from any angle.
