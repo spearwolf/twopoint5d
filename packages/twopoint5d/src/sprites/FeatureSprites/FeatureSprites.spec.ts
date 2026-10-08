@@ -770,6 +770,21 @@ describe('FeatureSprites', () => {
       sprites.dispose();
     });
 
+    test('binds a renamed uniform of a copy of a pass under its new name, and update() writes it', () => {
+      const moon = definePass({...ShadowPass, name: 'moon', uniformNames: {shadowLight: 'moonLight'}});
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass, moon]});
+      const lamp = new Object3D();
+      lamp.position.set(2, 6, 1);
+      sprites.bindUniform('moonLight', lightOf(lamp));
+
+      sprites.update();
+
+      expect(vec(sprites, 'moonLight')).toEqual([2, 6, 1, 1]);
+      expect(vec(sprites, 'shadowLight')).toEqual([-0.4, 1, -0.3, 0]);
+      expect(nodesOf(sprites.passes['moon']!.material.positionNode!).has(sprites.uniforms!['moonLight']!)).toBe(true);
+      sprites.dispose();
+    });
+
     test('refuses an unknown name, a source of another type and no source, and binds nothing then', () => {
       const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
       const vec3Source = {type: 'vec3' as const, write: () => {}};

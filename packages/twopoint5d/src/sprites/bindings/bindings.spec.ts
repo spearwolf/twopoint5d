@@ -32,7 +32,7 @@ describe('planeOf()', () => {
     expectNear(normalized(written(planeOf(ground))), [0, 1, 0, 2]);
   });
 
-  test('keeps the plane of a node scaled unevenly', () => {
+  test('keeps the plane of a node scaled unevenly along its own axes, which stretches it within itself', () => {
     const ground = new Object3D();
     ground.rotation.x = -Math.PI / 2;
     ground.rotation.z = 0.3;
@@ -40,6 +40,28 @@ describe('planeOf()', () => {
     ground.position.y = 1;
 
     expectNear(normalized(written(planeOf(ground))), [0, 1, 0, 1]);
+  });
+
+  test('carries the plane through a shear: a turned node inside a parent scaled unevenly', () => {
+    const parent = new Object3D();
+    parent.scale.set(3, 1, 0.5);
+    const ground = new Object3D();
+    ground.rotation.x = -Math.PI / 2 + 0.6;
+    ground.rotation.z = 0.3;
+    ground.position.y = 1;
+    parent.add(ground);
+    parent.updateMatrixWorld();
+
+    // the plane through three points of the local XY plane of the node, carried into the world
+    const [a, b, c] = [new Vector3(0, 0, 0), new Vector3(1, 0, 0), new Vector3(0, 1, 0)].map((p) =>
+      p.applyMatrix4(ground.matrixWorld),
+    );
+    const n = new Vector3().subVectors(b!, a!).cross(new Vector3().subVectors(c!, a!));
+    expectNear(normalized([n.x, n.y, n.z, n.dot(a!)]), [0, 0.59006, 0.80736, 0.59006]);
+
+    // the normal carried by the linear part of the matrix, as for a direction, would give
+    // [0, 0.94617, 0.32366, 0.94617]
+    expectNear(normalized(written(planeOf(ground))), [0, 0.59006, 0.80736, 0.59006]);
   });
 
   test('takes a plane of its own in the local space of the node', () => {

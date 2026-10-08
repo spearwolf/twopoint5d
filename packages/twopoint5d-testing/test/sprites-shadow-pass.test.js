@@ -314,6 +314,10 @@ describe('sprites — a shadow pass', function () {
     // The sprite (x ∈ [-2, 0], y ∈ [-1, 1]) covers part of it; above and below the sprite the left
     // half shows as well, so blue spans every column from x = -2 to x = 2
     expect(columnsOf(spread, BLUE), 'the spread shadow, x ∈ [-2, 2]').to.deep.equal({from: CENTER - 8, to: CENTER + 23});
+    expect(columnsOf(behind, [255, 0, 0]), 'the sprite, still drawn with the light behind the plane').to.deep.equal({
+      from: CENTER - 8,
+      to: CENTER + 7,
+    });
     expect(columnsOf(behind, BLUE).from, 'no shadow from behind the plane').to.equal(-1);
   });
 });
