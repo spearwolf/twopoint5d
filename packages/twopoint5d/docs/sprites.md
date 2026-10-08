@@ -632,7 +632,8 @@ The rules:
   the pass; the pass draws with copies of its features that declare and read those names, at the
   start values of the feature. Only the features of the pass are renamed, never those of the kind
   (`time` stays one uniform), and textures are not renamed. `definePass()` refuses a name no
-  feature of the pass declares, an empty target and two names with one target; a target that
+  feature of the pass declares, an empty target, two names with one target and a target that a
+  feature of the pass declares under its own name (the identity `{a: 'a'}` is fine); a target that
   collides with a uniform of the kind or of another pass is refused as "both declare the uniform".
 - **A copy shares.** `definePass({...ShadowPass, name: 'twin'})` without `uniformNames` reads the
   uniforms of `ShadowPass` and draws the same shadow a second time. This is not refused, since two

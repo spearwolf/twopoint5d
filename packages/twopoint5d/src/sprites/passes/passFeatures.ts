@@ -39,6 +39,11 @@ export function checkPass(pass: SpritePass, where: string): void {
     if (typeof target !== 'string' || target === '') {
       throw new TypeError(`${where}: pass "${pass.name}" renames the uniform "${name}" to an empty name`);
     }
+    if (target !== name && pass.features.some((feature) => feature.uniforms?.[target] != null)) {
+      throw new TypeError(
+        `${where}: pass "${pass.name}" renames the uniform "${name}" to "${target}", which a feature of the pass declares`,
+      );
+    }
     const first = targets.get(target);
     if (first != null) {
       throw new TypeError(`${where}: pass "${pass.name}" renames the uniforms "${first}" and "${name}" both to "${target}"`);

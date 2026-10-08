@@ -81,5 +81,15 @@ describe('definePass()', () => {
         'definePass: pass "moon" renames the uniforms "groundPlane" and "shadowLight" both to "moon"',
       );
     });
+
+    test('refuses a target that a feature of the pass declares, and allows the identity', () => {
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: 'shadowLight'}})).toThrow(
+        'definePass: pass "moon" renames the uniform "groundPlane" to "shadowLight", which a feature of the pass declares',
+      );
+      expect(() =>
+        definePass({...ShadowPass, name: 'moon', uniformNames: {shadowLight: 'groundPlane', groundPlane: 'moonGround'}}),
+      ).toThrow('renames the uniform "shadowLight" to "groundPlane", which a feature of the pass declares');
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: 'groundPlane'}})).not.toThrow();
+    });
   });
 });
