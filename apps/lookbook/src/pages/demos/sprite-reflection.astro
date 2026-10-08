@@ -1,0 +1,141 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_sprite-reflection.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section
+      class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-1 items-center content-center justify-center"
+    >
+      <div class="actionBtn lessSprites">less</div>
+      <div class="spriteCount">0</div>
+      <div class="actionBtn moreSprites">more</div>
+    </section>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: rgb(4 4 8);
+    color: #eee;
+  }
+  .spriteCount {
+    color: #eee;
+    font-weight: bold;
+    font-size: 250%;
+    min-width: 3em;
+    text-align: center;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    AnimatedSpriteKind,
+    FeatureSprites,
+    FeatureSpritesGeometry,
+    OnDisplayInit,
+    OnDisplayRenderFrame,
+    OnDisplayResize,
+    planeOf,
+    ReflectionPass,
+    TextureStore,
+  } from '@spearwolf/twopoint5d';
+  import {BufferGeometry, Line, LineBasicMaterial, Object3D, Vector3} from 'three/webgpu';
+  import {BouncingSprites} from '~demos/animated-sprites/BouncingSprites';
+  import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
+
+  const CAPACITY = 3000;
+  const INITIAL_SPRITE_COUNT = 500;
+  const SPRITE_SIZE = 7;
+  // the height the sprites bounce in; with the sprite on top it fills the upper half of the window
+  const HEIGHT = 75;
+  const UPPER_HALF = HEIGHT + SPRITE_SIZE;
+
+  // the .spriteCount readout is written by the markup of this very page
+  const renderSpriteCount = (count: number) => {
+    document.querySelector('.spriteCount')!.textContent = count.toString();
+  };
+
+  on(demo, OnDisplayInit, async ({scene, camera, renderer}) => {
+    // on the mirror, looking straight at the sprites: the horizon runs through the middle of the
+    // window, and the upper half shows UPPER_HALF units at the plane of the sprites
+    const halfFov = (camera.fov * Math.PI) / 360;
+    camera.position.set(0, 0, UPPER_HALF / Math.tan(halfFov));
+
+    const store = new TextureStore(renderer);
+    on(store, 'error', ({source, url, id, error}) => {
+      // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+      console.error(`[sprite-reflection] TextureStore ${source} failed for ${url ?? id}`, error);
+    });
+    await store.loadAsync(assetsUrl('nobingers.json'));
+    const [texture, frameBasedAnimations] = await store.getAsync('nobingers', ['texture', 'frameBasedAnimations']);
+
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
+    const bouncingSprites = new BouncingSprites(geometry.instancedPool, 500, HEIGHT, SPRITE_SIZE);
+    // the sprites fly to the edges of the window at any aspect; set before the first sprites are made
+    const fitWidth = (width: number, height: number) => {
+      bouncingSprites.containerWidth = 2 * (width / height) * UPPER_HALF;
+    };
+    fitWidth(demo.width, demo.height);
+    on(demo, OnDisplayResize, ({width, height}) => fitWidth(width, height));
+    bouncingSprites.startSpeedBaseX = 10;
+    bouncingSprites.startSpeedX = 50;
+    const animId = frameBasedAnimations.animId('anim0');
+    bouncingSprites.createSprites(INITIAL_SPRITE_COUNT, animId);
+    renderSpriteCount(INITIAL_SPRITE_COUNT);
+
+    const sprites = new FeatureSprites(AnimatedSpriteKind, {
+      geometry,
+      textures: {colorMap: texture, animsMap: frameBasedAnimations.bakeDataTexture({renderer})},
+      depthTest: false,
+      depthWrite: false,
+      passes: [ReflectionPass],
+      // darker, a little cool, half transparent
+      uniforms: {reflectionColor: [0.35, 0.38, 0.45, 0.55]},
+    });
+    // the container is centred on 0 and bounces at -HEIGHT / 2: lifted, the sprites touch the mirror
+    sprites.position.y = HEIGHT / 2 + SPRITE_SIZE / 2;
+    scene.add(sprites);
+
+    // the mirror: the world plane y = 0, the local XY plane of this node. The sprites are lifted, so
+    // for them the plane lies at y = -(HEIGHT + SPRITE_SIZE) / 2 — planeOf() works that out
+    const waterline = new Object3D();
+    waterline.rotation.x = -Math.PI / 2;
+    scene.add(waterline);
+    sprites.bindUniform('mirrorPlane', planeOf(waterline));
+
+    // a faint horizon: a strip in the plane of the mirror would be seen edge-on, a line is not
+    const horizon = new Line(
+      new BufferGeometry().setFromPoints([new Vector3(-5000, 0, 0), new Vector3(5000, 0, 0)]),
+      new LineBasicMaterial({color: 0x1a1f2e}),
+    );
+    scene.add(horizon);
+
+    on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
+      bouncingSprites.animate(deltaTime);
+      sprites.setUniform('time', now);
+      sprites.update();
+    });
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('FeatureSprites', sprites);
+
+    // the .moreSprites and .lessSprites buttons are written by the markup of this very page
+    document.querySelector('.moreSprites')!.addEventListener('click', () => {
+      bouncingSprites.createSprites(20, animId);
+      renderSpriteCount(bouncingSprites.sprites.length);
+    });
+    document.querySelector('.lessSprites')!.addEventListener('click', () => {
+      bouncingSprites.destroySprites(20);
+      renderSpriteCount(bouncingSprites.sprites.length);
+    });
+  });
+
+  demo.start();
+</script>
