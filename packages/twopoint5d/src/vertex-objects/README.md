@@ -1,7 +1,7 @@
 # Vertex objects
 
 What a vertex object description declares, which accessors it generates, and how two of
-them make an instanced mesh such as `TexturedSprites`. The layers of the module and the
+them make an instanced mesh such as `FeatureSprites`. The layers of the module and the
 rules for its classes are in
 [the library architecture](../../docs/architecture.md#vertex-objects--the-performance-core).
 
@@ -57,7 +57,7 @@ interface VertexObjectDescription {
     `0` … `1` (`-1` … `1` when signed), and for grouping attributes into one interleaved
     buffer. The TSDoc of `VADescription` has the rules.
 - **`basePrototype`** — the prototype the generated accessors are placed on. Methods of
-  your own go on it, as `make()` on `BaseSprite`. A name on it that an accessor would take
+  your own go on it, as `make()` on `QuadBase`. A name on it that an accessor would take
   is refused: the descriptor throws rather than let the accessor shadow it. A method
   under the exported symbol `voInitialize` fills every slot `createVO()` hands out.
 - **`methods`** — functions that become properties of every vertex object, keyed by
@@ -75,7 +75,7 @@ interface VertexObjectDescription {
 An attribute of a single value on a single vertex becomes a property under its own name,
 and gets no setter and no getter. Every other attribute gets both, under the names of
 `setter` and `getter`, and a property per component when it names components.
-`TexturedSpriteDescriptor` names the setter of `color` `setColorValues` and turns its
+The `Tint` sprite feature names the setter of `color` `setColorValues` and turns its
 getter off.
 
 The setter takes every value of the attribute, vertex by vertex, as separate arguments or
@@ -194,18 +194,19 @@ const sprite = geometry.instancedPool.createVO(); // one of the thousand
 description — and `instancedPool` the objects the scene is made of. The GPU draws the
 base quad once per object in use, with the values of that object.
 
-`TexturedSprites` is exactly this pair. Its geometry puts `BaseSpriteDescriptor` — four
-vertices with `position` and `uv` — under `TexturedSpriteDescriptor`, which gives each
+`FeatureSprites` is exactly this pair. Its geometry puts the description of `QuadBase` — four
+vertices with `position` and `uv` — under the merged description of its kind, which gives each
 sprite `quadSize` (`width`, `height`), `texCoords`, `texFlipDiagonal`, `texTrim`,
 `instancePosition` (`x`, `y`, `z`), `rotation` and `color`. Both descriptions are
-exported. The sprite of the `first-sprite` demo is one instance of it: `setSize()` writes
+exported, `QuadBase.description` and `TexturedSpriteKind.description` for the textured
+sprites. The sprite of the `first-sprite` demo is one instance of it: `setSize()` writes
 `width` and `height`, `setFrame()` the `texCoords`, `texFlipDiagonal` and `texTrim` of a
 frame.
 
 ## Further
 
 - The lookbook demos, from the smallest up:
-  - `first-sprite` — one `TexturedSprites` sprite:
+  - `first-sprite` — one sprite of `FeatureSprites` with `TexturedSpriteKind`:
     [`first-sprite.astro`](../../../../apps/lookbook/src/pages/demos/first-sprite.astro)
   - `crosses` — a description of its own, a cross of twelve vertices:
     [`Crosses.ts`](../../../../apps/lookbook/src/demos/crosses/Crosses.ts)

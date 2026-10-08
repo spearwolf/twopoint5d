@@ -48,7 +48,9 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov'],
       // The thresholds sit two points under the level measured when they were set — globally
       // and per module, the measured percentage rounded down minus two —, so a regression
-      // turns the gate red while a line that moves does not. `src/controls/` and `src/display/`
+      // turns the gate red while a line that moves does not — except `src/sprites/`, which is
+      // held at 100 %: the sprite module was rebuilt with complete coverage as a requirement,
+      // and a line without a test there is a regression, not noise. `src/controls/` and `src/display/`
       // carry no threshold of their own: the browser suite in `packages/twopoint5d-testing`
       // exercises them, and that suite is not measured.
       thresholds: {
@@ -57,7 +59,7 @@ export default defineConfig({
         functions: 82,
         lines: 83,
         'src/map2d/**': {statements: 93, branches: 91, functions: 91, lines: 94},
-        'src/sprites/**': {statements: 82, branches: 69, functions: 74, lines: 82},
+        'src/sprites/**': {statements: 100, branches: 100, functions: 100, lines: 100},
         'src/stage/**': {statements: 94, branches: 88, functions: 95, lines: 95},
         'src/texture/**': {statements: 92, branches: 85, functions: 93, lines: 94},
         'src/utils/**': {statements: 88, branches: 89, functions: 83, lines: 87},

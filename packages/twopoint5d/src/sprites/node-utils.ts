@@ -1,26 +1,8 @@
-import {
-  add,
-  attribute,
-  cameraPosition,
-  cross,
-  div,
-  float,
-  mod,
-  modelViewMatrix,
-  modelWorldMatrixInverse,
-  mul,
-  normalize,
-  select,
-  sub,
-  texture,
-  varying,
-  vec2,
-  vec3,
-  vec4,
-} from 'three/tsl';
+import {add, attribute, cross, div, float, mod, mul, normalize, sub, texture, vec2} from 'three/tsl';
 import type {Node, Texture} from 'three/webgpu';
 
-import {matrixColumn} from './matrixColumn.js';
+import {cameraPositionLocal, cameraUpLocal} from './cameraNodes.js';
+import {frameUv} from './frameUv.js';
 
 export const vertexByInstancePosition = (params?: {
   vertexPosition?: Node<'vec3'>;
@@ -58,16 +40,8 @@ export const billboardVertexByInstancePosition = (params?: {
 
   // the instance position lives in the local space of the mesh, the camera position in world
   // space; the look vector needs both ends in one space
-  const cameraPositionLocal = mul(modelWorldMatrixInverse, vec4(cameraPosition, 1)).xyz;
-  const look = normalize(sub(cameraPositionLocal, billboardPosition));
-
-  // the second row of the model-view rotation is the up axis of the camera, expressed in the
-  // local space of the mesh — exact as long as the mesh is scaled evenly on all axes
-  const cameraUp = vec3(
-    matrixColumn(modelViewMatrix, 0).y,
-    matrixColumn(modelViewMatrix, 1).y,
-    matrixColumn(modelViewMatrix, 2).y,
-  );
+  const look = normalize(sub(cameraPositionLocal(), billboardPosition));
+  const cameraUp = cameraUpLocal();
 
   const billboardRight = normalize(cross(cameraUp, look));
   const billboardUp = normalize(cross(look, billboardRight));
@@ -93,15 +67,8 @@ export const colorFromTextureByTexCoords = (
 ) => {
   const texCoords = params?.texCoords ?? attribute('texCoords');
   const uv = params?.uv ?? attribute('uv');
-  const flipDiagonal = params?.flipDiagonal;
 
-  const st = vec2(add(texCoords.xy, mul(uv.xy, texCoords.zw)));
-
-  // the flip is the same for every vertex of an instance, so swapping before the interpolation
-  // is the same as swapping after it
-  const vTexCoords = varying(flipDiagonal ? select(flipDiagonal.greaterThan(0.5), st.yx, st) : st);
-
-  return texture(colorMap, vTexCoords);
+  return texture(colorMap, frameUv(texCoords, uv, params?.flipDiagonal));
 };
 
 export const texCoordsFromIndex = (mapSize: Node<'vec2'>, ndx: Node<'int'>) => {

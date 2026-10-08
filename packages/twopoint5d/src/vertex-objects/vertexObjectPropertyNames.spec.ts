@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'vitest';
-import {BaseSpriteDescriptor} from '../sprites/BaseSprite.js';
-import {TexturedSpriteDescriptor} from '../sprites/TexturedSprites/TexturedSprite.js';
+import {TexturedSpriteKind} from '../sprites/presets.js';
+import {QuadBase} from '../sprites/SpriteBase.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import type {VertexObjectDescription} from './types.js';
@@ -10,8 +10,8 @@ import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 // of the descriptor refuses a valid description or lets two accessors collapse into one
 describe('vertexObjectPropertyNames() names what the vertex object prototype defines', () => {
   const cases: [string, VertexObjectDescription][] = [
-    ['TexturedSpriteDescriptor', TexturedSpriteDescriptor],
-    ['BaseSpriteDescriptor', BaseSpriteDescriptor],
+    ['TexturedSpriteKind', TexturedSpriteKind.description],
+    ['QuadBase', QuadBase.description],
     ['one vertex and an attribute of size 1', {vertexCount: 1, attributes: {bar: {size: 1}, pos: {components: ['x', 'y']}}}],
     ['a sole component named like its attribute', {attributes: {rotation: {components: ['rotation']}}}],
     ['a component named like its attribute among others', {attributes: {foo: {components: ['foo', 'bar']}}}],

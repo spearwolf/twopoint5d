@@ -1,0 +1,16 @@
+{
+  "title": "sprite reflection",
+  "shortDescription": "Bouncing sprites over a dark mirror: a ReflectionPass whose plane is bound to a node of the scene",
+  "description": "Bouncing sprites of the `AnimatedSpriteKind` in the upper half of the window, their mirror image in the lower half — a waterline. A `ReflectionPass` draws the image from the same pool and geometry, multiplied by a dark, cool `reflectionColor`. The mirror is a node at `y = 0`, bound with `bindUniform('mirrorPlane', planeOf(waterline))`: the sprites mesh is lifted so that the sprites touch the mirror, and `planeOf()` carries the plane into its local space every frame. Tilt the camera — the image is geometry and stays right from any angle. The *more* and *less* buttons create and free sprites.",
+  "url": "/demos/sprite-reflection",
+  "tags": [
+    "FeatureSprites",
+    "FeatureSpritesGeometry",
+    "AnimatedSpriteKind",
+    "ReflectionPass",
+    "planeOf",
+    "FrameBasedAnimations",
+    "TextureStore",
+    "vanilla"
+  ]
+}

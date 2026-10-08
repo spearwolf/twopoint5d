@@ -1,8 +1,10 @@
 /** @import {Display, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
 import {
+  FeatureSprites,
   Map2D,
   Map2DTileRenderer,
   RepeatingTilesProvider,
+  TexturedSpriteKind,
   TextureCoords,
   TileSet,
   TileSprites,
@@ -10,7 +12,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
-import {DataTexture, PerspectiveCamera} from 'three/webgpu';
+import {DataTexture, OrthographicCamera, PerspectiveCamera, Scene} from 'three/webgpu';
 
 // The fixtures the browser tests build their cases from. A helper that a second test file
 // needs moves here instead of being copied.
@@ -313,6 +315,124 @@ export function rgbAt(pixels, size, x, y) {
 /** Whether every channel of `rgb` lies within `tolerance` of the one in `expected`. */
 export function isNearColor(rgb, expected, tolerance = 2) {
   return rgb.every((value, i) => Math.abs(value - expected[i]) <= tolerance);
+}
+
+/** How many pixels of a read-back target have the color `rgb`, within the tolerance of {@link isNearColor}. */
+export function countColor(pixels, rgb) {
+  let count = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (isNearColor([pixels[i], pixels[i + 1], pixels[i + 2]], rgb)) count++;
+  }
+  return count;
+}
+
+/**
+ * Compares two read-back targets of the same size pixel by pixel: `lit` counts the pixels of `a`
+ * brighter than the clear color, `differing` the pixels where any channel differs by more than
+ * `tolerance`. Independent of the order in which a backend reads the rows back.
+ *
+ * @param {ArrayLike<number>} a
+ * @param {ArrayLike<number>} b
+ * @param {number} [tolerance]
+ * @returns {{lit: number, differing: number}}
+ */
+export function diffPixels(a, b, tolerance = 2) {
+  let lit = 0;
+  let differing = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    if (a[i] > 16 || a[i + 1] > 16 || a[i + 2] > 16) lit++;
+    if (
+      Math.abs(a[i] - b[i]) > tolerance ||
+      Math.abs(a[i + 1] - b[i + 1]) > tolerance ||
+      Math.abs(a[i + 2] - b[i + 2]) > tolerance
+    ) {
+      differing++;
+    }
+  }
+  return {lit, differing};
+}
+
+/**
+ * An orthographic camera on a target `size` pixels square, `pixelsPerUnit` pixels to the unit,
+ * that looks at the origin from in front and above, along `(0, -4, -3)`: the view of a sprite that
+ * stands upright on the XZ ground and faces `+z`. A world point `(x, y, z)` lands at
+ * `(x, 0.6 y - 0.8 z)` of the view, in world units from its centre — the coordinates of
+ * {@link compareWithModel}.
+ */
+export function makeCameraAboveGround(size, pixelsPerUnit) {
+  const half = size / pixelsPerUnit / 2;
+  const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
+  camera.position.set(0, 8, 6);
+  camera.lookAt(0, 0, 0);
+  return camera;
+}
+
+/**
+ * Whether `renderer` reads a target back from its top row down — WebGPU does, WebGL 2 reads from
+ * the bottom up. A sprite above the middle of `target`, one unit a pixel, answers it.
+ *
+ * It reads the pixels at a row length of `target.width * 4` bytes and needs a target 64 pixels
+ * wide, or a multiple of it — see {@link rgbAt}.
+ */
+export async function readsTopDown(renderer, target) {
+  const size = target.width;
+  const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1});
+  const sprite = sprites.createSprite();
+  sprite.setSize(4, 4);
+  sprite.setPosition(0, size / 4, 0);
+  const scene = new Scene();
+  scene.add(sprites);
+  sprites.update();
+  const camera = new OrthographicCamera(-size / 2, size / 2, size / 2, -size / 2, 0.1, 100);
+  camera.position.z = 10;
+  const pixels = await renderToPixels(renderer, scene, camera, target);
+  sprites.dispose();
+
+  const upperRow = size / 2 - size / 4;
+  const upper = !isNearColor(rgbAt(pixels, size, size / 2, upperRow), [0, 0, 0]);
+  const lower = !isNearColor(rgbAt(pixels, size, size / 2, size - 1 - upperRow), [0, 0, 0]);
+  if (upper === lower) throw new Error('readsTopDown: the probe sprite shows in both or neither of the two rows it may land in');
+  return upper;
+}
+
+/**
+ * Holds a read-back target to a model of the picture. `colorAt(x, y)` answers the color the model
+ * shows at the point `(x, y)` of the view, in world units from its centre, `y` upwards — one of a
+ * few `[r, g, b, a]` constants, compared by identity. A pixel whose centre lies closer than
+ * `edgeMargin` pixels to an edge of the model is left out: rasterisation may put it on either side.
+ * `topDown` is the row order the backend read the target back in (see {@link readsTopDown}).
+ *
+ * Answers how many pixels it checked, how many of those the model lights — where it answers
+ * anything but `black` — and the ones that differ.
+ *
+ * It reads the pixels at a row length of `size * 4` bytes and needs a target 64 pixels wide, or a
+ * multiple of it — see {@link rgbAt}.
+ *
+ * @param {ArrayLike<number>} pixels
+ * @param {{size: number, pixelsPerUnit: number, topDown: boolean, black: number[], colorAt: (x: number, y: number) => number[], edgeMargin?: number}} model
+ * @returns {{checked: number, lit: number, differing: string[]}}
+ */
+export function compareWithModel(pixels, {size, pixelsPerUnit, topDown, black, colorAt, edgeMargin = 0.75}) {
+  const ring = Array.from({length: 16}, (_, i) => [Math.cos((i * Math.PI) / 8), Math.sin((i * Math.PI) / 8)]);
+  const viewAt = (px, py) => colorAt((px - size / 2) / pixelsPerUnit, (size / 2 - py) / pixelsPerUnit);
+  let checked = 0;
+  let lit = 0;
+  const differing = [];
+  for (let row = 0; row < size; row++) {
+    for (let column = 0; column < size; column++) {
+      // row counts from the top of the picture
+      const expected = viewAt(column + 0.5, row + 0.5);
+      const unambiguous = ring.every(
+        ([dx, dy]) => viewAt(column + 0.5 + dx * edgeMargin, row + 0.5 + dy * edgeMargin) === expected,
+      );
+      if (!unambiguous) continue;
+      checked++;
+      if (expected !== black) lit++;
+      const rgb = rgbAt(pixels, size, column, topDown ? row : size - 1 - row);
+      if (!isNearColor(rgb, expected)) differing.push(`(${column}, ${row}) ${rgb} for ${expected.slice(0, 3)}`);
+    }
+  }
+  return {checked, lit, differing};
 }
 
 /**

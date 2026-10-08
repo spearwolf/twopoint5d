@@ -2,9 +2,10 @@ import {test} from 'vitest';
 
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
-import {AnimatedSpritesGeometry} from './AnimatedSprites/AnimatedSpritesGeometry.js';
-import {prepareSpriteFrame} from './TexturedSprites/TexturedSprite.js';
-import {TexturedSprites} from './TexturedSprites/TexturedSprites.js';
+import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
+import {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js';
+import {prepareSpriteFrame} from './features/AtlasFrame.js';
+import {AnimatedSpriteKind, TexturedSpriteKind} from './presets.js';
 
 const options = {time: 500, warmupTime: 200};
 
@@ -18,7 +19,7 @@ const trimmedFrame: TextureAtlasFrame<unknown> = {
 };
 
 test('a frame of 10 000 textured sprites', async ({bench}) => {
-  const sprites = new TexturedSprites(10_000);
+  const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 10_000});
   const all = Array.from({length: 10_000}, () => sprites.createSprite()!);
   const prepared = prepareSpriteFrame(frame);
   const preparedTrimmed = prepareSpriteFrame(trimmedFrame);
@@ -62,7 +63,7 @@ test('a frame of 10 000 textured sprites', async ({bench}) => {
 });
 
 test('a frame of 10 000 animated sprites', async ({bench}) => {
-  const geometry = new AnimatedSpritesGeometry(10_000);
+  const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 10_000);
   const all = Array.from({length: 10_000}, () => geometry.instancedPool.createVO()!);
   let n = 0;
 

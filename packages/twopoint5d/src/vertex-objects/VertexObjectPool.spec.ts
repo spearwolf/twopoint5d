@@ -70,7 +70,7 @@ interface MyInstancedVertexObject {
   zack: number;
 }
 
-// a vertex object whose prototype carries the creation hook, as TexturedSprite does; the
+// a vertex object whose prototype carries the creation hook, as a sprite kind does; the
 // interface and the class merge only in the same scope, which is why both live up here
 // biome-ignore lint/correctness/noUnusedVariables: merges into the class Leveled below
 interface Leveled extends VO {

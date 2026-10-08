@@ -45,8 +45,9 @@ export interface TexturePackerJsonData {
 export class TexturePackerJson {
   /**
    * Every frame carries its entry of the json as `data`, `trimmed`, `spriteSourceSize` and `sourceSize`
-   * included. The `coords` of a trimmed frame are the trimmed area; `TexturedSprite#setFrame()` and an
-   * animation `FrameBasedAnimations#add()` builds from the atlas lay it where the untrimmed sprite has it.
+   * included. The `coords` of a trimmed frame are the trimmed area; the `setFrame()` of the `AtlasFrame`
+   * sprite feature and an animation `FrameBasedAnimations#add()` builds from the atlas lay it where the
+   * untrimmed sprite has it.
    *
    * @throws {Error} if a frame name appears more than once in the json or is already taken in the `target`;
    * the `target` stays as it was.

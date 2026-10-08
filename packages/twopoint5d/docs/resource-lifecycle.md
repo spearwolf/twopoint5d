@@ -81,7 +81,7 @@ before it lets the factory go, so a factory serving a second renderer gets the s
 the first one back. Assertion (f) in section 7 tests it.
 
 An instance that passes what it took straight out to its caller has nothing to give
-back: `TexturedSprites#createSprite()` hands the sprite over, and whoever asked for it
+back: `FeatureSprites#createSprite()` hands the sprite over, and whoever asked for it
 calls `freeSprite()`.
 
 ## 2. Idempotence
@@ -123,14 +123,16 @@ by its declared type. Its TSDoc says which.
 
 1. **Type admits absence → answer `undefined`.** `T | undefined` is a value the caller
    handles anyway.
-   [`TexturedSprites#texture`](../src/sprites/TexturedSprites/TexturedSprites.ts).
+   [`FeatureSprites#getTexture()`](../src/sprites/FeatureSprites/FeatureSprites.ts).
 2. **Type claims presence → throw.** For a declared `T`, do not hand back `undefined`
    and lie about the type. Throw an `Error` naming class and state, so the stack points
    at the real mistake. [`Display#canvas`](../src/display/Display.ts) raises
    `Display#canvas is not available: this display has been disposed`.
 3. **Mutating method with nothing left to act on → silent no-op.**
-   [`TexturedSprites#freeSprite()`](../src/sprites/TexturedSprites/TexturedSprites.ts)
-   returns a sprite to a pool that is gone and does nothing. Invalid input is still
+   [`FeatureSprites#freeSprite()`](../src/sprites/FeatureSprites/FeatureSprites.ts)
+   returns a sprite to a pool that is gone and does nothing, and
+   [`FeatureSprites#setTexture()`](../src/sprites/FeatureSprites/FeatureSprites.ts) sets
+   a texture on a material that is gone and does nothing. Invalid input is still
    turned away:
    [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts) keeps
    rejecting a mismatched capacity.
@@ -151,33 +153,31 @@ a geometry without attributes, and no frame says so until one comes out empty.
 ## 4. Signals, effects and events
 
 Attach every signal and effect to the instance, so one call tears them all down — see
-[`TexturedSpritesMaterial`](../src/sprites/TexturedSprites/TexturedSpritesMaterial.ts):
+the texture signals of
+[`SpriteResources`](../src/sprites/FeatureSprites/SpriteResources.ts):
 
 ```ts
-#colorMap = createSignal<Texture | undefined>(undefined, {attach: this});
+const signal = createSignal<Texture | undefined>(undefined, {attach: this});
 
-this.#colorEffect = createEffect(() => {
+const sizeEffect = createEffect(() => {
   // …
 }, {attach: this});
 ```
 
 ```ts
-override dispose() {
-  // the effects go first: a write to a signal runs every effect that reads it on the
-  // spot, and clearing the references below would build nodes for a material on its way
-  // out
-  this.#positionEffect.destroy();
-  this.#colorEffect.destroy();
+dispose(): void {
+  if (this.#disposed) return;
+  this.#disposed = true;
 
-  // the references are given up while their signals are still live — a write after
+  // the effects go first: a write to a signal runs every effect that reads it on the
+  // spot, and clearing the textures below would run them for an instance on its way out
+  for (const slot of this.#textures.values()) slot.sizeEffect.destroy();
+
+  // the textures are given up while their signals are still live — a write after
   // SignalGroup.delete() would land in a destroyed signal and notify nobody
-  this.#colorMap.set(undefined);
-  this.#texCoordsNode.set(undefined);
-  this.#texFlipDiagonalNode.set(undefined);
-  this.#texTrimNode.set(undefined);
+  for (const slot of this.#textures.values()) slot.signal.set(undefined);
 
   SignalGroup.delete(this);
-  super.dispose();
 }
 ```
 
@@ -287,9 +287,11 @@ override dispose(): void {
 }
 ```
 
-[`AnimatedSpritesMaterial.dispose()`](../src/sprites/AnimatedSprites/AnimatedSpritesMaterial.ts)
-is ordered this way to clear its `animsMap` reference — a caller-owned texture, so not
-released — while the signal holding it is still live.
+[`FeatureSpritesMaterial.dispose()`](../src/sprites/FeatureSprites/FeatureSpritesMaterial.ts)
+is ordered this way: its effects and its frame memo go first, then the resources it
+built — they give up their textures, caller-owned and so not released, while the signals
+holding them are still live —, then `SignalGroup.delete(this)`, and `super.dispose()`
+last.
 
 The one rule behind both: **release nothing whose access path the `super` call has
 already cut, and take away nothing the `super` call is still going to read.**

@@ -5,9 +5,8 @@ import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
 import type {VAComponentsType, VertexAttributeDescription, VertexObjectDescription} from './types.js';
 import {TileBaseSpriteDescriptor, TileSpriteDescriptor} from '../map2d/TileSprites/descriptors.js';
-import {AnimatedSpriteDescriptor} from '../sprites/AnimatedSprites/AnimatedSprite.js';
-import {BaseSpriteDescriptor} from '../sprites/BaseSprite.js';
-import {TexturedSpriteDescriptor} from '../sprites/TexturedSprites/TexturedSprite.js';
+import {AnimatedSpriteKind, TexturedSpriteKind} from '../sprites/presets.js';
+import {QuadBase} from '../sprites/SpriteBase.js';
 
 describe('VertexObjectDescriptor', () => {
   test('construct with vertexCount and indices', () => {
@@ -446,9 +445,9 @@ describe('VertexObjectDescriptor', () => {
   describe('takes every description the layout can hold', () => {
     test('the sprite and tile descriptions of the library', () => {
       for (const description of [
-        BaseSpriteDescriptor,
-        TexturedSpriteDescriptor,
-        AnimatedSpriteDescriptor,
+        QuadBase.description,
+        TexturedSpriteKind.description,
+        AnimatedSpriteKind.description,
         TileBaseSpriteDescriptor,
         TileSpriteDescriptor,
       ]) {

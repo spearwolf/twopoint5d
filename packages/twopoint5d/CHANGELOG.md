@@ -7,12 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add sprite kinds made of features: `defineFeature()` checks one feature and freezes it, `defineSprite()` merges a base and a list of features into a `SpriteKind` — one instanced vertex object description, the sprite-handle methods of every feature and a pipeline of shader stages (frame slot, trim shift, local stages, one placement, mesh stages; color source, color stages) — and `SpriteOf<typeof Kind>` names the type of its sprite handle. `LocalOrder`, `MeshOrder` and `ColorOrder` name the order bands of the stages. `docs/sprites.md` is the guide, with the rules of each feature field under "Writing a feature"
+- add the built-in features `InstancePosition`, `FlatPlacement`, `BillboardPlacement`, `QuadSize`, `Shear`, `Rotation`, `AtlasFrame`, `AnimatedFrames`, `TextureColor` and `Tint`. They keep the attribute names, usage words and sprite-handle methods of the textured and animated sprites; `Shear` is new: `shearX`, `shearY` and `setShear()`, a dynamic attribute, sheared after the size and before the rotation
+- add `QuadBase`, the quad of four vertices with `position` and `uv` every built-in kind is drawn from, and the `SpriteBase` contract a base of one's own fulfils
+- add `FeatureSprites`, the mesh of a sprite kind: it builds the `FeatureSpritesGeometry` and the `FeatureSpritesMaterial` it is not handed, releases only those in `dispose()`, and offers `createSprite()`, `freeSprite()`, `spritePool`, `placement`, `uniforms`, `setUniform()`, `getTexture()`, `setTexture()` and `touchTexture()`
+- add `FeatureSpritesGeometry` (`capacity`, `attributeUsage` by attribute name or usage word, `baseArgs`) and `FeatureSpritesMaterial`, which folds the pipeline of a kind into `positionNode` and `colorNode` and rebuilds a graph only when the kind of a texture it reads changes
+- add `SpriteResources`: the uniforms and textures the features of a kind declare, held once and shareable between materials; a texture of the same kind takes the place of the one set without a rebuild
+- add the placement swap on a live material: `FeatureSpritesMaterial#placement` (and `FeatureSprites#placement`) takes another placement that brings nothing but its stage, `BillboardPlacement` for `FlatPlacement` and back, and rebuilds the position graph alone
+- add the presets `TexturedSpriteKind` and `AnimatedSpriteKind`, which draw what `TexturedSprites` and `AnimatedSprites` drew, and the types of their sprite handles `TexturedSprite` and `AnimatedSprite`
+- add passes, other ways to draw the sprites of a kind: `definePass()` checks a pass — features that bring stages, uniforms and textures but no data, the features of the kind it leaves out (`without`), material parameters and a `renderOrder` — and freezes it along with copies of its `features`, `without` and `material`. `FeatureSprites` and `FeatureSpritesMaterial` check a pass that did not come out of `definePass()` the same way. The `passes` option of `FeatureSprites` builds a `FeatureSpritesPass` for each, a child mesh over the geometry of the sprites with a material of its own, answered by `FeatureSprites#passes`; every material shares one set of uniforms and textures, a placement swap reaches every pass, `update()` uploads the geometry once for all of them, and `dispose()` releases the pass meshes with their materials. `docs/sprites.md` has the rules under "Passes: shadows and reflections"
+- add the pass features `PlanarShadow` (projects the placed vertex from the homogeneous light `shadowLight` — a direction towards the light, or a point light whose shadow is clamped to stay finite and in the plane — onto `groundPlane`), `ShadowMask` (keeps the alpha, takes `shadowColor`), `MirrorAtPlane` (mirrors the placed vertex at `mirrorPlane`, whose normal need not be a unit vector) and `Darken` (multiplies by `reflectionColor`), and the passes `ShadowPass` — `PlanarShadow` and `ShadowMask` behind `LightFacingPlacement`, which turns each sprite to the light first — and `ReflectionPass` built from them, both transparent, without a depth write, drawn from both sides (`side: DoubleSide`, since a mirror or a projection towards the camera turns the winding of the triangles) and before the sprites; `ShadowPass` takes a polygon offset that pulls it in front of a ground mesh in its plane. `ShadowPass` leaves the tint in — `ShadowMask` replaces the color anyway, and the alpha of the tint fades the shadow with the sprite — so it draws `AnimatedSpriteKind`, which holds no tint, as well. `ReflectionPass` fades evenly; a fade by the distance from the ground is not part of it
+- add `SpritePass#uniformNames`: a pass reads and declares the uniforms of its features under other names, so that a renamed copy of `ShadowPass` — `definePass({...ShadowPass, name, uniformNames})` — throws a second shadow from a second light. The pass draws with copies of its features that declare the renamed uniforms at the start values of the feature; the features of the kind and the textures are not renamed. `definePass()` refuses a name no feature of the pass declares (looked up as an own key, so a member of `Object.prototype` such as `toString` is no such name and is never renamed), a target that is no string or the empty string, two names with one target and a target that a feature of the pass declares under its own name, and a target that collides with another uniform is refused as "both declare the uniform", as is one target that two renamed copies of one pass give to two different uniforms. A copy of a pass without `uniformNames` shares the uniforms of the pass it copies
+- add `SpritePass#visible`, a hook that `FeatureSprites#update()` asks every frame whether to draw the pass, `FeatureSpritesPass#enabled`, the caller's switch next to it, and `shadowFallsOnPlane`, the hook of `ShadowPass`, which leaves the shadow out while its light does not fall onto the side of `groundPlane` the normal points to
+- add uniform bindings: `FeatureSprites#bindUniform()` and `#unbindUniform()` bind a uniform to a `SpriteUniformSource` that `update()` runs every frame, in the local space of the sprites, for the sprites and every pass; `planeOf()` takes a plane from a node — its local XY plane, the normal +Z, or a plane of its own in the space of the node — or from a `Plane` in world space, `lightOf()` a light from a `DirectionalLight` (a direction towards it, `w = 0`) or any other node (a point light, `w = 1`). `bindUniform()` refuses a name no feature declares, a source of another type than the uniform and something that is no source, and binds nothing then; a rebinding keeps its place, the bindings run in the order they were made and before the `visible` hooks, a `setUniform()` on a bound name holds until the next `update()`, and `dispose()` drops every binding. `update()` refreshes the world matrices it reads and allocates nothing with bindings either. `docs/sprites.md` has the rules under "Binding uniforms to the scene graph"
+- add placements of a pass: one feature of a pass may bring a `placement`, which the pass draws with in place of the placement of the kind; `definePass()` refuses a second. A placement swap of the sprites leaves such a pass alone, and a renamed copy of the pass renames what its placement reads
+- add `LightFacingPlacement`, which turns every sprite to face `shadowLight` before `PlanarShadow` projects it, flat or billboard alike, so a shadow is never smaller than the sprite: x across the light and level with `groundPlane`, y up and away from the light, the view of the camera for up only within a sine of 0.1 of the normal. `ShadowPass` is built from `LightFacingPlacement`, `PlanarShadow` and `ShadowMask`; `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` projects the sprites as they stand
+- add `MirroredBillboardPlacement` and `BillboardReflectionPass` (`MirroredBillboardPlacement`, `MirrorAtPlane`, `Darken`, named `reflection`): the reflection of a billboard faces the camera, as large as the sprite on screen and flipped across the mirror, where a mirrored billboard faces the mirror image of the camera and shrinks by `|cos 2θ|` at a camera `θ` above the mirror. `ReflectionPass` stays the reflection of flat sprites
+
 ### Changed
 
 - upgrade the `three` peer dependency to `~0.186.1` (was `~0.185.1`) and `@types/three` to `~0.186.0`. three 0.186 makes `Renderer.dispose()` asynchronous — the WebGL backend loses its context only after an await of its own — so the release of a `Display` now awaits `renderer.dispose()` before it hands a canvas back with a restorable context
-- `TexturedSprites#dispose()`, `AnimatedSprites#dispose()` and `Map2D#dispose()` override the `Object3D.dispose()` that three 0.186 introduces and fire its `dispose` event, so the renderer drops the render objects it built for the mesh — also those of a geometry or a material handed to the constructor, which the mesh leaves alive. The sprites fire it once; a second call still does nothing
+- `FeatureSprites#dispose()` and `Map2D#dispose()` override the `Object3D.dispose()` that three 0.186 introduces and fire its `dispose` event, so the renderer drops the render objects it built for the mesh — also those of a geometry or a material handed to the constructor, which the mesh leaves alive. Each fires it once; a second call still does nothing
 - an attribute of `int8` or `int16` with a single value and without `normalized` is laid out as `int32`, one of `uint8` or `uint16` as `uint32`: three builds no vertex format of one value for these types. `VertexAttributeDescriptor#dataType` answers the 32-bit type, and the buffer, its default `bufferName` (`static_int32` instead of `static_int16`, for one), the buffers data and the arrays the getter answers follow it. The attribute holds every value of the 32-bit type; a value its declared type would have wrapped is stored as it is
 - the gpu reads the arrays of the pool as the descriptor lays them out, and nothing is copied on the way. A buffer of `int8`, `uint8`, `int16` or `uint16` without `normalized` reaches three as an `InterleavedBuffer` — also one that holds a single attribute without padding — because three widens such an array to 32 bits only as a `BufferAttribute`, and the geometry then copied every upload into that copy. `getAttribute()` answers an `InterleavedBufferAttribute` for such an attribute; its `array` is the array of the pool, its `version` and `updateRanges` sit on `data`
+
+### Removed
+
+- remove `TexturedSprites`, `TexturedSpritesGeometry`, `TexturedSpritesMaterial`, `TexturedSpriteDescriptor` and the class `TexturedSprite`, with `TexturedSpritesPool`, `TexturedSpritesBasePool`, `TexturedSpritesMakeBaseSpriteArgs`, `TexturedSpritesGeometryParameters` and `TexturedSpritesMaterialParameters` (**BREAKING**). `TexturedSprite` is now the type of the sprite handle of `TexturedSpriteKind`, a type only. See the Migration Guide
+- remove `AnimatedSprites`, `AnimatedSpritesGeometry`, `AnimatedSpritesMaterial`, `AnimatedSpriteDescriptor` and the class `AnimatedSprite`, with `AnimatedSpritesPool`, `AnimatedSpritesBasePool`, `AnimatedSpritesMakeBaseSpriteArgs`, `AnimatedSpritesGeometryParameters` and `AnimatedSpritesMaterialParameters` (**BREAKING**). `AnimatedSprite` is now the type of the sprite handle of `AnimatedSpriteKind`, a type only
+- remove `BaseSprite` and `BaseSpriteDescriptor` (**BREAKING**); `QuadBase` and `QuadBase.description` take their place
+- remove the `TAttributeNode*` types — `TAttributeNodeQuadSize`, `TAttributeNodeTexCoords`, `TAttributeNodeTexFlipDiagonal`, `TAttributeNodeTexTrim`, `TAttributeNodeVertexPosition`, `TAttributeNodeInstancePosition`, `TAttributeNodeRotation`, `TAttributeNodeColor` — and the `*AttributeName` statics of the removed materials (**BREAKING**)
+- remove the deprecated aliases `TexturedSpritePool`, `TexturedSpriteMakeBaseSpriteArgs` and `TexturedSpriteGeometryParameters` of the plural types (**BREAKING**)
 
 ### Fixed
 
@@ -89,6 +116,113 @@ const uploads = (geometry.getAttribute('rgba') as BufferAttribute).version;
 ```ts
 const uploads = (geometry.getAttribute('rgba') as InterleavedBufferAttribute).data.version;
 ```
+
+#### TexturedSprites and AnimatedSprites become sprite kinds
+
+`FeatureSprites` with `TexturedSpriteKind` or `AnimatedSpriteKind` draws what the removed meshes drew; the sprite handles keep their attribute and method names. Textures and uniforms are set by name, the billboard toggle is a swap of the placement, and a node setter of the old materials becomes a feature of one's own (`docs/sprites.md`, "Writing a feature").
+
+| before | after |
+| --- | --- |
+| `new TexturedSprites(capacity, texture)` | `new FeatureSprites(TexturedSpriteKind, {capacity, textures: {colorMap: texture}})` |
+| `new TexturedSprites(n, {renderAsBillboards: true})` | `new FeatureSprites(TexturedSpriteKind, {capacity: n, placement: BillboardPlacement})` |
+| `material.renderAsBillboards = b` | `sprites.placement = b ? BillboardPlacement : FlatPlacement` |
+| `sprites.texture = t`, `material.colorMap = t` | `sprites.setTexture('colorMap', t)` |
+| `sprites.texture`, `material.colorMap`, `material.animsMap` | `sprites.getTexture('colorMap')`, `sprites.getTexture('animsMap')` |
+| `material.animsMap = t` | `sprites.setTexture('animsMap', t)` |
+| `new AnimatedSpritesMaterial({colorMap, animsMap, time})` | `new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}})` |
+| `material.time = t` | `sprites.setUniform('time', t)` |
+| `material.time` | `sprites.uniforms!['time']!.value`, a `number` |
+| `material.touchAnimsMap()` | `sprites.touchTexture('animsMap')` |
+| `new TexturedSpritesGeometry(n, [hw, hh, ox, oy])` | `new FeatureSpritesGeometry(TexturedSpriteKind, {capacity: n, baseArgs: [hw, hh, ox, oy]})` |
+| `new AnimatedSpritesGeometry(n, [hw, hh])` | `new FeatureSpritesGeometry(AnimatedSpriteKind, {capacity: n, baseArgs: [hw, hh]})` |
+| `new TexturedSpritesMaterial({colorMap, transparent: true})` | `new FeatureSpritesMaterial(TexturedSpriteKind, {textures: {colorMap}, transparent: true})` |
+| `TexturedSpritesGeometryParameters`, `AnimatedSpritesGeometryParameters` | `FeatureSpritesGeometryParameters` |
+| `TexturedSpritesMaterialParameters`, `AnimatedSpritesMaterialParameters` | `FeatureSpritesMaterialParameters`; the options of the mesh: `FeatureSpritesOptions` |
+| `TexturedSpritesMakeBaseSpriteArgs`, `AnimatedSpritesMakeBaseSpriteArgs` | `QuadBaseArgs` |
+| `TexturedSpritesPool`, `AnimatedSpritesPool` | `VertexObjectPool<TexturedSprite>`, `VertexObjectPool<AnimatedSprite>` |
+| `BaseSprite`, `BaseSpriteDescriptor` | `QuadBase`, `QuadBase.description` |
+| `TexturedSpriteDescriptor`, `AnimatedSpriteDescriptor` | `TexturedSpriteKind.description`, `AnimatedSpriteKind.description` |
+| `material.rotationNode = node` and the other node setters | a feature of your own in the slot (see "Writing a feature" in `docs/sprites.md`) |
+| `TAttributeNode*` types, `*AttributeName` statics | — (`Node<'vec3'>` and the attribute names of the features) |
+
+**Before**
+
+```ts
+import {TexturedSprites} from '@spearwolf/twopoint5d';
+
+const sprites = new TexturedSprites(1000, colorMap);
+sprites.material!.renderAsBillboards = true;
+
+const sprite = sprites.createSprite()!;
+sprite.setSize(32, 32);
+sprite.setFrame(atlas.frame('hero'));
+
+// later
+sprites.texture = otherColorMap;
+sprites.material!.renderAsBillboards = false;
+```
+
+**After**
+
+```ts
+import {BillboardPlacement, FeatureSprites, FlatPlacement, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {
+  capacity: 1000,
+  textures: {colorMap},
+  placement: BillboardPlacement,
+});
+
+const sprite = sprites.createSprite()!;
+sprite.setSize(32, 32);
+sprite.setFrame(atlas.frame('hero'));
+
+// later
+sprites.setTexture('colorMap', otherColorMap);
+sprites.placement = FlatPlacement;
+```
+
+**Before**
+
+```ts
+import {AnimatedSprites} from '@spearwolf/twopoint5d';
+
+const sprites = new AnimatedSprites(1000, {colorMap, animsMap, time: 0});
+
+const sprite = sprites.createSprite()!;
+sprite.animId = anims.animId('walk');
+
+// once the animsMap has loaded
+sprites.material!.touchAnimsMap();
+
+// every frame
+sprites.material!.time = now;
+sprites.update();
+```
+
+**After**
+
+```ts
+import {AnimatedSpriteKind, FeatureSprites} from '@spearwolf/twopoint5d';
+
+const sprites = new FeatureSprites(AnimatedSpriteKind, {
+  capacity: 1000,
+  textures: {colorMap, animsMap},
+  uniforms: {time: 0},
+});
+
+const sprite = sprites.createSprite()!;
+sprite.animId = anims.animId('walk');
+
+// once the animsMap has loaded
+sprites.touchTexture('animsMap');
+
+// every frame
+sprites.setUniform('time', now);
+sprites.update();
+```
+
+`TexturedSprite` and `AnimatedSprite` are types now, not classes: an `instanceof TexturedSprite` or a class that implements the old interface has no counterpart — a sprite handle is whatever `createSprite()` answers.
 
 ## [0.22.0] - 2026-09-30
 

@@ -32,9 +32,10 @@ import {description, title} from './_animated-sprites.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {
-    AnimatedSprites,
-    AnimatedSpritesGeometry,
-    AnimatedSpritesMaterial,
+    AnimatedSpriteKind,
+    FeatureSprites,
+    FeatureSpritesGeometry,
+    FeatureSpritesMaterial,
     OnDisplayInit,
     OnDisplayRenderFrame,
     TextureStore,
@@ -57,7 +58,7 @@ import {description, title} from './_animated-sprites.json';
     const CAPACITY = 3000;
     const INITIAL_SPRITE_COUNT = 500;
 
-    const geometry = new AnimatedSpritesGeometry(CAPACITY);
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
 
     const store = new TextureStore(renderer);
 
@@ -84,29 +85,26 @@ import {description, title} from './_animated-sprites.json';
 
     renderSpriteCount(INITIAL_SPRITE_COUNT);
 
-    const material = new AnimatedSpritesMaterial();
+    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {
+      textures: {colorMap: texture, animsMap: frameBasedAnimations.bakeDataTexture({renderer})},
+      depthTest: false,
+      depthWrite: false,
+    });
 
-    material.colorMap = texture;
-    material.animsMap = frameBasedAnimations.bakeDataTexture({renderer});
-
-    material.renderAsBillboards = false;
-    material.depthTest = false;
-    material.depthWrite = false;
-
-    const mesh = new AnimatedSprites(geometry, material);
+    const mesh = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
 
     scene.add(mesh);
 
     on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
-      material.time = now;
+      material.setUniform('time', now);
       mesh.update();
     });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('BouncingSprites', bouncingSprites);
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
-    console.log('AnimatedSprites', mesh);
+    console.log('FeatureSprites', mesh);
 
     // the .moreSprites and .lessSprites buttons are written by the markup of this very page
     document.querySelector('.moreSprites')!.addEventListener('click', () => {

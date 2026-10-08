@@ -268,8 +268,8 @@ export interface VO {
  *
  * V8 boxes a fractional value that crosses a call it does not inline as an argument of its own,
  * a heap number of 16 B. That allocation belongs to the calling code: a loop that writes
- * fractional values fills a tuple it reuses and hands that on, as `TexturedSprite`,
- * `AnimatedSprite` and `TileSpritesFactory` do. It is the type to give the `set…` method of a
+ * fractional values fills a tuple it reuses and hands that on, as the sprite features
+ * (`InstancePosition`, `QuadSize`, `AtlasFrame`, `Tint`) and `TileSpritesFactory` do. It is the type to give the `set…` method of a
  * vertex object interface.
  */
 export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;

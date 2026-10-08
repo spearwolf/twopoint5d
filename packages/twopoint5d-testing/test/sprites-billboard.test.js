@@ -1,5 +1,5 @@
 import {expect} from '@esm-bundle/chai';
-import {Display, TexturedSprites} from '@spearwolf/twopoint5d';
+import {BillboardPlacement, Display, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {Group, OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {coveredBox, disposeDisplay, makeContainer, renderToPixels} from './helpers/fixtures.js';
 
@@ -46,7 +46,7 @@ describe('sprites — billboards on a moved and turned mesh', function () {
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.set(2, 0, 10);
 
-    const sprites = new TexturedSprites(1, {renderAsBillboards: true});
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, placement: BillboardPlacement});
     sprites.frustumCulled = false;
     const sprite = sprites.createSprite();
     sprite.setSize(width, height);

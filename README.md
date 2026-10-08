@@ -104,7 +104,7 @@ does.
 One textured sprite, drawn by a `Display` with a scene and a camera of its own:
 
 ```ts check
-import {Display, TextureFactory, TexturedSprites} from '@spearwolf/twopoint5d';
+import {Display, FeatureSprites, TextureFactory, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene} from 'three/webgpu';
 
 // the display owns the renderer and drives the frame loop
@@ -125,7 +125,7 @@ display.onInit(async ({renderer}) => {
   const texture = await new TextureFactory(renderer).loadAsync('sprite.png');
 
   // a mesh with room for one sprite, drawn with the texture
-  const sprites = new TexturedSprites(1, texture);
+  const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: texture}});
 
   const sprite = sprites.createSprite()!;
   sprite.setSize(256, 256);
@@ -147,7 +147,9 @@ same sprite, with a frame of a texture atlas in place of the whole image, is the
 demo of the [lookbook](apps/lookbook/) — [its
 source](apps/lookbook/src/pages/demos/first-sprite.astro); in a clone of this
 repository, `pnpm lookbook` serves it at
-<http://localhost:4321/lookbook/demos/first-sprite>. From there:
+<http://localhost:4321/lookbook/demos/first-sprite>. `TexturedSpriteKind` is one of the
+sprite presets; [Sprites](packages/twopoint5d/docs/sprites.md) shows how to compose a
+kind of your own from features. From there:
 
 - [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) — projections,
   several stages in one frame, post-processing

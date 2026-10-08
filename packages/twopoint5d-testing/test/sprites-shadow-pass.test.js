@@ -1,0 +1,422 @@
+import {expect} from '@esm-bundle/chai';
+import {
+  AnimatedSpriteKind,
+  BillboardPlacement,
+  definePass,
+  Display,
+  FeatureSprites,
+  FrameBasedAnimations,
+  lightOf,
+  PlanarShadow,
+  planeOf,
+  ShadowMask,
+  ShadowPass,
+  TextureCoords,
+  TexturedSpriteKind,
+} from '@spearwolf/twopoint5d';
+import {
+  Color,
+  Mesh,
+  MeshBasicNodeMaterial,
+  Object3D,
+  OrthographicCamera,
+  Plane,
+  PlaneGeometry,
+  RenderTarget,
+  Scene,
+  Vector3,
+} from 'three/webgpu';
+import {
+  compareWithModel,
+  countColor,
+  diffPixels,
+  disposeDisplay,
+  isNearColor,
+  makeCameraAboveGround,
+  makeColorTexture,
+  makeContainer,
+  readsTopDown,
+  renderToPixels,
+} from './helpers/fixtures.js';
+
+const TARGET_SIZE = 64;
+const PIXELS_PER_UNIT = 8;
+const CENTER = TARGET_SIZE / 2;
+const RED = [255, 0, 0, 255];
+const CLEAR = [0, 0, 0, 0];
+const BLUE = [0, 0, 255];
+
+// the scene on the ground: 4 world units across 64 pixels
+const GROUND_PIXELS_PER_UNIT = 16;
+const WHITE = [255, 255, 255, 255];
+const BLACK = [0, 0, 0, 255];
+const SHADOW_BLUE = [0, 0, 255, 255];
+// the direction the light of the start value of shadowLight travels in: -[-0.4, 1, -0.3]
+const LIGHT = [0.4, -1, 0.3];
+
+/**
+ * The picture of a sprite 2 units square that stands on the XZ ground at the origin, facing the
+ * camera of makeCameraAboveGround(), and of its shadow on the ground: a point `h` units up the
+ * sprite falls along the light to `h · (L.x, 0, L.z)` beside its foot, `(x, 0.6 h)` of the view for
+ * the sprite and `(x + L.x · h, -0.8 · L.z · h)` for the shadow. With a `ground` color, a ground
+ * mesh 4 units square lies around the foot of the sprite, from `-1.6` to `1.6` up the view.
+ */
+function groundShadowAt(ground) {
+  return (x, y) => {
+    const up = y / 0.6;
+    if (up >= 0 && up <= 2 && Math.abs(x) <= 1) return WHITE;
+    const shadowUp = -y / (0.8 * LIGHT[2]);
+    if (shadowUp >= 0 && shadowUp <= 2 && Math.abs(x - LIGHT[0] * shadowUp) <= 1) return SHADOW_BLUE;
+    if (ground != null && Math.abs(y) <= 1.6) return ground;
+    return BLACK;
+  };
+}
+
+/**
+ * The picture of the sprite of {@link groundShadowAt} with the light from the left at 45°,
+ * `[-1, 1, 0, 0]`, whose shadow the quad turned to the light casts: x of the sprite runs along z,
+ * its y up and away from the light at 45°, so a point `y` up the turned quad lands `1 + √2 y` along
+ * x, for y ∈ [-1, 1], and across z ∈ [-1, 1] — `(x, -0.8 z)` of the view.
+ */
+function lightFacingShadowAt(x, y) {
+  const up = y / 0.6;
+  if (up >= 0 && up <= 2 && Math.abs(x) <= 1) return WHITE;
+  if (Math.abs(x - 1) <= Math.SQRT2 && Math.abs(y) <= 0.8) return SHADOW_BLUE;
+  return BLACK;
+}
+
+// the shadow of the sprite projected as it stands, without the turn to the light: the pass the
+// tests of the projection itself draw with
+const PlanarShadowPass = definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]});
+
+/** The columns, left to right, in which some pixel has the color `rgb`. */
+function columnsOf(pixels, rgb) {
+  const columns = new Set();
+  for (let y = 0; y < TARGET_SIZE; y++) {
+    for (let x = 0; x < TARGET_SIZE; x++) {
+      const i = (y * TARGET_SIZE + x) * 4;
+      if (isNearColor([pixels[i], pixels[i + 1], pixels[i + 2]], rgb)) columns.add(x);
+    }
+  }
+  return columns.size === 0 ? {from: -1, to: -1} : {from: Math.min(...columns), to: Math.max(...columns)};
+}
+
+describe('sprites — a shadow pass', function () {
+  this.timeout(20000);
+  let display;
+  let host;
+  let target;
+
+  beforeEach(async () => {
+    host = makeContainer();
+    display = new Display(host);
+    await display.start();
+    target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
+  });
+
+  afterEach(() => {
+    target?.dispose();
+    target = undefined;
+    disposeDisplay(display);
+    display = undefined;
+    host?.parentNode?.removeChild(host);
+    host = undefined;
+  });
+
+  function makeCamera() {
+    const half = TARGET_SIZE / PIXELS_PER_UNIT / 2;
+    const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
+    camera.position.set(-1, 0, 10);
+    return camera;
+  }
+
+  function aimTheShadow(sprites) {
+    sprites.setUniform('shadowLight', -0.5, 0, 1, 0);
+    sprites.setUniform('groundPlane', 0, 0, 1, 0);
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+  }
+
+  it('draws the shadow of a sprite where the light projects it, in the shadow color, flat and as a billboard', async function () {
+    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    aimTheShadow(sprites);
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(-1, 0, 4);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    const flat = await renderToPixels(display.renderer, scene, makeCamera(), target);
+    sprites.placement = BillboardPlacement;
+    const billboard = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    sprites.dispose();
+    colorMap.dispose();
+
+    for (const pixels of [flat, billboard]) {
+      expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
+      expect(columnsOf(pixels, BLUE), 'its shadow at x ∈ [0, 2]').to.deep.equal({from: CENTER + 8, to: CENTER + 23});
+    }
+  });
+
+  /**
+   * Renders a sprite 2 units square standing at the origin with its shadow, the light and the ground
+   * at their start values, through makeCameraAboveGround() — over an opaque ground mesh in the plane
+   * of the shadow when `ground` is set — and holds the picture to {@link groundShadowAt}.
+   */
+  async function renderOnTheGround(ground) {
+    const topDown = await readsTopDown(display.renderer, target);
+    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(0, 1, 0);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    let groundMesh;
+    if (ground != null) {
+      groundMesh = new Mesh(
+        new PlaneGeometry(4, 4),
+        new MeshBasicNodeMaterial({color: new Color(...ground.slice(0, 3).map((c) => c / 255))}),
+      );
+      groundMesh.rotation.x = -Math.PI / 2;
+      scene.add(groundMesh);
+    }
+    sprites.update();
+
+    const pixels = await renderToPixels(
+      display.renderer,
+      scene,
+      makeCameraAboveGround(TARGET_SIZE, GROUND_PIXELS_PER_UNIT),
+      target,
+    );
+
+    sprites.dispose();
+    colorMap.dispose();
+    groundMesh?.geometry.dispose();
+    groundMesh?.material.dispose();
+
+    return {
+      pixels,
+      ...compareWithModel(pixels, {
+        size: TARGET_SIZE,
+        pixelsPerUnit: GROUND_PIXELS_PER_UNIT,
+        topDown,
+        black: BLACK,
+        colorAt: groundShadowAt(ground),
+      }),
+    };
+  }
+
+  // mirroring or projecting a vertex in the shader turns the winding of a triangle whenever the
+  // image falls towards the camera; three culls by the side of the material alone
+  it('draws the shadow on the XZ ground in front of a sprite standing on it, the camera in front and above', async function () {
+    const {pixels, lit, differing} = await renderOnTheGround();
+
+    // the sprite covers 2 × 1.2 units of the view, 614 pixels
+    expect(countColor(pixels, WHITE), 'the pixels of the sprite').to.be.within(560, 670);
+    // the shadow covers 2 × 0.48 units, 246 pixels
+    expect(countColor(pixels, BLUE), 'the pixels of the shadow').to.be.within(220, 270);
+    expect(lit, 'the lit pixels of the sprite and its shadow the model checks').to.be.greaterThan(600);
+    expect(differing.length, `the pixels against the model, first ones: ${differing.slice(0, 4).join('; ')}`).to.equal(0);
+  });
+
+  // the shadow lies in the plane of the ground: without its polygon offset the two would fight over
+  // the depth of every pixel
+  it('draws the shadow over an opaque ground mesh in its plane', async function () {
+    const {pixels, lit, differing} = await renderOnTheGround(RED);
+
+    expect(countColor(pixels, BLUE), 'the pixels of the shadow').to.be.within(220, 270);
+    expect(lit, 'the lit pixels of the sprite, its shadow and the ground the model checks').to.be.greaterThan(2500);
+    expect(differing.length, `the pixels against the model, first ones: ${differing.slice(0, 4).join('; ')}`).to.equal(0);
+  });
+
+  it('shows the shadow of the frame the animated sprite shows at the same time', async function () {
+    // frame 0 is opaque red, frame 1 transparent: the shadow is there at the start and gone three quarters in
+    const texels = [RED, CLEAR];
+    const colorMap = makeColorTexture(texels);
+    const frames = new TextureCoords(0, 0, texels.length, 1);
+    const anims = new FrameBasedAnimations();
+    anims.add(
+      'blink',
+      1,
+      [0, 1].map((i) => new TextureCoords(frames, i, 0, 1, 1)),
+    );
+    const animsMap = anims.bakeDataTexture();
+
+    const sprites = new FeatureSprites(AnimatedSpriteKind, {
+      capacity: 1,
+      textures: {colorMap, animsMap},
+      passes: [PlanarShadowPass],
+    });
+    aimTheShadow(sprites);
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(-1, 0, 4);
+    sprite.animId = anims.animId('blink');
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    sprites.setUniform('time', 0);
+    const atStart = await renderToPixels(display.renderer, scene, makeCamera(), target);
+    sprites.setUniform('time', 0.75);
+    const later = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    sprites.dispose();
+    colorMap.dispose();
+    animsMap.dispose();
+
+    expect(columnsOf(atStart, BLUE).from, 'a shadow of the opaque frame').to.equal(CENTER + 8);
+    expect(columnsOf(later, BLUE).from, 'no shadow of the transparent frame').to.equal(-1);
+  });
+
+  it('draws the shadow on a plane bound from a moved and turned node, for sprites moved in the world', async function () {
+    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+    sprites.setUniform('shadowLight', -0.5, 0, 1, 0);
+    // the sprites stand at (-1, 0, 1) in the world, so the sprite at local (0, 0, 3) is at world
+    // (-1, 0, 4): x ∈ [-2, 0], z = 4
+    sprites.position.set(-1, 0, 1);
+    // the wall lies at z = -1 in the world (z = -2 in the local space of the sprites), turned about its
+    // own normal: the same plane through a rotated matrix
+    const wall = new Object3D();
+    wall.position.z = -1;
+    wall.rotation.z = 0.7;
+    sprites.bindUniform('groundPlane', planeOf(wall));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(0, 0, 3);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    scene.add(wall);
+    wall.updateMatrixWorld(true);
+    sprites.update();
+
+    const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    sprites.dispose();
+    colorMap.dispose();
+
+    // the light travels along (0.5, 0, -1): from z = 4 down to the wall at z = -1 is 5 units, 2.5 to the right
+    expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
+    expect(columnsOf(pixels, BLUE), 'its shadow at x ∈ [0.5, 2.5]').to.deep.equal({from: CENTER + 12, to: CENTER + 27});
+  });
+
+  it('spreads the shadow of a point light and draws none for a light behind the plane', async function () {
+    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+    sprites.bindUniform('groundPlane', planeOf(new Plane(new Vector3(0, 0, 1), 0)));
+    // a point 8 in front of the plane, at the left edge of the sprite: the sprite 4 in front of the
+    // plane casts a shadow twice its size, from x = -2 to x = 2 (ortho camera: 32 columns)
+    const lamp = new Object3D();
+    lamp.position.set(-2, 0, 8);
+    sprites.bindUniform('shadowLight', lightOf(lamp));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(-1, 0, 4);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+    const spread = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    lamp.position.set(-2, 0, -3);
+    sprites.update();
+    const behind = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    sprites.dispose();
+    colorMap.dispose();
+
+    // from (-2, 0, 8) through the sprite at z = 4 down to z = 0 doubles it: x ∈ [-2, 2], y ∈ [-2, 2].
+    // The sprite (x ∈ [-2, 0], y ∈ [-1, 1]) covers part of it; above and below the sprite the left
+    // half shows as well, so blue spans every column from x = -2 to x = 2
+    expect(columnsOf(spread, BLUE), 'the spread shadow, x ∈ [-2, 2]').to.deep.equal({from: CENTER - 8, to: CENTER + 23});
+    expect(columnsOf(behind, [255, 0, 0]), 'the sprite, still drawn with the light behind the plane').to.deep.equal({
+      from: CENTER - 8,
+      to: CENTER + 7,
+    });
+    expect(columnsOf(behind, BLUE).from, 'no shadow from behind the plane').to.equal(-1);
+  });
+
+  /**
+   * Renders a sprite 2 units square standing at the origin, its plane XY, with the shadow of
+   * `pass` from a light at `light`, through makeCameraAboveGround(), and answers the pixels. Without
+   * `drawSprite` only the shadow is drawn.
+   *
+   * @param {import('@spearwolf/twopoint5d').SpritePass} pass
+   * @param {{
+   *   light: [number, number, number, number],
+   *   placement?: import('@spearwolf/twopoint5d').SpriteFeature,
+   *   drawSprite?: boolean,
+   * }} options
+   */
+  async function renderTheShadowOf(pass, {light, placement, drawSprite = true}) {
+    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]});
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+    sprites.setUniform('shadowLight', ...light);
+    if (placement != null) sprites.placement = placement;
+    sprites.material.visible = drawSprite;
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(0, 1, 0);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    const pixels = await renderToPixels(
+      display.renderer,
+      scene,
+      makeCameraAboveGround(TARGET_SIZE, GROUND_PIXELS_PER_UNIT),
+      target,
+    );
+
+    sprites.dispose();
+    colorMap.dispose();
+    return pixels;
+  }
+
+  it('turns the sprite to the light: a sprite edge on to the light casts the full shadow of a quad facing it', async function () {
+    const topDown = await readsTopDown(display.renderer, target);
+    /** @type {[number, number, number, number]} */
+    const light = [-1, 1, 0, 0];
+
+    const turned = await renderTheShadowOf(ShadowPass, {light});
+    const edgeOn = await renderTheShadowOf(PlanarShadowPass, {light});
+
+    const {lit, differing} = compareWithModel(turned, {
+      size: TARGET_SIZE,
+      pixelsPerUnit: GROUND_PIXELS_PER_UNIT,
+      topDown,
+      black: BLACK,
+      colorAt: lightFacingShadowAt,
+    });
+    // x ∈ [1 - √2, 2] by 1.6 units of the view, less the 1.41 × 0.8 the sprite covers: 699 pixels
+    expect(countColor(turned, BLUE), 'the pixels of the turned shadow').to.be.within(640, 760);
+    expect(lit, 'the lit pixels of the sprite and its shadow the model checks').to.be.greaterThan(1100);
+    expect(differing.length, `the pixels against the model, first ones: ${differing.slice(0, 4).join('; ')}`).to.equal(0);
+    // projected as it stands, the sprite throws a line along x
+    expect(countColor(edgeOn, BLUE), 'the pixels of the shadow edge on').to.be.below(40);
+  });
+
+  it('casts one shadow for a flat sprite and a billboard: the shadow follows the light, not the placement', async function () {
+    /** @type {[number, number, number, number]} */
+    const light = [-0.4, 1, -0.3, 0];
+
+    const flat = await renderTheShadowOf(ShadowPass, {light, drawSprite: false});
+    const billboard = await renderTheShadowOf(ShadowPass, {light, placement: BillboardPlacement, drawSprite: false});
+
+    const {lit, differing} = diffPixels(flat, billboard);
+    expect(lit, 'the pixels of the shadow').to.be.greaterThan(300);
+    expect(differing, 'the pixels in which the two shadows differ').to.equal(0);
+  });
+});
