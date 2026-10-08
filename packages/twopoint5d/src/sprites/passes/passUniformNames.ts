@@ -30,7 +30,7 @@ function renamedCopy(feature: SpriteFeature, names: Readonly<Record<string, stri
     ...ctx,
     uniform: (name: string) => ctx.uniform(renamed(names, name)),
   });
-  const {frame, local, mesh, color, colorSource, uniforms} = feature;
+  const {frame, local, placement, mesh, color, colorSource, uniforms} = feature;
   const sources = new Map<string, string>();
   for (const name of Object.keys(uniforms ?? {})) sources.set(renamed(names, name), name);
   const copy: SpriteFeature = Object.freeze({
@@ -40,6 +40,7 @@ function renamedCopy(feature: SpriteFeature, names: Readonly<Record<string, stri
     }),
     ...(frame != null && {frame: (ctx: SpriteFrameContext) => frame(rename(ctx))}),
     ...(local != null && {local: {order: local.order, transform: (input, ctx) => local.transform(input, rename(ctx))}}),
+    ...(placement != null && {placement: (input, ctx) => placement(input, rename(ctx))}),
     ...(mesh != null && {mesh: {order: mesh.order, transform: (input, ctx) => mesh.transform(input, rename(ctx))}}),
     ...(color != null && {color: {order: color.order, transform: (input, ctx) => color.transform(input, rename(ctx))}}),
     ...(colorSource != null && {colorSource: (frame, ctx) => colorSource(frame, rename(ctx))}),

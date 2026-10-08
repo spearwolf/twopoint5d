@@ -2,11 +2,13 @@ import {uniform, vec3, vec4} from 'three/tsl';
 import {DoubleSide, type Node, Vector4} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {evaluateNode, nodesOf, stubShaderContext} from '../../testing/spriteGraph.js';
+import {attributeNamesOf, evaluateNode, nodesOf, stubShaderContext} from '../../testing/spriteGraph.js';
 import {ColorOrder, MeshOrder} from '../SpriteFeature.js';
 import {Darken} from './Darken.js';
+import {LightFacingPlacement} from './LightFacingPlacement.js';
 import {MirrorAtPlane} from './MirrorAtPlane.js';
-import {ReflectionPass, ShadowPass, shadowFallsOnPlane} from './passPresets.js';
+import {MirroredBillboardPlacement} from './MirroredBillboardPlacement.js';
+import {BillboardReflectionPass, ReflectionPass, ShadowPass, shadowFallsOnPlane} from './passPresets.js';
 import {PlanarShadow} from './PlanarShadow.js';
 import {ShadowMask} from './ShadowMask.js';
 
@@ -20,6 +22,34 @@ describe('the pass features', () => {
     expect(MirrorAtPlane.mesh!.order).toBe(MeshOrder.Mirror);
     expect(Darken.uniforms).toEqual({reflectionColor: [0.5, 0.5, 0.5, 0.5]});
     expect(Darken.color!.order).toBe(ColorOrder.Fade);
+  });
+
+  test('the two placements read the uniforms of the feature they require and declare none', () => {
+    const read = (feature: typeof LightFacingPlacement) => {
+      const names: string[] = [];
+      const stub = stubShaderContext();
+      const ctx = {
+        ...stub,
+        uniform: <T extends string>(name: string) => {
+          names.push(name);
+          return stub.uniform<T>(name);
+        },
+      };
+      const local = vec3(1, 2, 0) as unknown as Node<'vec3'>;
+      const placed = feature.placement!(local, ctx);
+      return {names: names.sort(), attributes: attributeNamesOf(placed), local: nodesOf(placed).has(local)};
+    };
+
+    expect(LightFacingPlacement.requires).toEqual(['instancePosition', 'planarShadow']);
+    expect(LightFacingPlacement.uniforms).toBeUndefined();
+    expect(read(LightFacingPlacement)).toEqual({
+      names: ['groundPlane', 'shadowLight'],
+      attributes: ['instancePosition'],
+      local: true,
+    });
+    expect(MirroredBillboardPlacement.requires).toEqual(['instancePosition', 'mirrorAtPlane']);
+    expect(MirroredBillboardPlacement.uniforms).toBeUndefined();
+    expect(read(MirroredBillboardPlacement)).toEqual({names: ['mirrorPlane'], attributes: ['instancePosition'], local: true});
   });
 
   test('build their stages from the placed vertex or the color and their uniforms', () => {
@@ -99,8 +129,16 @@ describe('the pass features', () => {
         polygonOffsetUnits: -1,
       },
     ]);
-    expect(ShadowPass.features).toEqual([PlanarShadow, ShadowMask]);
+    // the shadow of every sprite is that of a quad turned to the light, whatever its placement
+    expect(ShadowPass.features).toEqual([LightFacingPlacement, PlanarShadow, ShadowMask]);
     expect(ReflectionPass.features).toEqual([MirrorAtPlane, Darken]);
+    expect(BillboardReflectionPass.features).toEqual([MirroredBillboardPlacement, MirrorAtPlane, Darken]);
+    expect([BillboardReflectionPass.name, BillboardReflectionPass.renderOrder, BillboardReflectionPass.material]).toEqual([
+      'reflection',
+      -1,
+      {transparent: true, depthWrite: false, side: DoubleSide},
+    ]);
+    expect(BillboardReflectionPass.visible).toBeUndefined();
     expect(ShadowPass.visible).toBe(shadowFallsOnPlane);
     expect(ReflectionPass.visible).toBeUndefined();
   });

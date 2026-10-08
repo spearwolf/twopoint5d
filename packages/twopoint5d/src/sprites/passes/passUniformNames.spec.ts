@@ -32,6 +32,15 @@ const probe = defineFeature({
 });
 
 describe('stageFeaturesOf()', () => {
+  test('lets a placement read through the renaming, also a uniform the feature reads but does not declare', () => {
+    const facing = defineFeature({name: 'facing', placement: (_local, ctx) => read(ctx, 'a', 'z') as never});
+    const pass = definePass({name: 'p', features: [probe, facing], uniformNames: {a: 'x'}});
+    const [, copy] = stageFeaturesOf(pass);
+
+    expect(copy!.placement!(undefined as never, context())).toEqual(['x', 'z']);
+    expect(originOf(copy!)).toBe(facing);
+  });
+
   test('answers the features of a pass without a renaming, or with an empty one, as they are', () => {
     const plain = definePass({name: 'plain', features: [probe]});
     const empty = definePass({name: 'empty', features: [probe], uniformNames: {}});

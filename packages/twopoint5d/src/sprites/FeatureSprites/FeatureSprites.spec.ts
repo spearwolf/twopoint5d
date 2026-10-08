@@ -349,6 +349,18 @@ describe('FeatureSprites', () => {
       sprites.dispose();
     });
 
+    test('keeps the placement of a pass that brings its own, at the start and through a swap', () => {
+      const facing = defineFeature({name: 'facing', placement: (local) => local});
+      const own = definePass({name: 'own', features: [facing]});
+      const sprites = new FeatureSprites(kind, {passes: [shadow, own], placement: BillboardPlacement});
+
+      expect(sprites.passes['own']!.material.placement).toBe(facing);
+      sprites.placement = FlatPlacement;
+      expect(sprites.passes['own']!.material.placement).toBe(facing);
+      expect(sprites.passes['shadow']!.material.placement).toBe(FlatPlacement);
+      sprites.dispose();
+    });
+
     test('lets a placement the material of the sprites refuses reach no pass', () => {
       const sprites = new FeatureSprites(kind, {passes: [shadow]});
 

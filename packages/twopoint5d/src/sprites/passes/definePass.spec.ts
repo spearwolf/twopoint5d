@@ -19,12 +19,21 @@ describe('definePass()', () => {
     ['methods', {methods: {lift() {}}}],
     ['initialize', {initialize() {}}],
     ['usageAliases', {usageAliases: {up: ['lift']}}],
-    ['placement', {placement: (local: never) => local}],
   ])('refuses a feature that brings %s', (field, extra) => {
     const feature = defineFeature({name: 'data', ...(extra as object)});
 
     expect(() => definePass({name: 'p', features: [feature]})).toThrow(
       `definePass: feature "data" of pass "p" brings ${field}; a pass draws the data of the sprites and brings stages, uniforms and textures alone`,
+    );
+  });
+
+  test('takes one feature that brings a placement, and refuses a second', () => {
+    const facing = defineFeature({name: 'facing', placement: (local) => local});
+    const turned = defineFeature({name: 'turned', placement: (local) => local});
+
+    expect(definePass({name: 'p', features: [facing, mask]}).features).toEqual([facing, mask]);
+    expect(() => definePass({name: 'p', features: [facing, mask, turned]})).toThrow(
+      'definePass: features "facing" and "turned" of pass "p" each bring a placement; a pass takes at most one',
     );
   });
 

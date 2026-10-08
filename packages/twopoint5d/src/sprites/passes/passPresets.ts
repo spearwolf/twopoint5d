@@ -2,7 +2,9 @@ import {DoubleSide, type Vector4} from 'three/webgpu';
 import type {SpriteUniformNode} from '../FeatureSprites/SpriteResources.js';
 import {Darken} from './Darken.js';
 import {definePass} from './definePass.js';
+import {LightFacingPlacement} from './LightFacingPlacement.js';
 import {MirrorAtPlane} from './MirrorAtPlane.js';
+import {MirroredBillboardPlacement} from './MirroredBillboardPlacement.js';
 import {PlanarShadow} from './PlanarShadow.js';
 import {ShadowMask} from './ShadowMask.js';
 
@@ -31,13 +33,14 @@ export function shadowFallsOnPlane(uniform: (name: string) => SpriteUniformNode)
 }
 
 /**
- * A planar shadow behind the sprites: projected onto `groundPlane`, in `shadowColor`. It lies in the
- * ground plane, so a polygon offset pulls it in front of a ground mesh in that plane. It is left out
- * for a frame whose light does not fall onto the side of the plane its normal points to.
+ * A planar shadow behind the sprites: each sprite turned to face the light — flat or billboard alike,
+ * see {@link LightFacingPlacement} — and projected onto `groundPlane`, in `shadowColor`. It lies in
+ * the ground plane, so a polygon offset pulls it in front of a ground mesh in that plane. It is left
+ * out for a frame whose light does not fall onto the side of the plane its normal points to.
  */
 export const ShadowPass = definePass({
   name: 'shadow',
-  features: [PlanarShadow, ShadowMask],
+  features: [LightFacingPlacement, PlanarShadow, ShadowMask],
   material: {
     transparent: true,
     depthWrite: false,
@@ -59,4 +62,16 @@ export const ReflectionPass = definePass({
   features: [MirrorAtPlane, Darken],
   material: {transparent: true, depthWrite: false, side: DoubleSide},
   renderOrder: -1,
+});
+
+/**
+ * The reflection of billboards: as {@link ReflectionPass}, but each sprite placed so that its
+ * reflection faces the camera — see {@link MirroredBillboardPlacement}. For sprites drawn with
+ * `BillboardPlacement`; a flat sprite takes `ReflectionPass`, whose mirror image matches it. It
+ * keeps its placement through a placement swap of the sprites, and its name, `reflection`, so it
+ * takes the place of `ReflectionPass`.
+ */
+export const BillboardReflectionPass = definePass({
+  ...ReflectionPass,
+  features: [MirroredBillboardPlacement, MirrorAtPlane, Darken],
 });

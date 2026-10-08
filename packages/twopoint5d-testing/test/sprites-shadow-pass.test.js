@@ -2,11 +2,14 @@ import {expect} from '@esm-bundle/chai';
 import {
   AnimatedSpriteKind,
   BillboardPlacement,
+  definePass,
   Display,
   FeatureSprites,
   FrameBasedAnimations,
   lightOf,
+  PlanarShadow,
   planeOf,
+  ShadowMask,
   ShadowPass,
   TextureCoords,
   TexturedSpriteKind,
@@ -26,6 +29,7 @@ import {
 import {
   compareWithModel,
   countColor,
+  diffPixels,
   disposeDisplay,
   isNearColor,
   makeCameraAboveGround,
@@ -67,6 +71,23 @@ function groundShadowAt(ground) {
     return BLACK;
   };
 }
+
+/**
+ * The picture of the sprite of {@link groundShadowAt} with the light from the left at 45°,
+ * `[-1, 1, 0, 0]`, whose shadow the quad turned to the light casts: x of the sprite runs along z,
+ * its y up and away from the light at 45°, so a point `y` up the turned quad lands `1 + √2 y` along
+ * x, for y ∈ [-1, 1], and across z ∈ [-1, 1] — `(x, -0.8 z)` of the view.
+ */
+function lightFacingShadowAt(x, y) {
+  const up = y / 0.6;
+  if (up >= 0 && up <= 2 && Math.abs(x) <= 1) return WHITE;
+  if (Math.abs(x - 1) <= Math.SQRT2 && Math.abs(y) <= 0.8) return SHADOW_BLUE;
+  return BLACK;
+}
+
+// the shadow of the sprite projected as it stands, without the turn to the light: the pass the
+// tests of the projection itself draw with
+const PlanarShadowPass = definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]});
 
 /** The columns, left to right, in which some pixel has the color `rgb`. */
 function columnsOf(pixels, rgb) {
@@ -117,7 +138,7 @@ describe('sprites — a shadow pass', function () {
 
   it('draws the shadow of a sprite where the light projects it, in the shadow color, flat and as a billboard', async function () {
     const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
     aimTheShadow(sprites);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -148,7 +169,7 @@ describe('sprites — a shadow pass', function () {
   async function renderOnTheGround(ground) {
     const topDown = await readsTopDown(display.renderer, target);
     const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -227,7 +248,11 @@ describe('sprites — a shadow pass', function () {
     );
     const animsMap = anims.bakeDataTexture();
 
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {capacity: 1, textures: {colorMap, animsMap}, passes: [ShadowPass]});
+    const sprites = new FeatureSprites(AnimatedSpriteKind, {
+      capacity: 1,
+      textures: {colorMap, animsMap},
+      passes: [PlanarShadowPass],
+    });
     aimTheShadow(sprites);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -252,7 +277,7 @@ describe('sprites — a shadow pass', function () {
 
   it('draws the shadow on a plane bound from a moved and turned node, for sprites moved in the world', async function () {
     const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     sprites.setUniform('shadowLight', -0.5, 0, 1, 0);
     // the sprites stand at (-1, 0, 1) in the world, so the sprite at local (0, 0, 3) is at world
@@ -286,7 +311,7 @@ describe('sprites — a shadow pass', function () {
 
   it('spreads the shadow of a point light and draws none for a light behind the plane', async function () {
     const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     sprites.bindUniform('groundPlane', planeOf(new Plane(new Vector3(0, 0, 1), 0)));
     // a point 8 in front of the plane, at the left edge of the sprite: the sprite 4 in front of the
@@ -319,5 +344,79 @@ describe('sprites — a shadow pass', function () {
       to: CENTER + 7,
     });
     expect(columnsOf(behind, BLUE).from, 'no shadow from behind the plane').to.equal(-1);
+  });
+
+  /**
+   * Renders a sprite 2 units square standing at the origin, its plane XY, with the shadow of
+   * `pass` from a light at `light`, through makeCameraAboveGround(), and answers the pixels. Without
+   * `drawSprite` only the shadow is drawn.
+   *
+   * @param {import('@spearwolf/twopoint5d').SpritePass} pass
+   * @param {{
+   *   light: [number, number, number, number],
+   *   placement?: import('@spearwolf/twopoint5d').SpriteFeature,
+   *   drawSprite?: boolean,
+   * }} options
+   */
+  async function renderTheShadowOf(pass, {light, placement, drawSprite = true}) {
+    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]});
+    sprites.setUniform('shadowColor', 0, 0, 1, 1);
+    sprites.setUniform('shadowLight', ...light);
+    if (placement != null) sprites.placement = placement;
+    sprites.material.visible = drawSprite;
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(0, 1, 0);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    const pixels = await renderToPixels(
+      display.renderer,
+      scene,
+      makeCameraAboveGround(TARGET_SIZE, GROUND_PIXELS_PER_UNIT),
+      target,
+    );
+
+    sprites.dispose();
+    colorMap.dispose();
+    return pixels;
+  }
+
+  it('turns the sprite to the light: a sprite edge on to the light casts the full shadow of a quad facing it', async function () {
+    const topDown = await readsTopDown(display.renderer, target);
+    /** @type {[number, number, number, number]} */
+    const light = [-1, 1, 0, 0];
+
+    const turned = await renderTheShadowOf(ShadowPass, {light});
+    const edgeOn = await renderTheShadowOf(PlanarShadowPass, {light});
+
+    const {lit, differing} = compareWithModel(turned, {
+      size: TARGET_SIZE,
+      pixelsPerUnit: GROUND_PIXELS_PER_UNIT,
+      topDown,
+      black: BLACK,
+      colorAt: lightFacingShadowAt,
+    });
+    // x ∈ [1 - √2, 2] by 1.6 units of the view, less the 1.41 × 0.8 the sprite covers: 699 pixels
+    expect(countColor(turned, BLUE), 'the pixels of the turned shadow').to.be.within(640, 760);
+    expect(lit, 'the lit pixels of the sprite and its shadow the model checks').to.be.greaterThan(1100);
+    expect(differing.length, `the pixels against the model, first ones: ${differing.slice(0, 4).join('; ')}`).to.equal(0);
+    // projected as it stands, the sprite throws a line along x
+    expect(countColor(edgeOn, BLUE), 'the pixels of the shadow edge on').to.be.below(40);
+  });
+
+  it('casts one shadow for a flat sprite and a billboard: the shadow follows the light, not the placement', async function () {
+    /** @type {[number, number, number, number]} */
+    const light = [-0.4, 1, -0.3, 0];
+
+    const flat = await renderTheShadowOf(ShadowPass, {light, drawSprite: false});
+    const billboard = await renderTheShadowOf(ShadowPass, {light, placement: BillboardPlacement, drawSprite: false});
+
+    const {lit, differing} = diffPixels(flat, billboard);
+    expect(lit, 'the pixels of the shadow').to.be.greaterThan(300);
+    expect(differing, 'the pixels in which the two shadows differ').to.equal(0);
   });
 });

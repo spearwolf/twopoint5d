@@ -1,5 +1,12 @@
 import {expect} from '@esm-bundle/chai';
-import {Display, FeatureSprites, ReflectionPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import {
+  BillboardPlacement,
+  BillboardReflectionPass,
+  Display,
+  FeatureSprites,
+  ReflectionPass,
+  TexturedSpriteKind,
+} from '@spearwolf/twopoint5d';
 import {RenderTarget, Scene} from 'three/webgpu';
 import {
   compareWithModel,
@@ -89,5 +96,46 @@ describe('sprites — a reflection pass', function () {
     expect(countColor(pixels, GREEN), 'the pixels of the mirror image').to.be.within(560, 670);
     expect(lit, 'the lit pixels of the sprite and its mirror image the model checks').to.be.greaterThan(900);
     expect(differing.length, `the pixels against the model, first ones: ${differing.slice(0, 4).join('; ')}`).to.equal(0);
+  });
+
+  /**
+   * Renders a billboard 2 units square at (0, 2, 0) with its reflection of `pass` in the XZ ground,
+   * through makeCameraAboveGround(), and counts the pixels of the sprite and of its reflection.
+   */
+  async function countTheReflectionOf(pass) {
+    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
+    const sprites = new FeatureSprites(TexturedSpriteKind, {
+      capacity: 1,
+      textures: {colorMap},
+      passes: [pass],
+      placement: BillboardPlacement,
+    });
+    sprites.setUniform('reflectionColor', 0, 1, 0, 1);
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(0, 2, 0);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+
+    const pixels = await renderToPixels(display.renderer, scene, makeCameraAboveGround(TARGET_SIZE, PIXELS_PER_UNIT), target);
+
+    sprites.dispose();
+    colorMap.dispose();
+    return {sprite: countColor(pixels, WHITE), reflection: countColor(pixels, GREEN)};
+  }
+
+  // the camera looks down at 53°, the billboard turns its face up to it: mirrored as it is, the
+  // reflection faces the mirror image of the camera and shows the camera little more than its edge
+  it('draws the reflection of a billboard facing the camera, as large as the sprite on screen', async function () {
+    const facing = await countTheReflectionOf(BillboardReflectionPass);
+    const mirrored = await countTheReflectionOf(ReflectionPass);
+
+    // the sprite reaches from 0.2 to the top edge of the view, its reflection from -0.2 to the bottom
+    // edge: 2 × 1.8 units each, 922 pixels
+    expect(facing.sprite, 'the pixels of the sprite').to.be.within(860, 980);
+    expect(Math.abs(facing.reflection - facing.sprite), 'the reflection against the sprite').to.be.at.most(0.06 * facing.sprite);
+    expect(mirrored.reflection, 'the mirrored billboard, nearly edge on').to.be.below(0.25 * mirrored.sprite);
   });
 });

@@ -5,7 +5,7 @@ import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
-import {passFeatures} from '../passes/passFeatures.js';
+import {passFeatures, placementOfPass} from '../passes/passFeatures.js';
 import {resolvedUniformName, stageFeaturesOf} from '../passes/passUniformNames.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import {FeatureSpritesGeometry, type FeatureSpritesGeometryParameters} from './FeatureSpritesGeometry.js';
@@ -216,7 +216,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
       this.#passes = passes;
       for (const pass of options.passes ?? []) {
         // resources is defined whenever there are passes, so no pass material builds resources of its own
-        const passMaterial = new FeatureSpritesMaterial(kind, {pass, resources, placement: material.placement});
+        // a pass that brings a placement draws with its own and takes none of the sprites
+        const placement = placementOfPass(pass) == null ? material.placement : undefined;
+        const passMaterial = new FeatureSpritesMaterial(kind, {pass, resources, placement});
         const mesh = new FeatureSpritesPass(geometry, passMaterial, pass);
         this.add(mesh);
         passes[pass.name] = mesh;
@@ -265,15 +267,18 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   }
 
   /**
-   * Swaps the placement of the material and of every pass material; see
-   * {@link FeatureSpritesMaterial.placement}. Does nothing once disposed.
+   * Swaps the placement of the material and of every pass material that draws with the placement
+   * of the sprites — a pass that brings its own keeps it; see {@link FeatureSpritesMaterial.placement}.
+   * Does nothing once disposed.
    */
   set placement(feature: SpriteFeature) {
     if (this.material == null) return;
     // the material checks first, so a refused placement reaches no pass; the pass materials judge it
     // by the features of the kind as well, so they take what the material took
     this.material.placement = feature;
-    for (const mesh of Object.values(this.#passes)) mesh.material.placement = feature;
+    for (const mesh of Object.values(this.#passes)) {
+      if (placementOfPass(mesh.pass) == null) mesh.material.placement = feature;
+    }
   }
 
   /** The uniforms of the material — `undefined` once disposed. */

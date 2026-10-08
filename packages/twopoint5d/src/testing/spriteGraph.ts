@@ -97,7 +97,8 @@ const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
 
 /**
  * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
- * swizzles, `dot`, `length`, `normalize` and `max` — what the mesh stages of the passes are built from.
+ * swizzles, `dot`, `cross`, `length`, `normalize` and `max` — what the mesh stages and placements of
+ * the passes are built from.
  * Throws for any other node.
  */
 export function evaluateNode(root: Node): EvaluatedValue {
@@ -120,6 +121,11 @@ export function evaluateNode(root: Node): EvaluatedValue {
     switch (node.method) {
       case 'dot':
         return dotOf(a, evaluateNode(node.bNode!));
+      case 'cross': {
+        const [ax, ay, az] = a as number[];
+        const [bx, by, bz] = evaluateNode(node.bNode!) as number[];
+        return [ay! * bz! - az! * by!, az! * bx! - ax! * bz!, ax! * by! - ay! * bx!];
+      }
       case 'max':
         return zip(a, evaluateNode(node.bNode!), Math.max);
       case 'length':

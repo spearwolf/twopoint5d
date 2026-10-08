@@ -5,7 +5,7 @@ import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
 import {AdditiveBlending, NearestFilter, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
-import {attributeNamesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
+import {attributeNamesOf, nodesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
 import {defineSprite} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
 import {BillboardPlacement} from '../features/BillboardPlacement.js';
@@ -710,7 +710,7 @@ describe('FeatureSpritesMaterial', () => {
       expect(
         () => new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [], without: ['flatPlacement']})}),
       ).toThrow(
-        'FeatureSpritesMaterial: pass "p" leaves out the placement "flatPlacement"; a pass draws with the placement of the sprites',
+        'FeatureSpritesMaterial: pass "p" leaves out the placement "flatPlacement"; a pass draws with the placement of the sprites or brings one of its own',
       );
       expect(() => new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [needsAnchor]})})).toThrow(
         'FeatureSpritesMaterial: feature "needsAnchor" of pass "p" requires feature "anchor", which neither the sprite kind nor the pass holds',
@@ -737,6 +737,17 @@ describe('FeatureSpritesMaterial', () => {
         'FeatureSpritesMaterial: pass "p": features "textureColor" and "flat" each contribute a colorSource stage; a sprite takes at most one',
       );
       expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('draws a pass that brings a placement with it in place of the placement of the kind', () => {
+      const lifted = vec3(0, 7, 0) as unknown as Node<'vec3'>;
+      const facing = defineFeature({name: 'facing', requires: ['instancePosition'], placement: () => lifted});
+      const material = new FeatureSpritesMaterial(TexturedKind, {pass: definePass({name: 'p', features: [facing]})});
+
+      expect(material.placement).toBe(facing);
+      expect(nodesOf(material.positionNode!).has(lifted)).toBe(true);
+      expect(attributeNamesOf(material.positionNode!)).not.toContain('instancePosition');
+      material.dispose();
     });
 
     test('judges a placement by the features of the kind, not by those of the pass', () => {

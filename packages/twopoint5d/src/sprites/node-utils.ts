@@ -1,25 +1,8 @@
-import {
-  add,
-  attribute,
-  cameraPosition,
-  cross,
-  div,
-  float,
-  mod,
-  modelViewMatrix,
-  modelWorldMatrixInverse,
-  mul,
-  normalize,
-  sub,
-  texture,
-  vec2,
-  vec3,
-  vec4,
-} from 'three/tsl';
+import {add, attribute, cross, div, float, mod, mul, normalize, sub, texture, vec2} from 'three/tsl';
 import type {Node, Texture} from 'three/webgpu';
 
+import {cameraPositionLocal, cameraUpLocal} from './cameraNodes.js';
 import {frameUv} from './frameUv.js';
-import {matrixColumn} from './matrixColumn.js';
 
 export const vertexByInstancePosition = (params?: {
   vertexPosition?: Node<'vec3'>;
@@ -57,16 +40,8 @@ export const billboardVertexByInstancePosition = (params?: {
 
   // the instance position lives in the local space of the mesh, the camera position in world
   // space; the look vector needs both ends in one space
-  const cameraPositionLocal = mul(modelWorldMatrixInverse, vec4(cameraPosition, 1)).xyz;
-  const look = normalize(sub(cameraPositionLocal, billboardPosition));
-
-  // the second row of the model-view rotation is the up axis of the camera, expressed in the
-  // local space of the mesh — exact as long as the mesh is scaled evenly on all axes
-  const cameraUp = vec3(
-    matrixColumn(modelViewMatrix, 0).y,
-    matrixColumn(modelViewMatrix, 1).y,
-    matrixColumn(modelViewMatrix, 2).y,
-  );
+  const look = normalize(sub(cameraPositionLocal(), billboardPosition));
+  const cameraUp = cameraUpLocal();
 
   const billboardRight = normalize(cross(cameraUp, look));
   const billboardUp = normalize(cross(look, billboardRight));
