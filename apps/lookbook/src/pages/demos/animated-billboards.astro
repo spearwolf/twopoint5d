@@ -37,11 +37,13 @@ import {description, title} from './_animated-billboards.json';
     BillboardPlacement,
     FeatureSprites,
     FeatureSpritesGeometry,
-    FeatureSpritesMaterial,
     FrameBasedAnimations,
     OnDisplayRenderFrame,
+    ShadowPass,
+    lightOf,
+    planeOf,
   } from '@spearwolf/twopoint5d';
-  import {Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader} from 'three/webgpu';
+  import {DirectionalLight, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader} from 'three/webgpu';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
@@ -67,20 +69,28 @@ import {description, title} from './_animated-billboards.json';
 
     bouncingSprites.createSprites(CAPACITY, animId);
 
-    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {
+    const mesh = new FeatureSprites(AnimatedSpriteKind, {
+      geometry,
       textures: {colorMap: texture, animsMap: anims.bakeDataTexture({renderer})},
       placement: BillboardPlacement,
       depthTest: true,
       depthWrite: true,
+      passes: [ShadowPass],
+      uniforms: {shadowColor: [0, 0, 0, 0.45]},
     });
-
-    const mesh = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
 
     demo.scene.add(mesh);
 
+    // the sun circles the scene; lightOf() reads it and its target every frame, neither needs to
+    // be part of the scene: the ground material is unlit
+    const sun = new DirectionalLight();
+    const SUN_RADIUS = 140;
+    const SUN_HEIGHT = 160;
+
     on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
-      material.setUniform('time', now);
+      sun.position.set(Math.cos(now * 0.2) * SUN_RADIUS, SUN_HEIGHT, Math.sin(now * 0.2) * SUN_RADIUS);
+      mesh.setUniform('time', now);
       mesh.update();
     });
 
@@ -100,7 +110,14 @@ import {description, title} from './_animated-billboards.json';
     plane.rotation.x = -Math.PI / 2;
     plane.rotation.z = Math.PI;
 
+    // the transparent ground is drawn before the shadow (-1), which writes no depth and lies on it
+    plane.renderOrder = -2;
+
     demo.scene.add(plane);
+
+    // the front face of the ground looks up: rotation.x = -π/2 turns its normal +Z to +Y
+    mesh.bindUniform('groundPlane', planeOf(plane));
+    mesh.bindUniform('shadowLight', lightOf(sun));
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('FeatureSprites', mesh);

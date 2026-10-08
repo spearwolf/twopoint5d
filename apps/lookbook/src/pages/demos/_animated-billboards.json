@@ -1,14 +1,16 @@
 {
   "title": "animated billboards",
   "shortDescription": "Four hundred animated sprites bouncing over a ground plane, drawn as billboards that face the camera",
-  "description": "A `FeatureSprites` mesh of the `AnimatedSpriteKind` preset with room for 400 sprites, whose `FeatureSpritesMaterial` runs with `placement: BillboardPlacement` and with depth test and depth write switched on, so the sprites turn towards the orbiting camera and hide each other in the right order. Unlike in *animated sprites*, the animation is built in code rather than read from the texture catalog: `FrameBasedAnimations.add()` takes a name, a duration of 0.66 seconds, the `TileSet` and the tile ids of the frames. `bakeDataTexture()` turns the animations into the `animsMap` of the material, and the `time` uniform of the material drives them each frame. The ground is a plain three.js `PlaneGeometry` — the sprites share the scene with any other three.js object.",
+  "description": "A `FeatureSprites` mesh of the `AnimatedSpriteKind` preset with room for 400 sprites, which runs with `placement: BillboardPlacement` and with depth test and depth write switched on, so the sprites turn towards the orbiting camera and hide each other in the right order. Unlike in *animated sprites*, the animation is built in code rather than read from the texture catalog: `FrameBasedAnimations.add()` takes a name, a duration of 0.66 seconds, the `TileSet` and the tile ids of the frames. `bakeDataTexture()` turns the animations into the `animsMap` of the mesh, and the `time` uniform drives them each frame. The ground is a plain three.js `PlaneGeometry` — the sprites share the scene with any other three.js object. A `ShadowPass` throws the shadow of every billboard onto the ground: `bindUniform()` binds `groundPlane` to the ground mesh through `planeOf()` and `shadowLight` to a circling `DirectionalLight` through `lightOf()`.",
   "url": "/demos/animated-billboards",
   "tags": [
     "FeatureSprites",
     "FeatureSpritesGeometry",
-    "FeatureSpritesMaterial",
     "AnimatedSpriteKind",
     "FrameBasedAnimations",
+    "ShadowPass",
+    "planeOf",
+    "lightOf",
     "TextureStore",
     "tilesets",
     "textures",
