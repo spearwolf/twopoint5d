@@ -289,6 +289,12 @@ lights, is close to right.
 
 ## 8. Files
 
+`docs/sprites.md` grows with the features, not after them: every step that adds or changes a
+public symbol — a source, `bindUniform()`, `shadowLight`, the hook, `enabled`, `uniformNames` —
+brings its section of `docs/sprites.md` in the same commit, with a `ts check` block where the
+usage stands on its own, and states what works and what does not (§7). A user or an agent who
+reads `docs/sprites.md` alone knows how to use each feature and where it stops.
+
 | File | Change |
 | --- | --- |
 | `src/sprites/bindings/SpriteUniformSource.ts` | the interface |
