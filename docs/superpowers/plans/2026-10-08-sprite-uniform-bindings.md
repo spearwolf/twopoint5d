@@ -487,7 +487,7 @@ Expected: PASS, all sprite specs.
 A second light throws a second shadow through a renamed copy of `ShadowPass`: the same features,
 uniforms of other names.
 
-```ts check
+```ts
 import {definePass, FeatureSprites, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 
 export const MoonShadowPass = definePass({
@@ -800,7 +800,7 @@ Expected: PASS, the allocation test included (`pnpm test:allocations` runs it in
 - the two presets paragraph: `ShadowPass` carries the hook `shadowFallsOnPlane`.
 - a new subsection paragraph **Leaving a pass out for a frame.** — the `visible` hook (signature, when it runs, that it reads through `uniformNames`, must allocate nothing), what `ShadowPass` checks (spec §5, both cases with the cosine), the new convention "the sprites stand on the side the normal of `groundPlane` points to", and `FeatureSpritesPass#enabled` (`sprites.passes['shadow']!.enabled = false`) instead of `visible`. A `ts check` block:
 
-```ts check
+```ts
 import {definePass, FeatureSprites, ReflectionPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import type {Vector4} from 'three/webgpu';
 
@@ -1387,7 +1387,7 @@ Expected: PASS. If an allocation test fails, a source or `update()` hands a frac
 - What does not work (spec §7): sprites below the plane, a finite ground, a light per sprite.
 - One `ts check` block:
 
-```ts check
+```ts
 import {FeatureSprites, lightOf, planeOf, ReflectionPass, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {DirectionalLight, Mesh, MeshBasicNodeMaterial, PlaneGeometry, Scene} from 'three/webgpu';
 
