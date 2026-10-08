@@ -111,7 +111,7 @@ describe('vertex-objects — dispose', function () {
     const mesh = new VertexObjects(geometry, new MeshBasicMaterial());
     await renderOnce(mesh);
 
-    // the path a consumer walks: TexturedSprites#dispose() calls geometry.dispose()
+    // the path a consumer walks: FeatureSprites#dispose() calls geometry.dispose()
     // on a geometry that has rendered
     scene.remove(mesh);
     display.renderer.render(scene, camera);

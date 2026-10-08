@@ -7,12 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add sprite kinds made of features: `defineFeature()` checks one feature and freezes it, `defineSprite()` merges a base and a list of features into a `SpriteKind` — one instanced vertex object description, the sprite-handle methods of every feature and a pipeline of shader stages (frame slot, trim shift, local stages, one placement, mesh stages; color source, color stages) — and `SpriteOf<typeof Kind>` names the type of its sprite handle. `LocalOrder`, `MeshOrder` and `ColorOrder` name the order bands of the stages. `docs/sprites.md` is the guide, with the rules of each feature field under "Writing a feature"
+- add the built-in features `InstancePosition`, `FlatPlacement`, `BillboardPlacement`, `QuadSize`, `Shear`, `Rotation`, `AtlasFrame`, `AnimatedFrames`, `TextureColor` and `Tint`. They keep the attribute names, usage words and sprite-handle methods of the textured and animated sprites; `Shear` is new: `shearX`, `shearY` and `setShear()`, a dynamic attribute, sheared after the size and before the rotation
+- add `QuadBase`, the quad of four vertices with `position` and `uv` every built-in kind is drawn from, and the `SpriteBase` contract a base of one's own fulfils
+- add `FeatureSprites`, the mesh of a sprite kind: it builds the `FeatureSpritesGeometry` and the `FeatureSpritesMaterial` it is not handed, releases only those in `dispose()`, and offers `createSprite()`, `freeSprite()`, `spritePool`, `placement`, `uniforms`, `setUniform()`, `getTexture()`, `setTexture()` and `touchTexture()`
+- add `FeatureSpritesGeometry` (`capacity`, `attributeUsage` by attribute name or usage word, `baseArgs`) and `FeatureSpritesMaterial`, which folds the pipeline of a kind into `positionNode` and `colorNode` and rebuilds a graph only when the kind of a texture it reads changes
+- add `SpriteResources`: the uniforms and textures the features of a kind declare, held once and shareable between materials; a texture of the same kind takes the place of the one set without a rebuild
+- add the placement swap on a live material: `FeatureSpritesMaterial#placement` (and `FeatureSprites#placement`) takes another placement that brings nothing but its stage, `BillboardPlacement` for `FlatPlacement` and back, and rebuilds the position graph alone
+- add the presets `TexturedSpriteKind` and `AnimatedSpriteKind`, which draw what `TexturedSprites` and `AnimatedSprites` drew, and the types of their sprite handles `TexturedSprite` and `AnimatedSprite`
+
 ### Changed
 
 - upgrade the `three` peer dependency to `~0.186.1` (was `~0.185.1`) and `@types/three` to `~0.186.0`. three 0.186 makes `Renderer.dispose()` asynchronous — the WebGL backend loses its context only after an await of its own — so the release of a `Display` now awaits `renderer.dispose()` before it hands a canvas back with a restorable context
 - `TexturedSprites#dispose()`, `AnimatedSprites#dispose()` and `Map2D#dispose()` override the `Object3D.dispose()` that three 0.186 introduces and fire its `dispose` event, so the renderer drops the render objects it built for the mesh — also those of a geometry or a material handed to the constructor, which the mesh leaves alive. The sprites fire it once; a second call still does nothing
 - an attribute of `int8` or `int16` with a single value and without `normalized` is laid out as `int32`, one of `uint8` or `uint16` as `uint32`: three builds no vertex format of one value for these types. `VertexAttributeDescriptor#dataType` answers the 32-bit type, and the buffer, its default `bufferName` (`static_int32` instead of `static_int16`, for one), the buffers data and the arrays the getter answers follow it. The attribute holds every value of the 32-bit type; a value its declared type would have wrapped is stored as it is
 - the gpu reads the arrays of the pool as the descriptor lays them out, and nothing is copied on the way. A buffer of `int8`, `uint8`, `int16` or `uint16` without `normalized` reaches three as an `InterleavedBuffer` — also one that holds a single attribute without padding — because three widens such an array to 32 bits only as a `BufferAttribute`, and the geometry then copied every upload into that copy. `getAttribute()` answers an `InterleavedBufferAttribute` for such an attribute; its `array` is the array of the pool, its `version` and `updateRanges` sit on `data`
+
+### Removed
+
+- remove `TexturedSprites`, `TexturedSpritesGeometry`, `TexturedSpritesMaterial`, `TexturedSpriteDescriptor` and the class `TexturedSprite`, with `TexturedSpritesPool`, `TexturedSpritesBasePool`, `TexturedSpritesMakeBaseSpriteArgs`, `TexturedSpritesGeometryParameters` and `TexturedSpritesMaterialParameters` (**BREAKING**). `TexturedSprite` is now the type of the sprite handle of `TexturedSpriteKind`, a type only. See the Migration Guide
+- remove `AnimatedSprites`, `AnimatedSpritesGeometry`, `AnimatedSpritesMaterial`, `AnimatedSpriteDescriptor` and the class `AnimatedSprite`, with `AnimatedSpritesPool`, `AnimatedSpritesBasePool`, `AnimatedSpritesMakeBaseSpriteArgs`, `AnimatedSpritesGeometryParameters` and `AnimatedSpritesMaterialParameters` (**BREAKING**). `AnimatedSprite` is now the type of the sprite handle of `AnimatedSpriteKind`, a type only
+- remove `BaseSprite` and `BaseSpriteDescriptor` (**BREAKING**); `QuadBase` and `QuadBase.description` take their place
+- remove the `TAttributeNode*` types — `TAttributeNodeQuadSize`, `TAttributeNodeTexCoords`, `TAttributeNodeTexFlipDiagonal`, `TAttributeNodeTexTrim`, `TAttributeNodeVertexPosition`, `TAttributeNodeInstancePosition`, `TAttributeNodeRotation`, `TAttributeNodeColor` — and the `*AttributeName` statics of the removed materials (**BREAKING**)
+- remove the deprecated aliases `TexturedSpritePool`, `TexturedSpriteMakeBaseSpriteArgs` and `TexturedSpriteGeometryParameters` of the plural types (**BREAKING**)
 
 ### Fixed
 
@@ -89,6 +108,105 @@ const uploads = (geometry.getAttribute('rgba') as BufferAttribute).version;
 ```ts
 const uploads = (geometry.getAttribute('rgba') as InterleavedBufferAttribute).data.version;
 ```
+
+#### TexturedSprites and AnimatedSprites become sprite kinds
+
+`FeatureSprites` with `TexturedSpriteKind` or `AnimatedSpriteKind` draws what the removed meshes drew; the sprite handles keep their attribute and method names. Textures and uniforms are set by name, the billboard toggle is a swap of the placement, and a node setter of the old materials becomes a feature of one's own (`docs/sprites.md`, "Writing a feature").
+
+| before | after |
+| --- | --- |
+| `new TexturedSprites(capacity, texture)` | `new FeatureSprites(TexturedSpriteKind, {capacity, textures: {colorMap: texture}})` |
+| `new TexturedSprites(n, {renderAsBillboards: true})` | `new FeatureSprites(TexturedSpriteKind, {capacity: n, placement: BillboardPlacement})` |
+| `material.renderAsBillboards = b` | `sprites.placement = b ? BillboardPlacement : FlatPlacement` |
+| `sprites.texture = t`, `material.colorMap = t` | `sprites.setTexture('colorMap', t)` |
+| `new AnimatedSpritesMaterial({colorMap, animsMap, time})` | `new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}})` |
+| `material.time = t` | `sprites.setUniform('time', t)` |
+| `material.touchAnimsMap()` | `sprites.touchTexture('animsMap')` |
+| `new TexturedSpritesGeometry(n, [hw, hh, ox, oy])` | `new FeatureSpritesGeometry(TexturedSpriteKind, {capacity: n, baseArgs: [hw, hh, ox, oy]})` |
+| `TexturedSpritesPool`, `AnimatedSpritesPool` | `VertexObjectPool<TexturedSprite>`, `VertexObjectPool<AnimatedSprite>` |
+| `BaseSprite`, `BaseSpriteDescriptor` | `QuadBase`, `QuadBase.description` |
+| `TexturedSpriteDescriptor`, `AnimatedSpriteDescriptor` | `TexturedSpriteKind.description`, `AnimatedSpriteKind.description` |
+| `material.rotationNode = node` and the other node setters | a feature of your own in the slot (see "Writing a feature" in `docs/sprites.md`) |
+| `TAttributeNode*` types, `*AttributeName` statics | — (`Node<'vec3'>` and the attribute names of the features) |
+
+**Before**
+
+```ts
+import {TexturedSprites} from '@spearwolf/twopoint5d';
+
+const sprites = new TexturedSprites(1000, colorMap);
+sprites.material!.renderAsBillboards = true;
+
+const sprite = sprites.createSprite()!;
+sprite.setSize(32, 32);
+sprite.setFrame(atlas.frame('hero'));
+
+// later
+sprites.texture = otherColorMap;
+sprites.material!.renderAsBillboards = false;
+```
+
+**After**
+
+```ts
+import {BillboardPlacement, FeatureSprites, FlatPlacement, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {
+  capacity: 1000,
+  textures: {colorMap},
+  placement: BillboardPlacement,
+});
+
+const sprite = sprites.createSprite()!;
+sprite.setSize(32, 32);
+sprite.setFrame(atlas.frame('hero'));
+
+// later
+sprites.setTexture('colorMap', otherColorMap);
+sprites.placement = FlatPlacement;
+```
+
+**Before**
+
+```ts
+import {AnimatedSprites} from '@spearwolf/twopoint5d';
+
+const sprites = new AnimatedSprites(1000, {colorMap, animsMap, time: 0});
+
+const sprite = sprites.createSprite()!;
+sprite.animId = anims.animId('walk');
+
+// once the animsMap has loaded
+sprites.material!.touchAnimsMap();
+
+// every frame
+sprites.material!.time = now;
+sprites.update();
+```
+
+**After**
+
+```ts
+import {AnimatedSpriteKind, FeatureSprites} from '@spearwolf/twopoint5d';
+
+const sprites = new FeatureSprites(AnimatedSpriteKind, {
+  capacity: 1000,
+  textures: {colorMap, animsMap},
+  uniforms: {time: 0},
+});
+
+const sprite = sprites.createSprite()!;
+sprite.animId = anims.animId('walk');
+
+// once the animsMap has loaded
+sprites.touchTexture('animsMap');
+
+// every frame
+sprites.setUniform('time', now);
+sprites.update();
+```
+
+`TexturedSprite` and `AnimatedSprite` are types now, not classes: an `instanceof TexturedSprite` or a class that implements the old interface has no counterpart — a sprite handle is whatever `createSprite()` answers.
 
 ## [0.22.0] - 2026-09-30
 

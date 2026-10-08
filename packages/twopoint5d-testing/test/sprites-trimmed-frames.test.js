@@ -142,7 +142,7 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
     });
   }
 
-  async function renderTexturedSprites(candidateFrameName) {
+  async function renderTexturedKind(candidateFrameName) {
     const {texture, json} = makeTrimmedSheet();
     const [atlas] = TexturePackerJson.parse(json);
 
@@ -172,7 +172,7 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
     return pixels;
   }
 
-  async function renderAnimatedSprites(candidateFrameQuery) {
+  async function renderAnimatedKind(candidateFrameQuery) {
     const {texture, json} = makeTrimmedSheet();
     const [atlas] = TexturePackerJson.parse(json);
 
@@ -218,19 +218,19 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
   }
 
   it('TexturedSpriteKind draws a trimmed frame where its untrimmed sprite has it', async function () {
-    expectSameCells(await renderTexturedSprites('trimmed'));
+    expectSameCells(await renderTexturedKind('trimmed'));
   });
 
   it('TexturedSpriteKind draws a trimmed frame the packer turned where its untrimmed sprite has it', async function () {
-    expectSameCells(await renderTexturedSprites('trimmed-turned'));
+    expectSameCells(await renderTexturedKind('trimmed-turned'));
   });
 
   it('AnimatedSpriteKind draws the frame of a trimmed animation where its untrimmed sprite has it', async function () {
-    expectSameCells(await renderAnimatedSprites('^trimmed$'));
+    expectSameCells(await renderAnimatedKind('^trimmed$'));
   });
 
   it('AnimatedSpriteKind draws the frame of a trimmed animation the packer turned where its untrimmed sprite has it', async function () {
     // the bake then carries the diagonal flip and the margins of the frame
-    expectSameCells(await renderAnimatedSprites('^trimmed-turned$'));
+    expectSameCells(await renderAnimatedKind('^trimmed-turned$'));
   });
 });

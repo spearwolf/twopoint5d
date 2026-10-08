@@ -98,6 +98,18 @@ describe('AtlasFrame', () => {
     pool.dispose();
   });
 
+  test('prepareSpriteFrame() carries 1 for a frame with FLIP_DIAGONAL, and setPreparedFrame() writes it', () => {
+    const pool = makePool();
+    const sprite = pool.createVO()!;
+    const prepared = prepareSpriteFrame(flippedFrame);
+
+    sprite.setPreparedFrame(prepared);
+
+    expect(prepared.texFlipDiagonal).toBe(1);
+    expect(sprite.texFlipDiagonal).toBe(1);
+    pool.dispose();
+  });
+
   test('prepareSpriteFrame() takes a snapshot of the frame', () => {
     const coords = new TextureCoords(new TextureCoords(0, 0, 4, 2), 1, 1, 3, 2);
     const prepared = prepareSpriteFrame({coords});

@@ -1,6 +1,6 @@
 import {createEffect, getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {NearestFilter, Texture, Vector2, Vector3} from 'three/webgpu';
+import {NearestFilter, Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {defineFeature} from '../SpriteFeature.js';
@@ -45,6 +45,29 @@ describe('SpriteResources', () => {
     expect(resources.uniforms['light']!.value).toEqual(new Vector3(1, 2, 3));
     expect(() => resources.setUniform('light', 1, 2)).toThrow(
       'SpriteResources: the uniform "light" is a vec3 and takes 3 values',
+    );
+    resources.dispose();
+  });
+
+  test('holds a vec2 and a vec4 uniform, and takes start values for them', () => {
+    const shaped = defineFeature({name: 'shaped', uniforms: {offset: [1, 2], tint: [1, 1, 1, 1]}});
+    const resources = new SpriteResources([shaped], {uniforms: {tint: [0.5, 0.25, 0, 1]}});
+
+    expect(resources.uniforms['offset']!.value).toEqual(new Vector2(1, 2));
+    expect(resources.uniforms['tint']!.value).toEqual(new Vector4(0.5, 0.25, 0, 1));
+    resources.setUniform('offset', 3, 4);
+    resources.setUniform('tint', 0, 0, 1, 0.5);
+    expect(resources.uniforms['offset']!.value).toEqual(new Vector2(3, 4));
+    expect(resources.uniforms['tint']!.value).toEqual(new Vector4(0, 0, 1, 0.5));
+    resources.dispose();
+  });
+
+  test('refuses more values than a float uniform takes', () => {
+    const resources = new SpriteResources([anim]);
+
+    expect(() => resources.setUniform('time', 1, 2)).toThrow('SpriteResources: the uniform "time" is a float and takes 1 value');
+    expect(() => new SpriteResources([anim], {uniforms: {time: [1, 2]}})).toThrow(
+      'SpriteResources: the uniform "time" is a float and takes 1 value',
     );
     resources.dispose();
   });

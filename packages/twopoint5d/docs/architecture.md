@@ -32,7 +32,7 @@ The stack is strictly bottom-up. A lower layer never imports from a higher one.
 ```
 controls/         input: the pan control
 map2d/            Tiled-style streaming maps
-sprites/          ready-made sprite meshes
+sprites/          sprite kinds built from features
 stage/            scenes, projections, render pipeline
 display/          canvas, renderer, frame loop
 texture/          atlases, tile sets, resource cache
@@ -102,8 +102,8 @@ always builds a new one, and pools handed the same descriptor share it. The spri
 tile geometries build their pools from the description constants of their modules, so
 one loop over the sprites of several geometries of one type sees one prototype — in the
 bench, one writer for six pools of one description runs as fast as a writer per pool. A
-`TexturedSpritesGeometry` built with `attributeUsage` copies the sprite description and
-shares its prototype with no other geometry. An accessor call that V8 does not inline
+`FeatureSpritesGeometry` built with `attributeUsage` copies the description of its sprite
+kind and shares its prototype with no other geometry. An accessor call that V8 does not inline
 pays for the shared caches, about twice the time per call across six descriptors.
 Accessors generated per descriptor with `new Function` would help only there, and they
 would need `unsafe-eval` in the Content Security Policy of every application that turns
@@ -124,7 +124,7 @@ older way and deprecated; they pad an image to power-of-two sides, hand out its
 coordinates as a child of the padded canvas and start from the texture class `nearest`,
 where the store loads the image as it is, with its coordinates at the root, and starts
 from no texture class. `FrameBasedAnimations` turns a sequence of atlas frames into the
-timing data the animated sprite material reads.
+timing data the `AnimatedFrames` sprite feature reads.
 
 ### `display/`
 
@@ -149,23 +149,34 @@ cheat-sheet, including render-target ownership, is
 
 ### `sprites/`
 
-Ready-made vertex-object descriptions plus their geometry and a `NodeMaterial` whose
-shader is built with TSL (`three/tsl`): `TexturedSprites` for static atlas frames,
-`AnimatedSprites` for frame-based animation. Each comes as a triple — descriptor,
-`*Geometry`, `*Material` — and `BaseSprite` holds what they share. New sprite types
-follow that same triple. Both meshes take a capacity, geometry parameters or a geometry,
-and material parameters or a material (`TexturedSprites` a `Texture` as well), build
-what they are not handed, release only that in `dispose()`, and offer `createSprite()`,
-`freeSprite()` and `spritePool`. The orientation of a frame reaches the shader in two
-parts: `s`, `t`, `u` and `v` of the tex coords carry where the frame lies and its
-horizontal and vertical flip, and the diagonal flip of a turned frame travels as
-`texFlipDiagonal` — an instance attribute of `TexturedSprites` and of the `TileSprites`
-in `map2d/`, and the second texel of a frame in the `animsMap` of `AnimatedSprites`.
-`colorFromTextureByTexCoords()` swaps the two components of its lookup by that value.
+Sprites are defined as kinds made of features. `defineSprite()` merges a base — `QuadBase`,
+the quad every built-in kind is drawn from — and a list of features (`InstancePosition`,
+`QuadSize`, `Rotation`, `AtlasFrame`, `Tint` and the others) into a sprite kind: one merged
+instanced vertex-object description, so one pool and one sprite handle per kind, and the
+pipeline the features' shader stages form — a frame slot, the trim shift, local stages,
+exactly one placement and mesh stages on the vertex side, a color source and color stages on
+the fragment side, each slot sorted by `order`. `FeatureSpritesGeometry` holds the sprites of
+a kind, `FeatureSpritesMaterial` folds its pipeline into the `positionNode` and `colorNode` of
+a `NodeMaterial` built with TSL (`three/tsl`), and `SpriteResources` holds the uniforms and
+textures the features declare, shareable between materials. `FeatureSprites` is the mesh: it
+builds the geometry and the material it is not handed, releases only that in `dispose()`,
+and offers `createSprite()`, `freeSprite()` and `spritePool`. `TexturedSpriteKind` and
+`AnimatedSpriteKind` are the presets for static atlas frames and frame-based animation. The
+mesh slot after the placement is where the stages of passes over a kind — shadows, mirrors —
+go. The guide, with the rules of each feature field and the migration from the earlier
+sprite classes, is [`docs/sprites.md`](./sprites.md).
+
+The orientation of a frame reaches the shader in two parts: `s`, `t`, `u` and `v` of the
+tex coords carry where the frame lies and its horizontal and vertical flip, and the diagonal
+flip of a turned frame travels as `texFlipDiagonal` — an instance attribute of `AtlasFrame`
+and of the `TileSprites` in `map2d/`, and the second texel of a frame in the `animsMap` that
+`AnimatedFrames` reads. The lookup of `TextureColor`, like `colorFromTextureByTexCoords()`,
+swaps its two components by that value.
+
 Where a trimmed frame lies in its untrimmed sprite travels as `texTrim`, the margins the
-packer cut off — an instance attribute of `TexturedSprites` and the third texel of a
-frame in the `animsMap` of `AnimatedSprites` — and the sprite materials move the corners
-of the quad by them.
+packer cut off — an instance attribute of `AtlasFrame` and the third texel of a frame in the
+`animsMap` that `AnimatedFrames` reads — and the sprite material moves the corners of the
+quad by them before every local stage.
 
 ### `map2d/`
 

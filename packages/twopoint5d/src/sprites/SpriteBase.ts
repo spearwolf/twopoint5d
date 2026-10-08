@@ -91,7 +91,10 @@ class QuadBasePrototype {
   }
 }
 
-/** The quad every built-in sprite kind is drawn from — the `BaseSpriteDescriptor` of the old sprites. */
+/**
+ * The quad every built-in sprite kind is drawn from: four vertices with `position` and `uv`, two
+ * triangles, and a `make(halfWidth, halfHeight, xOffset, yOffset)` that lays them out.
+ */
 export const QuadBase: SpriteBase<QuadBaseArgs> = Object.freeze({
   name: 'quad',
   description: {

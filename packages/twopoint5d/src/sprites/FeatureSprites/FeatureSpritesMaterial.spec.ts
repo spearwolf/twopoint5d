@@ -1,6 +1,6 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {add} from 'three/tsl';
+import {add, vec3} from 'three/tsl';
 import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
 import {AdditiveBlending, NearestFilter, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
@@ -38,6 +38,9 @@ const recorder = (name: string, slot: 'local' | 'mesh' | 'color', order: number)
       },
     },
   } as unknown as SpriteFeature);
+// a recorder that declares a texture of its own and so waits for it
+const waiting = (name: string, slot: 'local' | 'mesh' | 'color', order: number): SpriteFeature =>
+  defineFeature({...recorder(name, slot, order), textures: {[`${name}Map`]: {}}});
 const recordingPlacement = defineFeature({
   name: 'recordingPlacement',
   requires: ['instancePosition'],
@@ -213,6 +216,32 @@ describe('FeatureSpritesMaterial', () => {
       material.dispose();
     });
 
+    test('leaves out a local, a mesh or a color stage until the texture it declares is set', () => {
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [
+          InstancePosition,
+          recordingPlacement,
+          waiting('wobble', 'local', 300),
+          waiting('mirror', 'mesh', 300),
+          waiting('mask', 'color', 150),
+        ],
+      });
+      const material = new FeatureSpritesMaterial(kind);
+
+      expect(calls).toEqual(['placement']);
+      for (const [textureName, rebuilt] of [
+        ['wobbleMap', ['wobble', 'placement']],
+        ['mirrorMap', ['wobble', 'placement', 'mirror']],
+        ['maskMap', ['mask']],
+      ] as const) {
+        calls.length = 0;
+        material.setTexture(textureName, new Texture());
+        expect(calls, textureName).toEqual(rebuilt);
+      }
+      material.dispose();
+    });
+
     test('throws, naming the feature and the attribute, for a stage that reads an attribute the kind does not hold', () => {
       const typo = defineFeature({
         name: 'typo',
@@ -326,6 +355,18 @@ describe('FeatureSpritesMaterial', () => {
       expect(() => {
         material.placement = anchored;
       }).toThrow('FeatureSpritesMaterial: feature "anchored" requires feature "anchor", which the sprite kind does not hold');
+      material.dispose();
+    });
+
+    test('takes a placement that requires nothing', () => {
+      const lifted = defineFeature({name: 'lifted', placement: (local) => add(local, vec3(0, 0, 1))});
+      const material = new FeatureSpritesMaterial(TexturedKind);
+      const {positionNode} = material;
+
+      material.placement = lifted;
+
+      expect(material.placement).toBe(lifted);
+      expect(material.positionNode).not.toBe(positionNode);
       material.dispose();
     });
 

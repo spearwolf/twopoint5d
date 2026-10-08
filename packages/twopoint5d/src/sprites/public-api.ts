@@ -1,8 +1,3 @@
-export * from './AnimatedSprites/AnimatedSprite.js';
-export * from './AnimatedSprites/AnimatedSprites.js';
-export * from './AnimatedSprites/AnimatedSpritesGeometry.js';
-export * from './AnimatedSprites/AnimatedSpritesMaterial.js';
-export * from './BaseSprite.js';
 export * from './defineSprite.js';
 export * from './features/AnimatedFrames.js';
 export * from './features/AtlasFrame.js';
@@ -23,7 +18,3 @@ export * from './presets.js';
 export * from './SpriteBase.js';
 export * from './SpriteFeature.js';
 export type {SpritePipeline} from './spritePipeline.js';
-export * from './TexturedSprites/TexturedSprite.js';
-export * from './TexturedSprites/TexturedSprites.js';
-export * from './TexturedSprites/TexturedSpritesGeometry.js';
-export * from './TexturedSprites/TexturedSpritesMaterial.js';

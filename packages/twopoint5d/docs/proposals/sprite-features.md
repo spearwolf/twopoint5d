@@ -1,8 +1,20 @@
 # Proposal: composable sprite features
 
-Status: **design sketch** — nothing here is implemented. Checked against the sources of
-`sprites/`, `vertex-objects/` and `map2d/TileSprites/` on 2026-10-07. Open questions are
-collected in §9.
+Status: **implemented** in phase 1 (§1–§5, the presets of §5.3 as replacements, not
+wrappers) — see [`docs/sprites.md`](../sprites.md); §6 lands with phase 2 of the plan.
+Deviations:
+
+- the old classes — `TexturedSprites`, `AnimatedSprites`, their geometries, materials and
+  descriptors, and `BaseSprite` — are removed rather than wrapped (§5.3);
+- textures and uniforms live in `SpriteResources`, written through `setTexture()` and
+  `setUniform()`, not through accessors of the material;
+- a stage samples only the textures its own feature declares;
+- a placement may not declare textures — it runs always and cannot wait for one;
+- `ShadowPass` takes no `without: ['tint']` (§6.3).
+
+The sketch below was checked against the sources of `sprites/`, `vertex-objects/` and
+`map2d/TileSprites/` on 2026-10-07 and describes the classes of that day as "today"; it is
+kept as it was written. Open questions are collected in §9.
 
 ## 1. Goal
 

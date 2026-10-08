@@ -1,4 +1,4 @@
-import {defineSprite} from './defineSprite.js';
+import {defineSprite, type SpriteOf} from './defineSprite.js';
 import {AnimatedFrames} from './features/AnimatedFrames.js';
 import {AtlasFrame} from './features/AtlasFrame.js';
 import {FlatPlacement} from './features/FlatPlacement.js';
@@ -23,3 +23,9 @@ export const AnimatedSpriteKind = defineSprite({
   base: QuadBase,
   features: [InstancePosition, FlatPlacement, QuadSize, Rotation, AnimatedFrames, TextureColor],
 });
+
+/** The sprite handle of {@link TexturedSpriteKind}. */
+export type TexturedSprite = SpriteOf<typeof TexturedSpriteKind>;
+
+/** The sprite handle of {@link AnimatedSpriteKind}. */
+export type AnimatedSprite = SpriteOf<typeof AnimatedSpriteKind>;

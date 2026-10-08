@@ -357,7 +357,9 @@ Two kinds ship ready-made, with the layout, the names and the start values of th
 animated sprites of earlier versions: `TexturedSpriteKind` (`InstancePosition`, `FlatPlacement`,
 `QuadSize`, `Rotation`, `AtlasFrame`, `TextureColor`, `Tint`) and `AnimatedSpriteKind` (`InstancePosition`,
 `FlatPlacement`, `QuadSize`, `Rotation`, `AnimatedFrames`, `TextureColor` — no tint). Both sit on `QuadBase`.
-A kind with one more feature is a `defineSprite()` away.
+A kind with one more feature is a `defineSprite()` away. `TexturedSprite` and `AnimatedSprite` are
+their sprite handles, `SpriteOf<typeof TexturedSpriteKind>` and `SpriteOf<typeof AnimatedSpriteKind>`:
+the type of a pool or a function that takes their sprites, `VertexObjectPool<TexturedSprite>`.
 
 ```ts check
 import {FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
@@ -426,13 +428,152 @@ export function frame(now: number) {
 }
 ```
 
+## Writing a feature
+
+A feature is a plain object handed to `defineFeature()`, which checks it on its own and freezes
+it. This one fades a sprite out: an attribute of one value per sprite, a property `fade` on the
+handle, a start value of 1, and a color stage that multiplies the alpha by it.
+
+```ts check
+import {
+  ColorOrder,
+  defineFeature,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  Tint,
+  AtlasFrame,
+} from '@spearwolf/twopoint5d';
+import {mul, vec4} from 'three/tsl';
+import type {Node} from 'three/webgpu';
+
+export interface FadeApi {
+  /** 1 draws the sprite as it is, 0 makes it invisible. */
+  fade: number;
+}
+
+export const Fade = defineFeature<FadeApi>({
+  name: 'fade',
+  attributes: {fade: {size: 1}},
+  initialize() {
+    this.fade = 1;
+  },
+  color: {
+    order: ColorOrder.Fade,
+    transform: (color, {attribute}) =>
+      vec4(color.rgb, mul(color.a, attribute<'float'>('fade'))) as unknown as Node<'vec4'>,
+  },
+});
+
+const FadingSprite = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint, Fade],
+});
+
+const sprites = new FeatureSprites(FadingSprite, {capacity: 100, transparent: true});
+const sprite = sprites.createSprite();
+if (sprite != null) sprite.fade = 0.5;
+sprites.dispose();
+```
+
+The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
+
+- **`name`** — required, unique within a kind; every error about the feature names it, and
+  `requires` of other features refers to it.
+- **`attributes`** — instance attributes in the form of a vertex object description (see
+  `src/vertex-objects/README.md`). They are merged into the one description of the kind, so an
+  attribute name is unique across the features and must not be one of the base (`position`,
+  `uv`); the merged layout has to fit into one sprite. An attribute is `static` unless it says
+  otherwise: give one that changes every frame `usage: 'dynamic'`.
+- **`usageAliases`** — words a caller of `attributeUsage` may use for attributes of this feature,
+  `{size: ['quadSize']}`. A word is unique across the kind, names only attributes of its own
+  feature, and may be named like one of them (`texCoords` of `AtlasFrame`).
+- **`methods`** — methods of the sprite handle, `this` being the sprite. Every property the
+  attributes generate and every method name is unique across the kind. A method that hands
+  fractional values of its caller to a generated setter writes them into a tuple declared once at
+  module level and hands that on, as `setSize()` of `QuadSize` does: separate arguments of a call
+  V8 does not inline are boxed, 16 bytes each.
+- **`initialize()`** — writes the neutral values into a slot `createSprite()` hands out: a freed
+  slot comes back with the values of its last sprite, and without `initialize()` a new sprite
+  keeps them. It runs for every sprite created, so it allocates nothing.
+- **`uniforms`** — start values by name: a number for a `float`, 2 to 4 numbers for a `vec2` to
+  `vec4`. A name is unique across the kind. Every stage of the kind reads every uniform, through
+  `uniform(name)` of its context.
+- **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
+  counts as set only once its image has measures. A name is unique across the kind. The textures
+  stay the caller's. Until all of them are set the feature drops out of the graph.
+- **`frame`** — the frame slot, at most one feature per kind: answers `texCoords`, and optionally
+  `flipDiagonal` and `trim`, read by both pipelines.
+- **`local`**, **`mesh`**, **`color`** — a stage `{order, transform}` in its slot; `order` is a
+  finite number, lower runs first, and a tie keeps the order of the feature list. `LocalOrder`,
+  `MeshOrder` and `ColorOrder` name the bands.
+- **`placement`** — maps the local vertex into the local space of the mesh: exactly one feature of
+  a kind, and it declares no textures, since the placement runs always.
+- **`colorSource`** — the color before the color stages, at most one feature per kind.
+- **`requires`** — names of other features that have to be part of the same kind; never the
+  feature's own name.
+
+A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
+`uniform(name)` for a uniform any feature of the kind declares, and `sample(name, uv)` and
+`textureSize(name)` for a texture the feature declares itself. The material throws, naming the
+feature, for any other name.
+
+A feature that brings nothing but a stage reads what other features hold, and says so with
+`requires`: `defineSprite()` then refuses a kind without them, naming both features, instead of
+the material failing on a missing attribute or uniform. This one lets sprites bob up and down,
+reading the `instancePosition` of `InstancePosition` and the `time` uniform of `AnimatedFrames`:
+
+```ts check
+import {defineFeature, MeshOrder} from '@spearwolf/twopoint5d';
+import {add, sin, vec3} from 'three/tsl';
+import type {Node} from 'three/webgpu';
+
+export const Bob = defineFeature({
+  name: 'bob',
+  requires: ['instancePosition', 'animatedFrames'],
+  mesh: {
+    order: MeshOrder.Offset,
+    transform: (position, {attribute, uniform}) => {
+      const phase = add(uniform<'float'>('time'), attribute<'vec3'>('instancePosition').x);
+      return add(position, vec3(0, sin(phase), 0)) as unknown as Node<'vec3'>;
+    },
+  },
+});
+```
+
 ## Performance
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch
-  tuple, and `createSprite()` allocates the sprite and nothing else. The allocation specs
-  (`hot-path-allocations.feature-sprites.spec.ts`) hold both presets to it, and `pnpm bench` times
+  tuple, and `createSprite()` allocates the sprite and nothing else. The allocation spec
+  (`src/sprites/hot-path-allocations.spec.ts`) holds both presets to it, and `pnpm bench` times
   the hot loops of 10 000 sprites.
 - A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame
   and `setPreparedFrame()` per sprite.
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering.
+
+## Migrating from TexturedSprites and AnimatedSprites
+
+`TexturedSprites` and `AnimatedSprites`, with their geometries, materials and descriptors and
+`BaseSprite`, are gone. `FeatureSprites` with `TexturedSpriteKind` or `AnimatedSpriteKind` draws
+the same pixels, and the sprite handles keep their attribute and method names.
+
+| before | after |
+| --- | --- |
+| `new TexturedSprites(capacity, texture)` | `new FeatureSprites(TexturedSpriteKind, {capacity, textures: {colorMap: texture}})` |
+| `new TexturedSprites(n, {renderAsBillboards: true})` | `new FeatureSprites(TexturedSpriteKind, {capacity: n, placement: BillboardPlacement})` |
+| `material.renderAsBillboards = b` | `sprites.placement = b ? BillboardPlacement : FlatPlacement` |
+| `sprites.texture = t`, `material.colorMap = t` | `sprites.setTexture('colorMap', t)` |
+| `new AnimatedSpritesMaterial({colorMap, animsMap, time})` | `new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}})` |
+| `material.time = t` | `sprites.setUniform('time', t)` |
+| `material.touchAnimsMap()` | `sprites.touchTexture('animsMap')` |
+| `new TexturedSpritesGeometry(n, [hw, hh, ox, oy])` | `new FeatureSpritesGeometry(TexturedSpriteKind, {capacity: n, baseArgs: [hw, hh, ox, oy]})` |
+| `TexturedSpritesPool`, `AnimatedSpritesPool` | `VertexObjectPool<TexturedSprite>`, `VertexObjectPool<AnimatedSprite>` |
+| `BaseSprite`, `BaseSpriteDescriptor` | `QuadBase`, `QuadBase.description` |
+| `TexturedSpriteDescriptor`, `AnimatedSpriteDescriptor` | `TexturedSpriteKind.description`, `AnimatedSpriteKind.description` |
+| `material.rotationNode = node` and the other node setters | a feature of your own in the slot (see "Writing a feature") |
+| `TAttributeNode*` types, `*AttributeName` statics | — (`Node<'vec3'>` and the attribute names of the features) |

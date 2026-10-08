@@ -1,6 +1,4 @@
-import type {SpriteOf, TextureAtlas, TexturedSpriteKind, VertexObjectPool} from '@spearwolf/twopoint5d';
-
-type TexturedSprite = SpriteOf<typeof TexturedSpriteKind>;
+import type {TextureAtlas, TexturedSprite, VertexObjectPool} from '@spearwolf/twopoint5d';
 
 interface BounceSprite extends TexturedSprite {
   speedX: number;
