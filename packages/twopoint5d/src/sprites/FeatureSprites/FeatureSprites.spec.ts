@@ -15,6 +15,8 @@ import {Rotation} from '../features/Rotation.js';
 import {TextureColor} from '../features/TextureColor.js';
 import {Tint} from '../features/Tint.js';
 import {definePass, type SpritePass} from '../passes/definePass.js';
+import {ReflectionPass, ShadowPass} from '../passes/passPresets.js';
+import {AnimatedSpriteKind} from '../presets.js';
 import {QuadBase} from '../SpriteBase.js';
 import {defineFeature} from '../SpriteFeature.js';
 import {FeatureSprites} from './FeatureSprites.js';
@@ -416,6 +418,14 @@ describe('FeatureSprites', () => {
       ]);
       expect(sprites.passes).toEqual({});
       geometry.dispose();
+    });
+
+    test('draws the animated sprites with the shadow and the reflection pass, all of them on one time', () => {
+      const sprites = new FeatureSprites(AnimatedSpriteKind, {passes: [ShadowPass, ReflectionPass]});
+
+      expect(sprites.passes['shadow']!.material.uniforms['time']).toBe(sprites.uniforms!['time']);
+      expect(sprites.passes['reflection']!.material.uniforms['time']).toBe(sprites.uniforms!['time']);
+      expect(() => sprites.dispose()).not.toThrow();
     });
 
     test('does not leak signals or effects with passes', () => {

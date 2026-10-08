@@ -17,11 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `SpriteResources`: the uniforms and textures the features of a kind declare, held once and shareable between materials; a texture of the same kind takes the place of the one set without a rebuild
 - add the placement swap on a live material: `FeatureSpritesMaterial#placement` (and `FeatureSprites#placement`) takes another placement that brings nothing but its stage, `BillboardPlacement` for `FlatPlacement` and back, and rebuilds the position graph alone
 - add the presets `TexturedSpriteKind` and `AnimatedSpriteKind`, which draw what `TexturedSprites` and `AnimatedSprites` drew, and the types of their sprite handles `TexturedSprite` and `AnimatedSprite`
+- add passes, other ways to draw the sprites of a kind: `definePass()` checks a pass — features that bring stages, uniforms and textures but no data, the features of the kind it leaves out (`without`), material parameters and a `renderOrder` — and freezes it. The `passes` option of `FeatureSprites` builds a `FeatureSpritesPass` for each, a child mesh over the geometry of the sprites with a material of its own, answered by `FeatureSprites#passes`; every material shares one set of uniforms and textures, a placement swap reaches every pass, `update()` uploads the geometry once for all of them, and `dispose()` releases the pass meshes with their materials. `docs/sprites.md` has the rules under "Passes: shadows and reflections"
+- add the pass features `PlanarShadow` (projects the placed vertex along `lightDirection` onto `groundPlane`), `ShadowMask` (keeps the alpha, takes `shadowColor`), `MirrorAtPlane` (mirrors the placed vertex at `mirrorPlane`) and `Darken` (multiplies by `reflectionColor`), and the passes `ShadowPass` and `ReflectionPass` built from them, both transparent, without a depth write and drawn before the sprites. `ShadowPass` leaves the tint in — `ShadowMask` replaces the color anyway, and the alpha of the tint fades the shadow with the sprite — so it draws `AnimatedSpriteKind`, which holds no tint, as well. `ReflectionPass` fades evenly; a fade by the distance from the ground is not part of it
 
 ### Changed
 
 - upgrade the `three` peer dependency to `~0.186.1` (was `~0.185.1`) and `@types/three` to `~0.186.0`. three 0.186 makes `Renderer.dispose()` asynchronous — the WebGL backend loses its context only after an await of its own — so the release of a `Display` now awaits `renderer.dispose()` before it hands a canvas back with a restorable context
-- `TexturedSprites#dispose()`, `AnimatedSprites#dispose()` and `Map2D#dispose()` override the `Object3D.dispose()` that three 0.186 introduces and fire its `dispose` event, so the renderer drops the render objects it built for the mesh — also those of a geometry or a material handed to the constructor, which the mesh leaves alive. The sprites fire it once; a second call still does nothing
+- `FeatureSprites#dispose()` and `Map2D#dispose()` override the `Object3D.dispose()` that three 0.186 introduces and fire its `dispose` event, so the renderer drops the render objects it built for the mesh — also those of a geometry or a material handed to the constructor, which the mesh leaves alive. Each fires it once; a second call still does nothing
 - an attribute of `int8` or `int16` with a single value and without `normalized` is laid out as `int32`, one of `uint8` or `uint16` as `uint32`: three builds no vertex format of one value for these types. `VertexAttributeDescriptor#dataType` answers the 32-bit type, and the buffer, its default `bufferName` (`static_int32` instead of `static_int16`, for one), the buffers data and the arrays the getter answers follow it. The attribute holds every value of the 32-bit type; a value its declared type would have wrapped is stored as it is
 - the gpu reads the arrays of the pool as the descriptor lays them out, and nothing is copied on the way. A buffer of `int8`, `uint8`, `int16` or `uint16` without `normalized` reaches three as an `InterleavedBuffer` — also one that holds a single attribute without padding — because three widens such an array to 32 bits only as a `BufferAttribute`, and the geometry then copied every upload into that copy. `getAttribute()` answers an `InterleavedBufferAttribute` for such an attribute; its `array` is the array of the pool, its `version` and `updateRanges` sit on `data`
 
@@ -119,10 +121,18 @@ const uploads = (geometry.getAttribute('rgba') as InterleavedBufferAttribute).da
 | `new TexturedSprites(n, {renderAsBillboards: true})` | `new FeatureSprites(TexturedSpriteKind, {capacity: n, placement: BillboardPlacement})` |
 | `material.renderAsBillboards = b` | `sprites.placement = b ? BillboardPlacement : FlatPlacement` |
 | `sprites.texture = t`, `material.colorMap = t` | `sprites.setTexture('colorMap', t)` |
+| `sprites.texture`, `material.colorMap`, `material.animsMap` | `sprites.getTexture('colorMap')`, `sprites.getTexture('animsMap')` |
+| `material.animsMap = t` | `sprites.setTexture('animsMap', t)` |
 | `new AnimatedSpritesMaterial({colorMap, animsMap, time})` | `new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}})` |
 | `material.time = t` | `sprites.setUniform('time', t)` |
+| `material.time` | `sprites.uniforms!['time']!.value`, a `number` |
 | `material.touchAnimsMap()` | `sprites.touchTexture('animsMap')` |
 | `new TexturedSpritesGeometry(n, [hw, hh, ox, oy])` | `new FeatureSpritesGeometry(TexturedSpriteKind, {capacity: n, baseArgs: [hw, hh, ox, oy]})` |
+| `new AnimatedSpritesGeometry(n, [hw, hh])` | `new FeatureSpritesGeometry(AnimatedSpriteKind, {capacity: n, baseArgs: [hw, hh]})` |
+| `new TexturedSpritesMaterial({colorMap, transparent: true})` | `new FeatureSpritesMaterial(TexturedSpriteKind, {textures: {colorMap}, transparent: true})` |
+| `TexturedSpritesGeometryParameters`, `AnimatedSpritesGeometryParameters` | `FeatureSpritesGeometryParameters` |
+| `TexturedSpritesMaterialParameters`, `AnimatedSpritesMaterialParameters` | `FeatureSpritesMaterialParameters`; the options of the mesh: `FeatureSpritesOptions` |
+| `TexturedSpritesMakeBaseSpriteArgs`, `AnimatedSpritesMakeBaseSpriteArgs` | `QuadBaseArgs` |
 | `TexturedSpritesPool`, `AnimatedSpritesPool` | `VertexObjectPool<TexturedSprite>`, `VertexObjectPool<AnimatedSprite>` |
 | `BaseSprite`, `BaseSpriteDescriptor` | `QuadBase`, `QuadBase.description` |
 | `TexturedSpriteDescriptor`, `AnimatedSpriteDescriptor` | `TexturedSpriteKind.description`, `AnimatedSpriteKind.description` |

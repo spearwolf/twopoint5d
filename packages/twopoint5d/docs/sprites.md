@@ -332,7 +332,8 @@ colorMap.dispose();
 ```
 
 The options are the ones of the geometry (`capacity`, `attributeUsage`, `baseArgs`) and of the
-material (`textures`, `uniforms`, `placement` and every three.js material parameter) side by side.
+material (`textures`, `uniforms`, `placement` and every three.js material parameter) side by side,
+and `passes` (see "Passes: shadows and reflections").
 `createSprite()` answers `undefined` once the pool is full. `placement`, `uniforms`, `setUniform()`,
 `getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
 
@@ -431,8 +432,9 @@ export function frame(now: number) {
 ## Writing a feature
 
 A feature is a plain object handed to `defineFeature()`, which checks it on its own and freezes
-it. This one fades a sprite out: an attribute of one value per sprite, a property `fade` on the
-handle, a start value of 1, and a color stage that multiplies the alpha by it.
+it. This one fades a sprite out: an attribute of one value per sprite, `dynamic` because a fade
+changes from frame to frame, a property `fade` on the handle, a start value of 1, and a color
+stage that multiplies the alpha by it.
 
 ```ts check
 import {
@@ -458,7 +460,7 @@ export interface FadeApi {
 
 export const Fade = defineFeature<FadeApi>({
   name: 'fade',
-  attributes: {fade: {size: 1}},
+  attributes: {fade: {size: 1, usage: 'dynamic'}},
   initialize() {
     this.fade = 1;
   },
@@ -545,6 +547,158 @@ export const Bob = defineFeature({
 });
 ```
 
+## Passes: shadows and reflections
+
+A sprite that throws a shadow onto the ground, or shows a reflection on it, is drawn twice: once
+as itself, once as its shadow or mirror image. The second draw reads the same sprites — the same
+positions, sizes, rotations and frames — and differs in its shader alone: the vertex lands
+somewhere else, projected onto the ground or mirrored at it, and the color is something else, a
+dark mask or a darker, fainter copy.
+
+A **pass** is such another way to draw the sprites of a kind. `definePass()` takes a name, the
+features whose stages the pass adds, the features of the kind whose stages it leaves out
+(`without`), three.js material parameters, and a `renderOrder` — a pass with a lower one is drawn
+before the sprites. `FeatureSprites` builds a child mesh for every pass in its `passes` option:
+the same pool and the same geometry, a material of its own, built from the features of the kind
+without those `without` names plus the features of the pass. The sprite data goes up to the gpu
+once per frame, whatever the number of passes; each pass costs one draw call.
+
+Projections and mirrors are `mesh` stages: they work on the placed vertex, after the placement, so
+the shadow of a billboard is the shadow of the billboard the camera sees.
+
+```ts check
+import {FeatureSprites, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import {Scene, Texture} from 'three/webgpu';
+
+const colorMap = new Texture();
+const sprites = new FeatureSprites(TexturedSpriteKind, {
+  capacity: 1000,
+  textures: {colorMap},
+  uniforms: {shadowColor: [0, 0, 0, 0.4]},
+  passes: [ShadowPass],
+});
+
+// the light falls from above, a little from the left; the ground is the XZ plane of the mesh
+sprites.setUniform('lightDirection', 0.5, -1, 0.3);
+sprites.setUniform('groundPlane', 0, 1, 0, 0);
+
+const scene = new Scene();
+// the mesh of the shadow is a child of the sprites and comes along
+scene.add(sprites);
+
+const sprite = sprites.createSprite();
+if (sprite != null) {
+  sprite.setPosition(0, 16, 0);
+  sprite.setSize(32, 32);
+  sprite.setTexCoords(0, 0, 1, 1);
+}
+
+// once per frame, for the sprites and every pass
+sprites.update();
+
+// a FeatureSpritesPass over the geometry of the sprites, drawn before them
+const shadow = sprites.passes['shadow'];
+
+sprites.dispose();
+colorMap.dispose();
+```
+
+The rules:
+
+- **No data.** A pass draws the data of the sprites. `definePass()` refuses a feature that brings
+  attributes, methods, `initialize()`, usage aliases or a placement, and two features of one
+  name. Everything a pass reads comes from a feature of the kind; a `requires` of a pass feature
+  is met by the kind or by the pass, or the sprites refuse the pass.
+- **`without`** leaves out the stages of features of the kind, by name; their data stays. The
+  sprites refuse a name the kind does not hold and the placement — a pass draws with the
+  placement of the sprites. A `without` ties a pass to the kinds that hold what it names.
+- **Shared uniforms and textures.** The material of the sprites and every pass material share
+  one set of uniforms and textures, which `textures` and `uniforms` start: `setUniform()` and
+  `setTexture()` of the sprites reach every pass, and the shadow of an animated sprite shows the
+  frame the sprite shows, since `time` is one uniform for all of them. Two features — of the kind
+  or of any pass — that declare the same name are refused, and so are two passes of one name.
+- **Placement.** A placement swap on the sprites reaches every pass material; one the material of
+  the sprites refuses reaches none.
+- **`update()` once.** The pass meshes have no `update()` of their own; `update()` of the sprites
+  uploads the geometry once for all of them.
+- **Ownership.** The pass meshes are children of the sprites: they move with them and leave the
+  scene graph with them. `passes` answers them by pass name, `FeatureSpritesPass` meshes whose
+  `material` is the material of the pass. `dispose()` releases the pass meshes, their materials
+  and the shared uniforms and textures, and `passes` is empty afterwards; a geometry handed in
+  and every texture stay the caller's. Passes need a material the sprites build, so they are
+  refused next to a `material` handed in.
+
+Two passes ship ready-made. Both are `transparent`, write no depth and take a `renderOrder` of
+-1. A plane is `[n.x, n.y, n.z, d]`, the plane `dot(n, p) = d` in the local space of the mesh,
+with `n` a unit vector:
+
+| pass | features | uniforms (start value) | what it draws |
+| --- | --- | --- | --- |
+| `ShadowPass` | `PlanarShadow`, `ShadowMask` | `lightDirection` (`[0.4, -1, 0.3]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite projected along `lightDirection` onto `groundPlane`, `p − L · (dot(n, p) − d) / dot(n, L)`, in `shadowColor`, its alpha multiplied by the alpha of the sprite |
+| `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n`, its color multiplied by `reflectionColor`, alpha included |
+
+`ShadowPass` keeps the tint of the kind: `ShadowMask` replaces the color anyway, and the alpha of
+the tint fades the shadow along with the sprite. It leaves nothing out, so it draws
+`AnimatedSpriteKind`, which holds no tint, as well. A reflection needs no flip of its own:
+mirroring the placed vertex turns the sprite upside down and keeps the frame where it is.
+
+A pass of one's own is a `definePass()` over features of one's own. This one throws the shadow of
+a second light onto the ground `y = 0`, with uniforms of other names than those of `ShadowPass`,
+so both draw the same sprites:
+
+```ts check
+import {ColorOrder, defineFeature, definePass, FeatureSprites, MeshOrder, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import {div, mul, sub, vec4} from 'three/tsl';
+import type {Node} from 'three/webgpu';
+
+export const MoonShadow = defineFeature({
+  name: 'moonShadow',
+  uniforms: {moonDirection: [-0.3, -1, 0.2], moonShadowColor: [0, 0, 0.1, 0.3]},
+  mesh: {
+    order: MeshOrder.Project,
+    transform: (p, {uniform}) => {
+      // along the light onto y = 0
+      const light = uniform<'vec3'>('moonDirection');
+      return sub(p, mul(light, div(p.y, light.y))) as unknown as Node<'vec3'>;
+    },
+  },
+  color: {
+    order: ColorOrder.Mask,
+    transform: (c, {uniform}) => {
+      const shadow = uniform<'vec4'>('moonShadowColor');
+      return vec4(shadow.rgb, mul(c.a, shadow.a));
+    },
+  },
+});
+
+// without the tint the moon shadow stays as dark as it is while a sprite fades out; in exchange
+// the pass draws only kinds that hold a tint
+export const MoonShadowPass = definePass({
+  name: 'moonShadow',
+  features: [MoonShadow],
+  without: ['tint'],
+  material: {transparent: true, depthWrite: false},
+  renderOrder: -1,
+});
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 100, passes: [ShadowPass, MoonShadowPass]});
+sprites.setUniform('moonDirection', 0.3, -1, -0.2);
+sprites.dispose();
+```
+
+The limits:
+
+- **Overlapping shadows darken twice.** Two transparent shadows that overlap darken each other,
+  which a real shadow does not. A stencil test per pass, or the shadows drawn into a render
+  target of their own and laid over the ground once, would avoid it; both lie outside the
+  feature model.
+- **No fade by distance yet.** A reflection that fades with its distance from the ground needs
+  the placed vertex in the color stages, and the material hands the color stages no such node.
+  `ReflectionPass` fades evenly, by the alpha of `reflectionColor`.
+- **One uniform name, one value.** The uniforms are shared, so two passes that read
+  `lightDirection` read the same light. A second light takes a feature with uniforms of other
+  names, as `MoonShadow` above does.
+
 ## Performance
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch
@@ -568,10 +722,18 @@ the same pixels, and the sprite handles keep their attribute and method names.
 | `new TexturedSprites(n, {renderAsBillboards: true})` | `new FeatureSprites(TexturedSpriteKind, {capacity: n, placement: BillboardPlacement})` |
 | `material.renderAsBillboards = b` | `sprites.placement = b ? BillboardPlacement : FlatPlacement` |
 | `sprites.texture = t`, `material.colorMap = t` | `sprites.setTexture('colorMap', t)` |
+| `sprites.texture`, `material.colorMap`, `material.animsMap` | `sprites.getTexture('colorMap')`, `sprites.getTexture('animsMap')` |
+| `material.animsMap = t` | `sprites.setTexture('animsMap', t)` |
 | `new AnimatedSpritesMaterial({colorMap, animsMap, time})` | `new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}})` |
 | `material.time = t` | `sprites.setUniform('time', t)` |
+| `material.time` | `sprites.uniforms!['time']!.value`, a `number` |
 | `material.touchAnimsMap()` | `sprites.touchTexture('animsMap')` |
 | `new TexturedSpritesGeometry(n, [hw, hh, ox, oy])` | `new FeatureSpritesGeometry(TexturedSpriteKind, {capacity: n, baseArgs: [hw, hh, ox, oy]})` |
+| `new AnimatedSpritesGeometry(n, [hw, hh])` | `new FeatureSpritesGeometry(AnimatedSpriteKind, {capacity: n, baseArgs: [hw, hh]})` |
+| `new TexturedSpritesMaterial({colorMap, transparent: true})` | `new FeatureSpritesMaterial(TexturedSpriteKind, {textures: {colorMap}, transparent: true})` |
+| `TexturedSpritesGeometryParameters`, `AnimatedSpritesGeometryParameters` | `FeatureSpritesGeometryParameters` |
+| `TexturedSpritesMaterialParameters`, `AnimatedSpritesMaterialParameters` | `FeatureSpritesMaterialParameters`; the options of the mesh: `FeatureSpritesOptions` |
+| `TexturedSpritesMakeBaseSpriteArgs`, `AnimatedSpritesMakeBaseSpriteArgs` | `QuadBaseArgs` |
 | `TexturedSpritesPool`, `AnimatedSpritesPool` | `VertexObjectPool<TexturedSprite>`, `VertexObjectPool<AnimatedSprite>` |
 | `BaseSprite`, `BaseSpriteDescriptor` | `QuadBase`, `QuadBase.description` |
 | `TexturedSpriteDescriptor`, `AnimatedSpriteDescriptor` | `TexturedSpriteKind.description`, `AnimatedSpriteKind.description` |

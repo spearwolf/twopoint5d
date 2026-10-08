@@ -1,8 +1,6 @@
 # Proposal: composable sprite features
 
-Status: **implemented** in phase 1 (§1–§5, the presets of §5.3 as replacements, not
-wrappers) — see [`docs/sprites.md`](../sprites.md); §6 lands with phase 2 of the plan.
-Deviations:
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md). Deviations:
 
 - the old classes — `TexturedSprites`, `AnimatedSprites`, their geometries, materials and
   descriptors, and `BaseSprite` — are removed rather than wrapped (§5.3);
@@ -10,7 +8,11 @@ Deviations:
   `setUniform()`, not through accessors of the material;
 - a stage samples only the textures its own feature declares;
 - a placement may not declare textures — it runs always and cannot wait for one;
-- `ShadowPass` takes no `without: ['tint']` (§6.3).
+- `ShadowPass` takes no `without: ['tint']` (§6.3): `ShadowMask` replaces the color anyway,
+  the alpha of the tint fading the shadow along with the sprite is right, and a `without` that
+  names a feature the kind does not hold is refused — it would shut out `AnimatedSpriteKind`;
+- `ReflectionPass` is `MirrorAtPlane` and `Darken` without `FadeWithDistance` (§6.3), and
+  `ctx.placedPosition` (§9, question 8) is not built: both wait for a scene that needs them.
 
 The sketch below was checked against the sources of `sprites/`, `vertex-objects/` and
 `map2d/TileSprites/` on 2026-10-07 and describes the classes of that day as "today"; it is
@@ -784,7 +786,9 @@ This is deliberately out of scope here: it touches the pool core, and nothing in
    code: the color effect of `TexturedSpritesMaterial` multiplies by the instance attribute
    `color` through `vertexColor()`, and `sprites-textured-material.test.js` reads the tinted
    pixels back under WebGPU and WebGL 2. Still to confirm for `attribute()` of a name of its
-   own, which is what a `Fade` or `Flash` would read.
+   own, which is what a `Fade` or `Flash` would read. Answered by the browser tests: `Tint`
+   reads its `color` through `attribute()` of the shader context in a color stage, and
+   `sprites-textured-material.test.js` reads the tinted pixels back under WebGPU and WebGL 2.
 4. ~~**`map2d` tiles.**~~ Out of scope: the tiles are a strand of their own. For that strand:
    `TileSpritesGeometry` has a base that breaks the contract of §4.1 — it lies on the XZ
    plane with its origin in a corner, and `TileSpritesMaterial` scales by
@@ -796,7 +800,9 @@ This is deliberately out of scope here: it touches the pool core, and nothing in
 6. ~~**Placement at runtime.**~~ Decided: `FeatureSpritesMaterial#placement` swaps the
    placement on a live material among features that contribute nothing but a placement
    stage and whose `requires` the kind meets (§4.3, §5.2); `renderAsBillboards` of the
-   presets maps onto it (§5.3).
+   presets maps onto it (§5.3). Answered by the browser tests: `sprites-composition.test.js`
+   draws one live material flat and as a billboard, and `sprites-shadow-pass.test.js` draws the
+   shadow of a billboard after a swap on the sprites, under WebGPU and WebGL 2.
 7. **Overlapping shadows.** Two transparent shadows that overlap darken each other twice,
    which a real shadow does not. A stencil test per pass, or the shadow pass drawn into a
    render target of its own and laid over the ground once, would avoid it; both lie outside
