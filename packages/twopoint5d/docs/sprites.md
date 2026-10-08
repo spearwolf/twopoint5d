@@ -524,7 +524,8 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   finite number, lower runs first, and a tie keeps the order of the feature list. `LocalOrder`,
   `MeshOrder` and `ColorOrder` name the bands.
 - **`placement`** — maps the local vertex into the local space of the mesh: exactly one feature of
-  a kind, and it declares no textures, since the placement runs always.
+  a kind, and it declares no textures, since the placement runs always. A pass may bring one in
+  place of the kind's — see "Passes: shadows and reflections".
 - **`colorSource`** — the color before the color stages, at most one feature per kind.
 - **`requires`** — names of other features that have to be part of the same kind; never the
   feature's own name.
@@ -573,8 +574,10 @@ the same pool and the same geometry, a material of its own, built from the featu
 without those `without` names plus the features of the pass. The sprite data goes up to the gpu
 once per frame, whatever the number of passes; each pass costs one draw call.
 
-Projections and mirrors are `mesh` stages: they work on the placed vertex, after the placement, so
-the shadow of a billboard is the shadow of the billboard the camera sees.
+Projections and mirrors are `mesh` stages: they work on the placed vertex, after the placement. A
+pass may bring a placement of its own, which takes the place of the placement of the sprites for
+that pass alone: `ShadowPass` turns every sprite to face the light before it projects it, and
+`BillboardReflectionPass` places every billboard so that its reflection faces the camera.
 
 ```ts check
 import {FeatureSprites, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
@@ -617,12 +620,17 @@ colorMap.dispose();
 The rules:
 
 - **No data.** A pass draws the data of the sprites. `definePass()` refuses a feature that brings
-  attributes, methods, `initialize()`, usage aliases or a placement, and two features of one
-  name. Everything a pass reads comes from a feature of the kind; a `requires` of a pass feature
+  attributes, methods, `initialize()` or usage aliases, and two features of one name. Everything a pass reads comes from a feature of the kind; a `requires` of a pass feature
   is met by the kind or by the pass, or the sprites refuse the pass.
 - **`without`** leaves out the stages of features of the kind, by name; their data stays. The
   sprites refuse a name the kind does not hold and the placement — a pass draws with the
-  placement of the sprites. A `without` ties a pass to the kinds that hold what it names.
+  placement of the sprites or brings one of its own. A `without` ties a pass to the kinds that
+  hold what it names.
+- **A placement of its own.** At most one feature of a pass brings a `placement`; `definePass()`
+  refuses a second. The pass draws with it in place of the placement of the kind, whose feature
+  stays with its data and loses its placement stage for this pass alone. Like every placement it
+  reads the local vertex — trimmed, scaled, sheared and turned already — and maps it into the
+  local space of the mesh; the mesh stages of the pass follow.
 - **Shared uniforms and textures.** The material of the sprites and every pass material share
   one set of uniforms and textures, which `textures` and `uniforms` start: `setUniform()` and
   `setTexture()` of the sprites reach every pass, and the shadow of an animated sprite shows the
@@ -641,8 +649,9 @@ The rules:
 - **A copy shares.** `definePass({...ShadowPass, name: 'twin'})` without `uniformNames` reads the
   uniforms of `ShadowPass` and draws the same shadow a second time. This is not refused, since two
   passes may share a uniform on purpose — one `reflectionColor` for two reflections.
-- **Placement.** A placement swap on the sprites reaches every pass material; one the material of
-  the sprites refuses reaches none.
+- **Placement.** A placement swap on the sprites reaches every pass material that draws with the
+  placement of the sprites; a pass that brings its own keeps it. A placement the material of the
+  sprites refuses reaches no pass.
 - **`update()` once.** The pass meshes have no `update()` of their own; `update()` of the sprites
   uploads the geometry once for all of them. It also judges the `visible` hooks of the passes.
 - **Ownership.** The pass meshes are children of the sprites: they move with them and leave the
@@ -652,7 +661,7 @@ The rules:
   and every texture stay the caller's. Passes need a material the sprites build, so they are
   refused next to a `material` handed in.
 
-Two passes ship ready-made. Both are `transparent`, write no depth, draw both sides of a triangle
+Three passes ship ready-made. All are `transparent`, write no depth, draw both sides of a triangle
 (`side: DoubleSide`) and take a `renderOrder` of -1; `ShadowPass` takes a polygon offset as well
 (`polygonOffset`, with a factor and units of -1). A plane is `[n.x, n.y, n.z, d]`, the plane
 `dot(n, p) = d` in the local space of the mesh; `n` need not be a unit vector, so `[0, 2, 0, 4]`
@@ -661,11 +670,48 @@ see "Binding uniforms to the scene graph" below:
 
 | pass | features | uniforms (start value) | what it draws |
 | --- | --- | --- | --- |
-| `ShadowPass` | `PlanarShadow`, `ShadowMask` | `shadowLight` (`[-0.4, 1, -0.3, 0]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite projected from `shadowLight` onto `groundPlane` — along a direction towards the light (`w = 0`) or from a point light (`w = 1`) — in `shadowColor`, its alpha multiplied by the alpha of the sprite |
-| `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included |
+| `ShadowPass` | `LightFacingPlacement`, `PlanarShadow`, `ShadowMask` | `shadowLight` (`[-0.4, 1, -0.3, 0]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite turned to face the light, projected from `shadowLight` onto `groundPlane` — along a direction towards the light (`w = 0`) or from a point light (`w = 1`) — in `shadowColor`, its alpha multiplied by the alpha of the sprite |
+| `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included — the reflection of a flat sprite |
+| `BillboardReflectionPass` | `MirroredBillboardPlacement`, `MirrorAtPlane`, `Darken` | as `ReflectionPass` | the reflection of a billboard: facing the camera, as large as the sprite on screen, flipped across the mirror — in `reflectionColor` |
 
 `ShadowPass` carries the hook `shadowFallsOnPlane` (see "Leaving a pass out for a frame" below);
-`ReflectionPass` carries none and is drawn whenever it is on.
+the two reflections carry none and are drawn whenever they are on. `BillboardReflectionPass` is
+named `reflection`, as `ReflectionPass` is: a kind takes one or the other.
+
+**The turn to the light.** A sprite is flat. Projected as it stands, a sprite that the light sees
+at a slant throws a thin, stretched shadow, and one it sees edge on throws a line — a billboard
+too, since it faces the camera, not the light. `LightFacingPlacement` turns every sprite about its
+instance position to face the light before `PlanarShadow` projects it, flat or billboard alike, so
+the shadow is never smaller than the sprite: the projection of a quad across the light grows by
+`1 / cos` of the angle between the light and the normal of the plane. Its local x runs across the
+light and level with the plane, its y up and away from the light, so the shadow of a sprite whose
+anchor sits at its foot starts at the foot and runs straight away from the light. Two consequences:
+
+- The sprite turns its face to the light. A light behind the sprite sees its face as well, so that
+  shadow shows the sprite left for right as the camera sees it. Keeping the camera's side instead
+  would flip the shadow over at once as the light passes the side of the sprite.
+- For a light straight above the plane, up across the light is undefined. Within a sine of 0.1 of
+  the normal the top of the quad turns over to the view of the camera — away from it, as the
+  sprite reads on screen; outside it the camera plays no part, and the shadow stays where it is
+  as the camera moves.
+
+The shadow follows the light, not the placement, so it does not change under a placement swap.
+For sprites that lie in the ground — decals — the turn is wrong: they would throw the shadow of a
+standing quad. A pass that projects the sprites as they stand leaves the placement out:
+`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`.
+
+**The reflection of a billboard.** `ReflectionPass` mirrors the placed vertex, which is right for a
+flat sprite: its mirror image is what the camera would see in the mirror. A billboard faces the
+camera, so its mirror image faces the mirror image of the camera, and the camera sees it at twice
+its height angle `θ` above the mirror: the reflection shrinks by `|cos 2θ|`, lies edge on at a
+camera 45° above the mirror and shows its back beyond — the usual angle of a 2.5D camera.
+`MirroredBillboardPlacement` places each sprite so that, once mirrored, the quad stands at the
+mirror image of the instance position, faces the camera and is flipped within its own plane
+across the normal of the mirror as the camera sees it: upside down below a mirror on the ground,
+left for right beside one, as large as the sprite on screen. A sprite whose anchor sits at its
+foot on the mirror meets its reflection there. The pass keeps its placement through a placement
+swap of the sprites — a billboard reflection of flat sprites is a reflection that does not match
+them, so swap the pass with the placement.
 
 **The light of the shadow.** `shadowLight` is a homogeneous light `[x, y, z, w]`. With the plane
 `(n, d)`, the placed vertex `p` and the light `(l, w)`, the shadow is:
@@ -706,8 +752,8 @@ own that mirrors or projects.
   under every pixel, and the two would fight over it; the polygon offset of the pass pulls the
   shadow in front of the ground, so it wins the depth test. It writes no depth, so whatever stands
   on the ground still covers it.
-- **`ReflectionPass`** lies on the far side of `mirrorPlane`, behind the ground the camera looks
-  at. An opaque ground hides it: three draws opaque meshes before transparent ones, and the
+- **`ReflectionPass`** and **`BillboardReflectionPass`** lie on the far side of `mirrorPlane`,
+  behind the ground the camera looks at. An opaque ground hides it: three draws opaque meshes before transparent ones, and the
   reflection then fails the depth test. Draw the ground transparent, so that it comes after the
   reflection and lets it show through, or switch the depth test of the pass off —
   `sprites.passes['reflection']!.material.depthTest = false` — which draws the reflection over
@@ -775,7 +821,9 @@ sprites.dispose();
 ```
 
 A pass of one's own is a `definePass()` over features of one's own, written as `PlanarShadow`
-and `ShadowMask` are — see "Writing a feature".
+and `ShadowMask` are — see "Writing a feature". A placement of a pass may read the uniforms of
+another feature of the pass without declaring them, as `LightFacingPlacement` reads those of
+`PlanarShadow` and names it in `requires`; a renamed copy of the pass renames those reads as well.
 
 **Shadow and reflection together.** `passes: [ShadowPass, ReflectionPass]` needs nothing more: their
 uniforms have distinct names. Their `renderOrder`, though, is -1 for both, and the pair needs the
