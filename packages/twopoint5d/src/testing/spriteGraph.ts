@@ -55,3 +55,80 @@ export function stubShaderContext(
     textureSize: () => vec2(4, 4) as unknown as Node<'vec2'>,
   };
 }
+
+/** A value of {@link evaluateNode}: a number, or the components of a vector. */
+export type EvaluatedValue = number | number[];
+
+interface EvaluableNode {
+  readonly type: string;
+  readonly isVarNode?: boolean;
+  readonly isConstNode?: boolean;
+  readonly isUniformNode?: boolean;
+  readonly isSplitNode?: boolean;
+  readonly isOperatorNode?: boolean;
+  readonly isMathNode?: boolean;
+  readonly node?: Node;
+  readonly value?: number | {toArray(): number[]};
+  readonly components?: string;
+  readonly op?: string;
+  readonly method?: string;
+  readonly aNode?: Node;
+  readonly bNode?: Node;
+}
+
+// applies f component by component; a number meets every component of a vector
+const zip = (a: EvaluatedValue, b: EvaluatedValue, f: (x: number, y: number) => number): EvaluatedValue => {
+  if (typeof a === 'number' && typeof b === 'number') return f(a, b);
+  const size = typeof a === 'number' ? (b as number[]).length : a.length;
+  return Array.from({length: size}, (_, i) => f(typeof a === 'number' ? a : a[i]!, typeof b === 'number' ? b : b[i]!));
+};
+
+const dotOf = (a: EvaluatedValue, b: EvaluatedValue): number => {
+  const product = zip(a, b, (x, y) => x * y);
+  return typeof product === 'number' ? product : product.reduce((sum, x) => sum + x, 0);
+};
+
+const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
+  '+': (x, y) => x + y,
+  '-': (x, y) => x - y,
+  '*': (x, y) => x * y,
+  '/': (x, y) => x / y,
+};
+
+/**
+ * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
+ * swizzles, `dot`, `length` and `normalize` — what the mesh stages of the passes are built from.
+ * Throws for any other node.
+ */
+export function evaluateNode(root: Node): EvaluatedValue {
+  const node = root as unknown as EvaluableNode;
+  if (node.isVarNode) return evaluateNode(node.node!);
+  if (node.isConstNode || node.isUniformNode) {
+    const {value} = node;
+    return typeof value === 'number' ? value : value!.toArray();
+  }
+  if (node.isSplitNode) {
+    const vector = evaluateNode(node.node!) as number[];
+    const picked = [...node.components!].map((component) => vector['xyzw'.indexOf(component)]!);
+    return picked.length === 1 ? picked[0]! : picked;
+  }
+  if (node.isOperatorNode && OPERATORS[node.op!] != null) {
+    return zip(evaluateNode(node.aNode!), evaluateNode(node.bNode!), OPERATORS[node.op!]!);
+  }
+  if (node.isMathNode) {
+    const a = evaluateNode(node.aNode!);
+    switch (node.method) {
+      case 'dot':
+        return dotOf(a, evaluateNode(node.bNode!));
+      case 'length':
+        return Math.sqrt(dotOf(a, a));
+      case 'normalize': {
+        const size = Math.sqrt(dotOf(a, a));
+        return zip(a, size, (x, y) => x / y);
+      }
+    }
+  }
+  throw new Error(
+    `evaluateNode: cannot work out a ${node.type}${(node.op ?? node.method) ? ` (${node.op ?? node.method})` : ''}`,
+  );
+}

@@ -349,8 +349,9 @@ it is disposed first, so a refused constructor leaves nothing behind.
 
 **After `dispose()`.** The mesh leaves the scene graph and fires the `dispose` event of three.
 `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`; `createSprite()`
-answers `undefined`; `freeSprite()`, `setUniform()`, `setTexture()`, `touchTexture()` and the
-`placement` setter do nothing. A second `dispose()` does nothing.
+and `getTexture()` answer `undefined`; `freeSprite()`, `setUniform()`, `setTexture()`,
+`touchTexture()`, `update()` and the `placement` setter do nothing; `passes` is empty. A second
+`dispose()` does nothing.
 
 ## Presets
 
@@ -388,14 +389,25 @@ colorMap.dispose();
 ```
 
 The animated preset needs the `animsMap` of a `FrameBasedAnimations` next to the `colorMap`, and the
-`time` uniform moves the animations:
+`time` uniform moves the animations. The `animsMap` holds the frames of every animation as float
+data, which an 8-bit image cannot carry: it comes out of `bakeDataTexture()`, never out of an
+image file.
 
 ```ts check
-import {AnimatedSpriteKind, FeatureSprites} from '@spearwolf/twopoint5d';
-import {Scene, Texture, TextureLoader} from 'three/webgpu';
+import {AnimatedSpriteKind, FeatureSprites, FrameBasedAnimations, TextureCoords} from '@spearwolf/twopoint5d';
+import {Scene, Texture} from 'three/webgpu';
 
 const colorMap = new Texture();
-const animsMap = new Texture();
+
+// four frames of 64 × 64 side by side on a sheet of 256 × 64, half a second for the round
+const sheet = new TextureCoords(0, 0, 256, 64);
+const anims = new FrameBasedAnimations();
+const walk = anims.add(
+  'walk',
+  0.5,
+  [0, 1, 2, 3].map((i) => new TextureCoords(sheet, i * 64, 0, 64, 64)),
+);
+const animsMap = anims.bakeDataTexture();
 
 const sprites = new FeatureSprites(AnimatedSpriteKind, {
   capacity: 1000,
@@ -407,18 +419,11 @@ const sprites = new FeatureSprites(AnimatedSpriteKind, {
 const scene = new Scene();
 scene.add(sprites);
 
-// a texture that loads fills its image without an event: tell the material once it is there
-new TextureLoader().load('animations.png', (loaded) => {
-  animsMap.image = loaded.image;
-  animsMap.needsUpdate = true;
-  sprites.touchTexture('animsMap');
-});
-
 const sprite = sprites.createSprite();
 if (sprite != null) {
   sprite.setPosition(10, 20, 0);
   sprite.setSize(32, 32);
-  sprite.animId = 0;
+  sprite.animId = walk;
   sprite.animOffset = 0.25;
 }
 
@@ -428,6 +433,11 @@ export function frame(now: number) {
   sprites.update();
 }
 ```
+
+`AnimatedFrames` declares the `animsMap` with `needsImage`: the animation drops out of the graph
+until the texture has an image with measures, which a baked texture has from the start. An
+`animsMap` handed in before its image is there — its image written into the same texture later,
+which three does without an event — takes `touchTexture('animsMap')` once the image is in place.
 
 ## Writing a feature
 
@@ -628,19 +638,42 @@ The rules:
   and every texture stay the caller's. Passes need a material the sprites build, so they are
   refused next to a `material` handed in.
 
-Two passes ship ready-made. Both are `transparent`, write no depth and take a `renderOrder` of
--1. A plane is `[n.x, n.y, n.z, d]`, the plane `dot(n, p) = d` in the local space of the mesh,
-with `n` a unit vector:
+Two passes ship ready-made. Both are `transparent`, write no depth, draw both sides of a triangle
+(`side: DoubleSide`) and take a `renderOrder` of -1; `ShadowPass` takes a polygon offset as well
+(`polygonOffset`, with a factor and units of -1). A plane is `[n.x, n.y, n.z, d]`, the plane
+`dot(n, p) = d` in the local space of the mesh; `n` need not be a unit vector, so `[0, 2, 0, 4]`
+is the plane `y = 2`:
 
 | pass | features | uniforms (start value) | what it draws |
 | --- | --- | --- | --- |
 | `ShadowPass` | `PlanarShadow`, `ShadowMask` | `lightDirection` (`[0.4, -1, 0.3]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite projected along `lightDirection` onto `groundPlane`, `p − L · (dot(n, p) − d) / dot(n, L)`, in `shadowColor`, its alpha multiplied by the alpha of the sprite |
-| `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n`, its color multiplied by `reflectionColor`, alpha included |
+| `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included |
 
 `ShadowPass` keeps the tint of the kind: `ShadowMask` replaces the color anyway, and the alpha of
 the tint fades the shadow along with the sprite. It leaves nothing out, so it draws
 `AnimatedSpriteKind`, which holds no tint, as well. A reflection needs no flip of its own:
 mirroring the placed vertex turns the sprite upside down and keeps the frame where it is.
+
+**Both sides.** A mirror turns the winding of every triangle it draws, and a projection onto the
+ground turns it whenever the shadow falls towards the camera, as it does for a sprite seen from
+the front and above under a light from above and behind it — the start value of `lightDirection`
+is one. three decides what to cull by the `side` of the material and the world matrix of the mesh,
+never by the vertex shader, so with the default `FrontSide` such a reflection or shadow is culled
+and nothing is drawn. Both presets therefore draw with `DoubleSide`, and so does a pass of one's
+own that mirrors or projects.
+
+**The scene around them.** Each preset expects something of the ground it is drawn on:
+
+- **`ShadowPass`** lies exactly in `groundPlane`. A ground mesh in that plane has the same depth
+  under every pixel, and the two would fight over it; the polygon offset of the pass pulls the
+  shadow in front of the ground, so it wins the depth test. It writes no depth, so whatever stands
+  on the ground still covers it.
+- **`ReflectionPass`** lies on the far side of `mirrorPlane`, behind the ground the camera looks
+  at. An opaque ground hides it: three draws opaque meshes before transparent ones, and the
+  reflection then fails the depth test. Draw the ground transparent, so that it comes after the
+  reflection and lets it show through, or switch the depth test of the pass off —
+  `sprites.passes['reflection']!.material.depthTest = false` — which draws the reflection over
+  everything drawn before it.
 
 A pass of one's own is a `definePass()` over features of one's own. This one throws the shadow of
 a second light onto the ground `y = 0`, with uniforms of other names than those of `ShadowPass`,
@@ -649,7 +682,7 @@ so both draw the same sprites:
 ```ts check
 import {ColorOrder, defineFeature, definePass, FeatureSprites, MeshOrder, ShadowPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {div, mul, sub, vec4} from 'three/tsl';
-import type {Node} from 'three/webgpu';
+import {DoubleSide, type Node} from 'three/webgpu';
 
 export const MoonShadow = defineFeature({
   name: 'moonShadow',
@@ -677,7 +710,16 @@ export const MoonShadowPass = definePass({
   name: 'moonShadow',
   features: [MoonShadow],
   without: ['tint'],
-  material: {transparent: true, depthWrite: false},
+  // a projection turns the winding whenever the shadow falls towards the camera; the offset pulls
+  // the shadow in front of a ground mesh in y = 0
+  material: {
+    transparent: true,
+    depthWrite: false,
+    side: DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  },
   renderOrder: -1,
 });
 

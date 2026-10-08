@@ -1,7 +1,7 @@
 import {Texture} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {attributeNamesOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
+import {attributeNamesOf, nodesOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {defineSprite, type SpriteOf} from '../defineSprite.js';
 import {FeatureSpritesMaterial} from '../FeatureSprites/FeatureSpritesMaterial.js';
@@ -68,6 +68,8 @@ describe('AnimatedFrames', () => {
     expect(samplesTexture(material.colorNode!, animsMap)).toBe(true);
     expect(samplesTexture(material.positionNode!, animsMap)).toBe(true);
     expect(attributeNamesOf(material.colorNode!)).toContain('anim');
+    const time = material.uniforms['time']!;
+    expect([nodesOf(material.colorNode!).has(time), nodesOf(material.positionNode!).has(time)]).toEqual([true, true]);
     // flip and trim come out of the animsMap: the kind holds no texTrim attribute to read
     expect(attributeNamesOf(material.positionNode!)).not.toContain('texTrim');
     material.dispose();

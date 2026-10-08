@@ -282,12 +282,19 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
     return this.resources.uniforms;
   }
 
-  /** Writes a uniform; see {@link SpriteResources.setUniform}. */
+  /**
+   * Writes a uniform; see {@link SpriteResources.setUniform}. Keeps working once disposed: the
+   * uniforms outlive `dispose()`, and with resources handed in the write reaches the other materials
+   * that read them.
+   */
   setUniform(name: string, x: number, y?: number, z?: number, w?: number): void {
     this.resources.setUniform(name, x, y, z, w);
   }
 
-  /** The texture `name`; `undefined` once a material that owns its resources has been disposed. */
+  /**
+   * The texture `name`; `undefined` while it is unset, and once a material that built its resources
+   * has been disposed. One handed its resources keeps answering their texture.
+   */
   getTexture(name: string): Texture | undefined {
     return this.resources.getTexture(name);
   }
@@ -299,12 +306,19 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
    * without a rebuild. Another kind, or a change between none and one, rebuilds the graphs that
    * read it and sets `needsUpdate`; three takes program and pipeline out of its caches for a source
    * it has built before. Do not alternate such textures every frame.
+   *
+   * Once disposed, a material that built its resources does nothing here. One handed its resources
+   * writes through to them still, and the other materials that read them take the texture.
    */
   setTexture(name: string, value: Texture | undefined): void {
     this.resources.setTexture(name, value);
   }
 
-  /** Re-reads the texture `name` once a loader filled in its image; see {@link SpriteResources.touchTexture}. */
+  /**
+   * Re-reads the texture `name` once a loader filled in its image; see
+   * {@link SpriteResources.touchTexture}. Once disposed, a material that built its resources does
+   * nothing here; one handed its resources passes the call on to them still.
+   */
   touchTexture(name: string): void {
     this.resources.touchTexture(name);
   }

@@ -13,6 +13,10 @@ Status: **implemented** — see [`docs/sprites.md`](../sprites.md). Deviations:
   names a feature the kind does not hold is refused — it would shut out `AnimatedSpriteKind`;
 - `ReflectionPass` is `MirrorAtPlane` and `Darken` without `FadeWithDistance` (§6.3), and
   `ctx.placedPosition` (§9, question 8) is not built: both wait for a scene that needs them.
+- both presets draw with `side: DoubleSide` besides the parameters of §6.3: a mirror, and a
+  projection whose shadow falls towards the camera, turn the winding of the triangles, and three
+  culls by the side of the material alone. `ShadowPass` takes a polygon offset as well, so that it
+  wins the depth test against a ground mesh in its plane.
 
 The sketch below was checked against the sources of `sprites/`, `vertex-objects/` and
 `map2d/TileSprites/` on 2026-10-07 and describes the classes of that day as "today"; it is

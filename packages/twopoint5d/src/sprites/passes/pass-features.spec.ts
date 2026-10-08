@@ -1,8 +1,8 @@
 import {vec3, vec4} from 'three/tsl';
-import type {Node} from 'three/webgpu';
+import {DoubleSide, type Node} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {nodesOf, stubShaderContext} from '../../testing/spriteGraph.js';
+import {evaluateNode, nodesOf, stubShaderContext} from '../../testing/spriteGraph.js';
 import {ColorOrder, MeshOrder} from '../SpriteFeature.js';
 import {Darken} from './Darken.js';
 import {MirrorAtPlane} from './MirrorAtPlane.js';
@@ -33,10 +33,35 @@ describe('the pass features', () => {
     expect(nodesOf(Darken.color!.transform(color, ctx)).has(color)).toBe(true);
   });
 
-  test('the two passes draw behind the sprites, transparent, without writing depth', () => {
-    for (const pass of [ShadowPass, ReflectionPass]) {
-      expect([pass.renderOrder, pass.material]).toEqual([-1, {transparent: true, depthWrite: false}]);
-    }
+  test('MirrorAtPlane mirrors at the plane dot(n, p) = d, for a normal of any length', () => {
+    const mirror = (plane: [number, number, number, number], p: [number, number, number]) => {
+      const ctx = {...stubShaderContext(), uniform: <T extends string>() => vec4(...plane) as unknown as Node<T>};
+      return evaluateNode(MirrorAtPlane.mesh!.transform(vec3(...p) as unknown as Node<'vec3'>, ctx));
+    };
+
+    expect(mirror([0, 1, 0, 0], [1, 3, 5])).toEqual([1, -3, 5]);
+    // 2y = 4 is the plane y = 2
+    expect(mirror([0, 2, 0, 4], [1, 3, 5])).toEqual([1, 1, 5]);
+    expect(mirror([0, 0, -3, 6], [1, 3, 5])).toEqual([1, 3, -9]);
+  });
+
+  test('the two passes draw behind the sprites, transparent, without writing depth, from both sides', () => {
+    expect([ReflectionPass.renderOrder, ReflectionPass.material]).toEqual([
+      -1,
+      {transparent: true, depthWrite: false, side: DoubleSide},
+    ]);
+    // the shadow lies in the ground plane: the offset pulls it in front of a ground mesh in that plane
+    expect([ShadowPass.renderOrder, ShadowPass.material]).toEqual([
+      -1,
+      {
+        transparent: true,
+        depthWrite: false,
+        side: DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      },
+    ]);
     expect(ShadowPass.features).toEqual([PlanarShadow, ShadowMask]);
     expect(ReflectionPass.features).toEqual([MirrorAtPlane, Darken]);
   });

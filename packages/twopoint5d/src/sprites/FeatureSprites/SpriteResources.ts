@@ -159,7 +159,10 @@ export class SpriteResources {
     return slot;
   }
 
-  /** The uniform `name`, for a stage; throws in the words of `where` for a name no feature declares. */
+  /**
+   * The uniform `name`, for a stage; throws in the words of `where` for a name no feature declares.
+   * Keeps answering it once disposed: the uniforms outlive `dispose()`.
+   */
   uniform(name: string, where: string): SpriteUniformNode {
     const node = this.uniforms[name];
     if (node == null) throw new Error(`${where} reads the uniform "${name}", which no feature of these sprites declares`);
@@ -187,7 +190,7 @@ export class SpriteResources {
     return this.#slot(name).signal.get();
   }
 
-  /** The texture `name`, read without tracking. @internal */
+  /** The texture `name`, read without tracking; `undefined` once disposed. @internal */
   peekTexture(name: string): Texture | undefined {
     return this.#slot(name).signal.value;
   }
@@ -213,17 +216,23 @@ export class SpriteResources {
     slot.signal.touch();
   }
 
-  /** The shape key of the texture `name`; `undefined` while it is unset or, for `needsImage`, has no image. Tracked. */
+  /**
+   * The shape key of the texture `name`; `undefined` while it is unset or, for `needsImage`, has no
+   * image, and once disposed. Tracked.
+   */
   shapeOf(name: string): string | undefined {
     return this.#slot(name).shape();
   }
 
-  /** The measures of the image of the texture `name`, in texels: a uniform kept current here. */
+  /**
+   * The measures of the image of the texture `name`, in texels: a uniform kept current here. Once
+   * disposed it keeps answering the same uniform, which keeps the last measures it held.
+   */
   textureSize(name: string): UniformNode<'vec2', Vector2> {
     return this.#slot(name).size;
   }
 
-  /** Whether every uniform and texture `feature` declares is held here. */
+  /** Whether every uniform and texture `feature` declares is held here; answers alike once disposed. */
   declares(feature: SpriteFeature): boolean {
     return (
       Object.keys(feature.uniforms ?? {}).every((name) => this.#uniformSizes.has(name)) &&

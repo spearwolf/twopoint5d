@@ -580,6 +580,23 @@ describe('FeatureSpritesMaterial', () => {
       shared.dispose();
     });
 
+    test('writes through to resources handed in afterwards, which the other materials read', () => {
+      const shared = new SpriteResources(TexturedKind.features);
+      const borrowing = new FeatureSpritesMaterial(TexturedKind, {resources: shared});
+      const other = new FeatureSpritesMaterial(TexturedKind, {resources: shared});
+      const touch = sandbox.spy(shared, 'touchTexture');
+      const colorMap = new Texture();
+
+      borrowing.dispose();
+      borrowing.setTexture('colorMap', colorMap);
+      borrowing.touchTexture('colorMap');
+
+      expect([borrowing.getTexture('colorMap'), other.getTexture('colorMap')]).toEqual([colorMap, colorMap]);
+      expect(touch.calledOnceWith('colorMap')).toBe(true);
+      other.dispose();
+      shared.dispose();
+    });
+
     test('behaves as documented afterwards', () => {
       const material = new FeatureSpritesMaterial(TexturedKind, {textures: {colorMap: new Texture()}});
       const {positionNode, colorNode} = material;
@@ -699,6 +716,17 @@ describe('FeatureSpritesMaterial', () => {
         'FeatureSpritesMaterial: feature "needsAnchor" of pass "p" requires feature "anchor", which neither the sprite kind nor the pass holds',
       );
       expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('refuses a pass built without definePass() whose feature brings data, or that leaves out a feature twice', () => {
+      const lifting = defineFeature({name: 'lifting', attributes: {lift: {size: 1}}});
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, {pass: {name: 'plain', features: [lifting]}})).toThrow(
+        'FeatureSpritesMaterial: feature "lifting" of pass "plain" brings attributes; a pass draws the data of the sprites and brings stages, uniforms and textures alone',
+      );
+      expect(
+        () => new FeatureSpritesMaterial(TexturedKind, {pass: {name: 'plain', features: [], without: ['tint', 'tint']}}),
+      ).toThrow('FeatureSpritesMaterial: pass "plain" leaves out feature "tint" twice');
     });
 
     test('refuses a pass that brings a second color source, and leaves nothing behind', () => {

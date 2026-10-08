@@ -47,6 +47,10 @@ export class FeatureSpritesPass<Api extends object = object> extends Mesh {
 
 const WHERE = 'FeatureSprites';
 
+// a record of pass meshes by pass name: without a prototype, a pass named "__proto__" or
+// "constructor" is an own entry like any other instead of a write to Object.prototype's members
+const passRecord = <Api extends object>(): Record<string, FeatureSpritesPass<Api>> => Object.create(null);
+
 const definedKeys = (record: object): string[] =>
   Object.entries(record)
     .filter(([, value]) => value !== undefined)
@@ -139,7 +143,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   #ownsGeometry: boolean;
   #ownsMaterial: boolean;
   #resources: SpriteResources | undefined;
-  #passes: Record<string, FeatureSpritesPass<Api>> = {};
+  #passes: Record<string, FeatureSpritesPass<Api>> = Object.freeze(passRecord<Api>());
   #disposed = false;
 
   /**
@@ -163,13 +167,17 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     this.name = 'twopoint5d.FeatureSprites';
 
     try {
+      // filled while the pass meshes are built, so that a dispose() on a throw finds those built so far
+      const passes = passRecord<Api>();
+      this.#passes = passes;
       for (const pass of options.passes ?? []) {
         // resources is defined whenever there are passes, so no pass material builds resources of its own
         const passMaterial = new FeatureSpritesMaterial(kind, {pass, resources, placement: material.placement});
         const mesh = new FeatureSpritesPass(geometry, passMaterial, pass);
         this.add(mesh);
-        this.#passes[pass.name] = mesh;
+        passes[pass.name] = mesh;
       }
+      Object.freeze(passes);
     } catch (error) {
       // the pass material that threw released what it built itself; dispose() releases the rest —
       // the pass materials built so far, the material, the shared resources and a geometry built here
@@ -179,9 +187,10 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   }
 
   /**
-   * The meshes of the passes by pass name, children of this mesh — empty once disposed. Each draws
-   * the geometry of the sprites with a material built for its pass; that material reads the uniforms
-   * and textures of the sprites, so {@link setUniform} and {@link setTexture} reach every pass.
+   * The meshes of the passes by pass name, children of this mesh, in a frozen record without a
+   * prototype — empty once disposed. Each draws the geometry of the sprites with a material built
+   * for its pass; that material reads the uniforms and textures of the sprites, so
+   * {@link setUniform} and {@link setTexture} reach every pass.
    */
   get passes(): Readonly<Record<string, FeatureSpritesPass<Api>>> {
     return this.#passes;
@@ -227,18 +236,31 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     return this.material?.uniforms;
   }
 
+  /**
+   * Writes a uniform the sprites and every pass read; see {@link FeatureSpritesMaterial.setUniform}.
+   * Does nothing once disposed.
+   */
   setUniform(name: string, x: number, y?: number, z?: number, w?: number): void {
     this.material?.setUniform(name, x, y, z, w);
   }
 
+  /** The texture `name` — `undefined` while it is unset, and once disposed. */
   getTexture(name: string): Texture | undefined {
     return this.material?.getTexture(name);
   }
 
+  /**
+   * Sets the texture `name` for the sprites and every pass; it stays the caller's. See
+   * {@link FeatureSpritesMaterial.setTexture}. Does nothing once disposed.
+   */
   setTexture(name: string, texture: Texture | undefined): void {
     this.material?.setTexture(name, texture);
   }
 
+  /**
+   * Re-reads the texture `name` once a loader filled in its image; see
+   * {@link FeatureSpritesMaterial.touchTexture}. Does nothing once disposed.
+   */
   touchTexture(name: string): void {
     this.material?.touchTexture(name);
   }
@@ -248,8 +270,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * and the uniforms and textures they shared. The mesh leaves the scene graph first and fires
    * three's `dispose` event, so the renderer drops what it built for it; every pass mesh leaves this
    * mesh and fires the event as well. Afterwards `geometry`, `material`, `spritePool`, `placement`
-   * and `uniforms` answer `undefined`, `passes` is empty, and every other member does nothing. A
-   * second call does nothing.
+   * and `uniforms` answer `undefined`, and so do `createSprite()` and `getTexture()`; `passes` is
+   * empty; `freeSprite()`, `setUniform()`, `setTexture()`, `touchTexture()`, `update()` and the
+   * `placement` setter do nothing. A second call does nothing.
    */
   override dispose(): void {
     if (this.#disposed) return;
@@ -269,7 +292,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
       mesh.dispose();
       mesh.material.dispose();
     }
-    this.#passes = {};
+    this.#passes = Object.freeze(passRecord<Api>());
 
     if (this.#ownsGeometry) this.geometry?.dispose();
     this.geometry = undefined;

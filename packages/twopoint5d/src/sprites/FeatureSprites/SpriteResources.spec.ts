@@ -195,6 +195,19 @@ describe('SpriteResources', () => {
       // a uniform keeps working; it reaches nothing that still renders
       resources.setUniform('time', 3);
       expect(resources.uniforms['time']!.value).toBe(3);
+      expect(resources.uniform('time', 'a stage')).toBe(resources.uniforms['time']);
+    });
+
+    test('answers no shape, the last measures and what it declared afterwards', () => {
+      const resources = new SpriteResources([anim, color], {textures: {animsMap: withImage(4, 2), colorMap: new Texture()}});
+      const size = resources.textureSize('animsMap');
+
+      resources.dispose();
+
+      expect([resources.shapeOf('animsMap'), resources.shapeOf('colorMap')]).toEqual([undefined, undefined]);
+      expect(resources.textureSize('animsMap')).toBe(size);
+      expect(size.value).toEqual(new Vector2(4, 2));
+      expect([resources.declares(anim), resources.declares(defineFeature({name: 'x', uniforms: {y: 1}}))]).toEqual([true, false]);
     });
 
     test('still refuses a misspelled name', () => {

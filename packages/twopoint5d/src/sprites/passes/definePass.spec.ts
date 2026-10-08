@@ -27,8 +27,35 @@ describe('definePass()', () => {
     );
   });
 
-  test('refuses a pass without a name and two features of one name', () => {
+  test('refuses a pass without a name, two features of one name and a feature it leaves out twice', () => {
     expect(() => definePass({name: '', features: []})).toThrow('definePass: a pass needs a name');
     expect(() => definePass({name: 'p', features: [mask, mask]})).toThrow('definePass: pass "p" lists feature "mask" twice');
+    expect(() => definePass({name: 'p', features: [], without: ['tint', 'tint']})).toThrow(
+      'definePass: pass "p" leaves out feature "tint" twice',
+    );
+  });
+
+  test('freezes copies of its features, without and material, and leaves the ones handed in alone', () => {
+    const features = [mask];
+    const without = ['tint'];
+    const material = {transparent: true};
+
+    const pass = definePass({name: 'p', features, without, material});
+    without.push('rotation');
+    material.transparent = false;
+
+    expect([pass.without, pass.material]).toEqual([['tint'], {transparent: true}]);
+    expect([Object.isFrozen(pass.features), Object.isFrozen(pass.without), Object.isFrozen(pass.material)]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect([Object.isFrozen(features), Object.isFrozen(without), Object.isFrozen(material)]).toEqual([false, false, false]);
+  });
+
+  test('adds no without or material to a pass that has none', () => {
+    const pass = definePass({name: 'p', features: []});
+
+    expect(Object.keys(pass)).toEqual(['name', 'features']);
   });
 });

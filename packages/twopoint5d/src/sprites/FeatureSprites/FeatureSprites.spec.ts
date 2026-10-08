@@ -184,6 +184,7 @@ describe('FeatureSprites', () => {
     expect(() => sprites.setTexture('colorMap', new Texture())).not.toThrow();
     expect(() => sprites.touchTexture('colorMap')).not.toThrow();
     expect(() => sprites.setUniform('time', 1)).not.toThrow();
+    expect(() => sprites.update()).not.toThrow();
   });
 
   describe('dispose()', () => {
@@ -397,6 +398,18 @@ describe('FeatureSprites', () => {
       expect(geometryBuilt.called).toBe(false);
     });
 
+    test('refuses a pass built without definePass() whose feature brings data, before it builds anything', () => {
+      const geometryBuilt = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+      const lifting = defineFeature({name: 'lifting', methods: {lift() {}}});
+
+      expect(() => new FeatureSprites(kind, {passes: [{name: 'plain', features: [lifting]}]})).toThrow(
+        new TypeError(
+          'FeatureSprites: feature "lifting" of pass "plain" brings methods; a pass draws the data of the sprites and brings stages, uniforms and textures alone',
+        ),
+      );
+      expect(geometryBuilt.called).toBe(false);
+    });
+
     test('dispose() removes the pass meshes, releases their materials and the shared resources, and leaves a geometry handed in alone', () => {
       const geometry = new FeatureSpritesGeometry(kind, 1);
       const geometryDispose = sandbox.spy(geometry, 'dispose');
@@ -426,6 +439,32 @@ describe('FeatureSprites', () => {
       expect(sprites.passes['shadow']!.material.uniforms['time']).toBe(sprites.uniforms!['time']);
       expect(sprites.passes['reflection']!.material.uniforms['time']).toBe(sprites.uniforms!['time']);
       expect(() => sprites.dispose()).not.toThrow();
+    });
+
+    test('answers the pass meshes in a frozen record, before and after dispose()', () => {
+      const sprites = new FeatureSprites(kind, {passes: [shadow]});
+
+      expect(Object.isFrozen(sprites.passes)).toBe(true);
+      sprites.dispose();
+      expect(Object.isFrozen(sprites.passes)).toBe(true);
+    });
+
+    test('holds a pass named like a member of Object.prototype as any other, and releases it', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const proto = definePass({name: '__proto__', features: [drop]});
+      const sprites = new FeatureSprites(kind, {passes: [proto, definePass({name: 'constructor', features: []})]});
+      const pass = sprites.passes[proto.name]!;
+
+      expect(Object.keys(sprites.passes)).toEqual(['__proto__', 'constructor']);
+      expect(pass.material.pass).toBe(proto);
+      sprites.placement = BillboardPlacement;
+      expect(pass.material.placement).toBe(BillboardPlacement);
+
+      sprites.dispose();
+
+      expect([pass.parent, sprites.children.length]).toEqual([null, 0]);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
     });
 
     test('does not leak signals or effects with passes', () => {

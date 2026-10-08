@@ -1,5 +1,6 @@
 import type {NodeMaterialParameters} from 'three/webgpu';
 import type {SpriteFeature} from '../SpriteFeature.js';
+import {checkPass} from './passFeatures.js';
 
 /**
  * Another way to draw the sprites of a kind: the same pool and geometry, a material of its own.
@@ -17,26 +18,20 @@ export interface SpritePass {
   readonly renderOrder?: number;
 }
 
-const DATA_FIELDS = ['attributes', 'methods', 'initialize', 'usageAliases', 'placement'] as const;
-
 /**
- * Checks a pass and freezes it: a name, features of distinct names, and features that bring no
- * data — no attributes, methods, `initialize`, usage aliases or placement. What can only be checked
- * against a sprite kind, `FeatureSpritesMaterial` checks when it is built for the pass.
+ * Checks a pass and freezes it: a name, features of distinct names, features that bring no data —
+ * no attributes, methods, `initialize`, usage aliases or placement — and a `without` that names no
+ * feature twice. It freezes copies of `features`, `without` and `material`, so the arrays and the
+ * object handed in stay the caller's. What can only be checked against a sprite kind,
+ * `FeatureSpritesMaterial` checks when it is built for the pass.
  */
 export function definePass(pass: SpritePass): SpritePass {
-  if (typeof pass.name !== 'string' || pass.name === '') throw new TypeError('definePass: a pass needs a name');
-  const names = new Set<string>();
-  for (const feature of pass.features) {
-    if (names.has(feature.name)) throw new TypeError(`definePass: pass "${pass.name}" lists feature "${feature.name}" twice`);
-    names.add(feature.name);
-    for (const field of DATA_FIELDS) {
-      if (feature[field] != null) {
-        throw new TypeError(
-          `definePass: feature "${feature.name}" of pass "${pass.name}" brings ${field}; a pass draws the data of the sprites and brings stages, uniforms and textures alone`,
-        );
-      }
-    }
-  }
-  return Object.freeze({...pass, features: Object.freeze([...pass.features])});
+  checkPass(pass, 'definePass');
+  const {without, material} = pass;
+  return Object.freeze({
+    ...pass,
+    features: Object.freeze([...pass.features]),
+    ...(without != null && {without: Object.freeze([...without])}),
+    ...(material != null && {material: Object.freeze({...material})}),
+  });
 }
