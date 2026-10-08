@@ -1,4 +1,5 @@
 import type {NodeMaterialParameters} from 'three/webgpu';
+import type {SpriteUniformNode} from '../FeatureSprites/SpriteResources.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import {checkPass} from './passFeatures.js';
 
@@ -22,6 +23,12 @@ export interface SpritePass {
    * uniforms of its own; a copy without it shares the uniforms of the pass it copies.
    */
   readonly uniformNames?: Readonly<Record<string, string>>;
+  /**
+   * Whether the pass is drawn in this frame, judged by `FeatureSprites#update()` after the bindings
+   * are written. `uniform(name)` answers the uniform the features of this pass read under `name` —
+   * through `uniformNames`, so a renamed copy judges its own uniforms. Must allocate nothing.
+   */
+  readonly visible?: (uniform: (name: string) => SpriteUniformNode) => boolean;
 }
 
 /**

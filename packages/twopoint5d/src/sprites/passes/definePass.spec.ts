@@ -60,6 +60,15 @@ describe('definePass()', () => {
     expect(Object.keys(pass)).toEqual(['name', 'features']);
   });
 
+  test('refuses a visible that is no function, and keeps one that is', () => {
+    const visible = () => true;
+
+    expect(definePass({name: 'p', features: [], visible}).visible).toBe(visible);
+    expect(() => definePass({name: 'p', features: [], visible: true as never})).toThrow(
+      'definePass: the visible of pass "p" is no function',
+    );
+  });
+
   describe('uniformNames', () => {
     test('freezes a copy of the renaming', () => {
       const names = {groundPlane: 'moonGround'};

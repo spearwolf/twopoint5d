@@ -605,5 +605,65 @@ describe('FeatureSprites', () => {
         sprites.dispose();
       });
     });
+
+    describe('visible and enabled', () => {
+      test('update() shows a pass while its hook agrees and hides it otherwise', () => {
+        const sprites = new FeatureSprites(kind, {passes: [ShadowPass, ReflectionPass]});
+        const shadowMesh = sprites.passes['shadow']!;
+
+        sprites.update();
+        expect(shadowMesh.visible).toBe(true);
+        sprites.setUniform('shadowLight', 0.4, -1, 0.3, 0); // from below
+        sprites.update();
+        expect(shadowMesh.visible).toBe(false);
+        expect(sprites.passes['reflection']!.visible).toBe(true);
+        sprites.dispose();
+      });
+
+      test('a pass switched off stays hidden through update() while the hook agrees, and follows it once switched on', () => {
+        const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+        const shadowMesh = sprites.passes['shadow']!;
+
+        expect(shadowMesh.enabled).toBe(true);
+        shadowMesh.enabled = false;
+        expect(shadowMesh.enabled).toBe(false);
+        sprites.update();
+        sprites.update();
+        expect(shadowMesh.visible).toBe(false);
+        shadowMesh.enabled = true;
+        expect(shadowMesh.visible).toBe(true);
+        sprites.setUniform('shadowLight', 0.4, -1, 0.3, 0);
+        sprites.update();
+        shadowMesh.enabled = true;
+        expect(shadowMesh.visible).toBe(false);
+        sprites.dispose();
+      });
+
+      test('the hook of a renamed copy judges the renamed uniforms', () => {
+        const moon = definePass({
+          ...ShadowPass,
+          name: 'moon',
+          uniformNames: {shadowLight: 'moonLight', groundPlane: 'moonGround', shadowColor: 'moonColor'},
+        });
+        const sprites = new FeatureSprites(kind, {passes: [ShadowPass, moon]});
+
+        sprites.setUniform('moonLight', 0, -1, 0, 1);
+        sprites.update();
+        expect([sprites.passes['shadow']!.visible, sprites.passes['moon']!.visible]).toEqual([true, false]);
+        sprites.dispose();
+      });
+
+      test('a pass without a hook follows enabled alone', () => {
+        const sprites = new FeatureSprites(kind, {passes: [ReflectionPass]});
+        const mesh = sprites.passes['reflection']!;
+
+        mesh.enabled = false;
+        sprites.update();
+        expect(mesh.visible).toBe(false);
+        mesh.enabled = true;
+        expect(mesh.visible).toBe(true);
+        sprites.dispose();
+      });
+    });
   });
 });

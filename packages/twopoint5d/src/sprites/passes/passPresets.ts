@@ -1,4 +1,5 @@
-import {DoubleSide} from 'three/webgpu';
+import {DoubleSide, type Vector4} from 'three/webgpu';
+import type {SpriteUniformNode} from '../FeatureSprites/SpriteResources.js';
 import {Darken} from './Darken.js';
 import {definePass} from './definePass.js';
 import {MirrorAtPlane} from './MirrorAtPlane.js';
@@ -10,9 +11,29 @@ import {ShadowMask} from './ShadowMask.js';
 // of the material and the world matrix alone, never by the vertex shader: with the default
 // FrontSide, a reflection on the ground and a shadow cast towards the camera would be culled.
 
+// below this cosine between the normal and the direction towards the light, a directional light
+// grazes the plane and its shadow runs off to infinity
+const GRAZING_COSINE = 1e-3;
+
+/**
+ * The hook of {@link ShadowPass}: whether `shadowLight` lights the side of `groundPlane` its normal
+ * points to — the side the sprites stand on. A direction (`w = 0`) has to meet the normal at a
+ * cosine above 0.001; a point light (`w = 1`) has to lie above the plane.
+ */
+export function shadowFallsOnPlane(uniform: (name: string) => SpriteUniformNode): boolean {
+  const plane = uniform('groundPlane').value as Vector4;
+  const light = uniform('shadowLight').value as Vector4;
+  const lightHeight = plane.x * light.x + plane.y * light.y + plane.z * light.z - light.w * plane.w;
+  if (light.w !== 0) return lightHeight > 0;
+  const normalLength = Math.sqrt(plane.x * plane.x + plane.y * plane.y + plane.z * plane.z);
+  const lightLength = Math.sqrt(light.x * light.x + light.y * light.y + light.z * light.z);
+  return lightHeight > GRAZING_COSINE * normalLength * lightLength;
+}
+
 /**
  * A planar shadow behind the sprites: projected onto `groundPlane`, in `shadowColor`. It lies in the
- * ground plane, so a polygon offset pulls it in front of a ground mesh in that plane.
+ * ground plane, so a polygon offset pulls it in front of a ground mesh in that plane. It is left out
+ * for a frame whose light does not fall onto the side of the plane its normal points to.
  */
 export const ShadowPass = definePass({
   name: 'shadow',
@@ -26,6 +47,7 @@ export const ShadowPass = definePass({
     polygonOffsetUnits: -1,
   },
   renderOrder: -1,
+  visible: shadowFallsOnPlane,
 });
 
 /**

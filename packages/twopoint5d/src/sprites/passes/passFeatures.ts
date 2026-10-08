@@ -14,6 +14,9 @@ const DATA_FIELDS = ['attributes', 'methods', 'initialize', 'usageAliases', 'pla
  */
 export function checkPass(pass: SpritePass, where: string): void {
   if (typeof pass.name !== 'string' || pass.name === '') throw new TypeError(`${where}: a pass needs a name`);
+  if (pass.visible != null && typeof pass.visible !== 'function') {
+    throw new TypeError(`${where}: the visible of pass "${pass.name}" is no function`);
+  }
   const names = new Set<string>();
   for (const feature of pass.features) {
     if (names.has(feature.name)) throw new TypeError(`${where}: pass "${pass.name}" lists feature "${feature.name}" twice`);

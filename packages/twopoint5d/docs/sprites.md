@@ -641,7 +641,7 @@ The rules:
 - **Placement.** A placement swap on the sprites reaches every pass material; one the material of
   the sprites refuses reaches none.
 - **`update()` once.** The pass meshes have no `update()` of their own; `update()` of the sprites
-  uploads the geometry once for all of them.
+  uploads the geometry once for all of them. It also judges the `visible` hooks of the passes.
 - **Ownership.** The pass meshes are children of the sprites: they move with them and leave the
   scene graph with them. `passes` answers them by pass name, `FeatureSpritesPass` meshes whose
   `material` is the material of the pass. `dispose()` releases the pass meshes, their materials
@@ -659,6 +659,9 @@ is the plane `y = 2`:
 | --- | --- | --- | --- |
 | `ShadowPass` | `PlanarShadow`, `ShadowMask` | `shadowLight` (`[-0.4, 1, -0.3, 0]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite projected from `shadowLight` onto `groundPlane` — along a direction towards the light (`w = 0`) or from a point light (`w = 1`) — in `shadowColor`, its alpha multiplied by the alpha of the sprite |
 | `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included |
+
+`ShadowPass` carries the hook `shadowFallsOnPlane` (see "Leaving a pass out for a frame" below);
+`ReflectionPass` carries none and is drawn whenever it is on.
 
 **The light of the shadow.** `shadowLight` is a homogeneous light `[x, y, z, w]`. With the plane
 `(n, d)`, the placed vertex `p` and the light `(l, w)`, the shadow is:
@@ -724,6 +727,44 @@ const sprites = new FeatureSprites(TexturedSpriteKind, {
 });
 // a point light: its shadows spread
 sprites.setUniform('moonLight', -30, 80, 20, 1);
+sprites.dispose();
+```
+
+**Leaving a pass out for a frame.** A pass may carry a `visible` hook,
+`(uniform: (name: string) => SpriteUniformNode) => boolean`. `update()` of the sprites asks it once
+per frame, for every pass that has one, and the answer decides whether the pass mesh is drawn.
+`uniform(name)` answers the uniform the features of the pass read under `name`, through
+`uniformNames`: the hook of a renamed copy judges the renamed uniforms, and a name no feature of
+the pass declares throws. The hook runs every frame and must allocate nothing, so it reads the
+`value` of a node and does not build a vector. `definePass()` refuses a `visible` that is no
+function.
+
+`ShadowPass` carries `shadowFallsOnPlane`. The sprites stand on the side of `groundPlane` its
+normal points to, so the shadow falls only if the light lights that side. For a direction
+(`w = 0`) the cosine between the normal and `shadowLight` has to exceed 0.001; a light from below
+or one that runs parallel to the plane, or grazes it, leaves the pass out. A point light
+(`w = 1`) has to lie above the plane. A point light at or below the plane, and a direction
+parallel to it, have no defined shadow, and the hook leaves exactly those frames out instead of
+drawing something that runs off to infinity.
+
+To switch a pass off yourself, set `enabled` on its mesh — `sprites.passes['shadow']!.enabled =
+false` — and not `visible`: `update()` writes `visible` for a pass with a hook. The pass is drawn
+while it is enabled and its hook agrees; a pass without a hook follows `enabled` alone.
+
+```ts check
+import {definePass, FeatureSprites, ReflectionPass, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import type {Vector4} from 'three/webgpu';
+
+// a reflection drawn only while the mirror faces up
+export const UpwardReflectionPass = definePass({
+  ...ReflectionPass,
+  name: 'upwardReflection',
+  visible: (uniform) => (uniform('mirrorPlane').value as Vector4).y > 0,
+});
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {passes: [UpwardReflectionPass]});
+sprites.update();
+sprites.passes['upwardReflection']!.enabled = false;
 sprites.dispose();
 ```
 

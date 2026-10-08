@@ -1,12 +1,12 @@
-import {vec3, vec4} from 'three/tsl';
-import {DoubleSide, type Node} from 'three/webgpu';
+import {uniform, vec3, vec4} from 'three/tsl';
+import {DoubleSide, type Node, Vector4} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {evaluateNode, nodesOf, stubShaderContext} from '../../testing/spriteGraph.js';
 import {ColorOrder, MeshOrder} from '../SpriteFeature.js';
 import {Darken} from './Darken.js';
 import {MirrorAtPlane} from './MirrorAtPlane.js';
-import {ReflectionPass, ShadowPass} from './passPresets.js';
+import {ReflectionPass, ShadowPass, shadowFallsOnPlane} from './passPresets.js';
 import {PlanarShadow} from './PlanarShadow.js';
 import {ShadowMask} from './ShadowMask.js';
 
@@ -100,5 +100,32 @@ describe('the pass features', () => {
     ]);
     expect(ShadowPass.features).toEqual([PlanarShadow, ShadowMask]);
     expect(ReflectionPass.features).toEqual([MirrorAtPlane, Darken]);
+    expect(ShadowPass.visible).toBe(shadowFallsOnPlane);
+    expect(ReflectionPass.visible).toBeUndefined();
+  });
+
+  describe('the hook of ShadowPass', () => {
+    const judge = (light: [number, number, number, number], plane: [number, number, number, number] = [0, 1, 0, 0]) => {
+      const nodes: Record<string, unknown> = {
+        shadowLight: uniform(new Vector4(...light)),
+        groundPlane: uniform(new Vector4(...plane)),
+      };
+      return shadowFallsOnPlane((name) => nodes[name] as never);
+    };
+
+    test('draws a shadow for a light above the plane, a direction or a point', () => {
+      expect(judge([-0.4, 1, -0.3, 0])).toBe(true);
+      expect(judge([0, 10, 0, 1])).toBe(true);
+      expect(judge([0, 5, 0, 1], [0, 2, 0, 4])).toBe(true); // 5 above y = 2
+    });
+
+    test('leaves it out for a direction parallel to the plane or from below, and a point in or below it', () => {
+      expect(judge([1, 0, 0, 0])).toBe(false);
+      expect(judge([1, 0.0005, 0, 0])).toBe(false); // grazing: below the cosine 1e-3
+      expect(judge([0.4, -1, 0.3, 0])).toBe(false);
+      expect(judge([3, 0, 0, 1])).toBe(false);
+      expect(judge([0, -1, 0, 1])).toBe(false);
+      expect(judge([0, 1, 0, 1], [0, 2, 0, 4])).toBe(false); // y = 1 lies below y = 2
+    });
   });
 });

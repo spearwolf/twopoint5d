@@ -5,7 +5,7 @@ import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
-import {stageFeaturesOf} from '../passes/passUniformNames.js';
+import {resolvedUniformName, stageFeaturesOf} from '../passes/passUniformNames.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import {FeatureSpritesGeometry, type FeatureSpritesGeometryParameters} from './FeatureSpritesGeometry.js';
 import {FeatureSpritesMaterial, type FeatureSpritesMaterialParameters} from './FeatureSpritesMaterial.js';
@@ -37,12 +37,38 @@ export class FeatureSpritesPass<Api extends object = object> extends Mesh {
   declare material: FeatureSpritesMaterial<Api>;
   readonly pass: SpritePass;
 
+  #enabled = true;
+  #hookAgrees = true;
+  // built once: the hook runs every frame and must not allocate
+  readonly #uniform: (name: string) => SpriteUniformNode;
+
   constructor(geometry: FeatureSpritesGeometry<Api>, material: FeatureSpritesMaterial<Api>, pass: SpritePass) {
     super(geometry, material);
     this.pass = pass;
     this.name = `twopoint5d.FeatureSprites.${pass.name}`;
     this.frustumCulled = false;
     this.renderOrder = pass.renderOrder ?? 0;
+    const where = `FeatureSprites: the visible of pass "${pass.name}"`;
+    this.#uniform = (name) => material.resources.uniform(resolvedUniformName(pass, name), where);
+  }
+
+  /**
+   * The caller's switch: the pass is drawn while it is on and its `visible` hook agrees. Use it
+   * instead of `visible`, which `FeatureSprites#update()` writes for a pass with a hook.
+   */
+  get enabled(): boolean {
+    return this.#enabled;
+  }
+
+  set enabled(enabled: boolean) {
+    this.#enabled = enabled;
+    this.visible = enabled && this.#hookAgrees;
+  }
+
+  /** Asks the `visible` hook of the pass for this frame; the sprites call it for passes that have one. @internal */
+  judgeVisibility(): void {
+    this.#hookAgrees = this.pass.visible!(this.#uniform);
+    this.visible = this.#enabled && this.#hookAgrees;
   }
 }
 
@@ -133,7 +159,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
  * the geometry and the material it is not handed, and a child mesh with a material of its own for
  * every pass; what it builds belongs to it and goes with {@link dispose}, while a geometry, a
  * material or a texture handed in stays the caller's. Call `update()` once per frame before
- * rendering — it serves every pass as well.
+ * rendering — it judges the `visible` hook of every pass and serves every pass as well.
  */
 export class FeatureSprites<Api extends object = object> extends VertexObjects<FeatureSpritesGeometry<Api>> {
   declare geometry: FeatureSpritesGeometry<Api> | undefined;
@@ -145,6 +171,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   #ownsMaterial: boolean;
   #resources: SpriteResources | undefined;
   #passes: Record<string, FeatureSpritesPass<Api>> = Object.freeze(passRecord<Api>());
+  #judgedPasses: readonly FeatureSpritesPass<Api>[] = [];
   #disposed = false;
 
   /**
@@ -179,6 +206,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
         passes[pass.name] = mesh;
       }
       Object.freeze(passes);
+      this.#judgedPasses = Object.values(passes).filter((mesh) => mesh.pass.visible != null);
     } catch (error) {
       // the pass material that threw released what it built itself; dispose() releases the rest —
       // the pass materials built so far, the material, the shared resources and a geometry built here
@@ -267,6 +295,17 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   }
 
   /**
+   * Judges the `visible` hook of every pass that has one, then uploads what the pools have marked
+   * — see {@link VertexObjects.update}. Call it once per frame, after the changes and before
+   * rendering. Allocates nothing.
+   */
+  override update(): void {
+    const judged = this.#judgedPasses;
+    for (let i = 0; i < judged.length; i++) judged[i]!.judgeVisibility();
+    super.update();
+  }
+
+  /**
    * Releases the geometry and the material this mesh built, the pass meshes with their materials
    * and the uniforms and textures they shared. The mesh leaves the scene graph first and fires
    * three's `dispose` event, so the renderer drops what it built for it; every pass mesh leaves this
@@ -294,6 +333,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
       mesh.material.dispose();
     }
     this.#passes = Object.freeze(passRecord<Api>());
+    this.#judgedPasses = [];
 
     if (this.#ownsGeometry) this.geometry?.dispose();
     this.geometry = undefined;

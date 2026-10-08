@@ -7,6 +7,7 @@ import {TextureCoords} from '../texture/TextureCoords.js';
 import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
 import {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js';
 import {prepareSpriteFrame} from './features/AtlasFrame.js';
+import {ReflectionPass, ShadowPass} from './passes/passPresets.js';
 import {AnimatedSpriteKind, TexturedSpriteKind} from './presets.js';
 
 // a call that allocates anything costs 16 B at least; the allocation-free paths measured below
@@ -137,5 +138,18 @@ describe('sprites on the hot path', () => {
     expect(bytesPerRound / 2000).toBeLessThan(BYTES_PER_CALL_LIMIT);
     textured.dispose();
     animated.dispose();
+  });
+
+  test('update() of sprites with a shadow and a reflection pass allocates nothing per call', async () => {
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1000, passes: [ShadowPass, ReflectionPass]});
+    for (let i = 0; i < 1000; i++) sprites.createSprite();
+    sprites.update();
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 1000; i++) sprites.update();
+    });
+
+    expect(bytesPerRound / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
   });
 });
