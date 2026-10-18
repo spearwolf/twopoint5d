@@ -9,6 +9,14 @@
       "tileSet": {"tileWidth": 128, "tileHeight": 128},
       "texture": ["nearest", "srgb"]
     },
+    "cardboardAtlas": {
+      "atlasUrl": "cardboard/cardboard.json",
+      "texture": ["mag-nearest", "srgb"]
+    },
+    "cardboardTurntable": {
+      "imageUrl": "cardboard/turntable.webp",
+      "texture": ["flipy", "srgb"]
+    },
     "glaskugelnTiles": {
       "imageUrl": "glaskugeln-2-256x.png",
       "tileSet": {"tileWidth": 256, "tileHeight": 256},
