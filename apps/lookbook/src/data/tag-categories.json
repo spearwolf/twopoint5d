@@ -19,6 +19,12 @@
         "ReflectionPass",
         "planeOf",
         "lightOf",
+        "FlatPlacement",
+        "GroundPlacement",
+        "Yaw",
+        "Orientation",
+        "Rotation",
+        "Tint",
         "billboards"
       ]
     },

@@ -9,12 +9,14 @@ import {attributeNamesOf, nodesOf, operatorOf, samplesTexture, textureNodesOf} f
 import {defineSprite} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
 import {BillboardPlacement} from '../features/BillboardPlacement.js';
-import {FlatPlacement} from '../features/FlatPlacement.js';
+import {FlatPlacement, flatPlacement, GroundPlacement} from '../features/FlatPlacement.js';
 import {InstancePosition} from '../features/InstancePosition.js';
+import {Orientation} from '../features/Orientation.js';
 import {QuadSize} from '../features/QuadSize.js';
 import {Rotation} from '../features/Rotation.js';
 import {TextureColor} from '../features/TextureColor.js';
 import {Tint} from '../features/Tint.js';
+import {Yaw} from '../features/Yaw.js';
 import {QuadBase} from '../SpriteBase.js';
 import {definePass} from '../passes/definePass.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
@@ -356,6 +358,52 @@ describe('FeatureSpritesMaterial', () => {
       expect(() => {
         material.placement = anchored;
       }).toThrow('FeatureSpritesMaterial: feature "anchored" requires feature "anchor", which the sprite kind does not hold');
+      material.dispose();
+    });
+
+    test('swaps a turned placement for a plain one and back, and lays the sprites on the ground', () => {
+      const YawPlacement = flatPlacement({orientation: 'yaw'});
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, YawPlacement, Yaw]});
+      const material = new FeatureSpritesMaterial(kind);
+      expect(attributeNamesOf(material.positionNode!)).toEqual(['instancePosition', 'position', 'yaw']);
+
+      material.placement = FlatPlacement;
+      expect(attributeNamesOf(material.positionNode!)).toEqual(['instancePosition', 'position']);
+      material.placement = GroundPlacement;
+      expect(material.placement).toBe(GroundPlacement);
+      material.placement = YawPlacement;
+      expect(attributeNamesOf(material.positionNode!)).toEqual(['instancePosition', 'position', 'yaw']);
+      material.dispose();
+    });
+
+    test('swaps the yaw for the quaternion on a kind that holds both', () => {
+      const QuaternionPlacement = flatPlacement({plane: 'xz', orientation: 'quaternion'});
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [InstancePosition, flatPlacement({orientation: 'yaw'}), Yaw, Orientation],
+      });
+      const material = new FeatureSpritesMaterial(kind);
+
+      material.placement = QuaternionPlacement;
+      expect(material.placement).toBe(QuaternionPlacement);
+      expect(attributeNamesOf(material.positionNode!)).toEqual(['instancePosition', 'orientation', 'position']);
+      material.dispose();
+    });
+
+    test('refuses a turned placement for a kind without the feature of its turn', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(() => {
+        material.placement = flatPlacement({orientation: 'yaw'});
+      }).toThrow(
+        'FeatureSpritesMaterial: feature "flatPlacement+yaw" requires feature "yaw", which the sprite kind does not hold',
+      );
+      expect(() => {
+        material.placement = flatPlacement({orientation: 'quaternion'});
+      }).toThrow(
+        'FeatureSpritesMaterial: feature "flatPlacement+quaternion" requires feature "orientation", which the sprite kind does not hold',
+      );
+      expect(material.placement).toBe(FlatPlacement);
       material.dispose();
     });
 

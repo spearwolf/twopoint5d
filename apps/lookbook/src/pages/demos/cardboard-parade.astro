@@ -1,0 +1,86 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_cardboard-parade.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-2 items-center justify-end">
+      <div class="actionBtn toggleSpin">turntable: on</div>
+      <div class="actionBtn toggleFacing">facing: on</div>
+    </section>
+    <div class="drawCalls fixed bottom-4 right-4">draw calls: …</div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    /* a pale daylight sky behind the theatre: the canvas is cleared transparent */
+    background: linear-gradient(to bottom, #bfe0f2 0%, #e4f0ee 55%, #f6ecd6 100%);
+    color: #3a2c1e;
+  }
+  .drawCalls {
+    font-family: monospace;
+    font-size: 110%;
+    padding: 0.3em 0.6em;
+    background: rgba(255 250 238 / 75%);
+    border-radius: 4px;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {OnDisplayRenderFrame} from '@spearwolf/twopoint5d';
+  import {CardboardParade} from '~demos/cardboard-parade/CardboardParade';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+
+  // the preview screenshot waits for the theatre, not for the default delay
+  const preview = deferPreview();
+
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: true});
+
+  await demo.start(async ({renderer}) => {
+    demo.camera.fov = 45;
+    demo.camera.updateProjectionMatrix();
+    demo.camera.position.set(0, 8.5, 15.5);
+    demo.controls.target.set(0, 0.5, 0);
+    demo.controls.maxPolarAngle = Math.PI / 2 - 0.08;
+    demo.controls.minDistance = 6;
+    demo.controls.maxDistance = 40;
+
+    const store = await loadTextureCatalog(renderer);
+    const [atlas, texture] = await store.getAsync('cardboardAtlas', ['atlas', 'texture']);
+    const [turntable] = await store.getAsync('cardboardTurntable', ['texture']);
+
+    const parade = new CardboardParade({atlas, texture}, turntable);
+    demo.scene.add(parade);
+
+    // the buttons and the readout are written by the markup of this very page
+    const spinButton = document.querySelector('.toggleSpin')!;
+    const facingButton = document.querySelector('.toggleFacing')!;
+    const drawCalls = document.querySelector('.drawCalls')!;
+    spinButton.addEventListener('click', () => {
+      parade.spinning = !parade.spinning;
+      spinButton.textContent = `turntable: ${parade.spinning ? 'on' : 'off'}`;
+    });
+    facingButton.addEventListener('click', () => {
+      parade.facing = !parade.facing;
+      facingButton.textContent = `facing: ${parade.facing ? 'on' : 'off'}`;
+    });
+
+    on(demo, OnDisplayRenderFrame, ({deltaTime}) => parade.update(deltaTime));
+
+    // read between two frames: the renderer counts anew at the start of each render
+    setInterval(() => {
+      drawCalls.textContent = `draw calls: ${renderer.info.render.drawCalls}`;
+    }, 250);
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('cardboard parade', parade);
+
+    preview.ready(demo);
+  });
+</script>

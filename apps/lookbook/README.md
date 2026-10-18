@@ -1,6 +1,6 @@
 # twopoint5d lookbook
 
-The living documentation of `@spearwolf/twopoint5d`: 18 runnable demos, each linked to its
+The living documentation of `@spearwolf/twopoint5d`: 19 runnable demos, each linked to its
 own source, searchable by tags.
 
 ## Running it
@@ -14,8 +14,8 @@ repo-root `README.md`.
 ## What's in `src/`
 
 - `pages/index.astro` — the overview page, the only page using `Layout.astro`
-- `pages/demos/<name>.astro` — 18 demo pages, all built on `VanillaDemo.astro`
-- `pages/demos/_<name>.json` — 18 metadata files, one per demo page
+- `pages/demos/<name>.astro` — 19 demo pages, all built on `VanillaDemo.astro`
+- `pages/demos/_<name>.json` — 19 metadata files, one per demo page
 - `demos/` — the demo code itself, TypeScript, grouped by demo; the three map2d demos
   share `map2d/`
 - `components/` — the lookbook UI: the card grid, the tag cloud, search, and
@@ -26,7 +26,14 @@ repo-root `README.md`.
 - `styles/`
 
 Three path aliases resolve into `src/`: `~components/*`, `~layouts/*` and `~demos/*`,
-declared in `tsconfig.json`. All 18 demo pages import through them.
+declared in `tsconfig.json`. All 19 demo pages import through them.
+
+## Generated assets
+
+Most images under `public/assets/` are plain files. The cut-outs of the demo `cardboard-parade`
+are generated: `assets-src/cardboard/` builds them in Blender and Python and writes
+`public/assets/cardboard/`. No build or check runs it; a change to the props is a commit of the
+script and its output together. Its README says how to rerun it.
 
 ## Adding a demo
 
