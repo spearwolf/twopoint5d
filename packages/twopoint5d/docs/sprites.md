@@ -1036,7 +1036,9 @@ frame can repeat on a surface.
 
 - `origin` is required. `'bottom-left'` is three's `uv()` on its own geometries, v counted
   upwards; `'top-left'` is the convention of `TextureCoords`.
-- `wrap: 'clamp'` (the default) holds the uv at the edge of the frame, `'repeat'` repeats it.
+- `wrap: 'clamp'` (the default) holds the uv at the edge of the frame, `'repeat'` repeats it; a
+  pair `[u, v]` wraps each axis on its own — `['repeat', 'clamp']` runs a frame around a cylinder
+  and keeps its top and bottom edges.
 - `trim: 'mask'` (the default) lets the uv stand for the untrimmed sprite, as the quad of a sprite
   does: outside the part the packer cut the frame out of, the result is `vec4(0)` — the material
   needs transparency or an alpha test for it. `'stretch'` lays the trimmed area over the whole uv.

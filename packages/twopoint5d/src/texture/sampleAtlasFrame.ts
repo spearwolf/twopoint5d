@@ -1,4 +1,4 @@
-import {clamp, dFdx, dFdy, div, float, fract, min, round, select, step, sub, texture, vec2} from 'three/tsl';
+import {clamp, dFdx, dFdy, div, float, fract, min, mix, round, step, sub, texture, vec2} from 'three/tsl';
 import {
   LinearMipmapLinearFilter,
   LinearMipmapNearestFilter,
@@ -11,14 +11,21 @@ import {
 
 import type {AtlasFrameTable} from './AtlasFrameTable.js';
 
+/** How {@link sampleAtlasFrame} treats a uv outside `[0, 1]` on one axis. */
+export type AtlasFrameWrap = 'clamp' | 'repeat';
+
 export interface SampleAtlasFrameOptions {
   /**
    * Where the uv has its `(0, 0)`. `'bottom-left'` is three's `uv()` on its own geometries, v counted
    * upwards; `'top-left'` is the convention of `TextureCoords`, v counted downwards.
    */
   origin: 'top-left' | 'bottom-left';
-  /** `'clamp'` holds a uv outside `[0, 1]` at the edge of the frame, `'repeat'` repeats the frame. `'clamp'` by default. */
-  wrap?: 'clamp' | 'repeat';
+  /**
+   * `'clamp'` holds a uv outside `[0, 1]` at the edge of the frame, `'repeat'` repeats the frame — on both
+   * axes, or a pair `[u, v]` for each axis on its own: `['repeat', 'clamp']` repeats a frame around a
+   * cylinder and keeps its top and bottom edges. `'clamp'` by default.
+   */
+  wrap?: AtlasFrameWrap | readonly [u: AtlasFrameWrap, v: AtlasFrameWrap];
   /**
    * How a trimmed frame fills the uv. With `'mask'` the uv stands for the untrimmed sprite, as the quad
    * of a sprite does: the trimmed area is the part of it the packer cut the frame out of, and outside
@@ -77,8 +84,16 @@ export function sampleAtlasFrame(
   if (!ORIGINS.includes(origin)) {
     throw new Error(`sampleAtlasFrame: the origin "${String(origin)}" is none of ${ORIGINS.join(', ')}`);
   }
-  if (!WRAPS.includes(wrap)) {
-    throw new Error(`sampleAtlasFrame: the wrap "${String(wrap)}" is none of ${WRAPS.join(', ')}`);
+  if (typeof wrap !== 'string' && (!Array.isArray(wrap) || wrap.length !== 2)) {
+    throw new Error(
+      `sampleAtlasFrame: the wrap ${JSON.stringify(wrap)} is neither one of ${WRAPS.join(', ')} nor a pair of them`,
+    );
+  }
+  const [wrapU, wrapV] = typeof wrap === 'string' ? [wrap, wrap] : wrap;
+  for (const axis of [wrapU, wrapV]) {
+    if (!WRAPS.includes(axis)) {
+      throw new Error(`sampleAtlasFrame: the wrap "${String(axis)}" is none of ${WRAPS.join(', ')}`);
+    }
   }
   if (!TRIMS.includes(trim)) {
     throw new Error(`sampleAtlasFrame: the trim "${String(trim)}" is none of ${TRIMS.join(', ')}`);
@@ -92,11 +107,18 @@ export function sampleAtlasFrame(
   const texCoords = table.element(first);
   const measures = table.element(first.add(1).toInt());
   const margins = table.element(first.add(2).toInt());
-  const flipDiagonal = measures.z.greaterThan(0.5);
+  // 1 for a frame with FLIP_DIAGONAL, 0 otherwise — exactly, as the table writes it. The axes are swapped
+  // by mix() with it and never by select(): three builds a select() as an if/else and declares a value
+  // the graph reads more than once in the branch that builds it first, so a value that both branches,
+  // and the mask after them, read stays unassigned in the other branch. Chromium and Firefox read such
+  // a variable as 0, WebKit's WebGL 2 reads garbage
+  const flipDiagonal = measures.z;
+  const swapped = <T extends Node<'vec2'>>(value: T) => mix(value, value.yx, flipDiagonal);
 
   // the uv in the convention of TextureCoords, v counted downwards; continuous, before the wrap
   const position = origin === 'bottom-left' ? vec2(uv.x, sub(1, uv.y)) : uv;
-  const wrapped = wrap === 'repeat' ? fract(position) : clamp(position, 0, 1);
+  const wrapAxis = (value: Node<'float'>, axis: AtlasFrameWrap) => (axis === 'repeat' ? fract(value) : clamp(value, 0, 1));
+  const wrapped = vec2(wrapAxis(position.x, wrapU), wrapAxis(position.y, wrapV));
 
   // the position inside the area the frame covers, and how far the tex coords move per unit of uv
   let inside: Node<'vec2'> = wrapped;
@@ -111,13 +133,13 @@ export function sampleAtlasFrame(
   }
   if (inset > 0) {
     // the texels of the frame as it is drawn: under the diagonal flip it is `height` wide and `width` high
-    const drawn = select(flipDiagonal, measures.yx, measures.xy);
+    const drawn = swapped(measures.xy);
     const edge = min(div(inset, drawn), 0.5);
     inside = clamp(inside, edge, sub(1, edge));
   }
 
   const st = texCoords.xy.add(inside.mul(texCoords.zw));
-  const sample = texture(map, select(flipDiagonal, st.yx, st));
+  const sample = texture(map, swapped(st));
   // gradients matter only where a mip level is picked. They are taken nowhere else: three (r186) reads a
   // texture whose filters are both NearestFilter with textureLoad and binds no sampler for it, while its
   // WGSL builder still names that sampler in the textureSampleGrad of a grad() — the shader fails on WebGPU
@@ -125,7 +147,7 @@ export function sampleAtlasFrame(
   if (MIPMAP_FILTERS.includes(map.minFilter)) {
     const gradX = dFdx(position).mul(extent);
     const gradY = dFdy(position).mul(extent);
-    color = sample.grad(select(flipDiagonal, gradX.yx, gradX), select(flipDiagonal, gradY.yx, gradY)) as unknown as Node<'vec4'>;
+    color = sample.grad(swapped(gradX), swapped(gradY)) as unknown as Node<'vec4'>;
   }
 
   return covered ? color.mul(covered) : color;

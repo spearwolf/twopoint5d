@@ -179,6 +179,30 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
     expectModel(await render(scene), imageOnPlane(-1, 6, 4));
   });
 
+  it('wraps each axis on its own: repeated across, held at the top and bottom edges', async function () {
+    const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
+    disposals.push(() => texture.dispose());
+    const [atlas] = TexturePackerJson.parse(json);
+    const table = AtlasFrameTable.fromAtlas(atlas, ['upright']);
+    // u runs over two frames; v from −0.5 at the bottom of the plane to 1.5 at its top, so half a
+    // frame lies beyond each edge — a repeat in v would bring the other row there
+    const across = vec2(uv().x.mul(2), uv().y.mul(2).sub(0.5));
+
+    const scene = new Scene();
+    makePlane(
+      scene,
+      6,
+      4,
+      0,
+      sampleAtlasFrame(texture, table, 0, across, {origin: 'bottom-left', wrap: ['repeat', 'clamp'], inset: 0.5}),
+    );
+
+    // the first row of the image over the upper half of the plane, the second over the lower half
+    expectModel(await render(scene), (x, y) =>
+      x < -3 || x >= 3 || y < -2 || y >= 2 ? BLACK : IMAGE[(y >= 0 ? 0 : 1) * IMAGE_WIDTH + (Math.floor(x + 3) % IMAGE_WIDTH)],
+    );
+  });
+
   it('lays a trimmed frame where the untrimmed sprite has it, and draws nothing around it', async function () {
     // the image is the trimmed area of a sprite of 5 × 4, one texel in from its left and top edges
     const texture = makeColorTexture(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);

@@ -1,5 +1,13 @@
 import {attribute, int, uv, vec2} from 'three/tsl';
-import {LinearFilter, LinearMipmapLinearFilter, NearestFilter, type Node, Texture, type TextureNode} from 'three/webgpu';
+import {
+  ConditionalNode,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  NearestFilter,
+  type Node,
+  Texture,
+  type TextureNode,
+} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {nodesOf, operatorOf, textureNodesOf} from '../testing/spriteGraph.js';
@@ -10,7 +18,7 @@ import {TextureCoords} from './TextureCoords.js';
 const table = new AtlasFrameTable([new TextureCoords(new TextureCoords(0, 0, 8, 4), 2, 0, 4, 2)]);
 
 const ORIGINS = ['top-left', 'bottom-left'] as const;
-const WRAPS = ['clamp', 'repeat', undefined] as const;
+const WRAPS = ['clamp', 'repeat', ['repeat', 'clamp'], undefined] as const;
 const TRIMS = ['mask', 'stretch', undefined] as const;
 const INDICES: [string, () => Node<'int'> | Node<'uint'> | Node<'float'> | number][] = [
   ['a number', () => 0],
@@ -78,7 +86,36 @@ describe('sampleAtlasFrame()', () => {
     expect(call({})).toThrow(/origin/);
     expect(call({origin: 'center'})).toThrow(/origin/);
     expect(call({origin: 'top-left', wrap: 'mirror'})).toThrow(/wrap/);
+    expect(call({origin: 'top-left', wrap: ['repeat']})).toThrow(/wrap/);
+    expect(call({origin: 'top-left', wrap: ['repeat', 'mirror']})).toThrow(/wrap/);
+    expect(call({origin: 'top-left', wrap: ['repeat', 'clamp', 'clamp']})).toThrow(/wrap/);
+    expect(call({origin: 'top-left', wrap: 1})).toThrow(/wrap/);
     expect(call({origin: 'top-left', trim: 'crop'})).toThrow(/trim/);
+  });
+
+  test('a wrap of one word is the wrap of both axes', () => {
+    const map = new Texture();
+    map.minFilter = NearestFilter;
+    const one = sampleAtlasFrame(map, table, 0, uv(), {origin: 'top-left', wrap: 'repeat', trim: 'stretch'});
+    const both = sampleAtlasFrame(map, table, 0, uv(), {origin: 'top-left', wrap: ['repeat', 'repeat'], trim: 'stretch'});
+    const mathOf = (root: Node) =>
+      [...nodesOf(root)].map((node) => (node as unknown as {method?: string}).method).filter((method) => method != null);
+
+    expect(mathOf(both).filter((method) => method === 'fract').length).toBeGreaterThan(0);
+    expect(mathOf(one).filter((method) => method === 'clamp').length).toBe(
+      mathOf(both).filter((method) => method === 'clamp').length,
+    );
+  });
+
+  test('builds no branch: three declares a value read in both branches of a select() in only one of them', () => {
+    const map = new Texture();
+    const color = sampleAtlasFrame(map, table, attribute<'float'>('frame'), uv(), {
+      origin: 'bottom-left',
+      wrap: 'repeat',
+      inset: 0.5,
+    });
+
+    expect([...nodesOf(color)].filter((node) => node instanceof ConditionalNode)).toEqual([]);
   });
 
   test('refuses an inset that is negative or no finite number', () => {

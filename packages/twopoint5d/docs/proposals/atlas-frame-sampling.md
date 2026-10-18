@@ -9,6 +9,10 @@ decisions it rests on are collected in §9. Deviations:
   filters are both `NearestFilter` with `textureLoad` and binds no sampler for it, while its WGSL
   builder still names that sampler in the `textureSampleGrad` of a `grad()` — the shader fails on
   WebGPU;
+- `wrap` takes a pair `[u, v]` as well, one wrap per axis (§4.1; §8 left it out): a frame repeated
+  around a cylinder — the skyline of the lookbook demo `atlas-frames-on-meshes`, and of the game
+  the issue came from — repeats in u and has to hold its top and bottom edges in v, where a
+  `fract()` of 1 at the edge would draw the opposite row;
 - the guide has a section of its own before "Performance", not one beside "Frames out of an
   atlas" (§7): it is about meshes, not about a feature of a sprite;
 - `update()` allocating nothing is held by `src/texture/hot-path-allocations.spec.ts`, and the
