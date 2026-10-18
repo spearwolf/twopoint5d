@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-18
+
+The sprite meshes of this release are built from features: `TexturedSprites` and
+`AnimatedSprites` give way to `FeatureSprites` and the sprite kinds `TexturedSpriteKind` and
+`AnimatedSpriteKind`, and the `three` peer dependency moves to 0.186. Both break the API;
+the Migration Guide at the end of this section walks a project through the upgrade.
+
 ### Added
 
 - add sprite kinds made of features: `defineFeature()` checks one feature and freezes it, `defineSprite()` merges a base and a list of features into a `SpriteKind` — one instanced vertex object description, the sprite-handle methods of every feature and a pipeline of shader stages (frame slot, trim shift, local stages, one placement, mesh stages; color source, color stages) — and `SpriteOf<typeof Kind>` names the type of its sprite handle. `LocalOrder`, `MeshOrder` and `ColorOrder` name the order bands of the stages. `docs/sprites.md` is the guide, with the rules of each feature field under "Writing a feature"

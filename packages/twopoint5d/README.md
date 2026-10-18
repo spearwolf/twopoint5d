@@ -15,13 +15,20 @@ and the [CHANGELOG](CHANGELOG.md) for what changed from release to release.
 
 The core features can be roughly classified into the following areas:
 
-#### 📚 [textured-sprites](src/sprites/)
-- create and render textured 2D sprites in 3D space
+#### 📚 [sprites](src/sprites/)
+- create and render textured 2D sprites in 3D space, thousands of them in one draw call
+- build a sprite kind from features — `defineSprite({base, features})` — or take a preset:
+  `TexturedSpriteKind`, `AnimatedSpriteKind`; a feature of your own brings its attributes,
+  uniforms and a stage of the TSL pipeline
 - load and create sprites from texture atlases or sprite sheet images
 - support frame based animations
 - draw trimmed and rotated frames of a TexturePacker atlas where the untrimmed sprite has
   them
-- render as billboards
+- stand them up, lay them on the ground (`GroundPlacement`) or render them as billboards,
+  swapped on a live material; turn each sprite by a yaw or a quaternion of its own
+- draw shadows and reflections of the same sprites as passes, bound to lights and planes of
+  the scene graph
+- the guide: [docs/sprites.md](docs/sprites.md)
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
 #### 📚 [texture atlases and tilesets](src/texture/)
@@ -29,6 +36,8 @@ The core features can be roughly classified into the following areas:
   catalog through `TextureStore`, which fetches every image once and owns the textures it
   builds
 - read the "JSON Hash" and the "JSON Array" format of TexturePacker
+- sample the frames of an atlas in a node material of your own (`AtlasFrameTable`), wrapped
+  per axis and without seams
 - create tilesets from images
 - the callback loaders (`TextureAtlasLoader`, `TileSetLoader`, …) are deprecated in
   favour of `TextureStore`
