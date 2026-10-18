@@ -27,6 +27,18 @@
       "tileSet": {"tileWidth": 256, "tileHeight": 256},
       "texture": ["nearest", "srgb"]
     },
+    "nightCityFacades": {
+      "atlasUrl": "night-city/facades.json",
+      "texture": ["mag-nearest", "srgb"]
+    },
+    "nightCitySkyline": {
+      "atlasUrl": "night-city/skyline.json",
+      "texture": ["mag-nearest", "srgb"]
+    },
+    "nightCityTrack": {
+      "atlasUrl": "night-city/track.json",
+      "texture": ["mag-nearest", "srgb"]
+    },
     "nobingerTiles": {
       "imageUrl": "nobinger-anim-sheet.png",
       "tileSet": {"tileWidth": 64, "tileHeight": 64, "margin": 1},

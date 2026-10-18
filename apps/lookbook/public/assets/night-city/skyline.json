@@ -1,0 +1,72 @@
+{
+  "frames": {
+    "skyline_far": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 96
+      }
+    },
+    "skyline_mid": {
+      "frame": {
+        "x": 0,
+        "y": 96,
+        "w": 512,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 96
+      }
+    },
+    "skyline_near": {
+      "frame": {
+        "x": 0,
+        "y": 192,
+        "w": 512,
+        "h": 96
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 96
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 96
+      }
+    }
+  },
+  "meta": {
+    "image": "skyline.png",
+    "size": {
+      "w": 512,
+      "h": 288
+    },
+    "scale": "1"
+  }
+}

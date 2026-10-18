@@ -1,0 +1,16 @@
+{
+  "title": "atlas frames on meshes",
+  "shortDescription": "A night city whose road, facades and skyline rings sample frames of TexturePacker atlases in node materials of their own",
+  "description": "Atlas frames on ordinary three.js meshes, each with a `MeshBasicNodeMaterial` of its own. `atlasFrameTable()` lays frames of an atlas from the `TextureStore` into an `AtlasFrameTable` — by a list of names or a `RegExp` — and `sampleAtlasFrame()` samples one of them per fragment, so a frame repeats inside its own area of the atlas. The road picks its frame per segment from a vertex attribute, the buildings — one `InstancedMesh` — pick a facade by a hash of the instance index and repeat it over their walls in world units, and the skyline rings repeat a frame around a cylinder with `wrap: ['repeat', 'clamp']`, so its top and bottom edges hold. `origin: 'bottom-left'` takes three's `uv()` as it is, and `inset: 0.5` keeps the frames beside each other in the atlas from bleeding in at the wraps. The atlases come from the game prototype *racing-into-night-city*, which asked for the feature.",
+  "url": "/demos/atlas-frames-on-meshes",
+  "tags": [
+    "AtlasFrameTable",
+    "atlasFrameTable",
+    "sampleAtlasFrame",
+    "TextureStore",
+    "texture-atlas",
+    "textures",
+    "vanilla",
+    "demo"
+  ]
+}
