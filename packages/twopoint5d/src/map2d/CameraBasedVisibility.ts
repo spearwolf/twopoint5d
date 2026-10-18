@@ -298,9 +298,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * under the camera instead: the camera sees the map point that lies `(centerX, centerY)` away
    * from where it looks on the plane.
    *
-   * The camera's own position already drives visibility either way, so for a map fixed in the
-   * world under a moving camera the view center stays at `(0, 0)` — feeding the camera position
-   * into `centerX`/`centerY` scrolls the map with the camera, on top of the camera's own motion.
+   * With `lookAtCenter = false`, the camera's own position already drives visibility, so for a map
+   * fixed in the world under a moving camera the view center stays at `(0, 0)` — feeding the camera
+   * position into `centerX`/`centerY` scrolls the map with the camera, on top of the camera's own
+   * motion.
    * Set the view center on `Map2D` or `Map2DTileStreamer`, which carry the full per-visibilitor
    * semantics on their `centerX`.
    */

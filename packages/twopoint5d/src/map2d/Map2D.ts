@@ -143,11 +143,12 @@ export class Map2D extends Group {
   }
 
   /**
-   * Where the tile grid starts on the x axis, in _world space_: with `centerX = centerY = 0`, a
-   * tile `(c, r)` covers `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile
-   * quad starts at that corner — it is **not** centered on its coordinates — so a tile at `(0, 0)`
-   * spans `[xOffset, xOffset + tileWidth)`, and the `xOffset` that centers the grid on the origin
-   * is `-tileWidth / 2`. Defaults to `0`, and changing it has the tiles built again.
+   * Where the tile grid starts on the x axis in map-plane coordinates, before the visibilitor's
+   * translation and the map node's world transform. A tile `(c, r)` covers
+   * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile quad starts at that
+   * corner — it is **not** centered on its coordinates — so a tile at `(0, 0)` spans
+   * `[xOffset, xOffset + tileWidth)`, and the `xOffset` that centers the grid on the map-plane
+   * origin is `-tileWidth / 2`. Defaults to `0`, and changing it has the tiles built again.
    */
   get xOffset(): number {
     return this.#tileStreamer.xOffset;
@@ -158,10 +159,10 @@ export class Map2D extends Group {
   }
 
   /**
-   * Where the tile grid starts on the axis of the rows, in _world space_: with
-   * `centerX = centerY = 0`, a tile `(c, r)` covers `[r · tileHeight + yOffset, (r + 1) ·
-   * tileHeight + yOffset)` there — corner-anchored like {@link xOffset}, not centered. Defaults
-   * to `0`, and changing it has the tiles built again.
+   * Where the tile grid starts on the axis of the rows in map-plane coordinates, before the
+   * visibilitor's translation and the map node's world transform. A tile `(c, r)` covers
+   * `[r · tileHeight + yOffset, (r + 1) · tileHeight + yOffset)` there — corner-anchored like
+   * {@link xOffset}, not centered. Defaults to `0`, and changing it has the tiles built again.
    */
   get yOffset(): number {
     return this.#tileStreamer.yOffset;
