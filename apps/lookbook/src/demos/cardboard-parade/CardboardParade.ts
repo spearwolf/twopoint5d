@@ -6,6 +6,7 @@ import {
   flatPlacement,
   GroundPlacement,
   InstancePosition,
+  Orientation,
   QuadBase,
   QuadSize,
   Rotation,
@@ -22,9 +23,11 @@ import {
   Color,
   CylinderGeometry,
   DoubleSide,
+  Euler,
   Group,
   Mesh,
   MeshBasicNodeMaterial,
+  Quaternion,
   type Texture,
 } from 'three/webgpu';
 import {CardboardBack} from './CardboardBack';
@@ -36,11 +39,13 @@ export interface CardboardAtlas {
 }
 
 const YawPlacement = flatPlacement({orientation: 'yaw'});
+const QuaternionPlacement = flatPlacement({orientation: 'quaternion'});
 
-// the props stand still: their yaw is written once
+// the props stand still, but not all of them upright: a signpost leans, a fence panel lies where it
+// fell. Their quaternions are written once — 16 bytes a sprite, where a yaw takes 4
 const PropKind = defineSprite({
   base: QuadBase,
-  features: [InstancePosition, YawPlacement, Yaw, QuadSize, AtlasFrame, TextureColor, CardboardBack],
+  features: [InstancePosition, QuaternionPlacement, Orientation, QuadSize, AtlasFrame, TextureColor, CardboardBack],
 });
 
 // the figures turn where they walk and rock on their feet; no back of their own — a profile drawn
@@ -89,6 +94,19 @@ function seededRandom(seed: number): () => number {
 /** The yaw that turns the local x of a quad — the right of its image — along `(dx, dz)`. */
 const yawAlong = (dx: number, dz: number) => Math.atan2(-dz, dx);
 
+/**
+ * A lean of a prop off the vertical, in its own frame: `pitch` about its local x — negative tips the
+ * top backwards, away from its print — and `roll` about its local z, in the plane of the print.
+ */
+interface Lean {
+  pitch: number;
+  roll: number;
+}
+
+// the yaw first, then the pitch, then the roll: Euler order 'YXZ', so the lean stays in the frame of the prop
+const leanEuler = new Euler(0, 0, 0, 'YXZ');
+const leanQuaternion = new Quaternion();
+
 /** The rotation on the ground that turns the top of an image — towards −Z at 0 — along `(dx, dz)`. */
 const rotationAlong = (dx: number, dz: number) => Math.atan2(-dx, -dz);
 
@@ -116,8 +134,8 @@ interface Print {
 }
 
 /**
- * A toy theatre on a turntable: a fence around the rim, a village of houses and trees, signposts at
- * the crossroads, figures that walk in circles and leave footprints, each with a blob shadow. Three
+ * A toy theatre on a turntable: a fence around the rim with a panel fallen over, a village of houses
+ * and trees, leaning signposts at the crossroads, figures that walk in circles and leave footprints, each with a blob shadow. Three
  * sprite meshes — props, walkers, ground — draw all of it, whatever way each cut-out faces.
  */
 export class CardboardParade extends Group {
@@ -218,35 +236,45 @@ export class CardboardParade extends Group {
     this.props.update();
   }
 
-  /** Whether the cut-outs face where their yaw says, or all of them +Z — a placement swap. */
-  set yaw(on: boolean) {
-    this.props.placement = on ? YawPlacement : FlatPlacement;
+  /**
+   * Whether the cut-outs face and lean where their quaternion or their yaw says, or all of them
+   * stand upright facing +Z — a placement swap.
+   */
+  set facing(on: boolean) {
+    this.props.placement = on ? QuaternionPlacement : FlatPlacement;
     this.walkers.placement = on ? YawPlacement : FlatPlacement;
   }
 
-  get yaw(): boolean {
-    return this.props.placement === YawPlacement;
+  get facing(): boolean {
+    return this.props.placement === QuaternionPlacement;
   }
 
   // trees and bushes are printed on both sides, as the wings of a toy theatre are; houses, the
   // fence and the signs show the cardboard from behind
-  #prop(name: string, x: number, z: number, yaw: number, scale = 1) {
+  #prop(name: string, x: number, z: number, yaw: number, scale = 1, lean?: Lean) {
     const sprite = this.props.createSprite();
     if (sprite == null) return;
     const {coords} = this.#frames[name]!;
     sprite.setFrame(this.#frames[name]!);
     sprite.setSize((coords.width / PX_PER_M) * scale, (coords.height / PX_PER_M) * scale);
     sprite.setPosition(x, 0, z);
-    sprite.yaw = yaw;
+    if (lean == null) {
+      sprite.setYaw(yaw);
+    } else {
+      sprite.setQuaternion(leanQuaternion.setFromEuler(leanEuler.set(lean.pitch, yaw, lean.roll)));
+    }
     sprite.twoSided = name.startsWith('tree') || name === 'bush' ? 1 : 0;
   }
 
   #buildVillage(random: () => number) {
-    // the fence: every segment along the tangent of the circle, its print facing outward
+    // the fence: every segment along the tangent of the circle, its print facing outward. One panel
+    // has fallen inwards and lies on its back, the print to the sky; its neighbours lean after it
     const segments = Math.round((2 * Math.PI * FENCE_RADIUS) / 1.62);
+    const fallen = Math.round(segments * 0.08);
     for (let i = 0; i < segments; i++) {
       const angle = (i / segments) * 2 * Math.PI;
-      this.#prop('fence', Math.sin(angle) * FENCE_RADIUS, Math.cos(angle) * FENCE_RADIUS, angle);
+      const lean = i === fallen ? {pitch: -1.48, roll: 0.04} : Math.abs(i - fallen) === 1 ? {pitch: -0.16, roll: 0} : undefined;
+      this.#prop('fence', Math.sin(angle) * FENCE_RADIUS, Math.cos(angle) * FENCE_RADIUS, angle, 1, lean);
     }
 
     // the village: houses facing outward, trees between them
@@ -281,11 +309,13 @@ export class CardboardParade extends Group {
       this.#prop(name, Math.sin(angle) * radius, Math.cos(angle) * radius, random() * 2 * Math.PI, 0.6 + random() * 0.5);
     }
 
-    // the crossroads: four signposts, each pointing its own way
+    // the crossroads: four signposts, each pointing its own way, none of them quite upright — the
+    // wind has had them, one sideways in the plane of its board, another backwards off it
     const signs = ['sign_yellow', 'sign_teal', 'sign_pink', 'sign_orange'];
     signs.forEach((name, i) => {
       const angle = (i / signs.length) * 2 * Math.PI + 0.4;
-      this.#prop(name, Math.sin(angle) * 0.5, Math.cos(angle) * 0.5, angle - Math.PI / 2 + (random() - 0.5) * 0.4);
+      const lean = {pitch: (random() - 0.5) * 0.5, roll: (random() - 0.5) * 0.4};
+      this.#prop(name, Math.sin(angle) * 0.5, Math.cos(angle) * 0.5, angle - Math.PI / 2 + (random() - 0.5) * 0.4, 1, lean);
     });
   }
 

@@ -99,6 +99,7 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `flatPlacement(options)` | — | — | placement | — |
 | `BillboardPlacement` | — | — | placement | — |
 | `Yaw` | `yaw` (static) | `yaw` | — | 0 |
+| `Orientation` | `orientation` (static) | `qx`, `qy`, `qz`, `qw`, `setOrientation()`, `setQuaternion(q)`, `getQuaternion(target?)`, `setYaw(angle)` | — | unturned, `(0, 0, 0, 1)` |
 | `QuadSize` | `quadSize` (static), word `size` | `width`, `height`, `setQuadSize()`, `setSize(w, h)` | local, `Scale` | 0 × 0 |
 | `Shear` | `shear` (dynamic) | `shearX`, `shearY`, `setShear()` | local, `Shear` | 0, 0 |
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
@@ -110,8 +111,9 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
 (see "Flat sprites and billboards"). `setPosition(x, y)` without a `z` keeps the `z` the sprite
-has. `Yaw` is data alone as well: only a placement of `flatPlacement({orientation: 'yaw'})` reads
-it (see "Planes and yaw").
+has. `Yaw` and `Orientation` are data alone as well: only a placement of
+`flatPlacement({orientation: 'yaw'})` reads the one, only one of `flatPlacement({orientation:
+'quaternion'})` the other (see "Planes and turns").
 
 `BillboardPlacement` maps the x and y of the local vertex — trimmed, scaled, sheared and turned
 already — onto the camera's right and up vectors in the local space of the mesh, so a mesh or its
@@ -288,13 +290,13 @@ it brings. A write of the placement the material holds builds nothing.
 A change rebuilds the position graph and sets `needsUpdate`; three serves a shader source it has
 built before from its caches, so the second swap back and forth is cheap. Do not swap every frame.
 
-### Planes and yaw
+### Planes and turns
 
-A flat sprite lies in a plane of its mesh, and may be turned about the up axis of the mesh one by
-one. `flatPlacement(options)` builds the placement for both:
+A flat sprite lies in a plane of its mesh, and may be turned one by one — about the up axis of the
+mesh, or any way at all. `flatPlacement(options)` builds the placement for both:
 
 ```
-placed = instancePosition + yaw · plane · local
+placed = instancePosition + turn · plane · local
 ```
 
 - **`plane`** — `'xy'`, the default, stands the quad up facing +Z. `'xz'` lays it on the ground
@@ -302,12 +304,15 @@ placed = instancePosition + yaw · plane · local
 - **`orientation: 'yaw'`** turns every sprite about +Y of the mesh by its `yaw` attribute, after
   the plane and before the instance position. The kind holds the `Yaw` feature, which brings the
   attribute; `defineSprite()` refuses the placement without it.
+- **`orientation: 'quaternion'`** turns every sprite by the unit quaternion of its `orientation`
+  attribute, at the same place in the chain: any tilt off the vertical — a banner on a ramp, a decal
+  on a slope, a sign that leans. The kind holds the `Orientation` feature.
 
 `flatPlacement()` returns one frozen feature per set of options — equal options give the same
 feature, which the placement swap needs. `FlatPlacement` is `flatPlacement()`, `GroundPlacement` is
-`flatPlacement({plane: 'xz'})`. The four forms are named `flatPlacement`, `groundPlacement`,
-`flatPlacement+yaw` and `groundPlacement+yaw`; a plane or an orientation it does not know throws a
-`TypeError`.
+`flatPlacement({plane: 'xz'})`. The six forms are named `flatPlacement`, `groundPlacement`,
+`flatPlacement+yaw`, `groundPlacement+yaw`, `flatPlacement+quaternion` and
+`groundPlacement+quaternion`; a plane or an orientation it does not know throws a `TypeError`.
 
 ```ts check
 import {
@@ -317,12 +322,14 @@ import {
   flatPlacement,
   GroundPlacement,
   InstancePosition,
+  Orientation,
   QuadBase,
   QuadSize,
   Rotation,
   TextureColor,
   Yaw,
 } from '@spearwolf/twopoint5d';
+import {Euler, Quaternion} from 'three/webgpu';
 
 // decals on the ground: world coordinates, the rotation turns them about +Y
 const DecalKind = defineSprite({
@@ -334,6 +341,12 @@ const DecalKind = defineSprite({
 const SignKind = defineSprite({
   base: QuadBase,
   features: [InstancePosition, flatPlacement({orientation: 'yaw'}), Yaw, QuadSize, AtlasFrame, TextureColor],
+});
+
+// banners that lean back off the vertical: a quaternion per sprite
+const BannerKind = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, flatPlacement({orientation: 'quaternion'}), Orientation, QuadSize, AtlasFrame, TextureColor],
 });
 
 const decals = new FeatureSprites(DecalKind, {capacity: 100});
@@ -354,10 +367,24 @@ for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
   sign.yaw = angle;
 }
 
+// the yaw first, then the lean in the frame of the banner: Euler order 'YXZ'
+const lean = new Euler(0, 0, 0, 'YXZ');
+const turn = new Quaternion();
+const banners = new FeatureSprites(BannerKind, {capacity: 100});
+for (let i = 0; i < 8; i++) {
+  const banner = banners.createSprite();
+  if (banner == null) break;
+  banner.setPosition(i * 3, 0, 0);
+  banner.setSize(2, 3);
+  banner.setQuaternion(turn.setFromEuler(lean.set(-0.3, i * 0.2, 0)));
+}
+
 decals.update();
 signs.update();
+banners.update();
 decals.dispose();
 signs.dispose();
+banners.dispose();
 ```
 
 The axes of the two planes:
@@ -384,20 +411,33 @@ The senses of the turns:
   the angle. A sprite with a yaw of 0 faces +Z, one with a yaw of π/2 faces +X.
 - On the ground both turn about +Y in the same sense; a kind there needs one of them, and
   `Rotation` is the one every kind knows.
+- **The quaternion** turns as `Object3D.quaternion` turns: a sprite with a quaternion `q` at a
+  position in the mesh draws where a sprite of the same plane without a turn draws in a mesh
+  turned by `q`, at that position turned back by the inverse of `q`. `setYaw(angle)` writes the
+  quaternion of a turn about +Y, the same facing as a `yaw` of that angle.
 
 `yaw` is a static attribute, as `quadSize` and `color` are: signs, fences and trees turn once. A
 sprite that turns every frame belongs in a geometry built with `attributeUsage: {dynamic: ['yaw']}`.
 It costs 4 bytes per sprite and a sine and a cosine per vertex; a kind without it builds the graph
 it builds without it, and a plane costs nothing beyond a swizzle.
 
-A sprite whose yaw turns its back to the camera is culled under `FrontSide` — for signs on a
+`orientation` is static as well, `attributeUsage: {dynamic: ['orientation']}` for a sprite that
+turns every frame. It costs 16 bytes per sprite and two cross products per vertex, `v + 2 · q.xyz ×
+(q.xyz × v + q.w · v)`. The placement does not normalize: a quaternion out of `Quaternion` is of
+unit length, one of another length scales the sprite by the square of it. Take `Yaw` where a turn
+about +Y is all a sprite needs — a quarter of the bytes and a number to write instead of four —
+and `Orientation` where a sprite leaves the vertical.
+
+A sprite whose yaw or quaternion turns its back to the camera is culled under `FrontSide` — for signs on a
 facade that is what you want. A cut-out seen from both sides draws with `side: DoubleSide` and
 shows its back mirrored; the color stage of a feature of your own can tell the back by
 `frontFacing` of `three/tsl`.
 
 `BillboardPlacement` stands in for every form of `flatPlacement()` and back; a sprite kind with
-`Yaw` keeps the attribute under a billboard and ignores it. `flatPlacement({orientation: 'yaw'})`
-stands in only for a placement of a kind that holds `Yaw`.
+`Yaw` or `Orientation` keeps the attribute under a billboard and ignores it.
+`flatPlacement({orientation: 'yaw'})` stands in only for a placement of a kind that holds `Yaw`,
+`flatPlacement({orientation: 'quaternion'})` only for one of a kind that holds `Orientation`; a kind
+that holds both swaps between the two.
 
 ## FeatureSprites
 
@@ -812,11 +852,11 @@ anchor sits at its foot starts at the foot and runs straight away from the light
   as the camera moves.
 
 The shadow follows the light, not the placement, so it does not change under a placement swap,
-and it ignores the plane and the yaw of `flatPlacement()`. For sprites that lie in the ground —
+and it ignores the plane and the turn of `flatPlacement()`. For sprites that lie in the ground —
 decals, `GroundPlacement` — the turn is wrong: they would throw the shadow of a standing quad. A
 pass that projects the sprites as they stand leaves the placement out:
-`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`. It keeps the yaw, too, and
-throws the shadow of a sign as it is turned — thin where the light grazes it.
+`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`. It keeps the yaw or the
+quaternion, too, and throws the shadow of a sign as it is turned — thin where the light grazes it.
 
 **The reflection of a billboard.** `ReflectionPass` mirrors the placed vertex, which is right for a
 flat sprite: its mirror image is what the camera would see in the mirror. A billboard faces the

@@ -7,7 +7,7 @@ import {description, title} from './_cardboard-parade.json';
   <demo-ui>
     <section class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-2 items-center justify-end">
       <div class="actionBtn toggleSpin">turntable: on</div>
-      <div class="actionBtn toggleYaw">yaw: on</div>
+      <div class="actionBtn toggleFacing">facing: on</div>
     </section>
     <div class="drawCalls fixed bottom-4 right-4">draw calls: …</div>
   </demo-ui>
@@ -60,15 +60,15 @@ import {description, title} from './_cardboard-parade.json';
 
     // the buttons and the readout are written by the markup of this very page
     const spinButton = document.querySelector('.toggleSpin')!;
-    const yawButton = document.querySelector('.toggleYaw')!;
+    const facingButton = document.querySelector('.toggleFacing')!;
     const drawCalls = document.querySelector('.drawCalls')!;
     spinButton.addEventListener('click', () => {
       parade.spinning = !parade.spinning;
       spinButton.textContent = `turntable: ${parade.spinning ? 'on' : 'off'}`;
     });
-    yawButton.addEventListener('click', () => {
-      parade.yaw = !parade.yaw;
-      yawButton.textContent = `yaw: ${parade.yaw ? 'on' : 'off'}`;
+    facingButton.addEventListener('click', () => {
+      parade.facing = !parade.facing;
+      facingButton.textContent = `facing: ${parade.facing ? 'on' : 'off'}`;
     });
 
     on(demo, OnDisplayRenderFrame, ({deltaTime}) => parade.update(deltaTime));

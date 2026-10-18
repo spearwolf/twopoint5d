@@ -7,13 +7,14 @@ import {
   flatPlacement,
   GroundPlacement,
   InstancePosition,
+  Orientation,
   QuadBase,
   QuadSize,
   Rotation,
   TextureColor,
   Yaw,
 } from '@spearwolf/twopoint5d';
-import {Group, OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
+import {Euler, Group, OrthographicCamera, Quaternion, RenderTarget, Scene, Vector3} from 'three/webgpu';
 import {
   diffPixels,
   disposeDisplay,
@@ -50,6 +51,22 @@ const GroundYawKind = defineSprite({
   features: [InstancePosition, flatPlacement({plane: 'xz', orientation: 'yaw'}), Yaw, QuadSize, Rotation, TextureColor],
 });
 
+const QuaternionKind = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, flatPlacement({orientation: 'quaternion'}), Orientation, QuadSize, Rotation, TextureColor],
+});
+const GroundQuaternionKind = defineSprite({
+  base: QuadBase,
+  features: [
+    InstancePosition,
+    flatPlacement({plane: 'xz', orientation: 'quaternion'}),
+    Orientation,
+    QuadSize,
+    Rotation,
+    TextureColor,
+  ],
+});
+
 const half = TARGET_SIZE / PIXELS_PER_UNIT / 2;
 
 /**
@@ -66,7 +83,7 @@ function cameraAt(position, up = [0, 1, 0]) {
   return camera;
 }
 
-describe('sprites — the plane of a flat sprite and its yaw', function () {
+describe('sprites — the plane of a flat sprite, its yaw and its quaternion', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
   this.timeout(20000);
 
@@ -235,6 +252,72 @@ describe('sprites — the plane of a flat sprite and its yaw', function () {
 
     const {lit, differing} = diffPixels(byYaw, byRotation);
     expect(lit).to.be.greaterThan(200);
+    expect(differing).to.equal(0);
+  });
+
+  /**
+   * Renders the sprite turned by `quaternion` at `position` twice: once through `kind`, a kind with
+   * the quaternion placement, and once through `plainKind` in a mesh turned by the same quaternion,
+   * with the position turned back into the local space of that mesh.
+   *
+   * @param {[import('@spearwolf/twopoint5d').SpriteKind<any>, import('@spearwolf/twopoint5d').SpriteKind<any>]} kinds
+   * @param {Quaternion} quaternion
+   * @param {[number, number, number]} position
+   */
+  async function renderTurnedTwice([kind, plainKind], quaternion, position) {
+    const camera = cameraAt([5, 6, 8]);
+
+    const turned = await render(kind, camera, (sprite) => {
+      sprite.setSize(4, 2);
+      sprite.setPosition(...position);
+      sprite.setQuaternion(quaternion);
+    });
+    const meshTurned = await render(plainKind, camera, (sprite, sprites) => {
+      sprites.quaternion.copy(quaternion);
+      sprite.setSize(4, 2);
+      const local = new Vector3(...position).applyQuaternion(quaternion.clone().invert());
+      sprite.setPosition(local.x, local.y, local.z);
+    });
+    return diffPixels(turned, meshTurned);
+  }
+
+  const TILTS = /** @type {const} */ ([
+    ['tilted back, then turned towards +x', new Quaternion().setFromEuler(new Euler(-0.5, 0.6, 0.2, 'YXZ'))],
+    ['turned about a slanted axis', new Quaternion().setFromAxisAngle(new Vector3(1, 1, 0).normalize(), 0.5)],
+  ]);
+
+  for (const [what, quaternion] of TILTS) {
+    it(`a flat sprite ${what} draws as a mesh turned by that quaternion`, async function () {
+      const {lit, differing} = await renderTurnedTwice([QuaternionKind, PlainKind], quaternion, [0.5, 0.25, -0.75]);
+
+      expect(lit, 'the sprite faces the camera and is drawn').to.be.greaterThan(100);
+      expect(differing).to.equal(0);
+    });
+  }
+
+  it('a ground sprite on a slope draws as a ground sprite in a mesh tilted by that quaternion', async function () {
+    const slope = new Quaternion().setFromEuler(new Euler(0.5, 0, 0.3));
+
+    const {lit, differing} = await renderTurnedTwice([GroundQuaternionKind, GroundKind], slope, [-0.25, 0.5, 0.5]);
+
+    expect(lit, 'the sprite faces the camera and is drawn').to.be.greaterThan(100);
+    expect(differing).to.equal(0);
+  });
+
+  it('setYaw() turns as a yaw of the same angle does', async function () {
+    const camera = cameraAt([5, 6, 8]);
+
+    const bySetYaw = await render(QuaternionKind, camera, (sprite) => {
+      sprite.setPosition(0.5, 0.25, -0.75);
+      sprite.setYaw(0.6);
+    });
+    const byYaw = await render(YawKind, camera, (sprite) => {
+      sprite.setPosition(0.5, 0.25, -0.75);
+      sprite.yaw = 0.6;
+    });
+
+    const {lit, differing} = diffPixels(bySetYaw, byYaw);
+    expect(lit).to.be.greaterThan(100);
     expect(differing).to.equal(0);
   });
 });

@@ -1,4 +1,4 @@
-import {Color, DirectionalLight, Object3D} from 'three/webgpu';
+import {Color, DirectionalLight, Euler, Object3D, Quaternion} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
@@ -11,6 +11,7 @@ import {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js
 import {AtlasFrame, prepareSpriteFrame} from './features/AtlasFrame.js';
 import {flatPlacement} from './features/FlatPlacement.js';
 import {InstancePosition} from './features/InstancePosition.js';
+import {Orientation} from './features/Orientation.js';
 import {QuadSize} from './features/QuadSize.js';
 import {TextureColor} from './features/TextureColor.js';
 import {Yaw} from './features/Yaw.js';
@@ -128,6 +129,28 @@ describe('sprites on the hot path', () => {
         const sprite = all[i]!;
         sprite.setPosition(i, 1.5, 2.5);
         sprite.yaw = i;
+      }
+      sprites.update();
+    });
+
+    expect(bytesPerRound / (all.length * 2)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
+  test('turning a sprite by a quaternion or by setYaw() allocates nothing per call', async () => {
+    const kind = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, flatPlacement({orientation: 'quaternion'}), Orientation, QuadSize, AtlasFrame, TextureColor],
+    });
+    const sprites = new FeatureSprites(kind, {capacity: 1000, attributeUsage: {dynamic: ['orientation']}});
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+    const tilted = new Quaternion().setFromEuler(new Euler(-0.6, 2.4, 0.1));
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        const sprite = all[i]!;
+        sprite.setQuaternion(tilted);
+        sprite.setYaw(i);
       }
       sprites.update();
     });

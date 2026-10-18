@@ -1,7 +1,7 @@
-# Proposal: a plane for flat sprites, and a yaw per sprite
+# Proposal: a plane for flat sprites, and a yaw or a quaternion per sprite
 
-Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Planes and yaw", and the
-lookbook demo `cardboard-parade`. Deviations:
+Status: **implemented**, the quaternion of §9 included — see [`docs/sprites.md`](../sprites.md),
+"Planes and turns", and the lookbook demo `cardboard-parade`. Deviations:
 
 - the sense of `Rotation` turned out counter-clockwise as seen from the front, as
   `Object3D.rotation.z` turns — the browser test pins it — so on the ground a yaw and a rotation
@@ -11,12 +11,17 @@ lookbook demo `cardboard-parade`. Deviations:
 - `CardboardBack` of the demo carries an attribute `twoSided` besides its stage (§8.3): trees and
   bushes are printed on both sides, as the wings of a toy theatre are, and only houses, the fence
   and the signs show the cardboard from behind — half a wood of grey backs drowned the scene;
-- the turntable is a WebP (§8.4): the year rings compress badly as a PNG.
+- the turntable is a WebP (§8.4): the year rings compress badly as a PNG;
+- the props of the demo hold `Orientation` rather than `Yaw` (§8.3, §9): the signposts lean and a
+  fence panel lies fallen inwards, the scene §9 waited for; the walkers keep `Yaw`, which turns
+  every frame;
+- `Orientation` answers its quaternion as well, `getQuaternion(target?)`, as `Tint` answers its
+  color (§9).
 
 The sketch below is kept as it was written, with the corrections of §2, §4.2, §5.1 and §6.
 Prepared from
 [issue #32](https://github.com/spearwolf/twopoint5d/issues/32).
-The decisions it rests on are collected in §10, the quaternion that would follow the yaw in §9.
+The decisions it rests on are collected in §10, the quaternion that followed the yaw in §9.
 
 ## 1. Goal
 
@@ -341,11 +346,12 @@ Requirements: `blender` on the PATH (5.2 LTS), `python3` with Pillow and numpy. 
 byte-stable for unchanged inputs. No CI step runs the generator; the README says how to rerun it,
 and a change to the props is a commit of the script and of its output together.
 
-## 9. Outlook: a quaternion per sprite
+## 9. A quaternion per sprite
 
 The yaw covers what stands upright — signs, fences, figures, trees — and, with `GroundPlacement`
 and `Rotation`, what lies flat. It does not cover a sprite tilted off the vertical: a banner on a
-ramp, a decal on a slope, a sign on a slanted roof. For that the option widens:
+ramp, a decal on a slope, a sign on a slanted roof, a fence panel that fell over. For that the
+option widens:
 
 ```ts
 readonly orientation?: 'yaw' | 'quaternion';
@@ -353,15 +359,24 @@ readonly orientation?: 'yaw' | 'quaternion';
 
 - a data feature `Orientation`: attribute `orientation`, `{components: ['qx', 'qy', 'qz', 'qw']}`,
   static, 16 bytes per sprite; `initialize()` writes the identity `(0, 0, 0, 1)` — 0 is not
-  neutral, as for `Tint`; methods `setOrientation(x, y, z, w)` and `setQuaternion(q: Quaternion)`
-  through a scratch tuple, and a `setYaw(angle)` that writes the quaternion of a turn about Y;
+  neutral, as for `Tint`; the generated `setOrientation(qx, qy, qz, qw)`, and `setQuaternion(q:
+  Quaternion)`, `getQuaternion(target?)` and a `setYaw(angle)` that writes the quaternion of a turn
+  about Y, the setters through a scratch tuple;
 - a placement `flatPlacement({plane, orientation: 'quaternion'})` that turns by
   `v + 2·cross(q.xyz, cross(q.xyz, v) + q.w·v)` — two cross products per vertex;
 - `R_quaternion` takes the place of `R_yaw` in §3; the passes keep the rules of §6.
 
+The forms are named `flatPlacement+quaternion` and `groundPlacement+quaternion` and require
+`orientation`, the name of the feature; a kind that holds both `Yaw` and `Orientation` swaps between
+the turned placements. The placement does not normalize the quaternion: one out of `Quaternion` is
+of unit length, and a normalization would cost a square root per vertex for a mistake of the
+caller.
+
 The widening is additive: a member of a union, a feature and a variant of the factory, no change
-to `Yaw`. It waits until a scene of the lookbook or of a game needs a sprite tilted off the
-vertical.
+to `Yaw`. The scene that asked for it is `cardboard-parade`: leaning signposts at the crossroads
+and a fence panel fallen onto its back, the print to the sky. A browser test holds the quaternion
+to a mesh turned by `Object3D.quaternion`, pixel for pixel, in both planes, and `setYaw()` to a
+`yaw` of the same angle.
 
 ## 10. Decisions
 
@@ -372,8 +387,9 @@ vertical.
    matters (§4.1).
 3. **Only `'xy'` and `'xz'`.** Any other fixed plane is a turn of the mesh, which the plane
    option leaves free; `'yz'` is a further member if a scene asks for it.
-4. **The yaw first, the quaternion later** (§9): 4 bytes instead of 16 and one number that a
-   caller already holds as a heading, for the cases the issue brings.
+4. **The yaw first, the quaternion beside it** (§9): 4 bytes instead of 16 and one number that a
+   caller already holds as a heading, for the cases the issue brings; the quaternion followed
+   for the sprites that leave the vertical, and `Yaw` stays the cheaper choice for the rest.
 5. **The sense of the yaw is that of `Object3D.rotation.y`.** The sense of `Rotation` is that of
    `Object3D.rotation.z`, now written down and held by a test (§4.2, §8.1); both turn alike on the
    ground.

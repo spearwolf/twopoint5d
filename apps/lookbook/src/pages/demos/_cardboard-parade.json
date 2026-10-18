@@ -1,13 +1,14 @@
 {
   "title": "cardboard parade",
-  "shortDescription": "A toy theatre on a turntable: cut-outs that face every way in one mesh, footprints and blob shadows on the ground",
-  "description": "Cardboard cut-outs on a turning, wobbling tree slice, drawn by three `FeatureSprites` meshes. The **props** — a fence along the rim, houses, trees and the signposts of the crossroads — are one mesh of a kind with `flatPlacement({orientation: 'yaw'})` and `Yaw`: every cut-out faces where its `yaw` says, so a fence follows a circle in one draw call, and a feature of the demo's own, `CardboardBack`, shows the brown back of the sheet from behind. The **walkers** turn their `yaw` every frame (`attributeUsage: {dynamic: ['yaw']}`) and rock on their feet with `Rotation`. The **ground** is a kind with `GroundPlacement`: a blob shadow under every walker and the footprints they leave, turned along the walk by `Rotation` and faded by `Tint`. All of it sits in a `Group` that turns and tilts as a whole — the mesh transforms stay free. *yaw* swaps the placement for `FlatPlacement`, and every cut-out snaps to face +Z. The atlas is rendered in Blender from `apps/lookbook/assets-src/cardboard/`.",
+  "shortDescription": "A toy theatre on a turntable: cut-outs that face and lean every way in one mesh, footprints and blob shadows on the ground",
+  "description": "Cardboard cut-outs on a turning, wobbling tree slice, drawn by three `FeatureSprites` meshes. The **props** — a fence along the rim, houses, trees and the signposts of the crossroads — are one mesh of a kind with `flatPlacement({orientation: 'quaternion'})` and `Orientation`: every cut-out faces where its quaternion says, so a fence follows a circle in one draw call, the signposts lean in the wind and one fence panel lies where it fell, its print to the sky. The upright ones are written with `setYaw()`, the leaning ones with `setQuaternion()`, and a feature of the demo's own, `CardboardBack`, shows the brown back of the sheet from behind. The **walkers** hold the cheaper `Yaw` — 4 bytes against 16 — and turn it every frame (`attributeUsage: {dynamic: ['yaw']}`) and rock on their feet with `Rotation`. The **ground** is a kind with `GroundPlacement`: a blob shadow under every walker and the footprints they leave, turned along the walk by `Rotation` and faded by `Tint`. All of it sits in a `Group` that turns and tilts as a whole — the mesh transforms stay free. *facing* swaps both placements for `FlatPlacement`, and every cut-out snaps upright to face +Z. The atlas is rendered in Blender from `apps/lookbook/assets-src/cardboard/`.",
   "url": "/demos/cardboard-parade",
   "tags": [
     "FeatureSprites",
     "GroundPlacement",
     "FlatPlacement",
     "Yaw",
+    "Orientation",
     "Rotation",
     "Tint",
     "TextureStore",

@@ -1,4 +1,4 @@
-import {add, cos, mul, sin, sub, vec3} from 'three/tsl';
+import {add, cos, cross, mul, sin, sub, vec3} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {vertexByInstancePosition} from '../node-utils.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
@@ -11,11 +11,12 @@ export interface FlatPlacementOptions {
    */
   readonly plane?: 'xy' | 'xz';
   /**
-   * `'yaw'` turns every sprite about +Y of the mesh by its `yaw` attribute, after the plane and
-   * before the instance position; the kind has to hold the `Yaw` feature. Without it the sprites
-   * keep the facing of the plane.
+   * Turns every sprite on its own, after the plane and before the instance position. `'yaw'` turns
+   * it about +Y of the mesh by its `yaw` attribute; the kind has to hold the `Yaw` feature.
+   * `'quaternion'` turns it by the unit quaternion of its `orientation` attribute — any tilt; the
+   * kind has to hold the `Orientation` feature. Without it the sprites keep the facing of the plane.
    */
-  readonly orientation?: 'yaw';
+  readonly orientation?: 'yaw' | 'quaternion';
 }
 
 type Vec3 = Node<'vec3'>;
@@ -29,6 +30,13 @@ const turnedAboutY = (v: Vec3, angle: Node<'float'>): Vec3 => {
   const c = cos(angle);
   const s = sin(angle);
   return vec3(add(mul(c, v.x), mul(s, v.z)), v.y, sub(mul(c, v.z), mul(s, v.x))) as unknown as Vec3;
+};
+
+// the turn of a unit quaternion, the one of Vector3#applyQuaternion: v + 2·q.xyz × (q.xyz × v + q.w·v),
+// two cross products where a matrix would take nine products to build and nine to apply
+const turnedBy = (v: Vec3, q: Node<'vec4'>): Vec3 => {
+  const axis = q.xyz;
+  return add(v, mul(2, cross(axis, add(cross(axis, v), mul(q.w, v))))) as unknown as Vec3;
 };
 
 // one feature per set of options: the placement swap compares by identity, and the passes keep a
@@ -48,21 +56,23 @@ export function flatPlacement(options?: FlatPlacementOptions): SpriteFeature {
   if (plane !== 'xy' && plane !== 'xz') {
     throw new TypeError(`flatPlacement: the plane ${JSON.stringify(plane)} is neither 'xy' nor 'xz'`);
   }
-  if (orientation !== undefined && orientation !== 'yaw') {
-    throw new TypeError(`flatPlacement: the orientation ${JSON.stringify(orientation)} is not 'yaw'`);
+  if (orientation !== undefined && orientation !== 'yaw' && orientation !== 'quaternion') {
+    throw new TypeError(`flatPlacement: the orientation ${JSON.stringify(orientation)} is neither 'yaw' nor 'quaternion'`);
   }
 
   const key = orientation == null ? plane : `${plane}+${orientation}`;
   let feature = placements.get(key);
   if (feature == null) {
     const base = plane === 'xz' ? 'groundPlacement' : 'flatPlacement';
-    const yaw = orientation === 'yaw';
+    // the feature that holds the attribute of the turn bears the name of that attribute
+    const turnAttribute = orientation === 'quaternion' ? 'orientation' : orientation;
     feature = defineFeature({
-      name: yaw ? `${base}+yaw` : base,
-      requires: yaw ? ['instancePosition', 'yaw'] : ['instancePosition'],
+      name: orientation == null ? base : `${base}+${orientation}`,
+      requires: turnAttribute == null ? ['instancePosition'] : ['instancePosition', turnAttribute],
       placement: (local, {attribute}) => {
         let vertex = plane === 'xz' ? onGround(local) : local;
-        if (yaw) vertex = turnedAboutY(vertex, attribute<'float'>('yaw'));
+        if (orientation === 'yaw') vertex = turnedAboutY(vertex, attribute<'float'>('yaw'));
+        if (orientation === 'quaternion') vertex = turnedBy(vertex, attribute<'vec4'>('orientation'));
         return vertexByInstancePosition({vertexPosition: vertex, instancePosition: attribute<'vec3'>('instancePosition')});
       },
     });

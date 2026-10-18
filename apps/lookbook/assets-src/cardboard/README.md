@@ -63,4 +63,6 @@ props is a commit of the scripts and of their output together.
 `src/demos/cardboard-parade/CardboardParade.ts` sizes every sprite as its frame at 64 pixels a
 meter and builds the standing ones with `baseArgs: [0.5, 0.5, 0, 0.5]`, which puts the pivot of
 the quad on the middle of its bottom edge — the feet. The back of a cut-out is not in the atlas:
-the color stage `CardboardBack` of the demo draws it.
+the color stage `CardboardBack` of the demo draws it. The pivot on the feet is also what a prop
+turns and leans about: a signpost tilts by its quaternion, and a fence panel falls onto its back
+about its bottom edge without leaving the ground.

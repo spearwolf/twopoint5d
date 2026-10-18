@@ -11,6 +11,7 @@ import {AtlasFrame} from '../features/AtlasFrame.js';
 import {BillboardPlacement} from '../features/BillboardPlacement.js';
 import {FlatPlacement, flatPlacement, GroundPlacement} from '../features/FlatPlacement.js';
 import {InstancePosition} from '../features/InstancePosition.js';
+import {Orientation} from '../features/Orientation.js';
 import {QuadSize} from '../features/QuadSize.js';
 import {Rotation} from '../features/Rotation.js';
 import {TextureColor} from '../features/TextureColor.js';
@@ -375,13 +376,32 @@ describe('FeatureSpritesMaterial', () => {
       material.dispose();
     });
 
-    test('refuses the turned placement for a kind without Yaw', () => {
+    test('swaps the yaw for the quaternion on a kind that holds both', () => {
+      const QuaternionPlacement = flatPlacement({plane: 'xz', orientation: 'quaternion'});
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [InstancePosition, flatPlacement({orientation: 'yaw'}), Yaw, Orientation],
+      });
+      const material = new FeatureSpritesMaterial(kind);
+
+      material.placement = QuaternionPlacement;
+      expect(material.placement).toBe(QuaternionPlacement);
+      expect(attributeNamesOf(material.positionNode!)).toEqual(['instancePosition', 'orientation', 'position']);
+      material.dispose();
+    });
+
+    test('refuses a turned placement for a kind without the feature of its turn', () => {
       const material = new FeatureSpritesMaterial(TexturedKind);
 
       expect(() => {
         material.placement = flatPlacement({orientation: 'yaw'});
       }).toThrow(
         'FeatureSpritesMaterial: feature "flatPlacement+yaw" requires feature "yaw", which the sprite kind does not hold',
+      );
+      expect(() => {
+        material.placement = flatPlacement({orientation: 'quaternion'});
+      }).toThrow(
+        'FeatureSpritesMaterial: feature "flatPlacement+quaternion" requires feature "orientation", which the sprite kind does not hold',
       );
       expect(material.placement).toBe(FlatPlacement);
       material.dispose();
