@@ -89,6 +89,22 @@ export class Map2D extends Group {
     this.#tileStreamer.visibilitor = v;
   }
 
+  /**
+   * The view center on the map plane, handed to the visibilitor on every {@link update}. What it
+   * does is the visibilitor's to say:
+   *
+   * - `CameraBasedVisibility` with `lookAtCenter = false` (the default): the view center **shifts
+   *   the map under the camera** — the camera sees the map point that lies `(centerX, centerY)`
+   *   away from where it looks on the plane. The camera's own position already drives visibility,
+   *   so for a map fixed in the world under a moving camera, leave both at `0`: feeding the camera
+   *   position in here scrolls the ground with the camera, on top of the camera's own motion. Use
+   *   it as a scroll or pan offset under a fixed camera.
+   * - `CameraBasedVisibility` with `lookAtCenter = true`: the map point that appears where the
+   *   camera looks — the tiles are laid out around `(centerX, centerY)` wherever the camera points.
+   * - `RectangularVisibilityArea`: the map point the visible rectangle is laid out around — its
+   *   center. The rectangle appears at the origin of the map node, so `(centerX, centerY)` is the
+   *   map point shown there.
+   */
   get centerX(): number {
     return this.#tileStreamer.centerX;
   }
@@ -97,6 +113,11 @@ export class Map2D extends Group {
     this.#tileStreamer.centerX = x;
   }
 
+  /**
+   * The view center on the map plane, along the same axis as the rows of the tile grid. See
+   * {@link centerX} for what the value means under each visibilitor — it always describes one
+   * point `(centerX, centerY)` together with it.
+   */
   get centerY(): number {
     return this.#tileStreamer.centerY;
   }
@@ -121,6 +142,14 @@ export class Map2D extends Group {
     this.#tileStreamer.tileHeight = height;
   }
 
+  /**
+   * Where the tile grid starts on the x axis in map-plane coordinates, before the visibilitor's
+   * translation and the map node's world transform. A tile `(c, r)` covers
+   * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile quad starts at that
+   * corner — it is **not** centered on its coordinates — so a tile at `(0, 0)` spans
+   * `[xOffset, xOffset + tileWidth)`, and the `xOffset` that centers the grid on the map-plane
+   * origin is `-tileWidth / 2`. Defaults to `0`, and changing it has the tiles built again.
+   */
   get xOffset(): number {
     return this.#tileStreamer.xOffset;
   }
@@ -129,6 +158,12 @@ export class Map2D extends Group {
     this.#tileStreamer.xOffset = offset;
   }
 
+  /**
+   * Where the tile grid starts on the axis of the rows in map-plane coordinates, before the
+   * visibilitor's translation and the map node's world transform. A tile `(c, r)` covers
+   * `[r · tileHeight + yOffset, (r + 1) · tileHeight + yOffset)` there — corner-anchored like
+   * {@link xOffset}, not centered. Defaults to `0`, and changing it has the tiles built again.
+   */
   get yOffset(): number {
     return this.#tileStreamer.yOffset;
   }

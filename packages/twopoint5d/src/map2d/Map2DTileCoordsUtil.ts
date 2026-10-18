@@ -95,7 +95,19 @@ export class Map2DTileCoordsUtil {
     this.#tileHeight = height;
   }
 
+  /**
+   * Where the tile grid starts on the x axis, in _world space_: a tile `(c, r)` covers
+   * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile is anchored at that
+   * corner, not centered on its coordinates, so the `xOffset` that centers the grid on the origin
+   * is `-tileWidth / 2`.
+   */
   xOffset: number;
+
+  /**
+   * Where the tile grid starts on the y axis, in _world space_: a tile `(c, r)` covers
+   * `[r · tileHeight + yOffset, (r + 1) · tileHeight + yOffset)` on Y — corner-anchored like
+   * {@link xOffset}, not centered.
+   */
   yOffset: number;
 
   // the rectangle and the answer the public queries hand `computeTilesWithinArea()`, written
