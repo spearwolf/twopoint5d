@@ -1,0 +1,82 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_atlas-frames-on-meshes.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <div class="loading-wrapper">
+      <div class="loading-content">.&nbsp;.&nbsp;.&nbsp;l&nbsp;o&nbsp;a&nbsp;d&nbsp;i&nbsp;n&nbsp;g&nbsp;.&nbsp;.&nbsp;.</div>
+    </div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    /* the night sky behind the city: the canvas is cleared transparent */
+    background: linear-gradient(to bottom, #07051a 0%, #1d1240 45%, #4a1f5c 62%, #2b1a4a 70%);
+    color: #eee;
+  }
+  .loading-wrapper {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    justify-content: center;
+  }
+  .loading-content {
+    margin: auto;
+    text-transform: lowercase;
+    font-size: 24px;
+    font-family: monospace;
+  }
+</style>
+
+<script>
+  import {makeNightCity} from '~demos/atlas-frames-on-meshes/NightCity';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+
+  // the preview screenshot waits for the city, not for the default delay
+  const preview = deferPreview();
+
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
+
+  await demo.start(async ({renderer}) => {
+    // above the roofs, so that the skyline rings show over the city
+    demo.camera.position.set(8, 56, 34);
+    demo.controls.target.set(0, 6, -90);
+    // the camera stays above the ground and inside the nearest ring of the skyline
+    demo.controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    demo.controls.minDistance = 20;
+    demo.controls.maxDistance = 200;
+    demo.controls.autoRotate = true;
+    demo.controls.autoRotateSpeed = 0.4;
+
+    // the three atlases of the catalog load with flipY = false, the convention every TextureCoords and
+    // sampleAtlasFrame() assume, and with mag-nearest: pixel-sharp up close, mipmapped far away —
+    // sampleAtlasFrame() then takes explicit gradients, so the repeated frames show no seams
+    const store = await loadTextureCatalog(renderer);
+    const load = async (name: string) => {
+      const [atlas, texture] = await store.getAsync(name, ['atlas', 'texture']);
+      return {atlas, texture};
+    };
+    const [track, facades, skyline] = await Promise.all([
+      load('nightCityTrack'),
+      load('nightCityFacades'),
+      load('nightCitySkyline'),
+    ]);
+
+    const city = makeNightCity({track, facades, skyline});
+    demo.scene.add(city);
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('night city', city);
+
+    preview.ready(demo);
+  });
+
+  // the <div class="loading-wrapper"> is written by the markup of this very page
+  document.querySelector<HTMLDivElement>('.loading-wrapper')!.style.display = 'none';
+</script>

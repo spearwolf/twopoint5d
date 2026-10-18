@@ -35,7 +35,10 @@
         "TextureFactory",
         "TextureStore",
         "TileSet",
-        "colorFromTextureByTexCoords"
+        "colorFromTextureByTexCoords",
+        "AtlasFrameTable",
+        "atlasFrameTable",
+        "sampleAtlasFrame"
       ]
     },
     {

@@ -124,7 +124,9 @@ older way and deprecated; they pad an image to power-of-two sides, hand out its
 coordinates as a child of the padded canvas and start from the texture class `nearest`,
 where the store loads the image as it is, with its coordinates at the root, and starts
 from no texture class. `FrameBasedAnimations` turns a sequence of atlas frames into the
-timing data the `AnimatedFrames` sprite feature reads.
+timing data the `AnimatedFrames` sprite feature reads. `AtlasFrameTable` lays frames of an atlas
+into a uniform array, and `sampleAtlasFrame()` samples one of them per fragment in a
+`NodeMaterial` of one's own — a repeated frame on a mesh — the first TSL of this layer.
 
 ### `display/`
 
