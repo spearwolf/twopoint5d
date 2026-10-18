@@ -8,14 +8,41 @@ import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisi
  * `Map2DTileStreamer` is a tile streaming manager for 2D maps that loads and discards tiles based on their visibility.
  *
  * `Map2DTileStreamer` divides a 2D world into an equal-sized grid of tiles (`tileWidth` + `tileHeight` and `xOffset` + `yOffset`)
- * and only loads the visible tiles.
+ * and only loads the visible tiles. The grid is corner-anchored: a tile `(c, r)` covers
+ * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X and the same with `r`,
+ * `tileHeight` and `yOffset` along the rows — it is not centered on its coordinates.
  *
  * Visibility is checked based on the _view center position_ (`centerX` + `centerY`) and a _visibilitor_ (see `IMap2DVisibilitor`).
+ * The view center means what the visibilitor makes of it — see {@link centerX}: under
+ * `CameraBasedVisibility` with its default `lookAtCenter = false` it shifts the map under the
+ * camera and stays `0` for a world-fixed map under a moving camera.
  *
  * Tile rendering is delegated to a _renderer_ (see `IMap2DTileRenderer`).
  */
 export class Map2DTileStreamer {
+  /**
+   * The view center on the map plane, handed to the visibilitor on every {@link update}. What it
+   * does is the visibilitor's to say:
+   *
+   * - `CameraBasedVisibility` with `lookAtCenter = false` (the default): the view center **shifts
+   *   the map under the camera** — the camera sees the map point that lies `(centerX, centerY)`
+   *   away from where it looks on the plane. The camera's own position already drives visibility,
+   *   so for a map fixed in the world under a moving camera, leave both at `0`: feeding the camera
+   *   position in here scrolls the ground with the camera, on top of the camera's own motion. Use
+   *   it as a scroll or pan offset under a fixed camera.
+   * - `CameraBasedVisibility` with `lookAtCenter = true`: the map point that appears where the
+   *   camera looks — the tiles are laid out around `(centerX, centerY)` wherever the camera points.
+   * - `RectangularVisibilityArea`: the map point the visible rectangle is laid out around — its
+   *   center. The rectangle appears at the origin of the map node, so `(centerX, centerY)` is the
+   *   map point shown there.
+   */
   centerX = 0;
+
+  /**
+   * The view center on the map plane, along the same axis as the rows of the tile grid. See
+   * {@link centerX} for what the value means under each visibilitor — it always describes one
+   * point `(centerX, centerY)` together with it.
+   */
   centerY = 0;
 
   #visibilitor?: IMap2DVisibilitor;
@@ -79,6 +106,16 @@ export class Map2DTileStreamer {
     this.clearTiles();
   }
 
+  /**
+   * Where the tile grid starts on the x axis, in _world space_: with `centerX = centerY = 0`, a
+   * tile `(c, r)` covers `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile
+   * quad starts at that corner — it is **not** centered on its coordinates — so a tile at `(0, 0)`
+   * spans `[xOffset, xOffset + tileWidth)`, and the `xOffset` that centers the grid on the origin
+   * is `-tileWidth / 2`. Defaults to `0`.
+   *
+   * Changing it clears the tiles, as every grid change does: the next {@link update} lays out the
+   * whole tile set again.
+   */
   get xOffset(): number {
     return this.#tileCoords.xOffset;
   }
@@ -89,6 +126,12 @@ export class Map2DTileStreamer {
     this.clearTiles();
   }
 
+  /**
+   * Where the tile grid starts on the axis of the rows, in _world space_: with
+   * `centerX = centerY = 0`, a tile `(c, r)` covers `[r · tileHeight + yOffset, (r + 1) ·
+   * tileHeight + yOffset)` there — corner-anchored like {@link xOffset}, not centered. Defaults
+   * to `0`, and changing it clears the tiles as every grid change does.
+   */
   get yOffset(): number {
     return this.#tileCoords.yOffset;
   }
