@@ -992,6 +992,70 @@ What does not work:
 - **A light per sprite.** A binding writes a uniform, and a uniform holds for every sprite of a
   `FeatureSprites`; sprites under different lights are sprites in different meshes.
 
+## Atlas frames on meshes of one's own
+
+The frames of an atlas are not only for sprites. A road, a facade or a sky cylinder with a
+`NodeMaterial` of its own reads them through an `AtlasFrameTable` and `sampleAtlasFrame()`:
+
+```ts check
+import {sampleAtlasFrame, atlasFrameTable, type TextureAtlas} from '@spearwolf/twopoint5d';
+import {attribute, uv} from 'three/tsl';
+import {MeshBasicNodeMaterial, type Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas;
+declare const atlasTexture: Texture;
+
+// index 0, 1, 2 — the order of the list
+const frames = atlasFrameTable(atlas, ['road', 'boost', 'start']);
+
+const material = new MeshBasicNodeMaterial();
+material.colorNode = sampleAtlasFrame(atlasTexture, frames, attribute<'float'>('frame'), uv().mul(4), {
+  origin: 'bottom-left',
+  wrap: 'repeat',
+  inset: 0.5,
+});
+```
+
+**The table.** `atlasFrameTable(atlas)` takes every frame, the index of a frame its frame id;
+with a list of names, or a `RegExp` matched as `frameNames()` matches it, the index is the
+position in that selection, and `indexOf(name)` answers it. `new AtlasFrameTable(frames)` takes
+a list of atlas frames or bare `TextureCoords`. A frame takes three `vec4` of a uniform array —
+the three texels of a frame in the animsMap: tex coords, `[width, height, flipDiagonal, 0]`, trim
+margins — so a turned, flipped or trimmed frame needs nothing of the caller. `update()` reads the
+frames again after their `coords` changed and allocates nothing; three uploads the array with
+every render. The table owns no GPU resource and has no `dispose()`.
+
+A table holds at most `AtlasFrameTable.MaxFrames`, 341 frames: WebGL 2 promises 16 KiB for a
+uniform block, and the constructor refuses more with a `RangeError` — split them into several
+tables. Every table a material samples takes one uniform block of the fragment shader, of which
+WebGL 2 and WebGPU promise 12 and three takes some itself: a few tables per material are safe,
+too many make the shader fail to build, which three reports on the console.
+
+**Sampling.** Everything is worked out per fragment, nothing passes through a varying, so a
+frame can repeat on a surface.
+
+- `origin` is required. `'bottom-left'` is three's `uv()` on its own geometries, v counted
+  upwards; `'top-left'` is the convention of `TextureCoords`.
+- `wrap: 'clamp'` (the default) holds the uv at the edge of the frame, `'repeat'` repeats it.
+- `trim: 'mask'` (the default) lets the uv stand for the untrimmed sprite, as the quad of a sprite
+  does: outside the part the packer cut the frame out of, the result is `vec4(0)` — the material
+  needs transparency or an alpha test for it. `'stretch'` lays the trimmed area over the whole uv.
+- `inset` keeps the lookup that many texels of the drawn frame away from its edges, so that a
+  linear sample, or a nearest one right at a wrap, does not reach the frame beside it in the atlas.
+- The index may be a number, an int node or a float node, which is rounded. Every index is clamped
+  to the frames of the table, **silently**: an index past the last frame draws the last frame.
+
+`atlasTexture` is the image of the atlas loaded with `flipY = false`, as `TextureFactory` and
+`TextureStore` load it; with `flipY = true` every frame is read from the wrong place, and nothing
+checks it.
+
+**Mipmaps.** With a `minFilter` that reads mipmaps the sample takes explicit gradients from the uv
+before the wrap, so a repeated frame shows no seam of the smallest mip level along its wraps; the
+filter is read when the graph is built. The smaller mip levels of an atlas still mix neighbouring
+frames — sample an atlas with mipmaps only when its packer pads or extrudes the frames. A surface
+that repeats one image is better served by that image as a texture of its own with
+`RepeatWrapping`.
+
 ## Performance
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch

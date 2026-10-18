@@ -1,5 +1,7 @@
+export * from './AtlasFrameTable.js';
 export * from './FrameBasedAnimations.js';
 export * from './PowerOf2ImageLoader.js';
+export * from './sampleAtlasFrame.js';
 export * from './TextureAtlas.js';
 export * from './TextureAtlasLoader.js';
 export * from './TextureCoords.js';
