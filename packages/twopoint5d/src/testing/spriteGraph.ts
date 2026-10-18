@@ -74,6 +74,8 @@ interface EvaluableNode {
   readonly method?: string;
   readonly aNode?: Node;
   readonly bNode?: Node;
+  /** The parts of a JoinNode — `vec3(x, y, z)` built from nodes. */
+  readonly nodes?: readonly Node[];
 }
 
 // applies f component by component; a number meets every component of a vector
@@ -97,8 +99,8 @@ const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
 
 /**
  * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
- * swizzles, `dot`, `cross`, `length`, `normalize` and `max` — what the mesh stages and placements of
- * the passes are built from.
+ * swizzles, vectors joined from parts, `dot`, `cross`, `length`, `normalize`, `max`, `negate`, `sin`
+ * and `cos` — what the mesh stages and placements are built from.
  * Throws for any other node.
  */
 export function evaluateNode(root: Node): EvaluatedValue {
@@ -112,6 +114,9 @@ export function evaluateNode(root: Node): EvaluatedValue {
     const vector = evaluateNode(node.node!) as number[];
     const picked = [...node.components!].map((component) => vector['xyzw'.indexOf(component)]!);
     return picked.length === 1 ? picked[0]! : picked;
+  }
+  if (node.type === 'JoinNode' && node.nodes != null) {
+    return node.nodes.flatMap((part) => evaluateNode(part));
   }
   if (node.isOperatorNode && OPERATORS[node.op!] != null) {
     return zip(evaluateNode(node.aNode!), evaluateNode(node.bNode!), OPERATORS[node.op!]!);
@@ -130,6 +135,12 @@ export function evaluateNode(root: Node): EvaluatedValue {
         return zip(a, evaluateNode(node.bNode!), Math.max);
       case 'length':
         return Math.sqrt(dotOf(a, a));
+      case 'negate':
+        return zip(a, -1, (x, y) => x * y);
+      case 'sin':
+        return zip(a, 0, Math.sin);
+      case 'cos':
+        return zip(a, 0, Math.cos);
       case 'normalize': {
         const size = Math.sqrt(dotOf(a, a));
         return zip(a, size, (x, y) => x / y);

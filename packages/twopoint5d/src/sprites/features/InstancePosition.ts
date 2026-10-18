@@ -28,7 +28,7 @@ const positionXYScratch: [x: number, y: number] = [0, 0];
 
 /**
  * Where a sprite stands, in the local space of its mesh. Data alone: a placement —
- * `FlatPlacement` or `BillboardPlacement` — reads it.
+ * `flatPlacement()` in each of its forms or `BillboardPlacement` — reads it.
  */
 export const InstancePosition = defineFeature<InstancePositionApi>({
   name: 'instancePosition',

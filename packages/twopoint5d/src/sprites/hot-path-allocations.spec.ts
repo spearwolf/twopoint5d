@@ -8,9 +8,16 @@ import {lightOf} from './bindings/lightOf.js';
 import {planeOf} from './bindings/planeOf.js';
 import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
 import {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js';
-import {prepareSpriteFrame} from './features/AtlasFrame.js';
+import {AtlasFrame, prepareSpriteFrame} from './features/AtlasFrame.js';
+import {flatPlacement} from './features/FlatPlacement.js';
+import {InstancePosition} from './features/InstancePosition.js';
+import {QuadSize} from './features/QuadSize.js';
+import {TextureColor} from './features/TextureColor.js';
+import {Yaw} from './features/Yaw.js';
 import {ReflectionPass, ShadowPass} from './passes/passPresets.js';
 import {AnimatedSpriteKind, TexturedSpriteKind} from './presets.js';
+import {QuadBase} from './SpriteBase.js';
+import {defineSprite} from './defineSprite.js';
 
 // a call that allocates anything costs 16 B at least; the allocation-free paths measured below
 // 0.4 B per call when these limits were set — the noise of a few hundred bytes per round,
@@ -106,6 +113,27 @@ describe('sprites on the hot path', () => {
 
     expect(bytesPerRound / (all.length * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
     geometry.dispose();
+  });
+
+  test('moving and turning a sprite by its yaw allocates nothing per call', async () => {
+    const kind = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, flatPlacement({plane: 'xz', orientation: 'yaw'}), Yaw, QuadSize, AtlasFrame, TextureColor],
+    });
+    const sprites = new FeatureSprites(kind, {capacity: 1000, attributeUsage: {dynamic: ['yaw']}});
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        const sprite = all[i]!;
+        sprite.setPosition(i, 1.5, 2.5);
+        sprite.yaw = i;
+      }
+      sprites.update();
+    });
+
+    expect(bytesPerRound / (all.length * 2)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
   });
 
   test('createSprite() allocates the sprite and nothing else, every initialize() included', async () => {
