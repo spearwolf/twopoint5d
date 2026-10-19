@@ -20,9 +20,9 @@
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
-    "astro": "^7.3.5",
+    "astro": "^7.4.0",
     "lil-gui": "^0.21.0",
-    "marked": "^18.0.14",
+    "marked": "^18.1.1",
     "tailwindcss": "^4.3.3",
     "three": "catalog:"
   },
