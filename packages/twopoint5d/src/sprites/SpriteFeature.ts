@@ -10,6 +10,12 @@ export interface SpriteFrameNodes {
   readonly flipDiagonal?: Node<'float'>;
   /** `[left, top, right, bottom]`, the margins a packer cut off, as fractions of the untrimmed sprite. Default: no shift. */
   readonly trim?: Node<'vec4'>;
+  /**
+   * `vec2(x, y)`: 1 along an axis a frame stage mirrored the drawn image on, 0 along one it did not —
+   * `Flip` writes it. A stage that places something on the image — an anchor, a nine-slice border —
+   * mirrors it along. Default: no mirror.
+   */
+  readonly mirror?: Node<'vec2'>;
 }
 
 /**
@@ -209,8 +215,11 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
   return Object.freeze({...feature});
 }
 
-/** The order bands of the local stages; the gaps take stages of your own. */
-export const LocalOrder = Object.freeze({Anchor: 100, Flip: 150, Scale: 200, Shear: 300, Rotate: 400} as const);
+/**
+ * The order bands of the local stages; the gaps take stages of your own. `Slice` moves the inner grid
+ * lines of a nine-slice, in the unit quad before `Scale`.
+ */
+export const LocalOrder = Object.freeze({Anchor: 100, Flip: 150, Slice: 175, Scale: 200, Shear: 300, Rotate: 400} as const);
 
 /**
  * The order bands of the frame stages. `Flip` mirrors the frame — `LocalOrder.Flip` is for a stage

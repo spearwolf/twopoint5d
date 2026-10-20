@@ -8,7 +8,9 @@ modes, per-frame durations and `AsepriteJson`, see
 uv stages, `gridBase()` and shared uniforms, see
 [`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md). **Phase F, part 1
 implemented** — sorting a pool, `sortBy()` and `sortByViewDepth()` of the sprites (§4.15, and the
-answer to §7 question 5); see [`pool-sorting.md`](pool-sorting.md). The rest is an idea, nothing
+answer to §7 question 5); see [`pool-sorting.md`](pool-sorting.md). **Phase D, part 1
+implemented** — `Flip`, `Anchor` and `NineSlice` (§4.9, §4.7); see
+[`flip-anchor-nine-slice.md`](flip-anchor-nine-slice.md). The rest is an idea, nothing
 scheduled. A review, not a build plan: it checks the open cards of the
 lists `sprites` and `texture-mapping` (and, since the sprites stand on them, `vertex-objects`)
 of the Trello board `twopoint5d` against the library as of v0.23.0, and proposes what to build

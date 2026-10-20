@@ -1,8 +1,11 @@
 import {afterEach, describe, expect, test, vi} from 'vitest';
 import {defineSprite, type SpriteKind} from '../sprites/defineSprite.js';
+import {Anchor} from '../sprites/features/Anchor.js';
 import {AnimatedFrames} from '../sprites/features/AnimatedFrames.js';
+import {AtlasFrame} from '../sprites/features/AtlasFrame.js';
 import {FlatPlacement} from '../sprites/features/FlatPlacement.js';
 import {InstancePosition} from '../sprites/features/InstancePosition.js';
+import {QuadSize} from '../sprites/features/QuadSize.js';
 import {TextureColor} from '../sprites/features/TextureColor.js';
 import {FeatureSprites, type FeatureSpritesOptions} from '../sprites/FeatureSprites/FeatureSprites.js';
 import {AnimatedSpriteKind, TexturedSpriteKind} from '../sprites/presets.js';
@@ -53,6 +56,23 @@ describe('writeText()', () => {
     expect(glyphs.map(position)).toEqual([
       [11.5, 17, -3],
       [13.5, 17, -3],
+    ]);
+  });
+
+  test('a kind with Anchor takes the text where a kind without it does: the glyphs keep the anchor of a new sprite', () => {
+    const kind = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, FlatPlacement, QuadSize, Anchor, AtlasFrame, TextureColor],
+    });
+    const glyphs = writeText(spritesOf(kind, {capacity: 8}), font, 'AV', {x: 10, y: 20});
+
+    expect(glyphs.map(position)).toEqual([
+      [11.5, 17, 0],
+      [13.5, 17, 0],
+    ]);
+    expect(glyphs.map(({anchorX, anchorY}) => [anchorX, anchorY])).toEqual([
+      [0.5, 0.5],
+      [0.5, 0.5],
     ]);
   });
 
