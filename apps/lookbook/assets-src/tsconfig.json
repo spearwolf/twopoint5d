@@ -1,0 +1,19 @@
+{
+  // Type-checks the asset generators as what they are: JavaScript that Node runs without a build
+  // step, like the scripts under scripts/ (see scripts/tsconfig.json). Part of the lookbook's
+  // `typecheck` target.
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noImplicitAny": false,
+    // the generators are pixel loops over typed arrays and tables, every index bounded by a
+    // length; JavaScript has no `!` to say so, and a cast per access would bury the drawing code
+    "noUncheckedIndexedAccess": false,
+    "types": ["node"]
+  },
+  "include": ["**/*.mjs"]
+}
