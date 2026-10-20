@@ -21,6 +21,8 @@ kind. A kind is immutable: a sprite with one more feature is a sprite of another
 The **base** is the geometry every sprite of a kind is drawn from. `QuadBase` is the quad of
 four vertices the built-in kinds use: the unit quad `[-0.5, 0.5]²` on the XY plane, centred on the
 pivot, its `uv` running from `(0, 0)` at the top left to `(1, 1)` at the bottom right.
+`gridBase({columns, rows})` cuts that quad into a grid of cells, for a stage that moves grid lines
+or bends the sprite (see "A grid base").
 
 ## The pipeline
 
@@ -105,6 +107,72 @@ the merged attributes cannot be laid out.
 Every kind brings a prototype of its own. One loop over the sprites of more than four kinds is
 megamorphic and runs about eighteen times slower per sprite (see `docs/architecture.md`, the
 `vertex-objects/` section) — keep a hot loop to the sprites of one kind.
+
+## A grid base
+
+A quad cannot keep its corners when it is stretched, and it cannot bend: a stage moves four
+vertices, and the image between them follows in a straight line. `gridBase({columns, rows})` is the
+same quad cut into `columns × rows` cells — `(columns + 1) × (rows + 1)` vertices, two triangles
+per cell, laid out by the same `make(halfWidth, halfHeight, xOffset, yOffset)` and the same
+`baseArgs` — and a stage can move each grid line on its own: a banner that waves, grass that bends,
+a nine-slice panel whose border keeps its size.
+
+```ts check
+import {
+  AtlasFrame,
+  defineFeature,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  gridBase,
+  InstancePosition,
+  MeshOrder,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import {add, mul, sin, vec3} from 'three/tsl';
+import type {Node} from 'three/webgpu';
+
+// bends the sprite along x: each column line moves up and down by the sine of where it lies
+const Banner = defineFeature({
+  name: 'banner',
+  uniforms: {bend: 0.2},
+  mesh: {
+    order: MeshOrder.Offset,
+    transform: (position, {attribute, uniform}) => {
+      const across = attribute<'vec2'>('uv').x;
+      return add(position, vec3(0, mul(sin(mul(across, Math.PI * 2)), uniform<'float'>('bend')), 0)) as unknown as Node<'vec3'>;
+    },
+  },
+});
+
+const Flag = defineSprite({
+  base: gridBase({columns: 8, rows: 1}),
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Banner],
+});
+
+const flags = new FeatureSprites(Flag, {capacity: 10});
+flags.createSprite()?.setSize(4, 1);
+flags.setUniform('bend', 0.3);
+flags.dispose();
+```
+
+- **The layout.** Vertex `k = j · (columns + 1) + i` lies on the column line `i` and the row line
+  `j`, row by row from the top: its `uv` is `(i / columns, j / rows)` and its position the point of
+  the quad at that uv. The triangles have the winding and the diagonal of the quad's.
+- **The grid line of a vertex** is exact in its uv: `round(uv.x · columns)` is its column line,
+  `round(uv.y · rows)` its row line. A stage reads the base uv through `attribute('uv')` — in every
+  slot, the uv stages' result `ctx.uv` aside.
+- **One base per grid.** `gridBase({columns: 3, rows: 3})` answers the same frozen base every time,
+  named `grid 3x3`, with its `columns` and `rows`: a feature that needs a grid recognizes it by
+  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024; anything else is
+  refused with a `TypeError`.
+- **Everything else works on it unchanged**: the pool, every placement and pass, the trim shift —
+  it moves every vertex by where it lies on the sprite — `AtlasFrame`, `AnimatedFrames` and
+  `TextureColor`. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws.
+- **It costs vertices.** A 3 × 3 grid shades 16 vertices per sprite, an 8 × 1 strip 18, the quad 4.
+  Take the quad unless a stage moves the inside of the sprite; a stage that only moves the whole
+  sprite — or shears it, which keeps its edges straight — works on the quad.
 
 ## Built-in features
 
