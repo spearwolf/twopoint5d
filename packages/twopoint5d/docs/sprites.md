@@ -39,7 +39,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 
 | slot | per kind | built-in features |
 | --- | --- | --- |
-| `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
+| `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames`, `TableFrame`, `tableFrame()` |
 | `frameStage` | any, by `order` | `Flip` |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `Anchor`, `NineSlice`, `QuadSize`, `Shear`, `Rotation` |
@@ -47,11 +47,11 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | `NineSlice` |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
-| `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
+| `color` | any, by `order` | `PaletteSwap`, `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
 The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Slice 175, Scale
 200, Shear 300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
-and `ColorOrder` (`Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
+and `ColorOrder` (`Palette 50, Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
 your own. Two stages of one order run in the order of the feature list. `ColorOrder.Pass` is the
 band of the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` —
 after every color stage of the kind.
@@ -191,6 +191,7 @@ flags.dispose();
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
 | `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
 | `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time` (shared); texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
+| `TableFrame`, `tableFrame(options)` | `frameIndex` (static); texture `frameTable` | `frameIndex` | frame | 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
@@ -198,6 +199,7 @@ flags.dispose();
 | `Flip` | `flip` (static) | `flipX`, `flipY`, `setFlip()` | frame stage, `Flip` | unflipped, 0, 0 |
 | `Anchor` | `anchor` (static) | `anchorX`, `anchorY`, `setAnchor()`, `setAnchorFromPivot(frame, slice?)` | local, `Anchor` | the middle, 0.5, 0.5 |
 | `NineSlice` | `sliceInsets`, `sliceScale` (static), `sliceInsets` part of the word `texCoords` | `insetLeft` … `insetBottom`, `setSliceInsets()`, `sliceScale`, `setSliceFrame(frame, slice?)` | local, `Slice`; uv, `Slice` | no border, scale 1 |
+| `PaletteSwap`, `paletteSwap(options)` | `paletteRow` (static); uniforms `paletteShift`, `paletteCycle`; texture `palette` | `paletteRow` | color, `Palette` | row 0 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -689,6 +691,189 @@ handed in stays the caller's. After `dispose()`, `texture`, `canvas`, `context`,
 Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as
 `TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()` and `layoutText()`, see
 [the text guide](text.md).
+
+### Frames out of a table: `tableFrame()`
+
+Between the nine numbers of `AtlasFrame` and an animation of `AnimatedFrames` sits the sprite that
+shows "frame 17 of this set": a tile, a card, a digit, a direction, a pose a game picks on the CPU.
+`TableFrame` stores one number per sprite, `frameIndex`, and reads the frame out of a **frame
+table** — a data texture `FrameTable#bakeDataTexture()` bakes, set as the texture `frameTable`.
+
+```ts check
+import {
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  FrameTable,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TableFrame,
+  type TextureAtlas,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas; // cards.json, frames card_0 … card_51
+declare const colorMap: Texture; // cards.png
+
+const Card = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TableFrame, TextureColor]});
+
+const deck = FrameTable.fromAtlas(atlas, /^card_/);
+const frameTable = deck.bakeDataTexture(); // the caller's: dispose it with the sprites
+const cards = new FeatureSprites(Card, {capacity: 52, textures: {colorMap, frameTable}});
+
+const ace = cards.createSprite()!;
+ace.setSize(64, 96);
+ace.frameIndex = deck.indexOf('card_0');
+
+// later: turn the card over — frameIndex is static, so the change is marked for upload
+export function show(index: number) {
+  ace.frameIndex = index;
+  cards.spritePool?.touchVO(ace, 'frameIndex');
+}
+```
+
+- **`FrameTable`** takes the frames of an atlas as `AtlasFrameTable` does — a list of names in its
+  order, a `RegExp` (the names it matches, in the order of the json), or every frame by id — or a list
+  of frames and bare `TextureCoords` (`new FrameTable(frames)`); `indexOf(name)` answers the index. Its
+  bake is a float `DataTexture`, three texels a frame row by row: up to 5 592 405 frames — 2^24 texels,
+  the most the shader addresses exactly in float —, where `AtlasFrameTable`, the uniform array for a
+  material of one's own, stops at 341 frames. Every
+  bake is a new texture the caller owns; a frame changed afterwards reaches the sprites with the next
+  bake.
+- **The frame** is drawn as `AtlasFrame` draws it: a turned frame upright, a trimmed frame where the
+  untrimmed sprite has it.
+- **`frameIndex`** is rounded to a whole entry; one before the first or past the last frame of the
+  table shows the first or the last — the shader cannot throw. It is static; a sprite animated on the
+  CPU, which writes it every frame, takes `attributeUsage: {dynamic: ['frameIndex']}`.
+- Until the frame table has an image the sprite shows the whole `colorMap`.
+
+**Directional frames.** The 8-direction sprites of every boomer shooter, the cheap impostor of a tree:
+`tableFrame({views: n})` adds to `frameIndex` the view the camera sees the sprite from. It needs `Yaw`,
+the facing of the sprite, and `InstancePosition`:
+
+```ts check
+import {
+  axisBillboardPlacement,
+  defineSprite,
+  FeatureSprites,
+  FrameTable,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  tableFrame,
+  type TextureAtlas,
+  TextureColor,
+  Yaw,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas; // stalker.json: stalker_<anim>_<view>_<frame>
+declare const colorMap: Texture; // stalker.png, nearest
+
+const Stalker = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, axisBillboardPlacement(), QuadSize, Yaw, tableFrame({views: 8}), TextureColor],
+});
+
+const walk = FrameTable.fromAtlas(atlas, /^stalker_walk_/);
+const stalkers = new FeatureSprites(Stalker, {
+  capacity: 16,
+  textures: {colorMap, frameTable: walk.bakeDataTexture()},
+  attributeUsage: {dynamic: ['frameIndex', 'yaw']},
+});
+
+const stalker = stalkers.createSprite()!;
+stalker.setSize(2, 2);
+stalker.yaw = Math.PI / 2; // facing +x
+
+export function frame(time: number) {
+  stalker.frameIndex = (Math.floor(time / 0.15) % 4) * 8; // walk frame 0 … 3, eight views each
+  stalkers.update();
+}
+```
+
+- **The views of a frame** are `n` consecutive entries of the table, view 0 first: `frameIndex` names
+  the first entry of the block, `frame · n`, and the shader adds the view.
+- **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of the
+  sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front is
+  where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh — `Object3D.rotation.y`
+  — and the angle of the camera is measured the same way:
+  `view = round((atan2(toCamera.x, toCamera.z) − yaw) / (2π / n)) mod n`. The lookbook's `stalker` is
+  rendered in that order and its json lists every frame's eight views in a row, so
+  `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is the table as it is. A sheet that counts its views
+  clockwise is reordered by its names, view `k` there being view `(n − k) mod n` here:
+  `` [0, 7, 6, 5, 4, 3, 2, 1].map((v) => `imp_${frame}_${v}`) ``.
+- The angle lies in the xz plane of the mesh, about +y: right for `axisBillboardPlacement()`,
+  `BillboardPlacement` and `flatPlacement({orientation: 'yaw'})`. A mesh laid out in the xy plane under
+  `axisBillboardPlacement({axis: 'z'})` gets its views about +y all the same; turn such a mesh instead.
+  Straight above or below the sprite, where the angle is undefined, the camera sees view 0, the
+  front view, whatever the yaw.
+- The camera is the one that renders: a `ShadowPass` and a `ReflectionPass` show the view the camera
+  sees, as the games of the genre do. A frame stage runs after the view is picked.
+
+### Palette swap and colour cycling
+
+Team colours, enemy variants — the red goblin and the blue goblin from one sheet — and the colour
+cycling of Deluxe Paint waterfalls. `PaletteSwap` draws each sprite in a row of a **palette**: a small
+image, row 0 the source colours, every row below a replacement set of the same length. Ordinary RGBA
+images, no indexed PNG.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  PaletteSwap,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  TextureFactory,
+} from '@spearwolf/twopoint5d';
+
+// nearest, so every texel keeps its exact colour; upright, as every image of the library
+const factory = new TextureFactory(0, ['nearest']);
+const colorMap = await factory.loadAsync('platformer/goblin.png');
+const palette = await factory.loadAsync('platformer/goblin-palette.png'); // 16 × 4: olive, red, blue, green
+
+const Goblin = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, PaletteSwap],
+});
+const goblins = new FeatureSprites(Goblin, {capacity: 32, textures: {colorMap, palette}});
+
+const red = goblins.createSprite()!;
+red.paletteRow = 1;
+const blue = goblins.createSprite()!;
+blue.paletteRow = 2;
+
+// colour cycling — the chrome font runs its entries 1 … 15 through the letters
+export function cycle(time: number) {
+  goblins.setUniform('paletteCycle', 1, 15);
+  goblins.setUniform('paletteShift', time * 12);
+}
+```
+
+- **The match.** A color stage in the band `ColorOrder.Palette` (50), before `Tint` — a tint, a fade
+  and a flash act on the swapped colours — compares the colour of the color source with the first 16
+  entries of row 0 (`paletteSwap({colors: n})` for 1 to 64) and draws it with that entry of the
+  sprite's `paletteRow`, its alpha kept. The first entry it matches wins; a colour no entry holds stays
+  as it is. A `paletteRow` past the last row draws the last.
+- **Exact colours.** The comparison allows `1/512` per channel, the rounding of 8-bit texels and no
+  more. So the `colorMap` is read with `NearestFilter` and no mipmaps — a linear filter blends
+  neighbouring texels into colours of no palette —, has no premultiplied edges, and lies in the same
+  colour space as the `palette` (both `srgb`, or both none). `PaletteSwap` names the `colorMap` in
+  `nearestTextures`, so the sprites say once on the console when it is filtered otherwise.
+- **Colour cycling.** `paletteCycle` `(first, count)` names the entries that cycle — `count` 0, the
+  default, to the end of the palette — and `paletteShift` how far, in whole steps: a colour of entry
+  `i` in the range is drawn with entry `first + ((i − first + floor(paletteShift)) mod count)` of its
+  row. Both are uniforms, one value per mesh; sprites that cycle differently live in meshes of their
+  own.
+- **The cost.** Every fragment reads `colors + 1` texels of the palette: 17 for the default.
+- The palette is read with `flipY = false`, row 0 at the top; it stays the caller's, as every texture.
 
 ## Uploads: static and dynamic attributes
 
@@ -1345,6 +1530,11 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
   counts as set only once its image has measures. A name is unique across the kind. The textures
   stay the caller's. Until all of them are set the feature drops out of the graph.
+- **`nearestTextures`** — textures, by name, the feature reads texel for texel — its own or
+  another feature's, as `PaletteSwap` names the `colorMap`. The sprites say once on the console,
+  per mesh and texture, when one of them is set with an image and filtered with anything but
+  `NearestFilter` for `magFilter` or `minFilter`; a texture whose image a loader fills in later is
+  judged when `touchTexture()` re-reads it. A name no feature declares is passed over.
 - **`frame`** — the frame slot, at most one feature per kind: answers `texCoords`, and optionally
   `flipDiagonal`, `trim` and `mirror`, read by both pipelines.
 - **`frameStage`** — a stage `{order, transform(frame, ctx)}` on the frame, after the frame slot —

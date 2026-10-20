@@ -8,7 +8,19 @@ import {
   type SignalReader,
 } from '@spearwolf/signalize';
 import {uniform} from 'three/tsl';
-import {type Texture, type UniformNode, Vector2, Vector3, Vector4} from 'three/webgpu';
+import {
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  LinearMipmapNearestFilter,
+  NearestFilter,
+  NearestMipmapLinearFilter,
+  NearestMipmapNearestFilter,
+  type Texture,
+  type UniformNode,
+  Vector2,
+  Vector3,
+  Vector4,
+} from 'three/webgpu';
 import {textureShapeKey} from '../textureShapeKey.js';
 import {collectSpriteDeclarations} from '../spriteDeclarations.js';
 import type {SpriteFeature, SpriteUniformValue} from '../SpriteFeature.js';
@@ -35,6 +47,17 @@ const loadedImageOf = (texture: Texture | undefined): {width: number; height: nu
   const height = image?.height;
   return width != null && width > 0 && height != null && height > 0 ? {width, height} : undefined;
 };
+
+// the names of three's filters, for the warning about a texture read texel for texel
+const FILTER_NAMES: Readonly<Record<number, string>> = {
+  [NearestFilter]: 'NearestFilter',
+  [NearestMipmapNearestFilter]: 'NearestMipmapNearestFilter',
+  [NearestMipmapLinearFilter]: 'NearestMipmapLinearFilter',
+  [LinearFilter]: 'LinearFilter',
+  [LinearMipmapNearestFilter]: 'LinearMipmapNearestFilter',
+  [LinearMipmapLinearFilter]: 'LinearMipmapLinearFilter',
+};
+const filterName = (filter: number): string => FILTER_NAMES[filter] ?? String(filter);
 
 const VECTOR_TYPES = ['float', 'vec2', 'vec3', 'vec4'] as const;
 const sizeOfValue = (value: SpriteUniformValue): number => (typeof value === 'number' ? 1 : value.length);
@@ -82,6 +105,8 @@ export class SpriteResources {
 
   constructor(features: Iterable<SpriteFeature>, options: SpriteResourcesOptions = {}, where = 'SpriteResources') {
     this.#where = where;
+    // read twice below: once for the declarations, once for the textures read texel for texel
+    features = [...features];
     const declarations = collectSpriteDeclarations(features, where);
 
     const uniforms: Record<string, SpriteUniformNode> = {};
@@ -130,9 +155,41 @@ export class SpriteResources {
     }
     this.textureNames = Object.freeze([...this.#textures.keys()]);
 
+    // one watch per texture a feature reads texel for texel, named by the first feature that names it;
+    // a name no feature declares is passed over
+    const exact = new Map<string, SpriteFeature>();
+    for (const feature of features) {
+      for (const name of feature.nearestTextures ?? []) {
+        if (this.#textures.has(name) && !exact.has(name)) exact.set(name, feature);
+      }
+    }
+    for (const [name, feature] of exact) this.#watchFilters(name, feature);
+
     for (const [name, texture] of Object.entries(options.textures ?? {})) {
       this.setTexture(name, texture);
     }
+  }
+
+  // says once on the console when the texture `name`, with an image, is filtered with anything but
+  // NearestFilter: judged when it is set and when touchTexture() re-reads it, so a texture whose loader
+  // applies the filters along with the image is judged once the image is there
+  #watchFilters(name: string, feature: SpriteFeature): void {
+    const {signal} = this.#textures.get(name)!;
+    let warned = false;
+    createEffect(
+      () => {
+        const texture = signal.get();
+        if (warned || loadedImageOf(texture) == null) return;
+        const {magFilter, minFilter} = texture!;
+        if (magFilter === NearestFilter && minFilter === NearestFilter) return;
+        warned = true;
+        // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+        console.warn(
+          `${this.#where}: the texture "${name}" is filtered with magFilter ${filterName(magFilter)} and minFilter ${filterName(minFilter)} — feature "${feature.name}" reads it texel for texel and needs NearestFilter for both; load it with the texture class 'nearest'`,
+        );
+      },
+      {attach: this},
+    );
   }
 
   #assertUniform(name: string): number {

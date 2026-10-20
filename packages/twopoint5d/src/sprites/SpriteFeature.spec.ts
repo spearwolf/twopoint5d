@@ -29,6 +29,14 @@ describe('defineFeature()', () => {
     expect(() => defineFeature(feature)).toThrow('defineFeature: the checkKind of feature "odd" is no function');
   });
 
+  test.each([['colorMap'], [['colorMap', 3]], [{colorMap: true}]])('refuses the nearestTextures %o', (nearestTextures) => {
+    const feature = {name: 'odd', nearestTextures} as unknown as SpriteFeature;
+
+    expect(() => defineFeature(feature)).toThrow(
+      'defineFeature: the nearestTextures of feature "odd" is no list of texture names',
+    );
+  });
+
   test('refuses a feature that requires itself', () => {
     expect(() => defineFeature({name: 'loop', requires: ['loop']})).toThrow('defineFeature: feature "loop" requires itself');
   });
@@ -62,7 +70,7 @@ describe('the order bands', () => {
   test('leave room between the built-in stages for stages of your own', () => {
     expect(LocalOrder).toEqual({Anchor: 100, Flip: 150, Slice: 175, Scale: 200, Shear: 300, Rotate: 400});
     expect(MeshOrder).toEqual({Offset: 100, Project: 200, Mirror: 300});
-    expect(ColorOrder).toEqual({Tint: 100, Mask: 150, Fade: 200, Flash: 300, Pass: 1000});
+    expect(ColorOrder).toEqual({Palette: 50, Tint: 100, Mask: 150, Fade: 200, Flash: 300, Pass: 1000});
     expect(FrameOrder).toEqual({Flip: 100});
     expect(UvOrder).toEqual({Slice: 100});
     expect([LocalOrder, MeshOrder, ColorOrder, FrameOrder, UvOrder].every((bands) => Object.isFrozen(bands))).toBe(true);
