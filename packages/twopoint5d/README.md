@@ -35,7 +35,7 @@ The core features can be roughly classified into the following areas:
 - load images, texture atlases, tilesets and frame based animations from one json
   catalog through `TextureStore`, which fetches every image once and owns the textures it
   builds
-- read the "JSON Hash" and the "JSON Array" format of TexturePacker
+- read the "JSON Hash" and the "JSON Array" format of TexturePacker and free-tex-packer
 - sample the frames of an atlas in a node material of your own (`AtlasFrameTable`), wrapped
   per axis and without seams
 - create tilesets from images

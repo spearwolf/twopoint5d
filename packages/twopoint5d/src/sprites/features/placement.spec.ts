@@ -1,4 +1,4 @@
-import {cameraPosition, modelWorldMatrixInverse, uniform, vec3} from 'three/tsl';
+import {cameraPosition, modelViewMatrix, modelWorldMatrixInverse, uniform, vec3} from 'three/tsl';
 import {Euler, type Node, Quaternion, Vector3, Vector4} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 
@@ -6,6 +6,8 @@ import {attributeNamesOf, evaluateNode, nodesOf, operatorOf, stubShaderContext} 
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {defineSprite, type SpriteOf} from '../defineSprite.js';
 import {QuadBase} from '../SpriteBase.js';
+import {AxisBillboardPlacement, axisBillboardPlacement} from './AxisBillboardPlacement.js';
+import {axisBillboardVertex} from './axisBillboardVertex.js';
 import {BillboardPlacement} from './BillboardPlacement.js';
 import {FeatureSpritesGeometry} from '../FeatureSprites/FeatureSpritesGeometry.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
@@ -359,5 +361,99 @@ describe('Orientation', () => {
 
     expect(geometry.instancedPool.descriptor.getAttribute('orientation')!.usageType).toBe('dynamic');
     geometry.dispose();
+  });
+});
+
+describe('axisBillboardPlacement()', () => {
+  test('answers one feature per axis: AxisBillboardPlacement for the default', () => {
+    expect(axisBillboardPlacement()).toBe(AxisBillboardPlacement);
+    expect(axisBillboardPlacement({})).toBe(AxisBillboardPlacement);
+    expect(axisBillboardPlacement({axis: 'y'})).toBe(AxisBillboardPlacement);
+    expect(axisBillboardPlacement({axis: 'z'})).toBe(axisBillboardPlacement({axis: 'z'}));
+    expect(axisBillboardPlacement({axis: 'z'})).not.toBe(AxisBillboardPlacement);
+    expect(Object.isFrozen(AxisBillboardPlacement)).toBe(true);
+  });
+
+  test('names each form and requires the instance position alone', () => {
+    expect(AxisBillboardPlacement.name).toBe('axisBillboardPlacement');
+    expect(axisBillboardPlacement({axis: 'z'}).name).toBe('axisBillboardPlacement+z');
+    expect(AxisBillboardPlacement.requires).toEqual(['instancePosition']);
+  });
+
+  test('refuses an axis it does not know, naming it', () => {
+    expect(() => axisBillboardPlacement({axis: 'x' as 'y'})).toThrow(
+      new TypeError(`axisBillboardPlacement: the axis "x" is neither 'y' nor 'z'`),
+    );
+  });
+
+  test('brings nothing but its placement stage, so it can stand in for every other placement', () => {
+    for (const feature of [AxisBillboardPlacement, axisBillboardPlacement({axis: 'z'})]) {
+      const {name, requires, placement, ...rest} = feature;
+      expect(Object.keys(rest)).toEqual([]);
+      expect(typeof placement).toBe('function');
+    }
+  });
+
+  test('reads the instance position, the camera position and the view of the camera, and never the quad size', () => {
+    const local = vec3(1, 2, 0) as unknown as Node<'vec3'>;
+
+    const placed = AxisBillboardPlacement.placement!(local, stubShaderContext());
+    const nodes = nodesOf(placed);
+
+    expect(attributeNamesOf(placed)).toEqual(['instancePosition']);
+    expect(nodes.has(local)).toBe(true);
+    expect([...nodes].some((node) => node === cameraPosition)).toBe(true);
+    expect([...nodes].some((node) => node === modelViewMatrix)).toBe(true);
+  });
+});
+
+describe('axisBillboardVertex()', () => {
+  const vertexAt = (
+    axis: 'y' | 'z',
+    camera: readonly [number, number, number],
+    cameraRight: readonly [number, number, number] = [1, 0, 0],
+    local: readonly [number, number, number] = [1, 2, 0],
+  ) =>
+    evaluateNode(
+      axisBillboardVertex({
+        vertex: vec3(...local) as unknown as Node<'vec3'>,
+        instancePosition: uniform(new Vector3(0, 0, 0)) as unknown as Node<'vec3'>,
+        axis,
+        cameraPosition: uniform(new Vector3(...camera)) as unknown as Node<'vec3'>,
+        cameraRight: uniform(new Vector3(...cameraRight)) as unknown as Node<'vec3'>,
+      }),
+    ) as number[];
+
+  test('level with the camera it faces the camera as a spherical billboard does', () => {
+    closeTo(vertexAt('y', [0, 0, 10]), new Vector3(1, 2, 0));
+    closeTo(vertexAt('y', [10, 0, 0], [0, 0, -1]), new Vector3(0, 2, -1));
+  });
+
+  test('under a camera above it turns about the axis and stays upright', () => {
+    closeTo(vertexAt('y', [0, 8, 6]), new Vector3(1, 2, 0));
+    closeTo(vertexAt('y', [6, 8, 0], [0, 0, -1]), new Vector3(0, 2, -1));
+  });
+
+  test('about +Z it stands along +Z and turns in the XY plane', () => {
+    closeTo(vertexAt('z', [0, -10, 5]), new Vector3(1, 0, 2));
+    closeTo(vertexAt('z', [10, 0, 5], [0, 1, 0]), new Vector3(0, 1, 2));
+  });
+
+  test('straight along the axis it takes the right of the camera, levelled', () => {
+    closeTo(vertexAt('y', [0, 10, 0], [1, 0, 0]), new Vector3(1, 2, 0));
+    closeTo(vertexAt('y', [0, 10, 0], [-1, 0.5, 0]), new Vector3(-1, 2, 0));
+    closeTo(vertexAt('z', [0, 0, 10], [0, 1, 0]), new Vector3(0, 1, 2));
+  });
+
+  test('inside the cone round the axis a camera rolled against the facing does not cancel it', () => {
+    // at a sine of 1/11 the facing across the axis and the weighted right of the camera have the
+    // same length: a right of the camera that points the other way would cancel it without the turn
+    const sine = 1 / 11;
+    const camera = [10 * sine, 10 * Math.sqrt(1 - sine * sine), 0] as const;
+
+    const placed = vertexAt('y', camera, [0, 0, 1], [1, 0, 0]);
+
+    placed.forEach((value) => expect(Number.isFinite(value)).toBe(true));
+    closeTo(placed, new Vector3(0, 0, -1));
   });
 });

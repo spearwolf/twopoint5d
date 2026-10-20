@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add the built-in features `Fade` and `Flash`, the first in the bands `ColorOrder.Fade` and `ColorOrder.Flash`: `Fade` multiplies the alpha by the dynamic `fade` (a new sprite starts at 1), `Flash` mixes the rgb towards the flash color of the dynamic `flash` attribute by `flashAmount`, alpha kept (`flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)`; a new sprite starts white at an amount of 0). The guide's example under "Writing a feature" is now `Grayscale`, a feature the library does not ship
+- add `axisBillboardPlacement({axis})` and `AxisBillboardPlacement`, the cylindrical billboard: every sprite turns about +Y of the mesh (or +Z, `axis: 'z'`) to face the camera and stays upright along the axis, and within a sine of 0.1 of the axis it takes the right of the camera. One frozen feature per axis that brings nothing but its placement, so it swaps with `FlatPlacement`, `flatPlacement()` and `BillboardPlacement` on a live material; `ShadowPass` turns it to the light as any placement, `ReflectionPass` draws its reflection. `docs/sprites.md` has it under "Axis billboards", with a table of the passes for each placement
+- add a one-time warning of a full pool: the first `FeatureSprites#createSprite()` that answers `undefined` because every sprite is in use says so on the console, once per mesh, with the `name` of the mesh, its capacity and the fix — twice the capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` handed in. A disposed mesh stays silent, and a refusal after the warning allocates nothing
+- add a fixture of a real free-tex-packer export — JSON Hash and JSON Array, a rotated and a rotated trimmed frame — and specs and a browser test that hold `TexturePackerJson` to it: free-tex-packer is supported as TexturePacker is
+- add the glow recipe to `docs/sprites.md`, "Glow: emissive sprites with bloom": a tint above white and `createBloomOutputNodeBuilder({threshold: 1})` let only the sprites brighter than white glow, held to it by a browser test; the threshold compares luminance, so a saturated red or blue needs a factor of about 5 or 14 to pass
+- add `ColorOrder.Pass` (1000), the band of the color stages a pass brings to recolor the sprite as a whole, after every color stage of the kind
+
+### Changed
+
+- `ShadowMask` and `Darken` run in `ColorOrder.Pass` (were `ColorOrder.Mask` and `ColorOrder.Fade`): a `Flash` no longer turns the shadow of `ShadowPass` into the flash color, and the reflection of `ReflectionPass` and `BillboardReflectionPass` flashes darkened
+
+### Migration Guide
+
+#### A color stage of one's own that ran after `ShadowMask` or `Darken`
+
+`ShadowMask` and `Darken` moved from the orders 150 and 200 to `ColorOrder.Pass` (1000). A color stage of one's own with an order between them that has to run after the mask or the darkening of a pass takes an order above `ColorOrder.Pass`.
+
+**Before**
+
+```ts
+color: {order: ColorOrder.Fade + 10, transform: tintTheShadow}
+```
+
+**After**
+
+```ts
+color: {order: ColorOrder.Pass + 10, transform: tintTheShadow}
+```
+
 ## [0.23.0] - 2026-10-18
 
 The sprite meshes of this release are built from features: `TexturedSprites` and
