@@ -30,10 +30,18 @@ declared in `tsconfig.json`. All 19 demo pages import through them.
 
 ## Generated assets
 
-Most images under `public/assets/` are plain files. The cut-outs of the demo `cardboard-parade`
-are generated: `assets-src/cardboard/` builds them in Blender and Python and writes
-`public/assets/cardboard/`. No build or check runs it; a change to the props is a commit of the
-script and its output together. Its README says how to rerun it.
+Most images under `public/assets/` are plain files. Two pipelines generate the rest, and no build
+or check runs either; a change to a generated asset is a commit of its generator and its output
+together.
+
+- `pnpm lookbook:assets` (from the repo root) runs `assets-src/build.mjs`: Node generators, one
+  per demo under `assets-src/<demo>/`, write `public/assets/<demo>/` — pixel-art sprites,
+  Aseprite sheets, palettes, bitmap fonts, nine-slice panels, a free-tex-packer atlas, textures,
+  and an enemy Blender renders headless from eight directions. `assets-src/README.md` documents
+  every output — formats, frame names, palette rows, insets, font metrics — and is the reference
+  a demo is built from.
+- The cut-outs of the demo `cardboard-parade`: `assets-src/cardboard/` builds them in Blender and
+  Python and writes `public/assets/cardboard/`. Its README says how to rerun it.
 
 ## Adding a demo
 

@@ -69,6 +69,12 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
   Markdown files; the tests and the blocks are checked against the built library
 - `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
+- `pnpm lookbook:assets` — regenerates the generated assets of the lookbook demos under
+  `apps/lookbook/public/assets/<demo>/` from `apps/lookbook/assets-src/`; `--only=<demo>,…`
+  for some, `--skip-render` reuses Blender's render cache. Not part of `pnpm run ci`: the
+  outputs are committed, and a change to an asset is a commit of its generator and its output
+  together. Every output file, frame name, palette and font metric is documented in
+  `apps/lookbook/assets-src/README.md`
 - `pnpm lookbook:generate-previews` — the preview image of every lookbook demo, through
   Playwright's Chromium against `astro preview`; `--only=<name>,…` for some. Not part of
   `pnpm run ci`: it needs a browser and writes binary files. The protocol is in
