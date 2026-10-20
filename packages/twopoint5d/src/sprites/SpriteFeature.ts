@@ -128,6 +128,13 @@ export interface SpriteFeature<Api extends object = object> {
   readonly uniforms?: Readonly<Record<string, SpriteUniformValue | SpriteUniformDeclaration>>;
   /** Textures the material holds for this feature. They stay the caller's. */
   readonly textures?: Readonly<Record<string, SpriteTextureDeclaration>>;
+  /**
+   * Textures, by name — the feature's own or another feature's — the feature reads texel for texel. The
+   * sprites say once on the console when such a texture is set, with an image, filtered with anything but
+   * `NearestFilter` for `magFilter` or `minFilter`; a texture whose image arrives later is judged when
+   * `touchTexture()` re-reads it. A name no feature of the sprites declares is passed over.
+   */
+  readonly nearestTextures?: readonly string[];
   /** The frame slot: at most one feature of a kind. */
   readonly frame?: (ctx: SpriteFrameContext) => SpriteFrameNodes;
   /** A stage on the frame, after the frame slot and before the trim shift and both pipelines read it. */
@@ -190,6 +197,12 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
   if (feature.checkKind != null && typeof feature.checkKind !== 'function') {
     throw new TypeError(`defineFeature: the checkKind of feature "${feature.name}" is no function`);
   }
+  if (
+    feature.nearestTextures != null &&
+    !(Array.isArray(feature.nearestTextures) && feature.nearestTextures.every((name) => typeof name === 'string'))
+  ) {
+    throw new TypeError(`defineFeature: the nearestTextures of feature "${feature.name}" is no list of texture names`);
+  }
   if (feature.requires?.includes(feature.name)) {
     throw new TypeError(`defineFeature: feature "${feature.name}" requires itself`);
   }
@@ -212,7 +225,8 @@ export const UvOrder = Object.freeze({Slice: 100} as const);
 export const MeshOrder = Object.freeze({Offset: 100, Project: 200, Mirror: 300} as const);
 
 /**
- * The order bands of the color stages. `Pass` is the band of the color stages a pass brings to
- * recolor the sprite as a whole — `ShadowMask`, `Darken` — after every color stage of the kind.
+ * The order bands of the color stages. `Palette` swaps the colours of the color source before every
+ * other stage acts on them. `Pass` is the band of the color stages a pass brings to recolor the sprite as
+ * a whole — `ShadowMask`, `Darken` — after every color stage of the kind.
  */
-export const ColorOrder = Object.freeze({Tint: 100, Mask: 150, Fade: 200, Flash: 300, Pass: 1000} as const);
+export const ColorOrder = Object.freeze({Palette: 50, Tint: 100, Mask: 150, Fade: 200, Flash: 300, Pass: 1000} as const);
