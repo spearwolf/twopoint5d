@@ -2,10 +2,11 @@
 const RUN = 32;
 
 /**
- * Orders the slots `0` … `n - 1` by `keys`, the lowest key first, and answers the array that holds
- * the order: `order` or `scratch`, both at least `n` long, whichever the last merge level wrote.
- * Stable: slots of equal keys keep their order. The keys are compared with `<=` and `>`, so the
- * caller hands in no `NaN`.
+ * Orders the first `n` entries of `order` — slot numbers, each an index into `keys` — by their keys,
+ * the lowest key first, and answers the array that holds the result: `order` or `scratch`, both at
+ * least `n` long, whichever the last merge level wrote. Neither array is touched beyond `n`. Stable:
+ * entries of equal keys keep the order they were handed in. The keys are compared with `<=` and
+ * `>`, so the caller hands in no slot whose key is `NaN`.
  *
  * A bottom-up merge sort: runs of {@link RUN} slots sorted by insertion, then merged pairwise, a
  * merge skipped where the last key of the left run is no greater than the first of the right one. A
@@ -13,8 +14,6 @@ const RUN = 32;
  * comparisons and the copies of the merge levels. Allocates nothing.
  */
 export function sortSlots(keys: Float64Array, order: Uint32Array, scratch: Uint32Array, n: number): Uint32Array {
-  for (let i = 0; i < n; i++) order[i] = i;
-
   for (let lo = 0; lo < n; lo += RUN) {
     const hi = Math.min(lo + RUN, n);
     for (let i = lo + 1; i < hi; i++) {

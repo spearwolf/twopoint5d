@@ -78,8 +78,11 @@ The two types go into `types.ts`, which the module exports as `export type *`.
 - **A key function** is called once per slot in use, in slot order, before anything moves. A slot
   filled by `createFromAttributes()`, `fromBuffersData()` or buffers data handed to the constructor
   has no vertex object yet; it gets one, as `getVO()` gives it — once, on the first sort. The key
-  function must not create or free vertex objects: `sortBy()` compares `usedCount` before and after
-  the keys and throws, with nothing moved,
+  function must not create or free vertex objects: `sortBy()` compares `usedCount` with the count it
+  started from before each slot, so that it never materializes a vertex object in a slot the key
+  function has freed, and once more after the last key, and throws — the sort has moved nothing,
+  while what the key function did stands (a `freeVO()` has moved the last vertex object into the
+  freed slot, as it always does):
 
   > `VertexObjectPool#sortBy(): the key function changed usedCount from 10 to 9 — create and free vertex objects before or after the sort, not inside the key function`
 
@@ -97,8 +100,10 @@ The two types go into `types.ts`, which the module exports as `export type *`.
   an unstable sort would flicker wherever two transparent sprites overlap at the same key.
 - **Ascending** by default, `descending: true` the other way round. Descending is not the reverse
   of ascending: ties keep their slot order in both directions.
-- **NaN last** in either direction: a key that is `NaN` sorts behind every number. `-0` and `0` are
-  the same key.
+- **NaN last** in either direction: a key that is `NaN` sorts behind every number, the infinities
+  included, and the slots of `NaN` keys keep their slot order among each other. The slots of a `NaN`
+  stay out of the sort and are put behind the sorted ones — a `NaN` made into `+Infinity` would tie
+  with a real infinity, and the stable order could keep it in front. `-0` and `0` are the same key.
 - The keys are held as doubles, in a `Float64Array` the pool owns. The roadmap sketch named a
   `Float32Array`; a key function answers doubles, and rounding two different keys to one float
   would turn a real order into a tie, decided by the slot order of the moment.
@@ -253,12 +258,13 @@ A pass that wants an order of its own needs a pool of its own; that is not offer
   a pool with a float32 buffer, an interleaved uint8 normalized buffer with padding, an int16 and a
   float16 attribute, `'static'`, `'dynamic'` and `autoTouch: false` — compared slot by slot with
   the values each handle wrote; the handles keep their identity, their values and `getVO()` agrees;
-  stable on ties in both directions; NaN last; `false` and no mark for a pool in order, for fewer
-  than two slots, on a disposed pool; the hull of the moved slots marked in every buffer, and an
+  stable on ties in both directions; NaN last, behind ±Infinity, by every form of key; `false` and
+  no mark for a pool in order, for fewer than two slots, on a disposed pool; the hull of the moved slots marked in every buffer, and an
   `update()` of a `VertexObjectGeometry` and of an `InstancedVertexObjectGeometry` uploads exactly
   that range (`updateRanges`); index buffer untouched; `freeVO()` after a sort and a sort after
   `freeVO()`; slots from `createFromAttributes()` sorted by a key function; the refusals of §2.2
-  with their messages; a throwing key function leaves the pool as it was; a sort after `resize()`.
+  with their messages; a key function that frees the last vertex object leaves no vertex object in a
+  slot out of use; a throwing key function leaves the pool as it was; a sort after `resize()`.
 - `src/sprites/FeatureSprites/FeatureSprites.sortBy.spec.ts`: `sortBy('y')`, a key function,
   `descending`; `sortByViewDepth()` for a camera on +z and on −z (orders reverse), a turned and a
   moved mesh, a perspective and an orthographic camera; the refusal of a kind without

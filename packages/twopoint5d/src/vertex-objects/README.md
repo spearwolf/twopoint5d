@@ -250,7 +250,7 @@ pool.sortByKeys(keys); // keys[i] is the key of slot i
   call where V8 does not inline it. `sortByKeys()` takes keys worked out in bulk, `keys[i]` for slot `i`.
 - **The order** is stable — equal keys keep their slot order, so a sort every frame never swaps two
   objects of the same key back and forth — and ascending unless `descending`; a `NaN` key goes last
-  either way.
+  either way, behind the infinities too.
 - **What moves.** Every buffer, as whole objects; every object keeps its values and stays the same
   object, its index following its slot. `getVO(i)` answers the object now in slot `i`, and an index
   read before the sort is stale — read it afresh. The index buffer of a geometry depends on the

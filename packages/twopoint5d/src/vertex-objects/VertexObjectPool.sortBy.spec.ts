@@ -5,6 +5,7 @@ import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js'
 import type {BufferLike, VO, VertexObjectDescription} from './types.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
+import {VOUtils} from './VOUtils.js';
 
 interface Thing extends VO {
   x: number;
@@ -195,7 +196,7 @@ describe('VertexObjectPool#sortBy()', () => {
       pool.dispose();
     });
 
-    test('refuses a key function that creates or frees vertex objects, with nothing moved', () => {
+    test('refuses a key function that creates or frees vertex objects, and the sort moves nothing', () => {
       const {pool, things} = makeThings([2, 1, 0]);
       expect(() =>
         pool.sortBy((thing) => {
@@ -205,6 +206,30 @@ describe('VertexObjectPool#sortBy()', () => {
       ).toThrow(
         'VertexObjectPool#sortBy(): the key function changed usedCount from 3 to 2 — create and free vertex objects before or after the sort, not inside the key function',
       );
+      expect(idsInSlotOrder(pool)).toEqual([0, 1]);
+      pool.dispose();
+    });
+
+    test('a key function that frees the last vertex object leaves no vertex object behind in a slot out of use', () => {
+      // slots without a vertex object, so that the sort materializes them as it goes
+      const pool = new VertexObjectPool<Thing>(thingDescription, 4);
+      pool.createFromAttributes({position: [0, 2, 0, 1, 1, 0, 2, 0, 0]});
+      const created: Thing[] = [];
+      pool.onCreateVO = (thing) => {
+        created.push(thing);
+      };
+
+      expect(() =>
+        pool.sortBy((thing) => {
+          if (pool.usedCount === 3) pool.freeVO(pool.getVO(2)!);
+          return thing.y;
+        }),
+      ).toThrow('VertexObjectPool#sortBy(): the key function changed usedCount from 3 to 2');
+
+      // every vertex object the pool built along the way is either let go of or sits in a slot in use
+      for (const thing of created) {
+        if (pool.containsVO(thing)) expect(VOUtils.getIndex(thing)).toBeLessThan(pool.usedCount);
+      }
       expect(idsInSlotOrder(pool)).toEqual([0, 1]);
       pool.dispose();
     });
@@ -244,6 +269,42 @@ describe('VertexObjectPool#sortBy()', () => {
       expect(idsInSlotOrder(pool)).toEqual([2, 3, 4, 1, 0]);
       pool.sortBy(byId, {descending: true});
       expect(idsInSlotOrder(pool)).toEqual([1, 4, 2, 3, 0]);
+      pool.dispose();
+    });
+
+    test('puts a NaN key behind an infinite one in both directions, by every form of key', () => {
+      // a NaN in the first slot, in front of either infinity: the two NaN keep their slot order
+      // behind everything else
+      const keys = [Number.NaN, Number.POSITIVE_INFINITY, 0, Number.NEGATIVE_INFINITY, Number.NaN];
+      const expected = {ascending: [3, 2, 1, 0, 4], descending: [1, 2, 3, 0, 4]};
+
+      for (const [direction, options] of [
+        ['ascending', undefined],
+        ['descending', {descending: true}],
+      ] as const) {
+        const byFunction = makeThings([0, 0, 0, 0, 0]).pool;
+        byFunction.sortBy((thing) => keys[thing.x]!, options);
+        expect(idsInSlotOrder(byFunction), `a key function, ${direction}`).toEqual(expected[direction]);
+        byFunction.dispose();
+
+        // the value property y holds the keys, read from a float32 buffer
+        const byName = makeThings(keys).pool;
+        byName.sortBy('y', options);
+        expect(idsInSlotOrder(byName), `a name, ${direction}`).toEqual(expected[direction]);
+        byName.dispose();
+
+        const byKeys = makeThings([0, 0, 0, 0, 0]).pool;
+        byKeys.sortByKeys(keys, options);
+        expect(idsInSlotOrder(byKeys), `keys, ${direction}`).toEqual(expected[direction]);
+        byKeys.dispose();
+      }
+    });
+
+    test('answers false for keys that are all NaN, and moves nothing', () => {
+      const {pool} = makeThings([0, 0, 0]);
+      expect(pool.sortByKeys([Number.NaN, Number.NaN, Number.NaN])).toBe(false);
+      expect(pool.sortByKeys([Number.NaN, 1, Number.NaN])).toBe(true);
+      expect(idsInSlotOrder(pool)).toEqual([1, 0, 2]);
       pool.dispose();
     });
 

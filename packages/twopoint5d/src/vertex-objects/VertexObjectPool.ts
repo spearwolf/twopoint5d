@@ -45,6 +45,12 @@ function unknownSortKeyError(name: string, layouts: ReadonlyMap<string, ValuePro
   );
 }
 
+function keyFunctionChangedPoolError(from: number, to: number): Error {
+  return new Error(
+    `VertexObjectPool#sortBy(): the key function changed usedCount from ${from} to ${to} — create and free vertex objects before or after the sort, not inside the key function`,
+  );
+}
+
 // a view of the scratch of a sort in the type of the buffer it takes a copy of, so that every value
 // goes over as it is
 function scratchViewOf(dataType: VertexAttributeDataType, buffer: ArrayBuffer): TypedArray {
@@ -361,9 +367,11 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * later one allocates nothing. Does nothing on a disposed pool.
    *
    * @returns whether a slot moved; `false` on a disposed pool and with fewer than two slots in use
-   * @throws when `key` names no value property — the message lists the ones there are — and when the
-   *   key function creates or frees a vertex object of this pool; nothing has moved then, and a key
-   *   function that throws leaves the pool as it was as well
+   * @throws when `key` names no value property — the message lists the ones there are —, and when the
+   *   key function creates or frees a vertex object of this pool: the sort has moved nothing then,
+   *   while what the key function did stands — a `freeVO()` has moved the last vertex object into
+   *   the freed slot, as it always does. A key function that throws leaves the sort undone as well.
+   *   `NaN` keys go behind every number, infinities included
    */
   sortBy(key: string | VOSortKey<VOType>, options?: VOSortOptions): boolean {
     if (this.isDisposed) return false;
@@ -385,6 +393,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       const keys = this.#prepareSort();
       const vos = this.#voIndex;
       for (let i = 0; i < n; i++) {
+        // asked before every slot: a slot the key function has freed lies beyond usedCount, and a
+        // vertex object materialized there would sit in a slot out of use
+        if (this.usedCount !== n) throw keyFunctionChangedPoolError(n, this.usedCount);
         let vo = vos[i];
         if (vo == null) {
           vo = this.#createVO(i, false);
@@ -392,11 +403,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
         }
         keys[i] = key(vo);
       }
-      if (this.usedCount !== n) {
-        throw new Error(
-          `VertexObjectPool#sortBy(): the key function changed usedCount from ${n} to ${this.usedCount} — create and free vertex objects before or after the sort, not inside the key function`,
-        );
-      }
+      if (this.usedCount !== n) throw keyFunctionChangedPoolError(n, this.usedCount);
     }
 
     return this.#sortByOwnKeys(n, options?.descending === true);
@@ -470,15 +477,27 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   /** Sorts the first `n` slots by the keys in `#sortKeys` and moves them; whether a slot moved. */
   #sortByOwnKeys(n: number, descending: boolean): boolean {
     const keys = this.#sortKeys!;
-    // the sort compares ascending and takes no NaN: descending turns the keys over, and a NaN
-    // becomes the highest key there is, so that it goes last in either direction
+    const slots = this.#sortOrder!;
+    // the sort compares ascending and takes no NaN: descending turns the keys over, the slots of a
+    // number go to the front of the order, and the slots of a NaN behind them, in slot order — a NaN
+    // would tie with an infinity if it were made one, and the stable order then put it in front
+    let numbered = 0;
     for (let i = 0; i < n; i++) {
-      let k = keys[i]!;
-      if (descending) k = -k;
-      keys[i] = Number.isNaN(k) ? Number.POSITIVE_INFINITY : k;
+      const k = keys[i]!;
+      if (Number.isNaN(k)) continue;
+      if (descending) keys[i] = -k;
+      slots[numbered++] = i;
+    }
+    for (let i = 0, nan = numbered; nan < n; i++) {
+      if (Number.isNaN(keys[i]!)) slots[nan++] = i;
     }
 
-    const order = sortSlotOrder(keys, this.#sortOrder!, this.#sortMerge!, n);
+    const order = sortSlotOrder(keys, slots, this.#sortMerge!, numbered);
+    // the slots of a NaN stay where they were put; the merge may have left the sorted ones in the
+    // other array
+    if (order !== slots) {
+      for (let i = numbered; i < n; i++) order[i] = slots[i]!;
+    }
 
     // a sort every frame mostly finds most slots where they were: only the hull of the slots that
     // changed is moved and marked

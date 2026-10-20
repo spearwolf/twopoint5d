@@ -8,7 +8,8 @@ const expectedOrder = (keys: ArrayLike<number>, n: number): number[] =>
 
 const run = (keys: number[]): number[] => {
   const n = keys.length;
-  const result = sortSlots(Float64Array.from(keys), new Uint32Array(n), new Uint32Array(n), n);
+  const order = Uint32Array.from({length: n}, (_, i) => i);
+  const result = sortSlots(Float64Array.from(keys), order, new Uint32Array(n), n);
   return Array.from(result.subarray(0, n));
 };
 
@@ -46,9 +47,30 @@ describe('sortSlots()', () => {
     expect(run(sorted.map((i) => -i))).toEqual(sorted.map((i) => n - 1 - i));
   });
 
-  test('sorts the first n slots of longer arrays and reads nothing beyond them', () => {
+  test('sorts the first n entries of the order handed in and leaves the rest alone', () => {
     const keys = Float64Array.from([2, 1, 0, -100, -200]);
-    const result = sortSlots(keys, new Uint32Array(5), new Uint32Array(5), 3);
+    const order = Uint32Array.from([0, 1, 2, 3, 4]);
+    const scratch = new Uint32Array(5).fill(9);
+    const result = sortSlots(keys, order, scratch, 3);
     expect(Array.from(result.subarray(0, 3))).toEqual([2, 1, 0]);
+    expect(Array.from(order.subarray(3)), 'the order beyond n').toEqual([3, 4]);
+    expect(Array.from(scratch.subarray(3)), 'the scratch beyond n').toEqual([9, 9]);
+  });
+
+  test('keeps the order handed in for equal keys, whatever the slot numbers say', () => {
+    const keys = Float64Array.from([1, 1, 1, 0]);
+    const order = Uint32Array.from([2, 0, 3, 1]);
+    const result = sortSlots(keys, order, new Uint32Array(4), 4);
+    expect(Array.from(result)).toEqual([3, 2, 0, 1]);
+  });
+
+  test('sorts a long order handed in out of slot order as a stable sort of that order does', () => {
+    const random = lcg(7);
+    const n = 300;
+    const keys = Float64Array.from({length: n}, () => Math.floor(random() * 5));
+    const given = Array.from({length: n}, (_, i) => (i * 7) % n);
+    const expected = [...given].sort((a, b) => keys[a]! - keys[b]!);
+    const result = sortSlots(keys, Uint32Array.from(given), new Uint32Array(n), n);
+    expect(Array.from(result)).toEqual(expected);
   });
 });

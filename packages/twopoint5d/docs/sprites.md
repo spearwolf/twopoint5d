@@ -806,7 +806,7 @@ balls.update();
   without `InstancePosition` has no position to measure and is refused, naming the fix; every
   built-in placement requires it, so only a placement of one's own meets that.
 - **Stable.** Sprites of the same key keep their order, so a sort every frame never swaps two
-  sprites on one row back and forth. A `NaN` key goes last.
+  sprites on one row back and forth. A `NaN` key goes last, behind the infinities too.
 - **The order of a frame**: write the sprites, sort, `update()`, render. A sort after `update()`
   reaches the gpu a frame late. Both answer whether a sprite moved.
 - **The passes follow.** A pass draws the geometry of the sprites, so it draws the same order:
