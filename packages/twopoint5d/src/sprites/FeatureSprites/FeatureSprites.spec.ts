@@ -3,7 +3,7 @@ import {createSandbox} from 'sinon';
 import {mul} from 'three/tsl';
 import type {MeshBasicMaterial, Vector3, Vector4} from 'three/webgpu';
 import {Mesh, Object3D, PlaneGeometry, PointLight, Scene, Texture} from 'three/webgpu';
-import {afterEach, describe, expect, expectTypeOf, test} from 'vitest';
+import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {nodesOf} from '../../testing/spriteGraph.js';
 import {lightOf} from '../bindings/lightOf.js';
@@ -69,6 +69,7 @@ describe('FeatureSprites', () => {
   });
 
   test('createSprite() hands out a sprite of the kind, freeSprite() takes it back, undefined once full', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const sprites = new FeatureSprites(kind, {capacity: 1});
     const sprite = sprites.createSprite()!;
 
@@ -78,6 +79,75 @@ describe('FeatureSprites', () => {
     expect(sprites.spritePool!.usedCount).toBe(0);
     expectTypeOf(sprite).toHaveProperty('setFrame');
     sprites.dispose();
+  });
+
+  describe('a full pool', () => {
+    const silenced = () => vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    test('warns once, naming the mesh, the capacity and the fix', () => {
+      const warn = silenced();
+      const sprites = new FeatureSprites(kind, {capacity: 2});
+      sprites.createSprite();
+      sprites.createSprite();
+      expect(warn).not.toHaveBeenCalled();
+
+      expect(sprites.createSprite()).toBeUndefined();
+      expect(sprites.createSprite()).toBeUndefined();
+
+      expect(warn.mock.calls).toEqual([
+        [
+          'FeatureSprites "twopoint5d.FeatureSprites": the pool is full — all 2 sprites are in use, so createSprite() answers undefined. Give the sprites a larger capacity — new FeatureSprites(kind, {capacity: 4}) — or free the sprites no longer drawn with freeSprite(). This warning is shown once per FeatureSprites.',
+        ],
+      ]);
+      sprites.dispose();
+    });
+
+    test('warns once only, also after sprites were freed and the pool filled up again', () => {
+      const warn = silenced();
+      const sprites = new FeatureSprites(kind, {capacity: 1});
+      sprites.name = 'enemies';
+      const sprite = sprites.createSprite()!;
+      sprites.createSprite();
+      sprites.freeSprite(sprite);
+      sprites.createSprite();
+      sprites.createSprite();
+
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]![0]).toMatch(/^FeatureSprites "enemies": the pool is full — all 1 sprites/);
+      sprites.dispose();
+    });
+
+    test('names the geometry handed in as the one to build larger', () => {
+      const warn = silenced();
+      const geometry = new FeatureSpritesGeometry(kind, 3);
+      const sprites = new FeatureSprites(kind, {geometry});
+      for (let i = 0; i < 4; i++) sprites.createSprite();
+
+      expect(warn.mock.calls[0]![0]).toContain(
+        'Build the FeatureSpritesGeometry handed in with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: 6}) —',
+      );
+      sprites.dispose();
+      geometry.dispose();
+    });
+
+    test('a pool of no sprites asks for one', () => {
+      const warn = silenced();
+      const sprites = new FeatureSprites(kind, {capacity: 0});
+
+      expect(sprites.createSprite()).toBeUndefined();
+      expect(warn.mock.calls[0]![0]).toContain('all 0 sprites are in use');
+      expect(warn.mock.calls[0]![0]).toContain('new FeatureSprites(kind, {capacity: 1})');
+      sprites.dispose();
+    });
+
+    test('disposed sprites answer undefined without a warning', () => {
+      const warn = silenced();
+      const sprites = new FeatureSprites(kind, {capacity: 1});
+      sprites.dispose();
+
+      expect(sprites.createSprite()).toBeUndefined();
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 
   test('createSprite() hands out a sprite at the values of an unused slot — 0, and white — whatever its slot held', () => {

@@ -600,7 +600,11 @@ colorMap.dispose();
 The options are the ones of the geometry (`capacity`, `attributeUsage`, `baseArgs`) and of the
 material (`textures`, `uniforms`, `placement` and every three.js material parameter) side by side,
 and `passes` (see "Passes: shadows and reflections").
-`createSprite()` answers `undefined` once the pool is full. `placement`, `uniforms`, `setUniform()`,
+`createSprite()` answers `undefined` once the pool is full, and the first time it does it says so on
+the console — once per mesh, naming the `name` of the mesh, its capacity and the fix: twice the
+capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` handed in.
+A pool that grows on its own does not exist yet; size the capacity for the most sprites drawn at
+once. `spritePool.createVO()` is the pool's own API and stays silent. `placement`, `uniforms`, `setUniform()`,
 `getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
 
 **Ownership.** The mesh disposes the geometry and the material it built, and nothing else. A
@@ -1356,7 +1360,8 @@ that repeats one image is better served by that image as a texture of its own wi
 ## Performance
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch
-  tuple, and `createSprite()` allocates the sprite and nothing else. The allocation spec
+  tuple, and `createSprite()` allocates the sprite and nothing else — on a full pool, once it has
+  warned, nothing at all. The allocation spec
   (`src/sprites/hot-path-allocations.spec.ts`) holds both presets to it, and `pnpm bench` times
   the hot loops of 10 000 sprites.
 - A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame

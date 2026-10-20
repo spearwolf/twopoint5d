@@ -1,5 +1,5 @@
 import {Color, DirectionalLight, Euler, Object3D, Quaternion} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {describe, expect, test, vi} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TextureAtlasFrame} from '../texture/TextureAtlas.js';
@@ -194,6 +194,20 @@ describe('sprites on the hot path', () => {
     });
 
     expect(bytesPerRound / 100).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);
+    sprites.dispose();
+  });
+
+  test('createSprite() on a full pool allocates nothing once it has warned', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 10});
+    for (let i = 0; i < 11; i++) sprites.createSprite();
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 1000; i++) sprites.createSprite();
+    });
+
+    expect(bytesPerRound / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expect(warn).toHaveBeenCalledOnce();
     sprites.dispose();
   });
 
