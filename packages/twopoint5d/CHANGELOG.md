@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `FrameBasedAnimations#bakeDataTexture()` writes a second header texel behind the frames of each animation, `[playback, hasDurations, cycleDuration, -1]`, and the end time of a frame of an animation with `durations` into the fourth component of its second texel, `[width, height, flipDiagonal, endTime]`; an animation with durations gives every frame of the bake a second texel. The first header texel keeps its layout and the frames of the first animation still begin at texel `n`, but the frames of every later animation begin one texel later per animation before them: a reader of its own that follows `firstFrameTexel` of the header reads them right, one that counted the texels itself has to follow it
+- `FrameBasedAnimations#bakeDataTexture()` writes a second header texel behind the frames of each animation, `[playback, hasDurations, cycleDuration, -2]` — the `-2` marks it, since no texel of a header or a frame lying within its image goes below `-1` (the `v` of a frame flipped vertically as high as its image), and the end time of a frame of an animation with `durations` into the fourth component of its second texel, `[width, height, flipDiagonal, endTime]`; an animation with durations gives every frame of the bake a second texel. The first header texel keeps its layout and the frames of the first animation still begin at texel `n`, but the frames of every later animation begin one texel later per animation before them: a reader of its own that follows `firstFrameTexel` of the header reads them right, one that counted the texels itself has to follow it
 
 ## [0.23.0] - 2026-10-18
 

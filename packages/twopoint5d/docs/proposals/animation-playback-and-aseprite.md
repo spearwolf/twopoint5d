@@ -165,14 +165,19 @@ the first header alone, and the frames of the first animation still begin at tex
 
 - texels `0 … n−1`: `[frameCount, duration, firstFrameTexel, texelsPerFrame]`, as before;
 - from texel `n` on, for each animation in the order of the ids: its frames, `texelsPerFrame`
-  texels each, then its **second header texel** `[playback, hasDurations, cycleDuration, −1]` at
+  texels each, then its **second header texel** `[playback, hasDurations, cycleDuration, −2]` at
   `firstFrameTexel + frameCount · texelsPerFrame`;
 - `playback` is `0` loop, `1` once, `2` pingpong; `hasDurations` is `1` for an animation with
   `durations`, `0` otherwise; `cycleDuration` as in §3.3;
-- the fourth component `−1` marks the texel as a second header. No texel of the old layout
-  carries a negative fourth component — a header has `texelsPerFrame ≥ 0`, tex coords `v ≥ 0`, a
-  size texel `0`, trim margins `≥ 0` — so `AnimatedFrames` reads an animsMap of the old layout,
-  one built by hand among them, as it did: every animation loops at one duration.
+- the fourth component `−2` marks the texel as a second header; `AnimatedFrames` takes a texel
+  whose fourth component lies below `−1.5` for one. No texel of the old layout goes below `−1`: a
+  header has `texelsPerFrame ≥ 0`, a size texel `0`, trim margins `0 … 1`, and the `v` of tex
+  coords is a fraction of the image — negative for a frame with `FLIP_VERTICAL` (every frame
+  TexturePacker turned carries `FLIP_DIAGONAL | FLIP_VERTICAL`), `−1` exactly for such a frame as
+  high as its image. A first draft marked with `−1` and read anything negative as a mark, which a
+  turned first frame of the next animation passed for; with `−2` an animsMap of the old layout,
+  one built by hand among them, plays as it did — every animation loops at one duration — as long
+  as its frames lie within their image.
 - the second frame texel becomes `[width, height, flipDiagonal, endTime]`: `endTime` is the end
   of the frame within the animation in seconds (the running sum of `durations`) for an animation
   with durations, `0` for any other.
@@ -190,7 +195,7 @@ them right; the CHANGELOG says it under "Changed".
 
 `T = time + animOffset`, `N = frameCount`, `D = duration`, `C = cycleDuration`. The second header
 is read at `firstFrameTexel + N · max(texelsPerFrame, 1)`; when its fourth component is not below
-`−0.5`, `playback = 0` and `hasDurations = 0` (the old layout). `D = 0` shows frame 0 in every
+`−1.5`, `playback = 0` and `hasDurations = 0` (the old layout). `D = 0` shows frame 0 in every
 mode, as today.
 
 **One duration** (`hasDurations = 0`), `s = T / D · N` the frames elapsed:

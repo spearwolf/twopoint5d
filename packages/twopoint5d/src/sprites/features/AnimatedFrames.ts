@@ -56,11 +56,12 @@ export const AnimatedFrames = defineFeature<AnimatedFramesApi>({
     const texelsPerFrame = max(header.w, float(1));
     const lastFrame = max(sub(frameCount, 1), float(0));
 
-    // the second header texel sits behind the frames: [playback, hasDurations, cycleDuration, -1].
-    // A texel without the -1 is no second header — an animsMap of the layout before it, whose
-    // animations all loop at one duration
+    // the second header texel sits behind the frames: [playback, hasDurations, cycleDuration, -2].
+    // A texel whose fourth component is not below -1.5 is no second header — an animsMap of the
+    // layout before it, whose animations all loop at one duration. No texel of that layout goes
+    // below -1: the lowest is the `v` of a frame flipped vertically and as high as its image
     const second = lookup(add(firstFrameTexel, mul(frameCount, texelsPerFrame)).toInt());
-    const isSecondHeader = second.w.lessThan(-0.5);
+    const isSecondHeader = second.w.lessThan(-1.5);
     const playback = select(isSecondHeader, second.x, float(0));
     const isPingpong = playback.greaterThan(1.5);
     const isOnce = playback.greaterThan(0.5).and(isPingpong.not());

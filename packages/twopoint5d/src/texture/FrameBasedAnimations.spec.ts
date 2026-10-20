@@ -645,7 +645,7 @@ describe('FrameBasedAnimations', () => {
       const frames = (count: number): TextureCoords[] =>
         Array.from({length: count}, (_, i) => new TextureCoords(new TextureCoords(0, 0, 64, 16), i * 16, 0, 16, 16));
 
-      test('sits behind the frames of its animation: [playback, hasDurations, cycleDuration, -1]', () => {
+      test('sits behind the frames of its animation: [playback, hasDurations, cycleDuration, -2]', () => {
         const animations = new FrameBasedAnimations();
         animations.add('loop', 1, frames(2));
         animations.add('once', {duration: 0.5, playback: 'once'}, frames(1));
@@ -657,9 +657,9 @@ describe('FrameBasedAnimations', () => {
         expect([texelAt(buffer, 0)[2], texelAt(buffer, 1)[2], texelAt(buffer, 2)[2]], 'the first frame texels').toEqual([
           3, 6, 8,
         ]);
-        expect(texelAt(buffer, 5), 'the second header of loop').toEqual([0, 0, 1, -1]);
-        expect(texelAt(buffer, 7), 'the second header of once').toEqual([1, 0, 0.5, -1]);
-        expect(texelAt(buffer, 12), 'the second header of pingpong: 6 frames of 0.5 s a turn').toEqual([2, 0, 3, -1]);
+        expect(texelAt(buffer, 5), 'the second header of loop').toEqual([0, 0, 1, -2]);
+        expect(texelAt(buffer, 7), 'the second header of once').toEqual([1, 0, 0.5, -2]);
+        expect(texelAt(buffer, 12), 'the second header of pingpong: 6 frames of 0.5 s a turn').toEqual([2, 0, 3, -2]);
       });
 
       test('an animation with durations brings a second texel per frame, its fourth component the end time of the frame', () => {
@@ -676,7 +676,7 @@ describe('FrameBasedAnimations', () => {
           [6, 8, 10, 12].map((index) => texelAt(buffer, index)[3]),
           'the end times of attack',
         ).toEqual([0.25, 0.5, 1.5, 2]);
-        expect(texelAt(buffer, 13), 'the second header of attack').toEqual([0, 1, 2, -1]);
+        expect(texelAt(buffer, 13), 'the second header of attack').toEqual([0, 1, 2, -2]);
       });
 
       test('the second header of a ping-pong with durations counts each end frame once', () => {
@@ -685,7 +685,7 @@ describe('FrameBasedAnimations', () => {
 
         const buffer = animations.bakeDataTexture().image.data as Float32Array;
 
-        expect(texelAt(buffer, 1 + 4 * 2), 'the second header').toEqual([2, 1, 2 * 2.5 - 0.25 - 1, -1]);
+        expect(texelAt(buffer, 1 + 4 * 2), 'the second header').toEqual([2, 1, 2 * 2.5 - 0.25 - 1, -2]);
       });
 
       test('the bake of no animation stays empty', () => {

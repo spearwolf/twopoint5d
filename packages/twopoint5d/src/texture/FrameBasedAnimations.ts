@@ -289,9 +289,12 @@ const readMaxTextureSize = (renderer: WebGPURenderer): number | undefined => {
 // the first component of the second header texel, read by `AnimatedFrames`
 const PLAYBACK_CODE: Record<AnimationPlayback, number> = {loop: 0, once: 1, pingpong: 2};
 
-// the fourth component of a second header texel: no texel of the layout before it carries a
-// negative fourth component, so a reader tells a second header from a frame texel by it
-const SECOND_HEADER_MARK = -1;
+// the fourth component of a second header texel. No texel of the layout before it carries a
+// fourth component below -1: a header carries its texelsPerFrame, a size texel 0, trim margins
+// fractions of 0 to 1 — and the tex coords their `v`, which is negative for a frame with
+// FLIP_VERTICAL (every frame TexturePacker turned) and -1 for one that is as high as its image. A
+// reader tells a second header by a fourth component below -1.5
+const SECOND_HEADER_MARK = -2;
 
 const renderFloatsBuffer = (
   floatsBuffer: Float32Array,
@@ -651,10 +654,12 @@ export class FrameBasedAnimations {
    *   `bottom` of its height, `top` counted from the top — and `0` at every side for an untrimmed
    *   frame of the same bake
    * - the second header texel of an animation, at `first frame texel + frameCount · texelsPerFrame`:
-   *   `[playback, hasDurations, cycleDuration, -1]` — `playback` `0` for `'loop'`, `1` for `'once'`,
+   *   `[playback, hasDurations, cycleDuration, -2]` — `playback` `0` for `'loop'`, `1` for `'once'`,
    *   `2` for `'pingpong'`; `hasDurations` `1` for an animation with `durations`; `cycleDuration` as
-   *   {@link FrameBasedAnimations.animation} answers it; the `-1` marks it, since no texel of a
-   *   header or a frame carries a negative fourth component
+   *   {@link FrameBasedAnimations.animation} answers it; the `-2` marks it. No texel of a header or a
+   *   frame carries a fourth component below `-1`: the `v` of the tex coords is negative for a frame
+   *   with `FLIP_VERTICAL` — every frame TexturePacker turned — and `-1` for one as high as its
+   *   image, but a frame that lies within its image goes no further
    * - `texelsPerFrame` is `3` when a registered frame is trimmed, else `2` when
    *   `includeTextureSize` is set, a registered frame carries `FLIP_DIAGONAL` or an animation has
    *   `durations`, and `1` otherwise — the same for every animation of a bake

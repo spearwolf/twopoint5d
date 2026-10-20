@@ -239,6 +239,31 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
     expect(after, 'the green of the second bake').to.satisfy((c) => isNearColor(c, [0, 255, 0]));
   });
 
+  // In the layout before the second header texel, the texel behind the frames of an animation is the
+  // first frame of the next one. A frame turned as TexturePacker turns it carries FLIP_VERTICAL, and
+  // one as high as its image a `v` of exactly -1 — which must not pass for a second header: read as
+  // one, [1, 0, …] would make the first animation a 'once' and hold its last frame
+  it('plays an animsMap of the old layout as a loop, the next animation starting with a turned frame of the full height', async function () {
+    const data = new Float32Array(8 * 4);
+    const setTexel = (index, values) => data.set(values, index * 4);
+
+    // two headers: two frames at texel 2, a duration of 1; one frame at texel 4
+    setTexel(0, [2, 1, 2, 1]);
+    setTexel(1, [1, 1, 4, 1]);
+    // the red and the green texel of the color map
+    setTexel(2, [0, 0, 0.5, 1]);
+    setTexel(3, [0.5, 0, 0.5, 1]);
+    // the turned frame of the second animation, the whole height of its image
+    setTexel(4, [1, 0, 0.5, -1]);
+
+    const animsMap = new DataTexture(data, 8, 1, RGBAFormat, FloatType);
+    animsMap.needsUpdate = true;
+
+    const rgb = await renderAt(1.25, {texels: [RED, GREEN], animsMap});
+
+    expect(rgb, 'the red of the first frame a quarter into the second run').to.satisfy((c) => isNearColor(c, [255, 0, 0]));
+  });
+
   // bakeDataTexture() builds one row, so only an animsMap built by hand reaches a texel in a second row
   it('reads a frame out of the second row of an animsMap it is handed', async function () {
     const width = 4;

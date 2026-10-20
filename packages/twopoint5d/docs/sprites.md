@@ -158,14 +158,16 @@ same number for the whole texture — and behind them its second header texel:
 | 1 of a frame | `[s, t, u, v]`, the tex coords | always |
 | 2 of a frame | `[width, height, flipDiagonal, endTime]` | `texelsPerFrame` is 2 or 3 |
 | 3 of a frame | `[left, top, right, bottom]`, the trim margins | `texelsPerFrame` is 3 |
-| second header, at `firstFrameTexel + frameCount · texelsPerFrame` | `[playback, hasDurations, cycleDuration, -1]` | always |
+| second header, at `firstFrameTexel + frameCount · texelsPerFrame` | `[playback, hasDurations, cycleDuration, -2]` | always |
 
 The bake writes 3 texels when any frame is trimmed, 2 when any frame is turned, an animation has
 per-frame durations (or `includeTextureSize` is set), and 1 otherwise. A frame without a second
 texel is never turned, one without a third is untrimmed. `playback` is `0` for `'loop'`, `1` for
 `'once'`, `2` for `'pingpong'`; `endTime` is the end of the frame within its animation for an
-animation with durations, `0` otherwise. The `-1` marks the second header: an animsMap built by
-hand without one plays every animation as a loop at one duration. A reader of its own finds the
+animation with durations, `0` otherwise. The `-2` marks the second header — a fourth component
+below `-1.5`, which no texel of a header or a frame reaches: the lowest is the `v` of a frame
+flipped vertically, `-1` for one as high as its image. An animsMap built by hand without second
+headers plays every animation as a loop at one duration. A reader of its own finds the
 frames through `firstFrameTexel` — the frames of a later animation start one texel later per
 animation before it.
 
