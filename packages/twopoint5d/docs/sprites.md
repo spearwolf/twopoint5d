@@ -523,8 +523,10 @@ vertex = vertex + axis · waveAmplitude · weight · sin(phase)
 - **Quad or grid.** On the quad `'top'` is a shear — the two top corners move by the full amount,
   the bottom ones stay. On `gridBase({columns: 1, rows: n})` every row line moves by its own weight,
   halfway up a quarter of the top's amount: the sprite bends. `'uniform'` moves every vertex alike,
-  so take the quad for it. The weight is the base uv's: a pivot moved by `baseArgs` and a trimmed
-  frame weigh as the untrimmed sprite does.
+  so take the quad for it. The weight is the base uv's: a pivot moved by `baseArgs`, an `Anchor` and
+  a trimmed frame weigh as the untrimmed sprite does. It is the top of the image that sways: under
+  `Flip` with `flipY` the image hangs upside down and the bottom of the quad sways — a vine hanging
+  from a ceiling.
 - **`time` is shared** with `AnimatedFrames`: a kind with both holds one `time`, and one
   `setUniform('time', t)` plays the animation and moves the wave.
 - **One wave per kind.** Every form is named `wave`, and `defineSprite()` refuses a second: `a kind
@@ -1368,6 +1370,10 @@ export function frame() {
   lays a sprite. `segmentPlacement({facing: 'camera'})` turns the quad about the segment until its
   face looks at the camera position, brought into the local space of the mesh as for the
   billboards — the 3D case, under a perspective and an orthographic camera alike.
+- **`Anchor`** says where on the image the segment runs: `anchorY` across it — 0.5, the default, the
+  middle of the thickness, 1 the foot of the image, so a plank lies on its rope — and `anchorX` how
+  the caps split — 0 puts the whole of `width` beyond the end, 1 before the start. It mirrors with
+  the image under `Flip`, as everywhere.
 - **Degenerate segments draw something.** A segment shorter than `1e-6` — a new one, which starts
   and ends at the origin — draws its caps quad, `width × height`, along +X in the plane or along the
   right of the camera. A segment along the normal of its plane takes the plane's up as its across.
@@ -1427,9 +1433,12 @@ export function frame() {
   atlas. A mipmapped `colorMap` is sampled with explicit gradients — any `colorMap` whose filters are
   not both `NearestFilter` — so the repeat shows no seam of the smallest mip level at its wraps; the
   smaller mip levels of an atlas still mix neighbouring frames (see "Atlas frames on meshes of one's
-  own"). The art repeats on a column boundary: a frame whose last column leads into its first, as
-  the segment frames of the lookbook's rope bridge do. A trimmed frame is stretched over the quad —
-  pack segment frames untrimmed. The math is the one of `sampleAtlasFrame()`, with `wrap: ['repeat',
+  own"). Under `Flip` with `flipX` the segment shows the mirror image of the unflipped one: the frame
+  mirrored, its repeat counted from the end, so a repeat that is no whole number ends where the
+  unflipped one begins; `flipY` turns the frame upside down across the segment. The art repeats on
+  a column boundary: a frame whose last column leads into its first, as the segment frames of the
+  lookbook's rope bridge do. A trimmed frame is stretched over the quad — pack segment frames
+  untrimmed. The math is the one of `sampleAtlasFrame()`, with `wrap: ['repeat',
   'clamp']`, `trim: 'stretch'` and `inset: 0.5`.
 - **Joins.** Two segments meet in a gap or an overlap on the outside of a bend. Caps of the
   thickness and a round frame hide it for ropes; a mitred ribbon is a mesh of its own.

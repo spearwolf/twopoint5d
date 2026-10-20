@@ -1,4 +1,4 @@
-import {uniform, vec3} from 'three/tsl';
+import {uniform, vec2, vec3, vec4} from 'three/tsl';
 import {type Node, Vector2, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
@@ -23,8 +23,16 @@ interface Values {
 }
 
 // the vertex the mesh stage of `feature` answers for `position`, with the attributes and uniforms given as uniforms
-const waved = (feature: SpriteFeature, position: readonly [number, number, number], values: Values) => {
-  const context = stubShaderContext();
+const waved = (
+  feature: SpriteFeature,
+  position: readonly [number, number, number],
+  values: Values,
+  mirror?: readonly [number, number],
+) => {
+  const context = stubShaderContext({
+    texCoords: vec4(0, 0, 1, 1) as unknown as Node<'vec4'>,
+    ...(mirror != null && {mirror: vec2(...mirror) as unknown as Node<'vec2'>}),
+  });
   const {instancePosition: _position, uv: _uv, ...given} = values;
   const uniforms: Record<string, number> = {waveAmplitude: 1, waveFrequency: 1, waveSpeed: 1, time: 0, ...given};
   return evaluateNode(
@@ -95,6 +103,18 @@ describe('wave()', () => {
     expectClose(at(0), [5, 2, 3]);
     expectClose(at(0.5), [2, 2, 3]);
     expectClose(at(1), [1, 2, 3]);
+  });
+
+  test("'top' sways the top of the image: under a vertical mirror the bottom of the quad, a vine hanging down", () => {
+    const sway = wave({weight: 'top'});
+    const at = (v: number, mirror: readonly [number, number]) =>
+      waved(sway, [0, 0, 0], {instancePosition: [0, 0, 0], uv: [0.5, v], waveAmplitude: 4, time: -0.25}, mirror);
+
+    expectClose(at(1, [0, 1]), [4, 0, 0]);
+    expectClose(at(0, [0, 1]), [0, 0, 0]);
+    expectClose(at(0.5, [1, 1]), [1, 0, 0]);
+    // a mirror left for right changes nothing
+    expectClose(at(0, [1, 0]), [4, 0, 0]);
   });
 
   test("'uniform' moves every vertex along y by the amplitude", () => {

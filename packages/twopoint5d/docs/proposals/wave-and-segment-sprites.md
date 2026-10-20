@@ -13,6 +13,11 @@ now state as built:
 - `evaluateNode()` learns `clamp` besides `step`, `abs` and `min` (§6.1): the frame math clamps;
 - the mipmapped checker and the count of mixed pixels of `texture-atlas-frame-sampling.test.js`
   moved into `test/helpers/fixtures.js`, which they now serve twice;
+- after phase D part 1 (`Flip`, `Anchor`, `SpriteFrameNodes#mirror`) came into the branch:
+  `RepeatingTextureColor` draws the mirror image of the whole segment under `flipX` and `wave({weight:
+  'top'})` sways the top of the image under `flipY` (§2.2, §4.3), and `Anchor` on a segment is
+  defined (§3.4), each with a spec and — for the rope and the anchor — a browser case in
+  `sprites-segments.test.js`; `evaluateNode()` also learns `fract`, varyings and sub-builds;
 - a degenerate segment is drawn in the browser in `'xy'` and facing the camera; `'xz'`, the segment
   along the normal of its plane and the segment that points at the camera are held by the specs of
   `segmentVertex()` alone, all finite.
@@ -112,8 +117,12 @@ vertex = vertex + axis · waveAmplitude · weight · sin(phase)
   up a quarter of the top's amount — a stalk bends. `'uniform'` moves every vertex alike on any
   base; a glyph stays rigid.
 - The weight is the base uv's, so a trimmed frame's foot weighs what the untrimmed sprite's foot
-  weighs, where the trim shift moved it. A pivot moved by `baseArgs` changes nothing: the uv does
-  not move with it.
+  weighs, where the trim shift moved it. A pivot moved by `baseArgs` or `Anchor` changes nothing:
+  the uv does not move with it.
+- **Under `Flip`** the weight is the top of the *image*: with `frame.mirror` (written by `Flip`,
+  [`flip-anchor-nine-slice.md`](flip-anchor-nine-slice.md) §2) `uv.y` is taken as
+  `mix(uv.y, 1 − uv.y, mirror.y)`, so under `flipY` the bottom of the quad sways — a vine hanging from
+  a ceiling. `flipX` changes nothing. A kind without `Flip` builds no node for it.
 
 ### 2.3 With `AnimatedFrames`, passes and placements
 
@@ -277,6 +286,13 @@ normal = dir × across
   facing the camera mirrors into a ribbon that faces the mirror image of the camera, as a mirrored
   billboard does: the camera sees it at twice its height angle above the mirror, thinner the higher
   the camera, edge on at 45°. No pass ships for it; the guide says so.
+- **`Anchor`** is defined, not refused: it moves the unit quad by `(0.5 − anchorX, anchorY − 0.5)`
+  before `QuadSize`, so the placement reads it in the local vertex — `anchorY` says where across the
+  thickness the segment runs (0.5 the middle, 1 the foot of the image: a plank lying on its rope),
+  `anchorX` how the caps split (0 the whole `width` beyond the end, 1 before the start). It mirrors
+  with the image under `Flip`, as `Anchor` does everywhere.
+- **`Flip`** mirrors the frame (`s` and `s + u` swap, `u` and `v` may be negative); the placement does
+  not read the frame. For `RepeatingTextureColor` see §4.3.
 - **No `Rotation`, no `Shear`** (§3.2). `Yaw` and `Orientation` are data and are ignored, as under a
   billboard.
 
@@ -369,6 +385,15 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
   texels on a segment 8 long and 1 thick repeats `(8 / 1) / 4 = 2` times. A frame of no texels
   (the zero frame of a new sprite) holds both measures at `1e-6` and answers `ratio` repeats; its
   lookup moves by nothing across the frame and samples the one texel at its corner, finite.
+- **Under `Flip`** (`u` or `v` negative, `frame.mirror` set): every measure goes through `abs()` and a
+  gradient only changes its sign, so nothing is NaN. Along the segment `flipX` draws the mirror image
+  of the whole unflipped segment: with `frame.mirror` the color source takes the frame back to its
+  unmirrored `s` and `u` along x (`s + u · mirror.x`, `u · (1 − 2 · mirror.x)`) and counts the repeat
+  from the end, `position.x = mix(uv.x, 1 − uv.x, mirror.x) · repeats`. Swapping `s` and `s + u` alone
+  would mirror each repetition in place and start the repeat at the same end: for a repeat that is
+  no whole number the flipped rope would not be the mirror image of the rope. Across, the frame is
+  drawn once, and the swapped `t` and `t + v` of `flipY` turn it upside down as they are. A kind
+  without `Flip` builds no node for the mirror.
 - **`wrap: ['repeat', 'clamp']`**: along the segment the frame repeats, across it is held at its
   edges — no row of the neighbouring repetition bleeds in at the edges of the rope.
 - **`inset: 0.5`**, fixed: a linear sample stays inside the frame and never reads the neighbouring
@@ -493,3 +518,6 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
 13. **Passes that would draw the caps refuse segments**, by name; `SegmentShadowPass` is the shadow
     of segments, named `shadow` (§3.4).
 14. **A duplicate name asks the first feature's `checkKind`** (§2.4), so a second `wave()` names its fix.
+15. **`Flip` mirrors the whole segment** under `RepeatingTextureColor`, the repeat counted from the end
+    (§4.3); `wave({weight: 'top'})` sways the top of the image under `flipY` (§2.2).
+16. **`Anchor` on a segment is defined**: across, where the line runs; along, how the caps split (§3.4).

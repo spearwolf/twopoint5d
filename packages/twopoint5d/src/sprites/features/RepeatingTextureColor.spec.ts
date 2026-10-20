@@ -9,10 +9,18 @@ import {
   type TextureFilter,
   type TextureNode,
   Vector2,
+  Vector3,
 } from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {attributeNamesOf, nodesOf, samplesTexture, stubShaderContext, textureNodesOf} from '../../testing/spriteGraph.js';
+import {
+  attributeNamesOf,
+  evaluateNode,
+  nodesOf,
+  samplesTexture,
+  stubShaderContext,
+  textureNodesOf,
+} from '../../testing/spriteGraph.js';
 import {defineSprite} from '../defineSprite.js';
 import {FeatureSpritesMaterial} from '../FeatureSprites/FeatureSpritesMaterial.js';
 import {QuadBase} from '../SpriteBase.js';
@@ -169,5 +177,55 @@ describe('RepeatingTextureColor', () => {
     const color = RepeatingTextureColor.colorSource!(staged.frame, staged);
 
     expect(attributeNamesOf(color)).toContain('u');
+  });
+
+  describe('under a mirror of the frame — Flip', () => {
+    // a frame of the whole texture, 64 × 16 texels, on a segment `length` long and 1 thick
+    const stAt = (frame: SpriteFrameNodes, x: number, y: number, length = 7) => {
+      const map = filtered(NearestFilter, NearestFilter);
+      const {ctx, sampled} = contextSampling(map, frame);
+      const values: Record<string, Node> = {
+        instancePosition: uniform(new Vector3(0, 0, 0)) as unknown as Node,
+        segmentEnd: uniform(new Vector3(length, 0, 0)) as unknown as Node,
+        quadSize: uniform(new Vector2(0, 1)) as unknown as Node,
+      };
+      const valued = {
+        ...ctx,
+        uv: uniform(new Vector2(x, y)) as unknown as Node<'vec2'>,
+        attribute: <T extends string>(name: string) => values[name] as unknown as Node<T>,
+      };
+      RepeatingTextureColor.colorSource!(valued.frame, valued);
+      return evaluateNode((sampled[0] as unknown as TextureNode).uvNode!) as number[];
+    };
+    // what Flip answers for the whole texture: s and s + u swapped where the mirror is 1
+    const flipped = (flipX: number, flipY: number): SpriteFrameNodes => ({
+      texCoords: vec4(flipX, flipY, 1 - 2 * flipX, 1 - 2 * flipY) as unknown as Node<'vec4'>,
+      flipDiagonal: float(0) as unknown as Node<'float'>,
+      mirror: vec2(flipX, flipY) as unknown as Node<'vec2'>,
+    });
+    const plain: SpriteFrameNodes = {texCoords: vec4(0, 0, 1, 1) as unknown as Node<'vec4'>};
+
+    const expectClose = (actual: number[], expected: number[]) =>
+      actual.forEach((value, i) => {
+        expect(Number.isFinite(value), `component ${i} of [${actual}]`).toBe(true);
+        expect(value, `component ${i} of [${actual}]`).toBeCloseTo(expected[i]!, 6);
+      });
+
+    test('repeats 1.75 times along a segment 7 long: the frame from the start', () => {
+      expectClose(stAt(plain, 0.1, 0.5), [0.175, 0.5]);
+      expectClose(stAt(plain, 0.9, 0.5), [0.575, 0.5]);
+    });
+
+    test('flipped along x draws the mirror image of the whole segment, the repeat counted from its end', () => {
+      // the flipped segment at x shows what the plain one shows at 1 − x — also for a repeat that is no whole number
+      expectClose(stAt(flipped(1, 0), 0.1, 0.25), stAt(plain, 0.9, 0.25));
+      expectClose(stAt(flipped(1, 0), 0.9, 0.25), stAt(plain, 0.1, 0.25));
+      expectClose(stAt(flipped(1, 0), 0.4, 0.25, 8), stAt(plain, 0.6, 0.25, 8));
+    });
+
+    test('flipped along y draws the frame upside down, along both both', () => {
+      expectClose(stAt(flipped(0, 1), 0.1, 0.25), [0.175, 0.75]);
+      expectClose(stAt(flipped(1, 1), 0.1, 0.25), [0.575, 0.75]);
+    });
   });
 });

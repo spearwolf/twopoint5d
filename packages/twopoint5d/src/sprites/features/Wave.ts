@@ -1,4 +1,4 @@
-import {add, mul, sin, sub, vec3} from 'three/tsl';
+import {add, mix, mul, sin, sub, vec3} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {defineFeature, MeshOrder, type SpriteFeature} from '../SpriteFeature.js';
 
@@ -6,7 +6,7 @@ export interface WaveOptions {
   /**
    * `'top'` sways the sprite — grass, flags, seaweed: the top moves by the full amount, the foot
    * stays, weighted by `(1 − uv.y)²` of the base uv, so a sprite on `gridBase()` bends where one on
-   * the quad shears. `'uniform'` moves the whole sprite — the glyphs of a sine scroller.
+   * the quad shears. It is the top of the image: under `flipY` the bottom of the quad sways. `'uniform'` moves the whole sprite — the glyphs of a sine scroller.
    */
   readonly weight: 'top' | 'uniform';
   /** The axis of the mesh the vertices move along: `'x'` for `'top'`, `'y'` for `'uniform'` by default. */
@@ -70,7 +70,7 @@ export function wave(options: WaveOptions): SpriteFeature {
       uniforms: {waveAmplitude: 1, waveFrequency: 1, waveSpeed: 1, time: {value: 0, shared: true}},
       mesh: {
         order: MeshOrder.Offset,
-        transform: (position, {attribute, uniform}) => {
+        transform: (position, {attribute, uniform, frame}) => {
           const instance = attribute<'vec3'>('instancePosition');
           const along = add(instance.x, instance.z);
           const phase = mul(
@@ -79,8 +79,11 @@ export function wave(options: WaveOptions): SpriteFeature {
           );
           let amount = mul(uniform<'float'>('waveAmplitude'), sin(phase));
           if (weight === 'top') {
-            // the square of the height on the base: a linear weight would shear a grid as it shears the quad
-            const height = sub(1, attribute<'vec2'>('uv').y);
+            // the square of the height on the image: a linear weight would shear a grid as it shears
+            // the quad. Upside down — Flip — the top of the image lies at the bottom of the quad, and
+            // that end sways: a vine hanging from a ceiling
+            const down = attribute<'vec2'>('uv').y;
+            const height = sub(1, frame.mirror != null ? mix(down, sub(1, down), frame.mirror.y) : down);
             amount = mul(amount, mul(height, height));
           }
           const offset = axis === 'x' ? vec3(amount, 0, 0) : axis === 'y' ? vec3(0, amount, 0) : vec3(0, 0, amount);

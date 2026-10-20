@@ -1,10 +1,12 @@
 import {expect} from '@esm-bundle/chai';
 import {
+  Anchor,
   AtlasFrame,
   defineFeature,
   defineSprite,
   Display,
   FeatureSprites,
+  Flip,
   InstancePosition,
   QuadBase,
   QuadSize,
@@ -205,6 +207,28 @@ describe('sprites — segments lie along their ends', function () {
       );
     });
 
+    it('with Anchor lays the line of the segment along the anchor of the image and splits the caps by it', async function () {
+      const colorMap = makeColorTexture([WHITE], 1, 1);
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [InstancePosition, SegmentEnd, SegmentPlacement, Anchor, QuadSize, AtlasFrame, TextureColor],
+      });
+      const sprites = new FeatureSprites(kind, {capacity: 1, textures: {colorMap}});
+      disposals.push(() => {
+        sprites.dispose();
+        colorMap.dispose();
+      });
+      const segment = sprites.createSprite();
+      segment.setPosition(-4, -2, 0);
+      segment.setSegmentEnd(4, -2, 0);
+      segment.setSize(2, 2);
+      segment.setTexCoords(0, 0, 1, 1);
+      // the line runs along the foot of the image, and the whole cap lies beyond the end
+      segment.setAnchor(0, 1);
+
+      expectModel(await render(sprites, 'front'), (x, y) => (x >= -4 && x <= 6 && y >= -2 && y <= 0 ? WHITE : BLACK));
+    });
+
     it('draws a segment of no length as its caps quad', async function () {
       const sprites = makeSegments(SegmentPlacement, [WHITE], [{start: [-3, 2, 0], end: [-3, 2, 0], size: [4, 2]}]);
 
@@ -334,8 +358,11 @@ describe('sprites — segments lie along their ends', function () {
       return sprites;
     }
 
-    it('repeats a 64 × 16 frame of an atlas twice along a segment 8 long and 1 thick, no texel of a neighbour drawn', async function () {
-      // a sheet of 128 × 32 in blue, the frame at (32, 8): its left half red, its right half green
+    /**
+     * A sheet of 128 × 32 texels in blue, and in it the frame `rope` of 64 × 16 at (32, 8): its left
+     * half red, its right half green. Disposed after the test.
+     */
+    function makeRopeSheet() {
       const width = 128;
       const height = 32;
       const texels = Array.from({length: width * height}, (_, i) => {
@@ -350,7 +377,12 @@ describe('sprites — segments lie along their ends', function () {
         frames: {rope: {frame: {x: 32, y: 8, w: 64, h: 16}}},
         meta: {image: 'rope.png', size: {w: width, h: height}},
       });
-      const sprites = makeRepeating(RepeatingTextureColor, colorMap, atlas.frame('rope'), [
+      return {colorMap, rope: /** @type {import('@spearwolf/twopoint5d').TextureAtlasFrame} */ (atlas.frame('rope'))};
+    }
+
+    it('repeats a 64 × 16 frame of an atlas twice along a segment 8 long and 1 thick, no texel of a neighbour drawn', async function () {
+      const {colorMap, rope} = makeRopeSheet();
+      const sprites = makeRepeating(RepeatingTextureColor, colorMap, rope, [
         {start: [-4, 2, 0], end: [4, 2, 0], size: [0, 1]},
         // the same rope the other way round: the frame runs from its start
         {start: [4, -2, 0], end: [-4, -2, 0], size: [0, 1]},
@@ -369,6 +401,36 @@ describe('sprites — segments lie along their ends', function () {
           repeated(-2, (x) => 4 - x),
         ),
       );
+    });
+
+    it('draws the mirror image of the rope under Flip, also for a repeat that is no whole number', async function () {
+      const {colorMap, rope} = makeRopeSheet();
+      const kind = defineSprite({
+        base: QuadBase,
+        features: [InstancePosition, SegmentEnd, SegmentPlacement, QuadSize, AtlasFrame, RepeatingTextureColor, Flip],
+      });
+      const sprites = new FeatureSprites(kind, {capacity: 2, textures: {colorMap}});
+      disposals.push(() => sprites.dispose());
+      // 7 long and 1 thick: the frame 1.75 times, ending on its red half
+      for (const [y, flipX] of [
+        [2, 0],
+        [-2, 1],
+      ]) {
+        const segment = sprites.createSprite();
+        segment.setPosition(-3.5, y, 0);
+        segment.setSegmentEnd(3.5, y, 0);
+        segment.setSize(0, 1);
+        segment.setFrame(rope);
+        segment.setFlip(flipX, 0);
+      }
+
+      const plain = (x) => ((x + 3.5) % 4 < 2 ? RED : GREEN);
+      expectModel(await render(sprites, 'front'), (x, y) => {
+        if (Math.abs(x) > 3.5) return BLACK;
+        if (Math.abs(y - 2) <= 0.5) return plain(x);
+        if (Math.abs(y + 2) <= 0.5) return plain(-x);
+        return BLACK;
+      });
     });
 
     it('repeats a mipmapped frame without a seam at its wraps, where a bare fract() shows one', async function () {
