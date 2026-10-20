@@ -248,3 +248,39 @@ smooth shading at native resolution.
 | `cave-back.png` | opaque; deep blue haze brighter towards the middle, faint distant pillars, three pale light shafts falling from the upper left | 0.1 |
 | `cave-mid.png` | transparent between; ceiling with stalactites down to y ≈ 120 and a floor from y ≈ 220, slate blue with a blue rim light `#4a6a9a` on the edges facing the open cave | 0.4 |
 | `cave-front.png` | transparent between; near-black stalactites and rocks at the top and bottom edges, rim `#2a3a5a` | 0.8, or in front of the bridge |
+
+## swaying-grass
+
+| file | format | what |
+| --- | --- | --- |
+| `meadow.png` (128 × 256) + `meadow.json` | free-tex-packer JSON (hash), untrimmed | 18 plants of a night meadow |
+| `meadow-back.png` (512 × 256) | image | the night behind the meadow, seamless horizontally |
+| `meadow-ground.png` (128 × 24) | image | a strip of soil with a grass edge on top, seamless horizontally |
+
+**`meadow.json`** is the layout free-tex-packer-core 0.3.9 writes with its "JSON (hash)" exporter:
+the TexturePacker frame fields plus `"pivot": {"x": 0.5, "y": 0.5}` on every frame (a constant of
+the exporter — *not* the plant's foot), `meta.app` `http://github.com/odrick/free-tex-packer-core`,
+`meta.version` `0.3.9`, a numeric `meta.scale` of `1`, and the frames in packing order. The
+generator packs the plants itself; the same images run through free-tex-packer-core give the same
+fields, sizes and flags, only another packing.
+
+Every plant is a separate image whose **foot is on the bottom row at x = ⌊width / 2⌋** (checked by
+the generator) and which grows upwards — the base of `wave({weight: 'top'})`: anchor the quads at
+the bottom centre. Pixel art, outlined `#08141a`, teal greens lit from the left.
+
+| frames | size | what |
+| --- | --- | --- |
+| `blade-0` … `blade-5` | 9 × 24, 9 × 32, 11 × 40, 11 × 46, 13 × 54, 13 × 62 | single blades, tapering, bending left and right in turn |
+| `tuft-0`, `tuft-1`, `tuft-2` | 20 × 20, 26 × 28, 32 × 36 | blades fanning out of one foot |
+| `daisy` | 13 × 30 | white petals, yellow heart |
+| `poppy` | 13 × 34 | a red cup |
+| `bluebell` | 15 × 32 | three hanging blue bells |
+| `glowcap` | 11 × 36 | a glowing cyan bulb on a stem — tint above 1 for bloom |
+| `lumen-lily` | 15 × 40 | a glowing pink blossom with two leaves — tint above 1 for bloom |
+| `reed-0`, `reed-1`, `reed-2` | 11 × 56, 11 × 64, 13 × 72 | cattails with a leaf |
+| `fern` | 30 × 34 | two curling fronds |
+
+**`meadow-back.png`** — a dithered night sky (deep blue to teal at the horizon), stars, a pale moon
+at (400, 54), two rows of dark hills from y ≈ 125 with a lighter rim, fireflies over the lower half.
+**`meadow-ground.png`** — soil with lighter stones, a wavy grass edge in the top 3–7 rows (clear
+above it).

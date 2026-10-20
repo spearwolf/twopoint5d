@@ -31,12 +31,13 @@ export function texturePackerHash(frames, sheet) {
 /**
  * free-tex-packer's "JSON (hash)" exporter, as free-tex-packer-core 0.3.9 writes it: the
  * TexturePacker layout plus a `pivot` per frame (always the centre), a numeric `scale` and the
- * packer in `meta.app`. Frames in name order, as free-tex-packer sorts them.
+ * packer in `meta.app`. Frames in the order they were packed, which is their order in the sheet,
+ * row by row.
  * @param {PackedFrame[]} frames
  * @param {{image: string, width: number, height: number}} sheet
  */
 export function freeTexPackerHash(frames, sheet) {
-  const sorted = [...frames].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const sorted = [...frames].sort((a, b) => a.y - b.y || a.x - b.x);
   return {
     frames: Object.fromEntries(sorted.map((f) => [f.name, {...frameEntry(f), pivot: {x: 0.5, y: 0.5}}])),
     meta: {
