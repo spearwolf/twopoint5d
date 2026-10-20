@@ -45,6 +45,12 @@ The core features can be roughly classified into the following areas:
   favour of `TextureStore`
 - :heavy_check_mark: api is stable and ready to use
 
+#### 📚 [text](src/text/)
+- read bitmap fonts in the AngelCode BMFont format — text, XML and the JSON of the common
+  converters — into a font and a texture atlas of its glyphs (`BitmapFont`)
+- the guide: [docs/text.md](docs/text.md)
+- :construction: new, the api may still change
+
 #### 📚 [map2d](src/map2d/)
 - create and render tiled maps which are laid out in a 2D spatial grid map data
   structure

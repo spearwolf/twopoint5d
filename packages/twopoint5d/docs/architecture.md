@@ -32,6 +32,7 @@ The stack is strictly bottom-up. A lower layer never imports from a higher one.
 ```
 controls/         input: the pan control
 map2d/            Tiled-style streaming maps
+text/             bitmap fonts, text laid out into sprites
 sprites/          sprite kinds built from features
 stage/            scenes, projections, render pipeline
 display/          canvas, renderer, frame loop
@@ -181,6 +182,14 @@ Where a trimmed frame lies in its untrimmed sprite travels as `texTrim`, the mar
 packer cut off — an instance attribute of `AtlasFrame` and the third texel of a frame in the
 `animsMap` that `AnimatedFrames` reads — and the sprite material moves the corners of the
 quad by them before every local stage.
+
+### `text/`
+
+Text out of bitmap fonts, as sprites of the layer below. `BitmapFont` reads the AngelCode
+BMFont format — the text format, XML by a tokenizer of its own (no `DOMParser`, so it runs
+in Node and in a worker) and the JSON of the common converters — into the metrics of its
+lines, its glyphs and kerning pairs, and a `TextureAtlas` of its page with one untrimmed
+frame per char. A font has one page. The guide is [`docs/text.md`](./text.md).
 
 ### `map2d/`
 
