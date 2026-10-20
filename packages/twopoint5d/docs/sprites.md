@@ -51,7 +51,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 
 The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear
 300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
-and `ColorOrder` (`Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
+and `ColorOrder` (`Palette 50, Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
 your own. Two stages of one order run in the order of the feature list. `ColorOrder.Pass` is the
 band of the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` —
 after every color stage of the kind.
@@ -1278,6 +1278,11 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
   counts as set only once its image has measures. A name is unique across the kind. The textures
   stay the caller's. Until all of them are set the feature drops out of the graph.
+- **`nearestTextures`** — textures, by name, the feature reads texel for texel — its own or
+  another feature's, as `PaletteSwap` names the `colorMap`. The sprites say once on the console,
+  per mesh and texture, when one of them is set with an image and filtered with anything but
+  `NearestFilter` for `magFilter` or `minFilter`; a texture whose image a loader fills in later is
+  judged when `touchTexture()` re-reads it. A name no feature declares is passed over.
 - **`frame`** — the frame slot, at most one feature per kind: answers `texCoords`, and optionally
   `flipDiagonal` and `trim`, read by both pipelines.
 - **`frameStage`** — a stage `{order, transform(frame, ctx)}` on the frame, after the frame slot —

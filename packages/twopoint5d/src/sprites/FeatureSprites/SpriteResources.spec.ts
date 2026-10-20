@@ -1,7 +1,7 @@
 import {createEffect, getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {NearestFilter, Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
-import {afterEach, describe, expect, test} from 'vitest';
+import {LinearFilter, LinearMipmapLinearFilter, NearestFilter, Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
+import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {defineFeature} from '../SpriteFeature.js';
 import {SpriteResources} from './SpriteResources.js';
@@ -241,6 +241,96 @@ describe('SpriteResources', () => {
 
       expect(getSignalsCount()).toBe(signals);
       expect(getEffectsCount()).toBe(effects);
+    });
+  });
+  describe('nearestTextures: the textures a feature reads texel for texel', () => {
+    const swap = defineFeature({name: 'swap', textures: {palette: {}}, nearestTextures: ['colorMap', 'palette', 'unknown']});
+    const nearest = (width = 4, height = 4) => {
+      const texture = withImage(width, height);
+      texture.magFilter = NearestFilter;
+      texture.minFilter = NearestFilter;
+      return texture;
+    };
+    const warnings = () => vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    test('warns once for a texture filtered with anything but NearestFilter, naming the filters, the feature and the fix', () => {
+      const warn = warnings();
+      const resources = new SpriteResources([color, swap], {textures: {colorMap: withImage(4, 4)}}, 'FeatureSprites');
+
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        `FeatureSprites: the texture "colorMap" is filtered with magFilter LinearFilter and minFilter LinearMipmapLinearFilter — feature "swap" reads it texel for texel and needs NearestFilter for both; load it with the texture class 'nearest'`,
+      );
+      resources.setTexture('colorMap', withImage(8, 8));
+      expect(warn).toHaveBeenCalledOnce();
+      resources.dispose();
+    });
+
+    test('says nothing for nearest textures, and checks a texture of the feature itself as well', () => {
+      const warn = warnings();
+      const resources = new SpriteResources([color, swap], {textures: {colorMap: nearest(), palette: nearest(16, 4)}});
+      expect(warn).not.toHaveBeenCalled();
+
+      const linearMin = nearest(16, 4);
+      linearMin.minFilter = LinearMipmapLinearFilter;
+      resources.setTexture('palette', linearMin);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]![0]).toContain(
+        'the texture "palette" is filtered with magFilter NearestFilter and minFilter LinearMipmapLinearFilter',
+      );
+      resources.dispose();
+    });
+
+    test('judges a texture once it has an image: when it is set with one, or touched after it arrived', () => {
+      const warn = warnings();
+      const loading = new Texture();
+      loading.magFilter = LinearFilter;
+      const resources = new SpriteResources([color, swap], {textures: {colorMap: loading}});
+      expect(warn).not.toHaveBeenCalled();
+
+      loading.image = {width: 4, height: 4} as unknown as HTMLImageElement;
+      resources.touchTexture('colorMap');
+      expect(warn).toHaveBeenCalledOnce();
+      resources.dispose();
+    });
+
+    test('a loader that applies nearest along with the image is judged by what it applied', () => {
+      const warn = warnings();
+      const loading = new Texture();
+      const resources = new SpriteResources([color, swap], {textures: {colorMap: loading}});
+      loading.image = {width: 4, height: 4} as unknown as HTMLImageElement;
+      loading.magFilter = NearestFilter;
+      loading.minFilter = NearestFilter;
+      resources.touchTexture('colorMap');
+      expect(warn).not.toHaveBeenCalled();
+      resources.dispose();
+    });
+
+    test('passes over a name no feature declares, and an unset texture', () => {
+      const warn = warnings();
+      const resources = new SpriteResources([swap]);
+      resources.setTexture('palette', undefined);
+      expect(warn).not.toHaveBeenCalled();
+      resources.dispose();
+    });
+
+    test('names a filter it does not know by its number, and warns once when two features name one texture', () => {
+      const warn = warnings();
+      const other = defineFeature({name: 'other', nearestTextures: ['colorMap']});
+      const odd = withImage(4, 4);
+      odd.magFilter = 4242 as typeof NearestFilter;
+      const resources = new SpriteResources([color, swap, other], {textures: {colorMap: odd}});
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]![0]).toContain('magFilter 4242 and minFilter LinearMipmapLinearFilter — feature "swap"');
+      resources.dispose();
+    });
+
+    test('says nothing once disposed', () => {
+      const warn = warnings();
+      const resources = new SpriteResources([color, swap]);
+      resources.dispose();
+      resources.setTexture('colorMap', withImage(4, 4));
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 });
