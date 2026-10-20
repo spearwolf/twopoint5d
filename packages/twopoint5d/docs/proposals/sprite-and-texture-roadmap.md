@@ -601,7 +601,7 @@ Lookbook demos that would carry the phases, one per phase: **"platformer"** (Ase
 directional frames, `ShadowPass`), **"sine scroller"** (bitmap text, `wave()`, `Tint` above 1 and
 bloom, palette cycling), **"rope bridge"** (segment sprites, Verlet in the demo, not the library).
 
-The board can lose the seven done cards of `sprites`, the three closed ideas of `vertex-objects`
+The board can lose the seven done cards of `sprites`, the four closed cards of `vertex-objects`
 and the free-tex-packer card once its fixture exists.
 
 ## 7. Open questions
