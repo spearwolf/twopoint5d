@@ -1,10 +1,23 @@
 # Proposal: `DynamicAtlas`, bitmap fonts and `writeText()`
 
-Status: **specified** — phase E, part 1 of
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Atlases built at run time:
+`DynamicAtlas`", and [`docs/text.md`](../text.md); the fixtures are in
+[`src/text/fixtures/`](../../src/text/fixtures/README.md). Phase E, part 1 of
 [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.11 and §4.12, with decision 6
 of its §7 taken: `writeText()` and `BitmapFont` live in a **new module `text/`** with a
 `public-api.ts` of its own, re-exported from `src/index.ts`. `tableFrame()` and `PaletteSwap`
-(part 2 of phase E) are not part of this proposal.
+(part 2 of phase E) are not part of this proposal. Deviations of the build from the first draft of
+this spec, which the sections below now state as built:
+
+- the union of a draw callback and an image has a name of its own, `DynamicAtlasSource` (§3.1):
+  `redraw()` takes it, and a type in a published signature has to be one a consumer can name
+  (`pnpm checkNameableTypes`);
+- the pen math of §5.2 read as if a kerning pair moved the glyph *after* the pair; a pair moves its
+  second glyph, as BMFont means it, and the section says so now;
+- extrusion copies four strips, not eight (§3.5, §8): left and right first, then top and bottom
+  across the extruded corners, which fills the corners from the corner texels;
+- `src/text/**` is held to a coverage threshold of its own in `vite.config.ts`, 98 on every count,
+  two under what the specs reach.
 
 ## 1. Goal
 
@@ -70,6 +83,9 @@ export type DynamicAtlasDraw = (context: DynamicAtlasContext, width: number, hei
 
 export type DynamicAtlasImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas;
 
+/** What a frame is drawn from. */
+export type DynamicAtlasSource = DynamicAtlasDraw | DynamicAtlasImage;
+
 export interface DynamicAtlasSize {
   width: number;
   height: number;
@@ -108,7 +124,7 @@ export class DynamicAtlas {
 
   add(name: TextureAtlasFrameName, draw: DynamicAtlasDraw, size: DynamicAtlasSize): TextureAtlasFrame;
   add(name: TextureAtlasFrameName, image: DynamicAtlasImage, size?: DynamicAtlasSize): TextureAtlasFrame;
-  redraw(name: TextureAtlasFrameName, source: DynamicAtlasDraw | DynamicAtlasImage): TextureAtlasFrame;
+  redraw(name: TextureAtlasFrameName, source: DynamicAtlasSource): TextureAtlasFrame;
   remove(name: TextureAtlasFrameName): boolean;
   clear(): void;
   dispose(): void;
@@ -389,6 +405,7 @@ export interface TextLayoutGlyph {
 export interface TextLayout {
   /** The visible glyphs in reading order. */
   readonly glyphs: readonly TextLayoutGlyph[];
+  /** An empty text is one empty line, a text ending in `\n` ends in an empty line. */
   readonly lineCount: number;
   /** The width of the widest line and the height of all lines, in mesh units. */
   readonly width: number;
