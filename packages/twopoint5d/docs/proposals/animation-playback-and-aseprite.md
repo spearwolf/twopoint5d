@@ -273,7 +273,7 @@ entry; the guide says to export without them.
   `0 … frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown
   `direction` (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name
   (`… — rename one of them in Aseprite`), and a frame of a tag without a `duration` above 0
-  (`AsepriteJson: the frame "x" carries no duration — Aseprite writes one in ms for every frame`).
+  (`AsepriteJson: the frame "x" carries a duration of 0 — Aseprite writes one in ms above zero for every frame`).
 
 ### 5.3 Frames and slices
 

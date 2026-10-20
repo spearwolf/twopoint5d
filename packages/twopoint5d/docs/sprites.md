@@ -214,6 +214,54 @@ writes the image without an event, so call `touchTexture('animsMap')` once it is
 `DataTexture` already has its image. The animsMap stays the caller's; the material does not
 dispose it.
 
+### Aseprite sheets
+
+`AsepriteJson.parse(json)` reads the json of Aseprite's "Export Sprite Sheet", in the layout
+"Hash" or "Array", and answers the atlas of the frames, the `meta` and a `FrameBasedAnimations`
+with one animation per frame tag:
+
+| `direction` | frames | playback |
+| --- | --- | --- |
+| `forward` | `from` … `to` | `'loop'` |
+| `reverse` | `to` … `from` | `'loop'` |
+| `pingpong` | `from` … `to` | `'pingpong'` |
+| `pingpong_reverse` | `to` … `from` | `'pingpong'` |
+
+The frames keep their durations — as one `duration` when they are all alike, as `durations` when
+they differ. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its frames
+played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1 is a
+one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code instead.
+
+```ts check
+import {AnimatedSpriteKind, AsepriteJson, type AsepriteJsonData, FeatureSprites} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const json: AsepriteJsonData; // fighter.json, exported with the tags idle, walk and kick
+declare const colorMap: Texture; // fighter.png, the sheet
+
+const [, , animations] = AsepriteJson.parse(json, {playback: {kick: 'once'}});
+const animsMap = animations.bakeDataTexture();
+
+const fighters = new FeatureSprites(AnimatedSpriteKind, {capacity: 16, textures: {colorMap, animsMap}});
+const fighter = fighters.createSprite()!;
+fighter.setSize(64, 64);
+fighter.animId = animations.animId('idle');
+
+// on a key press: kick now, and back to idle once the kick has played
+export function kick(now: number) {
+  fighter.animId = animations.animId('kick');
+  fighter.animOffset = -now;
+  fighters.spritePool?.touchVO(fighter, 'anim');
+  return now + animations.animation('kick').cycleDuration;
+}
+```
+
+Export the sheet without "Split Layers" and "Split Tags": the frame indices of a tag are positions
+in the frame list, one entry per frame of the sprite. Every frame's `data` keeps its json entry and
+adds `index` and `slices` — the key of each slice in force at that frame, `{bounds, center?,
+pivot?}` in pixels of the untrimmed frame, `center` and `pivot` relative to `bounds` as Aseprite
+writes them.
+
 ## Uploads: static and dynamic attributes
 
 `update()` of the mesh uploads what the sprite pool marked. Position, rotation and shear are

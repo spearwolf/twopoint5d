@@ -19,6 +19,8 @@
       "!audit.html",
       // image assets, exported by the tools that drew them
       "!**/*.svg",
+      // Aseprite sheet data in the formatting Aseprite writes, see its README
+      "!packages/twopoint5d/fixtures/aseprite/*.json",
       "!.vscode"
     ]
   },

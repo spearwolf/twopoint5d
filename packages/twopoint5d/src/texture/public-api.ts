@@ -1,3 +1,4 @@
+export * from './AsepriteJson.js';
 export * from './AtlasFrameTable.js';
 export * from './FrameBasedAnimations.js';
 export * from './PowerOf2ImageLoader.js';
