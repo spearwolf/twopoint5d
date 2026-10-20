@@ -272,9 +272,13 @@ A pass that wants an order of its own needs a pool of its own; that is not offer
 - Allocation specs: `sortBy(name)` both directions and `sortByKeys()` with an `update()` in the
   round; `sortBy(keyFunction)` with whole-number keys; `sortByViewDepth()` between two cameras set
   up once.
-- `src/sprites/FeatureSprites/sorting.bench.ts`: 10 000 sprites of `TexturedSpriteKind` — `sortBy('y')` of a
-  shuffled pool, of a nearly sorted one (a few sprites moved), of a sorted one; `sortByViewDepth()`;
-  and the `update()` after a sort.
+- `src/sprites/FeatureSprites/sorting.bench.ts`: 10 000 sprites of `TexturedSpriteKind`, a mesh of
+  its own per bench — `sortBy('y')` of a random order (one of 16 orders built beforehand, written
+  into the pool in the `beforeEach` hook, outside the measured call), with and without the
+  `update()` after it, of a nearly sorted pool (ten sprites out of line per call), of a sorted one;
+  `sortByViewDepth()` under a camera circling the cloud. Measured on Node 24: about 0.1 ms in order,
+  0.5 ms with ten out of line, 1.1 ms by the view depth, 1.3 ms from a random order; the `update()`
+  after a sort costs next to nothing beside it — the upload is the gpu's.
 - Browser test `packages/twopoint5d-testing/test/sprites-draw-order.test.js`, under WebGPU and
   WebGL 2: two overlapping half-transparent sprites, red in front, blue behind, on black.
   Back to front (`sortByViewDepth(camera)`) the overlap shows red over blue; front to back

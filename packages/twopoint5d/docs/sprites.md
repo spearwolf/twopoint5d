@@ -1646,8 +1646,9 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
 - A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame
   and `setPreparedFrame()` per sprite.
 - `sortBy()` by a name and `sortByViewDepth()` allocate nothing once their scratch is there —
-  the first sort allocates it, and it grows only with the capacity. 10 000 sprites sort in under
-  0.1 ms when the order holds and in about 1 ms shuffled (`src/sprites/FeatureSprites/sorting.bench.ts`);
+  the first sort allocates it, and it grows only with the capacity. 10 000 sprites sort in about
+  0.1 ms when the order holds, 0.5 ms with ten of them out of line, 1.1 ms by the view depth under a
+  circling camera and 1.3 ms from a random order (`src/sprites/FeatureSprites/sorting.bench.ts`);
   the upload after a sort that moved them is the larger price (see "Draw order: sorting the sprites").
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
