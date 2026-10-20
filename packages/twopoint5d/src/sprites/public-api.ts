@@ -4,6 +4,7 @@ export type {SpriteUniformSource} from './bindings/SpriteUniformSource.js';
 export * from './defineSprite.js';
 export * from './features/AnimatedFrames.js';
 export * from './features/AtlasFrame.js';
+export * from './features/AxisBillboardPlacement.js';
 export * from './features/BillboardPlacement.js';
 export * from './features/Fade.js';
 export * from './features/FlatPlacement.js';

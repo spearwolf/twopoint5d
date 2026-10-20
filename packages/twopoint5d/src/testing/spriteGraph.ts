@@ -67,7 +67,6 @@ interface EvaluableNode {
   readonly isSplitNode?: boolean;
   readonly isOperatorNode?: boolean;
   readonly isMathNode?: boolean;
-  readonly isConditionalNode?: boolean;
   readonly node?: Node;
   readonly value?: number | {toArray(): number[]};
   readonly components?: string;
@@ -132,7 +131,7 @@ export function evaluateNode(root: Node): EvaluatedValue {
   if (node.isOperatorNode && OPERATORS[node.op!] != null) {
     return zip(evaluateNode(node.aNode!), evaluateNode(node.bNode!), OPERATORS[node.op!]!);
   }
-  if (node.isConditionalNode) {
+  if (node.type === 'ConditionalNode') {
     const condition = evaluateNode(node.condNode!);
     return evaluateNode(condition !== 0 ? node.ifNode! : node.elseNode!);
   }

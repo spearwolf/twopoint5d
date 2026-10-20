@@ -39,7 +39,7 @@ fragment: colorSource(frame) ─▶ color stages ─▶ colorNode
 | `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
-| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement` |
+| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
 | `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
@@ -99,6 +99,7 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `GroundPlacement` | — | — | placement | — |
 | `flatPlacement(options)` | — | — | placement | — |
 | `BillboardPlacement` | — | — | placement | — |
+| `AxisBillboardPlacement`, `axisBillboardPlacement(options)` | — | — | placement | — |
 | `Yaw` | `yaw` (static) | `yaw` | — | 0 |
 | `Orientation` | `orientation` (static) | `qx`, `qy`, `qz`, `qw`, `setOrientation()`, `setQuaternion(q)`, `getQuaternion(target?)`, `setYaw(angle)` | — | unturned, `(0, 0, 0, 1)` |
 | `QuadSize` | `quadSize` (static), word `size` | `width`, `height`, `setQuadSize()`, `setSize(w, h)` | local, `Scale` | 0 × 0 |
@@ -490,6 +491,63 @@ shows its back mirrored; the color stage of a feature of your own can tell the b
 `flatPlacement({orientation: 'yaw'})` stands in only for a placement of a kind that holds `Yaw`,
 `flatPlacement({orientation: 'quaternion'})` only for one of a kind that holds `Orientation`; a kind
 that holds both swaps between the two.
+
+### Axis billboards
+
+`BillboardPlacement` is spherical: it lays the quad onto the camera's right and up. Under a 2.5D
+camera that looks down at the scene, a spherical billboard leans back with the camera, and a
+character that stands on the ground seems to float or sink at its feet. An **axis billboard** — a
+cylindrical billboard — turns about an up axis of the mesh to face the camera and stays upright:
+the look of sprites in a 3D world, of Doom, of Paper Mario.
+
+```ts check
+import {
+  AnimatedFrames,
+  AxisBillboardPlacement,
+  axisBillboardPlacement,
+  defineSprite,
+  FeatureSprites,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+
+// upright along +Y of the mesh: the ground is the XZ plane
+const Character = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, AxisBillboardPlacement, QuadSize, AnimatedFrames, TextureColor],
+});
+
+// upright along +Z: for a mesh laid out in the XY plane
+const Marker = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, axisBillboardPlacement({axis: 'z'}), QuadSize, TextureColor],
+});
+
+// the quads stand on their feet: the pivot at the bottom edge
+const characters = new FeatureSprites(Character, {capacity: 64, baseArgs: [0.5, 0.5, 0, 0.5]});
+const markers = new FeatureSprites(Marker, {capacity: 16});
+characters.dispose();
+markers.dispose();
+```
+
+- The x of the local vertex — trimmed, scaled, sheared and turned already — goes onto the level
+  direction across the axis and the direction towards the camera position, `normalize(cross(axis,
+  camera − instancePosition))`; its y goes onto the axis. As for `BillboardPlacement`, the camera
+  position is brought into the local space of the mesh, so a mesh may be moved, turned and scaled
+  evenly; under a perspective camera the sprites at the edge of the view turn towards it.
+- **Straight along the axis** the facing is undefined. Within a sine of 0.1 of the axis — about 6° —
+  the right of the quad turns over to the right of the camera, as `LightFacingPlacement` turns over
+  within a sine of 0.1 of the normal. A sprite seen exactly along its axis is a line either way.
+- `axisBillboardPlacement()` returns one frozen feature per axis; `AxisBillboardPlacement` is
+  `axisBillboardPlacement()`. The two forms are named `axisBillboardPlacement` and
+  `axisBillboardPlacement+z`; an axis other than `'y'` and `'z'` throws a `TypeError`.
+- It brings nothing but its placement stage, so it stands in for `FlatPlacement`, every
+  `flatPlacement()` and `BillboardPlacement` on a live material, and they for it. A kind with `Yaw`
+  or `Orientation` keeps the attribute under it and ignores it.
+- Cost: no data, and per vertex about what `BillboardPlacement` costs — two normalizations, a
+  length and a select.
 
 ## FeatureSprites
 
@@ -889,6 +947,22 @@ see "Binding uniforms to the scene graph" below:
 | `ShadowPass` | `LightFacingPlacement`, `PlanarShadow`, `ShadowMask` | `shadowLight` (`[-0.4, 1, -0.3, 0]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite turned to face the light, projected from `shadowLight` onto `groundPlane` — along a direction towards the light (`w = 0`) or from a point light (`w = 1`) — in `shadowColor`, its alpha multiplied by the alpha of the sprite |
 | `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included — the reflection of a flat sprite |
 | `BillboardReflectionPass` | `MirroredBillboardPlacement`, `MirrorAtPlane`, `Darken` | as `ReflectionPass` | the reflection of a billboard: facing the camera, as large as the sprite on screen, flipped across the mirror — in `reflectionColor` |
+
+Which pass suits which placement:
+
+| placement | shadow | reflection |
+| --- | --- | --- |
+| `FlatPlacement`, `flatPlacement()` | `ShadowPass` — turned to the light; for decals `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` | `ReflectionPass` |
+| `BillboardPlacement` | `ShadowPass` | `BillboardReflectionPass` |
+| `AxisBillboardPlacement`, `axisBillboardPlacement()` | `ShadowPass` | `ReflectionPass` |
+
+`ShadowPass` turns every sprite to the light, whatever its placement, so an axis billboard throws
+the shadow a flat or a spherical one throws. An axis billboard stands along its axis, so in a mirror
+across the axis — the ground, for `'y'` — its mirror image is an upright quad that faces the camera
+level as the sprite does: `ReflectionPass` draws it meeting the sprite at its foot, as large as the
+sprite on screen. `BillboardReflectionPass` would lean that reflection towards the camera while the
+sprite stands upright. In a mirror of another tilt `ReflectionPass` shows the mirror image of the
+card as it stands, as for a flat sprite.
 
 `ShadowPass` carries the hook `shadowFallsOnPlane` (see "Leaving a pass out for a frame" below);
 the two reflections carry none and are drawn whenever they are on. `BillboardReflectionPass` is
