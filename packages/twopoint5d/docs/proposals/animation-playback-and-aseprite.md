@@ -1,9 +1,19 @@
 # Proposal: animation playback, per-frame durations and Aseprite sheets
 
-Status: **specified** — phase B of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md),
-§4.4 and §4.5, with decision 1 of its §7 taken: a **second header texel** per animation. The
-binding spec of the build; once built, the guide [`docs/sprites.md`](../sprites.md) carries the
-rules and this file keeps the reasons.
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Animated frames" and "Aseprite
+sheets", and the fixtures in [`fixtures/aseprite/`](../../fixtures/aseprite/README.md). Phase B of
+[`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.4 and §4.5, with decision 1
+of its §7 taken: a **second header texel** per animation. Deviations of the build from the first
+draft of this spec, which the sections below now state as built:
+
+- the frame of an animation with durations is found by a search that builds the count bit by bit
+  (§4.2), not by a search over `[low, high)`: a step of the latter reads its two bounds three times
+  each, and `Node#traverse()`, which follows every path of a graph, did not come back from 13 such
+  steps — the bitwise step reads the count before it twice;
+- the way back of a ping-pong with durations counts with the same `≤` as the way there; only the
+  exact instant of a boundary on the way back shows the neighbouring frame (§4.2);
+- the test helper `nodesOf()` (`src/testing/spriteGraph.ts`) visits every node once instead of
+  following `Node#traverse()`.
 
 ## 1. Goal
 
