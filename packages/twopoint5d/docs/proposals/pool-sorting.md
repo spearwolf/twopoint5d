@@ -1,6 +1,15 @@
 # Proposal: draw order — sorting a vertex object pool
 
-Status: **specified**
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Draw order: sorting the sprites"
+and "Performance", and [`src/vertex-objects/README.md`](../../src/vertex-objects/README.md), "Sorting
+a pool". Deviations:
+
+- the bench lives beside the sprites, `src/sprites/FeatureSprites/sorting.bench.ts`: it sorts
+  `TexturedSpriteKind`, which the module `vertex-objects/` does not import (§4);
+- the upload price of §2.4 is measured, not estimated: 76 B a sprite of `TexturedSpriteKind`, 60 B of
+  them static;
+- the allocation spec of a key function found that a key of `-0` is boxed as a fractional one is —
+  `-0` is no small integer; the TSDoc of `VOSortKey` and the README say so (§2.2).
 
 Phase F, part 1, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.15, and the
 answer to its open question 5). A pool draws its objects in slot order, and that order is nobody's
@@ -74,9 +83,9 @@ The two types go into `types.ts`, which the module exports as `export type *`.
 
   > `VertexObjectPool#sortBy(): the key function changed usedCount from 10 to 9 — create and free vertex objects before or after the sort, not inside the key function`
 
-  A key function that returns a fractional value may cost a heap number of 16 B per call where V8
-  does not inline it (the rule of `AGENTS.md`); the TSDoc says so and names the property form as the
-  one that never does.
+  A key function that returns a fractional value — or `-0`, which is no small integer either — may
+  cost a heap number of 16 B per call where V8 does not inline it (the rule of `AGENTS.md`); the
+  TSDoc says so and names the property form as the one that never does.
 - **A key array** (`sortByKeys`) is the form for keys computed in bulk — the view depth of
   `FeatureSprites#sortByViewDepth()` (§3.2) is one. An array shorter than `usedCount` is refused
   with a `RangeError` that names both numbers, before anything moves.

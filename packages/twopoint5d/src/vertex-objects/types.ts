@@ -292,8 +292,9 @@ export type VOAttrGetter = {
  * called once per slot in use, in slot order, before anything moves, and must neither create nor
  * free a vertex object of the pool.
  *
- * A key that is a fractional value crossing the call costs a heap number of 16 B wherever V8 does
- * not inline the function; a key read by the name of a value property (`sortBy('y')`) never crosses
+ * A key that is a fractional value crossing the call — or `-0`, which is no small integer either, as
+ * `(vo) => -vo.layer` answers for a layer of 0 — costs a heap number of 16 B wherever V8 does not
+ * inline the function; a key read by the name of a value property (`sortBy('y')`) never crosses
  * a call, and a key array (`sortByKeys()`) is read as it is.
  */
 export type VOSortKey<VOType> = (vo: VOType & VO) => number;
