@@ -9,7 +9,9 @@ import {planeOf} from './bindings/planeOf.js';
 import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
 import {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js';
 import {AtlasFrame, prepareSpriteFrame} from './features/AtlasFrame.js';
-import {flatPlacement} from './features/FlatPlacement.js';
+import {Fade} from './features/Fade.js';
+import {FlatPlacement, flatPlacement} from './features/FlatPlacement.js';
+import {Flash} from './features/Flash.js';
 import {InstancePosition} from './features/InstancePosition.js';
 import {Orientation} from './features/Orientation.js';
 import {QuadSize} from './features/QuadSize.js';
@@ -156,6 +158,30 @@ describe('sprites on the hot path', () => {
     });
 
     expect(bytesPerRound / (all.length * 2)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
+  test('fading and flashing a sprite allocates nothing per call', async () => {
+    const kind = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Fade, Flash],
+    });
+    const sprites = new FeatureSprites(kind, {capacity: 1000});
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+    // the tuple a caller keeps for its flashes, written once
+    const hit: [number, number, number, number] = [1, 0.25, 0.25, 0.75];
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        const sprite = all[i]!;
+        sprite.fade = 0.5;
+        sprite.setFlash(hit);
+        sprite.flashAmount = i & 1;
+      }
+      sprites.update();
+    });
+
+    expect(bytesPerRound / (all.length * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
     sprites.dispose();
   });
 

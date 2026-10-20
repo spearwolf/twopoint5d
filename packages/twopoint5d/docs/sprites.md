@@ -42,12 +42,13 @@ fragment: colorSource(frame) ─▶ color stages ─▶ colorNode
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement` |
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
-| `color` | any, by `order` | `Tint`, `ShadowMask`, `Darken` (passes) |
+| `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
 The order bands `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear 300, Rotate 400`),
 `MeshOrder` (`Offset 100, Project 200, Mirror 300`) and `ColorOrder` (`Tint 100, Mask 150,
-Fade 200, Flash 300`) leave room for stages of your own. Two stages of one order run in the
-order of the feature list.
+Fade 200, Flash 300, Pass 1000`) leave room for stages of your own. Two stages of one order run in
+the order of the feature list. `ColorOrder.Pass` is the band of the color stages a pass brings to
+recolor the sprite as a whole — `ShadowMask`, `Darken` — after every color stage of the kind.
 
 The **trim shift** is no feature. A frame a packer trimmed covers only part of the untrimmed
 sprite; the shift moves each corner of the quad to its corner of that part, measured in the unit
@@ -107,6 +108,8 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time`; texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
+| `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
+| `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)`, `getFlash()` | color, `Flash` | white, amount 0 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -119,6 +122,55 @@ has. `Yaw` and `Orientation` are data alone as well: only a placement of
 already — onto the camera's right and up vectors in the local space of the mesh, so a mesh or its
 parents may be moved, turned and scaled evenly on all axes and its billboards still face the
 camera. A scale that differs from axis to axis skews them.
+
+### Fade and flash
+
+`Fade` multiplies the alpha of a sprite by its `fade`: spawning, dying, fog of war. `Flash` mixes
+its color towards a flash color by `flashAmount`, alpha kept: a hit flash, a freeze tint, a damage
+blink — what `Tint` cannot do, since a tint only multiplies and so only darkens.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  Fade,
+  FeatureSprites,
+  FlatPlacement,
+  Flash,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  Tint,
+} from '@spearwolf/twopoint5d';
+
+const Enemy = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint, Fade, Flash],
+});
+
+const enemies = new FeatureSprites(Enemy, {capacity: 100, transparent: true});
+const enemy = enemies.createSprite();
+if (enemy != null) {
+  enemy.fade = 0.5; // alpha × 0.5
+  enemy.setFlash(1, 1, 1, 0.8); // rgb mixed towards white by 0.8, alpha kept
+  enemy.flashAmount = 0; // the flash is over
+}
+enemies.update();
+enemies.dispose();
+```
+
+- Both attributes are **dynamic** — a fade and a flash change from frame to frame — and every
+  `update()` uploads them. A kind whose sprites fade once takes `attributeUsage: {static:
+  ['fade']}`.
+- A fade between 0 and 1 blends only on a material with `transparent: true`, and the default alpha
+  test drops a sprite faded to 0, as for the alpha of `Tint`.
+- The fourth value of `flash` is a weight, not an alpha: `flashAmount` 0 leaves the sprite as it
+  is, 1 draws it in the flash color. A flash color above 1 is brighter than white and glows under
+  a bloom (see "Glow: emissive sprites with bloom").
+- The passes leave both alone where they should: `ShadowMask` and `Darken` run after them, in
+  `ColorOrder.Pass`, so a fading sprite throws a fading shadow, a flashing one a plain shadow, and
+  its reflection flashes darkened.
 
 ### Frames out of an atlas
 
@@ -598,12 +650,15 @@ which three does without an event — takes `touchTexture('animsMap')` once the 
 ## Writing a feature
 
 A feature is a plain object handed to `defineFeature()`, which checks it on its own and freezes
-it. This one fades a sprite out: an attribute of one value per sprite, `dynamic` because a fade
-changes from frame to frame, a property `fade` on the handle, a start value of 1, and a color
-stage that multiplies the alpha by it.
+it. This one turns a sprite grey — a statue of stone, a frozen enemy, a locked item: an attribute
+of one value per sprite, `dynamic` because it may change from frame to frame, a property
+`grayscale` on the handle, a start value of 0, and a color stage that mixes the color towards its
+luminance. The stage runs at `ColorOrder.Tint - 50`, in the gap before the tint, so a tint colors
+the grey — a statue in blue.
 
 ```ts check
 import {
+  AtlasFrame,
   ColorOrder,
   defineFeature,
   defineSprite,
@@ -614,39 +669,44 @@ import {
   QuadSize,
   TextureColor,
   Tint,
-  AtlasFrame,
 } from '@spearwolf/twopoint5d';
-import {mul, vec4} from 'three/tsl';
+import {luminance, mix, vec3, vec4} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 
-export interface FadeApi {
-  /** 1 draws the sprite as it is, 0 makes it invisible. */
-  fade: number;
+export interface GrayscaleApi {
+  /** 0 draws the sprite in its colors, 1 in grey. */
+  grayscale: number;
 }
 
-export const Fade = defineFeature<FadeApi>({
-  name: 'fade',
-  attributes: {fade: {size: 1, usage: 'dynamic'}},
+export const Grayscale = defineFeature<GrayscaleApi>({
+  name: 'grayscale',
+  attributes: {grayscale: {size: 1, usage: 'dynamic'}},
   initialize() {
-    this.fade = 1;
+    this.grayscale = 0;
   },
   color: {
-    order: ColorOrder.Fade,
+    order: ColorOrder.Tint - 50,
     transform: (color, {attribute}) =>
-      vec4(color.rgb, mul(color.a, attribute<'float'>('fade'))) as unknown as Node<'vec4'>,
+      vec4(mix(color.rgb, vec3(luminance(color.rgb)), attribute<'float'>('grayscale')), color.a) as unknown as Node<'vec4'>,
   },
 });
 
-const FadingSprite = defineSprite({
+const Statue = defineSprite({
   base: QuadBase,
-  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint, Fade],
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Grayscale, Tint],
 });
 
-const sprites = new FeatureSprites(FadingSprite, {capacity: 100, transparent: true});
+const sprites = new FeatureSprites(Statue, {capacity: 100});
 const sprite = sprites.createSprite();
-if (sprite != null) sprite.fade = 0.5;
+if (sprite != null) {
+  sprite.grayscale = 1;
+  sprite.setColorValues(0.6, 0.7, 1, 1);
+}
 sprites.dispose();
 ```
+
+`Fade` and `Flash` are built the same way — `src/sprites/features/Fade.ts` and `Flash.ts` are a
+dozen lines each.
 
 The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
@@ -892,7 +952,10 @@ from the light beyond the vertex. The normal need not be a unit
 vector.
 
 `ShadowPass` keeps the tint of the kind: `ShadowMask` replaces the color anyway, and the alpha of
-the tint fades the shadow along with the sprite. It leaves nothing out, so it draws
+the tint — or a `Fade` — fades the shadow along with the sprite. `ShadowMask` and `Darken` run in
+`ColorOrder.Pass`, after every color stage of the kind, so a `Flash` leaves the shadow as it is and
+flashes the reflection darkened; a color stage of one's own that has to come after them takes an
+order above `ColorOrder.Pass`. `ShadowPass` leaves nothing out, so it draws
 `AnimatedSpriteKind`, which holds no tint, as well. A reflection needs no flip of its own:
 mirroring the placed vertex turns the sprite upside down and keeps the frame where it is.
 

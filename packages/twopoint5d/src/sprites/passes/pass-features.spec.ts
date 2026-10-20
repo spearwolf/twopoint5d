@@ -17,11 +17,11 @@ describe('the pass features', () => {
     expect(PlanarShadow.uniforms).toEqual({shadowLight: [-0.4, 1, -0.3, 0], groundPlane: [0, 1, 0, 0]});
     expect(PlanarShadow.mesh!.order).toBe(MeshOrder.Project);
     expect(ShadowMask.uniforms).toEqual({shadowColor: [0, 0, 0, 0.5]});
-    expect(ShadowMask.color!.order).toBe(ColorOrder.Mask);
+    expect(ShadowMask.color!.order).toBe(ColorOrder.Pass);
     expect(MirrorAtPlane.uniforms).toEqual({mirrorPlane: [0, 1, 0, 0]});
     expect(MirrorAtPlane.mesh!.order).toBe(MeshOrder.Mirror);
     expect(Darken.uniforms).toEqual({reflectionColor: [0.5, 0.5, 0.5, 0.5]});
-    expect(Darken.color!.order).toBe(ColorOrder.Fade);
+    expect(Darken.color!.order).toBe(ColorOrder.Pass);
   });
 
   test('the two placements read the uniforms of the feature they require and declare none', () => {

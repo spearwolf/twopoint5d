@@ -128,5 +128,8 @@ export const LocalOrder = Object.freeze({Anchor: 100, Flip: 150, Scale: 200, She
 /** The order bands of the mesh stages. */
 export const MeshOrder = Object.freeze({Offset: 100, Project: 200, Mirror: 300} as const);
 
-/** The order bands of the color stages. */
-export const ColorOrder = Object.freeze({Tint: 100, Mask: 150, Fade: 200, Flash: 300} as const);
+/**
+ * The order bands of the color stages. `Pass` is the band of the color stages a pass brings to
+ * recolor the sprite as a whole — `ShadowMask`, `Darken` — after every color stage of the kind.
+ */
+export const ColorOrder = Object.freeze({Tint: 100, Mask: 150, Fade: 200, Flash: 300, Pass: 1000} as const);

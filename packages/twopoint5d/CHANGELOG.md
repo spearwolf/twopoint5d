@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add the built-in features `Fade` and `Flash`, the first in the bands `ColorOrder.Fade` and `ColorOrder.Flash`: `Fade` multiplies the alpha by the dynamic `fade` (a new sprite starts at 1), `Flash` mixes the rgb towards the flash color of the dynamic `flash` attribute by `flashAmount`, alpha kept (`flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)`; a new sprite starts white at an amount of 0). The guide's example under "Writing a feature" is now `Grayscale`, a feature the library does not ship
+- add `ColorOrder.Pass` (1000), the band of the color stages a pass brings to recolor the sprite as a whole, after every color stage of the kind
+
+### Changed
+
+- `ShadowMask` and `Darken` run in `ColorOrder.Pass` (were `ColorOrder.Mask` and `ColorOrder.Fade`): a `Flash` no longer turns the shadow of `ShadowPass` into the flash color, and the reflection of `ReflectionPass` and `BillboardReflectionPass` flashes darkened
+
+### Migration Guide
+
+#### A color stage of one's own that ran after `ShadowMask` or `Darken`
+
+`ShadowMask` and `Darken` moved from the orders 150 and 200 to `ColorOrder.Pass` (1000). A color stage of one's own with an order between them that has to run after the mask or the darkening of a pass takes an order above `ColorOrder.Pass`.
+
+**Before**
+
+```ts
+color: {order: ColorOrder.Fade + 10, transform: tintTheShadow}
+```
+
+**After**
+
+```ts
+color: {order: ColorOrder.Pass + 10, transform: tintTheShadow}
+```
+
 ## [0.23.0] - 2026-10-18
 
 The sprite meshes of this release are built from features: `TexturedSprites` and
