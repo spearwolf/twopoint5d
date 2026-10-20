@@ -16,6 +16,7 @@ export * from './features/Rotation.js';
 export * from './features/Shear.js';
 export * from './features/TextureColor.js';
 export * from './features/Tint.js';
+export * from './features/Wave.js';
 export * from './features/Yaw.js';
 export * from './FeatureSprites/FeatureSprites.js';
 export * from './FeatureSprites/FeatureSpritesGeometry.js';

@@ -44,7 +44,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
-| `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
+| `mesh` | any, by `order` | `wave()`; `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | — |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
 | `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
@@ -195,6 +195,7 @@ flags.dispose();
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
+| `wave(options)` | — (uniforms `waveAmplitude`, `waveFrequency`, `waveSpeed`, `time` shared) | — | mesh, `Offset` | — |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -256,6 +257,93 @@ enemies.dispose();
 - The passes leave both alone where they should: `ShadowMask` and `Darken` run after them, in
   `ColorOrder.Pass`, so a fading sprite throws a fading shadow, a flashing one a plain shadow, and
   its reflection flashes darkened.
+
+### Waves: sway and scroller
+
+`wave(options)` moves the placed vertex along an axis of the mesh by a sine of time and of the
+instance position — one stage, two looks. `wave({weight: 'top'})` sways grass, trees, flags and
+seaweed: the top moves, the foot stays. `wave({weight: 'uniform'})` moves the whole sprite: the
+glyphs of a sine scroller, a bobbing row of coins.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  gridBase,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  wave,
+} from '@spearwolf/twopoint5d';
+
+// grass that bends: four rows of cells, each row line moves on its own
+const Grass = defineSprite({
+  base: gridBase({columns: 1, rows: 4}),
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, wave({weight: 'top'})],
+});
+
+// coins that bob along a row, each whole
+const Coin = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, wave({weight: 'uniform'})],
+});
+
+// the foot on the ground: the pivot at the bottom edge
+const meadow = new FeatureSprites(Grass, {
+  capacity: 500,
+  baseArgs: [0.5, 0.5, 0, 0.5],
+  // 6 units at the top, a wave every 40 units, a third of a wave per second
+  uniforms: {waveAmplitude: 6, waveFrequency: 1 / 40, waveSpeed: 1 / 3},
+});
+for (let i = 0; i < 100; i++) {
+  const blade = meadow.createSprite();
+  blade?.setPosition(i * 4, 0, 0);
+  blade?.setSize(8, 32);
+}
+
+const coins = new FeatureSprites(Coin, {capacity: 16, uniforms: {waveAmplitude: 2, waveFrequency: 1 / 64, waveSpeed: 0.5}});
+
+export function frame(seconds: number) {
+  meadow.setUniform('time', seconds);
+  coins.setUniform('time', seconds);
+  meadow.update();
+  coins.update();
+}
+```
+
+```text
+phase  = 2π · (waveFrequency · (x + z of instancePosition) − waveSpeed · time)
+weight = (1 − uv.y)²    for 'top', with uv the base uv: 1 at the top edge, 0 at the foot
+       = 1              for 'uniform'
+vertex = vertex + axis · waveAmplitude · weight · sin(phase)
+```
+
+- **Units.** `waveAmplitude` is in units of the mesh, `waveFrequency` in waves per unit of the mesh,
+  `waveSpeed` in waves per second; the wave runs towards +x at `waveSpeed / waveFrequency` units per
+  second, a negative speed the other way. The three uniforms belong to the kind and start at 1 —
+  set them through `uniforms` or `setUniform()`; `bindUniform()` binds them like any other.
+- **The phase** comes from `x + z` of the instance position, so a field does not sway in lockstep:
+  a row in the XY plane takes it from x, a field on the ground in the XZ plane gets a diagonal
+  front. There is no phase or amplitude per sprite; a kind that needs one writes a mesh stage of its
+  own, as `Banner` under "A grid base" does.
+- **The axis** is `'x'` for `'top'` and `'y'` for `'uniform'`; `wave({weight: 'top', axis: 'z'})`
+  takes another. It is an axis of the mesh, after the placement: wind blows along X whichever way a
+  billboard faces.
+- **Quad or grid.** On the quad `'top'` is a shear — the two top corners move by the full amount,
+  the bottom ones stay. On `gridBase({columns: 1, rows: n})` every row line moves by its own weight,
+  halfway up a quarter of the top's amount: the sprite bends. `'uniform'` moves every vertex alike,
+  so take the quad for it. The weight is the base uv's: a pivot moved by `baseArgs` and a trimmed
+  frame weigh as the untrimmed sprite does.
+- **`time` is shared** with `AnimatedFrames`: a kind with both holds one `time`, and one
+  `setUniform('time', t)` plays the animation and moves the wave.
+- **One wave per kind.** Every form is named `wave`, and `defineSprite()` refuses a second.
+  `wave()` answers one frozen feature per set of options and refuses options without a `weight`,
+  an unknown weight and an unknown axis with a `TypeError`.
+- **Passes** draw the mesh stages of the kind, so a shadow or a reflection sways with its sprite; a
+  pass that wants it still leaves the wave out, `without: ['wave']`.
 
 ### Frames out of an atlas
 
