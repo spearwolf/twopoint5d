@@ -192,7 +192,8 @@ frame's `coords` (`height × width` under `FLIP_DIAGONAL`).
   and on an even width the middle is the left edge of pixel `W / 2`. The fighter of the lookbook's
   platformer — `pivot {x: 32, y: 63}` in a 64 × 64 canvas — gets `(0.5, 1)`, its contract in
   `apps/lookbook/assets-src/README.md`.
-- **Which slice.** `sliceName` names it; without one, the one slice of the frame that has a pivot.
+- **Which slice.** `sliceName` names it — an own key of `slices`, so a member of `Object.prototype`
+  such as `"constructor"` is no slice; without one, the one slice of the frame that has a pivot.
 - **Animations.** `AnimatedFrames` picks the frame on the gpu, so a sprite takes the pivot of one
   frame of its animation — `setAnchorFromPivot(atlas.frame('fighter 0.aseprite'))` when the animation
   starts. A pivot that stays where the ground is across the frames — the rule of an Aseprite canvas,
@@ -259,6 +260,16 @@ export const NineSlice: SpriteFeature<NineSliceApi>; // name 'nineSlice', requir
 
 - Attributes `sliceInsets: {components: ['insetLeft', 'insetTop', 'insetRight', 'insetBottom']}` and
   `sliceScale: {size: 1}`, both static; `initialize()` writes `0, 0, 0, 0` and `1`.
+- **`usageAliases: {texCoords: ['sliceInsets']}`.** `setSliceFrame()` writes the insets with the frame,
+  so they take the frame's way up: `attributeUsage: {dynamic: ['texCoords']}` makes them dynamic with
+  it, and under the default usage they share the one static buffer, which `touchVO(sprite,
+  'texCoords')` marks. The doc comment of `setSliceFrame()` and the guide name
+  `touchVO(sprite, 'texCoords', 'sliceInsets')` for a geometry of other usages. `defineSprite()`
+  refused a second feature's word `texCoords`; the merge of `usageAliases` now opens a word named
+  after an attribute to every feature, when the feature of that attribute declares the word: each
+  adds attributes of its own, in the order of the feature list. A word named after the attribute of
+  a feature that does not declare it, and two declarations of a word that is no attribute, are still
+  refused. In a kind without `AtlasFrame` the word `texCoords` is `NineSlice`'s own.
 - `requires: ['quadSize']`: a nine-slice that is never stretched is a quad.
 
 ### 5.2 `checkKind`

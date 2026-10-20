@@ -11,6 +11,7 @@ import {gridBase} from '../GridBase.js';
 import {QuadBase} from '../SpriteBase.js';
 import {LocalOrder, type SpriteFrameNodes, UvOrder} from '../SpriteFeature.js';
 import {AnimatedFrames} from './AnimatedFrames.js';
+import {FeatureSpritesGeometry} from '../FeatureSprites/FeatureSpritesGeometry.js';
 import {AtlasFrame} from './AtlasFrame.js';
 import {FlatPlacement} from './FlatPlacement.js';
 import {InstancePosition} from './InstancePosition.js';
@@ -122,6 +123,31 @@ describe('NineSlice', () => {
 
     expect([again.insetLeft, again.insetTop, again.insetRight, again.insetBottom, again.sliceScale]).toEqual([0, 0, 0, 0, 1]);
     pool.dispose();
+  });
+
+  describe('the usage of the insets', () => {
+    test('declares the insets part of the word texCoords, which setSliceFrame() writes with them', () => {
+      expect(NineSlice.usageAliases).toEqual({texCoords: ['sliceInsets']});
+      // in the order of the feature list: NineSlice comes before AtlasFrame in this kind
+      expect(kind.usageAliases['texCoords']).toEqual(['sliceInsets', 'texFlipDiagonal', 'texTrim']);
+    });
+
+    test('a geometry that uploads texCoords with every update() uploads the insets with them', () => {
+      const geometry = new FeatureSpritesGeometry(kind, {capacity: 1, attributeUsage: {dynamic: ['texCoords']}});
+      const {descriptor} = geometry.instancedPool;
+
+      expect(descriptor.getAttribute('sliceInsets')!.usageType).toBe('dynamic');
+      expect(descriptor.getAttribute('sliceScale')!.usageType).toBe('static');
+      geometry.dispose();
+    });
+
+    test('touchVO(sprite, "texCoords") marks the buffer of the insets: the static attributes share it', () => {
+      const geometry = new FeatureSpritesGeometry(kind, {capacity: 1});
+      const {descriptor} = geometry.instancedPool;
+
+      expect(descriptor.getAttribute('sliceInsets')!.bufferName).toBe(descriptor.getAttribute('texCoords')!.bufferName);
+      geometry.dispose();
+    });
   });
 
   describe('checkKind', () => {
@@ -394,6 +420,9 @@ describe('NineSlice', () => {
       withSprite(kind, (sprite) => {
         expect(() => sprite.setSliceFrame(kit, 'pivot')).toThrow(
           `setSliceFrame: the slice "pivot" has no center — turn on 9-Slices in Aseprite's slice properties, or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])`,
+        );
+        expect(() => sprite.setSliceFrame(kit, 'constructor')).toThrow(
+          'setSliceFrame: the frame carries no slice "constructor" — its slices are: panel-stone, button-up, pivot',
         );
         expect(() => sprite.setSliceFrame(kit, 'panel')).toThrow(
           'setSliceFrame: the frame carries no slice "panel" — its slices are: panel-stone, button-up, pivot',

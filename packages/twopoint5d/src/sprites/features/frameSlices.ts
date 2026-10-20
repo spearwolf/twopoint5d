@@ -68,7 +68,8 @@ export function sliceOf(
   }
   const {field} = wanted;
   if (name !== undefined) {
-    const slice = slices[name] as AsepriteFrameSlice | undefined;
+    // own keys only: a member of Object.prototype such as "constructor" is no slice
+    const slice = Object.hasOwn(slices, name) ? (slices[name] as AsepriteFrameSlice | undefined) : undefined;
     if (slice == null) throw new Error(`${where}: the frame carries no slice "${name}" — its slices are: ${namesOf(slices)}`);
     if (slice[field] == null)
       throw new Error(`${where}: the slice "${name}" has no ${field} — ${wanted.named}, or ${wanted.fix}`);

@@ -197,7 +197,7 @@ flags.dispose();
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
 | `Flip` | `flip` (static) | `flipX`, `flipY`, `setFlip()` | frame stage, `Flip` | unflipped, 0, 0 |
 | `Anchor` | `anchor` (static) | `anchorX`, `anchorY`, `setAnchor()`, `setAnchorFromPivot(frame, slice?)` | local, `Anchor` | the middle, 0.5, 0.5 |
-| `NineSlice` | `sliceInsets`, `sliceScale` (static) | `insetLeft` … `insetBottom`, `setSliceInsets()`, `sliceScale`, `setSliceFrame(frame, slice?)` | local, `Slice`; uv, `Slice` | no border, scale 1 |
+| `NineSlice` | `sliceInsets`, `sliceScale` (static), `sliceInsets` part of the word `texCoords` | `insetLeft` … `insetBottom`, `setSliceInsets()`, `sliceScale`, `setSliceFrame(frame, slice?)` | local, `Slice`; uv, `Slice` | no border, scale 1 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -426,6 +426,11 @@ dialog.setPosition(16, 200);
   nine-slice frame is packed untrimmed, or the packer cuts into its border — and names the fix for a
   missing slice or center and for insets that are not four numbers of 0 or more. A frame written
   with `setFrame()` is not checked: a trimmed one draws its border cut where the packer cut it.
+- **Uploads.** `sliceInsets` is part of the usage word `texCoords`: a geometry built with
+  `attributeUsage: {dynamic: ['texCoords']}` uploads the insets with the frame on every `update()`.
+  Otherwise mark a later `setSliceFrame()` with `spritePool.touchVO(panel, 'texCoords',
+  'sliceInsets')` — under the default usage both sit in the one static buffer, and `'texCoords'`
+  alone marks them as well.
 - **Borders wider than the panel** shrink in proportion until they meet: the middle vanishes and
   no triangle turns over. Insets wider than the frame shrink in the uv alike.
 - **With the others.** `Anchor` places a panel by any point — `(0, 0)` its top left corner; `Flip`
@@ -1316,8 +1321,12 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   `uv`); the merged layout has to fit into one sprite. An attribute is `static` unless it says
   otherwise: give one that changes every frame `usage: 'dynamic'`.
 - **`usageAliases`** — words a caller of `attributeUsage` may use for attributes of this feature,
-  `{size: ['quadSize']}`. A word is unique across the kind, names only attributes of its own
-  feature, and may be named like one of them (`texCoords` of `AtlasFrame`).
+  `{size: ['quadSize']}`. A word names only attributes of its own feature and may be named like one
+  of them (`texCoords` of `AtlasFrame`). A word is unique across the kind, with one exception: a
+  word named after an attribute whose feature declares it is open to the other features, each adding
+  attributes of its own — `NineSlice` adds `sliceInsets` to `texCoords`, so they travel with the
+  frame `setSliceFrame()` writes them with. A word named after an attribute of a feature that does
+  not declare it is refused.
 - **`methods`** — methods of the sprite handle, `this` being the sprite. Every property the
   attributes generate and every method name is unique across the kind. A method that hands
   fractional values of its caller to a generated setter writes them into a tuple declared once at

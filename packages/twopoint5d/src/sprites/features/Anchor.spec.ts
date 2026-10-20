@@ -162,6 +162,10 @@ describe('Anchor', () => {
           'setAnchorFromPivot: the frame carries no slice "feet" — its slices are: pivot, hitbox',
         );
         expect(() => sprite.setAnchorFromPivot(asepriteFrame({}), 'feet')).toThrow('its slices are: (none)');
+        // a member of Object.prototype is no slice
+        expect(() => sprite.setAnchorFromPivot(asepriteFrame({}), 'toString')).toThrow(
+          'setAnchorFromPivot: the frame carries no slice "toString" — its slices are: (none)',
+        );
         expect([sprite.anchorX, sprite.anchorY]).toEqual([0.5, 0.5]);
       });
     });

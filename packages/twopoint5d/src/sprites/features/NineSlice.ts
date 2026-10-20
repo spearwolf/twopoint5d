@@ -43,6 +43,13 @@ export interface NineSliceApi {
    * one slice of the frame that has a center; or `slice` hands the insets in, four numbers of 0 or more
    * — for a frame of another packer. Every check runs before the first write, and it allocates nothing.
    *
+   * The insets are part of the usage word `texCoords`, so they take the way up the frame takes: written
+   * before the first `update()` after `createSprite()` they reach the gpu with it; a later call is marked
+   * with `spritePool.touchVO(sprite, 'texCoords', 'sliceInsets')` — the static attributes share one
+   * buffer, so `'texCoords'` alone marks them too unless the geometry gives the two other usages — or
+   * uploads with every `update()` in a geometry built with `attributeUsage: {dynamic: ['texCoords']}`,
+   * which makes the insets dynamic along with the frame.
+   *
    * @throws an `Error` for a trimmed frame — a nine-slice frame is packed untrimmed — and naming the
    *   fix for a frame without slices, a slice it does not carry or without a center, and no or several
    *   slices with one; a `TypeError` for a sprite without `AtlasFrame`; a `RangeError` for insets that
@@ -125,6 +132,9 @@ export const NineSlice = defineFeature<NineSliceApi>({
     sliceInsets: {components: ['insetLeft', 'insetTop', 'insetRight', 'insetBottom']},
     sliceScale: {size: 1},
   },
+  // setSliceFrame() writes the insets with the frame: a geometry that uploads the frame with every
+  // update() uploads them as well. The word is the one AtlasFrame names after its attribute
+  usageAliases: {texCoords: ['sliceInsets']},
   methods: {
     setSliceFrame(frame: TextureAtlasFrame<unknown>, slice?: string | Readonly<SliceInsets>) {
       const trim = frameTrimMargins(frame.data, trimScratch);
