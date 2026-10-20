@@ -1,6 +1,16 @@
 # Proposal: GPU picking — which sprite is under the pointer
 
-Status: **specified**
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Picking: which sprite is under
+the pointer" and "Performance", and the browser proofs in
+`packages/twopoint5d-testing/test/sprites-picking.test.js`. Deviations:
+
+- the list is typed `readonly FeatureSprites<any>[]`, not `FeatureSprites<object>[]`: `FeatureSprites`
+  is invariant in its handle type — the `onCreateVO` hook of its pool takes one —, so a mesh of a
+  kind is no `FeatureSprites<object>` (§2);
+- the picker's camera takes the coordinate system of the renderer before every pick; the reversed
+  depth it leaves to the renderer, which marks it and calls its `updateProjectionMatrix()` — a no-op
+  there, the projection is the one handed in (§3.3);
+- a drawing buffer of no pixels counts as one pixel, so the matrix of §3.3 stays finite (§3.3).
 
 Phase F, part 3, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.10, the
 card "sprite picking ?"), and the answer to the open point of [`pool-sorting.md`](pool-sorting.md)
@@ -50,7 +60,7 @@ export class SpritePicker {
    * Draws `sprites` as `camera` sees them into one pixel under `pointer` and answers the sprite
    * nearest to the camera there, or `undefined`.
    */
-  pick<const S extends readonly FeatureSprites<object>[]>(
+  pick<const S extends readonly FeatureSprites<any>[]>(
     camera: Camera,
     pointer: PickPointer,
     sprites: S,
@@ -142,8 +152,8 @@ A camera of the picker's own (a three `Camera`) draws one pixel:
 - **projection**: the projection of `camera` times a matrix that blows the pixel under the pointer
   up to the whole of the one-pixel target. With the drawing buffer of the renderer `W × H` pixels
   (`getDrawingBufferSize()`), the pointer lies in the pixel `i = ⌊(x + 1)/2 · W⌋`, `j = ⌊(y + 1)/2 ·
-  H⌋` (clamped to `W − 1`, `H − 1`), whose centre is `cx = (i + ½)/W · 2 − 1`, `cy = (j + ½)/H · 2 −
-  1`. Then
+  H⌋` (clamped to `W − 1`, `H − 1`; a buffer of no pixels counts as one), whose centre is
+  `cx = (i + ½)/W · 2 − 1`, `cy = (j + ½)/H · 2 − 1`. Then
 
   ```
   P' = | W  0  0  −W·cx |
@@ -159,8 +169,9 @@ A camera of the picker's own (a three `Camera`) draws one pixel:
 - `camera` is prepared as the renderer prepares it before it draws: a camera of another coordinate
   system than the renderer, or without reversed depth under a renderer with a reversed depth buffer,
   is switched and its `updateProjectionMatrix()` called — what the next `render()` would do anyway.
-  The picker's camera takes `coordinateSystem` and `reversedDepth` of the renderer, so the renderer
-  leaves it alone.
+  The picker's camera takes the `coordinateSystem` of the renderer; under a reversed depth buffer the
+  renderer marks it reversed and calls its `updateProjectionMatrix()`, which does nothing — the
+  projection is the one handed in, reversed already.
 - A pointer outside `[-1, 1]²` answers `undefined` without a draw. The pointer is a point of the view
   of `camera`; the snapping uses the drawing buffer of the renderer — for a camera that draws a part
   of the canvas (a viewport of its own) the snapping is off by less than a pixel.

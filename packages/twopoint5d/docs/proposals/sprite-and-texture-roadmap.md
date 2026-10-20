@@ -10,7 +10,8 @@ uv stages, `gridBase()` and shared uniforms, see
 implemented** — sorting a pool, `sortBy()` and `sortByViewDepth()` of the sprites (§4.15, and the
 answer to §7 question 5); see [`pool-sorting.md`](pool-sorting.md). **Phase F, part 2
 implemented** — growing capacity, `grow: true` of the sprites and `VertexObjectPool#adoptVOs()`
-(§4.16); see [`growing-capacity.md`](growing-capacity.md). The rest is an idea, nothing
+(§4.16); see [`growing-capacity.md`](growing-capacity.md). **Phase F, part 3 implemented** —
+GPU picking, `SpritePicker` (§4.10); see [`gpu-picking.md`](gpu-picking.md). The rest is an idea, nothing
 scheduled. A review, not a build plan: it checks the open cards of the
 lists `sprites` and `texture-mapping` (and, since the sprites stand on them, `vertex-objects`)
 of the Trello board `twopoint5d` against the library as of v0.23.0, and proposes what to build
