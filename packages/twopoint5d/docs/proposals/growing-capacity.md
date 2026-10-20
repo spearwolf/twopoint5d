@@ -1,6 +1,10 @@
 # Proposal: growing capacity — sprites that never run out of slots
 
-Status: **specified**
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "FeatureSprites" (growing
+capacity) and "Performance", and [`src/vertex-objects/README.md`](../../src/vertex-objects/README.md),
+"Growing a pool". Deviation: a growth that throws
+throws from `FeatureSpritesGeometry#grown()` before any geometry exists — the constructor allocates
+the buffers or fails —, so there is no half-built geometry to dispose (§2.6).
 
 Phase F, part 2, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.16, the
 second and third bullet — the first, the one-time warning of a full pool, came with phase A,
@@ -128,7 +132,8 @@ At construction, a `TypeError` before anything is built:
 - A disposed mesh answers `undefined` and does not grow.
 - A growth that throws — a typed array of more than the engine allows — throws out of
   `createSprite()` before the meshes switch: the sprites go on drawing the old geometry, every
-  handle still in it. The new geometry is disposed first if it was built.
+  handle still in it. The constructor of the new geometry allocates its buffers or throws, so
+  nothing half-built is left.
 
 ## 3. The core: `VertexObjectPool#adoptVOs(source)`
 
