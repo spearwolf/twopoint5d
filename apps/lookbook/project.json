@@ -18,6 +18,8 @@
         "{projectRoot}/src/**/*.ts",
         "{projectRoot}/src/**/*.astro",
         "{projectRoot}/src/**/*.json",
+        "{projectRoot}/assets-src/**/*.mjs",
+        "{projectRoot}/assets-src/tsconfig.json",
         "{projectRoot}/astro.config.mjs",
         "{projectRoot}/package.json",
         "sharedTsconfigs",

@@ -36,6 +36,7 @@
     "ci:checks": "pnpm run lint && pnpm run build && pnpm run typecheck && pnpm run checkPkgTypes && pnpm run checkNameableTypes && pnpm run lintPkg && pnpm run test:scripts",
     "cbt": "pnpm run ci",
     "lookbook": "pnpm nx dev lookbook",
+    "lookbook:assets": "node apps/lookbook/assets-src/build.mjs",
     "lookbook:generate-previews": "pnpm nx run lookbook:build && node scripts/lookbook/generateDemoPreviews.mjs"
   },
   "devDependencies": {

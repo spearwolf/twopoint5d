@@ -1,0 +1,17 @@
+{
+  "panel-stone": [8, 8, 8, 8],
+  "panel-wood": [7, 7, 7, 7],
+  "panel-parchment": [6, 6, 6, 6],
+  "panel-dark": [5, 5, 5, 5],
+  "button-up": [4, 4, 4, 4],
+  "button-hover": [4, 4, 4, 4],
+  "button-down": [4, 4, 4, 4],
+  "slot": [4, 4, 4, 4],
+  "bar-frame": [3, 3, 3, 3],
+  "bar-fill-red": [0, 1, 0, 1],
+  "bar-fill-blue": [0, 1, 0, 1],
+  "bar-fill-green": [0, 1, 0, 1],
+  "portrait-frame": [6, 6, 6, 6],
+  "tooltip": [3, 3, 3, 3],
+  "divider": [5, 0, 5, 0]
+}

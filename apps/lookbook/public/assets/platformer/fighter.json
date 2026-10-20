@@ -1,0 +1,584 @@
+{
+  "frames": {
+    "fighter 0.aseprite": {
+      "frame": {
+        "x": 74,
+        "y": 2,
+        "w": 24,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 22,
+        "y": 19,
+        "w": 24,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    "fighter 1.aseprite": {
+      "frame": {
+        "x": 39,
+        "y": 54,
+        "w": 24,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 22,
+        "y": 20,
+        "w": 24,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 140
+    },
+    "fighter 2.aseprite": {
+      "frame": {
+        "x": 65,
+        "y": 54,
+        "w": 24,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 22,
+        "y": 20,
+        "w": 24,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 140
+    },
+    "fighter 3.aseprite": {
+      "frame": {
+        "x": 2,
+        "y": 100,
+        "w": 24,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 22,
+        "y": 21,
+        "w": 24,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    "fighter 4.aseprite": {
+      "frame": {
+        "x": 141,
+        "y": 54,
+        "w": 22,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 23,
+        "y": 20,
+        "w": 22,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 5.aseprite": {
+      "frame": {
+        "x": 215,
+        "y": 2,
+        "w": 18,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 26,
+        "y": 19,
+        "w": 18,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 6.aseprite": {
+      "frame": {
+        "x": 173,
+        "y": 2,
+        "w": 19,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 26,
+        "y": 19,
+        "w": 19,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 7.aseprite": {
+      "frame": {
+        "x": 116,
+        "y": 54,
+        "w": 23,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 23,
+        "y": 20,
+        "w": 23,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 8.aseprite": {
+      "frame": {
+        "x": 194,
+        "y": 2,
+        "w": 19,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 26,
+        "y": 19,
+        "w": 19,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 9.aseprite": {
+      "frame": {
+        "x": 235,
+        "y": 2,
+        "w": 18,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 26,
+        "y": 19,
+        "w": 18,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 10.aseprite": {
+      "frame": {
+        "x": 150,
+        "y": 2,
+        "w": 21,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 22,
+        "y": 19,
+        "w": 21,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 80
+    },
+    "fighter 11.aseprite": {
+      "frame": {
+        "x": 2,
+        "y": 54,
+        "w": 35,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 18,
+        "y": 20,
+        "w": 35,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 70
+    },
+    "fighter 12.aseprite": {
+      "frame": {
+        "x": 165,
+        "y": 54,
+        "w": 40,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 16,
+        "y": 21,
+        "w": 40,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 320
+    },
+    "fighter 13.aseprite": {
+      "frame": {
+        "x": 100,
+        "y": 2,
+        "w": 23,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 21,
+        "y": 19,
+        "w": 23,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 90
+    },
+    "fighter 14.aseprite": {
+      "frame": {
+        "x": 125,
+        "y": 2,
+        "w": 23,
+        "h": 45
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 22,
+        "y": 19,
+        "w": 23,
+        "h": 45
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    "fighter 15.aseprite": {
+      "frame": {
+        "x": 85,
+        "y": 100,
+        "w": 21,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 24,
+        "y": 24,
+        "w": 21,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 16.aseprite": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 19,
+        "h": 50
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 26,
+        "y": 12,
+        "w": 19,
+        "h": 50
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 90
+    },
+    "fighter 17.aseprite": {
+      "frame": {
+        "x": 49,
+        "y": 2,
+        "w": 23,
+        "h": 46
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 27,
+        "y": 6,
+        "w": 23,
+        "h": 46
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 90
+    },
+    "fighter 18.aseprite": {
+      "frame": {
+        "x": 108,
+        "y": 100,
+        "w": 45,
+        "h": 33
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 17,
+        "y": 12,
+        "w": 45,
+        "h": 33
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 380
+    },
+    "fighter 19.aseprite": {
+      "frame": {
+        "x": 23,
+        "y": 2,
+        "w": 24,
+        "h": 47
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 25,
+        "y": 15,
+        "w": 24,
+        "h": 47
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 100
+    },
+    "fighter 20.aseprite": {
+      "frame": {
+        "x": 61,
+        "y": 100,
+        "w": 22,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 24,
+        "y": 24,
+        "w": 22,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 140
+    },
+    "fighter 21.aseprite": {
+      "frame": {
+        "x": 207,
+        "y": 54,
+        "w": 28,
+        "h": 43
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 16,
+        "y": 21,
+        "w": 28,
+        "h": 43
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 80
+    },
+    "fighter 22.aseprite": {
+      "frame": {
+        "x": 28,
+        "y": 100,
+        "w": 31,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 11,
+        "y": 24,
+        "w": 31,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 180
+    },
+    "fighter 23.aseprite": {
+      "frame": {
+        "x": 91,
+        "y": 54,
+        "w": 23,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 21,
+        "y": 20,
+        "w": 23,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    }
+  },
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.3.14-x64",
+    "image": "fighter.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 256,
+      "h": 256
+    },
+    "scale": "1",
+    "frameTags": [
+      {
+        "name": "idle",
+        "from": 0,
+        "to": 3,
+        "direction": "pingpong",
+        "color": "#3f9fffff"
+      },
+      {
+        "name": "walk",
+        "from": 4,
+        "to": 9,
+        "direction": "forward",
+        "color": "#5fd35fff"
+      },
+      {
+        "name": "kick",
+        "from": 10,
+        "to": 14,
+        "direction": "forward",
+        "color": "#ff7f3fff"
+      },
+      {
+        "name": "flying-kick",
+        "from": 15,
+        "to": 20,
+        "direction": "forward",
+        "color": "#ff3f6fff"
+      },
+      {
+        "name": "hit",
+        "from": 21,
+        "to": 23,
+        "direction": "forward",
+        "color": "#bf3fffff"
+      }
+    ],
+    "layers": [
+      {
+        "name": "Layer 1",
+        "opacity": 255,
+        "blendMode": "normal"
+      }
+    ],
+    "slices": [
+      {
+        "name": "pivot",
+        "color": "#ff0000ff",
+        "keys": [
+          {
+            "frame": 0,
+            "bounds": {
+              "x": 0,
+              "y": 0,
+              "w": 64,
+              "h": 64
+            },
+            "pivot": {
+              "x": 32,
+              "y": 63
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
