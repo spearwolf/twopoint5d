@@ -1,0 +1,81 @@
+{
+  "about": "Curated ComfyUI sources of the ui-panels portraits. Painted once, kept here; `pnpm lookbook:assets` reads these files and never runs ComfyUI.",
+  "generated": "2026-10-20",
+  "pipeline": [
+    {
+      "step": "text to image",
+      "tool": "~/ai/comfyui/setup/scripts/comfy-anime -s 1024x1024 --seed <seed> \"<tags>\" <out.png> (no --translate: the tags are written by hand)",
+      "workflow": "workflows/anime.api.json",
+      "comfyui": "0.41.0",
+      "checkpoint": "waiIllustriousSDXL_v170.safetensors (WAI-illustrious-SDXL v17.0, CivitAI model 827184 version 2883731, SHA256 f116b0c7…bd04)",
+      "sampler": {
+        "sampler_name": "euler_ancestral",
+        "scheduler": "normal",
+        "steps": 28,
+        "cfg": 6.0,
+        "denoise": 1.0,
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1,
+        "hires": false
+      },
+      "promptSuffix": "masterpiece, best quality, amazing quality",
+      "negative": "bad quality, worst quality, worst detail, sketch, censor, nsfw"
+    },
+    {
+      "step": "remove background",
+      "tool": "~/ai/comfyui/setup/scripts/comfy-remove-background <in.png> <out.png>",
+      "workflow": "workflows/remove-background.api.json",
+      "model": "background_removal/birefnet.safetensors (BiRefNet, Comfy-Org/BiRefNet, SHA256 9ab37426…a154)"
+    },
+    {
+      "step": "store",
+      "tool": "sharp 0.35.4: resize to 512 × 512 (lanczos3), WebP quality 90, alpha quality 100",
+      "why": "the outputs are 96 × 96 crops; 512 pixels keep room for larger crops at a fraction of the size of the 1024 × 1024 PNGs"
+    }
+  ],
+  "files": [
+    {
+      "file": "knight.webp",
+      "seed": 4101,
+      "prompt": "1girl, solo, female knight, silver hair, short hair, blue eyes, plate armor, pauldrons, cape, serious, upper body, portrait, looking at viewer, simple background, white background, fantasy, adult, masterpiece, best quality, amazing quality",
+      "rawSha256": "ec88aa2f53511b909a9754d9567b419b6afc46a3a874b86ea86d0f97defbf577",
+      "curation": "first and only render of this seed; kept"
+    },
+    {
+      "file": "rogue.webp",
+      "seed": 4102,
+      "prompt": "1boy, solo, rogue, hood up, dark green cloak, red scarf, black hair, smirk, scar on cheek, dagger, upper body, portrait, looking at viewer, simple background, white background, fantasy, adult, masterpiece, best quality, amazing quality",
+      "rawSha256": "7e7d11667ce8f73bb4aeaae0968f0a1d00463b638c7ce24996f0a4c2d4f08856",
+      "curation": "first and only render of this seed; kept"
+    },
+    {
+      "file": "witch.webp",
+      "seed": 4103,
+      "prompt": "1girl, solo, witch, purple hair, long hair, witch hat, purple robe, glowing eyes, smile, magic, upper body, portrait, looking at viewer, simple background, white background, fantasy, adult, masterpiece, best quality, amazing quality",
+      "rawSha256": "8f1bb63acd20fdc80f1e7592274da338b48df6e55b681517d81fd2563bf583fa",
+      "curation": "first and only render of this seed; kept"
+    },
+    {
+      "file": "wizard.webp",
+      "seed": 4104,
+      "prompt": "1boy, solo, old man, wizard, long white beard, white hair, blue robe, pointy hat, wise, wrinkles, upper body, portrait, looking at viewer, simple background, white background, fantasy, adult, masterpiece, best quality, amazing quality",
+      "rawSha256": "841fb91f0b5d33a2e6aade88e87e8f8c3eaf829018bd926f96daf6ba09703dfa",
+      "curation": "first and only render of this seed; kept"
+    },
+    {
+      "file": "ranger.webp",
+      "seed": 4105,
+      "prompt": "1girl, solo, elf, pointy ears, blonde hair, braid, green eyes, leather armor, green hood down, quiver, upper body, portrait, looking at viewer, simple background, white background, fantasy, adult, masterpiece, best quality, amazing quality",
+      "rawSha256": "988928fa61f62eaefb0c75a8dcc2c2dc55bc3666bad66d19c48b09b425c906ea",
+      "curation": "first and only render of this seed; kept"
+    },
+    {
+      "file": "barbarian.webp",
+      "seed": 4106,
+      "prompt": "1boy, solo, barbarian, muscular, red hair, braided beard, fur cloak, scar, grin, warrior, upper body, portrait, looking at viewer, simple background, white background, fantasy, adult, masterpiece, best quality, amazing quality",
+      "rawSha256": "ef86551c96105f7a4a79219df321827d037b55be145b68de3e50069efa0e4d48",
+      "curation": "first and only render of this seed; kept"
+    }
+  ]
+}

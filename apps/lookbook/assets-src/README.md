@@ -284,3 +284,62 @@ the bottom centre. Pixel art, outlined `#08141a`, teal greens lit from the left.
 at (400, 54), two rows of dark hills from y ≈ 125 with a lighter rim, fireflies over the lower half.
 **`meadow-ground.png`** — soil with lighter stones, a wavy grass edge in the top 3–7 rows (clear
 above it).
+
+## ui-panels
+
+| file | format | what |
+| --- | --- | --- |
+| `panels.png` (128 × 128) + `panels.json` | TexturePacker hash, **untrimmed** | 15 nine-slice frames |
+| `panels.aseprite.json` | Aseprite hash | the same sheet as an Aseprite UI kit: one frame, one slice with `center` per panel |
+| `panels.insets.json` | JSON | `{"<frame>": [left, top, right, bottom]}` — the insets of every panel |
+| `icons.png` (64 × 128) + `icons.json` | TexturePacker hash | 18 item icons, 12 × 12 |
+| `pixel-8.fnt`, `pixel-8.json`, `pixel-8.png`, `OFL.txt` | BMFont | the white 8 px font, identical to `sine-scroller/` |
+| `portraits/knight.png`, `rogue.png`, `witch.png`, `wizard.png`, `ranger.png`, `barbarian.png` | image, 96 × 96 | anime portraits of a dungeon party, transparent background |
+
+**Panels** — Tiny-Rogue-style pixel art, outlined `#14101a`, the outer corner pixels clear. Insets
+are pixels of the frame, in the order of `NineSlice`'s `setSliceInsets(left, top, right, bottom)`.
+Every panel is drawn from a cross-section, so its edges are the same along their length (checked
+by the generator): stretched, nothing smears. Decorations sit in the corners only.
+
+| frame | size | insets (l, t, r, b) | what |
+| --- | --- | --- | --- |
+| `panel-stone` | 24 × 24 | 8, 8, 8, 8 | stone frame with gold rivets, dark hollow inside `#1e1a26` — inventories, the main window |
+| `panel-wood` | 24 × 24 | 7, 7, 7, 7 | wooden frame with nails, dark wood inside — shops, chests |
+| `panel-parchment` | 24 × 24 | 6, 6, 6, 6 | parchment, light inside `#f2e6c6` — quest text, maps; write on it with a dark tint |
+| `panel-dark` | 24 × 24 | 5, 5, 5, 5 | near-black `#120e1a`, thin gold trim, ruby corners — dialogue boxes |
+| `button-up`, `button-hover`, `button-down` | 24 × 16 | 4, 4, 4, 4 | a raised brass button, lit, pressed (bevel turned round — move its label 1 px down) |
+| `slot` | 20 × 20 | 4, 4, 4, 4 | a sunken inventory slot; a 12 × 12 icon fits its 12 × 12 middle |
+| `bar-frame` | 32 × 10 | 3, 3, 3, 3 | the frame of a bar; its 26 × 4 inside is the empty bar `#0e0c14` |
+| `bar-fill-red`, `bar-fill-blue`, `bar-fill-green` | 8 × 4 | 0, 1, 0, 1 | the fill of a bar: a light top row, a dark bottom row; stretch to the bar's inside (4 high) |
+| `portrait-frame` | 40 × 40 | 6, 6, 6, 6 | a gold frame with ruby corners, **clear inside** — lay it over a portrait |
+| `tooltip` | 16 × 16 | 3, 3, 3, 3 | a small dark box — tooltips, labels, damage numbers |
+| `divider` | 32 × 5 | 5, 0, 5, 0 | a horizontal gold rule with studs at both ends; stretch in x only |
+
+**`panels.aseprite.json`** follows Aseprite's json-hash export of a UI kit drawn on one canvas:
+`frames` holds one frame `"panels 0.aseprite"` covering the whole 128 × 128 sheet (100 ms, no
+tags); `meta.slices` holds one slice per panel, named like its frame, with a single key at frame 0
+whose `bounds` is the panel's rect in the sheet (the same as its `frame` in `panels.json`) and
+whose `center` is the stretchable middle relative to `bounds`: `{x: left, y: top, w: width − left
+− right, h: height − top − bottom}`. The insets follow as `left = center.x`, `top = center.y`,
+`right = bounds.w − center.x − center.w`, `bottom = bounds.h − center.y − center.h`.
+
+**Icons** — 12 × 12, outlined `#1a1220`: `icon-sword`, `icon-axe`, `icon-shield`, `icon-helmet`,
+`icon-potion-red`, `icon-potion-blue`, `icon-potion-green`, `icon-key`, `icon-coin`, `icon-gem`,
+`icon-scroll`, `icon-bomb`, `icon-heart`, `icon-skull`, `icon-ring`, `icon-book`, `icon-torch`,
+`icon-apple`. Drawn as text in `ui-panels/icons.mjs`.
+
+**Portraits** — 96 × 96 RGBA, the head and shoulders, background removed; illustrations, so
+`linear` filtering suits them (also when `DynamicAtlas` packs them at run time). Painted with
+ComfyUI (WAI-illustrious-SDXL v17, then BiRefNet) and curated; the sources are
+`ui-panels/raw/<name>.webp` (512 × 512) and `ui-panels/raw/source.json` records prompt, seed,
+workflow, model and sampler of each. The generator cuts a square around the head (`PORTRAITS` in
+`ui-panels/generate.mjs`) and resizes it with lanczos3.
+
+| file | who |
+| --- | --- |
+| `knight.png` | a silver-haired female knight in plate armour |
+| `rogue.png` | a hooded rogue with a red scarf and a smirk |
+| `witch.png` | a witch with a wide purple hat and glowing eyes |
+| `wizard.png` | an old wizard with a long white beard and a blue hat |
+| `ranger.png` | a blonde elf ranger with a braid |
+| `barbarian.png` | a red-haired, horned barbarian, grinning |
