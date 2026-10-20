@@ -120,7 +120,8 @@ The slots `first` … `last`, the hull of the slots whose object changed, and no
 
 **The price.** A pool sorted every frame whose order changes uploads (about) every buffer in full
 every frame — the static ones included, which otherwise upload only when they are touched. For
-10 000 sprites of `TexturedSpriteKind` that is some 520 KB a frame. The guide says so (§5).
+10 000 sprites of `TexturedSpriteKind` — 76 B each, 60 B of them static — that is 760 KB a frame against
+the 160 KB its dynamic attributes upload anyway. The guide says so (§5).
 
 **Index buffers** stay as they are: the index of a non-instanced geometry repeats `indices` per
 slot, shifted by `vertexCount × slot` (`createIndicesArray()`), and depends on the slot, not on what

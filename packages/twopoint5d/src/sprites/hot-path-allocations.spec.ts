@@ -1,4 +1,4 @@
-import {Color, DirectionalLight, Euler, Object3D, Quaternion} from 'three/webgpu';
+import {Color, DirectionalLight, Euler, Object3D, PerspectiveCamera, Quaternion} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
@@ -270,6 +270,39 @@ describe('sprites on the hot path', () => {
 
     expect(sunBytes / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
     expect(lampBytes / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
+  test('sortByViewDepth() and sortBy() of sprites with a pass, and the update() after them, allocate nothing per call', async () => {
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1000, passes: [ReflectionPass]});
+    for (let i = 0; i < 1000; i++) {
+      // fractional values, written here and read by the sorts straight from the buffer
+      sprites.createSprite()!.setPosition(((i * 7919) % 1000) / 3, ((i * 104729) % 1000) / 7, ((i * 1299709) % 1000) / 9);
+    }
+    // two cameras that see the sprites from opposite sides, set up once: each round turns the order over
+    const front = new PerspectiveCamera(60, 1, 0.1, 1000);
+    front.position.set(0, 0, 500);
+    front.lookAt(0, 0, 0);
+    const back = new PerspectiveCamera(60, 1, 0.1, 1000);
+    back.position.set(0, 0, -500);
+    back.lookAt(0, 0, 0);
+    const descending = {descending: true};
+    sprites.update();
+
+    let moved = 0;
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 10; i++) {
+        if (sprites.sortByViewDepth(front)) moved++;
+        sprites.update();
+        if (sprites.sortByViewDepth(back)) moved++;
+        sprites.update();
+        if (sprites.sortBy('y')) moved++;
+        if (sprites.sortBy('y', descending)) moved++;
+      }
+    });
+
+    expect(moved).toBeGreaterThan(0);
+    expect(bytesPerRound / 60).toBeLessThan(BYTES_PER_CALL_LIMIT);
     sprites.dispose();
   });
 });
