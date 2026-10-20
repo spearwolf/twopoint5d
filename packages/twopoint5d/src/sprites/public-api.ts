@@ -13,6 +13,8 @@ export * from './features/InstancePosition.js';
 export * from './features/Orientation.js';
 export * from './features/QuadSize.js';
 export * from './features/Rotation.js';
+export * from './features/SegmentEnd.js';
+export * from './features/SegmentPlacement.js';
 export * from './features/Shear.js';
 export * from './features/TextureColor.js';
 export * from './features/Tint.js';

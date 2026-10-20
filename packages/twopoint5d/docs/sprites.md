@@ -43,7 +43,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `frameStage` | any, by `order` | — |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
-| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
+| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()`, `SegmentPlacement`, `segmentPlacement()` |
 | `mesh` | any, by `order` | `wave()`; `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | — |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
@@ -184,6 +184,8 @@ flags.dispose();
 | `flatPlacement(options)` | — | — | placement | — |
 | `BillboardPlacement` | — | — | placement | — |
 | `AxisBillboardPlacement`, `axisBillboardPlacement(options)` | — | — | placement | — |
+| `SegmentEnd` | `segmentEnd` (dynamic) | `endX`, `endY`, `endZ`, `setSegmentEnd(x, y, z?)` | — | ends at the origin |
+| `SegmentPlacement`, `segmentPlacement(options)` | — | — | placement | — |
 | `Yaw` | `yaw` (static) | `yaw` | — | 0 |
 | `Orientation` | `orientation` (static) | `qx`, `qy`, `qz`, `qw`, `setOrientation()`, `setQuaternion(q)`, `getQuaternion(target?)`, `setYaw(angle)` | — | unturned, `(0, 0, 0, 1)` |
 | `QuadSize` | `quadSize` (static), word `size` | `width`, `height`, `setQuadSize()`, `setSize(w, h)` | local, `Scale` | 0 × 0 |
@@ -920,6 +922,106 @@ markers.dispose();
 - Cost: no data, and per vertex about what `BillboardPlacement` costs — two normalizations, a
   length and a select.
 
+### Segments: ropes, chains, lasers
+
+A rope, a chain, a laser, a lightning bolt, a tracer, the edge of a graph: a quad stretched from one
+point to another. `SegmentEnd` gives each sprite a second point, and `segmentPlacement()` lays the
+quad from its `instancePosition` to its `segmentEnd` — no position, size or rotation worked out per
+segment on the CPU, and one draw call for every rope of a scene. The physics stays in the game: the
+sprites draw whatever a simulation writes.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  SegmentEnd,
+  SegmentPlacement,
+  segmentPlacement,
+  TextureColor,
+  Tint,
+} from '@spearwolf/twopoint5d';
+
+// a rope in the XY plane: the 2D case
+const Rope = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, SegmentEnd, SegmentPlacement, QuadSize, AtlasFrame, TextureColor],
+});
+
+// a laser in a 3D scene: turned about itself to face the camera
+const Laser = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, SegmentEnd, segmentPlacement({facing: 'camera'}), QuadSize, AtlasFrame, TextureColor, Tint],
+});
+
+const points = Array.from({length: 9}, (_, i) => ({x: i * 16, y: -Math.sin((i / 8) * Math.PI) * 24}));
+const ropes = new FeatureSprites(Rope, {capacity: 64});
+const links = points.slice(1).map(() => {
+  const link = ropes.createSprite()!;
+  link.setSize(4, 4); // 4 thick, caps of 2 beyond each end, so that the links overlap at the joints
+  return link;
+});
+
+const lasers = new FeatureSprites(Laser, {capacity: 16});
+const beam = lasers.createSprite()!;
+beam.setPosition(0, 1, 0);
+beam.setSegmentEnd(0, 1, -40);
+beam.setSize(0.5, 0.5); // round caps of a quarter unit, half a unit thick
+
+export function frame() {
+  // the simulation moved the points; each link runs from one to the next
+  links.forEach((link, i) => {
+    link.setPosition(points[i]!.x, points[i]!.y);
+    link.setSegmentEnd(points[i + 1]!.x, points[i + 1]!.y);
+  });
+  ropes.update(); // both ends are dynamic attributes: every update() uploads them
+  lasers.update();
+}
+```
+
+- **`QuadSize` keeps its meaning.** `height` is the thickness. `width` is the extra length of the
+  caps, half of it beyond each end: `setSize(thickness, thickness)` gives a round frame room to
+  close the rope. Without `QuadSize` the local quad is the unit quad — one unit thick, caps of half
+  a unit.
+- **Where a vertex lies** along the segment is its base `uv.x`, 0 at the start and 1 at the end; its
+  local x — after `QuadSize` — moves it on for the caps, its local y across for the thickness. With
+  `baseArgs` of `[0.5, 0.5, 0.5, 0]` the local x runs from 0 to `width`, and the whole cap sits
+  beyond the end. On `gridBase({columns: n, rows: 1})` every column line lies at its own point of
+  the segment: a strip that a mesh stage of one's own can bend into a lightning bolt.
+- **The facings.** `segmentPlacement()` — `SegmentPlacement` — lays the segment into the XY plane of
+  the mesh, its thickness to the left of its direction: a segment from left to right shows its frame
+  upright and faces +Z, as a flat sprite does. `segmentPlacement({plane: 'xz'})` lays it onto the
+  ground: a segment along +X shows the top of its frame towards −Z and faces +Y, as `GroundPlacement`
+  lays a sprite. `segmentPlacement({facing: 'camera'})` turns the quad about the segment until its
+  face looks at the camera position, brought into the local space of the mesh as for the
+  billboards — the 3D case, under a perspective and an orthographic camera alike.
+- **Degenerate segments draw something.** A segment shorter than `1e-6` — a new one, which starts
+  and ends at the origin — draws its caps quad, `width × height`, along +X in the plane or along the
+  right of the camera. A segment along the normal of its plane takes the plane's up as its across.
+  A segment that points at the camera turns its across over to the camera's up within a sine of 0.1,
+  as an axis billboard turns its right, and draws the line it is from there. Nothing is NaN.
+- **No `Rotation`, no `Shear`.** A segment lies along its ends whatever its local quad does, so
+  `defineSprite()` refuses either next to a segment placement — `a segment lies along its ends, so
+  it cannot follow the local stage of "rotation" — move the ends instead, and take Rotation out of
+  the kind`. `Yaw` and `Orientation` are data and are ignored, as under a billboard.
+- **Swaps.** The three forms — named `segmentPlacement`, `segmentPlacement+xz` and
+  `segmentPlacement+camera` — bring nothing but their placement stage and their check, so they stand
+  in for each other on a live material. A flat placement or a billboard may stand in for one too,
+  and draws the quad of `QuadSize` at the start of each segment — rarely what a rope wants.
+  `segmentPlacement()` refuses a facing or a plane it does not know, and a `plane` next to
+  `facing: 'camera'`, with a `TypeError`.
+- **Joins.** Two segments meet in a gap or an overlap on the outside of a bend. Caps of the
+  thickness and a round frame hide it for ropes; a mitred ribbon is a mesh of its own.
+- **Passes.** `ShadowPass` turns every sprite to the light about its instance position — for a
+  segment, the quad of its caps at its start. A kind of segments projects the segment as it lies
+  with `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`; `ReflectionPass` mirrors
+  the placed vertex and works as it is.
+- **Cost.** 12 bytes per sprite for the end, uploaded with every `update()`; per vertex two lengths
+  and two divisions in the plane, a cross product and a dot product more facing the camera.
+
 ## FeatureSprites
 
 `FeatureSprites` is the mesh of a kind: a `VertexObjects` that builds the `FeatureSpritesGeometry`
@@ -1477,6 +1579,7 @@ Which pass suits which placement:
 | `FlatPlacement`, `flatPlacement()` | `ShadowPass` — turned to the light; for decals `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` | `ReflectionPass` |
 | `BillboardPlacement` | `ShadowPass` | `BillboardReflectionPass` |
 | `AxisBillboardPlacement`, `axisBillboardPlacement()` | `ShadowPass` | `ReflectionPass` |
+| `SegmentPlacement`, `segmentPlacement()` | `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` — the segment projected as it lies | `ReflectionPass` |
 
 `ShadowPass` turns every sprite to the light, whatever its placement, so an axis billboard throws
 the shadow a flat or a spherical one throws. An axis billboard stands along its axis, so in a mirror
