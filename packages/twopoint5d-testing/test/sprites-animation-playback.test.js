@@ -176,6 +176,46 @@ describe('sprites — AnimatedFrames plays once, ping-pong and per-frame duratio
     expect(shown).to.deep.equal([0, 1, 2, 3, 3, 2, 2, 1, 1, 0]);
   });
 
+  it('per-frame durations run backwards in their cycle before time + animOffset reaches 0', async function () {
+    // 2 s a run: -0.1 lies 1.9 s into the run before, -1.9 at 0.1 s
+    const loop = await framesShown({
+      animations: [{name: 'attack', timing: {durations: [0.25, 0.25, 1, 0.5]}, frames: [0, 1, 2, 3]}],
+      draw: 'attack',
+      animOffset: -10,
+      times: [9.9, 8.1, 10.3],
+    });
+    // a turn of 3.75 s: -0.2 lies 3.55 s into it, on the way back over frame 1
+    const pingpong = await framesShown({
+      animations: [{name: 'breathe', timing: {durations: [0.25, 0.5, 0.75, 1], playback: 'pingpong'}, frames: [0, 1, 2, 3]}],
+      draw: 'breathe',
+      times: [-0.2, -3.7],
+    });
+
+    expect(loop, 'the loop').to.deep.equal([3, 0, 1]);
+    expect(pingpong, 'the ping-pong').to.deep.equal([1, 0]);
+  });
+
+  it("'pingpong' with durations over one frame shows that frame", async function () {
+    const shown = await framesShown({
+      animations: [{name: 'still', timing: {durations: [0.5], playback: 'pingpong'}, frames: [2]}],
+      draw: 'still',
+      times: [-0.3, 0.1, 0.6, 5],
+    });
+
+    expect(shown).to.deep.equal([2, 2, 2, 2]);
+  });
+
+  it("'pingpong' with durations over two frames alternates them, each at its own time", async function () {
+    // a turn of 2 · 1 − 0.25 − 0.75 = 1 s: frame 0 for 0.25 s, frame 1 for 0.75 s
+    const shown = await framesShown({
+      animations: [{name: 'blink', timing: {durations: [0.25, 0.75], playback: 'pingpong'}, frames: [0, 1]}],
+      draw: 'blink',
+      times: [0.1, 0.3, 0.9, 1.1, 1.3, -0.1],
+    });
+
+    expect(shown).to.deep.equal([0, 1, 1, 0, 1, 1]);
+  });
+
   it('every animation of a bake keeps its own playback, behind one with durations', async function () {
     const animations = [
       {name: 'attack', timing: {durations: [0.25, 0.75]}, frames: [3, 2]},

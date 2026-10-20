@@ -462,7 +462,10 @@ sheet trimmed. `biome.jsonc` leaves the folder out: the files keep Aseprite's ow
 - Browser, `sprites-animation-playback.test.js` (WebGPU and WebGL 2): `'once'` holds the last frame
   and shows the first before its start; `'pingpong'` over 4 frames at the 6 positions of a cycle;
   per-frame durations land on the right frame at each side of a boundary; ping-pong with durations
-  on the way back; the old-layout map of `sprites-animated-material.test.js` still passes.
+  on the way back; durations before `time + animOffset` reaches 0, in a loop and a ping-pong;
+  ping-pong with durations over 1 and over 2 frames; the old-layout map of
+  `sprites-animated-material.test.js` still passes, and so does one whose next animation starts
+  with a turned frame as high as its image (`v = −1`).
 - Browser, `texture-aseprite-sheet.test.js`: the hash fixture through `TextureStore` (`atlasUrl`
   on the dev server, the image a canvas data url as `overrideImageUrl`), the `kick` tag drawn
   before, during and after its run.
