@@ -1,6 +1,19 @@
 # Proposal: `Fade` and `Flash`, axis billboards, a loud full pool, free-tex-packer and the glow recipe
 
-Status: **specified**. Phase A of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md)
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Fade and flash", "Axis
+billboards", the table of passes for each placement under "Passes: shadows and reflections",
+"FeatureSprites", "Frames out of an atlas" and "Glow: emissive sprites with bloom". Deviations:
+
+- `FlashApi` declares the component properties and `setFlash()`, not the generated getter: the
+  sprite handle carries `getFlash()` at run time, untyped, as it carries the getters of `QuadSize`
+  or `Orientation` (§2.2);
+- the vertex of the axis billboard is built by an internal module of its own,
+  `features/axisBillboardVertex.ts`, so that the public API of `AxisBillboardPlacement.ts` stays the
+  factory, its options and the constant (§3.2);
+- the glow test draws the stage once without the bloom as well, a control that the sprite alone
+  lights nothing beside it (§6.4).
+
+Phase A of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md)
 (§4.1, §4.2, §4.16 first bullet, §3.2 free-tex-packer, §4.13 steps 1–2): five small additions,
 none of which changes the model. Where the roadmap sketch is wrong about the code, the section
 says what holds; §9 collects those corrections.
