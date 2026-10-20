@@ -75,6 +75,7 @@ describe('shared uniforms', () => {
     [{value: 'x', shared: true}, '{"value":"x","shared":true}'],
     [{value: 0, shared: 'yes'}, '{"value":0,"shared":"yes"}'],
     [{shared: true}, '{"shared":true}'],
+    ['fast', 'fast'],
   ])('refuses the malformed declaration %j', (declaration, shown) => {
     expect(() => collect(declaring('odd', declaration as never))).toThrow(
       `test: feature "odd" starts the uniform "time" with ${shown}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`,

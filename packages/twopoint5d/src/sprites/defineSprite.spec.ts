@@ -381,5 +381,18 @@ describe('defineSprite()', () => {
       );
       expect(error?.cause).toBe(cause);
     });
+
+    test('a throw of something that is no Error is refused in its string form', () => {
+      const picky = defineFeature({
+        name: 'picky',
+        checkKind: () => {
+          throw 'needs a grid base';
+        },
+      });
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, picky]})).toThrow(
+        'defineSprite: feature "picky": needs a grid base',
+      );
+    });
   });
 });
