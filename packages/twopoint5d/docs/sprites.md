@@ -47,7 +47,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | — |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
-| `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
+| `color` | any, by `order` | `PaletteSwap`, `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
 The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear
 300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
@@ -196,6 +196,7 @@ flags.dispose();
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
+| `PaletteSwap`, `paletteSwap(options)` | `paletteRow` (static); uniforms `paletteShift`, `paletteCycle`; texture `palette` | `paletteRow` | color, `Palette` | row 0 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -626,6 +627,68 @@ export function frame(time: number) {
   Straight above the sprite the camera sees the front view.
 - The camera is the one that renders: a `ShadowPass` and a `ReflectionPass` show the view the camera
   sees, as the games of the genre do. A frame stage runs after the view is picked.
+
+### Palette swap and colour cycling
+
+Team colours, enemy variants — the red goblin and the blue goblin from one sheet — and the colour
+cycling of Deluxe Paint waterfalls. `PaletteSwap` draws each sprite in a row of a **palette**: a small
+image, row 0 the source colours, every row below a replacement set of the same length. Ordinary RGBA
+images, no indexed PNG.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  PaletteSwap,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  TextureFactory,
+} from '@spearwolf/twopoint5d';
+
+// nearest, so every texel keeps its exact colour; upright, as every image of the library
+const factory = new TextureFactory(0, ['nearest']);
+const colorMap = await factory.loadAsync('platformer/goblin.png');
+const palette = await factory.loadAsync('platformer/goblin-palette.png'); // 16 × 4: olive, red, blue, green
+
+const Goblin = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, PaletteSwap],
+});
+const goblins = new FeatureSprites(Goblin, {capacity: 32, textures: {colorMap, palette}});
+
+const red = goblins.createSprite()!;
+red.paletteRow = 1;
+const blue = goblins.createSprite()!;
+blue.paletteRow = 2;
+
+// colour cycling — the chrome font runs its entries 1 … 15 through the letters
+export function cycle(time: number) {
+  goblins.setUniform('paletteCycle', 1, 15);
+  goblins.setUniform('paletteShift', time * 12);
+}
+```
+
+- **The match.** A color stage in the band `ColorOrder.Palette` (50), before `Tint` — a tint, a fade
+  and a flash act on the swapped colours — compares the colour of the color source with the first 16
+  entries of row 0 (`paletteSwap({colors: n})` for 1 to 64) and draws it with that entry of the
+  sprite's `paletteRow`, its alpha kept. The first entry it matches wins; a colour no entry holds stays
+  as it is. A `paletteRow` past the last row draws the last.
+- **Exact colours.** The comparison allows `1/512` per channel, the rounding of 8-bit texels and no
+  more. So the `colorMap` is read with `NearestFilter` and no mipmaps — a linear filter blends
+  neighbouring texels into colours of no palette —, has no premultiplied edges, and lies in the same
+  colour space as the `palette` (both `srgb`, or both none). `PaletteSwap` names the `colorMap` in
+  `nearestTextures`, so the sprites say once on the console when it is filtered otherwise.
+- **Colour cycling.** `paletteCycle` `(first, count)` names the entries that cycle — `count` 0, the
+  default, to the end of the palette — and `paletteShift` how far, in whole steps: a colour of entry
+  `i` in the range is drawn with entry `first + ((i − first + floor(paletteShift)) mod count)` of its
+  row. Both are uniforms, one value per mesh; sprites that cycle differently live in meshes of their
+  own.
+- **The cost.** Every fragment reads `colors + 1` texels of the palette: 17 for the default.
+- The palette is read with `flipY = false`, row 0 at the top; it stays the caller's, as every texture.
 
 ## Uploads: static and dynamic attributes
 

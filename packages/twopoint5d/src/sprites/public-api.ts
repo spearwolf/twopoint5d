@@ -11,6 +11,7 @@ export * from './features/FlatPlacement.js';
 export * from './features/Flash.js';
 export * from './features/InstancePosition.js';
 export * from './features/Orientation.js';
+export * from './features/PaletteSwap.js';
 export * from './features/QuadSize.js';
 export * from './features/Rotation.js';
 export * from './features/Shear.js';
