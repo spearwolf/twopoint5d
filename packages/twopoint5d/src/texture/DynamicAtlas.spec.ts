@@ -371,6 +371,28 @@ describe('DynamicAtlas', () => {
       expect(atlas.add('a', noop, {width: 10, height: 8}).data?.frame).toEqual({x: 1, y: 1, w: 10, h: 8});
     });
 
+    test('a throwing callback on a shelf in use gives its place on the shelf back', () => {
+      const {atlas} = atlasOn(64, 32);
+      atlas.add('a', noop, {width: 10, height: 8});
+      expect(() =>
+        atlas.add(
+          'b',
+          () => {
+            throw new Error('nope');
+          },
+          {width: 10, height: 8},
+        ),
+      ).toThrow('nope');
+      expect(atlas.add('c', noop, {width: 10, height: 8}).data?.frame).toEqual({x: 12, y: 1, w: 10, h: 8});
+    });
+
+    test('a full atlas counts the frames packed into it', () => {
+      const {atlas} = atlasOn(16, 16);
+      atlas.add('a', noop, {width: 6, height: 14});
+      atlas.add('b', noop, {width: 6, height: 14});
+      expect(() => atlas.add('c', noop, {width: 6, height: 6})).toThrow('beside the 2 frames packed into it');
+    });
+
     test('a throwing callback that opened a shelf gives the shelf back', () => {
       const {atlas} = atlasOn(64, 32);
       atlas.add('a', noop, {width: 10, height: 4});

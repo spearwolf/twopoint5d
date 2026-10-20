@@ -16,6 +16,9 @@ export type DynamicAtlasDraw = (context: DynamicAtlasContext, width: number, hei
 /** An image a {@link DynamicAtlas} draws a frame from. */
 export type DynamicAtlasImage = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas;
 
+/** What a frame of a {@link DynamicAtlas} is drawn from: a draw callback or an image. */
+export type DynamicAtlasSource = DynamicAtlasDraw | DynamicAtlasImage;
+
 /** The size of a frame of a {@link DynamicAtlas}, in texels; rounded up to whole texels. */
 export interface DynamicAtlasSize {
   width: number;
@@ -57,8 +60,6 @@ interface FrameRect {
   readonly w: number;
   readonly h: number;
 }
-
-type FrameSource = DynamicAtlasDraw | DynamicAtlasImage;
 
 const WHERE = 'DynamicAtlas';
 
@@ -239,7 +240,7 @@ export class DynamicAtlas {
    */
   add(name: TextureAtlasFrameName, draw: DynamicAtlasDraw, size: DynamicAtlasSize): TextureAtlasFrame;
   add(name: TextureAtlasFrameName, image: DynamicAtlasImage, size?: DynamicAtlasSize): TextureAtlasFrame;
-  add(name: TextureAtlasFrameName, source: FrameSource, size?: DynamicAtlasSize): TextureAtlasFrame {
+  add(name: TextureAtlasFrameName, source: DynamicAtlasSource, size?: DynamicAtlasSize): TextureAtlasFrame {
     this.#assertAlive('add()');
     if (this.#atlas.frameId(name) !== undefined) {
       throw new Error(
@@ -274,7 +275,7 @@ export class DynamicAtlas {
    *
    * @throws {Error} for a name the atlas does not hold, and once the atlas is disposed.
    */
-  redraw(name: TextureAtlasFrameName, source: FrameSource): TextureAtlasFrame {
+  redraw(name: TextureAtlasFrameName, source: DynamicAtlasSource): TextureAtlasFrame {
     this.#assertAlive('redraw()');
     const frame = this.#atlas.frame(name);
     if (frame === undefined) {
@@ -337,7 +338,11 @@ export class DynamicAtlas {
     }
   }
 
-  #sizeOf(name: TextureAtlasFrameName, source: FrameSource, size: DynamicAtlasSize | undefined): {width: number; height: number} {
+  #sizeOf(
+    name: TextureAtlasFrameName,
+    source: DynamicAtlasSource,
+    size: DynamicAtlasSize | undefined,
+  ): {width: number; height: number} {
     if (typeof source === 'function' && size == null) {
       throw new TypeError(
         `${WHERE}: add("${nameOf(name)}") with a draw callback needs the size — add(name, draw, {width, height})`,
@@ -424,7 +429,7 @@ export class DynamicAtlas {
     this.#context.clearRect(x - e, y - e, w + 2 * e, h + 2 * e);
   }
 
-  #draw(rect: FrameRect, source: FrameSource): void {
+  #draw(rect: FrameRect, source: DynamicAtlasSource): void {
     const context = this.#context;
     const {x, y, w, h} = rect;
     this.#clearCell(rect);

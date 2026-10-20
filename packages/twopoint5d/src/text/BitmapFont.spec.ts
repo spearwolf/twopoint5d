@@ -194,6 +194,36 @@ describe('BitmapFont', () => {
     });
   });
 
+  describe('the edges of the readers', () => {
+    test('an unquoted value that is no number stays a string in the text format', () => {
+      const [font] = BitmapFont.parse('info face=Plain\ncommon lineHeight=4 base=3 scaleW=4 scaleH=4\n');
+      expect(font.face).toBe('Plain');
+    });
+
+    test('an XML page without an id goes next in line, an unknown entity stays, an empty value in single quotes', () => {
+      const [font] = BitmapFont.parse(
+        `<font><info face='a&nbsp;b' charset=''/><common lineHeight="4" base="3" scaleW="4" scaleH="4"/><page file="p.png"/></font>`,
+      );
+      expect(font.face).toBe('a&nbsp;b');
+      expect(font.info.charset).toBe('');
+      expect(font.page).toBe('p.png');
+    });
+
+    test('a page without a file names an empty one', () => {
+      const [font] = BitmapFont.parse('common lineHeight=4 base=3 scaleW=4 scaleH=4\npage id=0\n');
+      expect(font.page).toBe('');
+    });
+
+    test('a face that is no string, pages that are no array and no kernings', () => {
+      const data = {...tinyFont(), info: {face: 7 as never}, pages: 'tiny.png' as never};
+      delete data.kernings;
+      const font = new BitmapFont(data);
+      expect(font.face).toBe('');
+      expect(font.page).toBeUndefined();
+      expect(font.kerning('A', 'V')).toBe(0);
+    });
+  });
+
   describe('JSON', () => {
     test('reads a JSON string as it reads the object', () => {
       const [font] = BitmapFont.parse(`  ${JSON.stringify(tinyFont())}`);

@@ -86,7 +86,8 @@ const readXml = (source: string): BitmapFontData => {
   for (const [, tag, attributes] of text.matchAll(/<\s*(\w+)((?:\s+[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*\/?>/g)) {
     const entry: Entry = {};
     for (const [, key, double, single] of attributes!.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
-      entry[key!] = readValue(key!, decodeEntities(double ?? single ?? ''), true);
+      // one of the two quotes matched
+      entry[key!] = readValue(key!, decodeEntities((double ?? single)!), true);
     }
     blocks.push({tag: tag!, entry});
   }
