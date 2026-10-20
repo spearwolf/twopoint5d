@@ -12,6 +12,7 @@ export * from './features/Flash.js';
 export * from './features/InstancePosition.js';
 export * from './features/Orientation.js';
 export * from './features/QuadSize.js';
+export * from './features/RepeatingTextureColor.js';
 export * from './features/Rotation.js';
 export * from './features/SegmentEnd.js';
 export * from './features/SegmentPlacement.js';

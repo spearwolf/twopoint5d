@@ -1,23 +1,29 @@
 import {expect} from '@esm-bundle/chai';
 import {
   AtlasFrame,
+  defineFeature,
   defineSprite,
   Display,
   FeatureSprites,
   InstancePosition,
   QuadBase,
   QuadSize,
+  RepeatingTextureColor,
   SegmentEnd,
   SegmentPlacement,
   segmentPlacement,
   TextureColor,
+  TexturePackerJson,
 } from '@spearwolf/twopoint5d';
+import {fract, mul, vec2} from 'three/tsl';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   compareWithModel,
+  countMixed,
   disposeDisplay,
   makeColorTexture,
   makeContainer,
+  makeMipmappedChecker,
   readsTopDown,
   renderToPixels,
 } from './helpers/fixtures.js';
@@ -30,9 +36,21 @@ const WHITE = [255, 255, 255, 255];
 const RED = [255, 0, 0, 255];
 const GREEN = [0, 255, 0, 255];
 
-/** @param {import('@spearwolf/twopoint5d').SpriteFeature} placement */
-const segmentsOf = (placement) =>
-  defineSprite({base: QuadBase, features: [InstancePosition, SegmentEnd, placement, QuadSize, AtlasFrame, TextureColor]});
+const BLUE = [0, 0, 255, 255];
+
+/**
+ * @param {import('@spearwolf/twopoint5d').SpriteFeature} placement
+ * @param {import('@spearwolf/twopoint5d').SpriteFeature} [colorSource]
+ */
+const segmentsOf = (placement, colorSource = TextureColor) =>
+  defineSprite({base: QuadBase, features: [InstancePosition, SegmentEnd, placement, QuadSize, AtlasFrame, colorSource]});
+
+/** The frame repeated three times along x by a bare fract(): the seam of the smallest mip level at each wrap. */
+const BareRepeat = defineFeature({
+  name: 'bareRepeat',
+  textures: {colorMap: {}},
+  colorSource: (_frame, {uv, sample}) => sample('colorMap', /** @type {any} */ (fract(vec2(mul(uv.x, 3), uv.y)))),
+});
 
 /**
  * The model of a segment from `start` to `end` in the plane of the view, `width` the caps and
@@ -242,6 +260,87 @@ describe('sprites — segments lie along their ends', function () {
 
       // above (−3, 0, −4) the camera from above sees the point at (−3, 4) of its view
       expectModel(await render(sprites, 'above'), segmentModel([-3, 4], [-3, 4], 4, 2, RED, GREEN));
+    });
+  });
+
+  describe('RepeatingTextureColor', () => {
+    /**
+     * Segments of `colorSource` under the plane placement on `colorMap`, each showing `frame` — the tex
+     * coords of a frame, or one out of an atlas.
+     *
+     * @param {import('@spearwolf/twopoint5d').SpriteFeature} colorSource
+     * @param {import('three/webgpu').Texture} colorMap
+     * @param {[number, number, number, number] | import('@spearwolf/twopoint5d').TextureAtlasFrame} frame
+     * @param {{start: [number, number, number], end: [number, number, number], size: [number, number]}[]} segments
+     */
+    function makeRepeating(colorSource, colorMap, frame, segments) {
+      const sprites = new FeatureSprites(segmentsOf(SegmentPlacement, colorSource), {
+        capacity: segments.length,
+        textures: {colorMap},
+      });
+      for (const {start, end, size} of segments) {
+        const segment = sprites.createSprite();
+        segment.setPosition(...start);
+        segment.setSegmentEnd(...end);
+        segment.setSize(...size);
+        if (Array.isArray(frame)) segment.setTexCoords(...frame);
+        else segment.setFrame(frame);
+      }
+      disposals.push(() => sprites.dispose());
+      return sprites;
+    }
+
+    it('repeats a 64 × 16 frame of an atlas twice along a segment 8 long and 1 thick, no texel of a neighbour drawn', async function () {
+      // a sheet of 128 × 32 in blue, the frame at (32, 8): its left half red, its right half green
+      const width = 128;
+      const height = 32;
+      const texels = Array.from({length: width * height}, (_, i) => {
+        const x = i % width;
+        const y = Math.floor(i / width);
+        if (x < 32 || x >= 96 || y < 8 || y >= 24) return BLUE;
+        return x < 64 ? RED : GREEN;
+      });
+      const colorMap = makeColorTexture(texels, width, height);
+      disposals.push(() => colorMap.dispose());
+      const [atlas] = TexturePackerJson.parse({
+        frames: {rope: {frame: {x: 32, y: 8, w: 64, h: 16}}},
+        meta: {image: 'rope.png', size: {w: width, h: height}},
+      });
+      const sprites = makeRepeating(RepeatingTextureColor, colorMap, atlas.frame('rope'), [
+        {start: [-4, 2, 0], end: [4, 2, 0], size: [0, 1]},
+        // the same rope the other way round: the frame runs from its start
+        {start: [4, -2, 0], end: [-4, -2, 0], size: [0, 1]},
+      ]);
+
+      // the frame repeats every 4 units, red on its first half
+      const repeated = (y0, fromStart) => (x, y) => {
+        if (Math.abs(y - y0) > 0.5 || Math.abs(x) > 4) return BLACK;
+        const along = fromStart(x);
+        return along % 4 < 2 ? RED : GREEN;
+      };
+      expectModel(
+        await render(sprites, 'front'),
+        either(
+          repeated(2, (x) => x + 4),
+          repeated(-2, (x) => 4 - x),
+        ),
+      );
+    });
+
+    it('repeats a mipmapped frame without a seam at its wraps, where a bare fract() shows one', async function () {
+      const colorMap = makeMipmappedChecker();
+      disposals.push(() => colorMap.dispose());
+      // 12 long and 4 thick: the checker of 4 × 4 texels three times. The gpu works the derivatives out
+      // over blocks of 2 × 2 pixels, and a seam shows only in a block a wrap runs through: a quarter of
+      // a unit — one pixel — off the middle, the wraps lie on odd pixels and cut through blocks
+      /** @type {{start: [number, number, number], end: [number, number, number], size: [number, number]}[]} */
+      const segments = [{start: [-5.75, 0.25, 0], end: [6.25, 0.25, 0], size: [0, 4]}];
+
+      const repeating = await render(makeRepeating(RepeatingTextureColor, colorMap, [0, 0, 1, 1], segments), 'front');
+      const bare = await render(makeRepeating(BareRepeat, colorMap, [0, 0, 1, 1], segments), 'front');
+
+      expect(countMixed(bare.pixels), 'mixed pixels of the bare fract(), the seam the test has to see').to.be.greaterThan(0);
+      expect(countMixed(repeating.pixels), 'mixed pixels of RepeatingTextureColor').to.equal(0);
     });
   });
 });

@@ -46,7 +46,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()`, `SegmentPlacement`, `segmentPlacement()` |
 | `mesh` | any, by `order` | `wave()`; `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | — |
-| `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
+| `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor`, `RepeatingTextureColor` |
 | `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
 The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear
@@ -194,6 +194,7 @@ flags.dispose();
 | `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
 | `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time` (shared); texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
+| `RepeatingTextureColor` | — (texture `colorMap`; requires `InstancePosition`, `SegmentEnd`, `QuadSize`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
@@ -1013,6 +1014,54 @@ export function frame() {
   and draws the quad of `QuadSize` at the start of each segment — rarely what a rope wants.
   `segmentPlacement()` refuses a facing or a plane it does not know, and a `plane` next to
   `facing: 'camera'`, with a `TypeError`.
+- **The texture along the segment.** `TextureColor` stretches the frame from end to end.
+  `RepeatingTextureColor` repeats it, its texels kept square: `(length / thickness) / aspect` times,
+  with `length` the segment and its caps, `thickness` the `height` and `aspect` the width over the
+  height of the frame as drawn. A 64 × 16 frame on a segment 8 long and 1 thick repeats twice. It
+  takes the place of `TextureColor` (a kind holds one color source) and needs `QuadSize`:
+
+  ```ts check
+  import {
+    AtlasFrame,
+    defineSprite,
+    FeatureSprites,
+    InstancePosition,
+    QuadBase,
+    QuadSize,
+    RepeatingTextureColor,
+    SegmentEnd,
+    SegmentPlacement,
+    type TextureAtlas,
+  } from '@spearwolf/twopoint5d';
+  import type {Texture} from 'three/webgpu';
+
+  declare const bridge: TextureAtlas;
+  declare const bridgeTexture: Texture;
+
+  const Chain = defineSprite({
+    base: QuadBase,
+    features: [InstancePosition, SegmentEnd, SegmentPlacement, QuadSize, AtlasFrame, RepeatingTextureColor],
+  });
+
+  const chains = new FeatureSprites(Chain, {capacity: 32, textures: {colorMap: bridgeTexture}});
+  const chain = chains.createSprite()!;
+  chain.setFrame(bridge.frame('chain')!); // 64 × 16 pixels: one repetition every 4 thicknesses
+  chain.setPosition(0, 100);
+  chain.setSegmentEnd(96, 40);
+  chain.setSize(0, 8);
+  chains.update();
+  ```
+
+  It works per fragment — the repeat wraps exactly, and a uv stage of the kind runs per fragment
+  under it. Along the segment the frame repeats, across it is held at its edges, and the lookup keeps
+  half a texel inside the frame, so a linear sample never reaches the neighbouring frame of an
+  atlas. A mipmapped `colorMap` is sampled with explicit gradients — any `colorMap` whose filters are
+  not both `NearestFilter` — so the repeat shows no seam of the smallest mip level at its wraps; the
+  smaller mip levels of an atlas still mix neighbouring frames (see "Atlas frames on meshes of one's
+  own"). The art repeats on a column boundary: a frame whose last column leads into its first, as
+  the segment frames of the lookbook's rope bridge do. A trimmed frame is stretched over the quad —
+  pack segment frames untrimmed. The math is the one of `sampleAtlasFrame()`, with `wrap: ['repeat',
+  'clamp']`, `trim: 'stretch'` and `inset: 0.5`.
 - **Joins.** Two segments meet in a gap or an overlap on the outside of a bend. Caps of the
   thickness and a round frame hide it for ropes; a mitred ribbon is a mesh of its own.
 - **Passes.** `ShadowPass` turns every sprite to the light about its instance position — for a
