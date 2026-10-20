@@ -1,7 +1,7 @@
 # Proposal: animation playback, per-frame durations and Aseprite sheets
 
 Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Animated frames" and "Aseprite
-sheets", and the fixtures in [`fixtures/aseprite/`](../../fixtures/aseprite/README.md). Phase B of
+sheets", and the fixtures in [`src/texture/fixtures/aseprite/`](../../src/texture/fixtures/aseprite/README.md). Phase B of
 [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.4 and §4.5, with decision 1
 of its §7 taken: a **second header texel** per animation. Deviations of the build from the first
 draft of this spec, which the sections below now state as built:
@@ -439,7 +439,7 @@ released with the store.
 
 ## 8. Fixtures
 
-`packages/twopoint5d/fixtures/aseprite/`: `fighter-hash.json` and `fighter-array.json`, written by
+`packages/twopoint5d/src/texture/fixtures/aseprite/`: `fighter-hash.json` and `fighter-array.json`, written by
 `generate.mjs` in the same folder to Aseprite's documented export format and in its own formatting
 (Aseprite is not installed here; the README says so and how to write them again): 16 frames of 16 × 16 on a 64 × 64 sheet, the tags `idle` (pingpong),
 `walk` (forward), `kick` (forward, `"repeat": "1"`, 80/80/240 ms), `block` (reverse), `spin`

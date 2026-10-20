@@ -4,7 +4,7 @@ import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {disposeDisplay, isNearColor, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
 
 // the dev server of web-test-runner serves the repo root
-const SHEET_URL = '/packages/twopoint5d/fixtures/aseprite/fighter-hash.json';
+const SHEET_URL = '/packages/twopoint5d/src/texture/fixtures/aseprite/fighter-hash.json';
 
 const TARGET_SIZE = 64;
 const PIXELS_PER_UNIT = 8;

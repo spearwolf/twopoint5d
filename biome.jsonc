@@ -20,7 +20,7 @@
       // image assets, exported by the tools that drew them
       "!**/*.svg",
       // Aseprite sheet data in the formatting Aseprite writes, see its README
-      "!packages/twopoint5d/fixtures/aseprite/*.json",
+      "!packages/twopoint5d/src/texture/fixtures/aseprite/*.json",
       // a texture packer export kept byte for byte as the packer wrote it, with its generator
       "!packages/twopoint5d/src/texture/fixtures/free-tex-packer",
       "!.vscode"

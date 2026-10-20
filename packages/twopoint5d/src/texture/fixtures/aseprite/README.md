@@ -14,7 +14,7 @@ in Aseprite's own formatting: one field per line in a frame entry, a frame tag a
 line each, `"repeat"` as a string, the rectangles of a slice key without the space after the
 opening brace. `biome.jsonc` leaves the json files alone, so that they keep that formatting.
 
-`node packages/twopoint5d/fixtures/aseprite/generate.mjs` writes both files again. The image the
+`node packages/twopoint5d/src/texture/fixtures/aseprite/generate.mjs` writes both files again. The image the
 json names, `fighter.png`, is not part of the fixture: the browser test paints the sheet itself
 and hands it to the store as `overrideImageUrl`.
 

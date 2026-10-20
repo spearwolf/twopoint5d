@@ -6,7 +6,7 @@ import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
 const fixture = (name: string): AsepriteJsonData =>
-  JSON.parse(readFileSync(new URL(`../../fixtures/aseprite/${name}`, import.meta.url), 'utf8')) as AsepriteJsonData;
+  JSON.parse(readFileSync(new URL(`./fixtures/aseprite/${name}`, import.meta.url), 'utf8')) as AsepriteJsonData;
 
 const frameName = (index: number) => `fighter ${index}.aseprite`;
 

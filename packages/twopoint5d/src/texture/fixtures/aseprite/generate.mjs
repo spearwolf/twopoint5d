@@ -1,6 +1,6 @@
 // Writes fighter-hash.json and fighter-array.json next to this file, in the layout and the
 // formatting of Aseprite's "Export Sprite Sheet" json (see README.md). Run it with
-// `node packages/twopoint5d/fixtures/aseprite/generate.mjs`; it reads nothing and imports only Node.
+// `node packages/twopoint5d/src/texture/fixtures/aseprite/generate.mjs`; it reads nothing and imports only Node.
 import {writeFileSync} from 'node:fs';
 
 const TITLE = 'fighter';
