@@ -32,6 +32,7 @@ The stack is strictly bottom-up. A lower layer never imports from a higher one.
 ```
 controls/         input: the pan control
 map2d/            Tiled-style streaming maps
+text/             bitmap fonts, text laid out into sprites
 sprites/          sprite kinds built from features
 stage/            scenes, projections, render pipeline
 display/          canvas, renderer, frame loop
@@ -127,6 +128,8 @@ from no texture class. `FrameBasedAnimations` turns a sequence of atlas frames i
 timing data the `AnimatedFrames` sprite feature reads. `AtlasFrameTable` lays frames of an atlas
 into a uniform array, and `sampleAtlasFrame()` samples one of them per fragment in a
 `NodeMaterial` of one's own — a repeated frame on a mesh — the first TSL of this layer.
+`DynamicAtlas` packs frames drawn at run time onto the shelves of a canvas and hands out a
+`CanvasTexture` of it and an ordinary `TextureAtlas` of its frames.
 
 ### `display/`
 
@@ -182,6 +185,19 @@ Where a trimmed frame lies in its untrimmed sprite travels as `texTrim`, the mar
 packer cut off — an instance attribute of `AtlasFrame` and the third texel of a frame in the
 `animsMap` that `AnimatedFrames` reads — and the sprite material moves the corners of the
 quad by them before every local stage.
+
+### `text/`
+
+Text out of bitmap fonts, as sprites of the layer below. `BitmapFont` reads the AngelCode
+BMFont format — the text format, XML by a tokenizer of its own (no `DOMParser`, so it runs
+in Node and in a worker) and the JSON of the common converters — into the metrics of its
+lines, its glyphs and kerning pairs, and a `TextureAtlas` of its page with one untrimmed
+frame per char. A font has one page. `layoutText()` lays a string out — boxes of the visible
+glyphs, y up, the top of the first line at `y` — and `writeText()` writes such a layout into
+sprites of any kind with `InstancePosition`, `QuadSize` and `AtlasFrame`: it creates them in the
+`FeatureSprites` it is handed, places them by the extents of the base read off the geometry, and
+hands them to the caller, who frees them. It is a function over sprites, not a mesh of its own. The
+guide is [`docs/text.md`](./text.md).
 
 ### `map2d/`
 

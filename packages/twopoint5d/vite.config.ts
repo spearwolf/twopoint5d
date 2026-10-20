@@ -61,6 +61,7 @@ export default defineConfig({
         'src/map2d/**': {statements: 93, branches: 91, functions: 91, lines: 94},
         'src/sprites/**': {statements: 100, branches: 100, functions: 100, lines: 100},
         'src/stage/**': {statements: 94, branches: 88, functions: 95, lines: 95},
+        'src/text/**': {statements: 98, branches: 98, functions: 98, lines: 98},
         'src/texture/**': {statements: 92, branches: 85, functions: 93, lines: 94},
         'src/utils/**': {statements: 88, branches: 89, functions: 83, lines: 87},
         'src/vertex-objects/**': {statements: 94, branches: 90, functions: 90, lines: 95},

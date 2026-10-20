@@ -38,10 +38,20 @@ The core features can be roughly classified into the following areas:
 - read the "JSON Hash" and the "JSON Array" format of TexturePacker and free-tex-packer
 - sample the frames of an atlas in a node material of your own (`AtlasFrameTable`), wrapped
   per axis and without seams
+- pack labels, icons and portraits into one texture at run time (`DynamicAtlas`): a shelf
+  packer on a canvas whose frames every sprite reads like those of any other atlas
 - create tilesets from images
 - the callback loaders (`TextureAtlasLoader`, `TileSetLoader`, …) are deprecated in
   favour of `TextureStore`
 - :heavy_check_mark: api is stable and ready to use
+
+#### 📚 [text](src/text/)
+- read bitmap fonts in the AngelCode BMFont format — text, XML and the JSON of the common
+  converters — into a font and a texture atlas of its glyphs (`BitmapFont`)
+- lay a string of it out into sprites, one per glyph — y up, aligned per line, kerned, wrapped at
+  a width — with `writeText()`, or measure it with `layoutText()`
+- the guide: [docs/text.md](docs/text.md)
+- :construction: new, the api may still change
 
 #### 📚 [map2d](src/map2d/)
 - create and render tiled maps which are laid out in a 2D spatial grid map data

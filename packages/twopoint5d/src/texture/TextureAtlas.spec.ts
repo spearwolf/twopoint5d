@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {forgetFrameName} from './internals.js';
 import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
@@ -380,6 +381,43 @@ describe('TextureAtlas', () => {
       expect(atlas.randomFrameName()).toBeUndefined();
       expect(atlas.randomFrames(2)).toEqual([undefined, undefined]);
       expect(atlas.randomFrameNames(2)).toEqual([undefined, undefined]);
+    });
+  });
+  describe('forgetFrameName (internal)', () => {
+    test('lets go of a name and leaves the frame at its id', () => {
+      const atlas = new TextureAtlas();
+      const first = new TextureCoords(0, 0, 4, 4);
+      atlas.add('a', first);
+      atlas.add('b', new TextureCoords(4, 0, 4, 4));
+
+      expect(atlas[forgetFrameName]('a')).toBe(true);
+
+      expect(atlas.frame('a')).toBeUndefined();
+      expect(atlas.frameId('a')).toBeUndefined();
+      expect(atlas.frameNames()).toEqual(['b']);
+      expect(atlas.get(0)?.coords).toBe(first);
+      expect(atlas.size).toBe(2);
+    });
+
+    test('a forgotten name can be added again, for a new frame', () => {
+      const atlas = new TextureAtlas();
+      atlas.add('a', new TextureCoords(0, 0, 4, 4));
+      atlas[forgetFrameName]('a');
+
+      const id = atlas.add('a', new TextureCoords(8, 0, 4, 4));
+
+      expect(id).toBe(1);
+      expect(atlas.frameId('a')).toBe(1);
+      expect(atlas.frameNames()).toEqual(['a']);
+    });
+
+    test('a symbol is forgotten as well, and an unknown name answers false', () => {
+      const atlas = new TextureAtlas();
+      atlas.add(Bar, new TextureCoords());
+      expect(atlas[forgetFrameName](Bar)).toBe(true);
+      expect(atlas.frame(Bar)).toBeUndefined();
+      expect(atlas[forgetFrameName](Bar)).toBe(false);
+      expect(atlas[forgetFrameName]('nope')).toBe(false);
     });
   });
 });
