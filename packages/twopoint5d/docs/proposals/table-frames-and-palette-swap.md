@@ -137,7 +137,7 @@ export const TableFrame: SpriteFeature<TableFrameApi>; // tableFrame()
 - **Texture** `frameTable`, declared `needsImage: true`: until it has an image the sprite shows the
   defaults — the whole `colorMap` —, as `AnimatedFrames` without an animsMap.
 - **The frame slot**, all through `ctx.sample('frameTable', texCoordsFromIndex(size, texel))` with
-  `size = ctx.textureSize('frameTable')`, five lookups:
+  `size = ctx.textureSize('frameTable')`, four lookups:
 
   ```
   count  = header.x                               // texel 0
@@ -308,7 +308,7 @@ attached to `SpriteResources` and go with its `dispose()`.
   texture per call. `AtlasFrameTable.spec.ts` keeps passing on the shared selection.
 - `TableFrame.spec.ts`: one feature per option set, names, `requires`, `attributes`, `textures`,
   `initialize`; the refusals of `views`; the graph without a table draws the defaults; with a table
-  five lookups registered in the frame scope, a swap reaches them without rebuild; with views the
+  four lookups registered in the frame scope, a swap reaches them without rebuild; with views the
   graph reads `instancePosition`, `yaw` and the camera; a kind with `views` but no `Yaw` is refused by
   `defineSprite()`.
 - `PaletteSwap.spec.ts`: one feature per option set; `ColorOrder.Palette`; attributes, uniforms,

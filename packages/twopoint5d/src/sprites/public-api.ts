@@ -14,6 +14,7 @@ export * from './features/Orientation.js';
 export * from './features/QuadSize.js';
 export * from './features/Rotation.js';
 export * from './features/Shear.js';
+export * from './features/TableFrame.js';
 export * from './features/TextureColor.js';
 export * from './features/Tint.js';
 export * from './features/Yaw.js';

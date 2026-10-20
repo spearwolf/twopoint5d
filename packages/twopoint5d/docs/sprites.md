@@ -39,7 +39,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 
 | slot | per kind | built-in features |
 | --- | --- | --- |
-| `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
+| `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames`, `TableFrame`, `tableFrame()` |
 | `frameStage` | any, by `order` | — |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
@@ -191,6 +191,7 @@ flags.dispose();
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
 | `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
 | `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time` (shared); texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
+| `TableFrame`, `tableFrame(options)` | `frameIndex` (static); texture `frameTable` | `frameIndex` | frame | 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
@@ -506,6 +507,125 @@ handed in stays the caller's. After `dispose()`, `texture`, `canvas`, `context`,
 Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as
 `TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()` and `layoutText()`, see
 [the text guide](text.md).
+
+### Frames out of a table: `tableFrame()`
+
+Between the nine numbers of `AtlasFrame` and an animation of `AnimatedFrames` sits the sprite that
+shows "frame 17 of this set": a tile, a card, a digit, a direction, a pose a game picks on the CPU.
+`TableFrame` stores one number per sprite, `frameIndex`, and reads the frame out of a **frame
+table** — a data texture `FrameTable#bakeDataTexture()` bakes, set as the texture `frameTable`.
+
+```ts check
+import {
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  FrameTable,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TableFrame,
+  type TextureAtlas,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas; // cards.json, frames card_0 … card_51
+declare const colorMap: Texture; // cards.png
+
+const Card = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TableFrame, TextureColor]});
+
+const deck = FrameTable.fromAtlas(atlas, /^card_/);
+const frameTable = deck.bakeDataTexture(); // the caller's: dispose it with the sprites
+const cards = new FeatureSprites(Card, {capacity: 52, textures: {colorMap, frameTable}});
+
+const ace = cards.createSprite()!;
+ace.setSize(64, 96);
+ace.frameIndex = deck.indexOf('card_0');
+
+// later: turn the card over — frameIndex is static, so the change is marked for upload
+export function show(index: number) {
+  ace.frameIndex = index;
+  cards.spritePool?.touchVO(ace, 'frameIndex');
+}
+```
+
+- **`FrameTable`** takes the frames of an atlas as `AtlasFrameTable` does — a list of names in its
+  order, a `RegExp` (the names it matches, in the order of the json), or every frame by id — or a list
+  of frames and bare `TextureCoords` (`new FrameTable(frames)`); `indexOf(name)` answers the index. Its
+  bake is a float `DataTexture`, three texels a frame row by row: no limit but the size of a texture,
+  where `AtlasFrameTable`, the uniform array for a material of one's own, stops at 341 frames. Every
+  bake is a new texture the caller owns; a frame changed afterwards reaches the sprites with the next
+  bake.
+- **The frame** is drawn as `AtlasFrame` draws it: a turned frame upright, a trimmed frame where the
+  untrimmed sprite has it.
+- **`frameIndex`** is rounded to a whole entry; one before the first or past the last frame of the
+  table shows the first or the last — the shader cannot throw. It is static; a sprite animated on the
+  CPU, which writes it every frame, takes `attributeUsage: {dynamic: ['frameIndex']}`.
+- Until the frame table has an image the sprite shows the whole `colorMap`.
+
+**Directional frames.** The 8-direction sprites of every boomer shooter, the cheap impostor of a tree:
+`tableFrame({views: n})` adds to `frameIndex` the view the camera sees the sprite from. It needs `Yaw`,
+the facing of the sprite, and `InstancePosition`:
+
+```ts check
+import {
+  axisBillboardPlacement,
+  defineSprite,
+  FeatureSprites,
+  FrameTable,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  tableFrame,
+  type TextureAtlas,
+  TextureColor,
+  Yaw,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas; // stalker.json: stalker_<anim>_<view>_<frame>
+declare const colorMap: Texture; // stalker.png, nearest
+
+const Stalker = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, axisBillboardPlacement(), QuadSize, Yaw, tableFrame({views: 8}), TextureColor],
+});
+
+const walk = FrameTable.fromAtlas(atlas, /^stalker_walk_/);
+const stalkers = new FeatureSprites(Stalker, {
+  capacity: 16,
+  textures: {colorMap, frameTable: walk.bakeDataTexture()},
+  attributeUsage: {dynamic: ['frameIndex', 'yaw']},
+});
+
+const stalker = stalkers.createSprite()!;
+stalker.setSize(2, 2);
+stalker.yaw = Math.PI / 2; // facing +x
+
+export function frame(time: number) {
+  stalker.frameIndex = (Math.floor(time / 0.15) % 4) * 8; // walk frame 0 … 3, eight views each
+  stalkers.update();
+}
+```
+
+- **The views of a frame** are `n` consecutive entries of the table, view 0 first: `frameIndex` names
+  the first entry of the block, `frame · n`, and the shader adds the view.
+- **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of the
+  sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front is
+  where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh — `Object3D.rotation.y`
+  — and the angle of the camera is measured the same way:
+  `view = round((atan2(toCamera.x, toCamera.z) − yaw) / (2π / n)) mod n`. The lookbook's `stalker` is
+  rendered in that order and its json lists every frame's eight views in a row, so
+  `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is the table as it is. A sheet that counts its views
+  clockwise is reordered by its names, view `k` there being view `(n − k) mod n` here:
+  `` [0, 7, 6, 5, 4, 3, 2, 1].map((v) => `imp_${frame}_${v}`) ``.
+- The angle lies in the xz plane of the mesh, about +y: right for `axisBillboardPlacement()`,
+  `BillboardPlacement` and `flatPlacement({orientation: 'yaw'})`. A mesh laid out in the xy plane under
+  `axisBillboardPlacement({axis: 'z'})` gets its views about +y all the same; turn such a mesh instead.
+  Straight above the sprite the camera sees the front view.
+- The camera is the one that renders: a `ShadowPass` and a `ReflectionPass` show the view the camera
+  sees, as the games of the genre do. A frame stage runs after the view is picked.
 
 ## Uploads: static and dynamic attributes
 
