@@ -26,9 +26,14 @@ const WHERE = 'FrameTable';
 // the texels of one frame: tex coords, measures and diagonal flip, trim margins
 const TEXELS_PER_FRAME = 3;
 
+// the shader finds a texel by its index in float arithmetic (`texCoordsFromIndex()`), and a float32
+// holds every whole number up to 2^24 exactly: a texel past that would be read from its neighbour
+const MAX_TEXELS = 2 ** 24;
+
 /**
  * The frames a `tableFrame()` sprite picks from by index, baked into a data texture — the `frameTable`
- * of the sprites. No limit but the size of a texture: the frames lie row by row.
+ * of the sprites. The frames lie row by row, up to 5 592 405 of them — 2^24 texels, the most the shader
+ * addresses exactly in float.
  *
  * `AtlasFrameTable` is the other table of the library: a uniform array of up to 341 frames for a
  * `NodeMaterial` of one's own and `sampleAtlasFrame()`.
@@ -92,8 +97,9 @@ export class FrameTable {
    * Every call builds a new texture and keeps no reference to it: the caller owns it and disposes it. A
    * material it is handed to as `frameTable` borrows it.
    *
-   * @throws {RangeError} for a `maxTextureSize` that is no whole number of 1 or more, and a table that
-   *   needs more rows than the widest texture allowed.
+   * @throws {RangeError} for a `maxTextureSize` that is no whole number of 1 or more, a table of more
+   *   than 2^24 texels — 5 592 405 frames, the most texels the shader addresses exactly in float —, and a
+   *   table that needs more rows than the widest texture allowed.
    */
   bakeDataTexture(options?: FrameTableBakeOptions): DataTexture {
     const given = options?.maxTextureSize;
@@ -107,6 +113,11 @@ export class FrameTable {
 
     const entries = this.#entries;
     const texelCount = 1 + entries.length * TEXELS_PER_FRAME;
+    if (texelCount > MAX_TEXELS) {
+      throw new RangeError(
+        `${WHERE}: ${entries.length} frames take ${texelCount} texels — the shader addresses ${MAX_TEXELS} (2^24) texels exactly in float; split them into several tables`,
+      );
+    }
     const width = Math.min(texelCount, maxTextureSize);
     const height = Math.ceil(texelCount / width);
     if (height > maxTextureSize) {

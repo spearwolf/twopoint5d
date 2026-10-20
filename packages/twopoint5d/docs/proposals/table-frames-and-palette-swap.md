@@ -112,8 +112,10 @@ export function frameTable(atlas: TextureAtlas<unknown>, selection?: AtlasFrameT
     `frameTrimMargins()` reads them — the frame texels of an animsMap of three texels a frame,
     always three, so the shader needs no branch;
   - the texels lie row by row in a texture `min(1 + 3n, maxTextureSize)` wide and as many rows high
-    as they take — the index → texel mapping of `texCoordsFromIndex()`. A table needs more than
-    `maxTextureSize` rows only beyond some 22 million frames; that is refused naming both numbers.
+    as they take — the index → texel mapping of `texCoordsFromIndex()`. That mapping works in float, and
+    a float32 holds every whole number up to 2^24 exactly, so a table holds at most 2^24 texels —
+    5 592 405 frames; one more is refused naming the count and the fix (several tables). A table that
+    needs more rows than `maxTextureSize` — a small limit handed in — is refused naming both numbers.
 - `bakeDataTexture()` builds a new texture on every call and keeps no reference to it: the caller
   owns it and disposes it (resource lifecycle §1, as `FrameBasedAnimations#bakeDataTexture()`). A
   table is plain data, no `dispose()`. A frame changed after the bake reaches the shader with the

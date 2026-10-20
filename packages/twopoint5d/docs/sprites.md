@@ -554,8 +554,9 @@ export function show(index: number) {
 - **`FrameTable`** takes the frames of an atlas as `AtlasFrameTable` does — a list of names in its
   order, a `RegExp` (the names it matches, in the order of the json), or every frame by id — or a list
   of frames and bare `TextureCoords` (`new FrameTable(frames)`); `indexOf(name)` answers the index. Its
-  bake is a float `DataTexture`, three texels a frame row by row: no limit but the size of a texture,
-  where `AtlasFrameTable`, the uniform array for a material of one's own, stops at 341 frames. Every
+  bake is a float `DataTexture`, three texels a frame row by row: up to 5 592 405 frames — 2^24 texels,
+  the most the shader addresses exactly in float —, where `AtlasFrameTable`, the uniform array for a
+  material of one's own, stops at 341 frames. Every
   bake is a new texture the caller owns; a frame changed afterwards reaches the sprites with the next
   bake.
 - **The frame** is drawn as `AtlasFrame` draws it: a turned frame upright, a trimmed frame where the

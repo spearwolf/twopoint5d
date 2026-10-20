@@ -141,6 +141,15 @@ describe('FrameTable', () => {
       );
     });
 
+    test('refuses a table of more texels than the shader addresses exactly in float, 2^24', () => {
+      // floor((2^24 − 1) / 3) frames fit; one more does not
+      const table = new FrameTable(new Array(5_592_406).fill(new TextureCoords(root, 0, 0, 8, 8)));
+      expect(() => table.bakeDataTexture()).toThrow(RangeError);
+      expect(() => table.bakeDataTexture()).toThrow(
+        'FrameTable: 5592406 frames take 16777219 texels — the shader addresses 16777216 (2^24) texels exactly in float; split them into several tables',
+      );
+    });
+
     test('refuses a maxTextureSize that is no whole number of 1 or more', () => {
       expect(() => FrameTable.fromAtlas(makeAtlas()).bakeDataTexture({maxTextureSize: 0})).toThrow(RangeError);
       expect(() => FrameTable.fromAtlas(makeAtlas()).bakeDataTexture({maxTextureSize: 2.5})).toThrow(
