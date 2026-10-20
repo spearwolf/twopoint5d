@@ -128,6 +128,11 @@ of the font's, in pixels of the font.
 no reference to them, to the font or to the text — to change a text, free its sprites and write it
 again. It is not allocation-free: write a text when it changes, not every frame.
 
+**Draw order.** `sortBy()` and `sortByViewDepth()` on a pool the glyphs share with other sprites mix
+them in draw order with those sprites — a label may end up behind the sprite it names; give text a
+`FeatureSprites` of its own when the order matters. The handles `writeText()` answered stay the same
+objects through a sort, still in reading order.
+
 **Refusals.** A kind without `InstancePosition`, `QuadSize` or `AtlasFrame` — `AnimatedSpriteKind`,
 whose frame comes out of an `animsMap` — is refused before a sprite is created, naming every feature
 missing. A pool that runs full is refused naming how many sprites the text needs; the sprites created
