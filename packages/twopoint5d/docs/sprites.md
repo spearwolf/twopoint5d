@@ -745,8 +745,83 @@ it is disposed first, so a refused constructor leaves nothing behind.
 **After `dispose()`.** The mesh leaves the scene graph and fires the `dispose` event of three.
 `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`; `createSprite()`
 and `getTexture()` answer `undefined`; `freeSprite()`, `setUniform()`, `setTexture()`,
-`touchTexture()`, `update()` and the `placement` setter do nothing; `passes` is empty. A second
-`dispose()` does nothing.
+`touchTexture()`, `update()` and the `placement` setter do nothing; `sortBy()` and
+`sortByViewDepth()` answer `false`; `passes` is empty. A second `dispose()` does nothing.
+
+## Draw order: sorting the sprites
+
+The sprites of a mesh are drawn in the order of their slots in the pool, and nobody chose that
+order: `createSprite()` appends, `freeSprite()` moves the last sprite into the freed slot. Opaque
+sprites and sprites cut out by the alpha test do not care — the depth test sorts them per pixel.
+Sprites that blend do:
+
+- **top-down and isometric games**, where the sprite lower on the screen covers the one above it
+  and soft edges rule out the alpha test — sort by `y`;
+- **vector balls, particle and billboard clouds**, transparent and drawn back to front from
+  wherever the camera stands — sort by the view depth;
+- **UI sprites** in a layer order of their own — sort by a key of your own.
+
+```ts check
+import {
+  BillboardPlacement,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import {PerspectiveCamera, Texture} from 'three/webgpu';
+
+const colorMap = new Texture();
+
+// a top-down scene in the xy plane, y up the screen: the lower sprite stands in front
+const Actor = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor]});
+const actors = new FeatureSprites(Actor, {capacity: 200, textures: {colorMap}, transparent: true});
+
+// a cloud of billboards, drawn back to front from wherever the camera stands
+const Ball = defineSprite({base: QuadBase, features: [InstancePosition, BillboardPlacement, QuadSize, TextureColor]});
+const balls = new FeatureSprites(Ball, {capacity: 500, textures: {colorMap}, transparent: true});
+const camera = new PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+
+// every frame: write the sprites, sort, update(), render
+actors.sortBy('y', {descending: true});
+actors.update();
+
+balls.sortByViewDepth(camera);
+balls.update();
+```
+
+- **`sortBy(key, {descending})`** takes the name of a number property of the sprite handle — `'y'`,
+  `'z'`, `'rotation'`, `'width'` … — or a function of the sprite, `(sprite) => number`. A name is
+  read straight from the buffer; a function is called once per sprite, and a fractional key it
+  answers may cost a heap number of 16 B per sprite where V8 does not inline it. A name that is no
+  value of the sprite is refused, with the list of the ones there are. Which way is in front depends
+  on the scene: with y up the screen, `sortBy('y', {descending: true})`; with the sprites standing on
+  the xz ground and the camera on the +z side, the nearer sprite has the larger z — `sortBy('z')`.
+- **`sortByViewDepth(camera)`** sorts back to front as `camera` sees them, by the depth of the
+  position of each sprite — the centre of its quad — in view space, through the world matrices of
+  the mesh and the camera, which it refreshes. Perspective and orthographic cameras alike. A kind
+  without `InstancePosition` has no position to measure and is refused, naming the fix; every
+  built-in placement requires it, so only a placement of one's own meets that.
+- **Stable.** Sprites of the same key keep their order, so a sort every frame never swaps two
+  sprites on one row back and forth. A `NaN` key goes last, behind the infinities too.
+- **The order of a frame**: write the sprites, sort, `update()`, render. A sort after `update()`
+  reaches the gpu a frame late. Both answer whether a sprite moved.
+- **The passes follow.** A pass draws the geometry of the sprites, so it draws the same order:
+  the reflection of a cloud sorted back to front blends back to front as well, and the overlapping
+  shadows of `ShadowPass`, one colour, look the same in any order. A pass that wants another order
+  needs a mesh of its own.
+- **The price.** The sort moves every attribute of the sprites that change their slot, so it marks
+  them for upload — the static ones included, which otherwise go up only when they are touched. A
+  mesh sorted every frame whose order changes uploads about everything every frame: 76 B a sprite
+  for `TexturedSpriteKind`, 760 KB a frame for 10 000 of them, against the 160 KB its dynamic
+  attributes upload anyway. A sort that finds the order as it is moves and uploads nothing. Sort
+  every frame where the camera or the sprites move; sort once where neither does.
+- A handle stays the same object and keeps its values through a sort; only its slot changes. The
+  pool behind it is `VertexObjectPool#sortBy()` — see
+  [the vertex objects](../src/vertex-objects/README.md#sorting-a-pool).
 
 ## Presets
 
@@ -1570,6 +1645,11 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
   the hot loops of 10 000 sprites.
 - A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame
   and `setPreparedFrame()` per sprite.
+- `sortBy()` by a name and `sortByViewDepth()` allocate nothing once their scratch is there —
+  the first sort allocates it, and it grows only with the capacity. 10 000 sprites sort in about
+  0.1 ms when the order holds, 0.5 ms with ten of them out of line, 1.1 ms by the view depth under a
+  circling camera and 1.3 ms from a random order (`src/sprites/FeatureSprites/sorting.bench.ts`);
+  the upload after a sort that moved them is the larger price (see "Draw order: sorting the sprites").
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
   with bindings and `visible` hooks as well; the allocation spec holds a plane and a light

@@ -1,5 +1,5 @@
-import {Matrix4, Mesh, type Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
-import type {VO} from '../../vertex-objects/types.js';
+import {type Camera, Matrix4, Mesh, type Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
+import type {VO, VOSortKey, VOSortOptions} from '../../vertex-objects/types.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
@@ -74,6 +74,12 @@ export class FeatureSpritesPass<Api extends object = object> extends Mesh {
 }
 
 const WHERE = 'FeatureSprites';
+
+/**
+ * The names of the number properties of a sprite handle `Api` — what {@link FeatureSprites.sortBy}
+ * takes by name: `'y'`, `'z'`, `'rotation'`, `'width'` and every other number a feature declares.
+ */
+export type SpriteSortKeyName<Api> = {[K in keyof Api]-?: Api[K] extends number ? K : never}[keyof Api] & string;
 
 // a record of pass meshes by pass name: without a prototype, a pass named "__proto__" or
 // "constructor" is an own entry like any other instead of a write to Object.prototype's members
@@ -191,6 +197,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   #disposed = false;
   // createSprite() says once that the pool is full
   #warnedFull = false;
+  // sortByViewDepth(): the depth of every sprite, grown with the capacity, and the camera's view of the mesh
+  #depthKeys: Float64Array | undefined;
+  readonly #modelView = new Matrix4();
 
   /**
    * @param options every field is optional, so another three.js `Material` or a `Texture` would
@@ -279,6 +288,83 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   /** Gives a sprite back; the last sprite moves into its slot. Does nothing once disposed. */
   freeSprite(sprite: VO): void {
     this.geometry?.instancedPool.freeVO(sprite);
+  }
+
+  /**
+   * Puts the sprites into a draw order: by a number property of their handle (`'y'`, `'z'`,
+   * `'rotation'` …), or by a function of the sprite. Stable — sprites of the same key keep their
+   * order —, the lowest key first unless `descending`, a `NaN` key last. The passes draw the
+   * geometry of the sprites, so they draw in the same order. See `VertexObjectPool#sortBy`, which
+   * this is, for what moves, what is refused and what a key function costs.
+   *
+   * Sort after the sprites are written and before {@link update}: the sort marks the sprites that
+   * moved for upload, all of their attributes — a mesh sorted every frame whose order changes uploads
+   * about every attribute every frame. Allocates nothing once its scratch is there.
+   *
+   * @returns whether a sprite moved; `false` once disposed
+   */
+  sortBy(key: SpriteSortKeyName<Api> | ((sprite: Api & VO) => number), options?: VOSortOptions): boolean {
+    const pool = this.geometry?.instancedPool;
+    if (pool == null) return false;
+    return pool.sortBy(key as string | VOSortKey<Api & VO>, options);
+  }
+
+  /**
+   * Puts the sprites into the order `camera` sees them back to front: by the depth of their
+   * `instancePosition` in view space, the farthest first — the order transparent billboards and
+   * sprite clouds blend right in. The depth is taken at the position of a sprite, the centre of its
+   * quad, through the world matrices of this mesh and of the camera, which it refreshes. Perspective
+   * and orthographic cameras alike.
+   *
+   * Everything else is {@link sortBy}: stable, the passes follow, call it before {@link update}.
+   * Allocates nothing once its scratch is there.
+   *
+   * @returns whether a sprite moved; `false` once disposed and with fewer than two sprites
+   * @throws for a kind without the attribute `instancePosition`, which every built-in placement
+   *   requires — only a kind with a placement of its own meets it
+   */
+  sortByViewDepth(camera: Camera): boolean {
+    const pool = this.geometry?.instancedPool;
+    if (pool == null) return false;
+
+    const layout = pool.buffer.bufferAttributes.get('instancePosition');
+    if (layout === undefined) {
+      throw new Error(
+        `${WHERE}#sortByViewDepth(): the sprites of this kind have no instancePosition to measure the view depth at — add InstancePosition to the features of the kind, or sort by a key of your own with sortBy()`,
+      );
+    }
+    const n = pool.usedCount;
+    if (n < 2) return false;
+
+    // the renderer writes the modelViewMatrix of the mesh only inside render(), after update(), so the
+    // product is built here, from world matrices refreshed as update() refreshes its own
+    this.updateWorldMatrix(true, false);
+    camera.updateWorldMatrix(true, false);
+    const m = this.#modelView.multiplyMatrices(camera.matrixWorldInverse, this.matrixWorld).elements;
+    // the third row: the z of a position in view space. three looks along -z, so the farthest sprite
+    // has the lowest z, and the ascending sort draws it first
+    const m2 = m[2]!;
+    const m6 = m[6]!;
+    const m10 = m[10]!;
+    const m14 = m[14]!;
+
+    let keys = this.#depthKeys;
+    if (keys === undefined || keys.length < pool.capacity) {
+      keys = new Float64Array(pool.capacity);
+      this.#depthKeys = keys;
+    }
+
+    // straight from the buffer, as a sort by a value property reads it: no value crosses a call
+    const record = pool.buffer.buffers.get(layout.bufferName)!;
+    const positions = record.typedArray!;
+    const stride = pool.descriptor.vertexCount * record.itemSize;
+    const {offset} = layout;
+    for (let i = 0; i < n; i++) {
+      const p = i * stride + offset;
+      keys[i] = m2 * positions[p]! + m6 * positions[p + 1]! + m10 * positions[p + 2]! + m14;
+    }
+
+    return pool.sortByKeys(keys);
   }
 
   /** The placement of the material — `undefined` once disposed. */
@@ -408,7 +494,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * well. Afterwards `geometry`, `material`, `spritePool`, `placement`
    * and `uniforms` answer `undefined`, and so do `createSprite()` and `getTexture()`; `passes` is
    * empty; `freeSprite()`, `setUniform()`, `bindUniform()`, `unbindUniform()`, `setTexture()`,
-   * `touchTexture()`, `update()` and the `placement` setter do nothing. A second call does nothing.
+   * `touchTexture()`, `update()` and the `placement` setter do nothing, `sortBy()` and
+   * `sortByViewDepth()` answer `false`. A second call does nothing.
    */
   override dispose(): void {
     if (this.#disposed) return;
@@ -433,6 +520,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     this.#boundNames.length = 0;
     this.#boundSources.length = 0;
     this.#boundVectors.length = 0;
+    this.#depthKeys = undefined;
 
     if (this.#ownsGeometry) this.geometry?.dispose();
     this.geometry = undefined;
