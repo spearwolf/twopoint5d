@@ -886,16 +886,50 @@ and `passes` (see "Passes: shadows and reflections").
 `createSprite()` answers `undefined` once the pool is full, and the first time it does it says so on
 the console — once per mesh, naming the `name` of the mesh, its capacity and the fix: twice the
 capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` handed in.
-A pool that grows on its own does not exist yet; size the capacity for the most sprites drawn at
-once. `spritePool.createVO()` is the pool's own API and stays silent. `placement`, `uniforms`, `setUniform()`,
+`spritePool.createVO()` is the pool's own API and stays silent. `placement`, `uniforms`, `setUniform()`,
 `getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
+
+**Growing capacity.** Where the count is not known up front — bullets, sparks, vector balls —
+`grow: true` lets a full pool grow instead of refusing:
+
+```ts check
+import {FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import {Texture} from 'three/webgpu';
+
+const colorMap = new Texture();
+const bullets = new FeatureSprites(TexturedSpriteKind, {capacity: 64, grow: true, textures: {colorMap}});
+
+// the 65th createSprite() doubles the pool to 128, and never answers undefined for want of room
+for (let i = 0; i < 100; i++) bullets.createSprite()?.setPosition(i, 0, 0);
+bullets.update();
+```
+
+- **What a growth does.** The `createSprite()` that finds every slot in use builds a geometry of
+  twice the capacity — at least 1 — on the same descriptor (`attributeUsage` stays) with the same
+  base (`baseArgs` stay), moves every sprite over and answers a sprite of the new pool. Every handle
+  stays the same object, in the same slot, with its values: a sorted mesh stays sorted. The mesh and
+  every pass mesh draw the new geometry; materials, textures, uniforms and bindings never held the
+  geometry and stay as they are. The old geometry is disposed — it was the mesh's own.
+- **The price** is a frame hitch: every used slot of every attribute copied, new gpu buffers, and
+  all of it uploaded on the next frame, the static attributes included. The doubling keeps the copies
+  of n sprites at about 2n in all. The first growth says so on the console, once per mesh, through
+  `console.info`, with the capacity to start with; the warning of a full pool never comes under
+  `grow`. Where the count is known, a capacity that fits is still the cheaper way.
+- **Read `geometry` and `spritePool` afresh.** Both are new objects after a growth, and the ones
+  kept from before are disposed. Only `createSprite()` grows — `spritePool.createVO()` is the pool's
+  own API and does not.
+- **Refused**: `grow: true` next to a `geometry` handed in, which the mesh does not own and cannot
+  replace (a `TypeError` that names the fix); a `grow` that is no boolean. A geometry with pools
+  attached through `attachInstancedPool()` cannot grow, and the `createSprite()` that would grow it
+  throws, naming both ways out. The pool behind it is `VertexObjectPool#adoptVOs()` — see
+  [the vertex objects](../src/vertex-objects/README.md#growing-a-pool).
 
 **Ownership.** The mesh disposes the geometry and the material it built, and nothing else. A
 `geometry` or a `material` handed in, and every texture, stays the caller's; `dispose()` leaves
 them alone. A mesh built around a geometry handed in still disposes the material it built for it.
 
 **Refusals.** A `TypeError` instead of a mismatch: a `geometry` or a `material` built for another
-sprite kind; `capacity`, `attributeUsage` or `baseArgs` next to a `geometry`; any material
+sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a `geometry`; any material
 parameter next to a `material`. A material that cannot be built (a `placement` that cannot stand
 in, a texture name no feature declares) throws as well, and the geometry the constructor built for
 it is disposed first, so a refused constructor leaves nothing behind.
@@ -1880,6 +1914,9 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
   0.1 ms when the order holds, 0.5 ms with ten of them out of line, 1.1 ms by the view depth under a
   circling camera and 1.3 ms from a random order (`src/sprites/FeatureSprites/sorting.bench.ts`);
   the upload after a sort that moved them is the larger price (see "Draw order: sorting the sprites").
+- Under `grow: true` a `createSprite()` that finds room allocates the sprite and nothing else, and
+  `update()` after a growth allocates nothing; the growth itself is the hitch, copying and uploading
+  every sprite the mesh holds (see "FeatureSprites").
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
   with bindings and `visible` hooks as well; the allocation spec holds a plane and a light
