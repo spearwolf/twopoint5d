@@ -12,6 +12,7 @@ import {VertexObjectDescriptor} from '../vertex-objects/VertexObjectDescriptor.j
 import {vertexObjectPropertyNames} from '../vertex-objects/vertexObjectPropertyNames.js';
 import type {SpriteBase} from './SpriteBase.js';
 import {collectSpriteDeclarations} from './spriteDeclarations.js';
+import {runCheckKind} from './runCheckKind.js';
 import type {SpriteFeature} from './SpriteFeature.js';
 import {buildSpritePipeline, type SpritePipeline} from './spritePipeline.js';
 
@@ -195,7 +196,8 @@ function checkLayout(
  * Merges a base and features into a sprite kind. Checks, in this order, and throws naming the
  * features involved: the base contract, unique feature names, `requires`, one placement and at most
  * one frame and color source, a placement without textures, unique uniforms, textures, attributes,
- * sprite-handle properties and usage aliases, and the layout of the merged attributes.
+ * sprite-handle properties and usage aliases, and the layout of the merged attributes — and last the
+ * `checkKind` of every feature, in the order of the list.
  */
 export function defineSprite<const F extends readonly SpriteFeature[]>(options: {
   readonly base: SpriteBase;
@@ -227,6 +229,8 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
 
   const description: VertexObjectDescription = {attributes, methods, basePrototype: initializerPrototype(features)};
   checkLayout(description, features, attributeOwners);
+
+  for (const feature of features) runCheckKind(feature, {base, features}, `${WHERE}: feature "${feature.name}"`);
 
   return Object.freeze({base, features, description, usageAliases, pipeline});
 }

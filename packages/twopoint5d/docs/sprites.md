@@ -955,11 +955,21 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`colorSource`** — the color before the color stages, at most one feature per kind.
 - **`requires`** — names of other features that have to be part of the same kind; never the
   feature's own name.
+- **`checkKind(kind)`** — checks the kind the feature is part of, shown `{base, features}`, and
+  throws for one the feature cannot work in, with a message that names the fix: a stage that needs
+  a grid base refuses the quad, a placement refuses a feature whose stage it cannot follow.
+  `defineSprite()` runs it last, once every other check has passed, and refuses the kind as
+  `defineSprite: feature "name": <message>`; a pass runs the checks of its features against the
+  features it draws with, and a placement that stands in on a live material runs its own against
+  the kind with itself in place of the kind's placement.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
-`uniform(name)` for a uniform any feature of the kind declares, and `sample(name, uv)` and
-`textureSize(name)` for a texture the feature declares itself. The material throws, naming the
-feature, for any other name. Every stage after the frame slot gets `frame`, the frame after the
+`uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
+the feature declares itself, and `textureSize(name)` for a texture any feature of the material
+declares. The material throws, naming the feature, for any other name. The size of a texture of
+another feature — the `colorMap` of the color source, to know a frame in texels — is `(0, 0)` while
+that texture is unset, and the stage does not wait for it: a stage that divides by it takes
+`max(size, 1)`. Every stage after the frame slot gets `frame`, the frame after the
 frame stages, and `uv`, the uv after the uv stages — built the first time a stage of a graph reads
 it, so a graph that never reads it builds no uv stage; in a uv stage `uv` is the stage's own input.
 `attribute('uv')` stays the base uv, where the vertex lies on the base.

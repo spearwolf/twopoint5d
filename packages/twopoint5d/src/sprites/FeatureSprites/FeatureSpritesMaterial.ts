@@ -13,6 +13,7 @@ import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
+import {runCheckKind} from '../runCheckKind.js';
 import type {
   SpriteFeature,
   SpriteFrameContext,
@@ -60,7 +61,7 @@ const SCOPES: readonly GraphScope[] = ['frame', 'position', 'color'];
 const WHERE = 'FeatureSpritesMaterial';
 
 // the fields a placement may carry to stand in for another on a live material
-const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'placement']);
+const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'checkKind', 'placement']);
 
 const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1) as unknown as Node<'vec4'>});
 
@@ -275,8 +276,11 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         this.#samples[scope].push({name: textureName, node});
         return node as unknown as Node<'vec4'>;
       },
+      // the size of a texture of another feature as well: a stage that reads it does not wait for it
       textureSize: (textureName) => {
-        ownTexture(textureName);
+        if (!this.#features.some(({textures}) => textures != null && Object.hasOwn(textures, textureName))) {
+          throw new Error(`${where} reads the size of the texture "${textureName}", which no feature of these sprites declares`);
+        }
         return this.resources.textureSize(textureName) as unknown as Node<'vec2'>;
       },
     };
@@ -352,12 +356,14 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   /**
    * The placement the position graph is built with; starts with the one of the kind. Another one
    * takes its place only when it contributes a placement stage and nothing else — no attributes,
-   * methods, uniforms or textures, which the sprites and this material were built without — and the
-   * kind holds every feature it requires; the placement of the kind always comes back. A change
+   * methods, uniforms or textures, which the sprites and this material were built without — the
+   * kind holds every feature it requires, and its `checkKind`, if any, takes the kind with it in
+   * place of the kind's placement; the placement of the kind always comes back. A change
    * rebuilds the position graph; three serves a source it has built before from its caches.
    * Keeps its last value once disposed, and a write there reaches nothing that renders.
    *
-   * @throws a `TypeError` naming both features for a placement that cannot stand in
+   * @throws a `TypeError` naming both features for a placement that cannot stand in, an `Error`
+   *   naming it for one whose `checkKind` refuses the kind
    */
   get placement(): SpriteFeature {
     return this.#placement.value;
@@ -388,6 +394,12 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
           );
         }
       }
+      const kindPlacement = this.kind.pipeline.placement;
+      runCheckKind(
+        feature,
+        {base: this.kind.base, features: this.kind.features.map((held) => (held === kindPlacement ? feature : held))},
+        `${WHERE}: feature "${feature.name}"`,
+      );
     }
     this.#placement.set(feature);
   }

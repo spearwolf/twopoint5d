@@ -23,6 +23,12 @@ describe('defineFeature()', () => {
     );
   });
 
+  test('refuses a checkKind that is no function', () => {
+    const feature = {name: 'odd', checkKind: 'grid'} as unknown as SpriteFeature;
+
+    expect(() => defineFeature(feature)).toThrow('defineFeature: the checkKind of feature "odd" is no function');
+  });
+
   test('refuses a feature that requires itself', () => {
     expect(() => defineFeature({name: 'loop', requires: ['loop']})).toThrow('defineFeature: feature "loop" requires itself');
   });

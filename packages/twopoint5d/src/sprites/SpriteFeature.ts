@@ -1,5 +1,6 @@
 import type {Node} from 'three/webgpu';
 import type {VertexAttributesType} from '../vertex-objects/types.js';
+import type {SpriteBase} from './SpriteBase.js';
 
 /** What the frame slot answers. Where no feature fills the slot, the material uses the defaults named here. */
 export interface SpriteFrameNodes {
@@ -119,8 +120,22 @@ export interface SpriteFeature<Api extends object = object> {
   readonly color?: SpriteStage<'vec4'>;
   /** Other features, by name, that have to be part of the same sprite kind. */
   readonly requires?: readonly string[];
+  /**
+   * Checks the kind the feature is part of: once when `defineSprite()` merges it, after every check
+   * of its own; when a pass that brings the feature is folded into a kind, with the features the pass
+   * draws with; and when the feature, a placement, stands in for another on a live material. Throws
+   * for a kind the feature cannot work in, with a message that names the fix — the caller adds the
+   * name of the feature.
+   */
+  readonly checkKind?: (kind: SpriteKindShape) => void;
   /** Carries `Api` for the type of the sprite handle; never set at runtime. */
   readonly __api?: Api;
+}
+
+/** What {@link SpriteFeature.checkKind} is shown of a kind: its base and its features. */
+export interface SpriteKindShape {
+  readonly base: SpriteBase;
+  readonly features: readonly SpriteFeature[];
 }
 
 const STAGE_SLOTS = ['frameStage', 'local', 'mesh', 'uv', 'color'] as const;
@@ -140,6 +155,9 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
         `defineFeature: the ${slot} stage of feature "${feature.name}" needs a finite order, got ${stage.order}`,
       );
     }
+  }
+  if (feature.checkKind != null && typeof feature.checkKind !== 'function') {
+    throw new TypeError(`defineFeature: the checkKind of feature "${feature.name}" is no function`);
   }
   if (feature.requires?.includes(feature.name)) {
     throw new TypeError(`defineFeature: feature "${feature.name}" requires itself`);

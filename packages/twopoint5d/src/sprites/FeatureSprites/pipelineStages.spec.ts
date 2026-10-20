@@ -11,6 +11,7 @@ import {TextureColor} from '../features/TextureColor.js';
 import {frameUv} from '../frameUv.js';
 import {definePass, type SpritePass} from '../passes/definePass.js';
 import {ReflectionPass, ShadowPass} from '../passes/passPresets.js';
+import {BillboardPlacement} from '../features/BillboardPlacement.js';
 import {AnimatedSpriteKind, TexturedSpriteKind} from '../presets.js';
 import {QuadBase} from '../SpriteBase.js';
 import {defineFeature, type SpriteFeature, type SpriteFrameNodes} from '../SpriteFeature.js';
@@ -302,6 +303,105 @@ describe('uv stages and ctx.uv', () => {
     });
 
     expect(calls).toEqual(['passUv']);
+    material.dispose();
+  });
+});
+
+describe('textureSize() of a texture another feature declares', () => {
+  const sizeReader = (textureName: string) =>
+    defineFeature({
+      name: 'sizeReader',
+      local: {
+        order: 0,
+        transform: (position, {textureSize}) => {
+          calls.push('sizeReader');
+          return add(position, vec4(textureSize(textureName), 0, 0).xyz) as unknown as Node<'vec3'>;
+        },
+      },
+    });
+
+  test('answers the size uniform of that texture, (0, 0) while it is unset, and does not wait for it', () => {
+    const material = new FeatureSpritesMaterial(kindOf(AtlasFrame, TextureColor, sizeReader('colorMap')));
+    const size = material.resources.textureSize('colorMap');
+
+    expect(calls).toEqual(['sizeReader']);
+    expect(nodesOf(material.positionNode!).has(size as unknown as Node)).toBe(true);
+    expect(size.value.toArray()).toEqual([0, 0]);
+    material.setTexture('colorMap', withImage(8, 2));
+    expect(size.value.toArray()).toEqual([8, 2]);
+    material.dispose();
+  });
+
+  test('is refused for a texture no feature of the material declares, naming it', () => {
+    expect(() => new FeatureSpritesMaterial(kindOf(AtlasFrame, TextureColor, sizeReader('normalMap')))).toThrow(
+      'FeatureSpritesMaterial: feature "sizeReader" reads the size of the texture "normalMap", which no feature of these sprites declares',
+    );
+  });
+});
+
+describe('checkKind', () => {
+  test('a placement that carries checkKind stands in on a live material, and its check runs', () => {
+    const seen: string[][] = [];
+    const checked = defineFeature({
+      name: 'checkedPlacement',
+      requires: ['instancePosition'],
+      checkKind: ({features}) => {
+        seen.push(features.map(({name}) => name));
+      },
+      placement: BillboardPlacement.placement,
+    });
+    const material = new FeatureSpritesMaterial(kindOf(AtlasFrame, TextureColor));
+
+    material.placement = checked;
+
+    expect(material.placement).toBe(checked);
+    expect(seen).toEqual([['instancePosition', 'checkedPlacement', 'atlasFrame', 'textureColor']]);
+    material.dispose();
+  });
+
+  test('a placement whose check refuses the kind does not stand in', () => {
+    const refusing = defineFeature({
+      name: 'refusing',
+      requires: ['instancePosition'],
+      checkKind: () => {
+        throw new Error('not on this kind — take another');
+      },
+      placement: BillboardPlacement.placement,
+    });
+    const material = new FeatureSpritesMaterial(kindOf(AtlasFrame, TextureColor));
+
+    expect(() => {
+      material.placement = refusing;
+    }).toThrow('FeatureSpritesMaterial: feature "refusing": not on this kind — take another');
+    expect(material.placement).toBe(FlatPlacement);
+    material.dispose();
+  });
+
+  test('a feature of a pass is checked against the features the pass draws with', () => {
+    const seen: string[][] = [];
+    const watcher = defineFeature({
+      name: 'watcher',
+      checkKind: ({base, features}) => {
+        expect(base).toBe(QuadBase);
+        seen.push(features.map(({name}) => name));
+      },
+      color: {order: 1, transform: (color) => color},
+    });
+    const refusing = defineFeature({
+      name: 'refusing',
+      checkKind: () => {
+        throw new Error('needs a grid');
+      },
+    });
+    const kind = kindOf(AtlasFrame, TextureColor);
+    const material = new FeatureSpritesMaterial(kind, {
+      pass: definePass({name: 'p', features: [watcher], without: ['atlasFrame']}),
+    });
+
+    expect(seen).toEqual([['instancePosition', 'flatPlacement', 'textureColor', 'watcher']]);
+    expect(() => new FeatureSpritesMaterial(kind, {pass: definePass({name: 'q', features: [refusing]})})).toThrow(
+      'FeatureSpritesMaterial: feature "refusing" of pass "q": needs a grid',
+    );
     material.dispose();
   });
 });
