@@ -147,6 +147,17 @@ describe('layoutText()', () => {
       expect(layout.width).toBe(7);
     });
 
+    test('counts the kerning pairs at the join of the line and the next word', () => {
+      const data = tinyFontData();
+      data.kernings = [{first: 65, second: 32, amount: -3}];
+      const kerned = new BitmapFont(data);
+      // A 4, the pair (A, space) −3, the space 3, A 4: 8 wide — it fits, where 11 would not
+      const layout = layoutText(kerned, 'A A', {maxWidth: 8});
+      expect(layout.lineCount).toBe(1);
+      expect(layout.width).toBe(8);
+      expect(layoutText(kerned, 'A A', {maxWidth: 7.5}).lineCount).toBe(2);
+    });
+
     test('keeps words together on a line while they fit', () => {
       const layout = layoutText(font, 'A A A', {maxWidth: 14});
       expect(boxes(layout).map(([, line, x]) => [line, x])).toEqual([

@@ -110,6 +110,23 @@ const widthOf = (font: BitmapFont, glyphs: readonly BitmapFontGlyph[], letterSpa
   return pen - letterSpacing;
 };
 
+// the pen after `glyphs` set behind `previous` at `pen`, and the last glyph set, in pixels of the font
+const advance = (
+  font: BitmapFont,
+  previous: BitmapFontGlyph | undefined,
+  glyphs: readonly BitmapFontGlyph[],
+  pen: number,
+  letterSpacing: number,
+): {pen: number; last: BitmapFontGlyph | undefined} => {
+  let last = previous;
+  for (const glyph of glyphs) {
+    if (last !== undefined) pen += font.kerning(last.id, glyph.id);
+    pen += glyph.xadvance + letterSpacing;
+    last = glyph;
+  }
+  return {pen, last};
+};
+
 // a line of the text broken where it is too wide: at the last space before the word that would make it
 // wider than `maxWidth`, every space at the break dropped. A word wider than maxWidth on its own stays whole
 const wrap = (
@@ -127,8 +144,12 @@ const wrap = (
     else runs.push({space, glyphs: [glyph]});
   }
 
+  // The line grows by a running pen, in pixels of the font: each word adds its own glyphs and the kerning
+  // pair at its join, and nothing is measured twice — a line of n glyphs costs O(n)
   const lines: BitmapFontGlyph[][] = [];
   let line: BitmapFontGlyph[] = [];
+  let pen = 0;
+  let last: BitmapFontGlyph | undefined;
   let hasWord = false;
   let pendingSpaces: BitmapFontGlyph[] = [];
   for (const run of runs) {
@@ -136,12 +157,19 @@ const wrap = (
       pendingSpaces = run.glyphs;
       continue;
     }
-    const candidate = [...line, ...pendingSpaces, ...run.glyphs];
-    if (hasWord && widthOf(font, candidate, letterSpacing) > maxWidth) {
+    const spaces = advance(font, last, pendingSpaces, pen, letterSpacing);
+    const word = advance(font, spaces.last, run.glyphs, spaces.pen, letterSpacing);
+    if (hasWord && word.pen - letterSpacing > maxWidth) {
       lines.push(line);
-      line = [...run.glyphs];
+      const alone = advance(font, undefined, run.glyphs, 0, letterSpacing);
+      line = run.glyphs.slice();
+      pen = alone.pen;
+      last = alone.last;
     } else {
-      line = candidate;
+      for (const glyph of pendingSpaces) line.push(glyph);
+      for (const glyph of run.glyphs) line.push(glyph);
+      pen = word.pen;
+      last = word.last;
     }
     hasWord = true;
     pendingSpaces = [];
