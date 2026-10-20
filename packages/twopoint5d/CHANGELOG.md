@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- add the built-in features `Fade` and `Flash`, the first in the bands `ColorOrder.Fade` and `ColorOrder.Flash`: `Fade` multiplies the alpha by the dynamic `fade` (a new sprite starts at 1), `Flash` mixes the rgb towards the flash color of the dynamic `flash` attribute by `flashAmount`, alpha kept (`flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)`; a new sprite starts white at an amount of 0). The guide's example under "Writing a feature" is now `Grayscale`, a feature the library does not ship
+- add `axisBillboardPlacement({axis})` and `AxisBillboardPlacement`, the cylindrical billboard: every sprite turns about +Y of the mesh (or +Z, `axis: 'z'`) to face the camera and stays upright along the axis, and within a sine of 0.1 of the axis it takes the right of the camera. One frozen feature per axis that brings nothing but its placement, so it swaps with `FlatPlacement`, `flatPlacement()` and `BillboardPlacement` on a live material; `ShadowPass` turns it to the light as any placement, `ReflectionPass` draws its reflection. `docs/sprites.md` has it under "Axis billboards", with a table of the passes for each placement
+- add a one-time warning of a full pool: the first `FeatureSprites#createSprite()` that answers `undefined` because every sprite is in use says so on the console, once per mesh, with the `name` of the mesh, its capacity and the fix — twice the capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` handed in. A disposed mesh stays silent, and a refusal after the warning allocates nothing
+- add a fixture of a real free-tex-packer export — JSON Hash and JSON Array, a rotated and a rotated trimmed frame — and specs and a browser test that hold `TexturePackerJson` to it: free-tex-packer is supported as TexturePacker is
+- add the glow recipe to `docs/sprites.md`, "Glow: emissive sprites with bloom": a tint above white and `createBloomOutputNodeBuilder({threshold: 1})` let only the sprites brighter than white glow, held to it by a browser test; the threshold compares luminance, so a saturated red or blue needs a factor of about 5 or 14 to pass
+- add `ColorOrder.Pass` (1000), the band of the color stages a pass brings to recolor the sprite as a whole, after every color stage of the kind
 - add playback modes and per-frame durations to `FrameBasedAnimations#add()`: the timing options take `playback` — `'loop'` (the default), `'once'`, which holds the last frame, or `'pingpong'`, which runs back and forth and shows each end frame once per turn (`0 1 2 3 2 1 0 1 …`) — and `durations`, seconds per frame in place of a `duration` or a `frameRate`, whose sum is the duration of the animation. `add()` refuses a playback that is none of the three, durations beside a duration or a frameRate, durations that are no array, of another count than the frames or with a value that is no finite number above zero, and more than 8191 frames with durations — `FrameBasedAnimations.MaxFramesWithDurations` — each naming the animation. The catalog types of `TextureStore` take both fields as well
 - `AnimatedFrames` plays the playback and the per-frame durations of the animsMap: `'once'` clamps the frame count and holds the last frame (the first before the start), `'pingpong'` runs a triangle wave over a turn of `2 · frameCount − 2` frames, and an animation with durations finds its frame by a binary search of 13 lookups over the end times of its frames. An animsMap without second header texels — one built by hand in the layout before — plays every animation as a loop, as it did. `animOffset = -now` starts an animation now; `docs/sprites.md` has the rules under "Animated frames"
 - add `FrameBasedAnimations#add(name, timing, atlas, frameNames)`: the frames of an atlas named in a list, in the order of the list and as often as they are named, with their trim margins; a name the atlas does not carry and an entry that is no string are refused, naming the index
@@ -18,7 +24,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `ShadowMask` and `Darken` run in `ColorOrder.Pass` (were `ColorOrder.Mask` and `ColorOrder.Fade`): a `Flash` no longer turns the shadow of `ShadowPass` into the flash color, and the reflection of `ReflectionPass` and `BillboardReflectionPass` flashes darkened
 - `FrameBasedAnimations#bakeDataTexture()` writes a second header texel behind the frames of each animation, `[playback, hasDurations, cycleDuration, -2]` — the `-2` marks it, since no texel of a header or a frame lying within its image goes below `-1` (the `v` of a frame flipped vertically as high as its image), and the end time of a frame of an animation with `durations` into the fourth component of its second texel, `[width, height, flipDiagonal, endTime]`; an animation with durations gives every frame of the bake a second texel. The first header texel keeps its layout and the frames of the first animation still begin at texel `n`, but the frames of every later animation begin one texel later per animation before them: a reader of its own that follows `firstFrameTexel` of the header reads them right, one that counted the texels itself has to follow it
+
+### Migration Guide
+
+#### A color stage of one's own that ran after `ShadowMask` or `Darken`
+
+`ShadowMask` and `Darken` moved from the orders 150 and 200 to `ColorOrder.Pass` (1000). A color stage of one's own with an order between them that has to run after the mask or the darkening of a pass takes an order above `ColorOrder.Pass`.
+
+**Before**
+
+```ts
+color: {order: ColorOrder.Fade + 10, transform: tintTheShadow}
+```
+
+**After**
+
+```ts
+color: {order: ColorOrder.Pass + 10, transform: tintTheShadow}
+```
 
 ## [0.23.0] - 2026-10-18
 

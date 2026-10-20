@@ -189,6 +189,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   readonly #boundVectors: (Vector3 | Vector4)[] = [];
   readonly #worldToSprites = new Matrix4();
   #disposed = false;
+  // createSprite() says once that the pool is full
+  #warnedFull = false;
 
   /**
    * @param options every field is optional, so another three.js `Material` or a `Texture` would
@@ -250,10 +252,28 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
 
   /**
    * Takes a sprite from the pool, at the values of an unused slot: 0 everywhere, white as its tint.
-   * Answers `undefined` once the pool is full or the sprites are disposed.
+   * Answers `undefined` once the pool is full or the sprites are disposed. The first time the pool
+   * is full it says so on the console, once per mesh, naming the capacity and how to raise it; a
+   * disposed mesh answers without a word.
    */
   createSprite(): (Api & VO) | undefined {
-    return this.geometry?.instancedPool.createVO();
+    const pool = this.geometry?.instancedPool;
+    if (pool == null) return undefined;
+    const sprite = pool.createVO();
+    if (sprite === undefined && !this.#warnedFull) this.#warnFull(pool.capacity);
+    return sprite;
+  }
+
+  #warnFull(capacity: number): void {
+    this.#warnedFull = true;
+    const larger = Math.max(2 * capacity, 1);
+    const fix = this.#ownsGeometry
+      ? `Give the sprites a larger capacity — new FeatureSprites(kind, {capacity: ${larger}})`
+      : `Build the FeatureSpritesGeometry handed in with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: ${larger}})`;
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+    console.warn(
+      `FeatureSprites "${this.name}": the pool is full — all ${capacity} sprites are in use, so createSprite() answers undefined. ${fix} — or free the sprites no longer drawn with freeSprite(). This warning is shown once per FeatureSprites.`,
+    );
   }
 
   /** Gives a sprite back; the last sprite moves into its slot. Does nothing once disposed. */

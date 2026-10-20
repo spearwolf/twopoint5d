@@ -84,6 +84,10 @@ interface EvaluableNode {
   readonly method?: string;
   readonly aNode?: Node;
   readonly bNode?: Node;
+  readonly cNode?: Node;
+  readonly condNode?: Node;
+  readonly ifNode?: Node;
+  readonly elseNode?: Node;
   /** The parts of a JoinNode — `vec3(x, y, z)` built from nodes. */
   readonly nodes?: readonly Node[];
 }
@@ -105,12 +109,15 @@ const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
   '-': (x, y) => x - y,
   '*': (x, y) => x * y,
   '/': (x, y) => x / y,
+  // a comparison answers 1 for true and 0 for false, which select() reads
+  '<': (x, y) => (x < y ? 1 : 0),
 };
 
 /**
  * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
- * swizzles, vectors joined from parts, `dot`, `cross`, `length`, `normalize`, `max`, `negate`, `sin`
- * and `cos` — what the mesh stages and placements are built from.
+ * `<`, `select()`, swizzles, vectors joined from parts, `dot`, `cross`, `length`, `normalize`, `max`,
+ * `mix`, `negate`, `sin` and `cos` — what the mesh stages, the placements and the color stages are
+ * built from.
  * Throws for any other node.
  */
 export function evaluateNode(root: Node): EvaluatedValue {
@@ -122,7 +129,10 @@ export function evaluateNode(root: Node): EvaluatedValue {
   }
   if (node.isSplitNode) {
     const vector = evaluateNode(node.node!) as number[];
-    const picked = [...node.components!].map((component) => vector['xyzw'.indexOf(component)]!);
+    // `rgba` names the components `xyzw` names
+    const picked = [...node.components!].map(
+      (component) => vector[Math.max('xyzw'.indexOf(component), 'rgba'.indexOf(component))]!,
+    );
     return picked.length === 1 ? picked[0]! : picked;
   }
   if (node.type === 'JoinNode' && node.nodes != null) {
@@ -130,6 +140,10 @@ export function evaluateNode(root: Node): EvaluatedValue {
   }
   if (node.isOperatorNode && OPERATORS[node.op!] != null) {
     return zip(evaluateNode(node.aNode!), evaluateNode(node.bNode!), OPERATORS[node.op!]!);
+  }
+  if (node.type === 'ConditionalNode') {
+    const condition = evaluateNode(node.condNode!);
+    return evaluateNode(condition !== 0 ? node.ifNode! : node.elseNode!);
   }
   if (node.isMathNode) {
     const a = evaluateNode(node.aNode!);
@@ -151,6 +165,20 @@ export function evaluateNode(root: Node): EvaluatedValue {
         return zip(a, 0, Math.sin);
       case 'cos':
         return zip(a, 0, Math.cos);
+      case 'mix': {
+        const b = evaluateNode(node.bNode!);
+        const t = evaluateNode(node.cNode!);
+        // a + (b − a) · t, a weight of one number meeting every component
+        return zip(
+          a,
+          zip(
+            zip(a, b, (x, y) => y - x),
+            t,
+            (d, w) => d * w,
+          ),
+          (x, d) => x + d,
+        );
+      }
       case 'normalize': {
         const size = Math.sqrt(dotOf(a, a));
         return zip(a, size, (x, y) => x / y);

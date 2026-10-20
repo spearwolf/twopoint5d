@@ -1,6 +1,6 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {add, vec3, vec4} from 'three/tsl';
+import {add, modelViewMatrix, vec3, vec4} from 'three/tsl';
 import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
 import {AdditiveBlending, NearestFilter, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
@@ -8,6 +8,7 @@ import {afterEach, describe, expect, test} from 'vitest';
 import {attributeNamesOf, nodesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
 import {defineSprite} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
+import {AxisBillboardPlacement, axisBillboardPlacement} from '../features/AxisBillboardPlacement.js';
 import {BillboardPlacement} from '../features/BillboardPlacement.js';
 import {FlatPlacement, flatPlacement, GroundPlacement} from '../features/FlatPlacement.js';
 import {InstancePosition} from '../features/InstancePosition.js';
@@ -19,6 +20,9 @@ import {Tint} from '../features/Tint.js';
 import {Yaw} from '../features/Yaw.js';
 import {QuadBase} from '../SpriteBase.js';
 import {definePass} from '../passes/definePass.js';
+import {LightFacingPlacement} from '../passes/LightFacingPlacement.js';
+import {ShadowPass} from '../passes/passPresets.js';
+import {FeatureSprites} from './FeatureSprites.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 import {SpriteResources} from './SpriteResources.js';
 import {FeatureSpritesMaterial} from './FeatureSpritesMaterial.js';
@@ -310,6 +314,32 @@ describe('FeatureSpritesMaterial', () => {
       material.placement = FlatPlacement;
       expect(attributeNamesOf(operatorOf(material.positionNode).bNode as Node)).toEqual(['instancePosition']);
       material.dispose();
+    });
+
+    test('swaps an axis billboard for a flat placement and a spherical billboard and back', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+      const readsTheView = () => [...nodesOf(material.positionNode!)].some((node) => node === modelViewMatrix);
+
+      material.placement = AxisBillboardPlacement;
+      expect([material.placement, readsTheView()]).toEqual([AxisBillboardPlacement, true]);
+      material.placement = BillboardPlacement;
+      expect(material.placement).toBe(BillboardPlacement);
+      material.placement = axisBillboardPlacement({axis: 'z'});
+      expect(material.placement).toBe(axisBillboardPlacement({axis: 'z'}));
+      material.placement = FlatPlacement;
+      expect([material.placement, readsTheView()]).toEqual([FlatPlacement, false]);
+      material.dispose();
+    });
+
+    test('the shadow of axis billboards turns them to the light, whatever their placement', () => {
+      const AxisKind = defineSprite({base: QuadBase, features: [InstancePosition, AxisBillboardPlacement, QuadSize]});
+      const sprites = new FeatureSprites(AxisKind, {passes: [ShadowPass]});
+
+      expect(sprites.placement).toBe(AxisBillboardPlacement);
+      expect(sprites.passes['shadow']!.material.placement).toBe(LightFacingPlacement);
+      sprites.placement = FlatPlacement;
+      expect(sprites.passes['shadow']!.material.placement).toBe(LightFacingPlacement);
+      sprites.dispose();
     });
 
     test('starts with the placement it is given', () => {

@@ -39,15 +39,16 @@ fragment: colorSource(frame) ─▶ color stages ─▶ colorNode
 | `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
-| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement` |
+| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
-| `color` | any, by `order` | `Tint`, `ShadowMask`, `Darken` (passes) |
+| `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
 The order bands `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear 300, Rotate 400`),
 `MeshOrder` (`Offset 100, Project 200, Mirror 300`) and `ColorOrder` (`Tint 100, Mask 150,
-Fade 200, Flash 300`) leave room for stages of your own. Two stages of one order run in the
-order of the feature list.
+Fade 200, Flash 300, Pass 1000`) leave room for stages of your own. Two stages of one order run in
+the order of the feature list. `ColorOrder.Pass` is the band of the color stages a pass brings to
+recolor the sprite as a whole — `ShadowMask`, `Darken` — after every color stage of the kind.
 
 The **trim shift** is no feature. A frame a packer trimmed covers only part of the untrimmed
 sprite; the shift moves each corner of the quad to its corner of that part, measured in the unit
@@ -98,6 +99,7 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `GroundPlacement` | — | — | placement | — |
 | `flatPlacement(options)` | — | — | placement | — |
 | `BillboardPlacement` | — | — | placement | — |
+| `AxisBillboardPlacement`, `axisBillboardPlacement(options)` | — | — | placement | — |
 | `Yaw` | `yaw` (static) | `yaw` | — | 0 |
 | `Orientation` | `orientation` (static) | `qx`, `qy`, `qz`, `qw`, `setOrientation()`, `setQuaternion(q)`, `getQuaternion(target?)`, `setYaw(angle)` | — | unturned, `(0, 0, 0, 1)` |
 | `QuadSize` | `quadSize` (static), word `size` | `width`, `height`, `setQuadSize()`, `setSize(w, h)` | local, `Scale` | 0 × 0 |
@@ -107,6 +109,8 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time`; texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
+| `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
+| `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -120,12 +124,64 @@ already — onto the camera's right and up vectors in the local space of the mes
 parents may be moved, turned and scaled evenly on all axes and its billboards still face the
 camera. A scale that differs from axis to axis skews them.
 
+### Fade and flash
+
+`Fade` multiplies the alpha of a sprite by its `fade`: spawning, dying, fog of war. `Flash` mixes
+its color towards a flash color by `flashAmount`, alpha kept: a hit flash, a freeze tint, a damage
+blink — what `Tint` cannot do, since a tint only multiplies and so only darkens.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  Fade,
+  FeatureSprites,
+  FlatPlacement,
+  Flash,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  Tint,
+} from '@spearwolf/twopoint5d';
+
+const Enemy = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint, Fade, Flash],
+});
+
+const enemies = new FeatureSprites(Enemy, {capacity: 100, transparent: true});
+const enemy = enemies.createSprite();
+if (enemy != null) {
+  enemy.fade = 0.5; // alpha × 0.5
+  enemy.setFlash(1, 1, 1, 0.8); // rgb mixed towards white by 0.8, alpha kept
+  enemy.flashAmount = 0; // the flash is over
+}
+enemies.update();
+enemies.dispose();
+```
+
+- Both attributes are **dynamic** — a fade and a flash change from frame to frame — and every
+  `update()` uploads them. A kind whose sprites fade once takes `attributeUsage: {static:
+  ['fade']}`.
+- A fade between 0 and 1 blends only on a material with `transparent: true`, and the default alpha
+  test drops a sprite faded to 0, as for the alpha of `Tint`.
+- The fourth value of `flash` is a weight, not an alpha: `flashAmount` 0 leaves the sprite as it
+  is, 1 draws it in the flash color. A flash color above 1 is brighter than white and glows under
+  a bloom (see "Glow: emissive sprites with bloom").
+- The passes leave both alone where they should: `ShadowMask` and `Darken` run after them, in
+  `ColorOrder.Pass`, so a fading sprite throws a fading shadow, a flashing one a plain shadow, and
+  its reflection flashes darkened.
+
 ### Frames out of an atlas
 
 A frame is three values: `texCoords` (`s, t, u, v`), `texFlipDiagonal` — a TexturePacker frame
 turned by 90°, read with the two lookup components swapped — and `texTrim`, the margins a
 packer cut off, as fractions of the untrimmed sprite. `setFrame(frame)` writes all three for a
 frame of any atlas; the margins come from TexturePacker data and are zero for every other.
+`TexturePackerJson` reads the "JSON Hash" and "JSON Array" exports of TexturePacker and of
+free-tex-packer alike, rotated and trimmed frames included — a fixture of a real free-tex-packer
+export holds it to that (`src/texture/fixtures/free-tex-packer/`).
 
 The quad of the sprite stands for the **untrimmed** sprite: size a sprite that shows trimmed
 frames by the `sourceSize` of its frames, not by the measures of their `coords`.
@@ -560,6 +616,64 @@ shows its back mirrored; the color stage of a feature of your own can tell the b
 `flatPlacement({orientation: 'quaternion'})` only for one of a kind that holds `Orientation`; a kind
 that holds both swaps between the two.
 
+### Axis billboards
+
+`BillboardPlacement` is spherical: it lays the quad onto the camera's right and up. Under a 2.5D
+camera that looks down at the scene, a spherical billboard leans back with the camera, and a
+character that stands on the ground seems to float or sink at its feet. An **axis billboard** — a
+cylindrical billboard — turns about an up axis of the mesh to face the camera and stays upright:
+the look of sprites in a 3D world, of Doom, of Paper Mario.
+
+```ts check
+import {
+  AnimatedFrames,
+  AxisBillboardPlacement,
+  axisBillboardPlacement,
+  defineSprite,
+  FeatureSprites,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+
+// upright along +Y of the mesh: the ground is the XZ plane
+const Character = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, AxisBillboardPlacement, QuadSize, AnimatedFrames, TextureColor],
+});
+
+// upright along +Z: for a mesh laid out in the XY plane
+const Marker = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, axisBillboardPlacement({axis: 'z'}), QuadSize, TextureColor],
+});
+
+// the quads stand on their feet: the pivot at the bottom edge
+const characters = new FeatureSprites(Character, {capacity: 64, baseArgs: [0.5, 0.5, 0, 0.5]});
+const markers = new FeatureSprites(Marker, {capacity: 16});
+characters.dispose();
+markers.dispose();
+```
+
+- The x of the local vertex — trimmed, scaled, sheared and turned already — goes onto the level
+  direction across the axis and the direction towards the camera position, `normalize(cross(axis,
+  camera − instancePosition))`; its y goes onto the axis. As for `BillboardPlacement`, the camera
+  position is brought into the local space of the mesh, so a mesh may be moved, turned and scaled
+  evenly; the sprites at the edge of the view turn towards the camera position, under a
+  perspective and an orthographic camera alike.
+- **Straight along the axis** the facing is undefined. Within a sine of 0.1 of the axis — about 6° —
+  the right of the quad turns over to the right of the camera, as `LightFacingPlacement` turns over
+  within a sine of 0.1 of the normal. A sprite seen exactly along its axis is a line either way.
+- `axisBillboardPlacement()` returns one frozen feature per axis; `AxisBillboardPlacement` is
+  `axisBillboardPlacement()`. The two forms are named `axisBillboardPlacement` and
+  `axisBillboardPlacement+z`; an axis other than `'y'` and `'z'` throws a `TypeError`.
+- It brings nothing but its placement stage, so it stands in for `FlatPlacement`, every
+  `flatPlacement()` and `BillboardPlacement` on a live material, and they for it. A kind with `Yaw`
+  or `Orientation` keeps the attribute under it and ignores it.
+- Cost: no data, and per vertex about what `BillboardPlacement` costs — two normalizations, a
+  length and a select.
+
 ## FeatureSprites
 
 `FeatureSprites` is the mesh of a kind: a `VertexObjects` that builds the `FeatureSpritesGeometry`
@@ -611,7 +725,11 @@ colorMap.dispose();
 The options are the ones of the geometry (`capacity`, `attributeUsage`, `baseArgs`) and of the
 material (`textures`, `uniforms`, `placement` and every three.js material parameter) side by side,
 and `passes` (see "Passes: shadows and reflections").
-`createSprite()` answers `undefined` once the pool is full. `placement`, `uniforms`, `setUniform()`,
+`createSprite()` answers `undefined` once the pool is full, and the first time it does it says so on
+the console — once per mesh, naming the `name` of the mesh, its capacity and the fix: twice the
+capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` handed in.
+A pool that grows on its own does not exist yet; size the capacity for the most sprites drawn at
+once. `spritePool.createVO()` is the pool's own API and stays silent. `placement`, `uniforms`, `setUniform()`,
 `getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
 
 **Ownership.** The mesh disposes the geometry and the material it built, and nothing else. A
@@ -719,12 +837,15 @@ which three does without an event — takes `touchTexture('animsMap')` once the 
 ## Writing a feature
 
 A feature is a plain object handed to `defineFeature()`, which checks it on its own and freezes
-it. This one fades a sprite out: an attribute of one value per sprite, `dynamic` because a fade
-changes from frame to frame, a property `fade` on the handle, a start value of 1, and a color
-stage that multiplies the alpha by it.
+it. This one turns a sprite grey — a statue of stone, a frozen enemy, a locked item: an attribute
+of one value per sprite, `dynamic` because it may change from frame to frame, a property
+`grayscale` on the handle, a start value of 0, and a color stage that mixes the color towards its
+luminance. The stage runs at `ColorOrder.Tint - 50`, in the gap before the tint, so a tint colors
+the grey — a statue in blue.
 
 ```ts check
 import {
+  AtlasFrame,
   ColorOrder,
   defineFeature,
   defineSprite,
@@ -735,39 +856,44 @@ import {
   QuadSize,
   TextureColor,
   Tint,
-  AtlasFrame,
 } from '@spearwolf/twopoint5d';
-import {mul, vec4} from 'three/tsl';
+import {luminance, mix, vec3, vec4} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 
-export interface FadeApi {
-  /** 1 draws the sprite as it is, 0 makes it invisible. */
-  fade: number;
+export interface GrayscaleApi {
+  /** 0 draws the sprite in its colors, 1 in grey. */
+  grayscale: number;
 }
 
-export const Fade = defineFeature<FadeApi>({
-  name: 'fade',
-  attributes: {fade: {size: 1, usage: 'dynamic'}},
+export const Grayscale = defineFeature<GrayscaleApi>({
+  name: 'grayscale',
+  attributes: {grayscale: {size: 1, usage: 'dynamic'}},
   initialize() {
-    this.fade = 1;
+    this.grayscale = 0;
   },
   color: {
-    order: ColorOrder.Fade,
+    order: ColorOrder.Tint - 50,
     transform: (color, {attribute}) =>
-      vec4(color.rgb, mul(color.a, attribute<'float'>('fade'))) as unknown as Node<'vec4'>,
+      vec4(mix(color.rgb, vec3(luminance(color.rgb)), attribute<'float'>('grayscale')), color.a) as unknown as Node<'vec4'>,
   },
 });
 
-const FadingSprite = defineSprite({
+const Statue = defineSprite({
   base: QuadBase,
-  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint, Fade],
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Grayscale, Tint],
 });
 
-const sprites = new FeatureSprites(FadingSprite, {capacity: 100, transparent: true});
+const sprites = new FeatureSprites(Statue, {capacity: 100});
 const sprite = sprites.createSprite();
-if (sprite != null) sprite.fade = 0.5;
+if (sprite != null) {
+  sprite.grayscale = 1;
+  sprite.setColorValues(0.6, 0.7, 1, 1);
+}
 sprites.dispose();
 ```
+
+`Fade` and `Flash` are built the same way — `src/sprites/features/Fade.ts` and `Flash.ts` are a
+dozen lines each.
 
 The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
@@ -951,6 +1077,22 @@ see "Binding uniforms to the scene graph" below:
 | `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included — the reflection of a flat sprite |
 | `BillboardReflectionPass` | `MirroredBillboardPlacement`, `MirrorAtPlane`, `Darken` | as `ReflectionPass` | the reflection of a billboard: facing the camera, as large as the sprite on screen, flipped across the mirror — in `reflectionColor` |
 
+Which pass suits which placement:
+
+| placement | shadow | reflection |
+| --- | --- | --- |
+| `FlatPlacement`, `flatPlacement()` | `ShadowPass` — turned to the light; for decals `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` | `ReflectionPass` |
+| `BillboardPlacement` | `ShadowPass` | `BillboardReflectionPass` |
+| `AxisBillboardPlacement`, `axisBillboardPlacement()` | `ShadowPass` | `ReflectionPass` |
+
+`ShadowPass` turns every sprite to the light, whatever its placement, so an axis billboard throws
+the shadow a flat or a spherical one throws. An axis billboard stands along its axis, so in a mirror
+across the axis — the ground, for `'y'` — its mirror image is an upright quad that faces the camera
+level as the sprite does: `ReflectionPass` draws it meeting the sprite at its foot, as large as the
+sprite on screen. `BillboardReflectionPass` would lean that reflection towards the camera while the
+sprite stands upright. In a mirror of another tilt `ReflectionPass` shows the mirror image of the
+card as it stands, as for a flat sprite.
+
 `ShadowPass` carries the hook `shadowFallsOnPlane` (see "Leaving a pass out for a frame" below);
 the two reflections carry none and are drawn whenever they are on. `BillboardReflectionPass` is
 named `reflection`, as `ReflectionPass` is: a kind takes one or the other.
@@ -1013,7 +1155,10 @@ from the light beyond the vertex. The normal need not be a unit
 vector.
 
 `ShadowPass` keeps the tint of the kind: `ShadowMask` replaces the color anyway, and the alpha of
-the tint fades the shadow along with the sprite. It leaves nothing out, so it draws
+the tint — or a `Fade` — fades the shadow along with the sprite. `ShadowMask` and `Darken` run in
+`ColorOrder.Pass`, after every color stage of the kind, so a `Flash` leaves the shadow as it is and
+flashes the reflection darkened; a color stage of one's own that has to come after them takes an
+order above `ColorOrder.Pass`. `ShadowPass` leaves nothing out, so it draws
 `AnimatedSpriteKind`, which holds no tint, as well. A reflection needs no flip of its own:
 mirroring the placed vertex turns the sprite upside down and keeps the frame where it is.
 
@@ -1337,10 +1482,90 @@ frames — sample an atlas with mipmaps only when its packer pads or extrudes th
 that repeats one image is better served by that image as a texture of its own with
 `RepeatWrapping`.
 
+## Glow: emissive sprites with bloom
+
+A sprite glows — a neon sign, a laser, a spark, an emissive light — when its color is brighter
+than white and the stage it is drawn in blooms. Nothing beyond the built-in parts is needed:
+
+- `Tint` writes a float color, and nothing in the material clamps it: a tint above 1 draws a color
+  above white.
+- `Stage2D` renders through three's `pass()`, whose target holds half floats, so that color
+  survives into the composition of the stages.
+- `createBloomOutputNodeBuilder({threshold: 1})` lets only what is brighter than white into the
+  bloom. A sprite at or below white — a texel of 255 under a tint of 1 — stays out of it.
+
+```ts check
+import {
+  createBloomOutputNodeBuilder,
+  type Display,
+  FeatureSprites,
+  OrthographicProjection,
+  Stage2D,
+  StageRenderer,
+  TexturedSpriteKind,
+} from '@spearwolf/twopoint5d';
+import {RenderPipeline} from 'three/webgpu';
+
+declare const display: Display;
+
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+const stageRenderer = new StageRenderer(display).add(stage);
+const pipeline = new RenderPipeline(display.renderer!);
+const withGlow = createBloomOutputNodeBuilder({strength: 1.2, radius: 0.4, threshold: 1});
+stageRenderer.pipeline = pipeline;
+stageRenderer.buildOutputNode = withGlow;
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 100});
+stage.scene.add(sprites);
+
+const neon = sprites.createSprite();
+if (neon != null) {
+  neon.setSize(64, 16);
+  // four times as bright as the color map: a luminance of 3.07, far above the threshold
+  neon.setColorValues(4, 3, 1, 1);
+}
+const plain = sprites.createSprite();
+if (plain != null) {
+  plain.setSize(64, 16);
+  plain.setPosition(0, -32);
+  // at most white: no glow
+  plain.setColorValues(1, 1, 1, 1);
+}
+sprites.update();
+
+// teardown: the renderer lets go first, then the builder and the pipeline go
+stageRenderer.dispose();
+withGlow.dispose();
+pipeline.dispose();
+sprites.dispose();
+```
+
+**Brightness is luminance.** The threshold compares the luminance of the linear color,
+`0.2126 r + 0.7152 g + 0.0722 b`, not its brightest channel. `[4, 3, 1]` has a luminance of 3.07
+and glows; a pure red `[4, 0, 0]` has 0.85 and does **not**, a pure blue `[0, 0, 4]` has 0.29. A
+saturated color needs a factor of about `threshold / coefficient` to pass — 5 for red, 14 for
+blue — or a little white mixed in: `[4, 1, 1]` has 1.64. The tint multiplies the color map, so a
+dark texel needs a larger factor than a white one.
+
+- The sprite itself draws clamped to its brightest color where it is above 1, unless the renderer
+  tone-maps (`renderer.toneMapping`), which compresses it and keeps its hue.
+- A `Flash` towards a color above white glows too: `setFlash(4, 4, 4, 1)` is a hit flash that
+  blooms.
+- `Fade` and the alpha of the tint fade the glow with the sprite on a material with
+  `transparent: true`.
+- The bloom holds for the whole stage: a sprite of another stage, or a mesh of one's own above
+  white, glows as well. A threshold below 1 lets bright sprites that are not meant to glow into the
+  bloom.
+
+What the recipe cannot do: glow from an emission map of its own, and glow without the sprite
+getting brighter. Both need an emissive output of the material and a bloom that reads it alone —
+an `Emissive` feature and a selective bloom, which wait for a scene that needs them.
+
 ## Performance
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch
-  tuple, and `createSprite()` allocates the sprite and nothing else. The allocation spec
+  tuple, and `createSprite()` allocates the sprite and nothing else — on a full pool, once it has
+  warned, nothing at all. The allocation spec
   (`src/sprites/hot-path-allocations.spec.ts`) holds both presets to it, and `pnpm bench` times
   the hot loops of 10 000 sprites.
 - A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame
