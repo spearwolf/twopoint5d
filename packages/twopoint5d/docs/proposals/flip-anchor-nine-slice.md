@@ -1,6 +1,20 @@
 # Proposal: `Flip`, `Anchor` and `NineSlice`
 
-Status: **specified**
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Flip", "Anchor", "Nine-slice
+panels", the pipeline and feature tables and `mirror` under "Writing a feature", and
+[`docs/text.md`](../text.md) for `writeText()` under `Anchor`. Deviations of the build from the first
+draft of this spec, which the sections below now state as built:
+
+- the slice lookup of `setAnchorFromPivot()` and `setSliceFrame()` lives in the internal module
+  `features/frameSlices.ts`; its refusal of several slices builds its message in a function of its
+  own, since a closure over the lookup's locals made V8 allocate a context of 48 bytes on every call;
+- the insets of `setSliceFrame()` are typed `SliceInsets`, exported with `NineSlice`, and a refusal
+  shows them as `[8, 8, 8]` with spaces (§5.4);
+- the material spec of §7.1 (a kind of `Flip` and `Anchor` reads `flip` through the frame's `mirror`)
+  lives in `features/Anchor.spec.ts`;
+- the test-only flip and nine-slice of `sprites-pipeline-stages.test.js` stay as the proofs of the
+  slots; their helpers `cellColors`, `mirroredX`, `mirroredY` and `expectSameCells` moved to
+  `test/helpers/fixtures.js`.
 
 Phase D, part 1, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.9, the
 `NineSlice` of §4.7): three features built on the slots of
