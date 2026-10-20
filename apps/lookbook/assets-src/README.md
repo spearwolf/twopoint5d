@@ -125,3 +125,88 @@ near-white → back in eight steps, symmetric.
 (a pale blue-white for `Tint`), each 64 × 16: a white core in rows 6–9, then the colour, its alpha
 falling off to 0 at the edges. Every column is the same, so a strip repeats along its length
 (`RepeatingTextureColor`); `Tint` above 1 plus bloom makes the glow.
+
+## platformer
+
+| file | format | what |
+| --- | --- | --- |
+| `fighter.png` (256 × 256) + `fighter.json` | Aseprite hash, trimmed | the kung-fu fighter, 24 frames |
+| `goblin.png` (128 × 128) + `goblin.json` | Aseprite hash, trimmed | the goblin, 13 frames, in palette row 0 colours |
+| `goblin-palette.png` (16 × 4) | palette | the goblin's source colours and its red, blue and green variants |
+| `sky.png`, `mountains.png`, `machines.png` (512 × 216 each) | image | three parallax layers, back to front |
+| `tiles.png` (64 × 128) + `tiles.json` | TexturePacker hash | the tile set |
+
+Generators: `platformer/puppet.mjs` (capsule puppet with two-bone IK), `fighter.mjs`,
+`goblin.mjs` (palette and poses), `backdrop.mjs` (layers and tiles), `generate.mjs`.
+
+**The Aseprite sheets** follow Aseprite 1.3's `--format json-hash` export with `--trim
+--list-tags --list-layers --list-slices`: frame keys `"fighter 0.aseprite"` … `"fighter
+23.aseprite"` in frame order, each with `frame`, `rotated`, `trimmed`, `spriteSourceSize`,
+`sourceSize` and `duration` (ms); `meta.app` is `https://www.aseprite.org/`, `meta.frameTags`
+holds `name`, `from`, `to` (inclusive), `direction` and `color`, `meta.slices` one slice `pivot`.
+Both characters face **right**; mirror them with `Flip`.
+
+**`fighter`** — a 70s martial-arts film hero in a yellow jumpsuit with black side stripes, black
+bowl cut, black slippers. Canvas (`sourceSize`) 64 × 64; frames trimmed to their pixels.
+
+| tag | frames | direction | durations (ms) |
+| --- | --- | --- | --- |
+| `idle` | 0–3 | `pingpong` | 160, 140, 140, 160 — fighting stance, breathing |
+| `walk` | 4–9 | `forward` | 100 each — a stride in guard |
+| `kick` | 10–14 | `forward` | 80, 70, **320**, 90, 110 — chamber, extend, the held high side kick (frame 12), re-chamber, stance |
+| `flying-kick` | 15–20 | `forward` | 100, 90, 90, **380**, 100, 140 — crouch, take-off, tuck, the held flying kick (frame 18), descent, landing |
+| `hit` | 21–23 | `forward` | 80, 180, 160 — recoil and recover |
+
+`kick`, `flying-kick` and `hit` are one-shots (`playback: 'once'`). Slice `pivot`: one key at frame
+0, bounds the whole canvas `{x: 0, y: 0, w: 64, h: 64}`, `pivot {x: 32, y: 63}` — the pixel the
+feet stand on, the middle of the bottom row; as an anchor, (0.5, 1) of the untrimmed frame. In
+`idle` and `walk` the soles are on row 63; the flying kick leaves the ground inside the canvas,
+so the pivot stays where the ground is.
+
+**`goblin`** — squat, big-eared, a spiked club over its shoulder, facing right. Canvas 56 × 48,
+trimmed. Slice `pivot`: bounds `{x: 0, y: 0, w: 56, h: 48}`, `pivot {x: 28, y: 47}`.
+
+| tag | frames | direction | durations (ms) |
+| --- | --- | --- | --- |
+| `walk` | 0–3 | `forward` | 130 each |
+| `attack` | 4–7 | `forward` | 140, 60, **260**, 140 — wind-up, swing, the held strike (frame 6), recover |
+| `hit` | 8–9 | `forward` | 90, 200 |
+| `die` | 10–12 | `forward` | 120, 120, 400 — falls on its back; hold the last frame, then `Fade` |
+
+**`goblin-palette.png`** — 16 entries, one row per variant. Every pixel of `goblin.png` is
+exactly one of the row-0 colours (checked by the generator); entries 0, 5 and 9–13 are the same in
+every row.
+
+| entry | paints | row 0, olive (source) | row 1, red | row 2, blue | row 3, green |
+| --- | --- | --- | --- | --- | --- |
+| 0 | outline | `#1a1016` | `#1a1016` | `#1a1016` | `#1a1016` |
+| 1–3 | skin light, skin, skin shadow | `#a8b04a` `#788a2e` `#4c5a1e` | `#f07a5e` `#c0402e` `#782018` | `#86bcf0` `#4a74c0` `#2a4080` | `#8ee86a` `#44a838` `#22661e` |
+| 4 | eye | `#ffd23a` | `#fff27a` | `#ff5040` | `#ff3a3a` |
+| 5 | teeth, claws | `#f0e6c8` | = | = | = |
+| 6–8 | cloth light, cloth, cloth shadow | `#a8744a` `#7a4e30` `#4e301e` | `#6a6a7c` `#46465a` `#2a2a36` | `#a678c4` `#6e4490` `#40265a` | `#c89448` `#8a6020` `#563a12` |
+| 9–11 | club light, club, club shadow | `#c89a60` `#946a3c` `#5e4026` | = | = | = |
+| 12 | strap | `#2c1e1a` | = | = | = |
+| 13 | spikes | `#b8c0cc` | = | = | = |
+| 14 | mouth | `#6a1a22` | `#2a0a10` | `#401838` | `#5a1020` |
+| 15 | inner ear | `#d07a6a` | `#ffb0a0` | `#c8a8f4` | `#f0a080` |
+
+**The parallax layers** — 512 × 216 each, seamless horizontally (`RepeatingTextureColor` or two
+quads side by side), lit by a sunset low on the horizon.
+
+| layer | content | suggested scroll factor |
+| --- | --- | --- |
+| `sky.png` | opaque; a dithered dusk gradient (indigo to gold, horizon at y ≈ 176), stars, a ringed planet at (372, 64), a small moon at (118, 38) | 0.05 |
+| `mountains.png` | transparent above; alien crags with a pink rim light, the tallest spire reaching the top edge | 0.25 |
+| `machines.png` | transparent above; a machine city — towers with lit windows and red beacons, chimneys, domes, pipes — standing on a floor at y = 192, solid dark below | 0.5 |
+
+**`tiles`** — TexturePacker hash, untrimmed, a Turrican tech set in steel blue with a cyan glow
+strip and amber warning stripes. Tiles meet seamlessly on a 16-pixel grid.
+
+| frame | size | what |
+| --- | --- | --- |
+| `ground-top`, `ground-top-left`, `ground-top-right` | 16 × 16 | the walkable top of the ground and its two ends |
+| `ground` | 16 × 16 | the fill below |
+| `platform`, `platform-left`, `platform-right` | 16 × 8 | a floating platform and its ends |
+| `girder` | 16 × 16 | a truss, stacks vertically under a platform |
+| `crate` | 16 × 16 | a tech crate with warning chevrons |
+| `lamp` | 16 × 16 | a lamp post with a cyan light, standing on the bottom edge |
