@@ -210,3 +210,41 @@ strip and amber warning stripes. Tiles meet seamlessly on a 16-pixel grid.
 | `girder` | 16 × 16 | a truss, stacks vertically under a platform |
 | `crate` | 16 × 16 | a tech crate with warning chevrons |
 | `lamp` | 16 × 16 | a lamp post with a cyan light, standing on the bottom edge |
+
+## rope-bridge
+
+| file | format | what |
+| --- | --- | --- |
+| `bridge.png` (128 × 256) + `bridge.json` | TexturePacker hash, untrimmed | segment textures and the parts of the bridge |
+| `cave-back.png`, `cave-mid.png`, `cave-front.png` (512 × 288 each) | image | a dark cave in three parallax layers, back to front |
+
+**Segment textures** — drawn along x, the segment's length; y runs across it. Every column equals
+the one 32 pixels on (checked by the generator), so each 64 × 16 frame repeats along a segment
+without a seam: `RepeatingTextureColor` with a 64 × 16 frame on a segment `length` long and
+`thickness` thick repeats it `(length / thickness) / 4` times.
+
+| frame | size | what |
+| --- | --- | --- |
+| `rope` | 64 × 16 | twisted hemp, rows 1–14 (an outline row at 1 and 14), three strands per 16 pixels |
+| `chain` | 64 × 16 | iron links, one face-on and one edge-on per 32 pixels |
+| `vine` | 64 × 16 | a thin stem with leaves, mostly transparent — hanging greenery |
+| `saber-blade` | 64 × 16 | a light-saber blade in white: opaque core in rows 6–9, alpha falling off to the edges; colour it with `Tint` above 1 and bloom |
+
+**Parts** — pixel art, outlined `#120c10`.
+
+| frame | size | what |
+| --- | --- | --- |
+| `saber-hilt` | 32 × 12 | a chrome hilt, the emitter at the right end (x = 31), a red stud; the blade starts at the right edge |
+| `plank-0`, `plank-1`, `plank-2` | 32 × 8 | weathered planks seen from the side, nail heads near both ends — a deck plank hangs between two rope points |
+| `post` | 16 × 48 | a wooden post with rope wound round its top, standing on the bottom edge |
+| `lantern` | 16 × 24 | a hanging lantern with pale cyan glass, its ring at the top |
+| `mote` | 16 × 16 | a soft round glow in white, alpha only — lumafly particles, tinted |
+
+**The cave** — 512 × 288 each, seamless horizontally, cool blue-black, no pixel-art outlines:
+smooth shading at native resolution.
+
+| layer | content | suggested scroll factor |
+| --- | --- | --- |
+| `cave-back.png` | opaque; deep blue haze brighter towards the middle, faint distant pillars, three pale light shafts falling from the upper left | 0.1 |
+| `cave-mid.png` | transparent between; ceiling with stalactites down to y ≈ 120 and a floor from y ≈ 220, slate blue with a blue rim light `#4a6a9a` on the edges facing the open cave | 0.4 |
+| `cave-front.png` | transparent between; near-black stalactites and rocks at the top and bottom edges, rim `#2a3a5a` | 0.8, or in front of the bridge |

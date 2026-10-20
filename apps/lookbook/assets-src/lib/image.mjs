@@ -231,6 +231,8 @@ export class Img {
    * @returns {RGBA}
    */
   get(x, y) {
+    x = Math.floor(x);
+    y = Math.floor(y);
     if (!this.inside(x, y)) return [0, 0, 0, 0];
     const i = (y * this.width + x) * 4;
     const d = this.data;
@@ -242,6 +244,8 @@ export class Img {
    * @param {number} y
    */
   alpha(x, y) {
+    x = Math.floor(x);
+    y = Math.floor(y);
     return this.inside(x, y) ? this.data[(y * this.width + x) * 4 + 3] : 0;
   }
 
