@@ -86,7 +86,7 @@ copy.
 | **support KTX2 textures pipeline** | none | **§4.15**, a loader hook in `TextureStore`, no bundled transcoder |
 | **support free-tex-packer** | its JSON (hash/array) export follows the TexturePacker layout, so `TexturePackerJson` should already read it | verify with a fixture in a spec, add one line to the guide, close the card |
 | **rTexPacker (itch.io)** | its own JSON layout | an adapter (§4.5); no dedicated parser until someone asks |
-| **aseprite sprite-sheets, atlas..** | the frames of an Aseprite JSON follow the TexturePacker layout; frame tags, per-frame durations, `pingpong` and slices are dropped | **§4.5 `AsepriteJson`** — high value |
+| **aseprite sprite-sheets, atlas..** | the frames of an Aseprite JSON follow the TexturePacker layout; frame tags, per-frame durations, `pingpong` and slices stay in `frame.data` and `meta`, but nothing turns them into animations, playback or pivots | **§4.5 `AsepriteJson`** — high value |
 
 ### 3.3 List `vertex-objects`
 
@@ -190,8 +190,9 @@ link.setSize(0, 0.2);                 // height = the thickness; width = extra l
   placement with a message that says why.
 - **The texture along the segment.** A rope repeats its texture by length. `sampleAtlasFrame()`
   already repeats a frame inside its area; a color source `RepeatingTextureColor` built on the
-  same math (`wrap: ['repeat', 'clamp']`, repeat count = length / thickness × aspect of the
-  frame) makes ropes and chains look right. It is the same function the mesh helper uses, not a
+  same math (`wrap: ['repeat', 'clamp']`, repeat count = (length / thickness) / aspect, with
+  aspect = width / height of the frame — a 64 × 16 frame on a segment 8 long and 1 thick repeats
+  twice) makes ropes and chains look right. It is the same function the mesh helper uses, not a
   second implementation.
 - **Joins.** Two segments meet in a gap or an overlap on the outside of a bend. Round caps in the
   frame hide it for ropes; a mitered ribbon is a mesh of its own and out of scope (§5).
@@ -245,7 +246,8 @@ having. High priority, together with §4.5.
 
 Aseprite is the pixel-art tool of the genre this library serves. Its JSON export carries the
 TexturePacker frame layout — `frame`, `rotated`, `trimmed`, `spriteSourceSize`, `sourceSize` —
-so `TexturePackerJson.parse()` already reads the frames. It drops everything else:
+so `TexturePackerJson.parse()` already reads the frames. The rest is not lost — every frame keeps
+its JSON entry as `frame.data`, and `meta` comes back as it was — but nothing interprets it:
 
 | Aseprite | what it is | where it goes |
 | --- | --- | --- |
@@ -288,7 +290,7 @@ Two related gaps:
 ```ts
 const Monster = defineSprite({
   base: QuadBase,
-  features: [InstancePosition, axisBillboardPlacement(), QuadSize, Yaw, TableFrame, DirectionalFrames, TextureColor],
+  features: [InstancePosition, axisBillboardPlacement(), QuadSize, Yaw, tableFrame({views: 8}), TextureColor],
 });
 
 const sprites = new FeatureSprites(Monster, {frameTables: {frames: atlasFrameTable(atlas, /^imp_walk_/)}});
@@ -296,30 +298,31 @@ monster.frameIndex = 0;          // the first frame of the 8 views
 monster.yaw = heading;           // where it faces; the camera picks the view
 ```
 
-- `TableFrame`: a frame feature (the frame slot) with `frameIndex` (float, static) and a frame
+- `tableFrame()`: a frame feature (the frame slot) with `frameIndex` (float, static) and a frame
   table, a new kind of resource next to textures and uniforms (`frameTables`). 4 bytes per
   sprite instead of 36.
-- `DirectionalFrames` (`requires: ['tableFrame', 'yaw']`): adds
-  `round((angleOf(toCamera) − yaw) / (2π / n)) mod n` to the index, `n` = 8 by default, a factory
-  option (`directionalFrames({views: 4})`). It needs to work on the frame slot's index before the
-  lookup — the frame stages of §4.7.
+- Directional frames are an option of the same feature, `tableFrame({views: n})`
+  (`requires: ['yaw']`): it adds `round((angleOf(toCamera) − yaw) / (2π / n)) mod n` to the index
+  before the lookup. The index has to change before the table is read, and a frame stage (§4.7)
+  runs after the frame slot has answered resolved tex coords — so the choice of the view belongs
+  in the frame feature itself, as `flatPlacement()` folds its options into one placement. One
+  frozen feature per option set; `tableFrame()` without `views` is the plain lookup.
 - Animated directional sprites: the animation writes `frameIndex` per frame on the CPU (a dynamic
   attribute), or `AnimatedFrames` learns a frame table as an alternative to the animsMap. The
   first is enough to start; the second waits for a demo that needs it.
 
-Verdict: `TableFrame` is the missing middle between "nine floats" and "an animation", and
+Verdict: `tableFrame()` is the missing middle between "nine floats" and "an animation", and
 directional frames are the 2.5D feature the board never named and every boomer shooter needs.
-Medium priority — after the pipeline extension it depends on.
+Medium priority; independent of the pipeline extension of §4.7.
 
 ### 4.7 The pipeline: frame stages, uv stages and a grid base — the card "nine-patch sprites"
 
-Three proposals of this document cannot be built as features today, and all three for the same
-reason: the pipeline has no stage between the frame slot and its readers.
+Two proposals of this document cannot be built as features today, and both for the same reason:
+the pipeline has no stage between the frame slot and its readers.
 
 | wants | needs |
 | --- | --- |
 | `Flip` (§4.9) — mirror the image without turning the triangles over | a change of the frame: swap `s` and `s + u`, swap the trim margins left and right |
-| `DirectionalFrames` (§4.6) | a change of the frame index before the lookup |
 | `NineSlice` | a uv per vertex that is not the base's `uv` |
 
 **Frame stages.** A slot `frameStages` — `{order, transform(frame, ctx): SpriteFrameNodes}` —
@@ -392,8 +395,9 @@ for every frame feature:
 hero.flipX = velocity.x < 0;     // 0 or 1, static; LocalOrder.Flip's band is finally used
 ```
 
-It respects the diagonal flip of a turned atlas frame (a turned frame flips along `t`, not `s`)
-and mirrors the trim margins, so a trimmed frame stays on its foot.
+It reverses `s` and `u` in every case, a turned atlas frame included: the lookup works out
+`(s + uv.x · u, t + uv.y · v)` before the diagonal swap (`frameUv`), so the drawn x is always the
+`s` axis. It mirrors the trim margins as well, so a trimmed frame stays on its foot.
 
 **`Anchor`** — where the sprite's position sits on its image: centre, foot, top left. `baseArgs`
 sets one anchor for the whole kind; a per-sprite anchor (`anchorX`, `anchorY`, static, in the
@@ -416,10 +420,15 @@ const hit = await picker.pick(camera, pointerNdc, [enemies, items]);
 ```
 
 - The picker draws the listed meshes into a 1 × 1 render target under the pointer, each with a
-  pick material derived from its kind: the same position graph, a color source that writes
-  `instanceIndex + 1` and an id of the mesh. Built like a pass, cached per kind.
-- **Pixel-perfect for free**: the alpha test of the sprites runs, so a click into the
-  transparent corner of a frame picks what lies behind it.
+  pick material derived from its kind: the same position graph, the color source and color
+  stages of the kind run unchanged so that the alpha — and with it the alpha test — is the
+  sprite's own, and a last step *after* the color stages replaces the result with the id:
+  `instanceIndex + 1` and an id of the mesh. Written there, no `Tint` or `Flash` can change it.
+  Built like a pass, cached per kind.
+- The target holds the id exactly: an integer (or float) render target, no blending, no tone
+  mapping, no output color space transform — any of them would turn an id into another id.
+- **Pixel-perfect for free**: the texels the alpha test drops are dropped here too, so a click
+  into the transparent corner of a frame picks what lies behind it.
 - **Asynchronous**: `readRenderTargetPixelsAsync()`, one frame of latency. Fine for clicks;
   for hover every frame, too.
 - The handle is resolved through `spritePool.getVO(index)`; a sprite freed between the draw and
@@ -590,9 +599,9 @@ silent. Lower-medium priority; first make the full pool loud (a one-time warning
 | --- | --- | --- |
 | **A** — small, no model change | `Fade`, `Flash` (§4.1); `axisBillboardPlacement()` (§4.2); a loud full pool (§4.16); free-tex-packer fixture; the glow recipe (§4.13) | each is a day or less, each removes a reason to hand-roll |
 | **B** — assets | playback modes and per-frame durations (§4.4); `AsepriteJson` and the atlas adapter (§4.5) | assets decide whether a project starts on the library |
-| **C** — the model | frame stages, uv stages, `gridBase()`, shared uniforms (§4.7, §4.8) | unblocks `Flip`, `NineSlice`, `wave()`, directional frames |
+| **C** — the model | frame stages, uv stages, `gridBase()`, shared uniforms (§4.7, §4.8) | unblocks `Flip`, `NineSlice`, `wave()` |
 | **D** — features on C | `Flip`, `Anchor` (§4.9); `NineSlice` (§4.7); `wave()` (§4.8); segment sprites (§4.3) | segment sprites could go in A, but their texture along the length wants the uv stage |
-| **E** — beside the model | `DynamicAtlas` (§4.11), bitmap text (§4.12), `TableFrame` + `DirectionalFrames` (§4.6), palette swap (§4.14) | helpers and features with a lookbook demo each |
+| **E** — beside the model | `DynamicAtlas` (§4.11), bitmap text (§4.12), `tableFrame()` with directional frames (§4.6), palette swap (§4.14) | helpers and features with a lookbook demo each |
 | **F** — core | sorting (§4.15), GPU picking (§4.10), growing capacity (§4.16) | touch the pool or the renderer; each its own proposal |
 | later | texture arrays, KTX2, `Ballistic`, `Emissive` (§4.17, §4.13) | wait for a scene |
 
