@@ -1,4 +1,5 @@
 /** @import {Display, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+import {expect} from '@esm-bundle/chai';
 import {
   FeatureSprites,
   Map2D,
@@ -465,6 +466,48 @@ export async function readsTopDown(renderer, target) {
   const lower = !isNearColor(rgbAt(pixels, size, size / 2, size - 1 - upperRow), [0, 0, 0]);
   if (upper === lower) throw new Error('readsTopDown: the probe sprite shows in both or neither of the two rows it may land in');
   return upper;
+}
+
+/**
+ * The colors at the middles of the cells of a sprite `columns × rows` units large whose middle is at
+ * `(x, y)`, row by row from the top of the picture, on a target `size` pixels square drawn at
+ * `pixelsPerUnit` pixels to the unit around the origin — `topDown` is the row order the backend read
+ * the target back in (see {@link readsTopDown}).
+ */
+export function cellColors(pixels, size, pixelsPerUnit, topDown, x, y, columns, rows) {
+  const center = size / 2;
+  const colors = [];
+  for (let row = 0; row < rows; row++) {
+    const line = [];
+    for (let column = 0; column < columns; column++) {
+      const px = Math.floor(center + (x + column - (columns - 1) / 2) * pixelsPerUnit);
+      const fromTop = Math.floor(center - (y + (rows - 1) / 2 - row) * pixelsPerUnit);
+      line.push(rgbAt(pixels, size, px, topDown ? fromTop : size - 1 - fromTop));
+    }
+    colors.push(line);
+  }
+  return colors;
+}
+
+/** The cells of {@link cellColors} mirrored left for right. */
+export const mirroredX = (cells) => cells.map((line) => [...line].reverse());
+
+/** The cells of {@link cellColors} mirrored upside down. */
+export const mirroredY = (cells) => [...cells].reverse();
+
+/** Holds the cells of {@link cellColors} to `expected`, cell by cell; the reference has to light more than one cell. */
+export function expectSameCells(actual, expected, what) {
+  expect(
+    expected.flat().filter((rgb) => !isNearColor(rgb, [0, 0, 0])),
+    `the cells of the reference of ${what} that are lit`,
+  ).to.have.length.above(1);
+  actual.forEach((line, row) =>
+    line.forEach((rgb, column) => {
+      expect(rgb, `${what}: cell (${column}, ${row}) against ${expected[row][column]}`).to.satisfy((c) =>
+        isNearColor(c, expected[row][column]),
+      );
+    }),
+  );
 }
 
 /**

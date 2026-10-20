@@ -310,6 +310,29 @@ describe('defineSprite()', () => {
       });
     });
 
+    test('lets a feature add attributes of its own to the word another feature names after its attribute, in any order', () => {
+      const frame = defineFeature({
+        name: 'frame',
+        attributes: {texCoords: {size: 4}, texTrim: {size: 4}},
+        usageAliases: {texCoords: ['texTrim']},
+      });
+      const border = defineFeature({name: 'border', attributes: {insets: {size: 4}}, usageAliases: {texCoords: ['insets']}});
+
+      expect(defineSprite({base: QuadBase, features: [position, flat, frame, border]}).usageAliases).toEqual({
+        position: ['instancePosition'],
+        texCoords: ['texTrim', 'insets'],
+      });
+      expect(defineSprite({base: QuadBase, features: [position, flat, border, frame]}).usageAliases).toEqual({
+        position: ['instancePosition'],
+        texCoords: ['insets', 'texTrim'],
+      });
+      // without the feature of the attribute the word is the joining feature's own
+      expect(defineSprite({base: QuadBase, features: [position, flat, border]}).usageAliases).toEqual({
+        position: ['instancePosition'],
+        texCoords: ['insets'],
+      });
+    });
+
     test('a uniform start value of the wrong shape', () => {
       const bad = defineFeature({name: 'bad', uniforms: {light: [1, 2, 3, 4, 5] as unknown as number}});
 

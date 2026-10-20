@@ -170,8 +170,8 @@ const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
 /**
  * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
  * `<`, `select()`, swizzles, vectors joined from parts, `dot`, `cross`, `length`, `normalize`, `max`,
- * `min`, `clamp`, `step`, `abs`, `mix`, `negate`, `sin` and `cos` — what the mesh stages, the
- * placements and the color stages are built from. Throws for any other node.
+ * `min`, `clamp`, `step`, `abs`, `round`, `mix`, `negate`, `sin` and `cos` — what the frame, local,
+ * mesh, uv and color stages and the placements are built from. Throws for any other node.
  */
 export function evaluateNode(root: Node): EvaluatedValue {
   const node = root as unknown as EvaluableNode;
@@ -214,11 +214,13 @@ export function evaluateNode(root: Node): EvaluatedValue {
         return zip(a, evaluateNode(node.bNode!), Math.min);
       case 'clamp':
         return zip(zip(a, evaluateNode(node.bNode!), Math.max), evaluateNode(node.cNode!), Math.min);
-      // step(edge, x) is 1 for x ≥ edge
+      // step(edge, x): 1 for x ≥ edge
       case 'step':
         return zip(a, evaluateNode(node.bNode!), (edge, x) => (x >= edge ? 1 : 0));
       case 'abs':
         return zip(a, 0, Math.abs);
+      case 'round':
+        return zip(a, 0, Math.round);
       case 'length':
         return Math.sqrt(dotOf(a, a));
       case 'negate':

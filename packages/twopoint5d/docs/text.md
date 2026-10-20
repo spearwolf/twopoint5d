@@ -108,6 +108,11 @@ attribute, so the `baseArgs` of the sprites count: under `QuadBase` with its def
 the middle of the glyph box, with `baseArgs: [0.5, 0.5, 0.5, -0.5]` it is the top left corner. A
 `Rotation` turns a glyph about its position, so the base chooses the pivot.
 
+**`Anchor`.** A kind with the sprite feature `Anchor` takes its text exactly where a kind without it
+does: `writeText()` writes no anchor, and a new sprite starts at `(0.5, 0.5)`, which moves nothing.
+An anchor set on a glyph afterwards moves the glyph off its box — to turn a glyph about another point
+and keep it in place, move it along: `x += (anchorX − 0.5) · width`, `y −= (anchorY − 0.5) · height`.
+
 **What is written.** The frame (`setFrame()`), the size of the box and the position, with the `z` of
 the options. Nothing else: a new sprite keeps its white tint and its rotation of 0 until the caller
 writes them. `QuadSize` and `AtlasFrame` are static attributes and reach the GPU with the first

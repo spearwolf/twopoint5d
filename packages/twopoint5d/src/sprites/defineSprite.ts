@@ -132,26 +132,32 @@ function mergeAttributes(features: readonly SpriteFeature[], base: SpriteBase) {
 function mergeUsageAliases(features: readonly SpriteFeature[], attributeOwners: ReadonlyMap<string, string>) {
   const aliases: Record<string, readonly string[]> = {};
   const owners = new Map<string, string>();
+  const declaresWord = (name: string, word: string) =>
+    features.some(
+      (feature) => feature.name === name && feature.usageAliases != null && Object.hasOwn(feature.usageAliases, word),
+    );
   for (const feature of features) {
     for (const [word, targets] of Object.entries(feature.usageAliases ?? {})) {
-      const owner = owners.get(word);
-      if (owner != null)
-        throw new Error(`${WHERE}: features "${owner}" and "${feature.name}" both declare the usage alias "${word}"`);
       // a word named like an attribute of its own feature names that attribute and its targets —
-      // `texCoords` of AtlasFrame; named like the attribute of another feature it would steal it
+      // `texCoords` of AtlasFrame. Another feature may add attributes of its own to such a word, when
+      // the feature of the attribute declares it — NineSlice's insets, which setSliceFrame() writes
+      // with the frame; named like the attribute of a feature that declares no such word it would steal it
       const attributeOwner = attributeOwners.get(word);
-      if (attributeOwner != null && attributeOwner !== feature.name) {
+      if (attributeOwner != null && attributeOwner !== feature.name && !declaresWord(attributeOwner, word)) {
         throw new Error(
           `${WHERE}: feature "${feature.name}" declares the usage alias "${word}", which is an attribute of feature "${attributeOwner}"`,
         );
       }
+      const owner = owners.get(word);
+      if (owner != null && attributeOwner == null)
+        throw new Error(`${WHERE}: features "${owner}" and "${feature.name}" both declare the usage alias "${word}"`);
       for (const target of targets) {
         if (feature.attributes?.[target] == null) {
           throw new Error(`${WHERE}: feature "${feature.name}" aliases "${word}" to "${target}", which it does not declare`);
         }
       }
       owners.set(word, feature.name);
-      aliases[word] = Object.freeze([...targets]);
+      aliases[word] = Object.freeze([...(aliases[word] ?? []), ...targets]);
     }
   }
   return Object.freeze(aliases);
@@ -201,10 +207,10 @@ function checkLayout(
 /**
  * Merges a base and features into a sprite kind. Checks, in this order, and throws naming the
  * features involved: the base contract, unique feature names — where two share one, the `checkKind`
- * of the first is asked first, so that the forms of one factory can say why a kind takes one —, `requires`, one placement and at most
- * one frame and color source, a placement without textures, unique uniforms, textures, attributes,
- * sprite-handle properties and usage aliases, and the layout of the merged attributes — and last the
- * `checkKind` of every feature, in the order of the list.
+ * of the first is asked first, so that the forms of one factory can say why a kind takes one —,
+ * `requires`, one placement and at most one frame and color source, a placement without textures,
+ * unique uniforms, textures, attributes, sprite-handle properties and usage aliases, and the layout of
+ * the merged attributes — and last the `checkKind` of every feature, in the order of the list.
  */
 export function defineSprite<const F extends readonly SpriteFeature[]>(options: {
   readonly base: SpriteBase;

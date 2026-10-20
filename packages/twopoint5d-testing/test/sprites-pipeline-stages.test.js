@@ -24,12 +24,16 @@ import {
 import {abs, add, div, float, max, min, mix, mul, round, step, sub, vec2, vec3, vec4} from 'three/tsl';
 import {OrthographicCamera, RenderTarget, Scene, Texture} from 'three/webgpu';
 import {
+  cellColors as cellColorsOf,
   disposeDisplay,
+  expectSameCells,
   isNearColor,
   makeColorTexture,
   makeContainer,
   makeSheetWithTurnedCopy,
   makeTrimmedSheet,
+  mirroredX,
+  mirroredY,
   readsTopDown,
   renderToPixels,
   rgbAt,
@@ -233,42 +237,8 @@ const BobKind = defineSprite({
 /** @param {import('@spearwolf/twopoint5d').SpriteBase} base */
 const waveKindOn = (base) => defineSprite({base, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor, Wave]});
 
-/**
- * The colors at the middles of the cells of a sprite `columns × rows` units large whose middle is at
- * `(x, y)`, row by row from the top of the picture — `topDown` is the row order the backend read the
- * target back in (see `readsTopDown()`).
- */
-function cellColors(pixels, pixelsPerUnit, topDown, x, y, columns, rows) {
-  const center = TARGET_SIZE / 2;
-  const colors = [];
-  for (let row = 0; row < rows; row++) {
-    const line = [];
-    for (let column = 0; column < columns; column++) {
-      const px = Math.floor(center + (x + column - (columns - 1) / 2) * pixelsPerUnit);
-      const fromTop = Math.floor(center - (y + (rows - 1) / 2 - row) * pixelsPerUnit);
-      line.push(rgbAt(pixels, TARGET_SIZE, px, topDown ? fromTop : TARGET_SIZE - 1 - fromTop));
-    }
-    colors.push(line);
-  }
-  return colors;
-}
-
-const mirroredX = (cells) => cells.map((line) => [...line].reverse());
-const mirroredY = (cells) => [...cells].reverse();
-
-function expectSameCells(actual, expected, what) {
-  expect(
-    expected.flat().filter((rgb) => !isNearColor(rgb, [0, 0, 0])),
-    `the cells of the reference of ${what} that are lit`,
-  ).to.have.length.above(1);
-  actual.forEach((line, row) =>
-    line.forEach((rgb, column) => {
-      expect(rgb, `${what}: cell (${column}, ${row}) against ${expected[row][column]}`).to.satisfy((c) =>
-        isNearColor(c, expected[row][column]),
-      );
-    }),
-  );
-}
+const cellColors = (pixels, pixelsPerUnit, topDown, x, y, columns, rows) =>
+  cellColorsOf(pixels, TARGET_SIZE, pixelsPerUnit, topDown, x, y, columns, rows);
 
 describe('sprites — the pipeline stages carry flip, nine-slice and wave', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget

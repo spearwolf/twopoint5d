@@ -39,19 +39,19 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 
 | slot | per kind | built-in features |
 | --- | --- | --- |
-| `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
-| `frameStage` | any, by `order` | — |
+| `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames`, `TableFrame`, `tableFrame()` |
+| `frameStage` | any, by `order` | `Flip` |
 | trim shift | built in, runs when the frame has trim margins | — |
-| `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
+| `local` | any, by `order` | `Anchor`, `NineSlice`, `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()`, `SegmentPlacement`, `segmentPlacement()` |
 | `mesh` | any, by `order` | `wave()`; `PlanarShadow`, `MirrorAtPlane` (passes) |
-| `uv` | any, by `order` | — |
+| `uv` | any, by `order` | `NineSlice` |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor`, `RepeatingTextureColor` |
-| `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
+| `color` | any, by `order` | `PaletteSwap`, `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
-The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear
-300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
-and `ColorOrder` (`Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
+The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Slice 175, Scale
+200, Shear 300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
+and `ColorOrder` (`Palette 50, Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
 your own. Two stages of one order run in the order of the feature list. `ColorOrder.Pass` is the
 band of the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` —
 after every color stage of the kind.
@@ -193,12 +193,17 @@ flags.dispose();
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
 | `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
 | `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time` (shared); texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
+| `TableFrame`, `tableFrame(options)` | `frameIndex` (static); texture `frameTable` | `frameIndex` | frame | 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `RepeatingTextureColor` | — (texture `colorMap`; requires `InstancePosition`, `SegmentEnd`, `QuadSize`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
 | `wave(options)` | — (uniforms `waveAmplitude`, `waveFrequency`, `waveSpeed`, `time` shared) | — | mesh, `Offset` | — |
+| `Flip` | `flip` (static) | `flipX`, `flipY`, `setFlip()` | frame stage, `Flip` | unflipped, 0, 0 |
+| `Anchor` | `anchor` (static) | `anchorX`, `anchorY`, `setAnchor()`, `setAnchorFromPivot(frame, slice?)` | local, `Anchor` | the middle, 0.5, 0.5 |
+| `NineSlice` | `sliceInsets`, `sliceScale` (static), `sliceInsets` part of the word `texCoords` | `insetLeft` … `insetBottom`, `setSliceInsets()`, `sliceScale`, `setSliceFrame(frame, slice?)` | local, `Slice`; uv, `Slice` | no border, scale 1 |
+| `PaletteSwap`, `paletteSwap(options)` | `paletteRow` (static); uniforms `paletteShift`, `paletteCycle`; texture `palette` | `paletteRow` | color, `Palette` | row 0 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -260,6 +265,186 @@ enemies.dispose();
 - The passes leave both alone where they should: `ShadowMask` and `Darken` run after them, in
   `ColorOrder.Pass`, so a fading sprite throws a fading shadow, a flashing one a plain shadow, and
   its reflection flashes darkened.
+
+### Flip
+
+`Flip` mirrors the image of a sprite — left for right with `flipX`, upside down with `flipY` — and
+leaves its triangles as they are: a platformer's character faces left and stays visible under the
+default `FrontSide`. A negative width would mirror it too, but turns the triangles over, and
+`setTexCoords()` with a negative `u` breaks a trimmed frame and cannot reach `AnimatedFrames`.
+
+```ts check
+import {
+  AnimatedFrames,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  Flip,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+
+const Fighter = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AnimatedFrames, TextureColor, Flip],
+});
+const fighters = new FeatureSprites(Fighter, {capacity: 8});
+const hero = fighters.createSprite()!;
+hero.setSize(64, 64);
+
+export function walk(velocityX: number) {
+  hero.flipX = velocityX < 0 ? 1 : 0; // the sheet faces right
+  fighters.spritePool?.touchVO(hero, 'flip');
+}
+```
+
+- **A frame stage** at `FrameOrder.Flip`: the frame's `s` and `s + u` swap places, and its trim
+  margins left for right. The drawn x is the `s` axis for every frame, so it mirrors a frame of
+  `AtlasFrame`, every frame `AnimatedFrames` picks — in every playback mode — and a frame the
+  packer turned or trimmed alike; a trimmed frame stays where the flipped untrimmed sprite has it,
+  on its foot. Without a frame feature it mirrors the whole texture.
+- **0 or 1.** A value above 0.5 counts as 1, so a flag never draws a squeezed image. `flip` is
+  static: mark a change with `touchVO(sprite, 'flip')`, or build a geometry with `attributeUsage:
+  {dynamic: ['flip']}` for sprites that turn every few frames.
+- **The frame records the mirror** in `mirror`, so `Anchor` mirrors the anchor and `NineSlice` the
+  border along with the image.
+- **Every base and every pass.** It works on the quad and on `gridBase()`, and `ShadowPass`,
+  `ReflectionPass` and `BillboardReflectionPass` draw the flipped image.
+- `LocalOrder.Flip` is a different thing: the band of a local stage of one's own that mirrors the
+  geometry, whose sprites need `side: DoubleSide`.
+
+### Anchor
+
+`Anchor` says where the position of a sprite sits on its image — the middle, the foot, the top left
+corner — per sprite, as fractions of the untrimmed sprite: `anchorX` from the left edge, `anchorY`
+from the top down, `(0.5, 0.5)` the middle a new sprite starts with. A sprite turns about its
+anchor, and a placement puts the anchor on the instance position.
+
+```ts check
+import {
+  Anchor,
+  AsepriteJson,
+  type AsepriteJsonData,
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  Flip,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+
+declare const json: AsepriteJsonData; // fighter.json: a 64 × 64 canvas, a slice "pivot" at the feet
+
+const Fighter = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, AtlasFrame, TextureColor, Flip],
+});
+const [atlas] = AsepriteJson.parse(json);
+const fighters = new FeatureSprites(Fighter, {capacity: 8});
+const hero = fighters.createSprite()!;
+const frame = atlas.frame('fighter 0.aseprite')!;
+hero.setSize(64, 64);
+hero.setFrame(frame);
+hero.setAnchorFromPivot(frame); // pivot {x: 32, y: 63}: the anchor (0.5, 1), the feet
+hero.setPosition(100, 0); // stands on y = 0
+```
+
+- **A local stage** at `LocalOrder.Anchor`: it moves the unit quad by `(0.5 − anchorX, anchorY −
+  0.5)` before `QuadSize` scales it, so the anchor is a fraction of the sprite's size whatever the
+  size, and of the untrimmed sprite — an animation through trimmed frames of different measures
+  keeps its feet where they are. It works on the quad and on every grid.
+- **It counts from where the base puts the position**: the middle, under the default `baseArgs`. A
+  `baseArgs` offset moves the sprite as well, and the two add up — a kind with `Anchor` leaves
+  `baseArgs` at its default.
+- **`Flip`** mirrors the anchor with the image: a fighter whose pivot lies off its middle keeps its
+  body on its position when it turns.
+- **`setAnchorFromPivot(frame, sliceName?)`** reads the pivot of an Aseprite slice of the frame —
+  the slices `AsepriteJson.parse()` writes into its data — and takes the **bottom left corner** of
+  the pixel the pivot marks, as a fraction of the untrimmed frame: a figure whose pivot marks the
+  pixel under its feet stands on its position. Without `sliceName` it takes the one slice that has
+  a pivot. A frame without slices, a slice it does not carry or without a pivot, and several slices
+  with a pivot and no name are refused, naming the fix. It allocates nothing.
+- **Animations.** The anchor belongs to the sprite: a sprite of `AnimatedFrames` takes the pivot of
+  one frame of its animation, when the animation starts — an Aseprite canvas keeps the ground where
+  it is from frame to frame.
+- `anchor` is static: mark a change with `touchVO(sprite, 'anchor')`. Under `ShadowPass` the shadow
+  starts at the anchor; `writeText()` writes no anchor (see `docs/text.md`).
+
+### Nine-slice panels
+
+`NineSlice` keeps the border of a frame at its size in pixels and stretches the middle: one small
+frame draws a panel, a dialog box, a button or a health bar of any size. It lives on
+`gridBase({columns: 3, rows: 3})` and requires `QuadSize`; `setSize()` stretches the panel.
+
+```ts check
+import {
+  Anchor,
+  AsepriteJson,
+  type AsepriteJsonData,
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  gridBase,
+  InstancePosition,
+  NineSlice,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const json: AsepriteJsonData; // panels.aseprite.json: one canvas, a slice with a center per panel
+declare const colorMap: Texture; // panels.png
+
+const Panel = defineSprite({
+  base: gridBase({columns: 3, rows: 3}),
+  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, NineSlice, AtlasFrame, TextureColor],
+});
+const [kit] = AsepriteJson.parse(json);
+const panels = new FeatureSprites(Panel, {capacity: 32, textures: {colorMap}});
+
+const dialog = panels.createSprite()!;
+dialog.setSliceFrame(kit.frame('panels 0.aseprite')!, 'panel-stone'); // the frame and its 8-pixel border
+dialog.sliceScale = 3; // a pixel of the border is 3 units: the pixel art drawn at 3 ×
+dialog.setSize(320, 96);
+dialog.setAnchor(0, 0); // placed by its top left corner
+dialog.setPosition(16, 200);
+```
+
+- **The insets** are left, top, right and bottom of the upright frame, in its pixels:
+  `setSliceInsets(8, 8, 8, 8)`, a new sprite has none. `sliceScale` — the units of the mesh a pixel
+  of the border takes, 1 by default — sizes the border on screen: it is `inset · sliceScale` units
+  wide whatever `setSize()` says.
+- **How.** A local stage at `LocalOrder.Slice`, before `QuadSize` scales, moves the inner grid lines
+  of the position to the border; a uv stage at `UvOrder.Slice` moves those of the uv to as many
+  pixels of the frame, measured in the texels of the `colorMap` (`textureSize()`). A frame the
+  packer turned slices as its upright copy.
+- **`setSliceFrame(frame, slice?)`** writes the frame through `AtlasFrame` and its border at once:
+  out of the `center` of an Aseprite slice — named, or the one slice of the frame that has a center
+  — taking the part of the frame the slice's `bounds` cover, so a UI kit drawn on one canvas gives
+  every panel by name; or with the insets handed in, `setSliceFrame(atlas.frame('panel-stone'),
+  [8, 8, 8, 8])`, for a packer with an insets file of its own. It **refuses a trimmed frame** — a
+  nine-slice frame is packed untrimmed, or the packer cuts into its border — and names the fix for a
+  missing slice or center and for insets that are not four numbers of 0 or more. A frame written
+  with `setFrame()` is not checked: a trimmed one draws its border cut where the packer cut it.
+- **Uploads.** `sliceInsets` is part of the usage word `texCoords`: a geometry built with
+  `attributeUsage: {dynamic: ['texCoords']}` uploads the insets with the frame on every `update()`.
+  Otherwise mark a later `setSliceFrame()` with `spritePool.touchVO(panel, 'texCoords',
+  'sliceInsets')` — under the default usage both sit in the one static buffer, and `'texCoords'`
+  alone marks them as well.
+- **Borders wider than the panel** shrink in proportion until they meet: the middle vanishes and
+  no triangle turns over. Insets wider than the frame shrink in the uv alike.
+- **With the others.** `Anchor` places a panel by any point — `(0, 0)` its top left corner; `Flip`
+  mirrors the border with the image, its left border then the frame's right one; every pass draws
+  the sliced panel. The measure is the unit quad of the default `baseArgs`, as for the trim shift.
+- `checkKind` refuses a kind on any other base — `defineSprite: feature "nineSlice": needs the base
+  gridBase({columns: 3, rows: 3}), not "quad" — …` — and one no feature of which declares the
+  `colorMap`. A 3 × 3 grid shades 16 vertices per sprite.
 
 ### Waves: sway and scroller
 
@@ -598,6 +783,189 @@ handed in stays the caller's. After `dispose()`, `texture`, `canvas`, `context`,
 Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as
 `TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()` and `layoutText()`, see
 [the text guide](text.md).
+
+### Frames out of a table: `tableFrame()`
+
+Between the nine numbers of `AtlasFrame` and an animation of `AnimatedFrames` sits the sprite that
+shows "frame 17 of this set": a tile, a card, a digit, a direction, a pose a game picks on the CPU.
+`TableFrame` stores one number per sprite, `frameIndex`, and reads the frame out of a **frame
+table** — a data texture `FrameTable#bakeDataTexture()` bakes, set as the texture `frameTable`.
+
+```ts check
+import {
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  FrameTable,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TableFrame,
+  type TextureAtlas,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas; // cards.json, frames card_0 … card_51
+declare const colorMap: Texture; // cards.png
+
+const Card = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TableFrame, TextureColor]});
+
+const deck = FrameTable.fromAtlas(atlas, /^card_/);
+const frameTable = deck.bakeDataTexture(); // the caller's: dispose it with the sprites
+const cards = new FeatureSprites(Card, {capacity: 52, textures: {colorMap, frameTable}});
+
+const ace = cards.createSprite()!;
+ace.setSize(64, 96);
+ace.frameIndex = deck.indexOf('card_0');
+
+// later: turn the card over — frameIndex is static, so the change is marked for upload
+export function show(index: number) {
+  ace.frameIndex = index;
+  cards.spritePool?.touchVO(ace, 'frameIndex');
+}
+```
+
+- **`FrameTable`** takes the frames of an atlas as `AtlasFrameTable` does — a list of names in its
+  order, a `RegExp` (the names it matches, in the order of the json), or every frame by id — or a list
+  of frames and bare `TextureCoords` (`new FrameTable(frames)`); `indexOf(name)` answers the index. Its
+  bake is a float `DataTexture`, three texels a frame row by row: up to 5 592 405 frames — 2^24 texels,
+  the most the shader addresses exactly in float —, where `AtlasFrameTable`, the uniform array for a
+  material of one's own, stops at 341 frames. Every
+  bake is a new texture the caller owns; a frame changed afterwards reaches the sprites with the next
+  bake.
+- **The frame** is drawn as `AtlasFrame` draws it: a turned frame upright, a trimmed frame where the
+  untrimmed sprite has it.
+- **`frameIndex`** is rounded to a whole entry; one before the first or past the last frame of the
+  table shows the first or the last — the shader cannot throw. It is static; a sprite animated on the
+  CPU, which writes it every frame, takes `attributeUsage: {dynamic: ['frameIndex']}`.
+- Until the frame table has an image the sprite shows the whole `colorMap`.
+
+**Directional frames.** The 8-direction sprites of every boomer shooter, the cheap impostor of a tree:
+`tableFrame({views: n})` adds to `frameIndex` the view the camera sees the sprite from. It needs `Yaw`,
+the facing of the sprite, and `InstancePosition`:
+
+```ts check
+import {
+  axisBillboardPlacement,
+  defineSprite,
+  FeatureSprites,
+  FrameTable,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  tableFrame,
+  type TextureAtlas,
+  TextureColor,
+  Yaw,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas; // stalker.json: stalker_<anim>_<view>_<frame>
+declare const colorMap: Texture; // stalker.png, nearest
+
+const Stalker = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, axisBillboardPlacement(), QuadSize, Yaw, tableFrame({views: 8}), TextureColor],
+});
+
+const walk = FrameTable.fromAtlas(atlas, /^stalker_walk_/);
+const stalkers = new FeatureSprites(Stalker, {
+  capacity: 16,
+  textures: {colorMap, frameTable: walk.bakeDataTexture()},
+  attributeUsage: {dynamic: ['frameIndex', 'yaw']},
+});
+
+const stalker = stalkers.createSprite()!;
+stalker.setSize(2, 2);
+stalker.yaw = Math.PI / 2; // facing +x
+
+export function frame(time: number) {
+  stalker.frameIndex = (Math.floor(time / 0.15) % 4) * 8; // walk frame 0 … 3, eight views each
+  stalkers.update();
+}
+```
+
+- **The views of a frame** are `n` consecutive entries of the table, view 0 first: `frameIndex` names
+  the first entry of the block, `frame · n`, and the shader adds the view.
+- **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of the
+  sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front is
+  where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh — `Object3D.rotation.y`
+  — and the angle of the camera is measured the same way:
+  `view = round((atan2(toCamera.x, toCamera.z) − yaw) / (2π / n)) mod n`. The lookbook's `stalker` is
+  rendered in that order and its json lists every frame's eight views in a row, so
+  `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is the table as it is. A sheet that counts its views
+  clockwise is reordered by its names, view `k` there being view `(n − k) mod n` here:
+  `` [0, 7, 6, 5, 4, 3, 2, 1].map((v) => `imp_${frame}_${v}`) ``.
+- The angle lies in the xz plane of the mesh, about +y: right for `axisBillboardPlacement()`,
+  `BillboardPlacement` and `flatPlacement({orientation: 'yaw'})`. A mesh laid out in the xy plane under
+  `axisBillboardPlacement({axis: 'z'})` gets its views about +y all the same; turn such a mesh instead.
+  Straight above or below the sprite, where the angle is undefined, the camera sees view 0, the
+  front view, whatever the yaw.
+- The camera is the one that renders: a `ShadowPass` and a `ReflectionPass` show the view the camera
+  sees, as the games of the genre do. A frame stage runs after the view is picked.
+
+### Palette swap and colour cycling
+
+Team colours, enemy variants — the red goblin and the blue goblin from one sheet — and the colour
+cycling of Deluxe Paint waterfalls. `PaletteSwap` draws each sprite in a row of a **palette**: a small
+image, row 0 the source colours, every row below a replacement set of the same length. Ordinary RGBA
+images, no indexed PNG.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  PaletteSwap,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  TextureFactory,
+} from '@spearwolf/twopoint5d';
+
+// nearest, so every texel keeps its exact colour; upright, as every image of the library
+const factory = new TextureFactory(0, ['nearest']);
+const colorMap = await factory.loadAsync('platformer/goblin.png');
+const palette = await factory.loadAsync('platformer/goblin-palette.png'); // 16 × 4: olive, red, blue, green
+
+const Goblin = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, PaletteSwap],
+});
+const goblins = new FeatureSprites(Goblin, {capacity: 32, textures: {colorMap, palette}});
+
+const red = goblins.createSprite()!;
+red.paletteRow = 1;
+const blue = goblins.createSprite()!;
+blue.paletteRow = 2;
+
+// colour cycling — the chrome font runs its entries 1 … 15 through the letters
+export function cycle(time: number) {
+  goblins.setUniform('paletteCycle', 1, 15);
+  goblins.setUniform('paletteShift', time * 12);
+}
+```
+
+- **The match.** A color stage in the band `ColorOrder.Palette` (50), before `Tint` — a tint, a fade
+  and a flash act on the swapped colours — compares the colour of the color source with the first 16
+  entries of row 0 (`paletteSwap({colors: n})` for 1 to 64) and draws it with that entry of the
+  sprite's `paletteRow`, its alpha kept. The first entry it matches wins; a colour no entry holds stays
+  as it is. A `paletteRow` past the last row draws the last.
+- **Exact colours.** The comparison allows `1/512` per channel, the rounding of 8-bit texels and no
+  more. So the `colorMap` is read with `NearestFilter` and no mipmaps — a linear filter blends
+  neighbouring texels into colours of no palette —, has no premultiplied edges, and lies in the same
+  colour space as the `palette` (both `srgb`, or both none). `PaletteSwap` names the `colorMap` in
+  `nearestTextures`, so the sprites say once on the console when it is filtered otherwise.
+- **Colour cycling.** `paletteCycle` `(first, count)` names the entries that cycle — `count` 0, the
+  default, to the end of the palette — and `paletteShift` how far, in whole steps: a colour of entry
+  `i` in the range is drawn with entry `first + ((i − first + floor(paletteShift)) mod count)` of its
+  row. Both are uniforms, one value per mesh; sprites that cycle differently live in meshes of their
+  own.
+- **The cost.** Every fragment reads `colors + 1` texels of the palette: 17 for the default.
+- The palette is read with `flipY = false`, row 0 at the top; it stays the caller's, as every texture.
 
 ## Uploads: static and dynamic attributes
 
@@ -1383,8 +1751,12 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   `uv`); the merged layout has to fit into one sprite. An attribute is `static` unless it says
   otherwise: give one that changes every frame `usage: 'dynamic'`.
 - **`usageAliases`** — words a caller of `attributeUsage` may use for attributes of this feature,
-  `{size: ['quadSize']}`. A word is unique across the kind, names only attributes of its own
-  feature, and may be named like one of them (`texCoords` of `AtlasFrame`).
+  `{size: ['quadSize']}`. A word names only attributes of its own feature and may be named like one
+  of them (`texCoords` of `AtlasFrame`). A word is unique across the kind, with one exception: a
+  word named after an attribute whose feature declares it is open to the other features, each adding
+  attributes of its own — `NineSlice` adds `sliceInsets` to `texCoords`, so they travel with the
+  frame `setSliceFrame()` writes them with. A word named after an attribute of a feature that does
+  not declare it is refused.
 - **`methods`** — methods of the sprite handle, `this` being the sprite. Every property the
   attributes generate and every method name is unique across the kind. A method that hands
   fractional values of its caller to a generated setter writes them into a tuple declared once at
@@ -1403,12 +1775,19 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
   counts as set only once its image has measures. A name is unique across the kind. The textures
   stay the caller's. Until all of them are set the feature drops out of the graph.
+- **`nearestTextures`** — textures, by name, the feature reads texel for texel — its own or
+  another feature's, as `PaletteSwap` names the `colorMap`. The sprites say once on the console,
+  per mesh and texture, when one of them is set with an image and filtered with anything but
+  `NearestFilter` for `magFilter` or `minFilter`; a texture whose image a loader fills in later is
+  judged when `touchTexture()` re-reads it. A name no feature declares is passed over.
 - **`frame`** — the frame slot, at most one feature per kind: answers `texCoords`, and optionally
-  `flipDiagonal` and `trim`, read by both pipelines.
+  `flipDiagonal`, `trim` and `mirror`, read by both pipelines.
 - **`frameStage`** — a stage `{order, transform(frame, ctx)}` on the frame, after the frame slot —
   or the defaults, without a frame feature — and before anything reads it. It answers a whole
   frame: one with no business with `flipDiagonal` or `trim` passes them on, `{...frame,
-  texCoords}`. Its context is the one of the frame slot, without `frame` and `uv`. The lookup reads
+  texCoords}`. A stage that mirrors the drawn image says so in `mirror` — `vec2`, 1 along each axis
+  it mirrored, as `Flip` writes it —, so that a stage which places something on the image mirrors
+  it along. Its context is the one of the frame slot, without `frame` and `uv`. The lookup reads
   `(s + uv.x · u, t + uv.y · v)` before the diagonal swap, so the drawn x is the `s` axis for every
   frame, a turned atlas frame included, and `trim` holds the margins of the sprite as drawn.
 - **`local`**, **`mesh`**, **`uv`**, **`color`** — a stage `{order, transform}` in its slot;

@@ -3,6 +3,7 @@ export {asepriteAtlasAdapter, type AtlasAdapter, type AtlasAdapterResult, textur
 export * from './AtlasFrameTable.js';
 export * from './DynamicAtlas.js';
 export * from './FrameBasedAnimations.js';
+export * from './FrameTable.js';
 export * from './PowerOf2ImageLoader.js';
 export * from './sampleAtlasFrame.js';
 export * from './TextureAtlas.js';

@@ -2,6 +2,7 @@ import {uniformArray} from 'three/tsl';
 import {type Node, type UniformArrayNode, Vector4} from 'three/webgpu';
 
 import {type FrameTrimMargins, frameTrimMargins} from './frameTrimMargins.js';
+import {selectAtlasFrames} from './selectAtlasFrames.js';
 import type {TextureAtlas, TextureAtlasFrame, TextureAtlasFrameName} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
@@ -48,29 +49,9 @@ export class AtlasFrameTable {
    * @throws {RangeError} if it holds more than {@link AtlasFrameTable.MaxFrames} frames.
    */
   static fromAtlas(atlas: TextureAtlas<unknown>, selection?: AtlasFrameTableSelection): AtlasFrameTable {
-    const names =
-      selection == null ? atlas.frameNames() : Array.isArray(selection) ? selection : atlas.frameNames(selection as RegExp);
-
-    if (selection == null) {
-      const frames = Array.from({length: atlas.size}, (_, id) => atlas.get(id)!);
-      const table = new AtlasFrameTable(frames);
-      for (const name of names) table.#indices.set(name, atlas.frameId(name)!);
-      return table;
-    }
-
-    const frames = names.map((name) => {
-      const frame = atlas.frame(name);
-      if (frame == null) {
-        // `toString()` and not an interpolation: a name can be a symbol
-        throw new Error(`AtlasFrameTable: the atlas holds no frame "${name.toString()}"`);
-      }
-      return frame;
-    });
+    const {frames, indices} = selectAtlasFrames(atlas, selection, 'AtlasFrameTable');
     const table = new AtlasFrameTable(frames);
-    names.forEach((name, index) => {
-      // a name listed twice keeps its first index
-      if (!table.#indices.has(name)) table.#indices.set(name, index);
-    });
+    for (const [name, index] of indices) table.#indices.set(name, index);
     return table;
   }
 
