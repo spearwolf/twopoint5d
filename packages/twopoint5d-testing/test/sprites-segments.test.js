@@ -11,6 +11,7 @@ import {
   RepeatingTextureColor,
   SegmentEnd,
   SegmentPlacement,
+  SegmentShadowPass,
   segmentPlacement,
   TextureColor,
   TexturePackerJson,
@@ -260,6 +261,49 @@ describe('sprites — segments lie along their ends', function () {
 
       // above (−3, 0, −4) the camera from above sees the point at (−3, 4) of its view
       expectModel(await render(sprites, 'above'), segmentModel([-3, 4], [-3, 4], 4, 2, RED, GREEN));
+    });
+  });
+
+  describe('SegmentShadowPass', () => {
+    it('throws the shadow of the whole segment where it lies, not of its caps at the start', async function () {
+      const colorMap = makeColorTexture([WHITE], 1, 1);
+      // a white shadow on the black clear color, the light straight from above, the ground y = 0
+      const sprites = new FeatureSprites(segmentsOf(segmentPlacement({plane: 'xz'})), {
+        capacity: 2,
+        textures: {colorMap},
+        passes: [SegmentShadowPass],
+        uniforms: {shadowColor: [1, 1, 1, 1], shadowLight: [0, 1, 0, 0], groundPlane: [0, 1, 0, 0]},
+      });
+      disposals.push(() => {
+        sprites.dispose();
+        colorMap.dispose();
+      });
+      // the segments themselves hang 2 above the ground and are not drawn: only their shadows show
+      sprites.material.visible = false;
+      /** @type {[[number, number, number], [number, number, number]][]} */
+      const ends = [
+        [
+          [-5, 2, 1],
+          [5, 2, 1],
+        ],
+        [
+          [-4, 2, -5],
+          [4, 2, -3],
+        ],
+      ];
+      for (const [start, end] of ends) {
+        const segment = sprites.createSprite();
+        segment.setPosition(...start);
+        segment.setSegmentEnd(...end);
+        segment.setSize(1, 1);
+        segment.setTexCoords(0, 0, 1, 1);
+      }
+
+      // seen from above, the view's y is −z
+      expectModel(
+        await render(sprites, 'above'),
+        either(segmentModel([-5, -1], [5, -1], 1, 1, WHITE), segmentModel([-4, 5], [4, 3], 1, 1, WHITE)),
+      );
     });
   });
 

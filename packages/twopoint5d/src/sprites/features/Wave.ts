@@ -32,7 +32,8 @@ const waves = new Map<string, SpriteFeature>();
  * per second; the wave runs towards +x. The uniforms belong to the kind and start at 1; `time` is
  * declared shared, so next to `AnimatedFrames` one `setUniform('time', t)` drives both.
  *
- * Returns one frozen feature per set of options, every one named `wave` — a kind takes one wave.
+ * Returns one frozen feature per set of options, every one named `wave` — a kind takes one wave, and
+ * `defineSprite()` refuses a second, naming the fix.
  *
  * @throws a `TypeError` for options without a weight, and for a weight or an axis it does not know
  */
@@ -57,6 +58,14 @@ export function wave(options: WaveOptions): SpriteFeature {
     feature = defineFeature({
       name: 'wave',
       requires: ['instancePosition'],
+      // asked by defineSprite() when a second feature named wave is listed, before the plain refusal
+      checkKind: ({features}) => {
+        if (features.filter(({name}) => name === 'wave').length > 1) {
+          throw new Error(
+            'a kind takes one wave — pick one weight and one axis, or write a mesh stage of your own for a second motion',
+          );
+        }
+      },
       // shared: the time of AnimatedFrames, a bob or another feature of the kind is the wave's
       uniforms: {waveAmplitude: 1, waveFrequency: 1, waveSpeed: 1, time: {value: 0, shared: true}},
       mesh: {

@@ -342,8 +342,9 @@ vertex = vertex + axis · waveAmplitude · weight · sin(phase)
   frame weigh as the untrimmed sprite does.
 - **`time` is shared** with `AnimatedFrames`: a kind with both holds one `time`, and one
   `setUniform('time', t)` plays the animation and moves the wave.
-- **One wave per kind.** Every form is named `wave`, and `defineSprite()` refuses a second.
-  `wave()` answers one frozen feature per set of options and refuses options without a `weight`,
+- **One wave per kind.** Every form is named `wave`, and `defineSprite()` refuses a second: `a kind
+  takes one wave — pick one weight and one axis, or write a mesh stage of your own for a second
+  motion`. `wave()` answers one frozen feature per set of options and refuses options without a `weight`,
   an unknown weight and an unknown axis with a `TypeError`.
 - **Passes** draw the mesh stages of the kind, so a shadow or a reflection sways with its sprite; a
   pass that wants it still leaves the wave out, `without: ['wave']`.
@@ -1064,10 +1065,15 @@ export function frame() {
   'clamp']`, `trim: 'stretch'` and `inset: 0.5`.
 - **Joins.** Two segments meet in a gap or an overlap on the outside of a bend. Caps of the
   thickness and a round frame hide it for ropes; a mitred ribbon is a mesh of its own.
-- **Passes.** `ShadowPass` turns every sprite to the light about its instance position — for a
-  segment, the quad of its caps at its start. A kind of segments projects the segment as it lies
-  with `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`; `ReflectionPass` mirrors
-  the placed vertex and works as it is.
+- **Passes.** `ShadowPass` turns every sprite to the light about its instance position, and
+  `BillboardReflectionPass` places it as a billboard there — of a segment, both would draw the quad
+  of its caps at its start, so both refuse a kind of segments, naming the pass to take.
+  `SegmentShadowPass` projects each segment onto the ground as it lies: `ShadowPass` without the turn
+  to the light, named `shadow` as well. `ReflectionPass` mirrors the placed vertex, which is the
+  mirror image of a segment in a plane. A segment that faces the camera mirrors into a ribbon that
+  faces the mirror image of the camera, as a mirrored billboard does: the camera sees it at twice
+  its height angle above the mirror, thinner the higher the camera, edge on at 45° — no pass ships
+  for that; draw the reflected ropes of a mirror in a plane.
 - **Cost.** 12 bytes per sprite for the end, uploaded with every `update()`; per vertex two lengths
   and two divisions in the plane, a cross product and a dot product more facing the camera.
 
@@ -1421,7 +1427,10 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   `defineSprite()` runs it last, once every other check has passed, and refuses the kind as
   `defineSprite: feature "name": <message>`; a pass runs the checks of its features against the
   features it draws with, and a placement that stands in on a live material runs its own against
-  the kind with itself in place of the kind's placement.
+  the kind with itself in place of the kind's placement. Where two features of a kind share a name —
+  two forms of one factory, as `wave()` gives every form the name `wave` — `defineSprite()` asks the
+  `checkKind` of the first before every other check, so that it can say why a kind takes one; a
+  check that lets it pass leaves the plain refusal, `two features are named "wave"`.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
@@ -1608,9 +1617,9 @@ The rules:
   and every texture stay the caller's. Passes need a material the sprites build, so they are
   refused next to a `material` handed in.
 
-Three passes ship ready-made. All are `transparent`, write no depth, draw both sides of a triangle
+Four passes ship ready-made. All are `transparent`, write no depth, draw both sides of a triangle
 (`side: DoubleSide`) and take a `renderOrder` of -1; `ShadowPass` takes a polygon offset as well
-(`polygonOffset`, with a factor and units of -1). A plane is `[n.x, n.y, n.z, d]`, the plane
+(`polygonOffset`, with a factor and units of -1), and so does `SegmentShadowPass`. A plane is `[n.x, n.y, n.z, d]`, the plane
 `dot(n, p) = d` in the local space of the mesh; `n` need not be a unit vector, so `[0, 2, 0, 4]`
 is the plane `y = 2`. A ground or a light in the scene graph need not be worked out by hand —
 see "Binding uniforms to the scene graph" below:
@@ -1620,15 +1629,16 @@ see "Binding uniforms to the scene graph" below:
 | `ShadowPass` | `LightFacingPlacement`, `PlanarShadow`, `ShadowMask` | `shadowLight` (`[-0.4, 1, -0.3, 0]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite turned to face the light, projected from `shadowLight` onto `groundPlane` — along a direction towards the light (`w = 0`) or from a point light (`w = 1`) — in `shadowColor`, its alpha multiplied by the alpha of the sprite |
 | `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included — the reflection of a flat sprite |
 | `BillboardReflectionPass` | `MirroredBillboardPlacement`, `MirrorAtPlane`, `Darken` | as `ReflectionPass` | the reflection of a billboard: facing the camera, as large as the sprite on screen, flipped across the mirror — in `reflectionColor` |
+| `SegmentShadowPass` | `PlanarShadow`, `ShadowMask` | as `ShadowPass` | the sprite projected as it lies, not turned to the light — the shadow of a segment sprite, or of a decal; named `shadow` |
 
 Which pass suits which placement:
 
 | placement | shadow | reflection |
 | --- | --- | --- |
-| `FlatPlacement`, `flatPlacement()` | `ShadowPass` — turned to the light; for decals `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` | `ReflectionPass` |
+| `FlatPlacement`, `flatPlacement()` | `ShadowPass` — turned to the light; for decals `SegmentShadowPass`, projected as they lie | `ReflectionPass` |
 | `BillboardPlacement` | `ShadowPass` | `BillboardReflectionPass` |
 | `AxisBillboardPlacement`, `axisBillboardPlacement()` | `ShadowPass` | `ReflectionPass` |
-| `SegmentPlacement`, `segmentPlacement()` | `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` — the segment projected as it lies | `ReflectionPass` |
+| `SegmentPlacement`, `segmentPlacement()` | `SegmentShadowPass` — the segment projected as it lies; `ShadowPass` refuses the kind | `ReflectionPass` for `'plane'`; facing the camera, the mirrored ribbon thins out towards a camera 45° above the mirror; `BillboardReflectionPass` refuses the kind |
 
 `ShadowPass` turns every sprite to the light, whatever its placement, so an axis billboard throws
 the shadow a flat or a spherical one throws. An axis billboard stands along its axis, so in a mirror
@@ -1638,9 +1648,10 @@ sprite on screen. `BillboardReflectionPass` would lean that reflection towards t
 sprite stands upright. In a mirror of another tilt `ReflectionPass` shows the mirror image of the
 card as it stands, as for a flat sprite.
 
-`ShadowPass` carries the hook `shadowFallsOnPlane` (see "Leaving a pass out for a frame" below);
-the two reflections carry none and are drawn whenever they are on. `BillboardReflectionPass` is
-named `reflection`, as `ReflectionPass` is: a kind takes one or the other.
+`ShadowPass` and `SegmentShadowPass` carry the hook `shadowFallsOnPlane` (see "Leaving a pass out
+for a frame" below); the two reflections carry none and are drawn whenever they are on.
+`SegmentShadowPass` is named `shadow`, as `ShadowPass` is, and `BillboardReflectionPass` is named
+`reflection`, as `ReflectionPass` is: a kind takes one or the other of each pair.
 
 **The turn to the light.** A sprite is flat. Projected as it stands, a sprite that the light sees
 at a slant throws a thin, stretched shadow, and one it sees edge on throws a line — a billboard
@@ -1662,8 +1673,8 @@ anchor sits at its foot starts at the foot and runs straight away from the light
 The shadow follows the light, not the placement, so it does not change under a placement swap,
 and it ignores the plane and the turn of `flatPlacement()`. For sprites that lie in the ground —
 decals, `GroundPlacement` — the turn is wrong: they would throw the shadow of a standing quad. A
-pass that projects the sprites as they stand leaves the placement out:
-`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`. It keeps the yaw or the
+pass that projects the sprites as they stand leaves the placement out: `SegmentShadowPass`, which is
+`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` and draws segment sprites as well. It keeps the yaw or the
 quaternion, too, and throws the shadow of a sign as it is turned — thin where the light grazes it.
 
 **The reflection of a billboard.** `ReflectionPass` mirrors the placed vertex, which is right for a

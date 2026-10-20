@@ -69,8 +69,10 @@ export function wave(options: WaveOptions): SpriteFeature;
 
 - **One frozen feature per option set**, memoized by `weight` and the resolved `axis`, as
   `flatPlacement()` memoizes its placements: `wave({weight: 'top'}) === wave({weight: 'top', axis:
-  'x'})`. Every one is named `wave`: a kind takes one wave, and a second is refused as two
-  features named `"wave"` by `defineSprite()` — which also keeps their uniforms from colliding.
+  'x'})`. Every one is named `wave`: a kind takes one wave. A second is refused by the wave's
+  `checkKind`, which `defineSprite()` asks before its plain refusal of two features of one name
+  (§2.4) — `defineSprite: feature "wave": a kind takes one wave — pick one weight and one axis, or
+  write a mesh stage of your own for a second motion`.
 - `requires: ['instancePosition']` — the phase reads it.
 - **Uniforms**, per kind: `waveAmplitude: 1`, `waveFrequency: 1`, `waveSpeed: 1`, and `time: {value:
   0, shared: true}` — the declaration of `AnimatedFrames`, so a kind with both holds one `time`
@@ -119,6 +121,16 @@ vertex = vertex + axis · waveAmplitude · weight · sin(phase)
 - A pass draws the kind's mesh stages, so `ShadowPass` and `ReflectionPass` sway along; a pass that
   wants a still shadow leaves the wave out, `without: ['wave']`.
 - Any placement; the wave moves the placed vertex in the mesh.
+
+### 2.4 Two features of one name ask the first
+
+`defineSprite()` checks the names of the features first, before `requires` and the declarations — so
+a second wave would be refused as `two features are named "wave"` (or, under other names, as two
+features that declare `waveAmplitude`), which names no fix. On a duplicate name it now runs the
+`checkKind` of the first feature of that name against the whole kind, before the plain refusal: a
+factory whose forms share a name says why a kind takes one of them. A check that lets the kind pass
+leaves the plain refusal. The `SpriteFeature#checkKind` doc and the guide's "Writing a feature" say
+so.
 
 ## 3. Segment sprites
 
@@ -247,9 +259,24 @@ normal = dir × across
   the trim margin times `width`). Segment frames are packed untrimmed.
 - **Passes**: `ShadowPass` brings `LightFacingPlacement`, which places the local quad — scaled by
   `QuadSize` — at the start of each segment and turns it to the light: the shadow of a cap, not of
-  the segment. A kind of segments takes `definePass({...ShadowPass, features: [PlanarShadow,
-  ShadowMask]})`, which projects the segment as placed; `ReflectionPass` mirrors the placed vertex
-  and works as it is. The guide adds the row to its table of passes per placement.
+  the segment. `BillboardReflectionPass` brings `MirroredBillboardPlacement`, which does the same as
+  a billboard. Both placements carry a `checkKind` that refuses a kind holding a segment placement,
+  matched by name (`segmentPlacement`, `segmentPlacement+…`) since a pass that brings its own
+  placement is shown the kind's placement as a copy without its stage:
+  `FeatureSprites: feature "lightFacingPlacement" of pass "shadow": it turns each sprite to the light
+  about its instance position, and of a segment of "segmentPlacement" it would draw the quad of the
+  caps at the start — take SegmentShadowPass, which projects the segment as it lies`; the refusal of
+  `mirroredBillboardPlacement` names `ReflectionPass`. A kind that holds `SegmentEnd` under another
+  placement is not refused.
+- **`SegmentShadowPass`** — `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`,
+  exported with the presets: the segment projected as it lies, in `shadowColor`, with the material,
+  `renderOrder` and `shadowFallsOnPlane` hook of `ShadowPass` and its name, `shadow` — a kind takes
+  one or the other, as `BillboardReflectionPass` takes the name of `ReflectionPass`. It is the pass
+  decals took before, under a name.
+- **`ReflectionPass`** mirrors the placed vertex: for a `'plane'` segment its mirror image. A segment
+  facing the camera mirrors into a ribbon that faces the mirror image of the camera, as a mirrored
+  billboard does: the camera sees it at twice its height angle above the mirror, thinner the higher
+  the camera, edge on at 45°. No pass ships for it; the guide says so.
 - **No `Rotation`, no `Shear`** (§3.2). `Yaw` and `Orientation` are data and are ignored, as under a
   billboard.
 
@@ -340,7 +367,8 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
 - **The aspect is the frame's as drawn**, `drawn.x / drawn.y` in texels of the bound `colorMap`
   (three's `textureSize()` of the bound texture, §7.8 of the pipeline spec); a frame of 64 × 16
   texels on a segment 8 long and 1 thick repeats `(8 / 1) / 4 = 2` times. A frame of no texels
-  (the zero frame of a new sprite) answers 0 repeats and samples its corner; nothing is NaN.
+  (the zero frame of a new sprite) holds both measures at `1e-6` and answers `ratio` repeats; its
+  lookup moves by nothing across the frame and samples the one texel at its corner, finite.
 - **`wrap: ['repeat', 'clamp']`**: along the segment the frame repeats, across it is held at its
   edges — no row of the neighbouring repetition bleeds in at the edges of the rope.
 - **`inset: 0.5`**, fixed: a linear sample stays inside the frame and never reads the neighbouring
@@ -380,6 +408,12 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
   the displacement worked out by `evaluateNode()` for both weights and the three axes at given
   instance positions, uvs, uniforms (`(1 − uv.y)²`, the phase of `x + z`, the sense of the speed); a
   kind with `AnimatedFrames` and a wave holds one `time` node.
+- `src/sprites/passes/segment-passes.spec.ts`: the refusals of `ShadowPass` and
+  `BillboardReflectionPass` for each segment placement, none for a kind with `SegmentEnd` under a
+  billboard, `SegmentShadowPass` as defined, and the placement of the sprites in `SegmentShadowPass`
+  and `ReflectionPass`.
+- `defineSprite.spec.ts`: on a duplicate name the `checkKind` of the first is asked, and the plain
+  refusal follows a check that passes.
 - `src/sprites/features/segments.spec.ts`: `SegmentEnd` (attribute, dynamic, the setter with and
   without z and as a tuple, `initialize()` on a reused slot); `segmentPlacement()` (identity,
   names, `requires`, nothing but its placement, the refusals of the factory); `checkKind` through
@@ -412,6 +446,8 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
     segment draws its full thickness with its top up in both, where a `'plane'` segment seen from
     above draws nothing;
   - **a degenerate segment** draws its caps quad, `width × height`, in each facing;
+  - **`SegmentShadowPass`** draws the shadow of the whole segment under a light from above, where
+    the segment lies;
   - **a rope**: a 64 × 16 frame of an atlas (neighbours of another colour) repeats twice over a
     segment 8 long and 1 thick under `RepeatingTextureColor`, its halves in the order of the frame,
     no texel of a neighbour drawn;
@@ -454,3 +490,6 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
 11. **Gradients unless both filters are nearest** in the color source, the one filter test the
     shape key holds (§4.3); `sampleAtlasFrame()` keeps its own rule.
 12. **`sampleFrameAt()` is internal**, in `texture/`, with the gradient decision left to the lookup.
+13. **Passes that would draw the caps refuse segments**, by name; `SegmentShadowPass` is the shadow
+    of segments, named `shadow` (§3.4).
+14. **A duplicate name asks the first feature's `checkKind`** (§2.4), so a second `wave()` names its fix.

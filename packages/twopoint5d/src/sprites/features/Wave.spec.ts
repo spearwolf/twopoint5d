@@ -150,12 +150,21 @@ describe('wave()', () => {
     material.dispose();
   });
 
-  test('two waves in one kind are refused by their name', () => {
+  test('a second wave in one kind is refused, naming the fix', () => {
     expect(() =>
       defineSprite({
         base: QuadBase,
         features: [InstancePosition, FlatPlacement, wave({weight: 'top'}), wave({weight: 'uniform'})],
       }),
-    ).toThrow('defineSprite: two features are named "wave"');
+    ).toThrow(
+      'defineSprite: feature "wave": a kind takes one wave — pick one weight and one axis, or write a mesh stage of your own for a second motion',
+    );
+    expect(() =>
+      defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, wave({weight: 'top'}), wave({weight: 'top'})]}),
+    ).toThrow('defineSprite: feature "wave": a kind takes one wave');
+  });
+
+  test('one wave passes its own check', () => {
+    expect(() => wave({weight: 'top'}).checkKind!({base: QuadBase, features: [wave({weight: 'top'})]})).not.toThrow();
   });
 });

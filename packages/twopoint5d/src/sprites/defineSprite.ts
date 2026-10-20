@@ -70,11 +70,17 @@ function assertSpriteBase(base: SpriteBase): void {
   }
 }
 
-function assertFeatureNames(features: readonly SpriteFeature[]): void {
-  const names = new Set<string>();
+function assertFeatureNames(base: SpriteBase, features: readonly SpriteFeature[]): void {
+  const names = new Map<string, SpriteFeature>();
   for (const feature of features) {
-    if (names.has(feature.name)) throw new Error(`${WHERE}: two features are named "${feature.name}"`);
-    names.add(feature.name);
+    const first = names.get(feature.name);
+    if (first != null) {
+      // the forms of one factory — wave() — share a name: the check of the first may say what to do
+      // about a second, before the refusal that only names the name
+      runCheckKind(first, {base, features}, `${WHERE}: feature "${feature.name}"`);
+      throw new Error(`${WHERE}: two features are named "${feature.name}"`);
+    }
+    names.set(feature.name, feature);
   }
   for (const feature of features) {
     for (const required of feature.requires ?? []) {
@@ -194,7 +200,8 @@ function checkLayout(
 
 /**
  * Merges a base and features into a sprite kind. Checks, in this order, and throws naming the
- * features involved: the base contract, unique feature names, `requires`, one placement and at most
+ * features involved: the base contract, unique feature names — where two share one, the `checkKind`
+ * of the first is asked first, so that the forms of one factory can say why a kind takes one —, `requires`, one placement and at most
  * one frame and color source, a placement without textures, unique uniforms, textures, attributes,
  * sprite-handle properties and usage aliases, and the layout of the merged attributes — and last the
  * `checkKind` of every feature, in the order of the list.
@@ -207,7 +214,7 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
   const features: readonly SpriteFeature[] = Object.freeze([...options.features]);
 
   assertSpriteBase(base);
-  assertFeatureNames(features);
+  assertFeatureNames(base, features);
 
   const pipeline = buildSpritePipeline(features, WHERE);
   if (pipeline.placement === undefined) {

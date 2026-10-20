@@ -156,7 +156,8 @@ export interface SpriteFeature<Api extends object = object> {
    * of its own; when a pass that brings the feature is folded into a kind, with the features the pass
    * draws with; and when the feature, a placement, stands in for another on a live material. Throws
    * for a kind the feature cannot work in, with a message that names the fix — the caller adds the
-   * name of the feature.
+   * name of the feature. When a second feature of its name is listed, `defineSprite()` asks it before
+   * every other check, so that the forms of one factory can say why a kind takes only one of them.
    */
   readonly checkKind?: (kind: SpriteKindShape) => void;
   /** Carries `Api` for the type of the sprite handle; never set at runtime. */

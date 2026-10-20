@@ -1,6 +1,7 @@
 import {cameraBackLocal, cameraUpLocal} from '../cameraNodes.js';
 import {defineFeature} from '../SpriteFeature.js';
 import {lightFacingVertex} from './facing.js';
+import {refuseSegments} from './refuseSegments.js';
 
 /**
  * The placement of `ShadowPass`: turns every sprite about its instance position to face the light
@@ -11,11 +12,16 @@ import {lightFacingVertex} from './facing.js';
  * normal of the plane, the top turns away from the camera instead. A light behind the sprite sees
  * its face too, so that shadow shows the sprite left for right as the camera sees it.
  *
- * Reads the uniforms of `PlanarShadow` and declares none of its own.
+ * Reads the uniforms of `PlanarShadow` and declares none of its own. Refuses a kind of segment
+ * sprites, whose shadow `SegmentShadowPass` projects as the segment lies.
  */
 export const LightFacingPlacement = defineFeature({
   name: 'lightFacingPlacement',
   requires: ['instancePosition', 'planarShadow'],
+  checkKind: refuseSegments(
+    'turns each sprite to the light about its instance position',
+    'SegmentShadowPass, which projects the segment as it lies',
+  ),
   placement: (local, {attribute, uniform}) =>
     lightFacingVertex({
       vertex: local,
