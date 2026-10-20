@@ -53,6 +53,22 @@ color: {order: ColorOrder.Fade + 10, transform: tintTheShadow}
 color: {order: ColorOrder.Pass + 10, transform: tintTheShadow}
 ```
 
+#### A stage context of one's own, and code that reads `SpritePipeline`
+
+`SpriteShaderContext` holds `uv`, the uv the color source samples at. Code that calls a stage with a context of its own — a unit test of a feature, a helper that folds stages by hand — adds it; without uv stages it is the base uv attribute. `SpritePipeline` holds `frameStage` and `uv`, the sorted features of the two new slots: code that walks every slot of a pipeline walks them too.
+
+**Before**
+
+```ts
+const ctx: SpriteShaderContext = {frame, attribute, uniform, sample, textureSize};
+```
+
+**After**
+
+```ts
+const ctx: SpriteShaderContext = {frame, uv: attribute('uv'), attribute, uniform, sample, textureSize};
+```
+
 ## [0.23.0] - 2026-10-18
 
 The sprite meshes of this release are built from features: `TexturedSprites` and
