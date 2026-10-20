@@ -343,3 +343,70 @@ workflow, model and sampler of each. The generator cuts a square around the head
 | `wizard.png` | an old wizard with a long white beard and a blue hat |
 | `ranger.png` | a blonde elf ranger with a braid |
 | `barbarian.png` | a red-haired, horned barbarian, grinning |
+
+## boomer-shooter-corridor
+
+| file | format | what |
+| --- | --- | --- |
+| `stalker.png` (1024 × 512) + `stalker.json` | TexturePacker hash, untrimmed | the enemy, 80 frames of 64 × 64: 10 poses × 8 views |
+| `wall.png`, `floor.png`, `ceiling.png` (64 × 64 each) | image | corridor textures, seamless in both directions |
+| `door.png` (64 × 96) | image | a blast door |
+| `signs.png` (256 × 128) + `signs.json` | TexturePacker hash | six neon signs |
+
+**The stalker** — a hunched cyber-mutant in the neon look of Anno: Mutationem: violet armour, a
+glowing cyan visor, magenta neon strips, a gun for a right arm, a claw and a fleshy pink growth on
+its left shoulder (the asymmetry tells the views apart), cyan rim light on its left edges and
+magenta on its right. Built from primitives in `boomer-shooter-corridor/blender_render.py` and
+rendered headless in Blender (Cycles) as a G-buffer — camera-space normal and material id per
+pixel — at 256 × 256, orthographic, 2.6 m across the frame, the camera looking down 8°. The
+generator shades it in four bands lit from the upper left, lets the most frequent shade of each
+4 × 4 block win (no blended colours) and outlines it in `#0a0612`. Glowing parts: visor and thigh
+strips `#3ad8ff`, neon `#ff2ab8`, muzzle flash `#ffb030`.
+
+Frame names: **`stalker_<anim>_<view>_<frame>`**.
+
+| anim | frames | suggested timing |
+| --- | --- | --- |
+| `idle` | 0–1 | 400 ms each, `pingpong` — breathing |
+| `walk` | 0–3 | 150 ms each, loop |
+| `attack` | 0–1 | 0 aims (200 ms), 1 fires with a muzzle flash (100 ms) |
+| `hurt` | 0 | one frame, recoiling — with `Flash` |
+| `dead` | 0 | one frame, lying on its back |
+
+**Views** — view *k* (0–7) is the camera *k* · 45° counter-clockwise, seen from above, from the
+stalker's front: 0 its front (the gun arm points at the camera), 1 front-left, 2 its left side
+(it faces screen-left), 3 back-left, 4 its back, 5 back-right, 6 its right side (it faces
+screen-right), 7 front-right. That is the order of a right-handed turn about the up axis — in
+three.js a rotation about +y, with yaw 0 facing +z. If a reader counts its views the other way
+round, view *k* there is view (8 − *k*) mod 8 here.
+
+**Order in `stalker.json`** — animation by animation (`idle`, `walk`, `attack`, `hurt`, `dead`),
+inside one frame by frame, inside one frame the eight views 0–7. So
+`atlasFrameTable(atlas, /^stalker_walk_/)` lists the walk as `frame · 8 + view`: set
+`frameIndex = frame · 8` and `tableFrame({views: 8})` adds the view.
+
+**Pivot** — every frame is 64 × 64 and untrimmed; the stalker stands at x = 32 with its soles on
+row 62 and the outline below them on row 63, so the bottom centre of the frame is its foot
+point: anchor (0.5, 1). The corpse of `dead` lies centred on x = 32 with its back on the ground.
+
+**Corridor** — dark navy-violet metal, pixel art at 64 pixels a texture.
+
+| file | what |
+| --- | --- |
+| `wall.png` | two riveted panels per 64 pixels, a teal pipe run in rows 40–45, a status display with lights |
+| `floor.png` | a metal grating on an 8-pixel grid over the dark, a few magenta and cyan reflections |
+| `ceiling.png` | panels and a white-cyan light strip in rows 29–34 running along x — `Tint` above 1 for bloom |
+| `door.png` | a two-leaf blast door, a cyan lit seam, hazard stripes at the bottom, red locks; stands on its bottom edge |
+
+**Signs** — glass tubes drawn from the 8 px font at 2×, the coloured tube with a pale core and two
+rings of glow (alpha 150, 70, 25) on a clear ground; 24 pixels high. Tint above 1 and bloom make
+them glow.
+
+| frame | size | colour |
+| --- | --- | --- |
+| `sign-noodle` | 124 × 24 | magenta `#ff3ac8`, "NOODLE" and a bowl |
+| `sign-bar` | 56 × 24 | cyan `#3ae8ff` |
+| `sign-open` | 136 × 24 | green `#4aff8a`, "OPEN 24H" |
+| `sign-exit` | 92 × 24 | red `#ff3a4a`, "EXIT" and an arrow |
+| `sign-danger` | 104 × 24 | amber `#ffb030` |
+| `sign-love` | 40 × 24 | pink `#ff6ab0`, "<3" |

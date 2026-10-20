@@ -1,0 +1,133 @@
+{
+  "frames": {
+    "sign-noodle": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 124,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 124,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 124,
+        "h": 24
+      }
+    },
+    "sign-bar": {
+      "frame": {
+        "x": 128,
+        "y": 2,
+        "w": 56,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 56,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 56,
+        "h": 24
+      }
+    },
+    "sign-open": {
+      "frame": {
+        "x": 2,
+        "y": 28,
+        "w": 136,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 136,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 136,
+        "h": 24
+      }
+    },
+    "sign-exit": {
+      "frame": {
+        "x": 140,
+        "y": 28,
+        "w": 92,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 92,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 92,
+        "h": 24
+      }
+    },
+    "sign-danger": {
+      "frame": {
+        "x": 2,
+        "y": 54,
+        "w": 104,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 104,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 104,
+        "h": 24
+      }
+    },
+    "sign-love": {
+      "frame": {
+        "x": 108,
+        "y": 54,
+        "w": 40,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 24
+      }
+    }
+  },
+  "meta": {
+    "image": "signs.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 256,
+      "h": 128
+    },
+    "scale": "1"
+  }
+}
