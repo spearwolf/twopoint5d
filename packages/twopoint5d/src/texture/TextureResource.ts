@@ -6,7 +6,9 @@ import {ImageLoader, type Texture} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {type AtlasAdapter, builtInAtlasAdapters, pickAtlasAdapter} from './atlasAdapters.js';
 import {
+  atlasAdapterPicker,
   changeRefCount,
   imageSource,
   type ImageLease,
@@ -16,14 +18,20 @@ import {
 } from './internals.js';
 import {isAtlasJsonResponse, type AtlasJsonResponse} from './isAtlasJsonResponse.js';
 import {resolveRelativeUrl} from './resolveRelativeUrl.js';
-import type {TextureAtlas} from './TextureAtlas.js';
+import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
-import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
+import type {TexturePackerJsonData} from './TexturePackerJson.js';
 import {TileSet, type TileSetOptions} from './TileSet.js';
 import type {FrameBasedAnimationsData, FrameBasedAnimationsDataMap} from './types.js';
 
 type FrameBasedAnimationsDataShape = 'frameNameQuery' | 'tileIds' | 'firstTileId';
+
+// what an atlas adapter answers, as the resource checks it
+interface AtlasAdapterResultShape {
+  atlas: unknown;
+  animations: unknown;
+}
 
 /**
  * Which of the three forms of animation data this entry carries, or `undefined` for an
@@ -81,7 +89,7 @@ export const TextureResourceSubtypes = {
  * built from them — is reported with the same `{source: 'texture', id, error}`; the value stays
  * published, and `TextureStore#getAsync()` does not reject on it. A tile set that `TileSet` refuses
  * is reported here whether the image arrives or the `tileSetOptions` change; the write that changed them
- * does not throw. An `atlasJson` that `TexturePackerJson` cannot read is reported here as soon
+ * does not throw. An `atlasJson` that its atlas adapter cannot read is reported here as soon
  * as the image it names is there; the write that set it does not throw either. It carries
  * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
  * skipped: one whose data is no object or does not fit this kind of resource, one whose data does not
@@ -188,8 +196,13 @@ const derivedImageUrlError = (resource: TextureResource): TypeError =>
       `— write "overrideImageUrl" instead`,
   );
 
+// a resource on its own picks among the built-in adapters by `meta.app`
+const BUILT_IN_ATLAS_ADAPTERS = builtInAtlasAdapters();
+const pickBuiltInAtlasAdapter = (json: TexturePackerJsonData): AtlasAdapter => pickAtlasAdapter(BUILT_IN_ATLAS_ADAPTERS, json);
+
 // the inputs only an atlas resource carries
 interface AtlasSignals {
+  readonly atlasAdapter: Signal<AtlasAdapter | undefined>;
   readonly atlasUrl: Signal<string | undefined>;
   readonly atlasJson: Signal<TexturePackerJsonData | undefined>;
   // the json as `atlasUrl` delivered it, with a relative `meta.image` resolved against that url,
@@ -213,7 +226,7 @@ export interface TextureResource extends EventizedObject {}
  * The properties fall into two groups.
  *
  * **Input** — write these to say what the resource is made of: `imageUrl`, `atlasUrl`,
- * `atlasJson`, `overrideImageUrl`, `tileSetOptions`, `frameBasedAnimationsData`,
+ * `atlasJson`, `overrideImageUrl`, `atlasAdapter`, `tileSetOptions`, `frameBasedAnimationsData`,
  * `textureClasses`, `textureFactory` and `renderer`. `atlasJson` is both: an atlas
  * resource with an `atlasUrl` fetches the JSON and writes it here itself.
  *
@@ -236,7 +249,7 @@ export interface TextureResource extends EventizedObject {}
  * on, has no `imageUrl` either and does the same. A `textureFactory` that is cleared takes
  * nothing back: the texture stays until the next factory builds one.
  *
- * `atlasUrl`, `atlasJson`, `overrideImageUrl` and `tileSetOptions` belong to one shape of
+ * `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter` and `tileSetOptions` belong to one shape of
  * resource each. Writing one on a resource of another shape throws a `TypeError`.
  *
  * `imageUrl` changes sides with the shape: an image and a tile set are told which file to
@@ -306,6 +319,9 @@ export class TextureResource {
   #tileSet = createSignal<TileSet | undefined>(undefined, {attach: this});
 
   #frameBasedAnimations = createSignal<FrameBasedAnimations | undefined>(undefined, {attach: this});
+  // the animations the atlas adapter read out of the json, published beside the atlas; the catalog
+  // entries of the resource are added to a copy of them
+  #adapterAnimations = createSignal<FrameBasedAnimations | undefined>(undefined, {attach: this});
   #frameBasedAnimationsData = createSignal<FrameBasedAnimationsDataMap | undefined>(undefined, {attach: this});
 
   #textureClasses = createSignal<TextureOptionClasses[] | undefined>(undefined, {compare: cmpTexClasses, attach: this});
@@ -391,8 +407,12 @@ export class TextureResource {
    * resolves a relative one against the document.
    *
    * While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`. A json
-   * that `TexturePackerJson` cannot read takes both back as well and is reported as an `error`
-   * with `source: 'texture'` once the image it names is there; writing it does not throw.
+   * that its atlas adapter cannot read — or an adapter that answers no `TextureAtlas`, or
+   * animations that are no `FrameBasedAnimations` — takes both back as well and is reported as an
+   * `error` with `source: 'texture'` once the image it names is there; writing it does not throw.
+   * The animations an adapter reads out of the json — the frame tags of an Aseprite json — are the
+   * `frameBasedAnimations` of the resource, and the entries of `frameBasedAnimationsData` are added
+   * to a copy of them; an entry named like one of them is skipped and reported.
    * Written before {@link TextureResource.activate}, it takes the place of the fetch of the
    * `atlasUrl` it was written after.
    */
@@ -432,6 +452,24 @@ export class TextureResource {
 
   get atlas(): TextureAtlas | undefined {
     return this.#disposed ? undefined : this.#atlas.value;
+  }
+
+  /**
+   * The adapter that reads the `atlasJson` of an atlas resource into its `atlas` and, if the json
+   * names any, its animations — `undefined` to pick one by `meta.app` of the json: among the
+   * adapters of the `TextureStore` the resource belongs to, among `texturePackerAtlasAdapter` and
+   * `asepriteAtlasAdapter` for a resource on its own. A change reads the json again. Writing it on a
+   * resource of another shape throws a `TypeError`.
+   */
+  get atlasAdapter(): AtlasAdapter | undefined {
+    return this.#disposed ? undefined : this.#atlasSignals?.atlasAdapter.value;
+  }
+
+  set atlasAdapter(value: AtlasAdapter | undefined) {
+    if (this.#disposed) return;
+    const signals = this.#atlasSignals;
+    if (!signals) throw wrongShapeError(this, 'atlasAdapter');
+    signals.atlasAdapter.set(value);
   }
 
   /**
@@ -506,6 +544,15 @@ export class TextureResource {
   [imageSource]?: TextureImageSource;
 
   /**
+   * How this resource picks an atlas adapter for a json by its `meta.app` while no `atlasAdapter`
+   * is written. The store it belongs to injects the pick among its registered adapters; a resource
+   * on its own picks among the built-in ones.
+   *
+   * @internal
+   */
+  [atlasAdapterPicker]?: (json: TexturePackerJsonData) => AtlasAdapter;
+
+  /**
    * The renderer a resource on its own builds its textures with. While no `textureFactory` was
    * written from outside — a `TextureStore` writes its shared one — the resource builds a
    * `TextureFactory` for it that starts from no texture class, as the factory of a store does,
@@ -560,6 +607,7 @@ export class TextureResource {
       this.#tileSetOptions = createSignal<Readonly<TileSetOptions> | undefined>(undefined, {compare: cmpShallow, attach: this});
     } else if (type === 'atlas') {
       this.#atlasSignals = {
+        atlasAdapter: createSignal<AtlasAdapter | undefined>(undefined, {attach: this}),
         atlasUrl: createSignal<string | undefined>(undefined, {attach: this}),
         atlasJson: createSignal<TexturePackerJsonData | undefined>(undefined, {attach: this}),
         fetchedAtlasJson: createSignal<FetchedAtlasJson | undefined>(undefined, {attach: this}),
@@ -917,6 +965,7 @@ export class TextureResource {
 
   #registerAtlasEffects(signals: AtlasSignals): void {
     const {
+      atlasAdapter: atlasAdapterSignal,
       atlasUrl: atlasUrlSignal,
       atlasJson: atlasJsonSignal,
       fetchedAtlasJson: fetchedAtlasJsonSignal,
@@ -1056,6 +1105,7 @@ export class TextureResource {
         // listener reading the resource would still find them. The texture stays.
         const takeBack = () => {
           atlasSignal.set(undefined);
+          this.#adapterAnimations.set(undefined);
           this.#frameBasedAnimations.set(undefined);
         };
         if (!atlasJson) {
@@ -1076,8 +1126,23 @@ export class TextureResource {
         // for
         if (this.#imageUrlOfCoords.value !== (this.overrideImageUrl ?? atlasJson.meta.image)) return;
         let atlas: TextureAtlas;
+        let adapterAnimations: FrameBasedAnimations | undefined;
         try {
-          [atlas] = TexturePackerJson.parse(atlasJson, imageCoords);
+          const adapter = atlasAdapterSignal.value ?? (this[atlasAdapterPicker] ?? pickBuiltInAtlasAdapter)(atlasJson);
+          const result: unknown = adapter(atlasJson, imageCoords);
+          const answered = (typeof result === 'object' && result !== null ? result : {}) as Partial<AtlasAdapterResultShape>;
+          if (!(answered.atlas instanceof TextureAtlas)) {
+            throw new Error(
+              `[TextureResource] the atlas adapter of resource "${this.id}" answered no atlas — an adapter answers {atlas, animations?}`,
+            );
+          }
+          if (answered.animations !== undefined && !(answered.animations instanceof FrameBasedAnimations)) {
+            throw new Error(
+              `[TextureResource] the atlas adapter of resource "${this.id}" answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none`,
+            );
+          }
+          atlas = answered.atlas;
+          adapterAnimations = answered.animations;
         } catch (error) {
           // reported instead of thrown: thrown, it would reach whoever wrote the json — the
           // `atlasJson` setter, a `TextureStore#parse()` — or the image effect, whose load
@@ -1086,19 +1151,28 @@ export class TextureResource {
           this.#fail('atlasParse', {source: 'texture', id: this.id, error});
           return;
         }
-        atlasSignal.set(atlas);
+        // one batch: the animations effect reads both, and runs once for the pair
+        const built = atlas;
+        batch(() => {
+          this.#adapterAnimations.set(adapterAnimations);
+          atlasSignal.set(built);
+        });
       },
-      [atlasJsonSignal, this.#imageCoords, this.#imageUrlOfCoords],
+      [atlasJsonSignal, atlasAdapterSignal, this.#imageCoords, this.#imageUrlOfCoords],
       {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
     );
 
-    this.#registerAnimationsEffect(this.#atlas, (animations, name, data, atlas) => {
-      const shape = animationDataShape(data);
-      if (shape !== 'frameNameQuery') throw wrongAnimationDataError(this, name, shape);
-      // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
-      // place that refuses an entry carrying neither, with the name of the animation
-      if ('frameNameQuery' in data) animations.add(name, data, atlas, data.frameNameQuery);
-    });
+    this.#registerAnimationsEffect(
+      this.#atlas,
+      (animations, name, data, atlas) => {
+        const shape = animationDataShape(data);
+        if (shape !== 'frameNameQuery') throw wrongAnimationDataError(this, name, shape);
+        // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
+        // place that refuses an entry carrying neither, with the name of the animation
+        if ('frameNameQuery' in data) animations.add(name, data, atlas, data.frameNameQuery);
+      },
+      this.#adapterAnimations,
+    );
 
     // activate() takes up what the resource holds at this call as if it were written right after
     // it. These effects have static dependencies and run on a change alone: a json written before
@@ -1111,25 +1185,29 @@ export class TextureResource {
 
   // The animations of the current data, built out of the current tile set or atlas. `addEntry`
   // registers one entry or throws for it: an entry it throws for is skipped and reported, and every
-  // other entry of the map is registered all the same
+  // other entry of the map is registered all the same. The entries go into a copy of the animations
+  // the atlas adapter read out of the json, where there are some
   #registerAnimationsEffect<S extends TileSet | TextureAtlas>(
     source: Signal<S | undefined>,
     addEntry: (animations: FrameBasedAnimations, name: string, data: FrameBasedAnimationsData, source: S) => void,
+    baseAnimations?: Signal<FrameBasedAnimations | undefined>,
   ): void {
     createEffect(
       () => {
         const from = source.value;
         const animationsData = this.frameBasedAnimationsData;
-        // animations come only out of the current source and the current data; without
-        // either of them they are taken back, which clears the retained event
-        if (!from || !animationsData) {
+        const base = baseAnimations?.value;
+        // animations come only out of the current source and the current data or the animations
+        // of the adapter; without either of them they are taken back, which clears the retained event
+        if (!from || (!animationsData && !base)) {
           this.#frameBasedAnimations.set(undefined);
           return;
         }
         // published as one finished object: a subscriber that reads it in the change
-        // callback would otherwise see an animation set that is still filling up
-        const animations = new FrameBasedAnimations();
-        for (const [name, data] of Object.entries(animationsData)) {
+        // callback would otherwise see an animation set that is still filling up. A copy of the
+        // animations of the adapter, so that a change of the data never adds to them twice
+        const animations = base ? base.clone() : new FrameBasedAnimations();
+        for (const [name, data] of Object.entries(animationsData ?? {})) {
           try {
             addEntry(animations, name, data, from);
           } catch (error) {
@@ -1142,7 +1220,7 @@ export class TextureResource {
         }
         this.#frameBasedAnimations.set(animations);
       },
-      [source, this.#frameBasedAnimationsData],
+      baseAnimations ? [source, this.#frameBasedAnimationsData, baseAnimations] : [source, this.#frameBasedAnimationsData],
       {attach: this},
     );
   }

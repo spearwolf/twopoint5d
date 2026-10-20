@@ -84,12 +84,13 @@ describe('AnimatedFrames', () => {
 
     expect([material.positionNode, material.colorNode, material.version]).toEqual([positionNode, colorNode, version]);
     expect(material.resources.textureSize('animsMap').value.toArray()).toEqual([16, 1]);
-    // the four lookups — header, tex coords, flip, trim — between the two graphs: the color graph
-    // reads no trim, the position graph no flip
+    // the nineteen lookups between the two graphs — header, second header, the end time of the first
+    // frame, the thirteen steps of the search over the end times, tex coords, flip, trim: the color
+    // graph reads no trim, the position graph no flip
     const lookups = new Set(
       [...textureNodesOf(material.positionNode!), ...textureNodesOf(material.colorNode!)].filter((node) => node.value === wider),
     );
-    expect(lookups.size).toBe(4);
+    expect(lookups.size).toBe(19);
     material.dispose();
   });
 

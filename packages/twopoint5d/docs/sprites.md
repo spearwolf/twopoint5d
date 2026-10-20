@@ -206,20 +206,64 @@ of `animId` or `animOffset` is marked with `spritePool.touchVO(sprite, 'anim')` 
 
 The animsMap is one row of RGBA float texels. The first texels are the headers, one per
 animation in the order of the ids: `[frameCount, duration, firstFrameTexel, texelsPerFrame]`.
-The frames of all animations follow, each of `texelsPerFrame` texels, the same number for the
-whole texture:
+The animations follow one after the other, each its frames — `texelsPerFrame` texels each, the
+same number for the whole texture — and behind them its second header texel:
 
-| texel of a frame | holds | present when |
+| texel | holds | present when |
 | --- | --- | --- |
-| 1 | `[s, t, u, v]`, the tex coords | always |
-| 2 | `[width, height, flipDiagonal, 0]` | `texelsPerFrame` is 2 or 3 |
-| 3 | `[left, top, right, bottom]`, the trim margins | `texelsPerFrame` is 3 |
+| 1 of a frame | `[s, t, u, v]`, the tex coords | always |
+| 2 of a frame | `[width, height, flipDiagonal, endTime]` | `texelsPerFrame` is 2 or 3 |
+| 3 of a frame | `[left, top, right, bottom]`, the trim margins | `texelsPerFrame` is 3 |
+| second header, at `firstFrameTexel + frameCount · texelsPerFrame` | `[playback, hasDurations, cycleDuration, -2]` | always |
 
-The bake writes 3 texels when any frame is trimmed, 2 when any frame is turned (or
-`includeTextureSize` is set), and 1 otherwise. A frame without a second texel is never turned,
-one without a third is untrimmed. The frame shown is
-`floor(((time + animOffset) / duration * frameCount) mod frameCount)`; a `duration` of 0 is a
-still image and shows the first frame.
+The bake writes 3 texels when any frame is trimmed, 2 when any frame is turned, an animation has
+per-frame durations (or `includeTextureSize` is set), and 1 otherwise. A frame without a second
+texel is never turned, one without a third is untrimmed. `playback` is `0` for `'loop'`, `1` for
+`'once'`, `2` for `'pingpong'`; `endTime` is the end of the frame within its animation for an
+animation with durations, `0` otherwise. The `-2` marks the second header — a fourth component
+below `-1.5`, which no texel of a header or a frame reaches: the lowest is the `v` of a frame
+flipped vertically, `-1` for one as high as its image. An animsMap built by hand without second
+headers plays every animation as a loop at one duration. A reader of its own finds the
+frames through `firstFrameTexel` — the frames of a later animation start one texel later per
+animation before it.
+
+**Playback.** `FrameBasedAnimations#add()` takes the playback with the timing, and the frame shown
+follows `t = time + animOffset`:
+
+- `'loop'` (the default): `floor((t / duration · frameCount) mod frameCount)`.
+- `'once'`: the same count clamped to the frames — the first frame before the start, the last
+  frame held after the end.
+- `'pingpong'`: a triangle wave that shows each end frame once per turn, `0 1 2 3 2 1 0 1 …`; every
+  frame lasts `duration / frameCount`, so a turn of `2 · frameCount − 2` frames lasts longer than
+  `duration`.
+- `durations`, seconds per frame in place of a `duration` or a `frameRate`, hold each frame for its
+  own time in any of the three — the hold on the key frame of an attack. The shader finds the
+  frame by a binary search of 13 lookups over the end times, for every animation of a material,
+  and an animation with durations holds at most 8191 frames.
+
+A `duration` of 0 is a still image and shows the first frame.
+
+```ts check
+import {FrameBasedAnimations, TextureCoords} from '@spearwolf/twopoint5d';
+
+const sheet = new TextureCoords(0, 0, 256, 32);
+const frames = [0, 1, 2, 3].map((i) => new TextureCoords(sheet, i * 32, 0, 32, 32));
+
+const anims = new FrameBasedAnimations();
+anims.add('explode', {frameRate: 24, playback: 'once'}, frames);
+anims.add('idle', {duration: 1.2, playback: 'pingpong'}, frames);
+const attack = anims.add('attack', {durations: [0.05, 0.05, 0.3, 0.1], playback: 'once'}, frames);
+
+// 0.5: the seconds after which the one-shot holds its last frame
+export const attackEnds = anims.animation(attack).cycleDuration;
+```
+
+**Start now.** A sprite starts its animation at `now` with `animOffset = -now`: `time + animOffset`
+runs from 0 at that moment. With `'once'` that is the whole one-shot — set `animId` and
+`animOffset`, mark `anim` with `spritePool.touchVO(sprite, 'anim')`, and
+`anims.animation(id).cycleDuration` seconds later the sprite holds the last frame until the game
+gives it another animation. `animation()` answers by name or by id; for a `'pingpong'`,
+`cycleDuration` is one turn.
 
 `time` is a uniform: set it with `setUniform('time', seconds)` or the `uniforms` option, a write
 builds nothing. The animsMap itself is a texture with `needsImage`: until it has an image the
@@ -227,6 +271,83 @@ sprite shows the whole `colorMap`, untrimmed. A `TextureLoader` or a `DataTextur
 writes the image without an event, so call `touchTexture('animsMap')` once it is there. A baked
 `DataTexture` already has its image. The animsMap stays the caller's; the material does not
 dispose it.
+
+### Aseprite sheets
+
+`AsepriteJson.parse(json)` reads the json of Aseprite's "Export Sprite Sheet", in the layout
+"Hash" or "Array", and answers the atlas of the frames, the `meta` and a `FrameBasedAnimations`
+with one animation per frame tag:
+
+| `direction` | frames | playback |
+| --- | --- | --- |
+| `forward` | `from` … `to` | `'loop'` |
+| `reverse` | `to` … `from` | `'loop'` |
+| `pingpong` | `from` … `to` | `'pingpong'` |
+| `pingpong_reverse` | `to` … `from` | `'pingpong'` |
+
+The frames keep their durations — as one `duration` when they are all alike, as `durations` when
+they differ. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its frames
+played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1 is a
+one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code instead.
+
+```ts check
+import {AnimatedSpriteKind, AsepriteJson, type AsepriteJsonData, FeatureSprites} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const json: AsepriteJsonData; // fighter.json, exported with the tags idle, walk and kick
+declare const colorMap: Texture; // fighter.png, the sheet
+
+const [, , animations] = AsepriteJson.parse(json, {playback: {kick: 'once'}});
+const animsMap = animations.bakeDataTexture();
+
+const fighters = new FeatureSprites(AnimatedSpriteKind, {capacity: 16, textures: {colorMap, animsMap}});
+const fighter = fighters.createSprite()!;
+fighter.setSize(64, 64);
+fighter.animId = animations.animId('idle');
+
+// on a key press: kick now, and back to idle once the kick has played
+export function kick(now: number) {
+  fighter.animId = animations.animId('kick');
+  fighter.animOffset = -now;
+  fighters.spritePool?.touchVO(fighter, 'anim');
+  return now + animations.animation('kick').cycleDuration;
+}
+```
+
+Export the sheet without "Split Layers" and "Split Tags": the frame indices of a tag are positions
+in the frame list, one entry per frame of the sprite. Every frame's `data` keeps its json entry and
+adds `index` and `slices` — the key of each slice in force at that frame, `{bounds, center?,
+pivot?}` in pixels of the untrimmed frame, `center` and `pivot` relative to `bounds` as Aseprite
+writes them.
+
+**In a `TextureStore` catalog** an item with an `atlasUrl` is read by an atlas adapter: the one it
+names with `atlasAdapter`, else the one whose `app` matches `meta.app` of its json. An Aseprite
+json says `"app": "https://www.aseprite.org/"`, so its tags become the `frameBasedAnimations` of the
+item without a word of configuration; the item's own `frameBasedAnimations` entries are added
+beside them. TexturePacker and free-tex-packer jsons go to `'texturepacker'`, which reads frames and
+no animations. An adapter of one's own is a function `(json, parentCoords) => {atlas,
+animations?}`, registered before the catalog is parsed — here to make a one-shot of the kick:
+
+```ts check
+import {AsepriteJson, type AsepriteJsonData, TextureStore} from '@spearwolf/twopoint5d';
+
+const store = new TextureStore();
+store.registerAtlasAdapter('fighter', (json, parentCoords) => {
+  const [atlas, , animations] = AsepriteJson.parse(json as unknown as AsepriteJsonData, {
+    parentCoords,
+    playback: {kick: 'once'},
+  });
+  return {atlas, animations};
+});
+store.parse({items: {fighter: {atlasUrl: 'fighter.json', atlasAdapter: 'fighter'}}});
+
+export const animations = store.getAsync('fighter', 'frameBasedAnimations');
+```
+
+An item that names an adapter the store does not know builds no resource and is reported as an
+`error` of the store. An adapter reads the envelope the three packers share — `frames`,
+`meta.size`, `meta.image` — since the resource reads the image out of the json before any adapter
+runs; a packer of another format is converted to that envelope first.
 
 ## Uploads: static and dynamic attributes
 
@@ -1323,8 +1444,8 @@ material.colorNode = sampleAtlasFrame(atlasTexture, frames, attribute<'float'>('
 with a list of names, or a `RegExp` matched as `frameNames()` matches it, the index is the
 position in that selection, and `indexOf(name)` answers it. `new AtlasFrameTable(frames)` takes
 a list of atlas frames or bare `TextureCoords`. A frame takes three `vec4` of a uniform array —
-the three texels of a frame in the animsMap: tex coords, `[width, height, flipDiagonal, 0]`, trim
-margins — so a turned, flipped or trimmed frame needs nothing of the caller. `update()` reads the
+the three texels of a frame in the animsMap: tex coords, `[width, height, flipDiagonal, 0]` (a `0`
+where the animsMap keeps the end time), trim margins — so a turned, flipped or trimmed frame needs nothing of the caller. `update()` reads the
 frames again after their `coords` changed and allocates nothing; three uploads the array with
 every render. The table owns no GPU resource and has no `dispose()`.
 

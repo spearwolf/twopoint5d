@@ -1,3 +1,5 @@
+export * from './AsepriteJson.js';
+export {asepriteAtlasAdapter, type AtlasAdapter, type AtlasAdapterResult, texturePackerAtlasAdapter} from './atlasAdapters.js';
 export * from './AtlasFrameTable.js';
 export * from './FrameBasedAnimations.js';
 export * from './PowerOf2ImageLoader.js';

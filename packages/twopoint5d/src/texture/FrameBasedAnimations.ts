@@ -10,18 +10,46 @@ import {TileSet} from './TileSet.js';
 
 export type AnimName = string | symbol;
 
+/**
+ * How an animation runs once its frames are through: `'loop'` starts it again, `'once'` holds its
+ * last frame, `'pingpong'` runs it back and forth and shows each end frame once per turn —
+ * `0 1 2 3 2 1 0 1 …`.
+ */
+export type AnimationPlayback = 'loop' | 'once' | 'pingpong';
+
 export interface FrameBasedAnimDef {
   frames: TextureCoords[];
+  /** Seconds, the frames once through; the sum of `durations` where there are some. */
   duration: number;
   name: AnimName;
   id: number;
+  playback: AnimationPlayback;
+  /** Seconds per frame, in the order of `frames`, or `undefined` for an animation of one duration. */
+  durations: readonly number[] | undefined;
+}
+
+/** What {@link FrameBasedAnimations.animation} answers about a registered animation. Frozen. */
+export interface FrameBasedAnimationInfo {
+  readonly id: number;
+  readonly name: AnimName;
+  readonly frameCount: number;
+  /** Seconds, the frames once through; the sum of `durations` where there are some. */
+  readonly duration: number;
+  readonly playback: AnimationPlayback;
+  /** Seconds per frame, or `undefined` for an animation of one duration. */
+  readonly durations: readonly number[] | undefined;
+  /**
+   * Seconds of one cycle: `duration` for `'loop'` and `'once'` — from then on a `'once'` holds its
+   * last frame — and the way there and back for `'pingpong'`, which shows each end frame once.
+   */
+  readonly cycleDuration: number;
 }
 
 export interface BakeTextureOptions {
   /**
-   * Gives every frame a second texel, `[width, height, flipDiagonal, 0]`. A bake with a frame under
-   * `TextureCoords.FLIP_DIAGONAL` brings that texel without the option, and so does a bake with a
-   * trimmed frame.
+   * Gives every frame a second texel, `[width, height, flipDiagonal, endTime]`. A bake with a frame
+   * under `TextureCoords.FLIP_DIAGONAL` brings that texel without the option, and so does a bake
+   * with a trimmed frame or with an animation of per-frame `durations`.
    */
   includeTextureSize?: boolean;
   /**
@@ -41,8 +69,10 @@ export interface BakeTextureOptions {
 /**
  * Timing options for frame-based animations.
  * Provide exactly one of the following:
- * - `duration`: Total animation time in seconds (e.g., 1.0 for 1 second)
+ * - `duration`: Total animation time in seconds (e.g., 1.0 for 1 second), each frame `duration / frameCount`
  * - `frameRate`: Frames per second (e.g., 10 for 10 FPS). Must be greater than 0.
+ * - `durations`: seconds per frame, one for each frame in the order of the frames; the duration of
+ *   the animation is their sum. Each is a finite number above zero.
  *
  * When `frameRate` is used, the duration is automatically calculated as:
  * `duration = frameCount / frameRate`
@@ -51,14 +81,33 @@ export interface BakeTextureOptions {
  * zero is a still image, a negative, infinite or `NaN` duration is refused by `add()`.
  * A `frameRate` that is not a number above zero — `NaN` among them — is refused by `add()` as well.
  *
+ * `playback` says what happens once the frames are through — see {@link AnimationPlayback}; it
+ * defaults to `'loop'`. A ping-pong runs at the same time per frame, so its cycle of
+ * `2 · frameCount − 2` frames takes longer than `duration`.
+ *
  * @example
  * // Using duration (animation takes 0.5 seconds total)
  * { duration: 0.5 }
  *
- * // Using frameRate (10 frames at 20 fps = 0.5 seconds)
- * { frameRate: 20 }
+ * // Using frameRate (10 frames at 20 fps = 0.5 seconds), played once and held on its last frame
+ * { frameRate: 20, playback: 'once' }
+ *
+ * // A hold on the third frame
+ * { durations: [0.05, 0.05, 0.3, 0.1] }
  */
-export type AnimationTimingOptions = {duration: number; frameRate?: never} | {duration?: never; frameRate: number};
+export type AnimationTimingOptions = (
+  | {duration: number; frameRate?: never; durations?: never}
+  | {duration?: never; frameRate: number; durations?: never}
+  | {duration?: never; frameRate?: never; durations: readonly number[]}
+) & {playback?: AnimationPlayback};
+
+const PLAYBACKS: readonly AnimationPlayback[] = ['loop', 'once', 'pingpong'];
+
+/**
+ * The most frames an animation with per-frame durations holds: the shader finds the frame of such
+ * an animation by a binary search of a fixed 13 steps, which covers 8191 frames.
+ */
+const MAX_FRAMES_WITH_DURATIONS = 8191;
 
 // the name is what tells one entry of an animation map from the next in an error message, and an
 // add() that was given none — or the empty string, which counts as none — has nothing else to be
@@ -86,27 +135,102 @@ const calculateDurationFromFrameRate = (frameCount: number, frameRate: number, n
   return frameCount / frameRate;
 };
 
+interface ResolvedTiming {
+  duration: number;
+  durations: readonly number[] | undefined;
+  playback: AnimationPlayback;
+}
+
 /**
- * Extracts the duration from timing options, calculating from frameRate if necessary.
+ * Extracts the duration, the per-frame durations and the playback from timing options,
+ * calculating the duration from a frameRate or summing the durations if necessary.
  * @param timing Either a duration number or AnimationTimingOptions object
- * @param frameCount Number of frames (required when using frameRate)
+ * @param frameCount Number of frames (required when using frameRate or durations)
  * @param name The name of the animation, for the error
- * @returns Duration in seconds
- * @throws Error if neither duration nor frameRate is provided
+ * @throws Error if neither duration, frameRate nor durations is provided, for durations beside one
+ *   of the other two, for durations that do not give each frame a duration above zero, and for a
+ *   playback that is none of the three
  */
-const resolveDuration = (timing: number | AnimationTimingOptions, frameCount: number, name: AnimName | undefined): number => {
+const resolveTiming = (
+  timing: number | AnimationTimingOptions,
+  frameCount: number,
+  name: AnimName | undefined,
+): ResolvedTiming => {
   if (typeof timing === 'number') {
-    return timing;
+    return {duration: timing, durations: undefined, playback: 'loop'};
+  }
+
+  // a catalog is json, so the playback is checked rather than trusted to the type; absent is
+  // `undefined`, a `null` is a playback of the wrong kind
+  const playback: unknown = timing.playback === undefined ? 'loop' : timing.playback;
+  if (!PLAYBACKS.includes(playback as AnimationPlayback)) {
+    throw new Error(
+      `FrameBasedAnimations: add() got a playback of ${describeValue(playback)} for the animation \`${animNameInError(name)}\` — a playback is 'loop', 'once' or 'pingpong'`,
+    );
+  }
+
+  if ('durations' in timing && timing.durations !== undefined) {
+    if (('duration' in timing && timing.duration !== undefined) || ('frameRate' in timing && timing.frameRate !== undefined)) {
+      throw new Error(
+        `FrameBasedAnimations: add() got durations and a duration (or frameRate) for the animation \`${animNameInError(name)}\` — give one of duration, frameRate and durations`,
+      );
+    }
+    const durations = resolveDurations(timing.durations, frameCount, name);
+    return {duration: durations.reduce((sum, value) => sum + value, 0), durations, playback: playback as AnimationPlayback};
   }
   if ('frameRate' in timing && timing.frameRate !== undefined) {
-    return calculateDurationFromFrameRate(frameCount, timing.frameRate, name);
+    return {
+      duration: calculateDurationFromFrameRate(frameCount, timing.frameRate, name),
+      durations: undefined,
+      playback: playback as AnimationPlayback,
+    };
   }
   if ('duration' in timing && timing.duration !== undefined) {
-    return timing.duration;
+    return {duration: timing.duration, durations: undefined, playback: playback as AnimationPlayback};
   }
   throw new Error(
     `FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation \`${animNameInError(name)}\``,
   );
+};
+
+// every frame gets a duration above zero: a frame of no time is never shown, and the shader walks
+// the end times of the frames, which have to rise
+const resolveDurations = (durations: unknown, frameCount: number, name: AnimName | undefined): readonly number[] => {
+  if (!Array.isArray(durations)) {
+    throw new Error(
+      `FrameBasedAnimations: add() got durations of ${describeValue(durations)} for the animation \`${animNameInError(name)}\` — durations is an array of seconds, one per frame`,
+    );
+  }
+  if (durations.length !== frameCount) {
+    throw new Error(
+      `FrameBasedAnimations: add() got ${durations.length} durations for the ${frameCount} frames of the animation \`${animNameInError(name)}\` — give one duration per frame`,
+    );
+  }
+  if (frameCount > MAX_FRAMES_WITH_DURATIONS) {
+    throw new Error(
+      `FrameBasedAnimations: add() got ${frameCount} frames with durations for the animation \`${animNameInError(name)}\` — an animation with per-frame durations holds at most ${MAX_FRAMES_WITH_DURATIONS} frames; split it`,
+    );
+  }
+  durations.forEach((value: unknown, index) => {
+    if (typeof value !== 'number' || !Number.isFinite(value) || !(value > 0)) {
+      throw new Error(
+        `FrameBasedAnimations: add() got a duration of ${describeValue(value)} at index ${index} for the animation \`${animNameInError(name)}\` — a frame duration is a finite number of seconds above zero`,
+      );
+    }
+  });
+  // a copy, frozen: the caller keeps its array, and animation() hands this one out
+  return Object.freeze(durations.slice() as number[]);
+};
+
+/**
+ * The seconds of one cycle of an animation: its duration, except for a ping-pong, whose way back
+ * shows every frame but the two ends once more.
+ */
+const cycleDurationOf = ({playback, duration, durations, frames}: FrameBasedAnimDef): number => {
+  const frameCount = frames.length;
+  if (playback !== 'pingpong' || frameCount < 2) return duration;
+  if (durations) return 2 * duration - durations[0]! - durations[frameCount - 1]!;
+  return ((2 * frameCount - 2) / frameCount) * duration;
 };
 
 const FRAME_NAME_ORDER = new Intl.Collator('en', {numeric: true});
@@ -124,7 +248,8 @@ const getBufferSize = (
 ) => {
   const anims = Array.from(animationsMap.values());
   const totalFramesCount = anims.reduce((sum, anim) => sum + anim.frames.length, 0);
-  const minBufSize = anims.length + totalFramesCount * texelsPerFrame;
+  // a header for each animation, its frames, and its second header behind them
+  const minBufSize = anims.length * 2 + totalFramesCount * texelsPerFrame;
   const bufSize = findNextPowerOf2(minBufSize);
 
   if (bufSize > maxTextureSize) {
@@ -161,35 +286,47 @@ const readMaxTextureSize = (renderer: WebGPURenderer): number | undefined => {
   }
 };
 
+// the first component of the second header texel, read by `AnimatedFrames`
+const PLAYBACK_CODE: Record<AnimationPlayback, number> = {loop: 0, once: 1, pingpong: 2};
+
+// the fourth component of a second header texel. No texel of the layout before it carries a
+// fourth component below -1: a header carries its texelsPerFrame, a size texel 0, trim margins
+// fractions of 0 to 1 — and the tex coords their `v`, which is negative for a frame with
+// FLIP_VERTICAL (every frame TexturePacker turned) and -1 for one that is as high as its image. A
+// reader tells a second header by a fourth component below -1.5
+const SECOND_HEADER_MARK = -2;
+
 const renderFloatsBuffer = (
   floatsBuffer: Float32Array,
   names: AnimName[],
   animations: AnimationsMap,
   texelsPerFrame: 1 | 2 | 3,
 ) => {
-  let curOffset = names.length;
+  let offset = names.length * 4;
 
-  floatsBuffer.set(
-    names.flatMap((name) => {
-      const {frames, duration} = animations.get(name)!;
-      const offset = curOffset;
-      curOffset += frames.length * texelsPerFrame;
-      return [frames.length, duration, offset, texelsPerFrame];
-    }),
-  );
+  for (const name of names) {
+    const anim = animations.get(name)!;
+    const {frames, trims, durations} = anim;
+    const firstFrameTexel = offset / 4;
 
-  floatsBuffer.set(
-    names.flatMap((name) => {
-      const {frames, trims} = animations.get(name)!;
-      return frames.flatMap((coords, i) => {
-        const texels: number[] = coords.getTexCoords();
-        if (texelsPerFrame >= 2) texels.push(coords.width, coords.height, coords.flipD ? 1 : 0, 0);
-        if (texelsPerFrame === 3) texels.push(...trims[i]!);
-        return texels;
-      });
-    }),
-    names.length * 4,
-  );
+    floatsBuffer.set([frames.length, anim.duration, firstFrameTexel, texelsPerFrame], anim.id * 4);
+
+    let endTime = 0;
+    frames.forEach((coords, i) => {
+      floatsBuffer.set(coords.getTexCoords(), offset);
+      if (texelsPerFrame >= 2) {
+        // the end of the frame within the animation, for the walk of the shader over the frames of
+        // an animation with durations; 0 for every other
+        if (durations) endTime += durations[i]!;
+        floatsBuffer.set([coords.width, coords.height, coords.flipD ? 1 : 0, durations ? endTime : 0], offset + 4);
+      }
+      if (texelsPerFrame === 3) floatsBuffer.set(trims[i]!, offset + 8);
+      offset += texelsPerFrame * 4;
+    });
+
+    floatsBuffer.set([PLAYBACK_CODE[anim.playback], durations ? 1 : 0, cycleDurationOf(anim), SECOND_HEADER_MARK], offset);
+    offset += 4;
+  }
 
   return floatsBuffer;
 };
@@ -203,6 +340,12 @@ export class FrameBasedAnimations {
    * It is also the upper bound of a `tileCount` in {@link FrameBasedAnimations.add}.
    */
   static MaxTextureSize = 8192;
+
+  /**
+   * The most frames an animation with per-frame `durations` holds: `AnimatedFrames` finds the frame
+   * of such an animation by a binary search of a fixed 13 steps, which covers 8191 frames.
+   */
+  static readonly MaxFramesWithDurations: number = MAX_FRAMES_WITH_DURATIONS;
 
   #animations: AnimationsMap = new Map();
 
@@ -261,6 +404,12 @@ export class FrameBasedAnimations {
       | [
           name: AnimName | undefined,
           timing: number | AnimationTimingOptions,
+          atlas: TextureAtlas<unknown>,
+          frameNames: readonly string[],
+        ]
+      | [
+          name: AnimName | undefined,
+          timing: number | AnimationTimingOptions,
           tileSet: TileSet<unknown>,
           firstTileId?: number,
           tileCount?: number,
@@ -283,6 +432,27 @@ export class FrameBasedAnimations {
       // the caller keeps its array and may change it later; the checks below and the bake see what
       // was registered, so the animation gets a copy
       frames = args[2].slice();
+    } else if (args[2] instanceof TextureAtlas && Array.isArray(args[3])) {
+      // a list of names picks the frames in its order, a name as often as it is named: the frames
+      // of an Aseprite tag are a range of frames, not a pattern of names, and a reversed tag runs
+      // the range backwards
+      const atlas = args[2];
+      const atlasFrames = (args[3] as readonly unknown[]).map((frameName, index) => {
+        if (typeof frameName !== 'string') {
+          throw new Error(
+            `FrameBasedAnimations: add() got a frame name of ${describeValue(frameName)} at index ${index} for the animation \`${animNameInError(name)}\` — a frame name is a string`,
+          );
+        }
+        const frame = atlas.frame(frameName);
+        if (frame == null) {
+          throw new Error(
+            `FrameBasedAnimations: add() got the frame name "${frameName}" at index ${index} for the animation \`${animNameInError(name)}\`, which the atlas does not carry`,
+          );
+        }
+        return frame;
+      });
+      frames = atlasFrames.map(({coords}) => coords);
+      trims = atlasFrames.map(({data}) => frameTrimMargins(data));
     } else if (args[2] instanceof TextureAtlas) {
       const atlas = args[2];
       const query: unknown = args[3];
@@ -368,7 +538,7 @@ export class FrameBasedAnimations {
     }
 
     const timing = args[1];
-    const duration = resolveDuration(timing, frames.length, name);
+    const {duration, durations, playback} = resolveTiming(timing, frames.length, name);
 
     // the duration divides the animation time in the shader: zero is a still image, everything
     // below it and everything that is no number at all is a configuration error
@@ -391,6 +561,8 @@ export class FrameBasedAnimations {
       name,
       frames,
       duration,
+      playback,
+      durations,
       trims,
     });
 
@@ -427,6 +599,47 @@ export class FrameBasedAnimations {
   }
 
   /**
+   * What a registered animation is, by its name or its id: frames, duration, playback, per-frame
+   * durations and the length of one cycle — `cycleDuration` is when a `'once'` animation started
+   * at `animOffset = -now` reaches its last frame. A frozen object, built per call.
+   *
+   * Like {@link FrameBasedAnimations.animId}, an animation that was never registered is an error.
+   */
+  animation(nameOrId: AnimName | number): FrameBasedAnimationInfo {
+    const anim =
+      typeof nameOrId === 'number' ? this.#animations.get(this.#names[nameOrId] as AnimName) : this.#animations.get(nameOrId);
+    if (anim == null) {
+      throw new Error(
+        typeof nameOrId === 'number'
+          ? `FrameBasedAnimations: there is no animation of the id ${nameOrId}`
+          : `FrameBasedAnimations: there is no animation named "${nameOrId.toString()}"`,
+      );
+    }
+    return Object.freeze({
+      id: anim.id,
+      name: anim.name,
+      frameCount: anim.frames.length,
+      duration: anim.duration,
+      playback: anim.playback,
+      durations: anim.durations,
+      cycleDuration: cycleDurationOf(anim),
+    });
+  }
+
+  /**
+   * A copy with the same animations under the same names and ids, which goes on with the counter of
+   * anonymous names where this one stands. An animation added to either afterwards leaves the other
+   * alone. A registered animation is never changed, so the copy shares its frames.
+   */
+  clone(): FrameBasedAnimations {
+    const copy = new FrameBasedAnimations();
+    copy.#animations = new Map(this.#animations);
+    copy.#names = this.#names.slice();
+    copy.#anonymousCounter = this.#anonymousCounter;
+    return copy;
+  }
+
+  /**
    * Bake every registered animation into a `DataTexture`, the `animsMap` a material reads the
    * frames from.
    *
@@ -435,17 +648,27 @@ export class FrameBasedAnimations {
    *
    * - texels `0` to `n - 1`, one for each of the `n` animations in the order of their ids:
    *   `[frameCount, duration, first frame texel, texelsPerFrame]`
-   * - from texel `n` on, `texelsPerFrame` texels for each frame, the frames of an animation one
-   *   after the other: first `[s, t, u, v]` as `TextureCoords#getTexCoords()` answers them, and with
-   *   two texels a second one, `[width, height, flipDiagonal, 0]` — `width` and `height` the
-   *   measures of the area in the image as `TextureCoords` holds them, `flipDiagonal` `1` for a
-   *   frame with `TextureCoords.FLIP_DIAGONAL` and `0` otherwise — and with three texels a third
-   *   one, `[left, top, right, bottom]`: the trim margins of the frame as fractions of the
-   *   untrimmed sprite — `left` and `right` of its width, `top` and `bottom` of its height, `top`
-   *   counted from the top — and `0` at every side for an untrimmed frame of the same bake
+   * - from texel `n` on, for each animation in the order of the ids, its frames one after the
+   *   other, `texelsPerFrame` texels each, and behind them its second header texel
+   * - the texels of a frame: first `[s, t, u, v]` as `TextureCoords#getTexCoords()` answers them,
+   *   and with two texels a second one, `[width, height, flipDiagonal, endTime]` — `width` and
+   *   `height` the measures of the area in the image as `TextureCoords` holds them, `flipDiagonal`
+   *   `1` for a frame with `TextureCoords.FLIP_DIAGONAL` and `0` otherwise, `endTime` the end of the
+   *   frame within its animation in seconds for an animation with `durations` and `0` for any
+   *   other — and with three texels a third one, `[left, top, right, bottom]`: the trim margins of
+   *   the frame as fractions of the untrimmed sprite — `left` and `right` of its width, `top` and
+   *   `bottom` of its height, `top` counted from the top — and `0` at every side for an untrimmed
+   *   frame of the same bake
+   * - the second header texel of an animation, at `first frame texel + frameCount · texelsPerFrame`:
+   *   `[playback, hasDurations, cycleDuration, -2]` — `playback` `0` for `'loop'`, `1` for `'once'`,
+   *   `2` for `'pingpong'`; `hasDurations` `1` for an animation with `durations`; `cycleDuration` as
+   *   {@link FrameBasedAnimations.animation} answers it; the `-2` marks it. No texel of a header or a
+   *   frame carries a fourth component below `-1`: the `v` of the tex coords is negative for a frame
+   *   with `FLIP_VERTICAL` — every frame TexturePacker turned — and `-1` for one as high as its
+   *   image, but a frame that lies within its image goes no further
    * - `texelsPerFrame` is `3` when a registered frame is trimmed, else `2` when
-   *   `includeTextureSize` is set or a registered frame carries `FLIP_DIAGONAL`, and `1` otherwise
-   *   — the same for every animation of a bake
+   *   `includeTextureSize` is set, a registered frame carries `FLIP_DIAGONAL` or an animation has
+   *   `durations`, and `1` otherwise — the same for every animation of a bake
    *
    * The texture is at most as wide as the device it is meant for can take: `options.maxTextureSize`
    * when it is given, else the limit of the device of `options.renderer`, else
@@ -469,11 +692,13 @@ export class FrameBasedAnimations {
       FrameBasedAnimations.MaxTextureSize;
 
     const anims = Array.from(this.#animations.values());
-    // a turned frame needs the second texel to carry its diagonal flip to the shader
+    // a turned frame needs the second texel to carry its diagonal flip to the shader, and a frame of
+    // an animation with durations to carry its end time
     const hasTurnedFrame = anims.some(({frames}) => frames.some((coords) => coords.flipD));
+    const hasDurations = anims.some(({durations}) => durations !== undefined);
     // a trimmed frame needs the third texel for its margins, and brings the second along with it
     const hasTrimmedFrame = anims.some(({trims}) => trims.some((margins) => margins.some((margin) => margin !== 0)));
-    const texelsPerFrame = hasTrimmedFrame ? 3 : options?.includeTextureSize || hasTurnedFrame ? 2 : 1;
+    const texelsPerFrame = hasTrimmedFrame ? 3 : options?.includeTextureSize || hasTurnedFrame || hasDurations ? 2 : 1;
 
     const bufSize = getBufferSize(this.#animations, texelsPerFrame, maxTextureSize);
 

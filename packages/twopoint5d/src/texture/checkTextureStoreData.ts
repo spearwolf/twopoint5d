@@ -49,7 +49,7 @@ export const textureResourceDataProblems = (item: unknown): string[] => {
   if (!isPlainObject(item)) return [`it is ${describeCatalogValue(item)}, not an object`];
 
   const problems: string[] = [];
-  for (const key of ['imageUrl', 'atlasUrl', 'overrideImageUrl'] as const) {
+  for (const key of ['imageUrl', 'atlasUrl', 'overrideImageUrl', 'atlasAdapter'] as const) {
     const value = item[key];
     if (value !== undefined && typeof value !== 'string') {
       problems.push(`${key} is ${describeCatalogValue(value)}, not a string`);

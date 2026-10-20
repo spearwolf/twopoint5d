@@ -22,10 +22,11 @@ const trimScratch: FrameTrimMargins = [0, 0, 0, 0];
  * The frames of an atlas as a uniform array, for a `NodeMaterial` that samples them by index — with
  * {@link sampleAtlasFrame}.
  *
- * Every frame takes three `vec4`, the layout of the texels of `FrameBasedAnimations#bakeDataTexture()`:
+ * Every frame takes three `vec4`, the layout of the frame texels of `FrameBasedAnimations#bakeDataTexture()`:
  * `[s, t, u, v]` as `TextureCoords#getTexCoords()` answers them, `[width, height, flipDiagonal, 0]` —
- * the measures of the area in the image, and `1` for a frame with `TextureCoords.FLIP_DIAGONAL` —
- * and `[left, top, right, bottom]`, the trim margins `frameTrimMargins()` reads out of the frame data.
+ * the measures of the area in the image, and `1` for a frame with `TextureCoords.FLIP_DIAGONAL`; the
+ * `0` stands where the animsMap keeps the end time of a frame — and `[left, top, right, bottom]`, the
+ * trim margins `frameTrimMargins()` reads out of the frame data.
  *
  * three uploads the array with every render, so {@link update} takes effect in the next frame. The
  * length of the array is part of the shader, so a table keeps the number of frames it was built with.
