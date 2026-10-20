@@ -1,4 +1,4 @@
-import {add, atan, clamp, div, float, int, max, mul, round, sub} from 'three/tsl';
+import {abs, add, atan, clamp, div, float, int, max, mul, round, step, sub} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {describeValue} from '../../utils/describeValue.js';
 import {cameraPositionLocal} from '../cameraNodes.js';
@@ -46,9 +46,13 @@ const viewOf = (
   cameraPosition: Node<'vec3'>,
 ): Node<'float'> => {
   const toCamera = sub(cameraPosition, instancePosition);
-  const angle = atan(toCamera.x, toCamera.z);
-  const step = round(div(sub(angle, yaw), (2 * Math.PI) / views));
-  return sub(step, mul(views, div(step, views).floor())) as unknown as Node<'float'>;
+  // straight above or below the sprite the angle is undefined — atan(0, 0) is undefined in GLSL — and
+  // the front view is taken: there z counts as 1, which makes atan() 0, and the yaw is added, which makes
+  // the view 0. step(edge, x) is 1 for x ≥ edge, so no branch
+  const above = sub(1, step(1e-6, add(abs(toCamera.x), abs(toCamera.z))));
+  const angle = add(atan(toCamera.x, add(toCamera.z, above)), mul(above, yaw));
+  const steps = round(div(sub(angle, yaw), (2 * Math.PI) / views));
+  return sub(steps, mul(views, div(steps, views).floor())) as unknown as Node<'float'>;
 };
 
 /**

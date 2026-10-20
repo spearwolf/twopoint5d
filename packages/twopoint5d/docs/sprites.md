@@ -625,7 +625,8 @@ export function frame(time: number) {
 - The angle lies in the xz plane of the mesh, about +y: right for `axisBillboardPlacement()`,
   `BillboardPlacement` and `flatPlacement({orientation: 'yaw'})`. A mesh laid out in the xy plane under
   `axisBillboardPlacement({axis: 'z'})` gets its views about +y all the same; turn such a mesh instead.
-  Straight above the sprite the camera sees the front view.
+  Straight above or below the sprite, where the angle is undefined, the camera sees view 0, the
+  front view, whatever the yaw.
 - The camera is the one that renders: a `ShadowPass` and a `ReflectionPass` show the view the camera
   sees, as the games of the genre do. A frame stage runs after the view is picked.
 

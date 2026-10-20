@@ -199,7 +199,10 @@ index    = round(frameIndex) + view
   'z'})` gets its views about +y of the mesh, not +z; such a scene turns the mesh instead. The
   camera is the one rendering: the views of a `ShadowPass` or `ReflectionPass` are the views the
   camera sees, as in every game of the genre.
-- Straight above or below the sprite (`toCamera.xz` = 0) `atan(0, 0)` is 0: the front view.
+- Straight above or below the sprite (`toCamera.xz` = 0) the angle is undefined — `atan(0, 0)` is
+  undefined in GLSL —, so the angle is the sprite's own `yaw` there (`toCamera.z` counts as 1 and the
+  yaw is added, both weighted by `1 − step(1e-6, |x| + |z|)`, no branch): view 0, the front view,
+  whatever the yaw.
 - The math is branch-free (`floor`, no `%` on negative numbers, whose sign differs between WGSL
   and GLSL).
 - `views` that is no whole number of 2 or more is refused with a `TypeError`:
