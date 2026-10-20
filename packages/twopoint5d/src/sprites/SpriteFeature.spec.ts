@@ -60,7 +60,7 @@ describe('defineFeature()', () => {
 
 describe('the order bands', () => {
   test('leave room between the built-in stages for stages of your own', () => {
-    expect(LocalOrder).toEqual({Anchor: 100, Flip: 150, Scale: 200, Shear: 300, Rotate: 400});
+    expect(LocalOrder).toEqual({Anchor: 100, Flip: 150, Slice: 175, Scale: 200, Shear: 300, Rotate: 400});
     expect(MeshOrder).toEqual({Offset: 100, Project: 200, Mirror: 300});
     expect(ColorOrder).toEqual({Tint: 100, Mask: 150, Fade: 200, Flash: 300, Pass: 1000});
     expect(FrameOrder).toEqual({Flip: 100});

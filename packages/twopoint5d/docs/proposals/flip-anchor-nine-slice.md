@@ -311,7 +311,7 @@ and down the rows. Affine within every cell, so the per-vertex varying of `Textu
    `setSliceFrame: the frame is trimmed — a nine-slice frame is packed untrimmed, or the packer cuts into its border; export it without trimming (TexturePacker: trim mode None; Aseprite: without --trim)`
 2. **The insets.** `slice` as four numbers — the insets of the frame, from a file of one's own such
    as the lookbook's `panels.insets.json` — each a finite number of 0 or more, else a `RangeError`:
-   `setSliceFrame: the insets are [8,8,8] — four numbers of 0 or more, [left, top, right, bottom] in pixels of the frame`.
+   `setSliceFrame: the insets are [8, 8, 8] — four numbers of 0 or more, [left, top, right, bottom] in pixels of the frame`.
    `slice` as a name, or absent: the Aseprite slice of that name, or the one slice of the frame that
    has a `center`; refused with the messages of §4.3 in its own words
    (`setSliceFrame: the slice "x" has no center — turn on 9-Slices in Aseprite's slice properties, or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])`, and alike).

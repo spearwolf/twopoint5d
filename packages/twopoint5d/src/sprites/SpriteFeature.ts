@@ -202,8 +202,11 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
   return Object.freeze({...feature});
 }
 
-/** The order bands of the local stages; the gaps take stages of your own. */
-export const LocalOrder = Object.freeze({Anchor: 100, Flip: 150, Scale: 200, Shear: 300, Rotate: 400} as const);
+/**
+ * The order bands of the local stages; the gaps take stages of your own. `Slice` moves the inner grid
+ * lines of a nine-slice, in the unit quad before `Scale`.
+ */
+export const LocalOrder = Object.freeze({Anchor: 100, Flip: 150, Slice: 175, Scale: 200, Shear: 300, Rotate: 400} as const);
 
 /**
  * The order bands of the frame stages. `Flip` mirrors the frame — `LocalOrder.Flip` is for a stage

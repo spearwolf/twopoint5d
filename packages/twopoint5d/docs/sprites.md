@@ -42,15 +42,15 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
 | `frameStage` | any, by `order` | `Flip` |
 | trim shift | built in, runs when the frame has trim margins | — |
-| `local` | any, by `order` | `Anchor`, `QuadSize`, `Shear`, `Rotation` |
+| `local` | any, by `order` | `Anchor`, `NineSlice`, `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
-| `uv` | any, by `order` | — |
+| `uv` | any, by `order` | `NineSlice` |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
 | `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
-The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear
-300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
+The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Slice 175, Scale
+200, Shear 300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
 and `ColorOrder` (`Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
 your own. Two stages of one order run in the order of the feature list. `ColorOrder.Pass` is the
 band of the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` —
@@ -197,6 +197,7 @@ flags.dispose();
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
 | `Flip` | `flip` (static) | `flipX`, `flipY`, `setFlip()` | frame stage, `Flip` | unflipped, 0, 0 |
 | `Anchor` | `anchor` (static) | `anchorX`, `anchorY`, `setAnchor()`, `setAnchorFromPivot(frame, slice?)` | local, `Anchor` | the middle, 0.5, 0.5 |
+| `NineSlice` | `sliceInsets`, `sliceScale` (static) | `insetLeft` … `insetBottom`, `setSliceInsets()`, `sliceScale`, `setSliceFrame(frame, slice?)` | local, `Slice`; uv, `Slice` | no border, scale 1 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -367,6 +368,72 @@ hero.setPosition(100, 0); // stands on y = 0
   it is from frame to frame.
 - `anchor` is static: mark a change with `touchVO(sprite, 'anchor')`. Under `ShadowPass` the shadow
   starts at the anchor; `writeText()` writes no anchor (see `docs/text.md`).
+
+### Nine-slice panels
+
+`NineSlice` keeps the border of a frame at its size in pixels and stretches the middle: one small
+frame draws a panel, a dialog box, a button or a health bar of any size. It lives on
+`gridBase({columns: 3, rows: 3})` and requires `QuadSize`; `setSize()` stretches the panel.
+
+```ts check
+import {
+  Anchor,
+  AsepriteJson,
+  type AsepriteJsonData,
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  gridBase,
+  InstancePosition,
+  NineSlice,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const json: AsepriteJsonData; // panels.aseprite.json: one canvas, a slice with a center per panel
+declare const colorMap: Texture; // panels.png
+
+const Panel = defineSprite({
+  base: gridBase({columns: 3, rows: 3}),
+  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, NineSlice, AtlasFrame, TextureColor],
+});
+const [kit] = AsepriteJson.parse(json);
+const panels = new FeatureSprites(Panel, {capacity: 32, textures: {colorMap}});
+
+const dialog = panels.createSprite()!;
+dialog.setSliceFrame(kit.frame('panels 0.aseprite')!, 'panel-stone'); // the frame and its 8-pixel border
+dialog.sliceScale = 3; // a pixel of the border is 3 units: the pixel art drawn at 3 ×
+dialog.setSize(320, 96);
+dialog.setAnchor(0, 0); // placed by its top left corner
+dialog.setPosition(16, 200);
+```
+
+- **The insets** are left, top, right and bottom of the upright frame, in its pixels:
+  `setSliceInsets(8, 8, 8, 8)`, a new sprite has none. `sliceScale` — the units of the mesh a pixel
+  of the border takes, 1 by default — sizes the border on screen: it is `inset · sliceScale` units
+  wide whatever `setSize()` says.
+- **How.** A local stage at `LocalOrder.Slice`, before `QuadSize` scales, moves the inner grid lines
+  of the position to the border; a uv stage at `UvOrder.Slice` moves those of the uv to as many
+  pixels of the frame, measured in the texels of the `colorMap` (`textureSize()`). A frame the
+  packer turned slices as its upright copy.
+- **`setSliceFrame(frame, slice?)`** writes the frame through `AtlasFrame` and its border at once:
+  out of the `center` of an Aseprite slice — named, or the one slice of the frame that has a center
+  — taking the part of the frame the slice's `bounds` cover, so a UI kit drawn on one canvas gives
+  every panel by name; or with the insets handed in, `setSliceFrame(atlas.frame('panel-stone'),
+  [8, 8, 8, 8])`, for a packer with an insets file of its own. It **refuses a trimmed frame** — a
+  nine-slice frame is packed untrimmed, or the packer cuts into its border — and names the fix for a
+  missing slice or center and for insets that are not four numbers of 0 or more. A frame written
+  with `setFrame()` is not checked: a trimmed one draws its border cut where the packer cut it.
+- **Borders wider than the panel** shrink in proportion until they meet: the middle vanishes and
+  no triangle turns over. Insets wider than the frame shrink in the uv alike.
+- **With the others.** `Anchor` places a panel by any point — `(0, 0)` its top left corner; `Flip`
+  mirrors the border with the image, its left border then the frame's right one; every pass draws
+  the sliced panel. The measure is the unit quad of the default `baseArgs`, as for the trim shift.
+- `checkKind` refuses a kind on any other base — `defineSprite: feature "nineSlice": needs the base
+  gridBase({columns: 3, rows: 3}), not "quad" — …` — and one no feature of which declares the
+  `colorMap`. A 3 × 3 grid shades 16 vertices per sprite.
 
 ### Frames out of an atlas
 

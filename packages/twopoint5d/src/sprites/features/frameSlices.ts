@@ -38,6 +38,15 @@ export function untrimmedSizeOf(frame: TextureAtlasFrame<unknown>, target: [numb
 
 const namesOf = (slices: Record<string, unknown>): string => Object.keys(slices).join(', ') || '(none)';
 
+// the refusal of several slices that carry the field — out of sliceOf(): a closure over its locals
+// would make V8 build a context for them on every call
+function ambiguous(slices: Record<string, unknown>, field: SliceWanted['field'], where: string): Error {
+  const holders = Object.keys(slices).filter((key) => (slices[key] as AsepriteFrameSlice)[field] != null);
+  return new Error(
+    `${where}: the slices ${holders.map((key) => `"${key}"`).join(', ')} of the frame have a ${field} — name one: ${where}(frame, "${holders[0]}")`,
+  );
+}
+
 /**
  * The Aseprite slice of `frame` named `name`, or — without a name — the one slice of the frame that
  * carries `wanted.field`. The slices are the ones `AsepriteJson.parse()` writes into the frame's data.
@@ -79,11 +88,6 @@ export function sliceOf(
       `${where}: no slice of the frame has a ${field} — its slices are: ${namesOf(slices)}; ${wanted.any}, or ${wanted.fix}`,
     );
   }
-  if (count > 1) {
-    const holders = Object.keys(slices).filter((key) => (slices[key] as AsepriteFrameSlice)[field] != null);
-    throw new Error(
-      `${where}: the slices ${holders.map((key) => `"${key}"`).join(', ')} of the frame have a ${field} — name one: ${where}(frame, "${holders[0]}")`,
-    );
-  }
+  if (count > 1) throw ambiguous(slices, field, where);
   return found;
 }
