@@ -287,6 +287,27 @@ export type VOAttrGetter = {
   <T extends TypedArray | number[]>(target: T): T;
 };
 
+/**
+ * The key of a vertex object for `VertexObjectPool#sortBy()`: a number, the lowest drawn first. It is
+ * called once per slot in use, in slot order, before anything moves, and must neither create nor
+ * free a vertex object of the pool.
+ *
+ * A key that is a fractional value crossing the call — or `-0`, which is no small integer either, as
+ * `(vo) => -vo.layer` answers for a layer of 0 — costs a heap number of 16 B wherever V8 does not
+ * inline the function; a key read by the name of a value property (`sortBy('y')`) never crosses
+ * a call, and a key array (`sortByKeys()`) is read as it is.
+ */
+export type VOSortKey<VOType> = (vo: VOType & VO) => number;
+
+/** How `VertexObjectPool#sortBy()` and `#sortByKeys()` order the keys. */
+export interface VOSortOptions {
+  /**
+   * The highest key first. Default `false`: the lowest first. Equal keys keep their slot order in
+   * either direction, and a `NaN` key goes last in either direction.
+   */
+  descending?: boolean;
+}
+
 /** The three.js buffer a geometry holds the values of an attribute in — interleaved when several attributes share one. */
 export type BufferLike = InterleavedBuffer | BufferAttribute;
 
