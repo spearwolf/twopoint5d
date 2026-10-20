@@ -51,3 +51,10 @@ export const loadFailureFor: unique symbol = Symbol('TextureResource.loadFailure
  * among the built-in adapters.
  */
 export const atlasAdapterPicker: unique symbol = Symbol('TextureResource.atlasAdapterPicker');
+
+/**
+ * The method of a `TextureAtlas` that lets go of a frame name: the name leaves the name map and the
+ * name list, and the frame stays at its id. `DynamicAtlas#remove()` calls it, so that a removed name
+ * can be added again.
+ */
+export const forgetFrameName: unique symbol = Symbol('TextureAtlas.forgetFrameName');

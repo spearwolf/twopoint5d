@@ -349,6 +349,80 @@ An item that names an adapter the store does not know builds no resource and is 
 `meta.size`, `meta.image` — since the resource reads the image out of the json before any adapter
 runs; a packer of another format is converted to that envelope first.
 
+### Atlases built at run time: `DynamicAtlas`
+
+Labels, damage numbers, player names, an avatar from a url: images that exist only at run time.
+`DynamicAtlas` packs them into one canvas, one `CanvasTexture` and one ordinary `TextureAtlas`, so
+all of them are drawn by one `FeatureSprites` in one draw call, and `setFrame()`, `AtlasFrameTable`
+and `sampleAtlasFrame()` read its frames as any other.
+
+```ts check
+import {DynamicAtlas, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+
+declare const portrait: ImageBitmap; // 96 × 96, e.g. createImageBitmap(await (await fetch(url)).blob())
+
+const ui = new DynamicAtlas({width: 1024, height: 1024, padding: 2});
+
+// a label: measured with the atlas' own context, drawn by a callback into a frame of that size
+const drawLabel = (text: string) => (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, _w: number, h: number) => {
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, 0, h - 4);
+};
+ui.context.font = '16px sans-serif';
+const label = ui.add('hp', drawLabel('HP 20/20'), {width: ui.context.measureText('HP 20/20').width, height: 20});
+
+// an image at its own size
+const face = ui.add('knight', portrait);
+
+const panel = new FeatureSprites(TexturedSpriteKind, {capacity: 64, textures: {colorMap: ui.texture}, transparent: true});
+const hp = panel.createSprite()!;
+hp.setFrame(label);
+hp.setSize(label.coords.width, label.coords.height);
+panel.createSprite()?.setFrame(face);
+
+// later, the counter changes: drawn anew in place, the sprite is not written to
+export const onHit = (left: number) => ui.redraw('hp', drawLabel(`HP ${left}/20`));
+```
+
+**Packing.** The frames lie on shelves: rows as high as the frame that opened them, a frame going
+onto the lowest shelf it fits beside the others, else onto a new shelf below. `padding` (default 1)
+clear texels lie between two frames and around the edge; `extrude` (default 0) repeats the edge of
+every frame outwards by as many texels, so linear filtering at the edge reads the frame and not the
+padding. A frame never moves. A frame that does not fit throws, naming the size of the atlas and the
+fix — there is no silent growth, which would move every frame already written to a sprite.
+
+**`add(name, source, size?)`** takes a draw callback `(context, width, height)` — run clipped to the
+frame and moved to its top left, its cell cleared — and then needs the `size`, or an `ImageBitmap`,
+an image element, a canvas or an `OffscreenCanvas`, drawn at its own size or scaled to `size`. A size
+is rounded up to whole texels, so a width from `measureText()` goes in as it comes. A callback that
+throws leaves the atlas as it was. The frame is untrimmed; its `data` is the rectangle in the canvas,
+`{frame: {x, y, w, h}}` — a copy: the atlas keeps the cell of every frame itself, and a change to
+`data` moves nothing. **`redraw(name, source)`** draws a frame anew at its size, in place: a score,
+a health label. A redraw that throws leaves the frame as far as it got — its cell cleared, perhaps
+drawn in part — and marked for upload; the frame and its name stay, so the next `redraw()` mends it.
+An image element that has not loaded is refused by `add()` and `redraw()` alike, before anything is
+cleared. **`remove(name)`** clears the frame and lets go of the name, not of its space — a shelf
+packer fragments; **`clear()`** starts over with a new `atlas`, frame ids from 0.
+
+The atlas draws, clears and extrudes in canvas pixels whatever the caller left on `context` — a
+transform, a `globalAlpha`, a composite operation — and gives that state back afterwards, so the
+`font` set for `measureText()` stays. A draw callback starts from that neutral state.
+
+**The texture** is read upright (`flipY = false`, as every atlas of the library), in sRGB, with
+straight alpha and without mipmaps; `filter: 'nearest'` for pixel art, `'linear'` by default. Every
+change marks it for upload, and the next render uploads the whole canvas once. The canvas is an
+`OffscreenCanvas` where there is one, a canvas element otherwise, or the `canvas` handed in, whose
+size the atlas takes; under Node there is neither, and the constructor says to hand one in.
+
+**Ownership.** The atlas owns its texture and a canvas it built; `dispose()` releases both. A canvas
+handed in stays the caller's. After `dispose()`, `texture`, `canvas`, `context`, `add()` and
+`redraw()` throw, `remove()` answers `false`, `clear()` does nothing.
+
+Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as
+`TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()` and `layoutText()`, see
+[the text guide](text.md).
+
 ## Uploads: static and dynamic attributes
 
 `update()` of the mesh uploads what the sprite pool marked. Position, rotation and shear are
