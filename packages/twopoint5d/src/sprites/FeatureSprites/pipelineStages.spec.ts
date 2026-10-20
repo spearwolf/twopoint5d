@@ -296,6 +296,28 @@ describe('uv stages and ctx.uv', () => {
     material.dispose();
   });
 
+  test('the lookups of a uv stage take a new texture of the same kind without a rebuild', () => {
+    const warping = defineFeature({
+      name: 'warping',
+      textures: {warpMap: {}},
+      uv: {order: 0, transform: (uv, {sample}) => add(uv, sample('warpMap', uv).xy) as unknown as Node<'vec2'>},
+    });
+    const first = new Texture();
+    const second = new Texture();
+    const material = new FeatureSpritesMaterial(kindOf(AtlasFrame, warping, TextureColor), {
+      textures: {colorMap: new Texture(), warpMap: first},
+    });
+    const colorNode = material.colorNode;
+    expect(samplesTexture(colorNode!, first)).toBe(true);
+
+    material.setTexture('warpMap', second);
+
+    expect(material.colorNode).toBe(colorNode);
+    expect(samplesTexture(colorNode!, second)).toBe(true);
+    expect(samplesTexture(colorNode!, first)).toBe(false);
+    material.dispose();
+  });
+
   test('a pass brings a uv stage of its own', () => {
     const material = new FeatureSpritesMaterial(TexturedSpriteKind, {
       textures: {colorMap: new Texture()},
