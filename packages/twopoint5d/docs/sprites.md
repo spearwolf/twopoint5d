@@ -1360,6 +1360,85 @@ frames — sample an atlas with mipmaps only when its packer pads or extrudes th
 that repeats one image is better served by that image as a texture of its own with
 `RepeatWrapping`.
 
+## Glow: emissive sprites with bloom
+
+A sprite glows — a neon sign, a laser, a spark, an emissive light — when its color is brighter
+than white and the stage it is drawn in blooms. Nothing beyond the built-in parts is needed:
+
+- `Tint` writes a float color, and nothing in the material clamps it: a tint above 1 draws a color
+  above white.
+- `Stage2D` renders through three's `pass()`, whose target holds half floats, so that color
+  survives into the composition of the stages.
+- `createBloomOutputNodeBuilder({threshold: 1})` lets only what is brighter than white into the
+  bloom. A sprite at or below white — a texel of 255 under a tint of 1 — stays out of it.
+
+```ts check
+import {
+  createBloomOutputNodeBuilder,
+  type Display,
+  FeatureSprites,
+  OrthographicProjection,
+  Stage2D,
+  StageRenderer,
+  TexturedSpriteKind,
+} from '@spearwolf/twopoint5d';
+import {RenderPipeline} from 'three/webgpu';
+
+declare const display: Display;
+
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+const stageRenderer = new StageRenderer(display).add(stage);
+const pipeline = new RenderPipeline(display.renderer!);
+const withGlow = createBloomOutputNodeBuilder({strength: 1.2, radius: 0.4, threshold: 1});
+stageRenderer.pipeline = pipeline;
+stageRenderer.buildOutputNode = withGlow;
+
+const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 100});
+stage.scene.add(sprites);
+
+const neon = sprites.createSprite();
+if (neon != null) {
+  neon.setSize(64, 16);
+  // four times as bright as the color map: a luminance of 3.07, far above the threshold
+  neon.setColorValues(4, 3, 1, 1);
+}
+const plain = sprites.createSprite();
+if (plain != null) {
+  plain.setSize(64, 16);
+  plain.setPosition(0, -32);
+  // at most white: no glow
+  plain.setColorValues(1, 1, 1, 1);
+}
+sprites.update();
+
+// teardown: the renderer lets go first, then the builder and the pipeline go
+stageRenderer.dispose();
+withGlow.dispose();
+pipeline.dispose();
+sprites.dispose();
+```
+
+**Brightness is luminance.** The threshold compares the luminance of the linear color,
+`0.2126 r + 0.7152 g + 0.0722 b`, not its brightest channel. `[4, 3, 1]` has a luminance of 3.07
+and glows; a pure red `[4, 0, 0]` has 0.85 and does **not**, a pure blue `[0, 0, 4]` has 0.29. A
+saturated color needs a factor of about `threshold / coefficient` to pass — 5 for red, 14 for
+blue — or a little white mixed in: `[4, 1, 1]` has 1.64. The tint multiplies the color map, so a
+dark texel needs a larger factor than a white one.
+
+- The sprite itself draws clamped to its brightest color where it is above 1, unless the renderer
+  tone-maps (`renderer.toneMapping`), which compresses it and keeps its hue.
+- A `Flash` towards a color above white glows too: `setFlash(4, 4, 4, 1)` is a hit flash that
+  blooms.
+- `Fade` and the alpha of the tint fade the glow with the sprite on a material with
+  `transparent: true`.
+- The bloom holds for the whole stage: a sprite of another stage, or a mesh of one's own above
+  white, glows as well. A threshold below 1 lets bright sprites that are not meant to glow into the
+  bloom.
+
+What the recipe cannot do: glow from an emission map of its own, and glow without the sprite
+getting brighter. Both need an emissive output of the material and a bloom that reads it alone —
+an `Emissive` feature and a selective bloom, which wait for a scene that needs them.
+
 ## Performance
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch
