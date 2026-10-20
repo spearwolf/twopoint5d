@@ -19,6 +19,8 @@
       "!audit.html",
       // image assets, exported by the tools that drew them
       "!**/*.svg",
+      // a texture packer export kept byte for byte as the packer wrote it, with its generator
+      "!packages/twopoint5d/src/texture/fixtures/free-tex-packer",
       "!.vscode"
     ]
   },

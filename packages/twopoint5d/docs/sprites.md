@@ -179,6 +179,9 @@ A frame is three values: `texCoords` (`s, t, u, v`), `texFlipDiagonal` — a Tex
 turned by 90°, read with the two lookup components swapped — and `texTrim`, the margins a
 packer cut off, as fractions of the untrimmed sprite. `setFrame(frame)` writes all three for a
 frame of any atlas; the margins come from TexturePacker data and are zero for every other.
+`TexturePackerJson` reads the "JSON Hash" and "JSON Array" exports of TexturePacker and of
+free-tex-packer alike, rotated and trimmed frames included — a fixture of a real free-tex-packer
+export holds it to that (`src/texture/fixtures/free-tex-packer/`).
 
 The quad of the sprite stands for the **untrimmed** sprite: size a sprite that shows trimmed
 frames by the `sourceSize` of its frames, not by the measures of their `coords`.
