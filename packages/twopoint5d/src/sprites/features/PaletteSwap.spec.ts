@@ -51,10 +51,17 @@ describe('paletteSwap()', () => {
     expect(ColorOrder.Palette).toBeLessThan(ColorOrder.Tint);
   });
 
-  test.each([0, 65, 2.5, '16'])('refuses colors of %o', (colors) => {
+  test.each([
+    [0, '0'],
+    [65, '65'],
+    [2.5, '2.5'],
+    ['16', '"16"'],
+    [Number.NaN, 'NaN'],
+    [-Infinity, '-Infinity'],
+  ])('refuses colors of %o', (colors, shown) => {
     expect(() => paletteSwap({colors: colors as number})).toThrow(TypeError);
     expect(() => paletteSwap({colors: colors as number})).toThrow(
-      `paletteSwap: colors must be a whole number from 1 to 64, got ${JSON.stringify(colors)}`,
+      `paletteSwap: colors must be a whole number from 1 to 64, got ${shown}`,
     );
   });
 

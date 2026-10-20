@@ -1,5 +1,6 @@
 import {add, atan, clamp, div, float, int, max, mul, round, sub} from 'three/tsl';
 import type {Node} from 'three/webgpu';
+import {describeValue} from '../../utils/describeValue.js';
 import {cameraPositionLocal} from '../cameraNodes.js';
 import {texCoordsFromIndex} from '../node-utils.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
@@ -71,7 +72,7 @@ export function tableFrame(options?: TableFrameOptions): SpriteFeature<TableFram
   const views = options?.views;
   if (views !== undefined && !(typeof views === 'number' && Number.isInteger(views) && views >= 2)) {
     throw new TypeError(
-      `tableFrame: views must be a whole number of 2 or more, got ${JSON.stringify(views)} — leave views out for frames without views`,
+      `tableFrame: views must be a whole number of 2 or more, got ${describeValue(views)} — leave views out for frames without views`,
     );
   }
   const key = views ?? 0;

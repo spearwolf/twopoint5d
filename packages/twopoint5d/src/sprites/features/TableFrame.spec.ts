@@ -50,10 +50,18 @@ describe('tableFrame()', () => {
     }
   });
 
-  test.each([1, 0, 2.5, -8, '8'])('refuses views of %o', (views) => {
+  test.each([
+    [1, '1'],
+    [0, '0'],
+    [2.5, '2.5'],
+    [-8, '-8'],
+    ['8', '"8"'],
+    [Number.NaN, 'NaN'],
+    [Infinity, 'Infinity'],
+  ])('refuses views of %o', (views, shown) => {
     expect(() => tableFrame({views: views as number})).toThrow(TypeError);
     expect(() => tableFrame({views: views as number})).toThrow(
-      `tableFrame: views must be a whole number of 2 or more, got ${JSON.stringify(views)} — leave views out for frames without views`,
+      `tableFrame: views must be a whole number of 2 or more, got ${shown} — leave views out for frames without views`,
     );
   });
 

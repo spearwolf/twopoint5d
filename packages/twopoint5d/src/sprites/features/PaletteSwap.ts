@@ -1,5 +1,6 @@
 import {abs, add, clamp, div, float, max, mix, mul, round, step, sub, vec2, vec4} from 'three/tsl';
 import type {Node} from 'three/webgpu';
+import {describeValue} from '../../utils/describeValue.js';
 import {ColorOrder, defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 
 export interface PaletteSwapOptions {
@@ -49,7 +50,7 @@ const TOLERANCE = 1 / 512;
 export function paletteSwap(options?: PaletteSwapOptions): SpriteFeature<PaletteSwapApi> {
   const colors = options?.colors ?? 16;
   if (!(typeof colors === 'number' && Number.isInteger(colors) && colors >= 1 && colors <= 64)) {
-    throw new TypeError(`paletteSwap: colors must be a whole number from 1 to 64, got ${JSON.stringify(colors)}`);
+    throw new TypeError(`paletteSwap: colors must be a whole number from 1 to 64, got ${describeValue(colors)}`);
   }
   let feature = features.get(colors);
   if (feature == null) {
