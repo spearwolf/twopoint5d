@@ -13,9 +13,6 @@ the first draft of this spec, which the sections below now state as built:
 - `runCheckKind()`, which calls a hook and names the feature in its error, lives in the internal
   module `runCheckKind.ts`; the type of what the hook is shown is exported as `SpriteKindShape`
   (§6);
-- the baseline of §8.1 compares the color *and* the position graph of each kind of today with
-  those of the same kind under the old `TextureColor`; the position graph has no older self to be
-  held to, so the browser suite carries it;
 - the grid's specs live in `src/sprites/GridBase.spec.ts`, the slot specs in
   `src/sprites/FeatureSprites/pipelineStages.spec.ts` and the merge table in
   `src/sprites/spriteDeclarations.spec.ts`; `GridBaseVO` also names the generated
@@ -449,12 +446,13 @@ stage context offers; phase E decides where it lives.
   `root` — each node once, in the order of a walk, with its type, its operator, method, swizzle,
   attribute name or constant value, and the indices of its children. Two graphs of the same
   structure answer the same text.
-- `TexturedSpriteKind`, `AnimatedSpriteKind` (with an animsMap and without), a `ShadowPass` and a
-  `ReflectionPass` material over each: the `colorNode` equals the one of the same kind with
-  `TextureColor` replaced by a copy of its old self, which sampled at `attribute('uv')`; the
-  `positionNode` equals the one of a material whose frame feature is wrapped in a copy that adds
-  nothing. Without frame stages the frame a color source gets is the very object the frame slot
-  answered.
+- `src/sprites/FeatureSprites/fixtures/preset-graphs.json` holds the signatures of the
+  `positionNode` and the `colorNode` that `TexturedSpriteKind`, `AnimatedSpriteKind` (with an
+  animsMap and without) and a `ShadowPass`, `ReflectionPass` and `BillboardReflectionPass` material
+  over each built at the branch point of this phase (main at `92508e8d`), written by
+  `presetGraphs.spec.ts` with `UPDATE_SPRITE_GRAPHS=1` on the sources of that commit. The spec
+  holds the graphs of today to them, string for string. A three bump that changes how its nodes are
+  built changes them as well; the fixture is then written anew and its diff read.
 - Every browser test of the sprites keeps passing unchanged — the pixel proof.
 
 ### 8.2 Vitest
