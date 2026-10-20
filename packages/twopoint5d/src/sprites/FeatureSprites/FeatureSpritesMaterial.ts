@@ -53,6 +53,8 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
 
 type TextureNode = ReturnType<typeof texture>;
 type GraphScope = 'frame' | 'position' | 'color';
+// the graphs whose stages read ctx.uv
+type StageScope = 'position' | 'color';
 const SCOPES: readonly GraphScope[] = ['frame', 'position', 'color'];
 
 const WHERE = 'FeatureSpritesMaterial';
@@ -92,6 +94,8 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   readonly #ownsResources: boolean;
   readonly #placement: Signal<SpriteFeature>;
   readonly #samples: Record<GraphScope, {name: string; node: TextureNode}[]> = {frame: [], position: [], color: []};
+  // ctx.uv of the graph being built, built by the first stage that reads it
+  readonly #uv: Record<StageScope, Node<'vec2'> | undefined> = {position: undefined, color: undefined};
   readonly #frame: SignalReader<SpriteFrameNodes>;
   readonly #positionEffect: Effect;
   readonly #colorEffect: Effect;
@@ -152,14 +156,17 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
       this.setValues(materialParameters);
 
       // the frame is built once per graph generation and read by both effects below: a change of the
-      // shape of a texture of the frame feature rebuilds each of them once
+      // shape of a texture of the frame feature or of a frame stage rebuilds each of them once
       this.#frame = createMemo(
         () => {
           this.#samples.frame.length = 0;
           const feature = this.#pipeline.frame;
-          return feature != null && this.#isActive(feature)
-            ? feature.frame!(this.#frameContext(feature, 'frame'))
-            : defaultFrame();
+          let frame =
+            feature != null && this.#isActive(feature) ? feature.frame!(this.#frameContext(feature, 'frame')) : defaultFrame();
+          for (const stage of this.#pipeline.frameStage) {
+            if (this.#isActive(stage)) frame = stage.frameStage!.transform(frame, this.#frameContext(stage, 'frame'));
+          }
+          return frame;
         },
         {attach: this},
       );
@@ -169,6 +176,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
           const frame = this.#frame();
           const placementFeature = this.#placement.get();
           this.#samples.position.length = 0;
+          this.#uv.position = undefined;
 
           let position = attribute<'vec3'>('position') as unknown as Node<'vec3'>;
           if (frame.trim != null) position = trimShift(position, attribute<'vec2'>('uv') as unknown as Node<'vec2'>, frame.trim);
@@ -192,6 +200,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         () => {
           const frame = this.#frame();
           this.#samples.color.length = 0;
+          this.#uv.color = undefined;
 
           const source = this.#pipeline.colorSource;
           let color =
@@ -273,8 +282,25 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
     };
   }
 
-  #shaderContext(feature: SpriteFeature, scope: GraphScope, frame: SpriteFrameNodes): SpriteShaderContext {
-    return {...this.#frameContext(feature, scope), frame};
+  #shaderContext(feature: SpriteFeature, scope: StageScope, frame: SpriteFrameNodes): SpriteShaderContext {
+    return Object.defineProperty({...this.#frameContext(feature, scope), frame}, 'uv', {
+      enumerable: true,
+      get: () => this.#uvOf(scope, frame),
+    }) as SpriteShaderContext;
+  }
+
+  // the base uv after every active uv stage, built once per graph: a tracked read of the textures of
+  // the uv stages, in the effect of the graph that reads it first
+  #uvOf(scope: StageScope, frame: SpriteFrameNodes): Node<'vec2'> {
+    let uv = this.#uv[scope];
+    if (uv == null) {
+      uv = attribute<'vec2'>('uv') as unknown as Node<'vec2'>;
+      for (const feature of this.#pipeline.uv) {
+        if (this.#isActive(feature)) uv = feature.uv!.transform(uv, {...this.#frameContext(feature, scope), frame, uv});
+      }
+      this.#uv[scope] = uv;
+    }
+    return uv;
   }
 
   /** The uniforms of the material, by declared name. Readable and writable after `dispose()`. */

@@ -11,7 +11,10 @@ export interface SpriteFrameNodes {
   readonly trim?: Node<'vec4'>;
 }
 
-/** What a frame stage reads through; the other stages get {@link SpriteShaderContext}, which adds the frame. */
+/**
+ * What the frame slot and a frame stage read through; the other stages get
+ * {@link SpriteShaderContext}, which adds the frame and the uv.
+ */
 export interface SpriteFrameContext {
   /**
    * An instance or base attribute of the sprite kind, by the name it has on the geometry. The
@@ -30,14 +33,32 @@ export interface SpriteFrameContext {
 }
 
 export interface SpriteShaderContext extends SpriteFrameContext {
-  /** The frame of the sprite, built once per graph and read by the vertex and the fragment pipeline. */
+  /**
+   * The frame of the sprite after every frame stage, built once per graph generation and read by
+   * the vertex and the fragment pipeline.
+   */
   readonly frame: SpriteFrameNodes;
+  /**
+   * The uv the color source samples at: the base `uv` after every uv stage — `(0, 0)` the top left
+   * of the frame as drawn, `(1, 1)` its bottom right. Built once per graph, the first time a stage
+   * reads it; a graph that never reads it builds no uv stage. In a uv stage it is the uv so far, the
+   * stage's own input. `attribute('uv')` stays the base uv, where the vertex lies on the base.
+   */
+  readonly uv: Node<'vec2'>;
 }
 
 export interface SpriteStage<T extends string> {
   /** Where in its slot this stage runs; lower runs first, a tie keeps the order of the feature list. */
   readonly order: number;
   transform(input: Node<T>, ctx: SpriteShaderContext): Node<T>;
+}
+
+/** A stage on the frame: after the frame slot, before the trim shift and both pipelines read the frame. */
+export interface SpriteFrameStage {
+  /** Where among the frame stages this one runs; lower runs first, a tie keeps the order of the feature list. */
+  readonly order: number;
+  /** Answers the whole frame; a stage with no business with `flipDiagonal` or `trim` passes them on. */
+  transform(frame: SpriteFrameNodes, ctx: SpriteFrameContext): SpriteFrameNodes;
 }
 
 export interface SpriteTextureDeclaration {
@@ -82,12 +103,16 @@ export interface SpriteFeature<Api extends object = object> {
   readonly textures?: Readonly<Record<string, SpriteTextureDeclaration>>;
   /** The frame slot: at most one feature of a kind. */
   readonly frame?: (ctx: SpriteFrameContext) => SpriteFrameNodes;
+  /** A stage on the frame, after the frame slot and before the trim shift and both pipelines read it. */
+  readonly frameStage?: SpriteFrameStage;
   /** A stage in the local quad space, after the trim shift and before the placement. */
   readonly local?: SpriteStage<'vec3'>;
   /** Maps the local vertex into the local space of the mesh: exactly one feature of a kind. */
   readonly placement?: (local: Node<'vec3'>, ctx: SpriteShaderContext) => Node<'vec3'>;
   /** A stage after the placement, in the local space of the mesh — the slot of shadows and mirrors. */
   readonly mesh?: SpriteStage<'vec3'>;
+  /** A stage on the uv the color source samples at — `ctx.uv` — before any stage reads it. */
+  readonly uv?: SpriteStage<'vec2'>;
   /** The color before the color stages: at most one feature of a kind; without one the sprite is flat grey. */
   readonly colorSource?: (frame: SpriteFrameNodes, ctx: SpriteShaderContext) => Node<'vec4'>;
   /** A stage on the color, after the color source. */
@@ -98,7 +123,7 @@ export interface SpriteFeature<Api extends object = object> {
   readonly __api?: Api;
 }
 
-const STAGE_SLOTS = ['local', 'mesh', 'color'] as const;
+const STAGE_SLOTS = ['frameStage', 'local', 'mesh', 'uv', 'color'] as const;
 
 /**
  * Checks a feature on its own and freezes it. What can only be checked against the other
@@ -124,6 +149,15 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
 
 /** The order bands of the local stages; the gaps take stages of your own. */
 export const LocalOrder = Object.freeze({Anchor: 100, Flip: 150, Scale: 200, Shear: 300, Rotate: 400} as const);
+
+/**
+ * The order bands of the frame stages. `Flip` mirrors the frame — `LocalOrder.Flip` is for a stage
+ * of one's own that mirrors the geometry itself, which turns its triangles over.
+ */
+export const FrameOrder = Object.freeze({Flip: 100} as const);
+
+/** The order bands of the uv stages. `Slice` moves the inner grid lines of a nine-slice. */
+export const UvOrder = Object.freeze({Slice: 100} as const);
 
 /** The order bands of the mesh stages. */
 export const MeshOrder = Object.freeze({Offset: 100, Project: 200, Mirror: 300} as const);

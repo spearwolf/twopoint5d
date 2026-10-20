@@ -29,26 +29,42 @@ rotate-then-scale turns it into a parallelogram — so the order of the stages b
 model, not to the order of the feature list:
 
 ```
-frame:    frame slot (or defaults) ─▶ texCoords, flipDiagonal, trim — read by both pipelines
+frame:    frame slot (or defaults) ─▶ frame stages ─▶ texCoords, flipDiagonal, trim — read by both pipelines
+uv:       base.uv ─▶ uv stages ─▶ ctx.uv — built where a stage reads it, the color source among them
 vertex:   base.position ─▶ trim shift ─▶ local stages ─▶ placement ─▶ mesh stages ─▶ positionNode
-fragment: colorSource(frame) ─▶ color stages ─▶ colorNode
+fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 ```
 
 | slot | per kind | built-in features |
 | --- | --- | --- |
 | `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
+| `frameStage` | any, by `order` | — |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
+| `uv` | any, by `order` | — |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
 | `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
-The order bands `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear 300, Rotate 400`),
-`MeshOrder` (`Offset 100, Project 200, Mirror 300`) and `ColorOrder` (`Tint 100, Mask 150,
-Fade 200, Flash 300, Pass 1000`) leave room for stages of your own. Two stages of one order run in
-the order of the feature list. `ColorOrder.Pass` is the band of the color stages a pass brings to
-recolor the sprite as a whole — `ShadowMask`, `Darken` — after every color stage of the kind.
+The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear
+300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
+and `ColorOrder` (`Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
+your own. Two stages of one order run in the order of the feature list. `ColorOrder.Pass` is the
+band of the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` —
+after every color stage of the kind.
+
+A **frame stage** changes the frame after the frame slot has answered it, and everything that
+reads the frame — the trim shift, every stage, the color source — reads the changed one: a mirror
+of the image (`FrameOrder.Flip`) swaps `s` with `s + u` and the trim margins left with right, for
+every frame feature at once, and leaves the triangles as they are. `LocalOrder.Flip` is the band of
+a local stage that mirrors the geometry itself, which turns its triangles over — such a sprite
+needs `side: DoubleSide`.
+
+A **uv stage** moves where a vertex samples. The color source reads `ctx.uv`, the base `uv` after
+every uv stage; `TextureColor` hands it through a varying, so its uv stages run per vertex and
+their result is interpolated across each triangle — exact for a stage that moves grid lines
+(`UvOrder.Slice`), not for one that bends the uv within a triangle.
 
 The **trim shift** is no feature. A frame a packer trimmed covers only part of the untrimmed
 sprite; the shift moves each corner of the quad to its corner of that part, measured in the unit
@@ -923,9 +939,16 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   stay the caller's. Until all of them are set the feature drops out of the graph.
 - **`frame`** — the frame slot, at most one feature per kind: answers `texCoords`, and optionally
   `flipDiagonal` and `trim`, read by both pipelines.
-- **`local`**, **`mesh`**, **`color`** — a stage `{order, transform}` in its slot; `order` is a
-  finite number, lower runs first, and a tie keeps the order of the feature list. `LocalOrder`,
-  `MeshOrder` and `ColorOrder` name the bands.
+- **`frameStage`** — a stage `{order, transform(frame, ctx)}` on the frame, after the frame slot —
+  or the defaults, without a frame feature — and before anything reads it. It answers a whole
+  frame: one with no business with `flipDiagonal` or `trim` passes them on, `{...frame,
+  texCoords}`. Its context is the one of the frame slot, without `frame` and `uv`. The lookup reads
+  `(s + uv.x · u, t + uv.y · v)` before the diagonal swap, so the drawn x is the `s` axis for every
+  frame, a turned atlas frame included, and `trim` holds the margins of the sprite as drawn.
+- **`local`**, **`mesh`**, **`uv`**, **`color`** — a stage `{order, transform}` in its slot;
+  `order` is a finite number, lower runs first, and a tie keeps the order of the feature list.
+  `FrameOrder`, `LocalOrder`, `MeshOrder`, `UvOrder` and `ColorOrder` name the bands. A `uv` stage
+  transforms the `vec2` the color source samples at.
 - **`placement`** — maps the local vertex into the local space of the mesh: exactly one feature of
   a kind, and it declares no textures, since the placement runs always. A pass may bring one in
   place of the kind's — see "Passes: shadows and reflections".
@@ -936,7 +959,15 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, and `sample(name, uv)` and
 `textureSize(name)` for a texture the feature declares itself. The material throws, naming the
-feature, for any other name.
+feature, for any other name. Every stage after the frame slot gets `frame`, the frame after the
+frame stages, and `uv`, the uv after the uv stages — built the first time a stage of a graph reads
+it, so a graph that never reads it builds no uv stage; in a uv stage `uv` is the stage's own input.
+`attribute('uv')` stays the base uv, where the vertex lies on the base.
+
+`sample()` builds its lookup when the graph is built, and the material keeps the node to hand it
+a new texture of the same kind. A lookup made inside a TSL `Fn`, `If` or `Loop` callback, which
+three runs while it compiles the shader, escapes it: build every lookup in the stage itself, and
+unroll a loop over lookups in JavaScript, as `AnimatedFrames` unrolls its search.
 
 A feature that brings nothing but a stage reads what other features hold, and says so with
 `requires`: `defineSprite()` then refuses a kind without them, naming both features, instead of
@@ -957,6 +988,43 @@ export const Bob = defineFeature({
       const phase = add(uniform<'float'>('time'), attribute<'vec3'>('instancePosition').x);
       return add(position, vec3(0, sin(phase), 0)) as unknown as Node<'vec3'>;
     },
+  },
+});
+```
+
+A frame stage and a uv stage, both worth a few lines. `StripStep` shows the frame `step` places to
+the right of the sprite's own frame in a strip of frames of one size — a digit of a counter, a tile
+of a row — by moving `s` by `step · u`, so it works on every frame feature. `Zoom` scales the uv
+about the middle of the frame by `zoom`, a magnifier over the sprite's image — 0.5 shows the
+middle half at twice its size; it is affine, so the per-vertex uv of `TextureColor` stays exact:
+
+```ts check
+import {defineFeature, FrameOrder, UvOrder} from '@spearwolf/twopoint5d';
+import {add, mul, sub, vec4} from 'three/tsl';
+import type {Node} from 'three/webgpu';
+
+export const StripStep = defineFeature<{step: number}>({
+  name: 'stripStep',
+  attributes: {step: {size: 1}},
+  initialize() {
+    this.step = 0;
+  },
+  frameStage: {
+    order: FrameOrder.Flip - 50,
+    transform: (frame, {attribute}) => {
+      const {texCoords} = frame;
+      const s = add(texCoords.x, mul(attribute<'float'>('step'), texCoords.z));
+      return {...frame, texCoords: vec4(s, texCoords.y, texCoords.z, texCoords.w) as unknown as Node<'vec4'>};
+    },
+  },
+});
+
+export const Zoom = defineFeature({
+  name: 'zoom',
+  uniforms: {zoom: 1},
+  uv: {
+    order: UvOrder.Slice + 100,
+    transform: (uv, {uniform}) => add(0.5, mul(sub(uv, 0.5), uniform<'float'>('zoom'))) as unknown as Node<'vec2'>,
   },
 });
 ```

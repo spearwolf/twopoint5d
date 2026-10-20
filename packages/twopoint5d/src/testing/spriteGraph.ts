@@ -105,6 +105,7 @@ export function stubShaderContext(
   const uniforms = new Map<string, Node>();
   return {
     frame,
+    uv: attribute('uv') as unknown as Node<'vec2'>,
     sampled,
     attribute: <T extends string>(name: string) => attribute(name) as unknown as Node<T>,
     uniform: <T extends string>(name: string) => {

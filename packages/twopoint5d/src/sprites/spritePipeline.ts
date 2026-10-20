@@ -1,17 +1,20 @@
 import type {SpriteFeature} from './SpriteFeature.js';
 
 /**
- * The stages of a sprite kind — or of a pass over one — by slot. The local, mesh and color stages
- * are sorted by their `order`; a tie keeps the order of the feature list.
+ * The stages of a sprite kind — or of a pass over one — by slot. The frame, local, mesh, uv and
+ * color stages are sorted by their `order`; a tie keeps the order of the feature list.
  *
  * ```
- * frame:    frame slot (or defaults) ─▶ SpriteFrameNodes, read by both pipelines
+ * frame:    frame slot (or defaults) ─▶ frame stages ─▶ SpriteFrameNodes, read by both pipelines
+ * uv:       base.uv ─▶ uv stages ─▶ ctx.uv, built where a stage reads it
  * vertex:   base.position ─▶ trim shift ─▶ local ─▶ placement ─▶ mesh ─▶ positionNode
  * fragment: colorSource(frame) ─▶ color ─▶ colorNode
  * ```
  */
 export interface SpritePipeline {
   readonly frame: SpriteFeature | undefined;
+  readonly frameStage: readonly SpriteFeature[];
+  readonly uv: readonly SpriteFeature[];
   readonly local: readonly SpriteFeature[];
   readonly placement: SpriteFeature | undefined;
   readonly mesh: readonly SpriteFeature[];
@@ -20,7 +23,7 @@ export interface SpritePipeline {
 }
 
 type SingleSlot = 'frame' | 'placement' | 'colorSource';
-type OrderedSlot = 'local' | 'mesh' | 'color';
+type OrderedSlot = 'frameStage' | 'uv' | 'local' | 'mesh' | 'color';
 
 const single = (features: readonly SpriteFeature[], slot: SingleSlot, where: string): SpriteFeature | undefined => {
   const holders = features.filter((feature) => feature[slot] != null);
@@ -39,6 +42,8 @@ const ordered = (features: readonly SpriteFeature[], slot: OrderedSlot): readonl
 export function buildSpritePipeline(features: readonly SpriteFeature[], where: string): SpritePipeline {
   return Object.freeze({
     frame: single(features, 'frame', where),
+    frameStage: ordered(features, 'frameStage'),
+    uv: ordered(features, 'uv'),
     local: ordered(features, 'local'),
     placement: single(features, 'placement', where),
     mesh: ordered(features, 'mesh'),

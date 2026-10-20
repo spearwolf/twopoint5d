@@ -21,9 +21,12 @@ describe('graphSignature()', () => {
   });
 
   test('numbers a node read twice once, so that sharing shows', () => {
-    const uv = attribute('uv');
+    const uv = attribute<'vec2'>('uv') as unknown as Node<'vec2'>;
     const shared = add(uv, uv) as unknown as Node;
-    const separate = add(attribute('uv'), attribute('uv')) as unknown as Node;
+    const separate = add(
+      attribute<'vec2'>('uv') as unknown as Node<'vec2'>,
+      attribute<'vec2'>('uv') as unknown as Node<'vec2'>,
+    ) as unknown as Node;
 
     expect(graphSignature(shared)).not.toBe(graphSignature(separate));
   });
