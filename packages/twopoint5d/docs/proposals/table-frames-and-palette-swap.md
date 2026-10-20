@@ -1,6 +1,19 @@
 # Proposal: frames out of a table, directional frames, palette swap
 
-Status: **specified** — phase E, part 2 of
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Frames out of a table:
+`tableFrame()`" (with "Directional frames"), "Palette swap and colour cycling" and the field
+`nearestTextures` under "Writing a feature"; the browser proofs are
+`packages/twopoint5d-testing/test/sprites-table-frame.test.js` and `sprites-palette-swap.test.js`.
+Deviations of the build from the first draft of this spec, which the sections below now state as
+built:
+
+- the frame slot of `tableFrame()` makes four lookups, not five: the header and the three texels of
+  the frame (§4.1);
+- the color graph of `PaletteSwap` holds one texture node of the palette more than its `colors + 1`
+  lookups — the node `textureSize()` reads the measures of, which fetches no texel (§5.2);
+- the bake names its texture `twopoint5d.FrameTable` (§3).
+
+Phase E, part 2 of
 [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.6 and §4.14, with decision 3
 of its §7 taken: a frame table is a **data texture**, handed to the sprites as an ordinary
 `textures` resource — no new kind of resource, no limit of 341 frames. Built on the slots of
