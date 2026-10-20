@@ -10,10 +10,20 @@ export const operatorOf = (node: Node | null | undefined): OperatorNode => {
   return varNode.isVarNode ? varNode.node : (node as unknown as OperatorNode);
 };
 
-/** Every node the graph below `root` is built from, `root` included. */
+/**
+ * Every node the graph below `root` is built from, `root` included. Each node is visited once:
+ * `Node#traverse()` follows every path, and a graph that reuses a node on every step of a chain —
+ * the unrolled search of `AnimatedFrames` — has exponentially many of them.
+ */
 export const nodesOf = (root: Node): Set<Node> => {
   const nodes = new Set<Node>();
-  root.traverse((node) => nodes.add(node));
+  const pending: Node[] = [root];
+  while (pending.length > 0) {
+    const node = pending.pop()!;
+    if (nodes.has(node)) continue;
+    nodes.add(node);
+    for (const child of node.getChildren()) pending.push(child);
+  }
   return nodes;
 };
 

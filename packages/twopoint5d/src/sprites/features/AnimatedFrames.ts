@@ -1,7 +1,14 @@
-import {add, div, float, int, max, mod, mul, select, vec4} from 'three/tsl';
+import {abs, add, clamp, div, float, int, max, min, mod, mul, select, step, sub, vec4} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {texCoordsFromIndex} from '../node-utils.js';
 import {defineFeature} from '../SpriteFeature.js';
+
+// The frame of an animation with per-frame durations is found by a binary search over the end
+// times of its frames, unrolled to a fixed count of steps, one bit of the frame count each: a TSL `Loop` needs a function stack
+// whose callback three runs while it builds the shader, and the lookups made there would escape
+// `sample()`, which keeps every lookup node to hand it a new animsMap without a rebuild. 13 steps
+// cover the 8191 frames `FrameBasedAnimations#add()` allows such an animation.
+const SEARCH_STEPS = 13;
 
 export interface AnimatedFramesApi {
   /**
@@ -18,9 +25,11 @@ export interface AnimatedFramesApi {
 
 /**
  * The frame out of the `animsMap` a `FrameBasedAnimations#bakeDataTexture()` writes, at the
- * `time` uniform. A frame texel holds the tex coords; a second texel, where there is one, the
- * diagonal flip; a third the trim margins. Until the animsMap has an image the sprite shows the
- * whole color map.
+ * `time` uniform: looped, played once and held, or run back and forth, as the second header texel
+ * of the animation says, at one duration or at the per-frame durations of its frames. A frame
+ * texel holds the tex coords; a second texel, where there is one, the diagonal flip and the end
+ * time; a third the trim margins. Until the animsMap has an image the sprite shows the whole color
+ * map.
  */
 export const AnimatedFrames = defineFeature<AnimatedFramesApi>({
   name: 'animatedFrames',
@@ -39,23 +48,72 @@ export const AnimatedFrames = defineFeature<AnimatedFramesApi>({
 
     // the header texel of an animation: [frameCount, duration, first frame texel, texelsPerFrame]
     const header = lookup(anim.x.toInt());
-    // a duration of 0 is a still image, its first frame, and the division by it drops out. Both
-    // branches are ints already: a select() converted to an int afterwards comes out of the WGSL
-    // builder as a float in one of the places it is read, and the shader fails to compile
-    const frameIndex = select(
-      header.y.greaterThan(0),
-      mod(mul(div(add(time, anim.y), header.y), header.x), header.x)
-        .floor()
-        .toInt(),
-      int(0),
-    );
+    const frameCount = header.x;
+    const duration = header.y;
+    const firstFrameTexel = header.z;
     // an animsMap built by hand with a 0 in the last field of the header reads as one texel per
     // frame, the layout it was written for
     const texelsPerFrame = max(header.w, float(1));
-    const frameTexel = add(header.z.toInt(), mul(frameIndex, texelsPerFrame.toInt())).toInt();
+    const lastFrame = max(sub(frameCount, 1), float(0));
+
+    // the second header texel sits behind the frames: [playback, hasDurations, cycleDuration, -1].
+    // A texel without the -1 is no second header — an animsMap of the layout before it, whose
+    // animations all loop at one duration
+    const second = lookup(add(firstFrameTexel, mul(frameCount, texelsPerFrame)).toInt());
+    const isSecondHeader = second.w.lessThan(-0.5);
+    const playback = select(isSecondHeader, second.x, float(0));
+    const isPingpong = playback.greaterThan(1.5);
+    const isOnce = playback.greaterThan(0.5).and(isPingpong.not());
+    const hasDurations = isSecondHeader.and(second.y.greaterThan(0.5));
+    const cycleDuration = select(isSecondHeader, second.z, duration);
+
+    const t = add(time, anim.y);
+
+    // One duration: the frames elapsed are t / duration · frameCount. 'loop' wraps them, 'once'
+    // clamps them, 'pingpong' runs a triangle wave over a turn of 2·frameCount − 2 frames, which
+    // shows each end frame once: 0 1 2 3 2 1 0 1 … Every branch is an int already: a select()
+    // converted to an int afterwards comes out of the WGSL builder as a float in one of the places
+    // it is read, and the shader fails to compile
+    const steps = mul(div(t, duration), frameCount);
+    const loopFrame = mod(steps, frameCount).floor().toInt();
+    const onceFrame = clamp(steps.floor(), float(0), lastFrame).toInt();
+    const turnStep = mod(steps, max(sub(mul(frameCount, 2), 2), float(1))).floor();
+    const pingpongFrame = sub(lastFrame, abs(sub(turnStep, lastFrame))).toInt();
+    const evenFrame = select(isPingpong, pingpongFrame, select(isOnce, onceFrame, loopFrame));
+
+    // Per-frame durations: the end time of frame k sits in the fourth component of its second
+    // texel. The frame is the count of frames that end at or before the time searched for; the way
+    // back of a ping-pong mirrors its time into the way there, over the frames frameCount − 2 down
+    // to 1. The count is built bit by bit, from 4096 down to 1: a step takes its bit when the frame
+    // before the candidate ends in time. A candidate past the last frame reads the last frame, which
+    // ends at the duration — taken only once every frame has ended, and the count is clamped to the
+    // last frame anyway. Each step reads the count before it twice and nothing else of it, so the
+    // graph stays a chain a walk over its nodes can follow
+    const endTimeOf = (frame: Node<'float'>) => lookup(add(firstFrameTexel, add(mul(frame, texelsPerFrame), 1)).toInt()).w;
+    const turnTime = mod(t, cycleDuration);
+    const isWayBack = isPingpong.and(turnTime.greaterThanEqual(duration));
+    const searched = select(
+      isPingpong,
+      select(isWayBack, sub(add(cycleDuration, endTimeOf(float(0))), turnTime), turnTime),
+      select(isOnce, t, mod(t, duration)),
+    );
+    // an animation without durations searches no frame: every one of its steps reads the same texel
+    const searchedFrames = select(hasDurations, frameCount, float(1));
+    let count: Node<'float'> = float(0) as unknown as Node<'float'>;
+    for (let bit = SEARCH_STEPS - 1; bit >= 0; bit--) {
+      const candidate = add(count, 2 ** bit);
+      const endTime = endTimeOf(sub(min(candidate, searchedFrames), 1) as unknown as Node<'float'>);
+      // step(edge, x) is 1 for x ≥ edge: the frame before the candidate has ended
+      count = add(count, mul(step(endTime, searched), 2 ** bit)) as unknown as Node<'float'>;
+    }
+    const walkedFrame = min(count, lastFrame).toInt();
+
+    // a duration of 0 is a still image, its first frame, and the division by it drops out
+    const frameIndex = select(duration.greaterThan(0), select(hasDurations, walkedFrame, evenFrame), int(0));
+    const frameTexel = add(firstFrameTexel.toInt(), mul(frameIndex, texelsPerFrame.toInt())).toInt();
 
     const texCoords = lookup(frameTexel);
-    // the second texel of a frame is [width, height, flipDiagonal, 0]; a frame of one texel is never turned
+    // the second texel of a frame is [width, height, flipDiagonal, endTime]; a frame of one texel is never turned
     const flip = lookup(add(frameTexel, 1).toInt());
     // the third texel of a frame is [left, top, right, bottom]; a frame of one or two texels is untrimmed
     const trim = lookup(add(frameTexel, 2).toInt());

@@ -198,25 +198,33 @@ in the cycle.
 
 **Per-frame durations** (`hasDurations = 1`), `e_k` the `endTime` of frame `k`, `e_{N−1} = D`:
 
-| playback | time `x` searched for | comparison |
-| --- | --- | --- |
-| loop | `x = mod(T, D)` | count of `e_k ≤ x` |
-| once | `x = T` | count of `e_k ≤ x` |
-| pingpong | `u = mod(T, C)`; way there `u < D`: `x = u`; way back: `x = C + e_0 − u` | there `e_k ≤ x`, back `e_k < x` |
+| playback | time `x` searched for |
+| --- | --- |
+| loop | `x = mod(T, D)` |
+| once | `x = T` |
+| pingpong | `u = mod(T, C)`; way there `u < D`: `x = u`; way back: `x = C + e_0 − u` |
 
-The frame is `min(count, N − 1)`. For the ping-pong, `C = 2D − d_0 − d_{N−1}` (`d_k` the duration
-of frame `k`): the way back shows the frames `N−2 … 1`, and mirroring the time into the way there
-— `x = D + e_{N−2} − u = C + e_0 − u` — finds them with the strict comparison, which lands on the
-right frame at every boundary. For `N = 1` and `N = 2` `C = D` and the way back is empty. A
-`'once'` before its start counts no frame (`0`), after its end all of them (`N − 1`, held).
+The frame is `min(count of e_k ≤ x, N − 1)`. For the ping-pong, `C = 2D − d_0 − d_{N−1}` (`d_k`
+the duration of frame `k`): the way back shows the frames `N−2 … 1`, and mirroring the time into
+the way there — `x = D + e_{N−2} − u = C + e_0 − u` — finds them by the same count. At the very
+instant of a boundary on the way back the mirror lands on the end of the frame it leaves, so that
+instant shows the neighbour; a time that falls exactly on a float end time is the only case. For
+`N = 1` and `N = 2` `C = D` and the way back is empty. A `'once'` before its start counts no frame
+(`0`), after its end all of them (`N − 1`, held).
 
-**The search.** The count is a binary search over `[0, N]` unrolled to **13 steps** of one lookup
-each (`2^13 > 8191`, the frame limit of §3.2). The roadmap sketched a walk that only animations
-with durations take; a TSL `Loop`/`If` needs a function stack whose callback three runs at build
-time, where `ctx.sample()` could no longer register its nodes for the swap without a rebuild — so
-the steps are built eagerly as `select()`s. An animation without durations searches the empty
-range `[0, 0]`: its 13 lookups all read one texel, a cache hit. Per vertex the slot then reads
-19 texels (header, second header, `e_0`, 13 steps, tex coords, size, trim) instead of 4.
+**The search.** The count is built bit by bit, from `4096` down to `1` — **13 steps** of one lookup
+each (`2^13 > 8191`, the frame limit of §3.2): a step adds its bit when the frame before the
+candidate count ends at or before `x` (`step(e, x)`). A candidate past the last frame reads the
+last frame, which ends at `D`: it is taken only once every frame has ended, and the final clamp to
+`N − 1` makes that right. The roadmap sketched a walk that only animations with durations take; a
+TSL `Loop`/`If` needs a function stack whose callback three runs at build time, where
+`ctx.sample()` could no longer register its nodes for the swap without a rebuild — so the steps
+are built eagerly. Each step reads the count before it twice and nothing else of it: three's
+builder visits a node once, but a walk that follows every path of the graph (`Node#traverse()`)
+meets `2^13` of them, which is why the test helper `nodesOf()` walks a node once. An animation
+without durations searches one frame: its 13 lookups all read one texel, a cache hit. Per vertex
+the slot then reads 19 texels (header, second header, `e_0`, 13 steps, tex coords, size, trim)
+instead of 4.
 
 ## 5. `AsepriteJson`
 
