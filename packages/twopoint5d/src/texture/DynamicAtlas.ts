@@ -119,6 +119,9 @@ export class DynamicAtlas {
   readonly #root: TextureCoords;
 
   #atlas = new TextureAtlas();
+  // where each frame lies in the canvas, kept apart from its `data`: a caller may change that, and redraw()
+  // and remove() still clear and draw the cell the frame was packed into
+  #cells = new Map<TextureAtlasFrame, FrameRect>();
   #shelves: Shelf[] = [];
   #disposed = false;
 
@@ -209,6 +212,8 @@ export class DynamicAtlas {
   /**
    * The 2D context of the canvas — to measure a text before it is added (`context.measureText()`, with the
    * `font` set). Draw through {@link add} and {@link redraw}: they clip, move and clear the cell of a frame.
+   * The atlas draws in canvas pixels whatever transform, alpha or compositing is left on it, and gives that
+   * state back afterwards.
    *
    * @throws {Error} once the atlas is disposed.
    */
@@ -264,7 +269,9 @@ export class DynamicAtlas {
     });
     this.#texture.needsUpdate = true;
     // the frame was added under this id just now
-    return this.#atlas.get(id)!;
+    const frame = this.#atlas.get(id)!;
+    this.#cells.set(frame, rect);
+    return frame;
   }
 
   /**
@@ -273,17 +280,27 @@ export class DynamicAtlas {
    * its id and its coords, so every sprite that shows it shows the new picture after the next upload,
    * without a write to it.
    *
-   * @throws {Error} for a name the atlas does not hold, and once the atlas is disposed.
+   * A draw callback or an image that throws leaves the frame as far as it got — its cell cleared, perhaps
+   * drawn in part — and marked for upload; the frame, its name and its cell stay, and the error goes on to
+   * the caller. An image element that has not loaded is refused before anything is cleared.
+   *
+   * @throws {Error} for a name the atlas does not hold, an image element that has not loaded, and once the
+   *   atlas is disposed.
    */
   redraw(name: TextureAtlasFrameName, source: DynamicAtlasSource): TextureAtlasFrame {
     this.#assertAlive('redraw()');
     const frame = this.#atlas.frame(name);
-    if (frame === undefined) {
+    const rect = frame === undefined ? undefined : this.#cells.get(frame);
+    if (frame === undefined || rect === undefined) {
       throw new Error(`${WHERE}: there is no frame "${nameOf(name)}" to redraw — add() it first`);
     }
-    const rect = this.#rectOf(frame);
-    this.#draw(rect, source);
-    this.#texture.needsUpdate = true;
+    if (typeof source !== 'function') this.#assertLoaded(name, source, 'redraw()');
+    try {
+      this.#draw(rect, source);
+    } finally {
+      // the cell was cleared at the least, so the canvas changed whether the draw went through or not
+      this.#texture.needsUpdate = true;
+    }
     return frame;
   }
 
@@ -296,8 +313,10 @@ export class DynamicAtlas {
   remove(name: TextureAtlasFrameName): boolean {
     if (this.#disposed) return false;
     const frame = this.#atlas.frame(name);
-    if (frame === undefined) return false;
-    this.#clearCell(this.#rectOf(frame));
+    const rect = frame === undefined ? undefined : this.#cells.get(frame);
+    if (frame === undefined || rect === undefined) return false;
+    this.#clearCell(rect);
+    this.#cells.delete(frame);
     this.#atlas[forgetFrameName](name);
     this.#texture.needsUpdate = true;
     return true;
@@ -310,9 +329,10 @@ export class DynamicAtlas {
    */
   clear(): void {
     if (this.#disposed) return;
-    this.#context.clearRect(0, 0, this.width, this.height);
+    this.#inCanvasPixels(() => this.#context.clearRect(0, 0, this.width, this.height));
     this.#shelves = [];
     this.#atlas = new TextureAtlas();
+    this.#cells = new Map();
     this.#texture.needsUpdate = true;
   }
 
@@ -349,11 +369,7 @@ export class DynamicAtlas {
       );
     }
     if (typeof source !== 'function' && size == null) {
-      const natural = sizeOfImage(source);
-      if (!(natural.width > 0) || !(natural.height > 0)) {
-        throw new Error(`${WHERE}: the image of "${nameOf(name)}" has not loaded yet — await image.decode() before add()`);
-      }
-      return natural;
+      return this.#assertLoaded(name, source, 'add()');
     }
     const given = size as DynamicAtlasSize;
     const check = (value: unknown, what: string): number => {
@@ -418,23 +434,41 @@ export class DynamicAtlas {
     };
   }
 
-  #rectOf(frame: TextureAtlasFrame): FrameRect {
-    // every frame of this atlas carries its rectangle, written by add()
-    const {x, y, w, h} = frame.data!.frame;
-    return {x, y, w, h};
+  // the natural size of an image, refused while it is 0: an image element that has not loaded
+  #assertLoaded(name: TextureAtlasFrameName, image: DynamicAtlasImage, call: string): {width: number; height: number} {
+    const natural = sizeOfImage(image);
+    if (!(natural.width > 0) || !(natural.height > 0)) {
+      throw new Error(`${WHERE}: the image of "${nameOf(name)}" has not loaded yet — await image.decode() before ${call}`);
+    }
+    return natural;
+  }
+
+  // Runs `work` with the context saved and set to canvas pixels: no transform, full alpha, plain
+  // compositing — whatever the caller left on the context, which `context` hands out for measureText() —
+  // and restored afterwards, so the caller's state, its font among it, comes back
+  #inCanvasPixels(work: () => void): void {
+    const context = this.#context;
+    context.save();
+    try {
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.globalAlpha = 1;
+      context.globalCompositeOperation = 'source-over';
+      work();
+    } finally {
+      context.restore();
+    }
   }
 
   #clearCell({x, y, w, h}: FrameRect): void {
     const e = this.extrude;
-    this.#context.clearRect(x - e, y - e, w + 2 * e, h + 2 * e);
+    this.#inCanvasPixels(() => this.#context.clearRect(x - e, y - e, w + 2 * e, h + 2 * e));
   }
 
   #draw(rect: FrameRect, source: DynamicAtlasSource): void {
     const context = this.#context;
     const {x, y, w, h} = rect;
     this.#clearCell(rect);
-    context.save();
-    try {
+    this.#inCanvasPixels(() => {
       context.beginPath();
       context.rect(x, y, w, h);
       context.clip();
@@ -444,9 +478,7 @@ export class DynamicAtlas {
       } else {
         context.drawImage(source, 0, 0, w, h);
       }
-    } finally {
-      context.restore();
-    }
+    });
     this.#extrudeEdges(rect);
   }
 
@@ -457,12 +489,12 @@ export class DynamicAtlas {
     if (e === 0) return;
     const context = this.#context;
     const canvas = this.#canvas;
-    context.save();
-    context.imageSmoothingEnabled = false;
-    context.drawImage(canvas, x, y, 1, h, x - e, y, e, h);
-    context.drawImage(canvas, x + w - 1, y, 1, h, x + w, y, e, h);
-    context.drawImage(canvas, x - e, y, w + 2 * e, 1, x - e, y - e, w + 2 * e, e);
-    context.drawImage(canvas, x - e, y + h - 1, w + 2 * e, 1, x - e, y + h, w + 2 * e, e);
-    context.restore();
+    this.#inCanvasPixels(() => {
+      context.imageSmoothingEnabled = false;
+      context.drawImage(canvas, x, y, 1, h, x - e, y, e, h);
+      context.drawImage(canvas, x + w - 1, y, 1, h, x + w, y, e, h);
+      context.drawImage(canvas, x - e, y, w + 2 * e, 1, x - e, y - e, w + 2 * e, e);
+      context.drawImage(canvas, x - e, y + h - 1, w + 2 * e, 1, x - e, y + h, w + 2 * e, e);
+    });
   }
 }

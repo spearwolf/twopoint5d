@@ -248,16 +248,42 @@ describe('DynamicAtlas', () => {
       expect(draw.mock.calls[0]![0]).toBe(context);
       expect(draw.mock.calls[0]!.slice(1)).toEqual([10, 8]);
       // the frame lies at (2, 2): padding 1, extrude 1
-      expect(context.calls.slice(0, 7).map(({op, args}) => [op, ...args])).toEqual([
-        ['clearRect', 1, 1, 12, 10],
-        ['save'],
-        ['beginPath'],
-        ['rect', 2, 2, 10, 8],
-        ['clip'],
-        ['translate', 2, 2],
-        ['fillRect', '#000', 0, 0, 10, 8],
+      expect(context.drawCalls.slice(0, 2).map(({op, args, translation}) => [op, ...args, translation])).toEqual([
+        ['clearRect', 1, 1, 12, 10, [0, 0]],
+        ['fillRect', '#000', 0, 0, 10, 8, [2, 2]],
       ]);
-      expect(context.calls[7]?.op).toBe('restore');
+      expect(context.callsOf('rect')).toMatchObject([{args: [2, 2, 10, 8], translation: [0, 0]}]);
+      expect(context.callsOf('save').length).toBe(context.callsOf('restore').length);
+    });
+
+    test('draws and clears in canvas pixels whatever transform, alpha and compositing the caller left on the context', () => {
+      const {atlas, canvas, context} = atlasOn(64, 32, {extrude: 1});
+      context.translate(5, 5);
+      context.globalAlpha = 0.5;
+      context.globalCompositeOperation = 'destination-out';
+      context.font = '16px serif';
+      const source = image(4, 4);
+      atlas.add('img', source);
+      atlas.add('drawn', noop, {width: 4, height: 4});
+      atlas.redraw('img', source);
+      atlas.remove('drawn');
+      atlas.clear();
+
+      const neutral = {globalAlpha: 1, globalCompositeOperation: 'source-over'};
+      for (const call of context.drawCalls) {
+        const expected = call.op === 'drawImage' && call.args[0] === source ? [2, 2] : [0, 0];
+        expect(call, `${call.op} ${call.args.slice(1).join(',')}`).toMatchObject({...neutral, translation: expected});
+      }
+      expect(context.drawCalls.at(-1)).toMatchObject({op: 'clearRect', args: [0, 0, 64, 32]});
+      // three frames drawn, each extruded by four strips
+      expect(context.callsOf('drawImage').filter(({args}) => args[0] === canvas)).toHaveLength(12);
+      // the caller's state comes back, and measureText() goes on with the font it set
+      expect([context.globalAlpha, context.globalCompositeOperation, context.font]).toEqual([
+        0.5,
+        'destination-out',
+        '16px serif',
+      ]);
+      expect(context.calls.at(-1)?.translation).toEqual([5, 5]);
     });
 
     test('restores the context whatever the callback left in it', () => {
@@ -447,7 +473,7 @@ describe('DynamicAtlas', () => {
       expect(frame.coords).toBe(coords);
       expect(atlas.atlas.frameId('score')).toBe(0);
       expect(draw.mock.calls[0]!.slice(1)).toEqual([10, 8]);
-      expect(context.calls[0]).toMatchObject({op: 'clearRect', args: [1, 1, 12, 10]});
+      expect(context.drawCalls[0]).toMatchObject({op: 'clearRect', args: [1, 1, 12, 10]});
       expect(context.callsOf('translate').map(({args}) => args)).toEqual([[2, 2]]);
       // extruded again
       expect(context.callsOf('drawImage')).toHaveLength(4);
@@ -465,6 +491,48 @@ describe('DynamicAtlas', () => {
       const {atlas} = atlasOn(64, 32);
       expect(() => atlas.redraw('hp', noop)).toThrow('DynamicAtlas: there is no frame "hp" to redraw — add() it first');
     });
+
+    test('refuses an image element that has not loaded, before it clears the frame', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      atlas.add('avatar', noop, {width: 10, height: 8});
+      const calls = context.calls.length;
+      const unloaded = {width: 0, height: 0, naturalWidth: 0, naturalHeight: 0} as unknown as DynamicAtlasImage;
+      expect(() => atlas.redraw('avatar', unloaded)).toThrow(
+        'DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before redraw()',
+      );
+      expect(context.calls.length).toBe(calls);
+    });
+
+    test('a draw that throws leaves the frame cleared, and marked for upload', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      const frame = atlas.add('hp', noop, {width: 10, height: 8});
+      const version = atlas.texture.version;
+      const failure = new Error('no font');
+      context.calls.length = 0;
+      expect(() =>
+        atlas.redraw('hp', () => {
+          throw failure;
+        }),
+      ).toThrow(failure);
+      expect(context.drawCalls).toMatchObject([{op: 'clearRect', args: [1, 1, 10, 8]}]);
+      expect(atlas.texture.version).toBeGreaterThan(version);
+      expect(atlas.atlas.frame('hp')).toBe(frame);
+      expect(context.callsOf('save').length).toBe(context.callsOf('restore').length);
+    });
+
+    test('keeps the cell of a frame whose data the caller changed', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      const frame = atlas.add('hp', noop, {width: 10, height: 8});
+      frame.data!.frame.x = 40;
+      (frame as {data?: unknown}).data = undefined;
+      context.calls.length = 0;
+      atlas.redraw('hp', noop);
+      atlas.remove('hp');
+      expect(context.callsOf('clearRect').map(({args}) => args)).toEqual([
+        [1, 1, 10, 8],
+        [1, 1, 10, 8],
+      ]);
+    });
   });
 
   describe('remove()', () => {
@@ -475,7 +543,7 @@ describe('DynamicAtlas', () => {
 
       expect(atlas.remove('a')).toBe(true);
 
-      expect(context.calls).toEqual([expect.objectContaining({op: 'clearRect', args: [1, 1, 12, 10]})]);
+      expect(context.drawCalls).toEqual([expect.objectContaining({op: 'clearRect', args: [1, 1, 12, 10]})]);
       expect(atlas.atlas.frame('a')).toBeUndefined();
       expect(atlas.atlas.frameId('a')).toBeUndefined();
       expect(atlas.atlas.get(0)).toBe(frame);
@@ -499,7 +567,7 @@ describe('DynamicAtlas', () => {
 
       atlas.clear();
 
-      expect(context.calls.at(-1)).toMatchObject({op: 'clearRect', args: [0, 0, 64, 32]});
+      expect(context.drawCalls.at(-1)).toMatchObject({op: 'clearRect', args: [0, 0, 64, 32]});
       expect(atlas.atlas).not.toBe(before);
       expect(atlas.atlas.size).toBe(0);
       expect(before.size).toBe(2);

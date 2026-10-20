@@ -397,9 +397,17 @@ frame and moved to its top left, its cell cleared — and then needs the `size`,
 an image element, a canvas or an `OffscreenCanvas`, drawn at its own size or scaled to `size`. A size
 is rounded up to whole texels, so a width from `measureText()` goes in as it comes. A callback that
 throws leaves the atlas as it was. The frame is untrimmed; its `data` is the rectangle in the canvas,
-`{frame: {x, y, w, h}}`. **`redraw(name, source)`** draws a frame anew at its size, in place: a score,
-a health label. **`remove(name)`** clears the frame and lets go of the name, not of its space — a
-shelf packer fragments; **`clear()`** starts over with a new `atlas`, frame ids from 0.
+`{frame: {x, y, w, h}}` — a copy: the atlas keeps the cell of every frame itself, and a change to
+`data` moves nothing. **`redraw(name, source)`** draws a frame anew at its size, in place: a score,
+a health label. A redraw that throws leaves the frame as far as it got — its cell cleared, perhaps
+drawn in part — and marked for upload; the frame and its name stay, so the next `redraw()` mends it.
+An image element that has not loaded is refused by `add()` and `redraw()` alike, before anything is
+cleared. **`remove(name)`** clears the frame and lets go of the name, not of its space — a shelf
+packer fragments; **`clear()`** starts over with a new `atlas`, frame ids from 0.
+
+The atlas draws, clears and extrudes in canvas pixels whatever the caller left on `context` — a
+transform, a `globalAlpha`, a composite operation — and gives that state back afterwards, so the
+`font` set for `measureText()` stays. A draw callback starts from that neutral state.
 
 **The texture** is read upright (`flipY = false`, as every atlas of the library), in sRGB, with
 straight alpha and without mipmaps; `filter: 'nearest'` for pixel art, `'linear'` by default. Every

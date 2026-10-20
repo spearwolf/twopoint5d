@@ -219,7 +219,16 @@ a frame then reads its own edge, not the padding.
   frame object, its id and its coords stay: every sprite showing it shows the new picture after the
   next upload, nothing is written to them. A score counter or a health label redraws; it does not
   add again. A name the atlas does not hold throws
-  (`DynamicAtlas: there is no frame "hp" to redraw — add() it first`).
+  (`DynamicAtlas: there is no frame "hp" to redraw — add() it first`), and so does an image element
+  that has not loaded, before anything is cleared. A callback or an image that throws leaves the frame
+  as far as it got — its cell cleared, perhaps drawn in part — and marked for upload (in a `finally`);
+  the frame, its name and its cell stay.
+- The cell of every frame is kept in a private map, apart from `data`: a caller who changes
+  `frame.data` moves nothing, and `redraw()` and `remove()` still work on the cell the frame was packed
+  into.
+- Every clear, clip, draw and extrusion runs inside `save()`/`restore()` with the transform reset to
+  identity, `globalAlpha` 1 and `source-over`: the caller may leave any state on `context` (it is handed
+  out for `measureText()`), and gets it back, its `font` included.
 - `remove(name)` clears the cell and lets go of the name: `atlas.frame(name)` and
   `atlas.frameId(name)` answer `undefined`, and `add(name, …)` may take it again — for a new cell.
   The cell is **not** reused: a shelf packer fragments, and a freed hole would have to fit the next
