@@ -34,4 +34,5 @@ export * from './passes/ShadowMask.js';
 export * from './presets.js';
 export * from './SpriteBase.js';
 export * from './SpriteFeature.js';
+export * from './SpritePicker.js';
 export type {SpritePipeline} from './spritePipeline.js';

@@ -1015,6 +1015,70 @@ balls.update();
   pool behind it is `VertexObjectPool#sortBy()` — see
   [the vertex objects](../src/vertex-objects/README.md#sorting-a-pool).
 
+## Picking: which sprite is under the pointer
+
+`FeatureSprites` places its vertices in the shader, so three's raycaster finds nothing to hit, and
+a hit test against positions and sizes is wrong for every sprite that is rotated, sheared, trimmed,
+billboarded or animated. `SpritePicker` asks the gpu instead: it draws the meshes it is handed into
+the one pixel under the pointer, each sprite through its own graph, and reads back which sprite
+landed there.
+
+```ts check
+import {AxisBillboardPlacement, defineSprite, FeatureSprites, Flash, InstancePosition, QuadBase, QuadSize, SpritePicker, TextureColor} from '@spearwolf/twopoint5d';
+import {PerspectiveCamera, Texture, WebGPURenderer} from 'three/webgpu';
+
+const Enemy = defineSprite({base: QuadBase, features: [InstancePosition, AxisBillboardPlacement, QuadSize, TextureColor, Flash]});
+const enemies = new FeatureSprites(Enemy, {capacity: 64, textures: {colorMap: new Texture()}});
+
+const renderer = new WebGPURenderer();
+const camera = new PerspectiveCamera(60, 16 / 9, 0.1, 1000);
+const picker = new SpritePicker(renderer);
+
+renderer.domElement.addEventListener('pointerdown', async (event) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const pointer = {
+    x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
+    y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
+  };
+  const hit = await picker.pick(camera, pointer, [enemies]);
+  hit?.sprite.setFlash(1, 1, 1, 1); // the enemy under the pointer, or nothing
+});
+```
+
+- **The answer** is `{sprites, sprite, index}` — the mesh out of the list, the handle, the slot it
+  was drawn from — or `undefined` where no sprite is under the pointer. The list may hold meshes of
+  several kinds; the result is typed as the union of their picks. `pointer` is in normalized device
+  coordinates of the view of `camera`, x and y from -1 to 1, y up, and is snapped to the centre of
+  the pixel it lies in, so the pick lands where the screen draws that pixel.
+- **Pixel-perfect for free.** The colour of every sprite runs through its own colour source and
+  colour stages — `Tint`, `Fade` and the rest — and the alpha test of its material drops the same
+  texels it drops on the screen: a click into the transparent corner of a frame picks what lies
+  behind it, and a sprite faded to 0 is not hit. The id is written after all of it (three's
+  `outputNode`), so no colour stage can change it.
+- **The nearest sprite wins**, by the depth test, whatever the sprites blend or write. At one depth —
+  a 2D scene on one plane — the sprite drawn later wins, as on the screen: the later slot of a mesh,
+  the later mesh by `renderOrder`. Only the sprites are drawn, not their passes: a shadow or a
+  reflection is nothing to hit. A mesh that is disposed, not visible or empty is left out.
+- **One frame of latency.** The answer comes once the gpu has drawn and the pixel is read back — fine
+  for a click, and for hover every frame too. Pick after `update()`, as you render.
+- **Sorted and growing meshes work.** The pick resolves a slot to its handle as the slots stood at the
+  draw, so a `sortBy()`, a `sortByViewDepth()` or a growth before the read back changes nothing
+  about the answer; a sprite freed in between answers `undefined`. The price is one look-up per sprite
+  of the listed meshes per pick.
+- **The cost** of a pick is a draw of the listed meshes into one pixel — every vertex of every
+  sprite, a fragment only under the pointer — and that look-up. List the meshes that can be hit, not
+  the whole scene.
+- **The renderer** is left as the pick found it: render target, MRT, clear colour and the `autoClear`
+  flags. The picker draws into a 1 × 1 float target — three's WebGL 2 backend reads no integer
+  target back — with no blending, no tone mapping and no output colour space, so the id arrives
+  exactly, up to 2²⁴ sprites per mesh.
+- **Ownership.** The renderer, the camera and the meshes stay the caller's. The picker builds a pick
+  material per mesh on the uniforms and textures of that mesh — a `setUniform()` or `setTexture()`
+  reaches the pick as it reaches the sprites —, follows a swapped placement, and releases it when the
+  mesh is disposed. `dispose()` releases the target and every pick material and rejects every pick
+  still in flight; a `pick()` after it answers `undefined`. A camera, a pointer or a list of the wrong
+  shape is refused with a `TypeError` that names the fix.
+
 ## Presets
 
 Two kinds ship ready-made, with the layout, the names and the start values of the textured and the
@@ -1917,6 +1981,9 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
 - Under `grow: true` a `createSprite()` that finds room allocates the sprite and nothing else, and
   `update()` after a growth allocates nothing; the growth itself is the hitch, copying and uploading
   every sprite the mesh holds (see "FeatureSprites").
+- A pick of `SpritePicker` draws the listed meshes into one pixel and looks up one handle per sprite
+  of them; it allocates its promise and three's read back per call — a tool for clicks and hover,
+  not for every sprite every frame (see "Picking: which sprite is under the pointer").
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
   with bindings and `visible` hooks as well; the allocation spec holds a plane and a light
