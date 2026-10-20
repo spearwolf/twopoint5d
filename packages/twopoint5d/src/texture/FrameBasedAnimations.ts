@@ -341,6 +341,12 @@ export class FrameBasedAnimations {
    */
   static MaxTextureSize = 8192;
 
+  /**
+   * The most frames an animation with per-frame `durations` holds: `AnimatedFrames` finds the frame
+   * of such an animation by a binary search of a fixed 13 steps, which covers 8191 frames.
+   */
+  static readonly MaxFramesWithDurations: number = MAX_FRAMES_WITH_DURATIONS;
+
   #animations: AnimationsMap = new Map();
 
   // NOTE we can not just use animations.keys() here, because we need a consistent name <-> id mapping

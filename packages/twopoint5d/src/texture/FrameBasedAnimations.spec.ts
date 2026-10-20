@@ -1222,6 +1222,10 @@ describe('FrameBasedAnimations', () => {
       },
     );
 
+    test('MaxFramesWithDurations is 8191, the frames a search of 13 steps covers', () => {
+      expect(FrameBasedAnimations.MaxFramesWithDurations).toBe(8191);
+    });
+
     test('refuses an animation of more than 8191 frames with durations', () => {
       const animations = new FrameBasedAnimations();
       const many = Array.from({length: 8192}, () => new TextureCoords(0, 0, 1, 1));

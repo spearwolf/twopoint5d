@@ -272,6 +272,40 @@ describe('AsepriteJson', () => {
       );
     });
 
+    test('refuses a frame name twice in the layout "Array", naming the fix', () => {
+      const data = sheet(2);
+      const entries = Object.values(data.frames as Record<string, object>).map((entry) => ({
+        ...entry,
+        filename: 'fighter.aseprite',
+      }));
+
+      expect(() => AsepriteJson.parse({...data, frames: entries} as never)).toThrow(
+        'AsepriteJson: the frame name "fighter.aseprite" appears twice — export with a filename format that contains {frame}',
+      );
+    });
+
+    test('refuses a tag whose repeat plays more frames with their own durations than an animation holds', () => {
+      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'forward', repeat: '3000'}]}, [50, 100, 150]);
+
+      expect(() => AsepriteJson.parse(data)).toThrow(
+        'AsepriteJson: the tag "a" plays 9000 frames with their own durations — an animation with per-frame durations holds at most 8191 frames; lower its repeat',
+      );
+    });
+
+    test('a tag refused for its repeat leaves the target atlas as it was', () => {
+      const target = new TextureAtlas<never>();
+      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'forward', repeat: '3000'}]}, [50, 100, 150]);
+
+      expect(() => AsepriteJson.parse(data, {target: target as never})).toThrow();
+      expect(target.size).toBe(0);
+    });
+
+    test('a repeat of even durations holds as many frames as a data texture takes', () => {
+      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'forward', repeat: '3000'}]});
+
+      expect(AsepriteJson.parse(data)[2].animation('a').frameCount).toBe(9000);
+    });
+
     test('a refused sheet leaves the target atlas as it was', () => {
       const target = new TextureAtlas<never>();
 

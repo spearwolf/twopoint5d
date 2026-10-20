@@ -287,8 +287,17 @@ entry; the guide says to export without them.
 - Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside
   `0 … frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown
   `direction` (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name
-  (`… — rename one of them in Aseprite`), and a frame of a tag without a `duration` above 0
-  (`AsepriteJson: the frame "x" carries a duration of 0 — Aseprite writes one in ms above zero for every frame`).
+  (`… — rename one of them in Aseprite`), a frame of a tag without a `duration` above 0
+  (`AsepriteJson: the frame "x" carries a duration of 0 — Aseprite writes one in ms above zero for every frame`),
+  and a tag whose `repeat` plays more than `FrameBasedAnimations.MaxFramesWithDurations` (8191)
+  frames of differing durations (`AsepriteJson: the tag "x" plays 9000 frames with their own
+  durations — … at most 8191 frames; lower its repeat`). A tag of even durations has no such
+  limit of its own: a bake refuses what does not fit.
+- A frame name twice in the layout "Array" — Aseprite writes it when the filename format holds no
+  `{frame}` — is refused (`AsepriteJson: the frame name "x" appears twice — export with a filename
+  format that contains {frame}`); in "Hash" a second key is gone by the time `JSON.parse()` is done.
+- Every check runs before the first frame is added, the animations are planned there as well:
+  a refused sheet leaves `options.target` as it was, and no `add()` that follows throws.
 
 ### 5.3 Frames and slices
 
@@ -336,8 +345,8 @@ AsepriteJson.parse(data: AsepriteJsonData, options?: AsepriteParseOptions):
   [atlas: TextureAtlas<AsepriteFrameData>, meta: AsepriteMetaData, animations: FrameBasedAnimations];
 ```
 
-The frames go through `TexturePackerJson.parse()` (rotation, duplicate names, a name taken in
-`target` — refused before anything is written), the tags through `FrameBasedAnimations#add(name,
+The frames go through `TexturePackerJson.parse()` (rotation, a name taken in `target` — refused
+before anything is written), the tags through `FrameBasedAnimations#add(name,
 timing, atlas, frameNames)`. A sheet without tags answers an empty `FrameBasedAnimations`. Each
 call builds a new `FrameBasedAnimations`; a bake of it belongs to the caller as before.
 
@@ -431,8 +440,8 @@ released with the store.
 ## 8. Fixtures
 
 `packages/twopoint5d/fixtures/aseprite/`: `fighter-hash.json` and `fighter-array.json`, written by
-hand to Aseprite's documented export format (Aseprite is not installed here; the README says so
-and how they were made): 16 frames of 16 × 16 on a 64 × 64 sheet, the tags `idle` (pingpong),
+`generate.mjs` in the same folder to Aseprite's documented export format and in its own formatting
+(Aseprite is not installed here; the README says so and how to write them again): 16 frames of 16 × 16 on a 64 × 64 sheet, the tags `idle` (pingpong),
 `walk` (forward), `kick` (forward, `"repeat": "1"`, 80/80/240 ms), `block` (reverse), `spin`
 (pingpong_reverse), the slices `hitbox` (two keys, `pivot`) and `panel` (`center`); the array
 sheet trimmed. `biome.jsonc` leaves the folder out: the files keep Aseprite's own formatting.

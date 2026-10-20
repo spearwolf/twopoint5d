@@ -199,8 +199,10 @@ export class AsepriteJson {
    *
    * Refused, with the tag named: a range outside the frames or running backwards, an unknown
    * direction, a repeat that is no whole number of 0 or more, two tags of one name, a frame without
-   * a duration above zero, and a playback for a tag the sheet does not carry. A refused sheet leaves
-   * `options.target` as it was.
+   * a duration above zero, a tag that plays more than `FrameBasedAnimations.MaxFramesWithDurations`
+   * frames of differing durations, and a playback for a tag the sheet does not carry; a frame name
+   * twice in the layout "Array" is refused as well. Every check runs before the first frame is
+   * added: a refused sheet leaves `options.target` as it was.
    */
   static parse(
     data: AsepriteJsonData,
@@ -212,7 +214,19 @@ export class AsepriteJson {
     const tags = data.meta.frameTags ?? [];
     const slices = data.meta.slices ?? [];
 
-    // every tag is checked before the first frame is added, so a refused sheet leaves the target as it was
+    // Everything is checked and every animation planned before the first frame is added, so a
+    // refused sheet leaves the target as it was. A name twice in "Array" would overwrite its first
+    // frame below; Aseprite writes it when the filename format has no {frame}
+    const frameNames = new Set<string>();
+    for (const [name] of entries) {
+      if (frameNames.has(name)) {
+        throw new Error(
+          `AsepriteJson: the frame name "${name}" appears twice — export with a filename format that contains {frame}`,
+        );
+      }
+      frameNames.add(name);
+    }
+    const plans: {name: string; timing: AnimationTimingOptions; frameNames: string[]}[] = [];
     const tagNames = new Set<string>();
     for (const tag of tags) {
       if (tagNames.has(tag.name)) {
@@ -245,6 +259,21 @@ export class AsepriteJson {
         }
       }
     }
+    for (const tag of tags) {
+      const {indices, playback} = framesOfTag(tag, options?.playback?.[tag.name]);
+      const durations = indices.map((index) => entries[index]![1].duration / 1000);
+      const even = durations.every((duration) => duration === durations[0]);
+      if (!even && indices.length > FrameBasedAnimations.MaxFramesWithDurations) {
+        throw new Error(
+          `AsepriteJson: the tag "${tag.name}" plays ${indices.length} frames with their own durations — an animation with per-frame durations holds at most ${FrameBasedAnimations.MaxFramesWithDurations} frames; lower its repeat`,
+        );
+      }
+      plans.push({
+        name: tag.name,
+        timing: even ? {duration: durations.reduce((sum, duration) => sum + duration, 0), playback} : {durations, playback},
+        frameNames: indices.map((index) => entries[index]![0]),
+      });
+    }
     for (const tagName of Object.keys(options?.playback ?? {})) {
       if (!tagNames.has(tagName)) {
         throw new Error(
@@ -265,16 +294,10 @@ export class AsepriteJson {
       (options?.target ?? new TextureAtlas<AsepriteFrameData>()) as unknown as TextureAtlas,
     ) as unknown as [TextureAtlas<AsepriteFrameData>];
 
+    // every plan was checked against what add() refuses: no add() below throws
     const animations = new FrameBasedAnimations();
-    for (const tag of tags) {
-      const {indices, playback} = framesOfTag(tag, options?.playback?.[tag.name]);
-      const names = indices.map((index) => entries[index]![0]);
-      const durations = indices.map((index) => entries[index]![1].duration / 1000);
-      const even = durations.every((duration) => duration === durations[0]);
-      const timing: AnimationTimingOptions = even
-        ? {duration: durations.reduce((sum, duration) => sum + duration, 0), playback}
-        : {durations, playback};
-      animations.add(tag.name, timing, atlas, names);
+    for (const {name, timing, frameNames: names} of plans) {
+      animations.add(name, timing, atlas, names);
     }
 
     return [atlas, data.meta, animations];
