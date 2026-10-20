@@ -474,21 +474,22 @@ describe('FrameBasedAnimations', () => {
 
       const buffer = animations.bakeDataTexture().image.data as Float32Array;
 
-      // two headers, then two texels for each of the three frames
+      // two headers, then two texels for each of the three frames and a second header behind the
+      // frames of each animation
       expect(texelAt(buffer, 0), 'the header of idle').toEqual([1, 1, 2, 2]);
-      expect(texelAt(buffer, 1), 'the header of spin').toEqual([2, 0.5, 4, 2]);
+      expect(texelAt(buffer, 1), 'the header of spin').toEqual([2, 0.5, 5, 2]);
       expect(texelAt(buffer, 3), 'the second texel of the frame of idle').toEqual([32, 16, 0, 0]);
-      expect(texelAt(buffer, 4), 'the tex coords of the first frame of spin').toEqual(
+      expect(texelAt(buffer, 5), 'the tex coords of the first frame of spin').toEqual(
         Array.from(new Float32Array(upright.getTexCoords())),
       );
-      expect(texelAt(buffer, 5), 'the second texel of the first frame of spin').toEqual([32, 16, 0, 0]);
-      expect(texelAt(buffer, 6), 'the tex coords of the turned frame').toEqual(
+      expect(texelAt(buffer, 6), 'the second texel of the first frame of spin').toEqual([32, 16, 0, 0]);
+      expect(texelAt(buffer, 7), 'the tex coords of the turned frame').toEqual(
         Array.from(new Float32Array(turnedFrame.getTexCoords())),
       );
-      expect(texelAt(buffer, 7), 'the second texel of the turned frame').toEqual([16, 32, 1, 0]);
+      expect(texelAt(buffer, 8), 'the second texel of the turned frame').toEqual([16, 32, 1, 0]);
     });
 
-    test('the headers count two texels for each frame of an animation before them', () => {
+    test('the headers count two texels for each frame of an animation before them, and one for its second header', () => {
       const animations = new FrameBasedAnimations();
 
       animations.add('idle', 1.0, [new TextureCoords(0, 0, 32, 32)]);
@@ -498,9 +499,9 @@ describe('FrameBasedAnimations', () => {
       const buffer = animations.bakeDataTexture({includeTextureSize: true}).image.data as Float32Array;
 
       expect(texelAt(buffer, 0), 'the header of idle').toEqual([1, 1, 3, 2]);
-      expect(texelAt(buffer, 1), 'the header of walk').toEqual([2, 0.5, 5, 2]);
-      expect(texelAt(buffer, 2), 'the header of run').toEqual([1, 0.25, 9, 2]);
-      // 3 headers and 4 frames of two texels: 11 texels, and the next power of 2 is 16
+      expect(texelAt(buffer, 1), 'the header of walk').toEqual([2, 0.5, 6, 2]);
+      expect(texelAt(buffer, 2), 'the header of run').toEqual([1, 0.25, 11, 2]);
+      // 3 headers, 4 frames of two texels and 3 second headers: 14 texels, and the next power of 2 is 16
       expect(buffer.length).toBe(16 * 4);
     });
 
@@ -533,7 +534,7 @@ describe('FrameBasedAnimations', () => {
         const buffer = animations.bakeDataTexture().image.data as Float32Array;
 
         expect(texelAt(buffer, 0), 'the header of still').toEqual([1, 1, 2, 3]);
-        expect(texelAt(buffer, 1), 'the header of trimmed').toEqual([2, 0.5, 5, 3]);
+        expect(texelAt(buffer, 1), 'the header of trimmed').toEqual([2, 0.5, 6, 3]);
 
         expect(texelAt(buffer, 2), 'the tex coords of the frame of still').toEqual(
           Array.from(new Float32Array(atlas.frame('still')!.coords.getTexCoords())),
@@ -541,15 +542,15 @@ describe('FrameBasedAnimations', () => {
         expect(texelAt(buffer, 3), 'the second texel of the frame of still').toEqual([5, 4, 0, 0]);
         expect(texelAt(buffer, 4), 'the margins of the frame of still').toEqual([0, 0, 0, 0]);
 
-        expect(texelAt(buffer, 5), 'the tex coords of the trimmed frame').toEqual(
+        expect(texelAt(buffer, 6), 'the tex coords of the trimmed frame').toEqual(
           Array.from(new Float32Array(atlas.frame('trimmed.1')!.coords.getTexCoords())),
         );
-        expect(texelAt(buffer, 6), 'the second texel of the trimmed frame').toEqual([2, 1, 0, 0]);
-        expectCloseTo(texelAt(buffer, 7), [0.2, 0.5, 0.4, 0.25], 'the margins of the trimmed frame');
+        expect(texelAt(buffer, 7), 'the second texel of the trimmed frame').toEqual([2, 1, 0, 0]);
+        expectCloseTo(texelAt(buffer, 8), [0.2, 0.5, 0.4, 0.25], 'the margins of the trimmed frame');
 
-        expect(texelAt(buffer, 10), 'the margins of the untrimmed frame of trimmed').toEqual([0, 0, 0, 0]);
+        expect(texelAt(buffer, 11), 'the margins of the untrimmed frame of trimmed').toEqual([0, 0, 0, 0]);
 
-        // 2 headers and 3 frames of three texels: 11 texels, and the next power of 2 is 16
+        // 2 headers, 3 frames of three texels and 2 second headers: 13 texels, and the next power of 2 is 16
         expect(buffer.length).toBe(16 * 4);
       });
 
@@ -600,7 +601,7 @@ describe('FrameBasedAnimations', () => {
         const buffer = animations.bakeDataTexture().image.data as Float32Array;
 
         expect(texelAt(buffer, 0), 'the header of list').toEqual([1, 1, 2, 1]);
-        expect(texelAt(buffer, 1), 'the header of tiles').toEqual([2, 1, 3, 1]);
+        expect(texelAt(buffer, 1), 'the header of tiles').toEqual([2, 1, 4, 1]);
       });
     });
 
@@ -638,6 +639,60 @@ describe('FrameBasedAnimations', () => {
       expect(buffer[8]).toBe(3); // frames.length
       expect(buffer[9]).toBeCloseTo(0.3, 5); // duration (use toBeCloseTo for float comparison)
       expect(buffer[10]).toBeGreaterThan(buffer[6]!); // offset > previous offset
+    });
+
+    describe('the second header texel and the end times', () => {
+      const frames = (count: number): TextureCoords[] =>
+        Array.from({length: count}, (_, i) => new TextureCoords(new TextureCoords(0, 0, 64, 16), i * 16, 0, 16, 16));
+
+      test('sits behind the frames of its animation: [playback, hasDurations, cycleDuration, -1]', () => {
+        const animations = new FrameBasedAnimations();
+        animations.add('loop', 1, frames(2));
+        animations.add('once', {duration: 0.5, playback: 'once'}, frames(1));
+        animations.add('pingpong', {duration: 2, playback: 'pingpong'}, frames(4));
+
+        const buffer = animations.bakeDataTexture().image.data as Float32Array;
+
+        // 3 headers; loop at 3 and 4, its second header at 5; once at 6, at 7; pingpong at 8 to 11, at 12
+        expect([texelAt(buffer, 0)[2], texelAt(buffer, 1)[2], texelAt(buffer, 2)[2]], 'the first frame texels').toEqual([
+          3, 6, 8,
+        ]);
+        expect(texelAt(buffer, 5), 'the second header of loop').toEqual([0, 0, 1, -1]);
+        expect(texelAt(buffer, 7), 'the second header of once').toEqual([1, 0, 0.5, -1]);
+        expect(texelAt(buffer, 12), 'the second header of pingpong: 6 frames of 0.5 s a turn').toEqual([2, 0, 3, -1]);
+      });
+
+      test('an animation with durations brings a second texel per frame, its fourth component the end time of the frame', () => {
+        const animations = new FrameBasedAnimations();
+        animations.add('still', 1, frames(1));
+        animations.add('attack', {durations: [0.25, 0.25, 1, 0.5]}, frames(4));
+
+        const buffer = animations.bakeDataTexture().image.data as Float32Array;
+
+        expect(texelAt(buffer, 0), 'the header of still').toEqual([1, 1, 2, 2]);
+        expect(texelAt(buffer, 1), 'the header of attack').toEqual([4, 2, 5, 2]);
+        expect(texelAt(buffer, 3)[3], 'the frame of an animation without durations ends at 0').toBe(0);
+        expect(
+          [6, 8, 10, 12].map((index) => texelAt(buffer, index)[3]),
+          'the end times of attack',
+        ).toEqual([0.25, 0.5, 1.5, 2]);
+        expect(texelAt(buffer, 13), 'the second header of attack').toEqual([0, 1, 2, -1]);
+      });
+
+      test('the second header of a ping-pong with durations counts each end frame once', () => {
+        const animations = new FrameBasedAnimations();
+        animations.add('idle', {durations: [0.25, 0.5, 0.75, 1], playback: 'pingpong'}, frames(4));
+
+        const buffer = animations.bakeDataTexture().image.data as Float32Array;
+
+        expect(texelAt(buffer, 1 + 4 * 2), 'the second header').toEqual([2, 1, 2 * 2.5 - 0.25 - 1, -1]);
+      });
+
+      test('the bake of no animation stays empty', () => {
+        const buffer = new FrameBasedAnimations().bakeDataTexture().image.data as Float32Array;
+
+        expect(Array.from(buffer).every((value) => value === 0)).toBe(true);
+      });
     });
 
     test('bake empty DataTexture', () => {
@@ -704,7 +759,7 @@ describe('FrameBasedAnimations', () => {
       const maxBefore = FrameBasedAnimations.MaxTextureSize;
       FrameBasedAnimations.MaxTextureSize = 2;
       try {
-        expect(() => animations.bakeDataTexture()).toThrow(/3 frame\(s\) in 1 animation\(s\).*4 texels.*maximum of 2/);
+        expect(() => animations.bakeDataTexture()).toThrow(/3 frame\(s\) in 1 animation\(s\).*8 texels.*maximum of 2/);
       } finally {
         FrameBasedAnimations.MaxTextureSize = maxBefore;
       }
@@ -745,7 +800,8 @@ describe('FrameBasedAnimations', () => {
   });
 
   describe('the widest data texture a bake may build', () => {
-    // one animation of `frameCount` frames at one texel each, one header texel before them
+    // one animation of `frameCount` frames at one texel each, one header texel before them and its
+    // second header behind them
     const animationsOf = (frameCount: number) => {
       const animations = new FrameBasedAnimations();
       animations.add(
@@ -778,7 +834,7 @@ describe('FrameBasedAnimations', () => {
     });
 
     test('without a limit named a bake of 16384 texels is refused, naming 8192', () => {
-      // 1 header texel and 8192 frame texels ask for 16384
+      // 1 header texel, 8192 frame texels and the second header ask for 16384
       expect(() => animationsOf(8192).bakeDataTexture()).toThrow(refusal(16384, 8192));
     });
 
@@ -827,8 +883,9 @@ describe('FrameBasedAnimations', () => {
     });
 
     test('a bake names a maxTextureSize without includeTextureSize', () => {
+      // a header, the frame and the second header: 3 texels, and the next power of 2 is 4
       const texture = animationsOf(1).bakeDataTexture({maxTextureSize: 4096});
-      expect(texture.image.width).toBe(2);
+      expect(texture.image.width).toBe(4);
       texture.dispose();
     });
   });

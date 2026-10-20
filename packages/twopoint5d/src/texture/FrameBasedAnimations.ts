@@ -47,9 +47,9 @@ export interface FrameBasedAnimationInfo {
 
 export interface BakeTextureOptions {
   /**
-   * Gives every frame a second texel, `[width, height, flipDiagonal, 0]`. A bake with a frame under
-   * `TextureCoords.FLIP_DIAGONAL` brings that texel without the option, and so does a bake with a
-   * trimmed frame.
+   * Gives every frame a second texel, `[width, height, flipDiagonal, endTime]`. A bake with a frame
+   * under `TextureCoords.FLIP_DIAGONAL` brings that texel without the option, and so does a bake
+   * with a trimmed frame or with an animation of per-frame `durations`.
    */
   includeTextureSize?: boolean;
   /**
@@ -248,7 +248,8 @@ const getBufferSize = (
 ) => {
   const anims = Array.from(animationsMap.values());
   const totalFramesCount = anims.reduce((sum, anim) => sum + anim.frames.length, 0);
-  const minBufSize = anims.length + totalFramesCount * texelsPerFrame;
+  // a header for each animation, its frames, and its second header behind them
+  const minBufSize = anims.length * 2 + totalFramesCount * texelsPerFrame;
   const bufSize = findNextPowerOf2(minBufSize);
 
   if (bufSize > maxTextureSize) {
@@ -285,35 +286,44 @@ const readMaxTextureSize = (renderer: WebGPURenderer): number | undefined => {
   }
 };
 
+// the first component of the second header texel, read by `AnimatedFrames`
+const PLAYBACK_CODE: Record<AnimationPlayback, number> = {loop: 0, once: 1, pingpong: 2};
+
+// the fourth component of a second header texel: no texel of the layout before it carries a
+// negative fourth component, so a reader tells a second header from a frame texel by it
+const SECOND_HEADER_MARK = -1;
+
 const renderFloatsBuffer = (
   floatsBuffer: Float32Array,
   names: AnimName[],
   animations: AnimationsMap,
   texelsPerFrame: 1 | 2 | 3,
 ) => {
-  let curOffset = names.length;
+  let offset = names.length * 4;
 
-  floatsBuffer.set(
-    names.flatMap((name) => {
-      const {frames, duration} = animations.get(name)!;
-      const offset = curOffset;
-      curOffset += frames.length * texelsPerFrame;
-      return [frames.length, duration, offset, texelsPerFrame];
-    }),
-  );
+  for (const name of names) {
+    const anim = animations.get(name)!;
+    const {frames, trims, durations} = anim;
+    const firstFrameTexel = offset / 4;
 
-  floatsBuffer.set(
-    names.flatMap((name) => {
-      const {frames, trims} = animations.get(name)!;
-      return frames.flatMap((coords, i) => {
-        const texels: number[] = coords.getTexCoords();
-        if (texelsPerFrame >= 2) texels.push(coords.width, coords.height, coords.flipD ? 1 : 0, 0);
-        if (texelsPerFrame === 3) texels.push(...trims[i]!);
-        return texels;
-      });
-    }),
-    names.length * 4,
-  );
+    floatsBuffer.set([frames.length, anim.duration, firstFrameTexel, texelsPerFrame], anim.id * 4);
+
+    let endTime = 0;
+    frames.forEach((coords, i) => {
+      floatsBuffer.set(coords.getTexCoords(), offset);
+      if (texelsPerFrame >= 2) {
+        // the end of the frame within the animation, for the walk of the shader over the frames of
+        // an animation with durations; 0 for every other
+        if (durations) endTime += durations[i]!;
+        floatsBuffer.set([coords.width, coords.height, coords.flipD ? 1 : 0, durations ? endTime : 0], offset + 4);
+      }
+      if (texelsPerFrame === 3) floatsBuffer.set(trims[i]!, offset + 8);
+      offset += texelsPerFrame * 4;
+    });
+
+    floatsBuffer.set([PLAYBACK_CODE[anim.playback], durations ? 1 : 0, cycleDurationOf(anim), SECOND_HEADER_MARK], offset);
+    offset += 4;
+  }
 
   return floatsBuffer;
 };
@@ -629,17 +639,25 @@ export class FrameBasedAnimations {
    *
    * - texels `0` to `n - 1`, one for each of the `n` animations in the order of their ids:
    *   `[frameCount, duration, first frame texel, texelsPerFrame]`
-   * - from texel `n` on, `texelsPerFrame` texels for each frame, the frames of an animation one
-   *   after the other: first `[s, t, u, v]` as `TextureCoords#getTexCoords()` answers them, and with
-   *   two texels a second one, `[width, height, flipDiagonal, 0]` — `width` and `height` the
-   *   measures of the area in the image as `TextureCoords` holds them, `flipDiagonal` `1` for a
-   *   frame with `TextureCoords.FLIP_DIAGONAL` and `0` otherwise — and with three texels a third
-   *   one, `[left, top, right, bottom]`: the trim margins of the frame as fractions of the
-   *   untrimmed sprite — `left` and `right` of its width, `top` and `bottom` of its height, `top`
-   *   counted from the top — and `0` at every side for an untrimmed frame of the same bake
+   * - from texel `n` on, for each animation in the order of the ids, its frames one after the
+   *   other, `texelsPerFrame` texels each, and behind them its second header texel
+   * - the texels of a frame: first `[s, t, u, v]` as `TextureCoords#getTexCoords()` answers them,
+   *   and with two texels a second one, `[width, height, flipDiagonal, endTime]` — `width` and
+   *   `height` the measures of the area in the image as `TextureCoords` holds them, `flipDiagonal`
+   *   `1` for a frame with `TextureCoords.FLIP_DIAGONAL` and `0` otherwise, `endTime` the end of the
+   *   frame within its animation in seconds for an animation with `durations` and `0` for any
+   *   other — and with three texels a third one, `[left, top, right, bottom]`: the trim margins of
+   *   the frame as fractions of the untrimmed sprite — `left` and `right` of its width, `top` and
+   *   `bottom` of its height, `top` counted from the top — and `0` at every side for an untrimmed
+   *   frame of the same bake
+   * - the second header texel of an animation, at `first frame texel + frameCount · texelsPerFrame`:
+   *   `[playback, hasDurations, cycleDuration, -1]` — `playback` `0` for `'loop'`, `1` for `'once'`,
+   *   `2` for `'pingpong'`; `hasDurations` `1` for an animation with `durations`; `cycleDuration` as
+   *   {@link FrameBasedAnimations.animation} answers it; the `-1` marks it, since no texel of a
+   *   header or a frame carries a negative fourth component
    * - `texelsPerFrame` is `3` when a registered frame is trimmed, else `2` when
-   *   `includeTextureSize` is set or a registered frame carries `FLIP_DIAGONAL`, and `1` otherwise
-   *   — the same for every animation of a bake
+   *   `includeTextureSize` is set, a registered frame carries `FLIP_DIAGONAL` or an animation has
+   *   `durations`, and `1` otherwise — the same for every animation of a bake
    *
    * The texture is at most as wide as the device it is meant for can take: `options.maxTextureSize`
    * when it is given, else the limit of the device of `options.renderer`, else
@@ -663,11 +681,13 @@ export class FrameBasedAnimations {
       FrameBasedAnimations.MaxTextureSize;
 
     const anims = Array.from(this.#animations.values());
-    // a turned frame needs the second texel to carry its diagonal flip to the shader
+    // a turned frame needs the second texel to carry its diagonal flip to the shader, and a frame of
+    // an animation with durations to carry its end time
     const hasTurnedFrame = anims.some(({frames}) => frames.some((coords) => coords.flipD));
+    const hasDurations = anims.some(({durations}) => durations !== undefined);
     // a trimmed frame needs the third texel for its margins, and brings the second along with it
     const hasTrimmedFrame = anims.some(({trims}) => trims.some((margins) => margins.some((margin) => margin !== 0)));
-    const texelsPerFrame = hasTrimmedFrame ? 3 : options?.includeTextureSize || hasTurnedFrame ? 2 : 1;
+    const texelsPerFrame = hasTrimmedFrame ? 3 : options?.includeTextureSize || hasTurnedFrame || hasDurations ? 2 : 1;
 
     const bufSize = getBufferSize(this.#animations, texelsPerFrame, maxTextureSize);
 

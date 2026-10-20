@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `FrameBasedAnimations#add(name, timing, atlas, frameNames)`: the frames of an atlas named in a list, in the order of the list and as often as they are named, with their trim margins; a name the atlas does not carry and an entry that is no string are refused, naming the index
 - add `FrameBasedAnimations#animation(nameOrId)`, a frozen `FrameBasedAnimationInfo` — frame count, duration, playback, per-frame durations and `cycleDuration`, the seconds after which a `'once'` holds its last frame and a `'pingpong'` starts its next turn — and `FrameBasedAnimations#clone()`, a copy under the same names and ids that grows apart from the original. `FrameBasedAnimDef` gains `playback` and `durations`
 
+### Changed
+
+- `FrameBasedAnimations#bakeDataTexture()` writes a second header texel behind the frames of each animation, `[playback, hasDurations, cycleDuration, -1]`, and the end time of a frame of an animation with `durations` into the fourth component of its second texel, `[width, height, flipDiagonal, endTime]`; an animation with durations gives every frame of the bake a second texel. The first header texel keeps its layout and the frames of the first animation still begin at texel `n`, but the frames of every later animation begin one texel later per animation before them: a reader of its own that follows `firstFrameTexel` of the header reads them right, one that counted the texels itself has to follow it
+
 ## [0.23.0] - 2026-10-18
 
 The sprite meshes of this release are built from features: `TexturedSprites` and
