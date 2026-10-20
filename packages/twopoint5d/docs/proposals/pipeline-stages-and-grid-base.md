@@ -1,6 +1,29 @@
 # Proposal: frame stages, uv stages, a grid base and shared uniforms
 
-Status: **specified**
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "The pipeline", "A grid base"
+and "Writing a feature" (the fields `frameStage`, `uv`, `uniforms`, `checkKind` and the stage
+context), and the browser proofs of §7 in
+`packages/twopoint5d-testing/test/sprites-pipeline-stages.test.js`. Deviations of the build from
+the first draft of this spec, which the sections below now state as built:
+
+- seen at a slant, a vertex of a grid on an outer edge of the sprite is rounded apart from the
+  line between the corners: the shadow of `ShadowPass` under a grid sprite matches the quad's but
+  for a few pixels on its edges (at most 2 % of the lit pixels, §8.3); seen straight on, the grid
+  draws the quad's picture pixel for pixel;
+- `runCheckKind()`, which calls a hook and names the feature in its error, lives in the internal
+  module `runCheckKind.ts`; the type of what the hook is shown is exported as `SpriteKindShape`
+  (§6);
+- the baseline of §8.1 compares the color *and* the position graph of each kind of today with
+  those of the same kind under the old `TextureColor`; the position graph has no older self to be
+  held to, so the browser suite carries it;
+- the grid's specs live in `src/sprites/GridBase.spec.ts`, the slot specs in
+  `src/sprites/FeatureSprites/pipelineStages.spec.ts` and the merge table in
+  `src/sprites/spriteDeclarations.spec.ts`; `GridBaseVO` also names the generated
+  `getPosition()` and `getUv()`;
+- the test-only nine-slice runs its local stage at `LocalOrder.Scale - 20`; the band
+  `LocalOrder.Slice` stays for phase D to add with the feature (§7.2);
+- the browser fixture `makeTrimmedSheet()` moved into `test/helpers/fixtures.js`, which it now
+  serves twice.
 
 Phase C of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.7, §4.8, decision
 2 of its §7 taken: `shared: true`): the one change to the feature model the roadmap asks for. Two
@@ -263,13 +286,19 @@ bobs in a kind without animations, and next to `AnimatedFrames` it reads the sam
 ## 6. `checkKind` — a feature refuses a kind
 
 ```ts
+/** What `checkKind` is shown of a kind. */
+export interface SpriteKindShape {
+  readonly base: SpriteBase;
+  readonly features: readonly SpriteFeature[];
+}
+
 // SpriteFeature
 /**
  * Checks the kind the feature is part of, once, when `defineSprite()` merges it — after every
  * check of its own — and when a pass that brings the feature is folded into a kind. Throws an
  * `Error` whose message names the fix for a kind the feature cannot work in.
  */
-readonly checkKind?: (kind: {readonly base: SpriteBase; readonly features: readonly SpriteFeature[]}) => void;
+readonly checkKind?: (kind: SpriteKindShape) => void;
 ```
 
 - `defineSprite()` calls the hook of every feature with the base and the features of the kind and
@@ -432,7 +461,7 @@ stage context offers; phase E decides where it lives.
 - `passes/pass-features.spec.ts`, `passUniformNames.spec.ts`: a pass brings a frame stage and a
   uv stage; a renamed copy wraps both and keeps `ctx.uv` lazy; `checkKind` of a pass feature runs
   against the folded features.
-- `SpriteBase.spec.ts` (grid): vertex count, positions, uvs, indices for 1 × 1, 3 × 3 and 4 × 2,
+- `GridBase.spec.ts`: vertex count, positions, uvs, indices for 1 × 1, 3 × 3 and 4 × 2,
   the winding of every triangle counter-clockwise, `baseArgs`, memoized identity, name, the
   refusals; `round(uv · columns)` gives every column line back for 1024.
 - `spriteDeclarations` (through `defineSprite.spec.ts`, `SpriteResources.spec.ts`,
@@ -447,8 +476,8 @@ stage context offers; phase E decides where it lives.
 
 - `sprites-grid-base.test.js`: a sprite on `gridBase({columns: 1, rows: 1})` and one on
   `gridBase({columns: 4, rows: 2})` draw the image of the same sprite on `QuadBase`, pixel for
-  pixel — an atlas frame, a turned frame, a trimmed frame, through `TextureColor`, and with a
-  `ShadowPass`.
+  pixel — an atlas frame, a turned frame, a trimmed frame, through `TextureColor`; with a
+  `ShadowPass` seen at a slant, pixel for pixel but for at most 2 % of the lit pixels on the edges.
 - `sprites-pipeline-stages.test.js`, with test-only features defined in the file:
   - a **flip** frame stage (§7.1) mirrors an upright, a turned and a trimmed atlas frame and an
     animated frame, each held cell by cell to the mirror image of the unflipped sprite, and flips
