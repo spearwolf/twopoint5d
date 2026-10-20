@@ -5,10 +5,10 @@ import {ImageLoader, Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
-import {loadFailureFor} from './internals.js';
+import {atlasAdapterPicker, loadFailureFor} from './internals.js';
 import {TextureResource} from './TextureResource.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
-import type {TextureAtlas} from './TextureAtlas.js';
+import {TextureAtlas} from './TextureAtlas.js';
 import type {FrameBasedAnimationsDataMap} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -2542,6 +2542,172 @@ describe('TextureResource', () => {
       expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
       expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
 
+      resource.dispose();
+    });
+  });
+
+  describe('atlas adapters', () => {
+    const asepriteJson = () => ({
+      frames: {
+        'f 0': {frame: {x: 0, y: 0, w: 8, h: 8}, duration: 100},
+        'f 1': {frame: {x: 8, y: 0, w: 8, h: 8}, duration: 300},
+      },
+      meta: {
+        app: 'https://www.aseprite.org/',
+        image: 'sheet.png',
+        size: {w: 16, h: 8},
+        frameTags: [{name: 'blink', from: 0, to: 1, direction: 'forward'}],
+      },
+    });
+    const packerJson = () => ({
+      frames: {'f 0': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+      meta: {app: 'https://www.codeandweb.com/texturepacker', image: 'sheet.png', size: {w: 16, h: 8}},
+    });
+
+    // an atlas resource on its own with `json` written, its image loaded: what it published, and
+    // what it reported
+    const atlasResource = async (json: object, setup?: (resource: TextureResource) => void) => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 8, tag: 'sheet'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+      const resource = new TextureResource('sheet', 'atlas');
+      const errors: Array<{source: string; animation?: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; animation?: string; error: Error}) => {
+        errors.push(payload);
+      });
+      resource.atlasJson = json as never;
+      setup?.(resource);
+      resource.activate();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      return {resource, errors};
+    };
+
+    test('a json that names Aseprite as its app publishes its tags as the animations, without catalog entries', async () => {
+      const {resource, errors} = await atlasResource(asepriteJson());
+
+      expect(errors).toEqual([]);
+      expect(resource.atlas!.frameNames()).toEqual(['f 0', 'f 1']);
+      expect(resource.frameBasedAnimations!.animation('blink').durations).toEqual([0.1, 0.3]);
+      resource.dispose();
+    });
+
+    test('a TexturePacker json without catalog entries publishes no animations, as before', async () => {
+      const {resource} = await atlasResource(packerJson());
+
+      expect(resource.atlas!.frameNames()).toEqual(['f 0']);
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      resource.dispose();
+    });
+
+    test('the catalog entries are added to the tags, and an entry named like a tag is skipped and reported', async () => {
+      const {resource, errors} = await atlasResource(asepriteJson(), (r) => {
+        r.frameBasedAnimationsData = {
+          first: {duration: 1, frameNameQuery: '^f 0$'},
+          blink: {duration: 1, frameNameQuery: '^f 1$'},
+        };
+      });
+
+      const animations = resource.frameBasedAnimations!;
+      expect([animations.animId('blink'), animations.animId('first')]).toEqual([0, 1]);
+      expect(animations.animation('blink').frameCount).toBe(2);
+      expect(errors.map(({source, animation}) => [source, animation])).toEqual([['frameBasedAnimations', 'blink']]);
+      resource.dispose();
+    });
+
+    test('a change of the catalog entries adds them to a fresh copy of the tags', async () => {
+      const {resource} = await atlasResource(asepriteJson(), (r) => {
+        r.frameBasedAnimationsData = {first: {duration: 1, frameNameQuery: '^f 0$'}};
+      });
+      const before = resource.frameBasedAnimations!;
+
+      resource.frameBasedAnimationsData = {second: {duration: 1, frameNameQuery: '^f 1$'}};
+
+      const after = resource.frameBasedAnimations!;
+      expect(after).not.toBe(before);
+      expect([after.hasAnimation('first'), after.hasAnimation('second'), after.animId('second')]).toEqual([false, true, 1]);
+      expect(before.hasAnimation('second')).toBe(false);
+      resource.dispose();
+    });
+
+    test('an atlasAdapter written to the resource reads the json, laid out in the coords of the image', async () => {
+      const seen: unknown[] = [];
+      const {resource} = await atlasResource(packerJson(), (r) => {
+        r.atlasAdapter = (json, parentCoords) => {
+          seen.push(json.meta.image, parentCoords.width, parentCoords.height);
+          const animations = new FrameBasedAnimations();
+          animations.add('custom', 1, [parentCoords]);
+          return {atlas: TexturePackerJson.parse(json, parentCoords)[0], animations};
+        };
+      });
+
+      expect(seen).toEqual(['sheet.png', 16, 8]);
+      expect(resource.frameBasedAnimations!.hasAnimation('custom')).toBe(true);
+      resource.dispose();
+    });
+
+    test('another atlasAdapter reads the json again', async () => {
+      const {resource} = await atlasResource(asepriteJson());
+      const first = resource.atlas;
+
+      resource.atlasAdapter = (json, parentCoords) => ({atlas: TexturePackerJson.parse(json, parentCoords)[0]});
+
+      expect(resource.atlas).not.toBe(first);
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      resource.dispose();
+    });
+
+    test('the injected picker chooses the adapter of a json while none is written', async () => {
+      const {resource} = await atlasResource(packerJson(), (r) => {
+        r[atlasAdapterPicker] = () => (json, parentCoords) => {
+          const animations = new FrameBasedAnimations();
+          animations.add('picked', 1, [parentCoords]);
+          return {atlas: TexturePackerJson.parse(json, parentCoords)[0], animations};
+        };
+      });
+
+      expect(resource.frameBasedAnimations!.hasAnimation('picked')).toBe(true);
+      resource.dispose();
+    });
+
+    test('an adapter that throws takes atlas and animations back and is reported', async () => {
+      const {resource, errors} = await atlasResource(asepriteJson(), (r) => {
+        r.atlasAdapter = () => {
+          throw new Error('unreadable');
+        };
+      });
+
+      expect([resource.atlas, resource.frameBasedAnimations]).toEqual([undefined, undefined]);
+      expect(errors.map(({source, error}) => [source, error.message])).toEqual([['texture', 'unreadable']]);
+      expect(resource[loadFailureFor](['atlas'])?.error).toBe(errors[0]!.error);
+      resource.dispose();
+    });
+
+    test.each([
+      [() => ({}), 'the atlas adapter of resource "sheet" answered no atlas — an adapter answers {atlas, animations?}'],
+      [() => undefined, 'the atlas adapter of resource "sheet" answered no atlas — an adapter answers {atlas, animations?}'],
+      [
+        (json: never, parentCoords: never) => ({atlas: TexturePackerJson.parse(json, parentCoords)[0], animations: {}}),
+        'the atlas adapter of resource "sheet" answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none',
+      ],
+    ])('an adapter answer that is no atlas is reported: %#', async (adapter, message) => {
+      const {resource, errors} = await atlasResource(packerJson(), (r) => {
+        r.atlasAdapter = adapter as never;
+      });
+
+      expect(resource.atlas).toBeUndefined();
+      expect(errors.map(({error}) => error.message)).toEqual([`[TextureResource] ${message}`]);
+      resource.dispose();
+    });
+
+    test('atlasAdapter belongs to an atlas resource', () => {
+      const resource = new TextureResource('image', 'image');
+
+      expect(() => {
+        resource.atlasAdapter = () => ({atlas: new TextureAtlas()});
+      }).toThrow(new TypeError('TextureResource "image" is an "image" resource and has no "atlasAdapter"'));
+      expect(resource.atlasAdapter).toBeUndefined();
       resource.dispose();
     });
   });

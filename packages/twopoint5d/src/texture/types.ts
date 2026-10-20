@@ -56,6 +56,13 @@ export interface TextureResourceData {
   overrideImageUrl?: string;
   /** The atlas json of an atlas resource. Relative to the catalog, as `imageUrl` is. */
   atlasUrl?: string;
+  /**
+   * The atlas adapter that reads the json of an atlas resource, by the name it is registered
+   * under in the store — `'texturepacker'`, `'aseprite'` or one of `registerAtlasAdapter()`.
+   * Without it the store picks one by `meta.app` of the json. A name the store does not know makes
+   * the item build no resource; on an item without `atlasUrl` it is reported and left out.
+   */
+  atlasAdapter?: string;
   tileSet?: TileSetOptions;
   /**
    * The texture classes of this resource, on top of the defaults of the store. A name no

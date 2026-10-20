@@ -44,3 +44,10 @@ export const imageSource: unique symbol = Symbol('TextureResource.imageSource');
  * given subtypes from arriving, if there is one. `TextureStore#getAsync()` asks it.
  */
 export const loadFailureFor: unique symbol = Symbol('TextureResource.loadFailureFor');
+
+/**
+ * The field of a `TextureResource` into which `TextureStore` injects the way it picks an atlas
+ * adapter for a json by its `meta.app`: the registry of the store. A resource on its own picks
+ * among the built-in adapters.
+ */
+export const atlasAdapterPicker: unique symbol = Symbol('TextureResource.atlasAdapterPicker');

@@ -2,6 +2,10 @@ import {emit, getRetainedEventNames, getSubscriptionCount, on, once} from '@spea
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader, LinearFilter, NearestFilter, type Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
+import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {TextureAtlas} from './TextureAtlas.js';
+import type {TextureCoords} from './TextureCoords.js';
+import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
 import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
 import {TextureStore, TextureStoreEvents, type TextureStoreLoadOptions} from './TextureStore.js';
@@ -2848,6 +2852,200 @@ describe('TextureStore', () => {
       expect(late).toHaveBeenCalledExactlyOnceWith(renderer);
 
       store.dispose();
+    });
+  });
+
+  describe('atlas adapters', () => {
+    const asepriteJson = {
+      frames: {
+        'f 0': {frame: {x: 0, y: 0, w: 8, h: 8}, duration: 100},
+        'f 1': {frame: {x: 8, y: 0, w: 8, h: 8}, duration: 100},
+      },
+      meta: {
+        app: 'https://www.aseprite.org/',
+        image: 'sheet.png',
+        size: {w: 16, h: 8},
+        frameTags: [{name: 'blink', from: 0, to: 1, direction: 'pingpong'}],
+      },
+    };
+    const packerJson = {
+      frames: {'f 0': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+      meta: {app: 'http://github.com/odrick/free-tex-packer', image: 'sheet.png', size: {w: 16, h: 8}},
+    };
+
+    // a store whose fetch answers `json` and whose images are 16 × 8, its renderer a stub
+    const storeWith = (json: object) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify(json)));
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 8}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      const errors: Array<{source: string; id?: string; error: Error}> = [];
+      on(store, TextureStoreEvents.Error, (payload: {source: string; id?: string; error: Error}) => {
+        errors.push(payload);
+      });
+      return {store, errors};
+    };
+    // a factory that builds plain objects, so no renderer is needed
+    const useStubFactory = (resource: TextureResource) => {
+      resource.textureFactory = {create: () => ({name: '', dispose() {}})} as never;
+    };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    test('an Aseprite item publishes its tags as its frameBasedAnimations without a word of configuration', async () => {
+      const {store} = storeWith(asepriteJson);
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json'}}});
+      useStubFactory(await store.whenResource('fighter'));
+
+      const animations = await store.getAsync('fighter', 'frameBasedAnimations');
+
+      expect(animations.animation('blink').playback).toBe('pingpong');
+      store.dispose();
+    });
+
+    test('a free-tex-packer item is read by the TexturePacker adapter and publishes no animations of its own', async () => {
+      const {store} = storeWith(packerJson);
+      store.parse({items: {sheet: {atlasUrl: 'sheet.json'}}});
+      const resource = await store.whenResource('sheet');
+      useStubFactory(resource);
+
+      const atlas = await store.getAsync('sheet', 'atlas');
+
+      expect(atlas.frameNames()).toEqual(['f 0']);
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      store.dispose();
+    });
+
+    test('an item names its adapter, and the named one wins over meta.app', async () => {
+      const {store} = storeWith(asepriteJson);
+      store.parse({items: {sheet: {atlasUrl: 'sheet.json', atlasAdapter: 'texturepacker'}}});
+      const resource = await store.whenResource('sheet');
+      useStubFactory(resource);
+
+      await store.getAsync('sheet', 'atlas');
+
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      store.dispose();
+    });
+
+    test('a registered adapter is named by an item, and reads the json in the coords of the image', async () => {
+      const {store} = storeWith(packerJson);
+      const seen: number[] = [];
+      store.registerAtlasAdapter('mine', (json, parentCoords) => {
+        seen.push(parentCoords.width, parentCoords.height);
+        const animations = new FrameBasedAnimations();
+        animations.add('all', {duration: 1, playback: 'once'}, TexturePackerJson.parse(json, parentCoords)[0]);
+        return {atlas: TexturePackerJson.parse(json, parentCoords)[0], animations};
+      });
+      store.parse({items: {sheet: {atlasUrl: 'sheet.json', atlasAdapter: 'mine'}}});
+      useStubFactory(await store.whenResource('sheet'));
+
+      const animations = await store.getAsync('sheet', 'frameBasedAnimations');
+
+      expect(seen).toEqual([16, 8]);
+      expect(animations.animation('all').playback).toBe('once');
+      store.dispose();
+    });
+
+    test('meta.app picks the latest registered adapter whose app matches it', async () => {
+      const {store} = storeWith(asepriteJson);
+      const picked: string[] = [];
+      const adapter = (name: string) => (json: TexturePackerJsonData, parentCoords: TextureCoords) => {
+        picked.push(name);
+        return {atlas: TexturePackerJson.parse(json, parentCoords)[0]};
+      };
+      store.registerAtlasAdapter('older', adapter('older'), {app: /aseprite/});
+      store.registerAtlasAdapter('newer', adapter('newer'), {app: /aseprite/g});
+      store.parse({items: {sheet: {atlasUrl: 'sheet.json'}}});
+      useStubFactory(await store.whenResource('sheet'));
+
+      await store.getAsync('sheet', 'atlas');
+
+      expect(picked).toEqual(['newer']);
+      store.dispose();
+    });
+
+    test('a registration under a taken name replaces the adapter', async () => {
+      const {store} = storeWith(asepriteJson);
+      store.registerAtlasAdapter('aseprite', (json, parentCoords) => ({atlas: TexturePackerJson.parse(json, parentCoords)[0]}), {
+        app: /aseprite/i,
+      });
+      store.parse({items: {sheet: {atlasUrl: 'sheet.json'}}});
+      const resource = await store.whenResource('sheet');
+      useStubFactory(resource);
+
+      await store.getAsync('sheet', 'atlas');
+
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      store.dispose();
+    });
+
+    test('an item that names an adapter the store does not know builds no resource and is reported', () => {
+      const {store, errors} = storeWith(asepriteJson);
+
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', atlasAdapter: 'asprite'}}});
+
+      expect(errors.map(({source, id, error}) => [source, id, error.message])).toEqual([
+        [
+          'parse',
+          'fighter',
+          '[TextureStore] item "fighter" names the atlasAdapter "asprite", which this store does not know — known: texturepacker, aseprite; register it with registerAtlasAdapter() before parse()',
+        ],
+      ]);
+      store.dispose();
+    });
+
+    test('an atlasAdapter on an item without atlasUrl is reported and left out, the item is built', async () => {
+      const {store, errors} = storeWith(asepriteJson);
+
+      store.parse({items: {tiles: {imageUrl: 'tiles.png', atlasAdapter: 'aseprite'}}});
+
+      expect(errors.map(({id, error}) => [id, error.message])).toEqual([
+        [
+          'tiles',
+          '[TextureStore] item "tiles" names the atlasAdapter "aseprite", but atlasAdapter only reads an atlas — left out',
+        ],
+      ]);
+      expect((await store.whenResource('tiles')).type).toBe('image');
+      store.dispose();
+    });
+
+    test('an atlasAdapter that is no string is a field of the wrong type', () => {
+      const {store, errors} = storeWith(asepriteJson);
+
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', atlasAdapter: 5 as never}}});
+
+      expect(errors[0]!.error.message).toBe('[TextureStore] item "fighter" builds no resource: atlasAdapter is 5, not a string');
+      store.dispose();
+    });
+
+    test.each([
+      [
+        () => new TextureStore().registerAtlasAdapter('', () => ({atlas: new TextureAtlas()})),
+        '[TextureStore] registerAtlasAdapter() got a name of  — an atlas adapter is registered under a name, a string',
+      ],
+      [
+        () => new TextureStore().registerAtlasAdapter('x', 5 as never),
+        '[TextureStore] registerAtlasAdapter() got an adapter for "x" that is no function — an adapter is (json, parentCoords) => {atlas, animations?}',
+      ],
+      [
+        () => new TextureStore().registerAtlasAdapter('x', () => ({atlas: new TextureAtlas()}), {app: 'aseprite' as never}),
+        '[TextureStore] registerAtlasAdapter() got an app for "x" that is no RegExp — app is matched against meta.app of the json, as /aseprite/i',
+      ],
+    ])('registerAtlasAdapter() refuses what it cannot register: %#', (register, message) => {
+      expect(register).toThrow(new TypeError(message));
+    });
+
+    test('the app handed in keeps its lastIndex', () => {
+      const app = /aseprite/g;
+      app.lastIndex = 3;
+
+      new TextureStore().registerAtlasAdapter('x', () => ({atlas: new TextureAtlas()}), {app});
+
+      expect(app.lastIndex).toBe(3);
     });
   });
 });

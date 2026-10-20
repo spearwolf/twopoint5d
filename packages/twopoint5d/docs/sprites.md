@@ -262,6 +262,35 @@ adds `index` and `slices` — the key of each slice in force at that frame, `{bo
 pivot?}` in pixels of the untrimmed frame, `center` and `pivot` relative to `bounds` as Aseprite
 writes them.
 
+**In a `TextureStore` catalog** an item with an `atlasUrl` is read by an atlas adapter: the one it
+names with `atlasAdapter`, else the one whose `app` matches `meta.app` of its json. An Aseprite
+json says `"app": "https://www.aseprite.org/"`, so its tags become the `frameBasedAnimations` of the
+item without a word of configuration; the item's own `frameBasedAnimations` entries are added
+beside them. TexturePacker and free-tex-packer jsons go to `'texturepacker'`, which reads frames and
+no animations. An adapter of one's own is a function `(json, parentCoords) => {atlas,
+animations?}`, registered before the catalog is parsed — here to make a one-shot of the kick:
+
+```ts check
+import {AsepriteJson, type AsepriteJsonData, TextureStore} from '@spearwolf/twopoint5d';
+
+const store = new TextureStore();
+store.registerAtlasAdapter('fighter', (json, parentCoords) => {
+  const [atlas, , animations] = AsepriteJson.parse(json as unknown as AsepriteJsonData, {
+    parentCoords,
+    playback: {kick: 'once'},
+  });
+  return {atlas, animations};
+});
+store.parse({items: {fighter: {atlasUrl: 'fighter.json', atlasAdapter: 'fighter'}}});
+
+export const animations = store.getAsync('fighter', 'frameBasedAnimations');
+```
+
+An item that names an adapter the store does not know builds no resource and is reported as an
+`error` of the store. An adapter reads the envelope the three packers share — `frames`,
+`meta.size`, `meta.image` — since the resource reads the image out of the json before any adapter
+runs; a packer of another format is converted to that envelope first.
+
 ## Uploads: static and dynamic attributes
 
 `update()` of the mesh uploads what the sprite pool marked. Position, rotation and shear are

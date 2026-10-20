@@ -1,8 +1,10 @@
 import {emitSafe, emitStrict, type EventizedObject, off, on, once, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
+import {type AtlasAdapter, type AtlasAdapterEntry, builtInAtlasAdapters, pickAtlasAdapter} from './atlasAdapters.js';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {
+  atlasAdapterPicker,
   changeRefCount,
   type ImageLease,
   imageSource,
@@ -295,6 +297,13 @@ export class TextureStore {
 
   #resources = new Map<string, TextureResource>();
 
+  // the atlas adapters by name, in the order they were registered: the pick by `meta.app` asks the
+  // latest first
+  #atlasAdapters: AtlasAdapterEntry[] = builtInAtlasAdapters();
+
+  // what every resource of this store picks an adapter by, while its item names none
+  #pickAtlasAdapter = (json: Parameters<typeof pickAtlasAdapter>[1]): AtlasAdapter => pickAtlasAdapter(this.#atlasAdapters, json);
+
   #images = new Map<string, {image: Promise<HTMLImageElement>; refCount: number}>();
 
   // One fetch per url for as long as at least one resource wants it. What is shared is the
@@ -364,6 +373,44 @@ export class TextureStore {
   }
 
   /**
+   * Registers an atlas adapter under `name`, or replaces the one registered under it. A catalog item
+   * names it with `atlasAdapter: name`; an item that names none is read by the adapter whose `app`
+   * matches `meta.app` of its json — the latest registered first — and by `'texturepacker'` when
+   * none does. The store starts with `'texturepacker'` (`texturePackerAtlasAdapter`, `app`
+   * `/texturepacker|free-tex-packer/i`) and `'aseprite'` (`asepriteAtlasAdapter`, `app`
+   * `/aseprite/i`).
+   *
+   * Register an adapter before the `parse()` or `loadAsync()` whose items name it: a registration
+   * reaches the next json a resource reads, a resource that has read its json keeps its atlas. The
+   * `app` is copied, so the `RegExp` handed in keeps its `lastIndex`.
+   *
+   * @throws {TypeError} for a name that is no string or the empty string, an adapter that is no
+   *   function and an `app` that is no `RegExp`
+   */
+  registerAtlasAdapter(name: string, adapter: AtlasAdapter, options?: {app?: RegExp}): void {
+    if (typeof name !== 'string' || name === '') {
+      throw new TypeError(
+        `[TextureStore] registerAtlasAdapter() got a name of ${String(name)} — an atlas adapter is registered under a name, a string`,
+      );
+    }
+    if (typeof adapter !== 'function') {
+      throw new TypeError(
+        `[TextureStore] registerAtlasAdapter() got an adapter for "${name}" that is no function — an adapter is (json, parentCoords) => {atlas, animations?}`,
+      );
+    }
+    const app: unknown = options?.app;
+    if (app !== undefined && !(app instanceof RegExp)) {
+      throw new TypeError(
+        `[TextureStore] registerAtlasAdapter() got an app for "${name}" that is no RegExp — app is matched against meta.app of the json, as /aseprite/i`,
+      );
+    }
+    this.#atlasAdapters = [
+      ...this.#atlasAdapters.filter((entry) => entry.name !== name),
+      {name, adapter, app: app === undefined ? undefined : new RegExp(app)},
+    ];
+  }
+
+  /**
    * Call `callback` once with the resource `id` — right away if it is already there, otherwise
    * with the first {@link TextureStore.parse} that brings it. A later `parse()` that names the
    * id again does not call it, nor does a resource that takes the place of an evicted one;
@@ -382,6 +429,11 @@ export class TextureStore {
       return () => {};
     }
     return once(this, `${OnResource}:${id}`, (resource: TextureResource) => callback(resource));
+  }
+
+  // the adapter an item names, by its name; the names are checked before parse() writes anything
+  #namedAtlasAdapter(name: string | undefined): AtlasAdapter | undefined {
+    return name === undefined ? undefined : this.#atlasAdapters.find((entry) => entry.name === name)?.adapter;
   }
 
   // Call `callback` with the resource `id` right away and once, if it is already there, otherwise
@@ -606,8 +658,11 @@ export class TextureStore {
    * with `source: 'parse'` and its id: one that is no object, one with a field of the wrong
    * type — a url that is no string, a `tileSet` or `frameBasedAnimations` that is no object,
    * a `texture` that is no array; absent is `undefined`, a `null` is a field of the wrong
-   * type —, and one that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`. A
-   * resource that already carries that id stays as it is.
+   * type —, one that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`, and an atlas
+   * item that names an `atlasAdapter` the store does not know (see
+   * {@link TextureStore.registerAtlasAdapter}). A resource that already carries that id stays as it
+   * is. An `atlasAdapter` on an item without `atlasUrl` is reported the same way and left out; the
+   * item is built without it.
    *
    * A texture class name no `TextureFactory` knows, in `texture` or in
    * `defaultTextureClasses`, is left out and reported as an `error` event with
@@ -652,6 +707,8 @@ export class TextureStore {
     // every item that builds nothing this run, with what says why; a resource that already
     // carries its id stays as it is
     const skipped = new Map<string, Error>();
+    // every item that builds its resource without a field it names, with what says why
+    const leftOut = new Map<string, Error>();
 
     for (const [id, item] of Object.entries(data.items)) {
       const problems = textureResourceDataProblems(item);
@@ -663,6 +720,25 @@ export class TextureStore {
       if (wanted == null) {
         skipped.set(id, new Error(`[TextureStore] item "${id}" names no tileSet, atlasUrl or imageUrl and builds no resource`));
         continue;
+      }
+      if (item.atlasAdapter !== undefined) {
+        if (wanted !== 'atlas') {
+          leftOut.set(
+            id,
+            new Error(
+              `[TextureStore] item "${id}" names the atlasAdapter "${item.atlasAdapter}", but atlasAdapter only reads an atlas — left out`,
+            ),
+          );
+        } else if (!this.#atlasAdapters.some(({name}) => name === item.atlasAdapter)) {
+          const known = this.#atlasAdapters.map(({name}) => name).join(', ');
+          skipped.set(
+            id,
+            new Error(
+              `[TextureStore] item "${id}" names the atlasAdapter "${item.atlasAdapter}", which this store does not know — known: ${known}; register it with registerAtlasAdapter() before parse()`,
+            ),
+          );
+          continue;
+        }
       }
       const existing = this.#resources.get(id);
       if (existing && existing.type !== wanted) {
@@ -696,6 +772,8 @@ export class TextureStore {
         emitSafe(this, OnError, {source: 'parse', id, error: why});
         continue;
       }
+      const notUsed = leftOut.get(id);
+      if (notUsed) emitSafe(this, OnError, {source: 'parse', id, error: notUsed});
       if (item.texture === undefined) continue;
       const {known, unknown} = partitionTextureClasses(item.texture);
       itemClasses.set(id, known);
@@ -752,6 +830,7 @@ export class TextureStore {
           if (resource) {
             const knownResource = resource;
             batch(() => {
+              knownResource.atlasAdapter = this.#namedAtlasAdapter(item.atlasAdapter);
               knownResource.atlasUrl = resolve(item.atlasUrl);
               knownResource.overrideImageUrl = resolve(item.overrideImageUrl);
               knownResource.textureClasses = textureClasses;
@@ -765,6 +844,7 @@ export class TextureStore {
               textureClasses,
               item.frameBasedAnimations,
             );
+            resource.atlasAdapter = this.#namedAtlasAdapter(item.atlasAdapter);
           }
         } else if (item.imageUrl) {
           if (resource) {
@@ -784,6 +864,7 @@ export class TextureStore {
             // without a factory and runs when it arrives, so an image source set afterwards
             // would miss the first fetch
             resource[imageSource] ??= this.#imageSource;
+            resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
             resource.textureFactory = this.#textureFactory.value;
           }
           this.#resources.set(id, resource);
@@ -892,6 +973,7 @@ export class TextureStore {
           clearSubTypeSubscriptions();
 
           resource[imageSource] ??= this.#imageSource;
+          resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
           resource.activate();
           if (this.#textureFactory.value && !resource.textureFactory) {
             resource.textureFactory = this.#textureFactory.value;
@@ -962,7 +1044,7 @@ export class TextureStore {
    * for from arriving: an image that does not load, an atlas json that cannot be fetched or
    * read or that names no image, a texture that cannot be built — and, for `tileSet`,
    * `atlas` and `frameBasedAnimations`, tile set options that `TileSet` refuses or an atlas
-   * json that `TexturePackerJson` cannot read. A failure reported before the call counts as
+   * json that its atlas adapter cannot read. A failure reported before the call counts as
    * well, until a change of what the failed step reads — its url, its options, the texture
    * classes, the renderer — sends that step off again, or an `atlasJson` written to the
    * resource takes the place of one that could not be fetched or is still being fetched. The
