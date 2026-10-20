@@ -289,6 +289,8 @@ describe('sprites on the hot path', () => {
     const descending = {descending: true};
     sprites.update();
 
+    // whole numbers, counted in the round: every call has to move, or the round measured no sort
+    let calls = 0;
     let moved = 0;
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < 10; i++) {
@@ -298,10 +300,11 @@ describe('sprites on the hot path', () => {
         sprites.update();
         if (sprites.sortBy('y')) moved++;
         if (sprites.sortBy('y', descending)) moved++;
+        calls += 4;
       }
     });
 
-    expect(moved).toBeGreaterThan(0);
+    expect(moved, 'the sorts that moved a sprite').toBe(calls);
     expect(bytesPerRound / 60).toBeLessThan(BYTES_PER_CALL_LIMIT);
     sprites.dispose();
   });

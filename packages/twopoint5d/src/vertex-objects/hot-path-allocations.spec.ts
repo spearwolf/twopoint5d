@@ -263,6 +263,8 @@ describe('vertex objects on the hot path', () => {
       for (let i = 0; i < 1000; i++) pool.createVO()!.setPosition(0, ((i * 7919) % 1000) / 3, 0);
       geometry.update();
 
+      // whole numbers, counted in the round: every call has to move, or the round measured no sort
+      let calls = 0;
       let moved = 0;
       const bytesPerRound = await measureSettledBytes(() => {
         for (let i = 0; i < 10; i++) {
@@ -270,11 +272,12 @@ describe('vertex objects on the hot path', () => {
           geometry.update();
           if (pool.sortBy('y', descending)) moved++;
           geometry.update();
+          calls += 2;
         }
       });
       const bytesPerCall = bytesPerRound / 40;
 
-      expect(moved).toBeGreaterThan(0);
+      expect(moved, 'the sorts that moved a slot').toBe(calls);
       expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
       geometry.dispose();
     });
@@ -284,13 +287,20 @@ describe('vertex objects on the hot path', () => {
       for (let i = 0; i < 1000; i++) pool.createVO();
       const keys = Float64Array.from({length: 1000}, (_, i) => ((i * 7919) % 1000) / 3);
 
+      let calls = 0;
+      let moved = 0;
       const bytesPerRound = await measureSettledBytes(() => {
         for (let i = 0; i < 10; i++) {
-          pool.sortByKeys(keys);
-          pool.sortByKeys(keys, descending);
+          if (pool.sortByKeys(keys)) moved++;
+          // keys[i] is the key of slot i, whatever stands there: each call orders the slots by the same
+          // keys, and neither order leaves every slot where it is
+          if (pool.sortByKeys(keys, descending)) moved++;
+          calls += 2;
         }
       });
       const bytesPerCall = bytesPerRound / 20;
+
+      expect(moved, 'the sorts that moved a slot').toBe(calls);
 
       expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
       pool.dispose();
@@ -304,13 +314,18 @@ describe('vertex objects on the hot path', () => {
       // not -vo.rotation: the -0 of the key 0 is no small integer, and V8 boxes it
       const negated = (vo: SpriteVO) => 1000 - vo.rotation;
 
+      let calls = 0;
+      let moved = 0;
       const bytesPerRound = await measureSettledBytes(() => {
         for (let i = 0; i < 10; i++) {
-          pool.sortBy(key);
-          pool.sortBy(negated);
+          if (pool.sortBy(key)) moved++;
+          if (pool.sortBy(negated)) moved++;
+          calls += 2;
         }
       });
       const bytesPerCall = bytesPerRound / 20;
+
+      expect(moved, 'the sorts that moved a slot').toBe(calls);
 
       expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
       pool.dispose();
