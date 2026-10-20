@@ -7,8 +7,9 @@ export const voBuffer = Symbol('voBuffer');
 
 /**
  * The key of the property that holds the slot of a vertex object in its buffer, which is where
- * its values start. `freeVO()` moves the last vertex object of a pool into the slot it frees, so
- * the index of a vertex object can change while it lives. `VOUtils` reads and writes it.
+ * its values start. `freeVO()` moves the last vertex object of a pool into the slot it frees, and
+ * `sortBy()` and `sortByKeys()` put the vertex objects into a new order, so the index of a vertex
+ * object can change while it lives — read it afresh, never keep it. `VOUtils` reads and writes it.
  */
 export const voIndex = Symbol('voIndex');
 

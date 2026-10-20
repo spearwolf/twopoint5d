@@ -203,6 +203,67 @@ sprites. The sprite of the `first-sprite` demo is one instance of it: `setSize()
 `width` and `height`, `setFrame()` the `texCoords`, `texFlipDiagonal` and `texTrim` of a
 frame.
 
+## Sorting a pool
+
+A pool draws its objects in the order of their slots, and nobody chose that order: `createVO()`
+appends, `freeVO()` moves the last object into the slot it frees. Where the order matters —
+transparent objects drawn back to front, sprites sorted by `y` — `sortBy()` puts the slots in use
+into the order of a key:
+
+```ts check
+import {VertexObjectPool} from '@spearwolf/twopoint5d';
+import type {VertexObjectDescription, VO} from '@spearwolf/twopoint5d';
+
+interface Ball extends VO {
+  x: number;
+  y: number;
+  z: number;
+  layer: number;
+}
+
+const BallDescription: VertexObjectDescription = {
+  attributes: {
+    position: {components: ['x', 'y', 'z'], usage: 'dynamic'},
+    layer: {size: 1},
+  },
+};
+
+const pool = new VertexObjectPool<Ball>(BallDescription, 500);
+for (let i = 0; i < 500; i++) {
+  const ball = pool.createVO();
+  if (ball) ball.y = Math.random();
+}
+
+pool.sortBy('y'); // by a value property, the lowest first
+pool.sortBy('y', {descending: true}); // the highest first
+pool.sortBy((ball) => ball.layer * 1000 + ball.z); // by a key function
+
+const keys = new Float64Array(pool.capacity);
+for (let i = 0; i < pool.usedCount; i++) keys[i] = pool.getVO(i)!.x;
+pool.sortByKeys(keys); // keys[i] is the key of slot i
+```
+
+- **The key.** The name of a value property — an attribute of one value under its own name, or a
+  component property (`y`, `x0`) — is read straight from the buffer, and no value crosses a call.
+  A key function is called once per slot in use before anything moves, and must not create or free
+  objects of the pool; a fractional key it answers may cost a heap number of 16 B per call where V8
+  does not inline it. `sortByKeys()` takes keys worked out in bulk, `keys[i]` for slot `i`.
+- **The order** is stable — equal keys keep their slot order, so a sort every frame never swaps two
+  objects of the same key back and forth — and ascending unless `descending`; a `NaN` key goes last
+  either way.
+- **What moves.** Every buffer, as whole objects; every object keeps its values and stays the same
+  object, its index following its slot. `getVO(i)` answers the object now in slot `i`, and an index
+  read before the sort is stale — read it afresh. The index buffer of a geometry depends on the
+  slots alone and stays as it is.
+- **The upload.** The slots from the first to the last that changed are marked in every buffer,
+  static ones included. A pool sorted every frame whose order changes uploads about everything every
+  frame; one whose order holds uploads nothing for the sort. `sortBy()` answers whether a slot moved.
+- **One pool.** A pool attached to an instanced geometry with `attachInstancedPool()` pairs its
+  slots with those of the instanced pool by index. Sorting one alone breaks the pairing: work the
+  keys out once and hand the same array to `sortByKeys()` of both.
+- The first sort allocates the scratch of the pool (keys, order, one copy of the largest buffer);
+  every later one allocates nothing, and the scratch grows only with the capacity.
+
 ## Further
 
 - The lookbook demos, from the smallest up:

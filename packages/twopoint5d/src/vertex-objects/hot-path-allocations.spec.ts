@@ -4,7 +4,7 @@ import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {TouchInstancedBuffersType} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
-import type {TouchBuffersType, VO, VOAttrSetter, VertexObjectDescription} from './types.js';
+import type {TouchBuffersType, VO, VOAttrSetter, VOSortOptions, VertexObjectDescription} from './types.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 
@@ -250,6 +250,71 @@ describe('vertex objects on the hot path', () => {
     expect(bytesPerVO, `${bytesPerVO.toFixed(2)} bytes per vertex object`).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);
 
     pool.dispose();
+  });
+
+  describe('sorting', () => {
+    // every round turns the order over, so each call moves every slot: the keys go one way and back
+    const descending: VOSortOptions = {descending: true};
+
+    test('sortBy() by a value property and the update() after it allocate nothing once the scratch is there', async () => {
+      const geometry = new VertexObjectGeometry<SpriteVO>(spriteDescription, 1000);
+      const {pool} = geometry;
+      // fractional keys, written here and read by the sort straight from the buffer
+      for (let i = 0; i < 1000; i++) pool.createVO()!.setPosition(0, ((i * 7919) % 1000) / 3, 0);
+      geometry.update();
+
+      let moved = 0;
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 10; i++) {
+          if (pool.sortBy('y')) moved++;
+          geometry.update();
+          if (pool.sortBy('y', descending)) moved++;
+          geometry.update();
+        }
+      });
+      const bytesPerCall = bytesPerRound / 40;
+
+      expect(moved).toBeGreaterThan(0);
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+      geometry.dispose();
+    });
+
+    test('sortByKeys() allocates nothing once the scratch is there', async () => {
+      const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 1000);
+      for (let i = 0; i < 1000; i++) pool.createVO();
+      const keys = Float64Array.from({length: 1000}, (_, i) => ((i * 7919) % 1000) / 3);
+
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 10; i++) {
+          pool.sortByKeys(keys);
+          pool.sortByKeys(keys, descending);
+        }
+      });
+      const bytesPerCall = bytesPerRound / 20;
+
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+      pool.dispose();
+    });
+
+    test('sortBy() by a key function of whole numbers allocates nothing once the scratch is there', async () => {
+      const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 1000);
+      // whole numbers: a fractional key crossing the call is boxed wherever V8 does not inline the key
+      for (let i = 0; i < 1000; i++) pool.createVO()!.rotation = (i * 7919) % 1000;
+      const key = (vo: SpriteVO) => vo.rotation;
+      // not -vo.rotation: the -0 of the key 0 is no small integer, and V8 boxes it
+      const negated = (vo: SpriteVO) => 1000 - vo.rotation;
+
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 10; i++) {
+          pool.sortBy(key);
+          pool.sortBy(negated);
+        }
+      });
+      const bytesPerCall = bytesPerRound / 20;
+
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+      pool.dispose();
+    });
   });
 
   describe('the upload path', () => {
