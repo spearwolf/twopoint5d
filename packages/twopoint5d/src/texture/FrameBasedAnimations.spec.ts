@@ -1070,4 +1070,285 @@ describe('FrameBasedAnimations', () => {
       );
     });
   });
+
+  describe('playback and per-frame durations', () => {
+    const frames = (count: number): TextureCoords[] =>
+      Array.from({length: count}, (_, i) => new TextureCoords(new TextureCoords(0, 0, 64, 16), i * 16, 0, 16, 16));
+
+    test('an animation loops unless it is told otherwise, a number as timing included', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('number', 1, frames(2));
+      animations.add('object', {duration: 1}, frames(2));
+      animations.add('rate', {frameRate: 4}, frames(2));
+
+      expect(['number', 'object', 'rate'].map((name) => animations.animation(name).playback)).toEqual(['loop', 'loop', 'loop']);
+    });
+
+    test.each(['loop', 'once', 'pingpong'] as const)('takes the playback %s', (playback) => {
+      const animations = new FrameBasedAnimations();
+      animations.add('a', {duration: 1, playback}, frames(3));
+
+      expect(animations.animation('a').playback).toBe(playback);
+    });
+
+    test.each([['bounce'], [''], [1], [null]])('refuses a playback of %j, naming the three', (playback) => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('a', {duration: 1, playback: playback as never}, frames(2))).toThrow(
+        "for the animation `a` — a playback is 'loop', 'once' or 'pingpong'",
+      );
+    });
+
+    test('per-frame durations make the duration their sum and are kept per frame', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('attack', {durations: [0.05, 0.05, 0.3, 0.1]}, frames(4));
+
+      const info = animations.animation('attack');
+
+      expect(info.duration).toBeCloseTo(0.5, 10);
+      expect(info.durations).toEqual([0.05, 0.05, 0.3, 0.1]);
+      expect(info.frameCount).toBe(4);
+    });
+
+    test('the durations handed in are copied', () => {
+      const animations = new FrameBasedAnimations();
+      const durations = [0.1, 0.2];
+      animations.add('a', {durations}, frames(2));
+
+      durations[0] = 5;
+
+      expect(animations.animation('a').durations).toEqual([0.1, 0.2]);
+    });
+
+    test('an animation of one duration has no durations', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('a', 1, frames(2));
+
+      expect(animations.animation('a').durations).toBeUndefined();
+    });
+
+    test.each([[{durations: [0.1, 0.1], duration: 1}], [{durations: [0.1, 0.1], frameRate: 10}]])(
+      'refuses durations beside a duration or a frameRate: %j',
+      (timing) => {
+        const animations = new FrameBasedAnimations();
+
+        expect(() => animations.add('a', timing as never, frames(2))).toThrow(
+          'for the animation `a` — give one of duration, frameRate and durations',
+        );
+      },
+    );
+
+    test.each([['0.1'], [{}], [5]])('refuses durations of %j that are no array', (durations) => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('a', {durations: durations as never}, frames(2))).toThrow(
+        'for the animation `a` — durations is an array of seconds, one per frame',
+      );
+    });
+
+    test('refuses a count of durations other than the count of frames', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('a', {durations: [0.1, 0.1, 0.1]}, frames(4))).toThrow(
+        'FrameBasedAnimations: add() got 3 durations for the 4 frames of the animation `a` — give one duration per frame',
+      );
+    });
+
+    test.each([[0], [-0.1], [Number.NaN], [Number.POSITIVE_INFINITY], ['0.1']])(
+      'refuses a frame duration of %j, naming its index',
+      (value) => {
+        const animations = new FrameBasedAnimations();
+
+        expect(() => animations.add('a', {durations: [0.1, 0.1, value as never]}, frames(3))).toThrow(
+          'at index 2 for the animation `a` — a frame duration is a finite number of seconds above zero',
+        );
+      },
+    );
+
+    test('refuses an animation of more than 8191 frames with durations', () => {
+      const animations = new FrameBasedAnimations();
+      const many = Array.from({length: 8192}, () => new TextureCoords(0, 0, 1, 1));
+
+      expect(() => animations.add('a', {durations: many.map(() => 0.01)}, many)).toThrow(
+        'FrameBasedAnimations: add() got 8192 frames with durations for the animation `a` — an animation with per-frame durations holds at most 8191 frames; split it',
+      );
+    });
+
+    test('a refused playback or durations spends no name of the counter', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add(undefined, {durations: [0.1]}, frames(2))).toThrow();
+      expect(() => animations.add(undefined, {duration: 1, playback: 'x' as never}, frames(2))).toThrow();
+      animations.add(undefined, 1, frames(1));
+
+      expect(animations.hasAnimation('anim_0')).toBe(true);
+    });
+  });
+
+  describe('add with a list of frame names', () => {
+    const makeAtlas = () =>
+      TexturePackerJson.parse({
+        frames: {
+          'kick 0': {frame: {x: 0, y: 0, w: 4, h: 4}},
+          'kick 1': {frame: {x: 4, y: 0, w: 2, h: 1}, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 4, h: 4}},
+          'kick 2': {frame: {x: 8, y: 0, w: 4, h: 4}},
+        },
+        meta: {image: 'sheet.png', size: {w: 16, h: 4}},
+      })[0];
+
+    test('takes the frames in the order of the list, a name as often as it is named', () => {
+      const atlas = makeAtlas();
+      const animations = new FrameBasedAnimations();
+
+      animations.add('kick', 1, atlas, ['kick 2', 'kick 0', 'kick 2']);
+
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
+      const sOf = (index: number) => buffer[index * 4];
+      expect(animations.animation('kick').frameCount).toBe(3);
+      expect([sOf(1), sOf(2), sOf(3)]).toEqual([atlas.frame('kick 2')!.coords.s, 0, atlas.frame('kick 2')!.coords.s]);
+    });
+
+    test('the frames of the list bring their trim margins', () => {
+      const atlas = makeAtlas();
+      const animations = new FrameBasedAnimations();
+
+      animations.add('kick', 1, atlas, ['kick 1']);
+
+      const buffer = animations.bakeDataTexture().image.data as Float32Array;
+      expect(buffer[3], 'three texels per frame').toBe(3);
+      expect(Array.from(buffer.subarray(12, 16))).toEqual([0.25, 0.5, 0.25, 0.25]);
+    });
+
+    test('refuses a name the atlas does not carry, naming its index', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('kick', 1, makeAtlas(), ['kick 0', 'kick 9'])).toThrow(
+        'FrameBasedAnimations: add() got the frame name "kick 9" at index 1 for the animation `kick`, which the atlas does not carry',
+      );
+    });
+
+    test('refuses an entry that is no string, naming its index', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('kick', 1, makeAtlas(), ['kick 0', 5 as never])).toThrow(
+        'FrameBasedAnimations: add() got a frame name of 5 at index 1 for the animation `kick` — a frame name is a string',
+      );
+    });
+
+    test('an empty list registers nothing', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('kick', 1, makeAtlas(), [])).toThrow('got no frames for the animation `kick`');
+    });
+
+    test('the list handed in is not kept: a change after add() leaves the animation as it was', () => {
+      const animations = new FrameBasedAnimations();
+      const names = ['kick 0', 'kick 2'];
+      animations.add('kick', 1, makeAtlas(), names);
+
+      names.length = 0;
+
+      expect(animations.animation('kick').frameCount).toBe(2);
+    });
+  });
+
+  describe('animation()', () => {
+    const frames = (count: number): TextureCoords[] => Array.from({length: count}, () => new TextureCoords(0, 0, 1, 1));
+
+    test('answers an animation by its name and by its id', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('idle', 1, frames(2));
+      const walk = animations.add('walk', {duration: 0.8, playback: 'once'}, frames(4));
+
+      expect(animations.animation('walk')).toEqual({
+        id: walk,
+        name: 'walk',
+        frameCount: 4,
+        duration: 0.8,
+        playback: 'once',
+        durations: undefined,
+        cycleDuration: 0.8,
+      });
+      expect(animations.animation(walk)).toEqual(animations.animation('walk'));
+    });
+
+    test('the answer is frozen', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('a', {durations: [0.1, 0.2]}, frames(2));
+
+      const info = animations.animation('a');
+
+      expect(Object.isFrozen(info)).toBe(true);
+      expect(Object.isFrozen(info.durations)).toBe(true);
+    });
+
+    test.each([
+      ['loop', 4, 1, 1],
+      ['once', 4, 1, 1],
+      ['pingpong', 4, 1, 1.5],
+      ['pingpong', 2, 1, 1],
+      ['pingpong', 1, 1, 1],
+    ] as const)('the cycle of a %s over %i frames of %f s lasts %f s', (playback, count, duration, cycle) => {
+      const animations = new FrameBasedAnimations();
+      animations.add('a', {duration, playback}, frames(count));
+
+      expect(animations.animation('a').cycleDuration).toBeCloseTo(cycle, 10);
+    });
+
+    test('the cycle of a ping-pong with durations shows each end once: 2 · duration − first − last', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('a', {durations: [0.1, 0.2, 0.3, 0.4], playback: 'pingpong'}, frames(4));
+
+      expect(animations.animation('a').cycleDuration).toBeCloseTo(2 * 1 - 0.1 - 0.4, 10);
+    });
+
+    test('an animation that was never registered is an error, as for animId()', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.animation('nope')).toThrow('FrameBasedAnimations: there is no animation named "nope"');
+      expect(() => animations.animation(3)).toThrow('FrameBasedAnimations: there is no animation of the id 3');
+    });
+  });
+
+  describe('clone()', () => {
+    const frames = (count: number): TextureCoords[] => Array.from({length: count}, () => new TextureCoords(0, 0, 1, 1));
+
+    test('answers a copy with the same animations under the same names and ids', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('idle', {duration: 1, playback: 'pingpong'}, frames(3));
+      animations.add(AnimSymbol, {durations: [0.1, 0.2]}, frames(2));
+
+      const copy = animations.clone();
+
+      expect(copy).not.toBe(animations);
+      expect(copy.animation('idle')).toEqual(animations.animation('idle'));
+      expect(copy.animId(AnimSymbol)).toBe(1);
+      expect(Array.from(copy.bakeDataTexture().image.data as Float32Array)).toEqual(
+        Array.from(animations.bakeDataTexture().image.data as Float32Array),
+      );
+    });
+
+    test('an animation added to the copy leaves the original alone, and the other way round', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('idle', 1, frames(1));
+      const copy = animations.clone();
+
+      copy.add('walk', 1, frames(2));
+      animations.add('run', 1, frames(2));
+
+      expect([copy.hasAnimation('walk'), copy.hasAnimation('run')]).toEqual([true, false]);
+      expect([animations.hasAnimation('walk'), animations.hasAnimation('run')]).toEqual([false, true]);
+      expect(copy.animId('walk')).toBe(1);
+    });
+
+    test('the copy goes on with the counter of anonymous names where the original stood', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add(undefined, 1, frames(1));
+      const copy = animations.clone();
+
+      copy.add(undefined, 1, frames(1));
+
+      expect(copy.hasAnimation('anim_1')).toBe(true);
+    });
+  });
 });
