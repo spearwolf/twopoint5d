@@ -190,7 +190,7 @@ flags.dispose();
 | `Shear` | `shear` (dynamic) | `shearX`, `shearY`, `setShear()` | local, `Shear` | 0, 0 |
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
 | `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
-| `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time`; texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
+| `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time` (shared); texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
@@ -1000,8 +1000,12 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   slot comes back with the values of its last sprite, and without `initialize()` a new sprite
   keeps them. It runs for every sprite created, so it allocates nothing.
 - **`uniforms`** — start values by name: a number for a `float`, 2 to 4 numbers for a `vec2` to
-  `vec4`. A name is unique across the kind. Every stage of the kind reads every uniform, through
-  `uniform(name)` of its context.
+  `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0, shared:
+  true}`: the features that declare a name shared, with the same type and start value, hold one
+  uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`, so a
+  wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name, or
+  two shared ones of another type or start value, are refused, naming the fix. Every stage of the
+  kind reads every uniform, through `uniform(name)` of its context.
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
   counts as set only once its image has measures. A name is unique across the kind. The textures
   stay the caller's. Until all of them are set the feature drops out of the graph.
@@ -1050,7 +1054,9 @@ unroll a loop over lookups in JavaScript, as `AnimatedFrames` unrolls its search
 A feature that brings nothing but a stage reads what other features hold, and says so with
 `requires`: `defineSprite()` then refuses a kind without them, naming both features, instead of
 the material failing on a missing attribute or uniform. This one lets sprites bob up and down,
-reading the `instancePosition` of `InstancePosition` and the `time` uniform of `AnimatedFrames`:
+reading the `instancePosition` of `InstancePosition`, and declares the `time` it reads shared: in a
+kind with `AnimatedFrames` it reads the time of the animations, in a kind without it a time of its
+own — either way one `setUniform('time', t)` drives it:
 
 ```ts check
 import {defineFeature, MeshOrder} from '@spearwolf/twopoint5d';
@@ -1059,7 +1065,8 @@ import type {Node} from 'three/webgpu';
 
 export const Bob = defineFeature({
   name: 'bob',
-  requires: ['instancePosition', 'animatedFrames'],
+  requires: ['instancePosition'],
+  uniforms: {time: {value: 0, shared: true}},
   mesh: {
     order: MeshOrder.Offset,
     transform: (position, {attribute, uniform}) => {

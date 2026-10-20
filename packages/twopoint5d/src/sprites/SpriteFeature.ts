@@ -78,6 +78,17 @@ export type SpriteUniformValue =
   | readonly [number, number, number, number];
 
 /**
+ * A uniform declared with options. `shared: true` lets several features declare the same name: the
+ * features that declare it shared hold one uniform, as long as they declare it with the same type
+ * and start value. Without it a second feature that declares the name is refused.
+ */
+export interface SpriteUniformDeclaration {
+  readonly value: SpriteUniformValue;
+  /** Whether other features may declare the same uniform, shared as well. Default `false`. */
+  readonly shared?: boolean;
+}
+
+/**
  * A method of the sprite handle. Declared through a method signature so that a feature of a
  * narrower handle still passes for a feature of any handle, which is what lets one kind list them all.
  */
@@ -98,8 +109,11 @@ export interface SpriteFeature<Api extends object = object> {
   readonly methods?: Readonly<Record<string, SpriteMethod<Api>>>;
   /** Writes the neutral values into a slot `createVO()` hands out — slots come back with old data in them. */
   initialize?(this: Api): void;
-  /** Uniforms the material holds for this feature, with their start values. */
-  readonly uniforms?: Readonly<Record<string, SpriteUniformValue>>;
+  /**
+   * Uniforms the material holds for this feature, with their start values — or, as `{value, shared:
+   * true}`, a uniform other features may declare as well, shared alike.
+   */
+  readonly uniforms?: Readonly<Record<string, SpriteUniformValue | SpriteUniformDeclaration>>;
   /** Textures the material holds for this feature. They stay the caller's. */
   readonly textures?: Readonly<Record<string, SpriteTextureDeclaration>>;
   /** The frame slot: at most one feature of a kind. */

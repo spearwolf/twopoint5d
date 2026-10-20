@@ -25,9 +25,9 @@ const makeAnimsMap = (width = 4, height = 4) => {
 };
 
 describe('AnimatedFrames', () => {
-  test('declares anim, the time uniform and the animsMap it waits for an image of', () => {
+  test('declares anim, the shared time uniform and the animsMap it waits for an image of', () => {
     expect(AnimatedFrames.attributes).toEqual({anim: {components: ['animId', 'animOffset']}});
-    expect(AnimatedFrames.uniforms).toEqual({time: 0});
+    expect(AnimatedFrames.uniforms).toEqual({time: {value: 0, shared: true}});
     expect(AnimatedFrames.textures).toEqual({animsMap: {needsImage: true}});
   });
 

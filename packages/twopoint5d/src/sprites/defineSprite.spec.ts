@@ -291,7 +291,7 @@ describe('defineSprite()', () => {
       const bad = defineFeature({name: 'bad', uniforms: {light: [1, 2, 3, 4, 5] as unknown as number}});
 
       expect(() => defineSprite({base: QuadBase, features: [position, flat, bad]})).toThrow(
-        'defineSprite: feature "bad" starts the uniform "light" with 1,2,3,4,5; a uniform takes a number or 2 to 4 numbers',
+        'defineSprite: feature "bad" starts the uniform "light" with [1,2,3,4,5]; a uniform takes a number, 2 to 4 numbers, or {value, shared}',
       );
     });
 
