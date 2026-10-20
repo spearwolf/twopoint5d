@@ -1,6 +1,21 @@
 # Proposal: `wave()` and segment sprites
 
-Status: **specified**
+Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Waves: sway and scroller" and
+"Segments: ropes, chains, lasers" (with `RepeatingTextureColor`), the tables of slots, of built-in
+features and of passes per placement, and the sine scroller of [`docs/text.md`](../text.md); the
+browser proofs are `packages/twopoint5d-testing/test/sprites-wave.test.js` and
+`sprites-segments.test.js`. Deviations of the build from the first draft, which the sections below
+now state as built:
+
+- the math of the segment placements lives in the internal module `features/segmentVertex.ts`, so
+  that `SegmentPlacement.ts` exports the factory, its options and the constant, as the axis
+  billboard does;
+- `evaluateNode()` learns `clamp` besides `step`, `abs` and `min` (§6.1): the frame math clamps;
+- the mipmapped checker and the count of mixed pixels of `texture-atlas-frame-sampling.test.js`
+  moved into `test/helpers/fixtures.js`, which they now serve twice;
+- a degenerate segment is drawn in the browser in `'xy'` and facing the camera; `'xz'`, the segment
+  along the normal of its plane and the segment that points at the camera are held by the specs of
+  `segmentVertex()` alone, all finite.
 
 Phase D, part 2 of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.8, §4.3;
 decision 4 of its §7 taken: the facing is a factory option, `segmentPlacement({facing})`), built on
@@ -377,7 +392,7 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
   samples `colorMap` through `ctx.sample()`, reads `uv` and the size of `colorMap`, takes gradients
   for a linear and a mipmapped `colorMap` and none for a nearest one; in a material it waits for its
   texture and a swap reaches its lookup; refused next to `TextureColor`.
-- `src/testing/spriteGraph.ts`: `evaluateNode()` learns `step`, `abs` and `min`.
+- `src/testing/spriteGraph.ts`: `evaluateNode()` learns `step`, `abs`, `min` and `clamp`.
 - `hot-path-allocations.spec.ts`: §5.
 
 ### 6.2 Browser (WebGPU and WebGL 2)
