@@ -2,15 +2,17 @@ import {uniform, vec3} from 'three/tsl';
 import {type Node, Vector2} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {evaluateNode, stubShaderContext} from '../../testing/spriteGraph.js';
+import {attributeNamesOf, evaluateNode, stubShaderContext} from '../../testing/spriteGraph.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import {TextureCoords} from '../../texture/TextureCoords.js';
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {defineSprite, type SpriteOf} from '../defineSprite.js';
+import {FeatureSpritesMaterial} from '../FeatureSprites/FeatureSpritesMaterial.js';
 import {QuadBase} from '../SpriteBase.js';
 import {LocalOrder} from '../SpriteFeature.js';
 import {Anchor} from './Anchor.js';
 import {FlatPlacement} from './FlatPlacement.js';
+import {Flip} from './Flip.js';
 import {InstancePosition} from './InstancePosition.js';
 
 const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, Anchor]});
@@ -81,6 +83,19 @@ describe('Anchor', () => {
     closeTo(shifted([0.25, 1], [1, 0]), [0, 0, 0.75]);
     closeTo(shifted([0.25, 1], [0, 1]), [0.5, -1, 0.75]);
     closeTo(shifted([0.25, 1], [0, 0]), [0.5, 0, 0.75]);
+  });
+
+  test('in a material, reads the mirror of Flip through the frame, and none without Flip', () => {
+    const flipped = new FeatureSpritesMaterial(
+      defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, Anchor, Flip]}),
+    );
+    const plain = new FeatureSpritesMaterial(kind);
+
+    expect(attributeNamesOf(flipped.positionNode!)).toEqual(expect.arrayContaining(['anchor', 'flip']));
+    expect(attributeNamesOf(plain.positionNode!)).toContain('anchor');
+    expect(attributeNamesOf(plain.positionNode!)).not.toContain('flip');
+    flipped.dispose();
+    plain.dispose();
   });
 
   describe('setAnchorFromPivot()', () => {
