@@ -42,7 +42,9 @@ A glyph keeps what the file says: where it lies in the page (`x`, `y`, `width`, 
 is drawn from the pen and the top of the line (`xoffset`, `yoffset`) and how far the pen moves on
 (`xadvance`), all in pixels of the font. The frames of the atlas are named by the char as a string
 and are **untrimmed**: the offsets place a glyph in its line, they are no trim margins. A char of
-0 × 0 — the space — has a frame of 0 × 0 and moves the pen alone.
+0 × 0 — the space — has a frame of 0 × 0 and moves the pen alone. `font.size` is the size of the
+font in pixels; BMFont writes it negative for a font made with "match char height", so the font
+answers its amount and `font.info.size` keeps the value as written.
 
 **One page.** A font is drawn out of one texture, so a font of several pages is refused: export it
 onto one page, in BMFont with a larger texture size. `BitmapFont.parse(source, {parentCoords})`

@@ -139,7 +139,10 @@ export class BitmapFont {
   readonly atlas: TextureAtlas<BitmapFontChar>;
   /** The face of `info`, or `''`. */
   readonly face: string;
-  /** The size of `info`, or the line height without one. */
+  /**
+   * The size of `info` as a positive number, or the line height without one. BMFont writes a negative size
+   * when the font was made with "match char height"; `info.size` keeps the value as written.
+   */
   readonly size: number;
   readonly lineHeight: number;
   readonly base: number;
@@ -255,7 +258,7 @@ export class BitmapFont {
     this.base = common.base;
     this.scaleW = scaleW;
     this.scaleH = scaleH;
-    this.size = isFiniteNumber(info.size) ? info.size : common.lineHeight;
+    this.size = isFiniteNumber(info.size) ? Math.abs(info.size) : common.lineHeight;
     this.page = pages[0];
 
     const parent = options?.parentCoords ?? new TextureCoords(0, 0, scaleW, scaleH);

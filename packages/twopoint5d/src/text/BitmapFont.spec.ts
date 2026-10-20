@@ -158,7 +158,9 @@ describe('BitmapFont', () => {
         ].join('\r\n'),
       );
       expect(font.face).toBe('My Font Bold');
-      expect(font.size).toBe(-12);
+      // BMFont writes a negative size for "match char height"; the font answers its amount, info keeps it
+      expect(font.size).toBe(12);
+      expect(font.info.size).toBe(-12);
       expect(font.info.padding).toEqual([1, 2, 3, 4]);
       expect(font.info.charset).toBe('');
       expect(font.page).toBe('my font_0.png');

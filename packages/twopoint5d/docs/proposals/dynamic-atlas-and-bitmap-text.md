@@ -322,7 +322,7 @@ export class BitmapFont {
 
   readonly atlas: TextureAtlas<BitmapFontChar>;
   readonly face: string;        // info.face, or ''
-  readonly size: number;        // info.size, or lineHeight
+  readonly size: number;        // |info.size| — BMFont writes it negative for "match char height" — or lineHeight
   readonly lineHeight: number;
   readonly base: number;
   readonly scaleW: number;
