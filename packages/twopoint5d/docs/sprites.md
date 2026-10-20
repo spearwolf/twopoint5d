@@ -42,7 +42,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
 | `frameStage` | any, by `order` | `Flip` |
 | trim shift | built in, runs when the frame has trim margins | — |
-| `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
+| `local` | any, by `order` | `Anchor`, `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | — |
@@ -196,6 +196,7 @@ flags.dispose();
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
 | `Flip` | `flip` (static) | `flipX`, `flipY`, `setFlip()` | frame stage, `Flip` | unflipped, 0, 0 |
+| `Anchor` | `anchor` (static) | `anchorX`, `anchorY`, `setAnchor()`, `setAnchorFromPivot(frame, slice?)` | local, `Anchor` | the middle, 0.5, 0.5 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -306,6 +307,66 @@ export function walk(velocityX: number) {
   `ReflectionPass` and `BillboardReflectionPass` draw the flipped image.
 - `LocalOrder.Flip` is a different thing: the band of a local stage of one's own that mirrors the
   geometry, whose sprites need `side: DoubleSide`.
+
+### Anchor
+
+`Anchor` says where the position of a sprite sits on its image — the middle, the foot, the top left
+corner — per sprite, as fractions of the untrimmed sprite: `anchorX` from the left edge, `anchorY`
+from the top down, `(0.5, 0.5)` the middle a new sprite starts with. A sprite turns about its
+anchor, and a placement puts the anchor on the instance position.
+
+```ts check
+import {
+  Anchor,
+  AsepriteJson,
+  type AsepriteJsonData,
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  Flip,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+
+declare const json: AsepriteJsonData; // fighter.json: a 64 × 64 canvas, a slice "pivot" at the feet
+
+const Fighter = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, AtlasFrame, TextureColor, Flip],
+});
+const [atlas] = AsepriteJson.parse(json);
+const fighters = new FeatureSprites(Fighter, {capacity: 8});
+const hero = fighters.createSprite()!;
+const frame = atlas.frame('fighter 0.aseprite')!;
+hero.setSize(64, 64);
+hero.setFrame(frame);
+hero.setAnchorFromPivot(frame); // pivot {x: 32, y: 63}: the anchor (0.5, 1), the feet
+hero.setPosition(100, 0); // stands on y = 0
+```
+
+- **A local stage** at `LocalOrder.Anchor`: it moves the unit quad by `(0.5 − anchorX, anchorY −
+  0.5)` before `QuadSize` scales it, so the anchor is a fraction of the sprite's size whatever the
+  size, and of the untrimmed sprite — an animation through trimmed frames of different measures
+  keeps its feet where they are. It works on the quad and on every grid.
+- **It counts from where the base puts the position**: the middle, under the default `baseArgs`. A
+  `baseArgs` offset moves the sprite as well, and the two add up — a kind with `Anchor` leaves
+  `baseArgs` at its default.
+- **`Flip`** mirrors the anchor with the image: a fighter whose pivot lies off its middle keeps its
+  body on its position when it turns.
+- **`setAnchorFromPivot(frame, sliceName?)`** reads the pivot of an Aseprite slice of the frame —
+  the slices `AsepriteJson.parse()` writes into its data — and takes the **bottom left corner** of
+  the pixel the pivot marks, as a fraction of the untrimmed frame: a figure whose pivot marks the
+  pixel under its feet stands on its position. Without `sliceName` it takes the one slice that has
+  a pivot. A frame without slices, a slice it does not carry or without a pivot, and several slices
+  with a pivot and no name are refused, naming the fix. It allocates nothing.
+- **Animations.** The anchor belongs to the sprite: a sprite of `AnimatedFrames` takes the pivot of
+  one frame of its animation, when the animation starts — an Aseprite canvas keeps the ground where
+  it is from frame to frame.
+- `anchor` is static: mark a change with `touchVO(sprite, 'anchor')`. Under `ShadowPass` the shadow
+  starts at the anchor; `writeText()` writes no anchor (see `docs/text.md`).
 
 ### Frames out of an atlas
 

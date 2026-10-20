@@ -2,6 +2,7 @@ export * from './bindings/lightOf.js';
 export * from './bindings/planeOf.js';
 export type {SpriteUniformSource} from './bindings/SpriteUniformSource.js';
 export * from './defineSprite.js';
+export * from './features/Anchor.js';
 export * from './features/AnimatedFrames.js';
 export * from './features/AtlasFrame.js';
 export * from './features/AxisBillboardPlacement.js';
