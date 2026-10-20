@@ -539,7 +539,8 @@ markers.dispose();
   direction across the axis and the direction towards the camera position, `normalize(cross(axis,
   camera − instancePosition))`; its y goes onto the axis. As for `BillboardPlacement`, the camera
   position is brought into the local space of the mesh, so a mesh may be moved, turned and scaled
-  evenly; under a perspective camera the sprites at the edge of the view turn towards it.
+  evenly; the sprites at the edge of the view turn towards the camera position, under a
+  perspective and an orthographic camera alike.
 - **Straight along the axis** the facing is undefined. Within a sine of 0.1 of the axis — about 6° —
   the right of the quad turns over to the right of the camera, as `LightFacingPlacement` turns over
   within a sine of 0.1 of the normal. A sprite seen exactly along its axis is a line either way.

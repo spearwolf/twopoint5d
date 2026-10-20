@@ -10,6 +10,7 @@ billboards", the table of passes for each placement under "Passes: shadows and r
 - the vertex of the axis billboard is built by an internal module of its own,
   `features/axisBillboardVertex.ts`, so that the public API of `AxisBillboardPlacement.ts` stays the
   factory, its options and the constant (§3.2);
+- `setFlash()` also takes a shorter tuple `[r, g, b]`, which keeps the amount as it is;
 - the glow test draws the stage once without the bloom as well, a control that the sprite alone
   lights nothing beside it (§6.4).
 
