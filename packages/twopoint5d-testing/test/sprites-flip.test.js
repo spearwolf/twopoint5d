@@ -8,12 +8,14 @@ import {
   FlatPlacement,
   Flip,
   FrameBasedAnimations,
+  FrameTable,
   gridBase,
   InstancePosition,
   QuadBase,
   QuadSize,
   ReflectionPass,
   ShadowPass,
+  TableFrame,
   TextureColor,
   TexturePackerJson,
 } from '@spearwolf/twopoint5d';
@@ -42,6 +44,10 @@ const GREEN = [0, 255, 0];
 const flipKindOn = (base) =>
   defineSprite({base, features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Flip]});
 const FlipKind = flipKindOn(QuadBase);
+const TableFlipKind = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, TableFrame, TextureColor, Flip],
+});
 const AnimatedFlipKind = defineSprite({
   base: QuadBase,
   features: [InstancePosition, FlatPlacement, QuadSize, AnimatedFrames, TextureColor, Flip],
@@ -188,6 +194,36 @@ describe('sprites — Flip', function () {
 
     expectSameCells(cellColors(pixels, TARGET_SIZE, PPU, topDown, -5, 0, 5, 4), mirroredX(REFERENCE), 'on the quad');
     expectSameCells(cellColors(pixels, TARGET_SIZE, PPU, topDown, 5, 0, 5, 4), mirroredX(REFERENCE), 'on the grid');
+  });
+
+  it('mirrors the frame tableFrame() picks, a trimmed and a turned trimmed one', async function () {
+    const PPU = 3;
+    const {texture, json} = makeTrimmedSheet();
+    const [atlas] = TexturePackerJson.parse(json);
+    const frameTable = FrameTable.fromAtlas(atlas, ['reference', 'trimmed', 'trimmed-turned']).bakeDataTexture();
+    const sprites = new FeatureSprites(TableFlipKind, {capacity: 3, textures: {colorMap: texture, frameTable}});
+    const places = [-6, 0, 6];
+    places.forEach((x, index) => {
+      const sprite = sprites.createSprite();
+      sprite.setSize(5, 4);
+      sprite.setPosition(x, 0, 0);
+      sprite.frameIndex = index;
+      sprite.flipX = 1;
+    });
+
+    const topDown = await readsTopDown(display.renderer, target);
+    const pixels = await render([sprites], makeCamera(PPU));
+    sprites.dispose();
+    texture.dispose();
+    frameTable.dispose();
+
+    for (const [index, x] of places.entries()) {
+      expectSameCells(
+        cellColors(pixels, TARGET_SIZE, PPU, topDown, x, 0, 5, 4),
+        mirroredX(REFERENCE),
+        `frame ${index} of the table`,
+      );
+    }
   });
 
   describe('in the passes', () => {
