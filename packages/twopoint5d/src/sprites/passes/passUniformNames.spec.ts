@@ -25,8 +25,10 @@ const probe = defineFeature({
   uniforms: {a: 1, b: [0, 1]},
   textures: {map: {}},
   frame: (ctx) => ({texCoords: read(ctx, 'a', 'b', 'c') as unknown as Node<'vec4'>}),
+  frameStage: {order: 5, transform: (_frame, ctx) => ({texCoords: read(ctx, 'b', 'a') as unknown as Node<'vec4'>})},
   local: {order: 1, transform: (input, ctx) => read(ctx, 'a', 'c') as unknown as typeof input},
   mesh: {order: 2, transform: (input, ctx) => read(ctx, 'b') as unknown as typeof input},
+  uv: {order: 4, transform: (input, ctx) => read(ctx, 'c', 'a') as unknown as typeof input},
   colorSource: (_frame, ctx) => read(ctx, 'a') as unknown as Node<'vec4'>,
   color: {order: 3, transform: (input, ctx) => read(ctx, 'a', 'b') as unknown as typeof input},
 });
@@ -73,6 +75,30 @@ describe('stageFeaturesOf()', () => {
     expect(copy!.colorSource!(ctx.frame, ctx)).toEqual(['x']);
     expect(copy!.color!.transform('in' as never, ctx)).toEqual(['x', 'y']);
     expect(copy!.local!.order).toBe(1);
+    expect(copy!.frameStage!.transform(ctx.frame, ctx).texCoords).toEqual(['y', 'x']);
+    expect(copy!.frameStage!.order).toBe(5);
+    expect(copy!.uv!.transform('in' as never, ctx)).toEqual(['c', 'x']);
+    expect(copy!.uv!.order).toBe(4);
+  });
+
+  test('hands the uv of the context on unread: a stage of a renamed copy that does not read it builds no uv', () => {
+    let reads = 0;
+    const lazy = Object.defineProperty({...context()}, 'uv', {
+      enumerable: true,
+      get: () => {
+        reads++;
+        return node('uv');
+      },
+    }) as SpriteShaderContext;
+    const pass = definePass({name: 'p', features: [probe], uniformNames: {a: 'x'}});
+    const [copy] = stageFeaturesOf(pass);
+    const reader = defineFeature({name: 'reader', color: {order: 1, transform: (_input, ctx) => ctx.uv as never}});
+    const [readerCopy] = stageFeaturesOf(definePass({name: 'q', features: [reader, probe], uniformNames: {a: 'x'}}));
+
+    copy!.color!.transform('in' as never, lazy);
+    expect(reads).toBe(0);
+    expect(readerCopy!.color!.transform('in' as never, lazy)).toBe('uv');
+    expect(reads).toBe(1);
   });
 
   test('leaves a feature without stages and uniforms alone but for the copy', () => {
@@ -82,6 +108,8 @@ describe('stageFeaturesOf()', () => {
 
     expect(copy!.uniforms).toEqual({x: 1});
     expect(copy!.frame).toBeUndefined();
+    expect(copy!.frameStage).toBeUndefined();
+    expect(copy!.uv).toBeUndefined();
     expect(copy!.color).toBeUndefined();
     expect(plainCopy!.uniforms).toBeUndefined();
     expect(originOf(plainCopy!)).toBe(plain);

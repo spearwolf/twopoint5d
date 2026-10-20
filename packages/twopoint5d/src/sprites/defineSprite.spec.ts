@@ -291,7 +291,7 @@ describe('defineSprite()', () => {
       const bad = defineFeature({name: 'bad', uniforms: {light: [1, 2, 3, 4, 5] as unknown as number}});
 
       expect(() => defineSprite({base: QuadBase, features: [position, flat, bad]})).toThrow(
-        'defineSprite: feature "bad" starts the uniform "light" with 1,2,3,4,5; a uniform takes a number or 2 to 4 numbers',
+        'defineSprite: feature "bad" starts the uniform "light" with [1,2,3,4,5]; a uniform takes a number, 2 to 4 numbers, or {value, shared}',
       );
     });
 
@@ -342,5 +342,44 @@ describe('defineSprite()', () => {
     const kind = defineSprite({base: QuadBase, features});
 
     expect(kind.features).toHaveLength(2);
+  });
+
+  describe('checkKind', () => {
+    test('is called once with the base and the features of the kind, after the other checks', () => {
+      const seen: {base: SpriteBase; names: string[]}[] = [];
+      const watcher = defineFeature({
+        name: 'watcher',
+        checkKind: ({base, features}) => {
+          seen.push({base, names: features.map(({name}) => name)});
+        },
+      });
+
+      defineSprite({base: QuadBase, features: [position, flat, watcher]});
+      expect(seen).toEqual([{base: QuadBase, names: ['instancePosition', 'flat', 'watcher']}]);
+
+      expect(() => defineSprite({base: QuadBase, features: [watcher]})).toThrow(/no feature contributes a placement stage/);
+      expect(seen).toHaveLength(1);
+    });
+
+    test('a throw is refused naming the feature, its message kept and the error as the cause', () => {
+      const cause = new Error('needs the base gridBase({columns: 3, rows: 3}) — build the kind on it');
+      const picky = defineFeature({
+        name: 'picky',
+        checkKind: () => {
+          throw cause;
+        },
+      });
+
+      let error: Error | undefined;
+      try {
+        defineSprite({base: QuadBase, features: [position, flat, picky]});
+      } catch (thrown) {
+        error = thrown as Error;
+      }
+      expect(error?.message).toBe(
+        'defineSprite: feature "picky": needs the base gridBase({columns: 3, rows: 3}) — build the kind on it',
+      );
+      expect(error?.cause).toBe(cause);
+    });
   });
 });

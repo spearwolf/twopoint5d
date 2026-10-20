@@ -1,8 +1,12 @@
 # Proposal: what comes after the feature sprites — a review of the board lists "sprites" and "texture-mapping"
 
-Status: **phase A implemented** — `Fade`, `Flash`, `axisBillboardPlacement()`, the warning of a
-full pool, the free-tex-packer fixture and the glow recipe; see
-[`fade-flash-axis-billboards.md`](fade-flash-axis-billboards.md). **Phase F, part 1
+Status: **phases A, B and C implemented** — phase A: `Fade`, `Flash`,
+`axisBillboardPlacement()`, the warning of a full pool, the free-tex-packer fixture and the glow
+recipe, see [`fade-flash-axis-billboards.md`](fade-flash-axis-billboards.md); phase B: playback
+modes, per-frame durations and `AsepriteJson`, see
+[`animation-playback-and-aseprite.md`](animation-playback-and-aseprite.md); phase C: frame stages,
+uv stages, `gridBase()` and shared uniforms, see
+[`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md). **Phase F, part 1
 implemented** — sorting a pool, `sortBy()` and `sortByViewDepth()` of the sprites (§4.15, and the
 answer to §7 question 5); see [`pool-sorting.md`](pool-sorting.md). The rest is an idea, nothing
 scheduled. A review, not a build plan: it checks the open cards of the

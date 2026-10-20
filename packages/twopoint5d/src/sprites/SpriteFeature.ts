@@ -1,5 +1,6 @@
 import type {Node} from 'three/webgpu';
 import type {VertexAttributesType} from '../vertex-objects/types.js';
+import type {SpriteBase} from './SpriteBase.js';
 
 /** What the frame slot answers. Where no feature fills the slot, the material uses the defaults named here. */
 export interface SpriteFrameNodes {
@@ -11,7 +12,10 @@ export interface SpriteFrameNodes {
   readonly trim?: Node<'vec4'>;
 }
 
-/** What a frame stage reads through; the other stages get {@link SpriteShaderContext}, which adds the frame. */
+/**
+ * What the frame slot and a frame stage read through; the other stages get
+ * {@link SpriteShaderContext}, which adds the frame and the uv.
+ */
 export interface SpriteFrameContext {
   /**
    * An instance or base attribute of the sprite kind, by the name it has on the geometry. The
@@ -25,19 +29,49 @@ export interface SpriteFrameContext {
    * it hands out here and gives it a new texture of the same kind without a rebuild.
    */
   sample(name: string, uv: Node<'vec2'>): Node<'vec4'>;
-  /** The measures of the image of a texture the calling feature declares, in texels; kept current by the material. */
+  /**
+   * The measures, in texels, of a texture any feature of the material declares — the calling
+   * feature's own or another's. For a set texture it is the size of the texture the shader binds,
+   * read on the gpu: it follows an image that arrives or changes after the texture was set, and a
+   * texture of the same kind swapped in without a rebuild. For a texture declared with `needsImage`
+   * it is a uniform the material keeps current, re-read by `touchTexture(name)`. A texture of another
+   * feature that is unset answers `(0, 0)`, and the stage does not wait for it; setting it builds the
+   * graph anew.
+   */
   textureSize(name: string): Node<'vec2'>;
 }
 
 export interface SpriteShaderContext extends SpriteFrameContext {
-  /** The frame of the sprite, built once per graph and read by the vertex and the fragment pipeline. */
+  /**
+   * The frame of the sprite after every frame stage, built once per graph generation and read by
+   * the vertex and the fragment pipeline.
+   */
   readonly frame: SpriteFrameNodes;
+  /**
+   * The uv the color source samples at: the base `uv` after every uv stage — `(0, 0)` the top left
+   * of the frame as drawn, `(1, 1)` its bottom right. Built once per graph, the first time a stage
+   * reads it; a graph that never reads it builds no uv stage. In a uv stage it is the uv so far, the
+   * stage's own input. `attribute('uv')` stays the base uv, where the vertex lies on the base.
+   *
+   * It is evaluated where its reader uses it: a color source that hands it to `frameUv()`, as
+   * `TextureColor` does, works it out per vertex and interpolates it across each triangle; one that
+   * reads it in its own fragment graph works it out per fragment.
+   */
+  readonly uv: Node<'vec2'>;
 }
 
 export interface SpriteStage<T extends string> {
   /** Where in its slot this stage runs; lower runs first, a tie keeps the order of the feature list. */
   readonly order: number;
   transform(input: Node<T>, ctx: SpriteShaderContext): Node<T>;
+}
+
+/** A stage on the frame: after the frame slot, before the trim shift and both pipelines read the frame. */
+export interface SpriteFrameStage {
+  /** Where among the frame stages this one runs; lower runs first, a tie keeps the order of the feature list. */
+  readonly order: number;
+  /** Answers the whole frame; a stage with no business with `flipDiagonal` or `trim` passes them on. */
+  transform(frame: SpriteFrameNodes, ctx: SpriteFrameContext): SpriteFrameNodes;
 }
 
 export interface SpriteTextureDeclaration {
@@ -54,6 +88,17 @@ export type SpriteUniformValue =
   | readonly [number, number]
   | readonly [number, number, number]
   | readonly [number, number, number, number];
+
+/**
+ * A uniform declared with options. `shared: true` lets several features declare the same name: the
+ * features that declare it shared hold one uniform, as long as they declare it with the same type
+ * and start value. Without it a second feature that declares the name is refused.
+ */
+export interface SpriteUniformDeclaration {
+  readonly value: SpriteUniformValue;
+  /** Whether other features may declare the same uniform, shared as well. Default `false`. */
+  readonly shared?: boolean;
+}
 
 /**
  * A method of the sprite handle. Declared through a method signature so that a feature of a
@@ -76,29 +121,55 @@ export interface SpriteFeature<Api extends object = object> {
   readonly methods?: Readonly<Record<string, SpriteMethod<Api>>>;
   /** Writes the neutral values into a slot `createVO()` hands out — slots come back with old data in them. */
   initialize?(this: Api): void;
-  /** Uniforms the material holds for this feature, with their start values. */
-  readonly uniforms?: Readonly<Record<string, SpriteUniformValue>>;
+  /**
+   * Uniforms the material holds for this feature, with their start values — or, as `{value, shared:
+   * true}`, a uniform other features may declare as well, shared alike.
+   */
+  readonly uniforms?: Readonly<Record<string, SpriteUniformValue | SpriteUniformDeclaration>>;
   /** Textures the material holds for this feature. They stay the caller's. */
   readonly textures?: Readonly<Record<string, SpriteTextureDeclaration>>;
   /** The frame slot: at most one feature of a kind. */
   readonly frame?: (ctx: SpriteFrameContext) => SpriteFrameNodes;
+  /** A stage on the frame, after the frame slot and before the trim shift and both pipelines read it. */
+  readonly frameStage?: SpriteFrameStage;
   /** A stage in the local quad space, after the trim shift and before the placement. */
   readonly local?: SpriteStage<'vec3'>;
   /** Maps the local vertex into the local space of the mesh: exactly one feature of a kind. */
   readonly placement?: (local: Node<'vec3'>, ctx: SpriteShaderContext) => Node<'vec3'>;
   /** A stage after the placement, in the local space of the mesh — the slot of shadows and mirrors. */
   readonly mesh?: SpriteStage<'vec3'>;
+  /**
+   * A stage on the uv the color source samples at — `ctx.uv` — before any stage reads it. It is
+   * evaluated where the color source uses the uv: `TextureColor` hands it to `frameUv()`, per vertex,
+   * so under it a uv stage must be affine within each triangle; a color source that does not use
+   * `frameUv()` evaluates it per fragment.
+   */
+  readonly uv?: SpriteStage<'vec2'>;
   /** The color before the color stages: at most one feature of a kind; without one the sprite is flat grey. */
   readonly colorSource?: (frame: SpriteFrameNodes, ctx: SpriteShaderContext) => Node<'vec4'>;
   /** A stage on the color, after the color source. */
   readonly color?: SpriteStage<'vec4'>;
   /** Other features, by name, that have to be part of the same sprite kind. */
   readonly requires?: readonly string[];
+  /**
+   * Checks the kind the feature is part of: once when `defineSprite()` merges it, after every check
+   * of its own; when a pass that brings the feature is folded into a kind, with the features the pass
+   * draws with; and when the feature, a placement, stands in for another on a live material. Throws
+   * for a kind the feature cannot work in, with a message that names the fix — the caller adds the
+   * name of the feature.
+   */
+  readonly checkKind?: (kind: SpriteKindShape) => void;
   /** Carries `Api` for the type of the sprite handle; never set at runtime. */
   readonly __api?: Api;
 }
 
-const STAGE_SLOTS = ['local', 'mesh', 'color'] as const;
+/** What {@link SpriteFeature.checkKind} is shown of a kind: its base and its features. */
+export interface SpriteKindShape {
+  readonly base: SpriteBase;
+  readonly features: readonly SpriteFeature[];
+}
+
+const STAGE_SLOTS = ['frameStage', 'local', 'mesh', 'uv', 'color'] as const;
 
 /**
  * Checks a feature on its own and freezes it. What can only be checked against the other
@@ -116,6 +187,9 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
       );
     }
   }
+  if (feature.checkKind != null && typeof feature.checkKind !== 'function') {
+    throw new TypeError(`defineFeature: the checkKind of feature "${feature.name}" is no function`);
+  }
   if (feature.requires?.includes(feature.name)) {
     throw new TypeError(`defineFeature: feature "${feature.name}" requires itself`);
   }
@@ -124,6 +198,15 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
 
 /** The order bands of the local stages; the gaps take stages of your own. */
 export const LocalOrder = Object.freeze({Anchor: 100, Flip: 150, Scale: 200, Shear: 300, Rotate: 400} as const);
+
+/**
+ * The order bands of the frame stages. `Flip` mirrors the frame — `LocalOrder.Flip` is for a stage
+ * of one's own that mirrors the geometry itself, which turns its triangles over.
+ */
+export const FrameOrder = Object.freeze({Flip: 100} as const);
+
+/** The order bands of the uv stages. `Slice` moves the inner grid lines of a nine-slice. */
+export const UvOrder = Object.freeze({Slice: 100} as const);
 
 /** The order bands of the mesh stages. */
 export const MeshOrder = Object.freeze({Offset: 100, Project: 200, Mirror: 300} as const);

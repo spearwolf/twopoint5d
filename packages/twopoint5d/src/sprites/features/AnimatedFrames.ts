@@ -29,12 +29,14 @@ export interface AnimatedFramesApi {
  * of the animation says, at one duration or at the per-frame durations of its frames. A frame
  * texel holds the tex coords; a second texel, where there is one, the diagonal flip and the end
  * time; a third the trim margins. Until the animsMap has an image the sprite shows the whole color
- * map.
+ * map. `time` is declared shared: another feature that declares `{value: 0, shared: true}` reads the
+ * same uniform.
  */
 export const AnimatedFrames = defineFeature<AnimatedFramesApi>({
   name: 'animatedFrames',
   attributes: {anim: {components: ['animId', 'animOffset']}},
-  uniforms: {time: 0},
+  // shared: a wave, a bob or a particle of another feature reads the same time
+  uniforms: {time: {value: 0, shared: true}},
   textures: {animsMap: {needsImage: true}},
   initialize() {
     this.animId = 0;

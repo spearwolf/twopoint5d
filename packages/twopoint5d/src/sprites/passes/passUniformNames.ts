@@ -26,11 +26,14 @@ export const sourceNameOf = (feature: SpriteFeature, name: string): string =>
   originOfCopy.get(feature)?.sources.get(name) ?? name;
 
 function renamedCopy(feature: SpriteFeature, names: Readonly<Record<string, string>>): SpriteFeature {
-  const rename = <C extends SpriteFrameContext>(ctx: C): C => ({
-    ...ctx,
-    uniform: (name: string) => ctx.uniform(renamed(names, name)),
-  });
-  const {frame, local, placement, mesh, color, colorSource, uniforms} = feature;
+  // the descriptors and not a spread: a spread would read the getter `uv` of a shader context and
+  // build the uv stages for a stage that never reads them
+  const rename = <C extends SpriteFrameContext>(ctx: C): C =>
+    Object.defineProperties({} as C, {
+      ...Object.getOwnPropertyDescriptors(ctx),
+      uniform: {enumerable: true, value: (name: string) => ctx.uniform(renamed(names, name))},
+    });
+  const {frame, frameStage, local, placement, mesh, uv, color, colorSource, uniforms} = feature;
   const sources = new Map<string, string>();
   for (const name of Object.keys(uniforms ?? {})) sources.set(renamed(names, name), name);
   const copy: SpriteFeature = Object.freeze({
@@ -39,9 +42,13 @@ function renamedCopy(feature: SpriteFeature, names: Readonly<Record<string, stri
       uniforms: Object.freeze(Object.fromEntries(Object.entries(uniforms).map(([name, value]) => [renamed(names, name), value]))),
     }),
     ...(frame != null && {frame: (ctx: SpriteFrameContext) => frame(rename(ctx))}),
+    ...(frameStage != null && {
+      frameStage: {order: frameStage.order, transform: (input, ctx) => frameStage.transform(input, rename(ctx))},
+    }),
     ...(local != null && {local: {order: local.order, transform: (input, ctx) => local.transform(input, rename(ctx))}}),
     ...(placement != null && {placement: (input, ctx) => placement(input, rename(ctx))}),
     ...(mesh != null && {mesh: {order: mesh.order, transform: (input, ctx) => mesh.transform(input, rename(ctx))}}),
+    ...(uv != null && {uv: {order: uv.order, transform: (input, ctx) => uv.transform(input, rename(ctx))}}),
     ...(color != null && {color: {order: color.order, transform: (input, ctx) => color.transform(input, rename(ctx))}}),
     ...(colorSource != null && {colorSource: (frame, ctx) => colorSource(frame, rename(ctx))}),
   } as SpriteFeature);

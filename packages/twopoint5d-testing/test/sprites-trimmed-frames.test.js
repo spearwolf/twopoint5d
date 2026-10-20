@@ -10,7 +10,7 @@ import {
   TexturePackerJson,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {disposeDisplay, isNearColor, makeContainer, makeTrimmedSheet, renderToPixels, rgbAt} from './helpers/fixtures.js';
 
 // 16 world units across 64 pixels: one unit is 4 pixels
 const TARGET_SIZE = 64;
@@ -20,55 +20,13 @@ const CENTER = TARGET_SIZE / 2;
 const RED = [255, 0, 0, 255];
 const GREEN = [0, 255, 0, 255];
 
-// the untrimmed sprite is 5 × 4 texels, drawn one unit per texel
+// the untrimmed sprite of makeTrimmedSheet() is 5 × 4 texels, drawn one unit per texel
 const SPRITE_WIDTH = 5;
 const SPRITE_HEIGHT = 4;
 
 // the reference and the candidate stand side by side
 const REFERENCE_X = -4;
 const CANDIDATE_X = 4;
-
-/**
- * A sheet of 8 × 4 texels and its TexturePacker json. The frame `reference` is the untrimmed sprite,
- * 5 × 4 texels at `(0, 0)` with a red texel at `(1, 2)` and a green one at `(2, 2)` and nothing else.
- * The frame `trimmed` is the same sprite with its transparent border cut off: the red and the green
- * texel, 2 × 1 at `(5, 0)`. The frame `trimmed-turned` is `trimmed` laid into the sheet turned by 90°
- * clockwise, the way TexturePacker does it — 1 × 2 at `(7, 0)`, red above green.
- *
- * Both trimmed frames lie at `(1, 2)` in a sprite of 5 × 4, which makes their margins
- * `[0.2, 0.5, 0.4, 0.25]`: four different values, so that a mix-up of two sides shows.
- */
-function makeTrimmedSheet() {
-  const width = 8;
-  const height = 4;
-  const texels = Array.from({length: width * height}, () => [0, 0, 0, 0]);
-  const put = (x, y, color) => {
-    texels[y * width + x] = color;
-  };
-
-  put(1, 2, RED);
-  put(2, 2, GREEN);
-
-  put(5, 0, RED);
-  put(6, 0, GREEN);
-
-  put(7, 0, RED);
-  put(7, 1, GREEN);
-
-  const trim = {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: SPRITE_WIDTH, h: SPRITE_HEIGHT}};
-
-  return {
-    texture: makeColorTexture(texels, width, height),
-    json: {
-      frames: {
-        reference: {frame: {x: 0, y: 0, w: SPRITE_WIDTH, h: SPRITE_HEIGHT}},
-        trimmed: {frame: {x: 5, y: 0, w: 2, h: 1}, ...trim},
-        'trimmed-turned': {frame: {x: 7, y: 0, w: 2, h: 1}, rotated: true, ...trim},
-      },
-      meta: {image: 'sheet.png', size: {w: width, h: height}},
-    },
-  };
-}
 
 /**
  * The colors at the middles of the 20 cells of the sprite whose middle is at `spriteX`, each read

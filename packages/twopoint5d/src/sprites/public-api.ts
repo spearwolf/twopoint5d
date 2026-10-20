@@ -21,6 +21,7 @@ export * from './FeatureSprites/FeatureSprites.js';
 export * from './FeatureSprites/FeatureSpritesGeometry.js';
 export * from './FeatureSprites/FeatureSpritesMaterial.js';
 export * from './FeatureSprites/SpriteResources.js';
+export * from './GridBase.js';
 export * from './node-utils.js';
 export * from './passes/Darken.js';
 export * from './passes/definePass.js';

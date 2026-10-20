@@ -1,6 +1,6 @@
 import {describe, expect, expectTypeOf, test} from 'vitest';
 
-import {ColorOrder, defineFeature, LocalOrder, MeshOrder, type SpriteFeature} from './SpriteFeature.js';
+import {ColorOrder, defineFeature, FrameOrder, LocalOrder, MeshOrder, type SpriteFeature, UvOrder} from './SpriteFeature.js';
 
 describe('defineFeature()', () => {
   test('answers the feature it is given, frozen', () => {
@@ -15,12 +15,18 @@ describe('defineFeature()', () => {
     expect(() => defineFeature({name: ''})).toThrow('defineFeature: a feature needs a name');
   });
 
-  test.each(['local', 'mesh', 'color'] as const)('refuses a %s stage without a finite order', (slot) => {
+  test.each(['frameStage', 'local', 'mesh', 'uv', 'color'] as const)('refuses a %s stage without a finite order', (slot) => {
     const feature = {name: 'odd', [slot]: {order: Number.NaN, transform: (input: unknown) => input}} as unknown as SpriteFeature;
 
     expect(() => defineFeature(feature)).toThrow(
       `defineFeature: the ${slot} stage of feature "odd" needs a finite order, got NaN`,
     );
+  });
+
+  test('refuses a checkKind that is no function', () => {
+    const feature = {name: 'odd', checkKind: 'grid'} as unknown as SpriteFeature;
+
+    expect(() => defineFeature(feature)).toThrow('defineFeature: the checkKind of feature "odd" is no function');
   });
 
   test('refuses a feature that requires itself', () => {
@@ -57,6 +63,8 @@ describe('the order bands', () => {
     expect(LocalOrder).toEqual({Anchor: 100, Flip: 150, Scale: 200, Shear: 300, Rotate: 400});
     expect(MeshOrder).toEqual({Offset: 100, Project: 200, Mirror: 300});
     expect(ColorOrder).toEqual({Tint: 100, Mask: 150, Fade: 200, Flash: 300, Pass: 1000});
-    expect(Object.isFrozen(LocalOrder) && Object.isFrozen(MeshOrder) && Object.isFrozen(ColorOrder)).toBe(true);
+    expect(FrameOrder).toEqual({Flip: 100});
+    expect(UvOrder).toEqual({Slice: 100});
+    expect([LocalOrder, MeshOrder, ColorOrder, FrameOrder, UvOrder].every((bands) => Object.isFrozen(bands))).toBe(true);
   });
 });

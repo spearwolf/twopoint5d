@@ -1,4 +1,5 @@
 import type {SpriteKind} from '../defineSprite.js';
+import {runCheckKind} from '../runCheckKind.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import type {SpritePass} from './definePass.js';
 import {stageFeaturesOf} from './passUniformNames.js';
@@ -90,7 +91,8 @@ const withoutPlacement = (feature: SpriteFeature): SpriteFeature => {
  * The features a material of `pass` over `kind` is built from: those of the kind, without the
  * ones `without` names, plus those of the pass. A pass that brings a placement draws with it: the
  * placement feature of the kind stays, without its placement stage. Checks the pass on its own
- * first, as `definePass()` does — a plain object passes for a pass — and then against the kind.
+ * first, as `definePass()` does — a plain object passes for a pass — and then against the kind, the
+ * `checkKind` of its features last, with the features it draws with.
  *
  * @internal
  */
@@ -123,5 +125,9 @@ export function passFeatures(kind: SpriteKind, pass: SpritePass, where: string):
   const kept = kind.features
     .filter(({name}) => !without.has(name))
     .map((feature) => (own && feature === kindPlacement ? withoutPlacement(feature) : feature));
-  return Object.freeze([...kept, ...stageFeaturesOf(pass)]);
+  const folded = Object.freeze([...kept, ...stageFeaturesOf(pass)]);
+  for (const feature of pass.features) {
+    runCheckKind(feature, {base: kind.base, features: folded}, `${where}: feature "${feature.name}" of pass "${pass.name}"`);
+  }
+  return folded;
 }

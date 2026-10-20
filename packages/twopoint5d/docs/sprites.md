@@ -21,6 +21,8 @@ kind. A kind is immutable: a sprite with one more feature is a sprite of another
 The **base** is the geometry every sprite of a kind is drawn from. `QuadBase` is the quad of
 four vertices the built-in kinds use: the unit quad `[-0.5, 0.5]²` on the XY plane, centred on the
 pivot, its `uv` running from `(0, 0)` at the top left to `(1, 1)` at the bottom right.
+`gridBase({columns, rows})` cuts that quad into a grid of cells, for a stage that moves grid lines
+or bends the sprite (see "A grid base").
 
 ## The pipeline
 
@@ -29,26 +31,42 @@ rotate-then-scale turns it into a parallelogram — so the order of the stages b
 model, not to the order of the feature list:
 
 ```
-frame:    frame slot (or defaults) ─▶ texCoords, flipDiagonal, trim — read by both pipelines
+frame:    frame slot (or defaults) ─▶ frame stages ─▶ texCoords, flipDiagonal, trim — read by both pipelines
+uv:       base.uv ─▶ uv stages ─▶ ctx.uv — built where a stage reads it, the color source among them
 vertex:   base.position ─▶ trim shift ─▶ local stages ─▶ placement ─▶ mesh stages ─▶ positionNode
-fragment: colorSource(frame) ─▶ color stages ─▶ colorNode
+fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 ```
 
 | slot | per kind | built-in features |
 | --- | --- | --- |
 | `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
+| `frameStage` | any, by `order` | — |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
 | `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
+| `uv` | any, by `order` | — |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
 | `color` | any, by `order` | `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
-The order bands `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear 300, Rotate 400`),
-`MeshOrder` (`Offset 100, Project 200, Mirror 300`) and `ColorOrder` (`Tint 100, Mask 150,
-Fade 200, Flash 300, Pass 1000`) leave room for stages of your own. Two stages of one order run in
-the order of the feature list. `ColorOrder.Pass` is the band of the color stages a pass brings to
-recolor the sprite as a whole — `ShadowMask`, `Darken` — after every color stage of the kind.
+The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Scale 200, Shear
+300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
+and `ColorOrder` (`Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
+your own. Two stages of one order run in the order of the feature list. `ColorOrder.Pass` is the
+band of the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` —
+after every color stage of the kind.
+
+A **frame stage** changes the frame after the frame slot has answered it, and everything that
+reads the frame — the trim shift, every stage, the color source — reads the changed one: a mirror
+of the image (`FrameOrder.Flip`) swaps `s` with `s + u` and the trim margins left with right, for
+every frame feature at once, and leaves the triangles as they are. `LocalOrder.Flip` is the band of
+a local stage that mirrors the geometry itself, which turns its triangles over — such a sprite
+needs `side: DoubleSide`.
+
+A **uv stage** moves where a vertex samples. The color source reads `ctx.uv`, the base `uv` after
+every uv stage; `TextureColor` hands it through a varying, so its uv stages run per vertex and
+their result is interpolated across each triangle — exact for a stage that moves grid lines
+(`UvOrder.Slice`), not for one that bends the uv within a triangle.
 
 The **trim shift** is no feature. A frame a packer trimmed covers only part of the untrimmed
 sprite; the shift moves each corner of the quad to its corner of that part, measured in the unit
@@ -90,6 +108,72 @@ Every kind brings a prototype of its own. One loop over the sprites of more than
 megamorphic and runs about eighteen times slower per sprite (see `docs/architecture.md`, the
 `vertex-objects/` section) — keep a hot loop to the sprites of one kind.
 
+## A grid base
+
+A quad cannot keep its corners when it is stretched, and it cannot bend: a stage moves four
+vertices, and the image between them follows in a straight line. `gridBase({columns, rows})` is the
+same quad cut into `columns × rows` cells — `(columns + 1) × (rows + 1)` vertices, two triangles
+per cell, laid out by the same `make(halfWidth, halfHeight, xOffset, yOffset)` and the same
+`baseArgs` — and a stage can move each grid line on its own: a banner that waves, grass that bends,
+a nine-slice panel whose border keeps its size.
+
+```ts check
+import {
+  AtlasFrame,
+  defineFeature,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  gridBase,
+  InstancePosition,
+  MeshOrder,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import {add, mul, sin, vec3} from 'three/tsl';
+import type {Node} from 'three/webgpu';
+
+// bends the sprite along x: each column line moves up and down by the sine of where it lies
+const Banner = defineFeature({
+  name: 'banner',
+  uniforms: {bend: 0.2},
+  mesh: {
+    order: MeshOrder.Offset,
+    transform: (position, {attribute, uniform}) => {
+      const across = attribute<'vec2'>('uv').x;
+      return add(position, vec3(0, mul(sin(mul(across, Math.PI * 2)), uniform<'float'>('bend')), 0)) as unknown as Node<'vec3'>;
+    },
+  },
+});
+
+const Flag = defineSprite({
+  base: gridBase({columns: 8, rows: 1}),
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Banner],
+});
+
+const flags = new FeatureSprites(Flag, {capacity: 10});
+flags.createSprite()?.setSize(4, 1);
+flags.setUniform('bend', 0.3);
+flags.dispose();
+```
+
+- **The layout.** Vertex `k = j · (columns + 1) + i` lies on the column line `i` and the row line
+  `j`, row by row from the top: its `uv` is `(i / columns, j / rows)` and its position the point of
+  the quad at that uv. The triangles have the winding and the diagonal of the quad's.
+- **The grid line of a vertex** is exact in its uv: `round(uv.x · columns)` is its column line,
+  `round(uv.y · rows)` its row line. A stage reads the base uv through `attribute('uv')` — in every
+  slot, the uv stages' result `ctx.uv` aside.
+- **One base per grid.** `gridBase({columns: 3, rows: 3})` answers the same frozen base every time,
+  named `grid 3x3`, with its `columns` and `rows`: a feature that needs a grid recognizes it by
+  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024; anything else is
+  refused with a `TypeError`.
+- **Everything else works on it unchanged**: the pool, every placement and pass, the trim shift —
+  it moves every vertex by where it lies on the sprite — `AtlasFrame`, `AnimatedFrames` and
+  `TextureColor`. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws.
+- **It costs vertices.** A 3 × 3 grid shades 16 vertices per sprite, an 8 × 1 strip 18, the quad 4.
+  Take the quad unless a stage moves the inside of the sprite; a stage that only moves the whole
+  sprite — or shears it, which keeps its edges straight — works on the quad.
+
 ## Built-in features
 
 | feature | attributes (usage) | sprite handle | slot | a new sprite |
@@ -106,7 +190,7 @@ megamorphic and runs about eighteen times slower per sprite (see `docs/architect
 | `Shear` | `shear` (dynamic) | `shearX`, `shearY`, `setShear()` | local, `Shear` | 0, 0 |
 | `Rotation` | `rotation` (dynamic) | `rotation` | local, `Rotate` | 0 |
 | `AtlasFrame` | `texCoords`, `texFlipDiagonal`, `texTrim` (static), word `texCoords` for all three | `s`, `t`, `u`, `v`, `texFlipDiagonal`, `trimLeft` … `trimBottom`, `setTexCoords()`, `setTexTrim()`, `setFrame()`, `setPreparedFrame()` | frame | all 0 |
-| `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time`; texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
+| `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time` (shared); texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
@@ -1065,32 +1149,66 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   slot comes back with the values of its last sprite, and without `initialize()` a new sprite
   keeps them. It runs for every sprite created, so it allocates nothing.
 - **`uniforms`** — start values by name: a number for a `float`, 2 to 4 numbers for a `vec2` to
-  `vec4`. A name is unique across the kind. Every stage of the kind reads every uniform, through
-  `uniform(name)` of its context.
+  `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0, shared:
+  true}`: the features that declare a name shared, with the same type and start value, hold one
+  uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`, so a
+  wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name, or
+  two shared ones of another type or start value, are refused, naming the fix. Every stage of the
+  kind reads every uniform, through `uniform(name)` of its context.
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
   counts as set only once its image has measures. A name is unique across the kind. The textures
   stay the caller's. Until all of them are set the feature drops out of the graph.
 - **`frame`** — the frame slot, at most one feature per kind: answers `texCoords`, and optionally
   `flipDiagonal` and `trim`, read by both pipelines.
-- **`local`**, **`mesh`**, **`color`** — a stage `{order, transform}` in its slot; `order` is a
-  finite number, lower runs first, and a tie keeps the order of the feature list. `LocalOrder`,
-  `MeshOrder` and `ColorOrder` name the bands.
+- **`frameStage`** — a stage `{order, transform(frame, ctx)}` on the frame, after the frame slot —
+  or the defaults, without a frame feature — and before anything reads it. It answers a whole
+  frame: one with no business with `flipDiagonal` or `trim` passes them on, `{...frame,
+  texCoords}`. Its context is the one of the frame slot, without `frame` and `uv`. The lookup reads
+  `(s + uv.x · u, t + uv.y · v)` before the diagonal swap, so the drawn x is the `s` axis for every
+  frame, a turned atlas frame included, and `trim` holds the margins of the sprite as drawn.
+- **`local`**, **`mesh`**, **`uv`**, **`color`** — a stage `{order, transform}` in its slot;
+  `order` is a finite number, lower runs first, and a tie keeps the order of the feature list.
+  `FrameOrder`, `LocalOrder`, `MeshOrder`, `UvOrder` and `ColorOrder` name the bands. A `uv` stage
+  transforms the `vec2` the color source samples at.
 - **`placement`** — maps the local vertex into the local space of the mesh: exactly one feature of
   a kind, and it declares no textures, since the placement runs always. A pass may bring one in
   place of the kind's — see "Passes: shadows and reflections".
 - **`colorSource`** — the color before the color stages, at most one feature per kind.
 - **`requires`** — names of other features that have to be part of the same kind; never the
   feature's own name.
+- **`checkKind(kind)`** — checks the kind the feature is part of, shown `{base, features}`, and
+  throws for one the feature cannot work in, with a message that names the fix: a stage that needs
+  a grid base refuses the quad, a placement refuses a feature whose stage it cannot follow.
+  `defineSprite()` runs it last, once every other check has passed, and refuses the kind as
+  `defineSprite: feature "name": <message>`; a pass runs the checks of its features against the
+  features it draws with, and a placement that stands in on a live material runs its own against
+  the kind with itself in place of the kind's placement.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
-`uniform(name)` for a uniform any feature of the kind declares, and `sample(name, uv)` and
-`textureSize(name)` for a texture the feature declares itself. The material throws, naming the
-feature, for any other name.
+`uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
+the feature declares itself, and `textureSize(name)` for a texture any feature of the material
+declares. The material throws, naming the feature, for any other name. `textureSize()` of a set
+texture is the size of the texture the shader binds, read on the gpu — it follows an image that a
+loader fills in after `setTexture()`, and a texture of the same kind swapped in without a rebuild;
+for a texture declared with `needsImage` it is a uniform, re-read by `touchTexture(name)`. The size
+of a texture of another feature — the `colorMap` of the color source, to know a frame in texels — is
+`(0, 0)` while that texture is unset, and the stage does not wait for it: a stage that divides by it
+takes `max(size, 1)`. Every stage after the frame slot gets `frame`, the frame after the
+frame stages, and `uv`, the uv after the uv stages — built the first time a stage of a graph reads
+it, so a graph that never reads it builds no uv stage; in a uv stage `uv` is the stage's own input.
+`attribute('uv')` stays the base uv, where the vertex lies on the base.
+
+`sample()` builds its lookup when the graph is built, and the material keeps the node to hand it
+a new texture of the same kind. A lookup made inside a TSL `Fn`, `If` or `Loop` callback, which
+three runs while it compiles the shader, escapes it: build every lookup in the stage itself, and
+unroll a loop over lookups in JavaScript, as `AnimatedFrames` unrolls its search.
 
 A feature that brings nothing but a stage reads what other features hold, and says so with
 `requires`: `defineSprite()` then refuses a kind without them, naming both features, instead of
 the material failing on a missing attribute or uniform. This one lets sprites bob up and down,
-reading the `instancePosition` of `InstancePosition` and the `time` uniform of `AnimatedFrames`:
+reading the `instancePosition` of `InstancePosition`, and declares the `time` it reads shared: in a
+kind with `AnimatedFrames` it reads the time of the animations, in a kind without it a time of its
+own — either way one `setUniform('time', t)` drives it:
 
 ```ts check
 import {defineFeature, MeshOrder} from '@spearwolf/twopoint5d';
@@ -1099,13 +1217,51 @@ import type {Node} from 'three/webgpu';
 
 export const Bob = defineFeature({
   name: 'bob',
-  requires: ['instancePosition', 'animatedFrames'],
+  requires: ['instancePosition'],
+  uniforms: {time: {value: 0, shared: true}},
   mesh: {
     order: MeshOrder.Offset,
     transform: (position, {attribute, uniform}) => {
       const phase = add(uniform<'float'>('time'), attribute<'vec3'>('instancePosition').x);
       return add(position, vec3(0, sin(phase), 0)) as unknown as Node<'vec3'>;
     },
+  },
+});
+```
+
+A frame stage and a uv stage, both worth a few lines. `StripStep` shows the frame `step` places to
+the right of the sprite's own frame in a strip of frames of one size — a digit of a counter, a tile
+of a row — by moving `s` by `step · u`, so it works on every frame feature. `Zoom` scales the uv
+about the middle of the frame by `zoom`, a magnifier over the sprite's image — 0.5 shows the
+middle half at twice its size; it is affine, so the per-vertex uv of `TextureColor` stays exact:
+
+```ts check
+import {defineFeature, FrameOrder, UvOrder} from '@spearwolf/twopoint5d';
+import {add, mul, sub, vec4} from 'three/tsl';
+import type {Node} from 'three/webgpu';
+
+export const StripStep = defineFeature<{step: number}>({
+  name: 'stripStep',
+  attributes: {step: {size: 1}},
+  initialize() {
+    this.step = 0;
+  },
+  frameStage: {
+    order: FrameOrder.Flip - 50,
+    transform: (frame, {attribute}) => {
+      const {texCoords} = frame;
+      const s = add(texCoords.x, mul(attribute<'float'>('step'), texCoords.z));
+      return {...frame, texCoords: vec4(s, texCoords.y, texCoords.z, texCoords.w) as unknown as Node<'vec4'>};
+    },
+  },
+});
+
+export const Zoom = defineFeature({
+  name: 'zoom',
+  uniforms: {zoom: 1},
+  uv: {
+    order: UvOrder.Slice + 100,
+    transform: (uv, {uniform}) => add(0.5, mul(sub(uv, 0.5), uniform<'float'>('zoom'))) as unknown as Node<'vec2'>,
   },
 });
 ```

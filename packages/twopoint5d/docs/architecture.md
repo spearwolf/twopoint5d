@@ -155,12 +155,15 @@ cheat-sheet, including render-target ownership, is
 ### `sprites/`
 
 Sprites are defined as kinds made of features. `defineSprite()` merges a base — `QuadBase`,
-the quad every built-in kind is drawn from — and a list of features (`InstancePosition`,
+the quad every built-in kind is drawn from, or `gridBase({columns, rows})`, the quad cut into
+cells for stages that move grid lines or bend — and a list of features (`InstancePosition`,
 `QuadSize`, `Rotation`, `AtlasFrame`, `Tint` and the others) into a sprite kind: one merged
 instanced vertex-object description, so one pool and one sprite handle per kind, and the
-pipeline the features' shader stages form — a frame slot, the trim shift, local stages,
-exactly one placement and mesh stages on the vertex side, a color source and color stages on
-the fragment side, each slot sorted by `order`. `FeatureSpritesGeometry` holds the sprites of
+pipeline the features' shader stages form — a frame slot and frame stages read by both sides,
+the trim shift, local stages, exactly one placement and mesh stages on the vertex side, uv
+stages, a color source and color stages on the fragment side, each slot sorted by `order`. A
+feature may check the kind it is part of (`checkKind`), and features that declare a uniform
+shared hold one. `FeatureSpritesGeometry` holds the sprites of
 a kind, `FeatureSpritesMaterial` folds its pipeline into the `positionNode` and `colorNode` of
 a `NodeMaterial` built with TSL (`three/tsl`), and `SpriteResources` holds the uniforms and
 textures the features declare, shareable between materials. `FeatureSprites` is the mesh: it

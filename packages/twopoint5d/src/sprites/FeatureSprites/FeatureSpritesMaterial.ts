@@ -8,11 +8,12 @@ import {
   SignalGroup,
   type SignalReader,
 } from '@spearwolf/signalize';
-import {add, attribute, float, mul, sub, texture, vec3, vec4} from 'three/tsl';
+import {add, attribute, float, mul, sub, texture, textureSize as textureSizeOf, vec2, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
+import {runCheckKind} from '../runCheckKind.js';
 import type {
   SpriteFeature,
   SpriteFrameContext,
@@ -53,12 +54,14 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
 
 type TextureNode = ReturnType<typeof texture>;
 type GraphScope = 'frame' | 'position' | 'color';
+// the graphs whose stages read ctx.uv
+type StageScope = 'position' | 'color';
 const SCOPES: readonly GraphScope[] = ['frame', 'position', 'color'];
 
 const WHERE = 'FeatureSpritesMaterial';
 
 // the fields a placement may carry to stand in for another on a live material
-const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'placement']);
+const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'checkKind', 'placement']);
 
 const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1) as unknown as Node<'vec4'>});
 
@@ -92,6 +95,8 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   readonly #ownsResources: boolean;
   readonly #placement: Signal<SpriteFeature>;
   readonly #samples: Record<GraphScope, {name: string; node: TextureNode}[]> = {frame: [], position: [], color: []};
+  // ctx.uv of the graph being built, built by the first stage that reads it
+  readonly #uv: Record<StageScope, Node<'vec2'> | undefined> = {position: undefined, color: undefined};
   readonly #frame: SignalReader<SpriteFrameNodes>;
   readonly #positionEffect: Effect;
   readonly #colorEffect: Effect;
@@ -152,14 +157,17 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
       this.setValues(materialParameters);
 
       // the frame is built once per graph generation and read by both effects below: a change of the
-      // shape of a texture of the frame feature rebuilds each of them once
+      // shape of a texture of the frame feature or of a frame stage rebuilds each of them once
       this.#frame = createMemo(
         () => {
           this.#samples.frame.length = 0;
           const feature = this.#pipeline.frame;
-          return feature != null && this.#isActive(feature)
-            ? feature.frame!(this.#frameContext(feature, 'frame'))
-            : defaultFrame();
+          let frame =
+            feature != null && this.#isActive(feature) ? feature.frame!(this.#frameContext(feature, 'frame')) : defaultFrame();
+          for (const stage of this.#pipeline.frameStage) {
+            if (this.#isActive(stage)) frame = stage.frameStage!.transform(frame, this.#frameContext(stage, 'frame'));
+          }
+          return frame;
         },
         {attach: this},
       );
@@ -169,6 +177,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
           const frame = this.#frame();
           const placementFeature = this.#placement.get();
           this.#samples.position.length = 0;
+          this.#uv.position = undefined;
 
           let position = attribute<'vec3'>('position') as unknown as Node<'vec3'>;
           if (frame.trim != null) position = trimShift(position, attribute<'vec2'>('uv') as unknown as Node<'vec2'>, frame.trim);
@@ -192,6 +201,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         () => {
           const frame = this.#frame();
           this.#samples.color.length = 0;
+          this.#uv.color = undefined;
 
           const source = this.#pipeline.colorSource;
           let color =
@@ -266,15 +276,47 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         this.#samples[scope].push({name: textureName, node});
         return node as unknown as Node<'vec4'>;
       },
+      // the size of a texture of another feature as well: a stage that reads it does not wait for it
       textureSize: (textureName) => {
-        ownTexture(textureName);
-        return this.resources.textureSize(textureName) as unknown as Node<'vec2'>;
+        const declaring = this.#features.find(({textures}) => textures != null && Object.hasOwn(textures, textureName));
+        if (declaring == null) {
+          throw new Error(`${where} reads the size of the texture "${textureName}", which no feature of these sprites declares`);
+        }
+        // a texture that needs its image counts as set once the image has measures, which the uniform
+        // holds; and the uniform is (0, 0) for a texture of another feature that is unset — a tracked
+        // read of its shape, so that setting it builds the graph anew
+        if (declaring.textures![textureName]!.needsImage === true || this.resources.shapeOf(textureName) === undefined) {
+          return this.resources.textureSize(textureName) as unknown as Node<'vec2'>;
+        }
+        // the size of the texture the shader binds, read on the gpu: it follows an image that arrives
+        // or changes after the texture was set, and a texture of the same kind through the value effect
+        const node = texture(this.resources.peekTexture(textureName)!);
+        this.#samples[scope].push({name: textureName, node});
+        // a uvec2, which vec2() converts
+        return vec2(textureSizeOf(node) as unknown as Node<'vec2'>) as unknown as Node<'vec2'>;
       },
     };
   }
 
-  #shaderContext(feature: SpriteFeature, scope: GraphScope, frame: SpriteFrameNodes): SpriteShaderContext {
-    return {...this.#frameContext(feature, scope), frame};
+  #shaderContext(feature: SpriteFeature, scope: StageScope, frame: SpriteFrameNodes): SpriteShaderContext {
+    return Object.defineProperty({...this.#frameContext(feature, scope), frame}, 'uv', {
+      enumerable: true,
+      get: () => this.#uvOf(scope, frame),
+    }) as SpriteShaderContext;
+  }
+
+  // the base uv after every active uv stage, built once per graph: a tracked read of the textures of
+  // the uv stages, in the effect of the graph that reads it first
+  #uvOf(scope: StageScope, frame: SpriteFrameNodes): Node<'vec2'> {
+    let uv = this.#uv[scope];
+    if (uv == null) {
+      uv = attribute<'vec2'>('uv') as unknown as Node<'vec2'>;
+      for (const feature of this.#pipeline.uv) {
+        if (this.#isActive(feature)) uv = feature.uv!.transform(uv, {...this.#frameContext(feature, scope), frame, uv});
+      }
+      this.#uv[scope] = uv;
+    }
+    return uv;
   }
 
   /** The uniforms of the material, by declared name. Readable and writable after `dispose()`. */
@@ -326,12 +368,14 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   /**
    * The placement the position graph is built with; starts with the one of the kind. Another one
    * takes its place only when it contributes a placement stage and nothing else — no attributes,
-   * methods, uniforms or textures, which the sprites and this material were built without — and the
-   * kind holds every feature it requires; the placement of the kind always comes back. A change
+   * methods, uniforms or textures, which the sprites and this material were built without — the
+   * kind holds every feature it requires, and its `checkKind`, if any, takes the kind with it in
+   * place of the kind's placement; the placement of the kind always comes back. A change
    * rebuilds the position graph; three serves a source it has built before from its caches.
    * Keeps its last value once disposed, and a write there reaches nothing that renders.
    *
-   * @throws a `TypeError` naming both features for a placement that cannot stand in
+   * @throws a `TypeError` naming both features for a placement that cannot stand in, an `Error`
+   *   naming it for one whose `checkKind` refuses the kind
    */
   get placement(): SpriteFeature {
     return this.#placement.value;
@@ -362,6 +406,12 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
           );
         }
       }
+      const kindPlacement = this.kind.pipeline.placement;
+      runCheckKind(
+        feature,
+        {base: this.kind.base, features: this.kind.features.map((held) => (held === kindPlacement ? feature : held))},
+        `${WHERE}: feature "${feature.name}"`,
+      );
     }
     this.#placement.set(feature);
   }

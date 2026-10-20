@@ -285,6 +285,50 @@ export function makeSheetWithTurnedCopy(texels, width, height) {
 }
 
 /**
+ * A sheet of 8 × 4 texels and its TexturePacker json. The frame `reference` is the untrimmed sprite,
+ * 5 × 4 texels at `(0, 0)` with a red texel at `(1, 2)` and a green one at `(2, 2)` and nothing else.
+ * The frame `trimmed` is the same sprite with its transparent border cut off: the red and the green
+ * texel, 2 × 1 at `(5, 0)`. The frame `trimmed-turned` is `trimmed` laid into the sheet turned by 90°
+ * clockwise, the way TexturePacker does it — 1 × 2 at `(7, 0)`, red above green.
+ *
+ * Both trimmed frames lie at `(1, 2)` in a sprite of 5 × 4, which makes their margins
+ * `[0.2, 0.5, 0.4, 0.25]`: four different values, so that a mix-up of two sides shows.
+ */
+export function makeTrimmedSheet() {
+  const width = 8;
+  const height = 4;
+  const texels = Array.from({length: width * height}, () => [0, 0, 0, 0]);
+  const put = (x, y, color) => {
+    texels[y * width + x] = color;
+  };
+
+  const red = [255, 0, 0, 255];
+  const green = [0, 255, 0, 255];
+  put(1, 2, red);
+  put(2, 2, green);
+
+  put(5, 0, red);
+  put(6, 0, green);
+
+  put(7, 0, red);
+  put(7, 1, green);
+
+  const trim = {trimmed: true, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}};
+
+  return {
+    texture: makeColorTexture(texels, width, height),
+    json: {
+      frames: {
+        reference: {frame: {x: 0, y: 0, w: 5, h: 4}},
+        trimmed: {frame: {x: 5, y: 0, w: 2, h: 1}, ...trim},
+        'trimmed-turned': {frame: {x: 7, y: 0, w: 2, h: 1}, rotated: true, ...trim},
+      },
+      meta: {image: 'sheet.png', size: {w: width, h: height}},
+    },
+  };
+}
+
+/**
  * Renders `scene` through `camera` into `target` on an opaque black background and reads the
  * target back: four bytes per pixel, red, green, blue, alpha.
  */

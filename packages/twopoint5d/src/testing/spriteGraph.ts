@@ -27,6 +27,59 @@ export const nodesOf = (root: Node): Set<Node> => {
   return nodes;
 };
 
+interface SignedNode {
+  readonly type: string;
+  readonly nodeType?: string | null;
+  readonly isConstNode?: boolean;
+  readonly value?: unknown;
+  readonly op?: string;
+  readonly method?: string;
+  readonly components?: string;
+  readonly convertTo?: string;
+}
+
+const constantOf = (value: unknown): string =>
+  typeof value === 'object' && value != null && 'toArray' in value
+    ? JSON.stringify((value as {toArray(): number[]}).toArray())
+    : String(value);
+
+// what tells two nodes of one type apart, besides their children
+const propsOf = (node: Node): string => {
+  const signed = node as unknown as SignedNode;
+  const props: string[] = [];
+  if (signed.op != null) props.push(`op=${signed.op}`);
+  if (signed.method != null) props.push(`method=${signed.method}`);
+  if (typeof signed.components === 'string') props.push(`components=${signed.components}`);
+  if (typeof signed.convertTo === 'string') props.push(`convertTo=${signed.convertTo}`);
+  if (node instanceof AttributeNode) props.push(`attribute=${node.getAttributeName(undefined as unknown as NodeBuilder)}`);
+  if (signed.isConstNode) props.push(`value=${constantOf(signed.value)}`);
+  return props.join(' ');
+};
+
+/**
+ * A canonical text of the graph below `root`: every node once, numbered in the order of a walk
+ * from `root`, with its type, its operator, method, swizzle, conversion, attribute name or constant
+ * value, and the numbers of its children. Two graphs built alike answer the same text, whatever
+ * objects they are built from — the values of uniforms and the images of textures are left out.
+ */
+export const graphSignature = (root: Node): string => {
+  const ids = new Map<Node, number>();
+  const lines: string[] = [];
+  const visit = (node: Node): number => {
+    const known = ids.get(node);
+    if (known != null) return known;
+    const id = ids.size;
+    ids.set(node, id);
+    lines.push('');
+    const children = [...node.getChildren()].map(visit);
+    const signed = node as unknown as SignedNode;
+    lines[id] = `${id}: ${signed.type}<${signed.nodeType ?? ''}> ${propsOf(node)} (${children.join(',')})`;
+    return id;
+  };
+  visit(root);
+  return lines.join('\n');
+};
+
 /** The names of the attributes the graph below `root` reads, sorted. */
 export const attributeNamesOf = (root: Node): string[] =>
   [...nodesOf(root)]
@@ -52,6 +105,7 @@ export function stubShaderContext(
   const uniforms = new Map<string, Node>();
   return {
     frame,
+    uv: attribute('uv') as unknown as Node<'vec2'>,
     sampled,
     attribute: <T extends string>(name: string) => attribute(name) as unknown as Node<T>,
     uniform: <T extends string>(name: string) => {
