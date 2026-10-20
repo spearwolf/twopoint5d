@@ -192,6 +192,65 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   }
 
   /**
+   * Takes the vertex objects of `source` over: the slots it uses, the values of every buffer —
+   * copied whole, and marked for upload —, and every vertex object, which reads and writes the
+   * buffer of this pool from then on and keeps its slot, its identity and its values. A slot of
+   * `source` that holds no vertex object yet — filled through `createFromAttributes()` — stays
+   * without one; {@link getVO} materializes it here.
+   *
+   * `source` is left empty: its `usedCount` goes to 0 and it holds no vertex object, so neither that
+   * nor a later `dispose()` of it unlinks one. Its buffers keep their data.
+   *
+   * The way to grow a pool behind a geometry, which `resize()` refuses: build a geometry on a pool
+   * of the larger capacity and the same descriptor, and let it adopt the vertex objects of the old
+   * one. `FeatureSprites` does that when it was built with `grow: true`.
+   *
+   * @throws an `Error` that names the fix, before anything moves: when this pool or `source` has
+   *   been disposed, when `source` is this pool, when `source` is built on another descriptor, when
+   *   this pool has vertex objects in use, and when its capacity is below that of `source`
+   */
+  adoptVOs(source: VertexObjectPool<VOType>): void {
+    if (this.isDisposed) throw new Error('VertexObjectPool#adoptVOs(): this pool has been disposed');
+    if (source.isDisposed) throw new Error('VertexObjectPool#adoptVOs(): the source pool has been disposed');
+    if (source === this) throw new Error('VertexObjectPool#adoptVOs(): a pool cannot adopt its own vertex objects');
+    // the prototype of a vertex object is the one of its descriptor: one of another descriptor would
+    // read this buffer through another layout
+    if (source.descriptor !== this.descriptor) {
+      throw new Error(
+        'VertexObjectPool#adoptVOs(): the source pool is built on another descriptor — build this pool on source.descriptor',
+      );
+    }
+    if (this.usedCount !== 0) {
+      throw new Error(
+        `VertexObjectPool#adoptVOs(): this pool has ${this.usedCount} vertex objects in use — adopt into an empty pool`,
+      );
+    }
+    if (this.capacity < source.capacity) {
+      throw new Error(
+        `VertexObjectPool#adoptVOs(): the source pool holds ${source.capacity} slots, this pool ${this.capacity} — adopt into a pool of at least the capacity of the source`,
+      );
+    }
+
+    const n = source.usedCount;
+    this.buffer.copy(source.buffer);
+    this.usedCount = n;
+
+    const from = source.#voIndex;
+    const to = this.#voIndex;
+    const buffer = this.buffer;
+    for (let i = 0; i < n; i++) {
+      const vo = from[i];
+      if (vo != null) {
+        VOUtils.setBuffer(vo, buffer);
+        to[i] = vo;
+        // out of the index of the source before its count goes down, so that nothing unlinks it there
+        from[i] = undefined;
+      }
+    }
+    source.usedCount = 0;
+  }
+
+  /**
    * Takes the next free slot of this pool and answers the vertex object sitting in it.
    *
    * Answers `undefined` once `usedCount` has reached `capacity`, and on a disposed pool,
