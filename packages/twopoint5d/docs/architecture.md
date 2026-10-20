@@ -127,6 +127,8 @@ from no texture class. `FrameBasedAnimations` turns a sequence of atlas frames i
 timing data the `AnimatedFrames` sprite feature reads. `AtlasFrameTable` lays frames of an atlas
 into a uniform array, and `sampleAtlasFrame()` samples one of them per fragment in a
 `NodeMaterial` of one's own — a repeated frame on a mesh — the first TSL of this layer.
+`DynamicAtlas` packs frames drawn at run time onto the shelves of a canvas and hands out a
+`CanvasTexture` of it and an ordinary `TextureAtlas` of its frames.
 
 ### `display/`
 

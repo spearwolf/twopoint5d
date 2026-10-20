@@ -1,3 +1,4 @@
+import {forgetFrameName} from './internals.js';
 import type {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
 
@@ -61,6 +62,17 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
 
   get size(): number {
     return this.#frames.length;
+  }
+
+  /**
+   * @internal Lets go of the name: `frame()` and `frameId()` find it no longer, `frameNames()` leaves it
+   * out, and `add()` takes it again for a new frame. The frame stays at its id, so `get()` and `size`
+   * are unchanged. Answers `false` for a name the atlas does not hold.
+   */
+  [forgetFrameName](name: TextureAtlasFrameName): boolean {
+    if (!this.#frameNames.delete(name)) return false;
+    this.#frameNameList.splice(this.#frameNameList.indexOf(name), 1);
+    return true;
   }
 
   get(id: number): TextureAtlasFrame<D> | undefined {
