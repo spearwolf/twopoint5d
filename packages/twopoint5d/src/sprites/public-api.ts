@@ -8,6 +8,7 @@ export * from './features/AxisBillboardPlacement.js';
 export * from './features/BillboardPlacement.js';
 export * from './features/Fade.js';
 export * from './features/FlatPlacement.js';
+export * from './features/Flip.js';
 export * from './features/Flash.js';
 export * from './features/InstancePosition.js';
 export * from './features/Orientation.js';

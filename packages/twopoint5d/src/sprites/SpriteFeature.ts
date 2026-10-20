@@ -10,6 +10,12 @@ export interface SpriteFrameNodes {
   readonly flipDiagonal?: Node<'float'>;
   /** `[left, top, right, bottom]`, the margins a packer cut off, as fractions of the untrimmed sprite. Default: no shift. */
   readonly trim?: Node<'vec4'>;
+  /**
+   * `vec2(x, y)`: 1 along an axis a frame stage mirrored the drawn image on, 0 along one it did not —
+   * `Flip` writes it. A stage that places something on the image — an anchor, a nine-slice border —
+   * mirrors it along. Default: no mirror.
+   */
+  readonly mirror?: Node<'vec2'>;
 }
 
 /**

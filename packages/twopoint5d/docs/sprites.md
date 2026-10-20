@@ -40,7 +40,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | slot | per kind | built-in features |
 | --- | --- | --- |
 | `frame` | 0 or 1 | `AtlasFrame`, `AnimatedFrames` |
-| `frameStage` | any, by `order` | — |
+| `frameStage` | any, by `order` | `Flip` |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
@@ -195,6 +195,7 @@ flags.dispose();
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
+| `Flip` | `flip` (static) | `flipX`, `flipY`, `setFlip()` | frame stage, `Flip` | unflipped, 0, 0 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -256,6 +257,55 @@ enemies.dispose();
 - The passes leave both alone where they should: `ShadowMask` and `Darken` run after them, in
   `ColorOrder.Pass`, so a fading sprite throws a fading shadow, a flashing one a plain shadow, and
   its reflection flashes darkened.
+
+### Flip
+
+`Flip` mirrors the image of a sprite — left for right with `flipX`, upside down with `flipY` — and
+leaves its triangles as they are: a platformer's character faces left and stays visible under the
+default `FrontSide`. A negative width would mirror it too, but turns the triangles over, and
+`setTexCoords()` with a negative `u` breaks a trimmed frame and cannot reach `AnimatedFrames`.
+
+```ts check
+import {
+  AnimatedFrames,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  Flip,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+
+const Fighter = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AnimatedFrames, TextureColor, Flip],
+});
+const fighters = new FeatureSprites(Fighter, {capacity: 8});
+const hero = fighters.createSprite()!;
+hero.setSize(64, 64);
+
+export function walk(velocityX: number) {
+  hero.flipX = velocityX < 0 ? 1 : 0; // the sheet faces right
+  fighters.spritePool?.touchVO(hero, 'flip');
+}
+```
+
+- **A frame stage** at `FrameOrder.Flip`: the frame's `s` and `s + u` swap places, and its trim
+  margins left for right. The drawn x is the `s` axis for every frame, so it mirrors a frame of
+  `AtlasFrame`, every frame `AnimatedFrames` picks — in every playback mode — and a frame the
+  packer turned or trimmed alike; a trimmed frame stays where the flipped untrimmed sprite has it,
+  on its foot. Without a frame feature it mirrors the whole texture.
+- **0 or 1.** A value above 0.5 counts as 1, so a flag never draws a squeezed image. `flip` is
+  static: mark a change with `touchVO(sprite, 'flip')`, or build a geometry with `attributeUsage:
+  {dynamic: ['flip']}` for sprites that turn every few frames.
+- **The frame records the mirror** in `mirror`, so `Anchor` mirrors the anchor and `NineSlice` the
+  border along with the image.
+- **Every base and every pass.** It works on the quad and on `gridBase()`, and `ShadowPass`,
+  `ReflectionPass` and `BillboardReflectionPass` draw the flipped image.
+- `LocalOrder.Flip` is a different thing: the band of a local stage of one's own that mirrors the
+  geometry, whose sprites need `side: DoubleSide`.
 
 ### Frames out of an atlas
 
@@ -1159,11 +1209,13 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   counts as set only once its image has measures. A name is unique across the kind. The textures
   stay the caller's. Until all of them are set the feature drops out of the graph.
 - **`frame`** — the frame slot, at most one feature per kind: answers `texCoords`, and optionally
-  `flipDiagonal` and `trim`, read by both pipelines.
+  `flipDiagonal`, `trim` and `mirror`, read by both pipelines.
 - **`frameStage`** — a stage `{order, transform(frame, ctx)}` on the frame, after the frame slot —
   or the defaults, without a frame feature — and before anything reads it. It answers a whole
   frame: one with no business with `flipDiagonal` or `trim` passes them on, `{...frame,
-  texCoords}`. Its context is the one of the frame slot, without `frame` and `uv`. The lookup reads
+  texCoords}`. A stage that mirrors the drawn image says so in `mirror` — `vec2`, 1 along each axis
+  it mirrored, as `Flip` writes it —, so that a stage which places something on the image mirrors
+  it along. Its context is the one of the frame slot, without `frame` and `uv`. The lookup reads
   `(s + uv.x · u, t + uv.y · v)` before the diagonal swap, so the drawn x is the `s` axis for every
   frame, a turned atlas frame included, and `trim` holds the margins of the sprite as drawn.
 - **`local`**, **`mesh`**, **`uv`**, **`color`** — a stage `{order, transform}` in its slot;
