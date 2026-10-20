@@ -23,7 +23,10 @@ the first draft of this spec, which the sections below now state as built:
 - the test-only nine-slice runs its local stage at `LocalOrder.Scale - 20`; the band
   `LocalOrder.Slice` stays for phase D to add with the feature (§7.2);
 - the browser fixture `makeTrimmedSheet()` moved into `test/helpers/fixtures.js`, which it now
-  serves twice.
+  serves twice;
+- `textureSize()` of a set texture without `needsImage` is three's `textureSize()` of a registered
+  texture node, not the uniform of `SpriteResources`: the uniform follows the texture signal only,
+  and a `TextureLoader` texture whose image arrives after `setTexture()` changes no signal (§7.8).
 
 Phase C of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.7, §4.8, decision
 2 of its §7 taken: `shared: true`): the one change to the feature model the roadmap asks for. Two
@@ -363,7 +366,11 @@ frameStage: {
   `1 − insetRight / framePixels.x` (and down). `framePixels`, the measures of the drawn frame in
   texels: `abs(frame.texCoords.zw) · (frame.flipDiagonal > 0.5 ? size.yx : size.xy)` with `size =
   ctx.textureSize('colorMap')` — `textureSize()` reads the size of a texture another feature
-  declares (§7.8). Affine within each cell: the per-vertex varying of `TextureColor` is exact.
+  declares (§7.8), the size of the texture the shader binds: a `colorMap` whose image a loader fills
+  in after `setTexture()` gives its real measures once the image is uploaded, with no
+  `touchTexture()`; before that the bound default texture is 1 × 1, and while no `colorMap` is set
+  the size is `(0, 0)` — guard with `max(framePixels, 1)`. Affine within each cell: the per-vertex
+  varying of `TextureColor` is exact.
 - **Trimmed frames** cannot be refused in the shader; a frame is data written at run time. Only a
   method that takes the frame — a `setSliceFrame(frame)` that also reads Aseprite's
   `slices[].center` — can refuse one, naming the fix (pack the frame untrimmed).
@@ -417,9 +424,15 @@ stage context offers; phase E decides where it lives.
   `Loop` callback, which three runs while it compiles: the material could not hand such a lookup
   a new texture of the same kind.
 - `ctx.textureSize(name)` reads the texture size of any texture a feature of the material
-  declares. For a texture of another feature it is `(0, 0)` while that texture is unset or has no
-  image, and the reader does not wait for it — a stage that divides by it guards with `max(size,
-  1)`. `ctx.sample()` stays limited to the feature's own textures. A name no feature of the
+  declares. For a set texture it is three's `textureSize()` (`TextureSizeNode`: `textureDimensions`
+  in WGSL, `textureSize` in GLSL ES 3.0) of a texture node the material registers like a lookup:
+  the size of the texture bound, so it follows an image that arrives or changes after the texture
+  was set, and a swap to a texture of the same kind without a rebuild. A texture declared with
+  `needsImage` keeps the uniform of `SpriteResources#textureSize()`, kept current by the material and
+  re-read by `touchTexture()` — the feature waits for its image anyway, and `AnimatedFrames` builds
+  the graph it built before. For a texture of another feature that is unset it is that uniform at
+  `(0, 0)`, the reader does not wait for it, and setting the texture builds the graph anew — a stage
+  that divides by it guards with `max(size, 1)`. `ctx.sample()` stays limited to the feature's own textures. A name no feature of the
   material declares is refused, naming it: `FeatureSpritesMaterial: feature "x" reads the size
   of the texture "y", which no feature of these sprites declares`.
 - The color pipeline order of phase A stays: the color stages of the kind (`Tint`, `Fade`,

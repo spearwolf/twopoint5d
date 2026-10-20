@@ -2,7 +2,9 @@ import {expect} from '@esm-bundle/chai';
 import {
   AnimatedFrames,
   AtlasFrame,
+  ColorOrder,
   defineFeature,
+  definePass,
   defineSprite,
   Display,
   FeatureSprites,
@@ -19,8 +21,8 @@ import {
   TexturePackerJson,
   UvOrder,
 } from '@spearwolf/twopoint5d';
-import {abs, add, float, max, min, mix, mul, round, step, sub, vec2, vec3, vec4} from 'three/tsl';
-import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
+import {abs, add, div, float, max, min, mix, mul, round, step, sub, vec2, vec3, vec4} from 'three/tsl';
+import {OrthographicCamera, RenderTarget, Scene, Texture} from 'three/webgpu';
 import {
   disposeDisplay,
   isNearColor,
@@ -196,6 +198,19 @@ const Bob = defineFeature({
   mesh: {
     order: MeshOrder.Offset,
     transform: (position, {uniform}) => add(position, vec3(0, /** @type {any} */ (uniform('time')), 0)),
+  },
+});
+
+/** Paints the sprite in the measures of the colorMap of TextureColor, in texels: red the width, green the height. */
+const SizeColor = defineFeature({
+  name: 'sizeColor',
+  color: {
+    order: ColorOrder.Pass + 10,
+    transform: (_color, {textureSize}) => {
+      /** @type {any} */
+      const measures = div(textureSize('colorMap'), 255);
+      return vec4(measures, 0, 1);
+    },
   },
 });
 
@@ -567,6 +582,68 @@ describe('sprites — the pipeline stages carry flip, nine-slice and wave', func
       expect(still).to.have.lengthOf(8);
       expect(moved).to.have.lengthOf(8);
       expect(Math.abs(moved[0] - still[0]), 'the sprite moved by 3 units of 4 pixels').to.equal(12);
+    });
+  });
+
+  describe("textureSize() of another feature's texture", () => {
+    const PPU = 4;
+
+    /** A texture as TextureLoader hands it out: no image until it has loaded. */
+    const imageArrivesLater = () => {
+      const texture = new Texture();
+      return {
+        texture,
+        arrive(width, height) {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          texture.image = canvas;
+          texture.needsUpdate = true;
+        },
+      };
+    };
+
+    const centerColor = (pixels) => rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+
+    it('follows an image that arrives after setTexture(), and a texture swapped in', async function () {
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor, SizeColor]});
+      const late = imageArrivesLater();
+      const sprites = new FeatureSprites(kind, {capacity: 1, textures: {colorMap: late.texture}});
+      sprites.createSprite().setSize(4, 4);
+
+      await render(sprites, PPU);
+      late.arrive(7, 3);
+      const arrived = centerColor(await render(sprites, PPU));
+      const other = imageArrivesLater();
+      other.arrive(5, 9);
+      sprites.setTexture('colorMap', other.texture);
+      const swapped = centerColor(await render(sprites, PPU));
+      sprites.dispose();
+      late.texture.dispose();
+      other.texture.dispose();
+
+      expect(arrived, 'the measures of the image that arrived').to.satisfy((c) => isNearColor(c, [7, 3, 0], 0));
+      expect(swapped, 'the measures of the texture swapped in').to.satisfy((c) => isNearColor(c, [5, 9, 0], 0));
+    });
+
+    it('follows an image that arrives later in the material of a pass', async function () {
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor]});
+      const late = imageArrivesLater();
+      const sprites = new FeatureSprites(kind, {
+        capacity: 1,
+        textures: {colorMap: late.texture},
+        passes: [definePass({name: 'size', features: [SizeColor]})],
+      });
+      sprites.material.visible = false;
+      sprites.createSprite().setSize(4, 4);
+
+      await render(sprites, PPU);
+      late.arrive(6, 2);
+      const arrived = centerColor(await render(sprites, PPU));
+      sprites.dispose();
+      late.texture.dispose();
+
+      expect(arrived).to.satisfy((c) => isNearColor(c, [6, 2, 0], 0));
     });
   });
 });

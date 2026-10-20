@@ -320,15 +320,52 @@ describe('textureSize() of a texture another feature declares', () => {
       },
     });
 
-  test('answers the size uniform of that texture, (0, 0) while it is unset, and does not wait for it', () => {
+  // the TextureSizeNodes of a graph, and the textures they measure
+  const sizeNodesOf = (root: Node) =>
+    [...nodesOf(root)].filter((node) => (node as {isTextureSizeNode?: boolean}).isTextureSizeNode === true) as unknown as {
+      textureNode: {value: Texture};
+    }[];
+
+  test('answers (0, 0) while that texture is unset, and does not wait for it', () => {
     const material = new FeatureSpritesMaterial(kindOf(AtlasFrame, TextureColor, sizeReader('colorMap')));
     const size = material.resources.textureSize('colorMap');
 
     expect(calls).toEqual(['sizeReader']);
     expect(nodesOf(material.positionNode!).has(size as unknown as Node)).toBe(true);
     expect(size.value.toArray()).toEqual([0, 0]);
-    material.setTexture('colorMap', withImage(8, 2));
-    expect(size.value.toArray()).toEqual([8, 2]);
+    material.dispose();
+  });
+
+  test('once the texture is set, answers the size of the texture the shader binds, which follows a swap without rebuild', () => {
+    const first = new Texture();
+    const second = new Texture();
+    const material = new FeatureSpritesMaterial(kindOf(AtlasFrame, TextureColor, sizeReader('colorMap')));
+
+    material.setTexture('colorMap', first);
+    const positionNode = material.positionNode!;
+    expect(sizeNodesOf(positionNode).map(({textureNode}) => textureNode.value)).toEqual([first]);
+
+    material.setTexture('colorMap', second);
+    expect(material.positionNode).toBe(positionNode);
+    expect(sizeNodesOf(positionNode).map(({textureNode}) => textureNode.value)).toEqual([second]);
+    material.dispose();
+  });
+
+  test('reads the size of a texture of its own the same way, and a texture that needs its image through the uniform', () => {
+    const own = defineFeature({
+      name: 'own',
+      textures: {ownMap: {}, waitedMap: {needsImage: true}},
+      local: {
+        order: 0,
+        transform: (position, {textureSize}) =>
+          add(position, vec4(textureSize('ownMap'), textureSize('waitedMap')).xyz) as unknown as Node<'vec3'>,
+      },
+    });
+    const ownMap = new Texture();
+    const material = new FeatureSpritesMaterial(kindOf(own), {textures: {ownMap, waitedMap: withImage(4, 2)}});
+
+    expect(sizeNodesOf(material.positionNode!).map(({textureNode}) => textureNode.value)).toEqual([ownMap]);
+    expect(nodesOf(material.positionNode!).has(material.resources.textureSize('waitedMap') as unknown as Node)).toBe(true);
     material.dispose();
   });
 

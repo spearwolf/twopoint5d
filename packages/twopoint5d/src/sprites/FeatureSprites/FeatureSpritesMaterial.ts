@@ -8,7 +8,7 @@ import {
   SignalGroup,
   type SignalReader,
 } from '@spearwolf/signalize';
-import {add, attribute, float, mul, sub, texture, vec3, vec4} from 'three/tsl';
+import {add, attribute, float, mul, sub, texture, textureSize as textureSizeOf, vec2, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
@@ -278,10 +278,22 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
       },
       // the size of a texture of another feature as well: a stage that reads it does not wait for it
       textureSize: (textureName) => {
-        if (!this.#features.some(({textures}) => textures != null && Object.hasOwn(textures, textureName))) {
+        const declaring = this.#features.find(({textures}) => textures != null && Object.hasOwn(textures, textureName));
+        if (declaring == null) {
           throw new Error(`${where} reads the size of the texture "${textureName}", which no feature of these sprites declares`);
         }
-        return this.resources.textureSize(textureName) as unknown as Node<'vec2'>;
+        // a texture that needs its image counts as set once the image has measures, which the uniform
+        // holds; and the uniform is (0, 0) for a texture of another feature that is unset — a tracked
+        // read of its shape, so that setting it builds the graph anew
+        if (declaring.textures![textureName]!.needsImage === true || this.resources.shapeOf(textureName) === undefined) {
+          return this.resources.textureSize(textureName) as unknown as Node<'vec2'>;
+        }
+        // the size of the texture the shader binds, read on the gpu: it follows an image that arrives
+        // or changes after the texture was set, and a texture of the same kind through the value effect
+        const node = texture(this.resources.peekTexture(textureName)!);
+        this.#samples[scope].push({name: textureName, node});
+        // a uvec2, which vec2() converts
+        return vec2(textureSizeOf(node) as unknown as Node<'vec2'>) as unknown as Node<'vec2'>;
       },
     };
   }

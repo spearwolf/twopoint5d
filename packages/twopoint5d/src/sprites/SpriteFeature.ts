@@ -29,7 +29,15 @@ export interface SpriteFrameContext {
    * it hands out here and gives it a new texture of the same kind without a rebuild.
    */
   sample(name: string, uv: Node<'vec2'>): Node<'vec4'>;
-  /** The measures of the image of a texture the calling feature declares, in texels; kept current by the material. */
+  /**
+   * The measures, in texels, of a texture any feature of the material declares — the calling
+   * feature's own or another's. For a set texture it is the size of the texture the shader binds,
+   * read on the gpu: it follows an image that arrives or changes after the texture was set, and a
+   * texture of the same kind swapped in without a rebuild. For a texture declared with `needsImage`
+   * it is a uniform the material keeps current, re-read by `touchTexture(name)`. A texture of another
+   * feature that is unset answers `(0, 0)`, and the stage does not wait for it; setting it builds the
+   * graph anew.
+   */
   textureSize(name: string): Node<'vec2'>;
 }
 
@@ -44,6 +52,10 @@ export interface SpriteShaderContext extends SpriteFrameContext {
    * of the frame as drawn, `(1, 1)` its bottom right. Built once per graph, the first time a stage
    * reads it; a graph that never reads it builds no uv stage. In a uv stage it is the uv so far, the
    * stage's own input. `attribute('uv')` stays the base uv, where the vertex lies on the base.
+   *
+   * It is evaluated where its reader uses it: a color source that hands it to `frameUv()`, as
+   * `TextureColor` does, works it out per vertex and interpolates it across each triangle; one that
+   * reads it in its own fragment graph works it out per fragment.
    */
   readonly uv: Node<'vec2'>;
 }
@@ -126,7 +138,12 @@ export interface SpriteFeature<Api extends object = object> {
   readonly placement?: (local: Node<'vec3'>, ctx: SpriteShaderContext) => Node<'vec3'>;
   /** A stage after the placement, in the local space of the mesh — the slot of shadows and mirrors. */
   readonly mesh?: SpriteStage<'vec3'>;
-  /** A stage on the uv the color source samples at — `ctx.uv` — before any stage reads it. */
+  /**
+   * A stage on the uv the color source samples at — `ctx.uv` — before any stage reads it. It is
+   * evaluated where the color source uses the uv: `TextureColor` hands it to `frameUv()`, per vertex,
+   * so under it a uv stage must be affine within each triangle; a color source that does not use
+   * `frameUv()` evaluates it per fragment.
+   */
   readonly uv?: SpriteStage<'vec2'>;
   /** The color before the color stages: at most one feature of a kind; without one the sprite is flat grey. */
   readonly colorSource?: (frame: SpriteFrameNodes, ctx: SpriteShaderContext) => Node<'vec4'>;

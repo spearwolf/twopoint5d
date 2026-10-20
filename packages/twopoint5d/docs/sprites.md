@@ -1038,10 +1038,13 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
 the feature declares itself, and `textureSize(name)` for a texture any feature of the material
-declares. The material throws, naming the feature, for any other name. The size of a texture of
-another feature — the `colorMap` of the color source, to know a frame in texels — is `(0, 0)` while
-that texture is unset, and the stage does not wait for it: a stage that divides by it takes
-`max(size, 1)`. Every stage after the frame slot gets `frame`, the frame after the
+declares. The material throws, naming the feature, for any other name. `textureSize()` of a set
+texture is the size of the texture the shader binds, read on the gpu — it follows an image that a
+loader fills in after `setTexture()`, and a texture of the same kind swapped in without a rebuild;
+for a texture declared with `needsImage` it is a uniform, re-read by `touchTexture(name)`. The size
+of a texture of another feature — the `colorMap` of the color source, to know a frame in texels — is
+`(0, 0)` while that texture is unset, and the stage does not wait for it: a stage that divides by it
+takes `max(size, 1)`. Every stage after the frame slot gets `frame`, the frame after the
 frame stages, and `uv`, the uv after the uv stages — built the first time a stage of a graph reads
 it, so a graph that never reads it builds no uv stage; in a uv stage `uv` is the stage's own input.
 `attribute('uv')` stays the base uv, where the vertex lies on the base.
