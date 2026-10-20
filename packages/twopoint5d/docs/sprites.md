@@ -411,6 +411,10 @@ size the atlas takes; under Node there is neither, and the constructor says to h
 handed in stays the caller's. After `dispose()`, `texture`, `canvas`, `context`, `add()` and
 `redraw()` throw, `remove()` answers `false`, `clear()` does nothing.
 
+Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as
+`TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()` and `layoutText()`, see
+[the text guide](text.md).
+
 ## Uploads: static and dynamic attributes
 
 `update()` of the mesh uploads what the sprite pool marked. Position, rotation and shear are

@@ -189,7 +189,12 @@ Text out of bitmap fonts, as sprites of the layer below. `BitmapFont` reads the 
 BMFont format — the text format, XML by a tokenizer of its own (no `DOMParser`, so it runs
 in Node and in a worker) and the JSON of the common converters — into the metrics of its
 lines, its glyphs and kerning pairs, and a `TextureAtlas` of its page with one untrimmed
-frame per char. A font has one page. The guide is [`docs/text.md`](./text.md).
+frame per char. A font has one page. `layoutText()` lays a string out — boxes of the visible
+glyphs, y up, the top of the first line at `y` — and `writeText()` writes such a layout into
+sprites of any kind with `InstancePosition`, `QuadSize` and `AtlasFrame`: it creates them in the
+`FeatureSprites` it is handed, places them by the extents of the base read off the geometry, and
+hands them to the caller, who frees them. It is a function over sprites, not a mesh of its own. The
+guide is [`docs/text.md`](./text.md).
 
 ### `map2d/`
 

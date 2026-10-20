@@ -422,7 +422,8 @@ measured from — at its left edge, middle or right edge by `align`. To write on
 - line `n` (from 0) has its top at `y − n · lineHeight · s`;
 - the pen of a line starts at 0; a glyph lies at `penX + xoffset · s` (left) and
   `lineTop − yoffset · s` (top), `width · s` wide and `height · s` high; the pen then moves on by
-  `(xadvance + kerning(previous, this) + letterSpacing) · s`;
+  `(xadvance + letterSpacing) · s`, and a kerning pair moves the second glyph of it — and the pen with
+  it — by `amount · s` before that glyph is placed;
 - the width of a line is the pen after its last char less one `letterSpacing · s` — the spacing lies
   between chars, not after the last; an empty line is 0 wide;
 - `align` moves the whole line: its left edge to `x` (`'left'`), `x − width / 2` (`'center'`),
@@ -499,7 +500,7 @@ written inline in the specs.
   §3.2, §3.5, §3.8; the shelves — positions of a sequence of frames, a taller frame opening a shelf,
   a lower frame going onto the lowest fitting shelf, padding at the edges; both full errors and that
   a refused frame changes nothing; the draw callback's clip, translation and size; images by natural
-  size and scaled; `Math.ceil`; extrusion's eight self-copies; a throwing callback rolls back;
+  size and scaled; `Math.ceil`; extrusion's four self-copies; a throwing callback rolls back;
   `redraw()` keeps frame and coords; `remove()` frees the name not the space; `clear()` new atlas;
   the texture settings of §3.3 and `needsUpdate` per call; `dispose()` (a)–(d) of the lifecycle
   pattern, a canvas handed in left alone; the atlas works with `AtlasFrameTable` and

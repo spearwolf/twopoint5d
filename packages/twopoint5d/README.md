@@ -48,6 +48,8 @@ The core features can be roughly classified into the following areas:
 #### 📚 [text](src/text/)
 - read bitmap fonts in the AngelCode BMFont format — text, XML and the JSON of the common
   converters — into a font and a texture atlas of its glyphs (`BitmapFont`)
+- lay a string of it out into sprites, one per glyph — y up, aligned per line, kerned, wrapped at
+  a width — with `writeText()`, or measure it with `layoutText()`
 - the guide: [docs/text.md](docs/text.md)
 - :construction: new, the api may still change
 
