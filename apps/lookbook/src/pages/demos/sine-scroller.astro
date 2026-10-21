@@ -29,7 +29,6 @@ import {description, title} from './_sine-scroller.json';
     OnStageResize,
     OnStageUpdateFrame,
     OrthographicProjection,
-    type OrthographicProjectionSpecs,
     Stage2D,
     StageRenderer,
     TextureStore,
@@ -41,24 +40,32 @@ import {description, title} from './_sine-scroller.json';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
-  // the art is drawn at a whole-number scale: as large as fits at least 240 × 400 pixels of it
-  const MIN_VIEW_HEIGHT = 240;
+  // the art is drawn as large as fits at least 400 × 240 pixels of it on the screen
   const MIN_VIEW_WIDTH = 400;
+  const MIN_VIEW_HEIGHT = 240;
 
   // the preview screenshot waits for the scroller, not for the default delay
   const preview = deferPreview();
 
+  // The drawing buffer is the art itself: one pixel of the buffer is one pixel of the art, and the
+  // browser scales the canvas up to the screen, pixelated. A phone of 1080 × 2400 device pixels
+  // shades 540 × 1200 pixels a frame instead of all of its 2.6 million, and every pass after the
+  // stage — the bloom, the output — works on that small image too
   const display = new Display(getFullscreenCanvas());
 
-  // one unit of the view is one pixel of the art; the specs stay ours, so a new pixelZoom reaches
-  // the next view the projection computes
-  const viewSpecs: Partial<OrthographicProjectionSpecs> = {pixelZoom: 2};
-  const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', viewSpecs));
+  // The display rounds the zoom down to whole device pixels — every pixel of the art equally large
+  // after the pixelated upscale — so the zoom at which the view fits exactly is the largest one at
+  // which at least as much of the art fits, whatever the pixel ratio of the screen
+  const fitPixelZoom = () => {
+    display.pixelZoom = Math.min(window.innerWidth / MIN_VIEW_WIDTH, window.innerHeight / MIN_VIEW_HEIGHT);
+  };
+  fitPixelZoom();
 
-  display.onResize(({width, height}) => {
-    viewSpecs.pixelZoom = Math.max(1, Math.min(Math.floor(height / MIN_VIEW_HEIGHT), Math.floor(width / MIN_VIEW_WIDTH)));
-    stage.needsUpdate = true;
-  });
+  // one unit of the view is one pixel of the buffer, and so one pixel of the art
+  const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {pixelZoom: 1}));
+
+  // a new zoom takes effect with the next measurement of the display, which emits the resize again
+  display.onResize(fitPixelZoom);
 
   // the glow recipe of the sprite guide: the stage renders into half floats, so a colour above
   // white survives, and the bloom lets in only what is brighter than white — a luminance above 1

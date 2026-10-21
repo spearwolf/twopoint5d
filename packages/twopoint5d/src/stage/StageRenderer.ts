@@ -102,6 +102,13 @@ export interface StageRenderer extends EventizedObject {}
  * whatever `clear` says; the own `clear` then applies on top, and one that
  * covers color and depth replaces the black clear.
  *
+ * With a {@link pipeline}, the quad of the pipeline covers the target it writes to, every pixel
+ * and without blending: the own clear of that target is left out where three.js clears it anyway
+ * before that draw — `renderer.autoClear` with the `autoClearColor`, `autoClearDepth` and
+ * `autoClearStencil` flags of every buffer the own clear covers, as three.js sets them by default.
+ * The target ends up the same either way, and on the canvas the clear would cost a full-screen draw
+ * of its own.
+ *
  * Setting `clearColor` to a non-null value also sets `clear = true` as a
  * convenience. Multiple stages are drawn additively into the same target —
  * use this to layer stages on top of each other in a single pass.
@@ -834,7 +841,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * a stage or the pipeline throws. The internal target is cleared in full to
    * transparent black every frame before the user's `clear` applies; the
    * stages draw into it with linear output. The user's `clear` additionally
-   * clears the final output target before the pipeline writes, and the
+   * clears the final output target before the pipeline writes, unless the
+   * pipeline's draw clears it anyway (see `#clearBeforePipeline()`), and the
    * pipeline applies the output transform of the caller.
    */
   #renderPipelineSimple(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
@@ -844,7 +852,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     try {
       this.#drawIntoInternalTarget(renderer, rt, stages);
       this.#wireInternalOutputNode(pipeline, rt);
-      if (this.clear) this.#applyClear(renderer);
+      this.#clearBeforePipeline(renderer);
       pipeline.render();
     } finally {
       this.#targets.returnInternalTarget();
@@ -913,8 +921,26 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
     this.#prerenderNestedRenderers(renderer, stages);
     if (this.#outputDirty) this.#rebuildComposedOutputNode(renderer, stages);
-    if (this.clear) this.#applyClear(renderer);
+    this.#clearBeforePipeline(renderer);
     this.pipeline!.render();
+  }
+
+  /**
+   * The own clear of the target the pipeline writes to, unless the pipeline's draw leaves that
+   * target as the clear would: three.js clears it first under `renderer.autoClear` — with the
+   * buffers of `autoClearColor`, `autoClearDepth` and `autoClearStencil` —, and the quad of the
+   * pipeline covers every pixel, color and depth, without blending. Where those flags cover every
+   * buffer of the own clear, the clear is left out. On the canvas it would cost a full-screen draw
+   * of its own: three.js clears through its frame buffer target and copies that onto the canvas.
+   */
+  #clearBeforePipeline(renderer: WebGPURenderer): void {
+    if (!this.clear) return;
+    const clearedByPipeline =
+      renderer.autoClear === true &&
+      (!this.clearColorBuffer || renderer.autoClearColor === true) &&
+      (!this.clearDepthBuffer || renderer.autoClearDepth === true) &&
+      (!this.clearStencilBuffer || renderer.autoClearStencil === true);
+    if (!clearedByPipeline) this.#applyClear(renderer);
   }
 
   /** Renders every nested `StageRenderer` among the stages into its pass target, with linear output. */

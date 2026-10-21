@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `grow: true` to `FeatureSprites`: a full pool grows instead of refusing — the `createSprite()` that finds every slot in use builds a geometry of twice the capacity (at least 1) on the same descriptor and base, moves every sprite over with `adoptVOs()`, handles, values and order included, points the mesh and every pass mesh at it, disposes the old geometry and answers a sprite of the new pool. Materials, textures, uniforms and bindings stay as they are. The first growth of a mesh says so once through `console.info`, naming the capacity to start with, and the warning of a full pool does not come under `grow`. `geometry` and `spritePool` are new objects after a growth. `grow: true` next to a `geometry` handed in and a `grow` that is no boolean are refused with a `TypeError`, a growth of a geometry with pools attached throws, each naming the fix. `docs/sprites.md` has it under "FeatureSprites"
 - add `SpritePicker`, GPU picking of the sprites: `await new SpritePicker(renderer).pick(camera, pointer, [sprites, …])` draws the listed `FeatureSprites` into the one pixel under `pointer` (normalized device coordinates, snapped to the pixel centre of the drawing buffer) and answers `{sprites, sprite, index}` (`SpritePick`, typed over the kinds listed by `SpritePickOf`) or `undefined`. Every sprite draws through its own graph and its own alpha test — pixel-perfect, a transparent texel picks what lies behind —, then writes `instanceIndex + 1` and the place of its mesh as the material's `outputNode`, after every colour stage; the nearest sprite wins by the depth test, passes are not drawn. The slot resolves to the handle as it stood at the draw, so a sort or a growth before the read back changes nothing and a sprite freed since answers `undefined`. A 1 × 1 float target (three's WebGL 2 backend reads no integer target back), the renderer's state restored, a pick material per mesh on the mesh's resources that follows a swapped placement and goes with the mesh; `dispose()` releases them and rejects the picks in flight. A mesh of more than 2^24 sprites, whose slots the float target cannot name, is refused with a `RangeError` before the draw. `docs/sprites.md` has it under "Picking: which sprite is under the pointer"
 - add `FeatureSpritesOf<K>` and `SpriteKindApiOf<K>`, the types from a kind to its mesh and to its api: `FeatureSpritesOf<typeof Kind>` is the `FeatureSprites` of the kind — the type of a field or a parameter that holds one — and `SpriteKindApiOf<typeof Kind>` the intersection of its feature apis, the type argument of `FeatureSprites`, `FeatureSpritesGeometry` and `FeatureSpritesMaterial`; `SpriteOf<typeof Kind>` is that api with the `VO`. Both answer `never` for a type that is no kind
+- add `Display#maxPixelRatio` and the option `maxPixelRatio`, the upper bound of `Display#pixelRatio`: above 0 the display draws at `min(devicePixelRatio, maxPixelRatio)` and the browser scales the canvas up, so a phone with a ratio of 3 and a bound of 1.5 shades a quarter of the pixels — in the drawing buffer and in every target that follows its size, the passes and the bloom of a `RenderPipeline` included. `Display.DefaultMaxPixelRatio` (`2`) is the bound of a display created without one, `0` or anything else but a positive finite number is no bound, and a bound does not apply while `pixelZoom` is above 0; a change takes effect with the next measurement and emits `OnDisplayResize`
+- add `Display#devicePixelZoom`, the whole device pixels a pixel of the drawing buffer takes on the screen while `pixelZoom` is above 0, and `0` without a zoom
+- add `Display#maxPixels` and the option `maxPixels`, a budget of pixels for the drawing buffer: above 0 the display draws at a pixel ratio of at most `sqrt(maxPixels / (width × height))`, rounded down to an eighth and below 1 where it has to be, so a 4K screen and a phone stay within the same budget, which `maxPixelRatio` alone does not hold for the 4K screen at a ratio of 1. Under a `pixelZoom` the budget raises `devicePixelZoom` to the smallest whole zoom that keeps the buffer within it. `0` (the default) or anything but a positive finite number is no budget; a change takes effect with the next measurement and emits `OnDisplayResize`
+- add `Display#resolutionScale`, a factor on the pixel ratio, `1` by default: below 1 the display draws fewer pixels than its bounds allow, the ratio rounded down to an eighth; it does not apply under a `pixelZoom`, and a change takes effect with the next measurement and emits `OnDisplayResize`
+- add `AdaptiveResolution` and the option `adaptiveResolution` of `Display` (`true` or `{targetFps, minScale, maxScale}`): a controller that holds 60 frames per second — or a lower `maxFps` — by `Display#resolutionScale`, in steps of an eighth between 0.5 and 1 by default. It reads the GPU time of a frame through the timestamp queries of three.js, for which a display that builds its renderer asks for `trackTimestamp: true`, and the pace of the frames where the renderer measures no GPU time; it lets 30 frames pass after every resize, start and restart, holds still under a `pixelZoom`, and gives the display its scale back with `dispose()` or `enabled = false`. `Display#adaptiveResolution` is the controller the display built
 
 ### Changed
 
@@ -57,8 +62,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the refusal of two features that declare one uniform names the fix — rename one, or declare it shared in both — and the refusal of a malformed start value reads `a uniform takes a number, 2 to 4 numbers, or {value, shared}`
 - `defineSprite()` opens a usage word named after an attribute to the other features of a kind when the feature of that attribute declares the word: each adds attributes of its own to it, in the order of the feature list (`NineSlice` adds `sliceInsets` to `texCoords` of `AtlasFrame`). A word named after the attribute of a feature that does not declare it, and a word that is no attribute declared twice, are still refused
 - `defineSprite()` asks the `checkKind` of the first of two features of one name before it refuses the pair as `two features are named "x"`, so that the forms of one factory — `wave()` — say why a kind takes one of them; a check that passes leaves the plain refusal
+- perf `StageRenderer` leaves its own clear of the target a pipeline writes to — in Mode C and in the composed modes — to the draw of the pipeline where `renderer.autoClear` covers every buffer of that clear with `autoClearColor`, `autoClearDepth` and `autoClearStencil`, the defaults of three.js: three.js clears the target itself before that draw, and the quad of the pipeline covers every pixel without blending, so the target ends up the same. On the canvas the clear cost a full-screen draw of its own, since three.js clears through its frame buffer target and copies that onto the canvas — about a fifth of the GPU time of a frame with a bloom at full resolution
+- `Display#pixelZoom` draws every pixel of the drawing buffer a whole number of device pixels large: the zoom times the `devicePixelRatio`, rounded down, at least 1 — where a zoom of 2 on a screen of a ratio of 2.625 drew the pixels 5 and 6 device pixels wide by turns. `width` and `height` count the whole pixels of the buffer that fit into the size source, the canvas takes just their size, up to one pixel of the buffer short of the source on its right and bottom edge, and `Display.MaxResolution` bounds the zoomed buffer itself rather than the CSS size. Rounded down, a pixel is never larger than the zoom asks for, so `Math.min(cssWidth / 400, cssHeight / 240)` is the largest whole zoom at which 400 × 240 pixels fit
+- perf `Display` draws at most at 2 device pixels per CSS pixel unless told otherwise — `Display.DefaultMaxPixelRatio` — where it drew at the full `devicePixelRatio` before: a phone with a ratio of 3 shades less than half of the pixels of every frame, a screen of a ratio of 2 or below draws as before
+- perf `Display` builds its renderer with `antialias: false`, where it asked for four samples per pixel before: a `RenderPipeline` takes that sample count for its scene pass, which then rendered four samples into half floats and resolved them before every pass after it. Pixel art, sprites cut out by the alpha test and textured quads gain nothing from multisampling; a scene of geometry edges asks for it with `antialias: true`
 
 ### Migration Guide
+
+#### A pointer position mapped through `Display#pixelZoom`
+
+A pixel of the buffer is `devicePixelZoom / devicePixelRatio` CSS pixels large, no longer `pixelZoom` itself.
+
+**Before**
+
+```ts
+const x = event.offsetX / display.pixelZoom;
+```
+
+**After**
+
+```ts
+const x = (event.offsetX * display.devicePixelRatio) / display.devicePixelZoom;
+```
+
+#### A display that should keep its full pixel ratio or multisampling
+
+`Display` builds its renderer without multisampling and draws at most at `Display.DefaultMaxPixelRatio` (`2`) device pixels per CSS pixel. A display that relied on either asks for it.
+
+**Before**
+
+```ts
+const display = new Display(canvas);
+```
+
+**After**
+
+```ts
+const display = new Display(canvas, {antialias: true, maxPixelRatio: 0});
+```
 
 #### A color stage of one's own that ran after `ShadowMask` or `Darken`
 

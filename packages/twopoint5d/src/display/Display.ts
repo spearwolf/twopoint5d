@@ -21,12 +21,14 @@ import {
   OnDisplayRestart,
   OnDisplayStart,
 } from '../events.js';
+import {AdaptiveResolution} from './AdaptiveResolution.js';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {FrameLoop} from './FrameLoop.js';
 import {isWebGLRenderer} from './isWebGLRenderer.js';
 import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
+import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
 import type {CreateRendererParameters, DisplayEventProps, DisplayParameters, ResizeDisplayToFn} from './types.js';
 
@@ -42,6 +44,21 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
     canvasMaxResolutionWarningWasShown = true;
   }
 }
+
+// A zoom of 5 / 2.625 CSS pixels, times 2.625, is 4.999… device pixels in floating point: the
+// whole device pixels of a zoom are counted with this much leeway before rounding down
+const DEVICE_PIXEL_ZOOM_EPSILON = 1e-6;
+
+// A pixel ratio that a budget of pixels or a resolution scale has made is rounded down to a step
+// of an eighth: the size of the drawing buffer, and of every render target that follows it,
+// changes in steps instead of with every pixel of a window drag
+const PIXEL_RATIO_STEP = 1 / 8;
+
+// The leeway, in device pixels, for the whole device pixels of a measured size. The layout of the
+// browser holds a size to a grid — 1/64 CSS pixel in Chromium — so a canvas that measures itself
+// reads back up to that much less than the size written into its style; without the leeway it
+// would lose a pixel of the buffer with every measurement
+const DEVICE_PIXEL_SIZE_TOLERANCE = 1 / 8;
 
 // An element of another realm — one in the document of a same-origin iframe — fails an instanceof
 // against the HTMLElement of this realm; it passes the one of its own window. The typeof guard is for
@@ -514,7 +531,9 @@ export interface Display extends EventizedObject {}
  * {@link Display.height} and `OnDisplayResize` one frame after the frame it
  * happened in; a caller that needs it in that frame calls
  * {@link Display.resize} itself. A frame measures as well when it is the first rendered one, when
- * {@link Display.pixelZoom} has changed, and when the size source has changed.
+ * {@link Display.pixelZoom} or {@link Display.pixelRatio} — through a new
+ * {@link Display.maxPixelRatio}, {@link Display.maxPixels} or
+ * {@link Display.resolutionScale} — has changed, and when the size source has changed.
  * The `resize-to` attribute and {@link Display.resizeToElement} are read in
  * every frame for that — a read of an attribute and a field, no layout — and
  * the element a selector found is kept as described below.
@@ -574,11 +593,14 @@ export interface Display extends EventizedObject {}
  * From the size of the source in CSS pixels, the pipeline goes on like this:
  * the canvas `box-sizing` decides whether its padding and border come off
  * the size or onto its CSS size; both are clamped to `>= 0`;
- * {@link Display.MaxResolution} bounds the drawing buffer — the CSS size times
- * {@link Display.pixelRatio}, per axis; then `renderer.setDrawingBufferSize()`
- * gets the size and the ratio, and the CSS `width`/`height` go into the inline
- * style of the canvas. {@link Display.pixelZoom} divides the size to produce
- * the logical {@link Display.width} / {@link Display.height}, which is what
+ * {@link Display.pixelZoom}, where it is above `0`, turns the size into the
+ * whole pixels of the drawing buffer that fit, each of them
+ * {@link Display.devicePixelZoom} device pixels large, and shrinks the CSS
+ * size to just those pixels; {@link Display.MaxResolution} bounds the drawing
+ * buffer — the CSS size times {@link Display.pixelRatio}, or the pixels of a
+ * zoomed buffer, per axis; then `renderer.setDrawingBufferSize()` gets the size
+ * and the ratio, and the CSS `width`/`height` go into the inline style of the
+ * canvas. The logical {@link Display.width} / {@link Display.height} is what
  * `OnDisplayResize` consumers see. `image-rendering` is checked on every call
  * and written only where the inline style differs, see
  * {@link Display.styleImageRendering}.
@@ -595,18 +617,26 @@ export interface Display extends EventizedObject {}
  */
 export class Display {
   /**
-   * Upper bound per axis, in device pixels, for the drawing buffer that
+   * Upper bound per axis, in pixels, for the drawing buffer that
    * {@link Display.resize} gives the renderer: the CSS size times
-   * {@link Display.pixelRatio}; while {@link Display.pixelZoom} is above `0`
-   * the ratio is `1`, so the bound holds the CSS size itself. A larger size is
-   * clamped, and a one-time `console.warn` names the requested size in device
-   * pixels. The logical {@link Display.width} / {@link Display.height} is then
-   * at most `Math.floor(MaxResolution / pixelRatio)`.
+   * {@link Display.pixelRatio}, or the pixels of the buffer themselves while
+   * {@link Display.pixelZoom} is above `0`. A larger size is clamped, and a
+   * one-time `console.warn` names the requested size. The logical
+   * {@link Display.width} / {@link Display.height} is then at most
+   * `Math.floor(MaxResolution / pixelRatio)`.
    *
    * Adjust this _before_ constructing a `Display` if you genuinely need a
    * larger canvas (and the GPU supports it).
    */
   static MaxResolution = 8192;
+
+  /**
+   * The {@link Display.maxPixelRatio} of a display created without one. Beyond 2 device pixels
+   * per CSS pixel a phone screen shows hardly more detail, but every pass of a frame pays for
+   * each of its pixels: a ratio of 3 shades 2.25 times as many as a ratio of 2. Changing it
+   * applies to the displays created afterwards.
+   */
+  static DefaultMaxPixelRatio = 2;
 
   static CssRulesPrefixContainer = 'twopoint5d-container';
   static CssRulesPrefixDisplay = 'twopoint5d-canvas';
@@ -645,12 +675,15 @@ export class Display {
   readonly #view: Window & typeof globalThis;
 
   // What the last measurement applied. NaN before the first one, so every comparison differs
-  #appliedWidthPx = NaN;
-  #appliedHeightPx = NaN;
+  #appliedWidth = NaN;
+  #appliedHeight = NaN;
   #appliedCssWidth = NaN;
   #appliedCssHeight = NaN;
   #appliedPixelRatio = NaN;
   #appliedPixelZoom = NaN;
+  #appliedDevicePixelZoom = NaN;
+  // compared by the frame alone: under a pixelZoom a new budget shows in no ratio
+  #appliedMaxPixels = NaN;
 
   // The size watch: a ResizeObserver on the size source, a media query on the pixel ratio and the
   // resize event of the window. Each of them only marks the size dirty; the next frame measures.
@@ -726,15 +759,77 @@ export class Display {
   #resizeToSelector?: {value: string; root: Node; element: Element | null; invalid: boolean};
 
   /**
-   * The pixelZoom factor is 0 by default and is therefore not used.
+   * The CSS pixels a pixel of the drawing buffer takes on the screen, `0` by default: not used.
    *
-   * If it is greater than 0, the _devicePixelRatio_ value is ignored and
-   * _cssPixel * pixelZoom_ is used as the effective pixelRatio of the display.
+   * Above `0`, the drawing buffer holds the image at its own resolution — pixel art at the size it
+   * is drawn in — and the browser scales the canvas up, `pixelated` unless
+   * {@link Display.styleImageRendering} says otherwise. A pixel of the buffer is always a whole
+   * number of device pixels large, {@link Display.devicePixelZoom}: the zoom times the
+   * `devicePixelRatio`, rounded down, at least `1`. A zoom of 2 is 4 device pixels on a screen of a
+   * ratio of 2 and 5 on one of 2.625, where 5.25 would draw the pixels 5 and 6 device pixels wide
+   * by turns. Rounded down, the pixels are never larger than asked for: a view that fits at the
+   * zoom fits after the rounding as well — so `Math.min(cssWidth / 400, cssHeight / 240)` is the
+   * largest whole zoom at which at least 400 × 240 pixels fit, whatever the ratio of the screen.
    *
-   * This is interesting for pixelart: a value of 2 means that each CSS pixel is rendered twice as
-   * large, regardless of the devicePixelRatio.
+   * {@link Display.width} and {@link Display.height} then count pixels of the buffer, as many
+   * whole ones as fit into the size source, and the canvas takes their size — up to one pixel of
+   * the buffer short of the size source, on its right and bottom edge.
+   * {@link Display.pixelRatio} is `1`, and {@link Display.maxPixelRatio} does not apply.
    */
   pixelZoom = 0;
+
+  /**
+   * The upper bound of {@link Display.pixelRatio}, {@link Display.DefaultMaxPixelRatio} — `2` —
+   * by default. `0` is no bound.
+   *
+   * Above `0`, the display draws at `min(devicePixelRatio, maxPixelRatio)` device pixels per CSS
+   * pixel, and the browser scales the canvas up to its CSS size. On a phone with a
+   * `devicePixelRatio` of 3, the default bound of 2 shades less than half of the pixels of every
+   * frame, a bound of 1.5 a quarter — in the drawing buffer and in every render target that
+   * follows its size, such as the passes and the bloom of a `RenderPipeline`. A ratio below the
+   * bound is left as it is. While {@link Display.pixelZoom} is above `0`, the ratio is `1` and
+   * this bound does not apply.
+   *
+   * A value that is not a positive finite number counts as `0`. A change takes effect with the
+   * next measurement — at the start of the next frame, or right away with a {@link Display.resize}
+   * of your own — and emits `OnDisplayResize` as a change of the pixel ratio does.
+   *
+   * @see {@link DisplayParameters.maxPixelRatio}
+   */
+  maxPixelRatio = Display.DefaultMaxPixelRatio;
+
+  /**
+   * The budget of pixels of the drawing buffer, `0` by default: no budget.
+   *
+   * Above `0`, the display draws at a pixel ratio of at most `sqrt(maxPixels / (width × height))`
+   * — width and height in CSS pixels — so the drawing buffer holds at most that many pixels,
+   * whatever the size or the density of the screen. Where the budget is what bounds the ratio, the
+   * ratio is rounded down to a step of an eighth, at least an eighth, and may fall below `1`: the
+   * browser scales the canvas up then. {@link Display.maxPixelRatio} bounds the ratio as well;
+   * the lower bound wins. A budget of 3 million pixels leaves a phone at its ratio of 2 and draws
+   * a 4K screen at a ratio of 0.5, rounded down from 0.6.
+   *
+   * While {@link Display.pixelZoom} is above `0`, the budget raises {@link Display.devicePixelZoom}
+   * instead, to the smallest whole zoom at which the drawing buffer stays within it.
+   *
+   * A value that is not a positive finite number counts as `0`. A change takes effect with the
+   * next measurement and emits `OnDisplayResize`, as a change of the pixel ratio does.
+   *
+   * @see {@link DisplayParameters.maxPixels}
+   */
+  maxPixels = 0;
+
+  /**
+   * A factor on the pixel ratio, `1` by default. Below `1` the display draws fewer pixels than its
+   * bounds allow — a scale of 0.75 shades 56 % of them — and the browser scales the canvas up.
+   * Where it is not `1`, the ratio is rounded down to a step of an eighth, at least an eighth.
+   * {@link Display.adaptiveResolution} sets it from frame to frame.
+   *
+   * It does not apply while {@link Display.pixelZoom} is above `0`. A value that is not a
+   * positive finite number counts as `1`. A change takes effect with the next measurement and
+   * emits `OnDisplayResize`, as a change of the pixel ratio does.
+   */
+  resolutionScale = 1;
 
   /**
    * The value of the CSS property `image-rendering` that the display writes into the inline
@@ -758,10 +853,28 @@ export class Display {
 
   #width = 0;
   #height = 0;
+  #devicePixelZoom = 0;
+
+  // the size in CSS pixels the last measurement found, without padding and border: the area a
+  // budget of pixels is spread over
+  #contentWidth = 0;
+  #contentHeight = 0;
+
+  #adaptiveResolution?: AdaptiveResolution;
 
   /**
-   * The width of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
-   * above `0`, and rounded down — as the last measurement of {@link Display.resize} left it. The
+   * The controller that sets {@link Display.resolutionScale} by the cost of a frame, built by the
+   * constructor with the option `adaptiveResolution`; `undefined` without it.
+   *
+   * @see {@link AdaptiveResolution}
+   */
+  get adaptiveResolution(): AdaptiveResolution | undefined {
+    return this.#adaptiveResolution;
+  }
+
+  /**
+   * The width of the display in CSS pixels, rounded down — in pixels of the drawing buffer while
+   * {@link Display.pixelZoom} is above `0` — as the last measurement of {@link Display.resize} left it. The
    * events of the display carry it as `width`. It follows the size source with every
    * measurement: at the start of the frame after a reported change, or of every frame while the
    * display polls — see the resize model of the class. The observer reports after the animation
@@ -773,8 +886,8 @@ export class Display {
   }
 
   /**
-   * The height of the display in CSS pixels — divided by {@link Display.pixelZoom} while that is
-   * above `0`, and rounded down — as the last measurement of {@link Display.resize} left it. The
+   * The height of the display in CSS pixels, rounded down — in pixels of the drawing buffer while
+   * {@link Display.pixelZoom} is above `0` — as the last measurement of {@link Display.resize} left it. The
    * events of the display carry it as `height`. It follows the size source with every
    * measurement: at the start of the frame after a reported change, or of every frame while the
    * display polls — see the resize model of the class. The observer reports after the animation
@@ -994,6 +1107,9 @@ export class Display {
     // WebGPURenderer takes — everything below reads its options from these constants
     const {
       maxFps,
+      maxPixelRatio,
+      maxPixels,
+      adaptiveResolution,
       pauseOutsideViewport,
       resizeTo,
       resizeToElement,
@@ -1012,6 +1128,9 @@ export class Display {
     this.#view = (this.#doc.defaultView ?? window) as Window & typeof globalThis;
 
     this.resizeToCallback = resizeTo;
+    // before the first measurement of the constructor, so the first drawing buffer has the bound
+    this.maxPixelRatio = maxPixelRatio ?? Display.DefaultMaxPixelRatio;
+    this.maxPixels = maxPixels ?? 0;
     this.#styleSheetRoot = styleSheetRoot ?? this.#doc.head;
 
     if (isWebGLRenderer(domElementOrRenderer)) {
@@ -1059,8 +1178,14 @@ export class Display {
           canvas,
           stencil: false,
           alpha: true,
-          antialias: true,
+          // Off unless asked for: a RenderPipeline takes the sample count of the renderer for its
+          // scene pass, which then renders four samples per pixel into half floats and resolves
+          // them, before every pass after it. Pixel art, sprites cut out by the alpha test and
+          // textured quads gain nothing from it; edges of geometry do
+          antialias: false,
           powerPreference: 'high-performance',
+          // the GPU time of a frame is what the controller of adaptiveResolution reads first
+          ...(adaptiveResolution ? {trackTimestamp: true} : null),
           ...rendererOptions,
         } as CreateRendererParameters);
       } catch (error) {
@@ -1110,6 +1235,14 @@ export class Display {
 
       this.#startSizeWatch();
       this.resize();
+
+      if (adaptiveResolution) {
+        this.#adaptiveResolution = new AdaptiveResolution(this, {
+          // a display held to a lower frame rate is held to that one
+          targetFps: isPositiveFinite(maxFps) && maxFps < 60 ? maxFps : undefined,
+          ...(adaptiveResolution === true ? null : adaptiveResolution),
+        });
+      }
 
       on(this.#stateMachine, {
         [DisplayStateMachine.Init]: () => this.#emit(OnDisplayInit),
@@ -1303,15 +1436,51 @@ export class Display {
     return this.#stateMachine.isRunning;
   }
 
+  /**
+   * The device pixels per CSS pixel the display draws at: `1` while {@link Display.pixelZoom} is
+   * above `0`, otherwise {@link Display.devicePixelRatio}, bounded by {@link Display.maxPixelRatio}
+   * and {@link Display.maxPixels}, times {@link Display.resolutionScale} — rounded down to a step
+   * of an eighth where the budget or the scale has made it.
+   */
   get pixelRatio(): number {
     if (this.pixelZoom > 0) {
       return 1.0;
     }
-    return this.devicePixelRatio;
+    const {devicePixelRatio, maxPixelRatio, maxPixels, resolutionScale} = this;
+
+    let ratio = isPositiveFinite(maxPixelRatio) && maxPixelRatio < devicePixelRatio ? maxPixelRatio : devicePixelRatio;
+    let stepped = false;
+
+    const area = this.#contentWidth * this.#contentHeight;
+    if (isPositiveFinite(maxPixels) && area > 0) {
+      const budgetRatio = Math.sqrt(maxPixels / area);
+      if (budgetRatio < ratio) {
+        ratio = budgetRatio;
+        stepped = true;
+      }
+    }
+
+    if (isPositiveFinite(resolutionScale) && resolutionScale !== 1) {
+      ratio *= resolutionScale;
+      stepped = true;
+    }
+
+    // rounded down, so the buffer stays within the budget; the leeway keeps 0.75 × 2 at 1.5
+    return stepped ? Math.max(PIXEL_RATIO_STEP, Math.floor(ratio / PIXEL_RATIO_STEP + 1e-9) * PIXEL_RATIO_STEP) : ratio;
   }
 
   get devicePixelRatio(): number {
     return this.#view.devicePixelRatio ?? 1;
+  }
+
+  /**
+   * The whole device pixels a pixel of the drawing buffer takes on the screen while
+   * {@link Display.pixelZoom} is above `0`, as the last measurement of {@link Display.resize} left
+   * it; `0` without a zoom. `devicePixelZoom / devicePixelRatio` is the size of such a pixel in
+   * CSS pixels, the one a pointer position is divided by.
+   */
+  get devicePixelZoom(): number {
+    return this.#devicePixelZoom;
   }
 
   /**
@@ -1387,14 +1556,22 @@ export class Display {
         const zoom = this.pixelZoom > 0 ? this.pixelZoom : 0;
         // the first frame always measures: the observer reports in the rendering update, after
         // the animation frame callbacks, and would miss a change between the constructor and
-        // the start
-        if (!this.#isFirstFrame && !this.#sizeDirty && zoom === this.#appliedPixelZoom) {
+        // the start. A new maxPixelRatio, maxPixels or resolutionScale is seen by no observer
+        // either: it shows in the ratio, and a budget under a zoom in the budget itself
+        if (
+          !this.#isFirstFrame &&
+          !this.#sizeDirty &&
+          zoom === this.#appliedPixelZoom &&
+          this.pixelRatio === this.#appliedPixelRatio &&
+          this.maxPixels === this.#appliedMaxPixels
+        ) {
           return;
         }
       }
     }
 
     this.#sizeDirty = false;
+    this.#appliedMaxPixels = this.maxPixels;
     this.#measureSizeSource(canvas);
     this.#applyMeasuredSize(canvas);
   }
@@ -1600,49 +1777,81 @@ export class Display {
       cssHeight = 0;
     }
 
-    // pixelRatio is 1 while pixelZoom is above 0, so the limit then holds the CSS size itself
+    // the ratio spreads a budget of pixels over this size
+    this.#contentWidth = wPx;
+    this.#contentHeight = hPx;
+
     const {pixelRatio} = this;
     // a zoom that is NaN or negative works as 0, and counts as 0 in the comparison below: NaN
     // would differ from itself and make every frame measure
     const pixelZoom = this.pixelZoom > 0 ? this.pixelZoom : 0;
 
-    if (wPx * pixelRatio > Display.MaxResolution || hPx * pixelRatio > Display.MaxResolution) {
-      // the warning names the size that was asked for, so it goes out before the clamp
-      showCanvasMaxResolutionWarning(Math.round(wPx * pixelRatio), Math.round(hPx * pixelRatio));
-      wPx = Math.min(wPx, Display.MaxResolution / pixelRatio);
-      hPx = Math.min(hPx, Display.MaxResolution / pixelRatio);
+    let width: number;
+    let height: number;
+    let devicePixelZoom = 0;
+
+    if (pixelZoom > 0) {
+      // Every pixel of the buffer a whole number of device pixels large, so the pixelated upscale
+      // draws all of them equally large: the zoom in device pixels rounded down, the whole pixels
+      // of the buffer that fit into the device pixels of the source, and a canvas of just their
+      // size — a fraction of a CSS pixel at times, always whole in device pixels
+      const ratio = this.devicePixelRatio;
+      devicePixelZoom = Math.max(1, Math.floor(pixelZoom * ratio + DEVICE_PIXEL_ZOOM_EPSILON));
+      if (isPositiveFinite(this.maxPixels)) {
+        // the smallest whole zoom at which the buffer stays within the budget
+        const budgetZoom = Math.ceil(Math.sqrt((wPx * ratio * hPx * ratio) / this.maxPixels) - DEVICE_PIXEL_ZOOM_EPSILON);
+        if (budgetZoom > devicePixelZoom) devicePixelZoom = budgetZoom;
+      }
+      width = Math.floor((wPx * ratio + DEVICE_PIXEL_SIZE_TOLERANCE) / devicePixelZoom);
+      height = Math.floor((hPx * ratio + DEVICE_PIXEL_SIZE_TOLERANCE) / devicePixelZoom);
+
+      if (width > Display.MaxResolution || height > Display.MaxResolution) {
+        showCanvasMaxResolutionWarning(width, height);
+        width = Math.min(width, Display.MaxResolution);
+        height = Math.min(height, Display.MaxResolution);
+      }
+
+      // the padding and border the CSS size carries beyond the size stay as they are
+      const cssPerPixel = devicePixelZoom / ratio;
+      cssWidth = Math.max(0, cssWidth - wPx + width * cssPerPixel);
+      cssHeight = Math.max(0, cssHeight - hPx + height * cssPerPixel);
+    } else {
+      if (wPx * pixelRatio > Display.MaxResolution || hPx * pixelRatio > Display.MaxResolution) {
+        // the warning names the size that was asked for, so it goes out before the clamp
+        showCanvasMaxResolutionWarning(Math.round(wPx * pixelRatio), Math.round(hPx * pixelRatio));
+        wPx = Math.min(wPx, Display.MaxResolution / pixelRatio);
+        hPx = Math.min(hPx, Display.MaxResolution / pixelRatio);
+      }
+
+      // rounded down, so the drawing buffer — Math.floor(width * pixelRatio) — stays within
+      // MaxResolution at a fractional pixel ratio as well
+      width = Math.floor(wPx);
+      height = Math.floor(hPx);
     }
 
     if (
-      wPx === this.#appliedWidthPx &&
-      hPx === this.#appliedHeightPx &&
+      width === this.#appliedWidth &&
+      height === this.#appliedHeight &&
       cssWidth === this.#appliedCssWidth &&
       cssHeight === this.#appliedCssHeight &&
       pixelRatio === this.#appliedPixelRatio &&
-      pixelZoom === this.#appliedPixelZoom
+      pixelZoom === this.#appliedPixelZoom &&
+      devicePixelZoom === this.#appliedDevicePixelZoom
     ) {
       return;
     }
 
-    this.#appliedWidthPx = wPx;
-    this.#appliedHeightPx = hPx;
+    this.#appliedWidth = width;
+    this.#appliedHeight = height;
     this.#appliedCssWidth = cssWidth;
     this.#appliedCssHeight = cssHeight;
     this.#appliedPixelRatio = pixelRatio;
     this.#appliedPixelZoom = pixelZoom;
+    this.#appliedDevicePixelZoom = devicePixelZoom;
 
-    if (pixelZoom > 0) {
-      this.#width = wPx / pixelZoom;
-      this.#height = hPx / pixelZoom;
-    } else {
-      this.#width = wPx;
-      this.#height = hPx;
-    }
-
-    // rounded down, so the drawing buffer — Math.floor(width * pixelRatio) — stays within
-    // MaxResolution at a fractional pixel ratio as well
-    this.#width = Math.floor(this.#width);
-    this.#height = Math.floor(this.#height);
+    this.#width = width;
+    this.#height = height;
+    this.#devicePixelZoom = devicePixelZoom;
 
     // one call for size and ratio: setPixelRatio() on its own resizes the drawing buffer to the
     // old size times the new ratio, and a change from a ratio of 1 to 2 at the limit would ask

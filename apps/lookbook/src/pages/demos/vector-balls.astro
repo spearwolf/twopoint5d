@@ -44,7 +44,7 @@ import {description, title} from './_vector-balls.json';
   // the preview screenshot waits for the balls, not for the default delay
   const preview = deferPreview();
 
-  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
   // the low resolution of an Amiga: about 240 lines, each pixel drawn as a square of whole CSS pixels
   const fitPixelZoom = () => {

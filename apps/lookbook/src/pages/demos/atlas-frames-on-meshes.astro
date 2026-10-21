@@ -41,7 +41,7 @@ import {description, title} from './_atlas-frames-on-meshes.json';
   // the preview screenshot waits for the city, not for the default delay
   const preview = deferPreview();
 
-  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
   await demo.start(async ({renderer}) => {
     // above the roofs, so that the skyline rings show over the city

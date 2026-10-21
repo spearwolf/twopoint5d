@@ -33,7 +33,7 @@ import {description, title} from './_textured-sprites.json';
 
   const RENDER_AS_BILLBOARDS = 'render-as-billboards';
 
-  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
   demo.onInit(async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);

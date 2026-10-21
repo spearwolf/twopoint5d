@@ -43,6 +43,9 @@ function findBlooms(root: Node): BloomNode[] {
 
 interface RendererMock {
   autoClear: boolean;
+  autoClearColor: boolean;
+  autoClearDepth: boolean;
+  autoClearStencil: boolean;
   __clearColor: Color;
   __clearAlpha: number;
   __renderTarget: unknown;
@@ -64,6 +67,10 @@ interface RendererMock {
 function createRendererMock(): RendererMock {
   const m: RendererMock = {
     autoClear: true,
+    // three's defaults: a draw clears every buffer of its target first
+    autoClearColor: true,
+    autoClearDepth: true,
+    autoClearStencil: true,
     __clearColor: new Color(0x111111),
     __clearAlpha: 0.5,
     __renderTarget: null,
@@ -1674,7 +1681,7 @@ describe('StageRenderer', () => {
       expect(clears).toEqual([{kind: 'clear', target: draw.target, color: 0x123456, alpha: 0.25, args: [true, true, true]}]);
     });
 
-    it('applies its own clear to the target it writes to after the stages drew and before the pipeline runs', () => {
+    function makeModeCSetup() {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
@@ -1685,17 +1692,36 @@ describe('StageRenderer', () => {
       sr.pipeline = pipeline as any;
       const log = logClearsAndDraws(stage);
       pipeline.render.mockImplementation(() => log.push({kind: 'pipeline', target: renderer.__renderTarget}));
+      // what comes after the last draw of the stage: the clear and the run of the pipeline
+      const afterStages = () => {
+        const lastDraw = log.map((entry) => entry.kind).lastIndexOf('draw');
+        expect(lastDraw, 'the stage is drawn').toBeGreaterThanOrEqual(0);
+        return log.slice(lastDraw + 1);
+      };
+      return {sr, afterStages};
+    }
+
+    it('applies its own clear to the target it writes to after the stages drew and before the pipeline runs, where the pipeline does not clear it', () => {
+      const {sr, afterStages} = makeModeCSetup();
+      renderer.autoClear = false;
 
       sr.renderTo(renderer as any);
 
-      const lastDraw = log.map((entry) => entry.kind).lastIndexOf('draw');
-      expect(lastDraw, 'the stage is drawn').toBeGreaterThanOrEqual(0);
-      expect(log.slice(lastDraw + 1)).toEqual([
+      expect(afterStages()).toEqual([
         {kind: 'clear', target: null, color: 0x336699, alpha: 0.75, args: [true, true, false]},
         {kind: 'pipeline', target: null},
       ]);
       expect(renderer.__clearColor.getHex(), 'clear color restored').toBe(0x111111);
       expect(renderer.__clearAlpha, 'clear alpha restored').toBe(0.5);
+      expect(renderer.autoClear, 'autoClear left as it was').toBe(false);
+    });
+
+    it('leaves its own clear of the target it writes to to the draw of the pipeline, which clears it under autoClear', () => {
+      const {sr, afterStages} = makeModeCSetup();
+
+      sr.renderTo(renderer as any);
+
+      expect(afterStages()).toEqual([{kind: 'pipeline', target: null}]);
     });
 
     it('lets the stages of Mode C draw linear, and its own pipeline apply the output transform of the caller', () => {
@@ -2452,10 +2478,11 @@ describe('StageRenderer', () => {
       expect(buildOutputNode.mock.calls[0]![0]).toEqual([passA, passB]);
     });
 
-    it('applies its own clear to the target it writes to before the pipeline runs', () => {
+    it('applies its own clear to the target it writes to before the pipeline runs, where the pipeline does not clear it', () => {
       const {sr, pipeline} = makeComposedSetup();
       sr.resize(100, 100);
       sr.setClearColor(null, 0.25);
+      renderer.autoClear = false;
       const log = logClearsAndDraws();
       pipeline.render.mockImplementation(() => log.push({kind: 'pipeline', target: renderer.__renderTarget}));
 
@@ -2466,6 +2493,53 @@ describe('StageRenderer', () => {
         {kind: 'pipeline', target: null},
       ]);
       expect(renderer.__clearAlpha, 'clear alpha restored').toBe(0.5);
+    });
+
+    it('leaves its own clear to the draw of the pipeline where autoClear covers every buffer of it', () => {
+      const {sr, pipeline} = makeComposedSetup();
+      sr.resize(100, 100);
+      sr.setClearColor(new Color(0x336699), 0.75);
+      const log = logClearsAndDraws();
+      pipeline.render.mockImplementation(() => log.push({kind: 'pipeline', target: renderer.__renderTarget}));
+
+      sr.renderTo(renderer as any);
+
+      expect(log).toEqual([{kind: 'pipeline', target: null}]);
+      expect(renderer.__clearColor.getHex(), 'the clear color of the renderer untouched').toBe(0x111111);
+      expect(renderer.__clearAlpha, 'the clear alpha of the renderer untouched').toBe(0.5);
+    });
+
+    it.each(['autoClearColor', 'autoClearDepth', 'autoClearStencil'] as const)(
+      'applies its own clear where %s leaves out a buffer of it',
+      (flag) => {
+        const {sr, pipeline} = makeComposedSetup();
+        sr.resize(100, 100);
+        sr.setClearColor(new Color(0x336699), 0.75);
+        renderer[flag] = false;
+        const log = logClearsAndDraws();
+        pipeline.render.mockImplementation(() => log.push({kind: 'pipeline', target: renderer.__renderTarget}));
+
+        sr.renderTo(renderer as any);
+
+        expect(log).toEqual([
+          {kind: 'clear', target: null, color: 0x336699, alpha: 0.75, args: [true, true, true]},
+          {kind: 'pipeline', target: null},
+        ]);
+      },
+    );
+
+    it('leaves its own clear to the draw of the pipeline where the buffer autoClear leaves out is no buffer of the own clear', () => {
+      const {sr, pipeline} = makeComposedSetup();
+      sr.resize(100, 100);
+      sr.setClearColor(new Color(0x336699), 0.75);
+      sr.clearStencilBuffer = false;
+      renderer.autoClearStencil = false;
+      const log = logClearsAndDraws();
+      pipeline.render.mockImplementation(() => log.push({kind: 'pipeline', target: renderer.__renderTarget}));
+
+      sr.renderTo(renderer as any);
+
+      expect(log).toEqual([{kind: 'pipeline', target: null}]);
     });
 
     it('sizes the pass target of a nested renderer in device pixels, before and after a resize', () => {

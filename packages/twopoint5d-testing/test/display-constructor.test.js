@@ -43,6 +43,40 @@ describe('Display — what the constructor accepts and what it reports', functio
     iframe = undefined;
   });
 
+  it('builds its renderer without multisampling by default, and passes antialias on when asked for it', () => {
+    /** @type {boolean[]} */
+    const antialias = [];
+    const createRenderer = (/** @type {any} */ params) => {
+      antialias.push(params.antialias);
+      return makeRendererStub(params.canvas, Promise.resolve());
+    };
+
+    host = makeContainer();
+    display = new Display(host, {createRenderer});
+    disposeDisplay(display);
+    display = new Display(host, {createRenderer, antialias: true});
+
+    expect(antialias).to.deep.equal([false, true]);
+  });
+
+  it('asks its renderer for timestamps with adaptiveResolution, and only then', () => {
+    /** @type {unknown[]} */
+    const trackTimestamp = [];
+    const createRenderer = (/** @type {any} */ params) => {
+      trackTimestamp.push(params.trackTimestamp);
+      return makeRendererStub(params.canvas, Promise.resolve());
+    };
+
+    host = makeContainer();
+    display = new Display(host, {createRenderer});
+    disposeDisplay(display);
+    display = new Display(host, {createRenderer, adaptiveResolution: true});
+    disposeDisplay(display);
+    display = new Display(host, {createRenderer, adaptiveResolution: true, trackTimestamp: false});
+
+    expect(trackTimestamp).to.deep.equal([undefined, true, false]);
+  });
+
   it('takes a canvas in the document of a same-origin iframe, and measures and styles it there', () => {
     const made = makeIframeDocument({width: 200, height: 100});
     iframe = made.iframe;

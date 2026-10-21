@@ -103,6 +103,12 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 
 - **A canvas, ready to go.** Renderer, resizing and the frame loop are taken care of, and a
   fixed timestep is available for game logic.
+- **Resolution under control.** Pixel art renders at its own resolution and is scaled up
+  crisp. The pixel ratio is capped and multisampling is off unless you ask for it, so
+  high-density phone screens stay affordable.
+- **Holds its frame rate.** A budget of pixels keeps large screens affordable, and with
+  `adaptiveResolution: true` the display measures what every frame costs the GPU and
+  draws fewer or more pixels to stay at 60 frames per second.
 - **A good starting point** for your three.js demos.
 
 ### 🎮 Controls
@@ -122,7 +128,8 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 - the **LOOKBOOK**, a gallery of runnable demos: `pnpm lookbook` in a clone of this
   repository, see the [project README](../../README.md)
 - the guides: [sprites](docs/sprites.md), [text](docs/text.md),
-  [stages](src/stage/README.md), [resource lifecycle](docs/resource-lifecycle.md),
+  [stages](src/stage/README.md), [display: resolution and frame rate](docs/display.md),
+  [resource lifecycle](docs/resource-lifecycle.md),
   [architecture](docs/architecture.md)
 
 have fun! :rocket:
