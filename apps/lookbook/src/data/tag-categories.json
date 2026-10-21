@@ -25,6 +25,9 @@
         "Orientation",
         "Rotation",
         "Tint",
+        "Flash",
+        "PaletteSwap",
+        "wave",
         "billboards"
       ]
     },
@@ -46,6 +49,11 @@
         "atlasFrameTable",
         "sampleAtlasFrame"
       ]
+    },
+    {
+      "name": "Text",
+      "tagId": "text",
+      "includeTags": ["BitmapFont", "writeText", "layoutText"]
     },
     {
       "name": "Map2D",
