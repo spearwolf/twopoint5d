@@ -54,6 +54,16 @@ export const ShadowPass = definePass({
 });
 
 /**
+ * The shadow of segment sprites — `segmentPlacement()` in each of its forms: {@link ShadowPass}
+ * without the turn to the light, so each segment is projected onto `groundPlane` as it lies, in
+ * `shadowColor`. `ShadowPass` turns a sprite about its instance position and would throw the shadow
+ * of the caps at the start of a segment, and refuses a kind of segments. The same projection without
+ * the turn suits sprites that lie in the ground, decals. Named `shadow`, as `ShadowPass` is: a kind
+ * takes one or the other, with the same uniforms and the same `shadowFallsOnPlane` hook.
+ */
+export const SegmentShadowPass = definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]});
+
+/**
  * A reflection behind the sprites: mirrored at `mirrorPlane`, multiplied by `reflectionColor`. It
  * lies behind the ground, so an opaque ground drawn before it hides it.
  */

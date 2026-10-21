@@ -151,7 +151,7 @@ describe('defineSprite()', () => {
   describe('refuses', () => {
     test('a kind without a placement', () => {
       expect(() => defineSprite({base: QuadBase, features: [position]})).toThrow(
-        'defineSprite: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement or axisBillboardPlacement()',
+        'defineSprite: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement, axisBillboardPlacement() or segmentPlacement()',
       );
     });
 
@@ -183,6 +183,29 @@ describe('defineSprite()', () => {
       expect(() => defineSprite({base: QuadBase, features: [position, flat, position]})).toThrow(
         'defineSprite: two features are named "instancePosition"',
       );
+    });
+
+    test('two features of one name ask the checkKind of the first to say why, before the plain refusal', () => {
+      const seen: string[][] = [];
+      const form = (name: string, refuse: boolean) =>
+        defineFeature({
+          name,
+          checkKind: ({features}) => {
+            seen.push(features.map((feature) => feature.name));
+            if (refuse) throw new Error('a kind takes one form of it');
+          },
+        });
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, form('form', true), form('form', false)]})).toThrow(
+        'defineSprite: feature "form": a kind takes one form of it',
+      );
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, form('quiet', false), form('quiet', true)]})).toThrow(
+        'defineSprite: two features are named "quiet"',
+      );
+      expect(seen).toEqual([
+        ['instancePosition', 'flat', 'form', 'form'],
+        ['instancePosition', 'flat', 'quiet', 'quiet'],
+      ]);
     });
 
     test('a feature whose requires the kind does not meet', () => {

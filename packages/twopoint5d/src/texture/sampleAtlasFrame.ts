@@ -1,4 +1,4 @@
-import {clamp, dFdx, dFdy, div, float, fract, min, mix, round, step, sub, texture, vec2} from 'three/tsl';
+import {clamp, float, mix, round, sub, texture, vec2} from 'three/tsl';
 import {
   LinearMipmapLinearFilter,
   LinearMipmapNearestFilter,
@@ -10,6 +10,7 @@ import {
 } from 'three/webgpu';
 
 import type {AtlasFrameTable} from './AtlasFrameTable.js';
+import {sampleFrameAt} from './sampleFrameAt.js';
 
 /** How {@link sampleAtlasFrame} treats a uv outside `[0, 1]` on one axis. */
 export type AtlasFrameWrap = 'clamp' | 'repeat';
@@ -107,48 +108,30 @@ export function sampleAtlasFrame(
   const texCoords = table.element(first);
   const measures = table.element(first.add(1).toInt());
   const margins = table.element(first.add(2).toInt());
-  // 1 for a frame with FLIP_DIAGONAL, 0 otherwise — exactly, as the table writes it. The axes are swapped
-  // by mix() with it and never by select(): three builds a select() as an if/else and declares a value
-  // the graph reads more than once in the branch that builds it first, so a value that both branches,
-  // and the mask after them, read stays unassigned in the other branch. Chromium and Firefox read such
-  // a variable as 0, WebKit's WebGL 2 reads garbage
-  const flipDiagonal = measures.z;
-  const swapped = <T extends Node<'vec2'>>(value: T) => mix(value, value.yx, flipDiagonal);
+  // 1 for a frame with FLIP_DIAGONAL, 0 otherwise — exactly, as the table writes it: sampleFrameAt()
+  // swaps the axes by mix() with it
+  const flipDiagonal = measures.z as unknown as Node<'float'>;
 
   // the uv in the convention of TextureCoords, v counted downwards; continuous, before the wrap
-  const position = origin === 'bottom-left' ? vec2(uv.x, sub(1, uv.y)) : uv;
-  const wrapAxis = (value: Node<'float'>, axis: AtlasFrameWrap) => (axis === 'repeat' ? fract(value) : clamp(value, 0, 1));
-  const wrapped = vec2(wrapAxis(position.x, wrapU), wrapAxis(position.y, wrapV));
-
-  // the position inside the area the frame covers, and how far the tex coords move per unit of uv
-  let inside: Node<'vec2'> = wrapped;
-  let extent: Node<'vec2'> = texCoords.zw;
-  let covered: Node<'float'> | undefined;
-  if (trim === 'mask') {
-    const area = sub(sub(vec2(1, 1), margins.xy), margins.zw);
-    const local = div(sub(wrapped, margins.xy), area);
-    covered = step(0, local.x).mul(step(local.x, 1)).mul(step(0, local.y)).mul(step(local.y, 1));
-    inside = clamp(local, 0, 1);
-    extent = div(texCoords.zw, area);
-  }
-  if (inset > 0) {
-    // the texels of the frame as it is drawn: under the diagonal flip it is `height` wide and `width` high
-    const drawn = swapped(measures.xy);
-    const edge = min(div(inset, drawn), 0.5);
-    inside = clamp(inside, edge, sub(1, edge));
-  }
-
-  const st = texCoords.xy.add(inside.mul(texCoords.zw));
-  const sample = texture(map, swapped(st));
+  const position = (origin === 'bottom-left' ? vec2(uv.x, sub(1, uv.y)) : uv) as unknown as Node<'vec2'>;
   // gradients matter only where a mip level is picked. They are taken nowhere else: three (r186) reads a
   // texture whose filters are both NearestFilter with textureLoad and binds no sampler for it, while its
   // WGSL builder still names that sampler in the textureSampleGrad of a grad() — the shader fails on WebGPU
-  let color = sample as unknown as Node<'vec4'>;
-  if (MIPMAP_FILTERS.includes(map.minFilter)) {
-    const gradX = dFdx(position).mul(extent);
-    const gradY = dFdy(position).mul(extent);
-    color = sample.grad(swapped(gradX), swapped(gradY)) as unknown as Node<'vec4'>;
-  }
+  const mipmapped = MIPMAP_FILTERS.includes(map.minFilter);
 
-  return covered ? color.mul(covered) : color;
+  return sampleFrameAt(
+    (st, gradX, gradY) => {
+      const sample = texture(map, st);
+      return (mipmapped ? sample.grad(gradX, gradY) : sample) as unknown as Node<'vec4'>;
+    },
+    {
+      texCoords,
+      flipDiagonal,
+      margins,
+      // the texels of the frame as it is drawn: under the diagonal flip it is `height` wide and `width` high
+      drawnTexels: mix(measures.xy, measures.yx, flipDiagonal) as unknown as Node<'vec2'>,
+    },
+    position,
+    {wrap: [wrapU, wrapV], trim, inset},
+  );
 }

@@ -13,7 +13,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
-import {DataTexture, OrthographicCamera, PerspectiveCamera, Scene} from 'three/webgpu';
+import {DataTexture, LinearMipmapLinearFilter, NearestFilter, OrthographicCamera, PerspectiveCamera, Scene} from 'three/webgpu';
 
 // The fixtures the browser tests build their cases from. A helper that a second test file
 // needs moves here instead of being copied.
@@ -243,6 +243,34 @@ export function makeColorTexture(texels, width = texels.length, height = 1) {
   const texture = new DataTexture(new Uint8Array(texels.flat()), width, height);
   texture.needsUpdate = true;
   return texture;
+}
+
+/**
+ * A checkerboard of 4 × 4 red and green texels with mipmaps, for drawing magnified: every texel is
+ * drawn by nearest, and only the smallest mip levels show the mix of the two colors — a seam of a
+ * mip level picked too small at the wrap of a repeat shows as pixels {@link countMixed} counts. The
+ * caller disposes it.
+ */
+export function makeMipmappedChecker() {
+  const red = [255, 0, 0, 255];
+  const green = [0, 255, 0, 255];
+  const texels = Array.from({length: 16}, (_, i) => (((i % 4) + Math.floor(i / 4)) % 2 ? green : red));
+  const texture = makeColorTexture(texels, 4, 4);
+  texture.generateMipmaps = true;
+  texture.minFilter = LinearMipmapLinearFilter;
+  texture.magFilter = NearestFilter;
+  return texture;
+}
+
+/** How many lit pixels of a read-back target are neither red nor green: the seam of a mip level picked too small. */
+export function countMixed(pixels) {
+  let mixed = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
+    if (isNearColor(rgb, [0, 0, 0])) continue;
+    if (!isNearColor(rgb, [255, 0, 0], 8) && !isNearColor(rgb, [0, 255, 0], 8)) mixed++;
+  }
+  return mixed;
 }
 
 /**

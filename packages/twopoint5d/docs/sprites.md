@@ -43,10 +43,10 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `frameStage` | any, by `order` | `Flip` |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `Anchor`, `NineSlice`, `QuadSize`, `Shear`, `Rotation` |
-| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()` |
-| `mesh` | any, by `order` | `PlanarShadow`, `MirrorAtPlane` (passes) |
+| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()`, `SegmentPlacement`, `segmentPlacement()` |
+| `mesh` | any, by `order` | `wave()`; `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | `NineSlice` |
-| `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor` |
+| `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor`, `RepeatingTextureColor` |
 | `color` | any, by `order` | `PaletteSwap`, `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
 The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Slice 175, Scale
@@ -184,6 +184,8 @@ flags.dispose();
 | `flatPlacement(options)` | — | — | placement | — |
 | `BillboardPlacement` | — | — | placement | — |
 | `AxisBillboardPlacement`, `axisBillboardPlacement(options)` | — | — | placement | — |
+| `SegmentEnd` | `segmentEnd` (dynamic) | `endX`, `endY`, `endZ`, `setSegmentEnd(x, y, z?)` | — | ends at the origin |
+| `SegmentPlacement`, `segmentPlacement(options)` | — | — | placement | — |
 | `Yaw` | `yaw` (static) | `yaw` | — | 0 |
 | `Orientation` | `orientation` (static) | `qx`, `qy`, `qz`, `qw`, `setOrientation()`, `setQuaternion(q)`, `getQuaternion(target?)`, `setYaw(angle)` | — | unturned, `(0, 0, 0, 1)` |
 | `QuadSize` | `quadSize` (static), word `size` | `width`, `height`, `setQuadSize()`, `setSize(w, h)` | local, `Scale` | 0 × 0 |
@@ -193,9 +195,11 @@ flags.dispose();
 | `AnimatedFrames` | `anim` (static): `animId`, `animOffset`; uniform `time` (shared); texture `animsMap` | `animId`, `animOffset` | frame | 0, 0 |
 | `TableFrame`, `tableFrame(options)` | `frameIndex` (static); texture `frameTable` | `frameIndex` | frame | 0 |
 | `TextureColor` | — (texture `colorMap`) | — | color source | — |
+| `RepeatingTextureColor` | — (texture `colorMap`; requires `InstancePosition`, `SegmentEnd`, `QuadSize`) | — | color source | — |
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
+| `wave(options)` | — (uniforms `waveAmplitude`, `waveFrequency`, `waveSpeed`, `time` shared) | — | mesh, `Offset` | — |
 | `Flip` | `flip` (static) | `flipX`, `flipY`, `setFlip()` | frame stage, `Flip` | unflipped, 0, 0 |
 | `Anchor` | `anchor` (static) | `anchorX`, `anchorY`, `setAnchor()`, `setAnchorFromPivot(frame, slice?)` | local, `Anchor` | the middle, 0.5, 0.5 |
 | `NineSlice` | `sliceInsets`, `sliceScale` (static), `sliceInsets` part of the word `texCoords` | `insetLeft` … `insetBottom`, `setSliceInsets()`, `sliceScale`, `setSliceFrame(frame, slice?)` | local, `Slice`; uv, `Slice` | no border, scale 1 |
@@ -441,6 +445,96 @@ dialog.setPosition(16, 200);
 - `checkKind` refuses a kind on any other base — `defineSprite: feature "nineSlice": needs the base
   gridBase({columns: 3, rows: 3}), not "quad" — …` — and one no feature of which declares the
   `colorMap`. A 3 × 3 grid shades 16 vertices per sprite.
+
+### Waves: sway and scroller
+
+`wave(options)` moves the placed vertex along an axis of the mesh by a sine of time and of the
+instance position — one stage, two looks. `wave({weight: 'top'})` sways grass, trees, flags and
+seaweed: the top moves, the foot stays. `wave({weight: 'uniform'})` moves the whole sprite: the
+glyphs of a sine scroller, a bobbing row of coins.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  gridBase,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  wave,
+} from '@spearwolf/twopoint5d';
+
+// grass that bends: four rows of cells, each row line moves on its own
+const Grass = defineSprite({
+  base: gridBase({columns: 1, rows: 4}),
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, wave({weight: 'top'})],
+});
+
+// coins that bob along a row, each whole
+const Coin = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, wave({weight: 'uniform'})],
+});
+
+// the foot on the ground: the pivot at the bottom edge
+const meadow = new FeatureSprites(Grass, {
+  capacity: 500,
+  baseArgs: [0.5, 0.5, 0, 0.5],
+  // 6 units at the top, a wave every 40 units, a third of a wave per second
+  uniforms: {waveAmplitude: 6, waveFrequency: 1 / 40, waveSpeed: 1 / 3},
+});
+for (let i = 0; i < 100; i++) {
+  const blade = meadow.createSprite();
+  blade?.setPosition(i * 4, 0, 0);
+  blade?.setSize(8, 32);
+}
+
+const coins = new FeatureSprites(Coin, {capacity: 16, uniforms: {waveAmplitude: 2, waveFrequency: 1 / 64, waveSpeed: 0.5}});
+
+export function frame(seconds: number) {
+  meadow.setUniform('time', seconds);
+  coins.setUniform('time', seconds);
+  meadow.update();
+  coins.update();
+}
+```
+
+```text
+phase  = 2π · (waveFrequency · (x + z of instancePosition) − waveSpeed · time)
+weight = (1 − uv.y)²    for 'top', with uv the base uv: 1 at the top edge, 0 at the foot
+       = 1              for 'uniform'
+vertex = vertex + axis · waveAmplitude · weight · sin(phase)
+```
+
+- **Units.** `waveAmplitude` is in units of the mesh, `waveFrequency` in waves per unit of the mesh,
+  `waveSpeed` in waves per second; the wave runs towards +x at `waveSpeed / waveFrequency` units per
+  second, a negative speed the other way. The three uniforms belong to the kind and start at 1 —
+  set them through `uniforms` or `setUniform()`; `bindUniform()` binds them like any other.
+- **The phase** comes from `x + z` of the instance position, so a field does not sway in lockstep:
+  a row in the XY plane takes it from x, a field on the ground in the XZ plane gets a diagonal
+  front. There is no phase or amplitude per sprite; a kind that needs one writes a mesh stage of its
+  own, as `Banner` under "A grid base" does.
+- **The axis** is `'x'` for `'top'` and `'y'` for `'uniform'`; `wave({weight: 'top', axis: 'z'})`
+  takes another. It is an axis of the mesh, after the placement: wind blows along X whichever way a
+  billboard faces.
+- **Quad or grid.** On the quad `'top'` is a shear — the two top corners move by the full amount,
+  the bottom ones stay. On `gridBase({columns: 1, rows: n})` every row line moves by its own weight,
+  halfway up a quarter of the top's amount: the sprite bends. `'uniform'` moves every vertex alike,
+  so take the quad for it. The weight is the base uv's: a pivot moved by `baseArgs`, an `Anchor` and
+  a trimmed frame weigh as the untrimmed sprite does. It is the top of the image that sways: under
+  `Flip` with `flipY` the image hangs upside down and the bottom of the quad sways — a vine hanging
+  from a ceiling.
+- **`time` is shared** with `AnimatedFrames`: a kind with both holds one `time`, and one
+  `setUniform('time', t)` plays the animation and moves the wave.
+- **One wave per kind.** Every form is named `wave`, and `defineSprite()` refuses a second: `a kind
+  takes one wave — pick one weight and one axis, or write a mesh stage of your own for a second
+  motion`. `wave()` answers one frozen feature per set of options and refuses options without a `weight`,
+  an unknown weight and an unknown axis with a `TypeError`.
+- **Passes** draw the mesh stages of the kind, so a shadow or a reflection sways with its sprite; a
+  pass that wants it still leaves the wave out, `without: ['wave']`.
 
 ### Frames out of an atlas
 
@@ -1200,6 +1294,166 @@ markers.dispose();
 - Cost: no data, and per vertex about what `BillboardPlacement` costs — two normalizations, a
   length and a select.
 
+### Segments: ropes, chains, lasers
+
+A rope, a chain, a laser, a lightning bolt, a tracer, the edge of a graph: a quad stretched from one
+point to another. `SegmentEnd` gives each sprite a second point, and `segmentPlacement()` lays the
+quad from its `instancePosition` to its `segmentEnd` — no position, size or rotation worked out per
+segment on the CPU, and one draw call for every rope of a scene. The physics stays in the game: the
+sprites draw whatever a simulation writes.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  SegmentEnd,
+  SegmentPlacement,
+  segmentPlacement,
+  TextureColor,
+  Tint,
+} from '@spearwolf/twopoint5d';
+
+// a rope in the XY plane: the 2D case
+const Rope = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, SegmentEnd, SegmentPlacement, QuadSize, AtlasFrame, TextureColor],
+});
+
+// a laser in a 3D scene: turned about itself to face the camera
+const Laser = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, SegmentEnd, segmentPlacement({facing: 'camera'}), QuadSize, AtlasFrame, TextureColor, Tint],
+});
+
+const points = Array.from({length: 9}, (_, i) => ({x: i * 16, y: -Math.sin((i / 8) * Math.PI) * 24}));
+const ropes = new FeatureSprites(Rope, {capacity: 64});
+const links = points.slice(1).map(() => {
+  const link = ropes.createSprite()!;
+  link.setSize(4, 4); // 4 thick, caps of 2 beyond each end, so that the links overlap at the joints
+  return link;
+});
+
+const lasers = new FeatureSprites(Laser, {capacity: 16});
+const beam = lasers.createSprite()!;
+beam.setPosition(0, 1, 0);
+beam.setSegmentEnd(0, 1, -40);
+beam.setSize(0.5, 0.5); // round caps of a quarter unit, half a unit thick
+
+export function frame() {
+  // the simulation moved the points; each link runs from one to the next
+  links.forEach((link, i) => {
+    link.setPosition(points[i]!.x, points[i]!.y);
+    link.setSegmentEnd(points[i + 1]!.x, points[i + 1]!.y);
+  });
+  ropes.update(); // both ends are dynamic attributes: every update() uploads them
+  lasers.update();
+}
+```
+
+- **`QuadSize` keeps its meaning.** `height` is the thickness. `width` is the extra length of the
+  caps, half of it beyond each end: `setSize(thickness, thickness)` gives a round frame room to
+  close the rope. Without `QuadSize` the local quad is the unit quad — one unit thick, caps of half
+  a unit.
+- **Where a vertex lies** along the segment is its base `uv.x`, 0 at the start and 1 at the end; its
+  local x — after `QuadSize` — moves it on for the caps, its local y across for the thickness. With
+  `baseArgs` of `[0.5, 0.5, 0.5, 0]` the local x runs from 0 to `width`, and the whole cap sits
+  beyond the end. On `gridBase({columns: n, rows: 1})` every column line lies at its own point of
+  the segment: a strip that a mesh stage of one's own can bend into a lightning bolt.
+- **The facings.** `segmentPlacement()` — `SegmentPlacement` — lays the segment into the XY plane of
+  the mesh, its thickness to the left of its direction: a segment from left to right shows its frame
+  upright and faces +Z, as a flat sprite does. `segmentPlacement({plane: 'xz'})` lays it onto the
+  ground: a segment along +X shows the top of its frame towards −Z and faces +Y, as `GroundPlacement`
+  lays a sprite. `segmentPlacement({facing: 'camera'})` turns the quad about the segment until its
+  face looks at the camera position, brought into the local space of the mesh as for the
+  billboards — the 3D case, under a perspective and an orthographic camera alike.
+- **`Anchor`** says where on the image the segment runs: `anchorY` across it — 0.5, the default, the
+  middle of the thickness, 1 the foot of the image, so a plank lies on its rope — and `anchorX` how
+  the caps split — 0 puts the whole of `width` beyond the end, 1 before the start. It mirrors with
+  the image under `Flip`, as everywhere.
+- **Degenerate segments draw something.** A segment shorter than `1e-6` — a new one, which starts
+  and ends at the origin — draws its caps quad, `width × height`, along +X in the plane or along the
+  right of the camera. A segment along the normal of its plane takes the plane's up as its across.
+  A segment that points at the camera turns its across over to the camera's up within a sine of 0.1,
+  as an axis billboard turns its right, and draws the line it is from there. Nothing is NaN.
+- **No `Rotation`, no `Shear`.** A segment lies along its ends whatever its local quad does, so
+  `defineSprite()` refuses either next to a segment placement — `a segment lies along its ends, so
+  it cannot follow the local stage of "rotation" — move the ends instead, and take Rotation out of
+  the kind`. `Yaw` and `Orientation` are data and are ignored, as under a billboard.
+- **Swaps.** The three forms — named `segmentPlacement`, `segmentPlacement+xz` and
+  `segmentPlacement+camera` — bring nothing but their placement stage and their check, so they stand
+  in for each other on a live material. A flat placement or a billboard may stand in for one too,
+  and draws the quad of `QuadSize` at the start of each segment — rarely what a rope wants.
+  `segmentPlacement()` refuses a facing or a plane it does not know, and a `plane` next to
+  `facing: 'camera'`, with a `TypeError`.
+- **The texture along the segment.** `TextureColor` stretches the frame from end to end.
+  `RepeatingTextureColor` repeats it, its texels kept square: `(length / thickness) / aspect` times,
+  with `length` the segment and its caps, `thickness` the `height` and `aspect` the width over the
+  height of the frame as drawn. A 64 × 16 frame on a segment 8 long and 1 thick repeats twice. It
+  takes the place of `TextureColor` (a kind holds one color source) and needs `QuadSize`:
+
+  ```ts check
+  import {
+    AtlasFrame,
+    defineSprite,
+    FeatureSprites,
+    InstancePosition,
+    QuadBase,
+    QuadSize,
+    RepeatingTextureColor,
+    SegmentEnd,
+    SegmentPlacement,
+    type TextureAtlas,
+  } from '@spearwolf/twopoint5d';
+  import type {Texture} from 'three/webgpu';
+
+  declare const bridge: TextureAtlas;
+  declare const bridgeTexture: Texture;
+
+  const Chain = defineSprite({
+    base: QuadBase,
+    features: [InstancePosition, SegmentEnd, SegmentPlacement, QuadSize, AtlasFrame, RepeatingTextureColor],
+  });
+
+  const chains = new FeatureSprites(Chain, {capacity: 32, textures: {colorMap: bridgeTexture}});
+  const chain = chains.createSprite()!;
+  chain.setFrame(bridge.frame('chain')!); // 64 × 16 pixels: one repetition every 4 thicknesses
+  chain.setPosition(0, 100);
+  chain.setSegmentEnd(96, 40);
+  chain.setSize(0, 8);
+  chains.update();
+  ```
+
+  It works per fragment — the repeat wraps exactly, and a uv stage of the kind runs per fragment
+  under it. Along the segment the frame repeats, across it is held at its edges, and the lookup keeps
+  half a texel inside the frame, so a linear sample never reaches the neighbouring frame of an
+  atlas. A mipmapped `colorMap` is sampled with explicit gradients — any `colorMap` whose filters are
+  not both `NearestFilter` — so the repeat shows no seam of the smallest mip level at its wraps; the
+  smaller mip levels of an atlas still mix neighbouring frames (see "Atlas frames on meshes of one's
+  own"). Under `Flip` with `flipX` the segment shows the mirror image of the unflipped one: the frame
+  mirrored, its repeat counted from the end, so a repeat that is no whole number ends where the
+  unflipped one begins; `flipY` turns the frame upside down across the segment. The art repeats on
+  a column boundary: a frame whose last column leads into its first, as the segment frames of the
+  lookbook's rope bridge do. A trimmed frame is stretched over the quad — pack segment frames
+  untrimmed. The math is the one of `sampleAtlasFrame()`, with `wrap: ['repeat',
+  'clamp']`, `trim: 'stretch'` and `inset: 0.5`.
+- **Joins.** Two segments meet in a gap or an overlap on the outside of a bend. Caps of the
+  thickness and a round frame hide it for ropes; a mitred ribbon is a mesh of its own.
+- **Passes.** `ShadowPass` turns every sprite to the light about its instance position, and
+  `BillboardReflectionPass` places it as a billboard there — of a segment, both would draw the quad
+  of its caps at its start, so both refuse a kind of segments, naming the pass to take.
+  `SegmentShadowPass` projects each segment onto the ground as it lies: `ShadowPass` without the turn
+  to the light, named `shadow` as well. `ReflectionPass` mirrors the placed vertex, which is the
+  mirror image of a segment in a plane. A segment that faces the camera mirrors into a ribbon that
+  faces the mirror image of the camera, as a mirrored billboard does: the camera sees it at twice
+  its height angle above the mirror, thinner the higher the camera, edge on at 45° — no pass ships
+  for that; draw the reflected ropes of a mirror in a plane.
+- **Cost.** 12 bytes per sprite for the end, uploaded with every `update()`; per vertex two lengths
+  and two divisions in the plane, a cross product and a dot product more facing the camera.
+
 ## FeatureSprites
 
 `FeatureSprites` is the mesh of a kind: a `VertexObjects` that builds the `FeatureSpritesGeometry`
@@ -1561,7 +1815,10 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   `defineSprite()` runs it last, once every other check has passed, and refuses the kind as
   `defineSprite: feature "name": <message>`; a pass runs the checks of its features against the
   features it draws with, and a placement that stands in on a live material runs its own against
-  the kind with itself in place of the kind's placement.
+  the kind with itself in place of the kind's placement. Where two features of a kind share a name —
+  two forms of one factory, as `wave()` gives every form the name `wave` — `defineSprite()` asks the
+  `checkKind` of the first before every other check, so that it can say why a kind takes one; a
+  check that lets it pass leaves the plain refusal, `two features are named "wave"`.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
@@ -1748,9 +2005,9 @@ The rules:
   and every texture stay the caller's. Passes need a material the sprites build, so they are
   refused next to a `material` handed in.
 
-Three passes ship ready-made. All are `transparent`, write no depth, draw both sides of a triangle
+Four passes ship ready-made. All are `transparent`, write no depth, draw both sides of a triangle
 (`side: DoubleSide`) and take a `renderOrder` of -1; `ShadowPass` takes a polygon offset as well
-(`polygonOffset`, with a factor and units of -1). A plane is `[n.x, n.y, n.z, d]`, the plane
+(`polygonOffset`, with a factor and units of -1), and so does `SegmentShadowPass`. A plane is `[n.x, n.y, n.z, d]`, the plane
 `dot(n, p) = d` in the local space of the mesh; `n` need not be a unit vector, so `[0, 2, 0, 4]`
 is the plane `y = 2`. A ground or a light in the scene graph need not be worked out by hand —
 see "Binding uniforms to the scene graph" below:
@@ -1760,14 +2017,16 @@ see "Binding uniforms to the scene graph" below:
 | `ShadowPass` | `LightFacingPlacement`, `PlanarShadow`, `ShadowMask` | `shadowLight` (`[-0.4, 1, -0.3, 0]`), `groundPlane` (`[0, 1, 0, 0]`), `shadowColor` (`[0, 0, 0, 0.5]`) | the sprite turned to face the light, projected from `shadowLight` onto `groundPlane` — along a direction towards the light (`w = 0`) or from a point light (`w = 1`) — in `shadowColor`, its alpha multiplied by the alpha of the sprite |
 | `ReflectionPass` | `MirrorAtPlane`, `Darken` | `mirrorPlane` (`[0, 1, 0, 0]`), `reflectionColor` (`[0.5, 0.5, 0.5, 0.5]`) | the sprite mirrored at `mirrorPlane`, `p − 2 · (dot(n, p) − d) · n / dot(n, n)`, its color multiplied by `reflectionColor`, alpha included — the reflection of a flat sprite |
 | `BillboardReflectionPass` | `MirroredBillboardPlacement`, `MirrorAtPlane`, `Darken` | as `ReflectionPass` | the reflection of a billboard: facing the camera, as large as the sprite on screen, flipped across the mirror — in `reflectionColor` |
+| `SegmentShadowPass` | `PlanarShadow`, `ShadowMask` | as `ShadowPass` | the sprite projected as it lies, not turned to the light — the shadow of a segment sprite, or of a decal; named `shadow` |
 
 Which pass suits which placement:
 
 | placement | shadow | reflection |
 | --- | --- | --- |
-| `FlatPlacement`, `flatPlacement()` | `ShadowPass` — turned to the light; for decals `definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` | `ReflectionPass` |
+| `FlatPlacement`, `flatPlacement()` | `ShadowPass` — turned to the light; for decals `SegmentShadowPass`, projected as they lie | `ReflectionPass` |
 | `BillboardPlacement` | `ShadowPass` | `BillboardReflectionPass` |
 | `AxisBillboardPlacement`, `axisBillboardPlacement()` | `ShadowPass` | `ReflectionPass` |
+| `SegmentPlacement`, `segmentPlacement()` | `SegmentShadowPass` — the segment projected as it lies; `ShadowPass` refuses the kind | `ReflectionPass` for `'plane'`; facing the camera, the mirrored ribbon thins out towards a camera 45° above the mirror; `BillboardReflectionPass` refuses the kind |
 
 `ShadowPass` turns every sprite to the light, whatever its placement, so an axis billboard throws
 the shadow a flat or a spherical one throws. An axis billboard stands along its axis, so in a mirror
@@ -1777,9 +2036,10 @@ sprite on screen. `BillboardReflectionPass` would lean that reflection towards t
 sprite stands upright. In a mirror of another tilt `ReflectionPass` shows the mirror image of the
 card as it stands, as for a flat sprite.
 
-`ShadowPass` carries the hook `shadowFallsOnPlane` (see "Leaving a pass out for a frame" below);
-the two reflections carry none and are drawn whenever they are on. `BillboardReflectionPass` is
-named `reflection`, as `ReflectionPass` is: a kind takes one or the other.
+`ShadowPass` and `SegmentShadowPass` carry the hook `shadowFallsOnPlane` (see "Leaving a pass out
+for a frame" below); the two reflections carry none and are drawn whenever they are on.
+`SegmentShadowPass` is named `shadow`, as `ShadowPass` is, and `BillboardReflectionPass` is named
+`reflection`, as `ReflectionPass` is: a kind takes one or the other of each pair.
 
 **The turn to the light.** A sprite is flat. Projected as it stands, a sprite that the light sees
 at a slant throws a thin, stretched shadow, and one it sees edge on throws a line — a billboard
@@ -1801,8 +2061,8 @@ anchor sits at its foot starts at the foot and runs straight away from the light
 The shadow follows the light, not the placement, so it does not change under a placement swap,
 and it ignores the plane and the turn of `flatPlacement()`. For sprites that lie in the ground —
 decals, `GroundPlacement` — the turn is wrong: they would throw the shadow of a standing quad. A
-pass that projects the sprites as they stand leaves the placement out:
-`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})`. It keeps the yaw or the
+pass that projects the sprites as they stand leaves the placement out: `SegmentShadowPass`, which is
+`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` and draws segment sprites as well. It keeps the yaw or the
 quaternion, too, and throws the shadow of a sign as it is turned — thin where the light grazes it.
 
 **The reflection of a billboard.** `ReflectionPass` mirrors the placed vertex, which is right for a

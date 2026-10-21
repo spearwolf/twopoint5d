@@ -16,6 +16,8 @@ import {InstancePosition} from './features/InstancePosition.js';
 import {Orientation} from './features/Orientation.js';
 import {PaletteSwap} from './features/PaletteSwap.js';
 import {QuadSize} from './features/QuadSize.js';
+import {SegmentEnd} from './features/SegmentEnd.js';
+import {segmentPlacement} from './features/SegmentPlacement.js';
 import {tableFrame} from './features/TableFrame.js';
 import {TextureColor} from './features/TextureColor.js';
 import {Yaw} from './features/Yaw.js';
@@ -208,6 +210,31 @@ describe('sprites on the hot path', () => {
     });
 
     expect(bytesPerRound / (all.length * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
+  test('moving both ends of a segment allocates nothing per call', async () => {
+    const kind = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, SegmentEnd, segmentPlacement({facing: 'camera'}), QuadSize, AtlasFrame, TextureColor],
+    });
+    const sprites = new FeatureSprites(kind, {capacity: 1000});
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+    // the tuple a caller keeps for an end it writes in one go
+    const end: [number, number, number] = [3.5, 0.25, -1.5];
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        const segment = all[i]!;
+        segment.setPosition(i, 1.5, 2.5);
+        segment.setSegmentEnd(i, 2.5, 0.5);
+        segment.setSegmentEnd(i, 0.75);
+        segment.setSegmentEnd(end);
+      }
+      sprites.update();
+    });
+
+    expect(bytesPerRound / (all.length * 4)).toBeLessThan(BYTES_PER_CALL_LIMIT);
     sprites.dispose();
   });
 
