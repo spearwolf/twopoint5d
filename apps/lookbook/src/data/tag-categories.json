@@ -25,6 +25,10 @@
         "Orientation",
         "Rotation",
         "Tint",
+        "Anchor",
+        "SegmentEnd",
+        "segmentPlacement",
+        "RepeatingTextureColor",
         "billboards"
       ]
     },

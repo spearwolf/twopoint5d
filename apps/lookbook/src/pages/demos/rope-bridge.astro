@@ -1,0 +1,164 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_rope-bridge.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-2 items-center justify-end">
+      <div class="actionBtn toggleRepeat">texture: repeating</div>
+      <div class="actionBtn dropLantern">drop a lantern</div>
+    </section>
+    <div class="hint fixed bottom-4 left-4">drag a rope · click into the air to drop a lantern</div>
+    <div class="hint linkCount fixed bottom-4 right-4">rope links: …</div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #070a12;
+    color: #b8c8e8;
+  }
+  #canvas-container {
+    touch-action: none;
+    cursor: grab;
+  }
+  #canvas-container.dragging {
+    cursor: grabbing;
+  }
+  .hint {
+    font-family: monospace;
+    font-size: 100%;
+    padding: 0.3em 0.6em;
+    background: rgba(8 12 24 / 70%);
+    border-radius: 4px;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    createBloomOutputNodeBuilder,
+    Display,
+    OnStageUpdateFrame,
+    OrthographicProjection,
+    Stage2D,
+    StageRenderer,
+    type StageUpdateFrameProps,
+  } from '@spearwolf/twopoint5d';
+  import {Color, RenderPipeline} from 'three/webgpu';
+  import {CAVE_HEIGHT, RopeBridge} from '~demos/rope-bridge/RopeBridge';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+
+  // the bridge spans about 460 units; the view keeps it whole
+  const MIN_VIEW_WIDTH = 480;
+
+  // the preview screenshot waits for the first clash of the blades, not for the default delay
+  const preview = deferPreview();
+
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  // one unit is one pixel of the art, drawn `pixelZoom` screen pixels large: always a whole number,
+  // so the pixel art stays crisp. The view is about as high as the cave, and as wide as the window
+  const projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 2});
+  const stage = new Stage2D(projection);
+  stage.scene.background = new Color('#070a12');
+
+  // the glow: every stage composed, and the bloom of whatever is brighter than white on top
+  const stageRenderer = new StageRenderer(display).add(stage);
+  const pipeline = new RenderPipeline(display.renderer!);
+  const withGlow = createBloomOutputNodeBuilder({strength: 1.1, radius: 0.45, threshold: 1});
+  stageRenderer.pipeline = pipeline;
+  stageRenderer.buildOutputNode = withGlow;
+
+  let pixelZoom = 2;
+  let bridge: RopeBridge | undefined;
+
+  display.onResize(({width, height}) => {
+    pixelZoom = Math.max(1, Math.min(Math.round(height / CAVE_HEIGHT), Math.floor(width / MIN_VIEW_WIDTH)));
+    projection.viewSpecs = {pixelZoom};
+    stage.updateProjection(true);
+    const view = projection.getViewRect();
+    bridge?.resizeView(view.width, view.height);
+  });
+
+  display.onInit(async ({renderer}) => {
+    const store = await loadTextureCatalog(renderer);
+    const [[atlas, texture], [caveBack], [caveMid], [caveFront]] = await Promise.all([
+      store.getAsync('ropeBridgeAtlas', ['atlas', 'texture']),
+      store.getAsync('ropeBridgeCaveBack', ['texture']),
+      store.getAsync('ropeBridgeCaveMid', ['texture']),
+      store.getAsync('ropeBridgeCaveFront', ['texture']),
+    ]);
+
+    // a dispose() while the textures loaded has gone out already: nothing is built
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
+
+    bridge = new RopeBridge(stage.scene, {atlas, texture, caveBack, caveMid, caveFront});
+    const view = projection.getViewRect();
+    if (view.height > 0) bridge.resizeView(view.width, view.height);
+
+    bridge.onClash = (count) => {
+      // the second clash: the bridge has swung a little, the sparks fly
+      if (count === 2) preview.ready(display);
+    };
+
+    on(stage, OnStageUpdateFrame, ({deltaTime}: StageUpdateFrameProps) => bridge?.update(deltaTime));
+
+    // the pointer, in view units from the middle of the canvas
+    const toView = (event: PointerEvent): [number, number] => {
+      const rect = canvas.getBoundingClientRect();
+      return [
+        (event.clientX - rect.left - rect.width / 2) / pixelZoom,
+        (rect.height / 2 - (event.clientY - rect.top)) / pixelZoom,
+      ];
+    };
+    canvas.addEventListener('pointerdown', (event) => {
+      if (bridge?.pointerDown(...toView(event)) === 'grab') {
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add('dragging');
+      }
+    });
+    canvas.addEventListener('pointermove', (event) => bridge?.pointerMove(...toView(event)));
+    const letGo = () => {
+      bridge?.pointerUp();
+      canvas.classList.remove('dragging');
+    };
+    canvas.addEventListener('pointerup', letGo);
+    canvas.addEventListener('pointercancel', letGo);
+
+    // the buttons and the readout are written by the markup of this very page
+    const repeatButton = document.querySelector('.toggleRepeat')!;
+    repeatButton.addEventListener('click', () => {
+      bridge!.repeating = !bridge!.repeating;
+      repeatButton.textContent = `texture: ${bridge!.repeating ? 'repeating' : 'stretched'}`;
+    });
+    document.querySelector('.dropLantern')!.addEventListener('click', () => {
+      bridge?.dropLantern((Math.random() - 0.5) * 240, 150);
+    });
+    document.querySelector('.linkCount')!.textContent = `${bridge.linkCount} rope links · 1 draw call`;
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('rope bridge', bridge);
+
+    display.onDispose(() => {
+      bridge?.dispose();
+      store.dispose();
+    });
+  });
+
+  display.onDispose(() => {
+    // the renderer lets go first, then the builder and the pipeline go
+    stageRenderer.dispose();
+    withGlow.dispose();
+    pipeline.dispose();
+  });
+
+  await display.start();
+</script>
