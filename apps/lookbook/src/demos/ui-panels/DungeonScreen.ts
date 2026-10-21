@@ -3,13 +3,13 @@ import {
   DynamicAtlas,
   FeatureSprites,
   layoutText,
-  type SpriteKind,
   type TexturedSprite,
   TexturedSpriteKind,
   type TextureAtlas,
   type TextureAtlasFrame,
   type WriteTextOptions,
   writeText,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {Color, Group, type Texture} from 'three/webgpu';
 
@@ -37,9 +37,8 @@ export interface DungeonScreenAssets {
   portraits: ReadonlyMap<string, HTMLImageElement>;
 }
 
-type SpritesOf<K> = K extends SpriteKind<infer Api> ? FeatureSprites<Api> : never;
-type PanelSprites = SpritesOf<typeof PanelKind>;
-type TextSprites = SpritesOf<typeof TexturedSpriteKind>;
+type PanelSprites = FeatureSpritesOf<typeof PanelKind>;
+type TextSprites = FeatureSpritesOf<typeof TexturedSpriteKind>;
 
 interface Rect {
   x: number;
@@ -178,7 +177,7 @@ export class DungeonScreen extends Group {
 
   readonly #back: PanelSprites;
   readonly #icons: TextSprites;
-  readonly #pictures: SpritesOf<typeof PictureKind>;
+  readonly #pictures: FeatureSpritesOf<typeof PictureKind>;
   readonly #front: PanelSprites;
   readonly #text: TextSprites;
 
@@ -509,7 +508,7 @@ export class DungeonScreen extends Group {
     this.#pictures.spritePool?.touchVO(picture);
   }
 
-  #hide(mesh: PanelSprites | TextSprites | SpritesOf<typeof PictureKind>, sprite: Panel | TexturedSprite | Picture): void {
+  #hide(mesh: PanelSprites | TextSprites | FeatureSpritesOf<typeof PictureKind>, sprite: Panel | TexturedSprite | Picture): void {
     if (sprite.width === 0) return;
     sprite.setSize(0, 0);
     mesh.spritePool?.touchVO(sprite, 'quadSize');

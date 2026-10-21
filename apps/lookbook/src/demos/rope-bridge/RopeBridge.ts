@@ -10,7 +10,6 @@ import {
   RepeatingTextureColor,
   Rotation,
   SegmentEnd,
-  type SpriteKind,
   type SpriteOf,
   segmentPlacement,
   type TextureAtlas,
@@ -18,6 +17,8 @@ import {
   TextureColor,
   TexturedSpriteKind,
   Tint,
+  type FeatureSpritesOf,
+  type SpriteKindApiOf,
 } from '@spearwolf/twopoint5d';
 import {
   AdditiveBlending,
@@ -84,8 +85,7 @@ const CaveKind = defineSprite({
   features: [InstancePosition, FlatPlacement, QuadSize, TextureColor],
 });
 
-type ApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
-type RopeApi = ApiOf<typeof RopeKind>;
+type RopeApi = SpriteKindApiOf<typeof RopeKind>;
 type Rope = SpriteOf<typeof RopeKind>;
 type Plank = SpriteOf<typeof PlankKind>;
 type Prop = SpriteOf<typeof PropKind>;
@@ -247,11 +247,11 @@ export class RopeBridge {
   #nextWeight = 0;
   #nextSpark = 0;
 
-  readonly #plankSprites: FeatureSprites<ApiOf<typeof PlankKind>>;
-  readonly #props: FeatureSprites<ApiOf<typeof PropKind>>;
+  readonly #plankSprites: FeatureSpritesOf<typeof PlankKind>;
+  readonly #props: FeatureSpritesOf<typeof PropKind>;
   readonly #blades: FeatureSprites<RopeApi>;
-  readonly #glow: FeatureSprites<ApiOf<typeof TexturedSpriteKind>>;
-  readonly #cave: FeatureSprites<ApiOf<typeof CaveKind>>[] = [];
+  readonly #glow: FeatureSpritesOf<typeof TexturedSpriteKind>;
+  readonly #cave: FeatureSpritesOf<typeof CaveKind>[] = [];
   readonly #caveTiles: SpriteOf<typeof CaveKind>[][] = [];
   readonly #caveFactors = [0.1, 0.4, 1.3];
   readonly #cliffParts: {geometry: BufferGeometry; material: Material}[] = [];

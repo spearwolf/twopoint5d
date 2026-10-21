@@ -12,9 +12,9 @@ import {
   type SpriteOf,
   type TextureAtlasFrame,
   TextureColor,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Sheet} from './assets';
-import type {SpritesOf} from './spritesOf';
 import {type Box, emptyBox, frameBox, frontOf, heldFrameWindow, placeBox} from './hitBoxes';
 
 /**
@@ -51,7 +51,7 @@ const KNOCK_BACK = 60;
 const FLASH_TIME = 0.3;
 
 export class Fighter {
-  readonly sprites: SpritesOf<typeof FighterKind>;
+  readonly sprites: FeatureSpritesOf<typeof FighterKind>;
   readonly sprite: FighterSprite;
 
   x = 0;

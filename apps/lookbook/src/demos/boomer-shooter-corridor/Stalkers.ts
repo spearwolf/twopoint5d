@@ -10,12 +10,12 @@ import {
   QuadBase,
   QuadSize,
   ShadowPass,
-  type SpriteKind,
   type SpriteOf,
   tableFrame,
   type TextureAtlas,
   TextureColor,
   Yaw,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Camera, DataTexture, Texture} from 'three/webgpu';
 import {CORRIDOR_LENGTH, CORRIDOR_WIDTH, TILE} from './Corridor';
@@ -30,8 +30,7 @@ const StalkerKind = defineSprite({
   features: [InstancePosition, UprightPlacement, QuadSize, Yaw, tableFrame({views: 8}), TextureColor, Fade, Flash],
 });
 
-type ApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
-export type StalkerSprites = FeatureSprites<ApiOf<typeof StalkerKind>>;
+export type StalkerSprites = FeatureSpritesOf<typeof StalkerKind>;
 type StalkerSprite = SpriteOf<typeof StalkerKind>;
 
 const ANIMS = ['idle', 'walk', 'attack', 'hurt', 'dead'] as const;

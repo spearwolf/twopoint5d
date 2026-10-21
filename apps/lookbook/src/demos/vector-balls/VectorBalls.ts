@@ -10,11 +10,11 @@ import {
   prepareSpriteFrame,
   QuadBase,
   QuadSize,
-  type SpriteKind,
   type SpriteOf,
   type TextureAtlas,
   TextureColor,
   Tint,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {
   type Camera,
@@ -42,7 +42,6 @@ const BallKind = defineSprite({
   features: [InstancePosition, BillboardPlacement, QuadSize, AtlasFrame, TextureColor, Tint, Flash],
 });
 
-type ApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
 type Ball = SpriteOf<typeof BallKind>;
 
 /** The fewest and the most balls; the count doubles and halves between the two. */
@@ -84,7 +83,7 @@ const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t)
  * with room for 64 balls and grows with the count (`grow: true`).
  */
 export class VectorBalls extends Group {
-  readonly balls: FeatureSprites<ApiOf<typeof BallKind>>;
+  readonly balls: FeatureSpritesOf<typeof BallKind>;
 
   /** Whether the balls are sorted back to front every frame. */
   sorting = true;
