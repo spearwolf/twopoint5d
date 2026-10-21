@@ -228,6 +228,34 @@ describe('FeatureSprites with grow: true', () => {
     sprites.dispose();
   });
 
+  test('a createSprite() from an onCreateVO hook on the last free slot grows, and both sprites live on', () => {
+    quiet();
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, grow: true});
+    let inner: TexturedSprite | undefined;
+    let companions = 0;
+    sprites.spritePool!.onCreateVO = (vo) => {
+      if (companions++ === 0) {
+        // a sprite that brings a companion along
+        inner = sprites.createSprite()!;
+        writeSprite(inner, 2);
+      }
+      writeSprite(vo as TexturedSprite, 1);
+    };
+
+    const outer = sprites.createSprite()!;
+
+    const pool = sprites.spritePool!;
+    expect(pool.capacity).toBe(2);
+    expect([pool.getVO(0), pool.getVO(1)]).toEqual([outer, inner]);
+    expect(pool.containsVO(outer) && pool.containsVO(inner!)).toBe(true);
+    expect([outer.x, inner!.x]).toEqual([1, 2]);
+    outer.setPosition(7, 0, 0);
+    expect(pool.getVO(0)!.x).toBe(7);
+    sprites.freeSprite(outer);
+    expect(pool.getVO(0)).toBe(inner);
+    sprites.dispose();
+  });
+
   describe('the note on the console', () => {
     test('says once, through console.info, that the pool grew and what it costs', () => {
       const info = quiet();

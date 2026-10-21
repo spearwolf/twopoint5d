@@ -162,6 +162,68 @@ describe('VertexObjectPool#adoptVOs()', () => {
     source.dispose();
   });
 
+  describe('from inside an onCreateVO hook', () => {
+    // a hook that makes the pool adopted while createVO() hands out its last free slot: what
+    // FeatureSprites#createSprite() does under grow when a hook of the pool calls it again
+    const adoptingHook = (source: VertexObjectPool<Thing>, replace?: (vo: Thing) => Thing) => {
+      const target = new VertexObjectPool<Thing>(descriptor, 4);
+      source.onCreateVO = (vo) => {
+        source.onCreateVO = undefined;
+        writeThing(vo, 9);
+        target.adoptVOs(source);
+        return replace?.(vo);
+      };
+      return target;
+    };
+
+    test('the vertex object handed out moves along with the others', () => {
+      const {pool: source, things} = makeThings(1, 2);
+      const target = adoptingHook(source);
+
+      const last = source.createVO()!;
+
+      expect(target.usedCount).toBe(2);
+      expect(target.getVO(0)).toBe(things[0]);
+      expect(target.getVO(1)).toBe(last);
+      expect(target.containsVO(last)).toBe(true);
+      expect(valuesOf(last)).toEqual(expectedValues(9));
+      last.x = 5;
+      expect(target.getVO(1)!.x).toBe(5);
+      // the slot is marked in the pool that holds it now
+      expect(target.buffer.bufferList.every((record) => record.dirtyTo >= 1)).toBe(true);
+      target.dispose();
+      source.dispose();
+    });
+
+    test('a replacement the hook answers takes the slot in the pool that adopted it', () => {
+      const {pool: source} = makeThings(1, 2);
+      const target = adoptingHook(source, (vo) => Object.create(vo) as Thing);
+
+      const last = source.createVO()!;
+
+      expect(target.getVO(1)).toBe(last);
+      expect(last.x).toBe(9);
+      target.dispose();
+      source.dispose();
+    });
+
+    test('a replacement the hook answers takes the slot, and none for a vertex object the hook freed', () => {
+      const pool = new VertexObjectPool<Thing>(descriptor, 2);
+      pool.onCreateVO = (vo) => Object.create(vo) as Thing;
+      const replaced = pool.createVO()!;
+      expect(pool.getVO(0)).toBe(replaced);
+
+      pool.onCreateVO = (vo) => {
+        pool.freeVO(vo);
+        return Object.create(vo) as Thing;
+      };
+      pool.createVO();
+      expect(pool.usedCount).toBe(1);
+      expect(pool.getVO(0)).toBe(replaced);
+      pool.dispose();
+    });
+  });
+
   describe('refuses, before anything moves', () => {
     const expectNothingMoved = (source: VertexObjectPool<Thing>, things: Thing[]) => {
       expect(source.usedCount).toBe(things.length);

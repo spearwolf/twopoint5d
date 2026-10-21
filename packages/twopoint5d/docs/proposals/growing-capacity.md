@@ -91,6 +91,10 @@ passes anew on the next frame. A mesh that grows from
 - **`geometry` and `spritePool` are new objects after a growth.** A reference kept from before
   points at a disposed geometry and a disposed pool (`isDisposed`); read them from the mesh afresh.
   The TSDoc of both getters says so.
+- **A `createSprite()` from an `onCreateVO` hook** of the sprite pool — a sprite that brings a
+  companion along — may grow the pool while the outer `createSprite()` hands out the last free slot.
+  Both sprites live on in the grown pool: the pool registers a handle before its hooks run (§3), so
+  the growth takes the outer one along. The rule holds for any hook that makes the pool adopted.
 - **Only `createSprite()` grows.** `spritePool.createVO()` and `createFromAttributes()` are the
   pool's own API, which knows nothing of the mesh, and answer what a full pool answers.
 - A geometry with **pools attached** under a name (`attachInstancedPool()`) cannot grow — the new
@@ -156,8 +160,8 @@ class VertexObjectPool<VOType> {
     descriptor's, and a vertex object of another descriptor would read this buffer through another
     layout (`… the source pool is built on another descriptor — build this pool on
     source.descriptor`);
-  - this pool is **empty** (`usedCount` 0 — `… this pool has 3 vertex objects in use; adopt into an
-    empty pool`);
+  - this pool is **empty** (`usedCount` 0 — `… this pool has 3 vertex objects in use — adopt into
+    an empty pool`);
   - this pool holds **at least `source.capacity`** slots (`… the source pool holds 16 slots, this
     pool 8 — adopt into a pool of at least the capacity of the source`). The copy takes the buffers
     whole (`VertexObjectBuffer#copy()`), which is what a growth needs.
@@ -167,7 +171,14 @@ class VertexObjectPool<VOType> {
   object (filled by `createFromAttributes()`) stay without one; `getVO()` materializes it here.
 - **`source` afterwards**: its index holds no vertex object, then its `usedCount` goes to 0 — so the
   release of those slots unlinks nothing, and neither does a later `dispose()` of `source`. Its
-  buffers keep their data.
+  buffers keep their data, and it remembers the pool that adopted it (below).
+- **Adopted from inside an `onCreateVO` hook.** `createVO()` registers the vertex object of the slot
+  it hands out in the index of the pool — and marks the slot for upload — *before* the
+  `voInitialize` and `onCreateVO` hooks run, so a hook that makes the pool adopted takes it along:
+  the vertex object `createVO()` answers lives in the adopting pool. A replacement the hook answers
+  takes the slot in the pool that holds the vertex object then, found through the pools that
+  adopted one another; a vertex object the hook freed gives its replacement no slot. `getVO()`
+  materializes a vertex object the same way.
 - Not a hot path: it allocates nothing beyond what `copy()` does, and nobody calls it per frame.
 - `src/vertex-objects/README.md` names it in a short section "Growing a pool", after "Sorting a
   pool": `resize()` refuses a pool behind a geometry, so a grown geometry is a new
