@@ -35,6 +35,18 @@
       "tileSet": {"tileWidth": 256, "tileHeight": 256},
       "texture": ["nearest", "srgb"]
     },
+    "meadowAtlas": {
+      "atlasUrl": "swaying-grass/meadow.json",
+      "texture": ["nearest", "srgb"]
+    },
+    "meadowBack": {
+      "imageUrl": "swaying-grass/meadow-back.png",
+      "texture": ["nearest", "flipy", "srgb"]
+    },
+    "meadowGround": {
+      "imageUrl": "swaying-grass/meadow-ground.png",
+      "texture": ["nearest", "flipy", "srgb"]
+    },
     "nightCityFacades": {
       "atlasUrl": "night-city/facades.json",
       "texture": ["mag-nearest", "srgb"]

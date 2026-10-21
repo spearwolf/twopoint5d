@@ -5,6 +5,7 @@ import {
 } from '../../vertex-objects/cloneVertexObjectDescription.js';
 import {InstancedVertexObjectGeometry} from '../../vertex-objects/InstancedVertexObjectGeometry.js';
 import type {VertexObjectDescription, VO} from '../../vertex-objects/types.js';
+import type {VertexObjectDescriptor} from '../../vertex-objects/VertexObjectDescriptor.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpriteBaseVO} from '../SpriteBase.js';
@@ -26,6 +27,10 @@ export interface FeatureSpritesGeometryParameters {
 }
 
 const WHERE = 'FeatureSpritesGeometry';
+
+// the descriptor grown() hands the constructor it calls, read there in place of the description of
+// the kind and cleared again before grown() goes on: no parameter of the public constructor carries it
+let descriptorOfGrowth: VertexObjectDescriptor | undefined;
 
 function descriptionOf(
   kind: SpriteKind,
@@ -70,7 +75,7 @@ export class FeatureSpritesGeometry<Api extends object = object> extends Instanc
       baseArgs = kind.base.defaultArgs,
     } = typeof parameters === 'number' ? {capacity: parameters} : parameters;
 
-    super(descriptionOf(kind as SpriteKind, attributeUsage), capacity, kind.base.description);
+    super(descriptorOfGrowth ?? descriptionOf(kind as SpriteKind, attributeUsage), capacity, kind.base.description);
 
     this.kind = kind;
     this.name = 'twopoint5d.FeatureSpritesGeometry';
@@ -78,5 +83,29 @@ export class FeatureSpritesGeometry<Api extends object = object> extends Instanc
     // the base pool is new and holds one slot, so createVO() cannot come back empty; expectDefined()
     // states that without leaving a branch no input reaches
     expectDefined(this.basePool.createVO(), 'the base vertex object').make(...baseArgs);
+  }
+
+  /**
+   * A geometry of `capacity` sprites that takes the sprites of this one over: the same kind, the
+   * same descriptor — so the usage of every attribute and the prototype of the handles stay —, the
+   * base vertices and the name copied, and every sprite adopted by its pool
+   * (`VertexObjectPool#adoptVOs`), handles, values, order and the `onCreateVO` hook of the pool
+   * included. This geometry is left with an empty pool. `FeatureSprites` calls it to grow.
+   *
+   * @internal
+   */
+  grown(capacity: number): FeatureSpritesGeometry<Api> {
+    descriptorOfGrowth = this.instancedPool.descriptor;
+    let grown: FeatureSpritesGeometry<Api>;
+    try {
+      grown = new FeatureSpritesGeometry(this.kind, capacity);
+    } finally {
+      descriptorOfGrowth = undefined;
+    }
+    grown.name = this.name;
+    grown.basePool.buffer.copy(this.basePool.buffer);
+    grown.instancedPool.adoptVOs(this.instancedPool);
+    grown.instancedPool.onCreateVO = this.instancedPool.onCreateVO;
+    return grown;
   }
 }

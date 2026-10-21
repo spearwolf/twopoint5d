@@ -91,6 +91,11 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * `voInitialize` hook, and by {@link getVO} for a slot that holds no vertex object yet. The
    * hook stays where it is once {@link VOBufferPool#dispose} has run and is never called again —
    * neither {@link createVO} nor {@link getVO} builds a vertex object on a disposed pool.
+   *
+   * The vertex object sits in the index of the pool before the hook runs, so a hook that makes the
+   * pool adopted ({@link adoptVOs}) — a `FeatureSprites#createSprite()` under `grow` on the last
+   * free slot — takes it along. A replacement it answers takes the slot in the pool that holds the
+   * vertex object then.
    */
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
@@ -105,6 +110,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   #sortScratch: ArrayBuffer | undefined;
   readonly #sortScratchViews = new Map<VertexAttributeDataType, TypedArray>();
   #valueLayouts: ReadonlyMap<string, ValuePropertyLayout> | undefined;
+  // the pool that adopted the vertex objects of this one: where a vertex object handed out while an
+  // onCreateVO hook made this pool adopted lives on
+  #adoptedBy: VertexObjectPool<VOType> | undefined;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     super(descriptor, capacityOrData);
@@ -192,6 +200,66 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   }
 
   /**
+   * Takes the vertex objects of `source` over: the slots it uses, the values of every buffer —
+   * copied whole, and marked for upload —, and every vertex object, which reads and writes the
+   * buffer of this pool from then on and keeps its slot, its identity and its values. A slot of
+   * `source` that holds no vertex object yet — filled through `createFromAttributes()` — stays
+   * without one; {@link getVO} materializes it here.
+   *
+   * `source` is left empty: its `usedCount` goes to 0 and it holds no vertex object, so neither that
+   * nor a later `dispose()` of it unlinks one. Its buffers keep their data.
+   *
+   * The way to grow a pool behind a geometry, which `resize()` refuses: build a geometry on a pool
+   * of the larger capacity and the same descriptor, and let it adopt the vertex objects of the old
+   * one. `FeatureSprites` does that when it was built with `grow: true`.
+   *
+   * @throws an `Error` that names the fix, before anything moves: when this pool or `source` has
+   *   been disposed, when `source` is this pool, when `source` is built on another descriptor, when
+   *   this pool has vertex objects in use, and when its capacity is below that of `source`
+   */
+  adoptVOs(source: VertexObjectPool<VOType>): void {
+    if (this.isDisposed) throw new Error('VertexObjectPool#adoptVOs(): this pool has been disposed');
+    if (source.isDisposed) throw new Error('VertexObjectPool#adoptVOs(): the source pool has been disposed');
+    if (source === this) throw new Error('VertexObjectPool#adoptVOs(): a pool cannot adopt its own vertex objects');
+    // the prototype of a vertex object is the one of its descriptor: one of another descriptor would
+    // read this buffer through another layout
+    if (source.descriptor !== this.descriptor) {
+      throw new Error(
+        'VertexObjectPool#adoptVOs(): the source pool is built on another descriptor — build this pool on source.descriptor',
+      );
+    }
+    if (this.usedCount !== 0) {
+      throw new Error(
+        `VertexObjectPool#adoptVOs(): this pool has ${this.usedCount} vertex objects in use — adopt into an empty pool`,
+      );
+    }
+    if (this.capacity < source.capacity) {
+      throw new Error(
+        `VertexObjectPool#adoptVOs(): the source pool holds ${source.capacity} slots, this pool ${this.capacity} — adopt into a pool of at least the capacity of the source`,
+      );
+    }
+
+    const n = source.usedCount;
+    this.buffer.copy(source.buffer);
+    this.usedCount = n;
+
+    const from = source.#voIndex;
+    const to = this.#voIndex;
+    const buffer = this.buffer;
+    for (let i = 0; i < n; i++) {
+      const vo = from[i];
+      if (vo != null) {
+        VOUtils.setBuffer(vo, buffer);
+        to[i] = vo;
+        // out of the index of the source before its count goes down, so that nothing unlinks it there
+        from[i] = undefined;
+      }
+    }
+    source.usedCount = 0;
+    source.#adoptedBy = this;
+  }
+
+  /**
    * Takes the next free slot of this pool and answers the vertex object sitting in it.
    *
    * Answers `undefined` once `usedCount` has reached `capacity`, and on a disposed pool,
@@ -207,13 +275,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   createVO(): (VOType & VO) | undefined {
     if (this.isDisposed) return undefined;
     if (this.usedCount < this.capacity) {
-      const idx = this.usedCount++;
-      const vo = this.#createVO(idx, true);
-      this.#voIndex[idx] = vo;
-      // the slot arrives carrying whatever stood in it before, and the draw range has just grown
-      // over it, so its vertices have to reach the gpu
-      this.buffer.touch(idx, idx);
-      return vo;
+      return this.#createVO(this.usedCount++, true);
     }
     return undefined;
   }
@@ -396,12 +458,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
         // asked before every slot: a slot the key function has freed lies beyond usedCount, and a
         // vertex object materialized there would sit in a slot out of use
         if (this.usedCount !== n) throw keyFunctionChangedPoolError(n, this.usedCount);
-        let vo = vos[i];
-        if (vo == null) {
-          vo = this.#createVO(i, false);
-          vos[i] = vo;
-        }
-        keys[i] = key(vo);
+        keys[i] = key(vos[i] ?? this.#createVO(i, false));
       }
       if (this.usedCount !== n) throw keyFunctionChangedPoolError(n, this.usedCount);
     }
@@ -571,23 +628,37 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     if (this.isDisposed) return undefined;
     if (!Number.isInteger(idx) || idx < 0 || idx >= this.usedCount) return undefined;
 
-    let vo = this.#voIndex[idx];
-    if (vo == null) {
-      vo = this.#createVO(idx, false);
-      this.#voIndex[idx] = vo;
-    }
-    return vo;
+    return this.#voIndex[idx] ?? this.#createVO(idx, false);
   }
 
+  /**
+   * Builds the vertex object of the slot `idx` and registers it in the index before any hook runs:
+   * a hook that makes this pool adopted — `FeatureSprites#createSprite()` under `grow`, called from
+   * `onCreateVO` on the last free slot — has `adoptVOs()` take it along with the others. A
+   * replacement the hook answers takes the slot in the pool that holds the vertex object then.
+   */
   #createVO(idx: number, initialize: boolean): VOType & VO {
     const vo = createVertexObject<VOType>(this.descriptor, this.buffer, idx);
+    this.#voIndex[idx] = vo;
     // only a slot createVO() has just handed out is new; one getVO() materializes carries the
     // data createFromAttributes(), fromBuffersData() or buffers data put there, and the hook
     // would write over it without marking anything for upload
-    if (initialize) vo[voInitialize]?.();
-    if (this.onCreateVO != null) {
-      return this.onCreateVO(vo) ?? vo;
+    if (initialize) {
+      vo[voInitialize]?.();
+      // the slot arrives carrying whatever stood in it before, and the draw range has just grown
+      // over it, so its vertices have to reach the gpu — marked while this buffer is the one that
+      // holds it: what the onCreateVO hook writes is read at the next upload either way
+      this.buffer.touch(idx, idx);
     }
-    return vo;
+    if (this.onCreateVO == null) return vo;
+    const hooked = this.onCreateVO(vo) ?? vo;
+    if (hooked !== vo) {
+      let owner: VertexObjectPool<VOType> = this;
+      while (owner.#adoptedBy !== undefined) owner = owner.#adoptedBy;
+      const at = VOUtils.getIndex(vo);
+      // a vertex object the hook freed has no slot to give its replacement
+      if (owner.#voIndex[at] === vo) owner.#voIndex[at] = hooked;
+    }
+    return hooked;
   }
 }
