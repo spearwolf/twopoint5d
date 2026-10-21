@@ -1,4 +1,4 @@
-import {emit, eventize} from '@spearwolf/eventize';
+import {emit, eventize, getSubscriptionCount} from '@spearwolf/eventize';
 import {describe, expect, it, vi} from 'vitest';
 import {OnDisplayDispose, OnDisplayRenderFrame, OnDisplayResize, OnDisplayRestart} from '../events.js';
 import {AdaptiveResolution} from './AdaptiveResolution.js';
@@ -75,6 +75,7 @@ function makeDisplay({
     renderer,
     resolutionScale,
     pixelZoom: 0,
+    isDisposed: false,
     devicePixelRatio,
     maxPixelRatio,
     maxPixels,
@@ -129,7 +130,8 @@ const BUDGET_4K = {devicePixelRatio: 2, width: 3840, height: 2160, maxPixels: 3_
 
 /**
  * Runs frames of `ms` until the controller has come back to a scale of 1 after it went down, or
- * `limit` frames have run; answers the lowest scale it went to, and whether it came back.
+ * `limit` frames have run; answers the lowest scale it went to, whether it came back, and the
+ * frames after which the scale lay below 1.
  */
 async function descendAndReturn(
   adaptive: AdaptiveResolution,
@@ -138,12 +140,14 @@ async function descendAndReturn(
   limit = 2000,
 ) {
   let lowest = adaptive.scale;
+  let framesBelow = 0;
   for (let i = 0; i < limit; i++) {
     await frame({deltaMs: ms});
     lowest = Math.min(lowest, adaptive.scale);
-    if (lowest < 1 && adaptive.scale === 1) return {lowest, back: true};
+    if (adaptive.scale < 1) framesBelow += 1;
+    if (lowest < 1 && adaptive.scale === 1) return {lowest, back: true, framesBelow};
   }
-  return {lowest, back: false};
+  return {lowest, back: false, framesBelow};
 }
 
 describe('AdaptiveResolution', () => {
@@ -183,11 +187,57 @@ describe('AdaptiveResolution', () => {
       expect(adaptive.scale).toBe(0.75);
       expect(display.resolutionScale).toBe(0.75);
     });
+
+    it.each([Number.NaN, Number.POSITIVE_INFINITY, 0, -1])(
+      'takes over a resolutionScale of %s as 1, and gives 1 back',
+      (value) => {
+        const {display} = makeDisplay({resolutionScale: value});
+        // a step above 1 to land on: a scale of ∞ taken as it is would go there
+        const adaptive = new AdaptiveResolution(display, {maxScale: 1.5});
+
+        expect(adaptive.scale, 'the step it takes over at').toBe(1);
+        expect(display.resolutionScale, 'the scale of the display').toBe(1);
+
+        adaptive.enabled = false;
+        expect(display.resolutionScale, 'the scale it gives back').toBe(1);
+      },
+    );
   });
 
   describe('method', () => {
     it('is undefined until the first frame', () => {
       expect(new AdaptiveResolution(makeDisplay({timestamps: true}).display).method).toBeUndefined();
+    });
+
+    it('is set in the first frame, while the frames after the start settle', async () => {
+      const measuring = makeDisplay({timestamps: true});
+      const gpu = new AdaptiveResolution(measuring.display);
+      await measuring.frame();
+
+      expect(gpu.method, 'with timestamps').toBe('gpu-time');
+      expect(measuring.renderer.resolveTimestampsAsync, 'a frame that settles measures nothing').not.toHaveBeenCalled();
+
+      const pacing = makeDisplay();
+      const adaptive = new AdaptiveResolution(pacing.display);
+      await pacing.frame();
+
+      expect(adaptive.method, 'without timestamps').toBe('frame-pacing');
+    });
+
+    it('stays undefined through the frames it holds still in', async () => {
+      const zoomed = makeDisplay({timestamps: true});
+      zoomed.display.pixelZoom = 2;
+      const underZoom = new AdaptiveResolution(zoomed.display);
+      await zoomed.frames(5);
+
+      expect(underZoom.method, 'under a pixelZoom').toBeUndefined();
+
+      const held = makeDisplay({timestamps: true});
+      const disabled = new AdaptiveResolution(held.display);
+      disabled.enabled = false;
+      await held.frames(5);
+
+      expect(disabled.method, 'disabled').toBeUndefined();
     });
 
     it('reads the GPU time where the backend tracks timestamps', async () => {
@@ -442,9 +492,11 @@ describe('AdaptiveResolution', () => {
       const {display, frame, frames, measured} = makeDisplay();
       const adaptive = new AdaptiveResolution(display);
       // a requestAnimationFrame held to 30 Hz, whatever the scale
-      const {lowest, back} = await descendAndReturn(adaptive, frame, 2 * FRAME_MS);
+      const {lowest, back, framesBelow} = await descendAndReturn(adaptive, frame, 2 * FRAME_MS);
       expect(lowest, 'the lowest scale it tried').toBe(0.5);
       expect(back, 'back where it began').toBe(true);
+      // four steps of 60 frames each: 30 that settle, and a window of 30
+      expect(framesBelow, 'the frames at a lower resolution').toBe(240);
 
       const resizes = measured.resizes;
       await frames(600, {deltaMs: 2 * FRAME_MS});
@@ -496,6 +548,22 @@ describe('AdaptiveResolution', () => {
 
       await frames(1, {deltaMs: 40, fromLoop: false});
       expect(adaptive.scale).toBe(0.875);
+    });
+
+    it('reads the pace of a renderFrame() of its own right after a settle from its rawDeltaTime', async () => {
+      const {display, frame, frames} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 30);
+      emit(display, OnDisplayRestart, {});
+      await frames(SETTLE - 1);
+      // the last frame of the settle: late, and it counts for nothing
+      await frame({deltaMs: 40, rafMs: 40});
+      // the first frame judged: a renderFrame() of one's own, on time
+      await frame({fromLoop: false});
+      await frames(27);
+      await frames(2, {deltaMs: 40});
+
+      expect(adaptive.scale, 'two late frames of 30').toBe(1);
     });
 
     it('measures the frame interval against a lower targetFps', async () => {
@@ -621,12 +689,87 @@ describe('AdaptiveResolution', () => {
     it('lets go of a display that is disposed', async () => {
       const {display, renderer, frames} = makeDisplay({timestamps: true});
       const adaptive = new AdaptiveResolution(display);
+      // a display says it is disposed before it emits the event
+      (display as {isDisposed: boolean}).isDisposed = true;
       emit(display, OnDisplayDispose, display);
       await frames(SETTLE + 24);
 
       expect(renderer.resolveTimestampsAsync).not.toHaveBeenCalled();
       adaptive.enabled = false;
       expect(adaptive.enabled, 'a disposed controller stays as it is').toBe(true);
+      expect(adaptive.isDisposed).toBe(true);
+    });
+
+    it('refuses a display that is disposed, and leaves its scale and its listeners as they are', () => {
+      const {display} = makeDisplay({resolutionScale: 0.8});
+      (display as {isDisposed: boolean}).isDisposed = true;
+
+      expect(() => new AdaptiveResolution(display)).toThrow(
+        'AdaptiveResolution: the display handed to the constructor has been disposed',
+      );
+      expect(display.resolutionScale, 'the scale of the display').toBe(0.8);
+      expect(getSubscriptionCount(display), 'the listeners on the display').toBe(0);
+    });
+
+    it('refuses a second controller on a display another one holds, enabled or not', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true});
+      gpu.ms = 15;
+      const first = new AdaptiveResolution(display);
+      const listeners = getSubscriptionCount(display);
+
+      expect(() => new AdaptiveResolution(display), 'beside one enabled').toThrow('is held by another controller');
+      first.enabled = false;
+      display.resolutionScale = 0.6;
+      expect(() => new AdaptiveResolution(display), 'beside one disabled').toThrow('is held by another controller');
+      expect(display.resolutionScale, 'the scale a refused one leaves').toBe(0.6);
+      expect(getSubscriptionCount(display), 'the listeners a refused one leaves').toBe(listeners);
+
+      // the first goes on as it would alone
+      display.resolutionScale = 1;
+      first.enabled = true;
+      await frames(SETTLE + 12);
+      expect(display.resolutionScale).toBe(0.875);
+    });
+
+    it('takes a display whose controller has been disposed', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true});
+      gpu.ms = 15;
+      const first = new AdaptiveResolution(display);
+      first.dispose();
+
+      const second = new AdaptiveResolution(display);
+      await frames(SETTLE + 12);
+
+      expect(second.scale, 'the second').toBe(0.875);
+      expect(display.resolutionScale).toBe(0.875);
+      expect(first.scale, 'the first, as it left the display').toBe(1);
+    });
+
+    it('answers isDisposed: false until dispose(), and true after it and once the display is disposed', () => {
+      const adaptive = new AdaptiveResolution(makeDisplay().display);
+      expect(adaptive.isDisposed, 'before dispose()').toBe(false);
+      adaptive.dispose();
+      expect(adaptive.isDisposed, 'after dispose()').toBe(true);
+
+      const {display} = makeDisplay();
+      const other = new AdaptiveResolution(display);
+      (display as {isDisposed: boolean}).isDisposed = true;
+      emit(display, OnDisplayDispose, display);
+      expect(other.isDisposed, 'once the display is disposed').toBe(true);
+    });
+
+    it('answers undefined for method and gpuTime after dispose(), and keeps the scale it set last', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true});
+      gpu.ms = 15;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 12);
+      expect([adaptive.scale, adaptive.gpuTime, adaptive.method], 'before dispose()').toEqual([0.875, 15, 'gpu-time']);
+
+      adaptive.dispose();
+
+      expect(adaptive.method, 'method').toBeUndefined();
+      expect(adaptive.gpuTime, 'gpuTime').toBeUndefined();
+      expect(adaptive.scale, 'scale').toBe(0.875);
     });
   });
 });

@@ -2182,6 +2182,35 @@ describe('Display', () => {
       expect(resolveTimestampsAsync).not.toHaveBeenCalled();
     });
 
+    it('answers a controller built with new AdaptiveResolution(display), and undefined after its dispose()', () => {
+      const {display} = makeMeasuringDisplay();
+      const adaptive = new AdaptiveResolution(display);
+
+      expect(display.adaptiveResolution).toBe(adaptive);
+      adaptive.dispose();
+      expect(display.adaptiveResolution).toBeUndefined();
+    });
+
+    it('refuses a second controller beside the one the option built, and takes one after its dispose()', () => {
+      const {display} = makeMeasuringDisplay({adaptiveResolution: true});
+      const built = display.adaptiveResolution!;
+
+      expect(() => new AdaptiveResolution(display)).toThrow('is held by another controller');
+      expect(display.adaptiveResolution, 'the refused one is not it').toBe(built);
+
+      built.dispose();
+      const adaptive = new AdaptiveResolution(display);
+      expect(display.adaptiveResolution).toBe(adaptive);
+    });
+
+    it('refuses a controller on a display that is disposed', () => {
+      const {display} = makeMeasuringDisplay();
+      display.dispose();
+
+      expect(() => new AdaptiveResolution(display)).toThrow('has been disposed');
+      expect(display.adaptiveResolution).toBeUndefined();
+    });
+
     it('lets the frames after a restart of the display pass', async () => {
       const {display, resolveTimestampsAsync, frames, framesUntilMeasured} = makeMeasuringDisplay({adaptiveResolution: true});
       await display.start();

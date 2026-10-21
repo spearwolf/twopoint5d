@@ -210,8 +210,10 @@ The controller reads the cost of a frame in one of two ways, see `adaptive.metho
   `requestAnimationFrame` that a power-saving mode or a 30 Hz screen holds to 30 frames — the
   pixels are not what holds the frame rate. The controller goes back to the scale the descent
   began at and measures against that pace from then on: a frame is late where it comes more than
-  half a target interval after it. It takes that one descent, and the return, to find out — a few
-  seconds at a lower resolution. Once the frames come sooner again, the target counts again.
+  half a target interval after it. It takes that one descent, and the return, to find out: with
+  the default scales four steps of 60 frames each — 30 that settle and a window of 30 —, 240
+  frames at a lower resolution, eight seconds at 30 frames per second. Once the frames come sooner
+  again, the target counts again.
 
 A step that leaves the pixel ratio as it is — `maxPixels` or the rounding of the ratio to an eighth
 draws two scales at the same ratio — is skipped: for every ratio the controller sets the highest
@@ -234,13 +236,22 @@ What to know about it:
   on the render pass descriptor three keeps for the canvas. The cost is small. A display that is
   to draw without them passes `trackTimestamp: false` beside `adaptiveResolution`, and the
   controller reads the frame pacing then.
-- `frame-pacing` cannot tell the GPU from the CPU. A frame held up by JavaScript takes the scale
-  down as well, which helps nothing; `minScale` is how far that goes.
+- `frame-pacing` cannot tell the GPU from the CPU. A load of the JavaScript takes the scale down as
+  well, which helps nothing. Where it holds every frame to the same slower pace, the descent down
+  to `minScale` brings the frames no sooner, and the controller goes back as above: the descent,
+  the return, and the pace it found to measure against. Where the load comes and goes, the frames
+  come at no steady pace, and the scale stays down — `minScale` is how far that goes — until clean
+  frames bring it back through the tries up, one every 180 clean frames.
 - Under a `pixelZoom` the controller holds still: pixel art keeps its size.
 - `adaptive.enabled = false` holds it still and gives the display back the `resolutionScale` it had
-  when the controller took over last; `true` takes over again. `adaptive.dispose()` lets go for
-  good, and gives that scale back as well. A disposed display lets go of its controller, and
-  `display.adaptiveResolution` answers `undefined` then.
+  when the controller took over last; `true` takes over again. It takes over a scale that is no
+  positive finite number as `1`, and gives `1` back. `adaptive.dispose()` lets go for good, and
+  gives that scale back as well. A disposed display lets go of its controller, and
+  `adaptive.isDisposed` says whether it has let go.
+- A display carries one controller at a time. `new AdaptiveResolution(display)` throws while
+  another one holds the display, enabled or not, and on a disposed display.
+  `display.adaptiveResolution` names the controller that holds the display — the one of the option
+  or one of your own — and answers `undefined` once that one or the display is disposed.
 
 The controller works without the option as well, on a display of one's own renderer:
 
@@ -251,6 +262,7 @@ import {WebGPURenderer} from 'three/webgpu';
 const renderer = new WebGPURenderer({canvas: document.querySelector('canvas')!, trackTimestamp: true});
 const display = new Display(renderer);
 const adaptive = new AdaptiveResolution(display, {targetFps: 30});
+display.adaptiveResolution; // adaptive: the controller that holds the display
 
 export {adaptive};
 ```

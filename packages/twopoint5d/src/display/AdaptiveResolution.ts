@@ -72,16 +72,32 @@ const PACING_PROBE_FRAMES = 180;
 const PACING_MAX_PROBE_FRAMES = 3600;
 const PACING_PROBE_WINDOWS = 2;
 
-const median = (values: number[]): number => {
-  const sorted = values.slice().sort((a, b) => a - b);
-  const mid = sorted.length >> 1;
-  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+// the median of a full window, sorted in place: the samples of a judged window are done with.
+// A typed array sorts its numbers without a compare function
+const medianOfWindow = (values: Float64Array): number => {
+  values.sort();
+  const mid = values.length >> 1;
+  return values.length % 2 === 1 ? values[mid]! : (values[mid - 1]! + values[mid]!) / 2;
 };
 
 // what the controller reads off the backend of three to know whether it measures GPU time
 interface TimestampBackend {
   trackTimestamp?: boolean;
   hasTimestamp?: boolean;
+}
+
+// the controller that holds a display: one at a time, from its constructor to its dispose() or the
+// dispose of the display
+const controllers = new WeakMap<Display, AdaptiveResolution>();
+
+/**
+ * The controller that holds `display`, `undefined` while none does — what
+ * {@link Display.adaptiveResolution} answers.
+ *
+ * @internal
+ */
+export function adaptiveResolutionOf(display: Display): AdaptiveResolution | undefined {
+  return controllers.get(display);
 }
 
 /**
@@ -102,16 +118,18 @@ interface TimestampBackend {
  *   wait twice as many windows, up to 300.
  * - **`frame-pacing`** — the frames that come late, where the renderer measures no GPU time, read
  *   off the intervals between the animation frames of the page: a frame that `maxFps` holds back
- *   is not late. It cannot tell the GPU from the CPU, and a frame on time shows no headroom: the
- *   controller tries a step up after three clean seconds and goes back where it fails, waiting
- *   twice as long before the next try. A frame is late where it comes more than half a frame
+ *   is not late. It cannot tell the GPU from the CPU — a load of the CPU that holds every frame to
+ *   the same slower pace leads back as a 30 Hz screen does, one that comes and goes keeps the scale
+ *   down —, and a frame on time shows no headroom: the controller tries a step up after three
+ *   clean seconds and goes back where it fails, waiting twice as long before the next try. A frame is late where it comes more than half a frame
  *   interval after the pace the page reaches — 1.5 frame intervals while that pace is the
  *   target. Where a descent down to {@link AdaptiveResolution.minScale} brought frames that came
  *   at a steady pace no sooner — a `requestAnimationFrame` that a power-saving mode or a 30 Hz
  *   screen holds to 30 frames — the pixels are not what holds the frame rate: the controller
  *   goes back to the scale the descent began at and measures against that pace from then on. It
- *   takes that one descent, and the return, to find out. Once the frames come sooner again, the
- *   target counts again.
+ *   takes that one descent, and the return, to find out: with the default scales four steps of 60
+ *   frames each — 30 that settle and a window of 30 —, 240 frames at a lower resolution, eight
+ *   seconds at 30 frames per second. Once the frames come sooner again, the target counts again.
  *
  * A step is an eighth of the scale, between {@link AdaptiveResolution.minScale} and
  * {@link AdaptiveResolution.maxScale}. A step that leaves the pixel ratio of the display as it is
@@ -123,8 +141,14 @@ interface TimestampBackend {
  * GPU time still in flight when the controller is disabled, or when the display goes over to a
  * pixel zoom, is dropped.
  *
- * The controller lets go of the display with {@link AdaptiveResolution.dispose}, and when the
- * display is disposed.
+ * A display carries one controller at a time: `new AdaptiveResolution(display)` throws on a display
+ * another controller holds, enabled or not, and on a disposed display.
+ * {@link Display.adaptiveResolution} names the controller that holds the display. The controller
+ * lets go of the display with {@link AdaptiveResolution.dispose}, and when the display is
+ * disposed; after that its options, {@link AdaptiveResolution.display} and
+ * {@link AdaptiveResolution.scale} keep their values, {@link AdaptiveResolution.method} and
+ * {@link AdaptiveResolution.gpuTime} answer `undefined`, and {@link AdaptiveResolution.isDisposed}
+ * answers `true`.
  */
 export class AdaptiveResolution {
   readonly display: Display;
@@ -148,9 +172,14 @@ export class AdaptiveResolution {
   // a measurement that started before the last reset belongs to frames that count for nothing
   #epoch = 0;
 
-  #gpuSamples: number[] = [];
+  // the measurements of the window that runs, in an array that is kept, as the intervals of
+  // frame-pacing are: a frame allocates nothing
+  readonly #gpuSamples = new Float64Array(GPU_WINDOW);
+  #gpuSampleCount = 0;
   #gpuTime?: number;
   #gpuResolving = false;
+  // the epoch the measurement in flight started in; one at a time is in flight
+  #gpuResolvingEpoch = 0;
   #gpuSilentFrames = 0;
   #gpuGoodWindows = 0;
   #gpuStepUpWindows = GPU_STEP_UP_WINDOWS;
@@ -177,8 +206,36 @@ export class AdaptiveResolution {
   #pacingDescentGained = false;
   // the frame of the frame loop the controller read last
   #loopFrameNo = -1;
+  // The interval between the animation frames of the page before the frame being judged. A field,
+  // not a return value or an argument: V8 boxes a fraction it hands across a call it does not
+  // inline, and writes a number field in place
+  #pacingRafMs = 0;
 
+  /**
+   * Takes over the {@link Display.resolutionScale} of `display`, at the highest step at or below
+   * the scale it has.
+   *
+   * @throws when `display` is disposed, and when another controller holds it that is not
+   * disposed, enabled or not. The message names the class and the state; no controller comes into
+   * being, and the display keeps its scale and its listeners.
+   */
   constructor(display: Display, options?: AdaptiveResolutionOptions) {
+    // before anything is written: a controller that cannot hold the display never comes into
+    // being, and the display keeps its scale and its listeners
+    if (display.isDisposed) {
+      throw new Error(
+        'AdaptiveResolution: the display handed to the constructor has been disposed and sends no more ' +
+          'render frames to judge. Build the controller while the display is alive, or hand it a live display.',
+      );
+    }
+    if (controllers.has(display)) {
+      throw new Error(
+        'AdaptiveResolution: the display handed to the constructor is held by another controller, which ' +
+          'sets its resolutionScale as well. dispose() that one first — it is display.adaptiveResolution — ' +
+          'or keep it and set its enabled.',
+      );
+    }
+
     this.display = display;
     this.targetFps = isPositiveFinite(options?.targetFps) ? options.targetFps : 60;
     this.#pacingCadenceMs = 1000 / this.targetFps;
@@ -202,35 +259,43 @@ export class AdaptiveResolution {
       // the display takes every listener off with its dispose; the controller holds still from then
       once(display, OnDisplayDispose, () => this.#letGo()),
     ];
+    controllers.set(display, this);
   }
 
   /**
-   * The {@link Display.resolutionScale} the controller has set, one of its steps.
+   * The {@link Display.resolutionScale} the controller has set, one of its steps. After
+   * {@link AdaptiveResolution.dispose}, and once the display is disposed, the step it set last.
    */
   get scale(): number {
     return this.#levels[this.#level]!;
   }
 
   /**
-   * How the controller reads the cost of a frame; `undefined` until the first frame it judges.
+   * How the controller reads the cost of a frame, set in the first frame it runs in — the frames
+   * that settle after a start count, a frame it holds still in, disabled or under a
+   * {@link Display.pixelZoom}, does not. `undefined` until then, after
+   * {@link AdaptiveResolution.dispose}, and once the display is disposed.
    */
   get method(): AdaptiveResolutionMethod | undefined {
-    return this.#method;
+    return this.#disposed ? undefined : this.#method;
   }
 
   /**
    * The median of the GPU time of the frames the controller judged last, in milliseconds;
-   * `undefined` until a window is through, and under `frame-pacing`.
+   * `undefined` until a window is through, under `frame-pacing`, after
+   * {@link AdaptiveResolution.dispose}, and once the display is disposed.
    */
   get gpuTime(): number | undefined {
-    return this.#gpuTime;
+    return this.#disposed ? undefined : this.#gpuTime;
   }
 
   /**
    * `true` by default. `false` holds the controller still, drops a measurement still in flight
    * and gives the display back the {@link Display.resolutionScale} it had when the controller took
-   * over last; `true` takes over again from the scale the display has then. After
-   * {@link AdaptiveResolution.dispose}, and once the display is disposed, a write does nothing.
+   * over last — `1` where that was no positive finite number, which the display counts as `1`;
+   * `true` takes over again from the scale the display has then. After
+   * {@link AdaptiveResolution.dispose}, and once the display is disposed, it keeps its value and a
+   * write does nothing.
    */
   get enabled(): boolean {
     return this.#enabled;
@@ -251,8 +316,17 @@ export class AdaptiveResolution {
   }
 
   /**
+   * `true` after {@link AdaptiveResolution.dispose}, and once the display is disposed: the
+   * controller lets go of it then.
+   */
+  get isDisposed(): boolean {
+    return this.#disposed;
+  }
+
+  /**
    * Lets go of the display, and gives it back the {@link Display.resolutionScale} it had when the
-   * controller took over last. Safe to call twice.
+   * controller took over last — `1` where that was no positive finite number, which the display
+   * counts as `1`. Safe to call twice.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -264,11 +338,13 @@ export class AdaptiveResolution {
     this.#disposed = true;
     for (const unsubscribe of this.#unsubscribe) unsubscribe();
     this.#unsubscribe = [];
+    if (controllers.get(this.display) === this) controllers.delete(this.display);
   }
 
-  // the highest step at or below the scale the display has; a takeover starts afresh
+  // The highest step at or below the scale the display has — one that is no positive finite
+  // number counts as 1, as it does for the display. A takeover starts afresh
   #takeOverScale(): void {
-    const scale = this.display.resolutionScale;
+    const scale = isPositiveFinite(this.display.resolutionScale) ? this.display.resolutionScale : 1;
     this.#scaleBefore = scale;
     this.#pacingDescentFrom = -1;
     this.#gpuStepUpPending = false;
@@ -314,7 +390,7 @@ export class AdaptiveResolution {
   readonly #settle = (): void => {
     this.#settleFrames = SETTLE_FRAMES;
     this.#epoch += 1;
-    this.#gpuSamples.length = 0;
+    this.#gpuSampleCount = 0;
     this.#gpuSilentFrames = 0;
     this.#pacingFrames = 0;
     this.#pacingLateFrames = 0;
@@ -326,6 +402,12 @@ export class AdaptiveResolution {
 
     this.#method ??= this.#tracksGpuTime() ? 'gpu-time' : 'frame-pacing';
 
+    // every frame the controller runs in reads the frame of the frame loop, the frames that settle
+    // included: a renderFrame() of one's own right after them has nothing but its own delta
+    const loop = this.display.frameLoop;
+    const fromLoop = loop.frameNo !== this.#loopFrameNo;
+    this.#loopFrameNo = loop.frameNo;
+
     if (this.#settleFrames > 0) {
       this.#settleFrames -= 1;
       return;
@@ -334,7 +416,8 @@ export class AdaptiveResolution {
     if (this.#method === 'gpu-time') {
       this.#sampleGpuTime();
     } else {
-      this.#samplePacing(this.#rafIntervalMs(rawDeltaTime));
+      this.#readRafInterval(rawDeltaTime, fromLoop);
+      this.#samplePacing();
     }
   };
 
@@ -351,28 +434,8 @@ export class AdaptiveResolution {
     const renderer = this.display.renderer;
     if (renderer != null && !this.#gpuResolving) {
       this.#gpuResolving = true;
-      const epoch = this.#epoch;
-      renderer.resolveTimestampsAsync('render').then(
-        (ms) => {
-          this.#gpuResolving = false;
-          // what holds #onRenderFrame still drops a measurement that comes in after it
-          if (
-            this.#disposed ||
-            !this.#enabled ||
-            isPositiveFinite(this.display.pixelZoom) ||
-            epoch !== this.#epoch ||
-            !isPositiveFinite(ms)
-          ) {
-            return;
-          }
-          this.#gpuSilentFrames = 0;
-          this.#gpuSamples.push(ms);
-          if (this.#gpuSamples.length >= GPU_WINDOW) this.#judgeGpuWindow();
-        },
-        () => {
-          this.#gpuResolving = false;
-        },
-      );
+      this.#gpuResolvingEpoch = this.#epoch;
+      renderer.resolveTimestampsAsync('render').then(this.#onGpuTime, this.#onGpuTimeFailed);
     }
 
     this.#gpuSilentFrames += 1;
@@ -383,9 +446,32 @@ export class AdaptiveResolution {
     }
   }
 
+  // the handlers of a measurement, built once: a measurement allocates no closure
+  readonly #onGpuTime = (ms: number | undefined): void => {
+    this.#gpuResolving = false;
+    // what holds #onRenderFrame still drops a measurement that comes in after it
+    if (
+      this.#disposed ||
+      !this.#enabled ||
+      isPositiveFinite(this.display.pixelZoom) ||
+      this.#gpuResolvingEpoch !== this.#epoch ||
+      !isPositiveFinite(ms)
+    ) {
+      return;
+    }
+    this.#gpuSilentFrames = 0;
+    this.#gpuSamples[this.#gpuSampleCount] = ms;
+    this.#gpuSampleCount += 1;
+    if (this.#gpuSampleCount >= GPU_WINDOW) this.#judgeGpuWindow();
+  };
+
+  readonly #onGpuTimeFailed = (): void => {
+    this.#gpuResolving = false;
+  };
+
   #judgeGpuWindow(): void {
-    const time = median(this.#gpuSamples);
-    this.#gpuSamples.length = 0;
+    const time = medianOfWindow(this.#gpuSamples);
+    this.#gpuSampleCount = 0;
     this.#gpuTime = time;
 
     const budget = (GPU_HEADROOM * 1000) / this.targetFps;
@@ -421,17 +507,16 @@ export class AdaptiveResolution {
 
   // --- frame-pacing ---
 
-  #rafIntervalMs(rawDeltaTime: number): number {
+  #readRafInterval(rawDeltaTime: number, fromLoop: boolean): void {
     // The interval between the animation frames of the page before this frame: a frame maxFps held
     // back is no late frame. A frame the frame loop of the display did not run — a renderFrame() of
     // one's own — has nothing but its own delta
     const loop = this.display.frameLoop;
-    const fromLoop = loop.frameNo !== this.#loopFrameNo;
-    this.#loopFrameNo = loop.frameNo;
-    return fromLoop && loop.longestRafInterval > 0 ? loop.longestRafInterval : rawDeltaTime * 1000;
+    this.#pacingRafMs = fromLoop && loop.longestRafInterval > 0 ? loop.longestRafInterval : rawDeltaTime * 1000;
   }
 
-  #samplePacing(rafMs: number): void {
+  #samplePacing(): void {
+    const rafMs = this.#pacingRafMs;
     const targetMs = 1000 / this.targetFps;
     // late is half a target interval behind the pace the page reaches: a frame that missed one
     // animation frame of a page at the target, or of a page at a slower pace
@@ -488,8 +573,9 @@ export class AdaptiveResolution {
 
       // At the bottom. A descent over steps that brought frames of a steady pace no sooner shows
       // that the pixels do not hold the frame rate — a requestAnimationFrame held to 30 Hz, a
-      // 30 Hz panel: back where it began, and the pace it found is the one to measure against.
-      // An unsteady pace, one the CPU sets, stays down here: minScale is how far that goes
+      // 30 Hz panel, a load of the CPU that holds every frame to the same slower pace: back where
+      // it began, and the pace it found is the one to measure against. A pace without that
+      // steadiness — a load that comes and goes — stays down here: minScale is how far that goes
       if (this.#pacingDescentFrom !== this.#level && !this.#pacingDescentGained && this.#pacingDescentSteady) {
         this.#pacingCadenceMs = Math.max(targetMs, this.#pacingDescentMs);
         const from = this.#pacingDescentFrom;

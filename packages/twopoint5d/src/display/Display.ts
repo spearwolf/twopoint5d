@@ -21,7 +21,7 @@ import {
   OnDisplayRestart,
   OnDisplayStart,
 } from '../events.js';
-import {AdaptiveResolution} from './AdaptiveResolution.js';
+import {AdaptiveResolution, adaptiveResolutionOf} from './AdaptiveResolution.js';
 import {Chronometer} from './Chronometer.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {FrameLoop} from './FrameLoop.js';
@@ -903,17 +903,17 @@ export class Display {
     requestedHeight: 0,
   };
 
-  #adaptiveResolution?: AdaptiveResolution;
-
   /**
-   * The controller that sets {@link Display.resolutionScale} by the cost of a frame, built by the
-   * constructor with the option `adaptiveResolution`; `undefined` without it, and once the display
-   * is disposed — the controller lets go of the display with it.
+   * The controller that holds the display and sets {@link Display.resolutionScale} by the cost of
+   * a frame: the one the constructor built with the option `adaptiveResolution`, or one built with
+   * `new AdaptiveResolution(display)`. A display carries one at a time, enabled or not.
+   * `undefined` while none holds it, once that one is disposed, and once the display is disposed —
+   * the controller lets go of the display with it.
    *
    * @see {@link AdaptiveResolution}
    */
   get adaptiveResolution(): AdaptiveResolution | undefined {
-    return this.#adaptiveResolution;
+    return this.#disposed ? undefined : adaptiveResolutionOf(this);
   }
 
   /**
@@ -1281,7 +1281,9 @@ export class Display {
       this.resize();
 
       if (adaptiveResolution) {
-        this.#adaptiveResolution = new AdaptiveResolution(this, {
+        // the controller registers itself as the one that holds this display, which is what
+        // adaptiveResolution answers
+        new AdaptiveResolution(this, {
           // a display held to a lower frame rate is held to that one
           targetFps: isPositiveFinite(maxFps) && maxFps < 60 ? maxFps : undefined,
           ...(adaptiveResolution === true ? null : adaptiveResolution),
@@ -2127,8 +2129,6 @@ export class Display {
       errors.push(error);
     }
     off(this);
-    // the controller has let go of the display with the event above
-    this.#adaptiveResolution = undefined;
 
     // before the release, which lets go of the canvas; and synchronously, so a display built on
     // the same canvas in this tick writes its values afterwards and nothing overwrites them

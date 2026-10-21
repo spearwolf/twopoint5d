@@ -78,7 +78,7 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * timestamps for its whole life, while the controller holds still, is disabled or disposed as
    * well; `trackTimestamp: false` beside this option builds it without them, and the controller
    * reads the pace of the frames. Off by default. Read once, by the constructor; the controller is
-   * {@link Display.adaptiveResolution}.
+   * {@link Display.adaptiveResolution} until it is disposed.
    */
   adaptiveResolution?: boolean | AdaptiveResolutionOptions;
 
