@@ -223,6 +223,64 @@ describe('sprites — picking', function () {
     }
   });
 
+  it('picks again after a growth of a mesh it has drawn, and a sort or a growth after the call changes nothing', async () => {
+    const info = console.info;
+    console.info = () => {};
+    try {
+      const camera = makeFlatCamera();
+      const {sprites, all} = makeSprites(FlatKind, [[-2, 0, 0]], {capacity: 1, grow: true});
+      const first = await picker.pick(camera, pointerAt(camera, -2, 0), [sprites]);
+
+      // the picker drew the first geometry; the growth replaces it
+      const grown = [0, 2].map((x) => {
+        const sprite = sprites.createSprite();
+        sprite.setSize(2, 2);
+        sprite.setPosition(x, 0, 0);
+        return sprite;
+      });
+      sprites.update();
+      const afterGrowth = await picker.pick(camera, pointerAt(camera, 2, 0), [sprites]);
+      const oldOne = await picker.pick(camera, pointerAt(camera, -2, 0), [sprites]);
+
+      // drawn now, read back after a sort and a growth that move its slot
+      const pending = picker.pick(camera, pointerAt(camera, -2, 0), [sprites]);
+      const sorted = sprites.sortBy('x', {descending: true});
+      for (let i = 0; i < 2; i++) sprites.createSprite().setPosition(0, 3, 0);
+      sprites.update();
+      const moved = await pending;
+
+      expect(first?.sprite === all[0]).to.be.true;
+      expect(sprites.spritePool.capacity).to.equal(8);
+      expect(afterGrowth?.sprite === grown[1] && afterGrowth.index === 2, `after the growth: ${afterGrowth?.index}`).to.be.true;
+      expect(oldOne?.sprite === all[0]).to.be.true;
+      expect(sorted).to.be.true;
+      expect(moved?.sprite === all[0] && moved.index === 0, 'the handle drawn, slot 0 at the draw').to.be.true;
+      expect(sprites.spritePool.getVO(0) === all[0], 'the sort moved it').to.be.false;
+      expect(sprites.spritePool.containsVO(all[0])).to.be.true;
+    } finally {
+      console.info = info;
+    }
+  });
+
+  it('answers two picks in flight at once, each from its own list', async () => {
+    const camera = makeFlatCamera();
+    const left = makeSprites(FlatKind, [[-2, 0, 0]]);
+    const right = makeSprites(FlatKind, [
+      [2, 0, 0],
+      [2, 2, 0],
+    ]);
+
+    const [hitLeft, hitRight, missed] = await Promise.all([
+      picker.pick(camera, pointerAt(camera, -2, 0), [left.sprites]),
+      picker.pick(camera, pointerAt(camera, 2, 2), [right.sprites, left.sprites]),
+      picker.pick(camera, pointerAt(camera, -2, 0), [right.sprites]),
+    ]);
+
+    expect(hitLeft?.sprites === left.sprites && hitLeft.sprite === left.all[0], 'the left mesh').to.be.true;
+    expect(hitRight?.sprites === right.sprites && hitRight.sprite === right.all[1], 'the upper right sprite').to.be.true;
+    expect(missed, 'the left sprite was not listed').to.be.undefined;
+  });
+
   it('does not hit a sprite faded to nothing, but what lies behind it', async () => {
     const camera = makeFlatCamera();
     const {sprites, all} = makeSprites(FlatKind, [
