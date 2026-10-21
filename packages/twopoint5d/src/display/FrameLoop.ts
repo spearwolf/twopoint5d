@@ -223,6 +223,12 @@ export class FrameLoop {
   #deltaTime = 0;
   #measuredFps = 0;
 
+  // every tick of the rAF driver, the ones maxFps holds back included: the longest gap between two
+  // of them since the frame emitted before, and that gap as of the frame emitted last
+  #lastRafNow?: number = undefined;
+  #longestRafGap = 0;
+  #longestRafInterval = 0;
+
   /**
    * The number of frames this loop has emitted — `0` before the first, one more with every frame
    * it emits; a frame `maxFps` holds back does not count.
@@ -246,6 +252,19 @@ export class FrameLoop {
    */
   get deltaTime(): number {
     return this.#deltaTime;
+  }
+
+  /**
+   * The longest interval between two animation frames of the rAF driver since the frame this loop
+   * emitted before, in milliseconds — equal to {@link FrameLoop.deltaTime} where `maxFps` holds no
+   * frame back. `0` for the first frame, and for the first after the loop has lost its last
+   * subscriber and got one again. {@link AdaptiveResolution} tells a late frame of the page by it
+   * from one that `maxFps` held back.
+   *
+   * @internal
+   */
+  get longestRafInterval(): number {
+    return this.#longestRafInterval;
   }
 
   /**
@@ -312,11 +331,20 @@ export class FrameLoop {
         // the driver starts its fps window anew for the same reason
         this.#lastNow = undefined;
         this.#nextEmitAt = 0;
+        this.#lastRafNow = undefined;
+        this.#longestRafGap = 0;
       }
     }
   }
 
   readonly #onRAF = (now: number, _frameNo: number, measuredFps: number): void => {
+    // before the throttle: a tick that maxFps holds back is an animation frame of the page as well
+    if (this.#lastRafNow != null) {
+      const gap = now - this.#lastRafNow;
+      if (gap > this.#longestRafGap) this.#longestRafGap = gap;
+    }
+    this.#lastRafNow = now;
+
     // Rastered throttle: emit when `now` reaches the next scheduled slot
     // (minus a small jitter tolerance). The schedule stays on a fixed grid
     // so individual rAF jitter cannot drift the cadence; a long pause
@@ -332,6 +360,8 @@ export class FrameLoop {
     this.#measuredFps = measuredFps;
     this.#deltaTime = prevNow == null ? 0 : now - prevNow;
     this.#lastNow = now;
+    this.#longestRafInterval = this.#longestRafGap;
+    this.#longestRafGap = 0;
 
     if (this.#maxFps > 0) {
       const interval = 1000 / this.#maxFps;

@@ -171,15 +171,31 @@ The controller reads the cost of a frame in one of two ways, see `adaptive.metho
   80 % of the frame interval, 13.3 ms at 60 frames per second. A window of 12 measured frames is
   judged by its median, which a single spike does not move: above the budget the scale goes down a
   step, above 1.5 times the budget two. It goes up a step where the time of the window, scaled by
-  the pixels of that step, stays below 90 % of the budget three windows in a row.
-- **`frame-pacing`**: where the renderer measures no GPU time. 3 frames of 30 that come later than
-  1.5 frame intervals take the scale down a step. A frame on time shows no headroom, so after 180
-  clean frames the controller tries a step up and keeps it where the next two windows stay clean;
-  a try that fails goes back, and the next try waits twice as long, up to 3600 frames.
+  the pixels the display would draw at that step, stays below 90 % of the budget three windows in
+  a row. A step up that the next window takes back makes the next one wait twice as many windows,
+  up to 300.
+- **`frame-pacing`**: where the renderer measures no GPU time. It reads the intervals between the
+  animation frames of the page, so a frame that `maxFps` holds back is not late. 3 frames of 30
+  that come later than 1.5 frame intervals take the scale down a step. A frame on time shows no
+  headroom, so after 180 clean frames the controller tries a step up and keeps it where the next
+  two windows stay clean; a try that fails goes back, and the next try waits twice as long, up to
+  3600 frames.
+
+  Where a descent down to `minScale` brought frames that came at a steady pace no sooner — a
+  `requestAnimationFrame` that a power-saving mode or a 30 Hz screen holds to 30 frames — the
+  pixels are not what holds the frame rate. The controller goes back to the scale the descent
+  began at and measures against that pace from then on: a frame is late where it comes more than
+  half a target interval after it. It takes that one descent, and the return, to find out — a few
+  seconds at a lower resolution. Once the frames come sooner again, the target counts again.
+
+A step that leaves the pixel ratio as it is — `maxPixels` or the rounding of the ratio to an eighth
+draws two scales at the same ratio — is skipped: for every ratio the controller sets the highest
+scale that draws at it.
 
 After every resize — the ones of its own steps included —, a start and a restart, the controller
 lets 30 frames pass before it judges again: shaders compile and the render targets are built anew
-in them, and a measurement that started before is dropped.
+in them, and a measurement that started before is dropped. So is a measurement still in flight
+when the controller is disabled, or when the display goes over to a `pixelZoom`.
 
 What to know about it:
 
@@ -190,8 +206,9 @@ What to know about it:
   down as well, which helps nothing; `minScale` is how far that goes.
 - Under a `pixelZoom` the controller holds still: pixel art keeps its size.
 - `adaptive.enabled = false` holds it still and gives the display back the `resolutionScale` it had
-  when the controller took over; `true` takes over again. `adaptive.dispose()` lets go for good, and
-  a disposed display lets go of its controller.
+  when the controller took over last; `true` takes over again. `adaptive.dispose()` lets go for
+  good, and gives that scale back as well. A disposed display lets go of its controller, and
+  `display.adaptiveResolution` answers `undefined` then.
 
 The controller works without the option as well, on a display of one's own renderer:
 

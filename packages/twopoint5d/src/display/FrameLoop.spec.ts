@@ -334,6 +334,73 @@ describe('FrameLoop', () => {
     expect(events.map((e) => e.now * 1000)).toEqual([0, 20, 54]);
   });
 
+  describe('longestRafInterval', () => {
+    // what the loop answers while it emits a frame
+    function record(loop: FrameLoop) {
+      const frames: {now: number; deltaTime: number; longestRafInterval: number}[] = [];
+      const target = {
+        [FrameLoop.OnFrame]() {
+          frames.push({now: loop.now, deltaTime: loop.deltaTime, longestRafInterval: loop.longestRafInterval});
+        },
+      };
+      loop.start(target);
+      return {frames, target};
+    }
+
+    it('is the deltaTime where maxFps holds no frame back', () => {
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(0, renderer);
+      const {frames} = record(loop);
+
+      renderer.tick(1000);
+      renderer.tick(1016);
+      renderer.tick(1040);
+
+      expect(frames.map((f) => f.longestRafInterval)).toEqual([0, 16, 24]);
+      expect(frames.map((f) => f.longestRafInterval)).toEqual(frames.map((f) => f.deltaTime));
+    });
+
+    it('is the longest gap between the animation frames since the frame emitted before, across the ticks maxFps holds back', () => {
+      const VSYNC = 1000 / 60;
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(50, renderer); // interval 20, tolerance 0.4
+      const {frames} = record(loop);
+
+      // the grid of 50 frames on 60 Hz: the tick at 16.7 is held back, every fifth frame comes
+      // after two animation frames
+      for (let i = 0; i <= 8; i++) renderer.tick(i * VSYNC);
+      // an animation frame the page missed: no tick at 150
+      renderer.tick(10 * VSYNC);
+
+      const emitted = frames.map((f) => Math.round(f.now));
+      expect(emitted).toEqual([0, 33, 50, 67, 83, 100, 133, 167]);
+
+      const across = frames[1]!;
+      expect(across.deltaTime, 'the frame after a held-back tick').toBeCloseTo(2 * VSYNC);
+      expect(across.longestRafInterval, 'the frame after a held-back tick').toBeCloseTo(VSYNC);
+      expect(frames[6]!.longestRafInterval, 'the next one held back').toBeCloseTo(VSYNC);
+      expect(frames[7]!.longestRafInterval, 'the missed animation frame').toBeCloseTo(2 * VSYNC);
+    });
+
+    it('is 0 for the first frame, and for the first after the loop has lost its last subscriber and got one again', () => {
+      const renderer = makeFakeRenderer();
+      const loop = new FrameLoop(0, renderer);
+      const {frames, target} = record(loop);
+
+      renderer.tick(1000);
+      renderer.tick(1016);
+
+      loop.stop(target);
+      loop.start(target);
+
+      // five seconds in which nobody asked for a frame
+      renderer.tick(6016);
+      renderer.tick(6032);
+
+      expect(frames.map((f) => f.longestRafInterval)).toEqual([0, 16, 0, 16]);
+    });
+  });
+
   it('reports a renderer whose animation loop fails once per error, and leaves no unhandled rejection', async () => {
     const error = new Error('the init of the renderer fails on purpose');
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});

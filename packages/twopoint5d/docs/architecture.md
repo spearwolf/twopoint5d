@@ -144,7 +144,10 @@ and frame events from here instead of reading the clock itself.
 The display also decides how many pixels a frame has: a bound on the pixel ratio, a budget
 of pixels, a zoom of pixel art in whole device pixels, and `AdaptiveResolution`, which sets
 the resolution scale by what every frame costs the GPU — see
-[the display guide](display.md).
+[the display guide](display.md). The policy — the bounds of the ratio, the budget, the scale, the
+rounding to an eighth, the zoom in whole device pixels — is a pure function in
+`src/display/resolveDrawingBuffer.ts`, which the display measures with and `AdaptiveResolution`
+predicts its steps with.
 
 ### `stage/`
 

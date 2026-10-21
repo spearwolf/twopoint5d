@@ -1018,6 +1018,24 @@ describe('Display', () => {
         expect(display.pixelRatio).toBe(0.25);
       });
 
+      it('answers with pixelRatioAt() the ratio a resolutionScale would give, at the size of the last measurement', () => {
+        stubDevicePixelRatio(2);
+        const {display} = makeDisplay({resizeTo: () => [3840, 2160], maxPixels: 3_000_000});
+
+        expect(display.pixelRatioAt(1)).toBe(0.5);
+        expect(display.pixelRatioAt(0.875), '0.526 rounded down').toBe(0.5);
+        expect(display.pixelRatioAt(0.75)).toBe(0.375);
+        expect(display.pixelRatioAt(0.5)).toBe(0.25);
+
+        display.pixelZoom = 2;
+        display.resize();
+
+        for (const scale of [1, 0.875, 0.75, 0.5]) {
+          expect(display.pixelRatioAt(scale), `${scale} under a pixelZoom`).toBe(1);
+        }
+        expect(display.resolutionScale, 'its own scale').toBe(1);
+      });
+
       it('raises the whole zoom under a pixelZoom until the buffer stays within the budget', () => {
         stubDevicePixelRatio(2);
         const {display, renderer} = makeDisplay({resizeTo: () => [1000, 500], maxPixels: 100_000});
@@ -1983,6 +2001,98 @@ describe('Display', () => {
       await settle();
 
       expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('adaptiveResolution', () => {
+    const FRAME_MS = 1000 / 60;
+
+    /**
+     * A display on a renderer whose backend measures GPU time. `gpu.ms` is what every measurement
+     * answers; with `gpu.manual` it stays open until the test resolves it from `gpu.pending`.
+     * `frames()` runs frames of the frame loop and lets a measurement come in after each.
+     */
+    function makeMeasuringDisplay(options?: DisplayParameters) {
+      const made = makeDisplay(options, undefined, {trackTimestamp: true, hasTimestamp: true});
+      const gpu = {ms: 15, manual: false, pending: [] as ((ms: number) => void)[]};
+      const resolveTimestampsAsync = vi.fn(
+        (): Promise<number> =>
+          gpu.manual ? new Promise<number>((resolve) => gpu.pending.push(resolve)) : Promise.resolve(gpu.ms),
+      );
+      Object.assign(made.renderer, {resolveTimestampsAsync});
+
+      let now = 1000;
+      const frames = async (count: number) => {
+        for (let i = 0; i < count; i++) {
+          now += FRAME_MS;
+          made.frame(now);
+          await Promise.resolve();
+          await Promise.resolve();
+        }
+      };
+      // the start and the first frame of a display let the controller settle anew, so the frames
+      // until its first measurement are counted, not derived
+      const framesUntilMeasured = async () => {
+        const calls = resolveTimestampsAsync.mock.calls.length;
+        for (let i = 0; i < 200 && resolveTimestampsAsync.mock.calls.length === calls; i++) await frames(1);
+        expect(resolveTimestampsAsync.mock.calls.length, 'the controller measures').toBe(calls + 1);
+      };
+
+      return {...made, gpu, resolveTimestampsAsync, frames, framesUntilMeasured};
+    }
+
+    it('lets go of the controller it built with dispose(): a measurement in flight writes nothing, and adaptiveResolution answers undefined', async () => {
+      const {display, gpu, frames, framesUntilMeasured} = makeMeasuringDisplay({adaptiveResolution: true});
+      const adaptive = display.adaptiveResolution!;
+      await display.start();
+
+      // eleven measurements of 15 ms, one short of a window
+      await framesUntilMeasured();
+      await frames(10);
+      gpu.manual = true;
+      await frames(1);
+
+      display.dispose();
+      gpu.pending.shift()!(15);
+      await settle();
+
+      expect(display.resolutionScale).toBe(1);
+      expect(display.adaptiveResolution).toBeUndefined();
+      adaptive.enabled = false;
+      expect(adaptive.enabled, 'a controller that has let go stays as it is').toBe(true);
+    });
+
+    it('a controller disposed on its own takes its listeners off the display and gives the scale back', async () => {
+      const {display, resolveTimestampsAsync, frames} = makeMeasuringDisplay();
+      await display.start();
+      const before = getSubscriptionCount(display);
+
+      const adaptive = new AdaptiveResolution(display);
+      for (let i = 0; i < 200 && adaptive.scale === 1; i++) await frames(1);
+      expect(display.resolutionScale, 'a step down at 15 ms').toBe(0.875);
+
+      adaptive.dispose();
+
+      expect(getSubscriptionCount(display)).toBe(before);
+      expect(display.resolutionScale).toBe(1);
+      resolveTimestampsAsync.mockClear();
+      await frames(60);
+      expect(resolveTimestampsAsync).not.toHaveBeenCalled();
+    });
+
+    it('lets the frames after a restart of the display pass', async () => {
+      const {display, resolveTimestampsAsync, frames, framesUntilMeasured} = makeMeasuringDisplay({adaptiveResolution: true});
+      await display.start();
+      await framesUntilMeasured();
+
+      display.stop();
+      await display.start();
+      resolveTimestampsAsync.mockClear();
+
+      await frames(30);
+      expect(resolveTimestampsAsync, 'the frames after the restart').not.toHaveBeenCalled();
+      await frames(1);
+      expect(resolveTimestampsAsync).toHaveBeenCalledTimes(1);
     });
   });
 

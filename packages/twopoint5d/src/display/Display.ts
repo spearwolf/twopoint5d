@@ -29,6 +29,7 @@ import {isWebGLRenderer} from './isWebGLRenderer.js';
 import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
+import {type DrawingBufferParams, pixelRatioFor, resolveDrawingBuffer} from './resolveDrawingBuffer.js';
 import {getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
 import type {CreateRendererParameters, DisplayEventProps, DisplayParameters, ResizeDisplayToFn} from './types.js';
 
@@ -44,21 +45,6 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
     canvasMaxResolutionWarningWasShown = true;
   }
 }
-
-// A zoom of 5 / 2.625 CSS pixels, times 2.625, is 4.999… device pixels in floating point: the
-// whole device pixels of a zoom are counted with this much leeway before rounding down
-const DEVICE_PIXEL_ZOOM_EPSILON = 1e-6;
-
-// A pixel ratio that a budget of pixels or a resolution scale has made is rounded down to a step
-// of an eighth: the size of the drawing buffer, and of every render target that follows it,
-// changes in steps instead of with every pixel of a window drag
-const PIXEL_RATIO_STEP = 1 / 8;
-
-// The leeway, in device pixels, for the whole device pixels of a measured size. The layout of the
-// browser holds a size to a grid — 1/64 CSS pixel in Chromium — so a canvas that measures itself
-// reads back up to that much less than the size written into its style; without the leeway it
-// would lose a pixel of the buffer with every measurement
-const DEVICE_PIXEL_SIZE_TOLERANCE = 1 / 8;
 
 // An element of another realm — one in the document of a same-origin iframe — fails an instanceof
 // against the HTMLElement of this realm; it passes the one of its own window. The typeof guard is for
@@ -503,8 +489,8 @@ export interface Display extends EventizedObject {}
  *    it while the release runs waits for it. Under WebGL only a display
  *    brings the context of that canvas back — see {@link Display.dispose}.
  * 4. After `dispose()` the instance is unusable, and says so.
- *    {@link Display.renderer} answers `undefined` and
- *    {@link Display.isDisposed} answers `true`. {@link Display.canvas},
+ *    {@link Display.renderer} and {@link Display.adaptiveResolution} answer
+ *    `undefined`, and {@link Display.isDisposed} answers `true`. {@link Display.canvas},
  *    {@link Display.getEventProps}, {@link Display.isWebGPUBackend} and
  *    {@link Display.isWebGLBackend} throw, and {@link Display.start} rejects.
  *    {@link Display.resize}, {@link Display.renderFrame}, {@link Display.stop},
@@ -860,11 +846,27 @@ export class Display {
   #contentWidth = 0;
   #contentHeight = 0;
 
+  // what the resolution policy reads, in one object that every call fills anew: the ratio is
+  // compared in every frame and read for the props of every event, and neither allocates for it
+  readonly #drawingBufferParams: DrawingBufferParams = {
+    contentWidth: 0,
+    contentHeight: 0,
+    cssWidth: 0,
+    cssHeight: 0,
+    devicePixelRatio: 0,
+    maxPixelRatio: 0,
+    maxPixels: 0,
+    resolutionScale: 1,
+    pixelZoom: 0,
+    maxResolution: 0,
+  };
+
   #adaptiveResolution?: AdaptiveResolution;
 
   /**
    * The controller that sets {@link Display.resolutionScale} by the cost of a frame, built by the
-   * constructor with the option `adaptiveResolution`; `undefined` without it.
+   * constructor with the option `adaptiveResolution`; `undefined` without it, and once the display
+   * is disposed — the controller lets go of the display with it.
    *
    * @see {@link AdaptiveResolution}
    */
@@ -1443,30 +1445,32 @@ export class Display {
    * of an eighth where the budget or the scale has made it.
    */
   get pixelRatio(): number {
-    if (this.pixelZoom > 0) {
-      return 1.0;
-    }
-    const {devicePixelRatio, maxPixelRatio, maxPixels, resolutionScale} = this;
+    return pixelRatioFor(this.#pixelRatioParams(this.resolutionScale));
+  }
 
-    let ratio = isPositiveFinite(maxPixelRatio) && maxPixelRatio < devicePixelRatio ? maxPixelRatio : devicePixelRatio;
-    let stepped = false;
+  /**
+   * The pixel ratio the display would draw at with `resolutionScale` in place of its own, at the
+   * size of its last measurement and with its bounds as they are now — what
+   * {@link Display.pixelRatio} answers once that scale is set. {@link AdaptiveResolution}
+   * predicts the cost of a step with it.
+   *
+   * @internal
+   */
+  pixelRatioAt(resolutionScale: number): number {
+    return pixelRatioFor(this.#pixelRatioParams(resolutionScale));
+  }
 
-    const area = this.#contentWidth * this.#contentHeight;
-    if (isPositiveFinite(maxPixels) && area > 0) {
-      const budgetRatio = Math.sqrt(maxPixels / area);
-      if (budgetRatio < ratio) {
-        ratio = budgetRatio;
-        stepped = true;
-      }
-    }
-
-    if (isPositiveFinite(resolutionScale) && resolutionScale !== 1) {
-      ratio *= resolutionScale;
-      stepped = true;
-    }
-
-    // rounded down, so the buffer stays within the budget; the leeway keeps 0.75 × 2 at 1.5
-    return stepped ? Math.max(PIXEL_RATIO_STEP, Math.floor(ratio / PIXEL_RATIO_STEP + 1e-9) * PIXEL_RATIO_STEP) : ratio;
+  // writes every field pixelRatioFor() reads, into the one object the display keeps for it
+  #pixelRatioParams(resolutionScale: number): DrawingBufferParams {
+    const params = this.#drawingBufferParams;
+    params.contentWidth = this.#contentWidth;
+    params.contentHeight = this.#contentHeight;
+    params.devicePixelRatio = this.devicePixelRatio;
+    params.maxPixelRatio = this.maxPixelRatio;
+    params.maxPixels = this.maxPixels;
+    params.resolutionScale = resolutionScale;
+    params.pixelZoom = this.pixelZoom;
+    return params;
   }
 
   get devicePixelRatio(): number {
@@ -1781,59 +1785,20 @@ export class Display {
     this.#contentWidth = wPx;
     this.#contentHeight = hPx;
 
-    const {pixelRatio} = this;
-    // a zoom that is NaN or negative works as 0, and counts as 0 in the comparison below: NaN
-    // would differ from itself and make every frame measure
-    const pixelZoom = this.pixelZoom > 0 ? this.pixelZoom : 0;
+    const params = this.#pixelRatioParams(this.resolutionScale);
+    params.cssWidth = cssWidth;
+    params.cssHeight = cssHeight;
+    params.maxResolution = Display.MaxResolution;
+    const buffer = resolveDrawingBuffer(params);
+    if (buffer.requestedSize != null) showCanvasMaxResolutionWarning(buffer.requestedSize[0], buffer.requestedSize[1]);
 
-    let width: number;
-    let height: number;
-    let devicePixelZoom = 0;
-
-    if (pixelZoom > 0) {
-      // Every pixel of the buffer a whole number of device pixels large, so the pixelated upscale
-      // draws all of them equally large: the zoom in device pixels rounded down, the whole pixels
-      // of the buffer that fit into the device pixels of the source, and a canvas of just their
-      // size — a fraction of a CSS pixel at times, always whole in device pixels
-      const ratio = this.devicePixelRatio;
-      devicePixelZoom = Math.max(1, Math.floor(pixelZoom * ratio + DEVICE_PIXEL_ZOOM_EPSILON));
-      if (isPositiveFinite(this.maxPixels)) {
-        // the smallest whole zoom at which the buffer stays within the budget
-        const budgetZoom = Math.ceil(Math.sqrt((wPx * ratio * hPx * ratio) / this.maxPixels) - DEVICE_PIXEL_ZOOM_EPSILON);
-        if (budgetZoom > devicePixelZoom) devicePixelZoom = budgetZoom;
-      }
-      width = Math.floor((wPx * ratio + DEVICE_PIXEL_SIZE_TOLERANCE) / devicePixelZoom);
-      height = Math.floor((hPx * ratio + DEVICE_PIXEL_SIZE_TOLERANCE) / devicePixelZoom);
-
-      if (width > Display.MaxResolution || height > Display.MaxResolution) {
-        showCanvasMaxResolutionWarning(width, height);
-        width = Math.min(width, Display.MaxResolution);
-        height = Math.min(height, Display.MaxResolution);
-      }
-
-      // the padding and border the CSS size carries beyond the size stay as they are
-      const cssPerPixel = devicePixelZoom / ratio;
-      cssWidth = Math.max(0, cssWidth - wPx + width * cssPerPixel);
-      cssHeight = Math.max(0, cssHeight - hPx + height * cssPerPixel);
-    } else {
-      if (wPx * pixelRatio > Display.MaxResolution || hPx * pixelRatio > Display.MaxResolution) {
-        // the warning names the size that was asked for, so it goes out before the clamp
-        showCanvasMaxResolutionWarning(Math.round(wPx * pixelRatio), Math.round(hPx * pixelRatio));
-        wPx = Math.min(wPx, Display.MaxResolution / pixelRatio);
-        hPx = Math.min(hPx, Display.MaxResolution / pixelRatio);
-      }
-
-      // rounded down, so the drawing buffer — Math.floor(width * pixelRatio) — stays within
-      // MaxResolution at a fractional pixel ratio as well
-      width = Math.floor(wPx);
-      height = Math.floor(hPx);
-    }
+    const {width, height, pixelRatio, pixelZoom, devicePixelZoom} = buffer;
 
     if (
       width === this.#appliedWidth &&
       height === this.#appliedHeight &&
-      cssWidth === this.#appliedCssWidth &&
-      cssHeight === this.#appliedCssHeight &&
+      buffer.cssWidth === this.#appliedCssWidth &&
+      buffer.cssHeight === this.#appliedCssHeight &&
       pixelRatio === this.#appliedPixelRatio &&
       pixelZoom === this.#appliedPixelZoom &&
       devicePixelZoom === this.#appliedDevicePixelZoom
@@ -1843,8 +1808,8 @@ export class Display {
 
     this.#appliedWidth = width;
     this.#appliedHeight = height;
-    this.#appliedCssWidth = cssWidth;
-    this.#appliedCssHeight = cssHeight;
+    this.#appliedCssWidth = buffer.cssWidth;
+    this.#appliedCssHeight = buffer.cssHeight;
     this.#appliedPixelRatio = pixelRatio;
     this.#appliedPixelZoom = pixelZoom;
     this.#appliedDevicePixelZoom = devicePixelZoom;
@@ -1858,8 +1823,8 @@ export class Display {
     // for a buffer of twice MaxResolution before setSize() brings it back
     this.renderer!.setDrawingBufferSize(this.#width, this.#height, pixelRatio);
 
-    canvas.style.width = `${cssWidth}px`;
-    canvas.style.height = `${cssHeight}px`;
+    canvas.style.width = `${buffer.cssWidth}px`;
+    canvas.style.height = `${buffer.cssHeight}px`;
 
     const isConstructing = this.frameNo === 0;
     if (!isConstructing) {
@@ -2098,6 +2063,8 @@ export class Display {
       errors.push(error);
     }
     off(this);
+    // the controller has let go of the display with the event above
+    this.#adaptiveResolution = undefined;
 
     // before the release, which lets go of the canvas; and synchronously, so a display built on
     // the same canvas in this tick writes its values afterwards and nothing overwrites them

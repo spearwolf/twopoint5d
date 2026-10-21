@@ -33,5 +33,10 @@ describe('Display — adaptiveResolution on a real renderer', function () {
     expect(['gpu-time', 'frame-pacing'], 'method').to.include(adaptive.method);
     expect(adaptive.scale, 'scale').to.be.within(adaptive.minScale, adaptive.maxScale);
     expect(display.resolutionScale, 'the scale of the display').to.equal(adaptive.scale);
+
+    display.dispose();
+    expect(display.adaptiveResolution, 'after dispose').to.be.undefined;
+    adaptive.enabled = false;
+    expect(adaptive.enabled, 'a controller that has let go stays as it is').to.equal(true);
   });
 });

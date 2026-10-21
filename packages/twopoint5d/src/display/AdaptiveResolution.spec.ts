@@ -3,43 +3,147 @@ import {describe, expect, it, vi} from 'vitest';
 import {OnDisplayDispose, OnDisplayRenderFrame, OnDisplayResize, OnDisplayRestart} from '../events.js';
 import {AdaptiveResolution} from './AdaptiveResolution.js';
 import type {Display} from './Display.js';
+import {pixelRatioFor} from './resolveDrawingBuffer.js';
 
 const FRAME_MS = 1000 / 60;
 
+interface DoubleOptions {
+  timestamps?: boolean;
+  resolutionScale?: number;
+  devicePixelRatio?: number;
+  maxPixelRatio?: number;
+  maxPixels?: number;
+  width?: number;
+  height?: number;
+}
+
+interface FrameOptions {
+  /** the rawDeltaTime of the frame, in milliseconds */
+  deltaMs?: number;
+  /** the longest interval between the animation frames of the page before the frame */
+  rafMs?: number;
+  /** a frame of the frame loop of the display, not a renderFrame() of one's own */
+  fromLoop?: boolean;
+}
+
 /**
- * A display stub with what the controller reads: the renderer and its backend, resolutionScale
- * and pixelZoom, and the events. `frame()` runs a frame as the display does — a changed scale is
- * measured first and emits a resize — and lets the measurement of the GPU time come in.
- * `timestamps` makes the backend measure GPU time; `gpuMs` is what it measures.
+ * A display double that holds to the contract of a display: what the controller reads off it —
+ * the renderer and its backend, resolutionScale, pixelZoom, the bounds of the ratio, the frame
+ * loop — and `pixelRatioAt()` through the very function a display resolves its ratio with.
+ *
+ * `frame()` runs a frame as the display does: it measures first, and emits a resize only where
+ * the ratio or the zoom has changed since the last measurement; then the frame, and two
+ * microtasks for a measurement to come in. `timestamps` makes the backend measure GPU time:
+ * `gpu.ms` is what it measures, or `gpu.msAt(ratio)` from the ratio the frame was drawn at. With
+ * `gpu.manual` every measurement stays open until `gpu.resolveNext(ms)` — frames later, if need
+ * be.
  */
-function makeDisplay({timestamps = false, resolutionScale = 1} = {}) {
-  const gpu = {ms: 0};
+function makeDisplay({
+  timestamps = false,
+  resolutionScale = 1,
+  devicePixelRatio = 1,
+  maxPixelRatio = 0,
+  maxPixels = 0,
+  width = 320,
+  height = 200,
+}: DoubleOptions = {}) {
+  const pending: ((ms: number) => void)[] = [];
+  const gpu = {
+    ms: 0,
+    msAt: undefined as ((ratio: number) => number) | undefined,
+    manual: false,
+    resolveNext(ms: number) {
+      pending.shift()!(ms);
+    },
+  };
+
+  // the ratio and the zoom of the last measurement
+  const measured = {ratio: 0, pixelZoom: 0, resizes: 0};
+
   const renderer = {
     backend: {trackTimestamp: timestamps, hasTimestamp: timestamps},
-    resolveTimestampsAsync: vi.fn(() => Promise.resolve(gpu.ms)),
+    resolveTimestampsAsync: vi.fn(
+      (): Promise<number> =>
+        gpu.manual
+          ? new Promise<number>((resolve) => pending.push(resolve))
+          : Promise.resolve(gpu.msAt?.(measured.ratio) ?? gpu.ms),
+    ),
   };
-  const display = eventize({renderer, resolutionScale, pixelZoom: 0}) as unknown as Display;
+  const frameLoop = {frameNo: 0, longestRafInterval: 0};
+  const display = eventize({
+    renderer,
+    resolutionScale,
+    pixelZoom: 0,
+    devicePixelRatio,
+    maxPixelRatio,
+    maxPixels,
+    frameLoop,
+    pixelRatioAt(scale: number): number {
+      return pixelRatioFor({
+        contentWidth: width,
+        contentHeight: height,
+        devicePixelRatio: this.devicePixelRatio,
+        maxPixelRatio: this.maxPixelRatio,
+        maxPixels: this.maxPixels,
+        resolutionScale: scale,
+        pixelZoom: this.pixelZoom,
+      });
+    },
+  }) as unknown as Display;
 
-  let measuredScale = resolutionScale;
-  const frame = async (deltaMs = FRAME_MS) => {
-    if (display.resolutionScale !== measuredScale) {
-      measuredScale = display.resolutionScale;
+  // the constructor of a display measures, and emits nothing for it
+  measured.ratio = display.pixelRatioAt(display.resolutionScale);
+
+  const frame = async ({deltaMs = FRAME_MS, rafMs = deltaMs, fromLoop = true}: FrameOptions = {}) => {
+    const ratio = display.pixelRatioAt(display.resolutionScale);
+    const pixelZoom = display.pixelZoom > 0 ? display.pixelZoom : 0;
+    if (ratio !== measured.ratio || pixelZoom !== measured.pixelZoom) {
+      measured.ratio = ratio;
+      measured.pixelZoom = pixelZoom;
+      measured.resizes += 1;
       emit(display, OnDisplayResize, {});
+    }
+    if (fromLoop) {
+      frameLoop.frameNo += 1;
+      frameLoop.longestRafInterval = rafMs;
     }
     emit(display, OnDisplayRenderFrame, {rawDeltaTime: deltaMs / 1000});
     // the measurement resolves in a microtask
     await Promise.resolve();
     await Promise.resolve();
   };
-  const frames = async (count: number, deltaMs = FRAME_MS) => {
-    for (let i = 0; i < count; i++) await frame(deltaMs);
+  const frames = async (count: number, options?: FrameOptions) => {
+    for (let i = 0; i < count; i++) await frame(options);
   };
 
-  return {display, renderer, gpu, frame, frames};
+  return {display, renderer, gpu, frame, frames, measured};
 }
 
 // the frames after a start, a restart and every resize that count for nothing
 const SETTLE = 30;
+
+// a 4K screen at a ratio of 2 on a budget of 3 million pixels: sqrt(3 000 000 / 8 294 400) is
+// 0.601, so the scales 1 and 0.875 both draw at 0.5, 0.75 and 0.625 both at 0.375, 0.5 at 0.25
+const BUDGET_4K = {devicePixelRatio: 2, width: 3840, height: 2160, maxPixels: 3_000_000};
+
+/**
+ * Runs frames of `ms` until the controller has come back to a scale of 1 after it went down, or
+ * `limit` frames have run; answers the lowest scale it went to, and whether it came back.
+ */
+async function descendAndReturn(
+  adaptive: AdaptiveResolution,
+  frame: (options?: FrameOptions) => Promise<void>,
+  ms: number,
+  limit = 2000,
+) {
+  let lowest = adaptive.scale;
+  for (let i = 0; i < limit; i++) {
+    await frame({deltaMs: ms});
+    lowest = Math.min(lowest, adaptive.scale);
+    if (lowest < 1 && adaptive.scale === 1) return {lowest, back: true};
+  }
+  return {lowest, back: false};
+}
 
 describe('AdaptiveResolution', () => {
   describe('options', () => {
@@ -203,6 +307,56 @@ describe('AdaptiveResolution', () => {
       expect(adaptive.scale).toBe(1);
     });
 
+    it('predicts a step up from the pixel ratio the display would draw at', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true, resolutionScale: 0.75, ...BUDGET_4K});
+      // the next step, 0.875, draws at 0.5: 8 ms × (0.5 / 0.375)² is 14.2 ms, above 90 % of 13.3 ms
+      gpu.ms = 8;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 12 * 6);
+
+      expect(adaptive.scale).toBe(0.75);
+    });
+
+    it('skips a step down that leaves the pixel ratio as it is', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true, ...BUDGET_4K});
+      gpu.ms = 15;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 12);
+
+      expect(adaptive.scale).toBe(0.75);
+      expect(display.pixelRatioAt(display.resolutionScale)).toBe(0.375);
+    });
+
+    it('goes up to the highest scale of the next pixel ratio', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true, resolutionScale: 0.5, ...BUDGET_4K});
+      gpu.ms = 1;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 12 * 3);
+      expect(adaptive.scale, '0.625 and 0.75 both draw at 0.375').toBe(0.75);
+
+      await frames(SETTLE + 12 * 3);
+      expect(adaptive.scale, '0.875 and 1 both draw at 0.5').toBe(1);
+    });
+
+    it('waits twice as many windows for the next step up after one that did not hold', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true, resolutionScale: 0.875});
+      // 6 ms × (1 / 0.875)² is 7.8 ms, below 90 % of 13.3 ms; the step up costs 14 ms all the same
+      gpu.msAt = (ratio) => (ratio <= 0.875 ? 6 : 14);
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 12 * 3);
+      expect(adaptive.scale, 'the step up').toBe(1);
+
+      await frames(SETTLE + 12);
+      expect(adaptive.scale, 'the step that did not hold').toBe(0.875);
+
+      await frames(SETTLE + 12 * 3);
+      expect(adaptive.scale, 'three good windows').toBe(0.875);
+      await frames(12 * 2);
+      expect(adaptive.scale, 'five good windows').toBe(0.875);
+      await frames(12);
+      expect(adaptive.scale, 'the sixth').toBe(1);
+    });
+
     it('drops a measurement that started before a resize', async () => {
       const {display, renderer, frames, frame} = makeDisplay({timestamps: true});
       const adaptive = new AdaptiveResolution(display);
@@ -225,10 +379,10 @@ describe('AdaptiveResolution', () => {
       const {display, frames} = makeDisplay();
       const adaptive = new AdaptiveResolution(display);
       await frames(SETTLE + 27);
-      await frames(2, 40);
+      await frames(2, {deltaMs: 40});
       expect(adaptive.scale).toBe(1);
 
-      await frames(1, 40);
+      await frames(1, {deltaMs: 40});
       expect(adaptive.scale).toBe(0.875);
     });
 
@@ -252,7 +406,7 @@ describe('AdaptiveResolution', () => {
       expect(adaptive.scale).toBe(0.875);
 
       await frames(SETTLE);
-      await frames(30, 40);
+      await frames(30, {deltaMs: 40});
       expect(adaptive.scale, 'the failed try').toBe(0.75);
 
       await frames(SETTLE + 359);
@@ -261,11 +415,82 @@ describe('AdaptiveResolution', () => {
       expect(adaptive.scale, 'the next try').toBe(0.875);
     });
 
+    it('tells the frames maxFps holds back from late ones by the animation frames of the page', async () => {
+      const {display, frame} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display, {targetFps: 50});
+      // maxFps 50 on 60 Hz: every fifth frame comes after two animation frames, none of them late
+      for (let i = 0; i < SETTLE + 300; i++) {
+        await frame({deltaMs: i % 5 === 0 ? 2 * FRAME_MS : FRAME_MS, rafMs: FRAME_MS});
+      }
+
+      expect(adaptive.scale).toBe(1);
+    });
+
+    it('measures against the pace the page reaches where fewer pixels bring the frames no sooner', async () => {
+      const {display, frame, frames, measured} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display);
+      // a requestAnimationFrame held to 30 Hz, whatever the scale
+      const {lowest, back} = await descendAndReturn(adaptive, frame, 2 * FRAME_MS);
+      expect(lowest, 'the lowest scale it tried').toBe(0.5);
+      expect(back, 'back where it began').toBe(true);
+
+      const resizes = measured.resizes;
+      await frames(600, {deltaMs: 2 * FRAME_MS});
+
+      expect(adaptive.scale).toBe(1);
+      // the resize of the return itself comes with the frame after it
+      expect(measured.resizes, 'no resize since the return').toBe(resizes + 1);
+    });
+
+    it('keeps going down where fewer pixels bring the frames sooner', async () => {
+      const {display, frame} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display);
+      let arrived = false;
+      let highestAfter = 0;
+      for (let i = 0; i < 1500; i++) {
+        const ms = display.pixelRatioAt(display.resolutionScale) >= 0.75 ? 2 * FRAME_MS : FRAME_MS;
+        await frame({deltaMs: ms});
+        if (adaptive.scale === 0.625) arrived = true;
+        if (arrived) highestAfter = Math.max(highestAfter, adaptive.scale);
+      }
+
+      expect(arrived, 'down at 0.625').toBe(true);
+      expect(highestAfter, 'a try up may visit 0.75').toBeLessThanOrEqual(0.75);
+      expect(adaptive.scale).toBeLessThan(1);
+    });
+
+    it('measures against the target again once the frames come sooner', async () => {
+      const {display, frame, frames} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display);
+      const {back} = await descendAndReturn(adaptive, frame, 2 * FRAME_MS);
+      expect(back, 'back where it began').toBe(true);
+      // the return is a resize
+      await frames(SETTLE, {deltaMs: 2 * FRAME_MS});
+
+      await frames(30 * 4, {deltaMs: FRAME_MS});
+      await frames(29, {deltaMs: 2 * FRAME_MS});
+      expect(adaptive.scale).toBe(1);
+
+      await frames(1, {deltaMs: 2 * FRAME_MS});
+      expect(adaptive.scale, 'the first late window').toBe(0.875);
+    });
+
+    it('reads the pace of a frame the frame loop did not run from its rawDeltaTime', async () => {
+      const {display, frames} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 27, {fromLoop: false});
+      await frames(2, {deltaMs: 40, fromLoop: false});
+      expect(adaptive.scale).toBe(1);
+
+      await frames(1, {deltaMs: 40, fromLoop: false});
+      expect(adaptive.scale).toBe(0.875);
+    });
+
     it('measures the frame interval against a lower targetFps', async () => {
       const {display, frames} = makeDisplay();
       const adaptive = new AdaptiveResolution(display, {targetFps: 30});
       // 40 ms lies below 1.5 × 33.3 ms
-      await frames(SETTLE + 60, 40);
+      await frames(SETTLE + 60, {deltaMs: 40});
 
       expect(adaptive.scale).toBe(1);
     });
@@ -309,6 +534,60 @@ describe('AdaptiveResolution', () => {
 
       adaptive.enabled = true;
       expect(display.resolutionScale).toBe(0.875);
+    });
+
+    it('drops a measurement in flight when it is disabled', async () => {
+      const {display, gpu, frame, frames} = makeDisplay({timestamps: true});
+      gpu.ms = 15;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 11);
+      gpu.manual = true;
+      await frame();
+
+      adaptive.enabled = false;
+      gpu.resolveNext(15);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(display.resolutionScale, 'the scale from before the takeover').toBe(1);
+      expect(adaptive.gpuTime).toBeUndefined();
+    });
+
+    it('drops a measurement in flight when the display goes over to a pixelZoom', async () => {
+      const {display, gpu, frame, frames} = makeDisplay({timestamps: true});
+      gpu.ms = 15;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 11);
+      gpu.manual = true;
+      await frame();
+
+      display.pixelZoom = 2;
+      gpu.resolveNext(15);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(adaptive.gpuTime, 'no window judged').toBeUndefined();
+      expect(display.resolutionScale).toBe(1);
+    });
+
+    it('gives back the scale the display had when it took over last', () => {
+      const {display} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display);
+
+      adaptive.enabled = false;
+      display.resolutionScale = 0.6;
+      adaptive.enabled = true;
+      expect(display.resolutionScale, 'the takeover').toBe(0.5);
+
+      adaptive.enabled = false;
+      expect(display.resolutionScale, 'set by hand').toBe(0.6);
+
+      const untouched = makeDisplay({resolutionScale: 0.9});
+      const other = new AdaptiveResolution(untouched.display);
+      other.enabled = false;
+      other.enabled = true;
+      other.enabled = false;
+      expect(untouched.display.resolutionScale, 'off, on and off again').toBe(0.9);
     });
 
     it('lets go and gives the display its scale back with dispose()', async () => {
