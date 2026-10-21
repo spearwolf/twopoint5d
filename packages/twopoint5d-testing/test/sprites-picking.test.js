@@ -1,5 +1,6 @@
 import {expect} from '@esm-bundle/chai';
 import {
+  AtlasFrame,
   AxisBillboardPlacement,
   BillboardPlacement,
   defineSprite,
@@ -7,7 +8,10 @@ import {
   Fade,
   FeatureSprites,
   FlatPlacement,
+  gridBase,
   InstancePosition,
+  NineSlice,
+  paletteSwap,
   QuadBase,
   QuadSize,
   SpritePicker,
@@ -22,6 +26,14 @@ const CLEAR = [0, 0, 0, 0];
 
 const FlatKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor, Tint, Fade]});
 const BillboardKind = defineSprite({base: QuadBase, features: [InstancePosition, BillboardPlacement, QuadSize, TextureColor]});
+const PanelKind = defineSprite({
+  base: gridBase({columns: 3, rows: 3}),
+  features: [InstancePosition, FlatPlacement, QuadSize, NineSlice, AtlasFrame, TextureColor],
+});
+const SwappedKind = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, TextureColor, paletteSwap({colors: 2})],
+});
 const AxisKind = defineSprite({base: QuadBase, features: [InstancePosition, AxisBillboardPlacement, QuadSize, TextureColor]});
 
 /** The pointer at the world point `(x, y, z)` as `camera` sees it. */
@@ -279,6 +291,62 @@ describe('sprites — picking', function () {
     expect(hitLeft?.sprites === left.sprites && hitLeft.sprite === left.all[0], 'the left mesh').to.be.true;
     expect(hitRight?.sprites === right.sprites && hitRight.sprite === right.all[1], 'the upper right sprite').to.be.true;
     expect(missed, 'the left sprite was not listed').to.be.undefined;
+  });
+
+  it('picks a nine-slice panel by its corners as drawn, not as the frame stretched', async () => {
+    const camera = makeFlatCamera();
+    const back = makeSprites(FlatKind, [[0, 0, 0]]);
+    back.all[0].setSize(6, 6);
+    back.sprites.update();
+    // a frame of 4 × 4 texels whose top left texel is transparent, its border one texel: the panel of
+    // 4 × 4 units keeps that texel 1 unit square in its corner, where a stretched frame would make it 2
+    const texels = Array.from({length: 16}, (_, i) => (i === 0 ? CLEAR : WHITE));
+    const colorMap = makeColorTexture(texels, 4, 4);
+    const panels = new FeatureSprites(PanelKind, {capacity: 1, textures: {colorMap}});
+    disposables.push(panels, colorMap);
+    const panel = panels.createSprite();
+    panel.setTexCoords(0, 0, 1, 1);
+    panel.setSliceInsets(1, 1, 1, 1);
+    panel.setSize(4, 4);
+    panel.setPosition(0, 0, 1);
+    panels.update();
+    const list = [panels, back.sprites];
+
+    const corner = await picker.pick(camera, pointerAt(camera, -1.5, 1.5), list);
+    const besideCorner = await picker.pick(camera, pointerAt(camera, -0.5, 0.5), list);
+
+    expect(corner?.sprites === back.sprites, 'through the transparent corner texel').to.be.true;
+    expect(besideCorner?.sprite === panel, 'where a stretched frame would be transparent, the panel').to.be.true;
+  });
+
+  it('picks a palette-swapped sprite by the alpha of its frame', async () => {
+    const camera = makeFlatCamera();
+    const back = makeSprites(FlatKind, [[0, 0, 0]]);
+    // the left texel of the frame is transparent, the right one red, which row 1 of the palette draws blue
+    const colorMap = makeColorTexture([CLEAR, [255, 0, 0, 255]]);
+    const palette = makeColorTexture(
+      [
+        [255, 0, 0, 255],
+        [0, 255, 0, 255],
+        [0, 0, 255, 255],
+        [255, 255, 0, 255],
+      ],
+      2,
+      2,
+    );
+    const swapped = new FeatureSprites(SwappedKind, {capacity: 1, textures: {colorMap, palette}});
+    disposables.push(swapped, colorMap, palette);
+    const sprite = swapped.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(0, 0, 1);
+    sprite.paletteRow = 1;
+    swapped.update();
+
+    const left = await picker.pick(camera, pointerAt(camera, -0.5, 0), [swapped, back.sprites]);
+    const right = await picker.pick(camera, pointerAt(camera, 0.5, 0), [swapped, back.sprites]);
+
+    expect(left?.sprites === back.sprites, 'the transparent half lets the pick through').to.be.true;
+    expect(right?.sprite === sprite, 'the swapped half').to.be.true;
   });
 
   it('does not hit a sprite faded to nothing, but what lies behind it', async () => {
