@@ -27,7 +27,10 @@ export interface TileBox {
   coords?: TilesWithinCoords;
   /** The box of the tile in the local space of the map node, where the tile renderers draw it. */
   box?: Box3;
-  /** The box the view frustum is tested against, in world space, scaled by `frustumBoxScale`. */
+  /**
+   * The box the view frustum is tested against, in world space: scaled by `frustumBoxScale`, and
+   * reaching no further above and below the map plane than the view frustum does.
+   */
   frustumBox?: Box3;
   /** The center of the tile in world space. */
   centerWorld?: Vector3;
@@ -183,6 +186,11 @@ const SEARCH_STOP_HEIGHT_SQ = 0;
 const SEARCH_STOP_FOOTPRINT_DIAGONAL = 1;
 const SEARCH_STOP_DISTANCE_SQ = 2;
 
+// where `CameraBasedVisibility` keeps the height range of the view frustum along the normal of
+// the map plane, in the local space of the map node, for the recomputation that runs
+const FRUSTUM_HEIGHT_MIN = 0;
+const FRUSTUM_HEIGHT_MAX = 1;
+
 /** The objects the dependency gate of {@link CameraBasedVisibility} compares. */
 interface CameraDependencies {
   centerPoint2D: Vector2;
@@ -235,8 +243,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   /**
    * How much larger than the tile the box is that the view frustum is tested against: the box is
    * `frustumBoxScale` times the tile in width, height and depth, around the tile — each side moves
-   * out by `(frustumBoxScale - 1) / 2` of the tile size. `1` tests the tile itself; the default
-   * `1.1` gives a tile that only just leaves the view a margin before it is dropped.
+   * out by `(frustumBoxScale - 1) / 2` of the tile size. Along the normal of the map plane the box
+   * reaches no further than the view frustum — see {@link depth}. `1` tests the tile itself; the
+   * default `1.1` gives a tile that only just leaves the view a margin before it is dropped.
    *
    * Takes a finite number of at least 1 and throws a `RangeError` for anything else, keeping the
    * value it had: below 1 the boxes of neighbouring tiles leave gaps between them, and the search,
@@ -315,6 +324,14 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * tested against `frustumBoxScale` times as far. Sprites that stand up from the map need a depth
    * that holds them, or the tiles they stand on leave the view while the sprites are still in it. `0`
    * tests the flat tile.
+   *
+   * The box the view frustum is tested against reaches no further above and below the plane than
+   * the frustum itself, measured in the local space of the map node: no point of the frustum lies
+   * beyond that. Within it, a box much higher than the tile is wide still passes the side planes of
+   * a tilted view beyond the edge of the view — `Frustum#intersectsBox()` tests the planes one by
+   * one —, and its tile is taken as visible without being in view. On tiles much smaller than the
+   * depth such tiles can make up about half of the visible set; a depth no higher than what stands
+   * on the map keeps them few.
    *
    * Takes a finite number of at least 0 and throws a `RangeError` for anything else, keeping the
    * value it had: a negative depth turns the box inside out, which three.js takes for an empty box
@@ -459,6 +476,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   // and the stop distance squared, written again each time another tile becomes the furthest kept
   // one. A typed array for the reason `#seenScalars` is one.
   readonly #searchStop = new Float64Array(3);
+  // The lowest and the highest point of the view frustum along the normal of the map plane, in the
+  // local space of the map node, at the `FRUSTUM_HEIGHT_…` indices: what the frustum boxes are cut
+  // to. Written by every recomputation. A typed array for the reason `#seenScalars` is one.
+  readonly #frustumHeight = new Float64Array(2);
   readonly #hullPoints: TilePoint[] = [];
   readonly #hull: TilePoint[] = [];
 
@@ -738,12 +759,25 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     truncateArray(this.pointsOnPlane);
 
+    const frustumHeight = this.#frustumHeight;
+    frustumHeight[FRUSTUM_HEIGHT_MIN] = Infinity;
+    frustumHeight[FRUSTUM_HEIGHT_MAX] = -Infinity;
+
     for (let i = 0; i < FRUSTUM_PROBES_NDC.length; ++i) {
-      // The loop bound is `FRUSTUM_PROBES_NDC.length`.
-      const [ndcX, ndcY] = FRUSTUM_PROBES_NDC[i]!;
+      // The loop bound is `FRUSTUM_PROBES_NDC.length`. Read by index: a tuple destructured costs an
+      // allocation wherever the compiler leaves the iteration in place
+      const probe = FRUSTUM_PROBES_NDC[i]!;
+      const ndcX = probe[0];
+      const ndcY = probe[1];
 
       this.#scratchLineOfSight.start.set(ndcX, ndcY, nearZ).unproject(camera);
       this.#scratchLineOfSight.end.set(ndcX, ndcY, farZ).unproject(camera);
+
+      // every probe counts here, one that misses the plane as well: the probes through the corners
+      // run through the eight corners of the frustum, on the near and on the far plane, so these
+      // points span the height range of the frustum
+      this.widenFrustumHeight(this.#scratchLineOfSight.start);
+      this.widenFrustumHeight(this.#scratchLineOfSight.end);
 
       const hit = this.planeWorld.intersectLine(this.#scratchLineOfSight, this.#scratchPlaneIntersection);
       if (hit == null) continue;
@@ -754,6 +788,26 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
 
     return this.pointsOnPlane.length;
+  }
+
+  /**
+   * Widens the height range of the view frustum by a point of it, given in world space. The range
+   * is kept in the local space of the map node, along its y axis — the normal of the map plane.
+   * The translation of `#tileBoxMatrix` moves along x and z alone, so the range holds in the space
+   * `setBox()` builds the boxes in as well. A point in and nothing out — see the note on doubles at
+   * the top of the module.
+   */
+  private widenFrustumHeight(point: Vector3): void {
+    // the y of `point.applyMatrix4(#matrixWorldInverse)`, written out: through `applyMatrix4()`,
+    // twice per probe, a recomputation under a tilted camera allocates 32 B — the probe loop grows
+    // past what the compiler inlines, see the note on doubles at the top of the module.
+    // `#matrixWorldInverse` is the one of this recomputation by now
+    const e = this.#matrixWorldInverse.elements;
+    const {x, y, z} = point;
+    const height = (e[1]! * x + e[5]! * y + e[9]! * z + e[13]!) / (e[3]! * x + e[7]! * y + e[11]! * z + e[15]!);
+    const frustumHeight = this.#frustumHeight;
+    if (height < frustumHeight[FRUSTUM_HEIGHT_MIN]!) frustumHeight[FRUSTUM_HEIGHT_MIN] = height;
+    if (height > frustumHeight[FRUSTUM_HEIGHT_MAX]!) frustumHeight[FRUSTUM_HEIGHT_MAX] = height;
   }
 
   /**
@@ -1097,8 +1151,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     let minY = Infinity;
     let maxY = -Infinity;
     for (let i = 0; i < hull.length; ++i) {
-      // The loop bound is `hull.length`.
-      const [x, y] = hull[i]!;
+      // The loop bound is `hull.length`. Read by index: a tuple destructured costs an allocation
+      // wherever the compiler leaves the iteration in place
+      const point = hull[i]!;
+      const x = point[0];
+      const y = point[1];
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
@@ -1254,8 +1311,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * The argument holds for every tile whose frustum box meets the frustum.
    * `Frustum#intersectsBox()` tests a box against the six planes one by one and also takes a box
    * that passes by an edge or a corner of the frustum without meeting it; such a tile, taken as
-   * visible and nearer than the furthest kept one, can in rare cases be left out for a tile
-   * further away.
+   * visible and nearer than the furthest kept one, can be left out for a tile further away. How
+   * many boxes pass that way grows with their height against the tile size — see {@link depth} —;
+   * the boxes reach no higher and no lower than the frustum.
    *
    * The height of the frustum boxes does not enter the margin, though it is why a margin is
    * needed at all: a tile whose box reaches into the frustum from below the lower edge of the
@@ -1342,9 +1400,10 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    */
   private pushNeighbors(tile: TileBox): void {
     for (let i = 0; i < NEIGHBOR_DX_DY.length; ++i) {
-      // The loop bound is `NEIGHBOR_DX_DY.length`.
-      const [dx, dy] = NEIGHBOR_DX_DY[i]!;
-      this.enqueue(this.acquireTileBox(tile.x + dx, tile.y + dy), false);
+      // The loop bound is `NEIGHBOR_DX_DY.length`. Read by index: a tuple destructured costs an
+      // allocation wherever the compiler leaves the iteration in place
+      const offset = NEIGHBOR_DX_DY[i]!;
+      this.enqueue(this.acquireTileBox(tile.x + offset[0], tile.y + offset[1]), false);
     }
   }
 
@@ -1367,15 +1426,29 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   /**
    * The box of a tile, `depth` high, in the space its coordinates are in — with the margin of
-   * `frustumBoxScale` for the box the frustum is tested against. A flag and not the scale itself,
-   * and the corners field by field — see the note on doubles at the top of the module.
+   * `frustumBoxScale` for the box the frustum is tested against, that box cut to the height range
+   * of the view frustum. A flag and not the scale itself, and the corners field by field — see the
+   * note on doubles at the top of the module.
    */
   private setBox(target: Box3, {top, left, width, height}: TilesWithinCoords, forFrustum: boolean): Box3 {
     const scale = forFrustum ? this.#frustumBoxScale : 1;
     const sw = (width * scale - width) / 2;
     const sh = (height * scale - height) / 2;
-    const ground = this.#depth * -0.5 * scale;
-    const ceiling = this.#depth * 0.5 * scale;
+    let ground = this.#depth * -0.5 * scale;
+    let ceiling = this.#depth * 0.5 * scale;
+    if (forFrustum) {
+      // no point of the frustum lies beyond this height, so the part of the box beyond it meets
+      // none — and a box higher than that passes the side planes of a tilted view far outside it.
+      // The range never turns inside out: a box for the frustum is built only in a recomputation
+      // in which a probe met the plane, and that point lies on a probe's line, so the lowest point
+      // lies at 0 or below and the highest at 0 or above. Compared and not through
+      // `Math.max()`/`Math.min()` — see the note on doubles at the top of the module
+      const frustumHeight = this.#frustumHeight;
+      const lowest = frustumHeight[FRUSTUM_HEIGHT_MIN]!;
+      const highest = frustumHeight[FRUSTUM_HEIGHT_MAX]!;
+      if (ground < lowest) ground = lowest;
+      if (ceiling > highest) ceiling = highest;
+    }
     const {min, max} = target;
     min.x = left - sw;
     min.y = ground;

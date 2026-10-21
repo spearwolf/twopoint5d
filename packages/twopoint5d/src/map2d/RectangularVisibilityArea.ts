@@ -65,7 +65,6 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   readonly #tileCoords: TilesWithinCoords = createTilesWithinCoords();
 
   // Per-call scratch — reused across calls, handed out in the result. See IMap2DVisibleTiles.
-  readonly #fullViewArea = new AABB2();
   readonly #offset = new Vector2();
   readonly #translate = new Vector3();
 
@@ -173,7 +172,6 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     area.width = width;
     area.height = height;
     const tileCoords = map2dTileCoords.computeTilesWithinArea(area, this.#tileCoords);
-    const fullViewArea = AABB2.from(tileCoords, this.#fullViewArea);
 
     const reuseTiles = this.#reuseTiles;
     const removeTiles = this.#removeTiles;
@@ -197,10 +195,13 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     for (let i = 0; i < previousTiles.length; ++i) {
       // The loop bound is `previousTiles.length`.
       const tile = previousTiles[i]!;
-      if (!tileGridChanged && fullViewArea.isIntersecting(tile.view)) {
+      const tx = tile.x - tileCoords.tileLeft;
+      const ty = tile.y - tileCoords.tileTop;
+      // by the integer indices, not by the edges: an edge worked out as `tileX * tileWidth` and one
+      // worked out as `left + columns * tileWidth` round apart on tile sizes like 0.1, and an index
+      // outside the columns would mark the cell of the neighbouring row as taken
+      if (!tileGridChanged && tx >= 0 && tx < tileCoords.columns && ty >= 0 && ty < tileCoords.rows) {
         reuseTiles.push(tile);
-        const tx = tile.x - tileCoords.tileLeft;
-        const ty = tile.y - tileCoords.tileTop;
         tileCreated[ty * tileCoords.columns + tx] = 1;
       } else {
         removeTiles.push(tile);

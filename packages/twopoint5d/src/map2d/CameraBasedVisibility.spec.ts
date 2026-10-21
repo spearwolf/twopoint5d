@@ -1164,6 +1164,7 @@ describe('CameraBasedVisibility', () => {
     test('the frustum box of a tile is frustumBoxScale times the tile, around the tile', () => {
       const visibility = new CameraBasedVisibility(makeTopDownCamera());
       visibility.frustumBoxScale = 2;
+      visibility.depth = 50;
 
       visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(100, 100), new Matrix4());
 
@@ -1173,8 +1174,9 @@ describe('CameraBasedVisibility', () => {
       const tileCenter = new Vector3();
       for (const tile of visibility.visibles) {
         const where = `tile ${tile.x},${tile.y}`;
-        // tile width times two, depth (100) times two, tile height times two
-        expect(tile.frustumBox!.getSize(size).toArray(), where).toEqual([200, 200, 200]);
+        // tile width times two, depth (50) times two, within the height the view frustum covers,
+        // tile height times two
+        expect(tile.frustumBox!.getSize(size).toArray(), where).toEqual([200, 100, 200]);
         tile.frustumBox!.getCenter(center);
         tile.box!.getCenter(tileCenter);
         expect(Math.abs(center.x - tileCenter.x), `${where}, x`).toBeLessThan(1e-6);
@@ -1217,6 +1219,70 @@ describe('CameraBasedVisibility', () => {
         // the difference, not the corners: `0 * -0.5` is `-0`
         expect(tile.box!.max.y - tile.box!.min.y, `${where}, box`).toBe(0);
         expect(tile.frustumBox!.max.y - tile.frustumBox!.min.y, `${where}, frustum box`).toBe(0);
+      }
+    });
+
+    test('with the default depth, a tilted view of tiles of 1 takes no more tiles than the ground around the camera holds', () => {
+      const camera = new PerspectiveCamera(60, 1, 0.1, 20);
+      camera.position.set(0, 5, 5);
+      camera.lookAt(0, 0, 0);
+      camera.updateMatrixWorld();
+      camera.updateProjectionMatrix();
+      const visibility = new CameraBasedVisibility(camera);
+
+      visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(1, 1), new Matrix4());
+
+      // the ground within `far` of the camera. When this bound was set, the view held 936 tiles, 498
+      // of them with a box the frustum meets (a separating-axis test tells), and boxes of the full
+      // default depth let 7 168 tiles through
+      const groundAroundTheCamera = Math.PI * camera.far ** 2;
+      expect(visibility.visibles.length, `${visibility.visibles.length} tiles`).toBeLessThan(groundAroundTheCamera);
+    });
+
+    test('the frustum box reaches no higher and no lower than the view frustum, the tile box keeps the depth', () => {
+      // the camera of makeTopDownCamera(), with a far of 150: the frustum reaches from 99.9 — the
+      // near plane — down to -50 — the far plane. Turned rather than aimed with lookAt(), which tips
+      // a camera that looks along its up vector by a hair
+      const camera = new PerspectiveCamera(90, 1, 0.1, 150);
+      camera.position.set(0, 100, 0);
+      camera.rotation.set(-Math.PI / 2, 0, 0);
+      camera.updateMatrixWorld();
+      camera.updateProjectionMatrix();
+      const visibility = new CameraBasedVisibility(camera);
+      visibility.depth = 400;
+
+      visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(100, 100), new Matrix4());
+
+      expect(visibility.visibles.length).toBeGreaterThan(0);
+      for (const tile of visibility.visibles) {
+        const where = `tile ${tile.x},${tile.y}`;
+        expect(tile.frustumBox!.min.y, `${where}, frustum box`).toBeCloseTo(-50, 6);
+        expect(tile.frustumBox!.max.y, `${where}, frustum box`).toBeCloseTo(99.9, 6);
+        expect(tile.box!.min.y, `${where}, box`).toBe(-200);
+        expect(tile.box!.max.y, `${where}, box`).toBe(200);
+      }
+    });
+
+    test('on a tilted map node the cut keeps every tile a flat box finds', () => {
+      const tileCoords = new Map2DTileCoordsUtil(256, 256);
+      const matrixWorld = new Matrix4().compose(
+        new Vector3(0, 0, 0),
+        new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 0.3),
+        new Vector3(1, 1, 1),
+      );
+      const flat = new CameraBasedVisibility(makeTiltedCamera());
+      flat.depth = 0;
+      const deep = new CameraBasedVisibility(makeTiltedCamera());
+
+      flat.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+      deep.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      expect(flat.visibles.length, 'the flat boxes').toBeGreaterThan(0);
+      expect(deep.visibles.length, 'the boxes of the default depth').toBeGreaterThan(0);
+      // the cut column holds the flat tile, so it passes each plane the flat tile passes
+      const deepIds = new Set(deep.visibles.map((tile) => tile.id));
+      for (const tile of flat.visibles) {
+        expect(deepIds.has(tile.id), `tile ${tile.x},${tile.y}`).toBe(true);
       }
     });
   });

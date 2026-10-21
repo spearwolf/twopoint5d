@@ -43,21 +43,23 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       // `include` counts every file under `src/`, one no spec loads included, so a bench or a
-      // helper of the specs at 0 % would pull the thresholds down
-      exclude: ['src/**/*.spec.ts', 'src/**/*.bench.ts', 'src/testing/**'],
+      // helper of the specs at 0 % would pull the thresholds down. `Stylesheets.ts` writes into a
+      // real `CSSStyleSheet`, which the specs — run under node, without a DOM — do not have;
+      // `packages/twopoint5d-testing/test/stylesheets.test.js` covers it in the browser
+      exclude: ['src/**/*.spec.ts', 'src/**/*.bench.ts', 'src/testing/**', 'src/display/Stylesheets.ts'],
       reporter: ['text-summary', 'lcov'],
       // The thresholds sit two points under the level measured when they were set — globally
       // and per module, the measured percentage rounded down minus two —, so a regression
       // turns the gate red while a line that moves does not — except `src/sprites/`, which is
       // held at 100 %: the sprite module was rebuilt with complete coverage as a requirement,
-      // and a line without a test there is a regression, not noise. `src/controls/` and `src/display/`
-      // carry no threshold of their own: the browser suite in `packages/twopoint5d-testing`
-      // exercises them, and that suite is not measured.
+      // and a line without a test there is a regression, not noise.
       thresholds: {
         statements: 83,
         branches: 78,
         functions: 82,
         lines: 83,
+        'src/controls/**': {statements: 90, branches: 74, functions: 89, lines: 92},
+        'src/display/**': {statements: 82, branches: 73, functions: 81, lines: 84},
         'src/map2d/**': {statements: 93, branches: 91, functions: 91, lines: 94},
         'src/sprites/**': {statements: 100, branches: 100, functions: 100, lines: 100},
         'src/stage/**': {statements: 94, branches: 88, functions: 95, lines: 95},

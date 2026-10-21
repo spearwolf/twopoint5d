@@ -160,8 +160,9 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
   gate: it runs every spec without coverage. The thresholds sit two points under the level
   measured when they were set, globally and per module: the measured percentage rounded
   down, minus two. A regression turns the gate red, a line that moves does not.
-  `controls` and `display` carry no threshold of their own; the browser suite exercises
-  them and is not measured.
+  `src/display/Stylesheets.ts` is not counted: it writes into a real `CSSStyleSheet`,
+  which the specs, run under Node without a DOM, do not have, and the browser suite
+  covers it.
 - `test:allocations` runs the Vitest project `allocations` (§2) without coverage: the
   heap bytes a hot-path call puts on the V8 heap, each against its limit in the spec.
 

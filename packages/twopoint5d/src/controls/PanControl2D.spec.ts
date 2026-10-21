@@ -62,9 +62,16 @@ interface PointerInit {
   buttons: number;
   clientX?: number;
   clientY?: number;
+  // what the event is dispatched on, `doc` without one
+  target?: EventTarget;
+  // what composedPath() answers: the element pressed first, then the ones around it
+  path?: object[];
 }
 
-function pointer(type: 'pointerdown' | 'pointermove' | 'pointerup', {buttons, clientX = 0, clientY = 0}: PointerInit): void {
+function pointer(
+  type: 'pointerdown' | 'pointermove' | 'pointerup',
+  {buttons, clientX = 0, clientY = 0, target = doc, path = []}: PointerInit,
+): void {
   const event = new Event(type);
   Object.defineProperties(event, {
     pointerId: {value: 1},
@@ -73,9 +80,9 @@ function pointer(type: 'pointerdown' | 'pointermove' | 'pointerup', {buttons, cl
     buttons: {value: buttons},
     clientX: {value: clientX},
     clientY: {value: clientY},
-    composedPath: {value: () => []},
+    composedPath: {value: () => path},
   });
-  doc.dispatchEvent(event);
+  target.dispatchEvent(event);
 }
 
 function drag(buttons: number): void {
@@ -298,6 +305,139 @@ describe('PanControl2D', () => {
       key('keydown', {code: 'KeyD'});
       control.update(1);
       expect(state.x).toBe(103);
+    });
+  });
+
+  describe('pointerTarget', () => {
+    // a press on `target`, then a move of 10 on the document
+    const pressAndMove = (target: EventTarget, path: object[] = []): void => {
+      pointer('pointerdown', {buttons: 1, clientX: 0, target, path});
+      pointer('pointermove', {buttons: 1, clientX: 10});
+    };
+
+    it('a press elsewhere starts no pan, a press on the target starts one the moves on the document carry on', () => {
+      const canvas = new EventTarget();
+      const control = makeControl({pointerTarget: canvas});
+
+      pressAndMove(doc);
+      control.update(0);
+      expect(control.panView.x, 'a press on the document').toBe(0);
+
+      pointer('pointerup', {buttons: 0});
+      pressAndMove(canvas);
+      control.update(0);
+      expect(control.panView.x, 'a press on the canvas').toBe(-10);
+    });
+
+    it('is the document without the option', () => {
+      const control = makeControl();
+
+      pressAndMove(doc);
+      control.update(0);
+
+      expect(control.panView.x).toBe(-10);
+    });
+
+    it('pointerDisabled takes the listener off the target and puts it back', () => {
+      const canvas = new EventTarget();
+      const control = makeControl({pointerTarget: canvas});
+
+      control.pointerDisabled = true;
+      pressAndMove(canvas);
+      control.update(0);
+      expect(control.panView.x, 'switched off').toBe(0);
+
+      control.pointerDisabled = false;
+      pressAndMove(canvas);
+      control.update(0);
+      expect(control.panView.x, 'switched on again').toBe(-10);
+    });
+
+    it('dispose() takes the listener off the target', () => {
+      const canvas = new EventTarget();
+      const add = vi.spyOn(canvas, 'addEventListener');
+      const remove = vi.spyOn(canvas, 'removeEventListener');
+      const control = makeControl({pointerTarget: canvas});
+      const onPointerDown = add.mock.calls.find(([type]) => type === 'pointerdown')?.[1];
+      expect(onPointerDown).toBeTypeOf('function');
+
+      control.dispose();
+
+      // update() of a disposed control moves nothing whatever reaches it, so the listener is what
+      // tells
+      expect(remove).toHaveBeenCalledWith('pointerdown', onPointerDown);
+    });
+  });
+
+  describe('a press on an interactive element', () => {
+    const pressAndMove = (path: object[], target: EventTarget = doc): void => {
+      pointer('pointerdown', {buttons: 1, clientX: 0, target, path});
+      pointer('pointermove', {buttons: 1, clientX: 10});
+    };
+
+    it.each(['input', 'textarea', 'select', 'button'])('starts no pan on %s', (localName) => {
+      const control = makeControl();
+
+      pressAndMove([{localName}]);
+      control.update(0);
+
+      expect(control.panView.x).toBe(0);
+    });
+
+    it('starts no pan on an element with contenteditable', () => {
+      const control = makeControl();
+
+      pressAndMove([{localName: 'div', isContentEditable: true}]);
+      control.update(0);
+
+      expect(control.panView.x).toBe(0);
+    });
+
+    it('starts a pan on an element that is none of them, within one that is none of them', () => {
+      const control = makeControl();
+
+      pressAndMove([{localName: 'canvas'}, {localName: 'div'}]);
+      control.update(0);
+
+      expect(control.panView.x).toBe(-10);
+    });
+
+    it('starts no pan on an element within a button, and one on the canvas', () => {
+      const canvas = new EventTarget();
+      const control = makeControl({pointerTarget: canvas});
+
+      pressAndMove([{localName: 'span'}, {localName: 'button'}, canvas], canvas);
+      control.update(0);
+      expect(control.panView.x, 'the span in the button').toBe(0);
+
+      pointer('pointerup', {buttons: 0});
+      pressAndMove([{localName: 'canvas'}, canvas], canvas);
+      control.update(0);
+      expect(control.panView.x, 'the canvas').toBe(-10);
+    });
+
+    it('an interactive element around the pointer target does not count', () => {
+      const canvas = new EventTarget();
+      const control = makeControl({pointerTarget: canvas});
+
+      pressAndMove([canvas, {localName: 'button'}], canvas);
+      control.update(0);
+
+      expect(control.panView.x).toBe(-10);
+    });
+
+    it('reads the target of the event while composedPath() answers nothing', () => {
+      const input = Object.assign(new EventTarget(), {localName: 'input'});
+      const onTheDocument = makeControl();
+      const onAnInput = makeControl({pointerTarget: input});
+
+      pressAndMove([]);
+      pressAndMove([], input);
+      onTheDocument.update(0);
+      onAnInput.update(0);
+
+      expect(onTheDocument.panView.x, 'the document').toBe(-10);
+      expect(onAnInput.panView.x, 'an input').toBe(0);
     });
   });
 

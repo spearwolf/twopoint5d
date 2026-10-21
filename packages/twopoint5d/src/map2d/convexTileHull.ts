@@ -96,11 +96,13 @@ export function convexTileHull(points: readonly TilePoint[], target: TilePoint[]
  * which is one interval and not several, because the outline is convex.
  */
 export function forEachTileWithinConvexHull(hull: readonly TilePoint[], visit: (x: number, y: number) => void): void {
+  // the points are read by index: destructured, the scan allocates on every call even once it has
+  // warmed up, as soon as a slanted edge crosses a row between two tile coordinates
   if (hull.length === 0) return;
 
   if (hull.length === 1) {
-    const [x, y] = hull[0]!;
-    visit(x, y);
+    const point = hull[0]!;
+    visit(point[0], point[1]);
     return;
   }
 
@@ -120,8 +122,12 @@ export function forEachTileWithinConvexHull(hull: readonly TilePoint[], visit: (
     for (let i = 0; i < hull.length; ++i) {
       // The loop bound is `hull.length`; the outline closes, so the last edge leads back to
       // the first point.
-      const [ax, ay] = hull[i]!;
-      const [bx, by] = hull[(i + 1) % hull.length]!;
+      const a = hull[i]!;
+      const b = hull[(i + 1) % hull.length]!;
+      const ax = a[0];
+      const ay = a[1];
+      const bx = b[0];
+      const by = b[1];
 
       if (ay === by) {
         // a horizontal edge crosses no row but the one it lies in, and there it is the span

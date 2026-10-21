@@ -83,6 +83,11 @@ const isEditableTarget = (target: EventTarget | null | undefined): boolean => {
   return localName === 'input' || localName === 'textarea' || localName === 'select';
 };
 
+// what a press starts no pan on: an editable element or a button, by property like
+// isEditableTarget() above
+const isInteractiveTarget = (target: EventTarget | null | undefined): boolean =>
+  isEditableTarget(target) || (target != null && 'localName' in target && target.localName === 'button');
+
 export interface PanControl2DOptions {
   state?: PanViewState;
 
@@ -157,6 +162,19 @@ export interface PanControl2DOptions {
    */
   keyCodes?: [number, number, number, number];
 
+  /**
+   * The target the `pointerdown` that starts a pan is listened for on. Default is `document`: a
+   * press anywhere on the page starts a pan. Name the canvas, or an element around it, and a press
+   * elsewhere starts none. The `pointermove`, `pointerup` and `pointercancel` of a drag are
+   * listened for on `document` whatever this names, so a drag that leaves the element goes on until
+   * it is let go.
+   *
+   * A press on an `input`, `textarea`, `select`, `button` or an element with `contenteditable` — or
+   * on an element within one of them, up to this target — starts no pan; the path is read through
+   * `composedPath()`, so in an open shadow root as well.
+   */
+  pointerTarget?: EventTarget;
+
   disablePointer?: boolean;
   disableKeyboard?: boolean;
 }
@@ -191,6 +209,8 @@ export class PanControl2D extends InputControlBase {
   #cursorStylesTarget?: HTMLElement;
   #styleSheetRoot: HTMLElement | ShadowRoot;
   #hideCursorState = HideCursorState.NO;
+
+  readonly #pointerTarget: EventTarget;
 
   mouseButton: number;
 
@@ -232,6 +252,9 @@ export class PanControl2D extends InputControlBase {
     this.mouseButton = readOption(options, 'mouseButton', 1);
     this.keys = readOption(options, 'keys', [...DEFAULT_KEYS] as [string, string, string, string]);
     this.keyCodes = readOption(options, 'keyCodes', [...DEFAULT_KEY_CODES] as [number, number, number, number]);
+
+    // before pointerDisabled below: the setter hangs the pointerdown listener on this target
+    this.#pointerTarget = readOption(options, 'pointerTarget', document);
 
     this.pointerDisabled = readOption(options, 'disablePointer', false);
     this.keyboardDisabled = readOption(options, 'disableKeyboard', false);
@@ -364,12 +387,12 @@ export class PanControl2D extends InputControlBase {
   set pointerDisabled(value: boolean) {
     this.#pointerDisabled = value;
     if (!value) {
-      this.addEventListener(document, POINTERDOWN, this.#onPointerDown);
+      this.addEventListener(this.#pointerTarget, POINTERDOWN, this.#onPointerDown);
       this.addEventListener(document, POINTERUP, this.#onPointerUp);
       this.addEventListener(document, POINTERMOVE, this.#onPointerMove);
       this.addEventListener(document, POINTERCANCEL, this.#onPointerCancel);
     } else {
-      this.removeEventListener(document, POINTERDOWN, this.#onPointerDown);
+      this.removeEventListener(this.#pointerTarget, POINTERDOWN, this.#onPointerDown);
       this.removeEventListener(document, POINTERUP, this.#onPointerUp);
       this.removeEventListener(document, POINTERMOVE, this.#onPointerMove);
       this.removeEventListener(document, POINTERCANCEL, this.#onPointerCancel);
@@ -384,8 +407,9 @@ export class PanControl2D extends InputControlBase {
   }
 
   /**
-   * Take every listener off `document` and `window` and give back what the input sources are
-   * holding: the pan collected in a drag, the keys still down and a hidden cursor.
+   * Take every listener off `document`, `window` and the `pointerTarget` and give back what the
+   * input sources are holding: the pan collected in a drag, the keys still down and a hidden
+   * cursor.
    *
    * None of it can come back through an event any more — a `pointerup` and a `keyup` reach a
    * control that is no longer listening, and without this the view would keep moving by a key
@@ -394,8 +418,8 @@ export class PanControl2D extends InputControlBase {
    * reaches this control or not.
    */
   override unsubscribe(): void {
-    // first: with the listeners off document and window, no event can refill what the
-    // lines below give up
+    // first: with the listeners off their targets, no event can refill what the lines below
+    // give up
     super.unsubscribe();
 
     this.#dropPointers();
@@ -468,7 +492,27 @@ export class PanControl2D extends InputControlBase {
     return false;
   }
 
+  // A press on a form control, a button or editable text is meant for that element: a range slider,
+  // a text selection, a click. Read through composedPath() and not event.target: an element in an
+  // open shadow root reaches a listener outside of it retargeted onto the shadow host. And the path
+  // and not its first entry alone: a press on the label of a button lands on the span within it.
+  // The path is read up to the pointer target, an element around it is no part of the press.
+  #startsOnInteractiveTarget(event: PointerEvent): boolean {
+    const path = event.composedPath();
+    // an event that is not being dispatched has no path
+    if (path.length === 0) return isInteractiveTarget(event.target);
+    const pointerTarget = this.#pointerTarget;
+    for (let i = 0; i < path.length; ++i) {
+      // The loop bound is `path.length`.
+      const target = path[i]!;
+      if (target === pointerTarget) return false;
+      if (isInteractiveTarget(target)) return true;
+    }
+    return false;
+  }
+
   #onPointerDown = (event: PointerEvent): void => {
+    if (this.#startsOnInteractiveTarget(event)) return;
     if (this.#isPanPointer(event)) {
       // an id that is still down missed its end: its old position is no anchor, and
       // whatever it collected goes with it
@@ -650,13 +694,14 @@ export class PanControl2D extends InputControlBase {
   };
 
   /**
-   * Take every listener off `document` and `window`, give the cursor styles target back
-   * the way it was found, give the cursor rule back to the stylesheet and drop the pan
-   * that was collected but never delivered.
+   * Take every listener off `document`, `window` and the `pointerTarget`, give the cursor
+   * styles target back the way it was found, give the cursor rule back to the stylesheet
+   * and drop the pan that was collected but never delivered.
    *
-   * The `state` object and the `cursorStylesTarget` element were handed in and stay the
-   * caller's: the state keeps the values the last {@link update} wrote, and the element
-   * keeps everything but the cursor class this control put on it. The cursor rule stays
+   * The `state` object, the `cursorStylesTarget` element and the `pointerTarget` were handed
+   * in and stay the caller's: the state keeps the values the last {@link update} wrote, the
+   * `cursorStylesTarget` keeps everything but the cursor class this control put on it, and
+   * the `pointerTarget` everything but the listener. The cursor rule stays
    * in the stylesheet for as long as another control in the same root shows the same
    * cursor style.
    *

@@ -132,7 +132,8 @@ export function whenPageAnimates() {
 
 /**
  * PanControl2D listens on `document`, so a pointer event dispatched on any element
- * bubbles up to it. The element it is dispatched on — `document.body` unless `target`
+ * bubbles up to it — composed, as a pointer event of the browser is, so from inside a
+ * shadow root as well. The element it is dispatched on — `document.body` unless `target`
  * names another — is what the control sees as `event.target`. `isPrimary` is `true`
  * unless named otherwise: the first pointer of its type, which a second finger on a
  * touch screen is not.
@@ -144,6 +145,7 @@ export function pointer(
   target.dispatchEvent(
     new PointerEvent(type, {
       bubbles: true,
+      composed: true,
       pointerId,
       isPrimary,
       pointerType,

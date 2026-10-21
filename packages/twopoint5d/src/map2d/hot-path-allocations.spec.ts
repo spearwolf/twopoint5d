@@ -1,25 +1,29 @@
-import {Matrix4, Object3D, PerspectiveCamera, Scene} from 'three/webgpu';
+import {Matrix4, Object3D, PerspectiveCamera, Scene, Vector3} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import {AABB2} from './AABB2.js';
 import {CameraBasedVisibility} from './CameraBasedVisibility.js';
 import {CameraBasedVisibilityHelpers} from './CameraBasedVisibilityHelpers.js';
+import {Map2D} from './Map2D.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';
 import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
+import {Map2DTileRenderer} from './Map2DTileRenderer.js';
+import {Map2DTileStreamer} from './Map2DTileStreamer.js';
 import {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
-import type {IMap2DTileCoords, IMap2DVisibilitor} from './types.js';
+import type {IMap2DTileCoords, IMap2DVisibilitor, IMapTileFactory} from './types.js';
 
 // a call that allocates anything costs 16 B at least; for rounds of a thousand calls. When this
 // limit was set, a call that finds nothing changed measured 0.01 B and the grid queries with a
-// target 0.01 B
+// target 0.01 B, and an `update()` of `Map2D` under a standing camera 0.01 B
 const BYTES_PER_CALL_LIMIT = 1;
 
 // half the smallest heap object (16 B): a single allocation per recomputation shows, while the
 // noise of a round spreads over its forty recomputations. When this limit was set, a recomputation
-// over the same tiles measured 0.31 to 0.51 B in `CameraBasedVisibility` and 0.31 B in
-// `RectangularVisibilityArea`
+// over the same tiles measured 0.31 to 0.51 B in `CameraBasedVisibility` and 0.31 B under a tilted
+// camera, 0.31 B in `RectangularVisibilityArea`, and an `update()` of `Map2D` under a moving camera
+// 0.31 B
 const BYTES_PER_RECOMPUTATION_LIMIT = 8;
 
 // what a tile that enters the view may cost beyond its Map2DTileCoords. When this margin was set,
@@ -48,6 +52,22 @@ function makeTopDownCamera(): PerspectiveCamera {
   camera.updateProjectionMatrix();
   return camera;
 }
+
+// the camera of `hot-path-allocations.tilted-view.spec.ts`: the probe rays span a hull with
+// slanted edges, where a top-down view spans a rectangle
+function makeTiltedCamera(): PerspectiveCamera {
+  const camera = new PerspectiveCamera(75, 1.6, 0.1, 4000);
+  camera.position.set(0, 350, 500);
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  camera.updateProjectionMatrix();
+  return camera;
+}
+
+// 304 tiles under the tilted camera, and a hull of the probe rays over three rows, the middle one
+// crossed by its slanted edges between two tile coordinates. On tiles of 400 the hull spans two
+// rows, each through two of its corners, and every crossing is a whole number
+const makeTiltedViewGrid = () => new Map2DTileCoordsUtil(300, 300, 0.25, -0.5);
 
 const sortedIds = (tiles: readonly IMap2DTileCoords[]): string[] => tiles.map((tile) => tile.id).sort();
 
@@ -153,6 +173,40 @@ describe('CameraBasedVisibility on the hot path', () => {
     );
   });
 
+  // Six probe rays meet the plane under this camera — the middle, the middle of the bottom, left and
+  // right edge, and the two lower corners —, the three upper ones aim above the horizon. The points
+  // left and right of the middle lie further out and further apart than the lower corners, so the
+  // hull is a trapezoid with slanted edges.
+  test('a recomputation over the same tiles under a tilted camera allocates nothing', async () => {
+    const visibility = new CameraBasedVisibility(makeTiltedCamera());
+    const grid = makeTiltedViewGrid();
+    const center = makeCenter();
+    const matrixWorlds = [makeMatrixWorld(), makeOtherMatrixWorld()] as const;
+
+    let previous = visibility.computeVisibleTiles([], center, grid, matrixWorlds[0])!.tiles;
+    const idsAtFirst = sortedIds(previous);
+    previous = visibility.computeVisibleTiles(previous, center, grid, matrixWorlds[1])!.tiles;
+    expect(sortedIds(previous), 'both positions see the same tiles').toEqual(idsAtFirst);
+    expect(visibility.visibles.length, 'a view of some hundred tiles').toBeGreaterThan(150);
+    expect(visibility.pointsOnPlane.length, 'the probe rays span a hull').toBeGreaterThanOrEqual(3);
+
+    const serialBefore = visibility.serial;
+    let flip = 0;
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < RECOMPUTATIONS_PER_ROUND; i++) {
+        flip ^= 1;
+        previous = visibility.computeVisibleTiles(previous, center, grid, matrixWorlds[flip]!)!.tiles;
+      }
+    });
+    const bytesPerRecomputation = bytesPerRound / RECOMPUTATIONS_PER_ROUND;
+
+    expect(visibility.serial - serialBefore, 'every call recomputed').toBeGreaterThan(RECOMPUTATIONS_PER_ROUND);
+    expect(
+      bytesPerRecomputation,
+      `${bytesPerRecomputation.toFixed(2)} bytes per recomputation of ${visibility.visibles.length} tiles`,
+    ).toBeLessThan(BYTES_PER_RECOMPUTATION_LIMIT);
+  });
+
   test('a tile that enters the view costs its Map2DTileCoords and nothing else', async () => {
     const visibility = new CameraBasedVisibility(makeTopDownCamera());
 
@@ -162,6 +216,85 @@ describe('CameraBasedVisibility on the hot path', () => {
       bytesPerTile - bytesPerShell,
       `${bytesPerTile.toFixed(2)} bytes per tile entering the view (${createdPerRecomputation} per recomputation), ${bytesPerShell.toFixed(2)} per Map2DTileCoords`,
     ).toBeLessThan(BYTES_PER_TILE_MARGIN);
+  });
+});
+
+describe('Map2D on the hot path', () => {
+  // a factory that allocates nothing of its own: a tile is a Smi
+  const makeTileFactory = (): IMapTileFactory<number> => {
+    let next = 0;
+    return {
+      addToNode() {},
+      removeFromNode() {},
+      createTile: () => next++,
+      updateTile() {},
+      destroyTile() {},
+      update() {},
+    };
+  };
+
+  const makeMap = () => {
+    const camera = makeTiltedCamera();
+    const visibility = new CameraBasedVisibility(camera);
+    const factory = makeTileFactory();
+    const map2d = new Map2D(new Map2DTileStreamer(400, 400, 0.25, -0.5));
+    map2d.visibilitor = visibility;
+    map2d.addTileRenderer(new Map2DTileRenderer(factory));
+    // lays the tiles out
+    map2d.update();
+    return {camera, visibility, factory, map2d};
+  };
+
+  // after the measurement, so that the spies cost the measured rounds nothing
+  const expectFactoryLeftAlone = (factory: IMapTileFactory<number>, round: () => void): void => {
+    const spies = [vi.spyOn(factory, 'createTile'), vi.spyOn(factory, 'updateTile'), vi.spyOn(factory, 'update')];
+    round();
+    for (const spy of spies) expect(spy, 'the factory in a round').not.toHaveBeenCalled();
+  };
+
+  test('an update() under a standing camera allocates nothing', async () => {
+    const {visibility, factory, map2d} = makeMap();
+    const serialBefore = visibility.serial;
+
+    const round = () => {
+      for (let i = 0; i < CALLS_PER_ROUND; i++) map2d.update();
+    };
+    const bytesPerRound = await measureSettledBytes(round);
+    const bytesPerCall = bytesPerRound / CALLS_PER_ROUND;
+
+    expect(visibility.serial, 'every call took the cached result').toBe(serialBefore);
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expectFactoryLeftAlone(factory, round);
+  });
+
+  test('an update() over the same tiles under a moving camera allocates nothing', async () => {
+    const {camera, visibility, factory, map2d} = makeMap();
+    // a step the gate sees, built before the round: the round hands over objects, no double it works out
+    const positions = [new Vector3(0, 350, 500), new Vector3(0, 350, 501)] as const;
+
+    const idsAtFirst = sortedIds(map2d.tileStreamer.tiles);
+    camera.position.copy(positions[1]);
+    map2d.update();
+    expect(sortedIds(map2d.tileStreamer.tiles), 'both positions see the same tiles').toEqual(idsAtFirst);
+
+    const serialBefore = visibility.serial;
+    let flip = 1;
+    const round = () => {
+      for (let i = 0; i < RECOMPUTATIONS_PER_ROUND; i++) {
+        flip ^= 1;
+        camera.position.copy(positions[flip]!);
+        map2d.update();
+      }
+    };
+    const bytesPerRound = await measureSettledBytes(round);
+    const bytesPerRecomputation = bytesPerRound / RECOMPUTATIONS_PER_ROUND;
+
+    expect(visibility.serial - serialBefore, 'every call recomputed').toBeGreaterThan(RECOMPUTATIONS_PER_ROUND);
+    expect(
+      bytesPerRecomputation,
+      `${bytesPerRecomputation.toFixed(2)} bytes per update() of ${map2d.tileStreamer.tiles.length} tiles`,
+    ).toBeLessThan(BYTES_PER_RECOMPUTATION_LIMIT);
+    expectFactoryLeftAlone(factory, round);
   });
 });
 

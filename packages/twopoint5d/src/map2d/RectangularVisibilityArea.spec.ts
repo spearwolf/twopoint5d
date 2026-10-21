@@ -191,6 +191,35 @@ describe('RectangularVisibilityArea', () => {
       expect(ids(second.removeTiles), 'every tile of the old grid goes').toEqual(firstIds);
       expect(ids(second.tiles), 'the new grid is covered once').toEqual([...new Set(ids(second.tiles))]);
     });
+
+    test('a grid of 0.1 scrolled tile by tile keeps the tile set a fresh area computes', () => {
+      const grid = new Map2DTileCoordsUtil(0.1, 0.1);
+
+      // summed up step by step, so the center carries the rounding of every step before it
+      for (const axis of [0, 1] as const) {
+        const area = new RectangularVisibilityArea(0.7, 0.3);
+        const center: [number, number] = [0, 0];
+        let previous: IMap2DTileCoords[] = [];
+
+        for (let i = 0; i < 40; i++) {
+          center[axis] -= 0.1;
+          // `previous` can be the `tiles` of the last result, which the call writes again
+          const before = ids(previous);
+          const result = area.computeVisibleTiles(previous, [center[0], center[1]], grid, matrixWorld)!;
+          previous = result.tiles;
+          const fresh = new RectangularVisibilityArea(0.7, 0.3).computeVisibleTiles(
+            [],
+            [center[0], center[1]],
+            grid,
+            matrixWorld,
+          )!;
+
+          expect(ids(result.tiles), `axis ${axis}, step ${i}`).toEqual(ids(fresh.tiles));
+          expect(ids([...(result.reuseTiles ?? []), ...(result.removeTiles ?? [])]), `axis ${axis}, step ${i}`).toEqual(before);
+          expect(new Set(ids(result.tiles)).size, `axis ${axis}, step ${i}: no tile twice`).toBe(result.tiles.length);
+        }
+      }
+    });
   });
 
   describe('width and height', () => {

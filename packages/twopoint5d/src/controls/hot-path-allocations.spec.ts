@@ -13,6 +13,9 @@ vi.mock('../display/Stylesheets.js', () => ({
 const BYTES_PER_CALL_LIMIT = 1;
 const CALLS = 1000;
 
+// the path of a press on the document, built once
+const NO_PATH: EventTarget[] = [];
+
 // the fields PanControl2D reads off a pointer event, on a plain object built once: a
 // round hands the listener the same few objects again and again
 const pointerEvent = (type: string, init: Record<string, unknown> = {}) =>
@@ -24,6 +27,7 @@ const pointerEvent = (type: string, init: Record<string, unknown> = {}) =>
     buttons: 1,
     clientX: 0,
     clientY: 0,
+    composedPath: () => NO_PATH,
     ...init,
   }) as unknown as PointerEvent;
 
