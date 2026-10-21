@@ -21,6 +21,13 @@ export interface FeatureSpritesOptions<Api extends object = object>
   /** A material of the same kind; it stays the caller's. Excludes every material parameter and `passes`. */
   material?: FeatureSpritesMaterial<Api>;
   /**
+   * A full pool grows instead of refusing: the {@link FeatureSprites.createSprite} that finds every
+   * slot in use builds a geometry of twice the capacity, moves every sprite over — handles, values
+   * and order — and answers a sprite of the new pool. A frame hitch, noted on the console once per
+   * mesh. Default `false`. Excludes `geometry`, which the sprites do not own and cannot replace.
+   */
+  grow?: boolean;
+  /**
    * Further ways to draw the sprites, each a child mesh over the geometry of the sprites with a
    * material of its own — see {@link FeatureSprites.passes}. The material of the sprites and every
    * pass material share one set of uniforms and textures, which `textures` and `uniforms` start.
@@ -103,6 +110,7 @@ interface ResolvedParts<Api extends object> {
   geometry: FeatureSpritesGeometry<Api>;
   material: FeatureSpritesMaterial<Api>;
   ownsGeometry: boolean;
+  grows: boolean;
   /** The uniforms and textures every material shares, built only for passes. */
   resources: SpriteResources | undefined;
 }
@@ -111,10 +119,18 @@ interface ResolvedParts<Api extends object> {
 // leaves nothing behind: every check runs before anything is built, and when the shared resources
 // or the material cannot be built, what was built for them goes first
 function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api>): ResolvedParts<Api> {
-  const {geometry, material, passes = [], capacity, attributeUsage, baseArgs, ...materialParameters} = options;
+  const {geometry, material, passes = [], capacity, attributeUsage, baseArgs, grow, ...materialParameters} = options;
 
+  if (grow !== undefined && typeof grow !== 'boolean') {
+    throw new TypeError(`${WHERE}: grow is true or false, got ${JSON.stringify(grow)}`);
+  }
   if (geometry != null) {
     if (geometry.kind !== kind) throw new TypeError(`${WHERE}: the geometry handed in was built for another sprite kind`);
+    if (grow === true) {
+      throw new TypeError(
+        `${WHERE}: grow builds a larger geometry once the pool is full, and a geometry was handed in, which the sprites do not own — leave out grow, or leave out the geometry and give the sprites the capacity (attributeUsage, baseArgs) to build their own`,
+      );
+    }
     if (definedKeys({capacity, attributeUsage, baseArgs}).length > 0) {
       throw new TypeError(`${WHERE}: capacity, attributeUsage and baseArgs build a geometry, and a geometry was handed in`);
     }
@@ -137,6 +153,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
   }
 
   const builtGeometry = geometry ?? new FeatureSpritesGeometry(kind, {capacity, attributeUsage, baseArgs});
+  const grows = grow === true;
   let resources: SpriteResources | undefined;
   try {
     if (passes.length > 0) {
@@ -152,6 +169,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
         geometry: builtGeometry,
         material: new FeatureSpritesMaterial(kind, {...ownParameters, resources}),
         ownsGeometry: geometry == null,
+        grows,
         resources,
       };
     }
@@ -159,6 +177,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
       geometry: builtGeometry,
       material: material ?? new FeatureSpritesMaterial(kind, materialParameters),
       ownsGeometry: geometry == null,
+      grows,
       resources: undefined,
     };
   } catch (error) {
@@ -179,6 +198,10 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
  * every pass as well.
  */
 export class FeatureSprites<Api extends object = object> extends VertexObjects<FeatureSpritesGeometry<Api>> {
+  /**
+   * The geometry the sprites draw — `undefined` once disposed. Under `grow` a growth replaces it
+   * with a larger one and disposes the old one: read it from the mesh afresh.
+   */
   declare geometry: FeatureSpritesGeometry<Api> | undefined;
   declare material: FeatureSpritesMaterial<Api> | undefined;
 
@@ -186,6 +209,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
 
   #ownsGeometry: boolean;
   #ownsMaterial: boolean;
+  readonly #grows: boolean;
   #resources: SpriteResources | undefined;
   #passes: Record<string, FeatureSpritesPass<Api>> = Object.freeze(passRecord<Api>());
   #judgedPasses: readonly FeatureSpritesPass<Api>[] = [];
@@ -195,8 +219,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   readonly #boundVectors: (Vector3 | Vector4)[] = [];
   readonly #worldToSprites = new Matrix4();
   #disposed = false;
-  // createSprite() says once that the pool is full
+  // createSprite() says once that the pool is full, or — under grow — that it grew
   #warnedFull = false;
+  #notedGrowth = false;
   // sortByViewDepth(): the depth of every sprite, grown with the capacity, and the camera's view of the mesh
   #depthKeys: Float64Array | undefined;
   readonly #modelView = new Matrix4();
@@ -210,7 +235,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    *   throws leaves nothing behind it built.
    */
   constructor(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api> & {isMaterial?: never; isTexture?: never} = {}) {
-    const {geometry, material, ownsGeometry, resources} = resolveParts(kind, options);
+    const {geometry, material, ownsGeometry, grows, resources} = resolveParts(kind, options);
 
     super(geometry, material);
 
@@ -218,6 +243,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     // only the geometry, the materials and the resources built right here belong to this mesh
     this.#ownsGeometry = ownsGeometry;
     this.#ownsMaterial = options.material == null;
+    this.#grows = grows;
     this.#resources = resources;
     this.name = 'twopoint5d.FeatureSprites';
 
@@ -254,7 +280,10 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     return this.#passes;
   }
 
-  /** The sprite pool of the geometry — `undefined` once disposed. */
+  /**
+   * The sprite pool of the geometry — `undefined` once disposed. Under `grow` a growth replaces it,
+   * and the geometry with it: read both from the mesh afresh, a pool kept from before is disposed.
+   */
   get spritePool(): VertexObjectPool<Api & VO> | undefined {
     return this.geometry?.instancedPool;
   }
@@ -264,13 +293,49 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * Answers `undefined` once the pool is full or the sprites are disposed. The first time the pool
    * is full it says so on the console, once per mesh, naming the capacity and how to raise it; a
    * disposed mesh answers without a word.
+   *
+   * Built with `grow: true`, a full pool grows instead: a geometry of twice the capacity takes the
+   * place of the old one, on this mesh and on every pass mesh, every sprite moves over — the handles
+   * stay the same objects in the same slots, with their values — and the old geometry is disposed.
+   * The first growth says so on the console, once per mesh, with the capacity to start with.
+   *
+   * @throws under `grow`, for a geometry with pools attached (`attachInstancedPool()`), which a grown
+   *   geometry would leave behind; nothing has changed then
    */
   createSprite(): (Api & VO) | undefined {
     const pool = this.geometry?.instancedPool;
     if (pool == null) return undefined;
     const sprite = pool.createVO();
-    if (sprite === undefined && !this.#warnedFull) this.#warnFull(pool.capacity);
-    return sprite;
+    if (sprite !== undefined) return sprite;
+    if (this.#grows) return this.#grow(pool.capacity).instancedPool.createVO();
+    if (!this.#warnedFull) this.#warnFull(pool.capacity);
+    return undefined;
+  }
+
+  // builds the grown geometry before anything switches, so that a throw leaves the sprites as they were
+  #grow(capacity: number): FeatureSpritesGeometry<Api> {
+    const old = this.geometry!;
+    if (old.extraInstancedPools.size > 0) {
+      throw new Error(
+        `${WHERE}#createSprite(): the pool is full and cannot grow — the geometry of the sprites has pools attached (attachInstancedPool()), which a grown geometry would leave behind. Detach them, or build the sprites without grow and with the capacity they need`,
+      );
+    }
+    const larger = Math.max(2 * capacity, 1);
+    const grown = old.grown(larger);
+    // three's render objects see a geometry of another id on the next frame and collect its
+    // attributes anew; the materials never held the geometry and stay as they are
+    this.geometry = grown;
+    for (const mesh of Object.values(this.#passes)) mesh.geometry = grown;
+    // built here, so it is this mesh's to release; its pool goes with it, holding no sprite any more
+    old.dispose();
+    if (!this.#notedGrowth) {
+      this.#notedGrowth = true;
+      // biome-ignore lint/suspicious/noConsole: the note to the developer is the point
+      console.info(
+        `FeatureSprites "${this.name}": the pool was full at ${capacity} sprites and grew to ${larger} — a frame hitch: a new geometry, every sprite copied over and every attribute uploaded anew. Where this many sprites are the rule, start with new FeatureSprites(kind, {capacity: ${larger}, grow: true}). This note is shown once per FeatureSprites.`,
+      );
+    }
+    return grown;
   }
 
   #warnFull(capacity: number): void {

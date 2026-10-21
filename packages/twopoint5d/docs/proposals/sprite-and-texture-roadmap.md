@@ -8,7 +8,10 @@ modes, per-frame durations and `AsepriteJson`, see
 uv stages, `gridBase()` and shared uniforms, see
 [`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md). **Phase F, part 1
 implemented** — sorting a pool, `sortBy()` and `sortByViewDepth()` of the sprites (§4.15, and the
-answer to §7 question 5); see [`pool-sorting.md`](pool-sorting.md). **Phase D, part 1
+answer to §7 question 5); see [`pool-sorting.md`](pool-sorting.md). **Phase F, part 2
+implemented** — growing capacity, `grow: true` of the sprites and `VertexObjectPool#adoptVOs()`
+(§4.16); see [`growing-capacity.md`](growing-capacity.md). **Phase F, part 3 implemented** —
+GPU picking, `SpritePicker` (§4.10); see [`gpu-picking.md`](gpu-picking.md). **Phase D, part 1
 implemented** — `Flip`, `Anchor` and `NineSlice` (§4.9, §4.7); see
 [`flip-anchor-nine-slice.md`](flip-anchor-nine-slice.md). The rest is an idea, nothing
 scheduled. A review, not a build plan: it checks the open cards of the

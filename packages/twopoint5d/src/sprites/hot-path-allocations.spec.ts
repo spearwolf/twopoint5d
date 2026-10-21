@@ -250,6 +250,35 @@ describe('sprites on the hot path', () => {
     sprites.dispose();
   });
 
+  test('createSprite() of sprites that may grow allocates the sprite and nothing else while the pool has room', async () => {
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1100, grow: true});
+    for (let i = 0; i < 1000; i++) sprites.createSprite();
+    const pool = sprites.spritePool;
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 100; i++) sprites.freeSprite(sprites.createSprite()!);
+    });
+
+    expect(sprites.spritePool).toBe(pool);
+    expect(bytesPerRound / 100).toBeLessThan(BYTES_PER_VERTEX_OBJECT_LIMIT);
+    sprites.dispose();
+  });
+
+  test('update() of sprites and their pass after a growth allocates nothing per call', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 600, grow: true, passes: [ReflectionPass]});
+    for (let i = 0; i < 1000; i++) sprites.createSprite();
+    sprites.update();
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < 1000; i++) sprites.update();
+    });
+
+    expect(sprites.spritePool!.capacity).toBe(1200);
+    expect(bytesPerRound / 1000).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
   test('createSprite() on a full pool allocates nothing once it has warned', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 10});
