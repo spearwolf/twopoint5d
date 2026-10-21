@@ -8,6 +8,9 @@ a pool". Deviations:
   `TexturedSpriteKind`, which the module `vertex-objects/` does not import (§4);
 - the upload price of §2.4 is measured, not estimated: 76 B a sprite of `TexturedSpriteKind`, 60 B of
   them static;
+- the name key of `VertexObjectPool#sortBy()` is typed `VOSortKeyName<VOType>`, the number properties
+  of `VOType` and any string for `unknown`, not `string` (§2.1); a key function that frees and creates
+  vertex objects in one call is refused with a message of its own (§2.2);
 - the allocation spec of a key function found that a key of `-0` is boxed as a fractional one is —
   `-0` is no small integer; the TSDoc of `VOSortKey` and the README say so (§2.2).
 
@@ -47,7 +50,7 @@ class VertexObjectPool<VOType> {
    * the vertex objects (`'y'`, `'x0'`, `'rotation'`) or a function of the vertex object.
    * @returns whether a slot moved
    */
-  sortBy(key: string | VOSortKey<VOType>, options?: VOSortOptions): boolean;
+  sortBy(key: VOSortKeyName<VOType> | VOSortKey<VOType>, options?: VOSortOptions): boolean;
 
   /**
    * Puts the slots in use into the order of `keys`: `keys[i]` is the key of the vertex object in
@@ -78,11 +81,13 @@ The two types go into `types.ts`, which the module exports as `export type *`.
 - **A key function** is called once per slot in use, in slot order, before anything moves. A slot
   filled by `createFromAttributes()`, `fromBuffersData()` or buffers data handed to the constructor
   has no vertex object yet; it gets one, as `getVO()` gives it — once, on the first sort. The key
-  function must not create or free vertex objects: `sortBy()` compares `usedCount` with the count it
-  started from before each slot, so that it never materializes a vertex object in a slot the key
-  function has freed, and once more after the last key, and throws — the sort has moved nothing,
-  while what the key function did stands (a `freeVO()` has moved the last vertex object into the
-  freed slot, as it always does):
+  function must not create or free vertex objects: `sortBy()` compares `usedCount` and a count of the
+  slots created and freed with those it started from before each slot, so that it never materializes
+  a vertex object in a slot the key function has freed, and once more after the last key. A change
+  throws. A key function that frees a vertex object and creates another leaves `usedCount` where it
+  was; the count of slots catches it, and it is refused with a message of its own. The sort has moved
+  nothing, while what the key function did stands (a `freeVO()` has moved the last vertex object into
+  the freed slot, as it always does):
 
   > `VertexObjectPool#sortBy(): the key function changed usedCount from 10 to 9 — create and free vertex objects before or after the sort, not inside the key function`
 

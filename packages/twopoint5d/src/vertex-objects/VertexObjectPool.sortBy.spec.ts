@@ -1,8 +1,8 @@
 import type {BufferAttribute, BufferGeometry, InterleavedBufferAttribute} from 'three/webgpu';
-import {describe, expect, test, vi} from 'vitest';
+import {describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
-import type {BufferLike, VO, VertexObjectDescription} from './types.js';
+import type {BufferLike, VO, VOSortKeyName, VertexObjectDescription} from './types.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {VOUtils} from './VOUtils.js';
@@ -82,9 +82,14 @@ function makeThings(keys: number[], capacity = keys.length) {
 const idsInSlotOrder = (pool: VertexObjectPool<Thing>): number[] =>
   Array.from({length: pool.usedCount}, (_, i) => pool.getVO(i)!.x);
 
-// the slot of each record that shows the dirty range of every buffer, read through the public bookkeeping
+// the hull around the recorded ranges of every buffer: the pairs are ascending and apart, so it runs from
+// the first start to the last end, and is -1, -1 while nothing is recorded
 const dirtyHullOf = (pool: VertexObjectPool<Thing>) =>
-  pool.buffer.bufferList.map((record) => [record.bufferName, record.dirtyFrom, record.dirtyTo]);
+  pool.buffer.bufferList.map((record) => [
+    record.bufferName,
+    record.dirtyRangeCount === 0 ? -1 : record.dirtyRanges[0],
+    record.dirtyRangeCount === 0 ? -1 : record.dirtyRanges[2 * record.dirtyRangeCount - 1],
+  ]);
 
 describe('VertexObjectPool#sortBy()', () => {
   describe('by the name of a value property', () => {
@@ -139,14 +144,26 @@ describe('VertexObjectPool#sortBy()', () => {
       pool.dispose();
     });
 
+    test('takes the names of the number properties of the vertex object type, and any name on a pool without one', () => {
+      expectTypeOf<VOSortKeyName<{y: number; x0: number; label(): string; tint: string}>>().toEqualTypeOf<'y' | 'x0'>();
+      expectTypeOf<VOSortKeyName<unknown>>().toEqualTypeOf<string>();
+
+      const {pool} = makeThings([2, 1]);
+      expect(() => {
+        // @ts-expect-error — label is a method of Thing, no number
+        pool.sortBy('label');
+      }).toThrow('"label" is no value property');
+      pool.dispose();
+    });
+
     test('refuses a name that is no value property and names the ones there are', () => {
       const {pool} = makeThings([2, 1]);
       for (const name of ['depth', 'label', 'setPosition', 'position', 'tint']) {
-        expect(() => pool.sortBy(name), name).toThrow(
+        expect(() => pool.sortBy(name as VOSortKeyName<Thing>), name).toThrow(
           `VertexObjectPool#sortBy(): "${name}" is no value property of the vertex objects of this pool — name one of`,
         );
       }
-      expect(() => pool.sortBy('depth')).toThrow(
+      expect(() => pool.sortBy('depth' as VOSortKeyName<Thing>)).toThrow(
         /name one of x, y, z, rotation, r, g, b, layer, h0, h1, weight, or hand in a key function/,
       );
       // nothing moved
@@ -207,6 +224,48 @@ describe('VertexObjectPool#sortBy()', () => {
         'VertexObjectPool#sortBy(): the key function changed usedCount from 3 to 2 — create and free vertex objects before or after the sort, not inside the key function',
       );
       expect(idsInSlotOrder(pool)).toEqual([0, 1]);
+      pool.dispose();
+    });
+
+    test('refuses a key function that frees a vertex object and creates another, which leaves usedCount where it was', () => {
+      const {pool, things} = makeThings([10, 9, 8, 7]);
+      const yInSlotOrder = () => Array.from({length: pool.usedCount}, (_, i) => pool.getVO(i)!.y);
+
+      expect(() =>
+        pool.sortBy((thing) => {
+          if (thing === things[0]) {
+            pool.freeVO(things[1]!);
+            pool.createVO()!.y = -100;
+          }
+          return thing.y;
+        }),
+      ).toThrow(
+        'VertexObjectPool#sortBy(): the key function created and freed vertex objects of this pool, which left usedCount at 4',
+      );
+
+      // what the key function left stands, unsorted
+      expect(yInSlotOrder()).toEqual([10, 7, 8, -100]);
+      pool.dispose();
+    });
+
+    test('refuses a key function that empties the pool and fills it to the same count again', () => {
+      const pool = new VertexObjectPool<Thing>(thingDescription, 4);
+      const position = [0, 2, 0, 1, 1, 0, 2, 0, 0];
+      pool.createFromAttributes({position});
+
+      expect(() =>
+        pool.sortBy((thing) => {
+          // read first: after clear() the vertex object has no buffer
+          const y = thing.y;
+          if (pool.usedCount === 3 && y === 2) {
+            pool.clear();
+            pool.createFromAttributes({position});
+          }
+          return y;
+        }),
+      ).toThrow(
+        'VertexObjectPool#sortBy(): the key function created and freed vertex objects of this pool, which left usedCount at 3',
+      );
       pool.dispose();
     });
 
@@ -449,7 +508,7 @@ describe('VertexObjectPool#sortBy()', () => {
       pool.dispose();
       const key = vi.fn(() => 0);
       expect(pool.sortBy('y')).toBe(false);
-      expect(pool.sortBy('depth')).toBe(false);
+      expect(pool.sortBy('depth' as VOSortKeyName<Thing>)).toBe(false);
       expect(pool.sortBy(key)).toBe(false);
       expect(pool.sortByKeys([1, 2, 3])).toBe(false);
       expect(key).not.toHaveBeenCalled();

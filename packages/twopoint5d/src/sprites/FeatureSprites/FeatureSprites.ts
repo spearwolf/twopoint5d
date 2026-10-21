@@ -1,5 +1,5 @@
 import {type Camera, Matrix4, Mesh, type Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
-import type {VO, VOSortKey, VOSortOptions} from '../../vertex-objects/types.js';
+import type {VO, VOSortKey, VOSortKeyName, VOSortOptions} from '../../vertex-objects/types.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
@@ -427,7 +427,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   sortBy(key: SpriteSortKeyName<Api> | ((sprite: Api & VO) => number), options?: VOSortOptions): boolean {
     const pool = this.geometry?.instancedPool;
     if (pool == null) return false;
-    return pool.sortBy(key as string | VOSortKey<Api & VO>, options);
+    return pool.sortBy(key as VOSortKeyName<Api & VO> | VOSortKey<Api & VO>, options);
   }
 
   /**

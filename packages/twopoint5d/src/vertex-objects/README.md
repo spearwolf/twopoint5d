@@ -245,6 +245,9 @@ pool.sortByKeys(keys); // keys[i] is the key of slot i
 
 - **The key.** The name of a value property — an attribute of one value under its own name, or a
   component property (`y`, `x0`) — is read straight from the buffer, and no value crosses a call.
+  The name is typed by the number properties of the vertex object type (`VOSortKeyName`), so a
+  misspelt one does not compile; on a pool without a vertex object type any string compiles, and
+  the sort refuses an unknown one with the names there are.
   A key function is called once per slot in use before anything moves, and must not create or free
   objects of the pool; a fractional key it answers, or a `-0`, may cost a heap number of 16 B per
   call where V8 does not inline it. `sortByKeys()` takes keys worked out in bulk, `keys[i]` for slot `i`.
@@ -291,7 +294,7 @@ function createDot(): Dot | undefined {
   if (dot !== undefined) return dot;
   const old = {pool, geometry: dots.geometry};
   pool = new VertexObjectPool<Dot>(old.pool.descriptor, 2 * old.pool.capacity);
-  pool.adoptVOs(old.pool); // every slot, every value, every handle
+  pool.adoptVOs(old.pool); // every slot, every value, every handle, and the onCreateVO hook
   dots.geometry = new VertexObjectGeometry(pool, pool.capacity);
   old.geometry?.dispose();
   old.pool.dispose(); // handed to the geometry, so it is ours to release; it holds no handle any more
@@ -302,7 +305,8 @@ createDot();
 ```
 
 - **What moves.** Every buffer, copied whole and marked for upload; `usedCount`; every vertex
-  object, which keeps its identity, its values and its slot and reads and writes the new buffer.
+  object, which keeps its identity, its values and its slot and reads and writes the new buffer;
+  the `onCreateVO` hook, when the new pool has none of its own — the old pool keeps its hook.
   A slot without a vertex object yet stays without one, and `getVO()` materializes it in the new
   pool.
 - **The old pool** is left empty, its data where it was: no vertex object is linked to it, so its

@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `TextureStore#acquireAsync(id, type, {signal}?)` and the type `TextureStoreLease`: it resolves as `getAsync()` does, with `{value, release()}`, and holds the resource the value came from — `clearUnused()` and `parse({evictMissing: true})` leave it standing — until `release()`, which gives the hold back once however often it is called. The hold is on the resource, not on the value: a new renderer, other texture classes or another image still make it build a new texture. Its rejections are those of `getAsync()`, their messages naming `acquireAsync()`
 - add `SpriteFrameContext#colorSpace(name)`: the `colorSpace` of a texture any feature of the material declares, as it is set — `undefined` while it is unset — and a tracked read, so a texture in another colour space builds the graph anew
 - add `Stage2D#releasePassNodeMemory()`: releases the GPU memory of the render target of the pass node `asPassNode()` built and keeps the node, so every node and pipeline on it stays valid; three.js allocates the memory again on the next draw of the node
+- add `VOSortKeyName<VOType>`: the names `VertexObjectPool#sortBy()` takes as its key
 
 ### Changed
 
@@ -78,6 +79,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a later `TextureStore#loadAsync()` on the same store cuts short one whose fetch is still under way: that fetch is aborted, nothing of it is parsed, no `error` event goes out, and its promise rejects with an `AbortError`, so the catalogs are parsed in the order of the calls. A load whose parse has begun is done and stays so, and so is a load whose fetch, status or body has failed once its `error` event goes out: a `loadAsync()` that a listener of that event starts does not take its place, and its promise rejects with the failure
 - `TextureStore#getAsync()` rejects for a subtype its resource never builds, naming the id, the type and the subtype: an `image` resource builds `imageCoords` and `texture` alone, an `atlas` resource no `tileSet`, and a resource without `frameBasedAnimationsData` whose atlas adapter reads no animations out of its json no `frameBasedAnimations`. `TextureStore#on()` for a subtype the type of its resource never builds says so once on the console
 - a `TextureResource` of a `TextureStore` that is disposed directly leaves the store: the next `parse()` naming its id builds a new resource, `on()` follows that one, and a `getAsync()` waiting on the disposed one rejects, naming the id
+- `VertexObjectPool#sortBy()` takes as a name only a number property of `VOType` (`VOSortKeyName<VOType>`), and any string on a pool without a vertex object type (**BREAKING** for TypeScript). See the Migration Guide
+- `Dependencies#value()` answers `Shape[K] | null | undefined`: `null` after an `update()` that wrote `null` (**BREAKING** for TypeScript). See the Migration Guide
+- `VertexObjectPool#adoptVOs()` hands the `onCreateVO` hook of the source to a pool without a hook of its own; the source keeps its hook
+
+### Removed
+
+- remove `VertexObjectBuffer#pickUpDirtyRange()`, and `dirtyFrom` and `dirtyTo` of `AttributeBuffer` (**BREAKING**). See the Migration Guide
 
 ### Fixed
 
@@ -90,6 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PaletteSwap` compares sRGB textures in their 8-bit values: under a palette of `colorSpace` `srgb` both colours are encoded back before the comparison, so black or a dark colour next to a close palette entry keeps its colour
 - `StageRenderer` releases the GPU memory of the pass targets of its nested renderers and of the pass nodes of its `Stage2D`s when a write to `pipeline` or `buildOutputNode` leaves the composed mode, and `remove()` releases that of the pass node of a removed `Stage2D` as it does for a child renderer
 - a `VertexObjectPool` whose vertex objects another pool adopted stays usable: a later `createVO()` gives the replacement of its `onCreateVO` hook its own slot, and two pools can adopt each other's vertex objects back and forth without `createVO()` hanging
+- `VertexObjectPool#sortBy()` refuses a key function that frees a vertex object and creates another, which leaves `usedCount` where it was, as it refuses one that changes the count
+- `VertexObjectPool#createVO()` gives its slot back when the `voInitialize` or the `onCreateVO` hook throws, and `getVO()` leaves no vertex object in its slot then; the error reaches the caller as it was thrown
 
 ### Migration Guide
 
@@ -239,6 +249,61 @@ sprites.material = other;
 sprites.setTexture('colorMap', colorMap); // reaches own, and other through the shared resources
 sprites.dispose();
 other.dispose();
+```
+
+#### A sort by a name held in a string
+
+`VertexObjectPool#sortBy()` types the name of a value property as `VOSortKeyName<VOType>`, the number properties of the vertex object type; a `string` does not compile on a pool with a vertex object type, so a name held in a variable takes the type `VOSortKeyName<VOType>`. The pool checks the name again when it sorts.
+
+**Before**
+
+```ts
+const key: string = 'y';
+pool.sortBy(key);
+```
+
+**After**
+
+```ts
+const key: VOSortKeyName<Ball> = 'y';
+pool.sortBy(key);
+```
+
+#### A value of Dependencies that can be null
+
+`Dependencies#value()` answers `null` for a key that an `update()` wrote `null` for, besides `undefined` for a key nothing has written.
+
+**Before**
+
+```ts
+const pos: Vector2 | undefined = deps.value('pos');
+```
+
+**After**
+
+```ts
+const pos = deps.value('pos');
+if (pos != null) {
+  // …
+}
+```
+
+#### The upload range of a vertex object buffer
+
+`VertexObjectBuffer` has no `pickUpDirtyRange()`, and `AttributeBuffer` has no hull `dirtyFrom`/`dirtyTo`. The geometries take the ranges they upload themselves (`pickUpDirtyRanges()`), and `serial` says whether a buffer has moved on since the serial a consumer holds. A record of `AttributeBuffer` built by hand carries neither field.
+
+**Before**
+
+```ts
+const range = buffer.pickUpDirtyRange('position', seenSerial, pool.usedCount);
+const record: AttributeBuffer = {bufferName, itemSize, dataType, usageType, typedArray, serial: 0, dirtyFrom: -1, dirtyTo: -1, dirtySince: 0, pickedUpSerial: 0, dirtyRanges, dirtyRangeCount: 0};
+```
+
+**After**
+
+```ts
+const moved = buffer.buffers.get('position')!.serial !== seenSerial;
+const record: AttributeBuffer = {bufferName, itemSize, dataType, usageType, typedArray, serial: 0, dirtySince: 0, pickedUpSerial: 0, dirtyRanges, dirtyRangeCount: 0};
 ```
 
 ## [0.23.0] - 2026-10-18

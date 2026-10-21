@@ -867,6 +867,94 @@ describe('VertexObjectPool', () => {
 
       expect(calls, 'the object built before the hook was set does not count').toBe(2);
     });
+
+    test('a hook that throws in createVO() gives the slot back, unlinks the vertex object and rethrows its error', () => {
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      pool.createVO();
+      const error = new Error('no vertex object');
+      let built: (Leveled & VO) | undefined;
+      pool.onCreateVO = (vo) => {
+        built = vo;
+        throw error;
+      };
+
+      let thrown: unknown;
+      try {
+        pool.createVO();
+      } catch (e) {
+        thrown = e;
+      }
+
+      expect(thrown).toBe(error);
+      expect(pool.usedCount).toBe(1);
+      expect(pool.getVO(1)).toBeUndefined();
+      expect(pool.containsVO(built!)).toBe(false);
+      pool.dispose();
+    });
+
+    test('a hook that created a vertex object before it threw keeps that one', () => {
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      pool.createVO();
+      let companion: (Leveled & VO) | undefined;
+      let first = true;
+      pool.onCreateVO = () => {
+        if (!first) return;
+        first = false;
+        companion = pool.createVO();
+        throw new Error('no vertex object');
+      };
+
+      expect(() => pool.createVO()).toThrow('no vertex object');
+
+      expect(pool.usedCount).toBe(2);
+      expect(pool.containsVO(companion!)).toBe(true);
+      // freeVO() drew the companion into the slot that was given back
+      expect(pool.getVO(1)).toBe(companion);
+      pool.dispose();
+    });
+
+    test('a hook that throws after another pool adopted this one gives the slot back in that pool', () => {
+      const source = new VertexObjectPool<Leveled>(leveledDescription, 2);
+      source.createVO();
+      const target = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      source.onCreateVO = () => {
+        source.onCreateVO = undefined;
+        target.adoptVOs(source);
+        throw new Error('no vertex object');
+      };
+
+      expect(() => source.createVO()).toThrow('no vertex object');
+
+      expect(target.usedCount).toBe(1);
+      expect(target.getVO(1)).toBeUndefined();
+      expect(source.usedCount).toBe(0);
+      target.dispose();
+      source.dispose();
+    });
+
+    test('a hook that throws in getVO() leaves the slot in use with its data, and the next getVO() builds the vertex object again', () => {
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      pool.createFromAttributes({level: [3]});
+      let built: (Leveled & VO) | undefined;
+      let calls = 0;
+      pool.onCreateVO = (vo) => {
+        calls++;
+        if (calls === 1) {
+          built = vo;
+          throw new Error('no vertex object');
+        }
+      };
+
+      expect(() => pool.getVO(0)).toThrow('no vertex object');
+      expect(pool.usedCount).toBe(1);
+
+      const again = pool.getVO(0)!;
+      expect(again).not.toBe(built);
+      expect(again.level).toBe(3);
+      expect(calls).toBe(2);
+      expect(pool.containsVO(built!)).toBe(false);
+      pool.dispose();
+    });
   });
 
   describe('voInitialize', () => {
@@ -888,6 +976,19 @@ describe('VertexObjectPool', () => {
         expect(calls[0]!.self, 'this of the hook').toBe(vo);
         expect(hook).toHaveBeenCalledTimes(1);
         expect(vo.level).toBe(9);
+      } finally {
+        hook.mockRestore();
+      }
+    });
+
+    test('a voInitialize hook that throws in createVO() gives the slot back as well', () => {
+      const pool = new VertexObjectPool<Leveled>(leveledDescription, 4);
+      const hook = vi.spyOn(Leveled.prototype, voInitialize).mockImplementation(() => {
+        throw new Error('no initialize');
+      });
+      try {
+        expect(() => pool.createVO()).toThrow('no initialize');
+        expect(pool.usedCount).toBe(0);
       } finally {
         hook.mockRestore();
       }

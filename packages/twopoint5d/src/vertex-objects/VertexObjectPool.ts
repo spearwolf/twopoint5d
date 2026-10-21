@@ -2,6 +2,7 @@ import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {typedArrayOf} from './createTypedArray.js';
 import {createVertexObject} from './createVertexObject.js';
 import {voBuffer, voInitialize} from './constants.js';
 import {sortSlots} from './sortSlots.js';
@@ -9,6 +10,7 @@ import type {
   TypedArray,
   VO,
   VOSortKey,
+  VOSortKeyName,
   VOSortOptions,
   VertexAttributeDataType,
   VertexObjectBuffersData,
@@ -46,36 +48,14 @@ function unknownSortKeyError(name: string, layouts: ReadonlyMap<string, ValuePro
 }
 
 function keyFunctionChangedPoolError(from: number, to: number): Error {
+  if (from === to) {
+    return new Error(
+      `VertexObjectPool#sortBy(): the key function created and freed vertex objects of this pool, which left usedCount at ${from} — create and free vertex objects before or after the sort, not inside the key function`,
+    );
+  }
   return new Error(
     `VertexObjectPool#sortBy(): the key function changed usedCount from ${from} to ${to} — create and free vertex objects before or after the sort, not inside the key function`,
   );
-}
-
-// a view of the scratch of a sort in the type of the buffer it takes a copy of, so that every value
-// goes over as it is
-function scratchViewOf(dataType: VertexAttributeDataType, buffer: ArrayBuffer): TypedArray {
-  switch (dataType) {
-    case 'float64':
-      return new Float64Array(buffer);
-    case 'float32':
-      return new Float32Array(buffer);
-    case 'float16':
-      return new Float16Array(buffer);
-    case 'uint32':
-      return new Uint32Array(buffer);
-    case 'int32':
-      return new Int32Array(buffer);
-    case 'uint16':
-      return new Uint16Array(buffer);
-    case 'int16':
-      return new Int16Array(buffer);
-    case 'uint8':
-      return new Uint8Array(buffer);
-    case 'uint8clamped':
-      return new Uint8ClampedArray(buffer);
-    case 'int8':
-      return new Int8Array(buffer);
-  }
 }
 
 /**
@@ -95,7 +75,15 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * The vertex object sits in the index of the pool before the hook runs, so a hook that makes the
    * pool adopted ({@link adoptVOs}) — a `FeatureSprites#createSprite()` under `grow` on the last
    * free slot — takes it along. A replacement it answers takes the slot in the pool that holds the
-   * vertex object then.
+   * vertex object then. {@link adoptVOs} hands the hook on to a pool that has none of its own.
+   *
+   * A hook that throws — and a `voInitialize` hook that throws — leaves no vertex object behind:
+   * {@link createVO} gives the slot it took back to the pool that holds the vertex object then, the
+   * way {@link freeVO} does; {@link getVO} leaves its slot in use with its data but without the
+   * vertex object, which the next {@link getVO} builds again and hands to the hook again. The vertex
+   * object handed to the hook is unlinked from its buffer. What the hook did before it threw stands
+   * — a vertex object it created keeps its slot, which may be the one given back. The error reaches
+   * the caller as it was thrown.
    */
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
@@ -115,6 +103,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   // Every #createVO() clears it first and every adoptVOs() clears it on the pool that adopts, so it
   // names no adoption from before and no chain of adoptions closes into a circle
   #adoptedBy: VertexObjectPool<VOType> | undefined;
+  // rises when createVO() hands out a slot and when usedCount goes down. sortBy() holds it still over
+  // its key function, which may neither create nor free: a free followed by a create leaves usedCount
+  // where it was, and the keys read so far would belong to slots that have moved
+  #slotChanges = 0;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     super(descriptor, capacityOrData);
@@ -208,6 +200,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * `source` that holds no vertex object yet — filled through `createFromAttributes()` — stays
    * without one; {@link getVO} materializes it here.
    *
+   * The `onCreateVO` hook of `source` comes along when this pool has none of its own; one of its own
+   * stays, and `source` keeps its hook either way.
+   *
    * `source` is left empty: its `usedCount` goes to 0 and it holds no vertex object, so neither that
    * nor a later `dispose()` of it unlinks one. Its buffers keep their data. It stays usable: a later
    * `createVO()` hands out its own slots, and it can adopt again — the vertex objects of this pool
@@ -260,6 +255,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       }
     }
     source.usedCount = 0;
+    // an own hook stays; without one, this pool calls the hook of the source for the vertex objects it
+    // builds from now on, and the source keeps its hook
+    this.onCreateVO ??= source.onCreateVO;
     // the pool that adopts holds its vertex objects itself now and is nobody's source any more — so no
     // chain of adoptions closes into a circle
     this.#adoptedBy = undefined;
@@ -278,10 +276,14 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * upload mark covers what it wrote.
    *
    * The slot that is handed out is marked for upload, and it alone.
+   *
+   * @throws whatever the `voInitialize` hook or the {@link onCreateVO} hook throws, as it was thrown;
+   *   the slot is given back then
    */
   createVO(): (VOType & VO) | undefined {
     if (this.isDisposed) return undefined;
     if (this.usedCount < this.capacity) {
+      this.#slotChanges++;
       return this.#createVO(this.usedCount++, true);
     }
     return undefined;
@@ -339,6 +341,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
   /** @internal */
   protected override onUsedCountShrunk(from: number, to: number): void {
+    this.#slotChanges++;
     for (let i = to; i < from; i++) {
       const vo = this.#voIndex[i];
       // only a slot that holds a vertex object is written: resize() calls the setter after it has
@@ -412,8 +415,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    *
    * - the **name of a value property** of the vertex objects: an attribute of one value on one
    *   vertex under its own name (`'rotation'`), or a component property (`'y'`, or `'x0'` on a vertex
-   *   object of several vertices). The key of each slot is read straight from the buffer, so no
-   *   vertex object is touched and no value crosses a call.
+   *   object of several vertices). The name is typed as {@link VOSortKeyName}: one that is no number
+   *   property of `VOType` does not compile, and the sort checks it all the same. The key of each
+   *   slot is read straight from the buffer, so no vertex object is touched and no value crosses a
+   *   call.
    * - a **key function** of the vertex object, called once per slot in use, in slot order, before
    *   anything moves (see {@link VOSortKey}). A slot that holds no vertex object yet — one filled
    *   through `createFromAttributes()`, `fromBuffersData()` or buffers data — gets one, as
@@ -437,12 +442,14 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    *
    * @returns whether a slot moved; `false` on a disposed pool and with fewer than two slots in use
    * @throws when `key` names no value property — the message lists the ones there are —, and when the
-   *   key function creates or frees a vertex object of this pool: the sort has moved nothing then,
-   *   while what the key function did stands — a `freeVO()` has moved the last vertex object into
-   *   the freed slot, as it always does. A key function that throws leaves the sort undone as well.
+   *   key function creates or frees a vertex object of this pool — also when it does both and
+   *   `usedCount` ends where it began —: the sort has moved nothing then, while what the key function
+   *   did stands — a `freeVO()` has moved the last vertex object into the freed slot, as it always
+   *   does. A key function that throws — or an `onCreateVO` hook of a slot the sort materializes —
+   *   leaves the sort undone as well.
    *   `NaN` keys go behind every number, infinities included
    */
-  sortBy(key: string | VOSortKey<VOType>, options?: VOSortOptions): boolean {
+  sortBy(key: VOSortKeyName<VOType> | VOSortKey<VOType>, options?: VOSortOptions): boolean {
     if (this.isDisposed) return false;
     const n = this.usedCount;
 
@@ -461,13 +468,14 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
       const keys = this.#prepareSort();
       const vos = this.#voIndex;
+      const changes = this.#slotChanges;
       for (let i = 0; i < n; i++) {
         // asked before every slot: a slot the key function has freed lies beyond usedCount, and a
         // vertex object materialized there would sit in a slot out of use
-        if (this.usedCount !== n) throw keyFunctionChangedPoolError(n, this.usedCount);
+        if (this.usedCount !== n || this.#slotChanges !== changes) throw keyFunctionChangedPoolError(n, this.usedCount);
         keys[i] = key(vos[i] ?? this.#createVO(i, false));
       }
-      if (this.usedCount !== n) throw keyFunctionChangedPoolError(n, this.usedCount);
+      if (this.usedCount !== n || this.#slotChanges !== changes) throw keyFunctionChangedPoolError(n, this.usedCount);
     }
 
     return this.#sortByOwnKeys(n, options?.descending === true);
@@ -529,10 +537,12 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     return this.#sortKeys;
   }
 
+  // a view of the scratch of a sort in the type of the buffer it takes a copy of, so that every value
+  // goes over as it is
   #scratchView(dataType: VertexAttributeDataType): TypedArray {
     let view = this.#sortScratchViews.get(dataType);
     if (view === undefined) {
-      view = scratchViewOf(dataType, this.#sortScratch!);
+      view = new (typedArrayOf(dataType))(this.#sortScratch!);
       this.#sortScratchViews.set(dataType, view);
     }
     return view;
@@ -630,6 +640,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    *
    * Nothing is marked for upload: reading a slot changes no data. Write through the vertex
    * object and call `touch()`, or give the attribute `autoTouch`.
+   *
+   * @throws whatever the {@link onCreateVO} hook throws for a slot that holds no vertex object yet, as
+   *   it was thrown; the slot stays in use with its data
    */
   getVO(idx: number): (VOType & VO) | undefined {
     if (this.isDisposed) return undefined;
@@ -650,25 +663,51 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     this.#adoptedBy = undefined;
     const vo = createVertexObject<VOType>(this.descriptor, this.buffer, idx);
     this.#voIndex[idx] = vo;
-    // only a slot createVO() has just handed out is new; one getVO() materializes carries the
-    // data createFromAttributes(), fromBuffersData() or buffers data put there, and the hook
-    // would write over it without marking anything for upload
-    if (initialize) {
-      vo[voInitialize]?.();
-      // the slot arrives carrying whatever stood in it before, and the draw range has just grown
-      // over it, so its vertices have to reach the gpu — marked while this buffer is the one that
-      // holds it: what the onCreateVO hook writes is read at the next upload either way
-      this.buffer.touch(idx, idx);
+    try {
+      // only a slot createVO() has just handed out is new; one getVO() materializes carries the
+      // data createFromAttributes(), fromBuffersData() or buffers data put there, and the hook
+      // would write over it without marking anything for upload
+      if (initialize) {
+        vo[voInitialize]?.();
+        // the slot arrives carrying whatever stood in it before, and the draw range has just grown
+        // over it, so its vertices have to reach the gpu — marked while this buffer is the one that
+        // holds it: what the onCreateVO hook writes is read at the next upload either way
+        this.buffer.touch(idx, idx);
+      }
+      if (this.onCreateVO == null) return vo;
+      const hooked = this.onCreateVO(vo) ?? vo;
+      if (hooked !== vo) {
+        const owner = this.#holder();
+        const at = VOUtils.getIndex(vo);
+        // a vertex object the hook freed has no slot to give its replacement
+        if (owner.#voIndex[at] === vo) owner.#voIndex[at] = hooked;
+      }
+      return hooked;
+    } catch (error) {
+      // a vertex object whose hook threw was never handed out, so nothing may be left holding it
+      if (initialize) {
+        // a no-op when the hook has freed it already; draws the last vertex object into the slot
+        // when the hook has created others
+        this.#holder().freeVO(vo);
+      } else {
+        // the slot was in use before and stays so with its data; only the half-built object goes,
+        // so that the next getVO() builds one and asks the hook again
+        const holder = this.#holder();
+        const at = VOUtils.getIndex(vo);
+        if (holder.#voIndex[at] === vo) holder.#voIndex[at] = undefined;
+        VOUtils.clearBuffer(vo);
+      }
+      throw error;
     }
-    if (this.onCreateVO == null) return vo;
-    const hooked = this.onCreateVO(vo) ?? vo;
-    if (hooked !== vo) {
-      let owner: VertexObjectPool<VOType> = this;
-      while (owner.#adoptedBy !== undefined) owner = owner.#adoptedBy;
-      const at = VOUtils.getIndex(vo);
-      // a vertex object the hook freed has no slot to give its replacement
-      if (owner.#voIndex[at] === vo) owner.#voIndex[at] = hooked;
-    }
-    return hooked;
+  }
+
+  /**
+   * The pool that holds the vertex object the running #createVO() built: this one, or the last of
+   * the pools that adopted one another from inside its hook.
+   */
+  #holder(): VertexObjectPool<VOType> {
+    let owner: VertexObjectPool<VOType> = this;
+    while (owner.#adoptedBy !== undefined) owner = owner.#adoptedBy;
+    return owner;
   }
 }

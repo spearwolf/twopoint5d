@@ -1,4 +1,5 @@
 import type {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
+import {vertexObjectProperties} from './vertexObjectProperties.js';
 
 export interface VertexObjectPropertyName {
   name: string;
@@ -8,39 +9,20 @@ export interface VertexObjectPropertyName {
 
 /**
  * The names `createVertexObjectPrototype()` defines as own properties of the vertex object
- * prototype, by the same rules and in the same order, each with where it comes from. They
- * depend on the description alone, so a descriptor can check them before any buffer exists.
- *
- * Whoever changes the rules in one of the two functions changes them in both;
- * `vertexObjectPropertyNames.spec.ts` holds the result against the prototype.
+ * prototype, in the same order, each with where it comes from: the names of
+ * `vertexObjectProperties()`, from which the prototype builds its accessors, then the functions of
+ * `methods`. They depend on the description alone, so a descriptor can check them before any buffer
+ * exists; `vertexObjectPropertyNames.spec.ts` holds the result against the prototype.
  */
 export function vertexObjectPropertyNames(
   attributes: Iterable<VertexAttributeDescriptor>,
   vertexCount: number,
   methods: object | null | undefined,
 ): VertexObjectPropertyName[] {
-  const names: VertexObjectPropertyName[] = [];
-
-  for (const attr of attributes) {
-    const origin = `attribute "${attr.name}"`;
-
-    if (vertexCount === 1 && attr.size === 1) {
-      names.push({name: attr.name, origin});
-    } else {
-      if (attr.getterName != null) names.push({name: attr.getterName, origin});
-      if (attr.setterName != null) names.push({name: attr.setterName, origin});
-    }
-
-    if (attr.hasComponents) {
-      for (const component of attr.components) {
-        for (let vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
-          if (vertexCount > 1 || attr.size > 1 || component !== attr.name) {
-            names.push({name: `${component}${vertexCount === 1 ? '' : vertexIndex}`, origin});
-          }
-        }
-      }
-    }
-  }
+  const names: VertexObjectPropertyName[] = vertexObjectProperties(attributes, vertexCount).map((p) => ({
+    name: p.name,
+    origin: `attribute "${p.attribute.name}"`,
+  }));
 
   for (const [key, value] of Object.entries(methods ?? {})) {
     if (typeof value === 'function') {

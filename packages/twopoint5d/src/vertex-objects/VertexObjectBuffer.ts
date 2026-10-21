@@ -46,16 +46,6 @@ export interface AttributeBuffer {
   /** Rises with every write to this buffer — the number a consumer holds its own state against. */
   serial: number;
   /**
-   * The lowest object index written since `dirtySince`; `-1` while nothing is recorded. It is the
-   * lower end of the hull around the ranges in `dirtyRanges`.
-   */
-  dirtyFrom: number;
-  /**
-   * The highest object index written since `dirtySince`; `-1` while nothing is recorded. It is the
-   * upper end of the hull around the ranges in `dirtyRanges`.
-   */
-  dirtyTo: number;
-  /**
    * The serial this buffer carried when the current range started to collect. A consumer that
    * last saw this serial or a later one has everything from before the range on the gpu already.
    */
@@ -74,7 +64,7 @@ export interface AttributeBuffer {
    */
   dirtyRanges: Int32Array;
   /**
-   * How many pairs of `dirtyRanges` count; `0` exactly when `dirtyFrom` is `-1`.
+   * How many pairs of `dirtyRanges` count; `0` while nothing is recorded.
    *
    * @internal
    */
@@ -98,8 +88,6 @@ function createAttributeBuffer(
     usageType,
     typedArray,
     serial: 0,
-    dirtyFrom: -1,
-    dirtyTo: -1,
     dirtySince: 0,
     pickedUpSerial: 0,
     dirtyRanges: new Int32Array(UPLOAD_RANGES_ARRAY_LENGTH),
@@ -304,8 +292,8 @@ export class VertexObjectBuffer {
   }
 
   /**
-   * Book the objects `fromIdx` … `toIdx` of `buf` as written: they join the recorded ranges, the
-   * hull around them grows to hold them, and the serial says that something happened.
+   * Book the objects `fromIdx` … `toIdx` of `buf` as written: they join the recorded ranges, and
+   * the serial says that something happened.
    *
    * The serial rises even when the range comes out empty — a write outside the slots this buffer
    * has is still a write. The range then stays the one that was already there, and only a
@@ -317,16 +305,12 @@ export class VertexObjectBuffer {
     if (from <= to) {
       // everyone who ever asked has taken the range that is there, so it has done its work and
       // the objects written now are a range of their own
-      if (buf.pickedUpSerial === buf.serial || buf.dirtyFrom < 0) {
+      if (buf.pickedUpSerial === buf.serial || buf.dirtyRangeCount === 0) {
         buf.dirtySince = buf.serial;
-        buf.dirtyFrom = from;
-        buf.dirtyTo = to;
         buf.dirtyRanges[0] = from;
         buf.dirtyRanges[1] = to;
         buf.dirtyRangeCount = 1;
       } else {
-        buf.dirtyFrom = Math.min(buf.dirtyFrom, from);
-        buf.dirtyTo = Math.max(buf.dirtyTo, to);
         buf.dirtyRangeCount = insertDirtyRange(buf.dirtyRanges, buf.dirtyRangeCount, from, to);
       }
     }
@@ -334,40 +318,10 @@ export class VertexObjectBuffer {
   }
 
   /**
-   * What a consumer that last saw `seenSerial` has left to upload of `bufferName`: the objects
-   * `from` … `to`, capped at the slots in use, or `null` when the buffer has not moved on since.
-   *
-   * A consumer further behind than the current range reaches gets every object in use — what
-   * happened before the range began is recorded nowhere. Taking a range up counts as having
-   * caught up, so the next write can start a range of its own.
-   *
-   * The range it answers with is the hull around the ranges the buffer recorded.
-   */
-  pickUpDirtyRange(bufferName: string, seenSerial: number | undefined, usedCount: number): {from: number; to: number} | null {
-    const buf = this.#buffers.get(bufferName);
-    // either the pool behind this buffer has let go and there is nothing left to upload from it,
-    // or the caller asks for a buffer name this buffer never had
-    if (buf == null) return null;
-
-    if (seenSerial === buf.serial) return null;
-
-    buf.pickedUpSerial = buf.serial;
-
-    if (seenSerial === undefined || seenSerial < buf.dirtySince || buf.dirtyFrom < 0) {
-      return {from: 0, to: usedCount - 1};
-    }
-
-    const from = buf.dirtyFrom;
-    const to = Math.min(buf.dirtyTo, usedCount - 1);
-    // what was written lies beyond the slots in use, so there is a write but nothing to carry
-    return from > to ? {from: 0, to: -1} : {from, to};
-  }
-
-  /**
    * What a consumer that last saw `seenSerial` has left to upload of `buffer`, a record out of
    * {@link bufferList}, written into `out` as pairs `[from, to]` of object indices, capped at the
-   * `usedCount` slots in use. Taking the ranges up counts as having caught up, the way
-   * {@link pickUpDirtyRange} does.
+   * `usedCount` slots in use. Taking the ranges up counts as having caught up: the next write
+   * starts a range of its own instead of widening these.
    *
    * @returns `-1` when the buffer has not moved on since `seenSerial` and nothing is written;
    *   otherwise the number of pairs written into `out`. A consumer further behind than the recorded

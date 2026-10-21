@@ -1,17 +1,5 @@
+import {typedArrayOf} from './createTypedArray.js';
 import type {VertexAttributeDataType} from './types.js';
-
-const BYTES_PER_ELEMENT: Record<VertexAttributeDataType, number> = {
-  float64: 8,
-  float32: 4,
-  float16: 2,
-  uint32: 4,
-  int32: 4,
-  uint16: 2,
-  int16: 2,
-  uint8clamped: 1,
-  uint8: 1,
-  int8: 1,
-};
 
 /**
  * The elements an attribute of `size` values takes per vertex in a buffer of `dataType`: its size,
@@ -21,6 +9,6 @@ const BYTES_PER_ELEMENT: Record<VertexAttributeDataType, number> = {
  * rounded up to whole 4 bytes (`unorm8x4` for three bytes, `WebGPUAttributeUtils.js:529–539`).
  */
 export function alignedAttributeSize(size: number, dataType: VertexAttributeDataType): number {
-  const bytes = BYTES_PER_ELEMENT[dataType];
+  const bytes = typedArrayOf(dataType).BYTES_PER_ELEMENT;
   return (Math.ceil((size * bytes) / 4) * 4) / bytes;
 }

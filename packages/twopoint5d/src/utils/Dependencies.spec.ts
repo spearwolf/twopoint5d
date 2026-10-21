@@ -1,6 +1,6 @@
 import {Vector2} from 'three/webgpu';
 import type {Matrix4, Vector3} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {describe, expect, expectTypeOf, test} from 'vitest';
 
 import {Dependencies} from './Dependencies.js';
 
@@ -12,6 +12,15 @@ describe('Dependencies', () => {
   test('construction', () => {
     const deps = new Dependencies([]);
     expect(deps).toBeDefined();
+  });
+
+  test('value() answers null after an update that wrote null, and its type says so', () => {
+    const deps = new Dependencies<{pos: number}>(['pos']);
+
+    deps.update({pos: null});
+
+    expect(deps.value('pos')).toBeNull();
+    expectTypeOf(deps.value('pos')).toEqualTypeOf<number | null | undefined>();
   });
 
   test('equals without equality callback', () => {

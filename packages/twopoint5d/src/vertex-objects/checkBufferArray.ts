@@ -1,17 +1,5 @@
+import {typedArrayOf} from './createTypedArray.js';
 import type {VertexAttributeDataType} from './types.js';
-
-const TYPED_ARRAY_NAMES: Record<VertexAttributeDataType, string> = {
-  float64: 'Float64Array',
-  float32: 'Float32Array',
-  float16: 'Float16Array',
-  uint32: 'Uint32Array',
-  int32: 'Int32Array',
-  uint16: 'Uint16Array',
-  int16: 'Int16Array',
-  uint8clamped: 'Uint8ClampedArray',
-  uint8: 'Uint8Array',
-  int8: 'Int8Array',
-};
 
 function describeArray(array: unknown): string {
   if (ArrayBuffer.isView(array)) {
@@ -38,7 +26,7 @@ export function checkBufferArray(
   layoutLength: number,
   lengthRule: 'exact' | 'at-most',
 ): void {
-  const expected = TYPED_ARRAY_NAMES[dataType];
+  const expected = typedArrayOf(dataType).name;
   // compared by name, not by instanceof: an array that comes from a worker or another realm is
   // built by a constructor of its own and would fail an instanceof against this one
   const actual = describeArray(array);

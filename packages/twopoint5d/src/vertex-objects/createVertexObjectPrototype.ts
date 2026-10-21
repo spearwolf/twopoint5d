@@ -2,6 +2,7 @@ import type {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {voBuffer, voIndex} from './constants.js';
 import {createTypedArray} from './createTypedArray.js';
 import type {TypedArray, VO} from './types.js';
+import {valueOffsetOf, vertexObjectProperties} from './vertexObjectProperties.js';
 
 // read once into constants of this module, so the accessors below never touch an imported binding:
 // a module runner that rewrites imports, as the one Vitest runs specs and benches in does, turns
@@ -235,28 +236,29 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
   const {descriptor} = voBuffer;
   const {methods} = descriptor;
 
-  const entries = descriptor.attributeNames.flatMap((attrName) => {
-    const attr = descriptor.getAttribute(attrName)!;
-    const bufAttr = voBuffer.bufferAttributes.get(attrName)!;
-    const buf = voBuffer.buffers.get(bufAttr.bufferName)!;
-    const bufferIndex = voBuffer.bufferList.indexOf(buf);
+  const entries = vertexObjectProperties(descriptor.attributes.values(), descriptor.vertexCount).map(
+    (property): [string, PropertyDescriptor] => {
+      const attr = property.attribute;
+      const bufAttr = voBuffer.bufferAttributes.get(attr.name)!;
+      const buf = voBuffer.buffers.get(bufAttr.bufferName)!;
+      const bufferIndex = voBuffer.bufferList.indexOf(buf);
 
-    const attrEntries: [string, PropertyDescriptor][] = [];
+      if (property.kind === 'value') {
+        const instanceOffset = descriptor.vertexCount * buf.itemSize;
+        const attrOffset = valueOffsetOf(property, buf.itemSize, bufAttr.offset);
+        return [
+          property.name,
+          {
+            enumerable: true,
+            get: makeAttributeGetter(bufferIndex, instanceOffset, attrOffset),
+            set: makeAttributeSetter(bufferIndex, instanceOffset, attrOffset),
+          },
+        ];
+      }
 
-    if (descriptor.vertexCount === 1 && attr.size === 1) {
-      attrEntries.push([
-        attrName,
-        {
-          enumerable: true,
-          get: makeAttributeGetter(bufferIndex, buf.itemSize, bufAttr.offset),
-          set: makeAttributeSetter(bufferIndex, buf.itemSize, bufAttr.offset),
-        },
-      ]);
-    } else {
-      // `getter: false` / `setter: false` leave the name undefined: the attribute gets no accessor
-      if (attr.getterName != null) {
-        attrEntries.push([
-          attr.getterName,
+      if (property.kind === 'valuesGetter') {
+        return [
+          property.name,
           {
             enumerable: true,
             value: makeAttributeValuesGetter(
@@ -266,50 +268,27 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
               bufAttr.offset,
               attr.size,
               attr.name,
-              attr.getterName,
+              property.name,
             ),
           },
-        ]);
+        ];
       }
-      if (attr.setterName != null) {
-        const count = descriptor.vertexCount * attr.size;
-        attrEntries.push([
-          attr.setterName,
-          {
-            enumerable: true,
-            value:
-              count <= FIXED_SETTER_VALUES
-                ? makeFixedAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size)
-                : count <= WIDE_SETTER_VALUES
-                  ? makeWideAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size)
-                  : makeAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
-          },
-        ]);
-      }
-    }
 
-    if (attr.hasComponents) {
-      attr.components.forEach((component, componentIndex) => {
-        for (let vertexIndex = 0; vertexIndex < descriptor.vertexCount; vertexIndex++) {
-          const instanceOffset = descriptor.vertexCount * buf.itemSize;
-          const attrOffset = vertexIndex * buf.itemSize + bufAttr.offset + componentIndex;
-          // a component is skipped only where it coincides with the attribute accessor above: one
-          // vertex, size 1 and the same name address the very same slot
-          if (descriptor.vertexCount > 1 || attr.size > 1 || component !== attr.name) {
-            attrEntries.push([
-              `${component}${descriptor.vertexCount === 1 ? '' : vertexIndex}`,
-              {
-                enumerable: true,
-                get: makeAttributeGetter(bufferIndex, instanceOffset, attrOffset),
-                set: makeAttributeSetter(bufferIndex, instanceOffset, attrOffset),
-              },
-            ]);
-          }
-        }
-      });
-    }
-    return attrEntries;
-  });
+      const count = descriptor.vertexCount * attr.size;
+      return [
+        property.name,
+        {
+          enumerable: true,
+          value:
+            count <= FIXED_SETTER_VALUES
+              ? makeFixedAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size)
+              : count <= WIDE_SETTER_VALUES
+                ? makeWideAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size)
+                : makeAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+        },
+      ];
+    },
+  );
 
   if (methods) {
     entries.push(

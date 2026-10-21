@@ -209,8 +209,11 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
     this.#state.clear();
   }
 
-  /** The value the state holds for `key`, and `undefined` for as long as nothing has written one. */
-  value<K extends keyof Shape>(key: K): Shape[K] | undefined {
-    return this.#state.get(key as DependencyKey) as Shape[K] | undefined;
+  /**
+   * The value the state holds for `key`: `null` after an {@link update} that wrote `null` for it, and
+   * `undefined` for as long as nothing has written one and after an `update()` that left the key out.
+   */
+  value<K extends keyof Shape>(key: K): Shape[K] | null | undefined {
+    return this.#state.get(key as DependencyKey) as Shape[K] | null | undefined;
   }
 }

@@ -2,9 +2,12 @@
 
 Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "FeatureSprites" (growing
 capacity) and "Performance", and [`src/vertex-objects/README.md`](../../src/vertex-objects/README.md),
-"Growing a pool". Deviation: a growth that throws
-throws from `FeatureSpritesGeometry#grown()` before any geometry exists — the constructor allocates
-the buffers or fails —, so there is no half-built geometry to dispose (§2.6).
+"Growing a pool". Deviations:
+
+- a growth that throws throws from `FeatureSpritesGeometry#grown()` before any geometry exists — the
+  constructor allocates the buffers or fails —, so there is no half-built geometry to dispose (§2.6);
+- `VertexObjectPool#adoptVOs()` hands the `onCreateVO` hook of the source to a pool without one
+  itself, so `FeatureSpritesGeometry#grown()` copies nothing by hand (§2, step 2; §3).
 
 Phase F, part 2, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.16, the
 second and third bullet — the first, the one-time warning of a full pool, came with phase A,

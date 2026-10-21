@@ -40,6 +40,11 @@ function writeThing(thing: Thing, id: number): void {
 const valuesOf = (thing: Thing) => [thing.x, thing.y, thing.z, thing.r, thing.g, thing.b, thing.weight];
 const expectedValues = (id: number) => [id, id * 2, id + 0.5, id, 2 * id, 3 * id, id + 0.25];
 
+// the hull around the recorded ranges of a buffer: the pairs are ascending and apart, so it runs from the
+// first start to the last end, and is [-1, -1] while nothing is recorded
+const hullOf = (record: {dirtyRanges: Int32Array; dirtyRangeCount: number}): [number, number] =>
+  record.dirtyRangeCount === 0 ? [-1, -1] : [record.dirtyRanges[0]!, record.dirtyRanges[2 * record.dirtyRangeCount - 1]!];
+
 function makeThings(count: number, capacity = count) {
   const pool = new VertexObjectPool<Thing>(descriptor, capacity);
   const things = Array.from({length: count}, (_, id) => {
@@ -112,7 +117,7 @@ describe('VertexObjectPool#adoptVOs()', () => {
     pool.adoptVOs(source);
 
     for (const record of pool.buffer.bufferList) {
-      expect([record.bufferName, record.dirtyFrom, record.dirtyTo]).toEqual([record.bufferName, 0, 2]);
+      expect([record.bufferName, ...hullOf(record)]).toEqual([record.bufferName, 0, 2]);
     }
     pool.dispose();
     source.dispose();
@@ -163,6 +168,35 @@ describe('VertexObjectPool#adoptVOs()', () => {
   });
 
   describe('the source pool afterwards', () => {
+    test('hands the onCreateVO hook of the source to a pool without one, keeps the own hook of one that has it, and the source keeps its hook', () => {
+      const calls: string[] = [];
+      const hA = () => {
+        calls.push('hA');
+      };
+      const hC = () => {
+        calls.push('hC');
+      };
+      const {pool: a} = makeThings(1, 2);
+      a.onCreateVO = hA;
+      const b = new VertexObjectPool<Thing>(descriptor, 4);
+
+      b.adoptVOs(a);
+
+      expect(b.onCreateVO).toBe(hA);
+      expect(a.onCreateVO).toBe(hA);
+      b.createVO();
+      expect(calls).toEqual(['hA']);
+
+      const c = new VertexObjectPool<Thing>(descriptor, 4);
+      c.onCreateVO = hC;
+      c.adoptVOs(b);
+      expect(c.onCreateVO).toBe(hC);
+      expect(b.onCreateVO).toBe(hA);
+      a.dispose();
+      b.dispose();
+      c.dispose();
+    });
+
     test('a source pool used again gives the replacement of its onCreateVO hook its own slot', () => {
       const {pool: a} = makeThings(2);
       const b = new VertexObjectPool<Thing>(descriptor, 4);
@@ -237,7 +271,7 @@ describe('VertexObjectPool#adoptVOs()', () => {
       last.x = 5;
       expect(target.getVO(1)!.x).toBe(5);
       // the slot is marked in the pool that holds it now
-      expect(target.buffer.bufferList.every((record) => record.dirtyTo >= 1)).toBe(true);
+      expect(target.buffer.bufferList.every((record) => hullOf(record)[1] >= 1)).toBe(true);
       target.dispose();
       source.dispose();
     });

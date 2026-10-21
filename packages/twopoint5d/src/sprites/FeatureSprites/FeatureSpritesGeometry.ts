@@ -105,7 +105,6 @@ export class FeatureSpritesGeometry<Api extends object = object> extends Instanc
     grown.name = this.name;
     grown.basePool.buffer.copy(this.basePool.buffer);
     grown.instancedPool.adoptVOs(this.instancedPool);
-    grown.instancedPool.onCreateVO = this.instancedPool.onCreateVO;
     return grown;
   }
 }

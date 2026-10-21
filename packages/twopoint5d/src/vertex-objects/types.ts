@@ -299,6 +299,17 @@ export type VOAttrGetter = {
  */
 export type VOSortKey<VOType> = (vo: VOType & VO) => number;
 
+/**
+ * The names `VertexObjectPool#sortBy()` takes as its key: every property of `VOType` whose type is
+ * `number` — `'y'`, `'rotation'`, `'x0'` on a vertex object of several vertices —, and any string
+ * on a pool built without a vertex object type, whose `VOType` is `unknown`. The pool checks the
+ * name again when it sorts: a number property that no attribute of the description backs is
+ * refused there, with the names there are.
+ */
+export type VOSortKeyName<VOType> = unknown extends VOType
+  ? string
+  : {[K in keyof VOType]-?: VOType[K] extends number ? K : never}[keyof VOType] & string;
+
 /** How `VertexObjectPool#sortBy()` and `#sortByKeys()` order the keys. */
 export interface VOSortOptions {
   /**
