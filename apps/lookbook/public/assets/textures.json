@@ -64,6 +64,22 @@
       "tileSet": {"tileWidth": 64, "tileHeight": 64, "margin": 1},
       "texture": ["nearest", "srgb"]
     },
+    "ropeBridgeAtlas": {
+      "atlasUrl": "rope-bridge/bridge.json",
+      "texture": ["nearest", "srgb"]
+    },
+    "ropeBridgeCaveBack": {
+      "imageUrl": "rope-bridge/cave-back.png",
+      "texture": ["linear", "srgb"]
+    },
+    "ropeBridgeCaveFront": {
+      "imageUrl": "rope-bridge/cave-front.png",
+      "texture": ["linear", "srgb"]
+    },
+    "ropeBridgeCaveMid": {
+      "imageUrl": "rope-bridge/cave-mid.png",
+      "texture": ["linear", "srgb"]
+    },
     "skinballTiles": {
       "imageUrl": "skinball-256.png",
       "tileSet": {"tileWidth": 256, "tileHeight": 256},

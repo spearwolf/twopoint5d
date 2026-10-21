@@ -32,7 +32,11 @@
         "axisBillboardPlacement",
         "BillboardPlacement",
         "Flash",
-        "PaletteSwap"
+        "PaletteSwap",
+        "Anchor",
+        "SegmentEnd",
+        "segmentPlacement",
+        "RepeatingTextureColor"
       ]
     },
     {
