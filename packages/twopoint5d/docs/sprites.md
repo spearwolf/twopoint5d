@@ -225,6 +225,13 @@ already — onto the camera's right and up vectors in the local space of the mes
 parents may be moved, turned and scaled evenly on all axes and its billboards still face the
 camera. A scale that differs from axis to axis skews them.
 
+`Tint` multiplies the **linear** color: the color map decoded from sRGB, before the renderer
+encodes the result for the screen again. A dimming tint therefore looks brighter than its number —
+`setColorValues(0.5, 0.5, 0.5)` halves the light, and the screen shows about 0.74 of the
+brightness, not half of it. For a tint picked in sRGB, convert it: a `Color` from a hex or CSS
+string (`new Color('#808080')`) or from `setRGB(r, g, b, SRGBColorSpace)` holds the linear values,
+and `setColor(color)` writes them; `setColorValues()` writes its numbers as they are.
+
 ### Fade and flash
 
 `Fade` multiplies the alpha of a sprite by its `fade`: spawning, dying, fog of war. `Flash` mixes
@@ -1631,10 +1638,17 @@ balls.update();
   sprites on one row back and forth. A `NaN` key goes last, behind the infinities too.
 - **The order of a frame**: write the sprites, sort, `update()`, render. A sort after `update()`
   reaches the gpu a frame late. Both answer whether a sprite moved.
-- **The passes follow.** A pass draws the geometry of the sprites, so it draws the same order:
-  the reflection of a cloud sorted back to front blends back to front as well, and the overlapping
-  shadows of `ShadowPass`, one colour, look the same in any order. A pass that wants another order
-  needs a mesh of its own.
+- **The passes follow.** A pass draws the geometry of the sprites, so it draws the same order.
+  The overlapping shadows of `ShadowPass`, one colour, look the same in any order. A mirror does
+  not keep the order: `ReflectionPass` and `BillboardReflectionPass` reverse the depth along the
+  mirror normal — above a floor, the sprite nearest a camera that looks down has the reflection
+  farthest from it. The reflection of a cloud sorted back to front blends back to front where the
+  camera looks along the mirror, and the steeper it looks onto the mirror, the more of it blends
+  out of order. Where that shows, give the reflection a blend that needs no order —
+  `definePass({...BillboardReflectionPass, material: {...BillboardReflectionPass.material,
+  blending: AdditiveBlending}})`, a glowing reflection on a dark floor — or a darker
+  `reflectionColor`, which hides the mistakes. A pass that wants an order of its own needs a mesh
+  of its own.
 - **The price.** The sort moves every attribute of the sprites that change their slot, so it marks
   them for upload — the static ones included, which otherwise go up only when they are touched. A
   mesh sorted every frame whose order changes uploads about everything every frame: 76 B a sprite
@@ -1644,6 +1658,14 @@ balls.update();
 - A handle stays the same object and keeps its values through a sort; only its slot changes. The
   pool behind it is `VertexObjectPool#sortBy()` — see
   [the vertex objects](../src/vertex-objects/README.md#sorting-a-pool).
+
+**Across meshes** the sort has no say: three.js draws every opaque mesh before every transparent
+one, whatever their `renderOrder`. A 2D scene of several meshes in painter's order — a backdrop,
+the actors, a UI layer — needs `transparent: true` on **every** mesh, the ones that look opaque
+too, and a `renderOrder` per layer: three sorts the transparent meshes by `renderOrder`, then by
+the depth of the origin of each mesh, back to front, then by the order they were created in. A
+layer that has to cover what lies nearer to the camera — a UI over the scene — takes
+`depthTest: false` and `depthWrite: false` as well.
 
 ## Picking: which sprite is under the pointer
 
@@ -2146,6 +2168,13 @@ card as it stands, as for a flat sprite.
 
 `ShadowPass` and `SegmentShadowPass` carry the hook `shadowFallsOnPlane` (see "Leaving a pass out
 for a frame" below); the two reflections carry none and are drawn whenever they are on.
+
+**The ground plane has no edge.** `PlanarShadow` projects onto `groundPlane`, an infinite plane,
+and nothing clips the shadow to a ground mesh: on a bounded ground — an island, a table, a
+platform — a shadow that reaches past the edge hangs in the air beyond it. Keep the sprites away
+from the edge on the side the shadows fall to, by the length of their shadow — `h · √(lx² + lz²) /
+ly` for a sprite `h` tall under a directional light `(lx, ly, lz)` over the XZ ground — or let the
+ground reach past every shadow.
 `SegmentShadowPass` is named `shadow`, as `ShadowPass` is, and `BillboardReflectionPass` is named
 `reflection`, as `ReflectionPass` is: a kind takes one or the other of each pair.
 
@@ -2598,6 +2627,14 @@ and glows; a pure red `[4, 0, 0]` has 0.85 and does **not**, a pure blue `[0, 0,
 saturated color needs a factor of about `threshold / coefficient` to pass — 5 for red, 14 for
 blue — or a little white mixed in: `[4, 1, 1]` has 1.64. The tint multiplies the color map, so a
 dark texel needs a larger factor than a white one.
+
+**The glowing area counts, not only the luminance.** A pixel above the threshold goes into the
+bloom with its whole color, not with what it has above the threshold, and the bloom blurs it
+through five mips — from half the resolution of the screen down to a thirty-second — and adds
+them up. A small sprite above white gets a halo. A full-width strip above white — a copper bar, a
+laser across the screen, a bright floor — fills the large mips as well and fogs the whole screen.
+Keep what glows small: draw a wide strip at or below white and give a thin core of it the tint
+above white.
 
 - The sprite itself draws clamped to its brightest color where it is above 1, unless the renderer
   tone-maps (`renderer.toneMapping`), which compresses it and keeps its hue.
