@@ -25,7 +25,12 @@
         "Orientation",
         "Rotation",
         "Tint",
-        "billboards"
+        "billboards",
+        "wave",
+        "gridBase",
+        "QuadBase",
+        "axisBillboardPlacement",
+        "BillboardPlacement"
       ]
     },
     {
@@ -40,6 +45,7 @@
         "TextureCoords",
         "TextureFactory",
         "TextureStore",
+        "TexturePackerJson",
         "TileSet",
         "colorFromTextureByTexCoords",
         "AtlasFrameTable",
