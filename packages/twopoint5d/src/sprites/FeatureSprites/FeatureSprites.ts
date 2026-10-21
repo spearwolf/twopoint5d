@@ -37,8 +37,8 @@ export interface FeatureSpritesOptions<Api extends object = object>
 }
 
 /**
- * The mesh of one pass of a {@link FeatureSprites}: its child, over the same geometry, with a
- * material of its own built for the pass. It has no `update()`; the sprites update the geometry
+ * The mesh of one pass of a {@link FeatureSprites}: its child, over the geometry of the sprites — it
+ * follows a geometry put into their `geometry` slot — with a material of its own built for the pass. It has no `update()`; the sprites update the geometry
  * once per frame for every pass. The sprites build and release it.
  */
 export class FeatureSpritesPass<Api extends object = object> extends Mesh {
@@ -200,15 +200,19 @@ export type FeatureSpritesOf<K> = K extends SpriteKind<infer Api> ? FeatureSprit
  * the geometry and the material it is not handed, and a child mesh with a material of its own for
  * every pass; what it builds belongs to it and goes with {@link dispose}, while a geometry, a
  * material or a texture handed in stays the caller's — and so does a material or a geometry the
- * caller puts into a slot later. Call `update()` once per frame before
- * rendering — it writes the bound uniforms, judges the `visible` hook of every pass and serves
+ * caller puts into a slot later. A geometry put into the `geometry` slot is the geometry of the
+ * sprites from then on, for the mesh, every pass and the sprite API alike. Call `update()` once per
+ * frame before rendering — it writes the bound uniforms, judges the `visible` hook of every pass and serves
  * every pass as well.
  */
 export class FeatureSprites<Api extends object = object> extends VertexObjects<FeatureSpritesGeometry<Api>> {
   /**
    * The geometry the sprites draw — `undefined` once disposed. Under `grow` a growth replaces it
    * with a larger one and disposes the old one: read it from the mesh afresh. A geometry the caller
-   * puts into this slot stays the caller's.
+   * puts into this slot stays the caller's, and it is the geometry of the sprites from then on: the
+   * mesh and every pass mesh draw it, and `createSprite()`, `freeSprite()`, `sortBy()`,
+   * `sortByViewDepth()` and `spritePool` work on its pool. A handle of the geometry before stays with
+   * that one, and `freeSprite()` leaves it alone.
    */
   declare geometry: FeatureSpritesGeometry<Api> | undefined;
   /**
@@ -224,6 +228,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   // the geometry this mesh built, `undefined` for one handed in: the one dispose() and a growth release,
   // whatever the geometry slot holds
   #builtGeometry: FeatureSpritesGeometry<Api> | undefined;
+  // the geometry in the slot, behind the accessor the constructor puts on the instance
+  #slotGeometry: FeatureSpritesGeometry<Api> | undefined;
   // the material of the sprites, built or handed in: the one their API and their passes speak to,
   // whatever the material slot holds; #ownsMaterial says whether it was built here
   #material: FeatureSpritesMaterial<Api> | undefined;
@@ -266,6 +272,16 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     this.#grows = grows;
     this.#resources = resources;
     this.name = 'twopoint5d.FeatureSprites';
+    this.#slotGeometry = geometry;
+    // three's Mesh writes and reads the slot inside its own constructor, before the private fields
+    // of this class exist, so the accessor that lets the pass meshes follow the slot goes onto the
+    // instance here rather than onto the prototype
+    Object.defineProperty(this, 'geometry', {
+      configurable: true,
+      enumerable: true,
+      get: () => this.#slotGeometry,
+      set: (next: FeatureSpritesGeometry<Api> | undefined) => this.#putGeometry(next),
+    });
 
     try {
       // filled while the pass meshes are built, so that a dispose() on a throw finds those built so far
@@ -349,9 +365,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     const larger = Math.max(2 * capacity, 1);
     const grown = old.grown(larger);
     // three's render objects see a geometry of another id on the next frame and collect its
-    // attributes anew; the materials never held the geometry and stay as they are
+    // attributes anew; the materials never held the geometry and stay as they are. Writing the slot
+    // takes every pass mesh along
     this.geometry = grown;
-    for (const mesh of Object.values(this.#passes)) mesh.geometry = grown;
     this.#builtGeometry = grown;
     // built here, so it is this mesh's to release; its pool goes with it, holding no sprite any more
     old.dispose();
@@ -368,14 +384,26 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   #warnFull(capacity: number): void {
     this.#warnedFull = true;
     const larger = Math.max(2 * capacity, 1);
+    // the geometry in the slot is the full one — built, handed in or put there by the caller; only the
+    // built one grows with the capacity of the sprites
     const fix =
-      this.#builtGeometry !== undefined
+      this.geometry === this.#builtGeometry
         ? `Give the sprites a larger capacity — new FeatureSprites(kind, {capacity: ${larger}})`
-        : `Build the FeatureSpritesGeometry handed in with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: ${larger}})`;
+        : `Build the FeatureSpritesGeometry in the geometry slot with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: ${larger}})`;
     // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
       `FeatureSprites "${this.name}": the pool is full — all ${capacity} sprites are in use, so createSprite() answers undefined. ${fix} — or free the sprites no longer drawn with freeSprite(). This warning is shown once per FeatureSprites.`,
     );
+  }
+
+  // the geometry in the slot is the geometry of the sprites: the mesh and every pass mesh draw it,
+  // and createSprite(), freeSprite(), sortBy(), sortByViewDepth() and spritePool work on its pool
+  #putGeometry(geometry: FeatureSpritesGeometry<Api> | undefined): void {
+    this.#slotGeometry = geometry;
+    for (const mesh of Object.values(this.#passes)) {
+      // undefined only while the slot is empty, when the mesh itself cannot be drawn either
+      mesh.geometry = geometry as FeatureSpritesGeometry<Api>;
+    }
   }
 
   /** Gives a sprite back; the last sprite moves into its slot. Does nothing once disposed. */

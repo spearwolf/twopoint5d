@@ -1547,7 +1547,8 @@ material (`textures`, `uniforms`, `placement` and every three.js material parame
 and `passes` (see "Passes: shadows and reflections").
 `createSprite()` answers `undefined` once the pool is full, and the first time it does it says so on
 the console — once per mesh, naming the `name` of the mesh, its capacity and the fix: twice the
-capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` handed in.
+capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` in the
+`geometry` slot — handed in or put there later.
 `spritePool.createVO()` is the pool's own API and stays silent. `placement`, `uniforms`, `setUniform()`,
 `getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
 
@@ -1593,7 +1594,10 @@ bullets.update();
 them alone. A mesh built around a geometry handed in still disposes the material it built for it.
 A material or a geometry the caller puts into the `material` or `geometry` slot of the mesh stays
 the caller's as well: `dispose()` releases the ones the mesh built even then, and lets go of the
-other. `placement`, `uniforms`, `setUniform()`, `bindUniform()`, the textures and the passes stay
+other. A geometry put into the `geometry` slot is the geometry of the sprites from then on: the mesh
+and every pass mesh draw it, `createSprite()`, `freeSprite()`, `sortBy()`, `sortByViewDepth()` and
+`spritePool` work on its pool, and a handle of the geometry before stays with that one. A material put
+into the `material` slot changes only how the mesh draws. `placement`, `uniforms`, `setUniform()`, `bindUniform()`, the textures and the passes stay
 with the material of the sprites — the built one or the one handed in — whatever the slot holds;
 a material put into the slot that is to draw with the uniforms and textures of the sprites is built
 on them before the swap, `new FeatureSpritesMaterial(kind, {resources: sprites.material.resources})`
@@ -2170,7 +2174,8 @@ The rules:
   scene graph with them. `passes` answers them by pass name, `FeatureSpritesPass` meshes whose
   `material` is the material of the pass. `dispose()` releases the pass meshes, their materials
   and the shared uniforms and textures, and `passes` is empty afterwards; a geometry handed in
-  and every texture stay the caller's. Passes need a material the sprites build, so they are
+  and every texture stay the caller's. The pass meshes draw the geometry in the `geometry` slot of
+  the sprites and follow a geometry put there, as they follow a growth. Passes need a material the sprites build, so they are
   refused next to a `material` handed in.
 
 Four passes ship ready-made. All are `transparent`, write no depth, draw both sides of a triangle

@@ -255,8 +255,9 @@ one-time warning, `CameraBasedVisibility#warnCapped`, `Map2DTileRenderer`):
   are in use, so createSprite() answers undefined. Give the sprites a larger capacity — new
   FeatureSprites(kind, {capacity: <2 · capacity>}) — or free the sprites no longer drawn with
   freeSprite(). This warning is shown once per FeatureSprites.`
-- a geometry handed in: the same, with `Build the FeatureSpritesGeometry handed in with a larger
-  capacity — new FeatureSpritesGeometry(kind, {capacity: <2 · capacity>}) —` as the fix.
+- a geometry in the slot the mesh did not build — handed in or put there later: the same, with
+  `Build the FeatureSpritesGeometry in the geometry slot with a larger capacity — new
+  FeatureSpritesGeometry(kind, {capacity: <2 · capacity>}) —` as the fix.
 
 `<name>` is the mesh's `name` (`twopoint5d.FeatureSprites` unless the caller set one), so two
 meshes can be told apart; twice the capacity is a concrete number to type, at least 1 for a pool

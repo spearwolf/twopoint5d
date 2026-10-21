@@ -20,7 +20,7 @@ import {TextureColor} from '../features/TextureColor.js';
 import {Tint} from '../features/Tint.js';
 import {definePass, type SpritePass} from '../passes/definePass.js';
 import {ReflectionPass, ShadowPass} from '../passes/passPresets.js';
-import {AnimatedSpriteKind} from '../presets.js';
+import {AnimatedSpriteKind, TexturedSpriteKind} from '../presets.js';
 import {QuadBase} from '../SpriteBase.js';
 import {defineFeature} from '../SpriteFeature.js';
 import {FeatureSprites, type FeatureSpritesOf} from './FeatureSprites.js';
@@ -133,10 +133,24 @@ describe('FeatureSprites', () => {
       for (let i = 0; i < 4; i++) sprites.createSprite();
 
       expect(warn.mock.calls[0]![0]).toContain(
-        'Build the FeatureSpritesGeometry handed in with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: 6}) —',
+        'Build the FeatureSpritesGeometry in the geometry slot with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: 6}) —',
       );
       sprites.dispose();
       geometry.dispose();
+    });
+
+    test('names the geometry put into the slot as the one to build larger', () => {
+      const warn = silenced();
+      const sprites = new FeatureSprites(kind, {capacity: 2});
+      const other = new FeatureSpritesGeometry(kind, 3);
+      sprites.geometry = other;
+      for (let i = 0; i < 4; i++) sprites.createSprite();
+
+      expect(warn.mock.calls[0]![0]).toContain(
+        'Build the FeatureSpritesGeometry in the geometry slot with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: 6}) —',
+      );
+      sprites.dispose();
+      other.dispose();
     });
 
     test('a pool of no sprites asks for one', () => {
@@ -1008,6 +1022,46 @@ describe('FeatureSprites', () => {
       expect(Object.hasOwn(other.uniforms, 'groundPlane')).toBe(false);
       expect(other.getTexture('colorMap')).toBeUndefined();
       expect([sprites.uniforms, sprites.getTexture('colorMap')]).toEqual([own.uniforms, colorMap]);
+      sprites.dispose();
+      other.dispose();
+    });
+  });
+
+  describe('another geometry in the slot', () => {
+    test('every pass mesh draws a geometry put into the slot, and the geometry put back', () => {
+      const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, passes: [ShadowPass, ReflectionPass]});
+      const built = sprites.geometry!;
+      const other = new FeatureSpritesGeometry(TexturedSpriteKind, 4);
+
+      sprites.geometry = other;
+      expect(sprites.geometry).toBe(other);
+      for (const mesh of Object.values(sprites.passes)) expect(mesh.geometry).toBe(other);
+
+      sprites.geometry = built;
+      for (const mesh of Object.values(sprites.passes)) expect(mesh.geometry).toBe(built);
+
+      sprites.dispose();
+      other.dispose();
+    });
+
+    test('createSprite(), freeSprite(), sortBy() and spritePool work on the pool of the geometry the passes draw', () => {
+      const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, passes: [ShadowPass]});
+      const other = new FeatureSpritesGeometry(TexturedSpriteKind, 4);
+      sprites.geometry = other;
+
+      const a = sprites.createSprite()!;
+      const b = sprites.createSprite()!;
+      a.setPosition(0, 2, 0);
+      b.setPosition(0, 1, 0);
+
+      expect(sprites.spritePool).toBe(other.instancedPool);
+      expect(other.instancedPool.usedCount).toBe(2);
+      expect(sprites.sortBy('y')).toBe(true);
+      expect(other.instancedPool.getVO(0)).toBe(b);
+      sprites.freeSprite(a);
+      expect(other.instancedPool.usedCount).toBe(1);
+      expect(sprites.passes['shadow']!.geometry).toBe(other);
+
       sprites.dispose();
       other.dispose();
     });

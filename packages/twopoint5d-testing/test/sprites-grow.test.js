@@ -3,6 +3,7 @@ import {
   defineSprite,
   Display,
   FeatureSprites,
+  FeatureSpritesGeometry,
   FlatPlacement,
   InstancePosition,
   QuadBase,
@@ -38,7 +39,7 @@ const SPRITES = [
 /** The pixel at `x` world units right of the centre, on the middle row. */
 const rgbAtX = (pixels, x) => rgbAt(pixels, TARGET_SIZE, Math.floor(CENTER + x * PIXELS_PER_UNIT), CENTER);
 
-describe('sprites — growing capacity', function () {
+describe('sprites — another geometry under the mesh: growth and the geometry slot', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
   this.timeout(20000);
 
@@ -126,6 +127,61 @@ describe('sprites — growing capacity', function () {
     for (const {x, rgb} of SPRITES) {
       expect(isNearColor(rgbAtX(after, x), rgb), `after, at ${x}: ${rgbAtX(after, x)}`).to.be.true;
       expect(isNearColor(rgbAtX(after, -x), rgb), `after, mirrored at ${-x}: ${rgbAtX(after, -x)}`).to.be.true;
+    }
+  });
+
+  // The sprites of the geometry in the slot are the sprites of the mesh and of its pass: the render
+  // objects built for the first geometry follow both to the one put there, and the first one is drawn by neither.
+  it('a geometry put into the slot is drawn by the mesh and by its pass, and the geometry it took the place of by neither', async function () {
+    const colorMap = makeColorTexture([WHITE]);
+    const sprites = new FeatureSprites(TintedKind, {
+      capacity: 2,
+      textures: {colorMap},
+      uniforms: {mirrorPlane: [1, 0, 0, 0], reflectionColor: [1, 1, 1, 1]},
+      passes: [ReflectionPass],
+    });
+    const create = ({x, rgb}) => {
+      const sprite = sprites.createSprite();
+      sprite.setSize(0.5, 0.5);
+      sprite.setPosition(x, 0, 0);
+      sprite.setColorValues(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, 1);
+      return sprite;
+    };
+
+    const scene = new Scene();
+    scene.add(sprites);
+    const half = TARGET_SIZE / PIXELS_PER_UNIT / 2;
+    const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
+    camera.position.z = 10;
+
+    SPRITES.slice(0, 2).map(create);
+    sprites.update();
+    const before = await renderToPixels(display.renderer, scene, camera, target);
+
+    const other = new FeatureSpritesGeometry(TintedKind, 4);
+    sprites.geometry = other;
+    SPRITES.slice(2).map(create);
+    sprites.update();
+    const after = await renderToPixels(display.renderer, scene, camera, target);
+
+    sprites.dispose();
+    other.dispose();
+    colorMap.dispose();
+
+    for (const {x, rgb} of SPRITES.slice(0, 2)) {
+      expect(isNearColor(rgbAtX(before, x), rgb), `before, at ${x}: ${rgbAtX(before, x)}`).to.be.true;
+      expect(isNearColor(rgbAtX(before, -x), rgb), `before, mirrored at ${-x}: ${rgbAtX(before, -x)}`).to.be.true;
+    }
+
+    for (const {x, rgb} of SPRITES.slice(2)) {
+      expect(isNearColor(rgbAtX(after, x), rgb), `after, at ${x}: ${rgbAtX(after, x)}`).to.be.true;
+      expect(isNearColor(rgbAtX(after, -x), rgb), `after, mirrored at ${-x}: ${rgbAtX(after, -x)}`).to.be.true;
+    }
+    for (const {x} of SPRITES.slice(0, 2)) {
+      expect(isNearColor(rgbAtX(after, x), [0, 0, 0]), `after, nothing of the first geometry at ${x}: ${rgbAtX(after, x)}`).to.be
+        .true;
+      expect(isNearColor(rgbAtX(after, -x), [0, 0, 0]), `after, nothing of it mirrored at ${-x}: ${rgbAtX(after, -x)}`).to.be
+        .true;
     }
   });
 });

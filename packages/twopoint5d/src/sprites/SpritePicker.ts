@@ -266,7 +266,7 @@ export class SpritePicker {
     entry.meshNumber.value = meshNumber;
 
     const {mesh} = entry;
-    // a growth gives the sprites a new geometry, which three follows by its id
+    // a growth, or a geometry the caller puts into the slot, gives the sprites a new geometry, which three follows by its id
     mesh.geometry = sprites.geometry!;
     sprites.updateWorldMatrix(true, false);
     mesh.matrixWorld.copy(sprites.matrixWorld);
