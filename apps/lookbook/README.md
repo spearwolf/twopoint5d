@@ -1,6 +1,6 @@
 # twopoint5d lookbook
 
-The living documentation of `@spearwolf/twopoint5d`: 19 runnable demos, each linked to its
+The living documentation of `@spearwolf/twopoint5d`: 28 runnable demos, each linked to its
 own source, searchable by tags.
 
 ## Running it
@@ -14,8 +14,8 @@ repo-root `README.md`.
 ## What's in `src/`
 
 - `pages/index.astro` — the overview page, the only page using `Layout.astro`
-- `pages/demos/<name>.astro` — 19 demo pages, all built on `VanillaDemo.astro`
-- `pages/demos/_<name>.json` — 19 metadata files, one per demo page
+- `pages/demos/<name>.astro` — 28 demo pages, all built on `VanillaDemo.astro`
+- `pages/demos/_<name>.json` — 28 metadata files, one per demo page
 - `demos/` — the demo code itself, TypeScript, grouped by demo; the three map2d demos
   share `map2d/`
 - `components/` — the lookbook UI: the card grid, the tag cloud, search, and
@@ -26,7 +26,7 @@ repo-root `README.md`.
 - `styles/`
 
 Three path aliases resolve into `src/`: `~components/*`, `~layouts/*` and `~demos/*`,
-declared in `tsconfig.json`. All 19 demo pages import through them.
+declared in `tsconfig.json`. All 28 demo pages import through them.
 
 ## Generated assets
 

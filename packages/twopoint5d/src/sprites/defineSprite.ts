@@ -46,6 +46,13 @@ export type SpriteApiOf<F extends readonly SpriteFeature[]> = (
 /** The sprite handle a pool of kind `K` hands out. */
 export type SpriteOf<K> = K extends SpriteKind<infer Api> ? Api & VO : never;
 
+/**
+ * The api of kind `K`: the intersection of its feature apis, its sprite handle without the `VO` of a
+ * vertex object — the type argument of `FeatureSprites`, `FeatureSpritesGeometry` and
+ * `FeatureSpritesMaterial` for that kind.
+ */
+export type SpriteKindApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
+
 const WHERE = 'defineSprite';
 
 const sizeOf = (attribute: VertexAttributeDescription | undefined): number =>

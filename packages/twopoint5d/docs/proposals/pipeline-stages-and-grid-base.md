@@ -497,7 +497,8 @@ stage context offers; phase E decides where it lives.
     texel frame with a border of 3 texels drawn at 3 × and at 6 × its size keeps its corner cells
     at 3 units;
   - a **wave** mesh stage weighted by the base uv (§7.3) on `gridBase({columns: 1, rows: 4})`:
-    the top row moves by the amplitude, the bottom row stays;
+    the top row moves by the amplitude, the bottom row stays — dropped once the real `wave()`
+    shipped, whose `sprites-wave.test.js` makes the same bend and shear assertions;
   - `Bob`-like: a mesh stage that declares `time` shared next to `AnimatedFrames` moves the sprite
     as `setUniform('time', …)` says.
 

@@ -9,9 +9,9 @@ import {
   type TextureAtlas,
   TextureColor,
   TexturedSpriteKind,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {Group, type Texture} from 'three/webgpu';
-import type {SpritesOf} from './spritesOf';
 
 // no frame feature: a layer sprite shows its whole texture
 const LayerKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor]});
@@ -25,7 +25,7 @@ const LAYER_COPIES = 8;
 const TILE = 16;
 
 interface Layer {
-  sprites: SpritesOf<typeof LayerKind>;
+  sprites: FeatureSpritesOf<typeof LayerKind>;
   copies: LayerSprite[];
   /** How far the layer moves with the camera: 0 stands still on the screen, 1 moves with the floor. */
   scroll: number;
@@ -45,7 +45,7 @@ export interface BackdropTextures {
  */
 export class Backdrop extends Group {
   readonly #layers: Layer[];
-  readonly #tiles: SpritesOf<typeof TexturedSpriteKind>;
+  readonly #tiles: FeatureSpritesOf<typeof TexturedSpriteKind>;
 
   /**
    * @param minX, maxX — the arena, in art pixels; the floor runs this far and a little beyond

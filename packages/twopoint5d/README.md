@@ -21,13 +21,22 @@ The core features can be roughly classified into the following areas:
   `TexturedSpriteKind`, `AnimatedSpriteKind`; a feature of your own brings its attributes,
   uniforms and a stage of the TSL pipeline
 - load and create sprites from texture atlases or sprite sheet images
-- support frame based animations
+- support frame based animations — looped, played once or back and forth, with a duration per
+  frame
 - draw trimmed and rotated frames of a TexturePacker atlas where the untrimmed sprite has
   them
 - stand them up, lay them on the ground (`GroundPlacement`) or render them as billboards,
   swapped on a live material; turn each sprite by a yaw or a quaternion of its own
 - draw shadows and reflections of the same sprites as passes, bound to lights and planes of
   the scene graph
+- stand them upright about an axis (`axisBillboardPlacement()`), pick one of n views by the
+  camera (`tableFrame({views})`), stretch a quad between two points for ropes, chains and lasers
+  (`segmentPlacement()`, `RepeatingTextureColor`)
+- mirror (`Flip`), anchor (`Anchor`), fade (`Fade`), flash (`Flash`), swap and cycle palettes
+  (`PaletteSwap`), sway and scroll on a sine (`wave()`), nine-slice panels on a grid base
+  (`NineSlice`, `gridBase()`)
+- sort the draw order (`sortBy()`, `sortByViewDepth()`), grow a full pool (`grow: true`) and
+  pick the sprite under the pointer on the gpu (`SpritePicker`)
 - the guide: [docs/sprites.md](docs/sprites.md)
 - :heavy_check_mark::rocket: ready to use but the api is still in progress
 
@@ -35,7 +44,9 @@ The core features can be roughly classified into the following areas:
 - load images, texture atlases, tilesets and frame based animations from one json
   catalog through `TextureStore`, which fetches every image once and owns the textures it
   builds
-- read the "JSON Hash" and the "JSON Array" format of TexturePacker and free-tex-packer
+- read the "JSON Hash" and the "JSON Array" format of TexturePacker and free-tex-packer, and
+  Aseprite sheets whose tags become animations (`AsepriteJson`); other packers through an atlas
+  adapter of `TextureStore`
 - sample the frames of an atlas in a node material of your own (`AtlasFrameTable`), wrapped
   per axis and without seams
 - pack labels, icons and portraits into one texture at run time (`DynamicAtlas`): a shelf

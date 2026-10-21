@@ -9,7 +9,7 @@ import {nodesOf} from '../../testing/spriteGraph.js';
 import {lightOf} from '../bindings/lightOf.js';
 import {planeOf} from '../bindings/planeOf.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
-import {defineSprite} from '../defineSprite.js';
+import {defineSprite, type SpriteKindApiOf} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
 import {BillboardPlacement} from '../features/BillboardPlacement.js';
 import {FlatPlacement} from '../features/FlatPlacement.js';
@@ -23,7 +23,7 @@ import {ReflectionPass, ShadowPass} from '../passes/passPresets.js';
 import {AnimatedSpriteKind} from '../presets.js';
 import {QuadBase} from '../SpriteBase.js';
 import {defineFeature} from '../SpriteFeature.js';
-import {FeatureSprites} from './FeatureSprites.js';
+import {FeatureSprites, type FeatureSpritesOf} from './FeatureSprites.js';
 import {FeatureSpritesGeometry} from './FeatureSpritesGeometry.js';
 import {FeatureSpritesMaterial} from './FeatureSpritesMaterial.js';
 import {SpriteResources} from './SpriteResources.js';
@@ -78,6 +78,15 @@ describe('FeatureSprites', () => {
     sprites.freeSprite(sprite);
     expect(sprites.spritePool!.usedCount).toBe(0);
     expectTypeOf(sprite).toHaveProperty('setFrame');
+    sprites.dispose();
+  });
+
+  test('FeatureSpritesOf<typeof kind> is the type of the mesh of the kind (a type-level check)', () => {
+    const sprites: FeatureSpritesOf<typeof kind> = new FeatureSprites(kind, {capacity: 1});
+
+    expectTypeOf(sprites).toEqualTypeOf<FeatureSprites<SpriteKindApiOf<typeof kind>>>();
+    expectTypeOf(sprites.createSprite()!).toHaveProperty('setFrame');
+    expectTypeOf<FeatureSpritesOf<number>>().toBeNever();
     sprites.dispose();
   });
 

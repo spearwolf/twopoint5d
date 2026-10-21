@@ -14,10 +14,10 @@ import {
   type SpriteOf,
   type TextureAtlasFrame,
   TextureColor,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Texture} from 'three/webgpu';
 import type {Sheet} from './assets';
-import type {SpritesOf} from './spritesOf';
 import type {Fighter} from './Fighter';
 import {type Box, emptyBox, frameBox, frontOf, heldFrameWindow, overlaps, placeBox} from './hitBoxes';
 
@@ -79,7 +79,7 @@ export interface GoblinsOptions {
 }
 
 export class Goblins {
-  readonly sprites: SpritesOf<typeof GoblinKind>;
+  readonly sprites: FeatureSpritesOf<typeof GoblinKind>;
   readonly goblins: Goblin[] = [];
 
   /** Off draws every goblin in the olive of the sheet, row 0 of the palette. */

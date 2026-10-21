@@ -1,6 +1,4 @@
 import {
-  AsepriteJson,
-  type AsepriteJsonData,
   type FrameBasedAnimationInfo,
   type FrameBasedAnimations,
   type TextureAtlas,
@@ -12,25 +10,20 @@ import type {DataTexture, Texture, WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
 
 /**
- * The tags that play once and then hold their last frame. In Aseprite a tag with "Repeat" set to 1
- * is a one-shot, and the store's built-in `aseprite` adapter reads it so without a word of code;
- * these two sheets leave "Repeat" empty, so their one-shots are named here instead.
- */
-const ONE_SHOTS = ['kick', 'flying-kick', 'hit', 'attack', 'die'];
-
-/**
  * The catalog of the demo. Every pixel-art image is read with `nearest` filtering — `PaletteSwap`
  * compares exact colours, and says so on the console when the colour map is filtered otherwise —
  * and in sRGB, the palette alike, so both sides of the comparison lie in one colour space.
  *
- * The two Aseprite sheets are plain atlas items: the store reads `meta.app` of their json, and the
- * frame tags `idle`, `walk`, `kick` … arrive as the `frameBasedAnimations` of the item.
+ * The two Aseprite sheets are plain atlas items: the store reads `meta.app` of their json and picks
+ * its built-in `aseprite` adapter, and the frame tags `idle`, `walk`, `kick` … arrive as the
+ * `frameBasedAnimations` of the item. The one-shots — `kick`, `flying-kick`, `hit`, `attack`, `die`
+ * — carry Aseprite's "Repeat" of 1, which the adapter reads as a `'once'` that holds its last frame.
  */
 const CATALOG: TextureStoreData = {
   defaultTextureClasses: ['nearest', 'srgb'],
   items: {
-    fighter: {atlasUrl: 'fighter.json', atlasAdapter: 'aseprite-one-shots'},
-    goblin: {atlasUrl: 'goblin.json', atlasAdapter: 'aseprite-one-shots'},
+    fighter: {atlasUrl: 'fighter.json'},
+    goblin: {atlasUrl: 'goblin.json'},
     goblinPalette: {imageUrl: 'goblin-palette.png'},
     tiles: {atlasUrl: 'tiles.json'},
     sky: {imageUrl: 'sky.png'},
@@ -89,16 +82,6 @@ async function loadSheet(store: TextureStore, id: string): Promise<Sheet> {
 
 export async function loadPlatformerAssets(renderer: WebGPURenderer): Promise<PlatformerAssets> {
   const store = new TextureStore(renderer);
-
-  // registered before the catalog is parsed: the items above name it with `atlasAdapter`
-  store.registerAtlasAdapter('aseprite-one-shots', (json, parentCoords) => {
-    const sheet = json as unknown as AsepriteJsonData;
-    const playback = Object.fromEntries(
-      (sheet.meta.frameTags ?? []).filter(({name}) => ONE_SHOTS.includes(name)).map(({name}) => [name, 'once'] as const),
-    );
-    const [atlas, , animations] = AsepriteJson.parse(sheet, {parentCoords, playback});
-    return {atlas: atlas as unknown as TextureAtlas, animations};
-  });
 
   try {
     store.parse(CATALOG, {baseUrl: new URL(assetsUrl('platformer/'), location.href)});

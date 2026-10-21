@@ -11,13 +11,14 @@ import {
   ShadowPass,
   type SpriteBase,
   type SpriteFeature,
-  type SpriteKind,
   type SpriteOf,
   type TextureAtlas,
   type TextureAtlasFrame,
   TextureColor,
   Tint,
   wave,
+  type FeatureSpritesOf,
+  type SpriteKindApiOf,
 } from '@spearwolf/twopoint5d';
 import {
   BackSide,
@@ -94,8 +95,7 @@ function plantKindOn(base: SpriteBase) {
   return kind;
 }
 
-type ApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
-type PlantApi = ApiOf<ReturnType<typeof plantKind>>;
+type PlantApi = SpriteKindApiOf<ReturnType<typeof plantKind>>;
 
 // fireflies: a square of flat grey, lifted far above white by the tint — a pixel that glows
 const FireflyKind = defineSprite({
@@ -174,7 +174,7 @@ export interface MeadowWind {
 export class SwayingMeadow extends Group {
   /** The plants: one mesh, one draw call, and one more for their shadows. */
   plants: FeatureSprites<PlantApi>;
-  readonly fireflies: FeatureSprites<ApiOf<typeof FireflyKind>>;
+  readonly fireflies: FeatureSpritesOf<typeof FireflyKind>;
 
   readonly wind: MeadowWind = {waveAmplitude: 0.9, waveFrequency: 1 / 24, waveSpeed: 0.3, gusts: true};
 

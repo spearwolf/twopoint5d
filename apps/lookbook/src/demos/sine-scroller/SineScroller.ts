@@ -10,7 +10,6 @@ import {
   PaletteSwap,
   QuadBase,
   QuadSize,
-  type SpriteKind,
   type SpriteOf,
   type TextureAtlas,
   TextureColor,
@@ -19,6 +18,7 @@ import {
   Tint,
   wave,
   writeText,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {Group, type Texture} from 'three/webgpu';
 
@@ -62,9 +62,6 @@ const BarKind = defineSprite({
   features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint, Flash],
 });
 
-// the mesh of a kind is typed by the api of its sprites, which the library names for the sprite
-// (SpriteOf) but not for the kind
-type ApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
 type Glyph = SpriteOf<typeof ChromeKind>;
 type Bar = SpriteOf<typeof BarKind>;
 type PixelGlyph = SpriteOf<typeof TexturedSpriteKind>;
@@ -130,11 +127,11 @@ const mod = (a: number, n: number) => ((a % n) + n) % n;
  * measured in pixels of the art — the page scales it by a whole number — and centred on the origin.
  */
 export class SineScroller extends Group {
-  readonly tunnel: FeatureSprites<ApiOf<typeof TunnelKind>>;
-  readonly copper: FeatureSprites<ApiOf<typeof BarKind>>;
-  readonly sabers: FeatureSprites<ApiOf<typeof BarKind>>;
-  readonly chrome: FeatureSprites<ApiOf<typeof ChromeKind>>;
-  readonly text: FeatureSprites<ApiOf<typeof TexturedSpriteKind>>;
+  readonly tunnel: FeatureSpritesOf<typeof TunnelKind>;
+  readonly copper: FeatureSpritesOf<typeof BarKind>;
+  readonly sabers: FeatureSpritesOf<typeof BarKind>;
+  readonly chrome: FeatureSpritesOf<typeof ChromeKind>;
+  readonly text: FeatureSpritesOf<typeof TexturedSpriteKind>;
 
   /** Flash the sabers on every beat. */
   beatFlash = true;

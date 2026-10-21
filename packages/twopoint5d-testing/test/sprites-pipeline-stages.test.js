@@ -40,8 +40,9 @@ import {
 } from './helpers/fixtures.js';
 
 // The features below are no features of the library: they prove that the frame stages, the uv
-// stages, gridBase() and the shared uniforms carry Flip, NineSlice and wave() as their spec sketches
-// them (docs/proposals/pipeline-stages-and-grid-base.md, §7).
+// stages, gridBase() and the shared uniforms carry Flip and NineSlice as their spec sketches them
+// (docs/proposals/pipeline-stages-and-grid-base.md, §7). The proof for wave() went with the
+// feature itself: sprites-wave.test.js holds the real wave() to the same bend and shear.
 
 const TARGET_SIZE = 64;
 
@@ -180,20 +181,6 @@ const NineSlice = /** @type {NineSliceFeature} */ (
   })
 );
 
-/** A sway: the placed vertex moves along x by `waveAmplitude` times the square of how high it lies on the sprite. */
-const Wave = defineFeature({
-  name: 'wave',
-  uniforms: {waveAmplitude: 0},
-  mesh: {
-    order: MeshOrder.Offset,
-    transform: (position, ctx) => {
-      const height = sub(1, vectorAttribute(ctx, 'uv').y);
-      const {uniform} = ctx;
-      return add(position, vec3(mul(uniform('waveAmplitude'), mul(height, height)), 0, 0));
-    },
-  },
-});
-
 /** A bob that declares the time it reads shared: next to AnimatedFrames it reads the same uniform. */
 const Bob = defineFeature({
   name: 'bob',
@@ -234,13 +221,10 @@ const BobKind = defineSprite({
   base: QuadBase,
   features: [InstancePosition, FlatPlacement, QuadSize, AnimatedFrames, TextureColor, Bob],
 });
-/** @param {import('@spearwolf/twopoint5d').SpriteBase} base */
-const waveKindOn = (base) => defineSprite({base, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor, Wave]});
-
 const cellColors = (pixels, pixelsPerUnit, topDown, x, y, columns, rows) =>
   cellColorsOf(pixels, TARGET_SIZE, pixelsPerUnit, topDown, x, y, columns, rows);
 
-describe('sprites — the pipeline stages carry flip, nine-slice and wave', function () {
+describe('sprites — the pipeline stages carry flip and nine-slice', function () {
   // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
   this.timeout(20000);
 
@@ -476,54 +460,6 @@ describe('sprites — the pipeline stages carry flip, nine-slice and wave', func
           features: [InstancePosition, FlatPlacement, QuadSize, NineSlice, AtlasFrame, TextureColor],
         }),
       ).to.throw('defineSprite: feature "nineSlice": needs the base gridBase({columns: 3, rows: 3})');
-    });
-  });
-
-  describe('a wave mesh stage weighted by the base uv', () => {
-    const PPU = 4;
-    const WHITE = [255, 255, 255, 255];
-
-    /** The lit columns of the row `fromTop` pixels below the top of the picture. */
-    function litColumns(pixels, topDown, fromTop) {
-      const row = topDown ? fromTop : TARGET_SIZE - 1 - fromTop;
-      const lit = [];
-      for (let x = 0; x < TARGET_SIZE; x++) if (!isNearColor(rgbAt(pixels, TARGET_SIZE, x, row), [0, 0, 0])) lit.push(x);
-      return {from: lit[0], to: lit[lit.length - 1]};
-    }
-
-    async function renderWave(base) {
-      const colorMap = makeColorTexture([WHITE], 1, 1);
-      const sprites = new FeatureSprites(waveKindOn(base), {capacity: 1, textures: {colorMap}});
-      sprites.setUniform('waveAmplitude', 4);
-      const sprite = sprites.createSprite();
-      sprite.setSize(2, 12);
-      const pixels = await render(sprites, PPU);
-      const topDown = await readsTopDown(display.renderer, target);
-      sprites.dispose();
-      colorMap.dispose();
-      return {pixels, topDown};
-    }
-
-    it('moves the top of a sprite on gridBase({columns: 1, rows: 4}) by the amplitude, bends its middle, keeps its foot', async function () {
-      const {pixels, topDown} = await renderWave(gridBase({columns: 1, rows: 4}));
-      // the sprite spans rows 8 … 55 from the top: 12 units of 4 pixels around the middle
-      const top = litColumns(pixels, topDown, 9);
-      const middle = litColumns(pixels, topDown, 32);
-      const foot = litColumns(pixels, topDown, 54);
-
-      // 2 units wide at the middle 32: the foot at 28 … 35, the top 4 units, 16 pixels, to the right
-      expect(foot, 'the foot').to.deep.equal({from: 28, to: 35});
-      expect(top.from - foot.from, 'the top moved by about the amplitude').to.be.within(14, 16);
-      // halfway up the weight is a quarter: a bend, where the quad would move it by half
-      expect(middle.from - foot.from, 'the middle moved by a quarter of the amplitude').to.be.within(3, 5);
-    });
-
-    it('shears the same sprite on the quad: the middle moves by half the amplitude', async function () {
-      const {pixels, topDown} = await renderWave(QuadBase);
-      const middle = litColumns(pixels, topDown, 32);
-      const foot = litColumns(pixels, topDown, 54);
-
-      expect(middle.from - foot.from).to.be.within(7, 9);
     });
   });
 

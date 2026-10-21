@@ -535,6 +535,7 @@
         "from": 10,
         "to": 14,
         "direction": "forward",
+        "repeat": "1",
         "color": "#ff7f3fff"
       },
       {
@@ -542,6 +543,7 @@
         "from": 15,
         "to": 20,
         "direction": "forward",
+        "repeat": "1",
         "color": "#ff3f6fff"
       },
       {
@@ -549,6 +551,7 @@
         "from": 21,
         "to": 23,
         "direction": "forward",
+        "repeat": "1",
         "color": "#bf3fffff"
       }
     ],

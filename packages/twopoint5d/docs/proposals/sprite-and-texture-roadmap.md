@@ -1,28 +1,35 @@
 # Proposal: what comes after the feature sprites — a review of the board lists "sprites" and "texture-mapping"
 
-Status: **phases A, B and C implemented** — phase A: `Fade`, `Flash`,
-`axisBillboardPlacement()`, the warning of a full pool, the free-tex-packer fixture and the glow
-recipe, see [`fade-flash-axis-billboards.md`](fade-flash-axis-billboards.md); phase B: playback
-modes, per-frame durations and `AsepriteJson`, see
-[`animation-playback-and-aseprite.md`](animation-playback-and-aseprite.md); phase C: frame stages,
-uv stages, `gridBase()` and shared uniforms, see
-[`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md). **Phase F, part 1
-implemented** — sorting a pool, `sortBy()` and `sortByViewDepth()` of the sprites (§4.15, and the
-answer to §7 question 5); see [`pool-sorting.md`](pool-sorting.md). **Phase F, part 2
-implemented** — growing capacity, `grow: true` of the sprites and `VertexObjectPool#adoptVOs()`
-(§4.16); see [`growing-capacity.md`](growing-capacity.md). **Phase F, part 3 implemented** —
-GPU picking, `SpritePicker` (§4.10); see [`gpu-picking.md`](gpu-picking.md). **Phase D, part 1
-implemented** — `Flip`, `Anchor` and `NineSlice` (§4.9, §4.7); see
-[`flip-anchor-nine-slice.md`](flip-anchor-nine-slice.md). The rest is an idea, nothing
+Status: **phases A–F implemented** — the rows A to F of §6 are built, each by a proposal of its
+own that is the binding spec and says where the build left this sketch:
+
+- A: `Fade`, `Flash`, `axisBillboardPlacement()`, the warning of a full pool, the free-tex-packer
+  fixture and the glow recipe — [`fade-flash-axis-billboards.md`](fade-flash-axis-billboards.md);
+- B: playback modes, per-frame durations, `AsepriteJson` and the atlas adapters —
+  [`animation-playback-and-aseprite.md`](animation-playback-and-aseprite.md);
+- C: frame stages, uv stages, `gridBase()` and shared uniforms —
+  [`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md);
+- D: `Flip`, `Anchor` and `NineSlice` — [`flip-anchor-nine-slice.md`](flip-anchor-nine-slice.md);
+  `wave()` and the segment sprites — [`wave-and-segment-sprites.md`](wave-and-segment-sprites.md);
+- E: `DynamicAtlas`, `BitmapFont` and `writeText()` in `text/` —
+  [`dynamic-atlas-and-bitmap-text.md`](dynamic-atlas-and-bitmap-text.md); `tableFrame()` with
+  directional frames and `PaletteSwap` —
+  [`table-frames-and-palette-swap.md`](table-frames-and-palette-swap.md);
+- F: sorting — [`pool-sorting.md`](pool-sorting.md); growing capacity —
+  [`growing-capacity.md`](growing-capacity.md); GPU picking — [`gpu-picking.md`](gpu-picking.md).
+
+The guides — [`docs/sprites.md`](../sprites.md) and [`docs/text.md`](../text.md) — carry the
+rules. What the build and its lookbook demos left open is in §8; the row "later" of §6 is not
 scheduled. A review, not a build plan: it checks the open cards of the
 lists `sprites` and `texture-mapping` (and, since the sprites stand on them, `vertex-objects`)
 of the Trello board `twopoint5d` against the library as of v0.23.0, and proposes what to build
-next, what to close and what to leave out. Every proposal in §4 is a sketch; the one that gets
-built first gets a proposal of its own, as [`sprite-features.md`](sprite-features.md) and its
-successors did.
+next, what to close and what to leave out. Every proposal in §4 is a sketch; each got built from a
+proposal of its own, as [`sprite-features.md`](sprite-features.md) and its successors did. §1 to
+§5 keep the sketch as it was written, corrected only where the build proved it wrong about the
+code; the names and the details that hold are those of the phase proposals and the guides.
 
-The board was read on 2026-10-20. The code blocks are excerpts of APIs that do not exist yet and
-are not checked.
+The board was read on 2026-10-20. The code blocks are excerpts of APIs that did not exist when
+this was written, and are not checked.
 
 ## 1. The yardstick
 
@@ -136,7 +143,7 @@ enemy.setFlash(1, 1, 1, 0.8);      // rgb mixed towards white by 0.8, alpha kept
 ```
 
 - `Fade`: `fade` (float, dynamic, start 1) multiplies the alpha. Exactly the guide's example,
-  which then imports it instead of defining it.
+  which as built became `Grayscale`, a feature the library does not ship.
 - `Flash`: `flash` (vec4, dynamic, start `[1, 1, 1, 0]`), `mix(color.rgb, flash.rgb, flash.a)`.
   A hit flash, a freeze tint, a damage blink — one feature, no `Tint` hack (a tint can only
   darken).
@@ -198,8 +205,8 @@ link.setSize(0, 0.2);                 // height = the thickness; width = extra l
 - `segmentPlacement({facing: 'camera' | 'plane'})`: the quad's x runs from start to end, its y
   across — turned about the segment towards the camera (`'camera'`, the 3D case) or lying in the
   plane of the mesh (`'plane'`, the 2D case, a factory option like `flatPlacement`'s `plane`).
-  The placement reads the unscaled base `position` for where along the segment a vertex lies,
-  and the scaled local y for the thickness, so `QuadSize` keeps its meaning.
+  The placement reads the base `uv.x` for where along the segment a vertex lies, and the scaled
+  local y for the thickness, so `QuadSize` keeps its meaning.
 - A kind of segments holds no `Rotation` or `Shear`; `defineSprite()` refuses them next to the
   placement with a message that says why.
 - **The texture along the segment.** A rope repeats its texture by length. `sampleAtlasFrame()`
@@ -247,9 +254,9 @@ sprite.animOffset = -now;   // starts now: (time + animOffset) runs from 0
   someone may read by hand; a second header texel is the non-breaking alternative (§7).
 - Per-frame durations: the second frame texel is `[width, height, flipDiagonal, 0]` — its fourth
   component is free. It takes the end time of the frame within the animation, and the shader
-  walks the frames of the animation until it passes `t`. The walk runs in the frame slot, per
-  vertex, over a dozen frames — cheap, and only animations with durations take it: the bake marks
-  them, and the uniform path stays as it is.
+  finds the frame that holds `t`. As built that is no walk but a search of 13 halving lookups, per
+  vertex in the frame slot, for up to 8191 frames — and only animations with durations take it:
+  the bake marks them, and the uniform path stays as it is.
 - `animOffset = -now` as "start now" works today and only needs a sentence in the guide; with
   `'once'` it becomes the whole one-shot API.
 
@@ -279,7 +286,7 @@ And in a `TextureStore` catalog: an item with an `atlasUrl` whose JSON names Ase
 of configuration.
 
 **The other packers.** Rather than one parser per tool, `TextureStore` takes an atlas adapter:
-`(json) => {atlas, meta, animations?}`, picked by `meta.app` or named in the item. TexturePacker,
+`(json, parentCoords) => {atlas, animations?}`, picked by `meta.app` or named in the item. TexturePacker,
 free-tex-packer (verify, §3.2) and Aseprite ship; rTexPacker and the rest are an adapter away,
 written by whoever needs them — a small, typed function an agent can write from the
 `TexturePackerJson` source.
@@ -307,16 +314,17 @@ const Monster = defineSprite({
   features: [InstancePosition, axisBillboardPlacement(), QuadSize, Yaw, tableFrame({views: 8}), TextureColor],
 });
 
-const sprites = new FeatureSprites(Monster, {frameTables: {frames: atlasFrameTable(atlas, /^imp_walk_/)}});
+const sprites = new FeatureSprites(Monster, {textures: {frameTable: frameTable(atlas, /^imp_walk_/).bakeDataTexture()}});
 monster.frameIndex = 0;          // the first frame of the 8 views
 monster.yaw = heading;           // where it faces; the camera picks the view
 ```
 
 - `tableFrame()`: a frame feature (the frame slot) with `frameIndex` (float, static) and a frame
-  table, a new kind of resource next to textures and uniforms (`frameTables`). 4 bytes per
-  sprite instead of 36.
+  table. As built the table is an ordinary texture, `frameTable`, a data texture that
+  `FrameTable#bakeDataTexture()` bakes — no new kind of resource, and no 341-frame limit. 4 bytes
+  per sprite instead of 36.
 - Directional frames are an option of the same feature, `tableFrame({views: n})`
-  (`requires: ['yaw']`): it adds `round((angleOf(toCamera) − yaw) / (2π / n)) mod n` to the index
+  (`requires: ['yaw']` — as built `['instancePosition', 'yaw']`): it adds `round((angleOf(toCamera) − yaw) / (2π / n)) mod n` to the index
   before the lookup. The index has to change before the table is read, and a frame stage (§4.7)
   runs after the frame slot has answered resolved tex coords — so the choice of the view belongs
   in the frame feature itself, as `flatPlacement()` folds its options into one placement. One
@@ -339,7 +347,7 @@ the pipeline has no stage between the frame slot and its readers.
 | `Flip` (§4.9) — mirror the image without turning the triangles over | a change of the frame: swap `s` and `s + u`, swap the trim margins left and right |
 | `NineSlice` | a uv per vertex that is not the base's `uv` |
 
-**Frame stages.** A slot `frameStages` — `{order, transform(frame, ctx): SpriteFrameNodes}` —
+**Frame stages.** A slot `frameStage` — `{order, transform(frame, ctx): SpriteFrameNodes}` —
 after the frame slot and before both pipelines read the frame. The trim shift reads the result,
 so a flipped trimmed frame stays where the untrimmed sprite has it.
 
@@ -352,9 +360,9 @@ build the same graph as before.
 stretched, and it cannot bend; a grid can:
 
 - `NineSlice` on `gridBase({columns: 3, rows: 3})`: `sliceInsets` (left, top, right, bottom, in
-  pixels of the frame, static) keep the border at its size and stretch the middle. It takes the
-  `Scale` band in place of `QuadSize`'s stage and moves the inner grid lines of both the position
-  and the uv. Insets out of Aseprite's `slices[].center` (§4.5). Trimmed frames are refused —
+  pixels of the frame, static) keep the border at its size and stretch the middle. As built it
+  has a band of its own, `LocalOrder.Slice` (175), before `QuadSize`'s `Scale`, requires
+  `QuadSize` and moves the inner grid lines of both the position and the uv. Insets out of Aseprite's `slices[].center` (§4.5). Trimmed frames are refused —
   a nine-slice frame is packed untrimmed — and the error says so.
 - `wave()` on a grid (§4.8) bends a flag, a banner, a water surface; on a quad it can only shear.
 
@@ -381,10 +389,10 @@ One stage, two looks:
   by the uv's y; the phase from the instance position, so a field does not sway in lockstep. On a
   quad it is a shear by time; on `gridBase()` a bend.
 - **The scroller**: a sine wave through a row of glyphs — the Amiga demo staple. The whole sprite
-  moves, the phase from the instance x.
+  moves, the phase from the instance x + z.
 
 ```ts
-wave({weight: 'top'});            // sway: amplitude × (1 − uv.y)
+wave({weight: 'top'});            // sway: amplitude × (1 − uv.y)², the square keeps a grid unsheared
 wave({weight: 'uniform'});        // scroller: the whole sprite
 // uniforms waveAmplitude, waveFrequency, waveSpeed; a mesh stage at MeshOrder.Offset
 ```
@@ -406,7 +414,7 @@ breaks trimmed frames and is impossible for `AnimatedFrames`. A frame stage (§4
 for every frame feature:
 
 ```ts
-hero.flipX = velocity.x < 0;     // 0 or 1, static; LocalOrder.Flip's band is finally used
+hero.flipX = velocity.x < 0 ? 1 : 0;  // a number, static; a frame stage at FrameOrder.Flip
 ```
 
 It reverses `s` and `u` in every case, a turned atlas frame included: the lookup works out
@@ -438,15 +446,16 @@ const hit = await picker.pick(camera, pointerNdc, [enemies, items]);
   stages of the kind run unchanged so that the alpha — and with it the alpha test — is the
   sprite's own, and a last step *after* the color stages replaces the result with the id:
   `instanceIndex + 1` and an id of the mesh. Written there, no `Tint` or `Flash` can change it.
-  Built like a pass, cached per kind.
-- The target holds the id exactly: an integer (or float) render target, no blending, no tone
+  Built like a pass, cached per mesh.
+- The target holds the id exactly: a float render target — WebGL 2 reads no integer target back
+  — no blending, no tone
   mapping, no output color space transform — any of them would turn an id into another id.
 - **Pixel-perfect for free**: the texels the alpha test drops are dropped here too, so a click
   into the transparent corner of a frame picks what lies behind it.
 - **Asynchronous**: `readRenderTargetPixelsAsync()`, one frame of latency. Fine for clicks;
   for hover every frame, too.
-- The handle is resolved through `spritePool.getVO(index)`; a sprite freed between the draw and
-  the read resolves to whatever moved into its slot — the result carries a frame number to check.
+- The handle is resolved as the slot stood at the draw: a sprite freed between the draw and the
+  read answers `undefined`, and no frame number is needed.
 
 Verdict: the only picking that is right for every kind, and a few lines to use. An agent without
 it writes a CPU hit test against positions and sizes that is wrong for rotated, sheared,
@@ -530,9 +539,10 @@ goblins.setUniform('paletteShift', t);    // cycling, if the palette asks for it
 ```
 
 - `palette`: a small texture, row 0 the source colors, every further row a replacement set.
-- The color stage compares the sampled color against the source row (up to 16 or 32 colors, one
-  loop) and replaces it with the color of the sprite's row; `paletteShift` rotates a range of
-  entries for cycling.
+- The color stage compares the sampled color against the source row (16 colors by default, 1 to
+  64 through `paletteSwap({colors})`, unrolled and free of branches) and replaces it with the
+  color of the sprite's row; `paletteShift` rotates a range of entries for cycling, the range
+  given by the uniform `paletteCycle`.
 - Works with ordinary RGBA images — no indexed-PNG pipeline, which browsers decode to RGB
   anyway. Needs exact colors: `nearest` filtering, no premultiplied edges. The feature's docs say
   so, and the material warns once for a linear-filtered `colorMap`.
@@ -556,11 +566,12 @@ sprites.sortBy('y');                    // by a property of the handle, ascendin
 sprites.sortByViewDepth(camera);        // back to front, for billboards
 ```
 
-- In the core: `VertexObjectPool#sortBy(key)` computes keys into a pool-owned `Float32Array`,
+- In the core: `VertexObjectPool#sortBy(key)` computes keys into a pool-owned `Float64Array`,
   sorts an index array, permutes every buffer through one scratch copy and rewrites the index of
   every handle (`VOUtils.setIndex`, which `freeVO()` already uses). Handles stay valid.
-- It marks the whole used range for upload; a sorted pool uploads everything every frame. That is
-  the price, and the docs say it.
+- It marks the slots it moved for upload — a sort that moves nothing marks nothing; a pool whose
+  order changes every frame uploads about everything every frame. That is the price, and the docs
+  say it.
 - Allocation-free after the first call, held by the allocation specs like every hot path.
 
 Verdict: a core change with a clear need in two genres and in the demo scene. Medium priority.
@@ -571,9 +582,11 @@ Verdict: a core change with a clear need in two genres and in the demo scene. Me
 capacity is wrong more often than not — the sprites that do not appear are the bug report.
 
 - `new FeatureSprites(kind, {capacity: 256, grow: true})`: a full pool builds a geometry of twice
-  the capacity, copies the buffers, points every handle at the new buffer (`VOUtils.setBuffer`)
-  and disposes the old geometry; passes follow, bindings are untouched.
-- A frame hitch and a rebuild of three's render objects per growth — logged once in development.
+  the capacity, copies the buffers, points every handle at the new buffer (as built,
+  `VertexObjectPool#adoptVOs()`) and disposes the old geometry; passes follow, bindings are
+  untouched.
+- A frame hitch and a rebuild of three's render objects per growth — noted on the console once
+  per mesh.
 - Refused next to a `geometry` handed in, which the mesh does not own.
 
 Verdict: a convenience with real risk in the ownership rules, but the failure it removes is
@@ -609,37 +622,74 @@ silent. Lower-medium priority; first make the full pool loud (a one-time warning
 
 ## 6. Order of the build
 
-| phase | what | why first |
-| --- | --- | --- |
-| **A** — small, no model change | `Fade`, `Flash` (§4.1); `axisBillboardPlacement()` (§4.2); a loud full pool (§4.16); free-tex-packer fixture; the glow recipe (§4.13) | each is a day or less, each removes a reason to hand-roll |
-| **B** — assets | playback modes and per-frame durations (§4.4); `AsepriteJson` and the atlas adapter (§4.5) | assets decide whether a project starts on the library |
-| **C** — the model | frame stages, uv stages, `gridBase()`, shared uniforms (§4.7, §4.8) | unblocks `Flip`, `NineSlice`, `wave()` |
-| **D** — features on C | `Flip`, `Anchor` (§4.9); `NineSlice` (§4.7); `wave()` (§4.8); segment sprites (§4.3) | segment sprites could go in A, but their texture along the length wants the uv stage |
-| **E** — beside the model | `DynamicAtlas` (§4.11), bitmap text (§4.12), `tableFrame()` with directional frames (§4.6), palette swap (§4.14) | helpers and features with a lookbook demo each |
-| **F** — core | sorting (§4.15), GPU picking (§4.10), growing capacity (§4.16) | touch the pool or the renderer; each its own proposal |
-| later | texture arrays, KTX2, `Ballistic`, `Emissive` (§4.17, §4.13) | wait for a scene |
+Every row from A to F is built; the proposals named in the status line say how.
+
+| phase | what | why first | state |
+| --- | --- | --- | --- |
+| **A** — small, no model change | `Fade`, `Flash` (§4.1); `axisBillboardPlacement()` (§4.2); a loud full pool (§4.16); free-tex-packer fixture; the glow recipe (§4.13) | each is a day or less, each removes a reason to hand-roll | built — [`fade-flash-axis-billboards.md`](fade-flash-axis-billboards.md) |
+| **B** — assets | playback modes and per-frame durations (§4.4); `AsepriteJson` and the atlas adapter (§4.5) | assets decide whether a project starts on the library | built — [`animation-playback-and-aseprite.md`](animation-playback-and-aseprite.md) |
+| **C** — the model | frame stages, uv stages, `gridBase()`, shared uniforms (§4.7, §4.8) | unblocks `Flip`, `NineSlice`, `wave()` | built — [`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md) |
+| **D** — features on C | `Flip`, `Anchor` (§4.9); `NineSlice` (§4.7); `wave()` (§4.8); segment sprites (§4.3) | segment sprites could go in A, but their texture along the length wants the uv stage | built — [`flip-anchor-nine-slice.md`](flip-anchor-nine-slice.md), [`wave-and-segment-sprites.md`](wave-and-segment-sprites.md) |
+| **E** — beside the model | `DynamicAtlas` (§4.11), bitmap text (§4.12), `tableFrame()` with directional frames (§4.6), palette swap (§4.14) | helpers and features with a lookbook demo each | built — [`dynamic-atlas-and-bitmap-text.md`](dynamic-atlas-and-bitmap-text.md), [`table-frames-and-palette-swap.md`](table-frames-and-palette-swap.md) |
+| **F** — core | sorting (§4.15), GPU picking (§4.10), growing capacity (§4.16) | touch the pool or the renderer; each its own proposal | built — [`pool-sorting.md`](pool-sorting.md), [`growing-capacity.md`](growing-capacity.md), [`gpu-picking.md`](gpu-picking.md) |
+| later | texture arrays, KTX2, `Ballistic`, `Emissive` (§4.17, §4.13) | wait for a scene | open, §8 |
 
 Lookbook demos that would carry the phases, one per phase: **"platformer"** (Aseprite import,
 `Flip`, `Fade`, `Flash`, one-shot animations), **"boomer shooter corridor"** (axis billboards,
 directional frames, `ShadowPass`), **"sine scroller"** (bitmap text, `wave()`, `Tint` above 1 and
 bloom, palette cycling), **"rope bridge"** (segment sprites, Verlet in the demo, not the library).
+All four were built, and three more: **"vector balls"** (`sortByViewDepth()`, `grow: true`),
+**"ui panels"** (`NineSlice`, `DynamicAtlas`, `writeText()`) and **"swaying grass"** (`wave()` on
+`gridBase()`, a free-tex-packer atlas).
 
 The board can lose the seven done cards of `sprites`, the four closed cards of `vertex-objects`
 and the free-tex-packer card once its fixture exists.
 
-## 7. Open questions
+## 7. Open questions — answered by the build
 
 1. **The playback in the animsMap** (§4.4): move `texelsPerFrame` into a uniform and use the free
    header component — a breaking change of a documented layout — or a second header texel?
+   *Decided:* a second header texel per animation, `[playback, hasDurations, cycleDuration, -2]`;
+   the documented first texel stays — [`animation-playback-and-aseprite.md`](animation-playback-and-aseprite.md).
 2. **Shared uniforms** (§4.8): `shared: true` on a declaration, or a `Time` feature that
    `AnimatedFrames` requires? The first keeps every kind of today valid; the second is the cleaner
    model.
+   *Decided:* `shared: true` on a declaration; no `Time` feature —
+   [`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md).
 3. **Frame tables as a resource** (§4.6): a third kind of resource next to textures and uniforms,
    or a texture after all — a data texture has no 341-frame limit, a uniform array needs no
    texture slot?
+   *Decided:* a data texture, an ordinary `textures` resource —
+   [`table-frames-and-palette-swap.md`](table-frames-and-palette-swap.md).
 4. **Segment facing** (§4.3): a factory option, or two placements (`segmentPlacement`,
    `flatSegmentPlacement`) that swap like `FlatPlacement` and `BillboardPlacement`?
+   *Decided:* a factory option, `segmentPlacement({facing})` —
+   [`wave-and-segment-sprites.md`](wave-and-segment-sprites.md).
 5. **Sorting and passes** (§4.15): the passes draw the same pool, so a sort reaches them — is a
    shadow drawn back to front ever wrong?
+   *Decided:* the passes draw the sorted order; a shadow of one colour looks the same in any order,
+   a mirror reverses it along its normal (`docs/sprites.md`, "Draw order: sorting the sprites") —
+   [`pool-sorting.md`](pool-sorting.md).
 6. **Where `writeText()` lives** (§4.12): `sprites/` beside the presets, or a module `text/` of its
    own that may grow a layout engine one day?
+   *Decided:* a module `text/` of its own, with `BitmapFont` and `layoutText()` —
+   [`dynamic-atlas-and-bitmap-text.md`](dynamic-atlas-and-bitmap-text.md).
+
+## 8. Open after the build
+
+What the build and its seven lookbook demos left open. None of it is scheduled; each item names
+the demo that ran into it, and each would get a proposal of its own before it is built.
+
+| what | why | surfaced by |
+| --- | --- | --- |
+| `drawText()` — a `BitmapFont` drawn into a canvas, next to `layoutText()` | a label in a `DynamicAtlas` is drawn by a callback into a 2D context, and the demo draws the glyphs of the font there by hand | `ui-panels` |
+| a per-segment offset of `RepeatingTextureColor` | the repeat starts anew at every joint, so a rope of many links cannot read as one continuous strip | `rope-bridge` |
+| a projection fit that snaps to a whole-number `pixelZoom` | pixel art wants the largest whole zoom that fits the container, and each of these demos computes it on every resize | `rope-bridge`, `platformer`, `sine-scroller`, `ui-panels` |
+| a texture class for repeat wrapping in `TextureFactory` | a tiling ground texture out of a `TextureStore` catalog needs `RepeatWrapping` set by hand after the load | `swaying-grass` |
+| the atlas frames of an animation in `FrameBasedAnimationInfo` | it answers count, durations and playback, not which atlas frames an animation shows — code that needs the frame on screen, a hit box, looks them up by name | `platformer` |
+| Aseprite frame data typed through `TextureStore` | the atlas out of the store is typed with TexturePacker data, so reading the `slices` of an Aseprite frame needs a cast to `AsepriteFrameData` | `platformer` |
+| per-sprite visibility | a sprite is hidden by a size or an alpha of 0, which costs its values and still runs its vertices | `ui-panels` |
+| one filter per `DynamicAtlas` | one atlas texture has one filter, so smooth portraits and pixel labels need two atlases | `ui-panels` |
+| a `playback` per tag in a catalog item | a sheet exported without Aseprite's "Repeat" still needs an atlas adapter of one's own to name its one-shots | `platformer` |
+| the `Emissive` feature and a selective bloom (§4.13) — still later | the bloom goes by luminance, so a saturated red or pink glow needs a large factor and a glow cannot come from an emission map | `swaying-grass`, `sine-scroller` |
+| texture arrays, KTX2, `Ballistic` (§4.17) — the row "later" of §6 | each waits for a scene that needs it: mipmapped tiles, large painted atlases, a thousand sparks | — |

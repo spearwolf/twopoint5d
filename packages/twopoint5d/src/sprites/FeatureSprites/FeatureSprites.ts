@@ -190,6 +190,12 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
 }
 
 /**
+ * The mesh of kind `K`, `FeatureSprites<SpriteKindApiOf<K>>`: the type of a field or a parameter
+ * that holds `new FeatureSprites(K, …)`, written as `FeatureSpritesOf<typeof K>`.
+ */
+export type FeatureSpritesOf<K> = K extends SpriteKind<infer Api> ? FeatureSprites<Api> : never;
+
+/**
  * The mesh that draws the sprites of a kind, one instance of its geometry per sprite. It builds
  * the geometry and the material it is not handed, and a child mesh with a material of its own for
  * every pass; what it builds belongs to it and goes with {@link dispose}, while a geometry, a

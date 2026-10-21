@@ -6,12 +6,12 @@ import {
   InstancePosition,
   QuadBase,
   QuadSize,
-  type SpriteKind,
   type SpriteOf,
   type TextureAtlas,
   TextureColor,
   Tint,
   Yaw,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Texture} from 'three/webgpu';
 import {CORRIDOR_HEIGHT, CORRIDOR_LENGTH, CORRIDOR_WIDTH, TILE} from './Corridor';
@@ -22,7 +22,6 @@ const SignKind = defineSprite({
   features: [InstancePosition, flatPlacement({orientation: 'yaw'}), Yaw, QuadSize, AtlasFrame, TextureColor, Tint],
 });
 
-type ApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
 type Sign = SpriteOf<typeof SignKind>;
 
 // the texel size of the corridor: 64 pixels a tile
@@ -73,7 +72,7 @@ interface SignState {
 
 /** The neon signs on the walls of the corridor; one of them flickers. */
 export class NeonSigns {
-  readonly sprites: FeatureSprites<ApiOf<typeof SignKind>>;
+  readonly sprites: FeatureSpritesOf<typeof SignKind>;
   readonly #signs: SignState[] = [];
   #flickerUntil = 0;
   #nextFlicker = 2;

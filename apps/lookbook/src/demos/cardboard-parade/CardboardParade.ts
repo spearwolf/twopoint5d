@@ -10,13 +10,13 @@ import {
   QuadBase,
   QuadSize,
   Rotation,
-  type SpriteKind,
   type SpriteOf,
   type TextureAtlas,
   type TextureAtlasFrame,
   TextureColor,
   Tint,
   Yaw,
+  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {
   CircleGeometry,
@@ -61,7 +61,6 @@ const GroundKind = defineSprite({
   features: [InstancePosition, GroundPlacement, QuadSize, Rotation, AtlasFrame, TextureColor, Tint],
 });
 
-type ApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
 type Walker = SpriteOf<typeof WalkerKind>;
 type GroundSprite = SpriteOf<typeof GroundKind>;
 
@@ -139,9 +138,9 @@ interface Print {
  * sprite meshes — props, walkers, ground — draw all of it, whatever way each cut-out faces.
  */
 export class CardboardParade extends Group {
-  readonly props: FeatureSprites<ApiOf<typeof PropKind>>;
-  readonly walkers: FeatureSprites<ApiOf<typeof WalkerKind>>;
-  readonly ground: FeatureSprites<ApiOf<typeof GroundKind>>;
+  readonly props: FeatureSpritesOf<typeof PropKind>;
+  readonly walkers: FeatureSpritesOf<typeof WalkerKind>;
+  readonly ground: FeatureSpritesOf<typeof GroundKind>;
 
   /** Whether the turntable turns. */
   spinning = true;

@@ -11,7 +11,7 @@ import * as goblin from './goblin.mjs';
 /**
  * @template P
  * @param {string} title
- * @param {{name: string, direction: 'forward' | 'pingpong', color: string, frames: [P, number][]}[]} animations
+ * @param {{name: string, direction: 'forward' | 'pingpong', repeat?: number, color: string, frames: [P, number][]}[]} animations
  * @param {(pose: P) => Img} draw
  * @param {{w: number, h: number}} canvas
  * @param {{x: number, y: number}} pivot
@@ -29,7 +29,7 @@ function asepriteSheet(title, animations, draw, canvas, pivot) {
       images.push(draw(pose));
       durations.push(ms);
     }
-    tags.push({name: anim.name, from, to: images.length - 1, direction: anim.direction, color: anim.color});
+    tags.push({name: anim.name, from, to: images.length - 1, direction: anim.direction, repeat: anim.repeat, color: anim.color});
   }
   images.forEach((img, i) => {
     check(img.width === canvas.w && img.height === canvas.h, `${title}: every frame is ${canvas.w} × ${canvas.h}`);
