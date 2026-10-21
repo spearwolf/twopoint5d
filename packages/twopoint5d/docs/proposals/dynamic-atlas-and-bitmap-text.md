@@ -200,8 +200,15 @@ frame is untrimmed (no `spriteSourceSize`), so `setFrame()` covers the whole qua
 - A `size` is rounded up to whole texels (`Math.ceil`): text measured by `measureText()` comes in
   fractions. A width or height that is no finite number above 0 is refused with a `RangeError`
   naming the frame and the value.
-- An image element that has not loaded (`naturalWidth` 0) is refused:
-  `DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before add()`.
+- An image element that is still loading (`complete` is `false`) is refused, with a `size` as well:
+  `DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before add()`. So is
+  an `ImageBitmap` that is closed and a canvas of no size:
+  `DynamicAtlas: the image of "avatar" is 0 × 0 — a closed ImageBitmap or a canvas of no size has nothing to draw`.
+  An image element that has loaded without a natural size, an SVG without `width` and `height`, is
+  drawn at the `size` given; without one `add()` refuses it:
+  `DynamicAtlas: the image of "avatar" has no natural size — an SVG without width and height needs the size: add(name, image, {width, height}); an image that failed to load cannot be drawn at all`.
+  An image that failed to load makes `drawImage()` throw an `InvalidStateError`: no frame is added
+  and no cell is taken.
 - A name that is taken is refused before anything is packed:
   `DynamicAtlas: the frame name "hp" is already taken — redraw() draws it anew, remove() lets go of it`.
 - A draw callback that throws leaves the atlas as it was: its cell is cleared again and given back,
@@ -214,15 +221,17 @@ a frame then reads its own edge, not the padding.
 
 ### 3.6 `redraw()`, `remove()`, `clear()`
 
-- `redraw(name, source)` clears the cell of the frame and draws `source` into it at the frame's
-  size — a callback with `(context, width, height)`, an image scaled to it — and extrudes again. The
+- `redraw(name, source)` clears the cell of the frame and draws `source` into it at the frame's size
+  — a callback with `(context, width, height)`, an image scaled to it — and extrudes again. The
   frame object, its id and its coords stay: every sprite showing it shows the new picture after the
   next upload, nothing is written to them. A score counter or a health label redraws; it does not
   add again. A name the atlas does not hold throws
   (`DynamicAtlas: there is no frame "hp" to redraw — add() it first`), and so does an image element
-  that has not loaded, before anything is cleared. A callback or an image that throws leaves the frame
-  as far as it got — its cell cleared, perhaps drawn in part — and marked for upload (in a `finally`);
-  the frame, its name and its cell stay.
+  that is still loading, a closed `ImageBitmap` or a canvas of no size, before anything is cleared.
+  An image element that has loaded without a natural size is drawn at the size of the frame. A
+  callback or an image that throws — one that failed to load among them — leaves the frame as far as
+  it got — its cell cleared, perhaps drawn in part — and marked for upload (in a `finally`); the
+  frame, its name and its cell stay.
 - The cell of every frame is kept in a private map, apart from `data`: a caller who changes
   `frame.data` moves nothing, and `redraw()` and `remove()` still work on the cell the frame was packed
   into.

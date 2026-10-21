@@ -204,7 +204,9 @@ export interface TextureStoreLoadOptions extends TextureStoreParseOptions {
   /**
    * Cuts the load short: the fetch is aborted, nothing is parsed, and the promise rejects
    * with an `AbortError`. A signal that aborts once the parse has begun — from a listener inside
-   * it among others — changes nothing: the promise resolves with the store.
+   * it among others — changes nothing: the promise resolves with the store. Nor does a signal
+   * that aborts after a step has failed, from a listener of the `error` event: the promise
+   * rejects with that error.
    */
   signal?: AbortSignal;
 }
@@ -552,15 +554,18 @@ export class TextureStore {
    * Fetch the catalog at `url`, hand it to {@link TextureStore.parse} and resolve with this
    * store once it has parsed.
    *
-   * The promise rejects when the catalog never gets as far as the parse: a `fetch` that
-   * fails, a response that answers with a status, a body that is no JSON, a `parse()` that
-   * throws. Each of these goes out as an `error` event as well, and the rejection names the
-   * step and the url and carries the reported error as its `cause`. An `error` listener that
-   * throws changes nothing of this: every listener hears the event, eventize reports the throw
-   * on the console, and the promise rejects as described. A catalog item that
-   * builds no resource and a texture class name no `TextureFactory` knows are `error` events
-   * only: the rest of the catalog is parsed, and the promise resolves. A listener of the store
-   * that throws inside the parse changes nothing either — the promise resolves with the store.
+   * The promise rejects when the catalog never gets as far as the parse: a `fetch` that fails,
+   * a response that answers with a status, a body that is no JSON, a `parse()` that throws.
+   * Each of these goes out as an `error` event as well, and the rejection names the step and
+   * the url and carries the reported error as its `cause`. An `error` listener that throws
+   * changes nothing of this: every listener hears the event, eventize reports the throw on the
+   * console, and the promise rejects as described. A listener that starts another
+   * `loadAsync()`, aborts the signal or disposes the store changes nothing of it either: a load
+   * whose step has failed is over when the event goes out, and its promise rejects with that
+   * error. A catalog item that builds no resource and a texture class name no `TextureFactory`
+   * knows are `error` events only: the rest of the catalog is parsed, and the promise resolves.
+   * A listener of the store that throws inside the parse changes nothing either — the promise
+   * resolves with the store.
    *
    * `options.signal` cuts the load short, and so does {@link TextureStore.dispose}: the fetch
    * is aborted, nothing is parsed, and no `error` event goes out. The promise rejects with an
@@ -614,8 +619,9 @@ export class TextureStore {
       const onAbort = () => cutShort(new DOMException(`${what} aborted`, 'AbortError'));
       const onDispose = () => cutShort(disposedError(what));
       // a load whose parse has begun is settled and cut short by nothing, a loadAsync() that a
-      // listener inside that parse starts included; one that is cut short reports nothing, as one
-      // whose signal aborts
+      // listener inside that parse starts included; so is a load whose step has failed, a loadAsync()
+      // that a listener of its `error` event starts included; one that is cut short reports nothing,
+      // as one whose signal aborts
       const onSuperseded = () =>
         cutShort(new DOMException(`${what} aborted: a later loadAsync() on this store took its place`, 'AbortError'));
 
@@ -633,6 +639,14 @@ export class TextureStore {
         return loadFailedError(source, url, error);
       };
 
+      // A step before the parse that fails ends the attempt before it is reported: a listener of the
+      // `error` event that starts another loadAsync(), aborts the signal or disposes the store finds
+      // this load over, and the promise rejects with the failure the event told of
+      const fail = (source: 'fetch' | 'parse', error: unknown, status?: number): void => {
+        settle();
+        reject(failed(source, error, status));
+      };
+
       // An attempt that was cut short ends at the next check: what arrives after it is dropped
       // and reports nothing. The check follows every await, because a body that is already
       // there — a mocked `Response#json()` among them — resolves without asking the signal.
@@ -641,25 +655,26 @@ export class TextureStore {
         try {
           response = await fetch(url, {signal: fetchAbort.signal});
         } catch (error) {
-          if (settled) return;
-          throw failed('fetch', error);
+          if (!settled) fail('fetch', error);
+          return;
         }
         if (settled) return;
         if (!response.ok) {
           // a status is a failure of the request, not of the parsing — an error response with
           // a JSON body would otherwise pass for a catalog
-          throw failed(
+          fail(
             'fetch',
             new Error(`[TextureStore] fetch("${String(url)}") answered ${response.status} ${response.statusText}`),
             response.status,
           );
+          return;
         }
         let data: TextureStoreData;
         try {
           data = await response.json();
         } catch (error) {
-          if (settled) return;
-          throw failed('parse', error);
+          if (!settled) fail('parse', error);
+          return;
         }
         if (settled) return;
         // Once the parse begins, the load is done: parse() runs through in one go, and a listener
@@ -676,8 +691,8 @@ export class TextureStore {
         resolve(this);
       };
 
-      // a step before the parse that fails throws out of attempt(); the parse settles the promise
-      // itself
+      // attempt() settles every failure it reports itself; a throw it does not foresee still rejects
+      // the promise instead of leaving it pending
       attempt().catch((error: unknown) => {
         if (settled) return;
         settle();

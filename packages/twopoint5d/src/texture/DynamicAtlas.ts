@@ -233,13 +233,17 @@ export class DynamicAtlas {
    *
    * A draw callback needs the `size`; it runs clipped to the frame and moved to its top left, the cell
    * cleared, and the context is restored afterwards. An image is drawn at its own size — the natural
-   * size of an image element — or scaled to `size`. A size is rounded up to whole texels.
+   * size of an image element — or scaled to `size`; an image element that has loaded without a natural
+   * size, an SVG without `width` and `height`, needs the `size`. A size is rounded up to whole texels.
    *
    * A frame that does not fit is refused, and a callback that throws leaves the atlas as it was: in
    * both cases no frame is added and no cell is taken.
    *
-   * @throws {Error} for a name that is taken, an image element that has not loaded — with or without a
-   *   size —, a frame that does not fit (a `RangeError`), and once the atlas is disposed.
+   * @throws {Error} for a name that is taken, an image element that is still loading — with or without a
+   *   size —, an image element without a natural size and without a `size`, a closed ImageBitmap or a
+   *   canvas of no size, a frame that does not fit (a `RangeError`), and once the atlas is disposed.
+   * @throws {DOMException} an `InvalidStateError` from `drawImage()` for an image element that failed to
+   *   load; no frame is added and no cell is taken.
    * @throws {RangeError} for a size that is no finite number above 0.
    * @throws {TypeError} for a draw callback without a size.
    */
@@ -282,10 +286,13 @@ export class DynamicAtlas {
    *
    * A draw callback or an image that throws leaves the frame as far as it got — its cell cleared, perhaps
    * drawn in part — and marked for upload; the frame, its name and its cell stay, and the error goes on to
-   * the caller. An image element that has not loaded is refused before anything is cleared.
+   * the caller. An image element that is still loading, a closed ImageBitmap and a canvas of no size are
+   * refused before anything is cleared. An image element that has loaded without a natural size is drawn
+   * at the size of the frame; one that failed to load makes `drawImage()` throw and leaves the frame
+   * cleared, like any image that throws.
    *
-   * @throws {Error} for a name the atlas does not hold, an image element that has not loaded, and once the
-   *   atlas is disposed.
+   * @throws {Error} for a name the atlas does not hold, an image element that is still loading, a closed
+   *   ImageBitmap or a canvas of no size, and once the atlas is disposed.
    */
   redraw(name: TextureAtlasFrameName, source: DynamicAtlasSource): TextureAtlasFrame {
     this.#assertAlive('redraw()');
@@ -294,7 +301,7 @@ export class DynamicAtlas {
     if (frame === undefined || rect === undefined) {
       throw new Error(`${WHERE}: there is no frame "${nameOf(name)}" to redraw — add() it first`);
     }
-    if (typeof source !== 'function') this.#assertLoaded(name, source, 'redraw()');
+    if (typeof source !== 'function') this.#assertDrawable(name, source, 'redraw()');
     try {
       this.#draw(rect, source);
     } finally {
@@ -369,10 +376,10 @@ export class DynamicAtlas {
       );
     }
     if (typeof source !== 'function') {
-      // with a size as well: drawImage() draws nothing of an image that has not loaded, and the frame
+      // with a size as well: drawImage() draws nothing of an image that is still loading, and the frame
       // would stay empty for good
-      const natural = this.#assertLoaded(name, source, 'add()');
-      if (size == null) return natural;
+      this.#assertDrawable(name, source, 'add()');
+      if (size == null) return this.#naturalSize(name, source);
     }
     const given = size as DynamicAtlasSize;
     const check = (value: unknown, what: string): number => {
@@ -437,14 +444,33 @@ export class DynamicAtlas {
     };
   }
 
-  // The natural size of an image, refused for an image element that has not loaded: one whose natural
-  // size is still 0, and one that is still loading — the browser knows the size of an image once it is
-  // "partially available", before the last of it has arrived. Only an image element carries `complete`;
-  // an ImageBitmap and a canvas have none and are there as soon as they exist
-  #assertLoaded(name: TextureAtlasFrameName, image: DynamicAtlasImage, call: string): {width: number; height: number} {
+  // Refuses an image that cannot be drawn now, before anything is packed or cleared: an image element
+  // that is still loading — the browser knows its size once it is "partially available", before the
+  // last of it has arrived, and drawImage() draws nothing of it — and an ImageBitmap or a canvas of no
+  // size, a closed ImageBitmap among them, which drawImage() refuses. An image element that has
+  // finished passes whatever its natural size: an SVG without width and height has none and is drawn
+  // at the size it is given, and one that failed to load makes drawImage() throw
+  #assertDrawable(name: TextureAtlasFrameName, image: DynamicAtlasImage, call: string): void {
+    if ('naturalWidth' in image) {
+      if ('complete' in image && image.complete === false) {
+        throw new Error(`${WHERE}: the image of "${nameOf(name)}" has not loaded yet — await image.decode() before ${call}`);
+      }
+      return;
+    }
+    if (!(image.width > 0) || !(image.height > 0)) {
+      throw new Error(
+        `${WHERE}: the image of "${nameOf(name)}" is ${image.width} × ${image.height} — a closed ImageBitmap or a canvas of no size has nothing to draw`,
+      );
+    }
+  }
+
+  // the size an image is drawn at by itself, refused for an image element without a natural size
+  #naturalSize(name: TextureAtlasFrameName, image: DynamicAtlasImage): {width: number; height: number} {
     const natural = sizeOfImage(image);
-    if (!(natural.width > 0) || !(natural.height > 0) || ('complete' in image && image.complete === false)) {
-      throw new Error(`${WHERE}: the image of "${nameOf(name)}" has not loaded yet — await image.decode() before ${call}`);
+    if (!(natural.width > 0) || !(natural.height > 0)) {
+      throw new Error(
+        `${WHERE}: the image of "${nameOf(name)}" has no natural size — an SVG without width and height needs the size: add(name, image, {width, height}); an image that failed to load cannot be drawn at all`,
+      );
     }
     return natural;
   }

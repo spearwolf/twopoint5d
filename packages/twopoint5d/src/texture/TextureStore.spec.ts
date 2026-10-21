@@ -622,6 +622,69 @@ describe('TextureStore', () => {
       ['a fetch that fails', 'fetch', () => Promise.reject(new Error('boom'))],
       ['a response with a status', 'fetch', () => Promise.resolve(new Response('{"items":{}}', {status: 404}))],
       ['a body that is no JSON', 'parse', () => Promise.resolve(new Response('not-json'))],
+    ] as const)(
+      'an error listener that starts another loadAsync() on %s leaves the failed load rejecting with its failure, naming the %s step, and the other load parses its catalog',
+      async (_what, step, answer) => {
+        const otherUrl = 'http://example.test/other.json';
+        vi.spyOn(globalThis, 'fetch').mockImplementation((input) =>
+          String(input) === catalogUrl ? answer() : Promise.resolve(new Response('{"items":{"b":{"imageUrl":"b.png"}}}')),
+        );
+        const store = new TextureStore();
+        let other: Promise<TextureStore> | undefined;
+        once(store, TextureStoreEvents.Error, () => {
+          other = store.loadAsync(otherUrl);
+        });
+        const errors: Array<{error: unknown}> = [];
+        on(store, TextureStoreEvents.Error, (payload: {error: unknown}) => errors.push(payload));
+
+        const settled = await settleWithin(store.loadAsync(catalogUrl));
+
+        expect(settled).toBeInstanceOf(Error);
+        expect((settled as Error).message).toBe(`[TextureStore] load failed at the ${step} step: "${catalogUrl}"`);
+        expect(errors).toHaveLength(1);
+        expect((settled as Error).cause).toBe(errors[0]!.error);
+        expect(await other).toBe(store);
+        expect(await store.whenResource('b')).toBeInstanceOf(TextureResource);
+
+        store.dispose();
+      },
+    );
+
+    test('an error listener that aborts the signal leaves the rejection to the failure it was told about', async () => {
+      const fetchError = new Error('boom');
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(fetchError);
+      const store = new TextureStore();
+      const ac = new AbortController();
+      on(store, TextureStoreEvents.Error, () => ac.abort());
+
+      const settled = await settleWithin(store.loadAsync(catalogUrl, {signal: ac.signal}));
+
+      expect(settled).toBeInstanceOf(Error);
+      expect((settled as Error).message).toBe(`[TextureStore] load failed at the fetch step: "${catalogUrl}"`);
+      expect((settled as Error).cause).toBe(fetchError);
+
+      store.dispose();
+    });
+
+    test('an error listener that disposes the store leaves the rejection to the failure it was told about', async () => {
+      const fetchError = new Error('boom');
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(fetchError);
+      const store = new TextureStore();
+      on(store, TextureStoreEvents.Error, () => store.dispose());
+
+      const settled = await settleWithin(store.loadAsync(catalogUrl));
+
+      expect(settled).toBeInstanceOf(Error);
+      expect((settled as Error).message).toBe(`[TextureStore] load failed at the fetch step: "${catalogUrl}"`);
+      expect((settled as Error).cause).toBe(fetchError);
+
+      store.dispose();
+    });
+
+    test.each([
+      ['a fetch that fails', 'fetch', () => Promise.reject(new Error('boom'))],
+      ['a response with a status', 'fetch', () => Promise.resolve(new Response('{"items":{}}', {status: 404}))],
+      ['a body that is no JSON', 'parse', () => Promise.resolve(new Response('not-json'))],
       ['a parse() that throws', 'parse', () => Promise.resolve(new Response('{"items":5}'))],
     ] as const)('rejects on %s, naming the %s step, and the error event goes out as well', async (_what, step, answer) => {
       vi.spyOn(globalThis, 'fetch').mockImplementation(answer);

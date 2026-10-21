@@ -233,4 +233,52 @@ describe('texture — DynamicAtlas', function () {
       expect(alphaAt(x, y), `(${x}, ${y})`).to.equal(0);
     }
   });
+
+  it('draws an SVG image without a width and a height at the size add() gives it, and redraws it at the size of the frame', async () => {
+    const svgImage = async (color) => {
+      const img = new Image();
+      img.src = `data:image/svg+xml,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><rect width="4" height="4" fill="${color}"/></svg>`,
+      )}`;
+      await img.decode();
+      return img;
+    };
+    const red = await svgImage('rgb(255,0,0)');
+    const blue = await svgImage('rgb(0,0,255)');
+
+    atlas = new DynamicAtlas({width: 16, height: 16});
+    const frame = atlas.add('icon', red, {width: 4, height: 4});
+    expect(frame.data.frame).to.deep.equal({x: 1, y: 1, w: 4, h: 4});
+
+    const pixelsOf = (color) => {
+      const {data} = atlas.context.getImageData(1, 1, 4, 4);
+      for (let i = 0; i < 16; i++) {
+        expect([data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]], `pixel ${i}`).to.deep.equal([...color, 255]);
+      }
+    };
+    pixelsOf(RED);
+
+    atlas.redraw('icon', blue);
+    pixelsOf(BLUE);
+  });
+
+  it('refuses an image element that failed to load, and takes no cell for it', async () => {
+    const broken = new Image();
+    broken.src = 'data:image/png;base64,AAAA';
+    await broken.decode().catch(() => {});
+
+    atlas = new DynamicAtlas({width: 16, height: 16});
+    let error;
+    try {
+      atlas.add('broken', broken, {width: 4, height: 4});
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error, 'add() of a broken image throws').to.be.an.instanceOf(Error);
+    expect(error.name).to.equal('InvalidStateError');
+    expect(atlas.atlas.size).to.equal(0);
+
+    const next = atlas.add('next', () => {}, {width: 4, height: 4});
+    expect(next.data.frame).to.deep.equal({x: 1, y: 1, w: 4, h: 4});
+  });
 });

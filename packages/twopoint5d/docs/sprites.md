@@ -460,16 +460,21 @@ fix — there is no silent growth, which would move every frame already written 
 
 **`add(name, source, size?)`** takes a draw callback `(context, width, height)` — run clipped to the
 frame and moved to its top left, its cell cleared — and then needs the `size`, or an `ImageBitmap`,
-an image element, a canvas or an `OffscreenCanvas`, drawn at its own size or scaled to `size`. A size
-is rounded up to whole texels, so a width from `measureText()` goes in as it comes. A callback that
-throws leaves the atlas as it was. The frame is untrimmed; its `data` is the rectangle in the canvas,
-`{frame: {x, y, w, h}}` — a copy: the atlas keeps the cell of every frame itself, and a change to
-`data` moves nothing. **`redraw(name, source)`** draws a frame anew at its size, in place: a score,
-a health label. A redraw that throws leaves the frame as far as it got — its cell cleared, perhaps
-drawn in part — and marked for upload; the frame and its name stay, so the next `redraw()` mends it.
-An image element that has not loaded — its natural size still 0, or `complete` still false — is
-refused by `add()`, with or without a size, and by `redraw()` alike, before anything is cleared. **`remove(name)`** clears the frame and lets go of the name, not of its space — a shelf
-packer fragments; **`clear()`** starts over with a new `atlas`, frame ids from 0.
+an image element, a canvas or an `OffscreenCanvas`, drawn at its own size or scaled to `size`. A
+size is rounded up to whole texels, so a width from `measureText()` goes in as it comes. A callback
+that throws leaves the atlas as it was. The frame is untrimmed; its `data` is the rectangle in the
+canvas, `{frame: {x, y, w, h}}` — a copy: the atlas keeps the cell of every frame itself, and a
+change to `data` moves nothing. **`redraw(name, source)`** draws a frame anew at its size, in place:
+a score, a health label. A redraw that throws leaves the frame as far as it got — its cell cleared,
+perhaps drawn in part — and marked for upload; the frame and its name stay, so the next `redraw()`
+mends it. An image element that is still loading (`complete` still `false`), a closed `ImageBitmap`
+and a canvas of no size are refused by `add()` — with or without a size — and by `redraw()`, before
+anything is cleared. An image element that has loaded without a natural size, an SVG without `width`
+and `height`, is drawn at the size `add()` is given and by `redraw()` at the size of the frame;
+`add()` without a size refuses it. One that failed to load makes `drawImage()` throw: `add()` takes
+no cell for it, and `redraw()` leaves the frame cleared. **`remove(name)`** clears the frame and
+lets go of the name, not of its space — a shelf packer fragments; **`clear()`** starts over with a
+new `atlas`, frame ids from 0.
 
 The atlas draws, clears and extrudes in canvas pixels whatever the caller left on `context` — a
 transform, a `globalAlpha`, a composite operation — and gives that state back afterwards, so the

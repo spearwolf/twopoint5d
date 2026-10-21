@@ -20,6 +20,14 @@ const image = (width: number, height: number) => ({width, height}) as unknown as
 
 const noop = () => {};
 
+// an image element that has loaded without a natural size: an SVG without width and height
+const svg = {width: 0, height: 0, naturalWidth: 0, naturalHeight: 0, complete: true} as unknown as DynamicAtlasImage;
+
+const NOT_LOADED = (call: string) =>
+  `DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before ${call}`;
+const ZERO_BY_ZERO =
+  'DynamicAtlas: the image of "avatar" is 0 × 0 — a closed ImageBitmap or a canvas of no size has nothing to draw';
+
 const rectOf = (atlas: DynamicAtlas, name: string) => atlas.atlas.frame(name)?.data?.frame;
 
 describe('DynamicAtlas', () => {
@@ -329,12 +337,28 @@ describe('DynamicAtlas', () => {
       expect(context.callsOf('drawImage').map(({args}) => args)).toEqual([[source, 0, 0, 24, 12]]);
     });
 
-    test('refuses an image element that has not loaded', () => {
+    test('refuses an image element that has loaded without a natural size when no size is given, asking for one', () => {
       const {atlas} = atlasOn(64, 32);
-      const unloaded = {width: 0, height: 0, naturalWidth: 0, naturalHeight: 0} as unknown as DynamicAtlasImage;
-      expect(() => atlas.add('avatar', unloaded)).toThrow(
-        'DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before add()',
+      expect(() => atlas.add('avatar', svg)).toThrow(
+        'DynamicAtlas: the image of "avatar" has no natural size — an SVG without width and height needs the size: add(name, image, {width, height}); an image that failed to load cannot be drawn at all',
       );
+    });
+
+    test('draws an image element that has loaded without a natural size at the size given', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      atlas.add('icon', svg, {width: 16, height: 8});
+      expect(rectOf(atlas, 'icon')).toEqual({x: 1, y: 1, w: 16, h: 8});
+      expect(context.callsOf('drawImage').map(({args}) => args)).toEqual([[svg, 0, 0, 16, 8]]);
+    });
+
+    test('refuses a closed ImageBitmap or a canvas of no size, with or without a size, and takes no cell', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      const source = image(0, 0);
+      expect(() => atlas.add('avatar', source)).toThrow(ZERO_BY_ZERO);
+      expect(() => atlas.add('avatar', source, {width: 8, height: 8})).toThrow(ZERO_BY_ZERO);
+      expect(atlas.atlas.size).toBe(0);
+      expect(context.callsOf('drawImage')).toHaveLength(0);
+      expect(atlas.add('next', noop, {width: 8, height: 8}).data?.frame).toMatchObject({x: 1, y: 1});
     });
 
     test('refuses an image element that has not loaded when a size is given', () => {
@@ -517,10 +541,23 @@ describe('DynamicAtlas', () => {
       const {atlas, context} = atlasOn(64, 32);
       atlas.add('avatar', noop, {width: 10, height: 8});
       const calls = context.calls.length;
-      const unloaded = {width: 0, height: 0, naturalWidth: 0, naturalHeight: 0} as unknown as DynamicAtlasImage;
-      expect(() => atlas.redraw('avatar', unloaded)).toThrow(
-        'DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before redraw()',
-      );
+      const unloaded = {width: 0, height: 0, naturalWidth: 0, naturalHeight: 0, complete: false} as unknown as DynamicAtlasImage;
+      expect(() => atlas.redraw('avatar', unloaded)).toThrow(NOT_LOADED('redraw()'));
+      expect(context.calls.length).toBe(calls);
+    });
+
+    test('draws an image element that has loaded without a natural size at the size of the frame', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      atlas.add('portrait', noop, {width: 10, height: 8});
+      atlas.redraw('portrait', svg);
+      expect(context.callsOf('drawImage').map(({args}) => args)).toEqual([[svg, 0, 0, 10, 8]]);
+    });
+
+    test('refuses a closed ImageBitmap or a canvas of no size, before it clears the frame', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      atlas.add('avatar', noop, {width: 10, height: 8});
+      const calls = context.calls.length;
+      expect(() => atlas.redraw('avatar', image(0, 0))).toThrow(ZERO_BY_ZERO);
       expect(context.calls.length).toBe(calls);
     });
 
