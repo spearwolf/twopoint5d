@@ -1,0 +1,22 @@
+{
+  "title": "vector balls",
+  "shortDescription": "Amiga vector balls: a cube, a torus, a sphere, a logo and a spiral of shaded balls morph into each other above a mirror, sorted back to front every frame",
+  "description": "The classic vector balls of the Amiga demo scene, from 64 up to 4096 of them, in one `FeatureSprites` mesh drawn at the low resolution of the time (`Display#pixelZoom`). Every ball is a spherical billboard (`BillboardPlacement`) showing one of eight shaded frames out of an atlas (`AtlasFrame`, switched with `prepareSpriteFrame()` and `setPreparedFrame()`), darkened towards the back by `Tint`. The balls blend with soft edges, no alpha test, and write no depth, so the order of their slots alone decides which ball covers which: **`sortByViewDepth(camera)`** puts them back to front every frame, before `update()` — see [Draw order: sorting the sprites](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#draw-order-sorting-the-sprites). *sort: off* leaves the slots as they are, and within a turn of the object balls from the back pop in front of the ones before them. The readout shows what the sort costs; the guide measures 1.1 ms for 10 000 sprites under a circling camera, and the upload of the attributes the sort moved as the larger price ([Performance](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#performance)). The mesh starts with room for 64 balls and **`grow: true`**: *more* doubles the count, and the `createSprite()` that finds the pool full doubles the capacity — a frame hitch, said once on the console, while the scene runs on and every handle keeps its slot and its values ([FeatureSprites](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#featuresprites)). The mirror is a `BillboardReflectionPass` of the same mesh, which draws the same sorted slots back to front as well ([Passes](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#passes-shadows-and-reflections)); *mirror* switches it off. A click on a ball asks a `SpritePicker` which ball lies under the pointer — sorted and grown as the mesh is — and lights it up with `Flash` ([Picking](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#picking-which-sprite-is-under-the-pointer)). Drag to orbit the camera.",
+  "url": "/demos/vector-balls",
+  "tags": [
+    "FeatureSprites",
+    "BillboardPlacement",
+    "BillboardReflectionPass",
+    "AtlasFrame",
+    "prepareSpriteFrame",
+    "Tint",
+    "Flash",
+    "SpritePicker",
+    "TextureStore",
+    "sorting",
+    "billboards",
+    "texture-atlas",
+    "vanilla",
+    "demo"
+  ]
+}

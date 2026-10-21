@@ -60,6 +60,10 @@
     "splotchs": {
       "atlasUrl": "splotchs-256x.json",
       "texture": ["srgb"]
+    },
+    "vectorBalls": {
+      "atlasUrl": "vector-balls/balls.json",
+      "texture": ["mag-nearest", "srgb"]
     }
   }
 }

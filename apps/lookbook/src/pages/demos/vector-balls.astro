@@ -1,0 +1,122 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_vector-balls.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-2 items-center justify-end">
+      <div class="actionBtn toggleSort">sort: on</div>
+      <div class="actionBtn toggleMirror">mirror: on</div>
+      <div class="actionBtn fewerBalls">fewer</div>
+      <div class="actionBtn moreBalls">more</div>
+    </section>
+    <div class="readout fixed bottom-4 right-4">balls: …</div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    /* a night sky over a violet horizon: the canvas is cleared transparent */
+    background: linear-gradient(to bottom, #000000 0%, #06021a 40%, #1f0838 58%, #05020f 60%, #000000 100%);
+    color: #e8dcff;
+  }
+  .readout {
+    font-family: monospace;
+    font-size: 110%;
+    padding: 0.3em 0.6em;
+    background: rgba(12 4 30 / 75%);
+    border: 1px solid #3a1f6e;
+    border-radius: 4px;
+    white-space: pre;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {OnDisplayRenderFrame, SpritePicker} from '@spearwolf/twopoint5d';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {MAX_BALLS, MIN_BALLS, VectorBalls} from '~demos/vector-balls/VectorBalls';
+
+  // the preview screenshot waits for the balls, not for the default delay
+  const preview = deferPreview();
+
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
+
+  // the low resolution of an Amiga: about 240 lines, each pixel drawn as a square of whole CSS pixels
+  const fitPixelZoom = () => {
+    demo.pixelZoom = Math.max(2, Math.round(window.innerHeight / 240));
+  };
+  fitPixelZoom();
+  window.addEventListener('resize', fitPixelZoom);
+
+  await demo.start(async ({renderer}) => {
+    demo.camera.fov = 40;
+    demo.camera.updateProjectionMatrix();
+    demo.camera.position.set(0, 2.5, 9.2);
+    demo.controls.target.set(0, 1.1, 0);
+    demo.controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    demo.controls.minDistance = 4;
+    demo.controls.maxDistance = 20;
+
+    const store = await loadTextureCatalog(renderer);
+    const [atlas, texture] = await store.getAsync('vectorBalls', ['atlas', 'texture']);
+
+    const vectorBalls = new VectorBalls({atlas, texture}, MIN_BALLS);
+    demo.scene.add(vectorBalls);
+
+    on(demo, OnDisplayRenderFrame, ({deltaTime}) => vectorBalls.update(deltaTime, demo.camera));
+
+    // the buttons and the readout are written by the markup of this very page
+    const sortButton = document.querySelector('.toggleSort')!;
+    const mirrorButton = document.querySelector('.toggleMirror')!;
+    const readout = document.querySelector('.readout')!;
+    sortButton.addEventListener('click', () => {
+      vectorBalls.sorting = !vectorBalls.sorting;
+      sortButton.textContent = `sort: ${vectorBalls.sorting ? 'on' : 'off'}`;
+    });
+    mirrorButton.addEventListener('click', () => {
+      vectorBalls.mirror = !vectorBalls.mirror;
+      mirrorButton.textContent = `mirror: ${vectorBalls.mirror ? 'on' : 'off'}`;
+    });
+    // twice the balls: past the capacity the next createSprite() grows the pool
+    document.querySelector('.moreBalls')!.addEventListener('click', () => {
+      vectorBalls.setCount(Math.min(MAX_BALLS, vectorBalls.ballCount * 2));
+    });
+    document.querySelector('.fewerBalls')!.addEventListener('click', () => {
+      vectorBalls.setCount(Math.max(MIN_BALLS, vectorBalls.ballCount / 2));
+    });
+
+    setInterval(() => {
+      const sort = vectorBalls.sorting ? `${vectorBalls.sortMillis.toFixed(2)} ms` : 'off';
+      readout.textContent = `balls ${vectorBalls.ballCount}  capacity ${vectorBalls.capacity}\nsortByViewDepth() ${sort}`;
+    }, 250);
+
+    // a click on a ball lights it up: the picker asks the gpu which ball lies under the pointer —
+    // sorted and grown as the mesh is. A drag of the orbit controls is no click
+    const picker = new SpritePicker(renderer);
+    const canvas = renderer.domElement;
+    let down: {x: number; y: number} | undefined;
+    canvas.addEventListener('pointerdown', (event) => {
+      down = {x: event.clientX, y: event.clientY};
+    });
+    canvas.addEventListener('pointerup', async (event) => {
+      if (down == null || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return;
+      const rect = canvas.getBoundingClientRect();
+      const pointer = {
+        x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      };
+      const hit = await picker.pick(demo.camera, pointer, [vectorBalls.balls]);
+      if (hit != null) vectorBalls.flash(hit.sprite);
+    });
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('vector balls', vectorBalls);
+
+    preview.ready(demo);
+  });
+</script>
