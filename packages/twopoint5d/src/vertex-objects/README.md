@@ -264,6 +264,54 @@ pool.sortByKeys(keys); // keys[i] is the key of slot i
 - The first sort allocates the scratch of the pool (keys, order, one copy of the largest buffer);
   every later one allocates nothing, and the scratch grows only with the capacity.
 
+## Growing a pool
+
+`resize()` refuses a pool behind a geometry: three sizes the gpu buffers of an attribute once. A
+pool that has to grow there goes into a new geometry instead — a pool of the larger capacity on
+**the same descriptor**, which adopts the vertex objects of the old one:
+
+```ts check
+import {VertexObjectGeometry, VertexObjectPool, VertexObjects} from '@spearwolf/twopoint5d';
+import type {VertexObjectDescription, VO} from '@spearwolf/twopoint5d';
+import {PointsNodeMaterial} from 'three/webgpu';
+
+interface Dot extends VO {
+  x: number;
+  y: number;
+  z: number;
+}
+
+const DotDescription: VertexObjectDescription = {vertexCount: 1, attributes: {position: {components: ['x', 'y', 'z']}}};
+
+let pool = new VertexObjectPool<Dot>(DotDescription, 16);
+const dots = new VertexObjects(new VertexObjectGeometry(pool, 16), new PointsNodeMaterial());
+
+function createDot(): Dot | undefined {
+  const dot = pool.createVO();
+  if (dot !== undefined) return dot;
+  const old = {pool, geometry: dots.geometry};
+  pool = new VertexObjectPool<Dot>(old.pool.descriptor, 2 * old.pool.capacity);
+  pool.adoptVOs(old.pool); // every slot, every value, every handle
+  dots.geometry = new VertexObjectGeometry(pool, pool.capacity);
+  old.geometry?.dispose();
+  old.pool.dispose(); // handed to the geometry, so it is ours to release; it holds no handle any more
+  return pool.createVO();
+}
+
+createDot();
+```
+
+- **What moves.** Every buffer, copied whole and marked for upload; `usedCount`; every vertex
+  object, which keeps its identity, its values and its slot and reads and writes the new buffer.
+  A slot without a vertex object yet stays without one, and `getVO()` materializes it in the new
+  pool.
+- **The old pool** is left empty, its data where it was: no vertex object is linked to it, so its
+  `dispose()` unlinks none.
+- **Refused**, before anything moves: a disposed pool on either side, the pool itself, a source on
+  another descriptor (`new VertexObjectPool(source.descriptor, …)` is the fix), a pool with
+  objects in use and one of a smaller capacity than the source.
+- `FeatureSprites` does all of it for `grow: true`, see `docs/sprites.md`, "FeatureSprites".
+
 ## Further
 
 - The lookbook demos, from the smallest up:

@@ -1,0 +1,126 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_platformer.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-2 items-center justify-end">
+      <div class="actionBtn togglePalette">palette swap: on</div>
+      <div class="actionBtn toggleFlip">flip: on</div>
+      <div class="actionBtn toggleAnchor">anchor: pivot</div>
+    </section>
+    <div class="keys fixed bottom-4 left-4">
+      <div><kbd>←</kbd> <kbd>→</kbd> walk · <kbd>↑</kbd> / <kbd>space</kbd> flying kick · <kbd>K</kbd> kick</div>
+      <div class="mode">autoplay — press a key to take over</div>
+    </div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    /* the dusk at the top of the sky layer, for a window taller than the backdrop */
+    background: #0a0628;
+    color: #ffe8b8;
+  }
+  .keys {
+    font-family: monospace;
+    font-size: 100%;
+    line-height: 1.6;
+    padding: 0.4em 0.7em;
+    background: rgba(10 6 40 / 72%);
+    border: 1px solid rgba(255 216 144 / 35%);
+    border-radius: 4px;
+  }
+  .keys kbd {
+    padding: 0 0.35em;
+    border: 1px solid rgba(255 216 144 / 60%);
+    border-radius: 3px;
+  }
+  .keys .mode {
+    color: #7fd8ff;
+  }
+</style>
+
+<script>
+  import {Display} from '@spearwolf/twopoint5d';
+  import {loadPlatformerAssets} from '~demos/platformer/assets';
+  import {Platformer} from '~demos/platformer/Platformer';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the preview image waits for the first kick that lands, the goblin flashing white
+  const preview = deferPreview();
+
+  const display = new Display(getFullscreenCanvas());
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadPlatformerAssets(renderer);
+    // a dispose() while the sheets loaded has gone out already: nothing is built
+    if (display.isDisposed) {
+      assets.dispose();
+      return;
+    }
+
+    const game = new Platformer(assets);
+
+    display.onResize(({width, height, pixelRatio}) => game.resize(width, height, pixelRatio));
+
+    // the keys of the page; the autoplay takes over again after a few seconds without one
+    window.addEventListener('keydown', game.onKeyDown);
+    window.addEventListener('keyup', game.onKeyUp);
+
+    const mode = document.querySelector('.keys .mode')!;
+    let autoplay = game.autoplay;
+
+    display.onRenderFrame(({renderer, now, deltaTime}) => {
+      game.update(now, deltaTime);
+      renderer.render(game.scene, game.camera);
+      if (autoplay !== game.autoplay) {
+        autoplay = game.autoplay;
+        mode.textContent = autoplay
+          ? 'autoplay — press a key to take over'
+          : 'you play — the autoplay returns when the keys rest';
+      }
+    });
+
+    // the buttons are written by the markup of this page
+    const toggle = (selector: string, label: string, values: [string, string], apply: (on: boolean) => void) => {
+      const button = document.querySelector(selector)!;
+      let on = true;
+      button.addEventListener('click', () => {
+        on = !on;
+        apply(on);
+        button.textContent = `${label}: ${values[on ? 0 : 1]}`;
+      });
+    };
+    toggle('.togglePalette', 'palette swap', ['on', 'off'], (on) => {
+      game.goblins.paletteSwap = on;
+    });
+    toggle('.toggleFlip', 'flip', ['on', 'off'], (on) => {
+      game.goblins.flip = on;
+      game.fighter.flip = on;
+    });
+    toggle('.toggleAnchor', 'anchor', ['pivot', 'middle'], (on) => {
+      game.anchorAtPivot = on;
+    });
+
+    // the frame after the hit shows the flash at its brightest; a scene without a hit for
+    // eight seconds is taken as it is
+    const timeout = setTimeout(() => preview.ready(display), 8000);
+    game.onFirstHit = () => {
+      clearTimeout(timeout);
+      preview.ready(display);
+    };
+
+    display.onDispose(() => {
+      clearTimeout(timeout);
+      window.removeEventListener('keydown', game.onKeyDown);
+      window.removeEventListener('keyup', game.onKeyUp);
+      game.dispose();
+      assets.dispose();
+    });
+  });
+
+  await display.start();
+</script>

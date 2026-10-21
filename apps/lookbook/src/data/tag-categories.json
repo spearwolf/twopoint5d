@@ -25,10 +25,14 @@
         "Orientation",
         "Rotation",
         "Tint",
-        "Flash",
-        "PaletteSwap",
+        "billboards",
         "wave",
-        "billboards"
+        "gridBase",
+        "QuadBase",
+        "axisBillboardPlacement",
+        "BillboardPlacement",
+        "Flash",
+        "PaletteSwap"
       ]
     },
     {
@@ -43,6 +47,7 @@
         "TextureCoords",
         "TextureFactory",
         "TextureStore",
+        "TexturePackerJson",
         "TileSet",
         "colorFromTextureByTexCoords",
         "AtlasFrameTable",

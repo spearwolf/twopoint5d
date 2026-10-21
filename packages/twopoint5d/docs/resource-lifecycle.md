@@ -84,6 +84,24 @@ An instance that passes what it took straight out to its caller has nothing to g
 back: `FeatureSprites#createSprite()` hands the sprite over, and whoever asked for it
 calls `freeSprite()`.
 
+**A resource replaced while the instance lives is released by whoever built it.**
+[`FeatureSprites`](../src/sprites/FeatureSprites/FeatureSprites.ts) built with
+`grow: true` replaces its own geometry when the pool is full: the new geometry adopts
+every sprite (`VertexObjectPool#adoptVOs()`), and the mesh disposes the old one with its
+pool right away — it built it. `geometry` and `spritePool` are new objects after a
+growth; a reference kept from before points at a disposed geometry and a disposed pool,
+so read them from the mesh afresh. A `geometry` handed in is never replaced: `grow` next
+to one is refused.
+
+**What an instance builds on a borrowed resource goes when that resource goes.**
+[`SpritePicker`](../src/sprites/SpritePicker.ts) owns its render target and, per mesh it
+has drawn, a pick mesh and a pick material built on the uniforms and textures of that
+mesh; the renderer, the camera and the meshes stay the caller's. It listens to three's
+`dispose` event of each mesh and releases that pick material then — the event comes
+before the mesh releases the resources the pick material reads. Its `dispose()` releases
+the target and every pick material, stops listening, and rejects every pick still in
+flight (section 3).
+
 ## 2. Idempotence
 
 **`dispose()` may be called any number of times** — the second call releases nothing
