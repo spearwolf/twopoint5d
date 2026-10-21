@@ -35,6 +35,18 @@
       "tileSet": {"tileWidth": 256, "tileHeight": 256},
       "texture": ["nearest", "srgb"]
     },
+    "meadowAtlas": {
+      "atlasUrl": "swaying-grass/meadow.json",
+      "texture": ["nearest", "srgb"]
+    },
+    "meadowBack": {
+      "imageUrl": "swaying-grass/meadow-back.png",
+      "texture": ["nearest", "flipy", "srgb"]
+    },
+    "meadowGround": {
+      "imageUrl": "swaying-grass/meadow-ground.png",
+      "texture": ["nearest", "flipy", "srgb"]
+    },
     "nightCityFacades": {
       "atlasUrl": "night-city/facades.json",
       "texture": ["mag-nearest", "srgb"]
@@ -51,6 +63,22 @@
       "imageUrl": "nobinger-anim-sheet.png",
       "tileSet": {"tileWidth": 64, "tileHeight": 64, "margin": 1},
       "texture": ["nearest", "srgb"]
+    },
+    "ropeBridgeAtlas": {
+      "atlasUrl": "rope-bridge/bridge.json",
+      "texture": ["nearest", "srgb"]
+    },
+    "ropeBridgeCaveBack": {
+      "imageUrl": "rope-bridge/cave-back.png",
+      "texture": ["linear", "srgb"]
+    },
+    "ropeBridgeCaveFront": {
+      "imageUrl": "rope-bridge/cave-front.png",
+      "texture": ["linear", "srgb"]
+    },
+    "ropeBridgeCaveMid": {
+      "imageUrl": "rope-bridge/cave-mid.png",
+      "texture": ["linear", "srgb"]
     },
     "skinballTiles": {
       "imageUrl": "skinball-256.png",

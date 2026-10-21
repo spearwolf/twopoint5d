@@ -1,0 +1,191 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_sine-scroller.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-2 items-center justify-end">
+      <div class="actionBtn toggleBloom">bloom: on</div>
+      <div class="actionBtn toggleFlash">beat flash: on</div>
+      <div class="actionBtn nextFontPalette">font: chrome</div>
+      <div class="actionBtn nextTunnelPalette">tunnel: fire</div>
+    </section>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    BitmapFont,
+    createBloomOutputNodeBuilder,
+    Display,
+    OnStageResize,
+    OnStageUpdateFrame,
+    OrthographicProjection,
+    type OrthographicProjectionSpecs,
+    Stage2D,
+    StageRenderer,
+    TextureStore,
+    type TextureStoreData,
+  } from '@spearwolf/twopoint5d';
+  import {Color, RenderPipeline} from 'three/webgpu';
+  import {FONT_PALETTES, SineScroller, TUNNEL_PALETTES} from '~demos/sine-scroller/SineScroller';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the art is drawn at a whole-number scale: as large as fits at least 240 × 400 pixels of it
+  const MIN_VIEW_HEIGHT = 240;
+  const MIN_VIEW_WIDTH = 400;
+
+  // the preview screenshot waits for the scroller, not for the default delay
+  const preview = deferPreview();
+
+  const display = new Display(getFullscreenCanvas());
+
+  // one unit of the view is one pixel of the art; the specs stay ours, so a new pixelZoom reaches
+  // the next view the projection computes
+  const viewSpecs: Partial<OrthographicProjectionSpecs> = {pixelZoom: 2};
+  const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', viewSpecs));
+
+  display.onResize(({width, height}) => {
+    viewSpecs.pixelZoom = Math.max(1, Math.min(Math.floor(height / MIN_VIEW_HEIGHT), Math.floor(width / MIN_VIEW_WIDTH)));
+    stage.needsUpdate = true;
+  });
+
+  // the glow recipe of the sprite guide: the stage renders into half floats, so a colour above
+  // white survives, and the bloom lets in only what is brighter than white — a luminance above 1
+  const stageRenderer = new StageRenderer(display).setClearColor(new Color('#000000'), 1).add(stage);
+  const pipeline = new RenderPipeline(display.renderer!);
+  const withGlow = createBloomOutputNodeBuilder({strength: 0.65, radius: 0.2, threshold: 1});
+  stageRenderer.pipeline = pipeline;
+  stageRenderer.buildOutputNode = withGlow;
+
+  display.onDispose(() => {
+    // the renderer lets go of the builder first, then the builder and the pipeline go
+    stageRenderer.dispose();
+    withGlow.dispose();
+    pipeline.dispose();
+  });
+
+  // the catalog of this demo, written here instead of in a json of its own: every image of the
+  // pixel art and its palettes read with nearest — a palette swap needs the exact colours, and
+  // says so on the console when its colour map is filtered otherwise
+  const catalog: TextureStoreData = {
+    defaultTextureClasses: ['nearest', 'srgb'],
+    items: {
+      chromePage: {imageUrl: 'chrome-32.png'},
+      chromePalette: {imageUrl: 'chrome-32-palette.png'},
+      pixelPage: {imageUrl: 'pixel-8.png'},
+      copperBars: {imageUrl: 'copper-bars.png', tileSet: {tileWidth: 4, tileHeight: 16}},
+      sabers: {atlasUrl: 'saber-glow.json'},
+      tunnel: {imageUrl: 'cycle-tunnel.png'},
+      tunnelPalette: {imageUrl: 'cycle-tunnel-palette.png'},
+    },
+  };
+
+  async function loadFont(name: string): Promise<BitmapFont> {
+    const response = await fetch(assetsUrl(`sine-scroller/${name}.fnt`));
+    // the font and an atlas of its glyphs; writeText() reads the frames through the font
+    const [font] = BitmapFont.parse(await response.text());
+    return font;
+  }
+
+  display.onInit(async ({renderer}) => {
+    const store = new TextureStore(renderer);
+    store.parse(catalog, {baseUrl: assetsUrl('sine-scroller/')});
+
+    const [
+      chromeFont,
+      pixelFont,
+      [chromePage],
+      [chromePalette],
+      [pixelPage],
+      [copperBars, copperTexture],
+      [sabers, saberTexture],
+      [tunnel],
+      [tunnelPalette],
+    ] = await Promise.all([
+      loadFont('chrome-32'),
+      loadFont('pixel-8'),
+      store.getAsync('chromePage', ['texture']),
+      store.getAsync('chromePalette', ['texture']),
+      store.getAsync('pixelPage', ['texture']),
+      store.getAsync('copperBars', ['tileSet', 'texture']),
+      store.getAsync('sabers', ['atlas', 'texture']),
+      store.getAsync('tunnel', ['texture']),
+      store.getAsync('tunnelPalette', ['texture']),
+    ]);
+
+    // a dispose() while the assets loaded has gone out already: the store goes, nothing is built
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
+
+    const scroller = new SineScroller({
+      chromeFont,
+      chromePage,
+      chromePalette,
+      pixelFont,
+      pixelPage,
+      copperBars,
+      copperTexture,
+      sabers,
+      saberTexture,
+      tunnel,
+      tunnelPalette,
+    });
+    stage.scene.add(scroller);
+
+    // the stage measures its view in pixels of the art; the scroller lays itself out in it
+    if (stage.width > 0) scroller.layout(stage.width, stage.height);
+    on(stage, OnStageResize, ({width, height}) => scroller.layout(width, height));
+    on(stage, OnStageUpdateFrame, ({now}) => scroller.update(now));
+
+    // the buttons are written by the markup of this very page
+    const bloomButton = document.querySelector('.toggleBloom')!;
+    const flashButton = document.querySelector('.toggleFlash')!;
+    const fontButton = document.querySelector('.nextFontPalette')!;
+    const tunnelButton = document.querySelector('.nextTunnelPalette')!;
+    bloomButton.addEventListener('click', () => {
+      // without the builder the pipeline draws the stage as it is: the sabers clamp to their
+      // brightest colour and nothing spills over
+      const glow = stageRenderer.buildOutputNode == null;
+      stageRenderer.buildOutputNode = glow ? withGlow : undefined;
+      bloomButton.textContent = `bloom: ${glow ? 'on' : 'off'}`;
+    });
+    flashButton.addEventListener('click', () => {
+      scroller.beatFlash = !scroller.beatFlash;
+      flashButton.textContent = `beat flash: ${scroller.beatFlash ? 'on' : 'off'}`;
+    });
+    fontButton.addEventListener('click', () => {
+      scroller.fontPalette = (scroller.fontPalette + 1) % FONT_PALETTES.length;
+      fontButton.textContent = `font: ${FONT_PALETTES[scroller.fontPalette]}`;
+    });
+    tunnelButton.addEventListener('click', () => {
+      scroller.tunnelPalette = (scroller.tunnelPalette + 1) % TUNNEL_PALETTES.length;
+      tunnelButton.textContent = `tunnel: ${TUNNEL_PALETTES[scroller.tunnelPalette]}`;
+    });
+
+    display.onDispose(() => {
+      // the meshes release the materials they built, the store its textures
+      scroller.dispose();
+      store.dispose();
+    });
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('sine scroller', scroller);
+
+    preview.ready(display);
+  });
+
+  await display.start();
+</script>

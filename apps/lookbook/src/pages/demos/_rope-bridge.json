@@ -1,0 +1,23 @@
+{
+  "title": "rope bridge",
+  "shortDescription": "A rope bridge in a dark cave, every rope link a segment sprite written every frame by a Verlet simulation — drag it, drop lanterns on it, watch two light sabers clash above it",
+  "description": "A rope bridge hangs between two ledges of a dark cave, simulated by a small Verlet solver in the demo's own code — points and sticks, nothing of it in the library. The sprites draw whatever the simulation writes: every rope link, every link of the lantern chains and every vine is a **segment sprite** from one point to the next, `SegmentEnd` plus `segmentPlacement({facing: 'plane'})`, both ends dynamic attributes written every frame — all of them one `FeatureSprites` mesh, one draw call. `QuadSize` gives each link its thickness (`height`) and its caps (`width`), so the links overlap at the joints. The ropes, chains and vines are 64 × 16 frames that `RepeatingTextureColor` repeats along each link with square texels, seamless, however far a link stretches; *texture: stretched* swaps in the same kind with `TextureColor` — a kind holds one color source, so the toggle builds the other mesh — and the long guy ropes at the posts show the difference best. The planks are segments as well, between two points of the deck rope, with `Anchor` at the foot of the image (`setAnchor(0.5, 1)`), so that each plank lies on its rope. Two phantom duelists cross light sabers on the deck: each blade is a segment of the white `saber-blade` frame, tinted far above white with `Tint` and drawn additively, and the stage blooms with `createBloomOutputNodeBuilder({threshold: 1})` — the recipe [Glow: emissive sprites with bloom](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#glow-emissive-sprites-with-bloom), where the threshold compares luminance: the cyan blade passes with ease, the red one needs about five times the red. The lanterns, the lumafly motes and the sparks of the clashes glow the same way. The cave is three parallax layers drawn behind and in front of the bridge, at a whole-number `pixelZoom` of an `OrthographicProjection`. Drag any point of the ropes, click into the air to drop a lantern onto the deck. The guide: [Segments: ropes, chains, lasers](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#segments-ropes-chains-lasers).",
+  "url": "/demos/rope-bridge",
+  "tags": [
+    "FeatureSprites",
+    "SegmentEnd",
+    "segmentPlacement",
+    "RepeatingTextureColor",
+    "TextureColor",
+    "QuadSize",
+    "Anchor",
+    "Tint",
+    "createBloomOutputNodeBuilder",
+    "Stage2D",
+    "OrthographicProjection",
+    "TextureStore",
+    "texture-atlas",
+    "vanilla",
+    "demo"
+  ]
+}
