@@ -52,6 +52,18 @@ describe('checkPeerDependenciesOnly.mjs', () => {
     assert.match(stderr, /lib\/a\.js imports tslib; the library ships with peer dependencies only/);
   });
 
+  it('refuses an import in a .cjs, .d.mts or .d.cts file: exit code 1, message names each file', () => {
+    const {status, stderr} = run(JSON.stringify({peerDependencies: {three: '~0.185.1'}}), {
+      'lib/a.cjs': "const _ = require('lodash');\n",
+      'lib/b.d.mts': "import type {X} from 'lodash';\n",
+      'lib/c.d.cts': "export type T = import('tslib').X;\n",
+    });
+    assert.equal(status, 1, stderr);
+    assert.match(stderr, /lib\/a\.cjs imports lodash/);
+    assert.match(stderr, /lib\/b\.d\.mts imports lodash/);
+    assert.match(stderr, /lib\/c\.d\.cts imports tslib/);
+  });
+
   it('passes a package whose code imports only peers and relative paths, in .js and .d.ts alike', () => {
     const {status, stderr} = run(JSON.stringify({peerDependencies: {three: '~0.185.1'}}), {
       'lib/a.js': "import {x} from 'three/webgpu';\nimport {y} from './b.js';\n",

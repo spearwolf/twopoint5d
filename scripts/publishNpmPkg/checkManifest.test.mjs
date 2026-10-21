@@ -22,4 +22,20 @@ describe('checkManifest', () => {
       assert.throws(() => checkManifest(manifest), {message: /^the manifest has no "name" and no "version"$/});
     }
   });
+
+  it('a publishConfig.registry that is no http or https URL is named', () => {
+    for (const registry of [42, '', 'registry.npmjs.org', 'file:///tmp/registry']) {
+      assert.throws(() => checkManifest({name: 'x', version: '1.0.0', publishConfig: {registry}}), {
+        message: `publishConfig.registry is ${JSON.stringify(registry)}, which is no http or https URL`,
+      });
+    }
+  });
+
+  it('a manifest with an https publishConfig.registry, or without publishConfig, passes', () => {
+    assert.doesNotThrow(() =>
+      checkManifest({name: 'x', version: '1.0.0', publishConfig: {registry: 'https://registry.npmjs.org/'}}),
+    );
+    assert.doesNotThrow(() => checkManifest({name: 'x', version: '1.0.0', publishConfig: {access: 'public'}}));
+    assert.doesNotThrow(() => checkManifest({name: 'x', version: '1.0.0'}));
+  });
 });

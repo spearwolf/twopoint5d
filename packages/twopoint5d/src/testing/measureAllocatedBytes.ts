@@ -48,12 +48,21 @@ export function measureAllocatedBytes(round: () => void, options: MeasureAllocat
 
   const profiler = new GCProfiler();
   profiler.start();
-  const start = getHeapStatistics().used_heap_size;
+  let start: number;
+  let end: number;
+  let result: ReturnType<GCProfiler['stop']>;
+  // a profiler that stays started keeps collecting statistics for the rest of the worker process,
+  // and the measurements of the later specs in the file would carry them, so a round that throws
+  // stops it too
+  try {
+    start = getHeapStatistics().used_heap_size;
 
-  for (let i = 0; i < rounds; i++) round();
+    for (let i = 0; i < rounds; i++) round();
 
-  const end = getHeapStatistics().used_heap_size;
-  const result = profiler.stop();
+    end = getHeapStatistics().used_heap_size;
+  } finally {
+    result = profiler.stop();
+  }
 
   // what a collection freed during the rounds was allocated during them, too
   let collected = 0;

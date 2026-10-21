@@ -161,6 +161,8 @@ explicit instruction.
   and parameters allowed). In a `CHANGELOG.md` the check compiles only the blocks of the
   `## [Unreleased]` section: a released section is history, its blocks show the API of
   their release and are not marked after the fact.
+  Backtick and tilde fences count alike, and a block marked `check` inside a blockquote
+  fails the check, because quotes are not unwrapped and the block would go unchecked.
 - **Commits** follow [Conventional
   Commits](https://www.conventionalcommits.org/en/v1.0.0/). Code, comments and docs are
   written in English.

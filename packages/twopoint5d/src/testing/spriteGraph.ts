@@ -170,24 +170,49 @@ const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
   '<': (x, y) => (x < y ? 1 : 0),
 };
 
+// WGSL's round() takes a half to the even neighbour; GLSL ES leaves the direction of a half to
+// the implementation, so WebGPU is the backend the cpu follows
+const roundHalfToEven = (x: number): number => {
+  const r = Math.round(x);
+  return Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r;
+};
+
 /**
  * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
  * `<`, `select()`, swizzles, vectors joined from parts, varyings, `dot`, `cross`, `length`,
  * `normalize`, `max`, `min`, `clamp`, `step`, `abs`, `round`, `fract`, `mix`, `negate`, `sin` and
- * `cos` — what the frame, local, mesh, uv and color stages and the placements are built from. Throws
- * for any other node.
+ * `cos` — what the frame, local, mesh, uv and color stages and the placements are built from. `round`
+ * takes a half to the even neighbour, as WGSL does. Throws for any other node.
  */
 export function evaluateNode(root: Node): EvaluatedValue {
+  return evaluateCached(root, new Map());
+}
+
+// Each node is worked out once per call, like `nodesOf()` visits it once: a graph that reuses a node
+// on every step of a chain has exponentially many paths. The cache lives as long as one call of
+// `evaluateNode()`, because the value of a uniform can change between two calls. A cached array goes
+// to every user of its node, so no branch below changes an `EvaluatedValue` — `zip`, `flatMap` and
+// `toArray()` all make new arrays, and it stays that way.
+function evaluateCached(root: Node, cache: Map<Node, EvaluatedValue>): EvaluatedValue {
+  const cached = cache.get(root);
+  if (cached !== undefined) return cached;
+  const value = evaluateUncached(root, cache);
+  cache.set(root, value);
+  return value;
+}
+
+function evaluateUncached(root: Node, cache: Map<Node, EvaluatedValue>): EvaluatedValue {
+  const evaluate = (child: Node) => evaluateCached(child, cache);
   const node = root as unknown as EvaluableNode;
   // a varying hands its node on to the fragment stage, a sub-build marks it for another one: on the
   // cpu each is that node
-  if (node.isVarNode || node.isVaryingNode || node.isSubBuildNode) return evaluateNode(node.node!);
+  if (node.isVarNode || node.isVaryingNode || node.isSubBuildNode) return evaluate(node.node!);
   if (node.isConstNode || node.isUniformNode) {
     const {value} = node;
     return typeof value === 'number' ? value : value!.toArray();
   }
   if (node.isSplitNode) {
-    const vector = evaluateNode(node.node!) as number[];
+    const vector = evaluate(node.node!) as number[];
     // `rgba` names the components `xyzw` names
     const picked = [...node.components!].map(
       (component) => vector[Math.max('xyzw'.indexOf(component), 'rgba'.indexOf(component))]!,
@@ -195,38 +220,38 @@ export function evaluateNode(root: Node): EvaluatedValue {
     return picked.length === 1 ? picked[0]! : picked;
   }
   if (node.type === 'JoinNode' && node.nodes != null) {
-    return node.nodes.flatMap((part) => evaluateNode(part));
+    return node.nodes.flatMap((part) => evaluate(part));
   }
   if (node.isOperatorNode && OPERATORS[node.op!] != null) {
-    return zip(evaluateNode(node.aNode!), evaluateNode(node.bNode!), OPERATORS[node.op!]!);
+    return zip(evaluate(node.aNode!), evaluate(node.bNode!), OPERATORS[node.op!]!);
   }
   if (node.type === 'ConditionalNode') {
-    const condition = evaluateNode(node.condNode!);
-    return evaluateNode(condition !== 0 ? node.ifNode! : node.elseNode!);
+    const condition = evaluate(node.condNode!);
+    return evaluate(condition !== 0 ? node.ifNode! : node.elseNode!);
   }
   if (node.isMathNode) {
-    const a = evaluateNode(node.aNode!);
+    const a = evaluate(node.aNode!);
     switch (node.method) {
       case 'dot':
-        return dotOf(a, evaluateNode(node.bNode!));
+        return dotOf(a, evaluate(node.bNode!));
       case 'cross': {
         const [ax, ay, az] = a as number[];
-        const [bx, by, bz] = evaluateNode(node.bNode!) as number[];
+        const [bx, by, bz] = evaluate(node.bNode!) as number[];
         return [ay! * bz! - az! * by!, az! * bx! - ax! * bz!, ax! * by! - ay! * bx!];
       }
       case 'max':
-        return zip(a, evaluateNode(node.bNode!), Math.max);
+        return zip(a, evaluate(node.bNode!), Math.max);
       case 'min':
-        return zip(a, evaluateNode(node.bNode!), Math.min);
+        return zip(a, evaluate(node.bNode!), Math.min);
       case 'clamp':
-        return zip(zip(a, evaluateNode(node.bNode!), Math.max), evaluateNode(node.cNode!), Math.min);
+        return zip(zip(a, evaluate(node.bNode!), Math.max), evaluate(node.cNode!), Math.min);
       // step(edge, x): 1 for x ≥ edge
       case 'step':
-        return zip(a, evaluateNode(node.bNode!), (edge, x) => (x >= edge ? 1 : 0));
+        return zip(a, evaluate(node.bNode!), (edge, x) => (x >= edge ? 1 : 0));
       case 'abs':
         return zip(a, 0, Math.abs);
       case 'round':
-        return zip(a, 0, Math.round);
+        return zip(a, 0, roundHalfToEven);
       case 'fract':
         return zip(a, 0, (x) => x - Math.floor(x));
       case 'length':
@@ -238,8 +263,8 @@ export function evaluateNode(root: Node): EvaluatedValue {
       case 'cos':
         return zip(a, 0, Math.cos);
       case 'mix': {
-        const b = evaluateNode(node.bNode!);
-        const t = evaluateNode(node.cNode!);
+        const b = evaluate(node.bNode!);
+        const t = evaluate(node.cNode!);
         // a + (b − a) · t, a weight of one number meeting every component
         return zip(
           a,

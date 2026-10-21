@@ -1,8 +1,8 @@
-import {add, attribute, float, sub, vec2} from 'three/tsl';
+import {add, attribute, float, round, sub, uniform, vec2} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {graphSignature} from './spriteGraph.js';
+import {evaluateNode, graphSignature} from './spriteGraph.js';
 
 const graph = (op: typeof add, name = 'uv', constant = 1) =>
   op(attribute(name), vec2(float(constant), float(2))) as unknown as Node;
@@ -29,5 +29,42 @@ describe('graphSignature()', () => {
     ) as unknown as Node;
 
     expect(graphSignature(shared)).not.toBe(graphSignature(separate));
+  });
+});
+
+describe('evaluateNode()', () => {
+  test('works out a node read twice once', () => {
+    const leaf = uniform(1);
+    let reads = 0;
+    // on the node itself: a count behind a proxy would miss the reads that go around it
+    Object.defineProperty(leaf, 'value', {
+      configurable: true,
+      get: () => {
+        reads++;
+        return 1;
+      },
+    });
+
+    let chain = leaf as unknown as Node<'float'>;
+    for (let i = 0; i < 16; i++) chain = add(chain, chain) as unknown as Node<'float'>;
+
+    expect(evaluateNode(chain as unknown as Node)).toBe(2 ** 16);
+    expect(reads).toBe(1);
+  });
+
+  test("rounds halves to the even neighbour, as WGSL's round does", () => {
+    const cases: [number, number][] = [
+      [2.5, 2],
+      [-2.5, -2],
+      [3.5, 4],
+      [-3.5, -4],
+      [0.5, 0],
+      [1.4, 1],
+      [1.6, 2],
+    ];
+    for (const [input, expected] of cases) {
+      expect(evaluateNode(round(float(input)) as unknown as Node)).toBe(expected);
+    }
+    expect(evaluateNode(round(vec2(0.5, 1.5)) as unknown as Node)).toEqual([0, 2]);
   });
 });

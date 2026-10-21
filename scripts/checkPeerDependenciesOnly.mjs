@@ -1,13 +1,15 @@
 // The library reaches its consumers with peer dependencies only, and the non-blocking
 // audit step in CI relies on that (docs/architecture.md, §3). This script fails on a
-// package that declares anything npm would install along with it, or whose `.js`, `.mjs`
-// or `.d.ts` files import a package that is not one of its `peerDependencies`.
+// package that declares anything npm would install along with it (`dependencies`,
+// `optionalDependencies`, bundled dependencies), or whose `.js`, `.cjs`, `.mjs`, `.d.ts`,
+// `.d.cts` or `.d.mts` files import a package that is not one of its `peerDependencies`.
 //
 //   node scripts/checkPeerDependenciesOnly.mjs <package-dir>
 //
-// Exit 0: <package-dir>/package.json declares no `dependencies` and no
-// `optionalDependencies`, and no `.js`, `.mjs` or `.d.ts` file below <package-dir>
-// (`node_modules` aside) imports anything but its peers, relative paths and `#` subpaths.
+// Exit 0: <package-dir>/package.json declares no `dependencies`, no `optionalDependencies`
+// and no `bundleDependencies`, and no `.js`, `.cjs`, `.mjs`, `.d.ts`, `.d.cts` or `.d.mts`
+// file below <package-dir> (`node_modules` aside) imports anything but its peers, relative
+// paths and `#` subpaths.
 // 1: it declares some, it imports one, a file cannot be read, or the argument is missing.
 
 import fs from 'node:fs';
@@ -37,7 +39,7 @@ for (const {section, name} of found) {
 
 const sources = fs
   .readdirSync(packageDir, {recursive: true, encoding: 'utf8'})
-  .filter((file) => /\.(js|mjs|d\.ts)$/.test(file) && !file.split(path.sep).includes('node_modules'))
+  .filter((file) => /\.(c?js|mjs|d\.[cm]?ts)$/.test(file) && !file.split(path.sep).includes('node_modules'))
   .sort()
   .map((file) => {
     const filePath = path.join(packageDir, file);

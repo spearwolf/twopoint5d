@@ -22,9 +22,9 @@ describe('makePackageJson.mjs', () => {
   // to `<dir>/dist/`
   /**
    * @param {Record<string, string> | undefined} peerDependencies
-   * @param {{dist?: boolean, packageJsonText?: string}} [options]
+   * @param {{dist?: boolean, packageJsonText?: string, override?: object}} [options]
    */
-  function run(peerDependencies, {dist = true, packageJsonText} = {}) {
+  function run(peerDependencies, {dist = true, packageJsonText, override} = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'makePackageJson-script-'));
     dirs.push(dir);
     // the script writes the manifest only into an existing `dist/`, which the compiler
@@ -37,6 +37,9 @@ describe('makePackageJson.mjs', () => {
       path.join(dir, 'package.json'),
       packageJsonText ?? JSON.stringify({name: '@scope/probe', version: '1.0.0', peerDependencies}),
     );
+    if (override !== undefined) {
+      fs.writeFileSync(path.join(dir, 'package.override.json'), JSON.stringify(override));
+    }
     const result = spawnSync(process.execPath, [script], {cwd: dir, encoding: 'utf8'});
     return {...result, dir, manifestPath: path.join(dir, 'dist', 'package.json')};
   }
@@ -78,5 +81,11 @@ describe('makePackageJson.mjs', () => {
     assert.match(stderr, /peerDependencies\.three is null, which resolves to no version range/);
     assert.doesNotMatch(stderr, /^\s+at /m);
     assert.equal(fs.existsSync(manifestPath), false);
+  });
+
+  it('rewrites a dist/ path that package.override.json brings in', () => {
+    const {status, stderr, manifestPath} = run({three: '^0.185.0'}, {override: {bin: {probe: './dist/cli.js'}}});
+    assert.equal(status, 0, stderr);
+    assert.equal(JSON.parse(fs.readFileSync(manifestPath, 'utf8')).bin.probe, './cli.js');
   });
 });

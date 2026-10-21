@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {isNotPublishedError, parsePublishedVersions} from './publishedVersions.mjs';
+import {NPM_SHOW_TIMEOUT_MS, describeShowFailure, isNotPublishedError, parsePublishedVersions} from './publishedVersions.mjs';
 
 describe('parsePublishedVersions', () => {
   it('a single published version comes back as a list', () => {
@@ -39,5 +39,22 @@ describe('isNotPublishedError', () => {
     for (const stderr of ['npm error code E401\n', 'npm error code ETIMEDOUT\n', '', undefined]) {
       assert.equal(isNotPublishedError(stderr), false);
     }
+  });
+});
+
+describe('describeShowFailure', () => {
+  it('describeShowFailure names the timeout for an npm show that was killed', () => {
+    const error = Object.assign(new Error('Command failed'), {killed: true});
+
+    assert.equal(describeShowFailure(error, ''), `npm show did not answer within ${NPM_SHOW_TIMEOUT_MS / 1000} s`);
+    assert.match(describeShowFailure(error, ''), /within 60 s$/);
+  });
+
+  it("describeShowFailure names npm's stderr, or the error message when stderr is empty", () => {
+    const error = new Error('spawn npm ENOENT');
+
+    assert.equal(describeShowFailure(error, 'npm error code E401\n'), 'npm show failed: npm error code E401');
+    assert.equal(describeShowFailure(error, ''), 'npm show failed: spawn npm ENOENT');
+    assert.equal(describeShowFailure(error, undefined), 'npm show failed: spawn npm ENOENT');
   });
 });

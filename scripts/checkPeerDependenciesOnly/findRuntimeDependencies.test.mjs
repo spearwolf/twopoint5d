@@ -31,4 +31,26 @@ describe('findRuntimeDependencies', () => {
       {section: 'optionalDependencies', name: 'shared'},
     ]);
   });
+
+  it('names every entry of bundleDependencies and bundledDependencies', () => {
+    const manifest = {
+      dependencies: {a: '^1.0.0'},
+      optionalDependencies: {b: '^2.0.0'},
+      bundleDependencies: ['c', 'd'],
+      bundledDependencies: ['e'],
+    };
+
+    assert.deepEqual(findRuntimeDependencies(manifest), [
+      {section: 'dependencies', name: 'a'},
+      {section: 'optionalDependencies', name: 'b'},
+      {section: 'bundleDependencies', name: 'c'},
+      {section: 'bundleDependencies', name: 'd'},
+      {section: 'bundledDependencies', name: 'e'},
+    ]);
+  });
+
+  it('passes bundleDependencies: true, which bundles nothing but the dependencies named already', () => {
+    assert.deepEqual(findRuntimeDependencies({bundleDependencies: true}), []);
+    assert.deepEqual(findRuntimeDependencies({bundledDependencies: false}), []);
+  });
 });

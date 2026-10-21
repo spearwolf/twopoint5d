@@ -5,16 +5,19 @@
 //
 // Every fence is tracked, marked or not, because a `ts check` line inside another code
 // block (a four-backtick block that shows Markdown, say) is an example of the marker, not
-// the marker. A marker that is nearly right (`js check`, `ts check strict`) is reported
-// instead of ignored: a typo must not drop a block out of the check without a word.
+// the marker. Backtick and tilde fences count alike. A marker that is nearly right (`js check`, `ts check strict`) is reported
+// instead of ignored: a typo must not drop a block out of the check without a word. So is a
+// marker inside a blockquote: `checkDocSnippets` does not unwrap quotes, and the block would
+// otherwise fall out of the check in silence.
 //
 // In a `CHANGELOG.md` only the `## [Unreleased]` section counts, up to the next `## [`
 // heading: a released section is history and shows the API of its release, so its
 // blocks are neither compiled nor checked for their marker. A changelog without an
 // Unreleased section has no block to check.
 
-const OPENING_FENCE = /^(\s*)(`{3,})(.*)$/;
-const CLOSING_FENCE = /^\s*(`{3,})\s*$/;
+const OPENING_FENCE = /^(\s*)(`{3,}|~{3,})(.*)$/;
+const CLOSING_FENCE = /^\s*(`{3,}|~{3,})\s*$/;
+const QUOTED_FENCE = /^\s*>[\s>]*(`{3,}|~{3,})(.*)$/;
 
 const MARKER = ['ts', 'check'];
 
@@ -45,7 +48,8 @@ export function extractSnippets(markdown, file) {
    * @typedef {object} OpenFence
    * @property {boolean} marked
    * @property {number} indent
-   * @property {number} ticks
+   * @property {'`' | '~'} fence
+   * @property {number} size
    * @property {number} line
    * @property {string[]} code
    */
@@ -65,12 +69,32 @@ export function extractSnippets(markdown, file) {
       }
 
       const match = OPENING_FENCE.exec(text);
-      // CommonMark: the info string of a backtick fence holds no backtick, so a line such
-      // as "```inline``` prose" opens nothing
-      if (match == null) return;
+      if (match == null) {
+        const quoted = inScope ? QUOTED_FENCE.exec(text) : null;
+        if (quoted != null) {
+          // both groups of the pattern always take part in a match
+          const [, , quotedRest] = /** @type {[string, string, string]} */ (/** @type {unknown} */ (quoted));
+          const quotedFence = /** @type {string} */ (quoted[1]);
+          // a quoted fence is never tracked as open: its code lines start with `>` themselves
+          if (!(quotedFence.startsWith('`') && quotedRest.includes('`'))) {
+            const info = quotedRest.trim();
+            if (info.split(/\s+/).includes('check')) {
+              problems.push({
+                file,
+                line: lineNumber,
+                message: `a code block marked \`${info}\` inside a blockquote is not checked — only a \`ts check\` block outside a quote is compiled`,
+              });
+            }
+          }
+        }
+        return;
+      }
       // the three groups of the pattern always take part in a match
-      const [, indent, ticks, rest] = /** @type {[string, string, string, string]} */ (/** @type {unknown} */ (match));
-      if (rest.includes('`')) return;
+      const [, indent, run, rest] = /** @type {[string, string, string, string]} */ (/** @type {unknown} */ (match));
+      const fence = /** @type {'`' | '~'} */ (run.charAt(0));
+      // CommonMark: the info string of a backtick fence holds no backtick, so a line such
+      // as "```inline``` prose" opens nothing; the info string of a tilde fence may
+      if (fence === '`' && rest.includes('`')) return;
 
       const info = rest.trim();
       const words = info.split(/\s+/).filter(Boolean);
@@ -83,7 +107,8 @@ export function extractSnippets(markdown, file) {
       open = {
         marked,
         indent: indent.length,
-        ticks: ticks.length,
+        fence,
+        size: run.length,
         line: lineNumber,
         code: [],
       };
@@ -91,7 +116,9 @@ export function extractSnippets(markdown, file) {
     }
 
     const closing = CLOSING_FENCE.exec(text);
-    if (closing != null && /** @type {string} */ (closing[1]).length >= open.ticks) {
+    // CommonMark: only a run of the same character, at least as long as the opening one, closes
+    const run = /** @type {string} */ (closing?.[1]);
+    if (closing != null && run.charAt(0) === open.fence && run.length >= open.size) {
       if (open.marked) {
         snippets.push({file, line: open.line + 1, indent: open.indent, code: open.code.join('\n')});
       }

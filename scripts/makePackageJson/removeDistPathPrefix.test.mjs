@@ -54,4 +54,33 @@ describe('removeDistPathPrefix', () => {
   it('rewrites exports given as a single path', () => {
     assert.deepEqual(removeDistPathPrefix({exports: './dist/index.js'}), {exports: './index.js'});
   });
+
+  it('removes a leading dist/ from bin, as a path and as a map of commands', () => {
+    assert.deepEqual(removeDistPathPrefix({bin: 'dist/cli.js'}), {bin: 'cli.js'});
+    assert.deepEqual(removeDistPathPrefix({bin: {'dist/probe': './dist/cli.js', other: 'dist/other.js'}}), {
+      bin: {'dist/probe': './cli.js', other: 'other.js'},
+    });
+  });
+
+  it('rewrites typings, imports and every path of typesVersions', () => {
+    assert.deepEqual(
+      removeDistPathPrefix({
+        typings: 'dist/index.d.ts',
+        imports: {'#internal/*': {default: './dist/internal/*.js'}, '#none': null},
+        typesVersions: {'>=5': {'*': ['dist/types/*']}},
+      }),
+      {
+        typings: 'index.d.ts',
+        imports: {'#internal/*': {default: './internal/*.js'}, '#none': null},
+        typesVersions: {'>=5': {'*': ['types/*']}},
+      },
+    );
+  });
+
+  it('rewrites browser as a path, and the keys and paths of a browser map, keeping a false entry', () => {
+    assert.deepEqual(removeDistPathPrefix({browser: 'dist/browser.js'}), {browser: 'browser.js'});
+    assert.deepEqual(removeDistPathPrefix({browser: {'./dist/node.js': './dist/browser.js', 'dist/fs.js': false, fs: false}}), {
+      browser: {'./node.js': './browser.js', 'fs.js': false, fs: false},
+    });
+  });
 });

@@ -3,6 +3,7 @@ import {describe, test} from 'node:test';
 import {extractSnippets} from './extractSnippets.mjs';
 
 const FENCE = '```';
+const TILDES = '~~~';
 
 // a markdown document built from lines, so the fences do not fight the template literal
 const doc = (...lines) => lines.join('\n');
@@ -93,11 +94,95 @@ test('a marked fence that never closes is a problem with the fence line', () => 
   assert.equal(problem.line, 2);
 });
 
-test('tilde fences are not fences', () => {
-  const {snippets, problems} = extractSnippets(doc('~~~ts check', 'const a = 1;', '~~~'), 'a.md');
+test('finds a block marked `ts check` in a tilde fence', () => {
+  const {snippets, problems} = extractSnippets(doc('prose', `${TILDES}ts check`, 'const a = 1;', TILDES), 'a.md');
+
+  assert.deepEqual(problems, []);
+  assert.deepEqual(snippets, [{file: 'a.md', line: 3, indent: 0, code: 'const a = 1;'}]);
+});
+
+test('a backtick fence line inside a tilde fence is code, and a tilde line inside a backtick fence too', () => {
+  const {snippets, problems} = extractSnippets(
+    doc(
+      `${TILDES}md`,
+      `${FENCE}ts check`,
+      'const a = 1;',
+      FENCE,
+      TILDES,
+      `${FENCE}md`,
+      `${TILDES}ts check`,
+      'const b = 2;',
+      TILDES,
+      FENCE,
+      `${FENCE}ts check`,
+      'const z = 26;',
+      FENCE,
+    ),
+    'a.md',
+  );
+
+  assert.deepEqual(problems, []);
+  assert.deepEqual(snippets, [{file: 'a.md', line: 12, indent: 0, code: 'const z = 26;'}]);
+});
+
+test('a tilde fence closes only on tildes, at least as many as it opened with', () => {
+  const {snippets, problems} = extractSnippets(
+    doc('~~~~ts check', 'const a = 1;', TILDES, 'const b = 2;', '~~~~~', 'prose'),
+    'a.md',
+  );
+
+  assert.deepEqual(problems, []);
+  assert.deepEqual(snippets, [{file: 'a.md', line: 2, indent: 0, code: 'const a = 1;\n~~~\nconst b = 2;'}]);
+});
+
+test('the info string of a tilde fence may hold a backtick', () => {
+  const {snippets, problems} = extractSnippets(
+    doc(`${TILDES}md \`x\``, `${FENCE}ts check`, 'const a = 1;', FENCE, TILDES, `${FENCE}ts check`, 'const z = 26;', FENCE),
+    'a.md',
+  );
+
+  // the tilde line opens a fence all the same, so the marker inside it is an example
+  assert.deepEqual(problems, []);
+  assert.deepEqual(snippets, [{file: 'a.md', line: 7, indent: 0, code: 'const z = 26;'}]);
+});
+
+test('a fence marked with `check` inside a blockquote is a problem with its line', () => {
+  const {snippets, problems} = extractSnippets(
+    doc(
+      'prose',
+      `> ${FENCE}ts check`,
+      '> const a = 1;',
+      `> ${FENCE}`,
+      '',
+      `> > ${TILDES}ts check`,
+      '> > const b = 2;',
+      `> > ${TILDES}`,
+      '',
+      `> ${FENCE}js check`,
+      '> const c = 3;',
+      `> ${FENCE}`,
+      '',
+      `> ${FENCE}ts`,
+      '> const d = 4;',
+      `> ${FENCE}`,
+    ),
+    'a.md',
+  );
 
   assert.deepEqual(snippets, []);
-  assert.deepEqual(problems, []);
+  assert.deepEqual(
+    problems.map(({file, line}) => ({file, line})),
+    [
+      {file: 'a.md', line: 2},
+      {file: 'a.md', line: 6},
+      {file: 'a.md', line: 10},
+    ],
+  );
+  assert.equal(
+    problems[0]?.message,
+    'a code block marked `ts check` inside a blockquote is not checked — only a `ts check` block outside a quote is compiled',
+  );
+  assert.match(problems[2]?.message ?? '', /marked `js check` inside a blockquote/);
 });
 
 test('a line whose info string holds a backtick opens no fence, so a marked block after it is found', () => {
@@ -174,6 +259,16 @@ describe('in a CHANGELOG.md', () => {
     );
 
     assert.deepEqual(snippets, []);
+  });
+
+  test('a quoted marked fence in a released section is no problem', () => {
+    const {snippets, problems} = extractSnippets(
+      doc('## [Unreleased]', '## [0.22.0] - 2026-09-30', `> ${FENCE}ts check`, '> const a = 1;', `> ${FENCE}`),
+      'CHANGELOG.md',
+    );
+
+    assert.deepEqual(snippets, []);
+    assert.deepEqual(problems, []);
   });
 
   test('another Markdown file keeps every block, version headings or not', () => {

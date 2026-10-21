@@ -42,4 +42,18 @@ describe('findUnpublishableSpecifiers', () => {
       {section: 'peerDependencies', name: 'b', specifier: 42},
     ]);
   });
+
+  it('names every link:, file: and portal: specifier, which point at a path on the machine that builds the package', () => {
+    const manifest = {
+      dependencies: {a: 'link:../a', ok1: 'npm:x@^1'},
+      peerDependencies: {b: 'file:../b.tgz', ok2: 'github:o/r'},
+      optionalDependencies: {c: 'portal:../c'},
+    };
+
+    assert.deepEqual(findUnpublishableSpecifiers(manifest), [
+      {section: 'dependencies', name: 'a', specifier: 'link:../a'},
+      {section: 'peerDependencies', name: 'b', specifier: 'file:../b.tgz'},
+      {section: 'optionalDependencies', name: 'c', specifier: 'portal:../c'},
+    ]);
+  });
 });

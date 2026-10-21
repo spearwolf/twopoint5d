@@ -38,8 +38,6 @@ const outPackageJson = {
   ...inPackageJson,
 };
 
-removeDistPathPrefix(outPackageJson);
-
 const context = {workspaceRoot, pnpmWorkspaceConfig, sharedDependencies, referencedFrom: inPackageJson.name};
 
 resolveDependencies(outPackageJson.dependencies, context);
@@ -55,7 +53,11 @@ for (const [key, value] of Object.entries(packageJsonOverride)) {
   }
 }
 
-// a manifest that still names a pnpm protocol cannot be installed from npm
+// the paths run through the rewrite only after the override is mixed in: a path the
+// override brings would keep its dist/ prefix otherwise
+removeDistPathPrefix(outPackageJson);
+
+// a manifest that still names a pnpm protocol or a path on this machine cannot be installed from npm
 const unpublishable = findUnpublishableSpecifiers(outPackageJson);
 if (unpublishable.length > 0) {
   for (const {section, name, specifier} of unpublishable) {

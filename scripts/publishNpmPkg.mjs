@@ -5,7 +5,13 @@ import {fileURLToPath} from 'node:url';
 import {checkManifest} from './publishNpmPkg/checkManifest.mjs';
 import {npmCommand} from './publishNpmPkg/npmCommand.mjs';
 import {USAGE, parseArguments} from './publishNpmPkg/parseArguments.mjs';
-import {isNotPublishedError, parsePublishedVersions} from './publishNpmPkg/publishedVersions.mjs';
+import {
+  NPM_SHOW_TIMEOUT_MS,
+  describeShowFailure,
+  isNotPublishedError,
+  parsePublishedVersions,
+} from './publishNpmPkg/publishedVersions.mjs';
+import {registryEnvironment} from './publishNpmPkg/registryEnvironment.mjs';
 import {releaseFiles} from './publishNpmPkg/releaseFiles.mjs';
 
 let args;
@@ -45,11 +51,31 @@ if (pkgJson.version.endsWith('-dev')) {
   process.exit(0);
 }
 
+// the release files go into the package directory before npm is asked anything, so that
+// `npm show` and `npm publish` read the same `.npmrc`
+let files;
+try {
+  files = releaseFiles({workspaceRoot, projectRoot, packageRoot});
+} catch (error) {
+  console.error(`cannot publish ${packageRoot}: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+for (const {src, dst} of files) {
+  copyFile(src, dst);
+}
+
 // `.` because npm reads the name from the manifest in `packageRoot`, the one
 // `npm publish` reads there, and no value from the manifest ends up on a command line
 const show = npmCommand(['show', '.', 'versions', '--json']);
 
-execFile(show.file, show.args, {...show.options, cwd: packageRoot}, (error, stdout, stderr) => {
+const showOptions = {
+  ...show.options,
+  cwd: packageRoot,
+  timeout: NPM_SHOW_TIMEOUT_MS,
+  env: registryEnvironment(pkgJson),
+};
+
+execFile(show.file, show.args, showOptions, (error, stdout, stderr) => {
   if (!error) {
     let versions;
     try {
@@ -67,29 +93,17 @@ execFile(show.file, show.args, {...show.options, cwd: packageRoot}, (error, stdo
     } else {
       publishPackage(packageRoot);
     }
-  } else if (isNotPublishedError(stderr)) {
+  } else if (!error.killed && isNotPublishedError(stderr)) {
+    // a killed npm has answered nothing, whatever it wrote before
     console.log('oh it looks like this is the first time to publish the package');
     publishPackage(packageRoot);
   } else {
-    // npm gives its reason on stderr; when npm could not be started at all, stderr is
-    // empty and `error.message` names the cause (`spawn npm ENOENT`)
-    console.error(`npm show failed: ${stderr.trim() || error.message}`);
+    console.error(describeShowFailure(error, stderr));
     process.exit(1);
   }
 });
 
 function publishPackage(cwd, dryRun = DRY_RUN) {
-  let files;
-  try {
-    files = releaseFiles({workspaceRoot, projectRoot, packageRoot: cwd});
-  } catch (error) {
-    console.error(`cannot publish ${cwd}: ${error instanceof Error ? error.message : String(error)}`);
-    process.exit(1);
-  }
-  for (const {src, dst} of files) {
-    copyFile(src, dst);
-  }
-
   const publish = npmCommand(['publish', '--access', 'public', ...(dryRun ? ['--dry-run'] : [])]);
   // npm writes straight to the console — the published version on success, the reason
   // on failure — so the message of our own names only the exit code

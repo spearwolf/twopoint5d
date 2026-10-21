@@ -139,8 +139,10 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
   lives in `scripts/checkNameableTypes/`. `attw` and `publint` resolve such a type
   structurally and stay quiet, which is exactly why this check exists.
 - `lintPkg` runs publint against `dist/` and then `scripts/checkPeerDependenciesOnly.mjs`,
-  which fails as soon as `dist/package.json` declares `dependencies` or
-  `optionalDependencies`, and also when a `.js`, `.mjs` or `.d.ts` file in `dist/`
+  which fails as soon as `dist/package.json` declares `dependencies`,
+  `optionalDependencies` or `bundleDependencies` (spelled `bundledDependencies` too; a
+  list names what it bundles, `true` bundles only what `dependencies` names already), and
+  also when a `.js`, `.cjs`, `.mjs`, `.d.ts`, `.d.cts` or `.d.mts` file in `dist/`
   imports a package that is not a peer; apart from its peers the package may import
   relative paths and its own `#` subpath imports only. The library reaches its
   consumers with peer dependencies only, and the non-blocking audit step in CI relies on
@@ -281,15 +283,21 @@ range, a spelled-out range ships as it is written, only without the whitespace a
 and not in the form semver normalizes it to — but only if it is a version range;
 anything else, a range of nothing but whitespace included, leaves the specifier standing).
 A `package.json` there that cannot be read, or whose version semver cannot read, leaves
-the specifier standing as well. If a `catalog:` or `workspace:` specifier is left in the
-manifest afterwards, the build fails — npm installs neither protocol. A value that is no
-string, a `null` or a number, stays standing with a warning, and the build fails on it the
-same way, with a message that names the section, the name and the value. The script writes
+the specifier standing as well. If a `catalog:`, `workspace:`, `link:`, `file:` or
+`portal:` specifier is left in the manifest afterwards, the build fails — npm installs none
+of these protocols, and the last three point at a path on the machine that builds the
+package, which the consumer does not have. A value that is no string, a `null` or a
+number, stays standing with a warning, and the build fails on it the same way, with a message that names the section, the name and the value. The script writes
 `dist/package.json` only into an existing `dist/` and stops without the compiled library,
 with the hint to compile first; an input file it cannot read stops it with the path and
-the reason. Since `dist/` is what gets published, `main`, `module`, `types` and every
-target in `exports` lose a leading `dist/` or `./dist/`; a `dist/` further inside a path
-is part of the name and stays.
+the reason. Since `dist/` is what gets published, `main`, `module`, `types`, `typings`,
+`browser` and every target in `exports`, `imports`, `bin` and `typesVersions` lose a
+leading `dist/` or `./dist/`; a `dist/` further inside a path is part of the name and
+stays. In those four maps only the values are rewritten — subpaths, `#` names, command
+names and the version ranges and patterns of `typesVersions` are no file paths; a
+`browser` map is rewritten in its keys and its string values alike, and a `false` stays.
+The rewrite runs after `package.override.json` is merged in, so a path the override brings
+loses its `dist/` as well.
 
 The logic of both scripts lives in `scripts/makePackageJson/` and
 `scripts/publishNpmPkg/`, next to its `node --test` specs; the scripts themselves only
@@ -298,10 +306,19 @@ wire it up.
 The publishable artifact is therefore `dist/`, not the source package directory.
 `publishNpmPkg` runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` first and then
 publishes `dist/`. It skips a version npm already lists and takes npm's `E404` for a first
-publish. Before `npm publish` it copies `LICENSE` from the workspace root, and
+publish. Before it asks npm anything it copies `LICENSE` from the workspace root, and
 `CHANGELOG.md` and the README from the directory it is started in, into the package
 directory; the README is `README-pkg.md`, or `README.md` if there is none, and ships as
-`README.md`. A workspace `.npmrc` goes along if there is one.
+`README.md`. A workspace `.npmrc` goes along if there is one, so that `npm show` and
+`npm publish` read the same one. A `-dev` version is skipped before any of this.
+`npm show` asks the registry from `publishConfig.registry` of the manifest, handed over as
+`npm_config_registry`, because that is the registry `npm publish` uploads to — it takes
+`publishConfig` over every config file and environment variable, and `npm show` reads none
+of it. `checkManifest` refuses a `publishConfig.registry` that is no http or https URL.
+`npm show` gets 60 s; a registry that does not answer in time ends the script with a line
+that says so, exit code 1, and a killed npm is never taken for a first publish. `npm
+publish` gets no time limit: one killed in the middle of the upload leaves an uncertain
+state, and the job as a whole is bounded by `timeout-minutes` in `deploy.yml`.
 `publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and exit code 1 on a
 missing directory, on a second one and on any other option — a misspelled `--dry-run`
 included — before it asks npm. npm is asked with `npm show .` in the package directory,
