@@ -30,7 +30,9 @@
         "gridBase",
         "QuadBase",
         "axisBillboardPlacement",
-        "BillboardPlacement"
+        "BillboardPlacement",
+        "Flash",
+        "PaletteSwap"
       ]
     },
     {
@@ -52,6 +54,11 @@
         "atlasFrameTable",
         "sampleAtlasFrame"
       ]
+    },
+    {
+      "name": "Text",
+      "tagId": "text",
+      "includeTags": ["BitmapFont", "writeText", "layoutText"]
     },
     {
       "name": "Map2D",
