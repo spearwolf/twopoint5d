@@ -13,125 +13,116 @@ and the [CHANGELOG](CHANGELOG.md) for what changed from release to release.
 
 ---
 
-The core features can be roughly classified into the following areas:
+## What's on the menu
 
-#### 📚 [sprites](src/sprites/)
-- create and render textured 2D sprites in 3D space, thousands of them in one draw call
-- build a sprite kind from features — `defineSprite({base, features})` — or take a preset:
-  `TexturedSpriteKind`, `AnimatedSpriteKind`; a feature of your own brings its attributes,
-  uniforms and a stage of the TSL pipeline
-- load and create sprites from texture atlases or sprite sheet images
-- support frame based animations — looped, played once or back and forth, with a duration per
-  frame
-- draw trimmed and rotated frames of a TexturePacker atlas where the untrimmed sprite has
-  them
-- stand them up, lay them on the ground (`GroundPlacement`) or render them as billboards,
-  swapped on a live material; turn each sprite by a yaw or a quaternion of its own
-- draw shadows and reflections of the same sprites as passes, bound to lights and planes of
-  the scene graph
-- stand them upright about an axis (`axisBillboardPlacement()`), pick one of n views by the
-  camera (`tableFrame({views})`), stretch a quad between two points for ropes, chains and lasers
-  (`segmentPlacement()`, `RepeatingTextureColor`)
-- mirror (`Flip`), anchor (`Anchor`), fade (`Fade`), flash (`Flash`), swap and cycle palettes
-  (`PaletteSwap`), sway and scroll on a sine (`wave()`), nine-slice panels on a grid base
-  (`NineSlice`, `gridBase()`)
-- sort the draw order (`sortBy()`, `sortByViewDepth()`), grow a full pool (`grow: true`) and
-  pick the sprite under the pointer on the gpu (`SpritePicker`)
-- the guide: [docs/sprites.md](docs/sprites.md)
-- :heavy_check_mark::rocket: ready to use but the api is still in progress
+Everything draws through three.js with WebGPU and falls back to WebGL 2 where a browser has
+no WebGPU.
 
-#### 📚 [texture atlases and tilesets](src/texture/)
-- load images, texture atlases, tilesets and frame based animations from one json
-  catalog through `TextureStore`, which fetches every image once and owns the textures it
-  builds
-- read the "JSON Hash" and the "JSON Array" format of TexturePacker and free-tex-packer, and
-  Aseprite sheets whose tags become animations (`AsepriteJson`); other packers through an atlas
-  adapter of `TextureStore`
-- sample the frames of an atlas in a node material of your own (`AtlasFrameTable`), wrapped
-  per axis and without seams
-- pack labels, icons and portraits into one texture at run time (`DynamicAtlas`): a shelf
-  packer on a canvas whose frames every sprite reads like those of any other atlas
-- create tilesets from images
-- the callback loaders (`TextureAtlasLoader`, `TileSetLoader`, …) are deprecated in
-  favour of `TextureStore`
-- :heavy_check_mark: api is stable and ready to use
+### 🍱 Sprites
 
-#### 📚 [text](src/text/)
-- read bitmap fonts in the AngelCode BMFont format — text, XML and the JSON of the common
-  converters — into a font and a texture atlas of its glyphs (`BitmapFont`)
-- lay a string of it out into sprites, one per glyph — y up, aligned per line, kerned, wrapped at
-  a width — with `writeText()`, or measure it with `layoutText()`
-- the guide: [docs/text.md](docs/text.md)
-- :construction: new, the api may still change
+Thousands of textured sprites in 3D space, drawn in a single draw call.
 
-#### 📚 [map2d](src/map2d/)
-- create and render tiled maps which are laid out in a 2D spatial grid map data
-  structure
-- :warning: work in progress
+- **Sprites à la carte.** A sprite kind is put together from small features. Pick the ones
+  you need, take a ready-made kind, or write a feature of your own.
+- **Standing, lying, facing the camera.** Sprites stand upright in the scene, lie flat on the
+  ground, turn freely in space, or face the camera as billboards. You can swap the placement
+  while the scene is running.
+- **Upright about an axis.** Trees, grass and torches face the camera but stay rooted to the
+  ground, the way old-school 3D shooters drew them.
+- **Eight-way sprites.** A sprite picks one of several pre-rendered views by the angle the
+  camera looks at it from.
+- **Ropes, chains and lasers.** A sprite stretched between two points, with its texture
+  repeating along the length instead of stretching.
+- **Animation.** Frame-based animations that loop, play once or play back and forth, with
+  its own duration for every frame.
+- **Shadows and reflections.** The same sprites drawn again as a shadow cast by a light or as
+  a mirror image on a plane. Both follow the lights and planes of the scene.
+- **Flip and anchor.** Sprites mirror horizontally or vertically and turn about any pivot,
+  such as the feet, the hilt of a sword or the hinge of a door.
+- **Nine-slice panels.** UI frames and buttons that scale to any size while their corners
+  keep their shape.
+- **Waves.** Grass and banners sway, and lines of text roll along a sine like the scrollers
+  of the old Amiga demos.
+- **Fade and flash.** Sprites fade in and out, or flash white or in any colour when hit.
+- **Palette swap and colour cycling.** One sprite sheet in many colour variants, and
+  palettes that rotate for water, fire and the classic copper look.
+- **Tint, trim and turned frames.** Sprites are coloured per instance. Frames that a packer
+  trimmed or turned in the atlas come out in their original place and orientation.
+- **Glow.** A recipe for emissive sprites such as neon and light sabers, made with bloom.
+- **Draw order.** Sprites sort back to front, by depth or by any key of your own, so
+  transparent sprites blend correctly.
+- **Growing pools.** A full pool of sprites grows on demand instead of turning sprites away.
+- **Picking.** Finds the sprite under the mouse pointer on the GPU, exactly to the pixel.
 
-#### 📚 [vertex-objects](src/vertex-objects/)
+### 🗺️ Texture atlases and tilesets
 
-three.js offers standardized geometry properties like position, normal, colors, etc.
-For rendering, triangles are almost always used as primitives.
+- **One catalog for everything.** Images, atlases, tilesets and animations are loaded from
+  one JSON file. Every image is fetched once, however often it is used.
+- **The common packers.** TexturePacker, free-tex-packer and Aseprite, where Aseprite tags
+  become animations. Other formats plug in through an adapter.
+- **Atlases built at run time.** Labels, icons and portraits are packed into one texture
+  while the app runs. Sprites use them like frames of any other atlas.
+- **Tilesets** are cut from plain images.
+- **Atlas frames on your own meshes.** A frame repeats across any surface, wrapped without
+  seams.
+- **Pixel-crisp or smooth.** Every texture can be set up for sharp pixel art or for smooth,
+  anisotropic filtering.
 
-The _vertex-objects_ api simplifies the creation of geometries with custom properties. A
-_vertex-object description_ is used to describe the geometry and its primitives, and an
-object-based api is used to manage the primitives &rarr; vertex-objects &rarr; _custom
-sprites_ of the geometry.
+### 🔤 Text
 
-Such a geometry almost always needs a material of its own, since the built-in materials
-of three.js know nothing of custom attributes. In this library that is a `NodeMaterial`
-whose shader is written in TSL (`three/tsl`) and reads the attributes through
-`attribute()` nodes, as the sprite materials under [src/sprites/](src/sprites/) do.
+- **Bitmap fonts** in the AngelCode BMFont format, in its text, XML and JSON flavours.
+- **Text as sprites.** Kerned, aligned and wrapped text, one sprite per glyph, so every letter
+  can be moved, coloured or waved on its own.
+- **Measuring** text before it is drawn.
 
-The main motivation behind the _vertex objects_ is to make it easier to create custom
-geometries, especially _instanced_ geometries (multiple objects within one buffer
-geometry) without worrying too much about the buffer attributes of three.js underneath.
+### 🧱 Tile maps
 
-This library provides you with a declarative interface to describe the shape of the
-geometry, incl. indices and attributes and manages the internal attribute buffers, deals
-with mapping of attributes to buffers AND the update of them.
+- **Endless 2D tile maps**, streamed in around the camera.
+- **Visibility** is worked out from the camera's view or from a plain rectangle, nearest
+  tiles first. A camera that stands still costs nothing.
+- **Spatial indexes** for fast lookups in large maps.
 
-It should significantly cut down on the amount of boilerplate code and state management
-you need to do in your applications. At the same time, the _vertex objects_ api gives
-you a convenient object-based interface to write extremely clean and readable programs
-for your custom geometries.
+### ⚙️ Vertex objects, the engine room
 
-- provides an object based abstraction over instanced buffer geometries. build them with
-  your own api
-- create, update and delete instances with ease
-- :heavy_check_mark: api is stable and ready to use
+- **Your own instanced geometry** is described once, then created, changed and deleted as
+  plain objects, with no buffer bookkeeping.
+- **Settles without garbage.** Once a scene is running, the hot paths allocate no memory.
+- **Sorting and growing** come with every pool.
 
-#### [stage2d and projections](src/stage/)
-- create responsive three.js scenes by describing a _projection_
-- supports _orthogonal_ and _parallax_ (aka _perspective_) projections (more to come)
-- render several stages into one frame with a `StageRenderer`, nest renderers and add
-  post-processing through a TSL pipeline — a bloom composition is built in
-- `Canvas2DStage` shows the content of a 2D `<canvas>` on a sprite, fitted by `contain` or
-  `cover`, and uploads it again after every change
-- api docs: [stage layer cheat-sheet](src/stage/README.md)
-- :heavy_check_mark: api is stable and ready to use
+### 🎬 Stages and projections
 
-#### [display](src/display/)
-- cosy boilerplate for creating a three.js &lt;canvas&gt; element and dealing with the
-  _init_, _resize_ and _frame_ event&#x2011;loop
-- nice starting point for your three.js demos
-- imports nothing but three.js and `@spearwolf/eventize`; the peer dependencies of the
-  package are listed under [Usage](../../README.md#usage)
-- api docs: the `Display` class docs — lifecycle and resize model — in
-  [src/display/Display.ts](src/display/Display.ts)
-- :heavy_check_mark: api is stable and ready to use
+- **Responsive scenes.** You describe the view, and the library keeps it fitted to the
+  canvas: filled, contained or covered, at a whole-pixel zoom when you want one.
+- **Orthographic and parallax** projections.
+- **Several stages in one frame**, layered and nested.
+- **Post-processing** with a node-based pipeline. Bloom is built in.
+- **2D canvas on a sprite.** Whatever you draw on an HTML canvas shows up in the scene and
+  is uploaded again after every change.
 
-#### [controls](src/controls/)
-- `PanControl2D` pans a 2D view by pointer drag and by keyboard, the keys at the _WASD_
-  position by default, whatever the keyboard layout labels them
-- `InputControlBase` is the base for controls of your own: it tracks the listeners a
-  control puts on its hosts and takes them off again on `dispose()`
+### 🖥️ Display
 
-#### [resource lifecycle](docs/resource-lifecycle.md)
-- the binding rules for `dispose()` and ownership of geometries, materials, textures and
-  pools
-- what a disposed instance answers, and how signals, effects and events are torn down
-- a checklist and a test pattern for every new `dispose()`
+- **A canvas, ready to go.** Renderer, resizing and the frame loop are taken care of, and a
+  fixed timestep is available for game logic.
+- **A good starting point** for your three.js demos.
+
+### 🎮 Controls
+
+- **Panning** with mouse drag and the WASD keys, whatever the keyboard layout.
+- **A base for your own controls**, which cleans up its listeners when you are done.
+
+### 🧹 Tidy resources
+
+- **Clear ownership.** It is always clear who frees which geometry, material and texture.
+  Cleaning up twice does no harm.
+
+---
+
+## Taste it
+
+- the **LOOKBOOK**, a gallery of runnable demos: `pnpm lookbook` in a clone of this
+  repository, see the [project README](../../README.md)
+- the guides: [sprites](docs/sprites.md), [text](docs/text.md),
+  [stages](src/stage/README.md), [resource lifecycle](docs/resource-lifecycle.md),
+  [architecture](docs/architecture.md)
 
 have fun! :rocket:
