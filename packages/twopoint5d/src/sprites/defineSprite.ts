@@ -225,7 +225,7 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
   const pipeline = buildSpritePipeline(features, WHERE);
   if (pipeline.placement === undefined) {
     throw new Error(
-      `${WHERE}: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement or axisBillboardPlacement()`,
+      `${WHERE}: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement, axisBillboardPlacement() or segmentPlacement()`,
     );
   }
   if (pipeline.placement.textures != null) {

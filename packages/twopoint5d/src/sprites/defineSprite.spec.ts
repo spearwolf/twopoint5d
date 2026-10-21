@@ -151,7 +151,7 @@ describe('defineSprite()', () => {
   describe('refuses', () => {
     test('a kind without a placement', () => {
       expect(() => defineSprite({base: QuadBase, features: [position]})).toThrow(
-        'defineSprite: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement or axisBillboardPlacement()',
+        'defineSprite: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement, axisBillboardPlacement() or segmentPlacement()',
       );
     });
 
