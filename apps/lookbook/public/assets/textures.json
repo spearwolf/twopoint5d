@@ -9,6 +9,30 @@
       "tileSet": {"tileWidth": 128, "tileHeight": 128},
       "texture": ["nearest", "srgb"]
     },
+    "boomerCeiling": {
+      "imageUrl": "boomer-shooter-corridor/ceiling.png",
+      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy"]
+    },
+    "boomerDoor": {
+      "imageUrl": "boomer-shooter-corridor/door.png",
+      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy"]
+    },
+    "boomerFloor": {
+      "imageUrl": "boomer-shooter-corridor/floor.png",
+      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy"]
+    },
+    "boomerSigns": {
+      "atlasUrl": "boomer-shooter-corridor/signs.json",
+      "texture": ["nearest", "srgb"]
+    },
+    "boomerStalker": {
+      "atlasUrl": "boomer-shooter-corridor/stalker.json",
+      "texture": ["nearest", "srgb"]
+    },
+    "boomerWall": {
+      "imageUrl": "boomer-shooter-corridor/wall.png",
+      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy"]
+    },
     "cardboardAtlas": {
       "atlasUrl": "cardboard/cardboard.json",
       "texture": ["mag-nearest", "srgb"]

@@ -1,0 +1,31 @@
+{
+  "title": "boomer shooter corridor",
+  "shortDescription": "Sprites in a 3D world, as Doom drew them: eight-view stalkers patrol a neon corridor, throw shadows from a gliding lamp, and flash, fall and fade when a click hits them",
+  "description": "A first-person walk down a neon cyberpunk corridor, patrolled by stalkers rendered in Blender from eight directions. The stalkers are one `FeatureSprites` mesh of a kind with `axisBillboardPlacement()`: they turn about the up axis to face the camera and stay upright at any pitch — the button swaps in `BillboardPlacement`, and the spherical billboards lean back as you look down ([axis billboards](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#axis-billboards)). Each stalker has a heading of its own in `Yaw`, and `tableFrame({views: 8})` adds to its `frameIndex` the view the camera sees it from: walk around one and its front, flanks and back come round. One `FrameTable` holds all 80 frames of the atlas; every animation — idle, walk, aim and fire, hurt, dead — runs on the CPU by writing `frameIndex = first + frame · 8` each frame (`attributeUsage: {dynamic: ['frameIndex', 'yaw']}`) ([directional frames](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#frames-out-of-a-table-tableframe)). A `ShadowPass` throws their shadows onto the floor from a lamp that glides along the ceiling, bound with `planeOf(floor)` and `lightOf(light)` ([passes](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#passes-shadows-and-reflections), [bindings](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#binding-uniforms-to-the-scene-graph)). A click asks a `SpritePicker` which stalker the gpu drew under the pointer — pixel-perfect, a click beside its body hits nothing — and the hit stalker `Flash`es white, recoils, falls at the third hit and `Fade`s out before it comes back ([picking](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#picking-which-sprite-is-under-the-pointer)); the fading body blends, so the mesh is sorted with `sortByViewDepth()` every frame. The neon signs are flat sprites with a `Tint` above 1, and the bloom of `createBloomOutputNodeBuilder({threshold: 1})` makes them, the ceiling strips and the lamp glow ([glow](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/sprites.md#glow-emissive-sprites-with-bloom)). Drag to look, WASD or the arrow keys to walk; the autoplay walks the corridor until you take over.",
+  "url": "/demos/boomer-shooter-corridor",
+  "tags": [
+    "FeatureSprites",
+    "AxisBillboardPlacement",
+    "BillboardPlacement",
+    "FrameTable",
+    "TableFrame",
+    "Yaw",
+    "ShadowPass",
+    "planeOf",
+    "lightOf",
+    "SpritePicker",
+    "Flash",
+    "Fade",
+    "Tint",
+    "createBloomOutputNodeBuilder",
+    "Stage2D",
+    "StageRenderer",
+    "TextureStore",
+    "texture-atlas",
+    "billboards",
+    "directional-sprites",
+    "picking",
+    "vanilla",
+    "demo"
+  ]
+}

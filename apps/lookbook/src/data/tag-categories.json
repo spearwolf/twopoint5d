@@ -36,7 +36,13 @@
         "Anchor",
         "SegmentEnd",
         "segmentPlacement",
-        "RepeatingTextureColor"
+        "RepeatingTextureColor",
+        "AxisBillboardPlacement",
+        "TableFrame",
+        "Fade",
+        "SpritePicker",
+        "directional-sprites",
+        "picking"
       ]
     },
     {
@@ -56,7 +62,8 @@
         "colorFromTextureByTexCoords",
         "AtlasFrameTable",
         "atlasFrameTable",
-        "sampleAtlasFrame"
+        "sampleAtlasFrame",
+        "FrameTable"
       ]
     },
     {
