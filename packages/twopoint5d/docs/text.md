@@ -108,6 +108,11 @@ attribute, so the `baseArgs` of the sprites count: under `QuadBase` with its def
 the middle of the glyph box, with `baseArgs: [0.5, 0.5, 0.5, -0.5]` it is the top left corner. A
 `Rotation` turns a glyph about its position, so the base chooses the pivot.
 
+**`Anchor`.** A kind with the sprite feature `Anchor` takes its text exactly where a kind without it
+does: `writeText()` writes no anchor, and a new sprite starts at `(0.5, 0.5)`, which moves nothing.
+An anchor set on a glyph afterwards moves the glyph off its box — to turn a glyph about another point
+and keep it in place, move it along: `x += (anchorX − 0.5) · width`, `y −= (anchorY − 0.5) · height`.
+
 **What is written.** The frame (`setFrame()`), the size of the box and the position, with the `z` of
 the options. Nothing else: a new sprite keeps its white tint and its rotation of 0 until the caller
 writes them. `QuadSize` and `AtlasFrame` are static attributes and reach the GPU with the first
@@ -159,27 +164,52 @@ export const panelSize = {width: width + 8, height: height + 8, lineCount, first
 
 ## A sine scroller
 
-`writeText()` lays the text out once; the scroller moves its glyphs. Each sprite keeps the x it was
-written at, and every frame moves them all along and bends them on a sine — here on the CPU, one
-`setPosition()` per glyph; a feature that bends the sprites in the shader takes that off it:
+`writeText()` lays the text out once; the scroller moves its glyphs along, and `wave({weight:
+'uniform'})` bends them on a sine in the shader — the phase of each glyph comes from its x, so the
+glyphs ride the wave as they pass. The CPU writes one x per glyph and one `time` per frame
+(see "Waves: sway and scroller" in [the sprite guide](sprites.md)):
 
 ```ts check
-import {type BitmapFont, FeatureSprites, TexturedSpriteKind, writeText} from '@spearwolf/twopoint5d';
+import {
+  AtlasFrame,
+  type BitmapFont,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  Tint,
+  wave,
+  writeText,
+} from '@spearwolf/twopoint5d';
 import type {Texture} from 'three/webgpu';
 
 declare const font: BitmapFont;
 declare const page: Texture;
 
-const scroller = new FeatureSprites(TexturedSpriteKind, {capacity: 128, textures: {colorMap: page}});
+const ScrollerKind = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Tint, wave({weight: 'uniform'})],
+});
+
+const scroller = new FeatureSprites(ScrollerKind, {
+  capacity: 128,
+  textures: {colorMap: page},
+  // 24 units up and down, a wave every 400 units, a third of a wave per second
+  uniforms: {waveAmplitude: 24, waveFrequency: 1 / 400, waveSpeed: 1 / 3},
+});
 const glyphs = writeText(scroller, font, 'GREETINGS TO ALL SCENERS ...', {scale: 4});
 const home = glyphs.map((glyph) => glyph.x);
 const length = home.at(-1)! + 64;
 
 export function frame(time: number) {
   glyphs.forEach((glyph, i) => {
-    const x = ((home[i]! - time * 120) % length + length) % length - 320;
-    glyph.setPosition(x, Math.sin(x / 60 + time * 2) * 24);
+    // x alone: the y writeText() gave the glyph stays, and the wave moves it in the shader
+    glyph.x = (((home[i]! - time * 120) % length) + length) % length - 320;
   });
+  scroller.setUniform('time', time);
   scroller.update(); // the position is a dynamic attribute: every update() uploads it
 }
 ```

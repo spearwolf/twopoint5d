@@ -1,4 +1,5 @@
 /** @import {Display, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+import {expect} from '@esm-bundle/chai';
 import {
   FeatureSprites,
   Map2D,
@@ -12,7 +13,7 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
-import {DataTexture, OrthographicCamera, PerspectiveCamera, Scene} from 'three/webgpu';
+import {DataTexture, LinearMipmapLinearFilter, NearestFilter, OrthographicCamera, PerspectiveCamera, Scene} from 'three/webgpu';
 
 // The fixtures the browser tests build their cases from. A helper that a second test file
 // needs moves here instead of being copied.
@@ -245,6 +246,34 @@ export function makeColorTexture(texels, width = texels.length, height = 1) {
 }
 
 /**
+ * A checkerboard of 4 × 4 red and green texels with mipmaps, for drawing magnified: every texel is
+ * drawn by nearest, and only the smallest mip levels show the mix of the two colors — a seam of a
+ * mip level picked too small at the wrap of a repeat shows as pixels {@link countMixed} counts. The
+ * caller disposes it.
+ */
+export function makeMipmappedChecker() {
+  const red = [255, 0, 0, 255];
+  const green = [0, 255, 0, 255];
+  const texels = Array.from({length: 16}, (_, i) => (((i % 4) + Math.floor(i / 4)) % 2 ? green : red));
+  const texture = makeColorTexture(texels, 4, 4);
+  texture.generateMipmaps = true;
+  texture.minFilter = LinearMipmapLinearFilter;
+  texture.magFilter = NearestFilter;
+  return texture;
+}
+
+/** How many lit pixels of a read-back target are neither red nor green: the seam of a mip level picked too small. */
+export function countMixed(pixels) {
+  let mixed = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
+    if (isNearColor(rgb, [0, 0, 0])) continue;
+    if (!isNearColor(rgb, [255, 0, 0], 8) && !isNearColor(rgb, [0, 255, 0], 8)) mixed++;
+  }
+  return mixed;
+}
+
+/**
  * A sheet that holds an image twice: upright at `(0, 0)`, and right beside it at `(width, 0)` turned by 90°
  * clockwise, the way TexturePacker lays a sprite with `rotated: true` into its sheet — the pixel `(px, py)`
  * of the image lies at `(width + height - 1 - py, px)` there, so the top edge of the image runs down the
@@ -437,6 +466,48 @@ export async function readsTopDown(renderer, target) {
   const lower = !isNearColor(rgbAt(pixels, size, size / 2, size - 1 - upperRow), [0, 0, 0]);
   if (upper === lower) throw new Error('readsTopDown: the probe sprite shows in both or neither of the two rows it may land in');
   return upper;
+}
+
+/**
+ * The colors at the middles of the cells of a sprite `columns × rows` units large whose middle is at
+ * `(x, y)`, row by row from the top of the picture, on a target `size` pixels square drawn at
+ * `pixelsPerUnit` pixels to the unit around the origin — `topDown` is the row order the backend read
+ * the target back in (see {@link readsTopDown}).
+ */
+export function cellColors(pixels, size, pixelsPerUnit, topDown, x, y, columns, rows) {
+  const center = size / 2;
+  const colors = [];
+  for (let row = 0; row < rows; row++) {
+    const line = [];
+    for (let column = 0; column < columns; column++) {
+      const px = Math.floor(center + (x + column - (columns - 1) / 2) * pixelsPerUnit);
+      const fromTop = Math.floor(center - (y + (rows - 1) / 2 - row) * pixelsPerUnit);
+      line.push(rgbAt(pixels, size, px, topDown ? fromTop : size - 1 - fromTop));
+    }
+    colors.push(line);
+  }
+  return colors;
+}
+
+/** The cells of {@link cellColors} mirrored left for right. */
+export const mirroredX = (cells) => cells.map((line) => [...line].reverse());
+
+/** The cells of {@link cellColors} mirrored upside down. */
+export const mirroredY = (cells) => [...cells].reverse();
+
+/** Holds the cells of {@link cellColors} to `expected`, cell by cell; the reference has to light more than one cell. */
+export function expectSameCells(actual, expected, what) {
+  expect(
+    expected.flat().filter((rgb) => !isNearColor(rgb, [0, 0, 0])),
+    `the cells of the reference of ${what} that are lit`,
+  ).to.have.length.above(1);
+  actual.forEach((line, row) =>
+    line.forEach((rgb, column) => {
+      expect(rgb, `${what}: cell (${column}, ${row}) against ${expected[row][column]}`).to.satisfy((c) =>
+        isNearColor(c, expected[row][column]),
+      );
+    }),
+  );
 }
 
 /**

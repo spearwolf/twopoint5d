@@ -151,7 +151,7 @@ describe('defineSprite()', () => {
   describe('refuses', () => {
     test('a kind without a placement', () => {
       expect(() => defineSprite({base: QuadBase, features: [position]})).toThrow(
-        'defineSprite: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement or axisBillboardPlacement()',
+        'defineSprite: no feature contributes a placement stage; a sprite kind holds exactly one — FlatPlacement, GroundPlacement, another flatPlacement(), BillboardPlacement, axisBillboardPlacement() or segmentPlacement()',
       );
     });
 
@@ -183,6 +183,29 @@ describe('defineSprite()', () => {
       expect(() => defineSprite({base: QuadBase, features: [position, flat, position]})).toThrow(
         'defineSprite: two features are named "instancePosition"',
       );
+    });
+
+    test('two features of one name ask the checkKind of the first to say why, before the plain refusal', () => {
+      const seen: string[][] = [];
+      const form = (name: string, refuse: boolean) =>
+        defineFeature({
+          name,
+          checkKind: ({features}) => {
+            seen.push(features.map((feature) => feature.name));
+            if (refuse) throw new Error('a kind takes one form of it');
+          },
+        });
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, form('form', true), form('form', false)]})).toThrow(
+        'defineSprite: feature "form": a kind takes one form of it',
+      );
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, form('quiet', false), form('quiet', true)]})).toThrow(
+        'defineSprite: two features are named "quiet"',
+      );
+      expect(seen).toEqual([
+        ['instancePosition', 'flat', 'form', 'form'],
+        ['instancePosition', 'flat', 'quiet', 'quiet'],
+      ]);
     });
 
     test('a feature whose requires the kind does not meet', () => {
@@ -284,6 +307,29 @@ describe('defineSprite()', () => {
       expect(defineSprite({base: QuadBase, features: [position, flat, frame]}).usageAliases).toEqual({
         position: ['instancePosition'],
         texCoords: ['texTrim'],
+      });
+    });
+
+    test('lets a feature add attributes of its own to the word another feature names after its attribute, in any order', () => {
+      const frame = defineFeature({
+        name: 'frame',
+        attributes: {texCoords: {size: 4}, texTrim: {size: 4}},
+        usageAliases: {texCoords: ['texTrim']},
+      });
+      const border = defineFeature({name: 'border', attributes: {insets: {size: 4}}, usageAliases: {texCoords: ['insets']}});
+
+      expect(defineSprite({base: QuadBase, features: [position, flat, frame, border]}).usageAliases).toEqual({
+        position: ['instancePosition'],
+        texCoords: ['texTrim', 'insets'],
+      });
+      expect(defineSprite({base: QuadBase, features: [position, flat, border, frame]}).usageAliases).toEqual({
+        position: ['instancePosition'],
+        texCoords: ['insets', 'texTrim'],
+      });
+      // without the feature of the attribute the word is the joining feature's own
+      expect(defineSprite({base: QuadBase, features: [position, flat, border]}).usageAliases).toEqual({
+        position: ['instancePosition'],
+        texCoords: ['insets'],
       });
     });
 

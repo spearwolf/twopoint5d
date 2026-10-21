@@ -14,7 +14,11 @@ import {FlatPlacement, flatPlacement} from './features/FlatPlacement.js';
 import {Flash} from './features/Flash.js';
 import {InstancePosition} from './features/InstancePosition.js';
 import {Orientation} from './features/Orientation.js';
+import {PaletteSwap} from './features/PaletteSwap.js';
 import {QuadSize} from './features/QuadSize.js';
+import {SegmentEnd} from './features/SegmentEnd.js';
+import {segmentPlacement} from './features/SegmentPlacement.js';
+import {tableFrame} from './features/TableFrame.js';
 import {TextureColor} from './features/TextureColor.js';
 import {Yaw} from './features/Yaw.js';
 import {ReflectionPass, ShadowPass} from './passes/passPresets.js';
@@ -39,6 +43,30 @@ const trimmedFrame: TextureAtlasFrame<unknown> = {
 const tint = new Color(0.8, 0.4, 0.2);
 
 describe('sprites on the hot path', () => {
+  test('picking the frame and the view of a table sprite and its palette row allocates nothing per call', async () => {
+    const TableSprite = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, FlatPlacement, QuadSize, Yaw, tableFrame({views: 8}), TextureColor, PaletteSwap],
+    });
+    const sprites = new FeatureSprites(TableSprite, {capacity: 1000, attributeUsage: {dynamic: ['frameIndex', 'yaw']}});
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+
+    // whole numbers from the counter and constants alone: see the first test of this file
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        const sprite = all[i]!;
+        sprite.frameIndex = (i & 3) * 8;
+        sprite.yaw = i;
+        sprite.paletteRow = i & 3;
+        sprites.setUniform('paletteShift', i);
+      }
+    });
+    const bytesPerCall = bytesPerRound / (all.length * 4);
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
   test('moving, turning, re-framing and tinting a textured sprite allocates nothing per call', async () => {
     const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1000});
     const all = Array.from({length: 1000}, () => sprites.createSprite()!);
@@ -182,6 +210,31 @@ describe('sprites on the hot path', () => {
     });
 
     expect(bytesPerRound / (all.length * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    sprites.dispose();
+  });
+
+  test('moving both ends of a segment allocates nothing per call', async () => {
+    const kind = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, SegmentEnd, segmentPlacement({facing: 'camera'}), QuadSize, AtlasFrame, TextureColor],
+    });
+    const sprites = new FeatureSprites(kind, {capacity: 1000});
+    const all = Array.from({length: 1000}, () => sprites.createSprite()!);
+    // the tuple a caller keeps for an end it writes in one go
+    const end: [number, number, number] = [3.5, 0.25, -1.5];
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < all.length; i++) {
+        const segment = all[i]!;
+        segment.setPosition(i, 1.5, 2.5);
+        segment.setSegmentEnd(i, 2.5, 0.5);
+        segment.setSegmentEnd(i, 0.75);
+        segment.setSegmentEnd(end);
+      }
+      sprites.update();
+    });
+
+    expect(bytesPerRound / (all.length * 4)).toBeLessThan(BYTES_PER_CALL_LIMIT);
     sprites.dispose();
   });
 

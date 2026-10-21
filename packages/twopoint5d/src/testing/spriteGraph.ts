@@ -126,6 +126,8 @@ export type EvaluatedValue = number | number[];
 interface EvaluableNode {
   readonly type: string;
   readonly isVarNode?: boolean;
+  readonly isVaryingNode?: boolean;
+  readonly isSubBuildNode?: boolean;
   readonly isConstNode?: boolean;
   readonly isUniformNode?: boolean;
   readonly isSplitNode?: boolean;
@@ -169,14 +171,16 @@ const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
 
 /**
  * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
- * `<`, `select()`, swizzles, vectors joined from parts, `dot`, `cross`, `length`, `normalize`, `max`,
- * `mix`, `negate`, `sin` and `cos` — what the mesh stages, the placements and the color stages are
- * built from.
- * Throws for any other node.
+ * `<`, `select()`, swizzles, vectors joined from parts, varyings, `dot`, `cross`, `length`,
+ * `normalize`, `max`, `min`, `clamp`, `step`, `abs`, `round`, `fract`, `mix`, `negate`, `sin` and
+ * `cos` — what the frame, local, mesh, uv and color stages and the placements are built from. Throws
+ * for any other node.
  */
 export function evaluateNode(root: Node): EvaluatedValue {
   const node = root as unknown as EvaluableNode;
-  if (node.isVarNode) return evaluateNode(node.node!);
+  // a varying hands its node on to the fragment stage, a sub-build marks it for another one: on the
+  // cpu each is that node
+  if (node.isVarNode || node.isVaryingNode || node.isSubBuildNode) return evaluateNode(node.node!);
   if (node.isConstNode || node.isUniformNode) {
     const {value} = node;
     return typeof value === 'number' ? value : value!.toArray();
@@ -211,6 +215,19 @@ export function evaluateNode(root: Node): EvaluatedValue {
       }
       case 'max':
         return zip(a, evaluateNode(node.bNode!), Math.max);
+      case 'min':
+        return zip(a, evaluateNode(node.bNode!), Math.min);
+      case 'clamp':
+        return zip(zip(a, evaluateNode(node.bNode!), Math.max), evaluateNode(node.cNode!), Math.min);
+      // step(edge, x): 1 for x ≥ edge
+      case 'step':
+        return zip(a, evaluateNode(node.bNode!), (edge, x) => (x >= edge ? 1 : 0));
+      case 'abs':
+        return zip(a, 0, Math.abs);
+      case 'round':
+        return zip(a, 0, Math.round);
+      case 'fract':
+        return zip(a, 0, (x) => x - Math.floor(x));
       case 'length':
         return Math.sqrt(dotOf(a, a));
       case 'negate':

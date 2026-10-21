@@ -1,23 +1,15 @@
 import {expect} from '@esm-bundle/chai';
 import {AtlasFrameTable, Display, sampleAtlasFrame, TexturePackerJson} from '@spearwolf/twopoint5d';
 import {float, fract, int, texture as sampleTexture, uv, vec2} from 'three/tsl';
-import {
-  LinearMipmapLinearFilter,
-  Mesh,
-  MeshBasicNodeMaterial,
-  NearestFilter,
-  OrthographicCamera,
-  PlaneGeometry,
-  RenderTarget,
-  Scene,
-} from 'three/webgpu';
+import {Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, RenderTarget, Scene} from 'three/webgpu';
 import {
   compareWithModel,
+  countMixed,
   disposeDisplay,
   makeColorTexture,
   makeContainer,
+  makeMipmappedChecker,
   makeSheetWithTurnedCopy,
-  isNearColor,
   readsTopDown,
   renderToPixels,
 } from './helpers/fixtures.js';
@@ -228,35 +220,9 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
     expectModel(await render(scene), (x, y) => (y > 1 ? BLACK : imageOnPlane(0, 3, 2)(x, y)));
   });
 
-  /**
-   * A checkerboard of 4 × 4 red and green texels with mipmaps, magnified: every texel is drawn by
-   * nearest, and only the smallest mip levels show the mix of the two colors.
-   */
-  function makeMipmappedChecker() {
-    const red = [255, 0, 0, 255];
-    const green = [0, 255, 0, 255];
-    const texels = Array.from({length: 16}, (_, i) => (((i % 4) + Math.floor(i / 4)) % 2 ? green : red));
-    const texture = makeColorTexture(texels, 4, 4);
-    texture.generateMipmaps = true;
-    texture.minFilter = LinearMipmapLinearFilter;
-    texture.magFilter = NearestFilter;
-    disposals.push(() => texture.dispose());
-    return texture;
-  }
-
-  /** How many lit pixels are neither red nor green: the seam of a mip level picked too small. */
-  function countMixed(pixels) {
-    let mixed = 0;
-    for (let i = 0; i < pixels.length; i += 4) {
-      const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
-      if (isNearColor(rgb, [0, 0, 0])) continue;
-      if (!isNearColor(rgb, [255, 0, 0], 8) && !isNearColor(rgb, [0, 255, 0], 8)) mixed++;
-    }
-    return mixed;
-  }
-
   it('repeats a frame of a mipmapped atlas without a seam at its wraps, where a bare fract() shows one', async function () {
     const map = makeMipmappedChecker();
+    disposals.push(() => map.dispose());
     const [atlas] = TexturePackerJson.parse({
       frames: {checker: {frame: {x: 0, y: 0, w: 4, h: 4}}},
       meta: {image: 'checker.png', size: {w: 4, h: 4}},

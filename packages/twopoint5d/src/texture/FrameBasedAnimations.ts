@@ -2,8 +2,8 @@ import type {WebGPURenderer} from 'three/webgpu';
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
-import {isObject} from '../utils/isObject.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
+import {isTextureSize, readMaxTextureSize} from './readMaxTextureSize.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TileSet} from './TileSet.js';
@@ -259,31 +259,6 @@ const getBufferSize = (
   }
 
   return bufSize;
-};
-
-const isTextureSize = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1;
-
-// The limit of the device behind `renderer`, or `undefined` when it names none. `@types/three`
-// types `renderer.backend` as a plain `Backend`, so the device is read through `unknown`: the
-// `device` of a WebGPU backend — `null` until `init()` has run — or the `gl` context of the WebGL2
-// fallback. An optional limit must not stop a bake, so a renderer that throws on the way names none.
-const readMaxTextureSize = (renderer: WebGPURenderer): number | undefined => {
-  try {
-    const backend: unknown = renderer.backend;
-    if (!isObject(backend)) return undefined;
-    const {device, gl} = backend;
-    let limit: unknown;
-    if (isObject(device)) {
-      const {limits} = device;
-      limit = isObject(limits) ? limits['maxTextureDimension2D'] : undefined;
-    } else if (isObject(gl)) {
-      const {getParameter, MAX_TEXTURE_SIZE} = gl;
-      limit = typeof getParameter === 'function' ? getParameter.call(gl, MAX_TEXTURE_SIZE) : undefined;
-    }
-    return isTextureSize(limit) ? limit : undefined;
-  } catch {
-    return undefined;
-  }
 };
 
 // the first component of the second header texel, read by `AnimatedFrames`
