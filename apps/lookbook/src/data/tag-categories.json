@@ -25,7 +25,15 @@
         "Orientation",
         "Rotation",
         "Tint",
-        "billboards"
+        "billboards",
+        "AxisBillboardPlacement",
+        "BillboardPlacement",
+        "TableFrame",
+        "Fade",
+        "Flash",
+        "SpritePicker",
+        "directional-sprites",
+        "picking"
       ]
     },
     {
@@ -38,6 +46,7 @@
         "texture-atlas",
         "TextureAtlas",
         "TextureCoords",
+        "FrameTable",
         "TextureFactory",
         "TextureStore",
         "TileSet",

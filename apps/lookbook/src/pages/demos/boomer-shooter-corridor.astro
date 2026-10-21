@@ -1,0 +1,187 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_boomer-shooter-corridor.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section class="fixed top-[calc(var(--demo-nav-bar-height)+1rem)] right-4 flex flex-wrap gap-2 items-center justify-end">
+      <div class="actionBtn toggleAutoplay">autoplay: on</div>
+      <div class="actionBtn togglePlacement">stalkers: axis billboards</div>
+      <div class="actionBtn toggleShadows">shadows: on</div>
+    </section>
+    <div class="hud fixed bottom-4 left-4">
+      <div class="score">hits 0 · down 0</div>
+      <div class="help">drag to look · WASD or arrows to walk · click a stalker to hit it</div>
+    </div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #0b0618;
+    color: #d8c8ff;
+  }
+  canvas {
+    cursor: crosshair;
+    touch-action: none;
+  }
+  .hud {
+    font-family: monospace;
+    font-size: 110%;
+    padding: 0.4em 0.7em;
+    background: rgba(11 6 24 / 70%);
+    border: 1px solid rgba(255 42 184 / 45%);
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .score {
+    color: #3ad8ff;
+    font-weight: bold;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    createBloomOutputNodeBuilder,
+    Display,
+    lightOf,
+    OnStageUpdateFrame,
+    planeOf,
+    SpritePicker,
+    Stage2D,
+    StageRenderer,
+    type StageUpdateFrameProps,
+  } from '@spearwolf/twopoint5d';
+  import {Color, Fog, PerspectiveCamera, RenderPipeline} from 'three/webgpu';
+  import {Corridor} from '~demos/boomer-shooter-corridor/Corridor';
+  import {CorridorWalker} from '~demos/boomer-shooter-corridor/CorridorWalker';
+  import {NeonSigns} from '~demos/boomer-shooter-corridor/NeonSigns';
+  import {Stalkers} from '~demos/boomer-shooter-corridor/Stalkers';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+  import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+
+  const FOG = new Color('#0b0618');
+  const STALKER_COUNT = 6;
+  const PREVIEW_AFTER_SECONDS = 4;
+
+  // the preview screenshot waits for the corridor and its stalkers, not for the default delay
+  const preview = deferPreview();
+
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  // a stage without a projection takes the camera it is handed: a first-person perspective camera
+  const camera = new PerspectiveCamera(72, 1, 0.05, 80);
+  const stage = new Stage2D();
+  stage.camera = camera;
+  stage.scene.fog = new Fog(FOG, 4, 36);
+
+  display.onResize(({width, height}) => {
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  });
+
+  // the glow recipe: Stage2D renders through three's pass() into half floats, and the bloom lets in
+  // only what is brighter than white — the neon signs, the ceiling strips and the lamp
+  const stageRenderer = new StageRenderer(display).setClearColor(FOG, 1).add(stage);
+  const pipeline = new RenderPipeline(display.renderer!);
+  const withGlow = createBloomOutputNodeBuilder({strength: 0.55, radius: 0.3, threshold: 1});
+  stageRenderer.pipeline = pipeline;
+  stageRenderer.buildOutputNode = withGlow;
+
+  const walker = new CorridorWalker(camera, canvas);
+
+  display.onInit(async ({renderer}) => {
+    const store = await loadTextureCatalog(renderer);
+    const [[stalkerAtlas, stalkerTexture], [signsAtlas, signsTexture], [wall], [floor], [ceiling], [door]] = await Promise.all([
+      store.getAsync('boomerStalker', ['atlas', 'texture']),
+      store.getAsync('boomerSigns', ['atlas', 'texture']),
+      store.getAsync('boomerWall', ['texture']),
+      store.getAsync('boomerFloor', ['texture']),
+      store.getAsync('boomerCeiling', ['texture']),
+      store.getAsync('boomerDoor', ['texture']),
+    ]);
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
+
+    const corridor = new Corridor({wall, floor, ceiling, door});
+    const stalkers = new Stalkers({atlas: stalkerAtlas, texture: stalkerTexture}, STALKER_COUNT);
+    const signs = new NeonSigns({atlas: signsAtlas, texture: signsTexture});
+    stage.scene.add(corridor, stalkers.sprites, signs.sprites);
+
+    // the shadows fall on the floor, thrown from the lamp that glides along the ceiling: both
+    // bindings are worked out again in every update(), wherever the floor and the lamp are
+    stalkers.sprites.bindUniform('groundPlane', planeOf(corridor.floor));
+    stalkers.sprites.bindUniform('shadowLight', lightOf(corridor.light));
+
+    // a click asks the gpu which stalker is drawn under the pointer — pixel-perfect: a click into the
+    // clear pixels beside its body lands on nothing
+    const picker = new SpritePicker(renderer);
+    const score = document.querySelector('.score')!;
+    let hits = 0;
+    let downs = 0;
+    walker.onClick = async (pointer) => {
+      const hit = await picker.pick(camera, pointer, [stalkers.sprites]);
+      if (hit == null) return;
+      const result = stalkers.hit(hit.sprite);
+      if (result === 'miss') return;
+      hits += 1;
+      if (result === 'down') downs += 1;
+      score.textContent = `hits ${hits} · down ${downs}`;
+    };
+
+    let time = 0;
+    on(stage, OnStageUpdateFrame, ({deltaTime}: StageUpdateFrameProps) => {
+      time += deltaTime;
+      // the preview image shows the patrol under way, the stalkers spread out along the corridor
+      if (time > PREVIEW_AFTER_SECONDS) preview.ready(display);
+      walker.update(deltaTime);
+      corridor.update(time);
+      signs.update(time);
+      stalkers.update(deltaTime, camera);
+    });
+
+    // the buttons are written by the markup of this very page
+    const autoplayButton = document.querySelector('.toggleAutoplay')!;
+    const placementButton = document.querySelector('.togglePlacement')!;
+    const shadowsButton = document.querySelector('.toggleShadows')!;
+    walker.onAutoplayChange = (on) => {
+      autoplayButton.textContent = `autoplay: ${on ? 'on' : 'off'}`;
+    };
+    autoplayButton.addEventListener('click', () => {
+      walker.autoplay = !walker.autoplay;
+    });
+    placementButton.addEventListener('click', () => {
+      // AxisBillboardPlacement stays upright at any pitch; BillboardPlacement leans back with the camera
+      stalkers.upright = !stalkers.upright;
+      placementButton.textContent = `stalkers: ${stalkers.upright ? 'axis billboards' : 'billboards'}`;
+    });
+    shadowsButton.addEventListener('click', () => {
+      const shadow = stalkers.sprites.passes['shadow']!;
+      shadow.enabled = !shadow.enabled;
+      shadowsButton.textContent = `shadows: ${shadow.enabled ? 'on' : 'off'}`;
+    });
+
+    display.onDispose(() => {
+      walker.dispose();
+      picker.dispose();
+      stalkers.dispose();
+      signs.dispose();
+      corridor.dispose();
+      stageRenderer.dispose();
+      withGlow.dispose();
+      pipeline.dispose();
+      store.dispose();
+    });
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('boomer shooter corridor', {stalkers, signs, corridor, stage});
+  });
+
+  await display.start();
+</script>
