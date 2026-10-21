@@ -13,6 +13,7 @@ import {
   imageSource,
   type ImageLease,
   loadFailureFor,
+  subTypesOutOfReach,
   type TextureImageSource,
   type TextureResourceLoadFailure,
 } from './internals.js';
@@ -169,6 +170,15 @@ const SUBTYPES_HELD_BACK_BY_STEP: Record<LoadStep, readonly TextureResourceSubTy
   atlasParse: ['atlas', 'frameBasedAnimations'],
 };
 
+// what each type of resource builds at all: activate() registers the image effect alone for an
+// image, the tile set effects set `tileSet` and `atlas` and register the animations, and the atlas
+// effects set `atlas` and register the animations, but never a `tileSet`
+const SUBTYPES_BUILT_BY_TYPE: Record<TextureResourceType, readonly TextureResourceSubType[]> = {
+  image: ['imageCoords', 'texture'],
+  tileset: ['imageCoords', 'texture', 'tileSet', 'atlas', 'frameBasedAnimations'],
+  atlas: ['imageCoords', 'texture', 'atlas', 'frameBasedAnimations'],
+};
+
 // An animation entry that carries the data of another kind of resource is skipped — a tile
 // range on an atlas, a frame name query on a tile set, or an entry that names no frames at
 // all — and this is the error it is skipped with.
@@ -246,8 +256,13 @@ export interface TextureResource extends EventizedObject {}
  * `atlas` and the `frameBasedAnimations` — and releases the texture it built, since a
  * subscriber only borrows it. An image that is still loading when the url is cleared builds
  * nothing. An atlas resource whose json names no image, with no `overrideImageUrl` to fall back
- * on, has no `imageUrl` either and does the same. A `textureFactory` that is cleared takes
- * nothing back: the texture stays until the next factory builds one.
+ * on, has no `imageUrl` either and does the same.
+ *
+ * A resource without a `textureFactory` loads its image all the same and publishes its
+ * `imageCoords` and what is built from them — the `atlas`, the `tileSet` and the
+ * `frameBasedAnimations`; only the `texture` waits for a factory. A factory that is cleared
+ * leaves the texture it built standing for as long as the image stays the same, and a texture
+ * built from another image than the one loaded now is taken back and released.
  *
  * `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter` and `tileSetOptions` belong to one shape of
  * resource each. Writing one on a resource of another shape throws a `TypeError`.
@@ -347,7 +362,8 @@ export class TextureResource {
 
   /**
    * How many `TextureStore#on()` subscriptions hold this resource, a pending
-   * `TextureStore#getAsync()` among them. `TextureStore#clearUnused()` and
+   * `TextureStore#getAsync()` among them, and every lease of `TextureStore#acquireAsync()` that
+   * is not released yet. `TextureStore#clearUnused()` and
    * `TextureStore#parse()` with `{evictMissing: true}` dispose a resource only while this
    * is 0.
    *
@@ -570,6 +586,9 @@ export class TextureResource {
   // resource owns: every texture that reaches the signal was built here, and is released
   // here once its successor has taken its place
   #ownTexture?: Texture;
+  // the image url `#ownTexture` was built from: a run without a factory takes back a texture of
+  // another image than the one it loaded
+  #ownTextureUrl?: string;
 
   // the failure each step last ended with, until that step runs again: a resource does not
   // try again by itself, and a getAsync() that comes after the failure has to see it all the
@@ -634,6 +653,10 @@ export class TextureResource {
    * hold up the teardown: the resource is torn down whole, and the throw goes on to the caller
    * afterwards — both together as an `AggregateError`, the one of the resource first. A second
    * `dispose()` does nothing and throws nothing.
+   *
+   * A resource of a `TextureStore` that is disposed directly leaves its store: the next `parse()`
+   * that names its id builds a new one, `TextureStore#on()` follows that one, and a
+   * `TextureStore#getAsync()` that waits on this one rejects.
    */
   dispose() {
     if (this.#disposed) return;
@@ -665,6 +688,7 @@ export class TextureResource {
       errors.push(error);
     }
     this.#ownTexture = undefined;
+    this.#ownTextureUrl = undefined;
 
     this.#loadFailures.clear();
 
@@ -690,6 +714,30 @@ export class TextureResource {
       if (SUBTYPES_HELD_BACK_BY_STEP[step].some((subType) => subTypes.includes(subType))) return failure;
     }
     return undefined;
+  }
+
+  /**
+   * The subtypes of `subTypes` this resource never builds: by its type, and with `'now'` also
+   * `frameBasedAnimations` while the data it carries now builds none — a tile set without
+   * `frameBasedAnimationsData`, and an atlas without it once its atlas stands and its atlas adapter
+   * read no animations out of the json; before the atlas is there, it is open whether the adapter
+   * reads any. Answers `[]` once the resource is disposed.
+   *
+   * @internal
+   */
+  [subTypesOutOfReach](subTypes: readonly TextureResourceSubType[], scope: 'type' | 'now'): TextureResourceSubType[] {
+    if (this.#disposed) return [];
+    const built = SUBTYPES_BUILT_BY_TYPE[this.type];
+    const outOfReach = subTypes.filter((subType) => !built.includes(subType));
+    if (scope === 'now' && subTypes.includes('frameBasedAnimations') && built.includes('frameBasedAnimations')) {
+      const noData = this.#frameBasedAnimationsData.value == null;
+      const noAnimations =
+        this.type === 'tileset'
+          ? noData
+          : noData && this.#atlas.value !== undefined && this.#adapterAnimations.value === undefined;
+      if (noAnimations) outOfReach.push('frameBasedAnimations');
+    }
+    return outOfReach;
   }
 
   /**
@@ -776,6 +824,21 @@ export class TextureResource {
   }
 
   #registerImageEffect(): void {
+    // The image a resource on its own fetched last, handed out again to a run that asks for the same
+    // url: a run without a factory loads the image, and the run the arriving factory starts asks for
+    // it once more. A load that failed is dropped, so the next run tries again. A resource of a store
+    // fetches through the image cache of the store instead, which shares one image for the same reason
+    let standalone: {url: string; image: Promise<HTMLImageElement>} | undefined;
+    const loadStandalone = (url: string): Promise<HTMLImageElement> => {
+      if (standalone?.url === url) return standalone.image;
+      const entry = {url, image: new ImageLoader().loadAsync(url)};
+      entry.image.catch(() => {
+        if (standalone === entry) standalone = undefined;
+      });
+      standalone = entry;
+      return entry.image;
+    };
+
     // auto-tracking effect (no static deps) so it autoruns at registration
     // — activate() is typically called AFTER `textureFactory` and `imageUrl` are
     // already set on the resource (by the store's parse-time injection), and
@@ -788,13 +851,14 @@ export class TextureResource {
         const factory = this.#textureFactory.get();
         const url = this.#imageUrl.get();
         const classes = this.#textureClasses.get();
-        // no url, no image: what was built from the last one is taken back. No factory is a "not
-        // yet" instead — the texture of the last factory stays until the next one builds
+        // no url, no image: what was built from the last one is taken back. Without a factory the
+        // image is loaded all the same and everything but the texture is published — the
+        // coordinates, and what the other effects build from them; the texture of the last factory
+        // stays for as long as it was built from this very image
         if (!url) {
           this.#takeBackImage();
           return;
         }
-        if (!factory) return;
 
         let aborted = false;
 
@@ -807,9 +871,13 @@ export class TextureResource {
         // replaces. It throws out of the `finally` below before a throw that the batch handed back
         // has gone out as an `error` event, takes its place, is no failure of this step and ends
         // as an unhandled rejection
-        (lease?.image ?? new ImageLoader().loadAsync(url)).then(
+        (lease?.image ?? loadStandalone(url)).then(
           (image) => {
             if (aborted) return;
+            if (!factory) {
+              this.#publishImageWithoutTexture(url, image);
+              return;
+            }
             // the coordinates first, so a throw there leaves no texture behind that nobody
             // releases. There is no failed url to name here, so the resource is reported
             let coords: TextureCoords;
@@ -829,6 +897,7 @@ export class TextureResource {
             // the successor is on the signal and no reader can reach it
             const previous = this.#ownTexture;
             this.#ownTexture = texture;
+            this.#ownTextureUrl = url;
             let publishError: {error: unknown} | undefined;
             try {
               // one batch: the three values reach their effects together, and the higher
@@ -874,6 +943,43 @@ export class TextureResource {
     );
   }
 
+  // What a run without a factory publishes of the image it loaded: the coordinates, and with them
+  // whatever the other effects build out of them. A texture built from another image describes
+  // something that is no longer there and is taken back, in the same batch and released after it,
+  // as #takeBackImage() does; one built from this very image stays — a factory that is cleared, or
+  // texture classes that change without one, take nothing away
+  #publishImageWithoutTexture(url: string, image: HTMLImageElement): void {
+    let coords: TextureCoords;
+    try {
+      coords = new TextureCoords(0, 0, image.width, image.height);
+    } catch (error) {
+      this.#fail('image', {source: 'texture', id: this.id, error});
+      return;
+    }
+    const stale = this.#ownTextureUrl === url ? undefined : this.#ownTexture;
+    if (stale) {
+      this.#ownTexture = undefined;
+      this.#ownTextureUrl = undefined;
+    }
+    let publishError: {error: unknown} | undefined;
+    try {
+      batch(() => {
+        this.#imageUrlOfCoords.set(url);
+        this.#imageCoords.set(coords);
+        if (stale) this.#texture.set(undefined);
+      });
+    } catch (error) {
+      // a subscriber that throws inside the batch: every value is published by then, as in the run
+      // with a factory, so the throw is reported without a record that would hold a value back
+      publishError = {error};
+    } finally {
+      stale?.dispose();
+    }
+    if (publishError) {
+      emitSafe(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
+    }
+  }
+
   // A cleared image takes back what was built from it: the coordinates and the texture here, and
   // with the coordinates the tile set, its atlas and the animations, in the effects that hang off
   // them. The texture was built here and is released here, once the signal has given it up, so no
@@ -882,6 +988,7 @@ export class TextureResource {
   #takeBackImage(): void {
     const previous = this.#ownTexture;
     this.#ownTexture = undefined;
+    this.#ownTextureUrl = undefined;
     try {
       batch(() => {
         this.#imageUrlOfCoords.set(undefined);

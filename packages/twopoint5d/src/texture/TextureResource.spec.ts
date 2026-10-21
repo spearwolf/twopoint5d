@@ -51,6 +51,12 @@ const makeTextureFactory = () => {
 
 const asStub = (texture: Texture | undefined): StubTexture | undefined => texture as unknown as StubTexture | undefined;
 
+// a resource loads its image with or without a texture factory, and the image loader of three has
+// no document to load with here: an image that never arrives keeps a test about something else
+// free of an image failure it never asked for
+const holdImages = () =>
+  vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(() => new Promise<HTMLImageElement>(() => {}));
+
 describe('TextureResource', () => {
   const sandbox = createSandbox();
 
@@ -1049,6 +1055,7 @@ describe('TextureResource', () => {
 
     test('an atlasJson written while the fetch is in flight aborts that fetch', async () => {
       const calls = stubAbortableFetch();
+      holdImages();
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
       const errors: unknown[] = [];
@@ -1083,6 +1090,7 @@ describe('TextureResource', () => {
 
     test('a fetch that answers after an atlasJson was written leaves the written json in place', async () => {
       const answer = stubDeafFetch();
+      holdImages();
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
       const errors: unknown[] = [];
@@ -1112,6 +1120,7 @@ describe('TextureResource', () => {
 
     test('a fetch that fails after an atlasJson was written reports nothing', async () => {
       const answer = stubDeafFetch();
+      holdImages();
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
       const errors: unknown[] = [];
@@ -1283,6 +1292,8 @@ describe('TextureResource', () => {
           .mockImplementation((input) =>
             String(input) === 'A' ? Promise.resolve(new Response(JSON.stringify(withoutImage))) : new Promise<Response>(() => {}),
           );
+
+        holdImages();
 
         const resource = TextureResource.fromAtlas('sprites', 'A', 'override.png');
         const errors: Array<{source: string; url: string; error: Error}> = [];
@@ -2368,6 +2379,59 @@ describe('TextureResource', () => {
       expect(resource.texture).toBeUndefined();
       expect(textures[0]!.disposed).toBe(true);
       expect(errors).toEqual([]);
+
+      resource.dispose();
+    });
+  });
+
+  describe('a resource without a texture factory', () => {
+    const loadByUrl = (width = 16, height = 16) =>
+      vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async (url: string) => ({width, height, tag: url}) as unknown as HTMLImageElement);
+
+    // the factory asks a renderer for its anisotropy maximum, and for nothing else
+    const rendererStub = () => ({getMaxAnisotropy: () => 16}) as unknown as WebGPURenderer;
+
+    test('without a factory the resource publishes its imageCoords and builds no texture, and the factory that arrives builds it from the same fetch', async () => {
+      const loadSpy = loadByUrl(16, 8);
+
+      const resource = TextureResource.fromImage('hero', 'first.png');
+      resource.activate();
+      await flushMicrotasks();
+
+      expect(resource.imageCoords).toMatchObject({width: 16, height: 8});
+      expect(resource.texture).toBeUndefined();
+
+      resource.renderer = rendererStub();
+      await flushMicrotasks();
+
+      expect(resource.texture).toBeInstanceOf(Texture);
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+
+      resource.dispose();
+    });
+
+    test('a new image url without a factory takes back the texture of the old image', async () => {
+      loadByUrl();
+      const {factory, textures} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('hero', 'first.png');
+      resource.textureFactory = factory;
+      resource.activate();
+      await flushMicrotasks();
+
+      expect(asStub(resource.texture)?.tag).toBe('first.png');
+
+      resource.textureFactory = undefined;
+      loadByUrl(32, 24);
+      resource.imageUrl = 'second.png';
+      await flushMicrotasks();
+
+      expect(resource.texture).toBeUndefined();
+      expect(textures).toHaveLength(1);
+      expect(textures[0]!.disposed).toBe(true);
+      expect(resource.imageCoords).toMatchObject({width: 32, height: 24});
 
       resource.dispose();
     });

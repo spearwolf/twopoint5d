@@ -337,6 +337,27 @@ describe('DynamicAtlas', () => {
       );
     });
 
+    test('refuses an image element that has not loaded when a size is given', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      const unloaded = {width: 0, height: 0, naturalWidth: 0, naturalHeight: 0, complete: false} as unknown as DynamicAtlasImage;
+      expect(() => atlas.add('avatar', unloaded, {width: 8, height: 8})).toThrow(
+        'DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before add()',
+      );
+      expect(atlas.atlas.size).toBe(0);
+      expect(context.callsOf('drawImage')).toHaveLength(0);
+      // no cell was taken: the next frame goes where the refused one would have gone
+      expect(atlas.add('next', noop, {width: 8, height: 8}).data?.frame).toMatchObject({x: 1, y: 1});
+    });
+
+    test('refuses an image element that is still loading although its natural size is known', () => {
+      const {atlas} = atlasOn(64, 32);
+      // the browser knows the size once the image is "partially available", before it has loaded
+      const loading = {width: 9, height: 5, naturalWidth: 9, naturalHeight: 5, complete: false} as unknown as DynamicAtlasImage;
+      expect(() => atlas.add('avatar', loading)).toThrow(
+        'DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before add()',
+      );
+    });
+
     test('refuses a draw callback without a size', () => {
       const {atlas} = atlasOn(64, 32);
       expect(() => atlas.add('a', noop as never)).toThrow(
@@ -501,6 +522,17 @@ describe('DynamicAtlas', () => {
         'DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before redraw()',
       );
       expect(context.calls.length).toBe(calls);
+    });
+
+    test('refuses an image element that is still loading, before it clears the frame', () => {
+      const {atlas, context} = atlasOn(64, 32);
+      atlas.add('avatar', noop, {width: 10, height: 8});
+      const clears = context.callsOf('clearRect').length;
+      const loading = {width: 9, height: 5, naturalWidth: 9, naturalHeight: 5, complete: false} as unknown as DynamicAtlasImage;
+      expect(() => atlas.redraw('avatar', loading)).toThrow(
+        'DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before redraw()',
+      );
+      expect(context.callsOf('clearRect')).toHaveLength(clears);
     });
 
     test('a draw that throws leaves the frame cleared, and marked for upload', () => {

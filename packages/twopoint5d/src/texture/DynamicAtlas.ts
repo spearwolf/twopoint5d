@@ -238,8 +238,8 @@ export class DynamicAtlas {
    * A frame that does not fit is refused, and a callback that throws leaves the atlas as it was: in
    * both cases no frame is added and no cell is taken.
    *
-   * @throws {Error} for a name that is taken, an image element that has not loaded, a frame that does
-   *   not fit (a `RangeError`), and once the atlas is disposed.
+   * @throws {Error} for a name that is taken, an image element that has not loaded — with or without a
+   *   size —, a frame that does not fit (a `RangeError`), and once the atlas is disposed.
    * @throws {RangeError} for a size that is no finite number above 0.
    * @throws {TypeError} for a draw callback without a size.
    */
@@ -368,8 +368,11 @@ export class DynamicAtlas {
         `${WHERE}: add("${nameOf(name)}") with a draw callback needs the size — add(name, draw, {width, height})`,
       );
     }
-    if (typeof source !== 'function' && size == null) {
-      return this.#assertLoaded(name, source, 'add()');
+    if (typeof source !== 'function') {
+      // with a size as well: drawImage() draws nothing of an image that has not loaded, and the frame
+      // would stay empty for good
+      const natural = this.#assertLoaded(name, source, 'add()');
+      if (size == null) return natural;
     }
     const given = size as DynamicAtlasSize;
     const check = (value: unknown, what: string): number => {
@@ -434,10 +437,13 @@ export class DynamicAtlas {
     };
   }
 
-  // the natural size of an image, refused while it is 0: an image element that has not loaded
+  // The natural size of an image, refused for an image element that has not loaded: one whose natural
+  // size is still 0, and one that is still loading — the browser knows the size of an image once it is
+  // "partially available", before the last of it has arrived. Only an image element carries `complete`;
+  // an ImageBitmap and a canvas have none and are there as soon as they exist
   #assertLoaded(name: TextureAtlasFrameName, image: DynamicAtlasImage, call: string): {width: number; height: number} {
     const natural = sizeOfImage(image);
-    if (!(natural.width > 0) || !(natural.height > 0)) {
+    if (!(natural.width > 0) || !(natural.height > 0) || ('complete' in image && image.complete === false)) {
       throw new Error(`${WHERE}: the image of "${nameOf(name)}" has not loaded yet — await image.decode() before ${call}`);
     }
     return natural;

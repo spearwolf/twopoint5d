@@ -404,6 +404,12 @@ store.parse({items: {fighter: {atlasUrl: 'fighter.json', atlasAdapter: 'fighter'
 export const animations = store.getAsync('fighter', 'frameBasedAnimations');
 ```
 
+The store above has no renderer, and the animations need none: without a renderer a `TextureStore`
+loads the images and builds coordinates, atlases, tile sets and animations; only `texture` waits
+until `store.renderer` is set. A `getAsync()` after a subtype its resource never builds — the
+`atlas` of an image item, the `tileSet` of an atlas, the animations of an item that carries no
+animation data and whose adapter reads none — rejects instead of waiting.
+
 An item that names an adapter the store does not know builds no resource and is reported as an
 `error` of the store. An adapter reads the envelope the three packers share — `frames`,
 `meta.size`, `meta.image` — since the resource reads the image out of the json before any adapter
@@ -461,8 +467,8 @@ throws leaves the atlas as it was. The frame is untrimmed; its `data` is the rec
 `data` moves nothing. **`redraw(name, source)`** draws a frame anew at its size, in place: a score,
 a health label. A redraw that throws leaves the frame as far as it got — its cell cleared, perhaps
 drawn in part — and marked for upload; the frame and its name stay, so the next `redraw()` mends it.
-An image element that has not loaded is refused by `add()` and `redraw()` alike, before anything is
-cleared. **`remove(name)`** clears the frame and lets go of the name, not of its space — a shelf
+An image element that has not loaded — its natural size still 0, or `complete` still false — is
+refused by `add()`, with or without a size, and by `redraw()` alike, before anything is cleared. **`remove(name)`** clears the frame and lets go of the name, not of its space — a shelf
 packer fragments; **`clear()`** starts over with a new `atlas`, frame ids from 0.
 
 The atlas draws, clears and extrudes in canvas pixels whatever the caller left on `context` — a

@@ -46,6 +46,13 @@ export const imageSource: unique symbol = Symbol('TextureResource.imageSource');
 export const loadFailureFor: unique symbol = Symbol('TextureResource.loadFailureFor');
 
 /**
+ * The method of a `TextureResource` that answers which of the given subtypes it never builds: by
+ * its type alone, or — asked about `'now'` — also by the data it carries now. `TextureStore#getAsync()`
+ * rejects on them, and `TextureStore#on()` warns about the ones its type rules out.
+ */
+export const subTypesOutOfReach: unique symbol = Symbol('TextureResource.subTypesOutOfReach');
+
+/**
  * The field of a `TextureResource` into which `TextureStore` injects the way it picks an atlas
  * adapter for a json by its `meta.app`: the registry of the store. A resource on its own picks
  * among the built-in adapters.

@@ -1,4 +1,4 @@
-import {emitSafe, emitStrict, type EventizedObject, off, on, once, retain} from '@spearwolf/eventize';
+import {emitSafe, emitStrict, type EventizedObject, off, on, once, Priority, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
 import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
 import {type AtlasAdapter, type AtlasAdapterEntry, builtInAtlasAdapters, pickAtlasAdapter} from './atlasAdapters.js';
@@ -9,6 +9,7 @@ import {
   type ImageLease,
   imageSource,
   loadFailureFor,
+  subTypesOutOfReach,
   type TextureImageSource,
   type TextureResourceLoadFailure,
 } from './internals.js';
@@ -121,6 +122,10 @@ const noResourceError = (id: string): Error =>
 // one message for every promise that is cut short, naming the class and the state
 const disposedError = (what: string): Error => new Error(`[TextureStore] ${what} was cancelled: this store has been disposed`);
 
+// one message for a promise whose resource was disposed directly while it waited on it
+const resourceDisposedError = (what: string, id: string): Error =>
+  new Error(`[TextureStore] ${what} was cancelled: the resource "${id}" has been disposed`);
+
 // one message for a load that never got as far as a parse, naming the step that failed and
 // whatever the failure can be pinned to — the url that was being fetched, the id of the item
 // that is at fault — an item without a source has no url of its own —, or the url of the catalog
@@ -133,6 +138,35 @@ const loadFailedError = (source: string, what: string | URL | undefined, cause: 
 const resourceFailedError = (what: string, {source, url, error}: TextureResourceLoadFailure): Error =>
   new Error(`[TextureStore] ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
 
+const articleOf = (type: string): string => (/^[aeiou]/.test(type) ? 'an' : 'a');
+
+// one message for a getAsync() after a subtype its resource never builds: by the type of the
+// resource — which wins where the type and the data both rule a subtype out — or by the animation
+// data it lacks
+const outOfReachError = (what: string, resource: TextureResource, subTypes: readonly TextureResourceSubType[]): Error => {
+  const {id, type} = resource;
+  const byType = resource[subTypesOutOfReach](subTypes, 'type');
+  if (byType.length) {
+    return new Error(
+      `[TextureStore] ${what} cannot resolve: "${id}" is ${articleOf(type)} "${type}" resource, which never builds ${byType.join(', ')}`,
+    );
+  }
+  if (type === 'tileset') {
+    return new Error(`[TextureStore] ${what} cannot resolve: "${id}" carries no frameBasedAnimations data`);
+  }
+  return new Error(
+    `[TextureStore] ${what} cannot resolve: "${id}" carries no frameBasedAnimations data, and its atlas adapter read none out of its json`,
+  );
+};
+
+/** What {@link TextureStore.acquireAsync} resolves with: the value, and a hold on the resource it came from. */
+export interface TextureStoreLease<V> {
+  /** The value (or tuple of values) of the subtype(s) asked for. */
+  readonly value: V;
+  /** Gives the hold back. A second call does nothing. */
+  release(): void;
+}
+
 export interface TextureStoreParseOptions {
   /**
    * Dispose and remove every resource that the parsed data no longer names and whose
@@ -141,7 +175,8 @@ export interface TextureStoreParseOptions {
    * `refCount` counts the live {@link TextureStore.on} subscriptions of a resource. A
    * value fetched through {@link TextureStore.getAsync} does not raise it: that promise
    * gives its subscription up as it settles, so a texture sitting in a material counts for
-   * nothing here. A caller who wants to keep such a value keeps a subscription as well.
+   * nothing here. A caller who wants to keep such a value holds it with
+   * {@link TextureStore.acquireAsync}, or holds a subscription.
    *
    * Defaults to `false`, which keeps every resource until
    * {@link TextureStore.clearUnused} is called.
@@ -183,7 +218,8 @@ export interface TextureStore extends EventizedObject {}
  * fetches one, {@link TextureStore.parse} takes one that is already at hand, and
  * {@link TextureStore.getAsync} and {@link TextureStore.on} hand out the values the resources
  * build. Every image is fetched once, however many resources name it. Every resource builds
- * its own texture and keeps it; a caller only borrows it.
+ * its own texture and keeps it; a caller only borrows it, and {@link TextureStore.acquireAsync}
+ * holds the resource for as long as the caller needs it.
  *
  * The four callback loaders — `TextureImageLoader`, `TileSetLoader`, `TextureAtlasLoader`
  * and `PowerOf2ImageLoader` — are the older way and deprecated, and the same image comes out
@@ -211,6 +247,9 @@ export class TextureStore {
    *
    * The relative urls of the items are resolved against `url`, and a `baseUrl` in `options`
    * takes its place, as in the instance method.
+   *
+   * The store it hands out has no renderer: it loads the images and builds coordinates, atlases,
+   * tile sets and animations, and a `getAsync(id, 'texture')` waits until `store.renderer` is set.
    */
   static async loadAsync(url: string | URL, options?: TextureStoreLoadOptions): Promise<TextureStore> {
     const store = new TextureStore();
@@ -272,6 +311,9 @@ export class TextureStore {
 
   /**
    * The renderer this store builds its textures with, or `undefined` while none is set.
+   *
+   * Without a renderer the store loads its images and builds the coordinates, atlases, tile sets
+   * and animations of its resources all the same; only `texture` waits until one is set.
    *
    * Answers `undefined` once {@link TextureStore.dispose} has run, whatever is written
    * to the setter afterwards.
@@ -352,6 +394,10 @@ export class TextureStore {
   // aborted by dispose(): every loadAsync() under way listens to it, cuts its fetch short and
   // rejects
   #disposal = new AbortController();
+
+  // cuts short the loadAsync() whose fetch is still under way; a later loadAsync() calls it before
+  // it fetches itself, so the catalogs are parsed in the order of the calls
+  #loadUnderWay?: () => void;
 
   constructor(renderer?: WebGPURenderer) {
     retain(this, [OnReady, OnRendererChanged]);
@@ -523,6 +569,11 @@ export class TextureStore {
    * begun the load is done: a listener inside `parse()` that aborts the signal or disposes the
    * store changes nothing, and the promise resolves with the store.
    *
+   * A later `loadAsync()` on this store cuts short one that is still under way: its fetch is
+   * aborted, nothing of it is parsed, no `error` event goes out, and its promise rejects with an
+   * `AbortError`. The catalogs are parsed in the order of the calls. The deprecated
+   * {@link TextureStore.load} inherits this and resolves with the store all the same.
+   *
    * With `{evictMissing: true}` the parse step also disposes and removes every resource
    * the new data no longer names and whose `refCount` is 0 — see
    * {@link TextureStoreParseOptions.evictMissing} for what that count covers.
@@ -551,6 +602,7 @@ export class TextureStore {
         settled = true;
         signal?.removeEventListener('abort', onAbort);
         disposal.removeEventListener('abort', onDispose);
+        if (this.#loadUnderWay === onSuperseded) this.#loadUnderWay = undefined;
       };
 
       const cutShort = (error: Error) => {
@@ -561,9 +613,17 @@ export class TextureStore {
       };
       const onAbort = () => cutShort(new DOMException(`${what} aborted`, 'AbortError'));
       const onDispose = () => cutShort(disposedError(what));
+      // a load whose parse has begun is settled and cut short by nothing, a loadAsync() that a
+      // listener inside that parse starts included; one that is cut short reports nothing, as one
+      // whose signal aborts
+      const onSuperseded = () =>
+        cutShort(new DOMException(`${what} aborted: a later loadAsync() on this store took its place`, 'AbortError'));
 
       signal?.addEventListener('abort', onAbort, {once: true});
       disposal.addEventListener('abort', onDispose, {once: true});
+
+      this.#loadUnderWay?.();
+      this.#loadUnderWay = onSuperseded;
 
       // A step that fails is reported twice: to whoever listens to the store, and to this caller.
       // emitSafe(): every listener hears it, and one that throws is reported on the console by
@@ -860,12 +920,22 @@ export class TextureStore {
 
         if (resource) {
           if (!this.#resources.has(id)) {
-            // the image source goes in before the factory: the image effect returns at once
-            // without a factory and runs when it arrives, so an image source set afterwards
-            // would miss the first fetch
+            // the image source goes in before anything can run the image effect: its first run
+            // fetches the image, with or without a factory, and an image source set afterwards
+            // would miss that fetch
             resource[imageSource] ??= this.#imageSource;
             resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
             resource.textureFactory = this.#textureFactory.value;
+            // A resource disposed directly leaves the store, so that the next parse() naming its id
+            // builds a new one instead of writing into a resource that answers nothing any more. At
+            // Priority.Max the map is clean before the listeners of on() and getAsync() hear the
+            // dispose and follow the id anew. clearUnused() and evictMissing take the resource out
+            // before they dispose it, and dispose() of the store sets #disposed first: this listener
+            // finds nothing to do then
+            const added = resource;
+            once(added, TextureResourceEvents.Dispose, Priority.Max, () => {
+              if (!this.#disposed && this.#resources.get(id) === added) this.#resources.delete(id);
+            });
           }
           this.#resources.set(id, resource);
           updatedResources.push(resource);
@@ -918,6 +988,10 @@ export class TextureStore {
    * the other. A tuple in which every value is the one the last call already carried is not
    * delivered a second time.
    *
+   * A resource that is disposed directly leaves the store, and the subscription follows the
+   * resource the next `parse()` builds under the id. A subtype the type of the resource never
+   * builds is reported once on the console.
+   *
    * On a disposed store this does nothing: the callback is never called, and the returned
    * unsubscribe function has nothing to take back.
    */
@@ -925,6 +999,19 @@ export class TextureStore {
     id: string,
     type: T,
     callback: (val: MapSubTypes<T>) => void,
+  ): () => void {
+    return this.#subscribe(id, type, (value) => callback(value), true);
+  }
+
+  // The body of on(), which getAsync() and acquireAsync() subscribe through as well: `callback` is
+  // handed the resource the value came from beside it, so that acquireAsync() holds exactly that
+  // one. Only on() warns about a subtype the type of its resource never builds — the promises
+  // reject on it instead
+  #subscribe<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
+    id: string,
+    type: T,
+    callback: (value: MapSubTypes<T>, resource: TextureResource) => void,
+    warnOutOfReach: boolean,
   ): () => void {
     if (this.#disposed) return () => {};
 
@@ -936,6 +1023,8 @@ export class TextureStore {
     let lastValues: unknown[] | undefined;
     // the resource the subtype subscriptions below listen to
     let subscribedResource: TextureResource | undefined;
+    // the resource this subscription last warned about, so that each instance is named once
+    let warnedResource: TextureResource | undefined;
     let unsubscribeFromResource: undefined | (() => void);
     // assigned below, once the handlers they release exist; `unsubscribe` closes over them
     // and reads them only when it runs, which is never before that point
@@ -961,67 +1050,96 @@ export class TextureStore {
       unsubscribeFromReady?.();
     };
 
+    const followed = (resource: TextureResource): void => {
+      // a subscription whose resource was still missing at the first ready listens for it
+      // on the store for good, and every parse() that names the resource announces it
+      // again; subscribing to the same instance anew would deliver its retained values a
+      // second time
+      if (resource === subscribedResource) return;
+
+      clearSubTypeSubscriptions();
+
+      resource[imageSource] ??= this.#imageSource;
+      resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
+      resource.activate();
+      if (this.#textureFactory.value && !resource.textureFactory) {
+        resource.textureFactory = this.#textureFactory.value;
+      }
+
+      // by the type alone: a later parse() may still bring the animation data, and on() lives
+      // that long. A resource of another type that takes the place of this one is asked again
+      if (warnOutOfReach && resource !== warnedResource) {
+        warnedResource = resource;
+        const never = resource[subTypesOutOfReach](
+          isMultipleTypes ? (type as TextureResourceSubType[]) : [type as TextureResourceSubType],
+          'type',
+        );
+        if (never.length) {
+          // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+          console.warn(
+            `[TextureStore] on(${id}, ${String(type)}) is never called for "${id}": it is ${articleOf(resource.type)} "${resource.type}" resource, which never builds ${never.join(', ')}`,
+          );
+        }
+      }
+
+      resource[changeRefCount](1);
+      unsubscribeFromSubType.push(() => {
+        resource[changeRefCount](-1);
+      });
+
+      // a resource disposed directly has left the store by now, so the subscription waits for
+      // the resource the next parse() builds under the id
+      unsubscribeFromSubType.push(
+        once(resource, TextureResourceEvents.Dispose, () => {
+          clearSubTypeSubscriptions();
+          if (!isActiveSubscription) return;
+          unsubscribeFromResource?.();
+          unsubscribeFromResource = this.#followResource(id, followed);
+        }),
+      );
+
+      if (isMultipleTypes) {
+        const subTypes = type as Array<TextureResourceSubType>;
+        subTypes.forEach((t) => {
+          unsubscribeFromSubType.push(
+            on(resource, t, () => {
+              // the tuple is read off the resource, not collected from the values the
+              // events carried: values that belong together are written in one batch,
+              // while the events announcing them arrive one after the other. A tuple
+              // assembled from the last event of each subtype would pair a fresh atlas
+              // with the texture of the image before it.
+              //
+              // The other half of that contract lives in the resource: the effects that
+              // derive from an image run at a higher priority than the bridges that emit,
+              // so no event of such a batch finds a value of the run before it
+              const valuesArg = subTypes.map((subType) => resource[subType]).filter((v) => v != null);
+              if (valuesArg.length !== subTypes.length) return;
+              // and because every event of such a batch reads the same finished tuple,
+              // the callback would otherwise be called once per event with it
+              if (lastValues?.every((value, index) => value === valuesArg[index])) return;
+              lastValues = valuesArg;
+              callback(valuesArg as MapSubTypes<T>, resource);
+            }),
+          );
+        });
+      } else {
+        unsubscribeFromSubType.push(
+          on(resource, type as TextureResourceSubType, (val) => {
+            // the same filter the tuple path applies: a signal that is cleared and notifies
+            // would otherwise hand the callback an undefined where its type promises a
+            // value — and getAsync() would resolve with it
+            if (val == null) return;
+            callback(val as MapSubTypes<T>, resource);
+          }),
+        );
+      }
+
+      subscribedResource = resource;
+    };
+
     const onReadyHandler = () => {
       if (isActiveSubscription) {
-        unsubscribeFromResource = this.#followResource(id, (resource) => {
-          // a subscription whose resource was still missing at the first ready listens for it
-          // on the store for good, and every parse() that names the resource announces it
-          // again; subscribing to the same instance anew would deliver its retained values a
-          // second time
-          if (resource === subscribedResource) return;
-
-          clearSubTypeSubscriptions();
-
-          resource[imageSource] ??= this.#imageSource;
-          resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
-          resource.activate();
-          if (this.#textureFactory.value && !resource.textureFactory) {
-            resource.textureFactory = this.#textureFactory.value;
-          }
-
-          resource[changeRefCount](1);
-          unsubscribeFromSubType.push(() => {
-            resource[changeRefCount](-1);
-          });
-
-          if (isMultipleTypes) {
-            const subTypes = type as Array<TextureResourceSubType>;
-            subTypes.forEach((t) => {
-              unsubscribeFromSubType.push(
-                on(resource, t, () => {
-                  // the tuple is read off the resource, not collected from the values the
-                  // events carried: values that belong together are written in one batch,
-                  // while the events announcing them arrive one after the other. A tuple
-                  // assembled from the last event of each subtype would pair a fresh atlas
-                  // with the texture of the image before it.
-                  //
-                  // The other half of that contract lives in the resource: the effects that
-                  // derive from an image run at a higher priority than the bridges that emit,
-                  // so no event of such a batch finds a value of the run before it
-                  const valuesArg = subTypes.map((subType) => resource[subType]).filter((v) => v != null);
-                  if (valuesArg.length !== subTypes.length) return;
-                  // and because every event of such a batch reads the same finished tuple,
-                  // the callback would otherwise be called once per event with it
-                  if (lastValues?.every((value, index) => value === valuesArg[index])) return;
-                  lastValues = valuesArg;
-                  callback(valuesArg as MapSubTypes<T>);
-                }),
-              );
-            });
-          } else {
-            unsubscribeFromSubType.push(
-              on(resource, type as TextureResourceSubType, (val) => {
-                // the same filter the tuple path applies: a signal that is cleared and notifies
-                // would otherwise hand the callback an undefined where its type promises a
-                // value — and getAsync() would resolve with it
-                if (val == null) return;
-                callback(val as MapSubTypes<T>);
-              }),
-            );
-          }
-
-          subscribedResource = resource;
-        });
+        unsubscribeFromResource = this.#followResource(id, followed);
       }
     };
 
@@ -1033,7 +1151,7 @@ export class TextureStore {
 
   /**
    * Resolve with the value (or tuple of values) of the given subtype(s) as soon as the
-   * resource `id` has them.
+   * resource `id` has them. On a store without a renderer, `texture` waits until one is set.
    *
    * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
    * call on a store that is already disposed is rejected right away. An id that is
@@ -1051,13 +1169,45 @@ export class TextureStore {
    * error names the step and the url, and carries what the resource reported as its `cause`.
    * An animation entry that is skipped does not reject, and neither does a subscriber of the
    * resource that throws: the value it was handed is there.
+   *
+   * It is rejected for a subtype the resource can never build, too: by its type — an `image`
+   * builds `imageCoords` and `texture` alone, an `atlas` builds no `tileSet` — or because it
+   * carries no animation data and its atlas adapter reads no animations out of its json. And it is
+   * rejected when the resource it waits on is disposed directly.
+   *
+   * The value is borrowed: the promise gives its hold on the resource back as it settles, so
+   * `clearUnused()`, `parse({evictMissing: true})` and a change of the renderer or of the texture
+   * classes may release it while it sits in a material. {@link TextureStore.acquireAsync} holds it.
    */
   getAsync<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,
     type: T,
     options?: {signal?: AbortSignal},
   ): Promise<MapSubTypes<T>> {
-    return this.#getOnce('getAsync', id, type, options);
+    return this.#getOnce('getAsync', id, type, options, false);
+  }
+
+  /**
+   * Resolve as {@link TextureStore.getAsync} does, with a {@link TextureStoreLease}: the value
+   * (or tuple of values) of the given subtype(s), and a hold on the resource it came from until
+   * `release()` is called. While it is held, {@link TextureStore.clearUnused} and
+   * `parse({evictMissing: true})` leave the resource standing.
+   *
+   * The resource is held, not the value: a new renderer, other texture classes or another image
+   * make it build a new texture and release the old one. Whoever wants to follow that subscribes
+   * with {@link TextureStore.on}. {@link TextureStore.dispose} releases everything, held resources
+   * among it; a `release()` afterwards does no harm.
+   *
+   * It is rejected where `getAsync()` is rejected — on a disposed store, for an id that is missing,
+   * on an abort, on a failure of the resource, for a subtype the resource never builds and for a
+   * resource disposed while it waits —, and its messages name `acquireAsync()`.
+   */
+  acquireAsync<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
+    id: string,
+    type: T,
+    options?: {signal?: AbortSignal},
+  ): Promise<TextureStoreLease<MapSubTypes<T>>> {
+    return this.#getOnce('acquireAsync', id, type, options, true);
   }
 
   /**
@@ -1073,17 +1223,19 @@ export class TextureStore {
     type: T,
     options?: {signal?: AbortSignal},
   ): Promise<MapSubTypes<T>> {
-    return this.#getOnce('get', id, type, options);
+    return this.#getOnce('get', id, type, options, false);
   }
 
-  // the body of getAsync() and of its alias; every message names the method the caller wrote,
-  // so that it leads back to the line it came from
-  #getOnce<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
-    method: 'get' | 'getAsync',
+  // the body of getAsync(), of its alias and of acquireAsync(); every message names the method the
+  // caller wrote, so that it leads back to the line it came from. With `hold` the promise resolves
+  // with a lease that holds the resource the value came from
+  #getOnce<const T extends TextureResourceSubType | readonly TextureResourceSubType[], H extends boolean>(
+    method: 'get' | 'getAsync' | 'acquireAsync',
     id: string,
     type: T,
-    options?: {signal?: AbortSignal},
-  ): Promise<MapSubTypes<T>> {
+    options: {signal?: AbortSignal} | undefined,
+    hold: H,
+  ): Promise<H extends true ? TextureStoreLease<MapSubTypes<T>> : MapSubTypes<T>> {
     const signal = options?.signal;
     const what = `${method}(${id}, ${String(type)})`;
     return new Promise((resolve, reject) => {
@@ -1124,10 +1276,32 @@ export class TextureStore {
       };
 
       track(
-        this.on(id, type, (value) => {
-          settle();
-          resolve(value);
-        }),
+        this.#subscribe(
+          id,
+          type,
+          (value, resource) => {
+            if (!hold) {
+              settle();
+              resolve(value as never);
+              return;
+            }
+            // the hold goes on before settle() gives back the count of the subscription of this
+            // promise, so the resource is held all the way through
+            resource[changeRefCount](1);
+            settle();
+            let released = false;
+            const lease: TextureStoreLease<MapSubTypes<T>> = {
+              value,
+              release: () => {
+                if (released) return;
+                released = true;
+                resource[changeRefCount](-1);
+              },
+            };
+            resolve(lease as never);
+          },
+          false,
+        ),
       );
 
       // a failure the resource reported before this call counts like one that arrives while
@@ -1146,8 +1320,29 @@ export class TextureStore {
             settle();
             reject(resourceFailedError(what, failure));
           };
+          // a subtype the resource never builds would leave the promise waiting for good
+          const rejectIfOutOfReach = () => {
+            if (settled) return;
+            if (resource[subTypesOutOfReach](subTypes, 'now').length === 0) return;
+            settle();
+            reject(outOfReachError(what, resource, subTypes));
+          };
           track(on(resource, TextureResourceEvents.Error, rejectIfHeldBack));
           rejectIfHeldBack();
+          rejectIfOutOfReach();
+          // whether the adapter of an atlas reads animations out of its json is known once the atlas
+          // is there: the resource writes the atlas and the animations of the adapter in one batch
+          if (resource.type === 'atlas' && subTypes.includes('frameBasedAnimations')) {
+            track(on(resource, TextureResourceEvents.Atlas, rejectIfOutOfReach));
+          }
+          // a dispose of the store goes out before its resources are disposed, so its message comes first
+          track(
+            once(resource, TextureResourceEvents.Dispose, () => {
+              if (settled) return;
+              settle();
+              reject(resourceDisposedError(what, id));
+            }),
+          );
         }),
       );
 

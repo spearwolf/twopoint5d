@@ -119,7 +119,8 @@ textures with a given set of options.
 `TextureStore` with its `TextureResource`s is the way to load textures, atlases and tile
 sets: a catalog names the resources, every image is fetched once however many resources
 name it, every resource counts the subscriptions that hold it, and `getAsync()` and
-`on()` hand out what it builds. `TexturePackerJson` reads the TexturePacker formats,
+`on()` hand out what it builds; `acquireAsync()` does as `getAsync()` and holds the resource
+until its lease is released. `TexturePackerJson` reads the TexturePacker formats,
 JSON Hash and JSON Array, rotated frames included. The four `*Loader` classes are the
 older way and deprecated; they pad an image to power-of-two sides, hand out its
 coordinates as a child of the padded canvas and start from the texture class `nearest`,

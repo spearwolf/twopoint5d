@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `Display#resolutionScale`, a factor on the pixel ratio, `1` by default: below 1 the display draws fewer pixels than its bounds allow, the ratio rounded down to an eighth; it does not apply under a `pixelZoom`, and a change takes effect with the next measurement and emits `OnDisplayResize`
 - add `AdaptiveResolution` and the option `adaptiveResolution` of `Display` (`true` or `{targetFps, minScale, maxScale}`): a controller that holds 60 frames per second — or a lower `maxFps` — by `Display#resolutionScale`, in steps of an eighth between 0.5 and 1 by default. It reads the GPU time of a frame through the timestamp queries of three.js, for which a display that builds its renderer asks for `trackTimestamp: true`, and predicts a step up from the pixel ratio the display would draw at that step; a step that leaves the ratio as it is is skipped, and a step up that does not hold makes the next one wait twice as long. Where the renderer measures no GPU time it reads the pace of the animation frames of the page, so a frame `maxFps` holds back is not late, and where a descent to `minScale` brings frames of a steady pace no sooner — a `requestAnimationFrame` held to 30 Hz — it goes back and measures against the pace the page reaches. It lets 30 frames pass after every resize, start and restart, holds still under a `pixelZoom`, drops a GPU measurement still in flight when it is disabled, and gives the display the scale it had at the last takeover back with `dispose()` or `enabled = false`. `Display#adaptiveResolution` is the controller the display built, and `undefined` once the display is disposed
 - add the option `pointerTarget` of `PanControl2D`, the `EventTarget` the `pointerdown` that starts a pan is listened for on — `document` by default. Name the canvas, or an element around it, and a press elsewhere on the page starts no pan; `pointermove`, `pointerup` and `pointercancel` stay on `document`, so a drag that leaves the element goes on until it is let go
+- add `TextureStore#acquireAsync(id, type, {signal}?)` and the type `TextureStoreLease`: it resolves as `getAsync()` does, with `{value, release()}`, and holds the resource the value came from — `clearUnused()` and `parse({evictMissing: true})` leave it standing — until `release()`, which gives the hold back once however often it is called. The hold is on the resource, not on the value: a new renderer, other texture classes or another image still make it build a new texture. Its rejections are those of `getAsync()`, their messages naming `acquireAsync()`
 
 ### Changed
 
@@ -70,10 +71,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PanControl2D` starts no pan with a press on an `input`, `textarea`, `select`, `button` or an element with `contenteditable`, nor on an element within one of them up to the `pointerTarget` — read through `composedPath()`, in an open shadow root as well: a range slider, a text selection or a button of an HTML interface over the canvas works as it does without the control
 - perf `CameraBasedVisibility` tests a tile with a box that reaches no further above and below the map plane than the view frustum: under a camera at a height of 5, tilted by 45° with a `far` of 20, the default `depth` of 100 on tiles of 1 takes 936 tiles as visible — about 500 of them meet the frustum — and a recomputation of that view takes some 0.3 ms. `TileBox#frustumBox`, and the boxes `CameraBasedVisibilityHelpers` draws for it, are cut the same way; `TileBox#box` keeps the full `depth`
 - perf `CameraBasedVisibility` allocates nothing in a recomputation under a tilted camera once a frame loop has settled, however many rows its view spans, and neither does `Map2D#update()` under a standing or a moving camera; `src/map2d/hot-path-allocations.spec.ts` holds both to it
+- a `TextureStore` without a renderer loads its images and builds `imageCoords`, `atlas`, `tileSet` and `frameBasedAnimations`; only `texture` waits until `store.renderer` is set. This holds for the store `TextureStore.loadAsync()` hands out, and for a `TextureResource` on its own without a `textureFactory`, which takes back a texture built from another image than the one it loads now
+- a later `TextureStore#loadAsync()` on the same store cuts short one whose fetch is still under way: that fetch is aborted, nothing of it is parsed, no `error` event goes out, and its promise rejects with an `AbortError`, so the catalogs are parsed in the order of the calls. A load whose parse has begun is done and stays so
+- `TextureStore#getAsync()` rejects for a subtype its resource never builds, naming the id, the type and the subtype: an `image` resource builds `imageCoords` and `texture` alone, an `atlas` resource no `tileSet`, and a resource without `frameBasedAnimationsData` whose atlas adapter reads no animations out of its json no `frameBasedAnimations`. `TextureStore#on()` for a subtype the type of its resource never builds says so once on the console
+- a `TextureResource` of a `TextureStore` that is disposed directly leaves the store: the next `parse()` naming its id builds a new resource, `on()` follows that one, and a `getAsync()` waiting on the disposed one rejects, naming the id
 
 ### Fixed
 
 - `RectangularVisibilityArea` keeps a tile of the last view for reuse only while its tile coordinate lies among the columns and rows of the new view: on a grid of tiles of 0.1, the tile set after every step of a scroll is the one a fresh area computes for the same center
+- `DynamicAtlas#add()` refuses an image element that has not loaded with a `size` as well, and `add()` and `redraw()` refuse one whose `complete` is still `false` although its natural size is known
 
 ### Migration Guide
 
@@ -155,6 +161,23 @@ const ctx: SpriteShaderContext = {frame, attribute, uniform, sample, textureSize
 
 ```ts
 const ctx: SpriteShaderContext = {frame, uv: attribute('uv'), attribute, uniform, sample, textureSize};
+```
+
+#### Two `TextureStore#loadAsync()` calls that overlap on one store
+
+The earlier of two calls rejects with an `AbortError` once the later one starts, and only the later catalog is parsed. Code that needs both catalogs loads them one after the other.
+
+**Before**
+
+```ts
+await Promise.all([store.loadAsync('base.json'), store.loadAsync('level.json')]);
+```
+
+**After**
+
+```ts
+await store.loadAsync('base.json');
+await store.loadAsync('level.json');
 ```
 
 ## [0.23.0] - 2026-10-18
