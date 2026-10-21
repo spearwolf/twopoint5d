@@ -1,5 +1,10 @@
 import {describe, expect, it} from 'vitest';
-import {type DrawingBufferParams, pixelRatioFor, resolveDrawingBuffer} from './resolveDrawingBuffer.js';
+import {
+  type DrawingBuffer,
+  type DrawingBufferParams,
+  pixelRatioFor,
+  resolveDrawingBuffer as resolveInto,
+} from './resolveDrawingBuffer.js';
 
 // the values of a display that is built with no option: 320 × 200, a ratio of 1 bounded at 2
 function params(overrides: Partial<DrawingBufferParams> = {}): DrawingBufferParams {
@@ -18,6 +23,21 @@ function params(overrides: Partial<DrawingBufferParams> = {}): DrawingBufferPara
     maxResolution: 8192,
     ...overrides,
   };
+}
+
+// every case resolves into an object of its own, as a display hands in the one it keeps
+function resolveDrawingBuffer(drawingBufferParams: DrawingBufferParams): DrawingBuffer {
+  return resolveInto(drawingBufferParams, {
+    width: 0,
+    height: 0,
+    cssWidth: 0,
+    cssHeight: 0,
+    pixelRatio: 0,
+    pixelZoom: 0,
+    devicePixelZoom: 0,
+    requestedWidth: 0,
+    requestedHeight: 0,
+  });
 }
 
 describe('pixelRatioFor()', () => {
@@ -71,10 +91,27 @@ describe('pixelRatioFor()', () => {
     ).toBe(0.25);
   });
 
+  it('holds the budget after a resolutionScale above 1', () => {
+    // 0.601 × 2 is 1.202, and the budget holds it to 0.601
+    expect(
+      pixelRatioFor(
+        params({contentWidth: 3840, contentHeight: 2160, devicePixelRatio: 2, maxPixels: 3_000_000, resolutionScale: 2}),
+      ),
+    ).toBe(0.5);
+  });
+
+  it('draws beyond maxPixelRatio with a resolutionScale above 1', () => {
+    expect(pixelRatioFor(params({devicePixelRatio: 2, maxPixelRatio: 2, resolutionScale: 1.5}))).toBe(3);
+  });
+
   it('is 1 under a pixelZoom, whatever bounds it otherwise', () => {
     expect(
       pixelRatioFor(params({devicePixelRatio: 3, maxPixelRatio: 1.5, maxPixels: 1000, resolutionScale: 0.5, pixelZoom: 2})),
     ).toBe(1);
+  });
+
+  it('takes a pixelZoom of Infinity as no zoom', () => {
+    expect(pixelRatioFor(params({devicePixelRatio: 2, pixelZoom: Number.POSITIVE_INFINITY}))).toBe(2);
   });
 });
 
@@ -91,7 +128,8 @@ describe('resolveDrawingBuffer()', () => {
         pixelRatio: 1,
         pixelZoom: 0,
         devicePixelZoom: 0,
-        requestedSize: undefined,
+        requestedWidth: 0,
+        requestedHeight: 0,
       });
     });
 
@@ -101,7 +139,7 @@ describe('resolveDrawingBuffer()', () => {
       expect(buffer.width).toBe(4096);
       expect(buffer.height).toBe(100);
       expect(buffer.pixelRatio).toBe(2);
-      expect(buffer.requestedSize).toEqual([10000, 200]);
+      expect([buffer.requestedWidth, buffer.requestedHeight]).toEqual([10000, 200]);
     });
 
     it('rounds a clamped size down, so the buffer stays within maxResolution at a fractional ratio', () => {
@@ -125,7 +163,7 @@ describe('resolveDrawingBuffer()', () => {
       expect(buffer.pixelZoom).toBe(2);
       expect(buffer.cssWidth).toBeCloseTo((216 * 5) / 2.625);
       expect(buffer.cssHeight).toBeCloseTo((480 * 5) / 2.625);
-      expect(buffer.requestedSize).toBeUndefined();
+      expect([buffer.requestedWidth, buffer.requestedHeight]).toEqual([0, 0]);
     });
 
     it('rounds the zoom in device pixels down, at least to 1', () => {
@@ -163,16 +201,18 @@ describe('resolveDrawingBuffer()', () => {
       expect(buffer.width).toBe(8192);
       expect(buffer.height).toBe(50);
       expect(buffer.cssWidth).toBe(16384);
-      expect(buffer.requestedSize).toEqual([10000, 50]);
+      expect([buffer.requestedWidth, buffer.requestedHeight]).toEqual([10000, 50]);
     });
 
-    it.each([Number.NaN, -1])('takes a pixelZoom of %s as 0', (pixelZoom) => {
+    it.each([Number.NaN, -1, Number.POSITIVE_INFINITY])('takes a pixelZoom of %s as 0', (pixelZoom) => {
       const buffer = resolveDrawingBuffer(params({devicePixelRatio: 2, pixelZoom}));
 
       expect(buffer.pixelZoom).toBe(0);
       expect(buffer.devicePixelZoom).toBe(0);
       expect(buffer.pixelRatio).toBe(2);
       expect(buffer.width).toBe(320);
+      expect(Number.isFinite(buffer.cssWidth), 'a finite CSS width').toBe(true);
+      expect(buffer).toEqual(resolveDrawingBuffer(params({devicePixelRatio: 2})));
     });
 
     it('keeps the padding and border the CSS size carries beyond the size', () => {
@@ -180,5 +220,30 @@ describe('resolveDrawingBuffer()', () => {
 
       expect(buffer.cssWidth).toBeCloseTo(10 + (buffer.width * buffer.devicePixelZoom) / 2.625);
     });
+  });
+
+  it('fills and returns the object it is handed, every field of it', () => {
+    const out: DrawingBuffer = {
+      width: -1,
+      height: -1,
+      cssWidth: -1,
+      cssHeight: -1,
+      pixelRatio: -1,
+      pixelZoom: -1,
+      devicePixelZoom: -1,
+      requestedWidth: -1,
+      requestedHeight: -1,
+    };
+
+    expect(resolveInto(params({devicePixelRatio: 2}), out)).toBe(out);
+    expect(out).toEqual(resolveDrawingBuffer(params({devicePixelRatio: 2})));
+
+    resolveInto(params({contentWidth: 5000, contentHeight: 100, devicePixelRatio: 2}), out);
+    expect([out.requestedWidth, out.requestedHeight], 'beyond maxResolution').toEqual([10000, 200]);
+    resolveInto(params({contentWidth: 412, contentHeight: 915, devicePixelRatio: 2.625, pixelZoom: 2}), out);
+    expect(out, 'under a pixelZoom, within maxResolution again').toEqual(
+      resolveDrawingBuffer(params({contentWidth: 412, contentHeight: 915, devicePixelRatio: 2.625, pixelZoom: 2})),
+    );
+    expect([out.requestedWidth, out.requestedHeight]).toEqual([0, 0]);
   });
 });

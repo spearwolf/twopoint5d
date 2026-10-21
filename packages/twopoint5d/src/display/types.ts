@@ -74,7 +74,10 @@ export interface DisplayParameters extends DisplayRendererParameters {
    *
    * A display that builds its renderer asks it for `trackTimestamp: true`, so the controller reads
    * the GPU time of a frame; a renderer handed in, or one without timestamp queries, leaves it the
-   * pace of the frames. Off by default. Read once, by the constructor; the controller is
+   * pace of the frames. A renderer the display built with `trackTimestamp: true` measures
+   * timestamps for its whole life, while the controller holds still, is disabled or disposed as
+   * well; `trackTimestamp: false` beside this option builds it without them, and the controller
+   * reads the pace of the frames. Off by default. Read once, by the constructor; the controller is
    * {@link Display.adaptiveResolution}.
    */
   adaptiveResolution?: boolean | AdaptiveResolutionOptions;

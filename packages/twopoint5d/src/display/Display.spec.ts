@@ -956,6 +956,17 @@ describe('Display', () => {
         expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(3840, 2160, 0.5);
       });
 
+      it('holds maxPixels after a resolutionScale above 1', () => {
+        stubDevicePixelRatio(2);
+        const {display, renderer} = makeDisplay({resizeTo: () => [3840, 2160], maxPixels: 3_000_000});
+
+        display.resolutionScale = 2;
+        display.resize();
+
+        // 0.601 × 2 is 1.202, and the budget holds it to 0.601
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(3840, 2160, 0.5);
+      });
+
       it('keeps the buffer within the budget', () => {
         stubDevicePixelRatio(1);
         const {display} = makeDisplay({resizeTo: () => [1920, 1080], maxPixels: 1_000_000});
@@ -1166,6 +1177,58 @@ describe('Display', () => {
         expect([display.width, display.height]).toEqual(size);
         expect(size).toEqual([216, 480]);
       });
+
+      // a canvas whose CSS size the layout reads back as written in its inline style
+      const readBackInlineSize = (canvas: ReturnType<typeof makeCanvas>) => {
+        canvas.getBoundingClientRect.mockImplementation(() => {
+          const style = canvas.style as {width: string; height: string};
+          return {width: Number.parseFloat(style.width), height: Number.parseFloat(style.height)};
+        });
+        Object.assign(canvas.style, {width: '1000px', height: '600px'});
+      };
+
+      it('keeps the size it had without a zoom where the canvas measures itself, through changes of the zoom', () => {
+        stubDevicePixelRatio(1);
+        const {display, canvas} = makeDisplay();
+        readBackInlineSize(canvas);
+        const style = canvas.style as {width: string; height: string};
+
+        // the second measurement reads back what the first wrote, as the ResizeObserver makes it
+        const zoomTo = (pixelZoom: number) => {
+          display.pixelZoom = pixelZoom;
+          display.resize();
+          display.resize();
+          return [display.width, style.width];
+        };
+
+        expect(zoomTo(3), 'zoom 3').toEqual([333, '999px']);
+        expect(zoomTo(2), 'zoom 2').toEqual([500, '1000px']);
+        expect(zoomTo(3), 'zoom 3 again').toEqual([333, '999px']);
+        expect(zoomTo(0), 'no zoom').toEqual([1000, '1000px']);
+        expect(style.height).toBe('600px');
+      });
+
+      it('takes a size of the canvas that the display did not write as the new base', () => {
+        stubDevicePixelRatio(1);
+        const {display, canvas} = makeDisplay();
+        readBackInlineSize(canvas);
+        const style = canvas.style as {width: string; height: string};
+
+        display.pixelZoom = 2;
+        display.resize();
+        display.resize();
+        expect(display.width).toBe(500);
+
+        style.width = '800px';
+        display.resize();
+        expect(display.width).toBe(400);
+
+        display.pixelZoom = 0;
+        display.resize();
+        display.resize();
+        expect(display.width).toBe(800);
+        expect(style.width).toBe('800px');
+      });
     });
 
     it('draws at maxPixelRatio where the device pixel ratio is above it', () => {
@@ -1343,6 +1406,45 @@ describe('Display', () => {
 
       expect(canvas.getBoundingClientRect.mock.calls.length, 'getBoundingClientRect()').toBe(measured);
       expect(getComputedStyleStub.mock.calls.length, 'getComputedStyle()').toBe(styled);
+    });
+
+    it('measures nothing in the frames after the first while maxPixels is NaN', async () => {
+      const {display, canvas, frame} = makeDisplay();
+      display.maxPixels = Number.NaN;
+      await display.start();
+      frame(1000);
+      frame(1016);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+
+      frame(1033);
+      frame(1050);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length).toBe(measured);
+    });
+
+    it('counts a pixelZoom of Infinity as no zoom', async () => {
+      const SIZE: [number, number] = [320, 200];
+      const {display, renderer, canvas, frame} = makeDisplay({resizeTo: () => SIZE});
+      let resizes = 0;
+      on(display, OnDisplayResize, () => {
+        resizes += 1;
+      });
+      display.pixelZoom = Number.POSITIVE_INFINITY;
+      await display.start();
+      frame(1000);
+      const applied = renderer.setDrawingBufferSize.mock.calls.length;
+      const emitted = resizes;
+
+      frame(1016);
+      frame(1033);
+      frame(1050);
+
+      expect(renderer.setDrawingBufferSize.mock.calls.length, 'setDrawingBufferSize()').toBe(applied);
+      expect(resizes, 'OnDisplayResize').toBe(emitted);
+      const style = canvas.style as {width: string; imageRendering: string};
+      expect(style.width).toMatch(/^\d+(\.\d+)?px$/);
+      expect(display.devicePixelZoom).toBe(0);
+      expect(style.imageRendering).toBe('auto');
     });
 
     it('measures in the first frame without a report', async () => {

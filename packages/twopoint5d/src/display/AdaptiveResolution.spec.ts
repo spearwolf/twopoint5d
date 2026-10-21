@@ -3,6 +3,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {OnDisplayDispose, OnDisplayRenderFrame, OnDisplayResize, OnDisplayRestart} from '../events.js';
 import {AdaptiveResolution} from './AdaptiveResolution.js';
 import type {Display} from './Display.js';
+import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {pixelRatioFor} from './resolveDrawingBuffer.js';
 
 const FRAME_MS = 1000 / 60;
@@ -96,7 +97,7 @@ function makeDisplay({
 
   const frame = async ({deltaMs = FRAME_MS, rafMs = deltaMs, fromLoop = true}: FrameOptions = {}) => {
     const ratio = display.pixelRatioAt(display.resolutionScale);
-    const pixelZoom = display.pixelZoom > 0 ? display.pixelZoom : 0;
+    const pixelZoom = isPositiveFinite(display.pixelZoom) ? display.pixelZoom : 0;
     if (ratio !== measured.ratio || pixelZoom !== measured.pixelZoom) {
       measured.ratio = ratio;
       measured.pixelZoom = pixelZoom;
@@ -325,6 +326,17 @@ describe('AdaptiveResolution', () => {
 
       expect(adaptive.scale).toBe(0.75);
       expect(display.pixelRatioAt(display.resolutionScale)).toBe(0.375);
+    });
+
+    it('holds a maxScale above 1 to the budget of the display', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true, ...BUDGET_4K});
+      gpu.ms = 1;
+      const adaptive = new AdaptiveResolution(display, {maxScale: 1.5});
+
+      expect(display.pixelRatioAt(adaptive.scale)).toBe(0.5);
+      await frames((SETTLE + 12 * 3) * 4);
+      expect(display.pixelRatioAt(adaptive.scale), 'after windows with room to spare').toBe(0.5);
+      expect(display.pixelRatioAt(adaptive.maxScale), 'at maxScale').toBe(0.5);
     });
 
     it('goes up to the highest scale of the next pixel ratio', async () => {

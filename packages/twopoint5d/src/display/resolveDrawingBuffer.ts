@@ -16,6 +16,18 @@ const PIXEL_RATIO_STEP = 1 / 8;
 const DEVICE_PIXEL_SIZE_TOLERANCE = 1 / 8;
 
 /**
+ * Whether `measured`, a size in CSS pixels that a canvas which is its own size source reads back,
+ * is the size `written` that a pixel zoom left in its inline style: the layout holds a size to
+ * its grid and reads it back up to DEVICE_PIXEL_SIZE_TOLERANCE device pixels short. `false` where
+ * `written` is NaN.
+ *
+ * @internal
+ */
+export function readsBackWrittenSize(measured: number, written: number, devicePixelRatio: number): boolean {
+  return Math.abs(measured - written) * devicePixelRatio <= DEVICE_PIXEL_SIZE_TOLERANCE;
+}
+
+/**
  * What the drawing buffer of a display is resolved from. Sizes in CSS pixels, none below 0.
  *
  * @internal
@@ -54,22 +66,27 @@ export interface DrawingBuffer {
   cssWidth: number;
   cssHeight: number;
   pixelRatio: number;
-  /** the zoom, 0 where it is not above 0 */
+  /** the zoom, 0 where it is not a positive finite number */
   pixelZoom: number;
   devicePixelZoom: number;
-  /** the size of the buffer the params asked for where it lies beyond maxResolution on an axis — the size the warning of the display names; undefined otherwise */
-  requestedSize: [width: number, height: number] | undefined;
+  /**
+   * the size of the buffer the params asked for where it lies beyond maxResolution on an axis —
+   * the size the warning of the display names; both 0 where it lies within
+   */
+  requestedWidth: number;
+  requestedHeight: number;
 }
 
 /**
  * The device pixels per CSS pixel a display draws at: `1` under a pixel zoom, otherwise the
- * `devicePixelRatio`, bounded by `maxPixelRatio` and `maxPixels`, times `resolutionScale` —
- * rounded down to a step of an eighth where the budget or the scale has made it.
+ * `devicePixelRatio`, bounded by `maxPixelRatio` and `maxPixels`, times `resolutionScale`, and
+ * bounded by `maxPixels` after the scale as well — rounded down to a step of an eighth where the
+ * budget or the scale has made it.
  *
  * @internal
  */
 export function pixelRatioFor(params: PixelRatioParams): number {
-  if (params.pixelZoom > 0) {
+  if (isPositiveFinite(params.pixelZoom)) {
     return 1.0;
   }
   const {devicePixelRatio, maxPixelRatio, maxPixels, resolutionScale} = params;
@@ -78,8 +95,9 @@ export function pixelRatioFor(params: PixelRatioParams): number {
   let stepped = false;
 
   const area = params.contentWidth * params.contentHeight;
+  let budgetRatio = Number.POSITIVE_INFINITY;
   if (isPositiveFinite(maxPixels) && area > 0) {
-    const budgetRatio = Math.sqrt(maxPixels / area);
+    budgetRatio = Math.sqrt(maxPixels / area);
     if (budgetRatio < ratio) {
       ratio = budgetRatio;
       stepped = true;
@@ -87,7 +105,9 @@ export function pixelRatioFor(params: PixelRatioParams): number {
   }
 
   if (isPositiveFinite(resolutionScale) && resolutionScale !== 1) {
-    ratio *= resolutionScale;
+    // above 1 the scale draws beyond maxPixelRatio — supersampling —, and the budget holds after
+    // it as well
+    ratio = Math.min(ratio * resolutionScale, budgetRatio);
     stepped = true;
   }
 
@@ -99,9 +119,12 @@ export function pixelRatioFor(params: PixelRatioParams): number {
  * The size, the CSS size and the pixel ratio of the drawing buffer of a display, and the whole
  * device pixels of a pixel zoom: the resolution policy of a display, without a DOM.
  *
+ * Writes every field of `out` and returns it: the caller keeps one object and hands it in again
+ * with every measurement, so a measurement allocates nothing.
+ *
  * @internal
  */
-export function resolveDrawingBuffer(params: DrawingBufferParams): DrawingBuffer {
+export function resolveDrawingBuffer(params: DrawingBufferParams, out: DrawingBuffer): DrawingBuffer {
   const {devicePixelRatio, maxPixels, maxResolution} = params;
   let wPx = params.contentWidth;
   let hPx = params.contentHeight;
@@ -109,14 +132,16 @@ export function resolveDrawingBuffer(params: DrawingBufferParams): DrawingBuffer
   let cssHeight = params.cssHeight;
 
   const pixelRatio = pixelRatioFor(params);
-  // a zoom that is NaN or negative works as 0, and counts as 0 in the comparison of the display:
-  // NaN would differ from itself and make every frame measure
-  const pixelZoom = params.pixelZoom > 0 ? params.pixelZoom : 0;
+  // a zoom that is not a positive finite number works as 0, and counts as 0 in the comparison of
+  // the display: NaN would differ from itself and make every frame measure, and Infinity would
+  // make a buffer without pixels on a canvas of NaN CSS pixels
+  const pixelZoom = isPositiveFinite(params.pixelZoom) ? params.pixelZoom : 0;
 
   let width: number;
   let height: number;
   let devicePixelZoom = 0;
-  let requestedSize: [number, number] | undefined;
+  let requestedWidth = 0;
+  let requestedHeight = 0;
 
   if (pixelZoom > 0) {
     // Every pixel of the buffer a whole number of device pixels large, so the pixelated upscale
@@ -134,7 +159,8 @@ export function resolveDrawingBuffer(params: DrawingBufferParams): DrawingBuffer
     height = Math.floor((hPx * ratio + DEVICE_PIXEL_SIZE_TOLERANCE) / devicePixelZoom);
 
     if (width > maxResolution || height > maxResolution) {
-      requestedSize = [width, height];
+      requestedWidth = width;
+      requestedHeight = height;
       width = Math.min(width, maxResolution);
       height = Math.min(height, maxResolution);
     }
@@ -146,7 +172,8 @@ export function resolveDrawingBuffer(params: DrawingBufferParams): DrawingBuffer
   } else {
     if (wPx * pixelRatio > maxResolution || hPx * pixelRatio > maxResolution) {
       // the size that was asked for, so it is taken before the clamp
-      requestedSize = [Math.round(wPx * pixelRatio), Math.round(hPx * pixelRatio)];
+      requestedWidth = Math.round(wPx * pixelRatio);
+      requestedHeight = Math.round(hPx * pixelRatio);
       wPx = Math.min(wPx, maxResolution / pixelRatio);
       hPx = Math.min(hPx, maxResolution / pixelRatio);
     }
@@ -157,5 +184,14 @@ export function resolveDrawingBuffer(params: DrawingBufferParams): DrawingBuffer
     height = Math.floor(hPx);
   }
 
-  return {width, height, cssWidth, cssHeight, pixelRatio, pixelZoom, devicePixelZoom, requestedSize};
+  out.width = width;
+  out.height = height;
+  out.cssWidth = cssWidth;
+  out.cssHeight = cssHeight;
+  out.pixelRatio = pixelRatio;
+  out.pixelZoom = pixelZoom;
+  out.devicePixelZoom = devicePixelZoom;
+  out.requestedWidth = requestedWidth;
+  out.requestedHeight = requestedHeight;
+  return out;
 }

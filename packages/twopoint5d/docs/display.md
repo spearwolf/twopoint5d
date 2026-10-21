@@ -56,7 +56,8 @@ screen:
 ```ts check
 import {Display, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
 
-const display = new Display(document.querySelector('canvas')!);
+// <canvas resize-to="window">: the window is the size source, and the zoom is worked out from it
+const display = new Display(document.querySelector<HTMLCanvasElement>('canvas[resize-to="window"]')!);
 
 // as large as fits at least 400 × 240 pixels of the art on the screen
 const fit = () => {
@@ -76,21 +77,33 @@ What follows from the zoom:
 
 - `width` and `height` count pixels of the buffer, as many whole ones as fit into the size source.
   The canvas takes just their size, up to one pixel of the art short of the size source on its
-  right and bottom edge — stretched to the full size, the pixels would be uneven again.
+  right and bottom edge — stretched to the full size, the pixels would be uneven again. A canvas
+  that is its own size source keeps the size it had without the zoom as that source, through
+  every change of the zoom.
 - `pixelRatio` is `1`; `maxPixelRatio` and `resolutionScale` do not apply. `maxPixels` raises the
   zoom instead, to the smallest whole zoom at which the buffer stays within the budget.
 - A pixel of the art is `devicePixelZoom / devicePixelRatio` CSS pixels large. A pointer position
   divides by that, not by `pixelZoom`:
 
-  ```ts
+  ```ts check
+  import {Display} from '@spearwolf/twopoint5d';
+
+  const canvas = document.querySelector('canvas')!;
+  const display = new Display(canvas);
+  display.pixelZoom = 2;
+
   canvas.addEventListener('pointermove', (event) => {
     const x = (event.offsetX * display.devicePixelRatio) / display.devicePixelZoom;
     const y = (event.offsetY * display.devicePixelRatio) / display.devicePixelZoom;
   });
+
+  export {display};
   ```
 
 - `styleImageRendering` pins `image-rendering` to `'pixelated'` or `'auto'`; without it the
   display writes `pixelated` while the zoom is above `0`.
+- A `pixelZoom` that is not a positive finite number — `NaN`, `Infinity`, a negative one — counts
+  as `0`.
 
 The zoom of a projection — `OrthographicProjection` with `{pixelZoom: 2}` on a display without a
 zoom — draws the art as large, but in a drawing buffer at the full pixel ratio: four times the
@@ -113,7 +126,8 @@ export {display};
 A budget of 3 million leaves a phone of 412 × 915 CSS pixels at its ratio of 2 — 1.5 million
 pixels — and draws a 4K screen at a ratio of 0.5, rounded down from 0.6. Where the ratio falls below
 `1`, the browser scales the canvas up, smoothly: that is dynamic resolution, fine for smooth images,
-not for pixel art, which takes a `pixelZoom` instead.
+not for pixel art, which takes a `pixelZoom` instead. The budget holds after a `resolutionScale`
+above `1` as well: the 4K screen stays at 0.5 at a scale of 2.
 
 ## Resolution scale
 
@@ -121,15 +135,20 @@ not for pixel art, which takes a `pixelZoom` instead.
 It is what `adaptiveResolution` moves, and it may be set by hand — a quality setting, say. It does
 not apply under a `pixelZoom`.
 
+Above `1` it is supersampling: the display draws beyond `maxPixelRatio` — a scale of 1.5 shades 2.25
+times the pixels — but within `maxPixels`. A `maxScale` above `1` lets `adaptiveResolution` go there.
+
 ## The pixel ratio, put together
 
 Without a `pixelZoom`, the display draws at
 
 ```text
-min(devicePixelRatio, maxPixelRatio, sqrt(maxPixels / cssArea)) × resolutionScale
+min(min(devicePixelRatio, maxPixelRatio, sqrt(maxPixels / cssArea)) × resolutionScale, sqrt(maxPixels / cssArea))
 ```
 
-device pixels per CSS pixel, each bound only where it is set. Where the budget or the scale has
+device pixels per CSS pixel, each bound only where it is set. The budget comes in twice: before the
+scale and after it, so a scale above `1` draws beyond `maxPixelRatio` but never beyond `maxPixels`.
+For a scale up to `1` the second bound changes nothing. Where the budget or the scale has
 made the ratio, it is rounded **down to a step of an eighth**, at least an eighth: three builds every
 render target of a pipeline anew with every new size, and in steps the sizes change less often and
 come back to the same values. Where neither has, the ratio stays exact — `devicePixelRatio` itself,
@@ -160,8 +179,14 @@ of the display where that is lower — by `resolutionScale`: down a step of an e
 costs more than the target allows, up a step where there is room for the pixels of it, between
 `0.5` and `1`. Options of its own instead of `true`:
 
-```ts
-new Display(canvas, {adaptiveResolution: {targetFps: 30, minScale: 0.25, maxScale: 1}});
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!, {
+  adaptiveResolution: {targetFps: 30, minScale: 0.25, maxScale: 1},
+});
+
+export {display};
 ```
 
 The controller reads the cost of a frame in one of two ways, see `adaptive.method`:
@@ -202,6 +227,13 @@ What to know about it:
 - A display that builds its renderer asks it for `trackTimestamp: true`, which `gpu-time` needs. A
   renderer handed to the constructor, a WebGPU adapter without `timestamp-query` and a WebGL 2
   without the timer extension — Android Chrome often hides it — leave `frame-pacing`.
+
+  A renderer the display built with `trackTimestamp: true` measures timestamps for its whole life:
+  while the controller holds still under a `pixelZoom`, after `adaptive.enabled = false` and after
+  `adaptive.dispose()` as well. three offers no way to take that back — the timestamp writes sit
+  on the render pass descriptor three keeps for the canvas. The cost is small. A display that is
+  to draw without them passes `trackTimestamp: false` beside `adaptiveResolution`, and the
+  controller reads the frame pacing then.
 - `frame-pacing` cannot tell the GPU from the CPU. A frame held up by JavaScript takes the scale
   down as well, which helps nothing; `minScale` is how far that goes.
 - Under a `pixelZoom` the controller holds still: pixel art keeps its size.

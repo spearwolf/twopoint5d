@@ -21,7 +21,9 @@ export interface AdaptiveResolutionOptions {
 
   /**
    * The highest {@link Display.resolutionScale} the controller goes up to, `1` by default.
-   * Rounded down to a step of an eighth, at least one eighth.
+   * Rounded down to a step of an eighth, at least one eighth. Above `1` the controller goes
+   * beyond {@link Display.maxPixelRatio}, within {@link Display.maxPixels}: a step that the budget
+   * holds to the same pixel ratio is skipped.
    */
   maxScale?: number;
 }
@@ -92,10 +94,12 @@ interface TimestampBackend {
  * - **`gpu-time`** — the time the GPU spent on the frame, through the timestamp queries of three
  *   (`timestamp-query` under WebGPU, `EXT_disjoint_timer_query_webgl2` under WebGL 2). It needs a
  *   renderer built with `trackTimestamp: true`, which a display that builds its renderer with
- *   `adaptiveResolution` asks for. The GPU may take 80 % of the frame interval; a step up is
- *   taken where the time, scaled by the pixels the display would draw at that step, stays below
- *   90 % of that, three windows in a row. A step up that the next window takes back makes the
- *   next one wait twice as many windows, up to 300.
+ *   `adaptiveResolution` asks for. A renderer built with `trackTimestamp: true` measures
+ *   timestamps for its whole life, while the controller holds still, after it is disabled and
+ *   after its dispose as well. The GPU may take 80 % of the frame interval; a step up is taken
+ *   where the time, scaled by the pixels the display would draw at that step, stays below 90 % of
+ *   that, three windows in a row. A step up that the next window takes back makes the next one
+ *   wait twice as many windows, up to 300.
  * - **`frame-pacing`** — the frames that come late, where the renderer measures no GPU time, read
  *   off the intervals between the animation frames of the page: a frame that `maxFps` holds back
  *   is not late. It cannot tell the GPU from the CPU, and a frame on time shows no headroom: the
@@ -318,7 +322,7 @@ export class AdaptiveResolution {
   };
 
   readonly #onRenderFrame = ({rawDeltaTime}: DisplayEventProps): void => {
-    if (!this.#enabled || this.display.pixelZoom > 0) return;
+    if (!this.#enabled || isPositiveFinite(this.display.pixelZoom)) return;
 
     this.#method ??= this.#tracksGpuTime() ? 'gpu-time' : 'frame-pacing';
 
@@ -352,7 +356,13 @@ export class AdaptiveResolution {
         (ms) => {
           this.#gpuResolving = false;
           // what holds #onRenderFrame still drops a measurement that comes in after it
-          if (this.#disposed || !this.#enabled || this.display.pixelZoom > 0 || epoch !== this.#epoch || !isPositiveFinite(ms)) {
+          if (
+            this.#disposed ||
+            !this.#enabled ||
+            isPositiveFinite(this.display.pixelZoom) ||
+            epoch !== this.#epoch ||
+            !isPositiveFinite(ms)
+          ) {
             return;
           }
           this.#gpuSilentFrames = 0;

@@ -409,6 +409,37 @@ describe('Display — resize behavior', () => {
     }
   });
 
+  it('pixelZoom 3, 2, 3 and 0 give a canvas that measures itself its size back', async () => {
+    const restoreDevicePixelRatio = emulateDevicePixelRatio(1);
+    try {
+      host = makeContainer({width: 1000, height: 600});
+      const canvas = document.createElement('canvas');
+      canvas.style.width = '1000px';
+      canvas.style.height = '600px';
+      host.appendChild(canvas);
+      display = new Display(canvas);
+      await display.start();
+
+      // the second frame measures what the first wrote, through the observer
+      const zoomTo = async (pixelZoom) => {
+        display.pixelZoom = pixelZoom;
+        await nextFrame(display);
+        await nextFrame(display);
+      };
+
+      await zoomTo(3);
+      await zoomTo(2);
+      expect(display.width, 'width under a zoom of 2').to.equal(500);
+      await zoomTo(3);
+      await zoomTo(0);
+
+      expect(canvas.getBoundingClientRect().width, 'canvas width').to.equal(1000);
+      expect(display.width, 'width without a zoom').to.equal(1000);
+    } finally {
+      restoreDevicePixelRatio();
+    }
+  });
+
   it('applies styleImageRendering on the next frame without a size change', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
