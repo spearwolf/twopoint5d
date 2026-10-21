@@ -84,6 +84,7 @@ import {
   QuadSize,
   Rotation,
   Shear,
+  type FeatureSpritesOf,
   type SpriteOf,
   TextureColor,
   Tint,
@@ -95,7 +96,14 @@ export const FancySprite = defineSprite({
 });
 
 export type Fancy = SpriteOf<typeof FancySprite>;
+export type FancyMesh = FeatureSpritesOf<typeof FancySprite>;
 ```
+
+Three types lead from a kind to what it makes: `SpriteOf<typeof Kind>` is its sprite handle,
+`FeatureSpritesOf<typeof Kind>` the [`FeatureSprites`](#featuresprites) that draws it — the type of a
+field or a parameter that holds the mesh — and `SpriteKindApiOf<typeof Kind>` the handle without
+its `VO`, the type argument of `FeatureSprites`, `FeatureSpritesGeometry` and
+`FeatureSpritesMaterial`. Each answers `never` for a type that is no kind.
 
 `defineSprite()` merges the attributes and methods of all features into **one** instanced vertex
 object description: one pool, one sprite handle carrying every accessor, one `freeVO()` that moves

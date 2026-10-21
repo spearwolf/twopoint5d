@@ -3,8 +3,9 @@ import {describe, expect, expectTypeOf, test} from 'vitest';
 
 import {voInitialize} from '../vertex-objects/constants.js';
 import {getDescriptorOf} from '../vertex-objects/getDescriptorOf.js';
+import type {VO} from '../vertex-objects/types.js';
 import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
-import {defineSprite, type SpriteOf} from './defineSprite.js';
+import {defineSprite, type SpriteKindApiOf, type SpriteOf} from './defineSprite.js';
 import {QuadBase, type SpriteBase} from './SpriteBase.js';
 import {ColorOrder, defineFeature, LocalOrder, type SpriteFeature} from './SpriteFeature.js';
 
@@ -380,6 +381,15 @@ describe('defineSprite()', () => {
     expectTypeOf<SpriteOf<typeof kind>>().toHaveProperty('setInstancePosition');
     expectTypeOf<SpriteOf<typeof kind>>().toHaveProperty('setColorValues');
     expectTypeOf<SpriteOf<typeof kind>>().toHaveProperty('x');
+  });
+
+  test('names the api of a kind, the sprite handle without its VO (a type-level check)', () => {
+    const kind = defineSprite({base: QuadBase, features: [position, flat, tint]});
+
+    expectTypeOf<SpriteKindApiOf<typeof kind>>().toHaveProperty('setInstancePosition');
+    expectTypeOf<SpriteKindApiOf<typeof kind>>().toHaveProperty('setColorValues');
+    expectTypeOf<SpriteOf<typeof kind>>().toEqualTypeOf<SpriteKindApiOf<typeof kind> & VO>();
+    expectTypeOf<SpriteKindApiOf<string>>().toBeNever();
   });
 
   test('takes a feature list typed as SpriteFeature[]', () => {
