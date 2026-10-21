@@ -218,6 +218,17 @@ covers color and depth (`clearColorBuffer` and `clearDepthBuffer` both
 `internalTargetPool` is cleared the same way, so nothing of the renderer that
 borrowed it before stays in it.
 
+The **target a pipeline writes to** — the canvas, or `outputRenderTarget` —
+gets the own clear before the pipeline runs, in Mode C and in the composed
+modes alike, unless the pipeline's draw clears it anyway: three.js clears the
+target first under `renderer.autoClear` with `autoClearColor`,
+`autoClearDepth` and `autoClearStencil` — its defaults —, and the quad of the
+pipeline then covers every pixel, color and depth, without blending. Where
+those flags cover every buffer of the own clear, the renderer leaves its clear
+out, and the target ends up the same. On the canvas that clear would cost a
+full-screen draw: three.js clears the canvas through its frame buffer target
+and copies that onto the canvas.
+
 The **pass-target of a nested `StageRenderer`** — the one its parent samples
 through `asPassNode()` — is cleared by the parent every frame to transparent
 black, color and depth. A child with `clear = true` then clears it once more

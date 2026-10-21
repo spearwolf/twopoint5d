@@ -1,4 +1,5 @@
 import type {WebGPURenderer} from 'three/webgpu';
+import type {AdaptiveResolutionOptions} from './AdaptiveResolution.js';
 import type {Display} from './Display.js';
 
 export interface DisplayEventProps {
@@ -50,6 +51,33 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * If nothing or 0 is specified here, the maximum possible FPS are used.
    */
   maxFps?: number;
+
+  /**
+   * The upper bound of the pixel ratio the display draws at, see {@link Display.maxPixelRatio}.
+   * Without it the bound is {@link Display.DefaultMaxPixelRatio}, `2`. With `0`, or anything else
+   * but a positive finite number, the display draws at the `devicePixelRatio` of the window of
+   * its canvas.
+   */
+  maxPixelRatio?: number;
+
+  /**
+   * The budget of pixels of the drawing buffer, see {@link Display.maxPixels}. Without it, or with
+   * anything but a positive finite number, there is no budget.
+   */
+  maxPixels?: number;
+
+  /**
+   * Hold the frame rate by the resolution: with `true`, or with options of its own, the display
+   * builds an {@link AdaptiveResolution} that sets {@link Display.resolutionScale} by the cost of
+   * every frame — down an eighth where a frame costs more than the target allows, up where there
+   * is room. The target is 60 frames per second, or `maxFps` where that is lower.
+   *
+   * A display that builds its renderer asks it for `trackTimestamp: true`, so the controller reads
+   * the GPU time of a frame; a renderer handed in, or one without timestamp queries, leaves it the
+   * pace of the frames. Off by default. Read once, by the constructor; the controller is
+   * {@link Display.adaptiveResolution}.
+   */
+  adaptiveResolution?: boolean | AdaptiveResolutionOptions;
 
   /**
    * Pause the display while its canvas is outside the viewport, and let it run again once

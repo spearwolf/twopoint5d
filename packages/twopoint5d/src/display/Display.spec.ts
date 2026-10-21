@@ -7,9 +7,11 @@ import {
   OnDisplayInit,
   OnDisplayPause,
   OnDisplayRenderFrame,
+  OnDisplayResize,
   OnDisplayRestart,
   OnDisplayStart,
 } from '../events.js';
+import {AdaptiveResolution} from './AdaptiveResolution.js';
 import {Display} from './Display.js';
 import {FixedFrameLoop} from './FixedFrameLoop.js';
 import {FrameLoop} from './FrameLoop.js';
@@ -926,20 +928,280 @@ describe('Display', () => {
 
     it('rounds a clamped size down, so the drawing buffer stays within MaxResolution at a fractional pixel ratio', () => {
       stubDevicePixelRatio(3);
-      const {renderer} = makeDisplay({resizeTo: () => [5000, 50]});
+      const {renderer} = makeDisplay({resizeTo: () => [5000, 50], maxPixelRatio: 0});
 
       // Math.floor(2730 * 3) is 8190
       expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(2730, 50, 3);
     });
 
-    it('holds the CSS size to MaxResolution while pixelZoom is above 0', () => {
-      stubDevicePixelRatio(2);
-      const {display, renderer} = makeDisplay({resizeTo: () => [10000, 100]});
+    it('holds the drawing buffer itself to MaxResolution while pixelZoom is above 0', () => {
+      stubDevicePixelRatio(1);
+      const {display, renderer, canvas} = makeDisplay({resizeTo: () => [20000, 100]});
 
       display.pixelZoom = 2;
       display.resize();
 
-      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(4096, 50, 1);
+      // 10000 pixels of the buffer would fit, and the canvas takes the size of the 8192 it gets
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(8192, 50, 1);
+      expect(canvas.style).toMatchObject({width: '16384px', height: '100px'});
+    });
+
+    describe('maxPixels and resolutionScale', () => {
+      it('bounds the pixel ratio by a budget of pixels, rounded down to an eighth', () => {
+        stubDevicePixelRatio(2);
+        const {display, renderer} = makeDisplay({resizeTo: () => [3840, 2160], maxPixels: 3_000_000});
+
+        // sqrt(3 000 000 / 8 294 400) is 0.601
+        expect(display.pixelRatio).toBe(0.5);
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(3840, 2160, 0.5);
+      });
+
+      it('keeps the buffer within the budget', () => {
+        stubDevicePixelRatio(1);
+        const {display} = makeDisplay({resizeTo: () => [1920, 1080], maxPixels: 1_000_000});
+
+        // sqrt(1 000 000 / 2 073 600) is 0.694
+        expect(display.pixelRatio).toBe(0.625);
+        expect(1920 * 0.625 * 1080 * 0.625).toBeLessThanOrEqual(1_000_000);
+      });
+
+      it('leaves the pixel ratio alone where the budget is not what bounds it', () => {
+        stubDevicePixelRatio(2.625);
+        const {display} = makeDisplay({maxPixels: 3_000_000, maxPixelRatio: 0});
+
+        // 320 × 200 at the ratio of the screen is 441 000 pixels
+        expect(display.pixelRatio).toBe(2.625);
+      });
+
+      it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('takes a maxPixels of %s as no budget', (maxPixels) => {
+        stubDevicePixelRatio(2);
+        const {display} = makeDisplay({resizeTo: () => [3840, 2160], maxPixels});
+
+        expect(display.pixelRatio).toBe(2);
+      });
+
+      it('multiplies the pixel ratio by resolutionScale, rounded down to an eighth', () => {
+        stubDevicePixelRatio(2);
+        const {display, renderer} = makeDisplay();
+
+        display.resolutionScale = 0.75;
+        display.resize();
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 1.5);
+
+        display.resolutionScale = 0.8;
+        display.resize();
+        expect(display.pixelRatio, '1.6 rounded down').toBe(1.5);
+
+        display.resolutionScale = 0.01;
+        display.resize();
+        expect(display.pixelRatio, 'at least an eighth').toBe(0.125);
+      });
+
+      it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('takes a resolutionScale of %s as 1', (resolutionScale) => {
+        stubDevicePixelRatio(2.625);
+        const {display} = makeDisplay({maxPixelRatio: 0});
+
+        display.resolutionScale = resolutionScale;
+        display.resize();
+
+        expect(display.pixelRatio).toBe(2.625);
+      });
+
+      it('scales the ratio the budget leaves', () => {
+        stubDevicePixelRatio(2);
+        const {display} = makeDisplay({resizeTo: () => [3840, 2160], maxPixels: 3_000_000});
+
+        display.resolutionScale = 0.5;
+        display.resize();
+
+        // 0.601 × 0.5 is 0.300
+        expect(display.pixelRatio).toBe(0.25);
+      });
+
+      it('raises the whole zoom under a pixelZoom until the buffer stays within the budget', () => {
+        stubDevicePixelRatio(2);
+        const {display, renderer} = makeDisplay({resizeTo: () => [1000, 500], maxPixels: 100_000});
+
+        display.pixelZoom = 1;
+        display.resize();
+
+        // 2000 × 1000 device pixels, and sqrt(2 000 000 / 100 000) is 4.47
+        expect(display.devicePixelZoom).toBe(5);
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(400, 200, 1);
+      });
+
+      it('leaves the zoom alone where the budget holds it already', () => {
+        stubDevicePixelRatio(2);
+        const {display} = makeDisplay({resizeTo: () => [1000, 500], maxPixels: 100_000});
+
+        display.pixelZoom = 4;
+        display.resize();
+
+        expect(display.devicePixelZoom).toBe(8);
+      });
+
+      it('ignores resolutionScale under a pixelZoom', () => {
+        stubDevicePixelRatio(2);
+        const {display, renderer} = makeDisplay();
+
+        display.pixelZoom = 2;
+        display.resolutionScale = 0.5;
+        display.resize();
+
+        expect(display.devicePixelZoom).toBe(4);
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(160, 100, 1);
+      });
+    });
+
+    describe('pixelZoom in whole device pixels', () => {
+      // the CSS size of the canvas, back in device pixels
+      const devicePixels = (cssSize: string, ratio: number) => Number.parseFloat(cssSize) * ratio;
+
+      it('draws every pixel of the buffer a whole number of device pixels large, and the canvas just as large as those pixels', () => {
+        stubDevicePixelRatio(2.625);
+        const {display, renderer, canvas} = makeDisplay({resizeTo: () => [412, 915]});
+
+        display.pixelZoom = 2;
+        display.resize();
+
+        // 2 CSS pixels are 5.25 device pixels: 5 of them, and 1081.5 × 2401.875 device pixels
+        // hold 216 × 480 of those
+        expect(display.devicePixelZoom).toBe(5);
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(216, 480, 1);
+        expect(display.width).toBe(216);
+        expect(display.height).toBe(480);
+        const style = canvas.style as {width: string; height: string};
+        expect(devicePixels(style.width, 2.625)).toBeCloseTo(216 * 5, 9);
+        expect(devicePixels(style.height, 2.625)).toBeCloseTo(480 * 5, 9);
+      });
+
+      it('never draws a pixel larger than the zoom asks for', () => {
+        stubDevicePixelRatio(1.25);
+        const {display, renderer} = makeDisplay();
+
+        display.pixelZoom = 2;
+        display.resize();
+
+        // 2.5 device pixels rounded down, so a view that fits at a zoom of 2 still fits
+        expect(display.devicePixelZoom).toBe(2);
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(200, 125, 1);
+      });
+
+      it('takes a zoom of whole device pixels divided by the ratio as exactly those device pixels', () => {
+        stubDevicePixelRatio(2.625);
+        const {display} = makeDisplay();
+
+        display.pixelZoom = 4 / 2.625;
+        display.resize();
+
+        expect(display.devicePixelZoom).toBe(4);
+      });
+
+      it('draws a pixel of the buffer at least one device pixel large', () => {
+        stubDevicePixelRatio(2);
+        const {display, renderer} = makeDisplay();
+
+        display.pixelZoom = 0.25;
+        display.resize();
+
+        expect(display.devicePixelZoom).toBe(1);
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(640, 400, 1);
+      });
+
+      it('is 0 without a zoom', () => {
+        stubDevicePixelRatio(2);
+        const {display} = makeDisplay();
+
+        expect(display.devicePixelZoom).toBe(0);
+      });
+
+      it('follows a new device pixel ratio at the same CSS size', () => {
+        vi.stubGlobal('window', {devicePixelRatio: 2, performance});
+        const {display, renderer} = makeDisplay();
+        display.pixelZoom = 2;
+        display.resize();
+
+        (window as {devicePixelRatio: number}).devicePixelRatio = 3;
+        display.resize();
+
+        expect(display.devicePixelZoom).toBe(6);
+        expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(160, 100, 1);
+      });
+
+      it('keeps its size where the canvas measures itself and reads back its size on the grid of the layout', () => {
+        stubDevicePixelRatio(2.625);
+        const {display, canvas} = makeDisplay();
+        // the layout holds a size to 1/64 CSS pixel, and reads it back rounded down
+        canvas.getBoundingClientRect.mockImplementation(() => {
+          const onGrid = (css: string) => Math.floor(Number.parseFloat(css) * 64) / 64;
+          const style = canvas.style as {width: string; height: string};
+          return {width: onGrid(style.width), height: onGrid(style.height)};
+        });
+        Object.assign(canvas.style, {width: '412px', height: '915px'});
+
+        display.pixelZoom = 2;
+        display.resize();
+        const size = [display.width, display.height];
+        display.resize();
+        display.resize();
+
+        expect([display.width, display.height]).toEqual(size);
+        expect(size).toEqual([216, 480]);
+      });
+    });
+
+    it('draws at maxPixelRatio where the device pixel ratio is above it', () => {
+      stubDevicePixelRatio(3);
+      const {display, renderer} = makeDisplay({maxPixelRatio: 1.5});
+
+      expect(display.pixelRatio).toBe(1.5);
+      expect(display.devicePixelRatio).toBe(3);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 1.5);
+    });
+
+    it('leaves a device pixel ratio below maxPixelRatio as it is', () => {
+      stubDevicePixelRatio(1.25);
+      const {display, renderer} = makeDisplay({maxPixelRatio: 2});
+
+      expect(display.pixelRatio).toBe(1.25);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 1.25);
+    });
+
+    it('draws at most at DefaultMaxPixelRatio without a maxPixelRatio', () => {
+      stubDevicePixelRatio(3);
+      const {display, renderer} = makeDisplay();
+
+      expect(display.maxPixelRatio).toBe(Display.DefaultMaxPixelRatio);
+      expect(display.pixelRatio).toBe(2);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 2);
+    });
+
+    it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('takes a maxPixelRatio of %s as no bound', (maxPixelRatio) => {
+      stubDevicePixelRatio(3);
+      const {display, renderer} = makeDisplay({maxPixelRatio});
+
+      expect(display.pixelRatio).toBe(3);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 3);
+    });
+
+    it('draws at a ratio of 1 while pixelZoom is above 0, whatever maxPixelRatio says', () => {
+      stubDevicePixelRatio(3);
+      const {display, renderer} = makeDisplay({maxPixelRatio: 2});
+
+      display.pixelZoom = 2;
+      display.resize();
+
+      expect(display.pixelRatio).toBe(1);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(160, 100, 1);
+    });
+
+    it('holds the drawing buffer to MaxResolution at the bounded ratio', () => {
+      stubDevicePixelRatio(4);
+      const {display, renderer} = makeDisplay({resizeTo: () => [5000, 100], maxPixelRatio: 1});
+
+      // 5000 × 1 lies within MaxResolution, where 5000 × 4 would not
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(5000, 100, 1);
+      expect(display.width).toBe(5000);
     });
 
     it('applies styleImageRendering without a size change, also within resizePollIntervalMs', async () => {
@@ -1169,6 +1431,66 @@ describe('Display', () => {
 
       expect(canvas.getBoundingClientRect.mock.calls.length).toBe(measured + 1);
       expect(display.width).toBe(160);
+    });
+
+    it('measures in the next frame once maxPixelRatio changes, and emits the resize', async () => {
+      view.devicePixelRatio = 3;
+      const {display, renderer, canvas, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+      const resizes: number[] = [];
+      on(display, OnDisplayResize, ({pixelRatio}: DisplayEventProps) => {
+        resizes.push(pixelRatio);
+      });
+      // OnDisplayResize is retained: the subscription hears the last one at once
+      resizes.length = 0;
+
+      display.maxPixelRatio = 1.5;
+      frame(1016);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length).toBe(measured + 1);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 1.5);
+      expect(resizes).toEqual([1.5]);
+
+      frame(1033);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'the frame after that').toBe(measured + 1);
+    });
+
+    it('measures in the next frame once resolutionScale changes, and emits the resize', async () => {
+      view.devicePixelRatio = 2;
+      const {display, renderer, canvas, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+      const resizes: number[] = [];
+      on(display, OnDisplayResize, ({pixelRatio}: DisplayEventProps) => {
+        resizes.push(pixelRatio);
+      });
+      resizes.length = 0;
+
+      display.resolutionScale = 0.5;
+      frame(1016);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length).toBe(measured + 1);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 1);
+      expect(resizes).toEqual([1]);
+    });
+
+    it('measures in the next frame once maxPixels changes under a pixelZoom', async () => {
+      view.devicePixelRatio = 2;
+      const {display, renderer, frame} = makeDisplay();
+      display.pixelZoom = 1;
+      await display.start();
+      frame(1000);
+
+      // 640 × 400 device pixels: a budget of 16 000 takes a zoom of 4
+      display.maxPixels = 16_000;
+      frame(1016);
+
+      expect(display.devicePixelZoom).toBe(4);
+      expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(160, 100, 1);
     });
 
     it('asks a resizeTo callback in every frame, observer or not', async () => {
@@ -1597,6 +1919,26 @@ describe('Display', () => {
   });
 
   describe('constructor', () => {
+    it('builds no AdaptiveResolution without the option', () => {
+      const {display} = makeDisplay();
+
+      expect(display.adaptiveResolution).toBeUndefined();
+    });
+
+    it('builds an AdaptiveResolution with adaptiveResolution: true, held to 60 frames or a lower maxFps', () => {
+      expect(makeDisplay({adaptiveResolution: true}).display.adaptiveResolution).toBeInstanceOf(AdaptiveResolution);
+      expect(makeDisplay({adaptiveResolution: true}).display.adaptiveResolution!.targetFps).toBe(60);
+      expect(makeDisplay({adaptiveResolution: true, maxFps: 30}).display.adaptiveResolution!.targetFps).toBe(30);
+      expect(makeDisplay({adaptiveResolution: true, maxFps: 120}).display.adaptiveResolution!.targetFps).toBe(60);
+    });
+
+    it('hands the options of adaptiveResolution to the controller', () => {
+      const {display} = makeDisplay({adaptiveResolution: {targetFps: 90, minScale: 0.25}, maxFps: 30});
+
+      expect(display.adaptiveResolution!.targetFps).toBe(90);
+      expect(display.adaptiveResolution!.minScale).toBe(0.25);
+    });
+
     it('releases a renderer it has taken over when the constructor fails after taking it', async () => {
       const failure = new Error('the resizeTo callback fails on purpose');
       const {renderer} = makeRenderer();

@@ -29,7 +29,12 @@ import {description, title} from './_swaying-grass.json';
   // the preview screenshot waits for the meadow, not for the default delay
   const preview = deferPreview();
 
-  const display = new Display(getFullscreenCanvas());
+  // The display holds 60 frames per second by its resolution: it reads the GPU time of every frame
+  // — the meadow, its shadows and the bloom chain alike — and draws an eighth fewer pixels per CSS
+  // pixel where a frame costs too much, an eighth more where there is room, down to half the
+  // pixel ratio. Above it, at most 2 device pixels per CSS pixel, the default
+  const PIXEL_RATIOS = {'1': 1, '1.5': 1.5, '2': 2, device: 0} as const;
+  const display = new Display(getFullscreenCanvas(), {adaptiveResolution: true});
 
   // a stage without a projection renders with the camera it is handed: a perspective camera that
   // orbits the meadow slowly, and that the mouse may take over
@@ -115,6 +120,46 @@ import {description, title} from './_swaying-grass.json';
       .onChange((on: boolean) => {
         controls.autoRotate = on;
       });
+
+    // what a frame costs the GPU: the pixel ratio sets how many pixels every pass shades, the
+    // bloom adds a chain of passes at half that size and below
+    const output = gui.addFolder('output');
+    const outputSettings = {pixelRatio: '2' as keyof typeof PIXEL_RATIOS, bloom: true, drawingBuffer: ''};
+    output
+      .add(outputSettings, 'pixelRatio', Object.keys(PIXEL_RATIOS))
+      .name('maxPixelRatio')
+      .onChange((name: keyof typeof PIXEL_RATIOS) => {
+        display.maxPixelRatio = PIXEL_RATIOS[name];
+      });
+    output
+      .add(outputSettings, 'bloom')
+      .name('bloom')
+      .onChange((on: boolean) => {
+        stageRenderer.buildOutputNode = on ? withGlow : undefined;
+      });
+    const drawingBuffer = output.add(outputSettings, 'drawingBuffer').name('drawing buffer').disable();
+    display.onResize(({display: {canvas, pixelRatio}}) => {
+      outputSettings.drawingBuffer = `${canvas.width} × ${canvas.height} @ ${pixelRatio}`;
+      drawingBuffer.updateDisplay();
+    });
+
+    // what the controller reads and what it makes of it, read anew in every frame of the gui
+    const adaptive = display.adaptiveResolution!;
+    output.add(adaptive, 'enabled').name('adaptiveResolution');
+    const adaptiveStatus = {
+      get scale() {
+        return adaptive.scale;
+      },
+      get method() {
+        return adaptive.method ?? '…';
+      },
+      get gpuTime() {
+        return adaptive.gpuTime == null ? '–' : `${adaptive.gpuTime.toFixed(2)} ms`;
+      },
+    };
+    output.add(adaptiveStatus, 'scale').name('resolutionScale').disable().listen();
+    output.add(adaptiveStatus, 'method').name('method').disable().listen();
+    output.add(adaptiveStatus, 'gpuTime').name('GPU time').disable().listen();
 
     display.onDispose(() => {
       gui.destroy();

@@ -50,7 +50,7 @@ import {description, title} from './_animated-billboards.json';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
-  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false});
+  const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
   await demo.start(async ({renderer}) => {
     demo.camera.position.set(0, 70, -220);

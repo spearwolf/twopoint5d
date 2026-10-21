@@ -361,6 +361,54 @@ describe('Display — resize behavior', () => {
     }
   });
 
+  it('pixelZoom draws every pixel of the buffer a whole number of device pixels large', async () => {
+    const restoreDevicePixelRatio = emulateDevicePixelRatio(2.625);
+    try {
+      host = makeContainer({width: 412, height: 915});
+      display = new Display(host);
+      display.pixelZoom = 2;
+      await display.start();
+      await nextFrame(display);
+
+      // 2 CSS pixels are 5.25 device pixels: 5 of them, and 1081.5 × 2401.875 device pixels hold
+      // 216 × 480 of those
+      expect(display.devicePixelZoom, 'devicePixelZoom').to.equal(5);
+      expect(display.canvas.width, 'drawing buffer width').to.equal(216);
+      expect(display.canvas.height, 'drawing buffer height').to.equal(480);
+      const rect = display.canvas.getBoundingClientRect();
+      // the layout holds the CSS size to its grid of 1/64 CSS pixel
+      expect(rect.width * 2.625, 'canvas width in device pixels').to.be.closeTo(216 * 5, 2.625 / 64);
+      expect(rect.height * 2.625, 'canvas height in device pixels').to.be.closeTo(480 * 5, 2.625 / 64);
+    } finally {
+      restoreDevicePixelRatio();
+    }
+  });
+
+  it('pixelZoom keeps the size of a canvas that measures itself, frame after frame', async () => {
+    const restoreDevicePixelRatio = emulateDevicePixelRatio(2.625);
+    try {
+      host = makeContainer({width: 412, height: 915});
+      const canvas = document.createElement('canvas');
+      canvas.style.width = '412px';
+      canvas.style.height = '915px';
+      host.appendChild(canvas);
+      display = new Display(canvas);
+      display.pixelZoom = 2;
+      await display.start();
+      await nextFrame(display);
+      await nextFrame(display);
+      const size = [display.width, display.height];
+
+      // every frame after a new size of the canvas measures it again, through the observer
+      for (let i = 0; i < 5; i++) await nextFrame(display);
+
+      expect([display.width, display.height]).to.deep.equal(size);
+      expect(size).to.deep.equal([216, 480]);
+    } finally {
+      restoreDevicePixelRatio();
+    }
+  });
+
   it('applies styleImageRendering on the next frame without a size change', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);

@@ -40,7 +40,7 @@ import {description, title} from './_map2d-cam-visi.json';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
-  const app = await run(new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: false}));
+  const app = await run(new PerspectiveOrbitDemo(getFullscreenCanvas()));
 
   const cameraControl = queryRadioButtons('camera');
 
