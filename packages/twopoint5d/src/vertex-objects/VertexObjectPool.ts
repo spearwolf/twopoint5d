@@ -110,8 +110,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   #sortScratch: ArrayBuffer | undefined;
   readonly #sortScratchViews = new Map<VertexAttributeDataType, TypedArray>();
   #valueLayouts: ReadonlyMap<string, ValuePropertyLayout> | undefined;
-  // the pool that adopted the vertex objects of this one: where a vertex object handed out while an
-  // onCreateVO hook made this pool adopted lives on
+  // the pool that adopted the vertex objects of this one from inside the onCreateVO hook of the
+  // #createVO() call running on this pool: where the vertex object that call handed out lives on.
+  // Every #createVO() clears it first and every adoptVOs() clears it on the pool that adopts, so it
+  // names no adoption from before and no chain of adoptions closes into a circle
   #adoptedBy: VertexObjectPool<VOType> | undefined;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
@@ -207,7 +209,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * without one; {@link getVO} materializes it here.
    *
    * `source` is left empty: its `usedCount` goes to 0 and it holds no vertex object, so neither that
-   * nor a later `dispose()` of it unlinks one. Its buffers keep their data.
+   * nor a later `dispose()` of it unlinks one. Its buffers keep their data. It stays usable: a later
+   * `createVO()` hands out its own slots, and it can adopt again — the vertex objects of this pool
+   * included, back and forth.
    *
    * The way to grow a pool behind a geometry, which `resize()` refuses: build a geometry on a pool
    * of the larger capacity and the same descriptor, and let it adopt the vertex objects of the old
@@ -256,6 +260,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       }
     }
     source.usedCount = 0;
+    // the pool that adopts holds its vertex objects itself now and is nobody's source any more — so no
+    // chain of adoptions closes into a circle
+    this.#adoptedBy = undefined;
     source.#adoptedBy = this;
   }
 
@@ -638,6 +645,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * replacement the hook answers takes the slot in the pool that holds the vertex object then.
    */
   #createVO(idx: number, initialize: boolean): VOType & VO {
+    // the field names only an adoption the hook of this call makes: a source pool that hands out
+    // again gives a replacement its own slot
+    this.#adoptedBy = undefined;
     const vo = createVertexObject<VOType>(this.descriptor, this.buffer, idx);
     this.#voIndex[idx] = vo;
     // only a slot createVO() has just handed out is new; one getVO() materializes carries the

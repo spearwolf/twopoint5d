@@ -349,6 +349,36 @@ describe('FeatureSprites', () => {
 
       expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
     });
+
+    test("a material put into the slot stays the caller's: dispose() releases the material the sprites built and leaves the other alone", () => {
+      const sprites = new FeatureSprites(kind);
+      const built = sprites.material!;
+      const other = new FeatureSpritesMaterial(kind);
+      const builtDispose = sandbox.spy(built, 'dispose');
+      const otherDispose = sandbox.spy(other, 'dispose');
+      sprites.material = other;
+
+      sprites.dispose();
+
+      expect([builtDispose.callCount, otherDispose.callCount]).toEqual([1, 0]);
+      expect(sprites.material).toBeUndefined();
+      other.dispose();
+    });
+
+    test("a geometry put into the slot stays the caller's: dispose() releases the geometry the sprites built", () => {
+      const sprites = new FeatureSprites(kind);
+      const built = sprites.geometry!;
+      const other = new FeatureSpritesGeometry(kind, {capacity: 4});
+      const builtDispose = sandbox.spy(built, 'dispose');
+      const otherDispose = sandbox.spy(other, 'dispose');
+      sprites.geometry = other;
+
+      sprites.dispose();
+
+      expect([builtDispose.callCount, otherDispose.callCount]).toEqual([1, 0]);
+      expect(sprites.geometry).toBeUndefined();
+      other.dispose();
+    });
   });
   describe('a constructor that throws', () => {
     test('leaves no geometry alive when the material it builds is refused', () => {
@@ -946,6 +976,40 @@ describe('FeatureSprites', () => {
       sprites.update();
       expect((sprites.uniforms!['lift']!.value as Vector3).toArray()).toEqual([2, 4, 8]);
       sprites.dispose();
+    });
+  });
+
+  describe('another material in the slot', () => {
+    const glow = defineFeature({name: 'glow', uniforms: {glowColor: [0, 0, 0, 1]}, color: {order: 150, transform: (c) => c}});
+    const glowing = defineSprite({
+      base: QuadBase,
+      features: [InstancePosition, FlatPlacement, QuadSize, Rotation, AtlasFrame, TextureColor, Tint, glow],
+    });
+
+    test('while another material sits in the slot, setUniform(), setTexture() and a binding reach the material of the sprites and every pass', () => {
+      const sprites = new FeatureSprites(glowing, {passes: [ShadowPass]});
+      const own = sprites.material!;
+      const pass = sprites.passes['shadow']!.material;
+      const other = new FeatureSpritesMaterial(glowing);
+      const colorMap = new Texture();
+      sprites.material = other;
+
+      sprites.setUniform('glowColor', 1, 0.5, 0.25, 1);
+      sprites.setTexture('colorMap', colorMap);
+      sprites.bindUniform('groundPlane', {type: 'vec4', write: (v) => v.set(0, 1, 0, 2)});
+      sprites.update();
+
+      for (const material of [own, pass]) {
+        expect((material.uniforms['glowColor']!.value as Vector4).toArray()).toEqual([1, 0.5, 0.25, 1]);
+        expect((material.uniforms['groundPlane']!.value as Vector4).toArray()).toEqual([0, 1, 0, 2]);
+        expect(material.getTexture('colorMap')).toBe(colorMap);
+      }
+      expect((other.uniforms['glowColor']!.value as Vector4).toArray()).toEqual([0, 0, 0, 1]);
+      expect(Object.hasOwn(other.uniforms, 'groundPlane')).toBe(false);
+      expect(other.getTexture('colorMap')).toBeUndefined();
+      expect([sprites.uniforms, sprites.getTexture('colorMap')]).toEqual([own.uniforms, colorMap]);
+      sprites.dispose();
+      other.dispose();
     });
   });
 });

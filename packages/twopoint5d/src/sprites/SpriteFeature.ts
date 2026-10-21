@@ -45,6 +45,14 @@ export interface SpriteFrameContext {
    * graph anew.
    */
   textureSize(name: string): Node<'vec2'>;
+  /**
+   * The `colorSpace` of a texture any feature of the material declares, as it is set — `undefined`
+   * while it is unset, and for a texture declared with `needsImage` until its image has measures. A
+   * tracked read of its shape, which `textureShapeKey()` carries the colour space in: a texture in
+   * another colour space builds the graph anew. The material throws, naming the feature, for a name
+   * no feature declares.
+   */
+  colorSpace(name: string): string | undefined;
 }
 
 export interface SpriteShaderContext extends SpriteFrameContext {

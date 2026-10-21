@@ -322,6 +322,27 @@ describe('FeatureSprites with grow: true', () => {
     });
   });
 
+  test('a full pool does not grow a geometry put into the slot: createSprite() throws and nothing is disposed', () => {
+    quiet();
+    const {sprites} = makeGrowing(1, 1);
+    const built = sprites.geometry!;
+    const other = new FeatureSpritesGeometry(TexturedSpriteKind, 1);
+    other.instancedPool.createVO();
+    const builtDispose = vi.spyOn(built, 'dispose');
+    const otherDispose = vi.spyOn(other, 'dispose');
+    sprites.geometry = other;
+
+    expect(() => sprites.createSprite()).toThrow(
+      'FeatureSprites#createSprite(): the pool is full and cannot grow — the geometry slot holds a geometry the sprites did not build, and grow replaces only their own. Put the geometry the sprites built back into the slot, or build the sprites with the capacity they need',
+    );
+    expect([builtDispose.mock.calls.length, otherDispose.mock.calls.length]).toEqual([0, 0]);
+    expect(sprites.geometry).toBe(other);
+    expect(other.instancedPool.isDisposed).toBe(false);
+    sprites.geometry = built;
+    sprites.dispose();
+    other.dispose();
+  });
+
   test('a growth that throws leaves the sprites drawing the geometry they had', () => {
     quiet();
     const {sprites, all} = makeGrowing(1, 1);

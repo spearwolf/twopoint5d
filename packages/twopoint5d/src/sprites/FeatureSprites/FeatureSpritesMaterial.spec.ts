@@ -2,7 +2,7 @@ import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {add, modelViewMatrix, vec3, vec4} from 'three/tsl';
 import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
-import {AdditiveBlending, NearestFilter, Texture} from 'three/webgpu';
+import {AdditiveBlending, NearestFilter, NoColorSpace, SRGBColorSpace, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {attributeNamesOf, nodesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
@@ -610,6 +610,54 @@ describe('FeatureSpritesMaterial', () => {
       expect(samplesTexture(material.positionNode!, bigger)).toBe(true);
       expect(material.resources.textureSize('lookup').value.toArray()).toEqual([8, 2]);
       material.dispose();
+    });
+
+    test('the context answers the color space of a texture any feature declares, undefined while it is unset, and builds the graph anew for another color space', () => {
+      const seen: (string | undefined)[] = [];
+      const spaceReader = defineFeature({
+        name: 'spaceReader',
+        color: {
+          order: 250,
+          transform: (color, {colorSpace}) => {
+            seen.push(colorSpace('colorMap'));
+            return color;
+          },
+        },
+      });
+      const material = new FeatureSpritesMaterial(
+        defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, TextureColor, spaceReader]}),
+      );
+      const srgb = new Texture();
+      srgb.colorSpace = SRGBColorSpace;
+      const none = new Texture();
+      none.colorSpace = NoColorSpace;
+
+      expect(seen).toEqual([undefined]);
+      material.setTexture('colorMap', srgb);
+      expect(seen.at(-1)).toBe('srgb');
+      const {colorNode} = material;
+      material.setTexture('colorMap', none);
+      expect(material.colorNode).not.toBe(colorNode);
+      expect(seen.at(-1)).toBe('');
+      material.dispose();
+
+      const stray = defineFeature({
+        name: 'stray',
+        color: {
+          order: 250,
+          transform: (color, {colorSpace}) => {
+            colorSpace('palette');
+            return color;
+          },
+        },
+      });
+      const baseline = [getSignalsCount(), getEffectsCount()];
+      expect(
+        () => new FeatureSpritesMaterial(defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, stray]})),
+      ).toThrow(
+        'FeatureSpritesMaterial: feature "stray" reads the color space of the texture "palette", which no feature of these sprites declares',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
     });
   });
 

@@ -117,6 +117,7 @@ export function stubShaderContext(
       return texture(new Texture(), uv) as unknown as Node<'vec4'>;
     },
     textureSize: () => vec2(4, 4) as unknown as Node<'vec2'>,
+    colorSpace: () => undefined,
   };
 }
 

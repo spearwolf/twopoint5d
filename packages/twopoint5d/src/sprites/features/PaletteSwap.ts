@@ -1,5 +1,5 @@
-import {abs, add, clamp, div, float, max, mix, mul, round, step, sub, vec2, vec4} from 'three/tsl';
-import type {Node} from 'three/webgpu';
+import {abs, add, clamp, div, float, max, mix, mul, round, sRGBTransferOETF, step, sub, vec2, vec4} from 'three/tsl';
+import {type Node, SRGBColorSpace} from 'three/webgpu';
 import {describeValue} from '../../utils/describeValue.js';
 import {ColorOrder, defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 
@@ -22,8 +22,8 @@ export interface PaletteSwapApi {
 // one feature per number of colours: the stage unrolls its comparisons by it
 const features = new Map<number, SpriteFeature<PaletteSwapApi>>();
 
-// two colours closer than this in every channel are one colour: it absorbs the rounding of 8-bit texels
-// on their way through the sampler and nothing more
+// two colours closer than this in every channel, in the 8-bit values of the texture data, are one
+// colour: it absorbs the rounding of 8-bit texels on their way through the sampler and nothing more
 const TOLERANCE = 1 / 512;
 
 /**
@@ -34,8 +34,10 @@ const TOLERANCE = 1 / 512;
  * The `palette` is a small image read with `flipY = false`, entry `i` of row `r` its texel `(i, r)` from the
  * top left: row 0 the source colours, every row below a replacement set of the same length. A color stage
  * in the band `ColorOrder.Palette`, before `Tint`, compares the colour of the color source with the first
- * `colors` entries of row 0 — the first entry it matches within `1/512` per channel wins — and draws it with
- * that entry of the sprite's `paletteRow`, its alpha kept. A colour that matches no entry stays as it is.
+ * `colors` entries of row 0 — the first entry it matches within `1/512` per channel of the values of the
+ * texture data wins; under an `srgb` palette both colours are encoded back to sRGB before they are compared —
+ * and draws it with that entry of the sprite's `paletteRow`, its alpha kept. A colour that matches no entry
+ * stays as it is.
  *
  * Colour cycling: the uniform `paletteCycle` `(first, count)` names the entries that cycle — `count` 0, the
  * default, to the end of the palette — and `paletteShift` how far: a colour of entry `i` in the range is drawn
@@ -65,8 +67,15 @@ export function paletteSwap(options?: PaletteSwapOptions): SpriteFeature<Palette
       },
       color: {
         order: ColorOrder.Palette,
-        transform: (color, {attribute, uniform, sample, textureSize}) => {
+        transform: (color, {attribute, uniform, sample, textureSize, colorSpace}) => {
           const size = textureSize('palette');
+          // the sampler decodes an sRGB texel to linear values, in which dark colours lie closer than 1/512:
+          // both sides go back to the 8-bit values of the texture data before they are compared. The docs
+          // ask for both textures in one colour space, so the one of the palette stands for both
+          const encoded = colorSpace('palette') === SRGBColorSpace;
+          const dataOf = (rgb: Node<'vec3'>): Node<'vec3'> =>
+            encoded ? (sRGBTransferOETF(rgb) as unknown as Node<'vec3'>) : rgb;
+          const colorData = dataOf(color.rgb as unknown as Node<'vec3'>);
           const width = size.x;
           // the centre of a texel: exact under any filter of the palette
           const entryUv = (entry: Node<'float'>, row: Node<'float'>) =>
@@ -77,7 +86,7 @@ export function paletteSwap(options?: PaletteSwapOptions): SpriteFeature<Palette
           let index = float(-1) as unknown as Node<'float'>;
           for (let i = colors - 1; i >= 0; i--) {
             const source = sample('palette', entryUv(float(i) as unknown as Node<'float'>, float(0) as unknown as Node<'float'>));
-            const distance = abs(sub(color.rgb, source.rgb));
+            const distance = abs(sub(colorData, dataOf(source.rgb as unknown as Node<'vec3'>)));
             const far = max(distance.x, max(distance.y, distance.z));
             // step(edge, x) is 1 for x ≥ edge: close in every channel, and an entry the palette holds
             const matches = mul(sub(1, step(TOLERANCE, far)), step(i + 0.5, width));

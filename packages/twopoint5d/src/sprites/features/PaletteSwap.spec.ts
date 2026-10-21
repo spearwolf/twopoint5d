@@ -1,4 +1,4 @@
-import {Texture} from 'three/webgpu';
+import {type Node, SRGBColorSpace, Texture} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {attributeNamesOf, nodesOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
@@ -27,6 +27,12 @@ const makePalette = (width = 16, height = 4) => {
 
 const lookupsOf = (root: Parameters<typeof textureNodesOf>[0], palette: Texture) =>
   new Set(textureNodesOf(root).filter((node) => node.value === palette)).size;
+
+// the calls of sRGBTransferOETF() in the graph below `root`, known by the layout of the function they call
+const encodingsOf = (root: Node) =>
+  [...nodesOf(root)].filter(
+    (node) => (node as unknown as {shaderNode?: {layout?: {name?: string}}}).shaderNode?.layout?.name === 'sRGBTransferOETF',
+  ).length;
 
 describe('paletteSwap()', () => {
   test('answers one frozen feature per set of options', () => {
@@ -93,6 +99,18 @@ describe('paletteSwap()', () => {
       true,
       true,
     ]);
+    material.dispose();
+  });
+
+  test('encodes the colour and every entry back to sRGB under an srgb palette, and nothing under another', () => {
+    const srgb = makePalette();
+    srgb.colorSpace = SRGBColorSpace;
+    const material = new FeatureSpritesMaterial(kind, {textures: {colorMap: new Texture(), palette: srgb}});
+
+    // the colour of the color source once, and the sixteen entries it is compared with
+    expect(encodingsOf(material.colorNode!)).toBe(1 + 16);
+    material.setTexture('palette', makePalette());
+    expect(encodingsOf(material.colorNode!)).toBe(0);
     material.dispose();
   });
 

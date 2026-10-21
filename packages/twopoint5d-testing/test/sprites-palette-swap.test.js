@@ -13,7 +13,7 @@ import {
   TextureColor,
   TextureCoords,
 } from '@spearwolf/twopoint5d';
-import {NearestFilter, OrthographicCamera, RenderTarget, Scene, TextureLoader} from 'three/webgpu';
+import {NearestFilter, OrthographicCamera, RenderTarget, Scene, SRGBColorSpace, TextureLoader} from 'three/webgpu';
 import {
   disposeDisplay,
   isNearColor,
@@ -168,6 +168,49 @@ describe('sprites — PaletteSwap', function () {
     sprites.setUniform('paletteCycle', 1, 2);
     sprites.setUniform('paletteShift', 1);
     expectCells(await cells(), [YELLOW, MAGENTA, CYAN, GREY], 'entries 1 and 2 cycled');
+  });
+
+  it('compares sRGB textures in their 8-bit values: black and a dark grey keep their colour beside close palette entries', async () => {
+    const topDown = await readsTopDown(display.renderer, keep(new RenderTarget(64, 64)));
+    const srgb = (texture) => {
+      texture.colorSpace = SRGBColorSpace;
+      texture.magFilter = NearestFilter;
+      texture.minFilter = NearestFilter;
+      return texture;
+    };
+    // black and 25 match no entry; decoded to linear values, black lies within 1/512 of the entry 5 and
+    // 25 within 1/512 of the entry 28
+    const colorMap = keep(
+      srgb(
+        makeColorTexture(
+          [
+            [0, 0, 0, 255],
+            [5, 5, 5, 255],
+            [25, 25, 25, 255],
+            [28, 28, 28, 255],
+          ],
+          4,
+          1,
+        ),
+      ),
+    );
+    const palette = keep(srgb(makeColorTexture([[5, 5, 5, 255], [28, 28, 28, 255], RED, GREEN], 2, 2)));
+    const sprites = keep(new FeatureSprites(Swapped, {capacity: 1, textures: {colorMap, palette}}));
+    const sprite = sprites.createSprite();
+    // 4 units a texel, at 1 pixel a unit: each texel a cell of 4 × 4 pixels
+    sprite.setSize(16, 4);
+    sprite.paletteRow = 1;
+
+    const colorAt = await render(sprites, 64, topDown);
+    const [black, five, darkGrey, twentyEight] = [-6, -2, 2, 6].map((x) => colorAt(x, 0));
+
+    expect(isNearColor(five, RED), `the texel 5: ${five}`).to.be.true;
+    expect(isNearColor(twentyEight, GREEN), `the texel 28: ${twentyEight}`).to.be.true;
+    // the target holds linear values, so the greys read darker than their texels; what counts is that
+    // they stay grey and dark
+    expect(isNearColor(black, [0, 0, 0]), `black: ${black}`).to.be.true;
+    const grey = darkGrey[0] === darkGrey[1] && darkGrey[1] === darkGrey[2] && darkGrey[0] <= 28;
+    expect(grey, `the texel 25: ${darkGrey}`).to.be.true;
   });
 
   it('draws the lookbook goblin in its red and its blue variant, texel for texel', async () => {

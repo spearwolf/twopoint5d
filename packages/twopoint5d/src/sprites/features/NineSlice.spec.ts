@@ -12,11 +12,15 @@ import {QuadBase} from '../SpriteBase.js';
 import {LocalOrder, type SpriteFrameNodes, UvOrder} from '../SpriteFeature.js';
 import {AnimatedFrames} from './AnimatedFrames.js';
 import {FeatureSpritesGeometry} from '../FeatureSprites/FeatureSpritesGeometry.js';
+import {FeatureSpritesMaterial} from '../FeatureSprites/FeatureSpritesMaterial.js';
 import {AtlasFrame} from './AtlasFrame.js';
 import {FlatPlacement} from './FlatPlacement.js';
 import {InstancePosition} from './InstancePosition.js';
 import {NineSlice} from './NineSlice.js';
 import {QuadSize} from './QuadSize.js';
+import {Rotation} from './Rotation.js';
+import {SegmentEnd} from './SegmentEnd.js';
+import {SegmentPlacement, segmentPlacement} from './SegmentPlacement.js';
 import {TextureColor} from './TextureColor.js';
 
 const GRID = gridBase({columns: 3, rows: 3});
@@ -167,6 +171,44 @@ describe('NineSlice', () => {
       ).toThrow(
         'defineSprite: feature "nineSlice": measures its frame in texels of the colorMap, which no feature of the kind declares — add TextureColor',
       );
+    });
+
+    test('defineSprite() refuses NineSlice next to each form of segmentPlacement(), naming the alternative', () => {
+      for (const placement of [SegmentPlacement, segmentPlacement({plane: 'xz'}), segmentPlacement({facing: 'camera'})]) {
+        const define = () =>
+          defineSprite({
+            base: GRID,
+            features: [InstancePosition, SegmentEnd, placement, QuadSize, NineSlice, AtlasFrame, TextureColor],
+          });
+
+        expect(define).toThrow(/"nineSlice" sets its border in the local quad/);
+        expect(define).toThrow(new RegExp(`a segment of "${placement.name.replace('+', '\\+')}" holds only its caps`));
+        expect(define).toThrow(/FlatPlacement/);
+        expect(define).toThrow(/Rotation/);
+      }
+    });
+
+    test('a segment placement cannot stand in for the placement of a live NineSlice material', () => {
+      const flat = defineSprite({
+        base: GRID,
+        features: [InstancePosition, SegmentEnd, FlatPlacement, QuadSize, NineSlice, AtlasFrame, TextureColor],
+      });
+      const material = new FeatureSpritesMaterial(flat);
+
+      expect(() => {
+        material.placement = SegmentPlacement;
+      }).toThrow(/"nineSlice" sets its border in the local quad/);
+      expect(material.placement).toBe(FlatPlacement);
+      material.dispose();
+    });
+
+    test('the kind the refusal names — NineSlice under FlatPlacement with Rotation — is defined', () => {
+      expect(() =>
+        defineSprite({
+          base: GRID,
+          features: [InstancePosition, FlatPlacement, QuadSize, Rotation, NineSlice, AtlasFrame, TextureColor],
+        }),
+      ).not.toThrow();
     });
   });
 

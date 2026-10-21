@@ -162,6 +162,53 @@ describe('VertexObjectPool#adoptVOs()', () => {
     source.dispose();
   });
 
+  describe('the source pool afterwards', () => {
+    test('a source pool used again gives the replacement of its onCreateVO hook its own slot', () => {
+      const {pool: a} = makeThings(2);
+      const b = new VertexObjectPool<Thing>(descriptor, 4);
+      b.adoptVOs(a);
+      a.onCreateVO = (vo) => Object.create(vo);
+
+      const handed = [a.createVO()!, a.createVO()!];
+
+      expect(a.getVO(0)).toBe(handed[0]);
+      expect(a.getVO(1)).toBe(handed[1]);
+      const keyed: Thing[] = [];
+      a.sortBy((thing) => {
+        keyed.push(thing);
+        return 0;
+      });
+      expect(new Set(keyed)).toEqual(new Set(handed));
+      a.dispose();
+      b.dispose();
+    });
+
+    test("two pools of one capacity adopt each other's vertex objects back and forth, and createVO() with a replacing hook returns", () => {
+      const {pool: a, things} = makeThings(2, 4);
+      const b = new VertexObjectPool<Thing>(descriptor, 4);
+      const replace = (vo: Thing) => Object.create(vo) as Thing;
+
+      b.adoptVOs(a);
+      a.adoptVOs(b);
+      a.onCreateVO = replace;
+      const intoA = a.createVO()!;
+
+      expect(a.getVO(2)).toBe(intoA);
+      expect(a.getVO(0)).toBe(things[0]);
+      expect(a.getVO(1)).toBe(things[1]);
+
+      b.adoptVOs(a);
+      b.onCreateVO = replace;
+      const intoB = b.createVO()!;
+
+      expect(b.getVO(3)).toBe(intoB);
+      expect(b.getVO(2)).toBe(intoA);
+      expect(b.usedCount).toBe(4);
+      a.dispose();
+      b.dispose();
+    });
+  });
+
   describe('from inside an onCreateVO hook', () => {
     // a hook that makes the pool adopted while createVO() hands out its last free slot: what
     // FeatureSprites#createSprite() does under grow when a hook of the pool calls it again

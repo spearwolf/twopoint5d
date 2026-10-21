@@ -236,6 +236,10 @@ with its own color. A child whose own clear covers color and depth, and
 reaches the target in that frame, clears it alone: the parent leaves out the
 black clear. A composing child without an area or with a `Stage2D` that has
 no camera yet returns before its own clear, and gets the black one.
+A write to `pipeline` or `buildOutputNode` that leaves the composed mode
+releases the GPU memory of these pass-targets, and of the pass node of every
+composed `Stage2D`: the children draw inline from then on. Returning to the
+composed mode allocates that memory again on the next frame.
 
 ---
 
@@ -395,6 +399,13 @@ does), or after `invalidateOutputNode()`. While the renderer
 has no area, or while a `Stage2D` it composes has no camera yet, the composed
 mode draws nothing. A composing renderer without a stage draws its own clear and
 calls neither `buildOutputNode` nor the pipeline, until a stage joins it.
+
+Leaving Mode D — `pipeline = undefined`, a pipeline without `buildOutputNode`
+that is not a `RootRenderPipeline`, or `buildOutputNode = undefined` under such
+a pipeline — releases the GPU memory of the pass-targets of the nested
+renderers and of the pass nodes of the `Stage2D`s
+(`Stage2D#releasePassNodeMemory()`); the nodes stay, and returning allocates
+the memory again on the next frame.
 
 #### Writing your own `buildOutputNode`
 
@@ -642,16 +653,18 @@ What this layer does on top of the general rules in
   renderer (`getOutputBufferType()`, `samples`); a changed `samples` reaches
   them on the next frame, as the same target objects.
 - Leaving Mode C — `pipeline = undefined`, a `buildOutputNode`, a
-  `RootRenderPipeline` — releases the GPU memory of the internal target,
-  and `remove(child)` releases that of the pass-target of a removed child
-  `StageRenderer`. The target objects stay, so every `texture()` node on them
+  `RootRenderPipeline` — releases the GPU memory of the internal target.
+  Leaving the composed mode releases that of the pass-targets of the nested
+  renderers and of the pass nodes of the `Stage2D`s among the stages, and
+  `remove(stage)` releases that of the pass-target of a removed child
+  `StageRenderer` and of the pass node of a removed `Stage2D`. The target objects stay, so every `texture()` node on them
   stays valid; three.js allocates the memory again on the next draw.
 - `StageRenderer.dispose()` releases the render targets it built for itself — a target
   borrowed from an `internalTargetPool` is back in the pool by then, and the pool is not
   disposed. It also detaches from its host or from the parent `StageRenderer` that holds
   it, and drops its stages through `remove()`, so a disposed renderer is no longer
   driven by any frame loop, and a nested `StageRenderer` among its stages releases the
-  GPU memory of its pass-target — the child itself is not disposed. An `OnStageDispose`
+  GPU memory of its pass-target, a `Stage2D` that of its pass node — neither is disposed. An `OnStageDispose`
   goes out before the renderer stops listening. A listener of `OnStageRemoved`,
   `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of this, and
   neither does an unsubscribe of the host that throws — the renderer gives up its other

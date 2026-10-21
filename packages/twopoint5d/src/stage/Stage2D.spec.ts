@@ -625,6 +625,24 @@ describe('Stage2D', () => {
       expect(stage.asPassNode(noRenderer)).toBe(first);
     });
 
+    it('releasePassNodeMemory() releases the render target of its pass node and keeps the node', () => {
+      const stage = makeStage();
+      stage.releasePassNodeMemory();
+      const passNode = stage.asPassNode(noRenderer) as PassNode;
+      const rtDispose = sandbox.spy(passNode.renderTarget, 'dispose');
+
+      stage.releasePassNodeMemory();
+
+      expect(rtDispose.callCount).toBe(1);
+      expect(rtDispose.firstCall.thisValue).toBe(passNode.renderTarget);
+      expect(stage.asPassNode(noRenderer), 'the same node').toBe(passNode);
+
+      stage.dispose();
+      rtDispose.resetHistory();
+      stage.releasePassNodeMemory();
+      expect(rtDispose.callCount, 'after dispose()').toBe(0);
+    });
+
     it('builds a new node for a new camera and releases the one before', () => {
       const stage = makeStage();
       const first = stage.asPassNode(noRenderer) as PassNode;

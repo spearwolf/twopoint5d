@@ -212,6 +212,8 @@ interface SpriteShaderContext {
   sample(name: string, uv: Node<'vec2'>): Node<'vec4'>;
   /** The measures of the image of a declared texture, in texels — a uniform the material keeps current. */
   textureSize(name: string): Node<'vec2'>;
+  /** The `colorSpace` of a declared texture as it is set, `undefined` while it is unset — a tracked read. */
+  colorSpace(name: string): string | undefined;
   /** The frame of this sprite kind, built once per graph and read by both pipelines. */
   readonly frame: SpriteFrameNodes;
 }

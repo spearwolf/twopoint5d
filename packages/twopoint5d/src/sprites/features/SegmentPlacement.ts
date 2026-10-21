@@ -1,6 +1,7 @@
 import {cameraPositionLocal, cameraRightLocal, cameraUpLocal} from '../cameraNodes.js';
 import {defineFeature, type SpriteFeature, type SpriteKindShape} from '../SpriteFeature.js';
 import {Rotation} from './Rotation.js';
+import {refuseNineSliceOnSegments} from './segmentChecks.js';
 import {Shear} from './Shear.js';
 import {type SegmentFacing, segmentVertex} from './segmentVertex.js';
 
@@ -21,14 +22,17 @@ const REFUSED: readonly [SpriteFeature, string][] = [
   [Shear, 'Shear'],
 ];
 
-function refuseTurns({features}: SpriteKindShape): void {
-  const held = REFUSED.filter(([feature]) => features.includes(feature));
-  if (held.length === 0) return;
-  const names = held.map(([feature]) => `"${feature.name}"`).join(' and ');
-  const exports = held.map(([, name]) => name).join(' and ');
-  throw new Error(
-    `a segment lies along its ends, so it cannot follow the local ${held.length > 1 ? 'stages' : 'stage'} of ${names} — move the ends instead, and take ${exports} out of the kind`,
-  );
+// also the check of a placement swap on a live material and of a pass that brings a segment placement
+function checkSegmentKind(kind: SpriteKindShape): void {
+  const held = REFUSED.filter(([feature]) => kind.features.includes(feature));
+  if (held.length > 0) {
+    const names = held.map(([feature]) => `"${feature.name}"`).join(' and ');
+    const exports = held.map(([, name]) => name).join(' and ');
+    throw new Error(
+      `a segment lies along its ends, so it cannot follow the local ${held.length > 1 ? 'stages' : 'stage'} of ${names} — move the ends instead, and take ${exports} out of the kind`,
+    );
+  }
+  refuseNineSliceOnSegments(kind);
 }
 
 // one feature per set of options: the placement swap compares by identity, and the passes keep a
@@ -51,7 +55,8 @@ const NAMES: Readonly<Record<SegmentFacing, string>> = {
  *
  * Returns one frozen feature per set of options: `segmentPlacement`, `segmentPlacement+xz` and
  * `segmentPlacement+camera`, which stand in for each other on a live material. A kind with
- * `Rotation` or `Shear` is refused: a segment lies along its ends.
+ * `Rotation` or `Shear` is refused: a segment lies along its ends. So is a kind with `NineSlice`,
+ * which sets its border in the local quad, where a segment holds only its caps.
  *
  * @throws a `TypeError` for a facing or a plane it does not know, and for a plane next to
  *   `facing: 'camera'`
@@ -77,7 +82,7 @@ export function segmentPlacement(options?: SegmentPlacementOptions): SpriteFeatu
     feature = defineFeature({
       name: NAMES[key],
       requires: ['instancePosition', 'segmentEnd'],
-      checkKind: refuseTurns,
+      checkKind: checkSegmentKind,
       placement: (local, {attribute}) =>
         segmentVertex({
           local,

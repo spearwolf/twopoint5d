@@ -306,7 +306,8 @@ createDot();
   A slot without a vertex object yet stays without one, and `getVO()` materializes it in the new
   pool.
 - **The old pool** is left empty, its data where it was: no vertex object is linked to it, so its
-  `dispose()` unlinks none.
+  `dispose()` unlinks none. It stays usable: a later `createVO()` hands out its own slots, and it
+  can adopt again — the vertex objects of the new pool included, back and forth.
 - **Refused**, before anything moves: a disposed pool on either side, the pool itself, a source on
   another descriptor (`new VertexObjectPool(source.descriptor, …)` is the fix), a pool with
   objects in use and one of a smaller capacity than the source.

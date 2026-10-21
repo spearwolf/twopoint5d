@@ -787,8 +787,14 @@ dialog.setPosition(16, 200);
   mirrors the border with the image, its left border then the frame's right one; every pass draws
   the sliced panel. The measure is the unit quad of the default `baseArgs`, as for the trim shift.
 - `checkKind` refuses a kind on any other base — `defineSprite: feature "nineSlice": needs the base
-  gridBase({columns: 3, rows: 3}), not "quad" — …` — and one no feature of which declares the
-  `colorMap`. A 3 × 3 grid shades 16 vertices per sprite.
+  gridBase({columns: 3, rows: 3}), not "quad" — …` —, one no feature of which declares the
+  `colorMap`, and one with a form of `segmentPlacement()`: `"nineSlice" sets its border in the
+  local quad, and a segment of "segmentPlacement" holds only its caps there — the border would land
+  inside the segment. For a bar with fixed ends, lay a nine-slice panel with FlatPlacement, turn it
+  with Rotation and stretch it with setSize(length, thickness), or draw the ends as sprites of their
+  own at the ends of the segment`. The segment placement checks the same, so the refusal holds as
+  well when a segment placement is to stand in for the placement of a live nine-slice material.
+  A 3 × 3 grid shades 16 vertices per sprite.
 
 ### Waves: sway and scroller
 
@@ -1406,6 +1412,12 @@ export function frame() {
   `defineSprite()` refuses either next to a segment placement — `a segment lies along its ends, so
   it cannot follow the local stage of "rotation" — move the ends instead, and take Rotation out of
   the kind`. `Yaw` and `Orientation` are data and are ignored, as under a billboard.
+- **No `NineSlice`.** `NineSlice` sets its border in the local quad, and a segment holds only its
+  caps there — the border would land inside the segment —, so `defineSprite()` refuses it next to a
+  segment placement, and a segment placement cannot stand in on a live nine-slice material. For a
+  bar with fixed ends, lay a nine-slice panel with `FlatPlacement`, turn it with `Rotation` and
+  stretch it with `setSize(length, thickness)`, or draw the ends as sprites of their own at both
+  ends of a segment, with `TextureColor` or `RepeatingTextureColor`.
 - **Swaps.** The three forms — named `segmentPlacement`, `segmentPlacement+xz` and
   `segmentPlacement+camera` — bring nothing but their placement stage and their check, so they stand
   in for each other on a live material. A flat placement or a billboard may stand in for one too,
@@ -1566,12 +1578,21 @@ bullets.update();
 - **Refused**: `grow: true` next to a `geometry` handed in, which the mesh does not own and cannot
   replace (a `TypeError` that names the fix); a `grow` that is no boolean. A geometry with pools
   attached through `attachInstancedPool()` cannot grow, and the `createSprite()` that would grow it
-  throws, naming both ways out. The pool behind it is `VertexObjectPool#adoptVOs()` — see
+  throws, naming both ways out. Nor does a geometry the caller put into the `geometry` slot: a growth
+  replaces only the geometry the mesh built, and the `createSprite()` that would grow another throws,
+  naming the ways out — the built one back into the slot, or a capacity that fits. The pool behind it is `VertexObjectPool#adoptVOs()` — see
   [the vertex objects](../src/vertex-objects/README.md#growing-a-pool).
 
 **Ownership.** The mesh disposes the geometry and the material it built, and nothing else. A
 `geometry` or a `material` handed in, and every texture, stays the caller's; `dispose()` leaves
 them alone. A mesh built around a geometry handed in still disposes the material it built for it.
+A material or a geometry the caller puts into the `material` or `geometry` slot of the mesh stays
+the caller's as well: `dispose()` releases the ones the mesh built even then, and lets go of the
+other. `placement`, `uniforms`, `setUniform()`, `bindUniform()`, the textures and the passes stay
+with the material of the sprites — the built one or the one handed in — whatever the slot holds;
+a material put into the slot that is to draw with the uniforms and textures of the sprites is built
+on them before the swap, `new FeatureSpritesMaterial(kind, {resources: sprites.material.resources})`
+— as `SpritePicker` builds its pick material.
 
 **Refusals.** A `TypeError` instead of a mismatch: a `geometry` or a `material` built for another
 sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a `geometry`; any material
@@ -1960,8 +1981,12 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
-the feature declares itself, and `textureSize(name)` for a texture any feature of the material
-declares. The material throws, naming the feature, for any other name. `textureSize()` of a set
+the feature declares itself, and `textureSize(name)` and `colorSpace(name)` for a texture any
+feature of the material declares. The material throws, naming the feature, for any other name.
+`colorSpace(name)` answers the `colorSpace` of the texture as it is set — `undefined` while it is
+unset, or for `needsImage` until its image has measures — and is a tracked read: a texture in
+another colour space builds the graph anew, so a stage can work in the values of the texture data
+(`PaletteSwap` encodes both colours back to sRGB for an `srgb` palette before it compares them). `textureSize()` of a set
 texture is the size of the texture the shader binds, read on the gpu — it follows an image that a
 loader fills in after `setTexture()`, and a texture of the same kind swapped in without a rebuild;
 for a texture declared with `needsImage` it is a uniform, re-read by `touchTexture(name)`. The size
@@ -2444,8 +2469,9 @@ The rules of `bindUniform()` and `unbindUniform()`:
 - **Ownership.** The nodes and the `Plane` a source reads stay the caller's. `dispose()` drops
   every binding, so the sprites hold no node after it; afterwards `bindUniform()` and
   `unbindUniform()` do nothing, as `setUniform()` does.
-- **A material handed in.** Bindings write into the uniforms of the material, so they work with a
-  `material` handed in as well — for the uniforms that material holds. A material shared by several
+- **A material handed in.** Bindings write into the uniforms of the material of the sprites, so they
+  work with a `material` handed in as well — for the uniforms that material holds —, and never into
+  a material put into the `material` slot later. A material shared by several
   `FeatureSprites` at different transforms shares its uniforms too, so their bindings overwrite
   each other and the last `update()` wins.
 

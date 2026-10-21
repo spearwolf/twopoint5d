@@ -392,6 +392,20 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     return this.#passNode;
   }
 
+  /**
+   * Releases the GPU memory of the render target of the pass node {@link asPassNode} built — color
+   * and depth. The node stays, and with it every `texture()` node on it and the pipeline built on
+   * it; three.js allocates the memory again on the next draw of the node, so this is safe for a
+   * stage two renderers share. Does nothing without a pass node, and after {@link dispose}. A
+   * `StageRenderer` calls it as soon as it no longer composes this stage.
+   */
+  releasePassNodeMemory(): void {
+    // a renderer that removes this stage on its OnStageDispose calls this while dispose() runs, and
+    // dispose() releases the node and its render target right after
+    if (this.#disposed) return;
+    this.#passNode?.renderTarget.dispose();
+  }
+
   #disposePassNode(): void {
     this.#passNode?.dispose();
     this.#passNode = undefined;

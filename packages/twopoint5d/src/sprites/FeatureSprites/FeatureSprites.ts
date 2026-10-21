@@ -199,22 +199,35 @@ export type FeatureSpritesOf<K> = K extends SpriteKind<infer Api> ? FeatureSprit
  * The mesh that draws the sprites of a kind, one instance of its geometry per sprite. It builds
  * the geometry and the material it is not handed, and a child mesh with a material of its own for
  * every pass; what it builds belongs to it and goes with {@link dispose}, while a geometry, a
- * material or a texture handed in stays the caller's. Call `update()` once per frame before
+ * material or a texture handed in stays the caller's — and so does a material or a geometry the
+ * caller puts into a slot later. Call `update()` once per frame before
  * rendering — it writes the bound uniforms, judges the `visible` hook of every pass and serves
  * every pass as well.
  */
 export class FeatureSprites<Api extends object = object> extends VertexObjects<FeatureSpritesGeometry<Api>> {
   /**
    * The geometry the sprites draw — `undefined` once disposed. Under `grow` a growth replaces it
-   * with a larger one and disposes the old one: read it from the mesh afresh.
+   * with a larger one and disposes the old one: read it from the mesh afresh. A geometry the caller
+   * puts into this slot stays the caller's.
    */
   declare geometry: FeatureSpritesGeometry<Api> | undefined;
+  /**
+   * The slot three draws the mesh with — `undefined` once disposed. A material the caller puts here
+   * stays the caller's, who disposes it. The API of the sprites — `placement`, `uniforms`,
+   * `setUniform()`, `bindUniform()`, the textures and `update()` — speaks to the material the sprites
+   * were built with, and so do the passes, whatever the slot holds.
+   */
   declare material: FeatureSpritesMaterial<Api> | undefined;
 
   readonly kind: SpriteKind<Api>;
 
-  #ownsGeometry: boolean;
-  #ownsMaterial: boolean;
+  // the geometry this mesh built, `undefined` for one handed in: the one dispose() and a growth release,
+  // whatever the geometry slot holds
+  #builtGeometry: FeatureSpritesGeometry<Api> | undefined;
+  // the material of the sprites, built or handed in: the one their API and their passes speak to,
+  // whatever the material slot holds; #ownsMaterial says whether it was built here
+  #material: FeatureSpritesMaterial<Api> | undefined;
+  readonly #ownsMaterial: boolean;
   readonly #grows: boolean;
   #resources: SpriteResources | undefined;
   #passes: Record<string, FeatureSpritesPass<Api>> = Object.freeze(passRecord<Api>());
@@ -247,7 +260,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
 
     this.kind = kind;
     // only the geometry, the materials and the resources built right here belong to this mesh
-    this.#ownsGeometry = ownsGeometry;
+    this.#builtGeometry = ownsGeometry ? geometry : undefined;
+    this.#material = material;
     this.#ownsMaterial = options.material == null;
     this.#grows = grows;
     this.#resources = resources;
@@ -306,7 +320,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * The first growth says so on the console, once per mesh, with the capacity to start with.
    *
    * @throws under `grow`, for a geometry with pools attached (`attachInstancedPool()`), which a grown
-   *   geometry would leave behind; nothing has changed then
+   *   geometry would leave behind, and for a geometry slot that holds another geometry than the one
+   *   the sprites built, which is not theirs to replace; nothing has changed then
    */
   createSprite(): (Api & VO) | undefined {
     const pool = this.geometry?.instancedPool;
@@ -321,6 +336,11 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   // builds the grown geometry before anything switches, so that a throw leaves the sprites as they were
   #grow(capacity: number): FeatureSpritesGeometry<Api> {
     const old = this.geometry!;
+    if (old !== this.#builtGeometry) {
+      throw new Error(
+        `${WHERE}#createSprite(): the pool is full and cannot grow — the geometry slot holds a geometry the sprites did not build, and grow replaces only their own. Put the geometry the sprites built back into the slot, or build the sprites with the capacity they need`,
+      );
+    }
     if (old.extraInstancedPools.size > 0) {
       throw new Error(
         `${WHERE}#createSprite(): the pool is full and cannot grow — the geometry of the sprites has pools attached (attachInstancedPool()), which a grown geometry would leave behind. Detach them, or build the sprites without grow and with the capacity they need`,
@@ -332,6 +352,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     // attributes anew; the materials never held the geometry and stay as they are
     this.geometry = grown;
     for (const mesh of Object.values(this.#passes)) mesh.geometry = grown;
+    this.#builtGeometry = grown;
     // built here, so it is this mesh's to release; its pool goes with it, holding no sprite any more
     old.dispose();
     if (!this.#notedGrowth) {
@@ -347,9 +368,10 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   #warnFull(capacity: number): void {
     this.#warnedFull = true;
     const larger = Math.max(2 * capacity, 1);
-    const fix = this.#ownsGeometry
-      ? `Give the sprites a larger capacity — new FeatureSprites(kind, {capacity: ${larger}})`
-      : `Build the FeatureSpritesGeometry handed in with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: ${larger}})`;
+    const fix =
+      this.#builtGeometry !== undefined
+        ? `Give the sprites a larger capacity — new FeatureSprites(kind, {capacity: ${larger}})`
+        : `Build the FeatureSpritesGeometry handed in with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: ${larger}})`;
     // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
       `FeatureSprites "${this.name}": the pool is full — all ${capacity} sprites are in use, so createSprite() answers undefined. ${fix} — or free the sprites no longer drawn with freeSprite(). This warning is shown once per FeatureSprites.`,
@@ -438,9 +460,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     return pool.sortByKeys(keys);
   }
 
-  /** The placement of the material — `undefined` once disposed. */
+  /** The placement of the material of the sprites — `undefined` once disposed. */
   get placement(): SpriteFeature | undefined {
-    return this.material?.placement;
+    return this.#material?.placement;
   }
 
   /**
@@ -449,18 +471,18 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * Does nothing once disposed.
    */
   set placement(feature: SpriteFeature) {
-    if (this.material == null) return;
+    if (this.#material == null) return;
     // the material checks first, so a refused placement reaches no pass; the pass materials judge it
     // by the features of the kind as well, so they take what the material took
-    this.material.placement = feature;
+    this.#material.placement = feature;
     for (const mesh of Object.values(this.#passes)) {
       if (placementOfPass(mesh.pass) == null) mesh.material.placement = feature;
     }
   }
 
-  /** The uniforms of the material — `undefined` once disposed. */
+  /** The uniforms of the material of the sprites — `undefined` once disposed. */
   get uniforms(): Readonly<Record<string, SpriteUniformNode>> | undefined {
-    return this.material?.uniforms;
+    return this.#material?.uniforms;
   }
 
   /**
@@ -468,7 +490,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * Does nothing once disposed.
    */
   setUniform(name: string, x: number, y?: number, z?: number, w?: number): void {
-    this.material?.setUniform(name, x, y, z, w);
+    this.#material?.setUniform(name, x, y, z, w);
   }
 
   /**
@@ -482,7 +504,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    *   bound then
    */
   bindUniform(name: string, source: SpriteUniformSource): void {
-    const material = this.material;
+    const material = this.#material;
     if (material == null) return;
     if (source == null || typeof source.write !== 'function' || (source.type !== 'vec3' && source.type !== 'vec4')) {
       throw new TypeError(`${WHERE}: bindUniform("${name}") takes a source with a type of vec3 or vec4 and a write()`);
@@ -514,7 +536,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
 
   /** The texture `name` — `undefined` while it is unset, and once disposed. */
   getTexture(name: string): Texture | undefined {
-    return this.material?.getTexture(name);
+    return this.#material?.getTexture(name);
   }
 
   /**
@@ -522,7 +544,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * {@link FeatureSpritesMaterial.setTexture}. Does nothing once disposed.
    */
   setTexture(name: string, texture: Texture | undefined): void {
-    this.material?.setTexture(name, texture);
+    this.#material?.setTexture(name, texture);
   }
 
   /**
@@ -530,7 +552,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * {@link FeatureSpritesMaterial.touchTexture}. Does nothing once disposed.
    */
   touchTexture(name: string): void {
-    this.material?.touchTexture(name);
+    this.#material?.touchTexture(name);
   }
 
   /**
@@ -541,7 +563,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    */
   override update(): void {
     const sources = this.#boundSources;
-    if (sources.length > 0 && this.material != null) {
+    if (sources.length > 0 && this.#material != null) {
       // the renderer refreshes the world matrices only inside render(), after this call
       this.updateWorldMatrix(true, false);
       const worldToSprites = this.#worldToSprites.copy(this.matrixWorld).invert();
@@ -558,7 +580,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   }
 
   /**
-   * Releases the geometry and the material this mesh built, the pass meshes with their materials
+   * Releases the geometry and the material this mesh built — also when another has taken their
+   * slot; what the caller put into a slot stays the caller's — the pass meshes with their materials
    * and the uniforms and textures they shared, and drops every binding, so that the sprites hold no
    * node after it. The mesh leaves the scene graph first and fires three's `dispose` event, so the
    * renderer drops what it built for it; every pass mesh leaves this mesh and fires the event as
@@ -593,10 +616,14 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     this.#boundVectors.length = 0;
     this.#depthKeys = undefined;
 
-    if (this.#ownsGeometry) this.geometry?.dispose();
+    // what was built here goes, whatever stands in its slot; what stands in a slot without being built
+    // here is let go of, not disposed
+    this.#builtGeometry?.dispose();
+    this.#builtGeometry = undefined;
     this.geometry = undefined;
 
-    if (this.#ownsMaterial) this.material?.dispose();
+    if (this.#ownsMaterial) this.#material?.dispose();
+    this.#material = undefined;
     this.material = undefined;
 
     // the materials borrowed the resources; they go after every material that read them

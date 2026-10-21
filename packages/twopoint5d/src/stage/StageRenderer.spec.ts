@@ -2920,6 +2920,176 @@ describe('StageRenderer', () => {
         expect((child.asPassNode(renderer as any) as any).value, 'a node on the same texture').toBe(passTexture);
       });
     }
+
+    // a parent after its first composed frame — under a pipeline with buildOutputNode, or under a
+    // RootRenderPipeline without one — and the texture of the pass target of its nested child
+    function makeComposedParent(under: 'buildOutputNode' | 'a RootRenderPipeline') {
+      const parent = new StageRenderer();
+      parent.resize(50, 50);
+      const child = new StageRenderer();
+      child.add(fakeStage('inner'));
+      parent.add(child);
+      if (under === 'buildOutputNode') {
+        parent.buildOutputNode = (passes) => passes[0]!;
+        parent.pipeline = makePipelineMock() as any;
+      } else {
+        parent.pipeline = fakeRootPipeline() as any;
+      }
+      parent.renderTo(renderer as any);
+      const passTexture = (child.asPassNode(renderer as any) as any).value;
+      return {parent, child, passTexture};
+    }
+
+    const leavingComposed: [string, 'buildOutputNode' | 'a RootRenderPipeline', (sr: StageRenderer) => void][] = [
+      ['pipeline = undefined', 'buildOutputNode', (sr) => (sr.pipeline = undefined)],
+      ['a RenderPipeline without buildOutputNode', 'a RootRenderPipeline', (sr) => (sr.pipeline = makePipelineMock() as any)],
+      ['buildOutputNode = undefined', 'buildOutputNode', (sr) => (sr.buildOutputNode = undefined)],
+    ];
+
+    for (const [leave, under, apply] of leavingComposed) {
+      it(`releases the pass target of a nested renderer once on leaving the composed mode through ${leave}`, () => {
+        const {parent, child, passTexture} = makeComposedParent(under);
+        const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+        apply(parent);
+
+        expect(rtDispose.callCount).toBe(1);
+        expect(rtDispose.firstCall.thisValue).toBe(passTexture.renderTarget);
+        expect((child.asPassNode(renderer as any) as any).value, 'a node on the same texture').toBe(passTexture);
+      });
+    }
+
+    // a stage that passes for a Stage2D: the flag the renderer recognizes it by, a camera, a pass node
+    function fakeStage2D(name: string) {
+      const passNode = {isNode: true, label: name, type: 'pass'};
+      return {
+        ...fakeStage(name),
+        isStage2D: true as const,
+        camera: new PerspectiveCamera(),
+        asPassNode: vi.fn(() => passNode),
+        releasePassNodeMemory: vi.fn(),
+      };
+    }
+
+    it('releases the pass node memory of a Stage2D it composed on leaving the composed mode', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      const stage = fakeStage2D('s');
+      sr.add(stage as any);
+      sr.buildOutputNode = (passes) => passes[0]!;
+      sr.pipeline = makePipelineMock() as any;
+      sr.renderTo(renderer as any);
+
+      sr.pipeline = undefined;
+
+      expect(stage.releasePassNodeMemory).toHaveBeenCalledTimes(1);
+    });
+
+    it('remove() of a Stage2D from a composing renderer releases its pass node memory', () => {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      const stage = fakeStage2D('s');
+      sr.add(stage as any);
+      sr.buildOutputNode = (passes) => passes[0]!;
+      sr.pipeline = makePipelineMock() as any;
+      sr.renderTo(renderer as any);
+
+      sr.remove(stage as any);
+
+      expect(stage.releasePassNodeMemory).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases no pass target on a change between two composing setups', () => {
+      const {parent} = makeComposedParent('buildOutputNode');
+      const stage = fakeStage2D('s');
+      parent.add(stage as any);
+      parent.renderTo(renderer as any);
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+      parent.buildOutputNode = (passes) => passes[1]!;
+      parent.pipeline = fakeRootPipeline() as any;
+
+      expect(rtDispose.callCount).toBe(0);
+      expect(stage.releasePassNodeMemory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a pixel ratio change at the same logical size', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => {
+      sandbox.restore();
+    });
+
+    // a renderer of 50 × 50 whose stage records the target it draws into
+    function makeModeC() {
+      const sr = new StageRenderer();
+      sr.resize(50, 50);
+      const stage = fakeStage('s');
+      const targets: RenderTarget[] = [];
+      stage.renderTo.mockImplementation(() => targets.push(renderer.__renderTarget as RenderTarget));
+      sr.add(stage);
+      sr.pipeline = makePipelineMock() as any;
+      return {sr, targets};
+    }
+
+    const sizeOf = (rt: RenderTarget) => [rt.width, rt.height];
+
+    it('the own internal target of Mode C follows the ratio in the next frame, the same object', () => {
+      const {sr, targets} = makeModeC();
+      sr.renderTo(renderer as any);
+      const first = targets[0]!;
+      expect(sizeOf(first)).toEqual([50, 50]);
+
+      renderer.getPixelRatio.mockReturnValue(1.5);
+      sr.renderTo(renderer as any);
+
+      expect(targets[1], 'the same target').toBe(first);
+      expect(sizeOf(first)).toEqual([75, 75]);
+    });
+
+    it('a target borrowed from the pool follows the ratio in the next frame, and the pool releases the one of the old size', () => {
+      const {sr, targets} = makeModeC();
+      const pool = new StageRenderTargetPool();
+      sr.internalTargetPool = pool;
+      sr.renderTo(renderer as any);
+      const first = targets[0]!;
+      expect(sizeOf(first)).toEqual([50, 50]);
+      const firstDispose = sandbox.spy(first, 'dispose');
+
+      renderer.getPixelRatio.mockReturnValue(1.5);
+      sr.renderTo(renderer as any);
+
+      const second = targets[1]!;
+      expect(second, 'another target').not.toBe(first);
+      expect(sizeOf(second)).toEqual([75, 75]);
+      expect(firstDispose.callCount, 'the target of the old size').toBe(1);
+      pool.dispose();
+    });
+
+    it('the pass target of a nested renderer follows the ratio in the next frame, the same object', () => {
+      const parent = new StageRenderer();
+      parent.resize(50, 50);
+      const child = new StageRenderer();
+      parent.add(child);
+      child.resize(50, 50);
+      const inner = fakeStage('inner');
+      const targets: RenderTarget[] = [];
+      inner.renderTo.mockImplementation(() => targets.push(renderer.__renderTarget as RenderTarget));
+      child.add(inner);
+      parent.buildOutputNode = (passes) => passes[0]!;
+      parent.pipeline = makePipelineMock() as any;
+
+      parent.renderTo(renderer as any);
+      const first = targets[0]!;
+      expect(sizeOf(first)).toEqual([50, 50]);
+
+      renderer.getPixelRatio.mockReturnValue(1.5);
+      parent.renderTo(renderer as any);
+
+      expect(targets[1], 'the same target').toBe(first);
+      expect(sizeOf(first)).toEqual([75, 75]);
+    });
   });
 
   describe('dispose()', () => {

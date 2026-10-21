@@ -252,11 +252,13 @@ describe('StageRenderer — pipeline integration', () => {
     };
 
     // the renderer composed the pass node into its output and is driven by the display: it lets go
-    // of the stage before the stage gives the node up, so no frame reaches a released render target
+    // of the stage before the stage gives the node up, so no frame reaches a released render target.
+    // Letting go, it releases the memory of the render target, which the node keeps
     sr.dispose();
+    expect(disposeCalls, 'the renderer releases the memory of the render target it no longer composes').to.equal(1);
     stage.dispose();
 
-    expect(disposeCalls, 'the stage gives up the render target it allocated').to.equal(1);
+    expect(disposeCalls, 'the stage gives up the render target it allocated').to.equal(2);
     expect(() => stage.asPassNode(display.renderer), 'and builds no further pass node').to.throw();
 
     // the pipeline was handed to the renderer and belongs to this test

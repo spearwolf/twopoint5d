@@ -295,6 +295,19 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         // a uvec2, which vec2() converts
         return vec2(textureSizeOf(node) as unknown as Node<'vec2'>) as unknown as Node<'vec2'>;
       },
+      colorSpace: (textureName) => {
+        const declaring = this.#features.find(({textures}) => textures != null && Object.hasOwn(textures, textureName));
+        if (declaring == null) {
+          throw new Error(
+            `${where} reads the color space of the texture "${textureName}", which no feature of these sprites declares`,
+          );
+        }
+        // shapeOf() is the tracked read: the shape key carries the colour space, so a texture in another
+        // one builds the graph anew, and it is undefined while the texture is unset or waits for its image
+        return this.resources.shapeOf(textureName) === undefined
+          ? undefined
+          : this.resources.peekTexture(textureName)!.colorSpace;
+      },
     };
   }
 

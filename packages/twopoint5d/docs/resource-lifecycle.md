@@ -93,7 +93,9 @@ every sprite (`VertexObjectPool#adoptVOs()`), and the mesh disposes the old one 
 pool right away — it built it. `geometry` and `spritePool` are new objects after a
 growth; a reference kept from before points at a disposed geometry and a disposed pool,
 so read them from the mesh afresh. A `geometry` handed in is never replaced: `grow` next
-to one is refused.
+to one is refused. Where the caller replaces a resource by putting another into the
+`geometry` or `material` slot of the mesh, `FeatureSprites#dispose()` still releases the
+geometry and the material it built, and what the caller put there stays the caller's.
 
 **What an instance builds on a borrowed resource goes when that resource goes.**
 [`SpritePicker`](../src/sprites/SpritePicker.ts) owns its render target and, per mesh it

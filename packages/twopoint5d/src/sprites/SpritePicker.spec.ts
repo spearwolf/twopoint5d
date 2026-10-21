@@ -631,7 +631,6 @@ describe('SpritePicker', () => {
       await picker.pick(makeCamera(), center, [sprites]);
       const first = rendered[0]!.children[0] as unknown as {material: FeatureSpritesMaterial};
       const firstDispose = vi.spyOn(first.material, 'dispose');
-      const own = sprites.material!;
       const other = new FeatureSpritesMaterial(TexturedSpriteKind);
       sprites.material = other;
 
@@ -641,7 +640,6 @@ describe('SpritePicker', () => {
       expect(second).not.toBe(first);
       expect(second.material.resources).toBe(other.resources);
       expect(firstDispose).toHaveBeenCalledOnce();
-      sprites.material = own;
       sprites.dispose();
       other.dispose();
       picker.dispose();

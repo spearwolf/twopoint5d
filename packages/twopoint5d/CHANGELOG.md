@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `AdaptiveResolution` and the option `adaptiveResolution` of `Display` (`true` or `{targetFps, minScale, maxScale}`): a controller that holds 60 frames per second — or a lower `maxFps` — by `Display#resolutionScale`, in steps of an eighth between 0.5 and 1 by default. It reads the GPU time of a frame through the timestamp queries of three.js, for which a display that builds its renderer asks for `trackTimestamp: true`, and predicts a step up from the pixel ratio the display would draw at that step; a step that leaves the ratio as it is is skipped, and a step up that does not hold makes the next one wait twice as long. Where the renderer measures no GPU time it reads the pace of the animation frames of the page, so a frame `maxFps` holds back is not late, and where a descent to `minScale` brings frames of a steady pace no sooner — a `requestAnimationFrame` held to 30 Hz — it goes back and measures against the pace the page reaches. It lets 30 frames pass after every resize, start and restart, holds still under a `pixelZoom`, drops a GPU measurement still in flight when it is disabled, and gives the display the scale it had at the last takeover back with `dispose()` or `enabled = false`. `Display#adaptiveResolution` is the controller the display built, and `undefined` once the display is disposed
 - add the option `pointerTarget` of `PanControl2D`, the `EventTarget` the `pointerdown` that starts a pan is listened for on — `document` by default. Name the canvas, or an element around it, and a press elsewhere on the page starts no pan; `pointermove`, `pointerup` and `pointercancel` stay on `document`, so a drag that leaves the element goes on until it is let go
 - add `TextureStore#acquireAsync(id, type, {signal}?)` and the type `TextureStoreLease`: it resolves as `getAsync()` does, with `{value, release()}`, and holds the resource the value came from — `clearUnused()` and `parse({evictMissing: true})` leave it standing — until `release()`, which gives the hold back once however often it is called. The hold is on the resource, not on the value: a new renderer, other texture classes or another image still make it build a new texture. Its rejections are those of `getAsync()`, their messages naming `acquireAsync()`
+- add `SpriteFrameContext#colorSpace(name)`: the `colorSpace` of a texture any feature of the material declares, as it is set — `undefined` while it is unset — and a tracked read, so a texture in another colour space builds the graph anew
+- add `Stage2D#releasePassNodeMemory()`: releases the GPU memory of the render target of the pass node `asPassNode()` built and keeps the node, so every node and pipeline on it stays valid; three.js allocates the memory again on the next draw of the node
 
 ### Changed
 
@@ -60,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnimatedFrames` plays the playback and the per-frame durations of the animsMap: `'once'` clamps the frame count and holds the last frame (the first before the start), `'pingpong'` runs a triangle wave over a turn of `2 · frameCount − 2` frames, and an animation with durations finds its frame by a binary search of 13 lookups over the end times of its frames. An animsMap without second header texels — one built by hand in the layout before — plays every animation as a loop, as it did. `animOffset = -now` starts an animation now; `docs/sprites.md` has the rules under "Animated frames"
 - `textureSize(name)` of a stage context reads the size of a texture any feature of the material declares, not only one of its own — `(0, 0)` while a texture of another feature is unset, and the stage does not wait for it; a name no feature declares is refused, naming it. For a set texture without `needsImage` it is the size of the texture the shader binds, read on the gpu (three's `textureSize()`), so it follows an image that a loader fills in after `setTexture()`; a texture with `needsImage` keeps the uniform of `SpriteResources`
 - `SpriteShaderContext` holds `uv`, the uv the color source samples at: code that calls a stage with a context of its own adds it (`attribute('uv')` without uv stages)
+- `SpriteFrameContext`, and with it `SpriteShaderContext`, holds `colorSpace(name)`: code that calls a stage with a context of its own adds it (`() => undefined` without textures)
 - `AnimatedFrames` declares its `time` shared, `{value: 0, shared: true}`: a feature of one's own that reads it — the guide's `Bob` — declares `time` shared as well and no longer needs `requires: ['animatedFrames']`. A feature that declares a plain `time` next to `AnimatedFrames` is still refused, now with the fix
 - the refusal of two features that declare one uniform names the fix — rename one, or declare it shared in both — and the refusal of a malformed start value reads `a uniform takes a number, 2 to 4 numbers, or {value, shared}`
 - `defineSprite()` opens a usage word named after an attribute to the other features of a kind when the feature of that attribute declares the word: each adds attributes of its own to it, in the order of the feature list (`NineSlice` adds `sliceInsets` to `texCoords` of `AtlasFrame`). A word named after the attribute of a feature that does not declare it, and a word that is no attribute declared twice, are still refused
@@ -80,6 +83,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `RectangularVisibilityArea` keeps a tile of the last view for reuse only while its tile coordinate lies among the columns and rows of the new view: on a grid of tiles of 0.1, the tile set after every step of a scroll is the one a fresh area computes for the same center
 - `DynamicAtlas#add()` refuses an image element that has not loaded with a `size` as well, and `add()` and `redraw()` refuse one whose `complete` is still `false` although its natural size is known
+- `FeatureSprites#dispose()` releases the geometry and the material the mesh built also after the caller put another into the `geometry` or `material` slot, and leaves what the caller put there alone; `placement`, `uniforms`, `setUniform()`, `bindUniform()`, the textures and `update()` stay with the material of the sprites and its passes, whatever the slot holds; under `grow`, `createSprite()` throws for a full pool behind a geometry the caller put into the slot, which is not the mesh's to replace
+- `NineSlice` next to a form of `segmentPlacement()` is refused by `defineSprite()` and when a segment placement is to stand in for the placement of a live material, with a message that names the alternative: a segment holds only its caps in the local quad, where `NineSlice` sets its border
+- `PaletteSwap` compares sRGB textures in their 8-bit values: under a palette of `colorSpace` `srgb` both colours are encoded back before the comparison, so black or a dark colour next to a close palette entry keeps its colour
+- `StageRenderer` releases the GPU memory of the pass targets of its nested renderers and of the pass nodes of its `Stage2D`s when a write to `pipeline` or `buildOutputNode` leaves the composed mode, and `remove()` releases that of the pass node of a removed `Stage2D` as it does for a child renderer
+- a `VertexObjectPool` whose vertex objects another pool adopted stays usable: a later `createVO()` gives the replacement of its `onCreateVO` hook its own slot, and two pools can adopt each other's vertex objects back and forth without `createVO()` hanging
 
 ### Migration Guide
 
@@ -149,7 +157,7 @@ const firstFrame = header[2]; // firstFrameTexel of [frameCount, duration, first
 
 #### A stage context of one's own, and code that reads `SpritePipeline`
 
-`SpriteShaderContext` holds `uv`, the uv the color source samples at. Code that calls a stage with a context of its own — a unit test of a feature, a helper that folds stages by hand — adds it; without uv stages it is the base uv attribute. `SpritePipeline` holds `frameStage` and `uv`, the sorted features of the two new slots: code that walks every slot of a pipeline walks them too.
+`SpriteShaderContext` holds `uv`, the uv the color source samples at, and `colorSpace(name)`, the colour space of a declared texture. Code that calls a stage with a context of its own — a unit test of a feature, a helper that folds stages by hand — adds both; without uv stages `uv` is the base uv attribute, and without textures `colorSpace` answers `undefined`. `SpritePipeline` holds `frameStage` and `uv`, the sorted features of the two new slots: code that walks every slot of a pipeline walks them too.
 
 **Before**
 
@@ -160,7 +168,15 @@ const ctx: SpriteShaderContext = {frame, attribute, uniform, sample, textureSize
 **After**
 
 ```ts
-const ctx: SpriteShaderContext = {frame, uv: attribute('uv'), attribute, uniform, sample, textureSize};
+const ctx: SpriteShaderContext = {
+  frame,
+  uv: attribute('uv'),
+  attribute,
+  uniform,
+  sample,
+  textureSize,
+  colorSpace: () => undefined,
+};
 ```
 
 #### Two `TextureStore#loadAsync()` calls that overlap on one store
@@ -178,6 +194,49 @@ await Promise.all([store.loadAsync('base.json'), store.loadAsync('level.json')])
 ```ts
 await store.loadAsync('base.json');
 await store.loadAsync('level.json');
+```
+
+#### `NineSlice` next to `segmentPlacement()`
+
+A kind that holds both is refused: the border of `NineSlice` would land inside the segment. A bar with fixed ends is a nine-slice panel under `FlatPlacement`, turned and stretched.
+
+**Before**
+
+```ts
+const Bar = defineSprite({base: gridBase({columns: 3, rows: 3}), features: [InstancePosition, SegmentEnd, SegmentPlacement, QuadSize, NineSlice, AtlasFrame, TextureColor]});
+bar.setSegmentEnd(x1, y1, 0);
+```
+
+**After**
+
+```ts
+const Bar = defineSprite({base: gridBase({columns: 3, rows: 3}), features: [InstancePosition, FlatPlacement, QuadSize, Rotation, NineSlice, AtlasFrame, TextureColor]});
+bar.setPosition((x0 + x1) / 2, (y0 + y1) / 2, 0);
+bar.rotation = Math.atan2(y1 - y0, x1 - x0);
+bar.setSize(Math.hypot(x1 - x0, y1 - y0), thickness);
+```
+
+#### A material put into the slot of `FeatureSprites`
+
+`setUniform()`, `bindUniform()`, the textures and `placement` write into the material the sprites were built with, not into one put into `sprites.material` later, and `dispose()` leaves that one to its caller. A material that is to follow them reads the resources of the sprites.
+
+**Before**
+
+```ts
+sprites.material = new FeatureSpritesMaterial(kind);
+sprites.setTexture('colorMap', colorMap);
+sprites.dispose();
+```
+
+**After**
+
+```ts
+const own = sprites.material!;
+const other = new FeatureSpritesMaterial(kind, {resources: own.resources});
+sprites.material = other;
+sprites.setTexture('colorMap', colorMap); // reaches own, and other through the shared resources
+sprites.dispose();
+other.dispose();
 ```
 
 ## [0.23.0] - 2026-10-18

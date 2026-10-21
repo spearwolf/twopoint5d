@@ -7,6 +7,7 @@ import {gridBase} from '../GridBase.js';
 import {defineFeature, LocalOrder, UvOrder} from '../SpriteFeature.js';
 import type {AtlasFrameApi} from './AtlasFrame.js';
 import {type SliceWanted, sliceOf, untrimmedSizeOf} from './frameSlices.js';
+import {refuseNineSliceOnSegments} from './segmentChecks.js';
 
 /** The insets of a nine-slice, `[left, top, right, bottom]` in pixels of the frame. */
 export type SliceInsets = [left: number, top: number, right: number, bottom: number];
@@ -123,7 +124,9 @@ const sliced = (value: Float, line: Float, near: Float, far: Float, startAt: Flo
  * frame, measured in the texels of the `colorMap`. Insets wider than the sprite or the frame shrink in
  * proportion until the borders meet. Under `Flip` the border mirrors with the image.
  *
- * Its `checkKind` refuses a kind on another base, and one no feature of which declares the `colorMap`.
+ * Its `checkKind` refuses a kind on another base, one no feature of which declares the `colorMap`,
+ * and one with a form of `segmentPlacement()`: a segment holds only its caps in the local quad, where
+ * the border is set.
  */
 export const NineSlice = defineFeature<NineSliceApi>({
   name: 'nineSlice',
@@ -182,15 +185,16 @@ export const NineSlice = defineFeature<NineSliceApi>({
     this.setSliceInsets(0, 0, 0, 0);
     this.sliceScale = 1;
   },
-  checkKind: ({base, features}) => {
-    if (base !== gridBase({columns: 3, rows: 3})) {
+  checkKind: (kind) => {
+    if (kind.base !== gridBase({columns: 3, rows: 3})) {
       throw new Error(
-        `needs the base gridBase({columns: 3, rows: 3}), not "${base.name}" — build the kind on it: defineSprite({base: gridBase({columns: 3, rows: 3}), features})`,
+        `needs the base gridBase({columns: 3, rows: 3}), not "${kind.base.name}" — build the kind on it: defineSprite({base: gridBase({columns: 3, rows: 3}), features})`,
       );
     }
-    if (!features.some(({textures}) => textures != null && Object.hasOwn(textures, 'colorMap'))) {
+    if (!kind.features.some(({textures}) => textures != null && Object.hasOwn(textures, 'colorMap'))) {
       throw new Error('measures its frame in texels of the colorMap, which no feature of the kind declares — add TextureColor');
     }
+    refuseNineSliceOnSegments(kind);
   },
   local: {
     order: LocalOrder.Slice,

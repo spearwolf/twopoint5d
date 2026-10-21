@@ -551,6 +551,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * itself; returning to it allocates that memory again on the next frame. A
    * target borrowed from {@link internalTargetPool} is back in the pool after
    * every draw already.
+   *
+   * A write that leaves the composed mode releases the GPU memory of the
+   * pass targets of the nested renderers and of the pass nodes of the
+   * composed `Stage2D`s; returning to it allocates that memory again on the
+   * next frame.
    */
   get pipeline(): RenderPipeline | undefined {
     return this.#pipeline;
@@ -605,7 +610,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * nothing. Without a stage it draws its own clear and calls neither this
    * callback nor the pipeline. Assigning it to a renderer whose pipeline
    * samples the internal target releases the GPU memory of that target;
-   * clearing it again allocates that memory again on the next frame.
+   * clearing it again allocates that memory again on the next frame. A write
+   * that leaves the composed mode releases the GPU memory of the pass targets
+   * of the nested renderers and of the pass nodes of the composed `Stage2D`s;
+   * returning to it allocates that memory again on the next frame.
    *
    * The callback runs again on every rebuild of the output node, and neither this renderer nor
    * the pipeline releases the output node a rebuild replaces: an effect node the callback builds
@@ -671,12 +679,32 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Marks the output node for a rebuild after a write to {@link pipeline} or
-   * {@link buildOutputNode}, and releases the GPU memory of the internal target when the write
-   * has left Mode C.
+   * {@link buildOutputNode}. A write that has left Mode C releases the GPU memory of the internal
+   * target; one that has left the composed mode — for the plain mode or for Mode C — releases that
+   * of the pass target of every nested renderer and of the pass node of every `Stage2D` among the
+   * stages, which nothing samples any more.
    */
   #modeInputChanged(previousMode: StageRendererMode): void {
     this.#outputDirty = true;
-    if (previousMode === 'pipeline-only' && this.#renderMode() !== 'pipeline-only') this.#targets.releaseInternalTarget();
+    const mode = this.#renderMode();
+    if (previousMode === 'pipeline-only' && mode !== 'pipeline-only') this.#targets.releaseInternalTarget();
+    if (previousMode === 'composed' && mode !== 'composed') {
+      for (const {stage} of this.#stages) this.#releasePassMemoryOf(stage);
+    }
+  }
+
+  /**
+   * Releases the GPU memory of what this renderer composed `stage` through: the pass target of a
+   * nested renderer, the pass node of a `Stage2D`. The objects stay, so every `texture()` node on
+   * them stays valid; three.js allocates the memory again on the next draw into them.
+   */
+  #releasePassMemoryOf(stage: IStage): void {
+    if (stage instanceof StageRenderer) {
+      stage.#targets.releasePassTarget();
+    } else if ((stage as Partial<Stage2D>).isStage2D === true) {
+      // recognized by its flag, as isStage2DWithoutCamera() does: no runtime import of Stage2D
+      (stage as Stage2D).releasePassNodeMemory();
+    }
   }
 
   /** The two render targets this renderer builds for itself. */
@@ -1062,8 +1090,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * drives it, and give up its stages. Call when this renderer is no longer needed.
    *
    * The stages go through {@link remove}, so a nested `StageRenderer` among them releases
-   * the GPU memory of its pass-target as well; the child itself is not disposed, and three.js
-   * allocates that memory again on its next draw into the target.
+   * the GPU memory of its pass-target as well, and a `Stage2D` that of its pass node; neither
+   * is disposed, and three.js allocates that memory again on the next draw into the target —
+   * another renderer that still composes the same `Stage2D` allocates it on its next frame.
    *
    * A {@link pipeline}, an {@link outputRenderTarget}, an {@link internalTargetPool}, a builder
    * assigned as {@link buildOutputNode} and every stage were handed in and belong to the caller:
@@ -1313,7 +1342,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    *
    * A removed child `StageRenderer` answers `undefined` as its `parent`
    * afterwards and gets its `OnRemoveFromParent`, and releases the GPU memory
-   * of its pass-target. Stops listening for the stage's camera and scene
+   * of its pass-target; a removed `Stage2D` releases the GPU memory of its
+   * pass node. Either is released whether or not this renderer composes right
+   * now, and another renderer that still composes a shared `Stage2D` allocates
+   * it again on its next frame. Stops listening for the stage's camera and scene
    * changes and for its `OnStageDispose`.
    *
    * A stage removed during `updateFrame()`, `renderTo()` or `resize()` is
@@ -1341,11 +1373,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       } catch (error) {
         errors.push(error);
       }
+      // the pass target belongs to the child, the pass node to the Stage2D, and this renderer, which
+      // let go of the stage, samples neither any longer. The objects stay, so every texture() node
+      // another parent built from them stays valid; three.js allocates the memory again on the next draw.
+      this.#releasePassMemoryOf(stage);
       if (stage instanceof StageRenderer) {
-        // the pass target belongs to the child, and this renderer, which let go of it, samples it
-        // no longer. The object stays, so every texture() node another parent built from it stays
-        // valid; three.js allocates the memory again on the next draw.
-        stage.#targets.releasePassTarget();
         if (stage.parent === this) {
           // the child still names this renderer as its holder; letting go is a move both
           // sides make, whichever of them started it
