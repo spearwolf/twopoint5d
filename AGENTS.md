@@ -68,7 +68,13 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
   `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
   Markdown files; the tests and the blocks are checked against the built library
-- `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook>
+- `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook> and on every network
+  interface (`server.host: true`). Run it once and pass on every URL it prints, the network
+  ones included — they change with the network, so none is written down here. No port check
+  before, no polling or probe after. Started by an agent, Astro moves the server into the
+  background by itself, prints its URLs and the command returns while the server keeps
+  running; `pnpm exec astro dev status`, `… logs` and `… stop` in `apps/lookbook` reach it.
+  Started in a terminal, it stays in the foreground
 - `pnpm lookbook:assets` — regenerates the generated assets of the lookbook demos under
   `apps/lookbook/public/assets/<demo>/` from `apps/lookbook/assets-src/`; `--only=<demo>,…`
   for some, `--skip-render` reuses Blender's render cache. Not part of `pnpm run ci`: the
