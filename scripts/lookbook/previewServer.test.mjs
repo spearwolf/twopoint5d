@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {after, describe, it} from 'node:test';
 import {setTimeout as delay} from 'node:timers/promises';
+import {startPreviewServer} from './previewServer.mjs';
 
 const previewServerUrl = new URL('./previewServer.mjs', import.meta.url).href;
 
@@ -34,10 +35,15 @@ async function waitFor(condition, timeoutMs = 10_000) {
 describe('startPreviewServer()', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preview-server-'));
   const pidFile = path.join(dir, 'server.pid');
+  const hangingPidFile = path.join(dir, 'hanging-server.pid');
   let serverPid = 0;
 
   after(() => {
     if (serverPid && isAlive(serverPid)) process.kill(serverPid, 'SIGKILL');
+    if (fs.existsSync(hangingPidFile)) {
+      const hangingPid = Number(fs.readFileSync(hangingPidFile, 'utf8'));
+      if (hangingPid && isAlive(hangingPid)) process.kill(hangingPid, 'SIGKILL');
+    }
     fs.rmSync(dir, {recursive: true, force: true});
   });
 
@@ -69,5 +75,44 @@ describe('startPreviewServer()', () => {
     assert.equal(await exited, 130);
 
     assert.ok(await waitFor(() => !isAlive(serverPid), 3000), `the server (pid ${serverPid}) outlived the process`);
+  });
+
+  it('rejects with the command it cannot start instead of an unhandled error event', {timeout: 10_000}, async () => {
+    await assert.rejects(
+      startPreviewServer({command: path.join(dir, 'no-such-command'), args: () => []}),
+      /could not start .*no-such-command: .*ENOENT/,
+    );
+  });
+
+  it('rejects as soon as the server dies on a signal', {timeout: 10_000}, async () => {
+    const start = Date.now();
+    await assert.rejects(
+      startPreviewServer({command: process.execPath, args: () => ['-e', "process.kill(process.pid, 'SIGKILL')"]}),
+      /exited on signal SIGKILL/,
+    );
+    assert.ok(Date.now() - start < 5000, `took ${Date.now() - start} ms`);
+  });
+
+  it('gives up on a server that accepts the connection and never answers, within the startup timeout', {
+    timeout: 10_000,
+  }, async () => {
+    const start = Date.now();
+    await assert.rejects(
+      startPreviewServer({
+        command: process.execPath,
+        args: (port) => [
+          '-e',
+          "require('node:fs').writeFileSync(process.argv[1], String(process.pid)); require('node:net').createServer(() => {}).listen(Number(process.argv[2]), '127.0.0.1');",
+          hangingPidFile,
+          String(port),
+        ],
+        startupTimeoutMs: 1500,
+      }),
+      /did not answer/,
+    );
+    assert.ok(Date.now() - start < 5000, `took ${Date.now() - start} ms`);
+
+    const pid = Number(fs.readFileSync(hangingPidFile, 'utf8'));
+    assert.ok(await waitFor(() => !isAlive(pid), 3000), `the server (pid ${pid}) outlived stop()`);
   });
 });

@@ -1,5 +1,5 @@
-// The constants and the flags of `pnpm lookbook:generate-previews`, apart from the run
-// itself so a spec can import them.
+// The constants, the flags and the helpers of `pnpm lookbook:generate-previews` that need no
+// browser, apart from the run itself so a spec can import them.
 import {parseArgs} from 'node:util';
 
 // the lookbook cannot hand a TypeScript constant to a Node script; demoPreviewConfig.test.mjs
@@ -23,9 +23,11 @@ export const CHROMIUM_GPU_ARGS = [
   '--use-angle=vulkan',
 ];
 
+/** @typedef {{id: string, ok: boolean, trigger?: string, seconds: number, kilobytes?: number, problems: string[]}} DemoResult */
+
 /**
  * @param {string[]} argv the arguments after the script name
- * @returns {{only: string[] | undefined, url: string | undefined, headed: boolean, timeoutMs: number}}
+ * @returns {{only: string[] | undefined, url: string | undefined, headed: boolean, timeoutMs: number, strict: boolean}}
  */
 export function parsePreviewArgs(argv) {
   const {values} = parseArgs({
@@ -35,6 +37,7 @@ export function parsePreviewArgs(argv) {
       url: {type: 'string'},
       headed: {type: 'boolean', default: false},
       timeout: {type: 'string'},
+      strict: {type: 'boolean', default: false},
     },
     strict: true,
     allowPositionals: false,
@@ -53,6 +56,7 @@ export function parsePreviewArgs(argv) {
     url: values.url?.replace(/\/+$/, ''),
     headed: values.headed ?? false,
     timeoutMs,
+    strict: values.strict ?? false,
   };
 }
 
@@ -69,4 +73,52 @@ export function selectDemos(ids, only) {
     throw new Error(`unknown demo id(s): ${unknown.join(', ')} — known: ${ids.join(', ')}`);
   }
   return ids.filter((id) => only.includes(id));
+}
+
+/**
+ * Why the screenshot of a demo is not written, or undefined when it is.
+ * @param {{pageErrors: number, consoleErrors: number}} counts what the page reported up to the screenshot
+ * @param {boolean} strict `--strict`: a console error fails the demo as well
+ * @returns {string | undefined}
+ */
+export function refuseScreenshot({pageErrors, consoleErrors}, strict) {
+  if (pageErrors > 0) return `the page threw ${pageErrors} error(s), the old image stays`;
+  if (strict && consoleErrors > 0) {
+    return `the page logged ${consoleErrors} console error(s) under --strict, the old image stays`;
+  }
+  return undefined;
+}
+
+/**
+ * The closing lines of a run and its exit code: 1 when a demo failed.
+ * @param {DemoResult[]} results
+ * @returns {{summary: string, exitCode: 0 | 1}}
+ */
+export function summarizeRun(results) {
+  const failed = results.filter(({ok}) => !ok).map(({id}) => id);
+  // without --strict, the problems of a demo that passed are its console errors
+  const noisy = results.filter(({ok, problems}) => ok && problems.length > 0).map(({id}) => id);
+  const lines = [
+    failed.length === 0
+      ? `${results.length} preview(s) written`
+      : `${failed.length} of ${results.length} failed, their old images stay: ${failed.join(', ')}`,
+  ];
+  if (noisy.length > 0) {
+    lines.push(`${noisy.length} written with console errors, --strict fails them: ${noisy.join(', ')}`);
+  }
+  return {summary: lines.join('\n'), exitCode: failed.length === 0 ? 0 : 1};
+}
+
+/**
+ * Installed with page.addInitScript() before any script of the page runs: records the first
+ * EVENT_GENERATE_PREVIEW as window.__lookbookPreview. Playwright sends the function as its
+ * source, so it uses nothing but its argument and the globals of the page.
+ * @param {string} eventName
+ */
+export function recordPreviewEvent(eventName) {
+  document.addEventListener(eventName, (event) => {
+    const w = /** @type {any} */ (window);
+    // wrapped: the generator waits for a truthy value, and an event may come without a detail
+    w.__lookbookPreview ??= {detail: /** @type {CustomEvent} */ (event).detail ?? null};
+  });
 }

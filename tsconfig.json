@@ -26,7 +26,7 @@
     "moduleResolution": "Bundler",
     "noEmit": true,
     "noErrorTruncation": true,
-    "noFallthroughCasesInSwitch": false,
+    "noFallthroughCasesInSwitch": true,
     "noImplicitAny": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,

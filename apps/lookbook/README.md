@@ -92,13 +92,18 @@ has no image, an image has no demo, or an image has another size.
 | `--url=<base>` | use a running lookbook, e.g. `http://localhost:4321/lookbook` from `pnpm lookbook`, instead of starting one |
 | `--headed` | show the browser window |
 | `--timeout=<ms>` | how long a demo may take to signal, 30000 by default |
+| `--strict` | a demo that logs a console error fails as well |
 
-A failed demo keeps its old image, and the run exits with 1. The run prints whether
+A demo fails when it does not signal in time, when its page throws an unhandled exception,
+or when the screenshot has another size. A failed demo keeps its old image, and the run
+exits with 1. Console errors are listed under the demo and counted in the closing line;
+the image is written anyway, and `--strict` fails such a demo as well. The run prints whether
 Chromium found a WebGPU adapter; without one three.js renders with WebGL 2, which works
 but may look slightly different.
 
 The screenshot is taken when the page dispatches `lookbook.generatePreview` on the
-`document`. `VanillaDemo.astro` does that `DEFAULT_PREVIEW_DELAY_MS` (5 s) after the page
+`document`; the event needs no `detail`, and when it has one the generator prints its
+`trigger`. `VanillaDemo.astro` does that `DEFAULT_PREVIEW_DELAY_MS` (5 s) after the page
 started. A demo that knows better takes over:
 
 ```ts

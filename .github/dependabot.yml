@@ -23,6 +23,12 @@ updates:
     ignore:
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
+      # @types/node follows the lowest Node line engines allows, the one the workflows
+      # run: the types of a later line would let a script call an API Node 24 lacks.
+      # Its major moves together with the node-version of the workflows, and in both
+      # manifests that name it: the root and apps/lookbook
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
   # keeps the commit SHAs the workflows pin, and the version comment next to each, current
   - package-ecosystem: github-actions
     directory: /

@@ -1,8 +1,11 @@
 name: Continuous Integration
 
 # every push, Markdown included: a Markdown file is an input of the type check of the
-# docs' marked code blocks
-on: push
+# docs' marked code blocks. A pull request runs the gate as well; one from a branch of
+# this repository skips it there, the push of that branch has run it already
+on:
+  push:
+  pull_request:
 
 permissions:
   contents: read
@@ -15,7 +18,8 @@ env:
 concurrency:
   # on main each commit gets a group of its own, so none is cancelled or displaced from
   # the queue and the deploy workflow has a result to follow; on other branches a newer
-  # push replaces the run of the older one
+  # push replaces the run of the older one, and a pull request is grouped by its merge ref
+  # (refs/pull/<n>/merge), so a newer push to it replaces its older run
   group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
@@ -25,6 +29,9 @@ jobs:
     # its part of the gate, the others still report theirs, and "Re-run failed jobs" repeats
     # only what failed. The deploy workflow follows the conclusion of the whole run, so every
     # job has to pass.
+    # a pull request from a fork has no push run in this repository; one from a branch
+    # here has, and a second run of the same commit would only double the minutes
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     # a hosted job runs for six hours by default; one whose apt stalled did once for over
@@ -146,11 +153,13 @@ jobs:
       - name: Drop the Nx cache entries this run did not use
         # the server touches every entry it serves; what is older than its start went
         # unused
-        if: success() && steps.nx-cache.outputs.cache-hit != 'true'
+        if: success() && steps.nx-cache.outputs.cache-hit != 'true' && github.event_name == 'push'
         run: find "$RUNNER_TEMP/nx-cache" -type f \( ! -newer "$RUNNER_TEMP/nx-cache.start" -o -name '*.partial' \) -delete
 
       - name: Save the Nx cache
-        if: success() && steps.nx-cache.outputs.cache-hit != 'true'
+        # only a push to this repository writes the cache; a pull request restores it and
+        # saves nothing
+        if: success() && steps.nx-cache.outputs.cache-hit != 'true' && github.event_name == 'push'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/nx-cache

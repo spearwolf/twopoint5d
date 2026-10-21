@@ -4,6 +4,10 @@ import http from 'node:http';
 import path from 'node:path';
 import {pipeline} from 'node:stream/promises';
 
+// an entry is the tarball of one task's outputs, the largest (the lookbook's dist) some
+// 20 MiB; the bound keeps a runaway Content-Length from filling the runner's disk
+export const MAX_ENTRY_BYTES = 512 * 1024 * 1024;
+
 /**
  * Nx indexes its local cache in a database named after the machine id, so a new CI runner
  * does not know a restored cache directory. Nx does take task results from a remote cache
@@ -11,8 +15,11 @@ import {pipeline} from 'node:stream/promises';
  * from a plain directory the workflow saves and restores with actions/cache.
  *
  * Returns an `http.Server` that is not listening yet.
+ *
+ * `maxEntryBytes` is the largest entry a PUT may declare in its Content-Length; a spec sets
+ * it small.
  */
-export function createCacheServer({dir, token}) {
+export function createCacheServer({dir, token, maxEntryBytes = MAX_ENTRY_BYTES}) {
   // compared as SHA-256 digests: crypto.timingSafeEqual takes two buffers of one
   // length, and a digest has that length whatever the client sends
   const expectedDigest = sha256(`Bearer ${token}`);
@@ -34,8 +41,10 @@ export function createCacheServer({dir, token}) {
     if (!authorized(req)) return reply(req, res, req.method === 'GET' ? 403 : 401);
 
     const hash = /** @type {string} */ (match[1]);
-    // Nx hashes are digit strings; anything else could name a path outside dir
-    if (!/^[A-Za-z0-9]+$/.test(hash)) return reply(req, res, 400);
+    // Nx hashes are digit strings of some twenty digits; anything else could name a path
+    // outside dir, and a name past 128 characters — the partial file adds some thirty — runs
+    // into the 255 bytes a file name may have
+    if (!/^[A-Za-z0-9]{1,128}$/.test(hash)) return reply(req, res, 400);
 
     const file = path.join(dir, hash);
     return req.method === 'GET' ? serve(req, res, file) : store(req, res, hash, file);
@@ -63,9 +72,10 @@ export function createCacheServer({dir, token}) {
 
   async function store(req, res, hash, file) {
     if (req.headers['content-length'] === undefined) return reply(req, res, 411);
+    const expectedLength = Number(req.headers['content-length']);
+    if (expectedLength > maxEntryBytes) return reply(req, res, 413);
     if (fs.existsSync(file)) return reply(req, res, 409);
 
-    const expectedLength = Number(req.headers['content-length']);
     const partial = path.join(dir, `.${hash}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.partial`);
     const out = fs.createWriteStream(partial, {flags: 'wx'});
     try {

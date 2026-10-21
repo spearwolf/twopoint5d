@@ -168,23 +168,26 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
 
 ### In CI
 
-`.github/workflows/ci.yml` runs the gate on every push, in four jobs side by side — one
-matrix job per part: `ci:checks`, `test:coverage`, `test:allocations` and, under
-`xvfb-run`, `test:browser`. `fail-fast` is off, so a red job does not hide the verdict of
-the others, and "Re-run failed jobs" repeats only the part that failed. Every job and
-every long step carries a `timeout-minutes`; a hosted job otherwise runs for six hours.
-The workflow has no path filter:
-Markdown is an input of `twopoint5d-testing:typecheck` (§2), so
-a push that changes nothing but docs runs the gate as well, and the Nx cache answers every
-target whose inputs the push leaves alone. Every action is pinned to a full commit SHA
+`.github/workflows/ci.yml` runs the gate on every push and on every pull request from a
+fork, in four jobs side by side — one matrix job per part: `ci:checks`, `test:coverage`,
+`test:allocations` and, under `xvfb-run`, `test:browser`. `fail-fast` is off, so a red job
+does not hide the verdict of the others, and "Re-run failed jobs" repeats only the part
+that failed. Every job and every long step carries a `timeout-minutes`; a hosted job
+otherwise runs for six hours. A pull request from a branch of this repository skips its
+`pull_request` run: the push of that branch has sent the same commit through the gate
+already, and the second run would only double the minutes. The workflow has no path
+filter: Markdown is an input of `twopoint5d-testing:typecheck` (§2), so a push that
+changes nothing but docs runs the gate as well, and the Nx cache answers every target
+whose inputs the push leaves alone. Every action is pinned to a full commit SHA
 with a `# vX.Y.Z` comment naming the release, so a moved tag cannot swap the code that
 runs. The workflow reads `contents` only. Every checkout, here and in `deploy.yml`, sets
 `persist-credentials: false`: no job pushes from a checkout — the `tag` job of
 `deploy.yml` writes its ref through the REST API (§4) — so no token lies in
 `.git/config` for an install script to find. The concurrency group of the workflow is the
-branch, so a newer push cancels the running or waiting run of the same branch — except
-on `main`, where the group is the commit: every commit there gets its own run, which
-nothing cancels, because `deploy.yml` follows each successful one.
+ref: the branch, or the merge ref of a pull request. A newer push cancels the running or
+waiting run of the same ref, except on `main`, where the group is the commit: every commit
+there gets its own run, which nothing cancels, because `deploy.yml` follows each
+successful one.
 
 The step `Audit dependencies` follows the install in the job `ci:checks` and runs `pnpm
 audit --audit-level=high`. It reports high and critical advisories without failing the run:
@@ -252,9 +255,13 @@ each saved state holds exactly the results of one green job of one commit and do
 grow from run to run. A red job saves nothing, and its next run restores the last green
 state.
 
+The server refuses a hash of more than 128 characters with 400 and an entry of more than
+512 MiB (`MAX_ENTRY_BYTES`, judged by the declared `Content-Length` before any body is
+read) with 413.
+
 The cache is only as trustworthy as what writes to it: its entries come solely from CI
-runs on pushes to this repository. `deploy.yml` does not use it and builds the published
-package from source.
+runs on pushes to this repository; a pull request run restores the cache and saves
+nothing. `deploy.yml` does not use it and builds the published package from source.
 
 ## 4. Build and publish pipeline
 
@@ -392,6 +399,13 @@ reads it from there and names no version of its own. `.nvmrc`, `mise.toml` and t
 install, not which ones are allowed, and none of them understands an alternative like
 `||`; a `24` picks the newest 24.x the tool can get and lands inside the range, while a
 narrower `24.16` would pin the minor line and cut the repo off from later 24.x releases.
+`@types/node` stays on the 24 line, the lowest `engines` allows and the one the workflows
+run on: the types of a later line would let a script or a spec call an API Node 24 lacks,
+and only a run on 24 would notice. `.github/dependabot.yml` therefore ignores its major
+updates; they move with the `node-version` of the workflows. Two manifests name it: the
+root `package.json` for the scripts and specs, and `apps/lookbook/package.json`, where it
+keeps the peers of astro, vite and sharp from resolving `@types/node` to the newest line
+for the lookbook. Both move together when the Node line changes.
 
 ## 6. Test surfaces
 

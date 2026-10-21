@@ -8,17 +8,25 @@ import {fileURLToPath} from 'node:url';
 export const demosDir = fileURLToPath(new URL('../../apps/lookbook/src/pages/demos/', import.meta.url));
 export const previewDir = fileURLToPath(new URL('../../apps/lookbook/public/images/demo-preview/', import.meta.url));
 
-/** @returns {{id: string, file: string, json: any}[]} sorted by id */
-export function listLookbookDemos() {
+/**
+ * @param {string} [dir] the directory of the demo pages; a spec hands in one of its own
+ * @returns {{id: string, file: string, json: any}[]} sorted by id
+ */
+export function listLookbookDemos(dir = demosDir) {
   return (
     fs
-      .readdirSync(demosDir)
+      .readdirSync(dir)
       .filter((file) => /^_.*\.json$/.test(file))
-      .map((file) => ({
-        id: file.slice(1, -'.json'.length),
-        file,
-        json: JSON.parse(fs.readFileSync(path.join(demosDir, file), 'utf8')),
-      }))
+      .map((file) => {
+        const full = path.join(dir, file);
+        let json;
+        try {
+          json = JSON.parse(fs.readFileSync(full, 'utf8'));
+        } catch (error) {
+          throw new Error(`${full}: ${error instanceof Error ? error.message : String(error)}`, {cause: error});
+        }
+        return {id: file.slice(1, -'.json'.length), file, json};
+      })
       // by id, not by file name: `.json` sorts textured-quads after textured-quads-from-tileset
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   );

@@ -13,13 +13,16 @@ import {
   PREVIEW_QUALITY,
   PREVIEW_WIDTH,
   parsePreviewArgs,
+  recordPreviewEvent,
+  refuseScreenshot,
   selectDemos,
+  summarizeRun,
 } from './demoPreviewConfig.mjs';
 import {listLookbookDemos, previewDir} from './lookbookDemos.mjs';
 import {startPreviewServer} from './previewServer.mjs';
 import {webpSize} from './webpSize.mjs';
 
-/** @typedef {{id: string, ok: boolean, trigger?: string, seconds: number, kilobytes?: number, problems: string[]}} DemoResult */
+/** @typedef {import('./demoPreviewConfig.mjs').DemoResult} DemoResult */
 
 /**
  * @param {import('playwright').BrowserContext} context
@@ -45,32 +48,35 @@ async function describeWebGpuAdapter(context, baseUrl) {
  * @param {string} baseUrl
  * @param {string} id
  * @param {number} timeoutMs
+ * @param {boolean} strict `--strict`: a console error fails the demo as well
  * @returns {Promise<DemoResult>}
  */
-async function captureDemo(context, baseUrl, id, timeoutMs) {
+async function captureDemo(context, baseUrl, id, timeoutMs, strict) {
   const started = performance.now();
   const seconds = () => (performance.now() - started) / 1000;
   /** @type {string[]} */
   const problems = [];
+  let pageErrors = 0;
+  let consoleErrors = 0;
   const target = path.join(previewDir, `${id}.webp`);
   const temporary = `${target}.tmp`;
   const page = await context.newPage();
-  page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+  page.on('pageerror', (error) => {
+    pageErrors++;
+    problems.push(`page error: ${error.message}`);
+  });
   page.on('console', (message) => {
-    if (message.type() === 'error') problems.push(`console error: ${message.text()}`);
+    if (message.type() !== 'error') return;
+    consoleErrors++;
+    problems.push(`console error: ${message.text()}`);
   });
 
   try {
     // installed before any script of the page runs, so not even an early event goes unheard
-    await page.addInitScript((eventName) => {
-      document.addEventListener(eventName, (event) => {
-        const w = /** @type {any} */ (window);
-        w.__lookbookPreview ??= /** @type {CustomEvent} */ (event).detail;
-      });
-    }, EVENT_GENERATE_PREVIEW);
+    await page.addInitScript(recordPreviewEvent, EVENT_GENERATE_PREVIEW);
 
     await page.goto(`${baseUrl}/demos/${id}/?preview=1`, {waitUntil: 'load', timeout: timeoutMs});
-    const detail = await (
+    const {detail} = await (
       await page.waitForFunction(() => /** @type {any} */ (window).__lookbookPreview, null, {timeout: timeoutMs})
     ).jsonValue();
 
@@ -82,6 +88,9 @@ async function captureDemo(context, baseUrl, id, timeoutMs) {
     if (width !== PREVIEW_WIDTH || height !== PREVIEW_HEIGHT) {
       throw new Error(`the screenshot is ${width}×${height}, not ${PREVIEW_WIDTH}×${PREVIEW_HEIGHT}`);
     }
+
+    const refusal = refuseScreenshot({pageErrors, consoleErrors}, strict);
+    if (refusal) throw new Error(refusal);
 
     fs.writeFileSync(temporary, bytes);
     fs.renameSync(temporary, target);
@@ -147,18 +156,14 @@ async function main() {
     /** @type {DemoResult[]} */
     const results = [];
     for (const id of ids) {
-      const result = await captureDemo(context, baseUrl, id, options.timeoutMs);
+      const result = await captureDemo(context, baseUrl, id, options.timeoutMs, options.strict);
       printResult(result);
       results.push(result);
     }
 
-    const failed = results.filter(({ok}) => !ok).map(({id}) => id);
-    console.log(
-      failed.length === 0
-        ? `\n${results.length} preview(s) written`
-        : `\n${failed.length} of ${results.length} failed, their old images stay: ${failed.join(', ')}`,
-    );
-    return failed.length === 0 ? 0 : 1;
+    const {summary, exitCode} = summarizeRun(results);
+    console.log(`\n${summary}`);
+    return exitCode;
   } finally {
     await browser?.close();
     server?.stop();

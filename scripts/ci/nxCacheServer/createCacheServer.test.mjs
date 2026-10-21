@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {afterEach, beforeEach, test} from 'node:test';
-import {createCacheServer} from './createCacheServer.mjs';
+import {createCacheServer, MAX_ENTRY_BYTES} from './createCacheServer.mjs';
 
 const TOKEN = 'secret';
 
@@ -102,6 +102,56 @@ test('a hash that is not alphanumeric answers 400 and writes nothing outside the
   assert.deepEqual(fs.readdirSync(dir), []);
   assert.deepEqual(fs.readdirSync(path.dirname(dir)), ['cache']);
   assert.deepEqual(fs.readdirSync(root), ['parent']);
+});
+
+test('a hash longer than 128 characters answers 400 on GET and PUT, one of 128 is stored', async () => {
+  const tooLong = '1'.repeat(129);
+  assert.equal((await get(tooLong)).status, 400, 'GET');
+  assert.equal((await put(tooLong, Buffer.from('data'))).status, 400, 'PUT');
+  assert.deepEqual(fs.readdirSync(dir), []);
+
+  const longest = '1'.repeat(128);
+  assert.equal((await put(longest, Buffer.from('data'))).status, 200);
+  assert.equal((await get(longest)).status, 200);
+});
+
+test('a PUT above the entry limit answers 413 and stores nothing', async () => {
+  const small = createCacheServer({dir, token: TOKEN, maxEntryBytes: 16});
+  await new Promise((resolve) => small.listen(0, '127.0.0.1', () => resolve(undefined)));
+  const smallUrl = `http://127.0.0.1:${/** @type {import('node:net').AddressInfo} */ (small.address()).port}`;
+  const putSmall = (hash, body) =>
+    fetch(`${smallUrl}/v1/cache/${hash}`, {
+      method: 'PUT',
+      headers: {...auth(), 'Content-Type': 'application/octet-stream'},
+      body,
+    });
+  try {
+    assert.equal((await putSmall('123', Buffer.alloc(17, 1))).status, 413);
+    assert.equal((await putSmall('456', Buffer.alloc(16, 1))).status, 200);
+    assert.deepEqual(fs.readdirSync(dir), ['456']);
+  } finally {
+    small.closeAllConnections();
+    await new Promise((resolve) => small.close(resolve));
+  }
+});
+
+test('the default limit is MAX_ENTRY_BYTES, refused before any body arrives', async () => {
+  const status = await new Promise((resolve, reject) => {
+    const req = http.request(
+      `${baseUrl}/v1/cache/123`,
+      {method: 'PUT', headers: {...auth(), 'Content-Length': String(MAX_ENTRY_BYTES + 1)}},
+      (res) => {
+        res.resume();
+        resolve(res.statusCode);
+        req.destroy();
+      },
+    );
+    req.on('error', () => {});
+    req.flushHeaders();
+    setTimeout(() => reject(new Error('no status before a body arrived')), 3000).unref();
+  });
+  assert.equal(status, 413);
+  assert.deepEqual(fs.readdirSync(dir), []);
 });
 
 test('GET refreshes the mtime of the entry it serves', async () => {

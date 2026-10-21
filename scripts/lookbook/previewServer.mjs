@@ -8,6 +8,8 @@ const lookbookDir = fileURLToPath(new URL('../../apps/lookbook/', import.meta.ur
 // `base` in apps/lookbook/astro.config.mjs
 const BASE_PATH = '/lookbook';
 const STARTUP_TIMEOUT_MS = 30_000;
+// one probe of the server may take this long; a connection that hangs is given up and retried
+const PROBE_TIMEOUT_MS = 2_000;
 
 /** @returns {Promise<number>} */
 function findFreePort() {
@@ -24,13 +26,15 @@ function findFreePort() {
 }
 
 /**
- * @param {{command?: string, args?: (port: number) => string[]}} [server] what to start on the
- *   free port: astro preview of the lookbook, unless a spec hands in a stand-in
+ * @param {{command?: string, args?: (port: number) => string[], startupTimeoutMs?: number}} [server]
+ *   what to start on the free port: astro preview of the lookbook, unless a spec hands in a
+ *   stand-in; `startupTimeoutMs` is how long it may take to answer, which a spec shortens
  * @returns {Promise<{baseUrl: string, stop: () => void}>}
  */
 export async function startPreviewServer({
   command = 'pnpm',
   args = (port) => ['exec', 'astro', 'preview', '--ignore-lock', '--host', '127.0.0.1', '--port', String(port)],
+  startupTimeoutMs = STARTUP_TIMEOUT_MS,
 } = {}) {
   const port = await findFreePort();
   // --ignore-lock: without it Astro 7 refuses a second preview server next to one already
@@ -42,6 +46,13 @@ export async function startPreviewServer({
     cwd: lookbookDir,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  /** @type {Error | undefined} */
+  let spawnError;
+  // spawn() reports a command it cannot start (ENOENT, EACCES) as an 'error' event, and an
+  // 'error' event without a listener ends the process with a raw stack trace
+  child.on('error', (error) => {
+    spawnError ??= error;
   });
   let output = '';
   child.stdout.on('data', (chunk) => {
@@ -65,19 +76,28 @@ export async function startPreviewServer({
   process.once('exit', stop);
 
   const baseUrl = `http://127.0.0.1:${port}${BASE_PATH}`;
-  const deadline = Date.now() + STARTUP_TIMEOUT_MS;
+  const deadline = Date.now() + startupTimeoutMs;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) {
-      throw new Error(`astro preview exited with code ${child.exitCode}:\n${output}`);
+    // first: after ENOENT node sets exitCode to -2 as well, and "exited with code -2" says less
+    if (spawnError) {
+      stop();
+      throw new Error(`could not start ${command}: ${spawnError.message}`);
+    }
+    if (child.exitCode !== null || child.signalCode !== null) {
+      stop();
+      const how = child.exitCode !== null ? `with code ${child.exitCode}` : `on signal ${child.signalCode}`;
+      throw new Error(`astro preview exited ${how}:\n${output}`);
     }
     try {
-      const response = await fetch(`${baseUrl}/`);
+      const response = await fetch(`${baseUrl}/`, {
+        signal: AbortSignal.timeout(Math.max(1, Math.min(PROBE_TIMEOUT_MS, deadline - Date.now()))),
+      });
       if (response.ok) return {baseUrl, stop};
     } catch {
-      // not listening yet
+      // not listening yet, or the probe ran out
     }
     await delay(250);
   }
   stop();
-  throw new Error(`astro preview did not answer at ${baseUrl}/ within ${STARTUP_TIMEOUT_MS} ms:\n${output}`);
+  throw new Error(`astro preview did not answer at ${baseUrl}/ within ${startupTimeoutMs} ms:\n${output}`);
 }
