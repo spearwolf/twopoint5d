@@ -116,7 +116,8 @@ One per listed mesh, built at its first pick and kept until the mesh or the pick
 - `blending: NoBlending`, `transparent: false`, `depthTest: true`, `depthWrite: true`: the nearest
   fragment wins, whatever the sprite's material blends or writes.
 - Copied from the sprite's material before every pick, since they decide which fragments a sprite
-  draws: `side`, `alphaTest`, `alphaTestNode`, `opacity`, `alphaHash`. A change sets `needsUpdate`.
+  draws: `side`, `alphaTest`, `alphaTestNode`, `opacity`, `opacityNode`, `maskNode`, `alphaHash`,
+  `alphaToCoverage`. A change sets `needsUpdate`.
 - **Rebuilt on placement swap**: a mesh whose `placement` differs from the one of its pick material
   sets it there (`FeatureSpritesMaterial#placement`, which rebuilds the position graph alone). A mesh
   whose material reads other resources than the pick material — a `material` swapped on the mesh —
@@ -183,7 +184,8 @@ not integer**: three 0.186.1 renders into an integer target under WebGPU (`getOu
 `uvec4` for `UnsignedIntType`), but its WebGL 2 backend reads none back —
 `WebGLTextureUtils#_getBytesPerTexel()` knows `RGBA`, `RGB` and `ALPHA` and answers `undefined` for
 `RGBA_INTEGER`, so `readRenderTargetPixelsAsync()` sizes its buffer `NaN`. A float holds every whole
-number up to 2²⁴ exactly — sixteen million sprites per mesh and as many meshes in a list — and is
+number up to 2²⁴ exactly — sixteen million sprites per mesh and as many meshes in a list; a mesh of
+more sprites is refused before the draw (§5), since two of its slots would read back as one — and is
 read back as `Float32Array` under both backends (`EXT_color_buffer_float`, which three's WebGL 2
 backend enables). No blending, and a target is no output target: three applies neither tone mapping
 nor the output color space to it (`Renderer#currentToneMapping`, `#currentColorSpace`).
@@ -234,7 +236,10 @@ are as long as the pools (one per mesh drawn by a pick in flight, returned when 
   finite number (`… the pointer is {x, y} in normalized device coordinates, -1 to 1 — got {x: NaN, y:
   0}`); `sprites` that is no array (`… takes a list of FeatureSprites — pick(camera, pointer,
   [sprites])`); an entry that is no `FeatureSprites` (`… the entry 1 of the list is no FeatureSprites
-  — the picker draws FeatureSprites alone`).
+  — the picker draws FeatureSprites alone`). A listed mesh of more than 2²⁴ sprites rejects the pick
+  with a `RangeError` before anything is drawn (`… the entry 0 of the list holds 16777217 sprites,
+  and the float target names a slot exactly up to 16777216 — split the sprites into meshes of at
+  most 16777216`).
 - **Ownership**: the renderer, the camera and every mesh stay the caller's. The picker owns its
   target, its scene, its camera, its pick meshes and pick materials. A pick material borrows the
   resources of its mesh and does not release them.

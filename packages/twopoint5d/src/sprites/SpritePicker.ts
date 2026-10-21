@@ -44,7 +44,19 @@ export interface PickPointer {
 }
 
 // the fields of a material that decide which fragments a sprite draws, copied to its pick material
-const DRAWN_FRAGMENTS = ['side', 'alphaTest', 'alphaTestNode', 'opacity', 'alphaHash'] as const;
+const DRAWN_FRAGMENTS = [
+  'side',
+  'alphaTest',
+  'alphaTestNode',
+  'opacity',
+  'opacityNode',
+  'maskNode',
+  'alphaHash',
+  'alphaToCoverage',
+] as const;
+
+// a float names every whole number up to 2^24 exactly, and the target holds the slot + 1
+const MAX_SPRITES_PER_MESH = 2 ** 24;
 
 const WHERE = 'SpritePicker#pick()';
 
@@ -141,7 +153,8 @@ export class SpritePicker {
    *   the centre of the pixel of the renderer's drawing buffer it lies in
    * @returns `undefined` once disposed
    * @throws (rejects with) a `TypeError` for a camera that is no three.js camera, a pointer whose `x`
-   *   or `y` is no finite number, a list that is no array and an entry that is no `FeatureSprites`;
+   *   or `y` is no finite number, a list that is no array and an entry that is no `FeatureSprites`; a
+   *   `RangeError` for a mesh of more than 2^24 sprites, whose slots the float target cannot name;
    *   an `Error` for a pick still in flight when the picker is disposed
    */
   // FeatureSprites is invariant in its handle type — the onCreateVO hook of its pool takes one —, so
@@ -205,6 +218,12 @@ export class SpritePicker {
       const pool = sprites.spritePool;
       if (pool === undefined || pool.usedCount === 0 || !isShown(sprites)) continue;
       if (drawn.some((record) => record.sprites === sprites)) continue;
+      // refused, not drawn: above it two slots read back as one, and the pick would name the wrong sprite
+      if (pool.usedCount > MAX_SPRITES_PER_MESH) {
+        throw new RangeError(
+          `${WHERE}: the entry ${k} of the list holds ${pool.usedCount} sprites, and the float target names a slot exactly up to ${MAX_SPRITES_PER_MESH} — split the sprites into meshes of at most ${MAX_SPRITES_PER_MESH}`,
+        );
+      }
       const entry = this.#sync(sprites, k + 1);
       scene.add(entry.mesh);
       drawn[k] = {sprites, handles: this.#handlesOf(pool)};

@@ -15,6 +15,7 @@ import {
   WebGLCoordinateSystem,
   WebGPUCoordinateSystem,
 } from 'three/webgpu';
+import {float} from 'three/tsl';
 import {describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {graphSignature, nodesOf} from '../testing/spriteGraph.js';
@@ -231,6 +232,22 @@ describe('SpritePicker', () => {
       picker.dispose();
       await expect(picker.pick(makeCamera(), {x: Number.NaN, y: 0}, [])).rejects.toThrow(TypeError);
     });
+  });
+
+  test('refuses a mesh of more sprites than the float target names exactly, before it draws', async () => {
+    const {renderer, rendered} = makeRenderer();
+    const picker = new SpritePicker(renderer);
+    const {sprites} = makeSprites(1);
+    vi.spyOn(sprites.spritePool!, 'usedCount', 'get').mockReturnValue(2 ** 24 + 1);
+
+    await expect(picker.pick(makeCamera(), center, [sprites])).rejects.toThrow(
+      new RangeError(
+        'SpritePicker#pick(): the entry 0 of the list holds 16777217 sprites, and the float target names a slot exactly up to 16777216 — split the sprites into meshes of at most 16777216',
+      ),
+    );
+    expect(rendered).toHaveLength(0);
+    sprites.dispose();
+    picker.dispose();
   });
 
   describe('draws nothing and answers undefined', () => {
@@ -564,13 +581,20 @@ describe('SpritePicker', () => {
         1,
         false,
       ]);
+      expect([material.opacityNode, material.maskNode, material.alphaToCoverage]).toEqual([null, null, false]);
 
       const version = material.version;
       await picker.pick(makeCamera(), center, [sprites]);
       expect(material.version).toBe(version);
       sprites.material!.opacity = 0.25;
+      const opacityNode = float(0.5);
+      const maskNode = float(1);
+      sprites.material!.opacityNode = opacityNode;
+      sprites.material!.maskNode = maskNode;
+      sprites.material!.alphaToCoverage = true;
       await picker.pick(makeCamera(), center, [sprites]);
       expect(material.opacity).toBe(0.25);
+      expect([material.opacityNode, material.maskNode, material.alphaToCoverage]).toEqual([opacityNode, maskNode, true]);
       expect(material.version).toBeGreaterThan(version);
       sprites.dispose();
       picker.dispose();

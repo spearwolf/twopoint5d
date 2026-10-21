@@ -1071,7 +1071,9 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
 - **The renderer** is left as the pick found it: render target, MRT, clear colour and the `autoClear`
   flags. The picker draws into a 1 × 1 float target — three's WebGL 2 backend reads no integer
   target back — with no blending, no tone mapping and no output colour space, so the id arrives
-  exactly, up to 2²⁴ sprites per mesh.
+  exactly, up to 2²⁴ sprites per mesh; a mesh of more is refused with a `RangeError` before the draw
+  rather than answered with the wrong sprite. A material's `side`, alpha test, opacity, `maskNode`,
+  `alphaHash` and `alphaToCoverage` reach its pick as they reach the screen.
 - **Ownership.** The renderer, the camera and the meshes stay the caller's. The picker builds a pick
   material per mesh on the uniforms and textures of that mesh — a `setUniform()` or `setTexture()`
   reaches the pick as it reaches the sprites —, follows a swapped placement, and releases it when the
