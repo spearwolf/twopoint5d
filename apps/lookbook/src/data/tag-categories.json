@@ -42,7 +42,16 @@
         "Fade",
         "SpritePicker",
         "directional-sprites",
-        "picking"
+        "picking",
+        "AnimatedFrames",
+        "AtlasFrame",
+        "prepareSpriteFrame",
+        "QuadSize",
+        "TextureColor",
+        "Flip",
+        "NineSlice",
+        "BillboardReflectionPass",
+        "sorting"
       ]
     },
     {
@@ -63,7 +72,10 @@
         "AtlasFrameTable",
         "atlasFrameTable",
         "sampleAtlasFrame",
-        "FrameTable"
+        "FrameTable",
+        "AsepriteJson",
+        "DynamicAtlas",
+        "pixel-art"
       ]
     },
     {
