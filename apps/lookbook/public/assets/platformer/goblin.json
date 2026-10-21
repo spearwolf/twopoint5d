@@ -297,6 +297,7 @@
         "from": 4,
         "to": 7,
         "direction": "forward",
+        "repeat": "1",
         "color": "#ff7f3fff"
       },
       {
@@ -304,6 +305,7 @@
         "from": 8,
         "to": 9,
         "direction": "forward",
+        "repeat": "1",
         "color": "#bf3fffff"
       },
       {
@@ -311,6 +313,7 @@
         "from": 10,
         "to": 12,
         "direction": "forward",
+        "repeat": "1",
         "color": "#7f7f7fff"
       }
     ],

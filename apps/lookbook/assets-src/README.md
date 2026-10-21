@@ -143,21 +143,24 @@ Generators: `platformer/puppet.mjs` (capsule puppet with two-bone IK), `fighter.
 --list-tags --list-layers --list-slices`: frame keys `"fighter 0.aseprite"` … `"fighter
 23.aseprite"` in frame order, each with `frame`, `rotated`, `trimmed`, `spriteSourceSize`,
 `sourceSize` and `duration` (ms); `meta.app` is `https://www.aseprite.org/`, `meta.frameTags`
-holds `name`, `from`, `to` (inclusive), `direction` and `color`, `meta.slices` one slice `pivot`.
+holds `name`, `from`, `to` (inclusive), `direction`, `repeat` and `color`, `meta.slices` one slice
+`pivot`. `repeat` is Aseprite's "Repeat" field, written as Aseprite writes it — a string, `"1"`, and
+only on a tag where it is set: the one-shots carry `"repeat": "1"`, the loops none.
 Both characters face **right**; mirror them with `Flip`.
 
 **`fighter`** — a 70s martial-arts film hero in a yellow jumpsuit with black side stripes, black
 bowl cut, black slippers. Canvas (`sourceSize`) 64 × 64; frames trimmed to their pixels.
 
-| tag | frames | direction | durations (ms) |
-| --- | --- | --- | --- |
-| `idle` | 0–3 | `pingpong` | 160, 140, 140, 160 — fighting stance, breathing |
-| `walk` | 4–9 | `forward` | 100 each — a stride in guard |
-| `kick` | 10–14 | `forward` | 80, 70, **320**, 90, 110 — chamber, extend, the held high side kick (frame 12), re-chamber, stance |
-| `flying-kick` | 15–20 | `forward` | 100, 90, 90, **380**, 100, 140 — crouch, take-off, tuck, the held flying kick (frame 18), descent, landing |
-| `hit` | 21–23 | `forward` | 80, 180, 160 — recoil and recover |
+| tag | frames | direction | repeat | durations (ms) |
+| --- | --- | --- | --- | --- |
+| `idle` | 0–3 | `pingpong` | — | 160, 140, 140, 160 — fighting stance, breathing |
+| `walk` | 4–9 | `forward` | — | 100 each — a stride in guard |
+| `kick` | 10–14 | `forward` | `"1"` | 80, 70, **320**, 90, 110 — chamber, extend, the held high side kick (frame 12), re-chamber, stance |
+| `flying-kick` | 15–20 | `forward` | `"1"` | 100, 90, 90, **380**, 100, 140 — crouch, take-off, tuck, the held flying kick (frame 18), descent, landing |
+| `hit` | 21–23 | `forward` | `"1"` | 80, 180, 160 — recoil and recover |
 
-`kick`, `flying-kick` and `hit` are one-shots (`playback: 'once'`). Slice `pivot`: one key at frame
+`kick`, `flying-kick` and `hit` are one-shots: their repeat of 1 is what `AsepriteJson` and the
+built-in `aseprite` adapter of `TextureStore` read as `playback: 'once'`, which holds the last frame. Slice `pivot`: one key at frame
 0, bounds the whole canvas `{x: 0, y: 0, w: 64, h: 64}`, `pivot {x: 32, y: 63}` — the pixel the
 feet stand on, the middle of the bottom row; as an anchor, (0.5, 1) of the untrimmed frame. In
 `idle` and `walk` the soles are on row 63; the flying kick leaves the ground inside the canvas,
@@ -166,12 +169,12 @@ so the pivot stays where the ground is.
 **`goblin`** — squat, big-eared, a spiked club over its shoulder, facing right. Canvas 56 × 48,
 trimmed. Slice `pivot`: bounds `{x: 0, y: 0, w: 56, h: 48}`, `pivot {x: 28, y: 47}`.
 
-| tag | frames | direction | durations (ms) |
-| --- | --- | --- | --- |
-| `walk` | 0–3 | `forward` | 130 each |
-| `attack` | 4–7 | `forward` | 140, 60, **260**, 140 — wind-up, swing, the held strike (frame 6), recover |
-| `hit` | 8–9 | `forward` | 90, 200 |
-| `die` | 10–12 | `forward` | 120, 120, 400 — falls on its back; hold the last frame, then `Fade` |
+| tag | frames | direction | repeat | durations (ms) |
+| --- | --- | --- | --- | --- |
+| `walk` | 0–3 | `forward` | — | 130 each |
+| `attack` | 4–7 | `forward` | `"1"` | 140, 60, **260**, 140 — wind-up, swing, the held strike (frame 6), recover |
+| `hit` | 8–9 | `forward` | `"1"` | 90, 200 |
+| `die` | 10–12 | `forward` | `"1"` | 120, 120, 400 — falls on its back; holds the last frame, then `Fade` |
 
 **`goblin-palette.png`** — 16 entries, one row per variant. Every pixel of `goblin.png` is
 exactly one of the row-0 colours (checked by the generator); entries 0, 5 and 9–13 are the same in

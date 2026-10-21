@@ -232,7 +232,7 @@ export function drawGoblin(pose) {
   return p.img;
 }
 
-/** @type {{name: string, direction: 'forward' | 'pingpong', color: string, frames: [Pose, number][]}[]} */
+/** @type {{name: string, direction: 'forward' | 'pingpong', repeat?: number, color: string, frames: [Pose, number][]}[]} */
 export const ANIMATIONS = [
   {
     name: 'walk',
@@ -258,6 +258,7 @@ export const ANIMATIONS = [
   {
     name: 'attack',
     direction: 'forward',
+    repeat: 1,
     color: '#ff7f3fff',
     frames: [
       [{hip: [-1, 10], lean: -5, nearAnkle: [4, 1.8], farAnkle: [-4, 1.8], nearHand: [-2, -6], farHand: [3, 5], club: -150}, 140],
@@ -269,6 +270,7 @@ export const ANIMATIONS = [
   {
     name: 'hit',
     direction: 'forward',
+    repeat: 1,
     color: '#bf3fffff',
     frames: [
       [{hip: [-2, 10], lean: -20, nearAnkle: [3, 1.8], farAnkle: [-5, 1.8], nearHand: [-3, 5], farHand: [-6, 2], club: -110}, 90],
@@ -278,6 +280,7 @@ export const ANIMATIONS = [
   {
     name: 'die',
     direction: 'forward',
+    repeat: 1,
     color: '#7f7f7fff',
     frames: [
       [{hip: [1, 9], lean: -35, nearAnkle: [4, 2.5], farAnkle: [-3, 1.8], nearHand: [-4, 2], farHand: [-6, -1], club: -160}, 120],

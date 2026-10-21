@@ -147,9 +147,10 @@ const stance = (/** @type {number} */ b) =>
   });
 
 /**
- * The animations in sheet order: name, Aseprite direction, and per frame a pose and a duration in
- * milliseconds.
- * @type {{name: string, direction: 'forward' | 'pingpong', color: string, frames: [Pose, number][]}[]}
+ * The animations in sheet order: name, Aseprite direction, Aseprite's "Repeat" (1 on the
+ * one-shots, which play once and hold their last frame; absent loops), and per frame a pose and a
+ * duration in milliseconds.
+ * @type {{name: string, direction: 'forward' | 'pingpong', repeat?: number, color: string, frames: [Pose, number][]}[]}
  */
 export const ANIMATIONS = [
   {
@@ -188,6 +189,7 @@ export const ANIMATIONS = [
   {
     name: 'kick',
     direction: 'forward',
+    repeat: 1,
     color: '#ff7f3fff',
     frames: [
       [
@@ -240,6 +242,7 @@ export const ANIMATIONS = [
   {
     name: 'flying-kick',
     direction: 'forward',
+    repeat: 1,
     color: '#ff3f6fff',
     frames: [
       [{hip: [0, 15], lean: 15, near: {ankle: [6, 2.5]}, far: {ankle: [-5, 2.5]}, nearHand: [7, 3], farHand: [4, 4]}, 100],
@@ -294,6 +297,7 @@ export const ANIMATIONS = [
   {
     name: 'hit',
     direction: 'forward',
+    repeat: 1,
     color: '#bf3fffff',
     frames: [
       [

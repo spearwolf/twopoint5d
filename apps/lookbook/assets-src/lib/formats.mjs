@@ -57,6 +57,8 @@ export function freeTexPackerHash(frames, sheet) {
  * @property {number} from first frame, inclusive
  * @property {number} to last frame, inclusive
  * @property {'forward' | 'reverse' | 'pingpong' | 'pingpong_reverse'} direction
+ * @property {number} [repeat] Aseprite's "Repeat" of the tag, written as a string (`"1"`) and only
+ *   when set — absent, the tag loops
  * @property {string} [color] `#rrggbbaa`
  */
 
@@ -100,6 +102,7 @@ export function asepriteHash(doc) {
         from: t.from,
         to: t.to,
         direction: t.direction,
+        ...(t.repeat === undefined ? {} : {repeat: String(t.repeat)}),
         color: t.color ?? '#000000ff',
       })),
       layers: (doc.layers ?? ['Layer 1']).map((name) => ({name, opacity: 255, blendMode: 'normal'})),
