@@ -1,0 +1,170 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_ui-panels.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <section
+      class="controls fixed top-[calc(var(--demo-nav-bar-height)+0.5rem)] right-4 flex flex-wrap gap-2 items-center justify-end"
+    >
+      <div class="actionBtn select-none toggleStyle">style: stone</div>
+      <div class="actionBtn select-none toggleInventory">inventory: open</div>
+      <div class="actionBtn select-none hitParty">hit the party</div>
+      <div class="drawCalls">draw calls: …</div>
+    </section>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #0b0912;
+    color: #f2e6c6;
+  }
+  .drawCalls {
+    font-family: monospace;
+    font-size: 110%;
+    padding: 0.3em 0.6em;
+    background: rgba(20 16 26 / 75%);
+    border-radius: 4px;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    BitmapFont,
+    Display,
+    OnStageResize,
+    OnStageUpdateFrame,
+    OrthographicProjection,
+    Stage2D,
+    StageRenderer,
+    TextureStore,
+  } from '@spearwolf/twopoint5d';
+  import {Color} from 'three/webgpu';
+  import {DungeonScreen, PANEL_STYLES} from '~demos/ui-panels/DungeonScreen';
+  import {PARTY} from '~demos/ui-panels/party';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the preview screenshot waits until the windows are open and the first line is typed out
+  const preview = deferPreview();
+
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  // a 2D stage: an orthographic camera in the middle of it, y up, one unit per CSS pixel of the
+  // canvas ('fill' without a pixelZoom). The screen scales its pixel art by a whole number itself
+  const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'fill'}));
+  new StageRenderer(display).setClearColor(new Color('#0b0912')).add(stage);
+
+  // the controls lie over the top of the canvas: the screen starts below them
+  const controls = document.querySelector<HTMLElement>('.controls')!;
+  const topInset = () => {
+    const {bottom, height} = controls.getBoundingClientRect();
+    return height > 0 ? bottom + 8 : 0;
+  };
+
+  const loadImage = async (url: string) => {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return image;
+  };
+
+  display.onInit(async ({renderer}) => {
+    // a catalog of this demo's own, parsed in place: an Aseprite json goes to the Aseprite adapter
+    // by its meta.app, and its slices travel with the frame
+    const store = new TextureStore(renderer);
+    store.parse(
+      {
+        items: {
+          kit: {atlasUrl: 'panels.aseprite.json', texture: ['nearest', 'srgb']},
+          icons: {atlasUrl: 'icons.json', texture: ['nearest', 'srgb']},
+          font: {imageUrl: 'pixel-8.png', texture: ['nearest', 'srgb']},
+        },
+      },
+      {baseUrl: assetsUrl('ui-panels/')},
+    );
+
+    const [[kit, kitTexture], [icons, iconsTexture], [fontTexture], fnt, fontImage, portraits] = await Promise.all([
+      store.getAsync('kit', ['atlas', 'texture']),
+      store.getAsync('icons', ['atlas', 'texture']),
+      store.getAsync('font', ['texture']),
+      fetch(assetsUrl('ui-panels/pixel-8.fnt')).then((response) => response.text()),
+      // the page once more as an image: the labels of the DynamicAtlas are drawn from it on the CPU
+      loadImage(assetsUrl('ui-panels/pixel-8.png')),
+      Promise.all(PARTY.map(async ({id}) => [id, await loadImage(assetsUrl(`ui-panels/portraits/${id}.png`))] as const)),
+    ]);
+
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
+
+    // the text spelling of BMFont; the json next to it reads the same
+    const [font] = BitmapFont.parse(fnt);
+
+    const screen = new DungeonScreen({
+      kit,
+      kitTexture,
+      icons,
+      iconsTexture,
+      font,
+      fontTexture,
+      fontImage,
+      portraits: new Map(portraits),
+    });
+    stage.scene.add(screen);
+    screen.onComposed = () => preview.ready(display);
+
+    if (stage.width > 0) screen.resize(stage.width, stage.height, topInset());
+    on(stage, OnStageResize, ({width, height}) => screen.resize(width, height, topInset()));
+    on(stage, OnStageUpdateFrame, ({deltaTime}) => screen.update(deltaTime));
+
+    // the NEXT button of the dialog box and the slots of the inventory answer the pointer
+    const at = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      return [event.clientX - rect.left, event.clientY - rect.top, topInset()] as const;
+    };
+    canvas.addEventListener('pointermove', (event) => {
+      canvas.style.cursor = screen.pointerMove(...at(event)) ? 'pointer' : '';
+    });
+    canvas.addEventListener('pointerdown', (event) => screen.pointerDown(...at(event)));
+    canvas.addEventListener('pointerup', (event) => screen.pointerUp(...at(event)));
+
+    // the buttons and the readout are written by the markup of this very page
+    const styleButton = document.querySelector('.toggleStyle')!;
+    const inventoryButton = document.querySelector('.toggleInventory')!;
+    const drawCalls = document.querySelector('.drawCalls')!;
+    styleButton.addEventListener('click', () => {
+      screen.style = PANEL_STYLES[(PANEL_STYLES.indexOf(screen.style) + 1) % PANEL_STYLES.length]!;
+      styleButton.textContent = `style: ${screen.style.replace('panel-', '')}`;
+    });
+    inventoryButton.addEventListener('click', () => {
+      screen.inventoryOpen = !screen.inventoryOpen;
+      inventoryButton.textContent = `inventory: ${screen.inventoryOpen ? 'open' : 'closed'}`;
+    });
+    document.querySelector('.hitParty')!.addEventListener('click', () => screen.hit());
+
+    // read between two frames: the renderer counts anew at the start of each render
+    const readout = setInterval(() => {
+      drawCalls.textContent = `draw calls: ${renderer.info.render.drawCalls}`;
+    }, 250);
+
+    // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
+    console.log('ui panels', screen);
+
+    display.onDispose(() => {
+      clearInterval(readout);
+      // the screen releases its meshes and its DynamicAtlas, the store the textures it loaded
+      screen.dispose();
+      store.dispose();
+    });
+  });
+
+  await display.start();
+</script>

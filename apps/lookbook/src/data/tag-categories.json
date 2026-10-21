@@ -26,11 +26,20 @@
         "Rotation",
         "Tint",
         "billboards",
-        "AxisBillboardPlacement",
+        "wave",
+        "gridBase",
+        "QuadBase",
+        "axisBillboardPlacement",
         "BillboardPlacement",
+        "Flash",
+        "PaletteSwap",
+        "Anchor",
+        "SegmentEnd",
+        "segmentPlacement",
+        "RepeatingTextureColor",
+        "AxisBillboardPlacement",
         "TableFrame",
         "Fade",
-        "Flash",
         "SpritePicker",
         "directional-sprites",
         "picking"
@@ -46,15 +55,21 @@
         "texture-atlas",
         "TextureAtlas",
         "TextureCoords",
-        "FrameTable",
         "TextureFactory",
         "TextureStore",
+        "TexturePackerJson",
         "TileSet",
         "colorFromTextureByTexCoords",
         "AtlasFrameTable",
         "atlasFrameTable",
-        "sampleAtlasFrame"
+        "sampleAtlasFrame",
+        "FrameTable"
       ]
+    },
+    {
+      "name": "Text",
+      "tagId": "text",
+      "includeTags": ["BitmapFont", "writeText", "layoutText"]
     },
     {
       "name": "Map2D",
