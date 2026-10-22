@@ -478,7 +478,7 @@ sprites.setTexture('colorMap', labels.texture);
 
 - A shelf packer on a canvas, a `CanvasTexture`, an ordinary `TextureAtlas` — so every feature,
   `AtlasFrameTable` and `sampleAtlasFrame()` read its frames unchanged.
-- `add()` marks the texture for upload; `remove()` frees nothing (shelves fragment) and
+- `add()` marks the texture for upload; `remove()` frees the cell for the next frame that fits and
   `clear()` starts over. A full atlas throws, naming its size — no silent growth that would move
   every frame.
 - `padding` and `extrude` against bleeding, the same reasons `inset` exists in the mesh helper.

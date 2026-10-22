@@ -167,6 +167,47 @@ describe('texture — DynamicAtlas', function () {
     expect(isNearColor(colorAt(-3, 0), BLUE), `first, redrawn: ${colorAt(-3, 0)}`).to.be.true;
   });
 
+  it('after upload(), a redraw, a remove and an add into the freed cell reach the next render through copies of their cells', async () => {
+    const topDown = await readsTopDown(display.renderer, target);
+    const fill = (color) => (ctx, w, h) => {
+      ctx.fillStyle = `rgb(${color.join(',')})`;
+      ctx.fillRect(0, 0, w, h);
+    };
+
+    atlas = new DynamicAtlas({width: 32, height: 32, filter: 'nearest'});
+    const left = atlas.add('left', fill(RED), {width: 4, height: 4});
+    const right = atlas.add('right', fill(GREEN), {width: 4, height: 4});
+
+    sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap: atlas.texture}});
+    sprites.frustumCulled = false;
+    showFrame(left, -3);
+    showFrame(right, 3);
+
+    // the first call copies nothing: the first render uploads the whole canvas
+    atlas.upload(display.renderer);
+    let colorAt = await render(topDown);
+    expect(isNearColor(colorAt(-3, 0), RED), `left: ${colorAt(-3, 0)}`).to.be.true;
+    expect(isNearColor(colorAt(3, 0), GREEN), `right: ${colorAt(3, 0)}`).to.be.true;
+
+    const version = atlas.texture.version;
+    atlas.redraw('left', fill(BLUE));
+    atlas.upload(display.renderer);
+    expect(atlas.texture.version).to.equal(version);
+    colorAt = await render(topDown);
+    expect(isNearColor(colorAt(-3, 0), BLUE), `left, redrawn: ${colorAt(-3, 0)}`).to.be.true;
+    expect(isNearColor(colorAt(3, 0), GREEN), `right, beside it: ${colorAt(3, 0)}`).to.be.true;
+
+    atlas.remove('right');
+    const again = atlas.add('again', fill(YELLOW), {width: 4, height: 4});
+    expect(again.data.frame).to.deep.equal(right.data.frame);
+    atlas.upload(display.renderer);
+    expect(atlas.texture.version).to.equal(version);
+    // the sprite on the right still shows the coords of `right`: the cell `again` was packed into
+    colorAt = await render(topDown);
+    expect(isNearColor(colorAt(3, 0), YELLOW), `right, packed anew: ${colorAt(3, 0)}`).to.be.true;
+    expect(isNearColor(colorAt(-3, 0), BLUE), `left: ${colorAt(-3, 0)}`).to.be.true;
+  });
+
   it('keeps straight alpha: a half transparent red blends to half red over black', async () => {
     const topDown = await readsTopDown(display.renderer, target);
 
@@ -262,12 +303,23 @@ describe('texture — DynamicAtlas', function () {
     pixelsOf(BLUE);
   });
 
-  it('refuses an image element that failed to load, and takes no cell for it', async () => {
+  it('refuses an image element that failed to load — without a size for want of a natural size, with one in drawImage() — and takes no cell for it', async () => {
     const broken = new Image();
     broken.src = 'data:image/png;base64,AAAA';
     await broken.decode().catch(() => {});
 
     atlas = new DynamicAtlas({width: 16, height: 16});
+    let refused;
+    try {
+      atlas.add('broken', broken);
+    } catch (caught) {
+      refused = caught;
+    }
+    expect(refused, 'add() of a broken image without a size throws').to.be.an.instanceOf(Error);
+    expect(refused.name).to.equal('Error');
+    expect(refused.message).to.contain('has no natural size');
+    expect(atlas.atlas.size).to.equal(0);
+
     let error;
     try {
       atlas.add('broken', broken, {width: 4, height: 4});

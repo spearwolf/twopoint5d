@@ -11,7 +11,7 @@ import {
   type WriteTextOptions,
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
-import {Color, Group, type Texture} from 'three/webgpu';
+import {Color, Group, type Texture, type WebGPURenderer} from 'three/webgpu';
 
 import {type Panel, PanelKind, type Picture, PictureKind} from './kinds.js';
 import {DIALOG, INVENTORY, INVENTORY_COLUMNS, INVENTORY_ROWS, PARTY, type PartyMemberData, QUEST, TITLE} from './party.js';
@@ -389,8 +389,11 @@ export class DungeonScreen extends Group {
     this.#buttonDown = false;
   }
 
-  /** Moves everything that moves, then uploads what changed. Once per frame, before rendering. */
-  update(deltaTime: number): void {
+  /**
+   * Moves everything that moves, then uploads what changed — the meshes, and the cells of the atlas its
+   * labels redraw. Once per frame, before rendering.
+   */
+  update(deltaTime: number, renderer: WebGPURenderer): void {
     const dt = Math.min(deltaTime, 0.1);
     this.#time += dt;
     if (this.#scale > 0) {
@@ -399,12 +402,13 @@ export class DungeonScreen extends Group {
       this.#animateParty(dt);
     }
     for (const mesh of [this.#back, this.#icons, this.#pictures, this.#front, this.#text]) mesh.update();
+    this.#atlas.upload(renderer);
   }
 
   override dispose(): void {
     for (const mesh of [this.#back, this.#icons, this.#pictures, this.#front, this.#text]) mesh.dispose();
-    // the atlas owns its canvas and its texture; the textures of the kit, the icons and the font
-    // belong to the store that loaded them
+    // the atlas owns its canvas, its texture and the staging canvas and texture of upload(); the
+    // textures of the kit, the icons and the font belong to the store that loaded them
     this.#atlas.dispose();
     this.removeFromParent();
   }

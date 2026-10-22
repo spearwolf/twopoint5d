@@ -428,6 +428,7 @@ and `sampleAtlasFrame()` read its frames as any other.
 
 ```ts check
 import {DynamicAtlas, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+import type {WebGPURenderer} from 'three/webgpu';
 
 declare const portrait: ImageBitmap; // 96 × 96, e.g. createImageBitmap(await (await fetch(url)).blob())
 
@@ -453,14 +454,18 @@ panel.createSprite()?.setFrame(face);
 
 // later, the counter changes: drawn anew in place, the sprite is not written to
 export const onHit = (left: number) => ui.redraw('hp', drawLabel(`HP ${left}/20`));
+
+// once per frame, before the render: from the first call on a change waits for it, which copies the changed cells alone
+export const beforeRender = (renderer: WebGPURenderer) => ui.upload(renderer);
 ```
 
 **Packing.** The frames lie on shelves: rows as high as the frame that opened them, a frame going
 onto the lowest shelf it fits beside the others, else onto a new shelf below. `padding` (default 1)
 clear texels lie between two frames and around the edge; `extrude` (default 0) repeats the edge of
 every frame outwards by as many texels, so linear filtering at the edge reads the frame and not the
-padding. A frame never moves. A frame that does not fit throws, naming the size of the atlas and the
-fix — there is no silent growth, which would move every frame already written to a sprite.
+padding. A frame never moves. A cell that `remove()` gave back takes the next frame that fits into
+it, a narrower one its left part. A frame that does not fit throws, naming the size of the atlas
+and the fix — there is no silent growth, which would move every frame already written to a sprite.
 
 **`add(name, source, size?)`** takes a draw callback `(context, width, height)` — run clipped to the
 frame and moved to its top left, its cell cleared — and then needs the `size`, or an `ImageBitmap`,
@@ -475,27 +480,37 @@ mends it. An image element that is still loading (`complete` still `false`), a c
 and a canvas of no size are refused by `add()` — with or without a size — and by `redraw()`, before
 anything is cleared. An image element that has loaded without a natural size, an SVG without `width`
 and `height`, is drawn at the size `add()` is given and by `redraw()` at the size of the frame;
-`add()` without a size refuses it. One that failed to load makes `drawImage()` throw: `add()` takes
-no cell for it, and `redraw()` leaves the frame cleared. **`remove(name)`** clears the frame and
-lets go of the name, not of its space — a shelf packer fragments. The frame keeps its id, and
-`atlas.get(id)` still answers it, but it leaves the random draws of the atlas (`randomFrame()` and
-its siblings) and a table of every frame (`frameTable(atlas)`, `atlasFrameTable(atlas)`), and the
-message of a full atlas counts only the frames it holds. **`clear()`** starts over with a new
-`atlas`, frame ids from 0.
+`add()` without a size refuses it. One that failed to load has no natural size either: `add()`
+refuses it without a size and takes no cell for it, `drawImage()` throws for it with one, and
+`redraw()` leaves the frame cleared. **`remove(name)`** clears the frame and lets go of its name
+and its cell. The frame keeps its id, and `atlas.get(id)` still answers it — its coords show the
+cell, cleared until another frame is packed into it, and that frame afterwards —, but it leaves the
+random draws of the atlas (`randomFrame()` and its siblings) and a table of every frame
+(`frameTable(atlas)`, `atlasFrameTable(atlas)`), and the message of a full atlas counts only the
+frames it holds. **`clear()`** starts over with a new `atlas`, frame ids from 0.
 
 The atlas draws, clears and extrudes in canvas pixels whatever the caller left on `context` — a
 transform, a `globalAlpha`, a composite operation — and gives that state back afterwards, so the
 `font` set for `measureText()` stays. A draw callback starts from that neutral state.
 
 **The texture** is read upright (`flipY = false`, as every atlas of the library), in sRGB, with
-straight alpha and without mipmaps; `filter: 'nearest'` for pixel art, `'linear'` by default. Every
-change marks it for upload, and the next render uploads the whole canvas once. The canvas is an
-`OffscreenCanvas` where there is one, a canvas element otherwise, or the `canvas` handed in, whose
-size the atlas takes; under Node there is neither, and the constructor says to hand one in.
+straight alpha and without mipmaps; `filter: 'nearest'` for pixel art, `'linear'` by default. The
+canvas is an `OffscreenCanvas` where there is one, a canvas element otherwise, or the `canvas`
+handed in, whose size the atlas takes; under Node there is neither, and the constructor says to
+hand one in.
 
-**Ownership.** The atlas owns its texture and a canvas it built; `dispose()` releases both. A canvas
-handed in stays the caller's. After `dispose()`, `texture`, `canvas`, `context`, `add()` and
-`redraw()` throw, `remove()` answers `false`, `clear()` does nothing.
+Without `upload()`, every change marks the texture, and the next render uploads the whole canvas
+once — 16 MiB at 2048 × 2048, every frame for a label redrawn every frame. `upload(renderer)`,
+called once per frame before the render — in the `OnStageUpdateFrame` of a `Stage2D`, which a
+`StageRenderer` emits before it renders, with `display.renderer` — copies the changed cells alone
+from its first call on: a change waits for the next call, which copies each cell through a small
+staging texture and `renderer.copyTextureToTexture()`. Where the cells would cover half the atlas or
+more, and at `clear()`, it marks the whole texture instead.
+
+**Ownership.** The atlas owns its texture, a canvas it built, and the staging canvas and texture of
+`upload()`; `dispose()` releases them. A canvas handed in stays the caller's. After `dispose()`,
+`texture`, `canvas`, `context`, `add()` and `redraw()` throw, `remove()` answers `false`, and
+`clear()` and `upload()` do nothing.
 
 Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as
 `TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()`, `rewriteText()` and

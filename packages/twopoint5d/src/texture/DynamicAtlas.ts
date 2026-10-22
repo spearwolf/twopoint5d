@@ -1,5 +1,6 @@
-import {CanvasTexture, LinearFilter, NearestFilter, SRGBColorSpace} from 'three/webgpu';
+import {Box2, CanvasTexture, LinearFilter, NearestFilter, SRGBColorSpace, Vector2, type WebGPURenderer} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
+import {expectDefined} from '../utils/expectDefined.js';
 import {forgetFrameName} from './internals.js';
 import {TextureAtlas, type TextureAtlasFrame, type TextureAtlasFrameName} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -46,22 +47,42 @@ export interface DynamicAtlasOptions {
   filter?: 'linear' | 'nearest';
 }
 
-// a row of cells, as high as the cell that opened it; `x` is where the next cell begins
+// a row of cells, as high as the cell that opened it; `x` is where its tail begins, `free` the cells given
+// back left of it, ascending, none touching another or the tail
 interface Shelf {
   readonly y: number;
   readonly height: number;
   x: number;
+  readonly free: FreeSpan[];
 }
 
-// where a frame lies in the canvas, its extruded edges not included
+// [start, end) in canvas pixels: a cell given back and the padding behind it
+interface FreeSpan {
+  start: number;
+  end: number;
+}
+
+// where a frame lies in the canvas, its extruded edges not included, and the shelf of its cell
 interface FrameRect {
   readonly x: number;
   readonly y: number;
   readonly w: number;
   readonly h: number;
+  readonly shelf: Shelf;
+}
+
+// the staging canvas upload() copies a changed cell into, and its texture, the source of the copy on the GPU
+interface Staging {
+  readonly canvas: HTMLCanvasElement | OffscreenCanvas;
+  readonly context: DynamicAtlasContext;
+  readonly texture: CanvasTexture<HTMLCanvasElement | OffscreenCanvas>;
 }
 
 const WHERE = 'DynamicAtlas';
+
+// where the copies of upload() would move half the atlas or more, one whole upload is cheaper: a single
+// transfer, and no submit for each cell
+const WHOLE_UPLOAD_SHARE = 0.5;
 
 const isWhole = (value: unknown, min: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= min;
@@ -99,11 +120,13 @@ const buildCanvas = (width: number, height: number): HTMLCanvasElement | Offscre
  * so `setFrame()`, `AtlasFrameTable` and `sampleAtlasFrame()` read them as any other.
  *
  * The texture is read upright (`flipY = false`, as every atlas of the library), in sRGB, with
- * straight alpha and without mipmaps. `add()`, `redraw()`, `remove()` and `clear()` mark it for
- * upload: the renderer uploads the whole canvas once with the next render that uses it.
+ * straight alpha and without mipmaps. `add()`, `redraw()` and `remove()` mark it for upload — the
+ * renderer uploads the whole canvas once with the next render that uses it — until {@link upload}
+ * is called for the first time; from then on they leave it to the next `upload()`, which copies the
+ * changed cells alone. `clear()` marks the whole canvas either way.
  *
- * The atlas owns its texture and a canvas it built itself; {@link dispose} releases both. A canvas
- * handed in stays the caller's.
+ * The atlas owns its texture, a canvas it built itself and the staging canvas and texture of
+ * {@link upload}; {@link dispose} releases them. A canvas handed in stays the caller's.
  */
 export class DynamicAtlas {
   readonly width: number;
@@ -124,6 +147,14 @@ export class DynamicAtlas {
   #cells = new Map<TextureAtlasFrame, FrameRect>();
   #shelves: Shelf[] = [];
   #disposed = false;
+
+  // set by the first upload(): from then on add(), redraw() and remove() leave the texture to the next upload()
+  #regionUploads = false;
+  // the cells changed since the last upload(), each once
+  readonly #dirty: FrameRect[] = [];
+  #staging: Staging | undefined;
+  readonly #srcRegion = new Box2();
+  readonly #dstPosition = new Vector2();
 
   /**
    * @throws {TypeError} without a size and without a canvas, for a size beside a canvas, for a filter it
@@ -177,7 +208,7 @@ export class DynamicAtlas {
     texture.colorSpace = SRGBColorSpace;
     // the canvas keeps its texels premultiplied; both backends hand them on unpremultiplied with this
     texture.premultiplyAlpha = false;
-    // every change uploads the whole canvas, and the small mip levels of a packed atlas mix its frames
+    // a change uploads the whole canvas or copies its changed cells, and the small mip levels of a packed atlas mix its frames
     texture.generateMipmaps = false;
     texture.magFilter = filter === 'nearest' ? NearestFilter : LinearFilter;
     texture.minFilter = filter === 'nearest' ? NearestFilter : LinearFilter;
@@ -243,10 +274,12 @@ export class DynamicAtlas {
    * both cases no frame is added and no cell is taken.
    *
    * @throws {Error} for a name that is taken, an image element that is still loading — with or without a
-   *   size —, an image element without a natural size and without a `size`, a closed ImageBitmap or a
-   *   canvas of no size, a frame that does not fit (a `RangeError`), and once the atlas is disposed.
+   *   size —, an image element without a natural size and without a `size` — one that failed to load among
+   *   them —, a closed ImageBitmap or a canvas of no size, a frame that does not fit (a `RangeError`), and
+   *   once the atlas is disposed.
    * @throws {DOMException} an `InvalidStateError` from `drawImage()` for an image element that failed to
-   *   load; no frame is added and no cell is taken.
+   *   load, given a `size` — without one it has no natural size and is refused as above; no frame is added
+   *   and no cell is taken.
    * @throws {RangeError} for a size that is no finite number above 0.
    * @throws {TypeError} for a draw callback without a size.
    */
@@ -262,7 +295,13 @@ export class DynamicAtlas {
     const {width, height} = this.#sizeOf(name, source, size);
 
     const rollback = this.#pack(name, width, height);
-    const rect: FrameRect = {x: rollback.x + this.extrude, y: rollback.y + this.extrude, w: width, h: height};
+    const rect: FrameRect = {
+      x: rollback.x + this.extrude,
+      y: rollback.y + this.extrude,
+      w: width,
+      h: height,
+      shelf: rollback.shelf,
+    };
     try {
       this.#draw(rect, source);
     } catch (error) {
@@ -274,7 +313,7 @@ export class DynamicAtlas {
     const id = this.#atlas.add(name, new TextureCoords(this.#root, rect.x, rect.y, width, height), {
       frame: {x: rect.x, y: rect.y, w: width, h: height},
     });
-    this.#texture.needsUpdate = true;
+    this.#changed(rect);
     // the frame was added under this id just now
     const frame = this.#atlas.get(id)!;
     this.#cells.set(frame, rect);
@@ -294,6 +333,9 @@ export class DynamicAtlas {
    * at the size of the frame; one that failed to load makes `drawImage()` throw and leaves the frame
    * cleared, like any image that throws.
    *
+   * A frame redrawn every frame — a counter, a timer — wants {@link upload} before each render: it copies
+   * the cell alone, where the whole canvas goes up otherwise, 16 MiB at 2048 × 2048.
+   *
    * @throws {Error} for a name the atlas does not hold, an image element that is still loading, a closed
    *   ImageBitmap or a canvas of no size, and once the atlas is disposed.
    */
@@ -309,18 +351,20 @@ export class DynamicAtlas {
       this.#draw(rect, source);
     } finally {
       // the cell was cleared at the least, so the canvas changed whether the draw went through or not
-      this.#texture.needsUpdate = true;
+      this.#changed(rect);
     }
     return frame;
   }
 
   /**
-   * Clears the cell of the frame `name` and lets go of the name: {@link atlas} finds it no longer, and
-   * `add()` may take it again — for a new cell. The cell is not reused, shelves fragment; the frame keeps
-   * its id, and `atlas.get(id)` still answers it, but it leaves the random draws of the atlas —
-   * `randomFrame()` and its siblings — and a table of every frame — `frameTable(atlas)`,
-   * `atlasFrameTable(atlas)` —, and the message of a full atlas counts only the frames it holds. Answers
-   * `false` for a name the atlas does not hold, and once the atlas is disposed.
+   * Clears the cell of the frame `name`, lets go of the name — {@link atlas} finds it no longer, and
+   * `add()` may take it again — and gives the cell back: the next frame that fits is packed into it, a
+   * narrower one into its left part. The frame keeps its id, and `atlas.get(id)` still answers it — its
+   * coords show the cell, cleared until another frame is packed into it and that frame afterwards —, but
+   * it leaves the random draws of the atlas — `randomFrame()` and its siblings — and a table of every
+   * frame — `frameTable(atlas)`, `atlasFrameTable(atlas)` —, and the message of a full atlas counts only
+   * the frames it holds. Answers `false` for a name the atlas does not hold, and once the atlas is
+   * disposed.
    */
   remove(name: TextureAtlasFrameName): boolean {
     if (this.#disposed) return false;
@@ -329,8 +373,9 @@ export class DynamicAtlas {
     if (frame === undefined || rect === undefined) return false;
     this.#clearCell(rect);
     this.#cells.delete(frame);
+    this.#release(rect);
     this.#atlas[forgetFrameName](name);
-    this.#texture.needsUpdate = true;
+    this.#changed(rect);
     return true;
   }
 
@@ -346,13 +391,89 @@ export class DynamicAtlas {
     this.#atlas = new TextureAtlas();
     this.#cells = new Map();
     this.#texture.needsUpdate = true;
+    this.#dirty.length = 0;
   }
 
   /**
-   * Disposes the texture and shrinks a canvas the atlas built itself to 0 × 0; a canvas handed in is left
-   * alone. Afterwards `texture`, `canvas` and `context` throw, and so do `add()` and `redraw()`;
-   * `remove()` answers `false` and `clear()` does nothing; `atlas` and the sizes answer what they held.
-   * A second call does nothing.
+   * Copies the cells changed since the last call into the texture as `renderer` holds it, each from a
+   * staging texture through `renderer.copyTextureToTexture()`; call it once per frame, before the
+   * render. The first call copies nothing — every change before it has marked the whole texture — and
+   * from then on `add()`, `redraw()` and `remove()` leave the texture to the next call, so a change
+   * shows only after it. Where the copies would cover half the atlas or more, it marks the whole
+   * texture instead; `clear()` marks it either way. A copy that throws marks the whole texture, so no
+   * change is lost, and the error goes on to the caller.
+   *
+   * The renderer is the one that draws the texture, initialised: another renderer gets the canvas
+   * as it is with its first render and none of the copies after. Without this call every change
+   * uploads the whole canvas with the next render — 16 MiB at 2048 × 2048. Does nothing once the atlas
+   * is disposed.
+   */
+  upload(renderer: WebGPURenderer): void {
+    if (this.#disposed) return;
+    if (!this.#regionUploads) {
+      this.#regionUploads = true;
+      return;
+    }
+    const dirty = this.#dirty;
+    if (dirty.length === 0) return;
+
+    const e = this.extrude;
+    let needW = 0;
+    let needH = 0;
+    for (const rect of dirty) {
+      needW = Math.max(needW, rect.w + 2 * e);
+      needH = Math.max(needH, rect.h + 2 * e);
+    }
+    const stageW = Math.max(needW, this.#staging?.canvas.width ?? 0);
+    const stageH = Math.max(needH, this.#staging?.canvas.height ?? 0);
+    if (dirty.length * stageW * stageH >= WHOLE_UPLOAD_SHARE * this.width * this.height) {
+      this.#texture.needsUpdate = true;
+      dirty.length = 0;
+      return;
+    }
+
+    const staging = this.#ensureStaging(stageW, stageH);
+    const {context} = staging;
+    try {
+      // one staging canvas serves every cell: each backend runs the upload of the staging texture, the copy
+      // out of it and the next upload in the order they are called — WebGPU submits each copy at once into
+      // its queue, WebGL 2 issues them in one command stream
+      for (const rect of dirty) {
+        const cx = rect.x - e;
+        const cy = rect.y - e;
+        const cw = rect.w + 2 * e;
+        const ch = rect.h + 2 * e;
+        context.save();
+        try {
+          context.setTransform(1, 0, 0, 1, 0, 0);
+          context.globalAlpha = 1;
+          // the cell replaces what the canvas held, its clear texels as well
+          context.globalCompositeOperation = 'copy';
+          context.imageSmoothingEnabled = false;
+          context.drawImage(this.#canvas, cx, cy, cw, ch, 0, 0, cw, ch);
+        } finally {
+          context.restore();
+        }
+        staging.texture.needsUpdate = true;
+        this.#srcRegion.min.set(0, 0);
+        this.#srcRegion.max.set(cw, ch);
+        this.#dstPosition.set(cx, cy);
+        renderer.copyTextureToTexture(staging.texture, this.#texture, this.#srcRegion, this.#dstPosition);
+      }
+    } catch (error) {
+      this.#texture.needsUpdate = true;
+      throw error;
+    } finally {
+      dirty.length = 0;
+    }
+  }
+
+  /**
+   * Disposes the texture and the staging texture of {@link upload}, and shrinks a canvas the atlas built
+   * itself and the staging canvas to 0 × 0; a canvas handed in is left alone. Afterwards `texture`,
+   * `canvas` and `context` throw, and so do `add()` and `redraw()`; `remove()` answers `false`, and
+   * `clear()` and `upload()` do nothing; `atlas` and the sizes answer what they held. A second call does
+   * nothing.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -362,6 +483,8 @@ export class DynamicAtlas {
       this.#canvas.width = 0;
       this.#canvas.height = 0;
     }
+    this.#dropStaging();
+    this.#dirty.length = 0;
   }
 
   #assertAlive(member: string): void {
@@ -398,9 +521,10 @@ export class DynamicAtlas {
     return {width: check(given.width, 'width'), height: check(given.height, 'height')};
   }
 
-  // Takes a cell for a frame of `width` × `height` off the shelves and answers its top left corner and
-  // the way to give it back. Throws, changing nothing, for a frame that does not fit
-  #pack(name: TextureAtlasFrameName, width: number, height: number): {x: number; y: number; undo: () => void} {
+  // Takes a cell for a frame of `width` × `height` — the leftmost freed cell it fits into on the lowest
+  // shelf that has room, else the tail of that shelf, else a new shelf — and answers its top left corner,
+  // its shelf and the way to give it back. Throws, changing nothing, for a frame that does not fit
+  #pack(name: TextureAtlasFrameName, width: number, height: number): {x: number; y: number; shelf: Shelf; undo: () => void} {
     const {padding, extrude} = this;
     const cellWidth = width + 2 * extrude;
     const cellHeight = height + 2 * extrude;
@@ -411,19 +535,37 @@ export class DynamicAtlas {
       );
     }
 
-    // the lowest shelf the cell fits onto, the first of equal ones
+    const room = cellWidth + padding;
+    // the lowest shelf the cell fits onto — into a freed cell or onto its tail —, the first of equal ones
     let best: Shelf | undefined;
     for (const shelf of this.#shelves) {
-      if (shelf.height < cellHeight || shelf.x + cellWidth + padding > this.width) continue;
-      if (best === undefined || shelf.height < best.height) best = shelf;
+      if (shelf.height < cellHeight || (best !== undefined && shelf.height >= best.height)) continue;
+      if (shelf.x + room <= this.width || shelf.free.some((span) => span.end - span.start >= room)) best = shelf;
     }
     if (best !== undefined) {
       const shelf = best;
+      const index = shelf.free.findIndex((span) => span.end - span.start >= room);
+      if (index >= 0) {
+        const span = shelf.free[index]!;
+        const x = span.start;
+        span.start += room;
+        if (span.start === span.end) shelf.free.splice(index, 1);
+        return {
+          x,
+          y: shelf.y,
+          shelf,
+          undo: () => {
+            span.start = x;
+            if (!shelf.free.includes(span)) shelf.free.splice(index, 0, span);
+          },
+        };
+      }
       const x = shelf.x;
-      shelf.x += cellWidth + padding;
+      shelf.x += room;
       return {
         x,
         y: shelf.y,
+        shelf,
         undo: () => {
           shelf.x = x;
         },
@@ -438,15 +580,54 @@ export class DynamicAtlas {
         `${WHERE}: the atlas of ${this.width} × ${this.height} is full — the frame "${nameOf(name)}" of ${width} × ${height} does not fit beside ${count === 1 ? 'the 1 frame' : `the ${count} frames`} packed into it; build a larger one — new DynamicAtlas({width: ${2 * this.width}, height: ${2 * this.height}}) — or clear() it`,
       );
     }
-    const shelf: Shelf = {y, height: cellHeight, x: padding + cellWidth + padding};
+    const shelf: Shelf = {y, height: cellHeight, x: padding + room, free: []};
     this.#shelves.push(shelf);
     return {
       x: padding,
       y,
+      shelf,
       undo: () => {
         this.#shelves.pop();
       },
     };
+  }
+
+  // Gives the cell of `rect` back to its shelf: a free span, merged with the free spans it touches, fallen
+  // back to the tail where it reaches it; an empty last shelf leaves the shelves, so that a taller frame
+  // may open one in its place
+  #release(rect: FrameRect): void {
+    const {shelf} = rect;
+    const e = this.extrude;
+    const start = rect.x - e;
+    const end = start + rect.w + 2 * e + this.padding;
+    const free = shelf.free;
+
+    let index = 0;
+    while (index < free.length && free[index]!.start < start) index++;
+    let span: FreeSpan = {start, end};
+    const left = free[index - 1];
+    if (left !== undefined && left.end === start) {
+      left.end = end;
+      span = left;
+      index--;
+    } else {
+      free.splice(index, 0, span);
+    }
+    const right = free[index + 1];
+    if (right !== undefined && span.end === right.start) {
+      span.end = right.end;
+      free.splice(index + 1, 1);
+    }
+    if (span.end === shelf.x) {
+      shelf.x = span.start;
+      free.splice(index, 1);
+    }
+
+    const shelves = this.#shelves;
+    for (let last = shelves.at(-1); last !== undefined && last.x === this.padding && last.free.length === 0; ) {
+      shelves.pop();
+      last = shelves.at(-1);
+    }
   }
 
   // Refuses an image that cannot be drawn now, before anything is packed or cleared: an image element
@@ -454,7 +635,8 @@ export class DynamicAtlas {
   // last of it has arrived, and drawImage() draws nothing of it — and an ImageBitmap or a canvas of no
   // size, a closed ImageBitmap among them, which drawImage() refuses. An image element that has
   // finished passes whatever its natural size: an SVG without width and height has none and is drawn
-  // at the size it is given, and one that failed to load makes drawImage() throw
+  // at the size it is given, and one that failed to load is refused by #naturalSize() without a size
+  // and makes drawImage() throw with one
   #assertDrawable(name: TextureAtlasFrameName, image: DynamicAtlasImage, call: string): void {
     if ('naturalWidth' in image) {
       if ('complete' in image && image.complete === false) {
@@ -494,6 +676,49 @@ export class DynamicAtlas {
     } finally {
       context.restore();
     }
+  }
+
+  // the texture without upload() so far, the next upload() afterwards
+  #changed(rect: FrameRect): void {
+    if (!this.#regionUploads) {
+      this.#texture.needsUpdate = true;
+    } else if (!this.#dirty.includes(rect)) {
+      this.#dirty.push(rect);
+    }
+  }
+
+  // The staging canvas and texture, built anew where the ones there are smaller than `width` × `height`.
+  // They carry the settings of the atlas texture, so both get the same GPU format and the copy stays texel
+  // for texel
+  #ensureStaging(width: number, height: number): Staging {
+    const staging = this.#staging;
+    if (staging !== undefined && staging.canvas.width >= width && staging.canvas.height >= height) return staging;
+    this.#dropStaging();
+    const canvas = buildCanvas(width, height);
+    // the union of both canvas types has no getContext() that TypeScript can call with '2d'
+    const context = expectDefined(
+      (canvas as HTMLCanvasElement).getContext('2d') as DynamicAtlasContext | null,
+      'the 2D context of a canvas of its own',
+    );
+    const texture = new CanvasTexture(canvas);
+    texture.name = 'twopoint5d.DynamicAtlas.staging';
+    texture.flipY = false;
+    texture.colorSpace = SRGBColorSpace;
+    texture.premultiplyAlpha = false;
+    texture.generateMipmaps = false;
+    texture.magFilter = NearestFilter;
+    texture.minFilter = NearestFilter;
+    this.#staging = {canvas, context, texture};
+    return this.#staging;
+  }
+
+  #dropStaging(): void {
+    const staging = this.#staging;
+    if (staging === undefined) return;
+    staging.texture.dispose();
+    staging.canvas.width = 0;
+    staging.canvas.height = 0;
+    this.#staging = undefined;
   }
 
   #clearCell({x, y, w, h}: FrameRect): void {

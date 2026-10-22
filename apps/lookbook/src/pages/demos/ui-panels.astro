@@ -123,7 +123,7 @@ import {description, title} from './_ui-panels.json';
 
     if (stage.width > 0) screen.resize(stage.width, stage.height, topInset());
     on(stage, OnStageResize, ({width, height}) => screen.resize(width, height, topInset()));
-    on(stage, OnStageUpdateFrame, ({deltaTime}) => screen.update(deltaTime));
+    on(stage, OnStageUpdateFrame, ({deltaTime}) => screen.update(deltaTime, renderer));
 
     // the NEXT button of the dialog box and the slots of the inventory answer the pointer
     const at = (event: PointerEvent) => {

@@ -127,6 +127,8 @@ export class DynamicAtlas {
   redraw(name: TextureAtlasFrameName, source: DynamicAtlasSource): TextureAtlasFrame;
   remove(name: TextureAtlasFrameName): boolean;
   clear(): void;
+  /** Copies the changed cells into the texture of the renderer — once called, before each render. */
+  upload(renderer: WebGPURenderer): void;
   dispose(): void;
 }
 ```
@@ -156,12 +158,31 @@ one that already has a WebGL context — is refused naming that.
 | `flipY` | `false` | the convention of every atlas of the library: `TextureCoords` count v downwards, and `sampleAtlasFrame()` reads the wrong place with `true`. `CanvasTexture` defaults to `true`. |
 | `colorSpace` | `SRGBColorSpace` | a 2D canvas holds sRGB colours; the class `srgb` the lookbook loads its images with |
 | `premultiplyAlpha` | `false` | straight alpha, as every loaded image: the canvas keeps its texels premultiplied, and both upload paths hand them on unpremultiplied with this flag (WebGL's `UNPACK_PREMULTIPLY_ALPHA_WEBGL`, WebGPU's `premultipliedAlpha`) — a half transparent red blends to half red, not a quarter |
-| `generateMipmaps` | `false` | every `add()` uploads the whole canvas; building the mip chain each time costs, and the small levels of a packed atlas mix neighbouring frames anyway |
+| `generateMipmaps` | `false` | a change uploads the whole canvas or copies cells into it; building the mip chain each time costs, and the small levels of a packed atlas mix neighbouring frames anyway |
 | `minFilter`, `magFilter` | `LinearFilter`, or `NearestFilter` with `filter: 'nearest'` | no mipmap filter without mipmaps; `'nearest'` for pixel art |
 
-Every `add()`, `redraw()`, `remove()` and `clear()` sets `texture.needsUpdate = true`: the renderer
-uploads the canvas once with the next render that uses the texture, however many calls came in
-between. The upload is the whole canvas; an atlas that changes every frame uploads every frame.
+Without `upload()`, every `add()`, `redraw()`, `remove()` and `clear()` sets
+`texture.needsUpdate = true`: the renderer uploads the canvas once with the next render that uses
+the texture, however many calls came in between. The upload is the whole canvas — 16 MiB at
+2048 × 2048 —, and an atlas that changes every frame uploads every frame.
+
+`upload(renderer)`, called once per frame before the render, copies the changed cells alone. Its
+first call copies nothing and switches the atlas over: from then on `add()`, `redraw()` and
+`remove()` leave the texture unmarked and note their cell, each once, and the next `upload()` copies
+every noted cell, its extruded edges included, into a staging canvas, marks the staging texture and
+hands both to `renderer.copyTextureToTexture()`, which uploads the staging texture and copies the
+cell to its place. The staging canvas and its `CanvasTexture` carry the settings of the table above
+— the same GPU format, so the copy is texel for texel —; the canvas grows to the largest cell that
+changed and keeps its size. Where the copies would cover half the atlas or more (cells × staging
+area ≥ half of `width × height`), `upload()` marks the whole texture instead: one transfer is
+cheaper than a submit per cell. `clear()` marks the whole texture either way, and a copy that throws
+marks it as well, so no change is lost, before the error goes on to the caller.
+
+`texture.updateRanges` is no way to it: three reads it only in the classic `WebGLRenderer` and
+only for data textures, and neither backend of `WebGPURenderer` uploads part of an image. Nor is
+`copyExternalImageToTexture()` with an origin straight onto the GPU texture: that needs
+`renderer.backend`, the internals of three, which the library leaves alone outside its specs.
+`renderer.copyTextureToTexture()` is public and runs on both backends.
 
 ### 3.4 Packing — the shelves
 
@@ -171,8 +192,15 @@ from every edge of the canvas. The frame's `coords` cover the frame alone, never
 
 The packer keeps **shelves**: rows of cells, each as high as the cell that opened it. A cell goes
 onto the lowest shelf (by height, the first of equal ones) that is at least as high and still has
-room to the right; without one it opens a new shelf below the last. Nothing is ever moved, so a
-frame keeps its coords until `clear()`.
+room — in a freed cell or to the right of its last cell; without one it opens a new shelf below the
+last. Nothing is ever moved, so a frame keeps its coords until `clear()`.
+
+A cell that `remove()` gives back becomes a free span of its shelf — the cell and the padding
+behind it. On the shelf it goes onto, a cell takes the leftmost free span it fits into, its left
+part where the span is wider, and the rest of the span stays free; without one it goes to the right
+of the last cell. Free spans that touch merge, a span that reaches the end of the cells of its shelf
+falls back to it, and a last shelf left empty leaves the shelves, so a taller frame may open one in
+its place.
 
 A frame that does not fit throws a `RangeError` and changes nothing:
 
@@ -207,8 +235,9 @@ frame is untrimmed (no `spriteSourceSize`), so `setFrame()` covers the whole qua
   An image element that has loaded without a natural size, an SVG without `width` and `height`, is
   drawn at the `size` given; without one `add()` refuses it:
   `DynamicAtlas: the image of "avatar" has no natural size — an SVG without width and height needs the size: add(name, image, {width, height}); an image that failed to load cannot be drawn at all`.
-  An image that failed to load makes `drawImage()` throw an `InvalidStateError`: no frame is added
-  and no cell is taken.
+  An image that failed to load has no natural size either: without a `size` `add()` refuses it with
+  the message above, and with a `size` `drawImage()` throws an `InvalidStateError` — no frame is
+  added and no cell is taken in either case.
 - A name that is taken is refused before anything is packed:
   `DynamicAtlas: the frame name "hp" is already taken — redraw() draws it anew, remove() lets go of it`.
 - A draw callback that throws leaves the atlas as it was: its cell is cleared again and given back,
@@ -239,13 +268,14 @@ a frame then reads its own edge, not the padding.
   identity, `globalAlpha` 1 and `source-over`: the caller may leave any state on `context` (it is handed
   out for `measureText()`), and gets it back, its `font` included.
 - `remove(name)` clears the cell and lets go of the name: `atlas.frame(name)` and
-  `atlas.frameId(name)` answer `undefined`, and `add(name, …)` may take it again — for a new cell.
-  The cell is **not** reused: a shelf packer fragments, and a freed hole would have to fit the next
-  frame exactly. The frame keeps its id, `atlas.get(id)` still answers it (showing a cleared
-  rectangle) and `atlas.size` stays, but it leaves the random draws of the atlas (`randomFrame()`
-  and its siblings) and a table of every frame (`frameTable(atlas)`, `atlasFrameTable(atlas)`), and
-  the message of a full atlas counts only the frames it holds. Answers `true`, or `false` for a name
-  it does not hold.
+  `atlas.frameId(name)` answer `undefined`, and `add(name, …)` may take it again. The cell goes
+  back to its shelf (§3.4): the next frame that fits is packed into it. The frame keeps its id,
+  `atlas.get(id)` still answers it and `atlas.size` stays; its coords show the cell — a cleared
+  rectangle until another frame is packed into it, and that frame's picture afterwards. The library
+  does not stop it: the frame is plain data, and a cell held for it would give no room back. It
+  leaves the random draws of the atlas (`randomFrame()` and its siblings) and a table of every frame
+  (`frameTable(atlas)`, `atlasFrameTable(atlas)`), and the message of a full atlas counts only the
+  frames it holds. Answers `true`, or `false` for a name it does not hold.
 - `clear()` clears the canvas and the shelves and starts a **new** `TextureAtlas`: `atlas` answers
   the new one, frame ids start at 0 again. Frames, tables and prepared frames of before are stale.
   The `texture` and the `canvas` stay the same objects.
@@ -258,17 +288,19 @@ draws and a selection of every frame read.
 
 ### 3.7 Ownership and `dispose()`
 
-The atlas builds the texture and — without a `canvas` handed in — the canvas: both are its own. A
-canvas handed in stays the caller's: it is drawn on (that is what it was handed in for) but neither
-resized nor released. The frames and the `TextureAtlas` are plain data.
+The atlas builds the texture, the canvas — without a `canvas` handed in — and, with the first copy
+of `upload()`, the staging canvas and its texture: all of them are its own. A canvas handed in stays
+the caller's: it is drawn on (that is what it was handed in for) but neither resized nor released.
+The frames and the `TextureAtlas` are plain data.
 
-`dispose()` disposes the texture, shrinks a canvas of its own to 0 × 0 so its backing store goes at
-once, and is idempotent (a flag). Afterwards, by the rules of `docs/resource-lifecycle.md` §3:
+`dispose()` disposes the texture and the staging texture, shrinks a canvas of its own and the
+staging canvas to 0 × 0 so their backing stores go at once, and is idempotent (a flag). Afterwards,
+by the rules of `docs/resource-lifecycle.md` §3:
 
 - `texture`, `canvas` and `context` claim a value and throw
   (`DynamicAtlas#texture is not available: this atlas has been disposed`);
 - `add()` and `redraw()` answer a frame and throw the same way;
-- `remove()` answers `false` and `clear()` does nothing;
+- `remove()` answers `false`, and `clear()` and `upload()` do nothing;
 - `atlas`, `width`, `height`, `padding`, `extrude` answer what they held — plain data, nothing was
   released; `isDisposed` answers `true`.
 
@@ -562,7 +594,8 @@ Disposed sprites — `geometry` gone — write nothing: `writeText()` answers an
 
 ## 6. Ownership and lifecycle
 
-`DynamicAtlas` owns its texture and its own canvas (§3.7). `BitmapFont` and its atlas are plain
+`DynamicAtlas` owns its texture, its own canvas and the staging canvas and texture of `upload()`
+(§3.7). `BitmapFont` and its atlas are plain
 data with no `dispose()`. `layoutText()` and `writeText()` keep nothing; the sprites `writeText()`
 creates are handed straight to the caller (`resource-lifecycle.md` §1, "passes what it took straight
 out to its caller"), who frees them.
@@ -583,8 +616,10 @@ written inline in the specs.
   a lower frame going onto the lowest fitting shelf, padding at the edges; both full errors and that
   a refused frame changes nothing; the draw callback's clip, translation and size; images by natural
   size and scaled; `Math.ceil`; extrusion's four self-copies; a throwing callback rolls back;
-  `redraw()` keeps frame and coords; `remove()` frees the name not the space; `clear()` new atlas;
-  the texture settings of §3.3 and `needsUpdate` per call; `dispose()` (a)–(d) of the lifecycle
+  `redraw()` keeps frame and coords; `remove()` frees the name and the cell, freed cells taken,
+  merged, given back to the tail, an empty last shelf dropped; `clear()` new atlas; the texture
+  settings of §3.3, `needsUpdate` per call without `upload()`, the copies of `upload()` and its
+  whole upload; `dispose()` (a)–(d) of the lifecycle
   pattern, a canvas handed in left alone; the atlas works with `AtlasFrameTable` and
   `prepareSpriteFrame()`; Node without a canvas throws the message of §3.2.
 - `TextureAtlas.spec.ts`: the internal `forgetFrameName`.
@@ -600,7 +635,8 @@ written inline in the specs.
   `ImageBitmap` and a canvas drawn upright where their pixels are; a frame added after the first
   render shows in the second; `redraw()` shows the new picture with no write to the sprite; a half
   transparent red over black blends to half red (straight alpha); extrusion and padding read back
-  from the canvas.
+  from the canvas; after `upload()` a redraw, a remove and an add into the freed cell reach the next
+  render through copies of their cells, the texture unmarked.
 - Browser, `text-bitmap-font.test.js`: `pixel-8` drawn by `writeText()` — two lines, `align` left
   and right — every texel of every glyph's box compared with the page image at the place §5.2
   computes; a glyph with a `yoffset` lands lower by it.

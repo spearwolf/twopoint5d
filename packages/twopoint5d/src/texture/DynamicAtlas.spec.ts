@@ -1,6 +1,6 @@
 import {createSandbox} from 'sinon';
-import {LinearFilter, NearestFilter, SRGBColorSpace} from 'three/webgpu';
-import {afterEach, describe, expect, test, vi} from 'vitest';
+import {Box2, CanvasTexture, LinearFilter, NearestFilter, SRGBColorSpace, Vector2, type WebGPURenderer} from 'three/webgpu';
+import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
 import {prepareSpriteFrame} from '../sprites/features/AtlasFrame.js';
 import {asCanvas, FakeCanvas} from '../testing/fakeCanvas.js';
 import {AtlasFrameTable} from './AtlasFrameTable.js';
@@ -32,6 +32,12 @@ const ZERO_BY_ZERO =
   'DynamicAtlas: the image of "avatar" is 0 × 0 — a closed ImageBitmap or a canvas of no size has nothing to draw';
 
 const rectOf = (atlas: DynamicAtlas, name: string) => atlas.atlas.frame(name)?.data?.frame;
+
+// a renderer that records the copies upload() hands it
+const fakeRenderer = () => {
+  const copyTextureToTexture = vi.fn();
+  return {renderer: {copyTextureToTexture} as unknown as WebGPURenderer, copyTextureToTexture};
+};
 
 describe('DynamicAtlas', () => {
   const sandbox = createSandbox();
@@ -235,6 +241,88 @@ describe('DynamicAtlas', () => {
       expect(atlas.atlas.size).toBe(1);
       expect(atlas.atlas.frame('more')).toBeUndefined();
       expect(context.calls.length).toBe(calls);
+    });
+    test('a removed cell is taken by the next frame that fits into it', () => {
+      const {atlas} = atlasOn(64, 32);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.add('b', noop, {width: 10, height: 8});
+      atlas.remove('a');
+      atlas.add('c', noop, {width: 10, height: 8});
+      expect(rectOf(atlas, 'c')).toEqual({x: 1, y: 1, w: 10, h: 8});
+    });
+
+    test('a narrower frame takes the left part of a freed cell, and the rest stays free for another', () => {
+      const {atlas} = atlasOn(64, 32);
+      atlas.add('a', noop, {width: 20, height: 8});
+      atlas.add('b', noop, {width: 10, height: 8});
+      atlas.remove('a');
+      atlas.add('c', noop, {width: 8, height: 8});
+      atlas.add('d', noop, {width: 8, height: 8});
+      expect(rectOf(atlas, 'c')).toEqual({x: 1, y: 1, w: 8, h: 8});
+      expect(rectOf(atlas, 'd')).toEqual({x: 10, y: 1, w: 8, h: 8});
+    });
+
+    test('freed neighbours merge, and a frame as wide as both together takes their place', () => {
+      const {atlas} = atlasOn(64, 32);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.add('b', noop, {width: 10, height: 8});
+      atlas.add('c', noop, {width: 10, height: 8});
+      atlas.remove('a');
+      atlas.remove('b');
+      atlas.add('wide', noop, {width: 21, height: 8});
+      expect(rectOf(atlas, 'wide')).toEqual({x: 1, y: 1, w: 21, h: 8});
+    });
+
+    test('a cell freed at the end of a shelf gives its room back to the shelf', () => {
+      const {atlas} = atlasOn(32, 32);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.add('b', noop, {width: 10, height: 8});
+      atlas.remove('b');
+      // 19 + padding fits behind `a` only once the shelf ends at 12 again
+      atlas.add('c', noop, {width: 19, height: 8});
+      expect(rectOf(atlas, 'c')).toEqual({x: 12, y: 1, w: 19, h: 8});
+    });
+
+    test('a last shelf left empty leaves the shelves, and a taller frame opens one in its place', () => {
+      const {atlas} = atlasOn(32, 32);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.add('tall', noop, {width: 10, height: 12});
+      expect(rectOf(atlas, 'tall')).toEqual({x: 1, y: 10, w: 10, h: 12});
+      atlas.remove('tall');
+      // below an empty shelf of 12 there would be no room for it
+      atlas.add('taller', noop, {width: 10, height: 20});
+      expect(rectOf(atlas, 'taller')).toEqual({x: 1, y: 10, w: 10, h: 20});
+    });
+
+    test('frames whose width changes through remove() and add() do not fill the atlas', () => {
+      const {atlas} = atlasOn(64, 32);
+      const names = ['hp', 'mp', 'gold', 'time'];
+      for (const name of names) atlas.add(name, noop, {width: 8, height: 6});
+      for (let round = 0; round < 1000; round++) {
+        for (const name of names) {
+          atlas.remove(name);
+          atlas.add(name, noop, {width: 8 + (round % 7), height: 6});
+        }
+      }
+      expect(atlas.atlas.frameNames().length).toBe(4);
+    });
+
+    test('a callback that throws gives a freed cell back as it was', () => {
+      const {atlas} = atlasOn(64, 32);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.add('b', noop, {width: 10, height: 8});
+      atlas.remove('a');
+      expect(() =>
+        atlas.add(
+          'x',
+          () => {
+            throw new Error('nope');
+          },
+          {width: 10, height: 8},
+        ),
+      ).toThrow('nope');
+      atlas.add('y', noop, {width: 10, height: 8});
+      expect(rectOf(atlas, 'y')).toEqual({x: 1, y: 1, w: 10, h: 8});
     });
   });
 
@@ -608,7 +696,7 @@ describe('DynamicAtlas', () => {
   });
 
   describe('remove()', () => {
-    test('clears the cell and lets go of the name, but not of the space', () => {
+    test('clears the cell, lets go of the name and gives the cell to the next frame that fits', () => {
       const {atlas, context} = atlasOn(64, 32, {extrude: 1});
       const frame = atlas.add('a', noop, {width: 10, height: 8});
       context.calls.length = 0;
@@ -620,8 +708,8 @@ describe('DynamicAtlas', () => {
       expect(atlas.atlas.frameId('a')).toBeUndefined();
       expect(atlas.atlas.get(0)).toBe(frame);
       expect(atlas.atlas.size).toBe(1);
-      // the name is free, the cell is not
-      expect(atlas.add('a', noop, {width: 10, height: 8}).data?.frame).toEqual({x: 15, y: 2, w: 10, h: 8});
+      // the name is free, and so is the cell: the shelf it emptied is gone, and a new one opens in its place
+      expect(atlas.add('a', noop, {width: 10, height: 8}).data?.frame).toEqual({x: 2, y: 2, w: 10, h: 8});
     });
 
     test('answers false for a name it does not hold', () => {
@@ -647,9 +735,21 @@ describe('DynamicAtlas', () => {
       atlas.add('b', noop, {width: 6, height: 14});
       atlas.remove('a');
 
-      expect(() => atlas.add('more', noop, {width: 1, height: 1})).toThrow(
-        'DynamicAtlas: the atlas of 16 × 16 is full — the frame "more" of 1 × 1 does not fit beside the 1 frame packed into it; build a larger one — new DynamicAtlas({width: 32, height: 32}) — or clear() it',
+      // wider than the cell `a` gave back
+      expect(() => atlas.add('more', noop, {width: 7, height: 14})).toThrow(
+        'DynamicAtlas: the atlas of 16 × 16 is full — the frame "more" of 7 × 14 does not fit beside the 1 frame packed into it; build a larger one — new DynamicAtlas({width: 32, height: 32}) — or clear() it',
       );
+    });
+
+    test('a frame let go of shows what is packed into its cell later', () => {
+      const {atlas} = atlasOn(64, 32);
+      const old = atlas.add('a', noop, {width: 10, height: 8});
+      const id = atlas.atlas.frameId('a')!;
+      atlas.remove('a');
+      const next = atlas.add('b', noop, {width: 10, height: 8});
+      expect(atlas.atlas.get(id)).toBe(old);
+      expect(old.data?.frame).toEqual(next.data?.frame);
+      expect(old.coords.getTexCoords()).toEqual(next.coords.getTexCoords());
     });
   });
 
@@ -669,6 +769,155 @@ describe('DynamicAtlas', () => {
       const frame = atlas.add('a', noop, {width: 10, height: 12});
       expect(atlas.atlas.frameId('a')).toBe(0);
       expect(frame.data?.frame).toEqual({x: 1, y: 1, w: 10, h: 12});
+    });
+  });
+
+  describe('upload()', () => {
+    beforeEach(() => {
+      // the staging canvas
+      vi.stubGlobal('OffscreenCanvas', FakeCanvas);
+    });
+
+    test('the texture is marked from its construction on, so the first render uploads the canvas at its size', () => {
+      const {atlas} = atlasOn(16, 16);
+      expect(atlas.texture.version).toBeGreaterThan(0);
+    });
+
+    test('the first call copies nothing, and from then on add(), redraw() and remove() leave the texture unmarked', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+      expect(copyTextureToTexture).not.toHaveBeenCalled();
+      const version = atlas.texture.version;
+      atlas.redraw('a', noop);
+      atlas.add('b', noop, {width: 10, height: 8});
+      atlas.remove('a');
+      expect(atlas.texture.version).toBe(version);
+    });
+
+    test('copies each changed cell, its extruded edges included, from a staging texture to its place', () => {
+      const {atlas, canvas} = atlasOn(64, 32, {extrude: 1});
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.upload(renderer);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+
+      expect(copyTextureToTexture).toHaveBeenCalledOnce();
+      const [staging, texture, region, position] = copyTextureToTexture.mock.calls[0]!;
+      expect(texture).toBe(atlas.texture);
+      expect(region).toEqual(new Box2(new Vector2(0, 0), new Vector2(12, 10)));
+      expect(position).toEqual(new Vector2(1, 1));
+      expect(staging).toBeInstanceOf(CanvasTexture);
+      expect(staging).toMatchObject({
+        flipY: false,
+        colorSpace: SRGBColorSpace,
+        premultiplyAlpha: false,
+        generateMipmaps: false,
+        name: 'twopoint5d.DynamicAtlas.staging',
+      });
+      const stagingContext = (staging.image as FakeCanvas).context;
+      expect(stagingContext.callsOf('drawImage')).toMatchObject([
+        {
+          args: [canvas, 1, 1, 12, 10, 0, 0, 12, 10],
+          globalCompositeOperation: 'copy',
+          imageSmoothingEnabled: false,
+          translation: [0, 0],
+          globalAlpha: 1,
+        },
+      ]);
+    });
+
+    test('copies a cell changed twice once, and nothing at the next call without a change', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+      atlas.redraw('a', noop);
+      atlas.redraw('a', noop);
+      atlas.upload(renderer);
+      expect(copyTextureToTexture).toHaveBeenCalledOnce();
+      atlas.upload(renderer);
+      expect(copyTextureToTexture).toHaveBeenCalledOnce();
+    });
+
+    test('copies the cell a remove() cleared', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.add('b', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+      atlas.remove('a');
+      atlas.upload(renderer);
+      expect(copyTextureToTexture).toHaveBeenCalledOnce();
+      const [, , region, position] = copyTextureToTexture.mock.calls[0]!;
+      expect(region).toEqual(new Box2(new Vector2(0, 0), new Vector2(10, 8)));
+      expect(position).toEqual(new Vector2(1, 1));
+    });
+
+    test('marks the whole texture instead where the copies would cover half the atlas or more, and copies nothing', () => {
+      const {atlas} = atlasOn(16, 16);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.upload(renderer);
+      // four cells of 6 × 6: 144 texels to copy, at least half of 256
+      for (const name of ['a', 'b', 'c', 'd']) atlas.add(name, noop, {width: 6, height: 6});
+      const version = atlas.texture.version;
+      atlas.upload(renderer);
+      expect(atlas.texture.version).toBeGreaterThan(version);
+      expect(copyTextureToTexture).not.toHaveBeenCalled();
+    });
+
+    test('marks the whole texture at clear(), and drops the cells changed before', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+      const version = atlas.texture.version;
+      atlas.redraw('a', noop);
+      atlas.clear();
+      expect(atlas.texture.version).toBeGreaterThan(version);
+      atlas.upload(renderer);
+      expect(copyTextureToTexture).not.toHaveBeenCalled();
+    });
+
+    test('grows the staging canvas to the largest changed cell and builds its texture anew', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.upload(renderer);
+      atlas.add('small', noop, {width: 4, height: 4});
+      atlas.upload(renderer);
+      const first = copyTextureToTexture.mock.calls[0]![0] as CanvasTexture<FakeCanvas>;
+      const firstCanvas = first.image;
+      const disposeFirst = sandbox.spy(first, 'dispose');
+
+      atlas.add('large', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+
+      expect(disposeFirst.calledOnce).toBe(true);
+      expect([firstCanvas.width, firstCanvas.height]).toEqual([0, 0]);
+      expect(copyTextureToTexture).toHaveBeenCalledTimes(2);
+      const second = copyTextureToTexture.mock.calls[1]![0] as CanvasTexture<FakeCanvas>;
+      expect(second).not.toBe(first);
+      expect(second.image.width).toBeGreaterThanOrEqual(10);
+      expect(second.image.height).toBeGreaterThanOrEqual(8);
+    });
+
+    test('an upload that throws marks the whole texture, so no change is lost, and the error goes on', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      const failure = new Error('device lost');
+      copyTextureToTexture.mockImplementation(() => {
+        throw failure;
+      });
+      atlas.upload(renderer);
+      atlas.add('a', noop, {width: 10, height: 8});
+      const version = atlas.texture.version;
+
+      expect(() => atlas.upload(renderer)).toThrow(failure);
+
+      expect(atlas.texture.version).toBeGreaterThan(version);
+      atlas.upload(renderer);
+      expect(copyTextureToTexture).toHaveBeenCalledOnce();
     });
   });
 
@@ -713,8 +962,27 @@ describe('DynamicAtlas', () => {
       expect(canvas.height).toBe(0);
     });
 
+    test('releases the staging texture and shrinks the staging canvas, and upload() does nothing afterwards', () => {
+      vi.stubGlobal('OffscreenCanvas', FakeCanvas);
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.upload(renderer);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+      const staging = copyTextureToTexture.mock.calls[0]![0] as CanvasTexture<FakeCanvas>;
+      const disposeStaging = sandbox.spy(staging, 'dispose');
+
+      atlas.dispose();
+
+      expect(disposeStaging.calledOnce).toBe(true);
+      expect([staging.image.width, staging.image.height]).toEqual([0, 0]);
+      expect(() => atlas.upload(renderer)).not.toThrow();
+      expect(copyTextureToTexture).toHaveBeenCalledOnce();
+    });
+
     test('behaves as documented after dispose()', () => {
       const {atlas} = atlasOn(64, 32);
+      const {renderer} = fakeRenderer();
       atlas.add('a', noop, {width: 4, height: 4});
       const frames = atlas.atlas;
       atlas.dispose();
@@ -729,6 +997,7 @@ describe('DynamicAtlas', () => {
       expect(() => atlas.redraw('a', noop)).toThrow('DynamicAtlas#redraw() is not available: this atlas has been disposed');
       expect(atlas.remove('a')).toBe(false);
       expect(() => atlas.clear()).not.toThrow();
+      expect(() => atlas.upload(renderer)).not.toThrow();
       expect(atlas.atlas).toBe(frames);
       expect(atlas.atlas.frame('a')).toBeDefined();
       expect([atlas.width, atlas.height, atlas.padding, atlas.extrude]).toEqual([64, 32, 1, 0]);
