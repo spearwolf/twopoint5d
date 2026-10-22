@@ -163,6 +163,20 @@ describe('OrthographicProjection', () => {
 
       expect(() => projection.updateCamera(new PerspectiveCamera())).toThrow(TypeError);
     });
+
+    it.each([
+      [new PerspectiveCamera(), 'PerspectiveCamera'],
+      [undefined, 'undefined'],
+      [{}, '{}'],
+      ['cam', '"cam"'],
+      [{type: 'OrthographicCamera'}, '{type: "OrthographicCamera"}'],
+    ])('names a refused camera %s as it is: got %s', (camera, written) => {
+      const projection = projectionFor({fit: 'contain', width: 640});
+
+      expect(() => projection.updateCamera(camera as never)).toThrow(
+        `OrthographicProjection: updateCamera() needs an OrthographicCamera, got ${written}`,
+      );
+    });
   });
 
   describe('without a projection plane', () => {

@@ -107,6 +107,18 @@ describe('TextureAtlas', () => {
       expect(atlas.size).toBe(1);
       expect(atlas.frame('foo')!.coords).toBe(texCoords0);
     });
+
+    test('a symbol name that is already taken is refused, written as a symbol', () => {
+      const atlas = new TextureAtlas();
+      const bar = Symbol('bar');
+
+      atlas.add(bar, new TextureCoords());
+
+      expect(() => atlas.add(bar, new TextureCoords())).toThrow('TextureAtlas: the frame name Symbol(bar) is already taken');
+      expect(() => atlas.add('foo', new TextureCoords()) && atlas.add('foo', new TextureCoords())).toThrow(
+        'TextureAtlas: the frame name "foo" is already taken',
+      );
+    });
   });
   describe('frameNames', () => {
     test('with regexp', () => {

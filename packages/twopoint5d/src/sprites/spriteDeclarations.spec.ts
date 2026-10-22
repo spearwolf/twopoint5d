@@ -51,7 +51,7 @@ describe('shared uniforms', () => {
       'test: features "animatedFrames" and "bob" both declare the uniform "time", and only "animatedFrames" shares it — declare it as {value: 0, shared: true} in "bob" as well, or rename one of them',
     );
     expect(() => collect(declaring('bob', [1, 2]), declaring('animatedFrames', {value: [1, 2], shared: true}))).toThrow(
-      'test: features "bob" and "animatedFrames" both declare the uniform "time", and only "animatedFrames" shares it — declare it as {value: [1,2], shared: true} in "bob" as well, or rename one of them',
+      'test: features "bob" and "animatedFrames" both declare the uniform "time", and only "animatedFrames" shares it — declare it as {value: [1, 2], shared: true} in "bob" as well, or rename one of them',
     );
   });
 
@@ -67,7 +67,7 @@ describe('shared uniforms', () => {
     );
     expect(() =>
       collect(declaring('a', {value: [0, 1, 0], shared: true}), declaring('b', {value: [0, 1, 1], shared: true})),
-    ).toThrow('starting at [0,1,0] and at [0,1,1]');
+    ).toThrow('starting at [0, 1, 0] and at [0, 1, 1]');
   });
 
   test.each([

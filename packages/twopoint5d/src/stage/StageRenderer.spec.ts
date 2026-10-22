@@ -512,6 +512,9 @@ describe('StageRenderer', () => {
       sr.add(fakeStage('a'));
       sr.add(fakeStage('a'));
       expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        'StageRenderer: 2 stages are named "a" and renderOrder="a,b" cannot tell them apart; they render in the order they were added. Set unique names on your stages.',
+      );
       warn.mockRestore();
     });
 

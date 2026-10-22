@@ -36,7 +36,7 @@ export function typedArrayOf(dataType: VertexAttributeDataType): TypedArrayClass
   }
   const typedArrayClass = TYPED_ARRAY_OF[dataType];
   if (typedArrayClass === undefined) {
-    throw new Error(`typedArrayOf: this runtime has no Float16Array for data type '${dataType}'`);
+    throw new Error(`typedArrayOf: this runtime has no Float16Array for data type ${describeValue(dataType)}`);
   }
   return typedArrayClass;
 }

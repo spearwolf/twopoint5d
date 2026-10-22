@@ -53,7 +53,7 @@ describe('FrameBasedAnimations', () => {
     test('a refusal of an animation with the empty string as its name calls it (no name)', () => {
       const animations = new FrameBasedAnimations();
 
-      expect(() => animations.add('', 1, [])).toThrow('`(no name)`');
+      expect(() => animations.add('', 1, [])).toThrow('the animation (no name)');
     });
 
     test('a second animation without a name gets the next name of the counter', () => {
@@ -84,7 +84,7 @@ describe('FrameBasedAnimations', () => {
       const frames = [new TextureCoords(0, 0, 32, 32)];
 
       expect(() => animations.add(undefined, {frameRate: 0}, frames)).toThrow(
-        /got a frameRate of 0 for the animation `\(no name\)`/,
+        /got a frameRate of 0 for the animation \(no name\)/,
       );
 
       const id = animations.add(undefined, 1.0, frames);
@@ -106,7 +106,7 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => animations.add('negative', -1, frames), 'a negative duration').toThrow(/-1/);
       expect(() => animations.add('not-a-number', {frameRate: NaN}, frames), 'a frameRate of NaN').toThrow(
-        /got a frameRate of NaN for the animation `not-a-number`/,
+        /got a frameRate of NaN for the animation "not-a-number"/,
       );
       expect(() => animations.add('endless', Infinity, frames), 'a duration of Infinity').toThrow(/Infinity/);
 
@@ -116,8 +116,8 @@ describe('FrameBasedAnimations', () => {
     });
 
     test.each([
-      ['duration', {duration: '1'}, /got a duration of "1" for the animation `text`/],
-      ['frameRate', {frameRate: '4'}, /got a frameRate of "4" for the animation `text`/],
+      ['duration', {duration: '1'}, /got a duration of "1" for the animation "text"/],
+      ['frameRate', {frameRate: '4'}, /got a frameRate of "4" for the animation "text"/],
     ] as const)('a %s that is a string is quoted in the message', (_field, timing, message) => {
       const animations = new FrameBasedAnimations();
       const frames = [new TextureCoords(0, 0, 32, 32)];
@@ -131,7 +131,7 @@ describe('FrameBasedAnimations', () => {
       const frames = [new TextureCoords(0, 0, 32, 32)];
 
       expect(() => animations.add('bare', {} as never, frames)).toThrow(
-        /got neither a duration nor a frameRate for the animation `bare`/,
+        /got neither a duration nor a frameRate for the animation "bare"/,
       );
     });
 
@@ -184,7 +184,18 @@ describe('FrameBasedAnimations', () => {
       expect(() => {
         animations.add('walk', 1.0, frames);
       }).toThrow(
-        'FrameBasedAnimations: add() got the name `walk`, which another animation already carries — an animation name must be unique',
+        'FrameBasedAnimations: add() got the name "walk", which another animation already carries — an animation name must be unique',
+      );
+    });
+
+    test('a symbol name that another animation already carries is written as a symbol', () => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      animations.add(AnimSymbol, 1.0, frames);
+
+      expect(() => animations.add(AnimSymbol, 1.0, frames)).toThrow(
+        'FrameBasedAnimations: add() got the name Symbol(anim), which another animation already carries',
       );
     });
 
@@ -217,7 +228,7 @@ describe('FrameBasedAnimations', () => {
         expect(() => {
           animations.add('odd', 1, value as never);
         }).toThrow(
-          `FrameBasedAnimations: add() got a third argument of ${described} for the animation \`odd\` — the third argument is a TextureAtlas, a TileSet or an array of frames`,
+          `FrameBasedAnimations: add() got a third argument of ${described} for the animation "odd" — the third argument is a TextureAtlas, a TileSet or an array of frames`,
         );
         expect(animations.hasAnimation('odd')).toBe(false);
       },
@@ -1044,7 +1055,7 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => {
         animations.add('invalid', {frameRate: 0}, frames);
-      }).toThrow(/got a frameRate of 0 for the animation `invalid`/);
+      }).toThrow(/got a frameRate of 0 for the animation "invalid"/);
     });
 
     test('throw error for negative frameRate', () => {
@@ -1053,7 +1064,7 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => {
         animations.add('invalid', {frameRate: -5}, frames);
-      }).toThrow(/got a frameRate of -5 for the animation `invalid`/);
+      }).toThrow(/got a frameRate of -5 for the animation "invalid"/);
     });
   });
 
@@ -1073,7 +1084,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('walk', 1, makeTileSet(), 1, tileCount)).toThrow(
-        `FrameBasedAnimations: add() got a tileCount of ${described} for the animation \`walk\` — a tileCount is a whole number from 1 to ${FrameBasedAnimations.MaxTextureSize}`,
+        `FrameBasedAnimations: add() got a tileCount of ${described} for the animation "walk" — a tileCount is a whole number from 1 to ${FrameBasedAnimations.MaxTextureSize}`,
       );
     });
 
@@ -1084,7 +1095,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('walk', 1, makeTileSet(), firstTileId, 2)).toThrow(
-        `FrameBasedAnimations: add() got a firstTileId of ${described} for the animation \`walk\` — a firstTileId is a whole number`,
+        `FrameBasedAnimations: add() got a firstTileId of ${described} for the animation "walk" — a firstTileId is a whole number`,
       );
     });
 
@@ -1095,7 +1106,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('walk', 1, makeTileSet(), [1, tileId, 3])).toThrow(
-        `FrameBasedAnimations: add() got a tileId of ${described} at index 1 for the animation \`walk\` — a tileId is a whole number`,
+        `FrameBasedAnimations: add() got a tileId of ${described} at index 1 for the animation "walk" — a tileId is a whole number`,
       );
     });
 
@@ -1123,7 +1134,7 @@ describe('FrameBasedAnimations', () => {
       atlas.add('idle.1', new TextureCoords(8, 0, 8, 8));
 
       expect(() => animations.add('walk', 1, atlas, 5 as unknown as string)).toThrow(
-        'FrameBasedAnimations: add() got a frameNameQuery of 5 for the animation `walk` — a frameNameQuery is a string or a RegExp',
+        'FrameBasedAnimations: add() got a frameNameQuery of 5 for the animation "walk" — a frameNameQuery is a string or a RegExp',
       );
     });
   });
@@ -1152,7 +1163,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('a', {duration: 1, playback: playback as never}, frames(2))).toThrow(
-        "for the animation `a` — a playback is 'loop', 'once' or 'pingpong'",
+        `for the animation "a" — a playback is 'loop', 'once' or 'pingpong'`,
       );
     });
 
@@ -1190,7 +1201,7 @@ describe('FrameBasedAnimations', () => {
         const animations = new FrameBasedAnimations();
 
         expect(() => animations.add('a', timing as never, frames(2))).toThrow(
-          'for the animation `a` — give one of duration, frameRate and durations',
+          'for the animation "a" — give one of duration, frameRate and durations',
         );
       },
     );
@@ -1199,7 +1210,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('a', {durations: durations as never}, frames(2))).toThrow(
-        'for the animation `a` — durations is an array of seconds, one per frame',
+        'for the animation "a" — durations is an array of seconds, one per frame',
       );
     });
 
@@ -1207,7 +1218,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('a', {durations: [0.1, 0.1, 0.1]}, frames(4))).toThrow(
-        'FrameBasedAnimations: add() got 3 durations for the 4 frames of the animation `a` — give one duration per frame',
+        'FrameBasedAnimations: add() got 3 durations for the 4 frames of the animation "a" — give one duration per frame',
       );
     });
 
@@ -1217,7 +1228,7 @@ describe('FrameBasedAnimations', () => {
         const animations = new FrameBasedAnimations();
 
         expect(() => animations.add('a', {durations: [0.1, 0.1, value as never]}, frames(3))).toThrow(
-          'at index 2 for the animation `a` — a frame duration is a finite number of seconds above zero',
+          'at index 2 for the animation "a" — a frame duration is a finite number of seconds above zero',
         );
       },
     );
@@ -1231,7 +1242,7 @@ describe('FrameBasedAnimations', () => {
       const many = Array.from({length: 8192}, () => new TextureCoords(0, 0, 1, 1));
 
       expect(() => animations.add('a', {durations: many.map(() => 0.01)}, many)).toThrow(
-        'FrameBasedAnimations: add() got 8192 frames with durations for the animation `a` — an animation with per-frame durations holds at most 8191 frames; split it',
+        'FrameBasedAnimations: add() got 8192 frames with durations for the animation "a" — an animation with per-frame durations holds at most 8191 frames; split it',
       );
     });
 
@@ -1284,7 +1295,7 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('kick', 1, makeAtlas(), ['kick 0', 'kick 9'])).toThrow(
-        'FrameBasedAnimations: add() got the frame name "kick 9" at index 1 for the animation `kick`, which the atlas does not carry',
+        'FrameBasedAnimations: add() got the frame name "kick 9" at index 1 for the animation "kick", which the atlas does not carry',
       );
     });
 
@@ -1292,14 +1303,14 @@ describe('FrameBasedAnimations', () => {
       const animations = new FrameBasedAnimations();
 
       expect(() => animations.add('kick', 1, makeAtlas(), ['kick 0', 5 as never])).toThrow(
-        'FrameBasedAnimations: add() got a frame name of 5 at index 1 for the animation `kick` — a frame name is a string',
+        'FrameBasedAnimations: add() got a frame name of 5 at index 1 for the animation "kick" — a frame name is a string',
       );
     });
 
     test('an empty list registers nothing', () => {
       const animations = new FrameBasedAnimations();
 
-      expect(() => animations.add('kick', 1, makeAtlas(), [])).toThrow('got no frames for the animation `kick`');
+      expect(() => animations.add('kick', 1, makeAtlas(), [])).toThrow('got no frames for the animation "kick"');
     });
 
     test('the list handed in is not kept: a change after add() leaves the animation as it was', () => {
@@ -1368,6 +1379,15 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => animations.animation('nope')).toThrow('FrameBasedAnimations: there is no animation named "nope"');
       expect(() => animations.animation(3)).toThrow('FrameBasedAnimations: there is no animation of the id 3');
+    });
+
+    test('an animation named by a symbol that was never registered is written as a symbol', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.animId(Symbol('nope'))).toThrow('FrameBasedAnimations: there is no animation named Symbol(nope)');
+      expect(() => animations.animation(Symbol('nope'))).toThrow(
+        'FrameBasedAnimations: there is no animation named Symbol(nope)',
+      );
     });
   });
 

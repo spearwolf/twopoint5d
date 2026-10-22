@@ -49,6 +49,90 @@ describe('describeValue', () => {
     expect(describeValue(cycle)).toBe('[[[[…]]]]');
   });
 
+  test('shows an accessor of a plain object by its kind and calls none of them', () => {
+    let calls = 0;
+    const object = {
+      get a() {
+        calls++;
+        return 1;
+      },
+      set b(_value: number) {
+        calls++;
+      },
+      get c() {
+        calls++;
+        return 1;
+      },
+      set c(_value: number) {
+        calls++;
+      },
+    };
+    expect(describeValue(object)).toBe('{a: [Getter], b: [Setter], c: [Getter/Setter]}');
+    expect(calls).toBe(0);
+  });
+
+  test('shows an accessor of an array the same way, one that throws included', () => {
+    const array = [1, 2];
+    Object.defineProperty(array, 1, {
+      get() {
+        throw new Error('read');
+      },
+      enumerable: true,
+    });
+    expect(describeValue(array)).toBe('[1, [Getter]]');
+  });
+
+  const revoked = (): object => {
+    const {proxy, revoke} = Proxy.revocable({}, {});
+    revoke();
+    return proxy;
+  };
+
+  test.each([
+    [
+      'an object whose toString() throws',
+      new (class Hostile {
+        toString(): string {
+          throw new Error('toString');
+        }
+      })(),
+    ],
+    ['an object without a toString()', Object.create(Object.create(null))],
+    ['a revoked proxy', revoked()],
+    [
+      'a proxy whose ownKeys() throws',
+      new Proxy(
+        {},
+        {
+          ownKeys() {
+            throw new Error('keys');
+          },
+        },
+      ),
+    ],
+  ])('writes a value that throws while it is shown as [object]: %s', (_name, value) => {
+    expect(describeValue(value)).toBe('[object]');
+  });
+
+  test('writes a value that throws beside others in its place, and the others as they are', () => {
+    expect(describeValue({a: 1, b: revoked()})).toBe('{a: 1, b: [object]}');
+    expect(describeValue([1, revoked()])).toBe('[1, [object]]');
+  });
+
+  test('writes a function whose name throws as [Function]', () => {
+    const fn = Object.defineProperty(function f() {}, 'name', {
+      get() {
+        throw new Error('name');
+      },
+    });
+    expect(describeValue(fn)).toBe('[Function]');
+  });
+
+  test('shows a hole of an array as the array literal does', () => {
+    // biome-ignore lint/suspicious/noSparseArray: the hole is the subject of the test
+    expect(describeValue([1, , 3])).toBe('[1, , 3]');
+  });
+
   test.each([
     [NaN, 'NaN'],
     [-Infinity, '-Infinity'],

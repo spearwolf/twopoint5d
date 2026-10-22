@@ -506,7 +506,7 @@ describe('DynamicAtlas', () => {
       const name = Symbol('label');
       const frame = atlas.add(name, noop, {width: 4, height: 4});
       expect(atlas.atlas.frame(name)).toBe(frame);
-      expect(() => atlas.add(name, noop, {width: 4, height: 4})).toThrow('the frame name "Symbol(label)" is already taken');
+      expect(() => atlas.add(name, noop, {width: 4, height: 4})).toThrow('the frame name Symbol(label) is already taken');
     });
 
     test('a draw callback that throws leaves the atlas as it was, its cell cleared again and given back', () => {

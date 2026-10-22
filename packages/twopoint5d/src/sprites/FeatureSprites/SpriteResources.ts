@@ -21,6 +21,7 @@ import {
   Vector3,
   Vector4,
 } from 'three/webgpu';
+import {describeValue} from '../../utils/describeValue.js';
 import {textureShapeKey} from '../textureShapeKey.js';
 import {collectSpriteDeclarations} from '../spriteDeclarations.js';
 import type {SpriteFeature, SpriteUniformValue} from '../SpriteFeature.js';
@@ -57,7 +58,7 @@ const FILTER_NAMES: Readonly<Record<number, string>> = {
   [LinearMipmapNearestFilter]: 'LinearMipmapNearestFilter',
   [LinearMipmapLinearFilter]: 'LinearMipmapLinearFilter',
 };
-const filterName = (filter: number): string => FILTER_NAMES[filter] ?? String(filter);
+const filterName = (filter: number): string => FILTER_NAMES[filter] ?? describeValue(filter);
 
 const VECTOR_TYPES = ['float', 'vec2', 'vec3', 'vec4'] as const;
 const sizeOfValue = (value: SpriteUniformValue): number => (typeof value === 'number' ? 1 : value.length);

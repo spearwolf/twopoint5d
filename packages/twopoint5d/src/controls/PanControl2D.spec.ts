@@ -176,6 +176,24 @@ describe('PanControl2D', () => {
     });
   });
 
+  describe('a cursorPanStyle the browser does not know', () => {
+    it('warns with the value quoted as a refused value is', () => {
+      vi.stubGlobal('CSS', {supports: () => false});
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const control = makeControl();
+      // the constructor writes the default cursors against the same CSS.supports()
+      warn.mockClear();
+
+      control.cursorPanStyle = 5 as never;
+      control.cursorPanStyle = 'grabby';
+
+      expect(warn.mock.calls.map(([message]) => message)).toEqual([
+        'PanControl2D: cursorPanStyle 5 is not a value of the CSS property cursor in this browser; the write is refused',
+        'PanControl2D: cursorPanStyle "grabby" is not a value of the CSS property cursor in this browser; the write is refused',
+      ]);
+    });
+  });
+
   describe('keys meant for something else', () => {
     it.each(['ctrlKey', 'metaKey', 'altKey'] as const)('does not pan by a key pressed with %s', (modifier) => {
       const control = makeControl();

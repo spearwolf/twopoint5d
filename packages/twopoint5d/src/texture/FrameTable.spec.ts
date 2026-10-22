@@ -80,6 +80,10 @@ describe('FrameTable', () => {
       expect(() => new FrameTable([])).toThrow('FrameTable: a table of no frames');
     });
 
+    test('writes a symbol name the atlas lacks as a symbol', () => {
+      expect(() => FrameTable.fromAtlas(makeAtlas(), [Symbol('x')])).toThrow('FrameTable: the atlas holds no frame Symbol(x)');
+    });
+
     test('a table of bare coords finds no name', () => {
       const table = new FrameTable([new TextureCoords(root, 0, 0, 8, 8)]);
       expect(table.size).toBe(1);

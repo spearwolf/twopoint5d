@@ -204,6 +204,20 @@ describe('ParallaxProjection', () => {
 
       expect(() => projection.updateCamera(new OrthographicCamera())).toThrow(TypeError);
     });
+
+    it.each([
+      [new OrthographicCamera(), 'OrthographicCamera'],
+      [undefined, 'undefined'],
+      [{}, '{}'],
+      ['cam', '"cam"'],
+      [{type: 'PerspectiveCamera'}, '{type: "PerspectiveCamera"}'],
+    ])('names a refused camera %s as it is: got %s', (camera, written) => {
+      const projection = projectionFor({fit: 'contain', width: 640});
+
+      expect(() => projection.updateCamera(camera as never)).toThrow(
+        `ParallaxProjection: updateCamera() needs a PerspectiveCamera, got ${written}`,
+      );
+    });
   });
 
   describe('without a projection plane', () => {

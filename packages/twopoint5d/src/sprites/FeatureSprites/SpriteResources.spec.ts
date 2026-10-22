@@ -299,6 +299,17 @@ describe('SpriteResources', () => {
       resources.dispose();
     });
 
+    test('writes a filter that is no filter of three through describeValue()', () => {
+      const warn = warnings();
+      const odd = nearest(16, 4);
+      odd.magFilter = 'linear' as never;
+      const resources = new SpriteResources([color, swap], {textures: {colorMap: nearest(), palette: odd}});
+
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0]![0]).toContain('is filtered with magFilter "linear" and minFilter NearestFilter');
+      resources.dispose();
+    });
+
     test('judges a texture once it has an image: when it is set with one, or touched after it arrived', () => {
       const warn = warnings();
       const loading = new Texture();

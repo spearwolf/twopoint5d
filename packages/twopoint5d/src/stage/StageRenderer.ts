@@ -817,7 +817,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #refuseStageWithoutPassNode(refusal: string): void {
     const bare = this.#stages.find((item) => !hasAsPassNode(item.stage));
-    if (bare) throw new TypeError(`${refusal}: the stage ${JSON.stringify(bare.stage.name)} ${NO_PASS_NODE}`);
+    if (bare) throw new TypeError(`${refusal}: the stage "${bare.stage.name}" ${NO_PASS_NODE}`);
   }
 
   /**
@@ -1061,9 +1061,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #getStagePass(stageItem: StageItem, renderer: WebGPURenderer): Node {
     const stage = stageItem.stage;
     if (!hasAsPassNode(stage)) {
-      throw new TypeError(
-        `StageRenderer#renderTo() cannot compose the stage ${JSON.stringify(stage.name)}: that stage ${NO_PASS_NODE}`,
-      );
+      throw new TypeError(`StageRenderer#renderTo() cannot compose the stage "${stage.name}": that stage ${NO_PASS_NODE}`);
     }
     return stage.asPassNode(renderer);
   }
@@ -1305,13 +1303,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     // a disposed stage never announces its end again: listed, it would stay in here for good
     if ((stage as {isDisposed?: unknown}).isDisposed === true) {
-      throw new Error(`StageRenderer#add() cannot take the stage ${JSON.stringify(stage.name)}: that stage has been disposed`);
+      throw new Error(`StageRenderer#add() cannot take the stage "${stage.name}": that stage has been disposed`);
     }
 
     // every stage of a composing renderer hands in its pass node: refused here, the stage would
     // make every frame throw from the rebuild of the output node
     if (this.#renderMode() === 'composed' && !hasAsPassNode(stage)) {
-      throw new TypeError(`StageRenderer#add() cannot take the stage ${JSON.stringify(stage.name)}: that stage ${NO_PASS_NODE}`);
+      throw new TypeError(`StageRenderer#add() cannot take the stage "${stage.name}": that stage ${NO_PASS_NODE}`);
     }
 
     const item: StageItem = {stage, width: 0, height: 0};

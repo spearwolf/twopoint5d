@@ -219,9 +219,11 @@ describe('SpritePicker', () => {
         ),
       );
       await expect(picker.pick(makeCamera(), {x: 0, y: Infinity}, [])).rejects.toThrow(TypeError);
-      await expect(picker.pick(makeCamera(), null as unknown as {x: number; y: number}, [])).rejects.toThrow(
-        'got {x: undefined, y: undefined}',
+      await expect(picker.pick(makeCamera(), null as unknown as {x: number; y: number}, [])).rejects.toThrow('got null');
+      await expect(picker.pick(makeCamera(), {x: '0', y: 0} as unknown as {x: number; y: number}, [])).rejects.toThrow(
+        'got {x: "0", y: 0}',
       );
+      await expect(picker.pick(makeCamera(), 5 as unknown as {x: number; y: number}, [])).rejects.toThrow('got 5');
     });
 
     test('a list that is no array, and an entry that is no FeatureSprites', async () => {

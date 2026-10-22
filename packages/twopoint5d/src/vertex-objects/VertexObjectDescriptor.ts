@@ -183,7 +183,7 @@ export class VertexObjectDescriptor {
     this.indices.forEach((index, position) => {
       if (!Number.isInteger(index) || index < 0 || index >= this.vertexCount) {
         throw new RangeError(
-          `VertexObjectDescriptor: index ${index} at position ${position} must be an integer in 0 … ${this.vertexCount - 1}`,
+          `VertexObjectDescriptor: index ${describeValue(index)} at position ${position} must be an integer in 0 … ${this.vertexCount - 1}`,
         );
       }
     });

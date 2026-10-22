@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {forgetFrameName, liveFrameIds} from './internals.js';
 import type {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
@@ -53,9 +54,9 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     if (isNamedTextureAtlasArgs(args)) {
       // checked before the push, so a refused frame leaves no half of itself behind
       if (this.#frameNames.has(args[0])) {
-        // `toString()` and not an interpolation: a name can be a symbol, and interpolating
-        // one throws in place of the message it was supposed to carry
-        throw new Error(`TextureAtlas: the frame name "${args[0].toString()}" is already taken`);
+        // describeValue() and not an interpolation: a name can be a symbol, which an interpolation
+        // throws for, and it writes a symbol apart from a string of the same text
+        throw new Error(`TextureAtlas: the frame name ${describeValue(args[0])} is already taken`);
       }
       this.#frameNames.set(args[0], id);
       this.#frameNameList.push(args[0]);

@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {AtlasFrameTableSelection} from './AtlasFrameTable.js';
 import {liveFrameIds} from './internals.js';
 import type {TextureAtlas, TextureAtlasFrame, TextureAtlasFrameName} from './TextureAtlas.js';
@@ -39,8 +40,9 @@ export function selectAtlasFrames(
   const frames = names.map((name) => {
     const frame = atlas.frame(name);
     if (frame == null) {
-      // `toString()` and not an interpolation: a name can be a symbol
-      throw new Error(`${where}: the atlas holds no frame "${name.toString()}"`);
+      // describeValue() and not an interpolation: a name can be a symbol, which an interpolation
+      // throws for, and it writes a symbol apart from a string of the same text
+      throw new Error(`${where}: the atlas holds no frame ${describeValue(name)}`);
     }
     return frame;
   });

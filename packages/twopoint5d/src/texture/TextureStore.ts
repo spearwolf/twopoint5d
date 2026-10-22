@@ -127,12 +127,14 @@ const disposedError = (what: string): Error => new Error(`TextureStore: ${what} 
 const resourceDisposedError = (what: string, id: string): Error =>
   new Error(`TextureStore: ${what} was cancelled: the resource "${id}" has been disposed`);
 
+const hrefOf = (url: string | URL): string => (typeof url === 'string' ? url : url.href);
+
 // one message for a load that never got as far as a parse, naming the step that failed and
 // whatever the failure can be pinned to — the url that was being fetched, the id of the item
 // that is at fault — an item without a source has no url of its own —, or the url of the catalog
 // for what belongs to it as a whole
 const loadFailedError = (source: string, what: string | URL | undefined, cause: unknown): Error =>
-  new Error(`TextureStore: load failed at the ${source} step${what != null ? `: "${String(what)}"` : ''}`, {cause});
+  new Error(`TextureStore: load failed at the ${source} step${what != null ? `: "${hrefOf(what)}"` : ''}`, {cause});
 
 // one message for a getAsync() whose resource reported a failure that keeps a value it asks for
 // from arriving, naming the step that failed and the url it failed on, if there is one
@@ -597,7 +599,7 @@ export class TextureStore {
    * its place. See {@link TextureStoreParseOptions.baseUrl}.
    */
   loadAsync(url: string | URL, options?: TextureStoreLoadOptions): Promise<this> {
-    const what = `loadAsync(${String(url)})`;
+    const what = `loadAsync(${describeValue(hrefOf(url))})`;
     if (this.#disposed) return Promise.reject(disposedError(what));
 
     // the signal belongs to this call and not to the parse
@@ -673,7 +675,7 @@ export class TextureStore {
           // a JSON body would otherwise pass for a catalog
           fail(
             'fetch',
-            new Error(`TextureStore: fetch("${String(url)}") answered ${response.status} ${response.statusText}`),
+            new Error(`TextureStore: fetch(${describeValue(hrefOf(url))}) answered ${response.status} ${response.statusText}`),
             response.status,
           );
           return;
@@ -1104,7 +1106,7 @@ export class TextureStore {
         if (never.length) {
           // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
           console.warn(
-            `TextureStore: on(${id}, ${String(type)}) is never called for "${id}": it is ${articleOf(resource.type)} "${resource.type}" resource, which never builds ${never.join(', ')}`,
+            `TextureStore: on(${describeValue(id)}, ${describeValue(type)}) is never called for "${id}": it is ${articleOf(resource.type)} "${resource.type}" resource, which never builds ${never.join(', ')}`,
           );
         }
       }
@@ -1264,7 +1266,7 @@ export class TextureStore {
     hold: H,
   ): Promise<H extends true ? TextureStoreLease<MapSubTypes<T>> : MapSubTypes<T>> {
     const signal = options?.signal;
-    const what = `${method}(${id}, ${String(type)})`;
+    const what = `${method}(${describeValue(id)}, ${describeValue(type)})`;
     return new Promise((resolve, reject) => {
       if (this.#disposed) {
         reject(disposedError(what));

@@ -2023,12 +2023,14 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   throws for one the feature cannot work in, with a message that names the fix: a stage that needs
   a grid base refuses the quad, a placement refuses a feature whose stage it cannot follow.
   `defineSprite()` runs it last, once every other check has passed, and refuses the kind as
-  `defineSprite: feature "name": <message>`; a pass runs the checks of its features against the
-  features it draws with, and a placement that stands in on a live material runs its own against
-  the kind with itself in place of the kind's placement. Where two features of a kind share a name —
-  two forms of one factory, as `wave()` gives every form the name `wave` — `defineSprite()` asks the
-  `checkKind` of the first before every other check, so that it can say why a kind takes one; a
-  check that lets it pass leaves the plain refusal, `two features are named "wave"`.
+  `defineSprite: feature "name": <message>` — the message of a thrown `Error`, a thrown string
+  itself, any other thrown value quoted like a refused value (`{code: 1}`); a pass runs the checks
+  of its features against the features it draws with, and a placement that stands in on a live
+  material runs its own against the kind with itself in place of the kind's placement. Where two
+  features of a kind share a name — two forms of one factory, as `wave()` gives every form the name
+  `wave` — `defineSprite()` asks the `checkKind` of the first before every other check, so that it
+  can say why a kind takes one; a check that lets it pass leaves the plain refusal, `two features
+  are named "wave"`.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture

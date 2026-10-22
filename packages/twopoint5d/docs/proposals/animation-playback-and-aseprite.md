@@ -106,14 +106,14 @@ New refusals of `add()`, each an `Error` that names the animation:
 
 | case | message (after `FrameBasedAnimations: add() got`) |
 | --- | --- |
-| `playback` not one of the three | `` a playback of X for the animation `a` — a playback is 'loop', 'once' or 'pingpong' `` |
-| `durations` beside `duration` or `frameRate` | `` durations and a duration (or frameRate) for the animation `a` — give one of duration, frameRate and durations `` |
-| `durations` no array | `` durations of X for the animation `a` — durations is an array of seconds, one per frame `` |
-| wrong count | `` 3 durations for the 4 frames of the animation `a` — give one duration per frame `` |
-| a value not finite or not above 0 | `` a duration of X at index 2 for the animation `a` — a frame duration is a finite number of seconds above zero `` |
-| more than 8191 frames with durations | `` 9000 frames with durations for the animation `a` — an animation with per-frame durations holds at most 8191 frames; split it `` |
-| a frame name of the list not in the atlas | `` the frame name "x" at index 1 for the animation `a`, which the atlas does not carry `` |
-| a list entry no string | `` a frame name of X at index 1 for the animation `a` — a frame name is a string `` |
+| `playback` not one of the three | `` a playback of X for the animation "a" — a playback is 'loop', 'once' or 'pingpong' `` |
+| `durations` beside `duration` or `frameRate` | `` durations and a duration (or frameRate) for the animation "a" — give one of duration, frameRate and durations `` |
+| `durations` no array | `` durations of X for the animation "a" — durations is an array of seconds, one per frame `` |
+| wrong count | `` 3 durations for the 4 frames of the animation "a" — give one duration per frame `` |
+| a value not finite or not above 0 | `` a duration of X at index 2 for the animation "a" — a frame duration is a finite number of seconds above zero `` |
+| more than 8191 frames with durations | `` 9000 frames with durations for the animation "a" — an animation with per-frame durations holds at most 8191 frames; split it `` |
+| a frame name of the list not in the atlas | `` the frame name "x" at index 1 for the animation "a", which the atlas does not carry `` |
+| a list entry no string | `` a frame name of X at index 1 for the animation "a" — a frame name is a string `` |
 
 The old precedence of `frameRate` over `duration` when both are given (the types forbid it, a
 json catalog may not) stays as it is — changing it would break such a catalog.

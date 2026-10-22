@@ -1,6 +1,7 @@
 // The `renderOrder` of a `StageRenderer`: its value, its entries, and the snapshot of the stages
 // in that order. This module is not in `public-api.ts`: only `StageRenderer` reaches it.
 
+import {describeValue} from '../utils/describeValue.js';
 import type {StageItem} from './StageRenderer.js';
 
 export class StageRenderOrder {
@@ -148,7 +149,7 @@ export class StageRenderOrder {
       if (count > 1) {
         // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
-          `StageRenderer: ${count} stages are named ${JSON.stringify(name)} and renderOrder=${JSON.stringify(this.#value)} cannot tell them apart; they render in the order they were added. Set unique names on your stages.`,
+          `StageRenderer: ${count} stages are named "${name}" and renderOrder=${describeValue(this.#value)} cannot tell them apart; they render in the order they were added. Set unique names on your stages.`,
         );
       }
     }

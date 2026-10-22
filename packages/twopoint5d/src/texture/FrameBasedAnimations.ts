@@ -111,7 +111,7 @@ const MAX_FRAMES_WITH_DURATIONS = 8191;
 // the name is what tells one entry of an animation map from the next in an error message, and an
 // add() that was given none — or the empty string, which counts as none — has nothing else to be
 // recognized by
-const animNameInError = (name: AnimName | undefined): string => (name ? name.toString() : '(no name)');
+const animNameInError = (name: AnimName | undefined): string => (name ? describeValue(name) : '(no name)');
 
 /**
  * Calculates the duration of an animation based on frame count and frame rate.
@@ -128,7 +128,7 @@ const calculateDurationFromFrameRate = (frameCount: number, frameRate: number, n
   // can name the frameRate instead of the duration it would turn into
   if (typeof frameRate !== 'number' || !(frameRate > 0)) {
     throw new Error(
-      `FrameBasedAnimations: add() got a frameRate of ${describeValue(frameRate)} for the animation \`${animNameInError(name)}\` — a frameRate is a number above zero`,
+      `FrameBasedAnimations: add() got a frameRate of ${describeValue(frameRate)} for the animation ${animNameInError(name)} — a frameRate is a number above zero`,
     );
   }
   return frameCount / frameRate;
@@ -164,14 +164,14 @@ const resolveTiming = (
   const playback: unknown = timing.playback === undefined ? 'loop' : timing.playback;
   if (!isAnimationPlayback(playback)) {
     throw new Error(
-      `FrameBasedAnimations: add() got a playback of ${describeValue(playback)} for the animation \`${animNameInError(name)}\` — a playback is 'loop', 'once' or 'pingpong'`,
+      `FrameBasedAnimations: add() got a playback of ${describeValue(playback)} for the animation ${animNameInError(name)} — a playback is 'loop', 'once' or 'pingpong'`,
     );
   }
 
   if ('durations' in timing && timing.durations !== undefined) {
     if (('duration' in timing && timing.duration !== undefined) || ('frameRate' in timing && timing.frameRate !== undefined)) {
       throw new Error(
-        `FrameBasedAnimations: add() got durations and a duration (or frameRate) for the animation \`${animNameInError(name)}\` — give one of duration, frameRate and durations`,
+        `FrameBasedAnimations: add() got durations and a duration (or frameRate) for the animation ${animNameInError(name)} — give one of duration, frameRate and durations`,
       );
     }
     const durations = resolveDurations(timing.durations, frameCount, name);
@@ -188,7 +188,7 @@ const resolveTiming = (
     return {duration: timing.duration, durations: undefined, playback};
   }
   throw new Error(
-    `FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation \`${animNameInError(name)}\``,
+    `FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation ${animNameInError(name)}`,
   );
 };
 
@@ -197,23 +197,23 @@ const resolveTiming = (
 const resolveDurations = (durations: unknown, frameCount: number, name: AnimName | undefined): readonly number[] => {
   if (!Array.isArray(durations)) {
     throw new Error(
-      `FrameBasedAnimations: add() got durations of ${describeValue(durations)} for the animation \`${animNameInError(name)}\` — durations is an array of seconds, one per frame`,
+      `FrameBasedAnimations: add() got durations of ${describeValue(durations)} for the animation ${animNameInError(name)} — durations is an array of seconds, one per frame`,
     );
   }
   if (durations.length !== frameCount) {
     throw new Error(
-      `FrameBasedAnimations: add() got ${durations.length} durations for the ${frameCount} frames of the animation \`${animNameInError(name)}\` — give one duration per frame`,
+      `FrameBasedAnimations: add() got ${durations.length} durations for the ${frameCount} frames of the animation ${animNameInError(name)} — give one duration per frame`,
     );
   }
   if (frameCount > MAX_FRAMES_WITH_DURATIONS) {
     throw new Error(
-      `FrameBasedAnimations: add() got ${frameCount} frames with durations for the animation \`${animNameInError(name)}\` — an animation with per-frame durations holds at most ${MAX_FRAMES_WITH_DURATIONS} frames; split it`,
+      `FrameBasedAnimations: add() got ${frameCount} frames with durations for the animation ${animNameInError(name)} — an animation with per-frame durations holds at most ${MAX_FRAMES_WITH_DURATIONS} frames; split it`,
     );
   }
   durations.forEach((value: unknown, index) => {
     if (typeof value !== 'number' || !Number.isFinite(value) || !(value > 0)) {
       throw new Error(
-        `FrameBasedAnimations: add() got a duration of ${describeValue(value)} at index ${index} for the animation \`${animNameInError(name)}\` — a frame duration is a finite number of seconds above zero`,
+        `FrameBasedAnimations: add() got a duration of ${describeValue(value)} at index ${index} for the animation ${animNameInError(name)} — a frame duration is a finite number of seconds above zero`,
       );
     }
   });
@@ -395,7 +395,7 @@ export class FrameBasedAnimations {
     // the empty string is no name, so there is nothing for the uniqueness check to compare
     if (name && this.#animations.has(name)) {
       throw new Error(
-        `FrameBasedAnimations: add() got the name \`${animNameInError(name)}\`, which another animation already carries — an animation name must be unique`,
+        `FrameBasedAnimations: add() got the name ${animNameInError(name)}, which another animation already carries — an animation name must be unique`,
       );
     }
 
@@ -414,13 +414,13 @@ export class FrameBasedAnimations {
       const atlasFrames = (args[3] as readonly unknown[]).map((frameName, index) => {
         if (typeof frameName !== 'string') {
           throw new Error(
-            `FrameBasedAnimations: add() got a frame name of ${describeValue(frameName)} at index ${index} for the animation \`${animNameInError(name)}\` — a frame name is a string`,
+            `FrameBasedAnimations: add() got a frame name of ${describeValue(frameName)} at index ${index} for the animation ${animNameInError(name)} — a frame name is a string`,
           );
         }
         const frame = atlas.frame(frameName);
         if (frame == null) {
           throw new Error(
-            `FrameBasedAnimations: add() got the frame name "${frameName}" at index ${index} for the animation \`${animNameInError(name)}\`, which the atlas does not carry`,
+            `FrameBasedAnimations: add() got the frame name "${frameName}" at index ${index} for the animation ${animNameInError(name)}, which the atlas does not carry`,
           );
         }
         return frame;
@@ -434,7 +434,7 @@ export class FrameBasedAnimations {
       // out every frame it has
       if (query !== undefined && typeof query !== 'string' && !(query instanceof RegExp)) {
         throw new Error(
-          `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation \`${animNameInError(name)}\` — a frameNameQuery is a string or a RegExp`,
+          `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation ${animNameInError(name)} — a frameNameQuery is a string or a RegExp`,
         );
       }
       // from here the query is a pattern as a string, a RegExp or no query at all — both forms
@@ -463,7 +463,7 @@ export class FrameBasedAnimations {
         tileIds.forEach((tileId: unknown, index) => {
           if (!Number.isInteger(tileId)) {
             throw new Error(
-              `FrameBasedAnimations: add() got a tileId of ${describeValue(tileId)} at index ${index} for the animation \`${animNameInError(name)}\` — a tileId is a whole number`,
+              `FrameBasedAnimations: add() got a tileId of ${describeValue(tileId)} at index ${index} for the animation ${animNameInError(name)} — a tileId is a whole number`,
             );
           }
         });
@@ -473,7 +473,7 @@ export class FrameBasedAnimations {
         // more tiles than a data texture can, and an add() that is never baked is legitimate
         if (args[3] !== undefined && !Number.isInteger(args[3])) {
           throw new Error(
-            `FrameBasedAnimations: add() got a firstTileId of ${describeValue(args[3])} for the animation \`${animNameInError(name)}\` — a firstTileId is a whole number`,
+            `FrameBasedAnimations: add() got a firstTileId of ${describeValue(args[3])} for the animation ${animNameInError(name)} — a firstTileId is a whole number`,
           );
         }
         // the upper bound keeps the loop below finite: more frames than this fit into no data
@@ -481,7 +481,7 @@ export class FrameBasedAnimations {
         const maxTileCount = FrameBasedAnimations.MaxTextureSize;
         if (args[4] !== undefined && (!Number.isInteger(args[4]) || args[4] < 1 || args[4] > maxTileCount)) {
           throw new Error(
-            `FrameBasedAnimations: add() got a tileCount of ${describeValue(args[4])} for the animation \`${animNameInError(name)}\` — a tileCount is a whole number from 1 to ${maxTileCount}`,
+            `FrameBasedAnimations: add() got a tileCount of ${describeValue(args[4])} for the animation ${animNameInError(name)} — a tileCount is a whole number from 1 to ${maxTileCount}`,
           );
         }
         const firstTileId = (args[3] as number | undefined) ?? tileSet.firstId;
@@ -493,7 +493,7 @@ export class FrameBasedAnimations {
       }
     } else {
       throw new Error(
-        `FrameBasedAnimations: add() got a third argument of ${describeValue(args[2])} for the animation \`${animNameInError(name)}\` — the third argument is a TextureAtlas, a TileSet or an array of frames`,
+        `FrameBasedAnimations: add() got a third argument of ${describeValue(args[2])} for the animation ${animNameInError(name)} — the third argument is a TextureAtlas, a TileSet or an array of frames`,
       );
     }
 
@@ -507,7 +507,7 @@ export class FrameBasedAnimations {
     // arrive here empty
     if (frames.length === 0) {
       throw new Error(
-        `FrameBasedAnimations: add() got no frames for the animation \`${animNameInError(name)}\` — an atlas query without a match, an empty tile range or an empty frame list registers nothing`,
+        `FrameBasedAnimations: add() got no frames for the animation ${animNameInError(name)} — an atlas query without a match, an empty tile range or an empty frame list registers nothing`,
       );
     }
 
@@ -518,7 +518,7 @@ export class FrameBasedAnimations {
     // below it and everything that is no number at all is a configuration error
     if (!Number.isFinite(duration) || duration < 0) {
       throw new Error(
-        `FrameBasedAnimations: add() got a duration of ${describeValue(duration)} for the animation \`${animNameInError(name)}\` — a duration is a finite number at or above zero`,
+        `FrameBasedAnimations: add() got a duration of ${describeValue(duration)} for the animation ${animNameInError(name)} — a duration is a finite number at or above zero`,
       );
     }
 
@@ -562,7 +562,7 @@ export class FrameBasedAnimations {
   animId(name: AnimName): number {
     const anim = this.#animations.get(name);
     if (anim == null) {
-      throw new Error(`FrameBasedAnimations: there is no animation named "${name.toString()}"`);
+      throw new Error(`FrameBasedAnimations: there is no animation named ${describeValue(name)}`);
     }
     return anim.id;
   }
@@ -586,7 +586,7 @@ export class FrameBasedAnimations {
       throw new Error(
         typeof nameOrId === 'number'
           ? `FrameBasedAnimations: there is no animation of the id ${nameOrId}`
-          : `FrameBasedAnimations: there is no animation named "${nameOrId.toString()}"`,
+          : `FrameBasedAnimations: there is no animation named ${describeValue(nameOrId)}`,
       );
     }
     return Object.freeze({

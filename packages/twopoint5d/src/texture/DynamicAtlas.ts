@@ -94,8 +94,6 @@ const assertWhole = (value: unknown, min: number, what: string): number => {
   return value;
 };
 
-const nameOf = (name: TextureAtlasFrameName): string => name.toString();
-
 // the size an image is drawn at by itself: the natural size of an image element, the size of the rest
 const sizeOfImage = (image: DynamicAtlasImage): {width: number; height: number} =>
   'naturalWidth' in image ? {width: image.naturalWidth, height: image.naturalHeight} : {width: image.width, height: image.height};
@@ -289,7 +287,7 @@ export class DynamicAtlas {
     this.#assertAlive('add()');
     if (this.#atlas.frameId(name) !== undefined) {
       throw new Error(
-        `${WHERE}: the frame name "${nameOf(name)}" is already taken — redraw() draws it anew, remove() lets go of it`,
+        `${WHERE}: the frame name ${describeValue(name)} is already taken — redraw() draws it anew, remove() lets go of it`,
       );
     }
     const {width, height} = this.#sizeOf(name, source, size);
@@ -344,7 +342,7 @@ export class DynamicAtlas {
     const frame = this.#atlas.frame(name);
     const rect = frame === undefined ? undefined : this.#cells.get(frame);
     if (frame === undefined || rect === undefined) {
-      throw new Error(`${WHERE}: there is no frame "${nameOf(name)}" to redraw — add() it first`);
+      throw new Error(`${WHERE}: there is no frame ${describeValue(name)} to redraw — add() it first`);
     }
     if (typeof source !== 'function') this.#assertDrawable(name, source, 'redraw()');
     try {
@@ -501,7 +499,7 @@ export class DynamicAtlas {
   ): {width: number; height: number} {
     if (typeof source === 'function' && size == null) {
       throw new TypeError(
-        `${WHERE}: add("${nameOf(name)}") with a draw callback needs the size — add(name, draw, {width, height})`,
+        `${WHERE}: add(${describeValue(name)}) with a draw callback needs the size — add(name, draw, {width, height})`,
       );
     }
     if (typeof source !== 'function') {
@@ -514,7 +512,7 @@ export class DynamicAtlas {
     const check = (value: unknown, what: string): number => {
       if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
         throw new RangeError(
-          `${WHERE}: the ${what} of the frame "${nameOf(name)}" must be a finite number above 0, got ${describeValue(value)}`,
+          `${WHERE}: the ${what} of the frame ${describeValue(name)} must be a finite number above 0, got ${describeValue(value)}`,
         );
       }
       return Math.ceil(value);
@@ -532,7 +530,7 @@ export class DynamicAtlas {
 
     if (cellWidth + 2 * padding > this.width || cellHeight + 2 * padding > this.height) {
       throw new RangeError(
-        `${WHERE}: the frame "${nameOf(name)}" of ${width} × ${height} does not fit into an atlas of ${this.width} × ${this.height} with padding ${padding} and extrude ${extrude} — build a larger atlas`,
+        `${WHERE}: the frame ${describeValue(name)} of ${width} × ${height} does not fit into an atlas of ${this.width} × ${this.height} with padding ${padding} and extrude ${extrude} — build a larger atlas`,
       );
     }
 
@@ -578,7 +576,7 @@ export class DynamicAtlas {
     if (y + cellHeight + padding > this.height) {
       const count = this.#cells.size;
       throw new RangeError(
-        `${WHERE}: the atlas of ${this.width} × ${this.height} is full — the frame "${nameOf(name)}" of ${width} × ${height} does not fit beside ${count === 1 ? 'the 1 frame' : `the ${count} frames`} packed into it; build a larger one — new DynamicAtlas({width: ${2 * this.width}, height: ${2 * this.height}}) — or clear() it`,
+        `${WHERE}: the atlas of ${this.width} × ${this.height} is full — the frame ${describeValue(name)} of ${width} × ${height} does not fit beside ${count === 1 ? 'the 1 frame' : `the ${count} frames`} packed into it; build a larger one — new DynamicAtlas({width: ${2 * this.width}, height: ${2 * this.height}}) — or clear() it`,
       );
     }
     const shelf: Shelf = {y, height: cellHeight, x: padding + room, free: []};
@@ -641,13 +639,13 @@ export class DynamicAtlas {
   #assertDrawable(name: TextureAtlasFrameName, image: DynamicAtlasImage, call: string): void {
     if ('naturalWidth' in image) {
       if ('complete' in image && image.complete === false) {
-        throw new Error(`${WHERE}: the image of "${nameOf(name)}" has not loaded yet — await image.decode() before ${call}`);
+        throw new Error(`${WHERE}: the image of ${describeValue(name)} has not loaded yet — await image.decode() before ${call}`);
       }
       return;
     }
     if (!(image.width > 0) || !(image.height > 0)) {
       throw new Error(
-        `${WHERE}: the image of "${nameOf(name)}" is ${image.width} × ${image.height} — a closed ImageBitmap or a canvas of no size has nothing to draw`,
+        `${WHERE}: the image of ${describeValue(name)} is ${image.width} × ${image.height} — a closed ImageBitmap or a canvas of no size has nothing to draw`,
       );
     }
   }
@@ -657,7 +655,7 @@ export class DynamicAtlas {
     const natural = sizeOfImage(image);
     if (!(natural.width > 0) || !(natural.height > 0)) {
       throw new Error(
-        `${WHERE}: the image of "${nameOf(name)}" has no natural size — an SVG without width and height needs the size: add(name, image, {width, height}); an image that failed to load cannot be drawn at all`,
+        `${WHERE}: the image of ${describeValue(name)} has no natural size — an SVG without width and height needs the size: add(name, image, {width, height}); an image that failed to load cannot be drawn at all`,
       );
     }
     return natural;

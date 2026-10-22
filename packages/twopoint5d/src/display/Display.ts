@@ -28,6 +28,7 @@ import {FrameLoop} from './FrameLoop.js';
 import {isWebGLRenderer} from './isWebGLRenderer.js';
 import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
+import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {
   type DrawingBuffer,
@@ -1915,7 +1916,7 @@ export class Display {
     } catch {
       // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
-        `Display: resize-to="${value}" is not a valid selector; the display falls back to its resizeToElement or the canvas`,
+        `Display: resize-to=${describeValue(value)} is not a valid selector; the display falls back to its resizeToElement or the canvas`,
       );
       this.#resizeToSelector = {value, root, element: null, invalid: true};
       return undefined;

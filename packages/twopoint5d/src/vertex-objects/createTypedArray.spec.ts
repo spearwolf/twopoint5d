@@ -61,7 +61,7 @@ describe('createTypedArray', () => {
     vi.stubGlobal('Float16Array', undefined);
     try {
       const {typedArrayOf: withoutFloat16} = await import('./createTypedArray.js');
-      expect(() => withoutFloat16('float16')).toThrow(/no Float16Array/);
+      expect(() => withoutFloat16('float16')).toThrow('typedArrayOf: this runtime has no Float16Array for data type "float16"');
       expect(withoutFloat16('float32')).toBe(Float32Array);
     } finally {
       vi.unstubAllGlobals();

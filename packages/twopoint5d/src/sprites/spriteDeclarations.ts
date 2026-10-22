@@ -32,7 +32,6 @@ const declarationOf = (declared: unknown): {value: SpriteUniformValue; shared: b
 };
 
 const sizeOf = (value: SpriteUniformValue): number => (typeof value === 'number' ? 1 : value.length);
-const shown = (value: SpriteUniformValue): string => JSON.stringify(value);
 
 const sameValue = (a: SpriteUniformValue, b: SpriteUniformValue): boolean =>
   typeof a === 'number' || typeof b === 'number'
@@ -57,14 +56,14 @@ function conflictOf(
     const [sharing, other, value] = known.shared
       ? [known.feature, feature, known.value]
       : [feature, known.feature, declaration.value];
-    return `${head}, and only "${sharing.name}" shares it — declare it as {value: ${shown(value)}, shared: true} in "${other.name}" as well, or rename one of them`;
+    return `${head}, and only "${sharing.name}" shares it — declare it as {value: ${describeValue(value)}, shared: true} in "${other.name}" as well, or rename one of them`;
   }
   const [a, b] = [sizeOf(known.value), sizeOf(declaration.value)];
   if (a !== b) {
     return `${head}, shared, as a ${VECTOR_TYPES[a - 1]} and as a ${VECTOR_TYPES[b - 1]} — ${SHARED_RULE}; rename one of them`;
   }
   if (!sameValue(known.value, declaration.value)) {
-    return `${head}, shared, starting at ${shown(known.value)} and at ${shown(declaration.value)} — ${SHARED_RULE}; give both the same start value`;
+    return `${head}, shared, starting at ${describeValue(known.value)} and at ${describeValue(declaration.value)} — ${SHARED_RULE}; give both the same start value`;
   }
   return undefined;
 }

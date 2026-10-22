@@ -1,6 +1,7 @@
 import type {Camera} from 'three/webgpu';
 import {OrthographicCamera, Vector2} from 'three/webgpu';
 
+import {describeValue} from '../utils/describeValue.js';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IProjection, ProjectionViewRect} from './IProjection.js';
@@ -135,7 +136,7 @@ export class OrthographicProjection implements IProjection {
   updateCamera(camera: Camera): void {
     if ((camera as OrthographicCamera)?.isOrthographicCamera !== true) {
       throw new TypeError(
-        `OrthographicProjection: updateCamera() needs an OrthographicCamera, got ${camera?.type ?? String(camera)}`,
+        `OrthographicProjection: updateCamera() needs an OrthographicCamera, got ${(camera as {isObject3D?: unknown} | null | undefined)?.isObject3D === true ? camera.type : describeValue(camera)}`,
       );
     }
     const projectionPlane = this.#requireProjectionPlane('updateCamera()');

@@ -17,6 +17,7 @@ import {
   Vector2,
   WebGLCoordinateSystem,
 } from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 import type {VO} from '../vertex-objects/types.js';
 import type {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
@@ -473,9 +474,11 @@ function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly 
     throw new TypeError(`${WHERE}: the camera is no three.js Camera`);
   }
   if (!Number.isFinite(pointer?.x) || !Number.isFinite(pointer?.y)) {
-    throw new TypeError(
-      `${WHERE}: the pointer is {x, y} in normalized device coordinates, -1 to 1 — got {x: ${pointer?.x}, y: ${pointer?.y}}`,
-    );
+    const got =
+      typeof pointer !== 'object' || pointer === null
+        ? describeValue(pointer)
+        : `{x: ${describeValue(pointer.x)}, y: ${describeValue(pointer.y)}}`;
+    throw new TypeError(`${WHERE}: the pointer is {x, y} in normalized device coordinates, -1 to 1 — got ${got}`);
   }
   if (!Array.isArray(sprites)) {
     throw new TypeError(`${WHERE}: takes a list of FeatureSprites — pick(camera, pointer, [sprites])`);

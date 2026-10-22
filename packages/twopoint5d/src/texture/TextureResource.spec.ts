@@ -643,10 +643,10 @@ describe('TextureResource', () => {
       expect(errors.map((e) => e.id)).toEqual(['tiles', 'tiles']);
       expect(errors.map((e) => e.animation)).toEqual(['walk', 'run']);
       expect(errors[0]!.error.message).toBe(
-        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation `walk`',
+        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation "walk"',
       );
       expect(errors[1]!.error.message).toBe(
-        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation `run`',
+        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation "run"',
       );
 
       // the entry beside it is registered all the same
@@ -721,7 +721,7 @@ describe('TextureResource', () => {
       expect(errors[0]!.id).toBe('sprites');
       expect(errors[0]!.animation).toBe('walk');
       expect(errors[0]!.error.message).toBe(
-        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation `walk`',
+        'FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation "walk"',
       );
 
       // the entry beside it is registered all the same
@@ -2897,7 +2897,7 @@ describe('TextureResource', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatchObject({source: 'frameBasedAnimations', id: 'tiles', animation: 'walk'});
       expect(errors[0]!.error.message).toBe(
-        `FrameBasedAnimations: add() got a tileCount of "5" for the animation \`walk\` — a tileCount is a whole number from 1 to ${FrameBasedAnimations.MaxTextureSize}`,
+        `FrameBasedAnimations: add() got a tileCount of "5" for the animation "walk" — a tileCount is a whole number from 1 to ${FrameBasedAnimations.MaxTextureSize}`,
       );
       expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
       expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);

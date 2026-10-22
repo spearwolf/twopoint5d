@@ -450,5 +450,22 @@ describe('defineSprite()', () => {
         'defineSprite: feature "picky": needs a grid base',
       );
     });
+
+    test('a throw of a value that is neither an Error nor a string is refused with the value quoted', () => {
+      const throwing = (value: unknown) =>
+        defineFeature({
+          name: 'picky',
+          checkKind: () => {
+            throw value;
+          },
+        });
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, throwing({code: 1})]})).toThrow(
+        'defineSprite: feature "picky": {code: 1}',
+      );
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, throwing(Object.create(null))]})).toThrow(
+        'defineSprite: feature "picky": {}',
+      );
+    });
   });
 });

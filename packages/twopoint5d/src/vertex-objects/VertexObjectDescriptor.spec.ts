@@ -290,6 +290,10 @@ describe('VertexObjectDescriptor', () => {
       expect(build({vertexCount: 4, indices: [-1, 1, 2], attributes: {pos}})).toThrow(/index -1 at position 0/);
     });
 
+    test('an index that is no number is quoted as it is', () => {
+      expect(build({vertexCount: 4, indices: [0, '1', 2] as never, attributes: {pos}})).toThrow(/index "1" at position 1/);
+    });
+
     test('a fractional index', () => {
       expect(build({vertexCount: 4, indices: [0, 1.5, 2], attributes: {pos}})).toThrow(/index 1.5 at position 1/);
     });

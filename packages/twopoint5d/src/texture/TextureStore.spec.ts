@@ -256,7 +256,7 @@ describe('TextureStore', () => {
         const settled = await loading;
         expect(settled).toBeInstanceOf(Error);
         expect((settled as Error).message).toBe(
-          'TextureStore: loadAsync(http://example.test/data.json) was cancelled: this store has been disposed',
+          'TextureStore: loadAsync("http://example.test/data.json") was cancelled: this store has been disposed',
         );
       } finally {
         fetchMock.mockRestore();
@@ -306,7 +306,7 @@ describe('TextureStore', () => {
         expect(() => store.dispose()).not.toThrow();
         expect(() => store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
         await expect(store.loadAsync('http://example.test/data.json')).rejects.toThrow(
-          'TextureStore: loadAsync(http://example.test/data.json) was cancelled: this store has been disposed',
+          'TextureStore: loadAsync("http://example.test/data.json") was cancelled: this store has been disposed',
         );
         expect(fetchMock).not.toHaveBeenCalled();
         expect(store.clearUnused()).toBe(0);
@@ -743,7 +743,7 @@ describe('TextureStore', () => {
 
       expect(settled).toBeInstanceOf(DOMException);
       expect((settled as DOMException).name).toBe('AbortError');
-      expect((settled as DOMException).message).toBe(`loadAsync(${catalogUrl}) aborted`);
+      expect((settled as DOMException).message).toBe(`loadAsync("${catalogUrl}") aborted`);
       expect(fetchMock).not.toHaveBeenCalled();
       expect(addEventListener).not.toHaveBeenCalled();
 
@@ -795,7 +795,7 @@ describe('TextureStore', () => {
       const settled = await loading;
 
       expect((settled as Error).message).toBe(
-        `TextureStore: loadAsync(${catalogUrl}) was cancelled: this store has been disposed`,
+        `TextureStore: loadAsync("${catalogUrl}") was cancelled: this store has been disposed`,
       );
       expect(parse).not.toHaveBeenCalled();
     });
@@ -806,7 +806,7 @@ describe('TextureStore', () => {
       store.dispose();
 
       await expect(store.loadAsync(catalogUrl)).rejects.toThrow(
-        `TextureStore: loadAsync(${catalogUrl}) was cancelled: this store has been disposed`,
+        `TextureStore: loadAsync("${catalogUrl}") was cancelled: this store has been disposed`,
       );
       expect(fetchMock).not.toHaveBeenCalled();
     });
@@ -902,7 +902,7 @@ describe('TextureStore', () => {
         expect(settledFirst).toBeInstanceOf(DOMException);
         expect((settledFirst as DOMException).name).toBe('AbortError');
         expect((settledFirst as DOMException).message).toBe(
-          `loadAsync(${firstUrl}) aborted: a later loadAsync() on this store took its place`,
+          `loadAsync("${firstUrl}") aborted: a later loadAsync() on this store took its place`,
         );
         expect(settledSecond).toBe(store);
         expect(fetchMock.mock.calls[0]![1]!.signal!.aborted).toBe(true);
@@ -1060,7 +1060,9 @@ describe('TextureStore', () => {
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
 
-      await expect(store.get('a', 'texture')).rejects.toThrow('TextureStore: get(a, texture) failed at the image step: "a.png"');
+      await expect(store.get('a', 'texture')).rejects.toThrow(
+        'TextureStore: get("a", "texture") failed at the image step: "a.png"',
+      );
 
       const ac = new AbortController();
       ac.abort();
@@ -1071,12 +1073,12 @@ describe('TextureStore', () => {
       const pending = new AbortController();
       const aborted = waiting.get('b', 'texture', {signal: pending.signal});
       pending.abort();
-      await expect(aborted).rejects.toThrow('get(b, texture) aborted');
+      await expect(aborted).rejects.toThrow('get("b", "texture") aborted');
       waiting.dispose();
 
       store.dispose();
       await expect(store.get('a', 'texture')).rejects.toThrow(
-        'TextureStore: get(a, texture) was cancelled: this store has been disposed',
+        'TextureStore: get("a", "texture") was cancelled: this store has been disposed',
       );
     });
   });
@@ -1192,7 +1194,7 @@ describe('TextureStore', () => {
         'TextureStore: no resource with id "missing" — check your TextureStoreData.items keys.',
       );
       await expect(store.acquireAsync('a', 'atlas')).rejects.toThrow(
-        'TextureStore: acquireAsync(a, atlas) cannot resolve: "a" is an "image" resource, which never builds atlas',
+        'TextureStore: acquireAsync("a", "atlas") cannot resolve: "a" is an "image" resource, which never builds atlas',
       );
 
       const aborted = new AbortController();
@@ -1203,13 +1205,15 @@ describe('TextureStore', () => {
       const ac = new AbortController();
       const waiting = store.acquireAsync('a', 'texture', {signal: ac.signal});
       ac.abort();
-      await expect(waiting).rejects.toThrow('acquireAsync(a, texture) aborted');
+      await expect(waiting).rejects.toThrow('acquireAsync("a", "texture") aborted');
 
       const pending = store.acquireAsync('a', 'texture');
       store.dispose();
-      await expect(pending).rejects.toThrow('TextureStore: acquireAsync(a, texture) was cancelled: this store has been disposed');
+      await expect(pending).rejects.toThrow(
+        'TextureStore: acquireAsync("a", "texture") was cancelled: this store has been disposed',
+      );
       await expect(store.acquireAsync('a', 'texture')).rejects.toThrow(
-        'TextureStore: acquireAsync(a, texture) was cancelled: this store has been disposed',
+        'TextureStore: acquireAsync("a", "texture") was cancelled: this store has been disposed',
       );
     });
   });
@@ -2543,7 +2547,7 @@ describe('TextureStore', () => {
     // promise still waiting gives 'pending', which a failed expectation then shows as such
     const messageOf = (settled: unknown) => (settled instanceof Error ? settled.message : settled);
 
-    const imageFailed = 'TextureStore: getAsync(a, texture) failed at the image step: "a.png"';
+    const imageFailed = 'TextureStore: getAsync("a", "texture") failed at the image step: "a.png"';
 
     test('getAsync() rejects when the image does not load', async () => {
       const loaderError = new Error('404');
@@ -2568,7 +2572,7 @@ describe('TextureStore', () => {
 
       const settled = await settleWithin(store.getAsync('a', 'texture'));
 
-      expect(messageOf(settled)).toBe('TextureStore: getAsync(a, texture) failed at the atlas step: "atlas.json"');
+      expect(messageOf(settled)).toBe('TextureStore: getAsync("a", "texture") failed at the atlas step: "atlas.json"');
 
       store.dispose();
     });
@@ -2588,7 +2592,7 @@ describe('TextureStore', () => {
       const resource = ofShape(await store.whenResource('a'), 'atlas');
 
       const failed = await settleWithin(store.getAsync('a', 'texture'));
-      expect(messageOf(failed)).toBe('TextureStore: getAsync(a, texture) failed at the atlas step: "atlas.json"');
+      expect(messageOf(failed)).toBe('TextureStore: getAsync("a", "texture") failed at the atlas step: "atlas.json"');
 
       // the json written from outside takes the place of the one that could not be fetched,
       // and the image it names is still on its way when the getAsync() below asks
@@ -2705,7 +2709,7 @@ describe('TextureStore', () => {
 
       const settled = await settleWithin(store.getAsync('t', 'tileSet'));
 
-      expect(messageOf(settled)).toBe('TextureStore: getAsync(t, tileSet) failed at the texture step');
+      expect(messageOf(settled)).toBe('TextureStore: getAsync("t", "tileSet") failed at the texture step');
 
       store.dispose();
     });
@@ -2805,7 +2809,7 @@ describe('TextureStore', () => {
       const settled = await settleWithin(store.getAsync('hero', ['atlas', 'texture']));
 
       expect(messageOf(settled)).toBe(
-        'TextureStore: getAsync(hero, atlas,texture) cannot resolve: "hero" is an "image" resource, which never builds atlas',
+        'TextureStore: getAsync("hero", ["atlas", "texture"]) cannot resolve: "hero" is an "image" resource, which never builds atlas',
       );
       store.dispose();
     });
@@ -2818,7 +2822,7 @@ describe('TextureStore', () => {
       const settled = await settleWithin(store.getAsync('sheet', 'tileSet'));
 
       expect(messageOf(settled)).toBe(
-        'TextureStore: getAsync(sheet, tileSet) cannot resolve: "sheet" is an "atlas" resource, which never builds tileSet',
+        'TextureStore: getAsync("sheet", "tileSet") cannot resolve: "sheet" is an "atlas" resource, which never builds tileSet',
       );
       store.dispose();
     });
@@ -2831,7 +2835,7 @@ describe('TextureStore', () => {
       const settled = await settleWithin(store.getAsync('tiles', 'frameBasedAnimations'));
 
       expect(messageOf(settled)).toBe(
-        'TextureStore: getAsync(tiles, frameBasedAnimations) cannot resolve: "tiles" carries no frameBasedAnimations data',
+        'TextureStore: getAsync("tiles", "frameBasedAnimations") cannot resolve: "tiles" carries no frameBasedAnimations data',
       );
       store.dispose();
     });
@@ -2844,7 +2848,7 @@ describe('TextureStore', () => {
       const settled = await settleWithin(store.getAsync('sheet', ['tileSet', 'frameBasedAnimations']));
 
       expect(messageOf(settled)).toBe(
-        'TextureStore: getAsync(sheet, tileSet,frameBasedAnimations) cannot resolve: "sheet" is an "atlas" resource, which never builds tileSet',
+        'TextureStore: getAsync("sheet", ["tileSet", "frameBasedAnimations"]) cannot resolve: "sheet" is an "atlas" resource, which never builds tileSet',
       );
       store.dispose();
     });
@@ -2861,7 +2865,7 @@ describe('TextureStore', () => {
 
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(
-        'TextureStore: on(hero, atlas) is never called for "hero": it is an "image" resource, which never builds atlas',
+        'TextureStore: on("hero", "atlas") is never called for "hero": it is an "image" resource, which never builds atlas',
       );
       expect(callback).not.toHaveBeenCalled();
       store.dispose();
@@ -2924,7 +2928,7 @@ describe('TextureStore', () => {
 
       expect(settled).toBeInstanceOf(Error);
       expect((settled as Error).message).toBe(
-        'TextureStore: getAsync(a, imageCoords) was cancelled: the resource "a" has been disposed',
+        'TextureStore: getAsync("a", "imageCoords") was cancelled: the resource "a" has been disposed',
       );
       store.dispose();
     });
@@ -3218,7 +3222,7 @@ describe('TextureStore', () => {
 
       const settled = await settleWithin(store.getAsync('a', 'texture'));
 
-      expect(messageOf(settled)).toBe('TextureStore: getAsync(a, texture) failed at the image step: "a.png"');
+      expect(messageOf(settled)).toBe('TextureStore: getAsync("a", "texture") failed at the image step: "a.png"');
       expect((settled as Error).cause).toBe(loaderError);
 
       store.dispose();
@@ -3337,7 +3341,7 @@ describe('TextureStore', () => {
 
       expect(afterIt).toHaveBeenCalledOnce();
       expect(messageOf(await settleWithin(pending))).toBe(
-        'TextureStore: getAsync(a, texture) was cancelled: this store has been disposed',
+        'TextureStore: getAsync("a", "texture") was cancelled: this store has been disposed',
       );
       expect(aDisposed).toHaveBeenCalledOnce();
       expect(getSubscriptionCount(store)).toBe(0);
@@ -3530,7 +3534,7 @@ describe('TextureStore', () => {
 
       expect(settled).toBeInstanceOf(Error);
       expect((settled as Error).message).toBe(
-        'TextureStore: getAsync(sheet, frameBasedAnimations) cannot resolve: "sheet" carries no frameBasedAnimations data, and its atlas adapter read none out of its json',
+        'TextureStore: getAsync("sheet", "frameBasedAnimations") cannot resolve: "sheet" carries no frameBasedAnimations data, and its atlas adapter read none out of its json',
       );
       expect(resource.atlas).toBeDefined();
       store.dispose();
