@@ -151,13 +151,13 @@ describe('recordPreviewEvent()', () => {
 
 describe('refuseScreenshot()', () => {
   it('refuses a page that threw, strict or not', () => {
-    assert.match(refuseScreenshot({pageErrors: 1, consoleErrors: 0}, false) ?? '', /threw 1 error/);
-    assert.match(refuseScreenshot({pageErrors: 1, consoleErrors: 0}, true) ?? '', /threw 1 error/);
+    assert.equal(refuseScreenshot({pageErrors: 1, consoleErrors: 0}, false), 'the page threw 1 error(s)');
+    assert.equal(refuseScreenshot({pageErrors: 1, consoleErrors: 0}, true), 'the page threw 1 error(s)');
   });
 
   it('lets console errors pass without --strict and refuses them with it', () => {
     assert.equal(refuseScreenshot({pageErrors: 0, consoleErrors: 2}, false), undefined);
-    assert.match(refuseScreenshot({pageErrors: 0, consoleErrors: 2}, true) ?? '', /--strict/);
+    assert.equal(refuseScreenshot({pageErrors: 0, consoleErrors: 2}, true), 'the page logged 2 console error(s) under --strict');
   });
 
   it('accepts a page that reported nothing', () => {
@@ -176,6 +176,7 @@ describe('summarizeRun()', () => {
     const {summary, exitCode} = summarizeRun([ok('a'), {id: 'b', ok: false, seconds: 1, problems: ['boom']}]);
     assert.equal(exitCode, 1);
     assert.match(summary, /1 of 2 failed/);
+    assert.match(summary, /their old images stay/);
     assert.match(summary, /\bb\b/);
   });
 

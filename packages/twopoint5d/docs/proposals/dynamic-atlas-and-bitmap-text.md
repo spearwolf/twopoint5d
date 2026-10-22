@@ -175,8 +175,9 @@ cell to its place. The staging canvas and its `CanvasTexture` carry the settings
 — the same GPU format, so the copy is texel for texel —; the canvas grows to the largest cell that
 changed and keeps its size. Where the copies would cover half the atlas or more (cells × staging
 area ≥ half of `width × height`), `upload()` marks the whole texture instead: one transfer is
-cheaper than a submit per cell. `clear()` marks the whole texture either way, and a copy that throws
-marks it as well, so no change is lost, before the error goes on to the caller.
+cheaper than a submit per cell. `clear()` marks the whole texture either way, and an `upload()` that
+throws — while it builds the staging canvas or in a copy — marks it as well, so no change is lost,
+before the error goes on to the caller.
 
 `texture.updateRanges` is no way to it: three reads it only in the classic `WebGLRenderer` and
 only for data textures, and neither backend of `WebGPURenderer` uploads part of an image. Nor is

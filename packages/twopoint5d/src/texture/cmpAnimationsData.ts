@@ -7,23 +7,28 @@ const isPlainObject = (value: object): boolean => {
 };
 
 // compares the parts of `a` and `b` with the pair on the path, and takes it off once that is done
-const descend = (a: object, b: object, onPath: Map<object, object>, compareParts: () => boolean): boolean => {
-  const outer = onPath.get(a);
-  onPath.set(a, b);
+const descend = (a: object, b: object, onPath: Map<object, Set<object>>, compareParts: () => boolean): boolean => {
+  let partners = onPath.get(a);
+  if (partners === undefined) {
+    partners = new Set();
+    onPath.set(a, partners);
+  }
+  partners.add(b);
   try {
     return compareParts();
   } finally {
-    if (outer === undefined) onPath.delete(a);
-    else onPath.set(a, outer);
+    partners.delete(b);
+    if (partners.size === 0) onPath.delete(a);
   }
 };
 
-// `onPath` holds the pairs whose comparison is under way: a pair met again further down is a cycle,
-// and it counts as equal, since every other part of both graphs is compared on its own
-const sameData = (a: unknown, b: unknown, onPath: Map<object, object>): boolean => {
+// `onPath` holds, for each object of `a`, the objects of `b` it is being compared with: a pair met again
+// further down is a cycle, and it counts as equal, since every other part of both graphs is compared on
+// its own — cycles of different periods included
+const sameData = (a: unknown, b: unknown, onPath: Map<object, Set<object>>): boolean => {
   if (Object.is(a, b)) return true;
   if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
-  if (onPath.get(a) === b) return true;
+  if (onPath.get(a)?.has(b)) return true;
 
   if (a instanceof RegExp || b instanceof RegExp) {
     return a instanceof RegExp && b instanceof RegExp && a.source === b.source && a.flags === b.flags;

@@ -95,4 +95,23 @@ describe('cmpAnimationsData()', () => {
     (other['walk'] as {duration: number}).duration = 2;
     expect(cmpAnimationsData(cyclic(), other)).toBe(false);
   });
+
+  test('cycles of different periods end the comparison', () => {
+    const once = () => {
+      const entry: Record<string, unknown> = {duration: 1, tileIds: [1]};
+      entry['self'] = entry;
+      return {walk: entry} as unknown as FrameBasedAnimationsDataMap;
+    };
+    const twice = (secondDuration: number) => {
+      const first: Record<string, unknown> = {duration: 1, tileIds: [1]};
+      const second: Record<string, unknown> = {duration: secondDuration, tileIds: [1]};
+      first['self'] = second;
+      second['self'] = first;
+      return {walk: first} as unknown as FrameBasedAnimationsDataMap;
+    };
+
+    expect(cmpAnimationsData(once(), twice(1))).toBe(true);
+    expect(cmpAnimationsData(twice(1), once())).toBe(true);
+    expect(cmpAnimationsData(once(), twice(2))).toBe(false);
+  });
 });

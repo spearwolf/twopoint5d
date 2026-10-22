@@ -308,6 +308,24 @@ describe('TextureResource', () => {
       expect(factoryDispose.called).toBe(false);
     });
 
+    test('a disposed tile set or atlas resource reads none of the frameBasedAnimationsData written to it', () => {
+      for (const resource of [new TileSetTextureResource('tiles'), new AtlasTextureResource('frames')]) {
+        resource.frameBasedAnimationsData = {walk: {duration: 1, tileIds: [1]}};
+        resource.dispose();
+        let reads = 0;
+
+        resource.frameBasedAnimationsData = {
+          get walk() {
+            reads++;
+            return {duration: 1, tileIds: [1]};
+          },
+        };
+
+        expect(reads).toBe(0);
+        expect(resource.frameBasedAnimationsData).toBeUndefined();
+      }
+    });
+
     // (c) every public member behaves after dispose() as its TSDoc says.
     // There is no member of the second kind here — no getter of this class is typed as
     // always present — so the "throws" assertion of the pattern has no subject.

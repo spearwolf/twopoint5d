@@ -919,6 +919,31 @@ describe('DynamicAtlas', () => {
       atlas.upload(renderer);
       expect(copyTextureToTexture).toHaveBeenCalledOnce();
     });
+
+    test('an upload whose staging canvas cannot be built marks the whole texture, so no change is lost, and the error goes on', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.upload(renderer);
+      atlas.add('a', noop, {width: 10, height: 8});
+      // a staging canvas whose 2D context is taken: getContext('2d') answers null
+      vi.stubGlobal(
+        'OffscreenCanvas',
+        class extends FakeCanvas {
+          constructor(width: number, height: number) {
+            super(width, height);
+            this.context2d = null;
+          }
+        },
+      );
+      const version = atlas.texture.version;
+
+      expect(() => atlas.upload(renderer)).toThrow('expected the 2D context of a canvas of its own to be defined');
+
+      expect(atlas.texture.version).toBeGreaterThan(version);
+      vi.stubGlobal('OffscreenCanvas', FakeCanvas);
+      atlas.upload(renderer);
+      expect(copyTextureToTexture).not.toHaveBeenCalled();
+    });
   });
 
   describe('the frames are those of an ordinary atlas', () => {

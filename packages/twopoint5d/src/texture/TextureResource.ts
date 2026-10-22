@@ -266,6 +266,10 @@ export interface TextureResource extends EventizedObject {}
  * {@link TextureResource.fromImage}, {@link TextureResource.fromTileSet} or
  * {@link TextureResource.fromAtlas}, which write its first values as well.
  *
+ * `TextureResource` is the base of these three alone and is not meant to be extended outside the
+ * library: the effects of a shape hang on a member the published types leave out. To add to a
+ * shape, extend the class of that shape.
+ *
  * **Inputs** of every shape — write these to say how the texture is built:
  *
  * - `textureClasses` — the texture classes the texture is built with;
@@ -1096,6 +1100,7 @@ export class TileSetTextureResource extends TextureResource {
   }
 
   set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
+    if (this.#context.isDisposed()) return;
     this.#context.frameBasedAnimationsData.set(value);
   }
 
@@ -1318,6 +1323,7 @@ export class AtlasTextureResource extends TextureResource {
   }
 
   set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
+    if (this.#context.isDisposed()) return;
     this.#context.frameBasedAnimationsData.set(value);
   }
 

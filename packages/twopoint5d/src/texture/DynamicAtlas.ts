@@ -400,8 +400,9 @@ export class DynamicAtlas {
    * render. The first call copies nothing — every change before it has marked the whole texture — and
    * from then on `add()`, `redraw()` and `remove()` leave the texture to the next call, so a change
    * shows only after it. Where the copies would cover half the atlas or more, it marks the whole
-   * texture instead; `clear()` marks it either way. A copy that throws marks the whole texture, so no
-   * change is lost, and the error goes on to the caller.
+   * texture instead; `clear()` marks it either way. A call that throws — while it builds its staging
+   * canvas or in a copy — marks the whole texture, so no change is lost, and the error goes on to the
+   * caller.
    *
    * The renderer is the one that draws the texture, initialised: another renderer gets the canvas
    * as it is with its first render and none of the copies after. Without this call every change
@@ -432,9 +433,9 @@ export class DynamicAtlas {
       return;
     }
 
-    const staging = this.#ensureStaging(stageW, stageH);
-    const {context} = staging;
     try {
+      const staging = this.#ensureStaging(stageW, stageH);
+      const {context} = staging;
       // one staging canvas serves every cell: each backend runs the upload of the staging texture, the copy
       // out of it and the next upload in the order they are called — WebGPU submits each copy at once into
       // its queue, WebGL 2 issues them in one command stream

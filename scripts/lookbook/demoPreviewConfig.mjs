@@ -82,10 +82,8 @@ export function selectDemos(ids, only) {
  * @returns {string | undefined}
  */
 export function refuseScreenshot({pageErrors, consoleErrors}, strict) {
-  if (pageErrors > 0) return `the page threw ${pageErrors} error(s), the old image stays`;
-  if (strict && consoleErrors > 0) {
-    return `the page logged ${consoleErrors} console error(s) under --strict, the old image stays`;
-  }
+  if (pageErrors > 0) return `the page threw ${pageErrors} error(s)`;
+  if (strict && consoleErrors > 0) return `the page logged ${consoleErrors} console error(s) under --strict`;
   return undefined;
 }
 

@@ -176,6 +176,9 @@ explicit instruction.
   their release and are not marked after the fact.
   Backtick and tilde fences count alike, and a block marked `check` inside a blockquote
   fails the check, because quotes are not unwrapped and the block would go unchecked.
+  A fence counts where CommonMark sees one: indented at most three columns past
+  the start of its line or past the content of its list item; a line indented
+  further is code of an indented block and opens no block.
 - **Commits** follow [Conventional
   Commits](https://www.conventionalcommits.org/en/v1.0.0/). Code, comments and docs are
   written in English.

@@ -39,6 +39,69 @@ test('strips the fence indentation from the code and reports it as `indent`', ()
   assert.deepEqual(snippets, [{file: 'a.md', line: 4, indent: 2, code: 'const a = 1;\n  const b = 2;\nx'}]);
 });
 
+test('a fence indented four spaces at the top level opens no block: the line is code of an indented block', () => {
+  const {snippets, problems} = extractSnippets(
+    doc(
+      'Write a fence like this:',
+      '',
+      `    ${FENCE}ts check`,
+      '',
+      'and close it.',
+      '',
+      `${FENCE}ts check`,
+      'const b = 1;',
+      FENCE,
+    ),
+    'a.md',
+  );
+
+  assert.deepEqual(snippets, [{file: 'a.md', line: 8, indent: 0, code: 'const b = 1;'}]);
+  assert.deepEqual(problems, []);
+});
+
+test('a tab before a fence is four columns: the line opens no block', () => {
+  const {snippets, problems} = extractSnippets(doc(`\t${FENCE}ts check`, 'const a = 1;', `\t${FENCE}`), 'a.md');
+
+  assert.deepEqual(snippets, []);
+  assert.deepEqual(problems, []);
+});
+
+test('a line indented four spaces inside a block is code, not its closing fence', () => {
+  const {snippets} = extractSnippets(
+    doc(`${FENCE}ts check`, '// a fence in a comment:', `    ${FENCE}`, 'const a = 1;', FENCE),
+    'a.md',
+  );
+
+  assert.deepEqual(snippets, [{file: 'a.md', line: 2, indent: 0, code: `// a fence in a comment:\n    ${FENCE}\nconst a = 1;`}]);
+});
+
+test('a fence indented four spaces in a nested list item opens a block', () => {
+  const {snippets} = extractSnippets(
+    doc('- outer', '  - inner', '', `    ${FENCE}ts check`, '    const a = 1;', `    ${FENCE}`),
+    'a.md',
+  );
+
+  assert.deepEqual(snippets, [{file: 'a.md', line: 5, indent: 4, code: 'const a = 1;'}]);
+});
+
+test('a fence of an ordered list item is measured from the content of the item', () => {
+  const {snippets} = extractSnippets(doc('10. item', '', `    ${FENCE}ts check`, '    const a = 1;', `    ${FENCE}`), 'a.md');
+
+  assert.deepEqual(snippets, [{file: 'a.md', line: 4, indent: 4, code: 'const a = 1;'}]);
+});
+
+test('a fence four columns past the content of its list item is code of an indented block', () => {
+  const {snippets} = extractSnippets(doc('- item', '', `      ${FENCE}ts check`, '      const a = 1;', `      ${FENCE}`), 'a.md');
+
+  assert.deepEqual(snippets, []);
+});
+
+test('a line less indented than the content of a list item ends it: a fence after it is measured from its line', () => {
+  const {snippets} = extractSnippets(doc('- item', '', 'prose', '', `    ${FENCE}ts check`, 'x', `    ${FENCE}`), 'a.md');
+
+  assert.deepEqual(snippets, []);
+});
+
 test('a `ts check` line inside a block of four backticks is no marker', () => {
   const outer = '````';
   const {snippets, problems} = extractSnippets(
