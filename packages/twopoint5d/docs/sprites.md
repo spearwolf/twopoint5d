@@ -54,7 +54,7 @@ The order bands `FrameOrder` (`Flip 100`), `LocalOrder`
 (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`) and `ColorOrder`
 (`Palette 50, Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of your
 own. Two stages of one order run in the order of the feature list. No built-in feature sits in
-`ColorOrder.Mask` since `ShadowMask` moved to `ColorOrder.Pass`. `ColorOrder.Pass` is the band of
+`ColorOrder.Mask`. `ColorOrder.Pass` is the band of
 the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` — after
 every color stage of the kind.
 
@@ -241,8 +241,7 @@ turned by 90°, read with the two lookup components swapped — and `texTrim`, t
 packer cut off, as fractions of the untrimmed sprite. `setFrame(frame)` writes all three for a
 frame of any atlas; the margins come from TexturePacker data and are zero for every other.
 `TexturePackerJson` reads the "JSON Hash" and "JSON Array" exports of TexturePacker and of
-free-tex-packer alike, rotated and trimmed frames included — a fixture of a real free-tex-packer
-export holds it to that (`src/texture/fixtures/free-tex-packer/`).
+free-tex-packer alike, rotated and trimmed frames included.
 
 The quad of the sprite stands for the **untrimmed** sprite: size a sprite that shows trimmed
 frames by the `sourceSize` of its frames, not by the measures of their `coords`.
@@ -1146,9 +1145,10 @@ material.dispose();
 
 Another placement takes the place of the current one only when it contributes a placement stage
 and nothing else — no attributes, methods, uniforms or textures, because the sprites and the
-material were built without them — and the kind holds every feature it `requires`. Anything else
-throws a `TypeError` naming both features. The placement of the kind always comes back, whatever
-it brings. A write of the placement the material holds builds nothing.
+material were built without them — and the kind holds every feature it `requires`. It may bring a
+`checkKind` of its own, which is shown the kind with it in place of the kind's placement. Anything
+else throws a `TypeError` naming both features, a refusal of its `checkKind` an `Error` naming it.
+The placement of the kind always comes back, whatever it brings. A write of the placement the material holds builds nothing.
 
 A change rebuilds the position graph and sets `needsUpdate`; three serves a shader source it has
 built before from its caches, so the second swap back and forth is cheap. Do not swap every frame.
@@ -1960,15 +1960,14 @@ if (sprite != null) {
 sprites.dispose();
 ```
 
-`Fade` and `Flash` are built the same way — `src/sprites/features/Fade.ts` and `Flash.ts` are a
-dozen lines each.
+`Fade` and `Flash` are built the same way, a dozen lines each.
 
 The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
 - **`name`** — required, unique within a kind; every error about the feature names it, and
   `requires` of other features refers to it.
 - **`attributes`** — instance attributes in the form of a vertex object description (see
-  `src/vertex-objects/README.md`). They are merged into the one description of the kind, so an
+  [vertex objects](../src/vertex-objects/README.md)). They are merged into the one description of the kind, so an
   attribute name is unique across the features and must not be one of the base (`position`,
   `uv`); the merged layout has to fit into one sprite. An attribute is `static` unless it says
   otherwise: give one that changes every frame `usage: 'dynamic'`.
@@ -2267,6 +2266,7 @@ platform — a shadow that reaches past the edge hangs in the air beyond it. Kee
 from the edge on the side the shadows fall to, by the length of their shadow — `h · √(lx² + lz²) /
 ly` for a sprite `h` tall under a directional light `(lx, ly, lz)` over the XZ ground — or let the
 ground reach past every shadow.
+
 `SegmentShadowPass` is named `shadow`, as `ShadowPass` is, and `BillboardReflectionPass` is named
 `reflection`, as `ReflectionPass` is: a kind takes one or the other of each pair.
 
@@ -2752,15 +2752,13 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
 
 - The setters of the features allocate nothing per call: they hand their values on in a scratch
   tuple, and `createSprite()` allocates the sprite and nothing else — on a full pool, once it has
-  warned, nothing at all. The allocation spec
-  (`src/sprites/hot-path-allocations.spec.ts`) holds both presets to it, and `pnpm bench` times
-  the hot loops of 10 000 sprites.
+  warned, nothing at all.
 - A sprite that changes its frame every frame takes `prepareSpriteFrame()` once per atlas frame
   and `setPreparedFrame()` per sprite.
 - `sortBy()` by a name and `sortByViewDepth()` allocate nothing once their scratch is there —
   the first sort allocates it, and it grows only with the capacity. 10 000 sprites sort in about
   0.1 ms when the order holds, 0.5 ms with ten of them out of line, 1.1 ms by the view depth under a
-  circling camera and 1.3 ms from a random order (`src/sprites/FeatureSprites/sorting.bench.ts`);
+  circling camera and 1.3 ms from a random order;
   the upload after a sort that moved them is the larger price (see "Draw order: sorting the
   sprites").
 - Under `grow: true` a `createSprite()` that finds room allocates the sprite and nothing else, and

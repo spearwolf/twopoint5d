@@ -2,8 +2,8 @@
 
 Generates the assets of the lookbook demo `cardboard-parade` into `apps/lookbook/public/assets/cardboard/`:
 
-- `cardboard.png` and `cardboard.json` — a TexturePacker "JSON Hash" atlas of 22 frames: four
-  trees, three houses, a fence segment, four signposts, four figures, a dog and a duck, all
+- `cardboard.png` and `cardboard.json` — a TexturePacker "JSON Hash" atlas of 22 frames: three
+  trees, a bush, three houses, a fence segment, four signposts, four figures, a dog and a duck, all
   standing on the bottom edge of their frame, and the flat frames `blob`, `foot_left`,
   `foot_right` and `paw` for the ground
 - `turntable.webp` — the disc the theatre stands on, the end grain of a tree slice
