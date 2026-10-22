@@ -44,10 +44,11 @@ const makeMatrixWorld = () => new Matrix4().makeTranslation(0.25, 0, 0.75);
 // the second position: a change the gate sees, and the same tiles
 const makeOtherMatrixWorld = () => new Matrix4().makeTranslation(0.25, 0, 0.7501);
 
+// turned through `rotation`: `lookAt()` along the up vector of the camera tips it by about 1e-4 rad
 function makeTopDownCamera(): PerspectiveCamera {
   const camera = new PerspectiveCamera(90, 1, 0.1, 500);
   camera.position.set(0, 100, 0);
-  camera.lookAt(0, 0, 0);
+  camera.rotation.set(-Math.PI / 2, 0, 0);
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
   return camera;

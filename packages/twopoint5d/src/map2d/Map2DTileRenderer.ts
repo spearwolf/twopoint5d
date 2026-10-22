@@ -41,6 +41,10 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
    */
   #tilesChanged = true;
 
+  // The `contentSerial` of the factory the tiles this renderer holds were built with; a factory
+  // that answers another one has every tile built again in the next update cycle.
+  #builtContentSerial: number | undefined;
+
   readonly node = new Object3D();
 
   /**
@@ -59,15 +63,25 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
    * {@link noTileCapacity} for a tile, a {@link clearTiles}, and an {@link addTile},
    * {@link reuseTile} or {@link removeTile} outside an update cycle. `true` as well while an update
    * cycle is open, and so after a cycle a throw broke off, in {@link endUpdatingTiles} as well: a
-   * factory whose `update()` throws is asked again in the next one. See
-   * {@link IMap2DTileRenderer.hasPendingTiles}. `false` once {@link dispose} has run.
+   * factory whose `update()` throws is asked again in the next one. `true` as well while the
+   * {@link IMapTileFactory.contentSerial} of the factory differs from the one the tiles were built
+   * with. See {@link IMap2DTileRenderer.hasPendingTiles}. `false` once {@link dispose} has run.
    */
   get hasPendingTiles(): boolean {
-    return this.tileFactory !== null && (this.#cleared || this.#tilesPending || this.#changedOutsideCycle || this.#updating);
+    const tileFactory = this.tileFactory;
+    return (
+      tileFactory !== null &&
+      (this.#cleared ||
+        this.#tilesPending ||
+        this.#changedOutsideCycle ||
+        this.#updating ||
+        tileFactory.contentSerial !== this.#builtContentSerial)
+    );
   }
 
   constructor(tileFactory: IMapTileFactory) {
     this.tileFactory = tileFactory;
+    this.#builtContentSerial = tileFactory.contentSerial;
     this.node.name = 'twopoint5d.Map2DTileRenderer';
     tileFactory.addToNode(this.node);
   }
@@ -75,7 +89,17 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
   beginUpdatingTiles(position: Vector3, tilesChanged = true): void {
     // this one never reaches the factory, but moving the node of a spent renderer is a
     // mutation all the same
-    if (this.tileFactory === null) return;
+    const tileFactory = this.tileFactory;
+    if (tileFactory === null) return;
+
+    // the factory builds something else for a coordinate now: every tile goes back, every hole is
+    // asked about again, and the tiles handed in for reuse are built anew. The serial is taken
+    // over only once clearTiles() has come back, so that one that throws is tried again
+    const contentSerial = tileFactory.contentSerial;
+    if (contentSerial !== this.#builtContentSerial) {
+      this.clearTiles();
+      this.#builtContentSerial = contentSerial;
+    }
 
     this.#tilesPending = false;
     this.#cleared = false;
@@ -229,6 +253,7 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
 
     tileFactory.removeFromNode(this.node);
     this.tileFactory = null;
+    this.#builtContentSerial = undefined;
     this.#dataSerial = 0;
     this.#updateDataSerial = -1;
     this.#tilesChanged = true;

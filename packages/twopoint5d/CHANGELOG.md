@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `SpriteFrameContext#colorSpace(name)`: the `colorSpace` of a texture any feature of the material declares, as it is set — `undefined` while it is unset — and a tracked read, so a texture in another colour space builds the graph anew
 - add `Stage2D#releasePassNodeMemory()`: releases the GPU memory of the render target of the pass node `asPassNode()` built and keeps the node, so every node and pipeline on it stays valid; three.js allocates the memory again on the next draw of the node
 - add `VOSortKeyName<VOType>`: the names `VertexObjectPool#sortBy()` takes as its key
+- add the guide `docs/map2d.md`: how a tile map is put together, under a camera and in a rectangle, how the defaults play together, what a change while the map runs takes, the debug view and who disposes what
+- add `IMapTileFactory#contentSerial` (optional) and `TileSpritesFactory#contentSerial`: a number that moves when what the factory builds for a coordinate changes, and on which `Map2DTileRenderer` builds its tiles again
 
 ### Changed
 
@@ -86,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderTargetPool#acquire()` resizes the oldest free target of the type and the samples asked for when no free target has the size, and releases the other free targets; the `texture()` node of Mode C and the pipeline on it stay across a change of the pixel ratio
 - the TSDoc of `dispose()` of `StageRenderer`, `Stage2D` and `Canvas2DStage` and of `StageRenderer#add()`, `remove()` and `parent` names what reaches the caller — one error unchanged, several as an `AggregateError` — and leaves the order of the errors open
 - the TSDoc and the sprites guide say that `setTexture()` with the texture that is set does nothing, and that a change of its filters, `colorSpace`, `type` or `format` needs `touchTexture()` to give the graphs the new kind of the texture
+- `CameraBasedVisibility` hands out what it computes for reading only: `TileBox` with `readonly` fields, `visibles` and `pointsOnPlane` as `readonly` arrays, `planeWorld`, `planeOrigin`, `planeCoords2D` and `matrixWorld` as `readonly`, `pointOnPlane` as a getter, and `CameraBasedVisibility.Plane` a new copy on every access (**BREAKING** for TypeScript). An `x` or `y` of a slot written by hand leaves the slot behind in the slot table, and an assigned `planeWorld` cuts the helpers off from the plane the class writes. See the Migration Guide
+- the setter `Map2D#visibilitor` takes `undefined`, which takes the visibilitor away; the next `update()` empties every tile renderer
+- `RepeatingTilesProvider#tileIds` keeps and hands out a frozen copy of the pattern, typed `readonly (readonly number[])[]` (**BREAKING**). See the Migration Guide
+- `InputControlBase` tells its listeners apart as the DOM does, by host, event and callback: a second `addEventListener()` with another `passive` replaces the listener, and `removeEventListener()` takes no `passive` (**BREAKING** for a control of one's own). See the Migration Guide
 
 ### Removed
 
@@ -108,6 +114,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VertexObjectPool#sortBy()` refuses a key function that frees a vertex object and creates another, which leaves `usedCount` where it was, as it refuses one that changes the count
 - `VertexObjectPool#createVO()` gives its slot back when the `voInitialize` or the `onCreateVO` hook throws, and `getVO()` leaves no vertex object in its slot then; the error reaches the caller as it was thrown
 - `StageRenderer` calls `releasePassNodeMemory()` only on a stage that has the method: a stage flagged `isStage2D` without it leaves through `remove()`, `dispose()` and a write that leaves the composed mode without an error
+- `CameraBasedVisibilityHelpers` puts the plane, the points and the frustum boxes into the root the map has at each `update()`, also when the map comes into the scene graph after `show = true` or moves into another one
+- a `RectangularVisibilityArea` with a width or a height of 0 takes its tiles down on the next update, and a `Map2DTileStreamer` whose visibilitor is taken away empties every renderer on the next update
+- another `tileSet` or another `tileDataProvider` on a `TileSpritesFactory` builds the tiles laid out with it again on the next update, the holes of the provider before included
+- `PanControl2D#update()` takes a delta time that is no finite number above 0 as 0: a `NaN` moves the view by no speed field and emits no `OnPanControl2DUpdate` after the first
 
 ### Migration Guide
 
@@ -335,6 +345,57 @@ root.add(world).add(ui);
 ```
 
 A stage of your own gets an `asPassNode(renderer)` that answers its pass node. Without a pipeline and in Mode C, the `ClearStage` works as before.
+
+#### What CameraBasedVisibility hands out
+
+`visibles`, `pointsOnPlane` and the fields of a `TileBox` are the visibility's own and written again by every recomputation. Whoever sorts or filters copies the list first; whoever needs a `TileBox` beyond the next recomputation copies the fields they need.
+
+**Before**
+
+```ts
+const nearestFirst = visibility.visibles.sort((a, b) => a.distanceToCamera! - b.distanceToCamera!);
+const kept = visibility.visibles[0];
+```
+
+**After**
+
+```ts
+const nearestFirst = [...visibility.visibles].sort((a, b) => a.distanceToCamera! - b.distanceToCamera!);
+const {x, y} = visibility.visibles[0]!;
+```
+
+#### The tile pattern of RepeatingTilesProvider
+
+The pattern is a frozen copy. A changed pattern is assigned to `tileIds` again; then `Map2D#clearTiles()` has the tiles laid out take it over, since the provider reports no change.
+
+**Before**
+
+```ts
+tileData.tileIds[0]![0] = 5;
+```
+
+**After**
+
+```ts
+tileData.tileIds = [[5, ...tileData.tileIds[0]!.slice(1)], ...tileData.tileIds.slice(1)];
+map2d.clearTiles();
+```
+
+#### A control of one's own that removes its listeners
+
+The fourth argument of `InputControlBase#removeEventListener()` goes away; the listener is removed whatever `passive` it was added with.
+
+**Before**
+
+```ts
+this.removeEventListener(canvas, 'wheel', this.#onWheel, false);
+```
+
+**After**
+
+```ts
+this.removeEventListener(canvas, 'wheel', this.#onWheel);
+```
 
 ## [0.23.0] - 2026-10-18
 

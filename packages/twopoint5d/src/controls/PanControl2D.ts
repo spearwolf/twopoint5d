@@ -436,17 +436,22 @@ export class PanControl2D extends InputControlBase {
    * On a disposed control this does nothing: the view stays where it is, whatever the
    * speed fields hold, and no event goes out.
    *
-   * @param t delta time since last `update()` call in seconds
+   * @param t seconds since the last `update()` call. A value that is no finite number above 0 —
+   * `NaN`, `undefined`, an infinity, 0 or less — counts as 0: the speed fields move the view by
+   * nothing then, and a pan the pointer collected is delivered all the same.
    */
   update(t: number): void {
     if (this.isDisposed) return;
 
+    // a delta time the first frame of a loop may lack must not turn the view into NaN for good
+    const dt = Number.isFinite(t) && t > 0 ? t : 0;
+
     const {x: prevX, y: prevY} = this.panView;
 
-    this.panView.y -= this.speedNorth * t;
-    this.panView.y += this.speedSouth * t;
-    this.panView.x += this.speedEast * t;
-    this.panView.x -= this.speedWest * t;
+    this.panView.y -= this.speedNorth * dt;
+    this.panView.y += this.speedSouth * dt;
+    this.panView.x += this.speedEast * dt;
+    this.panView.x -= this.speedWest * dt;
 
     if (!this.#pointerDisabled) {
       let panX = this.#releasedPanX;

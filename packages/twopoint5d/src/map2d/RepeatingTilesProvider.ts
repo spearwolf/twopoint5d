@@ -24,20 +24,31 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
 
   // Every path of the constructor writes this through the `tileIds` setter. The `!` stays
   // because TypeScript does not count an assignment through a setter as a definite one.
-  #tileIds!: number[][];
+  #tileIds!: readonly (readonly number[])[];
 
   // `#rows` and `#cols` are taken from the very array that is indexed below, in the `tileIds`
-  // setter, which lets a pattern in only when every row of it has the length of the first one.
-  // Every index into `#tileIds` therefore passes through `wrap()` or through a range check
-  // against them first, and cannot point past the pattern.
+  // setter, which lets a pattern in only when every row of it has the length of the first one,
+  // and keeps a frozen copy of it that nobody can shorten afterwards. Every index into `#tileIds`
+  // therefore passes through `wrap()` or through a range check against them first, and cannot
+  // point past the pattern.
   #rows = 0;
   #cols = 0;
 
-  get tileIds(): number[][] {
+  /**
+   * The pattern this provider holds, frozen: rows and the array of rows alike. A new pattern is
+   * assigned, not written into.
+   */
+  get tileIds(): readonly (readonly number[])[] {
     return this.#tileIds;
   }
 
-  set tileIds(tileIds: number[][]) {
+  /**
+   * Takes a copy of every row of the pattern, so that what the caller changes on its arrays
+   * afterwards does not reach the provider. Every row has the length of the first one, and there
+   * is at least one; a pattern that breaks either rule throws an `Error` and leaves the pattern
+   * the provider had.
+   */
+  set tileIds(tileIds: readonly (readonly number[])[]) {
     // the whole pattern is checked before the first field is written: a refused pattern leaves
     // the provider with the one it had rather than half of a new one
     const rows = tileIds.length;
@@ -52,7 +63,7 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
         );
       }
     }
-    this.#tileIds = tileIds;
+    this.#tileIds = Object.freeze(tileIds.map((row) => Object.freeze(row.slice())));
     this.#rows = rows;
     this.#cols = cols;
   }

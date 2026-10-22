@@ -41,24 +41,6 @@ describe('HelpersManager', () => {
     expect(node.userData['isHelper'], 'and it was not marked either').toBeUndefined();
   });
 
-  test('a scene this manager was never given keeps the nodes in the root', () => {
-    const manager = new HelpersManager();
-    const root = new Object3D();
-    const scene = new Object3D();
-    root.add(scene);
-    const node = new Object3D();
-    const rootNode = new Object3D();
-
-    manager.scene = scene;
-    manager.add(node);
-    manager.add(rootNode, true);
-
-    manager.removeFromScene(new Object3D());
-
-    expect(scene.children, 'the node in the scene this manager holds stays there').toContain(node);
-    expect(root.children, 'and so does the one in the root above it').toContain(rootNode);
-  });
-
   test('remove() takes the nodes out of the scene and out of the root above it', () => {
     const manager = new HelpersManager();
     const root = new Object3D();
@@ -75,5 +57,47 @@ describe('HelpersManager', () => {
 
     expect(scene.children).toHaveLength(0);
     expect(root.children, 'the scene stays a child of the root, the helper node does not').toEqual([scene]);
+  });
+
+  test('followRoot() moves the root nodes into the root the scene has now', () => {
+    const manager = new HelpersManager();
+    const scene = new Object3D();
+    const node = new Object3D();
+    const rootNode = new Object3D();
+
+    manager.scene = scene;
+    manager.add(node);
+    // the scene is a root of its own here
+    manager.add(rootNode, true);
+    expect(scene.children).toContain(rootNode);
+
+    const root = new Object3D();
+    root.add(scene);
+    manager.followRoot();
+
+    expect(root.children, 'the root node went into the new root').toContain(rootNode);
+    expect(scene.children, 'the scene node stays in the scene').toEqual([node]);
+    expect(manager.root).toBe(root);
+  });
+
+  test('remove() takes a root node out of the root it was moved to', () => {
+    const manager = new HelpersManager();
+    const rootA = new Object3D();
+    const rootB = new Object3D();
+    const scene = new Object3D();
+    rootA.add(scene);
+    const rootNode = new Object3D();
+
+    manager.scene = scene;
+    manager.add(rootNode, true);
+
+    rootB.add(scene);
+    manager.followRoot();
+    expect(rootB.children).toContain(rootNode);
+
+    manager.remove();
+
+    expect(rootA.children).toHaveLength(0);
+    expect(rootB.children, 'the scene stays a child of the root, the helper node does not').toEqual([scene]);
   });
 });

@@ -581,6 +581,62 @@ describe('Map2DTileRenderer', () => {
     });
   });
 
+  describe('the contentSerial of the factory', () => {
+    test('a factory whose contentSerial moves has the renderer give back every tile and report pending tiles', () => {
+      const factory = {...makeTileFactory(), contentSerial: 0};
+      const createTile = vi.spyOn(factory, 'createTile');
+      const destroyTile = vi.spyOn(factory, 'destroyTile');
+      // the coordinate (1, 0) has no tile while the content stands at 0
+      createTile.mockImplementation((tileCoords) =>
+        tileCoords.x === 1 && factory.contentSerial === 0 ? undefined : {coords: tileCoords},
+      );
+      const renderer = new Map2DTileRenderer(factory);
+      const a = new Map2DTileCoords(0, 0);
+      const hole = new Map2DTileCoords(1, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      renderer.addTile(hole);
+      renderer.endUpdatingTiles();
+      expect(renderer.hasPendingTiles, 'after the first cycle').toBe(false);
+
+      factory.contentSerial = 1;
+      expect(renderer.hasPendingTiles, 'once the content moved').toBe(true);
+
+      createTile.mockClear();
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      expect(destroyTile, 'the tile it held went back').toHaveBeenCalledTimes(1);
+      renderer.reuseTile(a);
+      renderer.reuseTile(hole);
+      renderer.endUpdatingTiles();
+
+      expect(
+        createTile.mock.calls.map(([tileCoords]) => tileCoords.id),
+        'both built again',
+      ).toEqual(['0,0', '1,0']);
+      expect(renderer.hasPendingTiles, 'after the cycle that built them').toBe(false);
+    });
+
+    test('a factory without contentSerial is never built again that way', () => {
+      const factory = makeTileFactory();
+      const destroyTile = vi.spyOn(factory, 'destroyTile');
+      const renderer = new Map2DTileRenderer(factory);
+      const a = new Map2DTileCoords(0, 0);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(a);
+      renderer.endUpdatingTiles();
+      expect(renderer.hasPendingTiles).toBe(false);
+
+      renderer.beginUpdatingTiles(new Vector3(), false);
+      renderer.reuseTile(a);
+      renderer.endUpdatingTiles();
+
+      expect(destroyTile).not.toHaveBeenCalled();
+      expect(renderer.hasPendingTiles).toBe(false);
+    });
+  });
+
   describe('hasPendingTiles', () => {
     // a factory with `room` free slots: it answers noTileCapacity while none is left, and a
     // destroyTile() gives one back; a coordinate in `holes` has no tile

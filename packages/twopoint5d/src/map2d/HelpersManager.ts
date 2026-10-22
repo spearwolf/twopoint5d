@@ -9,7 +9,13 @@ export class HelpersManager {
   readonly uuid = MathUtils.generateUUID();
 
   #scene?: Object3D;
-  #root?: Object3D;
+
+  // the nodes that went into the scene, and those that went into the root above it
+  readonly #sceneNodes: Object3D[] = [];
+  readonly #rootNodes: Object3D[] = [];
+
+  // the root the `#rootNodes` hang in right now
+  #root: Object3D | undefined;
 
   get scene(): Object3D | undefined {
     return this.#scene;
@@ -19,71 +25,87 @@ export class HelpersManager {
     if (this.#scene !== scene) {
       this.remove();
       this.#scene = scene;
-      this.#root = undefined;
     }
   }
 
+  /** The root above the {@link scene} as it is at this moment, looked up on every access. */
   get root(): Object3D | undefined {
-    if (this.#root == null && this.#scene != null) {
-      this.#root = findRootNode(this.#scene);
-    }
-    return this.#root;
+    return this.#scene != null ? findRootNode(this.#scene) : undefined;
   }
 
   /**
-   * Inserts a node and takes it over: {@link removeFromScene} takes it out of the scene graph
-   * again and calls its `dispose()` if it has one. A node that owns a geometry, a material or
-   * a texture therefore has to release it there — `Box3Helper` and `PlaneHelper` of three.js
-   * do, and a bare `THREE.Mesh` has no `dispose()` for the call to reach.
+   * Moves the nodes that went into the root into the root the {@link scene} has now, when that is
+   * another one than the one they hang in. The owner calls it on every pass, before it writes
+   * nodes: a scene that comes into a scene graph after a node went into its root, or moves into
+   * another one, takes those nodes along.
+   */
+  followRoot(): void {
+    if (this.#scene == null || this.#rootNodes.length === 0) return;
+    const root = findRootNode(this.#scene);
+    if (root === this.#root) return;
+    // indexed: the owner calls this on every pass of a frame loop
+    for (let i = 0; i < this.#rootNodes.length; ++i) {
+      // The loop bound is `this.#rootNodes.length`. three takes the node out of its old parent.
+      root.add(this.#rootNodes[i]!);
+    }
+    this.#root = root;
+  }
+
+  /**
+   * Inserts a node and takes it over: {@link remove} takes it out of the scene graph again and
+   * calls its `dispose()` if it has one. A node that owns a geometry, a material or a texture
+   * therefore has to release it there — `Box3Helper` and `PlaneHelper` of three.js do, and a bare
+   * `THREE.Mesh` has no `dispose()` for the call to reach.
+   *
+   * With `addToRoot`, the node goes into the root above the {@link scene}, and {@link followRoot}
+   * moves it along when that root changes.
    *
    * A manager without a {@link scene} has nowhere to put the node and no way to take it down
    * again, so it refuses the handover with an error instead of accepting a node it would drop.
    * Whoever builds nodes for a manager that may not have one asks {@link scene} first.
    */
   add(node: Object3D, addToRoot = false): void {
-    const target = addToRoot ? this.root : this.#scene;
-
-    if (target == null) {
+    const scene = this.#scene;
+    if (scene == null) {
       throw new Error('HelpersManager#add() has no scene to add to: set HelpersManager#scene before handing a node over');
     }
 
     node.userData['isHelper'] = true;
     node.userData['createdBy'] = this.uuid;
-    target.add(node);
+
+    if (addToRoot) {
+      // the nodes already there first, so that every root node hangs in the same root
+      this.followRoot();
+      const root = findRootNode(scene);
+      this.#root = root;
+      root.add(node);
+      this.#rootNodes.push(node);
+    } else {
+      scene.add(node);
+      this.#sceneNodes.push(node);
+    }
   }
 
   /**
-   * Takes the nodes of this manager out of the {@link scene} it holds and out of the {@link root}
-   * above it. Without a scene there is nothing to take down and the call does nothing. What
-   * happens to each node on the way out stands at {@link removeFromScene}.
+   * Takes every node of this manager out of the scene graph, wherever it hangs now, and calls
+   * `dispose()` on each one that has such a method. What a node has to bring for that to be enough
+   * stands at {@link add}. Without nodes the call does nothing.
+   *
+   * A node leaves the manager before its `dispose()` runs: when one throws, the error goes on, and
+   * a second call takes down the nodes not reached yet.
    */
   remove(): void {
-    if (this.#scene) {
-      this.removeFromScene(this.#scene);
-    }
+    HelpersManager.#takeDown(this.#sceneNodes);
+    HelpersManager.#takeDown(this.#rootNodes);
+    this.#root = undefined;
   }
 
-  /**
-   * Takes every node this manager added to `scene` out of it, and calls `dispose()` on each one
-   * that has such a method. What a node has to bring for that to be enough stands at {@link add}.
-   *
-   * The nodes of this manager sit in the {@link scene} it was given and in the {@link root} above
-   * it, and only for that scene do both come down together. Any other scene is searched for the
-   * nodes of this manager and otherwise left alone.
-   */
-  removeFromScene(scene: Object3D): void {
-    const removeChildren: Object3D[] = [];
-    for (const childNode of scene.children) {
-      if (childNode.userData['isHelper'] && childNode.userData['createdBy'] === this.uuid) {
-        removeChildren.push(childNode);
-      }
-    }
-    for (const childNode of removeChildren) {
-      childNode.removeFromParent();
-      (childNode as unknown as {dispose?: () => void}).dispose?.();
-    }
-    if (scene === this.#scene && this.root != null && scene !== this.root) {
-      this.removeFromScene(this.root);
+  static #takeDown(nodes: Object3D[]): void {
+    while (nodes.length > 0) {
+      // The loop runs while the list holds a node.
+      const node = nodes.pop()!;
+      node.removeFromParent();
+      (node as unknown as {dispose?: () => void}).dispose?.();
     }
   }
 }

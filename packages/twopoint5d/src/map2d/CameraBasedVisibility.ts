@@ -17,25 +17,25 @@ export interface TileBox {
    * The packed key of the tile coordinate, as `packTileCoords(x, y)` returns it. Whoever needs
    * a readable designation of the tile takes `x` and `y`.
    */
-  id: number;
-  x: number;
-  y: number;
+  readonly id: number;
+  readonly x: number;
+  readonly y: number;
   /**
    * The tile on the grid: its tile coordinate, one column and one row, and its edges relative to
    * the origin of the grid, without the offset of the grid.
    */
-  coords?: TilesWithinCoords;
+  readonly coords?: TilesWithinCoords;
   /** The box of the tile in the local space of the map node, where the tile renderers draw it. */
-  box?: Box3;
+  readonly box?: Box3;
   /**
    * The box the view frustum is tested against, in world space: scaled by `frustumBoxScale`, and
    * reaching no further above and below the map plane than the view frustum does.
    */
-  frustumBox?: Box3;
+  readonly frustumBox?: Box3;
   /** The center of the tile in world space. */
-  centerWorld?: Vector3;
-  distanceToCamera?: number;
-  map2dTile?: IMap2DTileCoords;
+  readonly centerWorld?: Vector3;
+  readonly distanceToCamera?: number;
+  readonly map2dTile?: IMap2DTileCoords;
   /**
    * `true` for a tile the search started from in the last recomputation: the tile a probe ray of
    * the view frustum met the map plane in — see {@link CameraBasedVisibility.pointsOnPlane} —, and
@@ -43,7 +43,7 @@ export interface TileBox {
    * tiles within the hull those points span come in without a frustum test, and every other visible
    * tile was reached from one of these, neighbour by neighbour.
    */
-  primary?: boolean;
+  readonly primary?: boolean;
 }
 
 /**
@@ -51,11 +51,16 @@ export interface TileBox {
  * needs on the way. Every slot carries all of its fields from the start, see `createTileSlot()`.
  */
 interface PooledTileBox extends TileBox, TileSlotTableEntry<PooledTileBox> {
+  id: number;
+  x: number;
+  y: number;
   coords: TilesWithinCoords;
   box: Box3;
   frustumBox: Box3;
   centerWorld: Vector3;
   distanceToCamera: number;
+  map2dTile: IMap2DTileCoords | undefined;
+  primary: boolean;
   /**
    * Whether the tile came into the frontier from within the hull of the probe rays, and so is
    * visible without a frustum test. Written each time the tile enters the frontier.
@@ -105,6 +110,10 @@ const createTileSlot = (): PooledTileBox => ({
 
 const _v = new Vector3();
 const _m = new Matrix4();
+
+// the plane of the map in the local space of the map node; never handed out, so nothing outside
+// this module can move it
+const MAP_PLANE = new Plane(new Vector3(0, 1, 0), 0);
 
 const NEIGHBOR_DX_DY: ReadonlyArray<readonly [number, number]> = [
   [0, -1],
@@ -236,7 +245,13 @@ interface CameraDependencies {
  * `projectionMatrixInverse`.
  */
 export class CameraBasedVisibility implements IMap2DVisibilitor {
-  static readonly Plane = new Plane(new Vector3(0, 1, 0), 0);
+  /**
+   * The plane of the map in the local space of the map node: the XZ plane through its origin,
+   * with the normal +Y. Every access hands out a new copy, and a change to it reaches no instance.
+   */
+  static get Plane(): Plane {
+    return MAP_PLANE.clone();
+  }
 
   #frustumBoxScale = 1.1;
 
@@ -353,12 +368,34 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   #cameraWorldPosition = new Vector3();
 
-  planeWorld = CameraBasedVisibility.Plane.clone();
-  planeOrigin = new Vector3();
+  /**
+   * The map plane in world space, an output of the last recomputation that the next one writes
+   * over in place; whoever wants to keep the value takes a copy. `CameraBasedVisibilityHelpers`
+   * holds this very object.
+   */
+  readonly planeWorld = MAP_PLANE.clone();
 
-  // `null` marks a plane that was deliberately cleared because the camera looks past it, as
-  // opposed to a `pointOnPlane` that was never set.
-  pointOnPlane?: Vector3 | null;
+  /**
+   * A point of {@link planeWorld}, an output of the last recomputation that the next one writes
+   * over in place; whoever wants to keep the value takes a copy.
+   */
+  readonly planeOrigin = new Vector3();
+
+  #pointOnPlane: Vector3 | null | undefined = undefined;
+
+  /**
+   * The point where the first probe ray of the last recomputation met the plane — the first entry
+   * of {@link pointsOnPlane}. `null` marks a plane that was deliberately cleared because the camera
+   * looks past it, as opposed to `undefined`, a point that was never set.
+   *
+   * The `Vector3` belongs to this class and is written again on the next recomputation; whoever
+   * wants to keep it takes a copy.
+   */
+  get pointOnPlane(): Vector3 | null | undefined {
+    return this.#pointOnPlane;
+  }
+
+  readonly #pointsOnPlane: Vector3[] = [];
 
   /**
    * The points where the probe rays of the last recomputation met the plane, in the order of
@@ -369,12 +406,23 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * The `Vector3`s belong to this class and are written again on the next recomputation;
    * whoever wants to keep one takes a copy.
    */
-  readonly pointsOnPlane: Vector3[] = [];
+  get pointsOnPlane(): readonly Vector3[] {
+    return this.#pointsOnPlane;
+  }
 
-  planeCoords2D = new Vector2();
+  /**
+   * Where the first probe ray met the plane, in map coordinates around the view center — an output
+   * of the last recomputation that met the plane, which the next one writes over in place; whoever
+   * wants to keep the value takes a copy.
+   */
+  readonly planeCoords2D = new Vector2();
   #centerPoint2D = new Vector2();
 
-  matrixWorld = new Matrix4();
+  /**
+   * The world matrix of the map node the last recomputation was given, an output that the next
+   * one writes over in place; whoever wants to keep the value takes a copy.
+   */
+  readonly matrixWorld = new Matrix4();
   #matrixWorldInverse = new Matrix4();
 
   #cameraFrustum = new Frustum();
@@ -430,6 +478,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   readonly #seenScalars = new Float64Array([NaN, NaN, NaN]);
   #seenLookAtCenter: boolean | undefined = undefined;
 
+  readonly #visibles: PooledTileBox[] = [];
+
   /**
    * The tiles of the last recomputation that met the plane, nearest to the camera first — an
    * order this class promises, not one it happens to produce — and at most
@@ -441,7 +491,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * one beyond the next call copies what they need of it. A `Map2DTileCoords` handed out in
    * `map2dTile` keeps its tile; a tile that enters the view gets a new one.
    */
-  readonly visibles: TileBox[] = [];
+  get visibles(): readonly TileBox[] {
+    return this.#visibles;
+  }
   #visibleTiles?: IMap2DVisibleTiles;
   #serial = 0;
 
@@ -661,13 +713,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const hitCount = this.findPointsOnPlaneThatAreInViewFrustum();
 
     if (hitCount > 0) {
-      if (this.pointOnPlane == null) {
-        this.pointOnPlane = new Vector3();
+      if (this.#pointOnPlane == null) {
+        this.#pointOnPlane = new Vector3();
       }
       // The list holds `hitCount` entries.
-      this.pointOnPlane.copy(this.pointsOnPlane[0]!);
+      this.#pointOnPlane.copy(this.#pointsOnPlane[0]!);
     } else {
-      this.pointOnPlane = null;
+      this.#pointOnPlane = null;
     }
 
     this.planeWorld.coplanarPoint(this.planeOrigin);
@@ -676,7 +728,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       // `findVisibleTiles()`, which is where the list is otherwise emptied, is not reached on
       // this way out — and `visibles` is public: the visibility helpers read it and would go on
       // drawing tile boxes for a view that no longer exists
-      truncateArray(this.visibles);
+      truncateArray(this.#visibles);
 
       if (previousTiles.length === 0) {
         this.#visibleTiles = undefined;
@@ -714,7 +766,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     for (let i = 0; i < hitCount; ++i) {
       // The loop bound is the number of points the probe rays found.
-      this.convertToPlaneCoords2D(this.pointsOnPlane[i]!, poolAt(this.#probePlaneCoords, i, newVector2));
+      this.convertToPlaneCoords2D(this.#pointsOnPlane[i]!, poolAt(this.#probePlaneCoords, i, newVector2));
     }
 
     if (this.lookAtCenter) {
@@ -748,7 +800,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld);
 
     this.planeWorld
-      .copy(CameraBasedVisibility.Plane)
+      .copy(MAP_PLANE)
       .applyMatrix4(_m.makeTranslation(this.#planeOffset.set(this.#map2dTileCoords.xOffset, 0, this.#map2dTileCoords.yOffset)))
       .applyMatrix4(this.matrixWorld);
 
@@ -757,7 +809,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const nearZ = camera.reversedDepth ? 1 : camera.coordinateSystem === WebGPUCoordinateSystem ? 0 : -1;
     const farZ = camera.reversedDepth ? 0 : 1;
 
-    truncateArray(this.pointsOnPlane);
+    truncateArray(this.#pointsOnPlane);
 
     const frustumHeight = this.#frustumHeight;
     frustumHeight[FRUSTUM_HEIGHT_MIN] = Infinity;
@@ -782,12 +834,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       const hit = this.planeWorld.intersectLine(this.#scratchLineOfSight, this.#scratchPlaneIntersection);
       if (hit == null) continue;
 
-      const point = poolAt(this.#pointOnPlanePool, this.pointsOnPlane.length, newVector3);
+      const point = poolAt(this.#pointOnPlanePool, this.#pointsOnPlane.length, newVector3);
       point.copy(hit);
-      this.pointsOnPlane.push(point);
+      this.#pointsOnPlane.push(point);
     }
 
-    return this.pointsOnPlane.length;
+    return this.#pointsOnPlane.length;
   }
 
   /**
@@ -861,7 +913,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     // Reset reusable working buffers. What is left in the frontier is what a cut at the limit did
     // not take.
     truncateArray(this.#frontier);
-    truncateArray(this.visibles);
+    truncateArray(this.#visibles);
 
     // Every tile of `previousTiles` gets its slot and the stamp that says so. In a frame loop
     // these are the slots of the recomputation before, found in the table as they stand.
@@ -975,7 +1027,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
       const tile = kept[i]!;
       tile.primary = tile.probeStamp === stamp;
       this.placeTile(tile, this.#reuseTiles, this.#createTiles);
-      this.visibles.push(tile);
+      this.#visibles.push(tile);
     }
     truncateArray(kept);
 
@@ -984,8 +1036,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.removePreviousTiles(previousTiles, stamp);
 
     truncateArray(this.#tiles);
-    // The loop bound is `this.visibles.length`, and `placeTile()` gave each of them its shell.
-    for (let i = 0; i < this.visibles.length; ++i) this.#tiles.push(this.visibles[i]!.map2dTile!);
+    // The loop bound is `this.#visibles.length`, and `placeTile()` gave each of them its shell.
+    for (let i = 0; i < this.#visibles.length; ++i) this.#tiles.push(this.#visibles[i]!.map2dTile!);
 
     this.evictSlots(stamp);
 

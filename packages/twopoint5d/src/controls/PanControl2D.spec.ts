@@ -441,6 +441,47 @@ describe('PanControl2D', () => {
     });
   });
 
+  describe('update() with a delta time that is no finite number above 0', () => {
+    it.each([
+      ['NaN', Number.NaN],
+      ['undefined', undefined],
+      ['Infinity', Number.POSITIVE_INFINITY],
+      ['-Infinity', Number.NEGATIVE_INFINITY],
+      ['-1', -1],
+    ])('update() with a delta time of %s moves the view by no speed field', (_, t) => {
+      const control = makeControl();
+      control.speedEast = 10;
+      control.speedNorth = 10;
+
+      control.update(t as number);
+
+      expect(control.panView.x).toBe(0);
+      expect(control.panView.y).toBe(0);
+    });
+
+    it('a delta time of NaN with every speed at 0 emits no update after the first', () => {
+      const control = makeControl();
+      const spy = vi.fn();
+      on(control, OnPanControl2DUpdate, spy);
+
+      control.update(Number.NaN);
+      control.update(Number.NaN);
+      control.update(Number.NaN);
+
+      expect(spy).toHaveBeenCalledExactlyOnceWith({x: 0, y: 0});
+    });
+
+    it('a delta time of NaN still delivers the pan a pointer collected', () => {
+      const control = makeControl();
+      control.speedEast = 10;
+
+      drag(1);
+      control.update(Number.NaN);
+
+      expect(control.panView.x).toBe(-10);
+    });
+  });
+
   describe('on…() shorthands', () => {
     it('onUpdate() hears where update() moved the view, until the function it returns takes it off', () => {
       const control = makeControl();

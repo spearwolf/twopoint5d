@@ -6,8 +6,8 @@ import {InputControlBase} from './InputControlBase.js';
 // addEventListener/removeEventListener are protected: a subclass is how a caller reaches
 // them, and how this spec does
 class TestControl extends InputControlBase {
-  listen(host: EventTarget, eventName: string, callback: EventListener) {
-    this.addEventListener(host, eventName, callback);
+  listen(host: EventTarget, eventName: string, callback: EventListener, passive?: boolean) {
+    this.addEventListener(host, eventName, callback, passive);
   }
 
   unlisten(host: EventTarget, eventName: string, callback: EventListener) {
@@ -45,6 +45,69 @@ describe('InputControlBase', () => {
     host.dispatchEvent(new Event('ping'));
     expect(calls, 'after subscribe()').toBe(2);
     expect(control.isActive).toBe(true);
+  });
+
+  describe('the identity of a listener', () => {
+    test('the same callback added once passive and once not is one listener, and one remove takes it off', () => {
+      const host = new EventTarget();
+      const control = new TestControl();
+      let calls = 0;
+      const callback = () => {
+        calls += 1;
+      };
+
+      control.listen(host, 'ping', callback, true);
+      control.listen(host, 'ping', callback, false);
+      control.unlisten(host, 'ping', callback);
+
+      host.dispatchEvent(new Event('ping'));
+      expect(calls).toBe(0);
+      expect(control.isActive).toBe(false);
+    });
+
+    test('a second add with another passive replaces the listener', () => {
+      const host = new EventTarget();
+      const control = new TestControl();
+      const callback = (event: Event) => event.preventDefault();
+
+      control.listen(host, 'ping', callback, true);
+      control.listen(host, 'ping', callback, false);
+
+      const event = new Event('ping', {cancelable: true});
+      host.dispatchEvent(event);
+      expect(event.defaultPrevented, 'the listener that is not passive prevents the default').toBe(true);
+
+      // and the list hooks it up as the last add asked for
+      control.unsubscribe();
+      control.subscribe();
+      const again = new Event('ping', {cancelable: true});
+      host.dispatchEvent(again);
+      expect(again.defaultPrevented, 'after subscribe()').toBe(true);
+    });
+
+    test('a second add with the same passive keeps the one listener, and one while unsubscribed waits for subscribe()', () => {
+      const host = new EventTarget();
+      const control = new TestControl();
+      let calls = 0;
+      const callback = (event: Event) => {
+        calls += 1;
+        event.preventDefault();
+      };
+
+      control.listen(host, 'ping', callback, true);
+      control.listen(host, 'ping', callback, true);
+      control.unsubscribe();
+      const addEventListener = sandbox.spy(host, 'addEventListener');
+      control.listen(host, 'ping', callback, false);
+      expect(addEventListener.called, 'nothing reaches the host while unsubscribed').toBe(false);
+
+      control.subscribe();
+      const event = new Event('ping', {cancelable: true});
+      host.dispatchEvent(event);
+
+      expect(calls, 'one listener').toBe(1);
+      expect(event.defaultPrevented, 'hooked up as the last add asked for').toBe(true);
+    });
   });
 
   describe('dispose()', () => {

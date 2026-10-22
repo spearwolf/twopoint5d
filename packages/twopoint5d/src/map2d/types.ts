@@ -65,6 +65,15 @@ export interface IMapTileFactory<T = unknown> {
    * This gives the factory the ability to synchronize any internal state or GPU data.
    */
   update(): void;
+
+  /**
+   * A number that moves as soon as what {@link createTile} builds for a coordinate changes —
+   * `TileSpritesFactory` moves it when its `tileSet` or its `tileDataProvider` gets another value.
+   * `Map2DTileRenderer` answers a value other than the one it built its tiles with by giving back
+   * every tile it holds, forgetting the coordinates without a tile and building all of them again
+   * in its next update cycle. A factory without this member is never built again that way.
+   */
+  readonly contentSerial?: number;
 }
 
 export interface IMap2DTileRenderer {

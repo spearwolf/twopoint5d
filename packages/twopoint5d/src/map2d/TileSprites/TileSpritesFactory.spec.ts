@@ -7,7 +7,9 @@ import {TileSet} from '../../texture/TileSet.js';
 import type {VOAttrGetter} from '../../vertex-objects/types.js';
 import {AABB2} from '../AABB2.js';
 import {Map2DTileCoords} from '../Map2DTileCoords.js';
+import {Map2D} from '../Map2D.js';
 import {Map2DTileRenderer} from '../Map2DTileRenderer.js';
+import {RectangularVisibilityArea} from '../RectangularVisibilityArea.js';
 import {RepeatingTilesProvider} from '../RepeatingTilesProvider.js';
 import {noTileCapacity} from '../constants.js';
 import type {TileSprite} from './descriptors.js';
@@ -461,6 +463,84 @@ describe('TileSpritesFactory', () => {
       } finally {
         warn.mockRestore();
       }
+    });
+  });
+
+  describe('another tile set or tile data provider', () => {
+    // a map of 4 × 2 tiles of 100, columns -2 … 1 and rows -1 … 0, that stands still
+    const makeMap = (factory: TileSpritesFactory): Map2D => {
+      const map = new Map2D();
+      map.tileWidth = 100;
+      map.tileHeight = 100;
+      map.visibilitor = new RectangularVisibilityArea(400, 100);
+      map.addTileRenderer(new Map2DTileRenderer(factory));
+      map.update();
+      return map;
+    };
+
+    const VIEW = ['-1,-1', '-1,0', '-2,-1', '-2,0', '0,-1', '0,0', '1,-1', '1,0'];
+
+    const texCoordsOf = (tile: unknown): number[] =>
+      Array.from((tile as TileSprite & {getTexCoords: VOAttrGetter}).getTexCoords());
+
+    test('another tileDataProvider builds every tile again on the next update, the holes of the one before included', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(16));
+      const tileSet = makeTileSet();
+      // every odd column is a hole
+      const factory = new TileSpritesFactory(tileSprites, tileSet, new RepeatingTilesProvider([1, 0]));
+      const map = makeMap(factory);
+      const pool = tileSprites.geometry!.instancedPool;
+      expect(pool.usedCount, 'the tiles of the first provider').toBe(4);
+
+      const createTile = vi.spyOn(factory, 'createTile');
+      factory.tileDataProvider = new RepeatingTilesProvider(2);
+      map.update();
+
+      expect(createTile.mock.calls.map(([coords]) => coords.id).sort(), 'every coordinate of the view').toEqual(VIEW);
+      for (const {value} of createTile.mock.results) {
+        expect(texCoordsOf(value), 'the tile id of the second provider').toEqual(texCoordsOfTile(tileSet, 2));
+      }
+      expect(pool.usedCount, 'one tile for every coordinate, the holes before included').toBe(8);
+    });
+
+    test('another tileSet writes its texture coordinates into every tile on the next update', () => {
+      const tileSprites = new TileSprites(new TileSpritesGeometry(16));
+      const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider(1));
+      const map = makeMap(factory);
+      const otherTileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 64, tileHeight: 64});
+      expect(texCoordsOfTile(otherTileSet, 1)).not.toEqual(texCoordsOfTile(makeTileSet(), 1));
+
+      const createTile = vi.spyOn(factory, 'createTile');
+      factory.tileSet = otherTileSet;
+      map.update();
+
+      expect(createTile.mock.calls.map(([coords]) => coords.id).sort(), 'every coordinate of the view').toEqual(VIEW);
+      for (const {value} of createTile.mock.results) {
+        expect(texCoordsOf(value)).toEqual(texCoordsOfTile(otherTileSet, 1));
+      }
+      expect(tileSprites.geometry!.instancedPool.usedCount).toBe(8);
+    });
+
+    test('the tile set or the provider assigned again costs nothing', () => {
+      const factory = new TileSpritesFactory(
+        new TileSprites(new TileSpritesGeometry(16)),
+        makeTileSet(),
+        new RepeatingTilesProvider(1),
+      );
+      const map = makeMap(factory);
+      const contentSerial = factory.contentSerial;
+
+      const createTile = vi.spyOn(factory, 'createTile');
+      const destroyTile = vi.spyOn(factory, 'destroyTile');
+      // biome-ignore lint/correctness/noSelfAssign: the same value assigned again is the case under test
+      factory.tileSet = factory.tileSet;
+      // biome-ignore lint/correctness/noSelfAssign: the same value assigned again is the case under test
+      factory.tileDataProvider = factory.tileDataProvider;
+      map.update();
+
+      expect(factory.contentSerial).toBe(contentSerial);
+      expect(createTile).not.toHaveBeenCalled();
+      expect(destroyTile).not.toHaveBeenCalled();
     });
   });
 });

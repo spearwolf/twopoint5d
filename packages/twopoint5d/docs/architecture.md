@@ -223,7 +223,7 @@ carries the `serial` that renderer last laid out in a closed cycle and it report
 `Map2DTileCoordsUtil` and `tileKeys` define the coordinate and key scheme — every tile
 coordinate has exactly one key, and code that invents a second spelling reintroduces
 duplicate tiles. `chunk-quad-tree/` and `Map2DSpatialHashGrid` are the spatial indexes
-tile providers query.
+tile providers query. The guide is [`docs/map2d.md`](./map2d.md).
 
 ## 3. Resource lifecycle
 

@@ -4,14 +4,21 @@ export class InputControlBase {
   readonly #listeners: [host: EventTarget, eventName: string, callback: EventListenerOrEventListenerObject, passive: boolean][] =
     [];
 
-  #findListenerIndex = (host: EventTarget, eventName: string, callback: EventListenerOrEventListenerObject, passive = true) => {
-    return this.#listeners.findIndex(
-      (listener) => listener[0] === host && listener[1] === eventName && listener[2] === callback && listener[3] === passive,
-    );
+  // the DOM tells listeners apart by type, callback and capture; this class never asks for capture,
+  // so `passive` is no part of what a listener is
+  #findListenerIndex = (host: EventTarget, eventName: string, callback: EventListenerOrEventListenerObject) => {
+    return this.#listeners.findIndex((listener) => listener[0] === host && listener[1] === eventName && listener[2] === callback);
   };
 
   #active = true;
 
+  /**
+   * Adds a listener for `eventName` to `host`, hooked up at once while the control is active.
+   *
+   * The same callback for the same host and the same event is one listener, as the DOM has it: a
+   * second call with the same `passive` does nothing, and one with another `passive` replaces the
+   * listener with one that carries the new value.
+   */
   protected addEventListener<E extends Event>(
     host: EventTarget,
     eventName: string,
@@ -27,25 +34,39 @@ export class InputControlBase {
     // and host references in it would stay reachable for as long as anybody holds the control
     if (this.#disposed) return;
 
-    if (this.#findListenerIndex(host, eventName, listener, passive) === -1) {
+    const index = this.#findListenerIndex(host, eventName, listener);
+    if (index === -1) {
       this.#listeners.push([host, eventName, listener, passive]);
       if (this.#active) {
         host.addEventListener(eventName, listener, {passive});
       }
+      return;
     }
+
+    const entry = expectDefined(this.#listeners[index], `the listener at index ${index}`);
+    if (entry[3] === passive) return;
+
+    // the host would ignore a second add of the same callback, and keep the passive it has
+    if (this.#active) {
+      host.removeEventListener(eventName, listener);
+      host.addEventListener(eventName, listener, {passive});
+    }
+    entry[3] = passive;
   }
 
+  /**
+   * Removes the listener for `eventName` from `host`, whatever `passive` it was added with.
+   */
   protected removeEventListener<E extends Event>(
     host: EventTarget,
     eventName: string,
     callback: ((event: E) => void) | EventListenerObject,
-    passive = true,
   ) {
     // the caller names the event type the host sends under eventName; the host itself promises
     // no more than an Event
     const listener = callback as EventListenerOrEventListenerObject;
 
-    const index = this.#findListenerIndex(host, eventName, listener, passive);
+    const index = this.#findListenerIndex(host, eventName, listener);
     if (index >= 0) {
       if (this.#active) {
         const [host, eventName, callback] = expectDefined(this.#listeners[index], `the listener at index ${index}`);

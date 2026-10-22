@@ -54,8 +54,8 @@ export class Map2DTileStreamer {
    * handed against that state — the tiles another visibilitor laid out are no ground for its
    * answer. Replacing a visibilitor, with another one or with `undefined`, therefore clears the
    * tiles as a change of the tile grid does: the next {@link update} empties every renderer and
-   * the visibilitor then in place lays out the whole set. The first visibilitor, and the one
-   * already held, cost nothing.
+   * the visibilitor then in place, if there is one, lays out the whole set. The first visibilitor,
+   * and the one already held, cost nothing.
    */
   get visibilitor(): IMap2DVisibilitor | undefined {
     return this.#visibilitor;
@@ -204,13 +204,15 @@ export class Map2DTileStreamer {
    * A renderer that has just come on, every renderer after the tiles were cleared, and every
    * renderer of a visibilitor whose results carry no `serial` go through the cycle.
    *
+   * An update without a visibilitor carries out a pending clear and nothing else: it touches no
+   * matrix and lays out no tile.
+   *
    * An update cycle that throws — in a renderer or in its factory, `endUpdatingTiles()` included —
    * clears the tiles as {@link clearTiles} does: the next `update()` empties every renderer and
    * lays out the whole set again. The error goes on unchanged.
    */
   update(node: Object3D): void {
-    const visibilitor = this.#visibilitor;
-    if (this.renderers.size === 0 || visibilitor == null) return;
+    if (this.renderers.size === 0) return;
 
     if (this.#clearTilesOnNextUpdate) {
       for (const tileRenderer of this.renderers) {
@@ -222,6 +224,10 @@ export class Map2DTileStreamer {
       this.#laidOutSerials = new WeakMap();
       this.#clearTilesOnNextUpdate = false;
     }
+
+    // after the clear: a visibilitor taken away leaves the tiles of the one before to be taken down
+    const visibilitor = this.#visibilitor;
+    if (visibilitor == null) return;
 
     node.updateWorldMatrix(true, false);
 

@@ -126,7 +126,10 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   /**
    * Whether the helper nodes are built at all. Switching it off takes the current set down and
    * releases every node in it. Switching it on builds the set right away when {@link add} has
-   * named a scene; without one, the first {@link update} after `add()` builds it.
+   * named a scene; without one, the first {@link update} after `add()` builds it. The plane, the
+   * points and the frustum boxes built here go into the root the map has at that moment, and the
+   * next `update()` moves them into the root the map has then — a map that comes into the scene
+   * graph after this switch takes them along.
    *
    * On a disposed set this answers `false` and a write to it does nothing.
    */
@@ -187,7 +190,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     this.placePointHelper(axisY, 5, 0x00ff00);
   }
 
-  private updateTileHelpers(visibles: TileBox[]): void {
+  private updateTileHelpers(visibles: readonly TileBox[]): void {
     // the frustum boxes of the primary tiles first, the ones of the other tiles after them
     for (let i = 0; i < visibles.length; ++i) {
       // The loop bound is `visibles.length`.
@@ -302,7 +305,9 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   /**
    * Names the scene the helper nodes go into. The scene named here is the map node: the tile
    * boxes are in its local space and go into it, while the plane, the points and the frustum
-   * boxes are in world space and go into the root above it.
+   * boxes are in world space and go into the root above it, as that root is at each
+   * {@link update} — a map that comes into the scene graph after `add()`, or moves into another
+   * one, takes them along on the next `update()`.
    *
    * On a disposed set this does nothing: no scene is taken, and none is built for.
    */
@@ -345,6 +350,10 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     if (!this.#show) return;
     // the manager refuses a node it cannot place, so nothing is built until there is a scene
     if (this.#helpers.scene == null) return;
+
+    // before the gate: a set that stands still still has to follow a map that moved into
+    // another scene graph
+    this.#helpers.followRoot();
 
     // asked on every pass and before the gate, never behind a `&&`: the state it keeps has to
     // follow every value written to those fields, not only the ones that fall on a pass that

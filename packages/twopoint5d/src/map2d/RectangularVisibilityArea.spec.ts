@@ -222,6 +222,54 @@ describe('RectangularVisibilityArea', () => {
     });
   });
 
+  describe('switched off', () => {
+    let tileCoords: Map2DTileCoordsUtil;
+    let matrixWorld: Matrix4;
+
+    beforeEach(() => {
+      tileCoords = new Map2DTileCoordsUtil(100, 100);
+      matrixWorld = new Matrix4();
+    });
+
+    for (const side of ['width', 'height'] as const) {
+      test(`${side} 0 hands every tile back in removeTiles and lays out none`, () => {
+        const area = new RectangularVisibilityArea(320, 240);
+        const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+        const previousIds = ids(first.tiles);
+        // read now: the next call writes the same result object again
+        const firstSerial = first.serial!;
+        expect(previousIds.length).toBeGreaterThan(0);
+
+        area[side] = 0;
+        const result = area.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld);
+
+        expect(result).toBeDefined();
+        expect(result!.tiles).toHaveLength(0);
+        expect(ids(result!.removeTiles)).toEqual(previousIds);
+        expect(result!.createTiles).toBeUndefined();
+        expect(result!.reuseTiles).toBeUndefined();
+        expect(result!.serial).toBeGreaterThan(firstSerial);
+
+        expect(area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld), 'nothing left to take down').toBeUndefined();
+      });
+    }
+
+    test('a size after 0 lays out the whole set again', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const firstIds = ids(first.tiles);
+
+      area.width = 0;
+      const off = area.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      area.width = 320;
+      const on = area.computeVisibleTiles(off.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(ids(on.createTiles)).toEqual(firstIds);
+      expect(on.reuseTiles).toHaveLength(0);
+    });
+  });
+
   describe('width and height', () => {
     test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a width of %s', (v) => {
       const create = () => new RectangularVisibilityArea(v, 240);

@@ -324,6 +324,59 @@ describe('CameraBasedVisibilityHelpers', () => {
     }
   });
 
+  test('a map added to the scene graph after show = true gets the plane, the points and the frustum boxes in the root on the next update', () => {
+    const map = new Object3D();
+    const scene = new Object3D();
+    const helpers = new CameraBasedVisibilityHelpers(makeVisibility([makeTileBox(0, 0, true), makeTileBox(1, 0, false)]));
+
+    // built while the map is a root of its own
+    helpers.add(map);
+    helpers.show = true;
+
+    // the visibility has not recomputed, so the set stands as it was built
+    scene.add(map);
+    helpers.update();
+
+    const worldNodes = scene.children.filter((node) => node !== map);
+    expect(
+      worldNodes.filter((node) => node.type === 'PlaneHelper'),
+      'the plane',
+    ).toHaveLength(1);
+    expect(
+      worldNodes.filter((node) => node.type === 'Mesh'),
+      'the four points',
+    ).toHaveLength(4);
+    expect(boxHelperColors(scene), 'the frustum boxes').toEqual(['ffffff', '777777']);
+    expect(map.children, 'nothing but the tile boxes stays in the map').toHaveLength(2);
+    expect(boxHelperColors(map), 'the tile boxes').toEqual(['ff0066', '772222']);
+  });
+
+  test('a map moved to another scene graph takes those nodes along, and remove() finds them there', () => {
+    const map = new Object3D();
+    const sceneA = new Object3D();
+    const sceneB = new Object3D();
+    sceneA.add(map);
+    const helpers = new CameraBasedVisibilityHelpers(makeVisibility([makeTileBox(0, 0, true)]));
+
+    helpers.add(map);
+    helpers.show = true;
+    expect(sceneA.children, 'the map, the plane, four points and a frustum box').toHaveLength(7);
+
+    sceneB.add(map);
+    helpers.update();
+
+    expect(sceneA.children, 'nothing stays behind').toHaveLength(0);
+    expect(sceneB.children, 'the map, the plane, four points and a frustum box').toHaveLength(7);
+
+    helpers.remove(map);
+
+    const isHelper = (node: Object3D): boolean => node.userData['isHelper'] === true;
+    expect(sceneA.children.filter(isHelper)).toHaveLength(0);
+    expect(sceneB.children.filter(isHelper)).toHaveLength(0);
+    expect(map.children.filter(isHelper)).toHaveLength(0);
+    expect(sceneB.children).toEqual([map]);
+  });
+
   describe('dispose()', () => {
     test('releases the geometry and the material of every node it built', () => {
       const scene = new Object3D();

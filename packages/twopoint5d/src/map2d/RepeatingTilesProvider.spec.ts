@@ -1024,4 +1024,42 @@ describe('RepeatingTilesProvider', () => {
       });
     });
   });
+
+  describe('the tile pattern', () => {
+    test('a row the caller shortens after the assignment leaves the pattern as it was', () => {
+      const rows = [
+        [1, 2],
+        [3, 4],
+      ];
+      const provider = new RepeatingTilesProvider();
+      provider.tileIds = rows;
+
+      rows[1]!.length = 1;
+      rows.push([9, 9]);
+
+      expect(provider.getTileIdAt(1, 1)).toBe(4);
+      expect([...provider.getTileIdsWithin(0, 0, 2, 2)]).toEqual([1, 2, 3, 4]);
+    });
+
+    test('the pattern it hands out is frozen', () => {
+      const provider = new RepeatingTilesProvider([
+        [1, 2],
+        [3, 4],
+      ]);
+
+      expect(Object.isFrozen(provider.tileIds)).toBe(true);
+      expect(Object.isFrozen(provider.tileIds[0])).toBe(true);
+      // a module runs in strict mode, where a write to a frozen array throws
+      expect(() => {
+        (provider.tileIds[0] as number[])[0] = 5;
+      }).toThrow(TypeError);
+      expect(provider.getTileIdAt(0, 0)).toBe(1);
+
+      // the guard keeps the type error from running
+      if (provider.tileIds.length < 0) {
+        // @ts-expect-error a new pattern is assigned, not written into
+        provider.tileIds[0]![0] = 5;
+      }
+    });
+  });
 });

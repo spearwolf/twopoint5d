@@ -7,6 +7,7 @@ import {
   Matrix4,
   OrthographicCamera,
   PerspectiveCamera,
+  Plane,
   Quaternion,
   Vector3,
   WebGLCoordinateSystem,
@@ -21,10 +22,12 @@ import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import {packTileCoords} from './tileKeys.js';
 import type {IMap2DVisibleTiles} from './types.js';
 
+// A camera that looks straight down is turned through `rotation`: `lookAt()` along the up vector of
+// the camera tips it by about 1e-4 rad.
 function makeTopDownCamera(): PerspectiveCamera {
   const camera = new PerspectiveCamera(90, 1, 0.1, 500);
   camera.position.set(0, 100, 0);
-  camera.lookAt(0, 0, 0);
+  camera.rotation.set(-Math.PI / 2, 0, 0);
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
   return camera;
@@ -102,7 +105,7 @@ function makeCameraWithTheNearPlaneOnTheGround(): PerspectiveCamera {
 function makeOrthoCameraLookingDown(): OrthographicCamera {
   const camera = new OrthographicCamera(-100, 100, 100, -100, 0.1, 500);
   camera.position.set(0, 100, 0);
-  camera.lookAt(0, 0, 0);
+  camera.rotation.set(-Math.PI / 2, 0, 0);
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
   return camera;
@@ -124,7 +127,7 @@ function makeCameraLookingToTheHorizon(): PerspectiveCamera {
 function makeCameraCloserToThePlaneThanItsNearPlane(): PerspectiveCamera {
   const camera = new PerspectiveCamera(90, 1, 10, 500);
   camera.position.set(0, 7, 0);
-  camera.lookAt(0, 0, 0);
+  camera.rotation.set(-Math.PI / 2, 0, 0);
   camera.updateMatrixWorld();
   camera.updateProjectionMatrix();
   return camera;
@@ -789,7 +792,7 @@ describe('CameraBasedVisibility', () => {
       rig.position.set(300, 0, -200);
       const camera = new PerspectiveCamera(90, 1, 0.1, 500);
       camera.position.set(0, 100, 0);
-      camera.lookAt(0, 0, 0);
+      camera.rotation.set(-Math.PI / 2, 0, 0);
       camera.updateProjectionMatrix();
       rig.add(camera);
       return {rig, camera};
@@ -848,11 +851,10 @@ describe('CameraBasedVisibility', () => {
         expect(point.y, `${point.toArray()} lies on the plane`).toBeCloseTo(0);
       }
 
-      // the center ray comes first, and that is the point the plane coordinates are taken from.
-      // `lookAt()` nudges a camera whose up vector runs along its view direction, so the point
-      // lands next to the origin instead of on it
-      expect(visibility.pointsOnPlane[0]!.x).toBeCloseTo(0, 1);
-      expect(visibility.pointsOnPlane[0]!.z).toBeCloseTo(0, 1);
+      // the center ray comes first, and that is the point the plane coordinates are taken from:
+      // the one straight below the camera
+      expect(visibility.pointsOnPlane[0]!.x).toBeCloseTo(0, 9);
+      expect(visibility.pointsOnPlane[0]!.z).toBeCloseTo(0, 9);
       expect(visibility.pointOnPlane!.equals(visibility.pointsOnPlane[0]!)).toBe(true);
 
       // and the rays through the edges and corners reach further out than the center one
@@ -1092,7 +1094,7 @@ describe('CameraBasedVisibility', () => {
     test('a grid of tiles smaller than 1 gives every tile its own tile', () => {
       const camera = new PerspectiveCamera(90, 1, 0.01, 10);
       camera.position.set(0, 2, 0);
-      camera.lookAt(0, 0, 0);
+      camera.rotation.set(-Math.PI / 2, 0, 0);
       camera.updateMatrixWorld();
       camera.updateProjectionMatrix();
       const visibility = new CameraBasedVisibility(camera);
@@ -1243,8 +1245,7 @@ describe('CameraBasedVisibility', () => {
 
     test('the frustum box reaches no higher and no lower than the view frustum, the tile box keeps the depth', () => {
       // the camera of makeTopDownCamera(), with a far of 150: the frustum reaches from 99.9 — the
-      // near plane — down to -50 — the far plane. Turned rather than aimed with lookAt(), which tips
-      // a camera that looks along its up vector by a hair
+      // near plane — down to -50 — the far plane
       const camera = new PerspectiveCamera(90, 1, 0.1, 150);
       camera.position.set(0, 100, 0);
       camera.rotation.set(-Math.PI / 2, 0, 0);
@@ -1310,7 +1311,7 @@ describe('CameraBasedVisibility', () => {
       camera: PerspectiveCamera | OrthographicCamera,
       tileCoords: Map2DTileCoordsUtil,
       center: [number, number] = [0, 0],
-    ): TileBox[] {
+    ): readonly TileBox[] {
       const visibility = new CameraBasedVisibility(camera);
       visibility.maxVisibleTiles = Infinity;
       visibility.computeVisibleTiles([], center, tileCoords, new Matrix4());
@@ -1569,6 +1570,41 @@ describe('CameraBasedVisibility', () => {
       // any other angle it grows, and the frustum test lets more tiles through at the edge
       const matrix = new Matrix4().makeTranslation(5000, 0, 300).multiply(new Matrix4().makeRotationY(Math.PI / 2));
       expect(sortedTileIds(matrix)).toEqual(sortedTileIds(new Matrix4()));
+    });
+  });
+
+  describe('what it hands out', () => {
+    test('hands out what it computes for reading only', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(10, 10), new Matrix4());
+      const tile = visibility.visibles[0]!;
+
+      // every line below is a type error; the guard keeps them from running
+      if (visibility.visibles.length < 0) {
+        // @ts-expect-error the list of visible tiles is the visibility's own
+        visibility.visibles.push(tile);
+        // @ts-expect-error a tile sits in the slot table under its x and y
+        visibility.visibles[0]!.x = 1;
+        // @ts-expect-error the points of the probe rays are the visibility's own
+        visibility.pointsOnPlane.push(new Vector3());
+        // @ts-expect-error the helpers hold this very plane
+        visibility.planeWorld = new Plane();
+        // @ts-expect-error written again by every recomputation
+        visibility.matrixWorld = new Matrix4();
+        // @ts-expect-error written again by every recomputation
+        visibility.pointOnPlane = null;
+      }
+
+      expect(visibility.visibles.length).toBeGreaterThan(0);
+    });
+
+    test('CameraBasedVisibility.Plane is a new copy on every access', () => {
+      expect(CameraBasedVisibility.Plane).not.toBe(CameraBasedVisibility.Plane);
+
+      CameraBasedVisibility.Plane.normal.set(1, 0, 0);
+
+      expect(CameraBasedVisibility.Plane.normal.toArray()).toEqual([0, 1, 0]);
+      expect(new CameraBasedVisibility().planeWorld.normal.toArray()).toEqual([0, 1, 0]);
     });
   });
 

@@ -84,7 +84,9 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   /**
    * The width of the visible area in _world space_, around the center the streamer hands over.
-   * `0` switches the area off: {@link computeVisibleTiles} answers `undefined` while a side is 0.
+   * `0` switches the area off: the next {@link computeVisibleTiles} hands every tile it is given
+   * back in `removeTiles` and lays out none, and while a side stays 0 and no tile is left, it
+   * answers `undefined`. A new size lays out the whole set again on the next call.
    * Any other value must be a finite number above 0, or a `RangeError` is thrown and the width
    * stays what it was.
    */
@@ -102,7 +104,9 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   /**
    * The height of the visible area in _world space_, around the center the streamer hands over.
-   * `0` switches the area off: {@link computeVisibleTiles} answers `undefined` while a side is 0.
+   * `0` switches the area off: the next {@link computeVisibleTiles} hands every tile it is given
+   * back in `removeTiles` and lays out none, and while a side stays 0 and no tile is left, it
+   * answers `undefined`. A new size lays out the whole set again on the next call.
    * Any other value must be a finite number above 0, or a `RangeError` is thrown and the height
    * stays what it was.
    */
@@ -118,6 +122,15 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     }
   }
 
+  /**
+   * Returns the tiles the rectangle covers on the `map2dTileCoords` grid around `centerPoint`,
+   * split into the tiles to create and to reuse, with the tiles of `previousTiles` that fall out
+   * as `removeTiles`.
+   *
+   * While a side of the area is `0` the area is switched off: a call hands every tile of
+   * `previousTiles` back in `removeTiles` and lays out none, and a call that is given no tile
+   * answers `undefined`.
+   */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],
     centerPoint: [number, number],
@@ -125,7 +138,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     matrixWorld: Matrix4,
   ): IMap2DVisibleTiles | undefined {
     if (this.width === 0 || this.height === 0) {
-      return undefined;
+      return this.#switchedOff(previousTiles);
     }
 
     // read by index: a tuple of doubles destructured in the signature costs an allocation per call
@@ -241,6 +254,41 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     // the view of a tile hangs on the grid alone, so a reused tile carries the view it was handed
     // out with unless the grid changed; a first call has no grid before it to say so
     result.changed = storedTileCoords == null || tileGridChanged;
+    result.serial = this.#serial;
+
+    this.#visibleTiles = result;
+    return result;
+  }
+
+  // The way out of a switched-off area. The snapshots of the gate are not asked here: switching
+  // the area on again goes through a setter that raises `needsUpdate`, and that recomputes anyway.
+  #switchedOff(previousTiles: IMap2DTileCoords[]): IMap2DVisibleTiles | undefined {
+    if (previousTiles.length === 0) {
+      this.#visibleTiles = undefined;
+      return undefined;
+    }
+
+    this.#serial += 1;
+
+    // `previousTiles` can be the `tiles` list of the last result — the tile streamer hands it
+    // back — so every entry is out of it before that list is emptied
+    const removeTiles = this.#removeTiles;
+    truncateArray(removeTiles);
+    for (let i = 0; i < previousTiles.length; ++i) removeTiles.push(previousTiles[i]!);
+    truncateArray(this.#tiles);
+    truncateArray(this.#createTiles);
+    truncateArray(this.#reuseTiles);
+
+    const result = this.#result;
+    result.tiles = this.#tiles;
+    result.removeTiles = removeTiles;
+    // nothing of the result before may stand: this way out has no tiles to place
+    result.createTiles = undefined;
+    result.reuseTiles = undefined;
+    result.offset = undefined;
+    result.translate = undefined;
+    // no tile is reused, so there is no view to write again
+    result.changed = false;
     result.serial = this.#serial;
 
     this.#visibleTiles = result;

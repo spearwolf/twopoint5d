@@ -79,13 +79,14 @@ export class Map2D extends Group {
 
   /**
    * The visibilitor of the tile streamer underneath. Assigning one hands it to the streamer,
-   * which has the tiles built again when it replaces another one.
+   * which has the tiles built again when it replaces another one. `undefined` takes the
+   * visibilitor away, and the next {@link update} empties every tile renderer.
    */
   get visibilitor(): IMap2DVisibilitor | undefined {
     return this.#tileStreamer.visibilitor;
   }
 
-  set visibilitor(v: IMap2DVisibilitor) {
+  set visibilitor(v: IMap2DVisibilitor | undefined) {
     this.#tileStreamer.visibilitor = v;
   }
 

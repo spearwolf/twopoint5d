@@ -19,9 +19,49 @@ const positionScratch: [x: number, y: number, z: number] = [0, 0, 0];
 export class TileSpritesFactory implements IMapTileFactory<TileSprite> {
   readonly tileSprites: TileSprites;
 
-  tileSet?: TileSet<unknown>;
+  #tileSet: TileSet<unknown> | undefined;
+  #tileDataProvider: IMap2DTileDataProvider | undefined;
+  #contentSerial = 0;
 
-  tileDataProvider?: IMap2DTileDataProvider;
+  /**
+   * The tile set the frames of the tiles come from. Another value has every `Map2DTileRenderer` of
+   * this factory build all of its tiles again in its next update cycle, the holes included. A
+   * change made within the tile set is not seen by the factory — after one, call
+   * `Map2D#clearTiles()`.
+   */
+  get tileSet(): TileSet<unknown> | undefined {
+    return this.#tileSet;
+  }
+
+  set tileSet(tileSet: TileSet<unknown> | undefined) {
+    if (this.#tileSet === tileSet) return;
+    this.#tileSet = tileSet;
+    this.#contentSerial += 1;
+  }
+
+  /**
+   * The provider of the tile id of each coordinate. Another value has every `Map2DTileRenderer` of
+   * this factory build all of its tiles again in its next update cycle, the holes included. A
+   * change made within the provider — a new pattern assigned to `RepeatingTilesProvider#tileIds`
+   * — is not seen by the factory; after one, call `Map2D#clearTiles()`.
+   */
+  get tileDataProvider(): IMap2DTileDataProvider | undefined {
+    return this.#tileDataProvider;
+  }
+
+  set tileDataProvider(tileDataProvider: IMap2DTileDataProvider | undefined) {
+    if (this.#tileDataProvider === tileDataProvider) return;
+    this.#tileDataProvider = tileDataProvider;
+    this.#contentSerial += 1;
+  }
+
+  /**
+   * Moves each time {@link tileSet} or {@link tileDataProvider} gets another value, see
+   * {@link IMapTileFactory.contentSerial}.
+   */
+  get contentSerial(): number {
+    return this.#contentSerial;
+  }
 
   constructor(tileSprites: TileSprites, tileSet?: TileSet<unknown>, tileDataProvider?: IMap2DTileDataProvider) {
     this.tileSprites = tileSprites;

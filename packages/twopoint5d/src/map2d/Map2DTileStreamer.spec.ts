@@ -408,6 +408,27 @@ describe('Map2DTileStreamer', () => {
       expect([...renderer.held]).toEqual(['0,0']);
     });
 
+    test('taking the visibilitor away empties every renderer on the next update', () => {
+      const streamer = new Map2DTileStreamer(100, 100);
+      const first = makeRecordingRenderer();
+      const second = makeRecordingRenderer();
+      streamer.addTileRenderer(first);
+      streamer.addTileRenderer(second);
+      streamer.visibilitor = makeCachingVisibilitor([tileA, tileB]);
+
+      const node = new Object3D();
+      streamer.update(node);
+      expect(first.held.size).toBe(2);
+
+      streamer.visibilitor = undefined;
+      streamer.update(node);
+
+      expect(first.cleared, 'the first renderer').toBe(1);
+      expect(second.cleared, 'the second renderer').toBe(1);
+      expect(first.held.size).toBe(0);
+      expect(streamer.tiles).toHaveLength(0);
+    });
+
     test('a view center that moves within the tiles it shows has the renderer write no tile', () => {
       const factory = {
         addToNode: vi.fn(),

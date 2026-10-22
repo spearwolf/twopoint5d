@@ -3,9 +3,10 @@ import {Group, Object3D, Vector3} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {Map2D} from './Map2D.js';
+import {Map2DTileRenderer} from './Map2DTileRenderer.js';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
 import {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
-import type {IMap2DTileCoords, IMap2DTileRenderer} from './types.js';
+import type {IMap2DTileCoords, IMap2DTileRenderer, IMapTileFactory} from './types.js';
 
 function makeTileRenderer(): IMap2DTileRenderer {
   return {
@@ -228,6 +229,56 @@ describe('Map2D', () => {
       map.update();
 
       expect([...renderer.held].sort()).toEqual(tilesOfA);
+    });
+
+    test('takes undefined, and the next update empties every renderer', () => {
+      const map = new Map2D();
+      map.tileWidth = 100;
+      map.tileHeight = 100;
+      const renderer = makeHoldingTileRenderer();
+      map.addTileRenderer(renderer);
+      map.visibilitor = new RectangularVisibilityArea(300, 300);
+      map.update();
+      expect(renderer.held.size).toBeGreaterThan(0);
+
+      map.visibilitor = undefined;
+
+      expect(map.visibilitor).toBeUndefined();
+      expect(map.tileStreamer.visibilitor).toBeUndefined();
+
+      map.update();
+
+      expect(renderer.held.size).toBe(0);
+    });
+
+    test('an area switched off to a width of 0 leaves no tile in a Map2DTileRenderer', () => {
+      const live = new Set<IMap2DTileCoords>();
+      const factory: IMapTileFactory<IMap2DTileCoords> = {
+        addToNode() {},
+        removeFromNode() {},
+        createTile(tileCoords) {
+          live.add(tileCoords);
+          return tileCoords;
+        },
+        updateTile() {},
+        destroyTile(tile) {
+          live.delete(tile);
+        },
+        update() {},
+      };
+      const map = new Map2D();
+      map.tileWidth = 100;
+      map.tileHeight = 100;
+      map.addTileRenderer(new Map2DTileRenderer(factory));
+      const area = new RectangularVisibilityArea(300, 300);
+      map.visibilitor = area;
+      map.update();
+      expect(live.size).toBeGreaterThan(0);
+
+      area.width = 0;
+      map.update();
+
+      expect(live.size).toBe(0);
     });
 
     test('answers with the visibilitor its tile streamer holds', () => {
