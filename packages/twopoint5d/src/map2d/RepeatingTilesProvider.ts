@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {IMap2DTileDataProvider} from './types.js';
 
 export type RepeatingTilesPatternType = number | number[] | number[][];
@@ -6,6 +7,10 @@ export type LimitToAxisType = 'horizontal' | 'vertical' | 'none';
 // Lifts every integer index, a negative one too, into `[0, n)` — the pattern repeats from `(0, 0)`
 // on in both directions.
 const wrap = (i: number, n: number): number => ((i % n) + n) % n;
+
+// the largest value a cell of the Uint32Array of getTileIdsWithin() holds: an id above it, a fraction
+// or a negative one would be answered as another id there than by getTileIdAt()
+const MAX_TILE_ID = 0xffffffff;
 
 /**
  * The `RepeatingTilesProvider` repeats a 2D pattern of tile IDs endlessly.
@@ -46,7 +51,9 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
    * Takes a copy of every row of the pattern, so that what the caller changes on its arrays
    * afterwards does not reach the provider. Every row has the length of the first one, and there
    * is at least one; a pattern that breaks either rule throws an `Error` and leaves the pattern
-   * the provider had.
+   * the provider had. Every tile id is a whole number from 0 to 4294967295, the range of a cell
+   * of the `Uint32Array` {@link getTileIdsWithin} writes; a pattern with any other value throws a
+   * `RangeError`, naming row, column and value, and leaves the pattern the provider had as well.
    */
   set tileIds(tileIds: readonly (readonly number[])[]) {
     // the whole pattern is checked before the first field is written: a refused pattern leaves
@@ -61,6 +68,17 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
         throw new Error(
           `RepeatingTilesProvider: every row of a tile id pattern has the same length, but row ${row} has ${tileIds[row]!.length} instead of ${cols}`,
         );
+      }
+    }
+    for (let row = 0; row < rows; row++) {
+      const cells = tileIds[row]!;
+      for (let col = 0; col < cols; col++) {
+        const id = cells[col];
+        if (!Number.isInteger(id) || id! < 0 || id! > MAX_TILE_ID) {
+          throw new RangeError(
+            `RepeatingTilesProvider: a tile id is a whole number from 0 to ${MAX_TILE_ID}, but row ${row}, column ${col} holds ${describeValue(id)}`,
+          );
+        }
       }
     }
     this.#tileIds = Object.freeze(tileIds.map((row) => Object.freeze(row.slice())));

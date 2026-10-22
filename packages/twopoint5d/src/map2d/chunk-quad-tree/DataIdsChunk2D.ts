@@ -1,3 +1,4 @@
+import {describeValue} from '../../utils/describeValue.js';
 import {DataChunk2D, type DataChunkCoords2D} from './DataChunk2D.js';
 import {base64toUint32Arr} from './base64toUint32Arr.js';
 
@@ -51,7 +52,7 @@ export class DataIdsChunk2D extends DataChunk2D {
     // is how Tiled writes an uncompressed layer.
     const compression = (this.data as {compression?: unknown}).compression;
     if (compression) {
-      throw new Error(`DataIdsChunk2D: the compression "${String(compression)}" is not supported`);
+      throw new Error(`DataIdsChunk2D: the compression ${describeValue(compression)} is not supported`);
     }
 
     return base64toUint32Arr((this.data as StringDataIdsChunk2DParams).data);

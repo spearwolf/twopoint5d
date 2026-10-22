@@ -190,9 +190,9 @@ describe('flatPlacement()', () => {
     expect(() => flatPlacement({orientation: NaN as unknown as 'yaw'})).toThrow(
       new TypeError(`flatPlacement: the orientation NaN is neither 'yaw' nor 'quaternion'`),
     );
-    // a BigInt, which JSON.stringify() cannot write, is shown as a number
+    // a BigInt, which JSON.stringify() cannot write, is shown with its n
     expect(() => flatPlacement({plane: 1n as unknown as 'xy'})).toThrow(
-      new TypeError(`flatPlacement: the plane 1 is neither 'xy' nor 'xz'`),
+      new TypeError(`flatPlacement: the plane 1n is neither 'xy' nor 'xz'`),
     );
   });
 

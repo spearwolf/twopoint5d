@@ -176,6 +176,31 @@ describe('TexturePackerJson.parse()', () => {
     );
     expect(target.frameNames()).toEqual(['b']);
   });
+
+  test('refuses a "JSON Array" frame without a filename, naming its index, and leaves the target as it was', () => {
+    const target = new TextureAtlas();
+    target.add('x', new TextureCoords(0, 0, 4, 4));
+    const data = {
+      frames: [{filename: 'a.png', frame: {x: 0, y: 0, w: 8, h: 8}}, {frame: {x: 8, y: 0, w: 8, h: 8}}],
+      meta: {image: 'a.png', size: {w: 16, h: 16}},
+    } as unknown as TexturePackerJsonData;
+
+    expect(() => TexturePackerJson.parse(data, undefined, target)).toThrow(
+      new TypeError(
+        'TexturePackerJson: the frame 1 of the "JSON Array" frames has a filename of undefined — a frame of that format is named by its filename, a string',
+      ),
+    );
+    expect(target.frameNames()).toEqual(['x']);
+  });
+
+  test('takes an empty filename as a name, as an empty key of the "JSON Hash" format', () => {
+    const [atlas] = TexturePackerJson.parse({
+      frames: [{filename: '', frame: {x: 0, y: 0, w: 8, h: 8}}],
+      meta: {image: 'a.png', size: {w: 16, h: 16}},
+    });
+
+    expect(atlas.frameNames()).toEqual(['']);
+  });
 });
 
 describe('the type of the frame data', () => {

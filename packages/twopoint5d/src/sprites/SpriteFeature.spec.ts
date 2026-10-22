@@ -23,6 +23,12 @@ describe('defineFeature()', () => {
     );
   });
 
+  test('refuses a stage whose order is a string, quoting it', () => {
+    const feature = {name: 'odd', local: {order: '1', transform: (input: unknown) => input}} as unknown as SpriteFeature;
+
+    expect(() => defineFeature(feature)).toThrow('defineFeature: the local stage of feature "odd" needs a finite order, got "1"');
+  });
+
   test('refuses a checkKind that is no function', () => {
     const feature = {name: 'odd', checkKind: 'grid'} as unknown as SpriteFeature;
 

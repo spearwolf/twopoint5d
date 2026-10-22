@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
@@ -55,6 +56,8 @@ export class TexturePackerJson {
    *
    * @throws {Error} if a frame name appears more than once in the json or is already taken in the `target`;
    * the `target` stays as it was.
+   * @throws {TypeError} if a frame of the "JSON Array" format has a filename that is no string; the target
+   * stays as it was.
    */
   static parse<D extends TexturePackerFrameData = TexturePackerFrameData>(
     data: {frames: Record<string, D> | (D & {filename: string})[]; meta: TexturePackerMetaData},
@@ -71,7 +74,13 @@ export class TexturePackerJson {
 
     // every name is checked before the first add(), so a refused json leaves the target as it was
     const names = new Set<string>();
-    for (const [name] of entries) {
+    for (const [index, [name]] of entries.entries()) {
+      // only a frame of the "JSON Array" format can miss its name: a key of the "JSON Hash" format is a string
+      if (typeof name !== 'string') {
+        throw new TypeError(
+          `TexturePackerJson: the frame ${index} of the "JSON Array" frames has a filename of ${describeValue(name)} — a frame of that format is named by its filename, a string`,
+        );
+      }
       if (names.has(name)) {
         throw new Error(`TexturePackerJson: the frame name "${name}" appears more than once in the json`);
       }

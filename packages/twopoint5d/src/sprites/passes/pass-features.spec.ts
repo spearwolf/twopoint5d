@@ -75,6 +75,12 @@ describe('the pass features', () => {
     expect(mirror([0, 0, -3, 6], [1, 3, 5])).toEqual([1, 3, -9]);
   });
 
+  test('MirrorAtPlane sends every vertex to the origin for a normal of (0, 0, 0)', () => {
+    const ctx = {...stubShaderContext(), uniform: <T extends string>() => vec4(0, 0, 0, 1) as unknown as Node<T>};
+
+    expect(evaluateNode(MirrorAtPlane.mesh!.transform(vec3(1, 3, 5) as unknown as Node<'vec3'>, ctx))).toEqual([0, 0, 0]);
+  });
+
   describe('PlanarShadow', () => {
     const shadow = (light: number[], plane: number[], p: [number, number, number]) => {
       const ctx = {
@@ -109,6 +115,11 @@ describe('the pass features', () => {
       const atLight = shadow([0, 10, 0, 1], [0, 1, 0, 0], [1, 10, 0]);
       expect(atLight.every(Number.isFinite), `${atLight}`).toBe(true);
       expectNear(atLight, [20, 0, 0]);
+    });
+
+    test('sends every vertex to the origin for a groundPlane whose normal is (0, 0, 0)', () => {
+      expect(shadow([-0.4, 1, -0.3, 0], [0, 0, 0, 0], [1, 2, 3])).toEqual([0, 0, 0]);
+      expect(shadow([0, 10, 0, 1], [0, 0, 0, 0], [2, 5, 0])).toEqual([0, 0, 0]);
     });
   });
 
@@ -165,6 +176,12 @@ describe('the pass features', () => {
       expect(judge([3, 0, 0, 1])).toBe(false);
       expect(judge([0, -1, 0, 1])).toBe(false);
       expect(judge([0, 1, 0, 1], [0, 2, 0, 4])).toBe(false); // y = 1 lies below y = 2
+    });
+
+    test('lets a point light through to the shader for a plane whose normal is (0, 0, 0) and whose d is below 0', () => {
+      // the case the browser test of such a plane draws with: the shader's guard, not the hook, keeps the shadow out
+      expect(judge([0, 10, 0, 1], [0, 0, 0, -1])).toBe(true);
+      expect(judge([-0.4, 1, -0.3, 0], [0, 0, 0, 0])).toBe(false);
     });
   });
 });

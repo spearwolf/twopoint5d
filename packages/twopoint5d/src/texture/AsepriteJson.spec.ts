@@ -257,6 +257,14 @@ describe('AsepriteJson', () => {
       expect(() => AsepriteJson.parse(sheet(2, {frameTags: [tag as never]}))).toThrow(`AsepriteJson: ${message}`);
     });
 
+    test('refuses a tag whose direction is a BigInt, showing it with its n', () => {
+      const tag = {name: 'a', from: 0, to: 1, direction: 1n};
+
+      expect(() => AsepriteJson.parse(sheet(2, {frameTags: [tag as never]}))).toThrow(
+        'AsepriteJson: the tag "a" has the direction 1n — Aseprite\'s directions are forward, reverse, pingpong and pingpong_reverse',
+      );
+    });
+
     test('refuses two tags of one name', () => {
       const tags = [
         {name: 'a', from: 0, to: 0, direction: 'forward' as const},

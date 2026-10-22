@@ -58,6 +58,53 @@ describe('RepeatingTilesProvider', () => {
       ]);
     });
   });
+  describe('tile ids', () => {
+    test.each([
+      ['1.5', [[1.5, NaN, -1]], 0, 0],
+      ['NaN', [[1, NaN, -1]], 0, 1],
+      [
+        '-1',
+        [
+          [1, 2],
+          [3, -1],
+        ],
+        1,
+        1,
+      ],
+      ['4294967296', [[4294967296]], 0, 0],
+      ['"1"', [['1']], 0, 0],
+    ])(
+      'refuses a tile id that is no whole number from 0 to 4294967295, naming row, column and value, and keeps its pattern: %s',
+      (shown, pattern, row, col) => {
+        const tiles = new RepeatingTilesProvider([[1, 2]]);
+        const assign = () => {
+          tiles.tileIds = pattern as number[][];
+        };
+
+        expect(assign).toThrow(RangeError);
+        expect(assign).toThrow(
+          `RepeatingTilesProvider: a tile id is a whole number from 0 to 4294967295, but row ${row}, column ${col} holds ${shown}`,
+        );
+        expect(tiles.tileIds).toEqual([[1, 2]]);
+        expect(tiles.getTileIdAt(0, 0)).toBe(1);
+        expect(Array.from(tiles.getTileIdsWithin(0, 0, 2, 1))).toEqual([1, 2]);
+      },
+    );
+
+    test('takes 0 and 4294967295', () => {
+      const tiles = new RepeatingTilesProvider([[0, 4294967295]]);
+
+      expect(tiles.getTileIdAt(1, 0)).toBe(4294967295);
+      expect(Array.from(tiles.getTileIdsWithin(0, 0, 2, 1))).toEqual([0, 4294967295]);
+    });
+
+    test('new RepeatingTilesProvider(NaN) throws', () => {
+      expect(() => new RepeatingTilesProvider(NaN)).toThrow(
+        new RangeError('RepeatingTilesProvider: a tile id is a whole number from 0 to 4294967295, but row 0, column 0 holds NaN'),
+      );
+    });
+  });
+
   describe('getTileIdAt()', () => {
     test('answers with 0 on a pattern that has no columns', () => {
       expect(new RepeatingTilesProvider().getTileIdAt(0, 0)).toBe(0);

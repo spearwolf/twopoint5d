@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {originOf, sourceNameOf} from './passes/passUniformNames.js';
 import type {SpriteFeature, SpriteUniformDeclaration, SpriteUniformValue} from './SpriteFeature.js';
 
@@ -32,7 +33,6 @@ const declarationOf = (declared: unknown): {value: SpriteUniformValue; shared: b
 
 const sizeOf = (value: SpriteUniformValue): number => (typeof value === 'number' ? 1 : value.length);
 const shown = (value: SpriteUniformValue): string => JSON.stringify(value);
-const shownDeclared = (declared: unknown): string => (typeof declared === 'object' ? JSON.stringify(declared) : String(declared));
 
 const sameValue = (a: SpriteUniformValue, b: SpriteUniformValue): boolean =>
   typeof a === 'number' || typeof b === 'number'
@@ -99,7 +99,7 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
       const declaration = declarationOf(declared);
       if (declaration == null) {
         throw new TypeError(
-          `${where}: feature "${feature.name}" starts the uniform "${name}" with ${shownDeclared(declared)}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`,
+          `${where}: feature "${feature.name}" starts the uniform "${name}" with ${describeValue(declared)}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`,
         );
       }
       if (known != null) {

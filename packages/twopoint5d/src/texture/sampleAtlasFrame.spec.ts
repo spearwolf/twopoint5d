@@ -93,6 +93,22 @@ describe('sampleAtlasFrame()', () => {
     expect(call({origin: 'top-left', trim: 'crop'})).toThrow(/trim/);
   });
 
+  test.each([
+    [{origin: 5}, Error, 'sampleAtlasFrame: the origin 5 is none of top-left, bottom-left'],
+    [{wrap: 1n}, Error, 'sampleAtlasFrame: the wrap 1n is neither one of clamp, repeat nor a pair of them'],
+    [{wrap: {}}, Error, 'sampleAtlasFrame: the wrap {} is neither one of clamp, repeat nor a pair of them'],
+    [{wrap: ['clamp', 'x']}, Error, 'sampleAtlasFrame: the wrap "x" is none of clamp, repeat'],
+    [{trim: null}, Error, 'sampleAtlasFrame: the trim null is none of mask, stretch'],
+    [{inset: -1}, RangeError, 'sampleAtlasFrame: the inset -1 is no finite number of 0 or more'],
+    [{inset: 1n}, RangeError, 'sampleAtlasFrame: the inset 1n is no finite number of 0 or more'],
+  ])('refuses %o, showing the value refused', (options, type, message) => {
+    const call = () =>
+      sampleAtlasFrame(new Texture(), table, 0, uv(), {origin: 'top-left', ...options} as SampleAtlasFrameOptions);
+
+    expect(call).toThrow(type);
+    expect(call).toThrow(message);
+  });
+
   test('a wrap of one word is the wrap of both axes', () => {
     const map = new Texture();
     map.minFilter = NearestFilter;

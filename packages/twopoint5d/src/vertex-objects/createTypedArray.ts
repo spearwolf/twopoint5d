@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {TypedArray, VertexAttributeDataType} from './types.js';
 
 /** The class of one of the arrays of {@link TypedArray}, as {@link typedArrayOf} answers it. */
@@ -31,7 +32,7 @@ const TYPED_ARRAY_OF: Readonly<Record<VertexAttributeDataType, TypedArrayClass |
 export function typedArrayOf(dataType: VertexAttributeDataType): TypedArrayClass {
   // own entries only: a name like 'constructor' or 'toString' must not find a constructor on Object.prototype
   if (!Object.hasOwn(TYPED_ARRAY_OF, dataType)) {
-    throw new Error(`typedArrayOf: unknown data type '${String(dataType)}'`);
+    throw new Error(`typedArrayOf: unknown data type ${describeValue(dataType)}`);
   }
   const typedArrayClass = TYPED_ARRAY_OF[dataType];
   if (typedArrayClass === undefined) {

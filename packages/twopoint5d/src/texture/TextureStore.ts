@@ -26,6 +26,7 @@ import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {type AnyTextureResource, TextureResource, TextureResourceEvents, type TextureResourceSubType} from './TextureResource.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
+import {describeValue} from '../utils/describeValue.js';
 import {throwCollected} from '../utils/throwCollected.js';
 
 /**
@@ -438,7 +439,7 @@ export class TextureStore {
   registerAtlasAdapter(name: string, adapter: AtlasAdapter, options?: {app?: RegExp}): void {
     if (typeof name !== 'string' || name === '') {
       throw new TypeError(
-        `TextureStore: registerAtlasAdapter() got a name of ${String(name)} — an atlas adapter is registered under a name, a string`,
+        `TextureStore: registerAtlasAdapter() got a name of ${describeValue(name)} — an atlas adapter is registered under a name, a string`,
       );
     }
     if (typeof adapter !== 'function') {

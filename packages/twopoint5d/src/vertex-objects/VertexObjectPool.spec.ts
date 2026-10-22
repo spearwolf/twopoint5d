@@ -606,6 +606,14 @@ describe('VertexObjectPool', () => {
       expect(run).toThrow('VertexObjectPool#resize(): capacity must be a non-negative integer, got -1');
     });
 
+    test('resize names a capacity given as a string in quotes', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+
+      const run = () => pool.resize('4' as never);
+      expect(run).toThrow(RangeError);
+      expect(run).toThrow('VertexObjectPool#resize(): capacity must be a non-negative integer, got "4"');
+    });
+
     test('resize throws error for non-integer capacity', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 

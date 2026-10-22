@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {alignedAttributeSize} from './alignedAttributeSize.js';
 import {checkBufferArray} from './checkBufferArray.js';
 import {createTypedArray} from './createTypedArray.js';
@@ -194,7 +195,7 @@ export class VertexObjectBuffer {
     // truncated or empty length, and `capacity` would then state something no array holds
     if (capacity < 0 || !Number.isInteger(capacity)) {
       const name = typeof capacityOrBuffersData === 'number' ? 'capacity' : 'buffersData.capacity';
-      throw new RangeError(`VertexObjectBuffer: ${name} must be a non-negative integer, got ${String(capacity)}`);
+      throw new RangeError(`VertexObjectBuffer: ${name} must be a non-negative integer, got ${describeValue(capacity)}`);
     }
 
     this.capacity = capacity;
@@ -408,7 +409,7 @@ export class VertexObjectBuffer {
 
     if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
       throw new RangeError(
-        `VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got ${String(targetObjectOffset)}`,
+        `VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got ${describeValue(targetObjectOffset)}`,
       );
     }
     if (targetObjectOffset + other.capacity > this.capacity) {
@@ -514,7 +515,7 @@ export class VertexObjectBuffer {
     const objCount = Math.ceil(source.length / (this.descriptor.vertexCount * buf.itemSize));
     if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
       throw new RangeError(
-        `VertexObjectBuffer#copyArray(): targetObjectOffset must be a non-negative integer, got ${String(targetObjectOffset)}`,
+        `VertexObjectBuffer#copyArray(): targetObjectOffset must be a non-negative integer, got ${describeValue(targetObjectOffset)}`,
       );
     }
     if (targetObjectOffset + objCount > this.capacity) {
@@ -553,7 +554,7 @@ export class VertexObjectBuffer {
       throw new RangeError(
         `VertexObjectBuffer#copyWithin(): targetIndex, startIndex and endIndex must be integers with ` +
           `0 ≤ startIndex ≤ endIndex ≤ ${this.capacity} and targetIndex + (endIndex - startIndex) ≤ ${this.capacity}, ` +
-          `got ${String(targetIndex)}, ${String(startIndex)} and ${String(endIndex)}`,
+          `got ${describeValue(targetIndex)}, ${describeValue(startIndex)} and ${describeValue(endIndex)}`,
       );
     }
 
@@ -582,7 +583,7 @@ export class VertexObjectBuffer {
   copyAttributes(attributes: Record<string, ArrayLike<number>>, targetObjectOffset = 0): number {
     if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
       throw new RangeError(
-        `VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got ${String(targetObjectOffset)}`,
+        `VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got ${describeValue(targetObjectOffset)}`,
       );
     }
     let copiedObjCount = 0;
@@ -643,7 +644,7 @@ export class VertexObjectBuffer {
     ) {
       throw new RangeError(
         `VertexObjectBuffer#toAttributeArrays(): startIndex and endIndex must be integers with ` +
-          `0 ≤ startIndex ≤ endIndex ≤ ${this.capacity}, got ${String(startIndex)} and ${String(endIndex)}`,
+          `0 ≤ startIndex ≤ endIndex ≤ ${this.capacity}, got ${describeValue(startIndex)} and ${describeValue(endIndex)}`,
       );
     }
 

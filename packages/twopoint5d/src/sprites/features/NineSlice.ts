@@ -2,6 +2,7 @@ import {abs, add, div, max, min, mix, mul, round, step, sub, vec2, vec3, vec4} f
 import type {Node} from 'three/webgpu';
 import {frameTrimMargins, type FrameTrimMargins} from '../../texture/frameTrimMargins.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
+import {describeValue} from '../../utils/describeValue.js';
 import {isFiniteNumber} from '../../utils/isFiniteNumber.js';
 import {gridBase} from '../GridBase.js';
 import {defineFeature, LocalOrder, UvOrder} from '../SpriteFeature.js';
@@ -83,8 +84,6 @@ const isInsets = (value: unknown): value is Readonly<SliceInsets> => {
   }
   return true;
 };
-
-const shownInsets = (value: unknown): string => (Array.isArray(value) ? `[${value.map(String).join(', ')}]` : String(value));
 
 type Vec2 = Node<'vec2'>;
 type Vec4 = Node<'vec4'>;
@@ -170,7 +169,7 @@ export const NineSlice = defineFeature<NineSliceApi>({
       } else {
         if (!isInsets(slice)) {
           throw new RangeError(
-            `${WHERE}: the insets are ${shownInsets(slice)} — four numbers of 0 or more, [left, top, right, bottom] in pixels of the frame`,
+            `${WHERE}: the insets are ${describeValue(slice)} — four numbers of 0 or more, [left, top, right, bottom] in pixels of the frame`,
           );
         }
         for (let i = 0; i < 4; i++) insetsScratch[i] = slice[i]!;

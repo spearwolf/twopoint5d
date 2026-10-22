@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {checkBufferArray} from './checkBufferArray.js';
@@ -104,7 +105,7 @@ export class VOBufferPool {
       // which of the two ways the capacity arrived, so a caller who handed in buffers data looks at
       // its `capacity` field rather than at the argument
       const capacityName = typeof capacityOrData === 'number' ? 'capacity' : 'buffersData.capacity';
-      throw new RangeError(`VOBufferPool: ${capacityName} must be a non-negative integer, got ${String(capacity)}`);
+      throw new RangeError(`VOBufferPool: ${capacityName} must be a non-negative integer, got ${describeValue(capacity)}`);
     }
     if (typeof capacityOrData === 'number') {
       this.#capacity = capacity;
@@ -138,7 +139,7 @@ export class VOBufferPool {
   set usedCount(value: number) {
     // ±Infinity is clamped like any other value out of range; a fraction or NaN names no slot
     if (Number.isNaN(value) || (Number.isFinite(value) && !Number.isInteger(value))) {
-      throw new RangeError(`VOBufferPool#usedCount must be an integer, got ${value}`);
+      throw new RangeError(`VOBufferPool#usedCount must be an integer, got ${describeValue(value)}`);
     }
     if (this.#disposed) return;
     const previous = this.#usedCount;
@@ -304,7 +305,7 @@ export class VOBufferPool {
     if (buffersData.capacity !== this.capacity) {
       throw new RangeError(
         `VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, ` +
-          `${this.capacity}, got ${String(buffersData.capacity)}`,
+          `${this.capacity}, got ${describeValue(buffersData.capacity)}`,
       );
     }
     // every array is checked before the first write, so a payload that fails leaves the pool as it was

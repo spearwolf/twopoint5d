@@ -267,7 +267,7 @@ The messages keep their head and add the reason and the fix (`where` is `defineS
 
 A declaration that is neither a uniform value nor `{value, shared?}` with a valid value, a
 boolean or absent `shared` and no other key is refused: `feature "x" starts the uniform "time"
-with {"value":0,"share":true}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`.
+with {value: 0, share: true}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`.
 
 ### 5.3 Where the merge reaches
 

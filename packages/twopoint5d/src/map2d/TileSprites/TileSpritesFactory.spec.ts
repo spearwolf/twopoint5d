@@ -12,12 +12,25 @@ import {Map2DTileRenderer} from '../Map2DTileRenderer.js';
 import {RectangularVisibilityArea} from '../RectangularVisibilityArea.js';
 import {RepeatingTilesProvider} from '../RepeatingTilesProvider.js';
 import {noTileCapacity} from '../constants.js';
+import type {IMap2DTileDataProvider} from '../types.js';
 import type {TileSprite} from './descriptors.js';
 import {TileSprites} from './TileSprites.js';
 import {TileSpritesFactory} from './TileSpritesFactory.js';
 import {TileSpritesGeometry} from './TileSpritesGeometry.js';
 
 const makeTileSet = () => new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
+
+// a provider that answers any id, a broken one too: RepeatingTilesProvider refuses a pattern with an
+// id that is no whole number, and the factory has to cope with a provider of one's own that does not
+const rowProvider = (ids: readonly number[]): IMap2DTileDataProvider => ({
+  getTileIdAt: (col, row) => (row === 0 ? (ids[col] ?? 0) : 0),
+  getTileIdsWithin: (left, top, width, height, target = new Uint32Array(width * height)) => {
+    for (let j = 0; j < height; j++) {
+      for (let i = 0; i < width; i++) target[j * width + i] = top + j === 0 ? (ids[left + i] ?? 0) : 0;
+    }
+    return target;
+  },
+});
 
 const bufferOf = (geometry: TileSpritesGeometry, attrName: string): InterleavedBuffer =>
   (geometry.getAttribute(attrName) as InterleavedBufferAttribute).data;
@@ -102,7 +115,7 @@ describe('TileSpritesFactory', () => {
       'a tile id of %s from the tile data provider throws the RangeError of TileSet#frameId() and leaves the instanced pool as it found it',
       (tileId, shown) => {
         const tileSprites = new TileSprites(new TileSpritesGeometry(4));
-        const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider(tileId));
+        const factory = new TileSpritesFactory(tileSprites, makeTileSet(), rowProvider([tileId]));
         const pool = tileSprites.geometry!.instancedPool;
 
         const error = catchError(() => factory.createTile(new Map2DTileCoords(0, 0)));
@@ -156,7 +169,7 @@ describe('TileSpritesFactory', () => {
     test('a full instanced pool answers noTileCapacity for a tile id that is no whole number, and throws the RangeError once a slot is free', () => {
       const tileSprites = new TileSprites(new TileSpritesGeometry(1));
       // column 0 holds tile id 1, column 1 tile id 1.5
-      const factory = new TileSpritesFactory(tileSprites, makeTileSet(), new RepeatingTilesProvider([[1, 1.5]]));
+      const factory = new TileSpritesFactory(tileSprites, makeTileSet(), rowProvider([1, 1.5]));
       const pool = tileSprites.geometry!.instancedPool;
       const first = factory.createTile(new Map2DTileCoords(0, 0)) as TileSprite;
 

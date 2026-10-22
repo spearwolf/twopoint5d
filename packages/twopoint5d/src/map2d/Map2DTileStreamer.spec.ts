@@ -181,6 +181,15 @@ describe('Map2DTileStreamer', () => {
       expect(Array.isArray(layer.tiles)).toBeTruthy();
       expect(layer.tiles).toHaveLength(0);
     });
+    test('tiles is read-only', () => {
+      const streamer = new Map2DTileStreamer(1, 1);
+
+      // @ts-expect-error tiles has a getter and no setter
+      expect(() => (streamer.tiles = [])).toThrow(TypeError);
+      expect(() => {
+        (streamer as unknown as {tiles: unknown}).tiles = [];
+      }).toThrow(TypeError);
+    });
     test('tilesRenderer', () => {
       const layer = new Map2DTileStreamer(1, 1);
       expect(layer.renderers.size).toBe(0);

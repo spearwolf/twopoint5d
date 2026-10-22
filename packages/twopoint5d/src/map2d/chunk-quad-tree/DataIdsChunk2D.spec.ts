@@ -70,6 +70,14 @@ describe('DataIdsChunk2D', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  test('names a compression that is no string as it is', () => {
+    const fromMapFile = {x: 0, y: 0, width: 2, height: 2, data: 'AAAAAA==', compression: 1};
+
+    expect(() => new DataIdsChunk2D(fromMapFile).readDataIdAt(0, 0)).toThrow(
+      'DataIdsChunk2D: the compression 1 is not supported',
+    );
+  });
+
   test('takes an empty compression for no compression', () => {
     const fromMapFile = {x: 0, y: 0, width: 2, height: 2, data: 'AQAAAAIAAAADAAAABAAAAA==', compression: ''};
 

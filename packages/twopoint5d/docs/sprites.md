@@ -2496,7 +2496,9 @@ uniform of one's own:
 
 The normal is not normalized; the features do not need it to be. **The sprites stand on the side
 the normal points to**, and the hook of `ShadowPass` judges the light by it: turn the plane
-over, and the shadow is left out.
+over, and the shadow is left out. A `mirrorPlane` or `groundPlane` whose normal is `(0, 0, 0)` is
+no plane: `ReflectionPass`, `BillboardReflectionPass`, `ShadowPass` and `SegmentShadowPass` draw
+nothing for it.
 
 **`lightOf()`** writes a homogeneous light `[x, y, z, w]` for `shadowLight`:
 

@@ -21,6 +21,8 @@ into a handful of parts, and a map is built by plugging them together.
 
 The usual map: the ground under a perspective camera that looks down at it. A tile id comes from
 the data provider, the frame of that id from the tile set, and the id `0` is a hole — no sprite.
+`RepeatingTilesProvider` takes ids that are whole numbers from 0 to 4294967295 — the range of the
+`Uint32Array` that `getTileIdsWithin()` writes — and refuses a pattern with any other value.
 
 ```ts check
 import {

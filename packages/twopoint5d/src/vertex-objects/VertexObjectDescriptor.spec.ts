@@ -244,6 +244,18 @@ describe('VertexObjectDescriptor', () => {
       );
     });
 
+    test('a vertexCount given as a string, quoted', () => {
+      expect(build({vertexCount: '4' as never, attributes: {pos}})).toThrow(
+        'VertexObjectDescriptor: vertexCount must be a positive integer, got "4"',
+      );
+    });
+
+    test('an attribute size given as a string, quoted', () => {
+      expect(build({attributes: {pos: {size: '2' as never}}})).toThrow(
+        'VertexObjectDescriptor: attribute "pos" needs a size of at least 1 (a positive integer size or at least one component), got "2"',
+      );
+    });
+
     test('an attribute without components', () => {
       expect(build({attributes: {pos: {components: []}}})).toThrow(
         'VertexObjectDescriptor: attribute "pos" needs a size of at least 1 (a positive integer size or at least one component), got 0',

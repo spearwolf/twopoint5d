@@ -5,6 +5,7 @@ import {describe, expect, test} from 'vitest';
 import {evaluateNode, stubShaderContext} from '../../testing/spriteGraph.js';
 import {lightFacingVertex, mirroredBillboardVertex} from './facing.js';
 import {MirrorAtPlane} from './MirrorAtPlane.js';
+import {PlanarShadow} from './PlanarShadow.js';
 
 type V3 = [number, number, number];
 type V4 = [number, number, number, number];
@@ -148,5 +149,41 @@ describe('mirroredBillboardVertex()', () => {
 
     expectNear(reflect([1, 0, 0], {...scene, cameraUp}), [-2, 0, 0]);
     expectNear(reflect([0, 1, 0], {...scene, cameraUp}), [-1, 1, 0]);
+  });
+});
+
+describe('a plane whose normal is (0, 0, 0)', () => {
+  const plane: V4 = [0, 0, 0, 1];
+  const ctxOf = (uniforms: Record<string, V4>) => ({
+    ...stubShaderContext(),
+    uniform: <T extends string>(name: string) => v4(uniforms[name]!) as unknown as Node<T>,
+  });
+
+  test('mirroredBillboardVertex() and then MirrorAtPlane answer the origin', () => {
+    const placed = mirroredBillboardVertex({
+      vertex: v3([1, 0, 0]),
+      instancePosition: v3([0, 1, 0]),
+      plane: v4(plane),
+      cameraPosition: v3([0, -1, 10]),
+      cameraUp: v3([0, 1, 0]),
+    });
+
+    expect(evaluateNode(MirrorAtPlane.mesh!.transform(placed, ctxOf({mirrorPlane: plane})))).toEqual([0, 0, 0]);
+  });
+
+  test('lightFacingVertex() and then PlanarShadow answer the origin', () => {
+    const light: V4 = [0, 1, 1, 0];
+    const placed = lightFacingVertex({
+      vertex: v3([1, 0, 0]),
+      instancePosition: v3([0, 0, 0]),
+      light: v4(light),
+      plane: v4(plane),
+      cameraUp: v3([0, 1, 0]),
+      cameraBack: v3([0, 0, 1]),
+    });
+
+    expect(evaluateNode(PlanarShadow.mesh!.transform(placed, ctxOf({shadowLight: light, groundPlane: plane})))).toEqual([
+      0, 0, 0,
+    ]);
   });
 });

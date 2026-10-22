@@ -107,8 +107,11 @@ explicit instruction.
   (`FeatureSprites "hud": …`). The subject is followed by a colon and what is wrong, or a
   sentence goes on from it (`StageRenderer#add() cannot take …`). A number check goes
   through `assertFinite()` or `assertPositiveFinite()` in `src/utils/`, which write
-  `Subject: name must be a finite number …, got …`. A failure of `expectDefined()` reports
-  a broken invariant of the library, not a refusal, and names no subject; the refusals a
+  `Subject: name must be a finite number …, got …`. A refused value is quoted through
+  `describeValue()` in `src/utils/`, never through `String()`, `JSON.stringify()` or a
+  bare interpolation: it writes a string in double quotes, a BigInt as `1n`, and an
+  array or a plain object by its content. A failure of `expectDefined()` reports a
+  broken invariant of the library, not a refusal, and names no subject; the refusals a
   feature's `checkKind` throws get theirs from `defineSprite()`.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.

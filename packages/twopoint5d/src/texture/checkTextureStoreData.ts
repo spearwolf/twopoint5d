@@ -7,7 +7,8 @@ import {isObject} from '../utils/isObject.js';
 import {isTextureOptionClass, type TextureOptionClasses} from './TextureFactory.js';
 import type {TextureStoreData} from './types.js';
 
-// an object or an array quoted into a message says nothing as `String()` writes it
+// a catalog, or a part of it, is large, and what a message about its shape has to name is its kind — an array
+// or an object —, not its content
 const describeCatalogValue = (value: unknown): string =>
   Array.isArray(value) ? 'an array' : isObject(value) ? 'an object' : describeValue(value);
 

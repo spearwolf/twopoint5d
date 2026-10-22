@@ -9,6 +9,7 @@ import {
   type Texture,
 } from 'three/webgpu';
 
+import {describeValue} from '../utils/describeValue.js';
 import type {AtlasFrameTable} from './AtlasFrameTable.js';
 import {roundHalfUp} from './roundHalfUp.js';
 import {sampleFrameAt} from './sampleFrameAt.js';
@@ -85,24 +86,22 @@ export function sampleAtlasFrame(
   const {origin, wrap = 'clamp', trim = 'mask', inset = 0} = options;
 
   if (!ORIGINS.includes(origin)) {
-    throw new Error(`sampleAtlasFrame: the origin "${String(origin)}" is none of ${ORIGINS.join(', ')}`);
+    throw new Error(`sampleAtlasFrame: the origin ${describeValue(origin)} is none of ${ORIGINS.join(', ')}`);
   }
   if (typeof wrap !== 'string' && (!Array.isArray(wrap) || wrap.length !== 2)) {
-    throw new Error(
-      `sampleAtlasFrame: the wrap ${JSON.stringify(wrap)} is neither one of ${WRAPS.join(', ')} nor a pair of them`,
-    );
+    throw new Error(`sampleAtlasFrame: the wrap ${describeValue(wrap)} is neither one of ${WRAPS.join(', ')} nor a pair of them`);
   }
   const [wrapU, wrapV] = typeof wrap === 'string' ? [wrap, wrap] : wrap;
   for (const axis of [wrapU, wrapV]) {
     if (!WRAPS.includes(axis)) {
-      throw new Error(`sampleAtlasFrame: the wrap "${String(axis)}" is none of ${WRAPS.join(', ')}`);
+      throw new Error(`sampleAtlasFrame: the wrap ${describeValue(axis)} is none of ${WRAPS.join(', ')}`);
     }
   }
   if (!TRIMS.includes(trim)) {
-    throw new Error(`sampleAtlasFrame: the trim "${String(trim)}" is none of ${TRIMS.join(', ')}`);
+    throw new Error(`sampleAtlasFrame: the trim ${describeValue(trim)} is none of ${TRIMS.join(', ')}`);
   }
   if (!Number.isFinite(inset) || inset < 0) {
-    throw new RangeError(`sampleAtlasFrame: the inset ${inset} is no finite number of 0 or more`);
+    throw new RangeError(`sampleAtlasFrame: the inset ${describeValue(inset)} is no finite number of 0 or more`);
   }
 
   const frameIndex = clamp(roundHalfUp(typeof index === 'number' ? float(index) : index.toFloat()), 0, table.size - 1).toInt();

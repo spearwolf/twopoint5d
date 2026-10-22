@@ -482,6 +482,38 @@ describe('PanControl2D', () => {
     });
   });
 
+  describe('speeds that are no finite number', () => {
+    it.each([
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+    ])('refuses a speed option that is no finite number: %s', (written, speed) => {
+      expect(() => makeControl({speed})).toThrow(new RangeError(`PanControl2D: speed must be a finite number, got ${written}`));
+    });
+
+    it.each(['pixelsPerSecond', 'speedNorth', 'speedEast', 'speedSouth', 'speedWest'] as const)(
+      'refuses a speed field set to NaN and keeps the one it holds: %s',
+      (field) => {
+        const control = makeControl();
+        control[field] = 7;
+
+        expect(() => {
+          control[field] = Number.NaN;
+        }).toThrow(new RangeError(`PanControl2D: ${field} must be a finite number, got NaN`));
+        expect(control[field]).toBe(7);
+      },
+    );
+
+    it('takes a negative speed', () => {
+      const control = makeControl({speed: -50});
+      control.speedEast = -10;
+
+      control.update(1);
+
+      expect(control.pixelsPerSecond).toBe(-50);
+      expect(control.panView.x).toBe(-10);
+    });
+  });
+
   describe('on…() shorthands', () => {
     it('onUpdate() hears where update() moved the view, until the function it returns takes it off', () => {
       const control = makeControl();

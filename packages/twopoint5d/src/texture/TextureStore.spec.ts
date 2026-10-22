@@ -3642,7 +3642,11 @@ describe('TextureStore', () => {
     test.each([
       [
         () => new TextureStore().registerAtlasAdapter('', () => ({atlas: new TextureAtlas()})),
-        'TextureStore: registerAtlasAdapter() got a name of  — an atlas adapter is registered under a name, a string',
+        'TextureStore: registerAtlasAdapter() got a name of "" — an atlas adapter is registered under a name, a string',
+      ],
+      [
+        () => new TextureStore().registerAtlasAdapter({} as never, () => ({atlas: new TextureAtlas()})),
+        'TextureStore: registerAtlasAdapter() got a name of {} — an atlas adapter is registered under a name, a string',
       ],
       [
         () => new TextureStore().registerAtlasAdapter('x', 5 as never),

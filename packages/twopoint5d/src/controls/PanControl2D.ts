@@ -7,6 +7,7 @@ import {
   OnPanControl2DUpdate,
   type PanControl2DUpdateProps,
 } from '../events.js';
+import {assertFinite} from '../utils/assertFinite.js';
 import {InputControlBase} from './InputControlBase.js';
 import {readOption} from './readOption.js';
 
@@ -112,7 +113,10 @@ export interface PanControl2DOptions {
    */
   styleSheetRoot?: HTMLElement | ShadowRoot;
 
-  /** Scroll speed while using the keys. Pixels per seconds. Default is 100. */
+  /**
+   * Scroll speed while using the keys. Pixels per seconds. Default is 100. A value that is no
+   * finite number throws a `RangeError`.
+   */
   speed?: number;
 
   /**
@@ -182,12 +186,12 @@ export interface PanControl2DOptions {
 export interface PanControl2D extends EventizedObject {}
 
 export class PanControl2D extends InputControlBase {
-  pixelsPerSecond = 0;
+  #pixelsPerSecond = 0;
 
-  speedNorth = 0;
-  speedEast = 0;
-  speedSouth = 0;
-  speedWest = 0;
+  #speedNorth = 0;
+  #speedEast = 0;
+  #speedSouth = 0;
+  #speedWest = 0;
 
   #pointersDown: Map<number, PanInternalState> = new Map();
 
@@ -232,13 +236,77 @@ export class PanControl2D extends InputControlBase {
   #pointerDisabled = false;
   #keyboardDisabled = false;
 
+  /**
+   * The speed a key held down sets its speed field to, in pixels per second — the option
+   * `speed`. A value that is no finite number throws a `RangeError` and leaves the one it holds.
+   */
+  get pixelsPerSecond(): number {
+    return this.#pixelsPerSecond;
+  }
+
+  set pixelsPerSecond(value: number) {
+    this.#pixelsPerSecond = assertFinite(value, 'PanControl2D', 'pixelsPerSecond');
+  }
+
+  /**
+   * Pixels per second towards the north. A key sets it to {@link pixelsPerSecond} and back to 0
+   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
+   * no finite number throws a `RangeError` and leaves the one it holds.
+   */
+  get speedNorth(): number {
+    return this.#speedNorth;
+  }
+
+  set speedNorth(value: number) {
+    this.#speedNorth = assertFinite(value, 'PanControl2D', 'speedNorth');
+  }
+
+  /**
+   * Pixels per second towards the east. A key sets it to {@link pixelsPerSecond} and back to 0
+   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
+   * no finite number throws a `RangeError` and leaves the one it holds.
+   */
+  get speedEast(): number {
+    return this.#speedEast;
+  }
+
+  set speedEast(value: number) {
+    this.#speedEast = assertFinite(value, 'PanControl2D', 'speedEast');
+  }
+
+  /**
+   * Pixels per second towards the south. A key sets it to {@link pixelsPerSecond} and back to 0
+   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
+   * no finite number throws a `RangeError` and leaves the one it holds.
+   */
+  get speedSouth(): number {
+    return this.#speedSouth;
+  }
+
+  set speedSouth(value: number) {
+    this.#speedSouth = assertFinite(value, 'PanControl2D', 'speedSouth');
+  }
+
+  /**
+   * Pixels per second towards the west. A key sets it to {@link pixelsPerSecond} and back to 0
+   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
+   * no finite number throws a `RangeError` and leaves the one it holds.
+   */
+  get speedWest(): number {
+    return this.#speedWest;
+  }
+
+  set speedWest(value: number) {
+    this.#speedWest = assertFinite(value, 'PanControl2D', 'speedWest');
+  }
+
   constructor(options?: PanControl2DOptions) {
     super();
     eventize(this);
 
     this.panView = options?.state;
 
-    this.pixelsPerSecond = readOption(options, 'speed', 100);
+    this.pixelsPerSecond = assertFinite(readOption(options, 'speed', 100), 'PanControl2D', 'speed');
 
     // before the cursorPanStyle below: the setter retains the rule, and it has to know by
     // then which root the rule belongs in

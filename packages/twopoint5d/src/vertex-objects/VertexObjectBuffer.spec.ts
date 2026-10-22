@@ -1117,6 +1117,13 @@ describe('VertexObjectBuffer', () => {
           );
         });
 
+        test('refuses a buffersData.capacity given as a string, quoting it', () => {
+          const build = () => new VertexObjectBuffer(makeSource(), {capacity: '4', usedCount: 0, buffers: {}} as never);
+
+          expect(build).toThrow(RangeError);
+          expect(build).toThrow('VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got "4"');
+        });
+
         test('takes a capacity of 0', () => {
           const buffer = new VertexObjectBuffer(makeSource(), 0);
 

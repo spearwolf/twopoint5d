@@ -1,4 +1,5 @@
 import type {Node} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 import type {VertexAttributesType} from '../vertex-objects/types.js';
 import type {SpriteBase} from './SpriteBase.js';
 
@@ -205,7 +206,7 @@ export function defineFeature<Api extends object = object>(feature: SpriteFeatur
     const stage = feature[slot];
     if (stage != null && !Number.isFinite(stage.order)) {
       throw new TypeError(
-        `defineFeature: the ${slot} stage of feature "${feature.name}" needs a finite order, got ${stage.order}`,
+        `defineFeature: the ${slot} stage of feature "${feature.name}" needs a finite order, got ${describeValue(stage.order)}`,
       );
     }
   }

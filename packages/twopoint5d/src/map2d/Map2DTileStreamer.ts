@@ -144,7 +144,17 @@ export class Map2DTileStreamer {
     this.clearTiles();
   }
 
-  tiles: IMap2DTileCoords[] = [];
+  #tiles: IMap2DTileCoords[] = [];
+
+  /**
+   * The tiles the last {@link update} laid out — the list the visibilitor gave back, and the one it
+   * gets as `previousTiles` in the next `update()`; empty after an update that cleared the tiles.
+   * Read-only: {@link clearTiles} has the next `update()` lay out the whole set again.
+   */
+  get tiles(): readonly IMap2DTileCoords[] {
+    return this.#tiles;
+  }
+
   renderers: Set<IMap2DTileRenderer> = new Set();
 
   // Per-frame scratch — handed to beginUpdatingTiles(), which reads it during the call.
@@ -220,7 +230,7 @@ export class Map2DTileStreamer {
       }
       // a new list, not `length = 0`: the visibilitor holds this very array as the tile set of
       // its last result, and its cache path hands that result back untouched by previousTiles
-      this.tiles = [];
+      this.#tiles = [];
       this.#laidOutSerials = new WeakMap();
       this.#clearTilesOnNextUpdate = false;
     }
@@ -234,14 +244,14 @@ export class Map2DTileStreamer {
     this.#viewCenter[0] = this.centerX;
     this.#viewCenter[1] = this.centerY;
     const visible: IMap2DVisibleTiles | undefined = visibilitor.computeVisibleTiles(
-      this.tiles,
+      this.#tiles,
       this.#viewCenter,
       this.#tileCoords,
       node.matrixWorld,
     );
 
     if (visible) {
-      this.tiles = visible.tiles;
+      this.#tiles = visible.tiles;
 
       // the renderer nodes are children of `node` — Map2D adds them to itself — so they are placed
       // in its local space, and its own world matrix carries them into the world
@@ -273,7 +283,7 @@ export class Map2DTileStreamer {
       } catch (error) {
         // No later result carries the removes this cycle had yet to go through, nor the whole
         // result for the renderers after the one that threw — the visibilitor computes against
-        // `this.tiles`, which holds the new set already. So the next update lays out everything
+        // `this.#tiles`, which holds the new set already. So the next update lays out everything
         // again.
         this.clearTiles();
         throw error;

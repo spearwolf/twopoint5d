@@ -98,6 +98,34 @@ describe('sprites — a reflection pass', function () {
     expect(differing.length, `the pixels against the model, first ones: ${differing.slice(0, 4).join('; ')}`).to.equal(0);
   });
 
+  for (const {name, pass} of [
+    {name: 'ReflectionPass', pass: ReflectionPass},
+    {name: 'BillboardReflectionPass', pass: BillboardReflectionPass},
+  ]) {
+    it(`draws no reflection for a mirrorPlane whose normal is (0, 0, 0), and the sprite as before: ${name}`, async function () {
+      const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
+      const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]});
+      sprites.setUniform('reflectionColor', 0, 1, 0, 1);
+      sprites.setUniform('mirrorPlane', 0, 0, 0, 0);
+      const sprite = sprites.createSprite();
+      sprite.setSize(2, 2);
+      sprite.setPosition(0, 1, 0);
+      sprite.setTexCoords(0, 0, 1, 1);
+      const scene = new Scene();
+      scene.add(sprites);
+      sprites.update();
+
+      const pixels = await renderToPixels(display.renderer, scene, makeCameraAboveGround(TARGET_SIZE, PIXELS_PER_UNIT), target);
+
+      sprites.dispose();
+      colorMap.dispose();
+
+      expect(countColor(pixels, GREEN), 'the pixels of a reflection').to.equal(0);
+      // the sprite covers 2 × 1.2 units of the view, 614 pixels, as in the first test
+      expect(countColor(pixels, WHITE), 'the pixels of the sprite').to.be.within(560, 670);
+    });
+  }
+
   /**
    * Renders a billboard 2 units square at (0, 2, 0) with its reflection of `pass` in the XZ ground,
    * through makeCameraAboveGround(), and counts the pixels of the sprite and of its reflection.

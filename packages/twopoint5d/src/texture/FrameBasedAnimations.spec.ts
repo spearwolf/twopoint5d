@@ -208,7 +208,7 @@ describe('FrameBasedAnimations', () => {
     test.each([
       [5, '5'],
       ['frames', '"frames"'],
-      [{}, '[object Object]'],
+      [{}, '{}'],
     ] as const)(
       'a third argument of %s that is no TextureAtlas, no TileSet and no array is refused with the value and the animation',
       (value, described) => {

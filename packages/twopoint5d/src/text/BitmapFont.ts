@@ -226,7 +226,7 @@ export class BitmapFont {
           );
         }
         if (AT_LEAST_ZERO.has(field) && value < 0) {
-          throw new Error(`${WHERE}: the char ${label} has ${article(field)} ${field} of ${value} — 0 or more`);
+          throw new Error(`${WHERE}: the char ${label} has ${article(field)} ${field} of ${describeValue(value)} — 0 or more`);
         }
       }
       if (char.x + char.width > scaleW) {

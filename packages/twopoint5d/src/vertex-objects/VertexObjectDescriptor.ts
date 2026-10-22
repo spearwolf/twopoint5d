@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
 import type {
@@ -151,7 +152,7 @@ export class VertexObjectDescriptor {
   #validate(): void {
     const {vertexCount} = this.description;
     if (vertexCount != null && !isPositiveInteger(vertexCount)) {
-      throw new RangeError(`VertexObjectDescriptor: vertexCount must be a positive integer, got ${vertexCount}`);
+      throw new RangeError(`VertexObjectDescriptor: vertexCount must be a positive integer, got ${describeValue(vertexCount)}`);
     }
 
     for (const attr of this.attributes.values()) {
@@ -163,7 +164,7 @@ export class VertexObjectDescriptor {
       }
       if (!isPositiveInteger(attr.size)) {
         throw new RangeError(
-          `VertexObjectDescriptor: attribute "${attr.name}" needs a size of at least 1 (a positive integer size or at least one component), got ${attr.size}`,
+          `VertexObjectDescriptor: attribute "${attr.name}" needs a size of at least 1 (a positive integer size or at least one component), got ${describeValue(attr.size)}`,
         );
       }
     }

@@ -1,9 +1,10 @@
-import {div, dot, length, mul, sub} from 'three/tsl';
+import {div, dot, float, length, mul, select, sub, vec3} from 'three/tsl';
 import {defineFeature, MeshOrder} from '../SpriteFeature.js';
 
 /**
  * Mirrors the placed vertex at the plane `dot(n, p) = d` of `mirrorPlane` (`[n.x, n.y, n.z, d]`);
  * the frame stays where it is. `n` need not be a unit vector: `[0, 2, 0, 4]` is the plane `y = 2`.
+ * A plane whose normal is `(0, 0, 0)` is no plane: the pass draws nothing for it.
  */
 export const MirrorAtPlane = defineFeature({
   name: 'mirrorAtPlane',
@@ -16,7 +17,8 @@ export const MirrorAtPlane = defineFeature({
       const size = length(plane.xyz);
       const n = div(plane.xyz, size);
       const d = div(plane.w, size);
-      return sub(p, mul(n, mul(2, sub(dot(n, p), d))));
+      // a normal of (0, 0, 0) is no plane: every vertex goes to the origin, and the pass draws nothing
+      return select(float(0).lessThan(size), sub(p, mul(n, mul(2, sub(dot(n, p), d)))), vec3(0));
     },
   },
 });

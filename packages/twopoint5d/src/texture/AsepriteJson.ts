@@ -257,7 +257,7 @@ export class AsepriteJson {
       }
       if (!DIRECTIONS.includes(tag.direction)) {
         throw new Error(
-          `AsepriteJson: the tag "${tag.name}" has the direction ${JSON.stringify(tag.direction)} — Aseprite's directions are forward, reverse, pingpong and pingpong_reverse`,
+          `AsepriteJson: the tag "${tag.name}" has the direction ${describeValue(tag.direction)} — Aseprite's directions are forward, reverse, pingpong and pingpong_reverse`,
         );
       }
       repeatOf(tag);

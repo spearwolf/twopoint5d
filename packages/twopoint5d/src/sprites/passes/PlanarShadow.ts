@@ -1,4 +1,4 @@
-import {div, dot, max, mul, sub} from 'three/tsl';
+import {div, dot, float, max, mul, select, sub, vec3} from 'three/tsl';
 import {defineFeature, MeshOrder} from '../SpriteFeature.js';
 
 // a vertex near or above a point light comes down to this share of the height of the light before
@@ -13,7 +13,8 @@ const CLAMPED_SHARE = 1 - 1 / MAX_POINT_SHADOW_STRETCH;
  * homogeneous: `[x, y, z, 0]` is a direction towards the light, `[x, y, z, 1]` the position of a
  * point light. Works on the placed vertex, so the shadow of a billboard is the shadow of the
  * billboard the camera sees. A vertex near or above a point light is brought down along the
- * normal first; its shadow grows long but stays finite and in the plane.
+ * normal first; its shadow grows long but stays finite and in the plane. A `groundPlane` whose normal
+ * is `(0, 0, 0)` is no plane: the pass draws nothing for it.
  */
 export const PlanarShadow = defineFeature({
   name: 'planarShadow',
@@ -30,7 +31,12 @@ export const PlanarShadow = defineFeature({
       const excess = mul(light.w, max(sub(height, mul(lightHeight, CLAMPED_SHARE)), 0));
       const clamped = sub(p, mul(n, div(excess, dot(n, n))));
       const towardsLight = sub(light.xyz, mul(light.w, clamped));
-      return sub(clamped, mul(towardsLight, div(sub(height, excess), dot(n, towardsLight))));
+      // a normal of (0, 0, 0) is no plane: every vertex goes to the origin, and the pass draws nothing
+      return select(
+        float(0).lessThan(dot(n, n)),
+        sub(clamped, mul(towardsLight, div(sub(height, excess), dot(n, towardsLight)))),
+        vec3(0),
+      );
     },
   },
 });

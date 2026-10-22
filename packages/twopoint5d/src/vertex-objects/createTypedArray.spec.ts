@@ -25,8 +25,8 @@ describe('createTypedArray', () => {
     }
   });
 
-  test('an unknown data type throws', () => {
-    expect(() => createTypedArray('nope' as VertexAttributeDataType, 1)).toThrow();
+  test('an unknown data type throws, naming it in double quotes', () => {
+    expect(() => createTypedArray('nope' as VertexAttributeDataType, 1)).toThrow('typedArrayOf: unknown data type "nope"');
   });
 
   test('typedArrayOf() answers the class of every data type, with its name and its bytes per element', () => {

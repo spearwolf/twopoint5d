@@ -71,14 +71,26 @@ describe('shared uniforms', () => {
   });
 
   test.each([
-    [{value: 0, share: true}, '{"value":0,"share":true}'],
-    [{value: 'x', shared: true}, '{"value":"x","shared":true}'],
-    [{value: 0, shared: 'yes'}, '{"value":0,"shared":"yes"}'],
-    [{shared: true}, '{"shared":true}'],
-    ['fast', 'fast'],
+    [{value: 0, share: true}, '{value: 0, share: true}'],
+    [{value: 'x', shared: true}, '{value: "x", shared: true}'],
+    [{value: 0, shared: 'yes'}, '{value: 0, shared: "yes"}'],
+    [{shared: true}, '{shared: true}'],
+    ['fast', '"fast"'],
   ])('refuses the malformed declaration %j', (declaration, shown) => {
     expect(() => collect(declaring('odd', declaration as never))).toThrow(
       `test: feature "odd" starts the uniform "time" with ${shown}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`,
+    );
+  });
+
+  test('refuses a uniform declared as {value: 1n}, showing it', () => {
+    expect(() => collect(declaring('odd', {value: 1n} as never))).toThrow(
+      'test: feature "odd" starts the uniform "time" with {value: 1n}; a uniform takes a number, 2 to 4 numbers, or {value, shared}',
+    );
+  });
+
+  test('refuses a uniform declared as {value: NaN}, showing NaN', () => {
+    expect(() => collect(declaring('odd', {value: NaN}))).toThrow(
+      'test: feature "odd" starts the uniform "time" with {value: NaN}; a uniform takes a number, 2 to 4 numbers, or {value, shared}',
     );
   });
 

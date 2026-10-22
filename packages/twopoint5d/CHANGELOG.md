@@ -93,6 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CameraBasedVisibility` hands out what it computes for reading only: `TileBox` with `readonly` fields, `visibles` and `pointsOnPlane` as `readonly` arrays, `planeWorld`, `planeOrigin`, `planeCoords2D` and `matrixWorld` as `readonly`, `pointOnPlane` as a getter, and `CameraBasedVisibility.Plane` a new copy on every access (**BREAKING** for TypeScript). An `x` or `y` of a slot written by hand leaves the slot behind in the slot table, and an assigned `planeWorld` cuts the helpers off from the plane the class writes. See the Migration Guide
 - the setter `Map2D#visibilitor` takes `undefined`, which takes the visibilitor away; the next `update()` empties every tile renderer
 - `RepeatingTilesProvider#tileIds` keeps and hands out a frozen copy of the pattern, typed `readonly (readonly number[])[]` (**BREAKING**). See the Migration Guide
+- `Map2DTileStreamer#tiles` is read-only, typed `readonly IMap2DTileCoords[]`: the streamer alone writes the list it hands its visibilitor as `previousTiles` (**BREAKING**). See the Migration Guide
 - `InputControlBase` tells its listeners apart as the DOM does, by host, event and callback: a second `addEventListener()` with another `passive` replaces the listener, and `removeEventListener()` takes no `passive` (**BREAKING** for a control of one's own). See the Migration Guide
 - `TexturePackerJson.parse()` takes the type of the frame entries as a type parameter: the `target` it fills and the atlas it answers carry that type — `TextureAtlas<TexturePackerFrameData>` for a TexturePacker json, `TextureAtlas<AsepriteFrameData>` for the frames `AsepriteJson.parse()` hands it
 - `new TileSet()` throws a `RangeError` for a `tileCount` that does not fit into the `baseCoords` with its `margin`, `padding` and `spacing`, naming how many tiles fit, and leaves the atlas handed in as it was; a `TextureResource` reports it as an `error` with `source: 'texture'` (**BREAKING**). See the Migration Guide
@@ -116,7 +117,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the pass meshes of `FeatureSprites` draw the geometry in the `geometry` slot and follow a geometry the caller puts there, so the mesh and every pass draw the sprites that `createSprite()`, `freeSprite()`, `sortBy()`, `sortByViewDepth()` and `spritePool` work on
 - `AnimatedFrames` holds the frame of a looped and of a ping-pong animation within the animation where the modulo of the GPU lands on its edge: under a division a few ULP off the sprite shows a frame of the animation rather than a header texel of the `animsMap` read as tex coords
 - `FeatureSprites` refuses a segment placement swapped in through `placement` or handed in as the option `placement` under `ShadowPass` or `BillboardReflectionPass`, with a message that names the pass to take, before any material takes it: of a segment, both would draw the quad of its caps at its start
-- the refusals of `flatPlacement()`, `axisBillboardPlacement()`, `segmentPlacement()`, `wave()`, `gridBase()` and of the option `grow` of `FeatureSprites` show the value as `describeValue()` does: `NaN` and `Infinity` as themselves, and a BigInt without the message getting lost
+- every refusal of the library quotes the value it refuses the same way: a string in double quotes, `NaN`, an infinity and a BigInt as themselves (`1n`), an array or a plain object by its content — `[1.5, NaN, -1]`, `{value: 1n}` — up to eight entries and three levels deep, and a function by its name. A uniform declared as `{value: 1n}` and a `wrap` of `sampleAtlasFrame()` given as a BigInt are refused with such a message
+- `MirrorAtPlane` and `PlanarShadow` draw nothing for a plane whose normal is `(0, 0, 0)`: every vertex of `ReflectionPass`, `BillboardReflectionPass`, `ShadowPass` and `SegmentShadowPass` goes to the origin of the mesh, and none becomes `NaN`
+- `PanControl2D` refuses an option `speed`, a `pixelsPerSecond` and a value of `speedNorth`, `speedEast`, `speedSouth` or `speedWest` that is no finite number with a `RangeError` that names it, and keeps the value it holds — a `NaN` there would turn `panView` into `NaN` for good
+- `RepeatingTilesProvider` refuses, through its constructor and `tileIds`, a pattern with a tile id that is no whole number from 0 to 4294967295 with a `RangeError` that names row, column and value, and keeps its pattern: `getTileIdAt()` and `getTileIdsWithin()` answer the same id for every cell
+- `TexturePackerJson.parse()` refuses a frame of the "JSON Array" format whose `filename` is no string, naming its index, before the first frame goes into the atlas
 - `NineSlice` next to a form of `segmentPlacement()` is refused by `defineSprite()` and when a segment placement is to stand in for the placement of a live material, with a message that names the alternative: a segment holds only its caps in the local quad, where `NineSlice` sets its border
 - `PaletteSwap` compares sRGB textures in their 8-bit values: under a palette of `colorSpace` `srgb` both colours are encoded back before the comparison, so black or a dark colour next to a close palette entry keeps its colour
 - `StageRenderer` releases the GPU memory of the pass targets of its nested renderers and of the pass nodes of its `Stage2D`s when a write to `pipeline` or `buildOutputNode` leaves the composed mode, and `remove()` releases that of the pass node of a removed `Stage2D` as it does for a child renderer
@@ -393,6 +398,22 @@ tileData.tileIds[0]![0] = 5;
 ```ts
 tileData.tileIds = [[5, ...tileData.tileIds[0]!.slice(1)], ...tileData.tileIds.slice(1)];
 map2d.clearTiles();
+```
+
+#### The tiles of Map2DTileStreamer
+
+The streamer hands the list of its tiles to the visibilitor as `previousTiles`, and a list assigned from outside would go there as tiles laid out that no renderer holds. `clearTiles()` has the next `update()` lay out the whole set again.
+
+**Before**
+
+```ts
+streamer.tiles = [];
+```
+
+**After**
+
+```ts
+streamer.clearTiles();
 ```
 
 #### A control of one's own that removes its listeners

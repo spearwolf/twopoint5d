@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
@@ -144,7 +145,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     }
 
     if (capacity < 0 || !Number.isInteger(capacity)) {
-      throw new RangeError(`VertexObjectPool#resize(): capacity must be a non-negative integer, got ${String(capacity)}`);
+      throw new RangeError(`VertexObjectPool#resize(): capacity must be a non-negative integer, got ${describeValue(capacity)}`);
     }
 
     if (capacity === this.capacity) return;

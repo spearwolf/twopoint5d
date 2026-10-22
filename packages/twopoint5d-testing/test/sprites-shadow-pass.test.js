@@ -9,6 +9,7 @@ import {
   lightOf,
   PlanarShadow,
   planeOf,
+  SegmentShadowPass,
   ShadowMask,
   ShadowPass,
   TextureCoords,
@@ -349,20 +350,22 @@ describe('sprites — a shadow pass', function () {
   /**
    * Renders a sprite 2 units square standing at the origin, its plane XY, with the shadow of
    * `pass` from a light at `light`, through makeCameraAboveGround(), and answers the pixels. Without
-   * `drawSprite` only the shadow is drawn.
+   * `drawSprite` only the shadow is drawn; `plane` takes the place of the start value of groundPlane.
    *
    * @param {import('@spearwolf/twopoint5d').SpritePass} pass
    * @param {{
    *   light: [number, number, number, number],
    *   placement?: import('@spearwolf/twopoint5d').SpriteFeature,
    *   drawSprite?: boolean,
+   *   plane?: [number, number, number, number],
    * }} options
    */
-  async function renderTheShadowOf(pass, {light, placement, drawSprite = true}) {
+  async function renderTheShadowOf(pass, {light, placement, drawSprite = true, plane}) {
     const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
     const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]});
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     sprites.setUniform('shadowLight', ...light);
+    if (plane != null) sprites.setUniform('groundPlane', ...plane);
     if (placement != null) sprites.placement = placement;
     sprites.material.visible = drawSprite;
     const sprite = sprites.createSprite();
@@ -419,4 +422,19 @@ describe('sprites — a shadow pass', function () {
     expect(lit, 'the pixels of the shadow').to.be.greaterThan(300);
     expect(differing, 'the pixels in which the two shadows differ').to.equal(0);
   });
+
+  for (const {name, pass} of [
+    {name: 'ShadowPass', pass: ShadowPass},
+    {name: 'SegmentShadowPass', pass: SegmentShadowPass},
+  ]) {
+    it(`draws no shadow for a groundPlane whose normal is (0, 0, 0): ${name}`, async function () {
+      // a point light and a d below 0: the hook of the pass judges the light 1 above that plane and lets
+      // the pass draw, so it is the guard in the shader that keeps the shadow out
+      const pixels = await renderTheShadowOf(pass, {light: [0, 10, 0, 1], plane: [0, 0, 0, -1]});
+
+      expect(countColor(pixels, BLUE), 'the pixels of a shadow').to.equal(0);
+      // the sprite covers 2 × 1.2 units of the view, 614 pixels
+      expect(countColor(pixels, WHITE), 'the pixels of the sprite').to.be.within(560, 670);
+    });
+  }
 });
