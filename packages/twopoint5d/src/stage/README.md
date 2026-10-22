@@ -297,8 +297,8 @@ for both, and the comment next to the cast names the reason the pass is there at
 ### Mode C — pipeline samples an internal RT
 
 Mode C applies to a `pipeline` without `buildOutputNode` that is not a
-`RootRenderPipeline`; a `RootRenderPipeline` composes as Mode D does (see
-[Shortcut: `RootRenderPipeline`](#shortcut-rootrenderpipeline--additive-composition-out-of-the-box)).
+`RootRenderPipeline`; a `RootRenderPipeline` composes as Mode D does (see [Shortcut:
+`RootRenderPipeline`](#shortcut-rootrenderpipeline--additive-composition-out-of-the-box)).
 
 The simplest path: render the stages into an internally managed
 `RenderTarget`, then run the pipeline with `outputNode = texture(rt.texture)`.
@@ -406,10 +406,10 @@ pipeline.dispose();
 `renderOrder`, a stage name, `pipeline` or `buildOutputNode` itself changed,
 after a stage announced a new camera or a new scene through
 `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged` (every `Stage2D`
-does), or after `invalidateOutputNode()`. While the renderer
-has no area, or while a `Stage2D` it composes has no camera yet, the composed
-mode draws nothing. A composing renderer without a stage draws its own clear and
-calls neither `buildOutputNode` nor the pipeline, until a stage joins it.
+does), or after `invalidateOutputNode()`. While the renderer has no area, or while a
+`Stage2D` it composes has no camera yet, the composed mode draws nothing. A composing
+renderer without a stage draws its own clear and calls neither `buildOutputNode` nor the
+pipeline, until a stage joins it.
 
 Leaving Mode D — `pipeline = undefined`, a pipeline without `buildOutputNode`
 that is not a `RootRenderPipeline`, or `buildOutputNode = undefined` under such
@@ -665,22 +665,22 @@ What this layer does on top of the general rules in
   them on the next frame, as the same target objects.
 - Leaving Mode C — `pipeline = undefined`, a `buildOutputNode`, a
   `RootRenderPipeline` — releases the GPU memory of the internal target.
-  Leaving the composed mode releases that of the pass-targets of the nested
-  renderers and of the pass nodes of the `Stage2D`s among the stages, and
-  `remove(stage)` releases that of the pass-target of a removed child
-  `StageRenderer` and of the pass node of a removed `Stage2D`. The target objects stay, so every `texture()` node on them
-  stays valid; three.js allocates the memory again on the next draw.
+  Leaving the composed mode releases that of the pass-targets of the nested renderers and
+  of the pass nodes of the `Stage2D`s among the stages, and `remove(stage)` releases that
+  of the pass-target of a removed child `StageRenderer` and of the pass node of a removed
+  `Stage2D`. The target objects stay, so every `texture()` node on them stays valid;
+  three.js allocates the memory again on the next draw.
 - `StageRenderer.dispose()` releases the render targets it built for itself — a target
   borrowed from an `internalTargetPool` is back in the pool by then, and the pool is not
   disposed. It also detaches from its host or from the parent `StageRenderer` that holds
-  it, and drops its stages through `remove()`, so a disposed renderer is no longer
-  driven by any frame loop, and a nested `StageRenderer` among its stages releases the
-  GPU memory of its pass-target, a `Stage2D` that of its pass node — neither is disposed. An `OnStageDispose`
-  goes out before the renderer stops listening. A listener of `OnStageRemoved`,
-  `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of this, and
-  neither does an unsubscribe of the host that throws — the renderer gives up its other
-  subscription there all the same; the errors reach the caller once the renderer is
-  down.
+  it, and drops its stages through `remove()`, so a disposed renderer is no longer driven
+  by any frame loop, and a nested `StageRenderer` among its stages releases the GPU memory
+  of its pass-target, a `Stage2D` that of its pass node — neither is disposed. An
+  `OnStageDispose` goes out before the renderer stops listening. A listener of
+  `OnStageRemoved`, `OnRemoveFromParent` or `OnStageDispose` that throws holds up none of
+  this, and neither does an unsubscribe of the host that throws — the renderer gives up
+  its other subscription there all the same; the errors reach the caller once the renderer
+  is down.
 - A `StageRenderTargetPool` set as `internalTargetPool` lends the internal target for
   one draw at a time; while it is set the renderer builds no internal target of its own,
   and assigning it releases the one it had. The pool belongs to the caller:

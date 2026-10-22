@@ -88,11 +88,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    */
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
-  // the scratch of sortBy(), sortByKeys() and prepareSortKeys(), built by the first sort, grown with the
-  // capacity and let go of by dispose(): the keys, the order of the slots and the merge scratch of the
-  // sort, the vertex objects on their way to a new slot, and one buffer for the copy of every attribute
-  // buffer
-  // with a view of it per data type
+  // the scratch of sortBy(), sortByKeys() and prepareSortKeys(), built by the first sort, grown with
+  // the capacity and let go of by dispose(): the keys, the order of the slots and the merge scratch
+  // of the sort, the vertex objects on their way to a new slot, and one buffer for the copy of every
+  // attribute buffer with a view of it per data type
   #sortKeys: Float64Array | undefined;
   #sortOrder: Uint32Array | undefined;
   #sortMerge: Uint32Array | undefined;

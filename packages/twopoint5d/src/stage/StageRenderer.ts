@@ -280,12 +280,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * here or of `OnStageRemoved` at a previous `StageRenderer` while this renderer leaves its
    * holder, one of `OnAddToParent` as it joins a host: every listener hears its event, the
    * renderer leaves its holder and joins the new one, and the errors reach the caller
-   * afterwards — one unchanged, several as an `AggregateError`. An
-   * unsubscribe of the host this renderer leaves that throws is taken the same way: the
-   * renderer gives up its other subscription there all the same, and the error joins those of
-   * the listeners. A listener that disposes this renderer or gives it another
-   * holder while it leaves its holder ends the assignment there. For a `StageRenderer`
-   * assigned here, {@link add} says the same.
+   * afterwards — one unchanged, several as an `AggregateError`. An unsubscribe of the host this
+   * renderer leaves that throws is taken the same way: the renderer gives up its other
+   * subscription there all the same, and the error joins those of the listeners. A listener that
+   * disposes this renderer or gives it another holder while it leaves its holder ends the
+   * assignment there. For a `StageRenderer` assigned here, {@link add} says the same.
    *
    * A host whose `onResize()` or `onRenderFrame()` throws as this renderer joins it
    * holds nothing of it: the renderer gives back the subscription the host had handed
@@ -1276,15 +1275,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `StageRenderer` while the child leaves that holder, one of `OnStageAdded`
    * here or of `OnAddToParent` at the child: every listener hears its event,
    * the stage is added, and the errors reach the caller afterwards — one
-   * unchanged, several as an `AggregateError`. An
-   * unsubscribe of the host a child leaves that throws is taken the same way:
-   * the child gives up its other subscription there all the same, and the
-   * error joins those of the listeners. The size stays the
-   * exception: a stage that refuses it is not added. A listener that disposes
-   * this renderer or the child, or gives the child another holder, while the
-   * child leaves its previous one ends the call there: the child is not
-   * added. What came before stays: the child has taken the size of this
-   * renderer and has left its previous holder.
+   * unchanged, several as an `AggregateError`. An unsubscribe of the host a
+   * child leaves that throws is taken the same way: the child gives up its other
+   * subscription there all the same, and the error joins those of the listeners.
+   * The size stays the exception: a stage that refuses it is not added. A
+   * listener that disposes this renderer or the child, or gives the child
+   * another holder, while the child leaves its previous one ends the call there:
+   * the child is not added. What came before stays: the child has taken the size
+   * of this renderer and has left its previous holder.
    *
    * On an eventized stage — every `Stage2D` and every `StageRenderer` — it
    * listens for `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged`

@@ -35,11 +35,10 @@ export interface Stage2D extends EventizedObject {}
  * The camera is automatically generated based on the projection.
  * A stage can be rendered by a StageRenderer.
  *
- * The width and height of a stage are calculated based on the properties
- * of the projection and the container dimension.
- * The container size is usually the same as the canvas element dimension,
- * but this is not always the case.
- * The StageRenderer passes the container size to the stage by calling the resize() method.
+ * The width and height of a stage are calculated based on the properties of the projection and
+ * the container dimension. The container size is usually the same as the canvas element
+ * dimension, but this is not always the case. The StageRenderer passes the container size to the
+ * stage by calling the resize() method.
  */
 export class Stage2D implements IStage, IRenderable, IPassProvider {
   isStage2D = true;

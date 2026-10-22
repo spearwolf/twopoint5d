@@ -19,9 +19,8 @@ Status: **implemented**, the quaternion of §9 included — see [`docs/sprites.m
   color (§9).
 
 The sketch below is kept as it was written, with the corrections of §2, §4.2, §5.1 and §6.
-Prepared from
-[issue #32](https://github.com/spearwolf/twopoint5d/issues/32).
-The decisions it rests on are collected in §10, the quaternion that followed the yaw in §9.
+Prepared from [issue #32](https://github.com/spearwolf/twopoint5d/issues/32). The decisions it rests
+on are collected in §10, the quaternion that followed the yaw in §9.
 
 ## 1. Goal
 

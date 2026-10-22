@@ -102,8 +102,8 @@ export type FancyMesh = FeatureSpritesOf<typeof FancySprite>;
 ```
 
 Three types lead from a kind to what it makes: `SpriteOf<typeof Kind>` is its sprite handle,
-`FeatureSpritesOf<typeof Kind>` the [`FeatureSprites`](#featuresprites) that draws it — the type of a
-field or a parameter that holds the mesh — and `SpriteKindApiOf<typeof Kind>` the handle without
+`FeatureSpritesOf<typeof Kind>` the [`FeatureSprites`](#featuresprites) that draws it — the type of
+a field or a parameter that holds the mesh — and `SpriteKindApiOf<typeof Kind>` the handle without
 its `VO`, the type argument of `FeatureSprites`, `FeatureSpritesGeometry` and
 `FeatureSpritesMaterial`. Each answers `never` for a type that is no kind.
 
@@ -175,8 +175,8 @@ flags.dispose();
   slot, the uv stages' result `ctx.uv` aside.
 - **One base per grid.** `gridBase({columns: 3, rows: 3})` answers the same frozen base every time,
   named `grid 3x3`, with its `columns` and `rows`: a feature that needs a grid recognizes it by
-  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024, and a grid holds at
-  most 4096 cells (`columns · rows`); anything else is refused with a `TypeError`.
+  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024, and a grid holds
+  at most 4096 cells (`columns · rows`); anything else is refused with a `TypeError`.
 - **Everything else works on it unchanged**: the pool, every placement and pass, the trim shift —
   it moves every vertex by where it lies on the sprite — `AtlasFrame`, `AnimatedFrames` and
   `TextureColor`. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws.
@@ -575,9 +575,9 @@ export function show(index: number) {
   `attributeUsage: {dynamic: ['frameIndex']}`.
 - Until the frame table has an image the sprite shows the whole `colorMap`.
 
-**Directional frames.** The 8-direction sprites of every boomer shooter, the cheap impostor of a tree:
-`tableFrame({views: n})` picks, in the frame `frameIndex`, the view the camera sees the sprite from. It
-needs `Yaw`, the facing of the sprite, and `InstancePosition`:
+**Directional frames.** The 8-direction sprites of every boomer shooter, the cheap impostor of a
+tree: `tableFrame({views: n})` picks, in the frame `frameIndex`, the view the camera sees the sprite
+from. It needs `Yaw`, the facing of the sprite, and `InstancePosition`:
 
 ```ts check
 import {
@@ -624,20 +624,20 @@ export function frame(time: number) {
   counts frames as it does without views, and the shader reads entry
   `floor(frameIndex + 0.5) · n + view`; a `frameIndex` past the last frame shows the matching view
   of the last frame, one before the first that of the first.
-- **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of the
-  sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front is
-  where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh — `Object3D.rotation.y`
-  — and the angle of the camera is measured the same way:
-  `view = round((atan2(toCamera.x, toCamera.z) − yaw) / (2π / n)) mod n`. The lookbook's `stalker` is
-  rendered in that order and its json lists every frame's eight views in a row, so
-  `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is the table as it is. A sheet that counts its views
-  clockwise is reordered by its names, view `k` there being view `(n − k) mod n` here:
+- **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of
+  the sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front
+  is where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh —
+  `Object3D.rotation.y` — and the angle of the camera is measured the same way:
+  `view = round((atan2(toCamera.x, toCamera.z) − yaw) / (2π / n)) mod n`. The lookbook's `stalker`
+  is rendered in that order and its json lists every frame's eight views in a row, so
+  `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is the table as it is. A sheet that counts its
+  views clockwise is reordered by its names, view `k` there being view `(n − k) mod n` here:
   `` [0, 7, 6, 5, 4, 3, 2, 1].map((v) => `imp_${frame}_${v}`) ``.
 - The angle lies in the xz plane of the mesh, about +y: right for `axisBillboardPlacement()`,
-  `BillboardPlacement` and `flatPlacement({orientation: 'yaw'})`. A mesh laid out in the xy plane under
-  `axisBillboardPlacement({axis: 'z'})` gets its views about +y all the same; turn such a mesh instead.
-  Straight above or below the sprite, where the angle is undefined, the camera sees view 0, the
-  front view, whatever the yaw.
+  `BillboardPlacement` and `flatPlacement({orientation: 'yaw'})`. A mesh laid out in the xy plane
+  under `axisBillboardPlacement({axis: 'z'})` gets its views about +y all the same; turn such a mesh
+  instead. Straight above or below the sprite, where the angle is undefined, the camera sees view 0,
+  the front view, whatever the yaw.
 - The camera is the one that renders: a `ShadowPass` and a `ReflectionPass` show the view the camera
   sees, as the games of the genre do. A frame stage runs after the view is picked.
 
@@ -910,10 +910,10 @@ vertex = vertex + axis · waveAmplitude · weight · sin(phase)
   from a ceiling.
 - **`time` is shared** with `AnimatedFrames`: a kind with both holds one `time`, and one
   `setUniform('time', t)` plays the animation and moves the wave.
-- **One wave per kind.** Every form is named `wave`, and `defineSprite()` refuses a second: `a kind
-  takes one wave — pick one weight and one axis, or write a mesh stage of your own for a second
-  motion`. `wave()` answers one frozen feature per set of options and refuses options without a `weight`,
-  an unknown weight and an unknown axis with a `TypeError`.
+- **One wave per kind.** Every form is named `wave`, and `defineSprite()` refuses a second:
+  `a kind takes one wave — pick one weight and one axis, or write a mesh stage of your own for a second motion`.
+  `wave()` answers one frozen feature per set of options and refuses options without a `weight`, an
+  unknown weight and an unknown axis with a `TypeError`.
 - **Passes** draw the mesh stages of the kind, so a shadow or a reflection sways with its sprite; a
   pass that wants it still leaves the wave out, `without: ['wave']`.
 
@@ -969,9 +969,9 @@ enemies.dispose();
 ### Palette swap and colour cycling
 
 Team colours, enemy variants — the red goblin and the blue goblin from one sheet — and the colour
-cycling of Deluxe Paint waterfalls. `PaletteSwap` draws each sprite in a row of a **palette**: a small
-image, row 0 the source colours, every row below a replacement set of the same length. Ordinary RGBA
-images, no indexed PNG.
+cycling of Deluxe Paint waterfalls. `PaletteSwap` draws each sprite in a row of a **palette**: a
+small image, row 0 the source colours, every row below a replacement set of the same length.
+Ordinary RGBA images, no indexed PNG.
 
 ```ts check
 import {
@@ -1013,9 +1013,9 @@ export function cycle(time: number) {
 - **The match.** A color stage in the band `ColorOrder.Palette` (50), before `Tint` — a tint, a fade
   and a flash act on the swapped colours — compares the colour of the color source with the first 16
   entries of row 0 (`paletteSwap({colors: n})` for 1 to 64) and draws it with that entry of the
-  sprite's `paletteRow`, its alpha kept. The first entry it matches wins; a colour no entry holds stays
-  as it is. `paletteRow` is rounded to the nearest row, a half up; a `paletteRow` past the last row
-  draws the last.
+  sprite's `paletteRow`, its alpha kept. The first entry it matches wins; a colour no entry holds
+  stays as it is. `paletteRow` is rounded to the nearest row, a half up; a `paletteRow` past the
+  last row draws the last.
 - **Exact colours.** The comparison allows `1/512` per channel, the rounding of 8-bit texels and no
   more. So the `colorMap` is read with `NearestFilter` and no mipmaps — a linear filter blends
   neighbouring texels into colours of no palette —, has no premultiplied edges, and lies in the same
@@ -1023,20 +1023,21 @@ export function cycle(time: number) {
   `nearestTextures`, so the sprites say once on the console when it is filtered otherwise.
 - **Colour cycling.** `paletteCycle` `(first, count)` names the entries that cycle — `count` 0, the
   default, to the end of the palette — and `paletteShift` how far, in whole steps: a colour of entry
-  `i` in the range is drawn with entry `first + ((i − first + floor(paletteShift)) mod count)` of its
-  row. Both are uniforms, one value per mesh; sprites that cycle differently live in meshes of their
-  own.
+  `i` in the range is drawn with entry `first + ((i − first + floor(paletteShift)) mod count)` of
+  its row. Both are uniforms, one value per mesh; sprites that cycle differently live in meshes of
+  their own.
 - **The cost.** Every fragment reads `colors + 1` texels of the palette: 17 for the default.
-- The palette is read with `flipY = false`, row 0 at the top; it stays the caller's, as every texture.
+- The palette is read with `flipY = false`, row 0 at the top; it stays the caller's, as every
+  texture.
 
 ## Uploads: static and dynamic attributes
 
 `update()` of the mesh uploads what the sprite pool marked. Position, rotation, shear, `fade`,
 `flash` and `segmentEnd` are **dynamic**: every `update()` uploads them. Everything else is
-**static**: written before the
-first `update()` after `createSprite()` it reaches the gpu with that sprite; a later change
-reaches the gpu only once it is marked — `spritePool.touchVO(sprite, 'quadSize')` for one sprite,
-`geometry.touch('quadSize')` for every sprite in use.
+**static**: written before the first `update()` after `createSprite()` it reaches the gpu with that
+sprite; a later change reaches the gpu only once it is marked —
+`spritePool.touchVO(sprite, 'quadSize')` for one sprite, `geometry.touch('quadSize')` for every
+sprite in use.
 
 A value that changes every frame belongs in a geometry built with `attributeUsage`:
 
@@ -1431,10 +1432,10 @@ export function frame() {
 - **The facings.** `segmentPlacement()` — `SegmentPlacement` — lays the segment into the XY plane of
   the mesh, its thickness to the left of its direction: a segment from left to right shows its frame
   upright and faces +Z, as a flat sprite does. `segmentPlacement({plane: 'xz'})` lays it onto the
-  ground: a segment along +X shows the top of its frame towards −Z and faces +Y, as `GroundPlacement`
-  lays a sprite. `segmentPlacement({facing: 'camera'})` turns the quad about the segment until its
-  face looks at the camera position, brought into the local space of the mesh as for the
-  billboards — the 3D case, under a perspective and an orthographic camera alike.
+  ground: a segment along +X shows the top of its frame towards −Z and faces +Y, as
+  `GroundPlacement` lays a sprite. `segmentPlacement({facing: 'camera'})` turns the quad about the
+  segment until its face looks at the camera position, brought into the local space of the mesh as
+  for the billboards — the 3D case, under a perspective and an orthographic camera alike.
 - **`Anchor`** says where on the image the segment runs: `anchorY` across it — 0.5, the default, the
   middle of the thickness, 1 the foot of the image, so a plank lies on its rope — and `anchorX` how
   the caps split — 0 puts the whole of `width` beyond the end, 1 before the start. It mirrors with
@@ -1499,18 +1500,18 @@ export function frame() {
   ```
 
   It works per fragment — the repeat wraps exactly, and a uv stage of the kind runs per fragment
-  under it. Along the segment the frame repeats, across it is held at its edges, and the lookup keeps
-  half a texel inside the frame, so a linear sample never reaches the neighbouring frame of an
-  atlas. A mipmapped `colorMap` is sampled with explicit gradients — any `colorMap` whose filters are
-  not both `NearestFilter` — so the repeat shows no seam of the smallest mip level at its wraps; the
-  smaller mip levels of an atlas still mix neighbouring frames (see "Atlas frames on meshes of one's
-  own"). Under `Flip` with `flipX` the segment shows the mirror image of the unflipped one: the frame
-  mirrored, its repeat counted from the end, so a repeat that is no whole number ends where the
-  unflipped one begins; `flipY` turns the frame upside down across the segment. The art repeats on
-  a column boundary: a frame whose last column leads into its first, as the segment frames of the
-  lookbook's rope bridge do. A trimmed frame is stretched over the quad — pack segment frames
-  untrimmed. The math is the one of `sampleAtlasFrame()`, with `wrap: ['repeat',
-  'clamp']`, `trim: 'stretch'` and `inset: 0.5`.
+  under it. Along the segment the frame repeats, across it is held at its edges, and the lookup
+  keeps half a texel inside the frame, so a linear sample never reaches the neighbouring frame of an
+  atlas. A mipmapped `colorMap` is sampled with explicit gradients — any `colorMap` whose filters
+  are not both `NearestFilter` — so the repeat shows no seam of the smallest mip level at its wraps;
+  the smaller mip levels of an atlas still mix neighbouring frames (see "Atlas frames on meshes of
+  one's own"). Under `Flip` with `flipX` the segment shows the mirror image of the unflipped one:
+  the frame mirrored, its repeat counted from the end, so a repeat that is no whole number ends
+  where the unflipped one begins; `flipY` turns the frame upside down across the segment. The art
+  repeats on a column boundary: a frame whose last column leads into its first, as the segment
+  frames of the lookbook's rope bridge do. A trimmed frame is stretched over the quad — pack segment
+  frames untrimmed. The math is the one of `sampleAtlasFrame()`, with `wrap: ['repeat', 'clamp']`,
+  `trim: 'stretch'` and `inset: 0.5`.
 - **Joins.** Two segments meet in a gap or an overlap on the outside of a bend. Caps of the
   thickness and a round frame hide it for ropes; a mitred ribbon is a mesh of its own.
 - **Passes.** `ShadowPass` turns every sprite to the light about its instance position, and
@@ -1518,12 +1519,12 @@ export function frame() {
   of its caps at its start, so both refuse a kind of segments, and the sprites refuse a segment
   placement swapped in under them through `placement` or handed in as the option `placement` —
   each naming the pass to take.
-  `SegmentShadowPass` projects each segment onto the ground as it lies: `ShadowPass` without the turn
-  to the light, named `shadow` as well. `ReflectionPass` mirrors the placed vertex, which is the
-  mirror image of a segment in a plane. A segment that faces the camera mirrors into a ribbon that
-  faces the mirror image of the camera, as a mirrored billboard does: the camera sees it at twice
-  its height angle above the mirror, thinner the higher the camera, edge on at 45° — no pass ships
-  for that; draw the reflected ropes of a mirror in a plane.
+  `SegmentShadowPass` projects each segment onto the ground as it lies: `ShadowPass` without the
+  turn to the light, named `shadow` as well. `ReflectionPass` mirrors the placed vertex, which is
+  the mirror image of a segment in a plane. A segment that faces the camera mirrors into a ribbon
+  that faces the mirror image of the camera, as a mirrored billboard does: the camera sees it at
+  twice its height angle above the mirror, thinner the higher the camera, edge on at 45° — no pass
+  ships for that; draw the reflected ropes of a mirror in a plane.
 - **Cost.** 12 bytes per sprite for the end, uploaded with every `update()`; per vertex two lengths
   and two divisions in the plane, a cross product and a dot product more facing the camera.
 
@@ -1582,8 +1583,8 @@ and `passes` (see "Passes: shadows and reflections").
 the console — once per mesh, naming the `name` of the mesh, its capacity and the fix: twice the
 capacity for `new FeatureSprites(kind, {capacity})`, or for the `FeatureSpritesGeometry` in the
 `geometry` slot — handed in or put there later.
-`spritePool.createVO()` is the pool's own API and stays silent. `placement`, `uniforms`, `setUniform()`,
-`getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
+`spritePool.createVO()` is the pool's own API and stays silent. `placement`, `uniforms`,
+`setUniform()`, `getTexture()`, `setTexture()` and `touchTexture()` pass through to the material.
 
 **Growing capacity.** Where the count is not known up front — bullets, sparks, vector balls —
 `grow: true` lets a full pool grow instead of refusing:
@@ -1607,20 +1608,20 @@ bullets.update();
   every pass mesh draw the new geometry; materials, textures, uniforms and bindings never held the
   geometry and stay as they are. The old geometry is disposed — it was the mesh's own.
 - **The price** is a frame hitch: every used slot of every attribute copied, new gpu buffers, and
-  all of it uploaded on the next frame, the static attributes included. The doubling keeps the copies
-  of n sprites at about 2n in all. The first growth says so on the console, once per mesh, through
-  `console.info`, with the capacity to start with; the warning of a full pool never comes under
-  `grow`. Where the count is known, a capacity that fits is still the cheaper way.
+  all of it uploaded on the next frame, the static attributes included. The doubling keeps the
+  copies of n sprites at about 2n in all. The first growth says so on the console, once per mesh,
+  through `console.info`, with the capacity to start with; the warning of a full pool never comes
+  under `grow`. Where the count is known, a capacity that fits is still the cheaper way.
 - **Read `geometry` and `spritePool` afresh.** Both are new objects after a growth, and the ones
   kept from before are disposed. Only `createSprite()` grows — `spritePool.createVO()` is the pool's
   own API and does not.
 - **Refused**: `grow: true` next to a `geometry` handed in, which the mesh does not own and cannot
   replace (a `TypeError` that names the fix); a `grow` that is no boolean. A geometry with pools
   attached through `attachInstancedPool()` cannot grow, and the `createSprite()` that would grow it
-  throws, naming both ways out. Nor does a geometry the caller put into the `geometry` slot: a growth
-  replaces only the geometry the mesh built, and the `createSprite()` that would grow another throws,
-  naming the ways out — the built one back into the slot, or a capacity that fits. The pool behind
-  it is `VertexObjectPool#adoptVOs()` — see [the vertex
+  throws, naming both ways out. Nor does a geometry the caller put into the `geometry` slot: a
+  growth replaces only the geometry the mesh built, and the `createSprite()` that would grow another
+  throws, naming the ways out — the built one back into the slot, or a capacity that fits. The pool
+  behind it is `VertexObjectPool#adoptVOs()` — see [the vertex
   objects](../src/vertex-objects/README.md#growing-a-pool).
 
 **Ownership.** The mesh disposes the geometry and the material it built, and nothing else. A
@@ -1630,24 +1631,24 @@ A material or a geometry the caller puts into the `material` or `geometry` slot 
 the caller's as well: `dispose()` releases the ones the mesh built even then, and lets go of the
 other. A geometry put into the `geometry` slot is the geometry of the sprites from then on: the mesh
 and every pass mesh draw it, `createSprite()`, `freeSprite()`, `sortBy()`, `sortByViewDepth()` and
-`spritePool` work on its pool, and a handle of the geometry before stays with that one. A material put
-into the `material` slot changes only how the mesh draws. `placement`, `uniforms`, `setUniform()`,
-`bindUniform()`, the textures and the passes stay with the material of the sprites — the built one
-or the one handed in — whatever the slot holds; a material put into the slot that is to draw with
-the uniforms and textures of the sprites is built on them before the swap,
+`spritePool` work on its pool, and a handle of the geometry before stays with that one. A material
+put into the `material` slot changes only how the mesh draws. `placement`, `uniforms`,
+`setUniform()`, `bindUniform()`, the textures and the passes stay with the material of the sprites —
+the built one or the one handed in — whatever the slot holds; a material put into the slot that is
+to draw with the uniforms and textures of the sprites is built on them before the swap,
 `new FeatureSpritesMaterial(kind, {resources: sprites.material.resources})` — as `SpritePicker`
 builds its pick material.
 
 **Refusals.** A `TypeError` instead of a mismatch: a `geometry` or a `material` built for another
-sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a `geometry`; any material
-parameter next to a `material`. A material that cannot be built (a `placement` that cannot stand
-in, a texture name no feature declares) throws as well, and the geometry the constructor built for
-it is disposed first, so a refused constructor leaves nothing behind.
+sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a `geometry`; any
+material parameter next to a `material`. A material that cannot be built (a `placement` that cannot
+stand in, a texture name no feature declares) throws as well, and the geometry the constructor built
+for it is disposed first, so a refused constructor leaves nothing behind.
 
 **After `dispose()`.** The mesh leaves the scene graph and fires the `dispose` event of three.
-`geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`; `createSprite()`
-and `getTexture()` answer `undefined`; `freeSprite()`, `setUniform()`, `setTexture()`,
-`touchTexture()`, `update()` and the `placement` setter do nothing; `sortBy()` and
+`geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`;
+`createSprite()` and `getTexture()` answer `undefined`; `freeSprite()`, `setUniform()`,
+`setTexture()`, `touchTexture()`, `update()` and the `placement` setter do nothing; `sortBy()` and
 `sortByViewDepth()` answer `false`; `passes` is empty. A second `dispose()` does nothing.
 
 ## Draw order: sorting the sprites
@@ -1700,8 +1701,9 @@ balls.update();
   read straight from the buffer; a function is called once per sprite, and a fractional key it
   answers may cost a heap number of 16 B per sprite where V8 does not inline it. A name that is no
   value of the sprite is refused, with the list of the ones there are. Which way is in front depends
-  on the scene: with y up the screen, `sortBy('y', {descending: true})`; with the sprites standing on
-  the xz ground and the camera on the +z side, the nearer sprite has the larger z — `sortBy('z')`.
+  on the scene: with y up the screen, `sortBy('y', {descending: true})`; with the sprites standing
+  on the xz ground and the camera on the +z side, the nearer sprite has the larger z —
+  `sortBy('z')`.
 - **`sortByViewDepth(camera)`** sorts back to front as `camera` sees them, by the depth of the
   position of each sprite — the centre of its quad — in view space, through the world matrices of
   the mesh and the camera, which it refreshes. Perspective and orthographic cameras alike. A kind
@@ -1729,8 +1731,8 @@ balls.update();
   attributes upload anyway. A sort that finds the order as it is moves and uploads nothing. Sort
   every frame where the camera or the sprites move; sort once where neither does.
 - A handle stays the same object and keeps its values through a sort; only its slot changes. The
-  pool behind it is `VertexObjectPool#sortBy()` — see
-  [the vertex objects](../src/vertex-objects/README.md#sorting-a-pool).
+  pool behind it is `VertexObjectPool#sortBy()` — see [the vertex
+  objects](../src/vertex-objects/README.md#sorting-a-pool).
 
 **Across meshes** the sort has no say: three.js draws every opaque mesh before every transparent
 one, whatever their `renderOrder`. A 2D scene of several meshes in painter's order — a backdrop,
@@ -1780,15 +1782,15 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   texels it drops on the screen: a click into the transparent corner of a frame picks what lies
   behind it, and a sprite faded to 0 is not hit. The id is written after all of it (three's
   `outputNode`), so no colour stage can change it.
-- **The nearest sprite wins**, by the depth test, whatever the sprites blend or write. At one depth —
-  a 2D scene on one plane — the sprite drawn later wins, as on the screen: the later slot of a mesh,
-  the later mesh by `renderOrder`. Only the sprites are drawn, not their passes: a shadow or a
+- **The nearest sprite wins**, by the depth test, whatever the sprites blend or write. At one depth
+  — a 2D scene on one plane — the sprite drawn later wins, as on the screen: the later slot of a
+  mesh, the later mesh by `renderOrder`. Only the sprites are drawn, not their passes: a shadow or a
   reflection is nothing to hit. A mesh that is disposed, not visible, whose material is not visible,
   or empty is left out.
-- **One frame of latency.** The answer comes once the gpu has drawn and the pixel is read back — fine
-  for a click, and for hover every frame too. Pick after `update()`, as you render.
-- **Sorted and growing meshes work.** The pick resolves a slot to its handle as the slots stood at the
-  draw, so a `sortBy()`, a `sortByViewDepth()` or a growth before the read back changes nothing
+- **One frame of latency.** The answer comes once the gpu has drawn and the pixel is read back —
+  fine for a click, and for hover every frame too. Pick after `update()`, as you render.
+- **Sorted and growing meshes work.** The pick resolves a slot to its handle as the slots stood at
+  the draw, so a `sortBy()`, a `sortByViewDepth()` or a growth before the read back changes nothing
   about the answer; a sprite freed in between answers `undefined`. The price is a copy of one
   reference per sprite of the listed meshes per pick. A sprite without a handle — written into the
   pool through `createFromAttributes()` — gets one when the pick hits it, and answers `undefined`
@@ -1796,12 +1798,12 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
 - **The cost** of a pick is a draw of the listed meshes into one pixel — every vertex of every
   sprite, a fragment only under the pointer — and that copy. List the meshes that can be hit, not
   the whole scene.
-- **The renderer** is left as the pick found it: render target, MRT, clear colour and the `autoClear`
-  flags. The picker draws into a 1 × 1 float target — three's WebGL 2 backend reads no integer
-  target back — with no blending, no tone mapping and no output colour space, so the id arrives
-  exactly, up to 2²⁴ sprites per mesh; a mesh of more is refused with a `RangeError` before the draw
-  rather than answered with the wrong sprite. A material's `side`, alpha test, opacity, `maskNode`,
-  `alphaHash` and `alphaToCoverage` reach its pick as they reach the screen.
+- **The renderer** is left as the pick found it: render target, MRT, clear colour and the
+  `autoClear` flags. The picker draws into a 1 × 1 float target — three's WebGL 2 backend reads no
+  integer target back — with no blending, no tone mapping and no output colour space, so the id
+  arrives exactly, up to 2²⁴ sprites per mesh; a mesh of more is refused with a `RangeError` before
+  the draw rather than answered with the wrong sprite. A material's `side`, alpha test, opacity,
+  `maskNode`, `alphaHash` and `alphaToCoverage` reach its pick as they reach the screen.
 - **Ownership.** The renderer, the camera and the meshes stay the caller's. The camera takes the
   coordinate system of the renderer, as its next render would; its depth convention stays as it is —
   under a reversed depth buffer the pick turns its projection over itself. The pointer and the list
@@ -1988,8 +1990,8 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`uniforms`** — start values by name: a number for a `float`, 2 to 4 numbers for a `vec2` to
   `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0, shared:
   true}`: the features that declare a name shared, with the same type and start value, hold one
-  uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`, so a
-  wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name, or
+  uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`, so
+  a wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name, or
   two shared ones of another type or start value, are refused, naming the fix. Every stage of the
   kind reads every uniform, through `uniform(name)` of its context.
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
@@ -2323,8 +2325,7 @@ that travels along `[0.4, -1, 0.3]`; `w = 1` is a point light at `[x, y, z]`, an
 spread. A vertex near or above a point light is brought down along the normal to `0.95` of the
 height of the light first, so its shadow grows long but stays finite, in the plane and on the far
 side of the light: measured across the normal, it lands at most 19 times the offset of the vertex
-from the light beyond the vertex. The normal need not be a unit
-vector.
+from the light beyond the vertex. The normal need not be a unit vector.
 
 `ShadowPass` keeps the tint of the kind: `ShadowMask` replaces the color anyway, and the alpha of
 the tint — or a `Fade` — fades the shadow along with the sprite. `ShadowMask` and `Darken` run in
@@ -2760,14 +2761,15 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
   the first sort allocates it, and it grows only with the capacity. 10 000 sprites sort in about
   0.1 ms when the order holds, 0.5 ms with ten of them out of line, 1.1 ms by the view depth under a
   circling camera and 1.3 ms from a random order (`src/sprites/FeatureSprites/sorting.bench.ts`);
-  the upload after a sort that moved them is the larger price (see "Draw order: sorting the sprites").
+  the upload after a sort that moved them is the larger price (see "Draw order: sorting the
+  sprites").
 - Under `grow: true` a `createSprite()` that finds room allocates the sprite and nothing else, and
   `update()` after a growth allocates nothing; the growth itself is the hitch, copying and uploading
   every sprite the mesh holds (see "FeatureSprites").
 - A pick of `SpritePicker` draws the listed meshes into one pixel and copies one handle per sprite
-  of them; it allocates its promise, a copy of the pointer and of the list, and three's read back per
-  call — a tool for clicks and hover, not for every sprite every frame (see "Picking: which sprite is
-  under the pointer").
+  of them; it allocates its promise, a copy of the pointer and of the list, and three's read back
+  per call — a tool for clicks and hover, not for every sprite every frame (see "Picking: which
+  sprite is under the pointer").
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
   with bindings and `visible` hooks as well; the allocation spec holds a plane and a light

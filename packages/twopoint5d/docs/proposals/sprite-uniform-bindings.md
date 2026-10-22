@@ -88,7 +88,8 @@ planeOf(plane: Plane): SpriteUniformSource;                               // typ
   `M = worldToSprites · node.matrixWorld`, `scratch.copy(localPlane).applyMatrix4(M)`.
   `Plane#applyMatrix4` transforms the normal by the normal matrix, so a non-uniform scale is
   handled.
-- **A `Plane`.** A fixed plane in world space; per frame `scratch.copy(plane).applyMatrix4(worldToSprites)`.
+- **A `Plane`.** A fixed plane in world space; per frame
+  `scratch.copy(plane).applyMatrix4(worldToSprites)`.
 - **Output** `[n.x, n.y, n.z, -constant]`: three's `Plane` is `dot(n, p) + constant = 0`, the
   uniform is `dot(n, p) = d`. The normal is not normalized; the features do not need it to be.
 
@@ -141,10 +142,10 @@ class FeatureSprites {
 
 1. Without bindings and without a pass that has a `visible` hook (§5), `update()` is what it is
    today: `super.update()`, the upload of the geometry.
-2. With bindings: `this.updateWorldMatrix(true, false)`, then `worldToSprites.copy(this.matrixWorld).invert()`
-   into a `Matrix4` of the instance. For every binding `source.write(vector, worldToSprites)`, where
-   `vector` is the `value` of the uniform node, looked up once in `bindUniform()` — the uniforms
-   are shared, so every pass reads the value.
+2. With bindings: `this.updateWorldMatrix(true, false)`, then
+   `worldToSprites.copy(this.matrixWorld).invert()` into a `Matrix4` of the instance. For every
+   binding `source.write(vector, worldToSprites)`, where `vector` is the `value` of the uniform
+   node, looked up once in `bindUniform()` — the uniforms are shared, so every pass reads the value.
 3. For every pass with a `visible` hook: its visibility for this frame (§5).
 4. `super.update()`.
 
@@ -214,11 +215,11 @@ class FeatureSpritesPass {
 }
 ```
 
-- `update()` sets `mesh.visible = mesh.enabled && pass.visible(uniform)` for every pass with a
-  hook; the lookup `uniform` is built once per pass mesh, not per frame. The `enabled` setter sets `mesh.visible = enabled && <the hook's last answer>`, which is
-  `true` for a pass without a hook. So a caller who switches a pass off is not switched back on by
-  the next `update()`. The docs tell the caller to use `enabled` rather than `visible` on a pass
-  mesh.
+- `update()` sets `mesh.visible = mesh.enabled && pass.visible(uniform)` for every pass with a hook;
+  the lookup `uniform` is built once per pass mesh, not per frame. The `enabled` setter sets
+  `mesh.visible = enabled && <the hook's last answer>`, which is `true` for a pass without a hook.
+  So a caller who switches a pass off is not switched back on by the next `update()`. The docs tell
+  the caller to use `enabled` rather than `visible` on a pass mesh.
 - `definePass()` checks that `visible`, if given, is a function, and freezes it along with the
   rest.
 - **`ShadowPass`** ships a hook. With `groundPlane = (n, d)` and `shadowLight = (l, w)`,
@@ -386,10 +387,11 @@ window, their mirror image in the lower half, darker — a waterline.
 
 - **Scene.** The mirror is the world plane `y = 0`. The camera stands at `y = 0` and looks along
   −Z, so the horizon runs through the middle of the window and the mirror is seen edge-on.
-- **Sprites.** The 2D `BouncingSprites` of `animated-sprites` (`~demos/animated-sprites/BouncingSprites`),
-  in an `AnimatedSpriteKind` built in the options form with `passes: [ReflectionPass]`. Their
-  container is centred on 0, so the sprites mesh moves to `position.y = H / 2`: the edge they
-  bounce off lies on the mirror, and each sprite touches its image there.
+- **Sprites.** The 2D `BouncingSprites` of `animated-sprites`
+  (`~demos/animated-sprites/BouncingSprites`), in an `AnimatedSpriteKind` built in the options form
+  with `passes: [ReflectionPass]`. Their container is centred on 0, so the sprites mesh moves to
+  `position.y = H / 2`: the edge they bounce off lies on the mirror, and each sprite touches its
+  image there.
 - **Upper half.** The camera distance satisfies `tan(fov / 2) · dist = H`, so the container
   height fills the upper half exactly. On every resize `containerWidth = 2 · aspect · H`, so the
   sprites fly to the edge of the window at any aspect.

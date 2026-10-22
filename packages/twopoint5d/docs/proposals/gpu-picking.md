@@ -4,12 +4,12 @@ Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Picking: wh
 the pointer" and "Performance", and the browser proofs in
 `packages/twopoint5d-testing/test/sprites-picking.test.js`. Deviations:
 
-- the list is typed `readonly FeatureSprites<any>[]`, not `FeatureSprites<object>[]`: `FeatureSprites`
-  is invariant in its handle type — the `onCreateVO` hook of its pool takes one —, so a mesh of a
-  kind is no `FeatureSprites<object>` (§2);
+- the list is typed `readonly FeatureSprites<any>[]`, not `FeatureSprites<object>[]`:
+  `FeatureSprites` is invariant in its handle type — the `onCreateVO` hook of its pool takes one —,
+  so a mesh of a kind is no `FeatureSprites<object>` (§2);
 - the picker's camera takes the coordinate system of the renderer before every pick; the depth
-  convention of the caller's camera stays as it is, and under a reversed depth buffer the picker turns
-  the depth row of the projection over itself (§3.3);
+  convention of the caller's camera stays as it is, and under a reversed depth buffer the picker
+  turns the depth row of the projection over itself (§3.3);
 - the pick meshes go with the geometry they draw and are built anew after a growth or a geometry put
   into the slot (§3.2, §5);
 - the snapshot copies the handles without `getVO()`; a slot without a handle gets one only when the
@@ -107,26 +107,26 @@ One per listed mesh, built at its first pick and kept until the mesh or the pick
 
 - a `FeatureSpritesMaterial` of the kind of the mesh, **on the `SpriteResources` of the mesh's
   material** — the same uniforms and textures, so a `setUniform()`, `setTexture()` or bound uniform
-  reaches the pick as it reaches the sprites —, with the mesh's current placement. The position graph,
-  the frame, the uv stages, the color source and every color stage are the sprite's own: the alpha
-  that reaches the alpha test is the sprite's alpha, `Fade`, `Tint` and all.
+  reaches the pick as it reaches the sprites —, with the mesh's current placement. The position
+  graph, the frame, the uv stages, the color source and every color stage are the sprite's own: the
+  alpha that reaches the alpha test is the sprite's alpha, `Fade`, `Tint` and all.
 - **Then the id.** three's `outputNode` takes the place of the fragment's output after the color
   node, the opacity and the alpha test have run (`NodeMaterial#setup()`, three 0.186.1): a fragment
   the alpha test drops is dropped here too, and what survives writes
-  `vec4(instanceIndex + 1, meshNumber, 0, 1)`. Nothing after it — no color stage, no `ColorOrder.Pass`
-  stage, no fog, no premultiplied alpha — can change the id. `instanceIndex` reaches the fragment
-  stage through a flat varying (three makes an integer varying flat under both backends);
-  `meshNumber` is a float uniform of the pick material, written before each pick: the place of the
-  mesh in the list, from 1.
+  `vec4(instanceIndex + 1, meshNumber, 0, 1)`. Nothing after it — no color stage, no
+  `ColorOrder.Pass` stage, no fog, no premultiplied alpha — can change the id. `instanceIndex`
+  reaches the fragment stage through a flat varying (three makes an integer varying flat under both
+  backends); `meshNumber` is a float uniform of the pick material, written before each pick: the
+  place of the mesh in the list, from 1.
 - `blending: NoBlending`, `transparent: false`, `depthTest: true`, `depthWrite: true`: the nearest
   fragment wins, whatever the sprite's material blends or writes.
 - Copied from the sprite's material before every pick, since they decide which fragments a sprite
   draws: `side`, `alphaTest`, `alphaTestNode`, `opacity`, `opacityNode`, `maskNode`, `alphaHash`,
   `alphaToCoverage`. A change sets `needsUpdate`.
 - **Rebuilt on placement swap**: a mesh whose `placement` differs from the one of its pick material
-  sets it there (`FeatureSpritesMaterial#placement`, which rebuilds the position graph alone). A mesh
-  whose material reads other resources than the pick material — a `material` swapped on the mesh —
-  gets a new pick material.
+  sets it there (`FeatureSpritesMaterial#placement`, which rebuilds the position graph alone). A
+  mesh whose material reads other resources than the pick material — a `material` swapped on the
+  mesh — gets a new pick material.
 
 The roadmap sketch says "cached per kind". The resources — textures, uniforms — belong to a mesh,
 not to a kind: two meshes of one kind draw from different atlases. So the cache is per mesh.
@@ -184,10 +184,11 @@ A camera of the picker's own (a three `Camera`) draws one pixel:
   −1 … 1 of WebGL (three 0.186.1, `Matrix4#makePerspective()` and `#makeOrthographic()`); a camera
   three has drawn with is reversed already and taken as it is. The picker's camera takes the
   `coordinateSystem` of the renderer; under a reversed depth buffer the renderer marks it reversed
-  and calls its `updateProjectionMatrix()`, which does nothing — the projection is the one handed in.
-- A pointer outside `[-1, 1]²` answers `undefined` without a draw. The pointer is a point of the view
-  of `camera`; the snapping uses the drawing buffer of the renderer — for a camera that draws a part
-  of the canvas (a viewport of its own) the snapping is off by less than a pixel.
+  and calls its `updateProjectionMatrix()`, which does nothing — the projection is the one handed
+  in.
+- A pointer outside `[-1, 1]²` answers `undefined` without a draw. The pointer is a point of the
+  view of `camera`; the snapping uses the drawing buffer of the renderer — for a camera that draws a
+  part of the canvas (a viewport of its own) the snapping is off by less than a pixel.
 
 ### 3.4 The target
 
@@ -210,9 +211,9 @@ nor the output color space to it (`Renderer#currentToneMapping`, `#currentColorS
    of each mesh (§4).
 3. Save the state of the renderer the picker changes — the render target with its active cube face
    and mipmap level, the MRT, the clear color and alpha, `autoClear`, `autoClearColor`,
-   `autoClearDepth`, `autoClearStencil` — then: the target, no MRT (a global MRT would take the place
-   of the `outputNode` for a render target), clear to `(0, 0, 0, 0)`, every clear on, `render()`.
-   The state is restored in a `finally`, a throwing render included.
+   `autoClearDepth`, `autoClearStencil` — then: the target, no MRT (a global MRT would take the
+   place of the `outputNode` for a render target), clear to `(0, 0, 0, 0)`, every clear on,
+   `render()`. The state is restored in a `finally`, a throwing render included.
 4. `readRenderTargetPixelsAsync(target, 0, 0, 1, 1)` — called right after the render, before any
    `await`: the copy is queued behind the draw, so two picks in flight share one target safely.
 5. On the read back: `r = round(pixel[0])`, `g = round(pixel[1])`. `r = 0` is nothing. Otherwise the
@@ -226,18 +227,18 @@ the snapshot.
 ## 4. The slot and the handle — the open point of sorting and growth
 
 The GPU writes the slot a sprite was drawn from. By the time the read back resolves, a sort
-(`sortBy()`, `sortByViewDepth()`), a `freeSprite()` — which moves the last sprite into the freed slot —
-or a growth may have moved it; `spritePool.getVO(index)` after the read back would answer whatever
-stands there now. A mesh sorted every frame — the vector balls, a y-sorted top-down scene — moves
-slots every frame, so a check for staleness would refuse almost every pick there.
+(`sortBy()`, `sortByViewDepth()`), a `freeSprite()` — which moves the last sprite into the freed
+slot — or a growth may have moved it; `spritePool.getVO(index)` after the read back would answer
+whatever stands there now. A mesh sorted every frame — the vector balls, a y-sorted top-down scene —
+moves slots every frame, so a check for staleness would refuse almost every pick there.
 
 So the picker resolves in the frame it draws: **at the draw it takes a snapshot of the handles of
 every drawn mesh** — the handles of the slots in use copied as they stand (`copyVOsInto()`, an
 internal member of the pool), into an array the picker keeps and reuses — and the read back looks
-the slot up there. The answer is the handle that was drawn under the
-pointer; a sort or a growth since then changes nothing about it. A sprite freed since answers
-`undefined`: the handle is no longer in the pool of its mesh (`containsVO()` — a handle is never
-handed out twice, `createVO()` builds a new one). `index` is the slot it was drawn from.
+the slot up there. The answer is the handle that was drawn under the pointer; a sort or a growth
+since then changes nothing about it. A sprite freed since answers `undefined`: the handle is no
+longer in the pool of its mesh (`containsVO()` — a handle is never handed out twice, `createVO()`
+builds a new one). `index` is the slot it was drawn from.
 
 A slot that holds no handle at the draw — filled through `createFromAttributes()` — stays empty in
 the snapshot, so the pick builds no handle and calls no `onCreateVO` hook for a sprite it does not
@@ -246,34 +247,37 @@ draw: the pool counts every sort that moves a slot and every drop of `usedCount`
 internal member), and the snapshot holds the count of the draw. Moved since, or another pool after a
 growth, the answer is `undefined`.
 
-The cost is one copied reference per sprite of the listed meshes per pick, and no allocation once the
-arrays are as long as the pools (one per mesh drawn by a pick in flight, returned when it resolves).
+The cost is one copied reference per sprite of the listed meshes per pick, and no allocation once
+the arrays are as long as the pools (one per mesh drawn by a pick in flight, returned when it
+resolves).
 
 ## 5. Refusals, ownership, disposal
 
 - `pick()` refuses, rejecting with a `TypeError` that names the fix: a `camera` that is no three
-  camera (`SpritePicker#pick(): the camera is no three.js Camera`); a `pointer` whose `x` or `y` is no
-  finite number (`… the pointer is {x, y} in normalized device coordinates, -1 to 1 — got {x: NaN, y:
-  0}`); `sprites` that is no array (`… takes a list of FeatureSprites — pick(camera, pointer,
-  [sprites])`); an entry that is no `FeatureSprites` (`… the entry 1 of the list is no FeatureSprites
-  — the picker draws FeatureSprites alone`). A listed mesh of more than 2²⁴ sprites rejects the pick
-  with a `RangeError` before anything is drawn (`… the entry 0 of the list holds 16777217 sprites,
-  and the float target names a slot exactly up to 16777216 — split the sprites into meshes of at
-  most 16777216`).
+  camera (`SpritePicker#pick(): the camera is no three.js Camera`); a `pointer` whose `x` or `y` is
+  no finite number
+  (`… the pointer is {x, y} in normalized device coordinates, -1 to 1 — got {x: NaN, y: 0}`);
+  `sprites` that is no array
+  (`… takes a list of FeatureSprites — pick(camera, pointer, [sprites])`); an entry that is no
+  `FeatureSprites`
+  (`… the entry 1 of the list is no FeatureSprites — the picker draws FeatureSprites alone`). A
+  listed mesh of more than 2²⁴ sprites rejects the pick with a `RangeError` before anything is drawn
+  (`… the entry 0 of the list holds 16777217 sprites, and the float target names a slot exactly up to 16777216 — split the sprites into meshes of at most 16777216`).
 - **Ownership**: the renderer, the camera and every mesh stay the caller's. The picker owns its
   target, its scene, its camera, its pick meshes and pick materials. A pick material borrows the
   resources of its mesh and does not release them.
 - **A mesh disposed**: the picker listens to three's `dispose` event of every mesh it has drawn and
   releases its pick mesh and pick material then — the event comes before the sprites release their
-  resources, so the pick material goes before what it reads. It listens to the `dispose` event of the
-  geometry the pick mesh draws as well: a growth disposes it, and the pick mesh and its material go
-  with it, so neither the picker nor three's render object of the pick mesh holds the geometry until
-  the next pick. (three's render list of the pick scene still names it until a render finds that list
-  unused for more than 10 frames of the animation loop, or the next pick fills it anew.)
+  resources, so the pick material goes before what it reads. It listens to the `dispose` event of
+  the geometry the pick mesh draws as well: a growth disposes it, and the pick mesh and its material
+  go with it, so neither the picker nor three's render object of the pick mesh holds the geometry
+  until the next pick. (three's render list of the pick scene still names it until a render finds
+  that list unused for more than 10 frames of the animation loop, or the next pick fills it anew.)
 - **`dispose()`**: releases the target, every pick mesh (three's `dispose` event, so the renderer
-  drops its render objects) and every pick material, stops listening to the meshes, and rejects every
-  pick still in flight with `SpritePicker#pick(): the picker was disposed before the pick was read
-  back` (`docs/resource-lifecycle.md` §3). A second call does nothing. After it, `pick()` answers
+  drops its render objects) and every pick material, stops listening to the meshes, and rejects
+  every pick still in flight with
+  `SpritePicker#pick(): the picker was disposed before the pick was read back`
+  (`docs/resource-lifecycle.md` §3). A second call does nothing. After it, `pick()` answers
   `undefined` — the type admits absence (§3 of the rules).
 
 ## 6. Specs
@@ -299,16 +303,17 @@ arrays are as long as the pools (one per mesh drawn by a pick in flight, returne
   uninitialized renderer is awaited; the type of the result over a list of two kinds
   (`expectTypeOf`).
 - Browser test `packages/twopoint5d-testing/test/sprites-picking.test.js`, under WebGPU and WebGL 2,
-  through a `Display`: two overlapping sprites — the front one wins in the overlap, the back one where
-  it shows alone; the transparent corner of the front sprite's frame picks the sprite behind it; after
-  `sortBy()` the same handles answer; a `BillboardPlacement` and an `AxisBillboardPlacement` mesh under
-  a camera that looks down at a slant; two meshes in one list — the right mesh; a mesh with
-  `grow: true` picked at a sprite created past its first capacity; a sprite faded to 0 is not hit;
-  nothing under the pointer answers `undefined`; the front sprite under a reversed depth buffer,
-  through a camera three has not drawn with and one it has; the geometry a growth replaced collected
-  without another pick (Chromium, which has `gc()`); `renderer.info.memory` unchanged over 50 picks
-  and back where it was once the mesh, the picker and the texture are disposed; and the canvas
-  renders as before after a pick (the clear color and the render target restored).
+  through a `Display`: two overlapping sprites — the front one wins in the overlap, the back one
+  where it shows alone; the transparent corner of the front sprite's frame picks the sprite behind
+  it; after `sortBy()` the same handles answer; a `BillboardPlacement` and an
+  `AxisBillboardPlacement` mesh under a camera that looks down at a slant; two meshes in one list —
+  the right mesh; a mesh with `grow: true` picked at a sprite created past its first capacity; a
+  sprite faded to 0 is not hit; nothing under the pointer answers `undefined`; the front sprite
+  under a reversed depth buffer, through a camera three has not drawn with and one it has; the
+  geometry a growth replaced collected without another pick (Chromium, which has `gc()`);
+  `renderer.info.memory` unchanged over 50 picks and back where it was once the mesh, the picker and
+  the texture are disposed; and the canvas renders as before after a pick (the clear color and the
+  render target restored).
 - `src/vertex-objects/VertexObjectPool.spec.ts`: `copyVOsInto()` and `slotMoves`.
 - `src/testing/threeInternals.spec.ts`: the two places where the specs read three's internals — the
   depth convention behind `Camera#reversedDepth` and the structure of the pick output — fail there
@@ -318,7 +323,7 @@ arrays are as long as the pools (one per mesh drawn by a pick in flight, returne
 
 - `docs/sprites.md`, a section **"Picking: which sprite is under the pointer"** after "Draw order:
   sorting the sprites": the use in one `ts check` block; pixel-perfect for free (the alpha test);
-  nearest wins, sprites without a depth test in their own pick (UI layers: pick the top layer first);
-  one frame of latency; the snapshot — sorted and growing meshes work, a freed sprite answers
-  `undefined`; passes are not hit; what it costs; ownership and `dispose()`.
+  nearest wins, sprites without a depth test in their own pick (UI layers: pick the top layer
+  first); one frame of latency; the snapshot — sorted and growing meshes work, a freed sprite
+  answers `undefined`; passes are not hit; what it costs; ownership and `dispose()`.
 - CHANGELOG `[Unreleased]`, Added: one bullet.

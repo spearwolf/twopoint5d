@@ -62,8 +62,8 @@ export interface TilesWithinCoords {
 /**
  * The Map2DTileCoordsUtil does the mapping from _2D_ coordinates to _tile_ coordinates.
  *
- * The origin of the 2D coordinate system is assumed
- * to be in the upper left corner (with the y-axis pointing down).
+ * The origin of the 2D coordinate system is assumed to be in the upper left corner (with the
+ * y-axis pointing down).
  */
 export class Map2DTileCoordsUtil {
   #tileWidth = 1;

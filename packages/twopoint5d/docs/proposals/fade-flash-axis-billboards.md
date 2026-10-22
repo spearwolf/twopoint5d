@@ -14,10 +14,10 @@ billboards", the table of passes for each placement under "Passes: shadows and r
 - the glow test draws the stage once without the bloom as well, a control that the sprite alone
   lights nothing beside it (§6.4).
 
-Phase A of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md)
-(§4.1, §4.2, §4.16 first bullet, §3.2 free-tex-packer, §4.13 steps 1–2): five small additions,
-none of which changes the model. Where the roadmap sketch is wrong about the code, the section
-says what holds; §9 collects those corrections.
+Phase A of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.1, §4.2, §4.16 first
+bullet, §3.2 free-tex-packer, §4.13 steps 1–2): five small additions, none of which changes the
+model. Where the roadmap sketch is wrong about the code, the section says what holds; §9 collects
+those corrections.
 
 ## 1. Goal
 

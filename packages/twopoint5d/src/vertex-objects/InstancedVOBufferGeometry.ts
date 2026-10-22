@@ -215,14 +215,15 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * @param pool - an existing {@link VertexObjectPool} or a descriptor / description that will be wrapped in a new pool
    *   with the capacity of the `.instancedPool`.
    * @param options.autoDispose - when `true`, the attached pool is disposed together with this
-   *   geometry on {@link dispose}. The **default** is whether this geometry built the pool itself: a descriptor or
-   *   description handed in here becomes a pool that belongs to this geometry (e.g. created on the fly when an
-   *   `InstancedMesh` is built and torn down again), while a pool from elsewhere belongs to the caller. That answer follows the
-   *   pool, so handing a pool this geometry built back to it under the name it already has keeps it owned here.
-   *   Set to `false` when the same
-   *   pool is shared with other geometries or otherwise managed by the caller — in that case the pool will be
-   *   detached from the internal bookkeeping on `dispose`, but its buffers and typed arrays remain untouched and the
-   *   caller is responsible for releasing them.
+   *   geometry on {@link dispose}. The **default** is whether this geometry built the pool
+   *   itself: a descriptor or description handed in here becomes a pool that belongs to this
+   *   geometry (e.g. created on the fly when an `InstancedMesh` is built and torn down again),
+   *   while a pool from elsewhere belongs to the caller. That answer follows the pool, so handing
+   *   a pool this geometry built back to it under the name it already has keeps it owned here.
+   *   Set to `false` when the same pool is shared with other geometries or otherwise managed by
+   *   the caller — in that case the pool will be detached from the internal bookkeeping on
+   *   `dispose`, but its buffers and typed arrays remain untouched and the caller is responsible
+   *   for releasing them.
    * @throws when an attribute of `pool` would take an attribute slot that this geometry has
    *   already had an attribute in. The message names the call and every slot it is about, and
    *   the geometry is left exactly as it was.

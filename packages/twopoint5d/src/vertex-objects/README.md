@@ -2,8 +2,8 @@
 
 What a vertex object description declares, which accessors it generates, and how two of
 them make an instanced mesh such as `FeatureSprites`. The layers of the module and the
-rules for its classes are in
-[the library architecture](../../docs/architecture.md#vertex-objects--the-performance-core).
+rules for its classes are in [the library
+architecture](../../docs/architecture.md#vertex-objects--the-performance-core).
 
 ---
 
@@ -250,7 +250,8 @@ pool.sortByKeys(keys); // keys[i] is the key of slot i
   the sort refuses an unknown one with the names there are.
   A key function is called once per slot in use before anything moves, and must not create or free
   objects of the pool; a fractional key it answers, or a `-0`, may cost a heap number of 16 B per
-  call where V8 does not inline it. `sortByKeys()` takes keys worked out in bulk, `keys[i]` for slot `i`.
+  call where V8 does not inline it. `sortByKeys()` takes keys worked out in bulk, `keys[i]` for slot
+  `i`.
 - **The order** is stable — equal keys keep their slot order, so a sort every frame never swaps two
   objects of the same key back and forth — and ascending unless `descending`; a `NaN` key goes last
   either way, behind the infinities too.
@@ -260,7 +261,8 @@ pool.sortByKeys(keys); // keys[i] is the key of slot i
   slots alone and stays as it is.
 - **The upload.** The slots from the first to the last that changed are marked in every buffer,
   static ones included. A pool sorted every frame whose order changes uploads about everything every
-  frame; one whose order holds uploads nothing for the sort. `sortBy()` answers whether a slot moved.
+  frame; one whose order holds uploads nothing for the sort. `sortBy()` answers whether a slot
+  moved.
 - **One pool.** A pool attached to an instanced geometry with `attachInstancedPool()` pairs its
   slots with those of the instanced pool by index. Sorting one alone breaks the pairing: work the
   keys out once and hand the same array to `sortByKeys()` of both.

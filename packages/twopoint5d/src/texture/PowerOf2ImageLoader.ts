@@ -40,10 +40,10 @@ export class PowerOf2ImageLoader {
     this.imageLoader.load(
       url,
       (img: HTMLImageElement) => {
-        // this callback runs inside the `load` event of the image, a path with no way back into
-        // the promise `loadAsync()` wraps around `load()` — a throw here would leave that promise
-        // pending forever, so it is turned into a call of `onErrorCallback`. The call of `onLoadCallback` stays
-        // outside: a throw of the caller's own callback is no failure of the load
+        // this callback runs inside the `load` event of the image, a path with no way back into the promise
+        // `loadAsync()` wraps around `load()` — a throw here would leave that promise pending forever, so it is
+        // turned into a call of `onErrorCallback`. The call of `onLoadCallback` stays outside: a throw of the
+        // caller's own callback is no failure of the load
         let result: ImageWithTexCoords;
         try {
           if (!isPowerOf2(img.width) || !isPowerOf2(img.height)) {

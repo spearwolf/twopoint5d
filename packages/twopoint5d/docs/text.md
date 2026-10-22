@@ -17,8 +17,8 @@ layout engine.
 | XML (`.fnt`, `.xml`) | a string starting with `<` | BMFont, Littera |
 | JSON | an object, or a string starting with `{` | `msdf-bmfont-xml`, `bmfont2json`, `load-bmfont`, `parse-bmfont-ascii` — `{pages, chars, kernings, info, common}` |
 
-The XML is read by a tokenizer of its own, not a `DOMParser`, so all three read in a worker and under
-Node alike. The binary BMFont format is not read; export the font as one of the three.
+The XML is read by a tokenizer of its own, not a `DOMParser`, so all three read in a worker and
+under Node alike. The binary BMFont format is not read; export the font as one of the three.
 
 ```ts check
 import {BitmapFont, TextureFactory} from '@spearwolf/twopoint5d';
@@ -63,10 +63,10 @@ A font and its atlas are plain data: nothing to dispose. The page texture is the
 
 ## Writing text into sprites
 
-`writeText(sprites, font, text, options?)` lays a string out and writes it into `sprites`: one sprite
-per visible glyph, created in the `FeatureSprites` handed in and answered in reading order. The kind of
-the sprites holds `InstancePosition`, `QuadSize` and `AtlasFrame` — `TexturedSpriteKind` does — and
-the font's page is their `colorMap`.
+`writeText(sprites, font, text, options?)` lays a string out and writes it into `sprites`: one
+sprite per visible glyph, created in the `FeatureSprites` handed in and answered in reading order.
+The kind of the sprites holds `InstancePosition`, `QuadSize` and `AtlasFrame` — `TexturedSpriteKind`
+does — and the font's page is their `colorMap`.
 
 ```ts check
 import {BitmapFont, FeatureSprites, rewriteText, TexturedSpriteKind, writeText} from '@spearwolf/twopoint5d';
@@ -93,8 +93,8 @@ export function rewrite(next: string) {
 
 **Coordinates.** The text lies in the x/y plane of the mesh, **y up** — the plane of `FlatPlacement`
 and of every billboard; a text on the ground is a `FlatPlacement` mesh turned by
-`rotation.x = -Math.PI / 2`. `(x, y)` is the **top** of the first line, the top of the BMFont line box
-that every `yoffset` is measured from; a baseline at `b` is `y: b + font.base * scale`. With
+`rotation.x = -Math.PI / 2`. `(x, y)` is the **top** of the first line, the top of the BMFont line
+box that every `yoffset` is measured from; a baseline at `b` is `y: b + font.base * scale`. With
 `s = scale`:
 
 - line `n` (from 0) has its top at `y − n · lineHeight · s`;
@@ -113,8 +113,9 @@ the middle of the glyph box, with `baseArgs: [0.5, 0.5, 0.5, -0.5]` it is the to
 
 **`Anchor`.** A kind with the sprite feature `Anchor` takes its text exactly where a kind without it
 does: `writeText()` writes no anchor, and a new sprite starts at `(0.5, 0.5)`, which moves nothing.
-An anchor set on a glyph afterwards moves the glyph off its box — to turn a glyph about another point
-and keep it in place, move it along: `x += (anchorX − 0.5) · width`, `y −= (anchorY − 0.5) · height`.
+An anchor set on a glyph afterwards moves the glyph off its box — to turn a glyph about another
+point and keep it in place, move it along: `x += (anchorX − 0.5) · width`,
+`y −= (anchorY − 0.5) · height`.
 
 **What is written.** The frame (`setFrame()`), the size of the box and the position, with the `z` of
 the options. Nothing else: a new sprite keeps its white tint and its rotation of 0 until the caller
@@ -170,9 +171,9 @@ objects through a sort, still in reading order.
 
 **Refusals.** A kind without `InstancePosition`, `QuadSize` or `AtlasFrame` — `AnimatedSpriteKind`,
 whose frame comes out of an `animsMap` — is refused before a sprite is created, naming every feature
-missing. A pool that runs full is refused naming how many sprites the text needs; the sprites created
-so far are freed again, so nothing of the text is left behind. An error of `createSprite()` — under
-`grow`, a pool that cannot grow — goes on to the caller after the same freeing. A `scale`,
+missing. A pool that runs full is refused naming how many sprites the text needs; the sprites
+created so far are freed again, so nothing of the text is left behind. An error of `createSprite()`
+— under `grow`, a pool that cannot grow — goes on to the caller after the same freeing. A `scale`,
 `lineHeight` or `maxWidth` that is no number above 0, an `align` it does not know and a `fallback`
 the font lacks are refused naming the option. `rewriteText()` refuses a glyph that is no sprite of
 the sprites handed in, naming its index, before anything changes; on a pool that runs full the
@@ -181,10 +182,10 @@ empty array, `rewriteText()` empties `glyphs`.
 
 ## Measuring: `layoutText()`
 
-`layoutText(font, text, options?)` is the half of `writeText()` that writes nothing: the boxes of the
-visible glyphs in reading order, the number of lines and the size of the text, in units of the mesh,
-for the same options. A panel sized to its label, a text centred in a box of its own, a scroller that
-knows its length:
+`layoutText(font, text, options?)` is the half of `writeText()` that writes nothing: the boxes of
+the visible glyphs in reading order, the number of lines and the size of the text, in units of the
+mesh, for the same options. A panel sized to its label, a text centred in a box of its own, a
+scroller that knows its length:
 
 ```ts check
 import {type BitmapFont, layoutText} from '@spearwolf/twopoint5d';

@@ -119,18 +119,18 @@ export function adaptiveResolutionOf(display: Display): AdaptiveResolution | und
  * - **`frame-pacing`** — the frames that come late, where the renderer measures no GPU time, read
  *   off the intervals between the animation frames of the page: a frame that `maxFps` holds back
  *   is not late. It cannot tell the GPU from the CPU — a load of the CPU that holds every frame to
- *   the same slower pace leads back as a 30 Hz screen does, one that comes and goes keeps the scale
- *   down —, and a frame on time shows no headroom: the controller tries a step up after three
- *   clean seconds and goes back where it fails, waiting twice as long before the next try. A
- *   frame is late where it comes more than half a frame interval after the pace the page
+ *   the same slower pace leads back as a 30 Hz screen does, one that comes and goes keeps the
+ *   scale down —, and a frame on time shows no headroom: the controller tries a step up after
+ *   three clean seconds and goes back where it fails, waiting twice as long before the next try.
+ *   A frame is late where it comes more than half a frame interval after the pace the page
  *   reaches — 1.5 frame intervals while that pace is the target. Where a descent down to
  *   {@link AdaptiveResolution.minScale} brought frames that came at a steady pace no sooner — a
- *   `requestAnimationFrame` that a power-saving mode or a 30 Hz
- *   screen holds to 30 frames — the pixels are not what holds the frame rate: the controller
- *   goes back to the scale the descent began at and measures against that pace from then on. It
- *   takes that one descent, and the return, to find out: with the default scales four steps of 60
- *   frames each — 30 that settle and a window of 30 —, 240 frames at a lower resolution, eight
- *   seconds at 30 frames per second. Once the frames come sooner again, the target counts again.
+ *   `requestAnimationFrame` that a power-saving mode or a 30 Hz screen holds to 30 frames — the
+ *   pixels are not what holds the frame rate: the controller goes back to the scale the descent
+ *   began at and measures against that pace from then on. It takes that one descent, and the
+ *   return, to find out: with the default scales four steps of 60 frames each — 30 that settle
+ *   and a window of 30 —, 240 frames at a lower resolution, eight seconds at 30 frames per
+ *   second. Once the frames come sooner again, the target counts again.
  *
  * A step is an eighth of the scale, between {@link AdaptiveResolution.minScale} and
  * {@link AdaptiveResolution.maxScale}. A step that leaves the pixel ratio of the display as it is

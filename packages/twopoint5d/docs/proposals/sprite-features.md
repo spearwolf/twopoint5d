@@ -555,11 +555,10 @@ cost a `TexturedSpritesGeometry` built with `attributeUsage` pays today.
     over the input
   - a `placement` signal that starts with the placement of the kind. It takes another
     feature only when that feature contributes a `placement` stage and nothing else — no
-    attributes, methods, uniforms or textures, which the sprite handle and the material were
-    built without — and the kind holds every feature it `requires`; otherwise it throws
-    with both feature names. A change rebuilds the position graph,
-    as a write to `renderAsBillboards` does today, and three serves a source it has built
-    before from its caches
+    attributes, methods, uniforms or textures, which the sprite handle and the material were built
+    without — and the kind holds every feature it `requires`; otherwise it throws with both feature
+    names. A change rebuilds the position graph, as a write to `renderAsBillboards` does today, and
+    three serves a source it has built before from its caches
   - one `uniform()` per declared uniform (exposed as `material.uniforms.time`), readable and
     writable after `dispose()` like `AnimatedSpritesMaterial#time` today
   - per declared texture a signal, a memo over `textureShapeKey()` (and the image measures

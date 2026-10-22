@@ -618,11 +618,11 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * and the uniforms and textures they shared, and drops every binding, so that the sprites hold no
    * node after it. The mesh leaves the scene graph first and fires three's `dispose` event, so the
    * renderer drops what it built for it; every pass mesh leaves this mesh and fires the event as
-   * well. Afterwards `geometry`, `material`, `spritePool`, `placement`
-   * and `uniforms` answer `undefined`, and so do `createSprite()` and `getTexture()`; `passes` is
-   * empty; `freeSprite()`, `setUniform()`, `bindUniform()`, `unbindUniform()`, `setTexture()`,
-   * `touchTexture()`, `update()` and the `placement` setter do nothing, `sortBy()` and
-   * `sortByViewDepth()` answer `false`. A second call does nothing.
+   * well. Afterwards `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer
+   * `undefined`, and so do `createSprite()` and `getTexture()`; `passes` is empty; `freeSprite()`,
+   * `setUniform()`, `bindUniform()`, `unbindUniform()`, `setTexture()`, `touchTexture()`, `update()`
+   * and the `placement` setter do nothing, `sortBy()` and `sortByViewDepth()` answer `false`. A
+   * second call does nothing.
    */
   override dispose(): void {
     if (this.#disposed) return;

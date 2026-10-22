@@ -1,16 +1,16 @@
 # Proposal: draw order — sorting a vertex object pool
 
 Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Draw order: sorting the sprites"
-and "Performance", and [`src/vertex-objects/README.md`](../../src/vertex-objects/README.md), "Sorting
-a pool". Deviations:
+and "Performance", and [`src/vertex-objects/README.md`](../../src/vertex-objects/README.md),
+"Sorting a pool". Deviations:
 
 - the bench lives beside the sprites, `src/sprites/FeatureSprites/sorting.bench.ts`: it sorts
   `TexturedSpriteKind`, which the module `vertex-objects/` does not import (§4);
-- the upload price of §2.4 is measured, not estimated: 76 B a sprite of `TexturedSpriteKind`, 60 B of
-  them static;
-- the name key of `VertexObjectPool#sortBy()` is typed `VOSortKeyName<VOType>`, the number properties
-  of `VOType` and any string for `unknown`, not `string` (§2.1); a key function that frees and creates
-  vertex objects in one call is refused with a message of its own (§2.2);
+- the upload price of §2.4 is measured, not estimated: 76 B a sprite of `TexturedSpriteKind`, 60 B
+  of them static;
+- the name key of `VertexObjectPool#sortBy()` is typed `VOSortKeyName<VOType>`, the number
+  properties of `VOType` and any string for `unknown`, not `string` (§2.1); a key function that
+  frees and creates vertex objects in one call is refused with a message of its own (§2.2);
 - the allocation spec of a key function found that a key of `-0` is boxed as a fractional one is —
   `-0` is no small integer; the TSDoc of `VOSortKey` and the README say so (§2.2).
 
@@ -81,13 +81,13 @@ The two types go into `types.ts`, which the module exports as `export type *`.
 - **A key function** is called once per slot in use, in slot order, before anything moves. A slot
   filled by `createFromAttributes()`, `fromBuffersData()` or buffers data handed to the constructor
   has no vertex object yet; it gets one, as `getVO()` gives it — once, on the first sort. The key
-  function must not create or free vertex objects: `sortBy()` compares `usedCount` and a count of the
-  slots created and freed with those it started from before each slot, so that it never materializes
-  a vertex object in a slot the key function has freed, and once more after the last key. A change
-  throws. A key function that frees a vertex object and creates another leaves `usedCount` where it
-  was; the count of slots catches it, and it is refused with a message of its own. The sort has moved
-  nothing, while what the key function did stands (a `freeVO()` has moved the last vertex object into
-  the freed slot, as it always does):
+  function must not create or free vertex objects: `sortBy()` compares `usedCount` and a count of
+  the slots created and freed with those it started from before each slot, so that it never
+  materializes a vertex object in a slot the key function has freed, and once more after the last
+  key. A change throws. A key function that frees a vertex object and creates another leaves
+  `usedCount` where it was; the count of slots catches it, and it is refused with a message of its
+  own. The sort has moved nothing, while what the key function did stands (a `freeVO()` has moved
+  the last vertex object into the freed slot, as it always does):
 
   > `VertexObjectPool#sortBy(): the key function changed usedCount from 10 to 9 — create and free vertex objects before or after the sort, not inside the key function`
 
@@ -139,8 +139,8 @@ The slots `first` … `last`, the hull of the slots whose object changed, and no
 
 **The price.** A pool sorted every frame whose order changes uploads (about) every buffer in full
 every frame — the static ones included, which otherwise upload only when they are touched. For
-10 000 sprites of `TexturedSpriteKind` — 76 B each, 60 B of them static — that is 760 KB a frame against
-the 160 KB its dynamic attributes upload anyway. The guide says so (§5).
+10 000 sprites of `TexturedSpriteKind` — 76 B each, 60 B of them static — that is 760 KB a frame
+against the 160 KB its dynamic attributes upload anyway. The guide says so (§5).
 
 **Index buffers** stay as they are: the index of a non-instanced geometry repeats `indices` per
 slot, shifted by `vertexCount × slot` (`createIndicesArray()`), and depends on the slot, not on what
@@ -233,9 +233,9 @@ class FeatureSprites<Api> {
   > `FeatureSprites#sortByViewDepth(): the sprites of this kind have no instancePosition to measure the view depth at — add InstancePosition to the features of the kind, or sort by a key of your own with sortBy()`
 
   An `Error`, thrown before anything is read; a disposed mesh answers `false` first, without it.
-- Allocation-free per frame once the scratch of the pool is there (it grows with the capacity) — held by
-  `src/sprites/hot-path-allocations.spec.ts`. The vector-balls demo of the next wave calls it every
-  frame on some 500 billboards.
+- Allocation-free per frame once the scratch of the pool is there (it grows with the capacity) —
+  held by `src/sprites/hot-path-allocations.spec.ts`. The vector-balls demo of the next wave calls
+  it every frame on some 500 billboards.
 
 ### 3.3 Order of a frame
 
@@ -261,15 +261,16 @@ A pass that wants an order of its own needs a pool of its own; that is not offer
 - `src/vertex-objects/VertexObjectPool.sortBy.spec.ts`: by a property name, ascending and
   descending, on one vertex and on four (`x0`); by a key function; by keys; every buffer permuted —
   a pool with a float32 buffer, an interleaved uint8 normalized buffer with padding, an int16 and a
-  float16 attribute, `'static'`, `'dynamic'` and `autoTouch: false` — compared slot by slot with
-  the values each handle wrote; the handles keep their identity, their values and `getVO()` agrees;
+  float16 attribute, `'static'`, `'dynamic'` and `autoTouch: false` — compared slot by slot with the
+  values each handle wrote; the handles keep their identity, their values and `getVO()` agrees;
   stable on ties in both directions; NaN last, behind ±Infinity, by every form of key; `false` and
-  no mark for a pool in order, for fewer than two slots, on a disposed pool; the hull of the moved slots marked in every buffer, and an
-  `update()` of a `VertexObjectGeometry` and of an `InstancedVertexObjectGeometry` uploads exactly
-  that range (`updateRanges`); index buffer untouched; `freeVO()` after a sort and a sort after
-  `freeVO()`; slots from `createFromAttributes()` sorted by a key function; the refusals of §2.2
-  with their messages; a key function that frees the last vertex object leaves no vertex object in a
-  slot out of use; a throwing key function leaves the pool as it was; a sort after `resize()`.
+  no mark for a pool in order, for fewer than two slots, on a disposed pool; the hull of the moved
+  slots marked in every buffer, and an `update()` of a `VertexObjectGeometry` and of an
+  `InstancedVertexObjectGeometry` uploads exactly that range (`updateRanges`); index buffer
+  untouched; `freeVO()` after a sort and a sort after `freeVO()`; slots from
+  `createFromAttributes()` sorted by a key function; the refusals of §2.2 with their messages; a key
+  function that frees the last vertex object leaves no vertex object in a slot out of use; a
+  throwing key function leaves the pool as it was; a sort after `resize()`.
 - `src/sprites/FeatureSprites/FeatureSprites.sortBy.spec.ts`: `sortBy('y')`, a key function,
   `descending`; `sortByViewDepth()` for a camera on +z and on −z (orders reverse), a turned and a
   moved mesh, a perspective and an orthographic camera; the refusal of a kind without
@@ -294,14 +295,15 @@ A pass that wants an order of its own needs a pool of its own; that is not offer
 
 ## 5. The guide
 
-- `docs/sprites.md`, a section **"Draw order: sorting the sprites"** after "FeatureSprites": when the
-  slot order is not enough (alpha test and depth test do it for opaque and cut-out sprites); y-sort
-  for top-down and isometric (`sortBy('y', {descending: true})` with y up the screen, `sortBy('z')`
-  for sprites standing on the xz ground with the camera looking along −z from +z); back to front for
-  billboards and clouds (`sortByViewDepth(camera)`); a `ts check` block; stable, NaN last; the
-  order of a frame; the passes follow; the upload price; the line under "FeatureSprites" about
-  `dispose()` and the "Performance" bullets.
+- `docs/sprites.md`, a section **"Draw order: sorting the sprites"** after "FeatureSprites": when
+  the slot order is not enough (alpha test and depth test do it for opaque and cut-out sprites);
+  y-sort for top-down and isometric (`sortBy('y', {descending: true})` with y up the screen,
+  `sortBy('z')` for sprites standing on the xz ground with the camera looking along −z from +z);
+  back to front for billboards and clouds (`sortByViewDepth(camera)`); a `ts check` block; stable,
+  NaN last; the order of a frame; the passes follow; the upload price; the line under
+  "FeatureSprites" about `dispose()` and the "Performance" bullets.
 - `src/vertex-objects/README.md`, a section **"Sorting a pool"**: the three forms of a key, what
   moves, the upload, the attached pools.
-- `constants.ts`: the TSDoc of `voIndex` names `sortBy()` beside `freeVO()` as what changes an index.
+- `constants.ts`: the TSDoc of `voIndex` names `sortBy()` beside `freeVO()` as what changes an
+  index.
 - CHANGELOG `[Unreleased]`, Added: one bullet for the core, one for the sprites.

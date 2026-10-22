@@ -132,9 +132,9 @@ export class FixedFrameLoop {
    * is discarded (sim time stays consistent with the ticks that did
    * run; `alpha` drops back to ~0 on the next frame).
    *
-   * A value that is not a whole number of 1 or more is ignored, in the
-   * constructor as well as here; the constructor then keeps `DefaultMaxStepsPerFrame`, or 5 when
-   * that is such a value too.
+   * A value that is not a whole number of 1 or more is ignored, in the constructor as well as
+   * here; the constructor then keeps `DefaultMaxStepsPerFrame`, or 5 when that is such a value
+   * too.
    */
   get maxStepsPerFrame(): number {
     return this.#maxStepsPerFrame;
@@ -151,9 +151,8 @@ export class FixedFrameLoop {
   /**
    * Target simulation rate in frames per second.
    *
-   * A value that is not finite or not greater than 0 is ignored — in the
-   * constructor as well, where the loop then keeps `DefaultFps`, or 60 when that is such a value
-   * too.
+   * A value that is not finite or not greater than 0 is ignored — in the constructor as well,
+   * where the loop then keeps `DefaultFps`, or 60 when that is such a value too.
    */
   get fps(): number {
     return this.#fps;

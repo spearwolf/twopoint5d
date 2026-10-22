@@ -13,12 +13,11 @@ built:
   lookups — the node `textureSize()` reads the measures of, which fetches no texel (§5.2);
 - the bake names its texture `twopoint5d.FrameTable` (§3).
 
-Phase E, part 2 of
-[`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.6 and §4.14, with decision 3
-of its §7 taken: a frame table is a **data texture**, handed to the sprites as an ordinary
-`textures` resource — no new kind of resource, no limit of 341 frames. Built on the slots of
-[`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md) (§7.6, §7.7): nothing new in
-the shader model, every lookup through `ctx.sample()` at graph build time.
+Phase E, part 2 of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.6 and §4.14,
+with decision 3 of its §7 taken: a frame table is a **data texture**, handed to the sprites as an
+ordinary `textures` resource — no new kind of resource, no limit of 341 frames. Built on the slots
+of [`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md) (§7.6, §7.7): nothing new
+in the shader model, every lookup through `ctx.sample()` at graph build time.
 
 ## 1. Goal
 
@@ -115,14 +114,15 @@ export function frameTable(atlas: TextureAtlas<unknown>, selection?: AtlasFrameT
     as they take — the index → texel mapping of `texCoordsFromIndex()`, which works in int. The
     shader reads the frame index of a sprite and the frame count of the header as floats, and a
     float32 holds every whole number up to 2^24 exactly, so a table holds at most 2^24 texels —
-    5 592 405 frames; one more is refused naming the count and the fix (several tables). A table that
-    needs more rows than `maxTextureSize` — a small limit handed in — is refused naming both numbers.
+    5 592 405 frames; one more is refused naming the count and the fix (several tables). A table
+    that needs more rows than `maxTextureSize` — a small limit handed in — is refused naming both
+    numbers.
 - `bakeDataTexture()` builds a new texture on every call and keeps no reference to it: the caller
   owns it and disposes it (resource lifecycle §1, as `FrameBasedAnimations#bakeDataTexture()`). A
   table is plain data, no `dispose()`. A frame changed after the bake reaches the shader with the
   next bake.
-- `maxTextureSize`: a whole number of 1 or more, else a `RangeError`; the limit of a renderer is read
-  as `FrameBasedAnimations` reads it (the helper moves into an internal module both import).
+- `maxTextureSize`: a whole number of 1 or more, else a `RangeError`; the limit of a renderer is
+  read as `FrameBasedAnimations` reads it (the helper moves into an internal module both import).
 - `AtlasFrameTable` stays as it is: the uniform array for a `NodeMaterial` of one's own. The guide
   says which to take.
 
@@ -207,15 +207,15 @@ entry    = clamp(index, 0, max(entries − 1, 0))                // only a table
   camera is the one rendering: the views of a `ShadowPass` or `ReflectionPass` are the views the
   camera sees, as in every game of the genre.
 - Straight above or below the sprite (`toCamera.xz` = 0) the angle is undefined — `atan(0, 0)` is
-  undefined in GLSL —, so the angle is the sprite's own `yaw` there (`toCamera.z` counts as 1 and the
-  yaw is added, both weighted by `1 − step(1e-6, |x| + |z|)`, no branch): view 0, the front view,
-  whatever the yaw.
+  undefined in GLSL —, so the angle is the sprite's own `yaw` there (`toCamera.z` counts as 1 and
+  the yaw is added, both weighted by `1 − step(1e-6, |x| + |z|)`, no branch): view 0, the front
+  view, whatever the yaw.
 - The math is branch-free (`floor`, no `%` on negative numbers, whose sign differs between WGSL
   and GLSL).
 - `step` and `entries` are whole numbers, and the f32 division may lie a few ULP off: on a multiple
   of `n` a plain `floor(step / n)` could land one too low — a view of `n` — and `floor(entries / n)`
-  could leave the last frame of a table of `frames · n` entries out of reach. Half a step or an entry
-  more keeps the quotient `0.5 / n` away from every whole number, which no ULP of the division
+  could leave the last frame of a table of `frames · n` entries out of reach. Half a step or an
+  entry more keeps the quotient `0.5 / n` away from every whole number, which no ULP of the division
   crosses.
 - `views` that is no whole number of 2 or more is refused with a `TypeError`:
   `tableFrame: views must be a whole number of 2 or more, got 1 — leave views out for frames without views`.
@@ -248,17 +248,18 @@ export const ColorOrder: {Palette: 50, Tint: 100, Mask: 150, Fade: 200, Flash: 3
   loaded with `flipY = false` as every image of the library; row 0 the source colours, every row
   below a replacement set of the same length. Ordinary RGBA, no indexed PNG.
 - **Uniforms** `paletteShift` (float, 0) and `paletteCycle` (vec2, `(0, 0)`): see §5.3.
-- **A color stage at `ColorOrder.Palette` (50)** — a new band, before `Tint`, so a tint, a fade and a
-  flash act on the swapped colours. `ColorOrder` gains the key; nothing else moves.
+- **A color stage at `ColorOrder.Palette` (50)** — a new band, before `Tint`, so a tint, a fade and
+  a flash act on the swapped colours. `ColorOrder` gains the key; nothing else moves.
 - `colors` that is no whole number from 1 to 64 is refused with a `TypeError`. 16 covers both
-  lookbook palettes (`goblin-palette.png`, `chrome-32-palette.png`, 16 × 4 each); 64 bounds the cost.
+  lookbook palettes (`goblin-palette.png`, `chrome-32-palette.png`, 16 × 4 each); 64 bounds the
+  cost.
 
 ### 5.2 The match
 
 The stage gets the colour of the color source (`TextureColor`: the texel of the `colorMap`), and
 compares its rgb with the first `colors` entries of row 0, unrolled in JavaScript — one
-`ctx.sample('palette', …)` per entry, built eagerly as `AnimatedFrames` builds its search, never in a
-TSL `Loop`/`If`/`Fn` callback (pipeline proposal §7.8):
+`ctx.sample('palette', …)` per entry, built eagerly as `AnimatedFrames` builds its search, never in
+a TSL `Loop`/`If`/`Fn` callback (pipeline proposal §7.8):
 
 ```
 w, h     = textureSize('palette')
@@ -342,14 +343,14 @@ attached to `SpriteResources` and go with its `dispose()`.
 - `TableFrame.spec.ts`: one feature per option set, names, `requires`, `attributes`, `textures`,
   `initialize`; the refusals of `views`; the graph without a table draws the defaults; with a table
   four lookups registered in the frame scope, a swap reaches them without rebuild; with views the
-  graph reads `instancePosition`, `yaw` and the camera; a kind with `views` but no `Yaw` is refused by
-  `defineSprite()`.
+  graph reads `instancePosition`, `yaw` and the camera; a kind with `views` but no `Yaw` is refused
+  by `defineSprite()`.
 - `PaletteSwap.spec.ts`: one feature per option set; `ColorOrder.Palette`; attributes, uniforms,
   textures, `nearestTextures`; `colors + 1` lookups in the color graph and none in the position
   graph; refusals of `colors`; the stage drops out without a `palette`.
-- `SpriteResources.spec.ts` / `SpriteFeature.spec.ts`: the warning — once, not for a nearest texture,
-  not before the image, on `touchTexture()`, for no undeclared name, gone after `dispose()`; the
-  refusal of a malformed `nearestTextures`.
+- `SpriteResources.spec.ts` / `SpriteFeature.spec.ts`: the warning — once, not for a nearest
+  texture, not before the image, on `touchTexture()`, for no undeclared name, gone after
+  `dispose()`; the refusal of a malformed `nearestTextures`.
 - `hot-path-allocations.spec.ts`: writing `frameIndex` and `paletteRow` and
   `setUniform('paletteShift')` in a frame loop allocate nothing.
 - Browser, `sprites-table-frame.test.js`: frames by index — an upright, a turned and a trimmed frame
@@ -368,5 +369,5 @@ attached to `SpriteResources` and go with its `dispose()`.
   `ColorOrder.Palette`, `nearestTextures` among the fields of "Writing a feature"; new sections
   "Frames out of a table: `tableFrame()`" (with "Directional frames") and "Palette swap and colour
   cycling", each with a `ts check` block, after "Atlases built at run time".
-- CHANGELOG `[Unreleased]`, Added: `FrameTable`, `tableFrame()`, `PaletteSwap`, `ColorOrder.Palette`,
-  `nearestTextures`.
+- CHANGELOG `[Unreleased]`, Added: `FrameTable`, `tableFrame()`, `PaletteSwap`,
+  `ColorOrder.Palette`, `nearestTextures`.

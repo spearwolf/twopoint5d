@@ -428,13 +428,13 @@ stage context offers; phase E decides where it lives.
   in WGSL, `textureSize` in GLSL ES 3.0) of a texture node the material registers like a lookup:
   the size of the texture bound, so it follows an image that arrives or changes after the texture
   was set, and a swap to a texture of the same kind without a rebuild. A texture declared with
-  `needsImage` keeps the uniform of `SpriteResources#textureSize()`, kept current by the material and
-  re-read by `touchTexture()` — the feature waits for its image anyway, and `AnimatedFrames` builds
-  the graph it built before. For a texture of another feature that is unset it is that uniform at
-  `(0, 0)`, the reader does not wait for it, and setting the texture builds the graph anew — a stage
-  that divides by it guards with `max(size, 1)`. `ctx.sample()` stays limited to the feature's own textures. A name no feature of the
-  material declares is refused, naming it: `FeatureSpritesMaterial: feature "x" reads the size
-  of the texture "y", which no feature of these sprites declares`.
+  `needsImage` keeps the uniform of `SpriteResources#textureSize()`, kept current by the material
+  and re-read by `touchTexture()` — the feature waits for its image anyway, and `AnimatedFrames`
+  builds the graph it built before. For a texture of another feature that is unset it is that
+  uniform at `(0, 0)`, the reader does not wait for it, and setting the texture builds the graph
+  anew — a stage that divides by it guards with `max(size, 1)`. `ctx.sample()` stays limited to the
+  feature's own textures. A name no feature of the material declares is refused, naming it:
+  `FeatureSpritesMaterial: feature "x" reads the size of the texture "y", which no feature of these sprites declares`.
 - The color pipeline order of phase A stays: the color stages of the kind (`Tint`, `Fade`,
   `Flash`, `PaletteSwap`) first, pass stages in `ColorOrder.Pass` last, a tie keeps a kind's
   stage before a pass's.

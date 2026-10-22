@@ -136,10 +136,11 @@ export class DynamicAtlas {
 ### 3.2 The canvas
 
 Without a `canvas` the atlas builds its own: an `OffscreenCanvas` where the global exists — every
-current browser, also in a worker, and no DOM node to hold — and a `document.createElement('canvas')`
-otherwise. three uploads both on both backends (`WebGLTextureUtils` takes an `OffscreenCanvas` as an
-image source, WebGPU's `copyExternalImageToTexture()` does as well). Where neither exists — Node,
-Vitest — the constructor throws:
+current browser, also in a worker, and no DOM node to hold — and a
+`document.createElement('canvas')` otherwise. three uploads both on both backends
+(`WebGLTextureUtils` takes an `OffscreenCanvas` as an image source, WebGPU's
+`copyExternalImageToTexture()` does as well). Where neither exists — Node, Vitest — the constructor
+throws:
 
 > `DynamicAtlas: there is no OffscreenCanvas and no document to build a canvas — hand one in: new DynamicAtlas({canvas})`
 
@@ -230,8 +231,8 @@ frame is untrimmed (no `spriteSourceSize`), so `setFrame()` covers the whole qua
   fractions. A width or height that is no finite number above 0 is refused with a `RangeError`
   naming the frame and the value.
 - An image element that is still loading (`complete` is `false`) is refused, with a `size` as well:
-  `DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before add()`. So is
-  an `ImageBitmap` that is closed and a canvas of no size:
+  `DynamicAtlas: the image of "avatar" has not loaded yet — await image.decode() before add()`. So
+  is an `ImageBitmap` that is closed and a canvas of no size:
   `DynamicAtlas: the image of "avatar" is 0 × 0 — a closed ImageBitmap or a canvas of no size has nothing to draw`.
   An image element that has loaded without a natural size, an SVG without `width` and `height`, is
   drawn at the `size` given; without one `add()` refuses it:
@@ -264,11 +265,11 @@ a frame then reads its own edge, not the padding.
   the first `upload()`, its cell for the next `upload()` after it; the frame, its name and its cell
   stay.
 - The cell of every frame is kept in a private map, apart from `data`: a caller who changes
-  `frame.data` moves nothing, and `redraw()` and `remove()` still work on the cell the frame was packed
-  into.
+  `frame.data` moves nothing, and `redraw()` and `remove()` still work on the cell the frame was
+  packed into.
 - Every clear, clip, draw and extrusion runs inside `save()`/`restore()` with the transform reset to
-  identity, `globalAlpha` 1 and `source-over`: the caller may leave any state on `context` (it is handed
-  out for `measureText()`), and gets it back, its `font` included.
+  identity, `globalAlpha` 1 and `source-over`: the caller may leave any state on `context` (it is
+  handed out for `measureText()`), and gets it back, its `font` included.
 - `remove(name)` clears the cell and lets go of the name: `atlas.frame(name)` and
   `atlas.frameId(name)` answer `undefined`, and `add(name, …)` may take it again. The cell goes
   back to its shelf (§3.4): the next frame that fits is packed into it. The frame keeps its id,
@@ -392,8 +393,8 @@ export class BitmapFont {
 shape of `TexturePackerJson.parse()` and `AsepriteJson.parse()`. The atlas holds one frame per
 char, named by the char as a string (`'A'`), in the order of the file; each frame's `data` is a
 frozen copy of its char. The frames are untrimmed: the offsets are not trim margins — they move the
-glyph inside its line, and `writeText()` applies them (§5.2). A char of width or height 0 — the space
-— has a frame of 0 × 0 and is never drawn.
+glyph inside its line, and `writeText()` applies them (§5.2). A char of width or height 0 — the
+space — has a frame of 0 × 0 and is never drawn.
 
 The page image is not loaded: `font.page` names it relative to the font file, and the caller loads
 it with `flipY = false` — `TextureFactory`, `TextureStore` — and `nearest` for pixel fonts.
@@ -411,13 +412,15 @@ or a char whose `page` is not 0 — is refused:
 Each throws before the atlas holds a frame, naming the char by itself and its id where one is
 involved:
 
-- font data that is no object: `BitmapFont: the font data is null — a font is an object in the JSON layout, {pages, chars, common}`;
+- font data that is no object:
+  `BitmapFont: the font data is null — a font is an object in the JSON layout, {pages, chars, common}`;
 - no `common`, or a `lineHeight`, `base`, `scaleW` or `scaleH` that is no finite number (all but
   `base` above 0 — a line height of 0 would stack every line onto the first);
 - no `chars` array;
 - a char whose `id` is no whole number from 0 to 0x10FFFF, or a field of §4.2 that is no finite
   number; `width`, `height` below 0;
-- a char that lies outside the page: `BitmapFont: the char "A" (65) reaches beyond the page of 128 × 64 — x 120 + width 12`;
+- a char that lies outside the page:
+  `BitmapFont: the char "A" (65) reaches beyond the page of 128 × 64 — x 120 + width 12`;
 - two chars of one id;
 - a kerning pair whose `first` or `second` is no code point — a whole number from 0 to 0x10FFFF — or
   whose `amount` is no finite number (pairs naming chars the font lacks are kept and never met).
@@ -503,8 +506,8 @@ measured from — at its left edge, middle or right edge by `align`. To write on
 - line `n` (from 0) has its top at `y − n · lineHeight · s`;
 - the pen of a line starts at 0; a glyph lies at `penX + xoffset · s` (left) and
   `lineTop − yoffset · s` (top), `width · s` wide and `height · s` high; the pen then moves on by
-  `(xadvance + letterSpacing) · s`, and a kerning pair moves the second glyph of it — and the pen with
-  it — by `amount · s` before that glyph is placed;
+  `(xadvance + letterSpacing) · s`, and a kerning pair moves the second glyph of it — and the pen
+  with it — by `amount · s` before that glyph is placed;
 - the width of a line is the pen after its last char that is no breakable space, less one
   `letterSpacing · s` — the spacing lies between chars, not after the last; the spaces behind that
   char hang out of the line, out of its width and its alignment, and an empty line or one of
@@ -552,9 +555,9 @@ changes, not every frame.
 - `setFrame(glyph.frame)`,
 - `setSize(width, height)` — the glyph box,
 - `setPosition(px, py, z)`, where the position is the glyph box moved by the anchor of the base:
-  `px = x − width · minX`, `py = y − height · maxY`, with `minX` and `maxY` the extents of the base's
-  `position` attribute (read from the geometry, so `baseArgs` count). Under `QuadBase` with its
-  default `[0.5, 0.5]` — extents `−0.5 … 0.5` — the position is the middle of the box; with
+  `px = x − width · minX`, `py = y − height · maxY`, with `minX` and `maxY` the extents of the
+  base's `position` attribute (read from the geometry, so `baseArgs` count). Under `QuadBase` with
+  its default `[0.5, 0.5]` — extents `−0.5 … 0.5` — the position is the middle of the box; with
   `baseArgs: [0.5, 0.5, 0.5, -0.5]` it is the top left corner.
 
 Nothing else is written: a `Tint`, a `Rotation` or any other feature of the kind keeps the start
@@ -579,7 +582,8 @@ it does not write; `rewriteText(sprites, glyphs, font, '')` frees them all and e
   the features) — a `TypeError` before a sprite is created:
   `writeText: the sprites lack the features QuadSize, AtlasFrame — writeText() writes the position, the size and the frame of every glyph; build the kind with InstancePosition, QuadSize and AtlasFrame, as TexturedSpriteKind does`;
 - a pool that runs full: the sprites created so far are freed again, and a `RangeError` names the
-  count — `writeText: "GREETINGS TO AL…" needs 21 sprites, and the pool ran full after 12 — give the sprites a larger capacity; no sprite was written`;
+  count —
+  `writeText: "GREETINGS TO AL…" needs 21 sprites, and the pool ran full after 12 — give the sprites a larger capacity; no sprite was written`;
   `createSprite()`'s one-time warning goes out as well;
 - an error of `createSprite()` — under `grow`, a pool that cannot grow — goes on unchanged after
   the sprites created so far are freed again;
@@ -598,19 +602,18 @@ Disposed sprites — `geometry` gone — write nothing: `writeText()` answers an
 ## 6. Ownership and lifecycle
 
 `DynamicAtlas` owns its texture, its own canvas and the staging canvas and texture of `upload()`
-(§3.7). `BitmapFont` and its atlas are plain
-data with no `dispose()`. `layoutText()` and `writeText()` keep nothing; the sprites `writeText()`
-creates are handed straight to the caller (`resource-lifecycle.md` §1, "passes what it took straight
-out to its caller"), who frees them.
+(§3.7). `BitmapFont` and its atlas are plain data with no `dispose()`. `layoutText()` and
+`writeText()` keep nothing; the sprites `writeText()` creates are handed straight to the caller
+(`resource-lifecycle.md` §1, "passes what it took straight out to its caller"), who frees them.
 
 ## 7. Fixtures
 
-`packages/twopoint5d/src/text/fixtures/`: the font `pixel-8` of the lookbook (`apps/lookbook/assets-src/README.md`,
-"sine-scroller": `size=8 lineHeight=10 base=7`, advance 8, ASCII 32–126, one page of 128 × 64, white)
-— `pixel-8.fnt` and `pixel-8.json` byte for byte, `pixel-8.png`, `OFL.txt` (the licence travels with
-the font), and `pixel-8.xml`, written from the `.fnt` by `generate.mjs` in the same folder in
-BMFont's XML layout. A `README.md` says where they come from. Kerning and multi-page cases are
-written inline in the specs.
+`packages/twopoint5d/src/text/fixtures/`: the font `pixel-8` of the lookbook
+(`apps/lookbook/assets-src/README.md`, "sine-scroller": `size=8 lineHeight=10 base=7`, advance 8,
+ASCII 32–126, one page of 128 × 64, white) — `pixel-8.fnt` and `pixel-8.json` byte for byte,
+`pixel-8.png`, `OFL.txt` (the licence travels with the font), and `pixel-8.xml`, written from the
+`.fnt` by `generate.mjs` in the same folder in BMFont's XML layout. A `README.md` says where they
+come from. Kerning and multi-page cases are written inline in the specs.
 
 ## 8. Tests
 
@@ -622,9 +625,9 @@ written inline in the specs.
   `redraw()` keeps frame and coords; `remove()` frees the name and the cell, freed cells taken,
   merged, given back to the tail, an empty last shelf dropped; `clear()` new atlas; the texture
   settings of §3.3, `needsUpdate` per call without `upload()`, the copies of `upload()` and its
-  whole upload; `dispose()` (a)–(d) of the lifecycle
-  pattern, a canvas handed in left alone; the atlas works with `AtlasFrameTable` and
-  `prepareSpriteFrame()`; Node without a canvas throws the message of §3.2.
+  whole upload; `dispose()` (a)–(d) of the lifecycle pattern, a canvas handed in left alone; the
+  atlas works with `AtlasFrameTable` and `prepareSpriteFrame()`; Node without a canvas throws the
+  message of §3.2.
 - `TextureAtlas.spec.ts`: the internal `forgetFrameName`.
 - `BitmapFont.spec.ts`: the three fixtures read into equal fonts and atlases; the text tokenizer
   (quoted strings with spaces, lists, negatives); XML entities; JSON as object and string; kerning;
@@ -650,9 +653,9 @@ written inline in the specs.
   — a `ts check` block (labels with `measureText()`, a portrait, `redraw()` for a counter), the
   packing, padding and extrusion, the texture settings, ownership; a pointer to `docs/text.md`.
 - `docs/text.md`, the guide of the module `text/`: loading a font (fetch, `parse()`, the page via
-  `TextureFactory`), `writeText()` in a `ts check` block, the coordinates and the anchor of the base,
-  `layoutText()` for measuring, wrap, freeing, a sine scroller sketch (`Tint` per glyph, positions per
-  frame).
-- `README.md` of the package: a `text` entry in the module list, `DynamicAtlas` in the texture entry;
-  `docs/architecture.md`: the layer `text/` above `sprites/` and its section.
+  `TextureFactory`), `writeText()` in a `ts check` block, the coordinates and the anchor of the
+  base, `layoutText()` for measuring, wrap, freeing, a sine scroller sketch (`Tint` per glyph,
+  positions per frame).
+- `README.md` of the package: a `text` entry in the module list, `DynamicAtlas` in the texture
+  entry; `docs/architecture.md`: the layer `text/` above `sprites/` and its section.
 - CHANGELOG `[Unreleased]`, Added: `DynamicAtlas`; `BitmapFont`; `layoutText()` and `writeText()`.

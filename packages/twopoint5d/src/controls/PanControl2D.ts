@@ -772,10 +772,10 @@ export class PanControl2D extends InputControlBase {
    * styles target back the way it was found, give the cursor rule back to the stylesheet
    * and drop the pan that was collected but never delivered.
    *
-   * The `state` object, the `cursorStylesTarget` element and the `pointerTarget` were handed
-   * in and stay the caller's: the state keeps the values the last {@link update} wrote, the
-   * `cursorStylesTarget` keeps everything but the cursor class this control put on it, and
-   * the `pointerTarget` everything but the listener. The cursor rule stays
+   * The `state` object, the `cursorStylesTarget` element and the `pointerTarget` were
+   * handed in and stay the caller's: the state keeps the values the last {@link update}
+   * wrote, the `cursorStylesTarget` keeps everything but the cursor class this control
+   * put on it, and the `pointerTarget` everything but the listener. The cursor rule stays
    * in the stylesheet for as long as another control in the same root shows the same
    * cursor style.
    *

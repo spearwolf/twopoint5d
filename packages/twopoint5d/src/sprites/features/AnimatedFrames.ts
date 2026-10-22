@@ -4,11 +4,11 @@ import {texCoordsFromIndex} from '../node-utils.js';
 import {defineFeature} from '../SpriteFeature.js';
 import {evenFrameOf} from './evenFrame.js';
 
-// The frame of an animation with per-frame durations is found by a binary search over the end
-// times of its frames, unrolled to a fixed count of steps, one bit of the frame count each: a TSL `Loop` needs a function stack
-// whose callback three runs while it builds the shader, and the lookups made there would escape
-// `sample()`, which keeps every lookup node to hand it a new animsMap without a rebuild. 13 steps
-// cover the 8191 frames `FrameBasedAnimations#add()` allows such an animation.
+// The frame of an animation with per-frame durations is found by a binary search over the end times
+// of its frames, unrolled to a fixed count of steps, one bit of the frame count each: a TSL `Loop`
+// needs a function stack whose callback three runs while it builds the shader, and the lookups made
+// there would escape `sample()`, which keeps every lookup node to hand it a new animsMap without a
+// rebuild. 13 steps cover the 8191 frames `FrameBasedAnimations#add()` allows such an animation.
 const SEARCH_STEPS = 13;
 
 export interface AnimatedFramesApi {

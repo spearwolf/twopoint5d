@@ -20,13 +20,13 @@ own that is the binding spec and says where the build left this sketch:
 
 The guides — [`docs/sprites.md`](../sprites.md) and [`docs/text.md`](../text.md) — carry the
 rules. What the build and its lookbook demos left open is in §8; the row "later" of §6 is not
-scheduled. A review, not a build plan: it checks the open cards of the
-lists `sprites` and `texture-mapping` (and, since the sprites stand on them, `vertex-objects`)
-of the Trello board `twopoint5d` against the library as of v0.23.0, and proposes what to build
-next, what to close and what to leave out. Every proposal in §4 is a sketch; each got built from a
-proposal of its own, as [`sprite-features.md`](sprite-features.md) and its successors did. §1 to
-§5 keep the sketch as it was written, corrected only where the build proved it wrong about the
-code; the names and the details that hold are those of the phase proposals and the guides.
+scheduled. A review, not a build plan: it checks the open cards of the lists `sprites` and
+`texture-mapping` (and, since the sprites stand on them, `vertex-objects`) of the Trello board
+`twopoint5d` against the library as of v0.23.0, and proposes what to build next, what to close and
+what to leave out. Every proposal in §4 is a sketch; each got built from a proposal of its own, as
+[`sprite-features.md`](sprite-features.md) and its successors did. §1 to §5 keep the sketch as it
+was written, corrected only where the build proved it wrong about the code; the names and the
+details that hold are those of the phase proposals and the guides.
 
 The board was read on 2026-10-20. The code blocks are excerpts of APIs that did not exist when
 this was written, and are not checked.
@@ -286,9 +286,9 @@ And in a `TextureStore` catalog: an item with an `atlasUrl` whose JSON names Ase
 of configuration.
 
 **The other packers.** Rather than one parser per tool, `TextureStore` takes an atlas adapter:
-`(json, parentCoords) => {atlas, animations?}`, picked by `meta.app` or named in the item. TexturePacker,
-free-tex-packer (verify, §3.2) and Aseprite ship; rTexPacker and the rest are an adapter away,
-written by whoever needs them — a small, typed function an agent can write from the
+`(json, parentCoords) => {atlas, animations?}`, picked by `meta.app` or named in the item.
+TexturePacker, free-tex-packer (verify, §3.2) and Aseprite ship; rTexPacker and the rest are an
+adapter away, written by whoever needs them — a small, typed function an agent can write from the
 `TexturePackerJson` source.
 
 Verdict: the import is where a game's assets enter the library. If walking animations out of
@@ -324,11 +324,12 @@ monster.yaw = heading;           // where it faces; the camera picks the view
   `FrameTable#bakeDataTexture()` bakes — no new kind of resource, and no 341-frame limit. 4 bytes
   per sprite instead of 36.
 - Directional frames are an option of the same feature, `tableFrame({views: n})`
-  (`requires: ['yaw']` — as built `['instancePosition', 'yaw']`): it adds `round((angleOf(toCamera) − yaw) / (2π / n)) mod n` to the index
-  before the lookup. The index has to change before the table is read, and a frame stage (§4.7)
-  runs after the frame slot has answered resolved tex coords — so the choice of the view belongs
-  in the frame feature itself, as `flatPlacement()` folds its options into one placement. One
-  frozen feature per option set; `tableFrame()` without `views` is the plain lookup.
+  (`requires: ['yaw']` — as built `['instancePosition', 'yaw']`): it adds
+  `round((angleOf(toCamera) − yaw) / (2π / n)) mod n` to the index before the lookup. The index has
+  to change before the table is read, and a frame stage (§4.7) runs after the frame slot has
+  answered resolved tex coords — so the choice of the view belongs in the frame feature itself, as
+  `flatPlacement()` folds its options into one placement. One frozen feature per option set;
+  `tableFrame()` without `views` is the plain lookup.
 - Animated directional sprites: the animation writes `frameIndex` per frame on the CPU (a dynamic
   attribute), or `AnimatedFrames` learns a frame table as an alternative to the animsMap. The
   first is enough to start; the second waits for a demo that needs it.
@@ -360,10 +361,11 @@ build the same graph as before.
 stretched, and it cannot bend; a grid can:
 
 - `NineSlice` on `gridBase({columns: 3, rows: 3})`: `sliceInsets` (left, top, right, bottom, in
-  pixels of the frame, static) keep the border at its size and stretch the middle. As built it
-  has a band of its own, `LocalOrder.Slice` (175), before `QuadSize`'s `Scale`, requires
-  `QuadSize` and moves the inner grid lines of both the position and the uv. Insets out of Aseprite's `slices[].center` (§4.5). Trimmed frames are refused —
-  a nine-slice frame is packed untrimmed — and the error says so.
+  pixels of the frame, static) keep the border at its size and stretch the middle. As built it has a
+  band of its own, `LocalOrder.Slice` (175), before `QuadSize`'s `Scale`, requires `QuadSize` and
+  moves the inner grid lines of both the position and the uv. Insets out of Aseprite's
+  `slices[].center` (§4.5). Trimmed frames are refused — a nine-slice frame is packed untrimmed —
+  and the error says so.
 - `wave()` on a grid (§4.8) bends a flag, a banner, a water surface; on a quad it can only shear.
 
 ```ts
@@ -447,9 +449,9 @@ const hit = await picker.pick(camera, pointerNdc, [enemies, items]);
   sprite's own, and a last step *after* the color stages replaces the result with the id:
   `instanceIndex + 1` and an id of the mesh. Written there, no `Tint` or `Flash` can change it.
   Built like a pass, cached per mesh.
-- The target holds the id exactly: a float render target — WebGL 2 reads no integer target back
-  — no blending, no tone
-  mapping, no output color space transform — any of them would turn an id into another id.
+- The target holds the id exactly: a float render target — WebGL 2 reads no integer target back — no
+  blending, no tone mapping, no output color space transform — any of them would turn an id into
+  another id.
 - **Pixel-perfect for free**: the texels the alpha test drops are dropped here too, so a click
   into the transparent corner of a frame picks what lies behind it.
 - **Asynchronous**: `readRenderTargetPixelsAsync()`, one frame of latency. Fine for clicks;
@@ -652,7 +654,8 @@ and the free-tex-packer card once its fixture exists.
 1. **The playback in the animsMap** (§4.4): move `texelsPerFrame` into a uniform and use the free
    header component — a breaking change of a documented layout — or a second header texel?
    *Decided:* a second header texel per animation, `[playback, hasDurations, cycleDuration, -2]`;
-   the documented first texel stays — [`animation-playback-and-aseprite.md`](animation-playback-and-aseprite.md).
+   the documented first texel stays —
+   [`animation-playback-and-aseprite.md`](animation-playback-and-aseprite.md).
 2. **Shared uniforms** (§4.8): `shared: true` on a declaration, or a `Time` feature that
    `AnimatedFrames` requires? The first keeps every kind of today valid; the second is the cleaner
    model.

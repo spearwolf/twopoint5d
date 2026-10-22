@@ -51,8 +51,8 @@ export class StageRenderTargetPool {
    * Lends a target of exactly `width`×`height` pixels, of the texture `type` and the `samples`
    * asked for: a free one of that size; else the oldest free one of that type and those samples,
    * resized; else a new one. `width` and `height` are the pixels of the target itself, not a
-   * logical size. Every `acquire()` is paired with one {@link release} of
-   * the target it answered; code of your own may borrow from the same pool on the same terms.
+   * logical size. Every `acquire()` is paired with one {@link release} of the target it answered;
+   * code of your own may borrow from the same pool on the same terms.
    *
    * Throws an error naming the class and the state once {@link dispose} has run.
    */

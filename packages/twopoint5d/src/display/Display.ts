@@ -479,22 +479,22 @@ export interface Display extends EventizedObject {}
  *    the start and that of the pause — each an `AggregateError` itself when
  *    more than one listener of its event throws.
  * 3. `display.dispose()` — stops the loop, takes the size watch down, fires
- *    `OnDisplayDispose` and gives up {@link Display.renderer} right away. A listener that throws does
- *    not stop it; its error follows once the display is down — see
- *    {@link Display.dispose}. A container this display
- *    created inside a host element comes out of the DOM with the canvas in
- *    it; a canvas or a renderer handed to the constructor keeps its place in
- *    the document, and a canvas handed in gets back what the display wrote
- *    on it — its classes, attributes and inline styles. The renderer itself
- *    is released after `dispose()` has returned, once its init is through
- *    and the GPU has run the work submitted to it, or for two seconds at
- *    most, and goes on with a warning on the console after that; under
- *    WebGPU it also waits until the page has drawn two more animation
- *    frames, or for two more seconds while the visible page draws none; a
- *    hidden page holds the release until it is visible again. A canvas
- *    handed to the constructor carries a new display afterwards; one built on
- *    it while the release runs waits for it. Under WebGL only a display
- *    brings the context of that canvas back — see {@link Display.dispose}.
+ *    `OnDisplayDispose` and gives up {@link Display.renderer} right away. A
+ *    listener that throws does not stop it; its error follows once the display
+ *    is down — see {@link Display.dispose}. A container this display created
+ *    inside a host element comes out of the DOM with the canvas in it; a
+ *    canvas or a renderer handed to the constructor keeps its place in the
+ *    document, and a canvas handed in gets back what the display wrote on it —
+ *    its classes, attributes and inline styles. The renderer itself is
+ *    released after `dispose()` has returned, once its init is through and the
+ *    GPU has run the work submitted to it, or for two seconds at most, and
+ *    goes on with a warning on the console after that; under WebGPU it also
+ *    waits until the page has drawn two more animation frames, or for two more
+ *    seconds while the visible page draws none; a hidden page holds the
+ *    release until it is visible again. A canvas handed to the constructor
+ *    carries a new display afterwards; one built on it while the release runs
+ *    waits for it. Under WebGL only a display brings the context of that
+ *    canvas back — see {@link Display.dispose}.
  * 4. After `dispose()` the instance is unusable, and says so.
  *    {@link Display.renderer} and {@link Display.adaptiveResolution} answer
  *    `undefined`, and {@link Display.isDisposed} answers `true`. {@link Display.canvas},
@@ -517,19 +517,19 @@ export interface Display extends EventizedObject {}
  * The display measures its size when something reports a change: a
  * `ResizeObserver` on the size source (on its `device-pixel-content-box`,
  * where the browser knows that box), a media query on the current
- * `devicePixelRatio`, or the `resize` event of the window of the canvas.
- * Each of them only marks the size dirty, and the next frame measures. The
- * observer reports in the rendering update, after the animation frame
- * callbacks, so a change of the size source reaches {@link Display.width},
+ * `devicePixelRatio`, or the `resize` event of the window of the canvas. Each
+ * of them only marks the size dirty, and the next frame measures. The observer
+ * reports in the rendering update, after the animation frame callbacks, so a
+ * change of the size source reaches {@link Display.width},
  * {@link Display.height} and `OnDisplayResize` one frame after the frame it
  * happened in; a caller that needs it in that frame calls
- * {@link Display.resize} itself. A frame measures as well when it is the first rendered one, when
- * {@link Display.pixelZoom} or {@link Display.pixelRatio} — through a new
- * {@link Display.maxPixelRatio}, {@link Display.maxPixels} or
- * {@link Display.resolutionScale} — has changed, and when the size source has changed.
- * The `resize-to` attribute and {@link Display.resizeToElement} are read in
- * every frame for that — a read of an attribute and a field, no layout — and
- * the element a selector found is kept as described below.
+ * {@link Display.resize} itself. A frame measures as well when it is the first
+ * rendered one, when {@link Display.pixelZoom} or {@link Display.pixelRatio} —
+ * through a new {@link Display.maxPixelRatio}, {@link Display.maxPixels} or
+ * {@link Display.resolutionScale} — has changed, and when the size source has
+ * changed. The `resize-to` attribute and {@link Display.resizeToElement} are
+ * read in every frame for that — a read of an attribute and a field, no layout
+ * — and the element a selector found is kept as described below.
  *
  * The display polls — measures in every frame, spaced out by
  * {@link Display.resizePollIntervalMs} — with a
@@ -815,11 +815,11 @@ export class Display {
    * — width and height in CSS pixels — so the drawing buffer holds at most that many pixels,
    * whatever the size or the density of the screen and whatever the
    * {@link Display.resolutionScale}: the budget bounds the ratio after the scale as well. Where
-   * the budget is what bounds the ratio, the
-   * ratio is rounded down to a step of an eighth, at least an eighth, and may fall below `1`: the
-   * browser scales the canvas up then. {@link Display.maxPixelRatio} bounds the ratio as well;
-   * the lower bound wins. A budget of 3 million pixels leaves a phone at its ratio of 2 and draws
-   * a 4K screen at a ratio of 0.5, rounded down from 0.6.
+   * the budget is what bounds the ratio, the ratio is rounded down to a step of an eighth, at
+   * least an eighth, and may fall below `1`: the browser scales the canvas up then.
+   * {@link Display.maxPixelRatio} bounds the ratio as well; the lower bound wins. A budget of 3
+   * million pixels leaves a phone at its ratio of 2 and draws a 4K screen at a ratio of 0.5,
+   * rounded down from 0.6.
    *
    * While {@link Display.pixelZoom} is above `0`, the budget raises {@link Display.devicePixelZoom}
    * instead, to the smallest whole zoom at which the drawing buffer stays within it.
@@ -993,11 +993,10 @@ export class Display {
    * Optional size provider. If set, it is invoked with every measurement of
    * {@link Display.resize} — at the start of each frame, unless
    * {@link Display.resizePollIntervalMs} spaces the measurements out: no
-   * observer sees what it answers, so with it the display polls — and
-   * its returned `[width, height]` (in CSS pixels) overrides
-   * any element-based measurement. Use this for app-specific sizing logic
-   * (e.g. fitting to a UI panel, applying min/max constraints, locking
-   * aspect ratio).
+   * observer sees what it answers, so with it the display polls — and its
+   * returned `[width, height]` (in CSS pixels) overrides any element-based
+   * measurement. Use this for app-specific sizing logic (e.g. fitting to a
+   * UI panel, applying min/max constraints, locking aspect ratio).
    *
    * The `resize-to` attribute is still honored for its fullscreen-CSS
    * toggle, but the size it would compute is discarded in favor of the
@@ -1934,12 +1933,11 @@ export class Display {
   }
 
   /**
-   * Renders one frame: advances the chronometer, measures the size where
-   * the size watch has reported a change or the display polls — see the
-   * resize model of the class — to keep the canvas in sync with its
-   * environment, emits
-   * `OnDisplayResize` (always on the first frame, otherwise only when the
-   * size, pixelRatio or pixelZoom actually changed), and finally emits
+   * Renders one frame: advances the chronometer, measures the size where the
+   * size watch has reported a change or the display polls — see the resize
+   * model of the class — to keep the canvas in sync with its environment,
+   * emits `OnDisplayResize` (always on the first frame, otherwise only when
+   * the size, pixelRatio or pixelZoom actually changed), and finally emits
    * `OnDisplayRenderFrame` so listeners can draw.
    *
    * You normally do not call this yourself — the {@link FrameLoop} drives it

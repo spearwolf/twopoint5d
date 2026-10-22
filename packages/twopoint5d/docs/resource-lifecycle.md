@@ -26,8 +26,8 @@ them disposes what came back. [`TextureResource`](../src/texture/TextureResource
 the other case: it keeps the texture it built and disposes it itself when a successor
 takes its place, when its `imageUrl` is cleared and on `dispose()`, and a subscriber of
 `TextureStore` only borrows it. `TextureStore#acquireAsync()` holds the resource against
-`clearUnused()` and `evictMissing` until its `release()` comes; the texture stays the resource's
-all the same.
+`clearUnused()` and `evictMissing` until its `release()` comes; the texture stays the
+resource's all the same.
 
 **A take-over counts only where the receiving side promises it in its own TSDoc** — at
 the constructor parameter, at the field, at the method that accepts the resource. One

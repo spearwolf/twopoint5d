@@ -2,16 +2,17 @@
 
 Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Flip", "Anchor", "Nine-slice
 panels", the pipeline and feature tables and `mirror` under "Writing a feature", and
-[`docs/text.md`](../text.md) for `writeText()` under `Anchor`. Deviations of the build from the first
-draft of this spec, which the sections below now state as built:
+[`docs/text.md`](../text.md) for `writeText()` under `Anchor`. Deviations of the build from the
+first draft of this spec, which the sections below now state as built:
 
 - the slice lookup of `setAnchorFromPivot()` and `setSliceFrame()` lives in the internal module
   `features/frameSlices.ts`; its refusal of several slices builds its message in a function of its
-  own, since a closure over the lookup's locals made V8 allocate a context of 48 bytes on every call;
+  own, since a closure over the lookup's locals made V8 allocate a context of 48 bytes on every
+  call;
 - the insets of `setSliceFrame()` are typed `SliceInsets`, exported with `NineSlice`, and a refusal
   shows them as `[8, 8, 8]` with spaces (§5.4);
-- the material spec of §7.1 (a kind of `Flip` and `Anchor` reads `flip` through the frame's `mirror`)
-  lives in `features/Anchor.spec.ts`;
+- the material spec of §7.1 (a kind of `Flip` and `Anchor` reads `flip` through the frame's
+  `mirror`) lives in `features/Anchor.spec.ts`;
 - the test-only flip and nine-slice of `sprites-pipeline-stages.test.js` stay as the proofs of the
   slots; their helpers `cellColors`, `mirroredX`, `mirroredY` and `expectSameCells` moved to
   `test/helpers/fixtures.js`.
@@ -105,8 +106,8 @@ mirror    = |frame.mirror − f|   (f where the frame carries no mirror)
 - **Every frame.** The lookup reads `(s + uv.x · u, t + uv.y · v)` before the diagonal swap, so the
   drawn x is the `s` axis for an upright and a turned atlas frame alike (§2.2 of the phase C
   proposal), and the same stage mirrors every frame `AtlasFrame` writes and every frame
-  `AnimatedFrames` picks, in every playback mode — it runs after the frame is picked. Without a frame
-  feature it mirrors the whole texture, the defaults `(0, 0, 1, 1)`.
+  `AnimatedFrames` picks, in every playback mode — it runs after the frame is picked. Without a
+  frame feature it mirrors the whole texture, the defaults `(0, 0, 1, 1)`.
 - **Trim.** The margins swap left with right (top with bottom), so the trim shift — which reads the
   stage's result — puts a trimmed frame where the flipped untrimmed sprite has it: a trimmed frame
   stays on its foot. A frame without `trim` gets the margins of zeros, which shift nothing.
@@ -175,29 +176,29 @@ position + (0.5 − a.x,  a.y − 0.5,  0)
 
 ### 4.3 The pivot of an Aseprite slice
 
-`setAnchorFromPivot(frame, sliceName?)` reads `frame.data.slices` — the slices in force at the frame,
-which `AsepriteJson.parse()` writes, each `{bounds, center?, pivot?}` in pixels of the untrimmed
-frame, the pivot relative to `bounds`:
+`setAnchorFromPivot(frame, sliceName?)` reads `frame.data.slices` — the slices in force at the
+frame, which `AsepriteJson.parse()` writes, each `{bounds, center?, pivot?}` in pixels of the
+untrimmed frame, the pivot relative to `bounds`:
 
 ```
 anchorX = (bounds.x + pivot.x) / W
 anchorY = (bounds.y + pivot.y + 1) / H
 ```
 
-with `W × H` the untrimmed frame — the `sourceSize` of the frame data, else the drawn measures of the
-frame's `coords` (`height × width` under `FLIP_DIAGONAL`).
+with `W × H` the untrimmed frame — the `sourceSize` of the frame data, else the drawn measures of
+the frame's `coords` (`height × width` under `FLIP_DIAGONAL`).
 
 - **Which point of the pixel.** Aseprite marks the pivot as a pixel. The anchor is the **bottom left
-  corner** of that pixel: a figure whose pivot marks the pixel under its feet stands on its position,
-  and on an even width the middle is the left edge of pixel `W / 2`. The fighter of the lookbook's
-  platformer — `pivot {x: 32, y: 63}` in a 64 × 64 canvas — gets `(0.5, 1)`, its contract in
-  `apps/lookbook/assets-src/README.md`.
+  corner** of that pixel: a figure whose pivot marks the pixel under its feet stands on its
+  position, and on an even width the middle is the left edge of pixel `W / 2`. The fighter of the
+  lookbook's platformer — `pivot {x: 32, y: 63}` in a 64 × 64 canvas — gets `(0.5, 1)`, its contract
+  in `apps/lookbook/assets-src/README.md`.
 - **Which slice.** `sliceName` names it — an own key of `slices`, so a member of `Object.prototype`
   such as `"constructor"` is no slice; without one, the one slice of the frame that has a pivot.
 - **Animations.** `AnimatedFrames` picks the frame on the gpu, so a sprite takes the pivot of one
-  frame of its animation — `setAnchorFromPivot(atlas.frame('fighter 0.aseprite'))` when the animation
-  starts. A pivot that stays where the ground is across the frames — the rule of an Aseprite canvas,
-  and of the fighter's sheet — is all a per-sprite anchor can follow.
+  frame of its animation — `setAnchorFromPivot(atlas.frame('fighter 0.aseprite'))` when the
+  animation starts. A pivot that stays where the ground is across the frames — the rule of an
+  Aseprite canvas, and of the fighter's sheet — is all a per-sprite anchor can follow.
 - Allocation-free on its way through: it searches the slices without building an array, and writes
   through a tuple declared once.
 - **Refusals** (`Error`, the sprite left as it was):
@@ -216,11 +217,12 @@ frame's `coords` (`height × width` under `FLIP_DIAGONAL`).
 ### 4.4 `writeText()`
 
 `writeText()` places each glyph by the extents of the base (`dynamic-atlas-and-bitmap-text.md`
-§5.3) and writes no anchor. A new sprite starts at the anchor `(0.5, 0.5)`, which moves nothing, so a
-kind with `Anchor` takes its text exactly where a kind without it does. An anchor set on a glyph
-afterwards moves the glyph off its box — to turn a glyph about its foot and keep it in place, move it
-along: `glyph.setAnchor(0.5, 1)` and `y −= height / 2`, in general `x += (anchorX − 0.5) · width`,
-`y −= (anchorY − 0.5) · height`. `docs/text.md` says so in one paragraph; `writeText()` is unchanged.
+§5.3) and writes no anchor. A new sprite starts at the anchor `(0.5, 0.5)`, which moves nothing, so
+a kind with `Anchor` takes its text exactly where a kind without it does. An anchor set on a glyph
+afterwards moves the glyph off its box — to turn a glyph about its foot and keep it in place, move
+it along: `glyph.setAnchor(0.5, 1)` and `y −= height / 2`, in general
+`x += (anchorX − 0.5) · width`, `y −= (anchorY − 0.5) · height`. `docs/text.md` says so in one
+paragraph; `writeText()` is unchanged.
 
 ## 5. `NineSlice`
 
@@ -260,10 +262,10 @@ export const NineSlice: SpriteFeature<NineSliceApi>; // name 'nineSlice', requir
 
 - Attributes `sliceInsets: {components: ['insetLeft', 'insetTop', 'insetRight', 'insetBottom']}` and
   `sliceScale: {size: 1}`, both static; `initialize()` writes `0, 0, 0, 0` and `1`.
-- **`usageAliases: {texCoords: ['sliceInsets']}`.** `setSliceFrame()` writes the insets with the frame,
-  so they take the frame's way up: `attributeUsage: {dynamic: ['texCoords']}` makes them dynamic with
-  it, and under the default usage they share the one static buffer, which `touchVO(sprite,
-  'texCoords')` marks. The doc comment of `setSliceFrame()` and the guide name
+- **`usageAliases: {texCoords: ['sliceInsets']}`.** `setSliceFrame()` writes the insets with the
+  frame, so they take the frame's way up: `attributeUsage: {dynamic: ['texCoords']}` makes them
+  dynamic with it, and under the default usage they share the one static buffer, which
+  `touchVO(sprite, 'texCoords')` marks. The doc comment of `setSliceFrame()` and the guide name
   `touchVO(sprite, 'texCoords', 'sliceInsets')` for a geometry of other usages. `defineSprite()`
   refused a second feature's word `texCoords`; the merge of `usageAliases` now opens a word named
   after an attribute to every feature, when the feature of that attribute declares the word: each
@@ -297,8 +299,9 @@ left = p.x − uv.x                       (the unit quad's left edge, uv the bas
 x' = p.x + on(1)·(left + fL/d − p.x) + on(2)·(left + 1 − fR/d − p.x)
 ```
 
-and down the rows with `top = p.y + uv.y`, y counted upwards (`y' = … top − fT/d' … top − 1 + fB/d'`).
-After `QuadSize` the border is `inset · sliceScale` units wide, whatever the size.
+and down the rows with `top = p.y + uv.y`, y counted upwards
+(`y' = … top − fT/d' … top − 1 + fB/d'`). After `QuadSize` the border is `inset · sliceScale` units
+wide, whatever the size.
 
 **Uv — a uv stage at `UvOrder.Slice`.** The frame in texels,
 `px = max(|texCoords.zw| · (flipDiagonal > 0.5 ? size.yx : size.xy), 1)` with
@@ -325,29 +328,30 @@ and down the rows. Affine within every cell, so the per-vertex varying of `Textu
 - **`QuadSize`, `Anchor`, `Flip`.** `QuadSize` scales afterwards; `Anchor` moves every vertex before
   it, which `left = p.x − uv.x` absorbs — a panel anchored at `(0, 0)` is placed by its top left
   corner; under `Flip` the left border is drawn from the frame's right inset (§2).
-- **The base measure.** `left = p.x − uv.x` holds for the unit quad of the default `baseArgs` and any
-  offset of it, as for the trim shift; a `halfWidth` other than 0.5 breaks it.
+- **The base measure.** `left = p.x − uv.x` holds for the unit quad of the default `baseArgs` and
+  any offset of it, as for the trim shift; a `halfWidth` other than 0.5 breaks it.
 - **Trimmed frames** cannot be refused in the shader. A trimmed frame written by `setFrame()` is
   drawn with its border cut where the packer cut it; `setSliceFrame()` refuses it (§5.4).
 
 ### 5.4 `setSliceFrame(frame, slice?)`
 
-1. **Untrimmed.** A frame whose trim margins (`frameTrimMargins(frame.data)`) are not all 0 is refused:
+1. **Untrimmed.** A frame whose trim margins (`frameTrimMargins(frame.data)`) are not all 0 is
+   refused:
    `setSliceFrame: the frame is trimmed — a nine-slice frame is packed untrimmed, or the packer cuts into its border; export it without trimming (TexturePacker: trim mode None; Aseprite: without --trim)`
 2. **The insets.** `slice` as four numbers — the insets of the frame, from a file of one's own such
    as the lookbook's `panels.insets.json` — each a finite number of 0 or more, else a `RangeError`:
    `setSliceFrame: the insets are [8, 8, 8] — four numbers of 0 or more, [left, top, right, bottom] in pixels of the frame`.
    `slice` as a name, or absent: the Aseprite slice of that name, or the one slice of the frame that
    has a `center`; refused with the messages of §4.3 in its own words
-   (`setSliceFrame: the slice "x" has no center — turn on 9-Slices in Aseprite's slice properties, or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])`, and alike).
-   The insets out of a slice: `left = center.x`, `top = center.y`,
+   (`setSliceFrame: the slice "x" has no center — turn on 9-Slices in Aseprite's slice properties, or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])`,
+   and alike). The insets out of a slice: `left = center.x`, `top = center.y`,
    `right = bounds.w − center.x − center.w`, `bottom = bounds.h − center.y − center.h`.
-3. **The frame.** Through `AtlasFrame` (`setTexCoords()`, `texFlipDiagonal`, `setTexTrim(0, 0, 0, 0)`):
-   for insets handed in, the whole frame; for a slice, the part `bounds` covers —
-   `(s + u · bx / W, t + v · by / H, u · bw / W, v · bh / H)` with `W × H` the frame (§4.3), right
-   for a turned frame as the drawn x is the `s` axis. A UI kit drawn on one Aseprite canvas — one
-   frame, a slice per panel — gives every panel by its name.
-   A sprite without `setTexCoords()` — a kind of `AnimatedFrames` — is refused:
+3. **The frame.** Through `AtlasFrame` (`setTexCoords()`, `texFlipDiagonal`,
+   `setTexTrim(0, 0, 0, 0)`): for insets handed in, the whole frame; for a slice, the part `bounds`
+   covers — `(s + u · bx / W, t + v · by / H, u · bw / W, v · bh / H)` with `W × H` the frame
+   (§4.3), right for a turned frame as the drawn x is the `s` axis. A UI kit drawn on one Aseprite
+   canvas — one frame, a slice per panel — gives every panel by its name. A sprite without
+   `setTexCoords()` — a kind of `AnimatedFrames` — is refused:
    `setSliceFrame: the sprite has no setTexCoords() — setSliceFrame() writes the frame through AtlasFrame; build the kind with AtlasFrame, or set the insets with setSliceInsets()`.
 4. Every check runs before the first write; allocation-free on its way through.
 
@@ -371,9 +375,9 @@ border.
 ### 7.1 Vitest (`src/sprites/features/`)
 
 - `Flip.spec.ts`: declaration (attribute, band), a new sprite at `0, 0` whatever its slot held,
-  `setFlip()`; the stage worked out by `evaluateNode()` on uniforms for every combination of `flipX`,
-  `flipY`, an upright and a turned frame, trim present and absent, a prior `mirror`, a flag of 0.7;
-  the stage reads no position.
+  `setFlip()`; the stage worked out by `evaluateNode()` on uniforms for every combination of
+  `flipX`, `flipY`, an upright and a turned frame, trim present and absent, a prior `mirror`, a flag
+  of 0.7; the stage reads no position.
 - `Anchor.spec.ts`: declaration, default `(0.5, 0.5)`, the shift for `(0, 0)`, `(0.5, 1)`,
   `(1, 0.25)`, mirrored and not; `setAnchorFromPivot()` — the fighter's `(0.5, 1)`, a slice with
   bounds off the origin, a named slice, the one slice, `sourceSize` absent (coords, and turned
@@ -436,9 +440,9 @@ the field list of "Writing a feature". `docs/text.md`: the anchor paragraph of �
    position needs them in units of the mesh, and the camera decides how many a pixel takes. The
    phase C proof drew one unit per pixel.
 6. **`LocalOrder.Slice` is 175** (§5.3); the phase C proof ran at `Scale − 20`.
-7. **Border collapse shrinks in proportion** (§5.3), in the position and in the uv: no triangle turns
-   over, no inner uv line crosses another.
-8. **`setSliceFrame()` takes a slice name or the insets** (§5.4): the one call that refuses a trimmed
-   frame serves both the Aseprite UI kit and a packer with insets of its own.
-9. **`NineSlice` requires `quadSize`** and refuses a kind without `colorMap` in `checkKind` (§5.2); it
-   composes with `QuadSize` rather than taking its band, as phase C §9.7 decided.
+7. **Border collapse shrinks in proportion** (§5.3), in the position and in the uv: no triangle
+   turns over, no inner uv line crosses another.
+8. **`setSliceFrame()` takes a slice name or the insets** (§5.4): the one call that refuses a
+   trimmed frame serves both the Aseprite UI kit and a packer with insets of its own.
+9. **`NineSlice` requires `quadSize`** and refuses a kind without `colorMap` in `checkKind` (§5.2);
+   it composes with `QuadSize` rather than taking its band, as phase C §9.7 decided.

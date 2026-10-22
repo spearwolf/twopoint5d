@@ -1,11 +1,12 @@
 # Proposal: growing capacity — sprites that never run out of slots
 
 Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "FeatureSprites" (growing
-capacity) and "Performance", and [`src/vertex-objects/README.md`](../../src/vertex-objects/README.md),
-"Growing a pool". Deviations:
+capacity) and "Performance", and
+[`src/vertex-objects/README.md`](../../src/vertex-objects/README.md), "Growing a pool". Deviations:
 
 - a growth that throws throws from `FeatureSpritesGeometry#grown()` before any geometry exists — the
-  constructor allocates the buffers or fails —, so there is no half-built geometry to dispose (§2.6);
+  constructor allocates the buffers or fails —, so there is no half-built geometry to dispose
+  (§2.6);
 - `VertexObjectPool#adoptVOs()` hands the `onCreateVO` hook of the source to a pool without one
   itself, so `FeatureSpritesGeometry#grown()` copies nothing by hand (§2, step 2; §3).
 
@@ -62,9 +63,10 @@ built with `grow: true`:
    the kind's, keeps the usage of every attribute and the prototype of its handles —, and the base
    pool's buffers copied over from the old base, so `baseArgs` come along without being kept. The
    new geometry takes the `name` of the old one.
-2. **Every sprite moves over** with `newPool.adoptVOs(oldPool)` (§3): the used slots of every buffer,
-   in their order — a sorted pool stays sorted —, and every handle, which now reads and writes the
-   new buffer and keeps its slot. The new pool takes the `onCreateVO` hook of the old one.
+2. **Every sprite moves over** with `newPool.adoptVOs(oldPool)` (§3): the used slots of every
+   buffer, in their order — a sorted pool stays sorted —, and every handle, which now reads and
+   writes the new buffer and keeps its slot. The new pool takes the `onCreateVO` hook of the old
+   one.
 3. **The meshes follow**: `this.geometry` and the geometry of every pass mesh become the new one.
    The materials, their uniforms, textures and bindings are untouched — they never held the
    geometry. three's render objects see a geometry of another id on the next frame and collect its
@@ -84,8 +86,8 @@ builds on its first sort, as every pool does. A sort, a `freeSprite()` and an
 (76 B a sprite of `TexturedSpriteKind`), new gpu buffers for every attribute, and the upload of
 the used slots of all of them on the next frame — the static ones included, which otherwise go up
 only when touched — and three collects the attributes of every render object of the mesh and its
-passes anew on the next frame. A mesh that grows from
-16 to 10 000 sprites grows ten times, each costing about as much as the sprites it held.
+passes anew on the next frame. A mesh that grows from 16 to 10 000 sprites grows ten times, each
+costing about as much as the sprites it held.
 
 ### 2.3 Handles and references
 
@@ -114,10 +116,10 @@ asked to grow, and it did; the note is there to name the price, not a mistake:
 > `FeatureSprites "<name>": the pool was full at <capacity> sprites and grew to <2 · capacity> — a frame hitch: a new geometry, every sprite copied over and every attribute uploaded anew. Where this many sprites are the rule, start with new FeatureSprites(kind, {capacity: <2 · capacity>, grow: true}). This note is shown once per FeatureSprites.`
 
 **Once per mesh, not "in development".** The library has no notion of a build mode, and the
-convention a bundler offers (`process.env.NODE_ENV`) is no binding in a plain ES module in a browser;
-a check that guards against its absence still logs in every page built without a bundler. Once per
-mesh is quiet enough for production and loud enough for the developer, and it is the rule phase A
-set for the full pool.
+convention a bundler offers (`process.env.NODE_ENV`) is no binding in a plain ES module in a
+browser; a check that guards against its absence still logs in every page built without a bundler.
+Once per mesh is quiet enough for production and loud enough for the developer, and it is the rule
+phase A set for the full pool.
 
 Under `grow: true` the warning of a full pool (phase A) is not shown: the pool is never full.
 

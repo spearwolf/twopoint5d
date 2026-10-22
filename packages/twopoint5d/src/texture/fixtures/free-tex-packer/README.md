@@ -1,8 +1,8 @@
 # free-tex-packer fixtures
 
 A real export of [free-tex-packer](https://github.com/odrick/free-tex-packer-core), for the specs
-that hold `TexturePackerJson` to it (`../../TexturePackerJson.freeTexPacker.spec.ts`) and the browser
-test `packages/twopoint5d-testing/test/sprites-free-tex-packer.test.js`.
+that hold `TexturePackerJson` to it (`../../TexturePackerJson.freeTexPacker.spec.ts`) and the
+browser test `packages/twopoint5d-testing/test/sprites-free-tex-packer.test.js`.
 
 - `sheet.png` — the sheet, 24 × 7 texels
 - `sheet-hash.json` — its "JsonHash" export, byte for byte as the packer wrote it

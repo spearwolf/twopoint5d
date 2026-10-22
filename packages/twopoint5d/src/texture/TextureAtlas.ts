@@ -110,8 +110,8 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
   }
 
   /**
-   * frame names that are symbols are not found here,
-   * but if no argument is given, all names are returned (including symbols)
+   * frame names that are symbols are not found here, but if no argument is given, all names are
+   * returned (including symbols)
    *
    * A `RegExp` is tested against every name from the start of that name, whatever its flags —
    * with `y` the match has to begin there. The `RegExp` handed in stays as it was, its

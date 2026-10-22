@@ -179,8 +179,8 @@ export class TextureCoords {
   }
 
   /**
-   * The four values `s`, `t`, `u` and `v`, computed in one walk up the chain of parents where each getter walks it on its own.
-   * Without a `target` the values come as a new tuple; with one they are written to its indices 0 to 3 and
+   * The four values `s`, `t`, `u` and `v`, computed in one walk up the chain of parents where each getter walks it on
+   * its own. Without a `target` the values come as a new tuple; with one they are written to its indices 0 to 3 and
    * `target` is answered, without allocating.
    *
    * @throws {RangeError} if `target` holds fewer than four values; it stays as it was.

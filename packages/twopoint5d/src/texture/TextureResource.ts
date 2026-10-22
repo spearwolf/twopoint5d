@@ -415,10 +415,9 @@ export abstract class TextureResource {
 
   /**
    * How many `TextureStore#on()` subscriptions hold this resource, a pending
-   * `TextureStore#getAsync()` among them, and every lease of `TextureStore#acquireAsync()` that
-   * is not released yet. `TextureStore#clearUnused()` and
-   * `TextureStore#parse()` with `{evictMissing: true}` dispose a resource only while this
-   * is 0.
+   * `TextureStore#getAsync()` among them, and every lease of `TextureStore#acquireAsync()` that is
+   * not released yet. `TextureStore#clearUnused()` and `TextureStore#parse()` with
+   * `{evictMissing: true}` dispose a resource only while this is 0.
    *
    * Read-only: the store that holds the resource keeps the count.
    */

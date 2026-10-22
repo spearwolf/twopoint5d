@@ -194,12 +194,12 @@ waiting run of the same ref, except on `main`, where the group is the commit: ev
 there gets its own run, which nothing cancels, because `deploy.yml` follows each
 successful one.
 
-The step `Audit dependencies` follows the install in the job `ci:checks` and runs `pnpm
-audit --audit-level=high`. It reports high and critical advisories without failing the run:
-the published package declares peer dependencies only (`lintPkg` holds that), so
-whatever the audit finds sits in tooling, and Dependabot proposes the update that fixes
-it (§5). Dependabot also keeps the commit SHAs of the actions, and the version comment
-next to each, current.
+The step `Audit dependencies` follows the install in the job `ci:checks` and runs
+`pnpm audit --audit-level=high`. It reports high and critical advisories without failing
+the run: the published package declares peer dependencies only (`lintPkg` holds that), so
+whatever the audit finds sits in tooling, and Dependabot proposes the update that fixes it
+(§5). Dependabot also keeps the commit SHAs of the actions, and the version comment next
+to each, current.
 
 The benchmarks run in a workflow of their own, `.github/workflows/bench.yml`: nightly on
 `main` and by hand (`workflow_dispatch`) on any branch. It installs the workspace root and
@@ -253,12 +253,11 @@ to every later step. Each job keeps a cache of its own — `actions/cache` resto
 directory under `nx-<os>-<job>-<hash of pnpm-lock.yaml>-<commit sha>`, falling back to the
 newest entry of the same job and lockfile and then to the newest entry of the job at all.
 Four jobs of one commit would otherwise race for one key, and only the first save would
-count. The server touches every entry it
-serves. After a green run the job deletes each entry older than the server start — what
-this run neither used nor wrote — and saves the directory under the commit's key, so
-each saved state holds exactly the results of one green job of one commit and does not
-grow from run to run. A red job saves nothing, and its next run restores the last green
-state.
+count. The server touches every entry it serves. After a green run the job deletes each
+entry older than the server start — what this run neither used nor wrote — and saves the
+directory under the commit's key, so each saved state holds exactly the results of one
+green job of one commit and does not grow from run to run. A red job saves nothing, and
+its next run restores the last green state.
 
 The server refuses a hash of more than 128 characters with 400 and an entry of more than
 512 MiB (`MAX_ENTRY_BYTES`, judged by the declared `Content-Length` before any body is
@@ -287,8 +286,8 @@ and not in the form semver normalizes it to — but only if it is a version rang
 anything else, a range of nothing but whitespace included, leaves the specifier standing).
 A `package.json` there that cannot be read, or whose version semver cannot read, leaves
 the specifier standing as well. If a `catalog:`, `workspace:`, `link:`, `file:` or
-`portal:` specifier is left in the manifest afterwards, the build fails — npm installs none
-of these protocols, and the last three point at a path on the machine that builds the
+`portal:` specifier is left in the manifest afterwards, the build fails — npm installs
+none of these protocols, and the last three point at a path on the machine that builds the
 package, which the consumer does not have. A value that is no string, a `null` or a
 number, stays standing with a warning, and the build fails on it the same way, with a
 message that names the section, the name and the value. The script writes

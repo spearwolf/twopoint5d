@@ -1,10 +1,11 @@
 # Proposal: animation playback, per-frame durations and Aseprite sheets
 
 Status: **implemented** — see [`docs/sprites.md`](../sprites.md), "Animated frames" and "Aseprite
-sheets", and the fixtures in [`src/texture/fixtures/aseprite/`](../../src/texture/fixtures/aseprite/README.md). Phase B of
-[`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.4 and §4.5, with decision 1
-of its §7 taken: a **second header texel** per animation. Deviations of the build from the first
-draft of this spec, which the sections below now state as built:
+sheets", and the fixtures in
+[`src/texture/fixtures/aseprite/`](../../src/texture/fixtures/aseprite/README.md). Phase B of
+[`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), §4.4 and §4.5, with decision 1 of
+its §7 taken: a **second header texel** per animation. Deviations of the build from the first draft
+of this spec, which the sections below now state as built:
 
 - the frame of an animation with durations is found by a search that builds the count bit by bit
   (§4.2), not by a search over `[low, high)`: a step of the latter reads its two bounds three times
@@ -448,12 +449,13 @@ stays the caller's. The resource publishes a new `FrameBasedAnimations` per run 
 
 ## 8. Fixtures
 
-`packages/twopoint5d/src/texture/fixtures/aseprite/`: `fighter-hash.json` and `fighter-array.json`, written by
-`generate.mjs` in the same folder to Aseprite's documented export format and in its own formatting
-(Aseprite is not installed here; the README says so and how to write them again): 16 frames of 16 × 16 on a 64 × 64 sheet, the tags `idle` (pingpong),
-`walk` (forward), `kick` (forward, `"repeat": "1"`, 80/80/240 ms), `block` (reverse), `spin`
-(pingpong_reverse), the slices `hitbox` (two keys, `pivot`) and `panel` (`center`); the array
-sheet trimmed. `biome.jsonc` leaves the folder out: the files keep Aseprite's own formatting.
+`packages/twopoint5d/src/texture/fixtures/aseprite/`: `fighter-hash.json` and `fighter-array.json`,
+written by `generate.mjs` in the same folder to Aseprite's documented export format and in its own
+formatting (Aseprite is not installed here; the README says so and how to write them again): 16
+frames of 16 × 16 on a 64 × 64 sheet, the tags `idle` (pingpong), `walk` (forward), `kick` (forward,
+`"repeat": "1"`, 80/80/240 ms), `block` (reverse), `spin` (pingpong_reverse), the slices `hitbox`
+(two keys, `pivot`) and `panel` (`center`); the array sheet trimmed. `biome.jsonc` leaves the folder
+out: the files keep Aseprite's own formatting.
 
 ## 9. Tests
 

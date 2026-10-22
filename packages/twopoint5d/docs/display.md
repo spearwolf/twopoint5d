@@ -136,7 +136,8 @@ It is what `adaptiveResolution` moves, and it may be set by hand — a quality s
 not apply under a `pixelZoom`.
 
 Above `1` it is supersampling: the display draws beyond `maxPixelRatio` — a scale of 1.5 shades 2.25
-times the pixels — but within `maxPixels`. A `maxScale` above `1` lets `adaptiveResolution` go there.
+times the pixels — but within `maxPixels`. A `maxScale` above `1` lets `adaptiveResolution` go
+there.
 
 ## The pixel ratio, put together
 
@@ -149,11 +150,11 @@ min(min(devicePixelRatio, maxPixelRatio, sqrt(maxPixels / cssArea)) × resolutio
 device pixels per CSS pixel, each bound only where it is set. The budget comes in twice: before the
 scale and after it, so a scale above `1` draws beyond `maxPixelRatio` but never beyond `maxPixels`.
 For a scale up to `1` the second bound changes nothing. Where the budget or the scale has
-made the ratio, it is rounded **down to a step of an eighth**, at least an eighth: three builds every
-render target of a pipeline anew with every new size, and in steps the sizes change less often and
-come back to the same values. Where neither has, the ratio stays exact — `devicePixelRatio` itself,
-or `maxPixelRatio` — so a canvas at the ratio of its screen maps one pixel of the buffer onto one
-device pixel. `Display.MaxResolution` (8192) bounds the buffer per axis in the end.
+made the ratio, it is rounded **down to a step of an eighth**, at least an eighth: three builds
+every render target of a pipeline anew with every new size, and in steps the sizes change less often
+and come back to the same values. Where neither has, the ratio stays exact — `devicePixelRatio`
+itself, or `maxPixelRatio` — so a canvas at the ratio of its screen maps one pixel of the buffer
+onto one device pixel. `Display.MaxResolution` (8192) bounds the buffer per axis in the end.
 
 A change of any of these knobs takes effect with the next measurement — at the start of the next
 frame, or right away with a `resize()` of your own — and emits `OnDisplayResize`. `width` and

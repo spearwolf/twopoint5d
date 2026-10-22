@@ -115,10 +115,10 @@ explicit instruction.
   an animation — and each argument of a call a message writes out
   (`getAsync("hero", ["atlas", "texture"])`) go through it as well; a name typed as a
   string, one that tells instances apart or one a look-up did not find, is quoted by hand
-  (`"${name}"`), which writes the same. A three.js object refused for its class is named by
-  its `type`. A failure of `expectDefined()` reports a
-  broken invariant of the library, not a refusal, and names no subject; the refusals a
-  feature's `checkKind` throws get theirs from `defineSprite()`.
+  (`"${name}"`), which writes the same. A three.js object refused for its class is named
+  by its `type`. A failure of `expectDefined()` reports a broken invariant of the library,
+  not a refusal, and names no subject; the refusals a feature's `checkKind` throws get
+  theirs from `defineSprite()`.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. They are peer dependencies of

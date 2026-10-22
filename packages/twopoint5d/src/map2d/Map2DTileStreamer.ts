@@ -7,15 +7,16 @@ import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisi
 /**
  * `Map2DTileStreamer` is a tile streaming manager for 2D maps that loads and discards tiles based on their visibility.
  *
- * `Map2DTileStreamer` divides a 2D world into an equal-sized grid of tiles (`tileWidth` + `tileHeight` and `xOffset` + `yOffset`)
- * and only loads the visible tiles. The grid is corner-anchored: a tile `(c, r)` covers
+ * `Map2DTileStreamer` divides a 2D world into an equal-sized grid of tiles (`tileWidth` +
+ * `tileHeight` and `xOffset` + `yOffset`) and only loads the visible tiles. The grid is
+ * corner-anchored: a tile `(c, r)` covers
  * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X and the same with `r`,
  * `tileHeight` and `yOffset` along the rows — it is not centered on its coordinates.
  *
  * Visibility is checked based on the _view center position_ (`centerX` + `centerY`) and a _visibilitor_
- * (see `IMap2DVisibilitor`). The view center means what the visibilitor makes of it — see {@link centerX}: under
- * `CameraBasedVisibility` with its default `lookAtCenter = false` it shifts the map under the
- * camera and stays `0` for a world-fixed map under a moving camera.
+ * (see `IMap2DVisibilitor`). The view center means what the visibilitor makes of it — see
+ * {@link centerX}: under `CameraBasedVisibility` with its default `lookAtCenter = false` it shifts
+ * the map under the camera and stays `0` for a world-fixed map under a moving camera.
  *
  * Tile rendering is delegated to a _renderer_ (see `IMap2DTileRenderer`).
  */
