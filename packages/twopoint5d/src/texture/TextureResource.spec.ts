@@ -2584,7 +2584,7 @@ describe('TextureResource', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0]).toMatchObject({source: 'frameBasedAnimations', id: 'tiles', animation: 'walk'});
       expect(errors[0]!.error.message).toBe(
-        '[TextureResource] animation "walk" of resource "tiles" carries tileIds of 3 — tileIds is an array of tile ids',
+        'TextureResource: animation "walk" of resource "tiles" carries tileIds of 3 — tileIds is an array of tile ids',
       );
       expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
       expect(resource.frameBasedAnimations!.hasAnimation('run')).toBe(true);
@@ -2761,7 +2761,7 @@ describe('TextureResource', () => {
       });
 
       expect(resource.atlas).toBeUndefined();
-      expect(errors.map(({error}) => error.message)).toEqual([`[TextureResource] ${message}`]);
+      expect(errors.map(({error}) => error.message)).toEqual([`TextureResource: ${message}`]);
       resource.dispose();
     });
 

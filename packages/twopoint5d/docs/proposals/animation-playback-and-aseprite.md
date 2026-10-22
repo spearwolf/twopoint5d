@@ -391,7 +391,7 @@ any adapter runs; a packer with another envelope is converted to it first.
   are refused with a `TypeError` naming the fix.
 - A catalog item names one with `atlasAdapter: 'aseprite'`. A name the store does not know
   makes the item build no resource, reported as an `error` with `source: 'parse'` and the id
-  (`[TextureStore] item "fighter" names the atlasAdapter "asprite", which this store does not
+  (`TextureStore: item "fighter" names the atlasAdapter "asprite", which this store does not
   know — known: texturepacker, aseprite; register it with registerAtlasAdapter() before parse()`);
   `atlasAdapter` that is no string is a field of the wrong type; on an item without `atlasUrl` it
   is reported and ignored (`… atlasAdapter only reads an atlas — left out`).
@@ -407,7 +407,7 @@ any adapter runs; a packer with another envelope is converted to it first.
   adapter an item names, `undefined` otherwise); on another shape the setter throws the
   `TypeError` of `wrongShapeError()`. A change parses the json again.
 - The parse effect calls the adapter where it called `TexturePackerJson.parse()`. A throw, or an
-  answer without a `TextureAtlas` as `atlas` (`[TextureResource] the atlas adapter of resource
+  answer without a `TextureAtlas` as `atlas` (`TextureResource: the atlas adapter of resource
   "x" answered no atlas — an adapter answers {atlas, animations?}`), takes atlas and animations
   back and is reported as today (`source: 'texture'`, step `atlasParse`). An `animations` that is
   no `FrameBasedAnimations` is refused the same way.

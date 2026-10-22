@@ -764,7 +764,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (this.#disposed) return;
 
     if (isWebGLRenderer(renderer)) {
-      throw new TypeError('The WebGLRenderer renderer is not supported anymore');
+      throw new TypeError('StageRenderer#renderTo(): a WebGLRenderer is not supported — render with a WebGPURenderer');
     }
 
     if (this.outputRenderTarget) {

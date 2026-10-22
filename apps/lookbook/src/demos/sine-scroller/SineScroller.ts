@@ -10,6 +10,7 @@ import {
   PaletteSwap,
   QuadBase,
   QuadSize,
+  rewriteText,
   type SpriteOf,
   type TextureAtlas,
   TextureColor,
@@ -144,7 +145,8 @@ export class SineScroller extends Group {
   // where writeText() put each glyph: the scroll is an offset from there
   readonly #home: number[];
   readonly #textWidth: number;
-  #textGlyphs: PixelGlyph[] = [];
+  readonly #titleGlyphs: PixelGlyph[] = [];
+  readonly #infoGlyphs: PixelGlyph[] = [];
 
   #width = 0;
   #height = 0;
@@ -253,7 +255,7 @@ export class SineScroller extends Group {
 
   /**
    * Lays the screen out for a view of `width` × `height` pixels of the art. The static texts are
-   * written anew here, never per frame: writeText() allocates.
+   * written anew here, never per frame: rewriteText() allocates.
    */
   layout(width: number, height: number): void {
     if (width === this.#width && height === this.#height) return;
@@ -296,19 +298,25 @@ export class SineScroller extends Group {
   }
 
   #writeStaticText(width: number, height: number): void {
-    for (const glyph of this.#textGlyphs.splice(0)) this.text.freeSprite(glyph);
-
+    // rewriteText() reuses the sprites of the last size: a resize creates and frees none
     const font = this.#assets.pixelFont;
-    const title = writeText(this.text, font, TITLE_TEXT, {x: 0, y: Math.floor(height / 2) - 8, z: Z_TEXT, align: 'center'});
+    const title = rewriteText(this.text, this.#titleGlyphs, font, TITLE_TEXT, {
+      x: 0,
+      y: Math.floor(height / 2) - 8,
+      z: Z_TEXT,
+      align: 'center',
+    });
     for (const glyph of title) glyph.setColorValues(...TITLE_TINT, 1);
 
     // word-wrapped at the screen's width; layoutText() measures it first, to stand it on the bottom edge
     const options = {x: 0, z: Z_TEXT, align: 'center', maxWidth: width - 16} as const;
     const {height: infoHeight} = layoutText(font, INFO_TEXT, options);
-    const info = writeText(this.text, font, INFO_TEXT, {...options, y: -Math.ceil(height / 2) + 6 + infoHeight});
+    const info = rewriteText(this.text, this.#infoGlyphs, font, INFO_TEXT, {
+      ...options,
+      y: -Math.ceil(height / 2) + 6 + infoHeight,
+    });
     for (const glyph of info) glyph.setColorValues(...INFO_TINT, 1);
 
-    this.#textGlyphs = [...title, ...info];
     this.text.update();
   }
 

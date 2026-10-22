@@ -6,7 +6,7 @@ describe('assertPositiveFinite', () => {
     const check = () => assertPositiveFinite('abc', 'Subject', 'size');
 
     expect(check).toThrow(RangeError);
-    expect(check).toThrow('[Subject] size must be a finite number above 0, got "abc"');
+    expect(check).toThrow('Subject: size must be a finite number above 0, got "abc"');
   });
 
   test.each([
@@ -15,11 +15,11 @@ describe('assertPositiveFinite', () => {
     [-1, '-1'],
   ])('a number is written as it is: %s', (value, written) => {
     expect(() => assertPositiveFinite(value, 'Subject', 'size')).toThrow(
-      `[Subject] size must be a finite number above 0, got ${written}`,
+      `Subject: size must be a finite number above 0, got ${written}`,
     );
   });
 
-  test.each([1, 0.5])('a finite number above 0 passes: %s', (value) => {
-    expect(() => assertPositiveFinite(value, 'Subject', 'size')).not.toThrow();
+  test.each([1, 0.5])('a finite number above 0 passes and comes back: %s', (value) => {
+    expect(assertPositiveFinite(value, 'Subject', 'size')).toBe(value);
   });
 });

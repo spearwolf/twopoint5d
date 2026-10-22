@@ -26,7 +26,7 @@ export class RootRenderPipeline extends RenderPipeline {
    */
   static buildOutputNode(passes: Node[]): Node {
     if (passes.length === 0) {
-      throw new Error('RootRenderPipeline.buildOutputNode: no passes to compose');
+      throw new Error('RootRenderPipeline.buildOutputNode(): no passes to compose');
     }
     // TSL nodes expose arithmetic operators via the ShaderNodeProxy at
     // runtime; the static `Node` type does not surface `.add()`.

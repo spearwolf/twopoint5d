@@ -13,7 +13,7 @@ import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './ty
 // 0 is the off switch of an area, so it is as valid as a finite number above 0
 function assertAreaSize(value: number, name: 'width' | 'height'): void {
   if (value !== 0 && !isPositiveFinite(value)) {
-    throw new RangeError(`[RectangularVisibilityArea] ${name} must be 0 or a finite number above 0, got ${describeValue(value)}`);
+    throw new RangeError(`RectangularVisibilityArea: ${name} must be 0 or a finite number above 0, got ${describeValue(value)}`);
   }
 }
 

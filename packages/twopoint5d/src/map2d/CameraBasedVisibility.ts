@@ -274,7 +274,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   set frustumBoxScale(value: number) {
     if (!(Number.isFinite(value) && value >= 1)) {
       throw new RangeError(
-        `[CameraBasedVisibility] frustumBoxScale must be a finite number of at least 1, got ${describeValue(value)}`,
+        `CameraBasedVisibility: frustumBoxScale must be a finite number of at least 1, got ${describeValue(value)}`,
       );
     }
     this.#frustumBoxScale = value;
@@ -308,7 +308,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   set maxVisibleTiles(value: number) {
     if (!(Number.isInteger(value) && value >= 1) && value !== Infinity) {
       throw new RangeError(
-        `[CameraBasedVisibility] maxVisibleTiles must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
+        `CameraBasedVisibility: maxVisibleTiles must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
       );
     }
     this.#maxVisibleTiles = value;
@@ -359,7 +359,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   set depth(value: number) {
     if (!(Number.isFinite(value) && value >= 0)) {
-      throw new RangeError(`[CameraBasedVisibility] depth must be a finite number of at least 0, got ${describeValue(value)}`);
+      throw new RangeError(`CameraBasedVisibility: depth must be a finite number of at least 0, got ${describeValue(value)}`);
     }
     this.#depth = value;
   }

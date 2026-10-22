@@ -492,8 +492,8 @@ handed in stays the caller's. After `dispose()`, `texture`, `canvas`, `context`,
 `redraw()` throw, `remove()` answers `false`, `clear()` does nothing.
 
 Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as
-`TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()` and `layoutText()`, see
-[the text guide](text.md).
+`TexturedSpriteKind` — is the module `text/`: `BitmapFont`, `writeText()`, `rewriteText()` and
+`layoutText()`, see [the text guide](text.md).
 
 ### Frames out of a table: `tableFrame()`
 

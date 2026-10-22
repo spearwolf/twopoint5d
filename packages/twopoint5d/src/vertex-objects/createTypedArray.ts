@@ -31,11 +31,11 @@ const TYPED_ARRAY_OF: Readonly<Record<VertexAttributeDataType, TypedArrayClass |
 export function typedArrayOf(dataType: VertexAttributeDataType): TypedArrayClass {
   // own entries only: a name like 'constructor' or 'toString' must not find a constructor on Object.prototype
   if (!Object.hasOwn(TYPED_ARRAY_OF, dataType)) {
-    throw new Error(`typedArrayOf(): unknown data type '${String(dataType)}'`);
+    throw new Error(`typedArrayOf: unknown data type '${String(dataType)}'`);
   }
   const typedArrayClass = TYPED_ARRAY_OF[dataType];
   if (typedArrayClass === undefined) {
-    throw new Error(`typedArrayOf(): this runtime has no Float16Array for data type '${dataType}'`);
+    throw new Error(`typedArrayOf: this runtime has no Float16Array for data type '${dataType}'`);
   }
   return typedArrayClass;
 }

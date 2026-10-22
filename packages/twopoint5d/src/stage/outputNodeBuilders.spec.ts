@@ -96,7 +96,7 @@ describe('createBloomOutputNodeBuilder()', () => {
     const built = findBlooms(builder([makePass()]))[0]!;
     const builtDispose = sandbox.spy(built, 'dispose');
 
-    expect(() => builder([])).toThrow('The builder of createBloomOutputNodeBuilder() has no passes to compose');
+    expect(() => builder([])).toThrow('createBloomOutputNodeBuilder: the builder it built has no passes to compose');
     expect(builtDispose.called).toBe(false);
   });
 
@@ -140,7 +140,7 @@ describe('createBloomOutputNodeBuilder()', () => {
 
       expect(builder.isDisposed).toBe(true);
       expect(() => builder([makePass()])).toThrow(
-        'The builder of createBloomOutputNodeBuilder() is not available: this builder has been disposed',
+        'createBloomOutputNodeBuilder: the builder it built is not available: this builder has been disposed',
       );
     });
 

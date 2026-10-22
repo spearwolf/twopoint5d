@@ -125,7 +125,7 @@ describe('TileSet', () => {
     test('a tile wider than the image is refused', () => {
       expect(() => new TileSet(base, {tileWidth: 100, tileHeight: 16})).toThrow(RangeError);
       expect(() => new TileSet(base, {tileWidth: 100, tileHeight: 16})).toThrow(
-        '[TileSet] the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 100, the baseCoords are 64 wide',
+        'TileSet: the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 100, the baseCoords are 64 wide',
       );
     });
 
@@ -134,7 +134,7 @@ describe('TileSet', () => {
 
       expect(create).toThrow(RangeError);
       expect(create).toThrow(
-        '[TileSet] the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 258, the baseCoords are 256 wide',
+        'TileSet: the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 258, the baseCoords are 256 wide',
       );
     });
 
@@ -143,7 +143,7 @@ describe('TileSet', () => {
 
       expect(create).toThrow(RangeError);
       expect(create).toThrow(
-        '[TileSet] the first tile does not fit into the height of the baseCoords: margin, padding and tileHeight take 64, the baseCoords are 32 high',
+        'TileSet: the first tile does not fit into the height of the baseCoords: margin, padding and tileHeight take 64, the baseCoords are 32 high',
       );
     });
 
@@ -195,7 +195,7 @@ describe('TileSet', () => {
       [NaN, 'NaN'],
       [Infinity, 'Infinity'],
     ])('a tileId of %s is refused', (tileId, shown) => {
-      const message = `[TileSet] tileId must be a whole number, got ${shown}`;
+      const message = `TileSet: tileId must be a whole number, got ${shown}`;
 
       expect(() => tiles.frameId(tileId)).toThrow(RangeError);
       expect(() => tiles.frameId(tileId)).toThrow(message);
@@ -253,9 +253,9 @@ describe('TileSet', () => {
 
     test.each([
       // the catalog json carries what it carries: a string would be concatenated, not added
-      ['a string', '1' as unknown as number, '[TileSet] firstId must be a whole number, got "1"'],
-      ['a fraction', 1.5, '[TileSet] firstId must be a whole number, got 1.5'],
-      ['NaN', NaN, '[TileSet] firstId must be a whole number, got NaN'],
+      ['a string', '1' as unknown as number, 'TileSet: firstId must be a whole number, got "1"'],
+      ['a fraction', 1.5, 'TileSet: firstId must be a whole number, got 1.5'],
+      ['NaN', NaN, 'TileSet: firstId must be a whole number, got NaN'],
     ])('%s is refused', (_name, firstId, message) => {
       expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 16, firstId})).toThrow(RangeError);
       expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 16, firstId})).toThrow(message);

@@ -21,18 +21,18 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> => isOb
 export function assertTextureStoreData(data: unknown): asserts data is TextureStoreData {
   if (!isPlainObject(data)) {
     throw new TypeError(
-      `[TextureStore] parse() got ${describeCatalogValue(data)} instead of texture store data, an object with an items object`,
+      `TextureStore: parse() got ${describeCatalogValue(data)} instead of texture store data, an object with an items object`,
     );
   }
   const {items, defaultTextureClasses} = data;
   if (!isPlainObject(items)) {
     throw new TypeError(
-      `[TextureStore] parse() got texture store data whose items is ${describeCatalogValue(items)} — items is an object of resource items by id`,
+      `TextureStore: parse() got texture store data whose items is ${describeCatalogValue(items)} — items is an object of resource items by id`,
     );
   }
   if (defaultTextureClasses !== undefined && !Array.isArray(defaultTextureClasses)) {
     throw new TypeError(
-      `[TextureStore] parse() got texture store data whose defaultTextureClasses is ${describeCatalogValue(defaultTextureClasses)} — defaultTextureClasses is an array of texture class names`,
+      `TextureStore: parse() got texture store data whose defaultTextureClasses is ${describeCatalogValue(defaultTextureClasses)} — defaultTextureClasses is an array of texture class names`,
     );
   }
 }

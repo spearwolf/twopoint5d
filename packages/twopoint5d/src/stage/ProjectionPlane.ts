@@ -30,7 +30,7 @@ export class ProjectionPlane {
       // custom projection plane
       this.plane = planeDescription.clone();
       if (up == null) {
-        throw new Error('up is mandatory for a custom projection plane');
+        throw new Error('ProjectionPlane: up is mandatory for a custom projection plane');
       }
       this.up = up.clone();
     }

@@ -204,8 +204,9 @@ frame per char. A font has one page. `layoutText()` lays a string out — boxes 
 glyphs, y up, the top of the first line at `y` — and `writeText()` writes such a layout into
 sprites of any kind with `InstancePosition`, `QuadSize` and `AtlasFrame`: it creates them in the
 `FeatureSprites` it is handed, places them by the extents of the base read off the geometry, and
-hands them to the caller, who frees them. It is a function over sprites, not a mesh of its own. The
-guide is [`docs/text.md`](./text.md).
+hands them to the caller, who frees them. `rewriteText()` writes another text into the sprites of
+one and reuses them, creating and freeing only the glyphs the new text has more or fewer. It is a
+function over sprites, not a mesh of its own. The guide is [`docs/text.md`](./text.md).
 
 ### `map2d/`
 

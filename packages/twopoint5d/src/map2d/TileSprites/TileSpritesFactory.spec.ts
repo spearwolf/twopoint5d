@@ -108,7 +108,7 @@ describe('TileSpritesFactory', () => {
         const error = catchError(() => factory.createTile(new Map2DTileCoords(0, 0)));
 
         expect(error).toBeInstanceOf(RangeError);
-        expect(error).toHaveProperty('message', `[TileSet] tileId must be a whole number, got ${shown}`);
+        expect(error).toHaveProperty('message', `TileSet: tileId must be a whole number, got ${shown}`);
         expect(pool.usedCount, 'usedCount after a throw').toBe(0);
       },
     );
@@ -166,7 +166,7 @@ describe('TileSpritesFactory', () => {
       const error = catchError(() => factory.createTile(new Map2DTileCoords(1, 0)));
 
       expect(error, 'with a slot free').toBeInstanceOf(RangeError);
-      expect(error).toHaveProperty('message', '[TileSet] tileId must be a whole number, got 1.5');
+      expect(error).toHaveProperty('message', 'TileSet: tileId must be a whole number, got 1.5');
       expect(pool.usedCount, 'usedCount after the throw').toBe(0);
     });
 

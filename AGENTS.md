@@ -100,6 +100,16 @@ explicit instruction.
   is not published until you add it to its module's `public-api.ts`.
 - **Imports.** Relative imports carry the `.js` suffix (NodeNext) even though the
   sources are `.ts`. Types use `import type` — lint enforces it.
+- **Error and warning messages** start with their subject, unbracketed: the class
+  (`BitmapFont: …`), the call — `VertexObjectPool#sortBy(): …`, `new Display(): …`,
+  `RootRenderPipeline.buildOutputNode(): …` —, or a function by its bare name
+  (`writeText: …`). A quoted name may follow the subject where it tells instances apart
+  (`FeatureSprites "hud": …`). The subject is followed by a colon and what is wrong, or a
+  sentence goes on from it (`StageRenderer#add() cannot take …`). A number check goes
+  through `assertFinite()` or `assertPositiveFinite()` in `src/utils/`, which write
+  `Subject: name must be a finite number …, got …`. A failure of `expectDefined()` reports
+  a broken invariant of the library, not a refusal, and names no subject; the refusals a
+  feature's `checkKind` throws get theirs from `defineSprite()`.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. They are peer dependencies of

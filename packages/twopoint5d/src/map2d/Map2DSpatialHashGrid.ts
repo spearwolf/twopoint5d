@@ -34,7 +34,7 @@ function assertFiniteAABB(aabb: AABB2, what: string): void {
   const {left, top, width, height} = aabb;
   if (Number.isFinite(left) && Number.isFinite(top) && Number.isFinite(width) && Number.isFinite(height)) return;
   throw new RangeError(
-    `[Map2DSpatialHashGrid] ${what} must have a finite left, top, width and height, got left ${describeValue(left)}, top ${describeValue(top)}, width ${describeValue(width)}, height ${describeValue(height)}`,
+    `Map2DSpatialHashGrid: ${what} must have a finite left, top, width and height, got left ${describeValue(left)}, top ${describeValue(top)}, width ${describeValue(width)}, height ${describeValue(height)}`,
   );
 }
 
@@ -181,7 +181,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   getTiles(tileX: number, tileY: number, width = 1, height = 1, out?: Renderable[]): Set<Renderable> | Renderable[] | undefined {
     if (!Number.isFinite(width) || !Number.isFinite(height)) {
       throw new RangeError(
-        `[Map2DSpatialHashGrid] the width and height of getTiles() must be finite numbers, got width ${describeValue(width)}, height ${describeValue(height)}`,
+        `Map2DSpatialHashGrid: the width and height of getTiles() must be finite numbers, got width ${describeValue(width)}, height ${describeValue(height)}`,
       );
     }
     const within = this.#within;

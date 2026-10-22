@@ -115,6 +115,12 @@ describe('BitmapFont', () => {
       expect(font.kerning('', 'A')).toBe(0);
     });
 
+    test('answer 0 for a number that is no code point, which never meets the key of another pair', () => {
+      expect(font.kerning(66, 86 - 0x110000)).toBe(0);
+      expect(font.kerning(65.5, 86)).toBe(0);
+      expect(font.kerning(65, 0x110000 + 86)).toBe(0);
+    });
+
     test('a font without info takes its size from the line height and has no face', () => {
       const bare = new BitmapFont(without(tinyFont(), 'info'));
       expect(bare.face).toBe('');
@@ -194,6 +200,13 @@ describe('BitmapFont', () => {
       expect(font.page).toBe('"tj".png');
       expect(font.kerning('A', 'A')).toBe(1);
     });
+
+    test('keeps a numeric entity that is no code point as it is written', () => {
+      const [font] = BitmapFont.parse(
+        `<font><info face="A&#x110000;B&#xD800;C&#1114112;D&#99999999999999999999;"/><common lineHeight="4" base="3" scaleW="4" scaleH="4"/></font>`,
+      );
+      expect(font.face).toBe('A&#x110000;B&#xD800;C&#1114112;D&#99999999999999999999;');
+    });
   });
 
   describe('the edges of the readers', () => {
@@ -261,6 +274,15 @@ describe('BitmapFont', () => {
       );
     });
 
+    test.each([
+      ['null', () => new BitmapFont(null as never), 'BitmapFont: the font data is null — '],
+      ['a number', () => new BitmapFont(42 as never), 'BitmapFont: the font data is 42 — '],
+      ['null to parse()', () => BitmapFont.parse(null as never), 'BitmapFont: the font data is null — '],
+      ['42 to parse()', () => BitmapFont.parse(42 as never), 'BitmapFont: the font data is 42 — '],
+    ])('font data that is no object: %s', (_, build, start) => {
+      expect(build).toThrow(`${start}a font is an object in the JSON layout, {pages, chars, common}`);
+    });
+
     test('no common block', () => {
       expect(() => new BitmapFont(without(tinyFont(), 'common'))).toThrow(
         'BitmapFont: the font has no common block — BMFont writes lineHeight, base, scaleW and scaleH there',
@@ -268,7 +290,9 @@ describe('BitmapFont', () => {
     });
 
     test.each([
-      ['lineHeight', Number.NaN, 'BitmapFont: common.lineHeight must be a finite number, got NaN'],
+      ['lineHeight', Number.NaN, 'BitmapFont: common.lineHeight must be a finite number above 0, got NaN'],
+      ['lineHeight', 0, 'BitmapFont: common.lineHeight must be a finite number above 0, got 0'],
+      ['lineHeight', -10, 'BitmapFont: common.lineHeight must be a finite number above 0, got -10'],
       ['base', '7', 'BitmapFont: common.base must be a finite number, got "7"'],
       ['scaleW', 0, 'BitmapFont: common.scaleW must be a finite number above 0, got 0'],
       ['scaleH', undefined, 'BitmapFont: common.scaleH must be a finite number above 0, got undefined'],
@@ -297,7 +321,16 @@ describe('BitmapFont', () => {
     });
 
     test.each([
-      ['an id that is no whole number', {id: 6.5}, 'BitmapFont: a char has the id 6.5 — an id is a whole number of 0 or more'],
+      [
+        'an id that is no whole number',
+        {id: 6.5},
+        'BitmapFont: a char has the id 6.5 — an id is a whole number from 0 to 0x10FFFF',
+      ],
+      [
+        'an id above 0x10FFFF',
+        {id: 0x110000},
+        'BitmapFont: a char has the id 1114112 — an id is a whole number from 0 to 0x10FFFF',
+      ],
       ['a field that is no number', {xadvance: '4'}, 'BitmapFont: the char "A" (65) has an xadvance of "4" — a finite number'],
       ['a negative width', {width: -1}, 'BitmapFont: the char "A" (65) has a width of -1 — 0 or more'],
       ['a negative x', {x: -1}, 'BitmapFont: the char "A" (65) has an x of -1 — 0 or more'],
@@ -315,12 +348,24 @@ describe('BitmapFont', () => {
       expect(() => new BitmapFont(data)).toThrow('BitmapFont: the char "A" (65) appears twice');
     });
 
-    test('a kerning pair that is no numbers', () => {
+    test.each([
+      [{first: -1}, 'a first of -1'],
+      [{first: 0x110000}, 'a first of 1114112'],
+      [{second: 1.5}, 'a second of 1.5'],
+      [{second: -0x110000 + 5}, 'a second of -1114107'],
+      [{first: '65', second: Number.NaN}, 'a first of "65"'],
+    ])('a kerning pair whose chars are no code points: %o', (change, named) => {
+      const data = tinyFont();
+      data.kernings = [{first: 65, second: 86, amount: -1}, {first: 1, second: 86, amount: 3, ...change} as never];
+      expect(() => new BitmapFont(data)).toThrow(
+        `BitmapFont: kerning pair 1 has ${named} — first and second are code points, whole numbers from 0 to 0x10FFFF`,
+      );
+    });
+
+    test('a kerning pair whose amount is no number', () => {
       const data = tinyFont();
       data.kernings = [{first: 65, second: 86, amount: Number.NaN}];
-      expect(() => new BitmapFont(data)).toThrow(
-        'BitmapFont: kerning pair 0 has an amount of NaN — first, second and amount are finite numbers',
-      );
+      expect(() => new BitmapFont(data)).toThrow('BitmapFont: kerning pair 0 has an amount of NaN — a finite number');
     });
 
     test('a pair of chars the font lacks is kept and never met', () => {

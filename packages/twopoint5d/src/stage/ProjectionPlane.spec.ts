@@ -164,7 +164,7 @@ describe('ProjectionPlane', () => {
   describe('constructor', () => {
     it('refuses a custom plane without up', () => {
       expect(() => new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1)))).toThrow(
-        'up is mandatory for a custom projection plane',
+        'ProjectionPlane: up is mandatory for a custom projection plane',
       );
     });
   });

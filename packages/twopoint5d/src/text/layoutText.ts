@@ -1,3 +1,5 @@
+import {assertFinite} from '../utils/assertFinite.js';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
 import type {BitmapFont, BitmapFontGlyph} from './BitmapFont.js';
 
@@ -13,11 +15,17 @@ export interface TextLayoutOptions {
   scale?: number;
   /** Extra space between two glyphs of a line, in pixels of the font. Default 0. */
   letterSpacing?: number;
-  /** The distance of two lines, in pixels of the font. Default the `lineHeight` of the font. */
+  /** The distance of two lines, in pixels of the font, above 0. Default the `lineHeight` of the font. */
   lineHeight?: number;
-  /** A line wider than this, in units of the mesh, breaks at a space. Default: no wrap. */
+  /**
+   * A line wider than this, in units of the mesh, breaks before the word that made it too wide: at a
+   * breakable space, after U+200B, or before an ideograph or a kana. Default: no wrap.
+   */
   maxWidth?: number;
-  /** A char drawn in place of a char the font lacks. Default: such a char is skipped. */
+  /**
+   * A char drawn in place of a char the font lacks — never for a space, a line end, or a control or
+   * format char. Default: such a char is skipped.
+   */
   fallback?: string;
 }
 
@@ -40,7 +48,7 @@ export interface TextLayout {
   readonly glyphs: readonly TextLayoutGlyph[];
   /** How many lines the text takes; an empty text is one empty line. */
   readonly lineCount: number;
-  /** The width of the widest line, in units of the mesh. */
+  /** The width of the widest line, in units of the mesh; the spaces at the end of a line hang out of it. */
   readonly width: number;
   /** The height of all lines, `lineCount · lineHeight · scale`. */
   readonly height: number;
@@ -50,12 +58,28 @@ const ALIGNS: readonly string[] = ['left', 'center', 'right'];
 
 const SPACE = 32;
 
-const finite = (where: string, name: string, value: unknown, above0 = false): number => {
-  if (typeof value !== 'number' || !Number.isFinite(value) || (above0 && value <= 0)) {
-    throw new RangeError(`${where}: the ${name} must be a finite number${above0 ? ' above 0' : ''}, got ${describeValue(value)}`);
-  }
-  return value;
-};
+// The classes of a char, tested in this order. A line end ends the line. A breakable space is a place to
+// break, hangs at the end of a line and is dropped at a break; a tab is set as U+0020, the others as
+// their own glyph or else as U+0020, and one the font has neither for breaks without taking room, as
+// U+200B does. A no-break space is set the same way, holds its word together, and is dropped without
+// either glyph. A control or format char is dropped: no glyph, no room, never the fallback
+const LINE_END = /^[\n\u2028\u2029]$/u;
+const TAB = '\t';
+const BREAKABLE_SPACE = /^[\u0020\t\u1680\u2000-\u2006\u2008-\u200a\u205f\u3000]$/u;
+const ZERO_WIDTH_BREAK = '\u200b';
+const NO_BREAK_SPACE = /^[\u00a0\u2007\u202f]$/u;
+const CONTROL_OR_FORMAT = /^[\p{Cc}\p{Cf}]$/u;
+// a line may break before an ideograph or a kana; a mark after it (。, 」, of the script Common) stays
+// with the char before, so a closing mark never starts a line
+const BREAK_BEFORE = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]$/u;
+
+// a char of a line set in the font: its glyph, whether it is a breakable space, and whether the line
+// may break before it
+interface Entry {
+  readonly glyph: BitmapFontGlyph;
+  readonly space: boolean;
+  readonly breakBefore: boolean;
+}
 
 // the options of a layout, checked
 interface ResolvedTextLayoutOptions {
@@ -86,40 +110,81 @@ const resolveOptions = (where: string, font: BitmapFont, options: TextLayoutOpti
     }
   }
   return {
-    x: finite(where, 'x', options.x ?? 0),
-    y: finite(where, 'y', options.y ?? 0),
+    x: assertFinite(options.x ?? 0, where, 'x'),
+    y: assertFinite(options.y ?? 0, where, 'y'),
     align,
-    scale: finite(where, 'scale', options.scale ?? 1, true),
-    letterSpacing: finite(where, 'letterSpacing', options.letterSpacing ?? 0),
-    lineHeight: finite(where, 'lineHeight', options.lineHeight ?? font.lineHeight),
-    maxWidth: options.maxWidth === undefined ? undefined : finite(where, 'maxWidth', options.maxWidth, true),
+    scale: assertPositiveFinite(options.scale ?? 1, where, 'scale'),
+    letterSpacing: assertFinite(options.letterSpacing ?? 0, where, 'letterSpacing'),
+    lineHeight: assertPositiveFinite(options.lineHeight ?? font.lineHeight, where, 'lineHeight'),
+    maxWidth: options.maxWidth === undefined ? undefined : assertPositiveFinite(options.maxWidth, where, 'maxWidth'),
     fallback,
   };
 };
 
-// The width of a run of glyphs set on one line, in pixels of the font: the pen after the last glyph,
-// less the letter spacing behind it. A kerning pair moves the second glyph of it
-const widthOf = (font: BitmapFont, glyphs: readonly BitmapFontGlyph[], letterSpacing: number): number => {
-  if (glyphs.length === 0) return 0;
-  let pen = 0;
-  for (let i = 0; i < glyphs.length; i++) {
-    const glyph = glyphs[i]!;
-    if (i > 0) pen += font.kerning(glyphs[i - 1]!.id, glyph.id);
-    pen += glyph.xadvance + letterSpacing;
+// the lines of a text, each char turned into an entry of its class; the chars that take no room are left out
+const entriesOf = (font: BitmapFont, text: string, fallback: BitmapFontGlyph | undefined): Entry[][] => {
+  const space = font.glyph(SPACE);
+  const lines: Entry[][] = [[]];
+  // a place to break left by a char without an entry, for the next entry
+  let pendingBreak = false;
+  for (const char of text) {
+    if (LINE_END.test(char)) {
+      lines.push([]);
+      pendingBreak = false;
+      continue;
+    }
+    if (BREAKABLE_SPACE.test(char)) {
+      const glyph = char === TAB ? space : (font.glyph(char) ?? space);
+      if (glyph === undefined) pendingBreak = true;
+      else lines.at(-1)!.push({glyph, space: true, breakBefore: false});
+      continue;
+    }
+    if (char === ZERO_WIDTH_BREAK) {
+      pendingBreak = true;
+      continue;
+    }
+    let glyph: BitmapFontGlyph | undefined;
+    if (NO_BREAK_SPACE.test(char)) {
+      glyph = font.glyph(char) ?? space;
+    } else if (CONTROL_OR_FORMAT.test(char)) {
+      continue;
+    } else {
+      if (BREAK_BEFORE.test(char)) pendingBreak = true;
+      glyph = font.glyph(char) ?? fallback;
+    }
+    if (glyph !== undefined) {
+      lines.at(-1)!.push({glyph, space: false, breakBefore: pendingBreak});
+      pendingBreak = false;
+    }
   }
-  return pen - letterSpacing;
+  return lines;
 };
 
-// the pen after `glyphs` set behind `previous` at `pen`, and the last glyph set, in pixels of the font
+// The width of entries set on one line, in pixels of the font: the pen after the last entry that is no
+// breakable space, less the letter spacing behind it. The spaces behind it hang out of the line; a line
+// of nothing but spaces is 0 wide. A kerning pair moves the second glyph of it
+const widthOf = (font: BitmapFont, entries: readonly Entry[], letterSpacing: number): number => {
+  let pen = 0;
+  let width = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const {glyph, space} = entries[i]!;
+    if (i > 0) pen += font.kerning(entries[i - 1]!.glyph.id, glyph.id);
+    pen += glyph.xadvance + letterSpacing;
+    if (!space) width = pen - letterSpacing;
+  }
+  return width;
+};
+
+// the pen after `entries` set behind `previous` at `pen`, and the last glyph set, in pixels of the font
 const advance = (
   font: BitmapFont,
   previous: BitmapFontGlyph | undefined,
-  glyphs: readonly BitmapFontGlyph[],
+  entries: readonly Entry[],
   pen: number,
   letterSpacing: number,
 ): {pen: number; last: BitmapFontGlyph | undefined} => {
   let last = previous;
-  for (const glyph of glyphs) {
+  for (const {glyph} of entries) {
     if (last !== undefined) pen += font.kerning(last.id, glyph.id);
     pen += glyph.xadvance + letterSpacing;
     last = glyph;
@@ -127,54 +192,49 @@ const advance = (
   return {pen, last};
 };
 
-// a line of the text broken where it is too wide: at the last space before the word that would make it
-// wider than `maxWidth`, every space at the break dropped. A word wider than maxWidth on its own stays whole
-const wrap = (
-  font: BitmapFont,
-  glyphs: readonly BitmapFontGlyph[],
-  maxWidth: number,
-  letterSpacing: number,
-): BitmapFontGlyph[][] => {
-  // the runs of the line, words and spaces taking turns
-  const runs: {space: boolean; glyphs: BitmapFontGlyph[]}[] = [];
-  for (const glyph of glyphs) {
-    const space = glyph.id === SPACE;
+// A line of the text broken where it is too wide: before the word that would make it wider than
+// `maxWidth`, every space at the break dropped. A word wider than maxWidth on its own stays whole
+const wrap = (font: BitmapFont, entries: readonly Entry[], maxWidth: number, letterSpacing: number): Entry[][] => {
+  // the runs of the line, words and spaces taking turns — and two words in a row where the second may
+  // break before it, with no space between them
+  const runs: {space: boolean; entries: Entry[]}[] = [];
+  for (const entry of entries) {
     const last = runs.at(-1);
-    if (last?.space === space) last.glyphs.push(glyph);
-    else runs.push({space, glyphs: [glyph]});
+    if (last?.space === entry.space && (entry.space || !entry.breakBefore)) last.entries.push(entry);
+    else runs.push({space: entry.space, entries: [entry]});
   }
 
   // The line grows by a running pen, in pixels of the font: each word adds its own glyphs and the kerning
   // pair at its join, and nothing is measured twice — a line of n glyphs costs O(n)
-  const lines: BitmapFontGlyph[][] = [];
-  let line: BitmapFontGlyph[] = [];
+  const lines: Entry[][] = [];
+  let line: Entry[] = [];
   let pen = 0;
   let last: BitmapFontGlyph | undefined;
   let hasWord = false;
-  let pendingSpaces: BitmapFontGlyph[] = [];
+  let pendingSpaces: Entry[] = [];
   for (const run of runs) {
     if (run.space) {
-      pendingSpaces = run.glyphs;
+      pendingSpaces = run.entries;
       continue;
     }
     const spaces = advance(font, last, pendingSpaces, pen, letterSpacing);
-    const word = advance(font, spaces.last, run.glyphs, spaces.pen, letterSpacing);
+    const word = advance(font, spaces.last, run.entries, spaces.pen, letterSpacing);
     if (hasWord && word.pen - letterSpacing > maxWidth) {
       lines.push(line);
-      const alone = advance(font, undefined, run.glyphs, 0, letterSpacing);
-      line = run.glyphs.slice();
+      const alone = advance(font, undefined, run.entries, 0, letterSpacing);
+      line = run.entries.slice();
       pen = alone.pen;
       last = alone.last;
     } else {
-      for (const glyph of pendingSpaces) line.push(glyph);
-      for (const glyph of run.glyphs) line.push(glyph);
+      for (const entry of pendingSpaces) line.push(entry);
+      for (const entry of run.entries) line.push(entry);
       pen = word.pen;
       last = word.last;
     }
     hasWord = true;
     pendingSpaces = [];
   }
-  // the spaces at the end of a line of the text stay
+  // the spaces at the end of a line of the text stay for the pen; they hang out of its width
   lines.push([...line, ...pendingSpaces]);
   return lines;
 };
@@ -190,15 +250,24 @@ const wrap = (
  * `yoffset`; the pen moves on by its `xadvance` and the `letterSpacing`, and a kerning pair moves the second
  * glyph of it by its amount. All measures of the font are multiplied by `scale`.
  *
- * Chars are read by code point; `\n` ends a line and `\r` is dropped. A char the font lacks is drawn as
- * `fallback`, or skipped without taking room — a kerning pair then forms across it. A char of 0 × 0, the
- * space, moves the pen and yields no glyph. With `maxWidth` a line breaks at the last space before the word
- * that would make it wider, the spaces at the break dropped; a word wider on its own overflows.
+ * Chars are read by code point. `\n`, U+2028 and U+2029 end a line. A breakable space — U+0020, the tab,
+ * U+1680, U+2000–U+2006, U+2008–U+200A, U+205F, U+3000 — moves the pen and yields no glyph: a tab by the
+ * advance of U+0020, the others by their own glyph or else by U+0020; one the font has neither for takes
+ * no room. A no-break space — U+00A0, U+2007, U+202F — is set the same way and holds its word together.
+ * Control and format chars (`\r`, a soft hyphen, U+200B–U+200F, U+FEFF …) are dropped: no glyph, no room,
+ * never the `fallback`. Any other char the font lacks is drawn as `fallback`, or skipped without taking
+ * room. A kerning pair forms across a char that is dropped or skipped. A char of 0 × 0 yields no glyph.
+ *
+ * A line is as wide as the pen after its last char that is no breakable space: the spaces at its end hang
+ * out of its width and its alignment. With `maxWidth` a line breaks before the word that would make it
+ * wider — at a breakable space, after U+200B, or before an ideograph or a kana (Han, Hiragana, Katakana) —
+ * the spaces at the break dropped; a word wider on its own overflows. A mark after an ideograph stays with
+ * it, so a closing mark never starts a line.
  *
  * Every call builds a layout object per glyph: lay a text out when it changes, not every frame.
  *
- * @throws {RangeError} for a `scale` or `maxWidth` that is no finite number above 0, and an `x`, `y`,
- *   `letterSpacing` or `lineHeight` that is no finite number.
+ * @throws {RangeError} for a `scale`, `lineHeight` or `maxWidth` that is no finite number above 0, and an
+ *   `x`, `y` or `letterSpacing` that is no finite number.
  * @throws {Error} for an `align` it does not know, and a `fallback` that is no single char or no glyph of the font.
  * @throws {TypeError} for a text that is no string.
  */
@@ -213,17 +282,7 @@ export function layoutTextFor(where: string, font: BitmapFont, text: string, opt
   }
   const {x, y, align, scale, letterSpacing, lineHeight, maxWidth, fallback} = resolveOptions(where, font, options);
 
-  // the lines of the text, the chars turned into glyphs and the ones the font lacks left out
-  const textLines: BitmapFontGlyph[][] = [[]];
-  for (const char of text) {
-    if (char === '\n') {
-      textLines.push([]);
-      continue;
-    }
-    if (char === '\r') continue;
-    const glyph = font.glyph(char) ?? fallback;
-    if (glyph !== undefined) textLines.at(-1)!.push(glyph);
-  }
+  const textLines = entriesOf(font, text, fallback);
   const lines =
     maxWidth === undefined ? textLines : textLines.flatMap((line) => wrap(font, line, maxWidth / scale, letterSpacing));
 
@@ -236,9 +295,9 @@ export function layoutTextFor(where: string, font: BitmapFont, text: string, opt
     const top = y - index * lineHeight * scale;
     let pen = 0;
     for (let i = 0; i < line.length; i++) {
-      const glyph = line[i]!;
-      if (i > 0) pen += font.kerning(line[i - 1]!.id, glyph.id);
-      if (glyph.width > 0 && glyph.height > 0) {
+      const {glyph, space} = line[i]!;
+      if (i > 0) pen += font.kerning(line[i - 1]!.glyph.id, glyph.id);
+      if (!space && glyph.width > 0 && glyph.height > 0) {
         glyphs.push({
           glyph,
           line: index,

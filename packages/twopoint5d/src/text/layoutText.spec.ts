@@ -59,7 +59,14 @@ describe('layoutText()', () => {
     test('a space moves the pen and yields no glyph', () => {
       const layout = layoutText(font, ' A ');
       expect(boxes(layout)).toEqual([['A', 0, 3, -1, 3, 4]]);
-      expect(layout.width).toBe(10);
+      expect(layout.width).toBe(7);
+    });
+
+    test('a space yields no glyph even where the font gives it a box', () => {
+      const data = tinyFontData();
+      Object.assign(data.chars[0]!, {x: 12, y: 4, width: 2, height: 2});
+      const boxed = new BitmapFont(data);
+      expect(boxes(layoutText(boxed, 'A A')).map(([char]) => char)).toEqual(['A', 'A']);
     });
 
     test('reads chars by code point', () => {
@@ -93,6 +100,121 @@ describe('layoutText()', () => {
       expect(layout.lineCount).toBe(1);
       expect(layout.width).toBe(0);
       expect(layout.height).toBe(6);
+    });
+  });
+
+  describe('spaces at the end of a line', () => {
+    test('hang out of the width and the alignment', () => {
+      const right = layoutText(font, 'A  ', {align: 'right'});
+      expect(boxes(right).map(([char, , x]) => [char, x])).toEqual([['A', -4]]);
+      expect(right.width).toBe(4);
+      const firstX = (text: string) => layoutText(font, text, {align: 'center'}).glyphs[0]?.x;
+      expect(firstX('AV  ')).toBe(firstX('AV'));
+    });
+
+    test('hang out of a line of maxWidth', () => {
+      expect(layoutText(font, 'A   ', {maxWidth: 5}).width).toBe(4);
+    });
+
+    test('a line of nothing but spaces is 0 wide', () => {
+      const layout = layoutText(font, ' \n  ');
+      expect(layout.width).toBe(0);
+      expect(layout.lineCount).toBe(2);
+    });
+
+    test('a line is as wide as the pen after its last char that is no space, less the letter spacing', () => {
+      expect(layoutText(font, 'AV ', {letterSpacing: 2}).width).toBe(9);
+    });
+  });
+
+  describe('chars beyond the printable ones', () => {
+    test('a tab is set as a space, and the line breaks at it', () => {
+      expect(boxes(layoutText(font, 'A\tA')).map(([char, line, x]) => [char, line, x])).toEqual([
+        ['A', 0, 0],
+        ['A', 0, 7],
+      ]);
+      expect(layoutText(font, 'A\tA', {maxWidth: 8}).lineCount).toBe(2);
+      expect(boxes(layoutText(font, 'A\tA', {fallback: '-'})).map(([char]) => char)).toEqual(['A', 'A']);
+    });
+
+    test('a control or format char is dropped without the fallback, and the kerning pair forms across it', () => {
+      const layout = layoutText(font, 'A\u0001\u00adV\ufeff', {fallback: '-'});
+      expect(boxes(layout).map(([char, , x]) => [char, x])).toEqual([
+        ['A', 0],
+        ['V', 2],
+      ]);
+      expect(layout.width).toBe(7);
+    });
+
+    test.each([
+      ['U+2028', '\u2028'],
+      ['U+2029', '\u2029'],
+    ])('%s starts a line as \\n does', (_, separator) => {
+      const layout = layoutText(font, `A${separator}V`, {fallback: '-'});
+      expect(boxes(layout).map(([char, line, x]) => [char, line, x])).toEqual([
+        ['A', 0, 0],
+        ['V', 1, -1],
+      ]);
+      expect(layout.lineCount).toBe(2);
+    });
+
+    test('U+200B takes no room and is a place to break', () => {
+      const layout = layoutText(font, 'AV\u200bAV', {fallback: '-'});
+      expect(boxes(layout).map(([char, line, x]) => [char, line, x])).toEqual([
+        ['A', 0, 0],
+        ['V', 0, 2],
+        ['A', 0, 7],
+        ['V', 0, 9],
+      ]);
+      expect(layoutText(font, 'AV\u200bAV', {maxWidth: 8}).lineCount).toBe(2);
+    });
+
+    test('U+3000 the font lacks is set as a space and breaks; U+00A0 the font lacks is set as a space and holds', () => {
+      const ideographic = layoutText(font, 'A\u3000A', {fallback: '-'});
+      expect(boxes(ideographic).map(([char, , x]) => [char, x])).toEqual([
+        ['A', 0],
+        ['A', 7],
+      ]);
+      expect(layoutText(font, 'A\u3000A', {maxWidth: 8}).lineCount).toBe(2);
+
+      const noBreak = layoutText(font, 'A\u00a0A', {fallback: '-', maxWidth: 8});
+      expect(boxes(noBreak).map(([char, line, x]) => [char, line, x])).toEqual([
+        ['A', 0, 0],
+        ['A', 0, 7],
+      ]);
+      expect(noBreak.width).toBe(11);
+    });
+
+    test('a space of a font without U+0020 takes no room and is a place to break', () => {
+      const data = tinyFontData();
+      data.chars = data.chars.filter(({id}) => id !== 32);
+      const spaceless = new BitmapFont(data);
+      expect(boxes(layoutText(spaceless, 'A A', {fallback: '-'})).map(([char, , x]) => [char, x])).toEqual([
+        ['A', 0],
+        ['A', 4],
+      ]);
+      expect(layoutText(spaceless, 'A A', {maxWidth: 5}).lineCount).toBe(2);
+      expect(layoutText(spaceless, 'A\u00a0A', {fallback: '-'}).glyphs.map(({glyph}) => glyph.char)).toEqual(['A', 'A']);
+      expect(layoutText(spaceless, 'A\u00a0A').width).toBe(8);
+    });
+
+    test('a line breaks before an ideograph, and a closing mark stays with the char before it', () => {
+      const layout = layoutText(font, '日本語。', {fallback: '-', maxWidth: 8});
+      expect(boxes(layout).map(([char, line, x]) => [char, line, x])).toEqual([
+        ['-', 0, 1],
+        ['-', 0, 5],
+        ['-', 1, 1],
+        ['-', 1, 5],
+      ]);
+    });
+
+    test('a line breaks before a kana', () => {
+      const layout = layoutText(font, 'あいう', {fallback: '-', maxWidth: 8});
+      expect(boxes(layout).map(([, line]) => line)).toEqual([0, 0, 1]);
+    });
+
+    test('a skipped ideograph leaves the place to break before the next char', () => {
+      expect(layoutText(font, 'AV日AV', {maxWidth: 8}).lineCount).toBe(2);
     });
   });
 
@@ -202,12 +324,14 @@ describe('layoutText()', () => {
 
   describe('refusals', () => {
     test.each([
-      [{scale: 0}, 'layoutText: the scale must be a finite number above 0, got 0'],
-      [{maxWidth: -1}, 'layoutText: the maxWidth must be a finite number above 0, got -1'],
-      [{x: Number.NaN}, 'layoutText: the x must be a finite number, got NaN'],
-      [{y: '1'}, 'layoutText: the y must be a finite number, got "1"'],
-      [{letterSpacing: Infinity}, 'layoutText: the letterSpacing must be a finite number, got Infinity'],
-      [{lineHeight: Number.NaN}, 'layoutText: the lineHeight must be a finite number, got NaN'],
+      [{scale: 0}, 'layoutText: scale must be a finite number above 0, got 0'],
+      [{maxWidth: -1}, 'layoutText: maxWidth must be a finite number above 0, got -1'],
+      [{x: Number.NaN}, 'layoutText: x must be a finite number, got NaN'],
+      [{y: '1'}, 'layoutText: y must be a finite number, got "1"'],
+      [{letterSpacing: Infinity}, 'layoutText: letterSpacing must be a finite number, got Infinity'],
+      [{lineHeight: Number.NaN}, 'layoutText: lineHeight must be a finite number above 0, got NaN'],
+      [{lineHeight: 0}, 'layoutText: lineHeight must be a finite number above 0, got 0'],
+      [{lineHeight: -10}, 'layoutText: lineHeight must be a finite number above 0, got -10'],
     ])('%o', (options, message) => {
       expect(() => layoutText(font, 'A', options as never)).toThrow(RangeError);
       expect(() => layoutText(font, 'A', options as never)).toThrow(message);

@@ -76,10 +76,10 @@ export function createBloomOutputNodeBuilder(options?: BloomOutputNodeBuilderOpt
 
   const builder = ((stagePasses: Node[]): Node => {
     if (disposed) {
-      throw new Error('The builder of createBloomOutputNodeBuilder() is not available: this builder has been disposed');
+      throw new Error('createBloomOutputNodeBuilder: the builder it built is not available: this builder has been disposed');
     }
     if (stagePasses.length === 0) {
-      throw new Error('The builder of createBloomOutputNodeBuilder() has no passes to compose');
+      throw new Error('createBloomOutputNodeBuilder: the builder it built has no passes to compose');
     }
 
     // bloom() asks for a `Node<'vec4'>`, and `.add()` is attached at runtime by the

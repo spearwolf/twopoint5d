@@ -1,6 +1,9 @@
 import {TextureAtlas, type TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
 import {describeValue} from '../utils/describeValue.js';
+import {isFiniteNumber} from '../utils/isFiniteNumber.js';
+import {isObject} from '../utils/isObject.js';
+import {isCodePoint} from './codePoints.js';
 import {readBitmapFontSource} from './readBitmapFontSource.js';
 
 /** A char of a BMFont, as the font file writes it: where it lies in the page, and how it is set. */
@@ -48,7 +51,7 @@ export interface BitmapFontInfo {
 
 /** The `common` block of a BMFont: the metrics every line shares and the size of the page. */
 export interface BitmapFontCommon {
-  /** The distance of two lines, in pixels. */
+  /** The distance of two lines, in pixels, above 0. */
   lineHeight: number;
   /** The distance from the top of a line to its baseline, in pixels. */
   base: number;
@@ -92,12 +95,11 @@ export interface BitmapFontOptions {
 
 const WHERE = 'BitmapFont';
 
-// the code points of a pair in one number: a code point is below 0x110000
+// the code points of a pair in one number, one to one for code points — below 0x110000 — and only
+// code points go in: the constructor refuses any other pair, kerning() answers 0 for any other number
 const pairKey = (first: number, second: number) => first * 0x110000 + second;
 
 const codeOf = (char: string | number): number | undefined => (typeof char === 'number' ? char : char.codePointAt(0));
-
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 const article = (field: string) => (/^[aeiox]/.test(field) ? 'an' : 'a');
 
@@ -161,20 +163,26 @@ export class BitmapFont {
   /**
    * A font of `data` in the JSON layout; `BitmapFont.parse()` reads the other spellings into it.
    *
-   * @throws {Error} — each before the atlas holds a frame — for a font without a `common` block or with a
-   *   `lineHeight`, `base`, `scaleW` or `scaleH` that is no finite number (the last two above 0), without
-   *   `chars`, with more than one page, with a char whose id is no whole number of 0 or more, whose fields
-   *   are no finite numbers, whose `x`, `y`, `width` or `height` are below 0, or which reaches beyond the
-   *   page, with two chars of one id, and with a kerning pair that is no finite numbers.
+   * @throws {Error} — each before the atlas holds a frame — for font data that is no object, a font
+   *   without a `common` block or with a `lineHeight`, `base`, `scaleW` or `scaleH` that is no finite
+   *   number (all but `base` above 0), without `chars`, with more than one page, with a char whose id is
+   *   no whole number from 0 to 0x10FFFF, whose fields are no finite numbers, whose `x`, `y`, `width` or
+   *   `height` are below 0, or which reaches beyond the page, with two chars of one id, and with a kerning
+   *   pair whose `first` or `second` is no code point or whose `amount` is no finite number.
    */
   constructor(data: BitmapFontData, options?: BitmapFontOptions) {
+    if (!isObject(data)) {
+      throw new Error(
+        `${WHERE}: the font data is ${describeValue(data)} — a font is an object in the JSON layout, {pages, chars, common}`,
+      );
+    }
     const {common} = data;
     if (common == null || typeof common !== 'object') {
       throw new Error(`${WHERE}: the font has no common block — BMFont writes lineHeight, base, scaleW and scaleH there`);
     }
     for (const key of ['lineHeight', 'base', 'scaleW', 'scaleH'] as const) {
       const value: unknown = common[key];
-      const above0 = key === 'scaleW' || key === 'scaleH';
+      const above0 = key !== 'base';
       if (!isFiniteNumber(value) || (above0 && value <= 0)) {
         throw new Error(
           `${WHERE}: common.${key} must be a finite number${above0 ? ' above 0' : ''}, got ${describeValue(value)}`,
@@ -204,8 +212,8 @@ export class BitmapFont {
     const ids = new Set<number>();
     for (const raw of data.chars) {
       const id: unknown = raw?.id;
-      if (typeof id !== 'number' || !Number.isInteger(id) || id < 0 || id > 0x10ffff) {
-        throw new Error(`${WHERE}: a char has the id ${describeValue(id)} — an id is a whole number of 0 or more`);
+      if (!isCodePoint(id)) {
+        throw new Error(`${WHERE}: a char has the id ${describeValue(id)} — an id is a whole number from 0 to 0x10FFFF`);
       }
       const label = `"${String.fromCodePoint(id)}" (${id})`;
       // a converter that leaves out page and chnl writes a font of one page, all four channels
@@ -240,13 +248,17 @@ export class BitmapFont {
 
     const kernings = Array.isArray(data.kernings) ? data.kernings : [];
     kernings.forEach((pair, index) => {
-      for (const field of ['first', 'second', 'amount'] as const) {
+      for (const field of ['first', 'second'] as const) {
         const value: unknown = pair?.[field];
-        if (!isFiniteNumber(value)) {
+        if (!isCodePoint(value)) {
           throw new Error(
-            `${WHERE}: kerning pair ${index} has ${article(field)} ${field} of ${describeValue(value)} — first, second and amount are finite numbers`,
+            `${WHERE}: kerning pair ${index} has ${article(field)} ${field} of ${describeValue(value)} — first and second are code points, whole numbers from 0 to 0x10FFFF`,
           );
         }
+      }
+      const amount: unknown = pair.amount;
+      if (!isFiniteNumber(amount)) {
+        throw new Error(`${WHERE}: kerning pair ${index} has an amount of ${describeValue(amount)} — a finite number`);
       }
     });
 
@@ -288,11 +300,11 @@ export class BitmapFont {
     return code === undefined ? undefined : this.#glyphs.get(code);
   }
 
-  /** The kerning amount between two chars, in pixels of the font; 0 without a pair. */
+  /** The kerning amount between two chars, in pixels of the font; 0 without a pair, and for a number that is no code point. */
   kerning(first: string | number, second: string | number): number {
     const a = codeOf(first);
     const b = codeOf(second);
-    if (a === undefined || b === undefined) return 0;
+    if (!isCodePoint(a) || !isCodePoint(b)) return 0;
     return this.#kernings.get(pairKey(a, b)) ?? 0;
   }
 }

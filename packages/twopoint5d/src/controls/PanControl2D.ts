@@ -294,7 +294,7 @@ export class PanControl2D extends InputControlBase {
     if (!CSS.supports('cursor', cursor)) {
       // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
-        `[PanControl2D] cursorPanStyle "${value}" is not a value of the CSS property cursor in this browser; the write is refused`,
+        `PanControl2D: cursorPanStyle "${value}" is not a value of the CSS property cursor in this browser; the write is refused`,
       );
       return;
     }

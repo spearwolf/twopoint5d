@@ -51,10 +51,13 @@ onto one page, in BMFont with a larger texture size. `BitmapFont.parse(source, {
 reads a page that was packed into a larger image, at the coords given.
 
 **Refusals.** Each names what is wrong and where: a source in none of the three spellings, JSON that
-does not parse, a font without a `common` block or with a `lineHeight`, `base`, `scaleW` or `scaleH`
-that is no number, no `chars`, more than one page, a char with an id that is no whole number, a field
+does not parse, font data that is no object, a font without a `common` block or with a `lineHeight`,
+`base`, `scaleW` or `scaleH` that is no number — `lineHeight`, `scaleW` and `scaleH` above 0 —, no
+`chars`, more than one page, a char with an id that is no whole number from 0 to 0x10FFFF, a field
 that is no number, a negative position or size, a glyph that reaches beyond the page, two chars of
-one id, a kerning pair that is no numbers.
+one id, a kerning pair whose chars are no code points or whose `amount` is no number. A numeric
+entity in the XML that is no code point stays as it is written, like an entity the reader does not
+know.
 
 A font and its atlas are plain data: nothing to dispose. The page texture is the caller's.
 
@@ -66,7 +69,7 @@ the sprites holds `InstancePosition`, `QuadSize` and `AtlasFrame` — `TexturedS
 the font's page is their `colorMap`.
 
 ```ts check
-import {BitmapFont, FeatureSprites, TexturedSpriteKind, writeText} from '@spearwolf/twopoint5d';
+import {BitmapFont, FeatureSprites, rewriteText, TexturedSpriteKind, writeText} from '@spearwolf/twopoint5d';
 import {Color, Scene, type Texture} from 'three/webgpu';
 
 declare const fnt: string; // the text of pixel-8.fnt
@@ -80,10 +83,10 @@ new Scene().add(text);
 const glyphs = writeText(text, font, 'GAME OVER\npress fire', {x: 0, y: 40, align: 'center', scale: 2});
 for (const glyph of glyphs) glyph.setColor(new Color('#ffd166'));
 
-// the text changes: free the sprites and write it again
+// the text changes: write it into the sprites of the last one
 export function rewrite(next: string) {
-  for (const glyph of glyphs.splice(0)) text.freeSprite(glyph);
-  glyphs.push(...writeText(text, font, next, {x: 0, y: 40, align: 'center', scale: 2}));
+  rewriteText(text, glyphs, font, next, {x: 0, y: 40, align: 'center', scale: 2});
+  for (const glyph of glyphs) glyph.setColor(new Color('#ffd166'));
   text.update();
 }
 ```
@@ -98,9 +101,9 @@ that every `yoffset` is measured from; a baseline at `b` is `y: b + font.base * 
 - a glyph's box lies at `pen + xoffset · s` and `lineTop − yoffset · s`, `width · s` × `height · s`;
 - the pen moves on by `(xadvance + letterSpacing) · s`, and a kerning pair moves the second glyph by
   its `amount · s`;
-- a line is as wide as the pen after its last char, less one `letterSpacing · s` — the spacing lies
-  between chars —, and `align` puts its left edge (`'left'`), its middle (`'center'`) or its right
-  edge (`'right'`) on `x`, line by line.
+- a line is as wide as the pen after its last char that is no space, less one `letterSpacing · s` —
+  the spacing lies between chars —, and `align` puts its left edge (`'left'`), its middle
+  (`'center'`) or its right edge (`'right'`) on `x`, line by line.
 
 **The anchor of the base.** A sprite is placed by its position, and the base decides where its quad
 lies around it. `writeText()` reads the extents of the base out of the geometry's `position`
@@ -117,21 +120,47 @@ and keep it in place, move it along: `x += (anchorX − 0.5) · width`, `y −= 
 the options. Nothing else: a new sprite keeps its white tint and its rotation of 0 until the caller
 writes them. `QuadSize` and `AtlasFrame` are static attributes and reach the GPU with the first
 `update()` after `createSprite()`; a later change to one glyph goes up after
-`spritePool.touchVO(glyph, 'quadSize')` (see "Uploads" in the sprite guide).
+`spritePool.touchVO(glyph, 'quadSize')` (see "Uploads" in the sprite guide). A glyph that
+`rewriteText()` reuses keeps its tint and its rotation, and `rewriteText()` marks its slot for
+upload itself: its new frame and size, and a tint written after the call, go up with the next
+`update()` without a `touchVO()`.
 
-**Chars.** Read by code point, so a char beyond the BMP is one glyph. `\n` ends a line, `\r` is
-dropped. A char the font lacks is drawn as `fallback` when one is given (`{fallback: '?'}`), and
-otherwise skipped: it takes no room, and the kerning pair forms across it. A space moves the pen and
-yields no sprite.
+**Chars.** Read by code point, so a char beyond the BMP is one glyph. Each falls into one class:
 
-**Word wrap.** With `maxWidth`, in units of the mesh, a line breaks at the last space before the word
-that would make it wider; the spaces at the break are dropped. A word wider than `maxWidth` on its own
-stays whole on a line of its own and overflows — there is no hyphenation. `lineHeight` takes the place
-of the font's, in pixels of the font.
+| class | chars | set as |
+| --- | --- | --- |
+| line end | `\n`, U+2028, U+2029 | ends the line |
+| breakable space | U+0020, tab, U+1680, U+2000–U+2006, U+2008–U+200A, U+205F, U+3000 | a tab as U+0020, the others as their own glyph or else as U+0020 |
+| break without width | U+200B, and a breakable space the font has neither glyph for | takes no room |
+| no-break space | U+00A0, U+2007, U+202F | its own glyph or else U+0020, else dropped |
+| control and format | `\r`, a soft hyphen, U+200C–U+200F, U+2060, U+FEFF and every other of Cc and Cf | dropped |
+| any other | | its glyph, else `fallback`, else skipped |
 
-**Freeing.** The sprites are the caller's: `sprites.freeSprite(glyph)` for each. `writeText()` keeps
-no reference to them, to the font or to the text — to change a text, free its sprites and write it
-again. It is not allocation-free: write a text when it changes, not every frame.
+A space moves the pen and yields no sprite, even where the font gives it a box. A char the font
+lacks is drawn as `fallback` when one is given (`{fallback: '?'}`) and otherwise skipped; a
+`fallback` is never drawn for a space, a line end, or a control or format char. A char dropped or
+skipped takes no room, and the kerning pair forms across it. A tab is one space wide: there are no
+tab stops.
+
+**Word wrap.** With `maxWidth`, in units of the mesh, a line breaks before the word that would make
+it wider: at a breakable space, after U+200B, or before an ideograph or a kana (the scripts Han,
+Hiragana and Katakana). The spaces at the break are dropped. A mark after an ideograph — `。`, `」`
+— stays with the char before it, so a closing mark never starts a line. A word wider than
+`maxWidth` on its own stays whole on a line of its own and overflows — there is no hyphenation.
+`lineHeight` takes the place of the font's, in pixels of the font, above 0.
+
+**Spaces at the end of a line** hang out of it: they count neither in its width nor in its
+alignment nor in the `width` of the layout, so `'Score: 100 '` stands where `'Score: 100'` does, and
+a line of nothing but spaces is 0 wide.
+
+**Freeing.** The sprites are the caller's. To change a text, `rewriteText(sprites, glyphs, font,
+next, options?)` writes the next one into the sprites of the last: it reuses the glyphs in reading
+order, frees the ones left over from the last backwards, creates only the ones missing, and rewrites
+`glyphs` in place. `rewriteText(sprites, glyphs, font, '')` frees them all. A caller who frees
+glyphs itself frees them from the last to the first — `freeSprite()` moves the last sprite of the
+pool into the gap, so freed backwards a text at the end of its pool is popped, and no other sprite
+moves. `writeText()` keeps no reference to the sprites, to the font or to the text. Neither is
+allocation-free: write a text when it changes, not every frame.
 
 **Draw order.** `sortBy()` and `sortByViewDepth()` on a pool the glyphs share with other sprites mix
 them in draw order with those sprites — a label may end up behind the sprite it names; give text a
@@ -141,9 +170,13 @@ objects through a sort, still in reading order.
 **Refusals.** A kind without `InstancePosition`, `QuadSize` or `AtlasFrame` — `AnimatedSpriteKind`,
 whose frame comes out of an `animsMap` — is refused before a sprite is created, naming every feature
 missing. A pool that runs full is refused naming how many sprites the text needs; the sprites created
-so far are freed again, so nothing of the text is left behind. A `scale` or `maxWidth` that is no
-number above 0, an `align` it does not know and a `fallback` the font lacks are refused naming the
-option. Sprites that are disposed write nothing and answer an empty array.
+so far are freed again, so nothing of the text is left behind. An error of `createSprite()` — under
+`grow`, a pool that cannot grow — goes on to the caller after the same freeing. A `scale`,
+`lineHeight` or `maxWidth` that is no number above 0, an `align` it does not know and a `fallback`
+the font lacks are refused naming the option. `rewriteText()` refuses a glyph that is no sprite of
+the sprites handed in, naming its index, before anything changes; on a pool that runs full the
+glyphs keep the text they had. Sprites that are disposed write nothing: `writeText()` answers an
+empty array, `rewriteText()` empties `glyphs`.
 
 ## Measuring: `layoutText()`
 

@@ -117,26 +117,26 @@ const joinTextureClasses = (...classes: Array<TextureOptionClasses[] | undefined
 // one message for a missing id, shared by every method that gives up on one, so the two
 // ways of asking for a resource cannot drift apart in what they say
 const noResourceError = (id: string): Error =>
-  new Error(`[TextureStore] No resource with id "${id}" — check your TextureStoreData.items keys.`);
+  new Error(`TextureStore: no resource with id "${id}" — check your TextureStoreData.items keys.`);
 
 // one message for every promise that is cut short, naming the class and the state
-const disposedError = (what: string): Error => new Error(`[TextureStore] ${what} was cancelled: this store has been disposed`);
+const disposedError = (what: string): Error => new Error(`TextureStore: ${what} was cancelled: this store has been disposed`);
 
 // one message for a promise whose resource was disposed directly while it waited on it
 const resourceDisposedError = (what: string, id: string): Error =>
-  new Error(`[TextureStore] ${what} was cancelled: the resource "${id}" has been disposed`);
+  new Error(`TextureStore: ${what} was cancelled: the resource "${id}" has been disposed`);
 
 // one message for a load that never got as far as a parse, naming the step that failed and
 // whatever the failure can be pinned to — the url that was being fetched, the id of the item
 // that is at fault — an item without a source has no url of its own —, or the url of the catalog
 // for what belongs to it as a whole
 const loadFailedError = (source: string, what: string | URL | undefined, cause: unknown): Error =>
-  new Error(`[TextureStore] load failed at the ${source} step${what != null ? `: "${String(what)}"` : ''}`, {cause});
+  new Error(`TextureStore: load failed at the ${source} step${what != null ? `: "${String(what)}"` : ''}`, {cause});
 
 // one message for a getAsync() whose resource reported a failure that keeps a value it asks for
 // from arriving, naming the step that failed and the url it failed on, if there is one
 const resourceFailedError = (what: string, {source, url, error}: TextureResourceLoadFailure): Error =>
-  new Error(`[TextureStore] ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
+  new Error(`TextureStore: ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
 
 const articleOf = (type: string): string => (/^[aeiou]/.test(type) ? 'an' : 'a');
 
@@ -148,14 +148,14 @@ const outOfReachError = (what: string, resource: TextureResource, subTypes: read
   const byType = resource[subTypesOutOfReach](subTypes, 'type');
   if (byType.length) {
     return new Error(
-      `[TextureStore] ${what} cannot resolve: "${id}" is ${articleOf(type)} "${type}" resource, which never builds ${byType.join(', ')}`,
+      `TextureStore: ${what} cannot resolve: "${id}" is ${articleOf(type)} "${type}" resource, which never builds ${byType.join(', ')}`,
     );
   }
   if (type === 'tileset') {
-    return new Error(`[TextureStore] ${what} cannot resolve: "${id}" carries no frameBasedAnimations data`);
+    return new Error(`TextureStore: ${what} cannot resolve: "${id}" carries no frameBasedAnimations data`);
   }
   return new Error(
-    `[TextureStore] ${what} cannot resolve: "${id}" carries no frameBasedAnimations data, and its atlas adapter read none out of its json`,
+    `TextureStore: ${what} cannot resolve: "${id}" carries no frameBasedAnimations data, and its atlas adapter read none out of its json`,
   );
 };
 
@@ -438,18 +438,18 @@ export class TextureStore {
   registerAtlasAdapter(name: string, adapter: AtlasAdapter, options?: {app?: RegExp}): void {
     if (typeof name !== 'string' || name === '') {
       throw new TypeError(
-        `[TextureStore] registerAtlasAdapter() got a name of ${String(name)} — an atlas adapter is registered under a name, a string`,
+        `TextureStore: registerAtlasAdapter() got a name of ${String(name)} — an atlas adapter is registered under a name, a string`,
       );
     }
     if (typeof adapter !== 'function') {
       throw new TypeError(
-        `[TextureStore] registerAtlasAdapter() got an adapter for "${name}" that is no function — an adapter is (json, parentCoords) => {atlas, animations?}`,
+        `TextureStore: registerAtlasAdapter() got an adapter for "${name}" that is no function — an adapter is (json, parentCoords) => {atlas, animations?}`,
       );
     }
     const app: unknown = options?.app;
     if (app !== undefined && !(app instanceof RegExp)) {
       throw new TypeError(
-        `[TextureStore] registerAtlasAdapter() got an app for "${name}" that is no RegExp — app is matched against meta.app of the json, as /aseprite/i`,
+        `TextureStore: registerAtlasAdapter() got an app for "${name}" that is no RegExp — app is matched against meta.app of the json, as /aseprite/i`,
       );
     }
     this.#atlasAdapters = [
@@ -664,7 +664,7 @@ export class TextureStore {
           // a JSON body would otherwise pass for a catalog
           fail(
             'fetch',
-            new Error(`[TextureStore] fetch("${String(url)}") answered ${response.status} ${response.statusText}`),
+            new Error(`TextureStore: fetch("${String(url)}") answered ${response.status} ${response.statusText}`),
             response.status,
           );
           return;
@@ -788,12 +788,12 @@ export class TextureStore {
     for (const [id, item] of Object.entries(data.items)) {
       const problems = textureResourceDataProblems(item);
       if (problems.length) {
-        skipped.set(id, new Error(`[TextureStore] item "${id}" builds no resource: ${problems.join('; ')}`));
+        skipped.set(id, new Error(`TextureStore: item "${id}" builds no resource: ${problems.join('; ')}`));
         continue;
       }
       const wanted = item.tileSet ? 'tileset' : item.atlasUrl ? 'atlas' : item.imageUrl ? 'image' : undefined;
       if (wanted == null) {
-        skipped.set(id, new Error(`[TextureStore] item "${id}" names no tileSet, atlasUrl or imageUrl and builds no resource`));
+        skipped.set(id, new Error(`TextureStore: item "${id}" names no tileSet, atlasUrl or imageUrl and builds no resource`));
         continue;
       }
       if (item.atlasAdapter !== undefined) {
@@ -801,7 +801,7 @@ export class TextureStore {
           leftOut.set(
             id,
             new Error(
-              `[TextureStore] item "${id}" names the atlasAdapter "${item.atlasAdapter}", but atlasAdapter only reads an atlas — left out`,
+              `TextureStore: item "${id}" names the atlasAdapter "${item.atlasAdapter}", but atlasAdapter only reads an atlas — left out`,
             ),
           );
         } else if (!this.#atlasAdapters.some(({name}) => name === item.atlasAdapter)) {
@@ -809,7 +809,7 @@ export class TextureStore {
           skipped.set(
             id,
             new Error(
-              `[TextureStore] item "${id}" names the atlasAdapter "${item.atlasAdapter}", which this store does not know — known: ${known}; register it with registerAtlasAdapter() before parse()`,
+              `TextureStore: item "${id}" names the atlasAdapter "${item.atlasAdapter}", which this store does not know — known: ${known}; register it with registerAtlasAdapter() before parse()`,
             ),
           );
           continue;
@@ -822,7 +822,7 @@ export class TextureStore {
     }
 
     if (conflicts.length) {
-      throw new Error(`[TextureStore] parse() found ${conflicts.length} item(s) of a conflicting type: ${conflicts.join('; ')}`);
+      throw new Error(`TextureStore: parse() found ${conflicts.length} item(s) of a conflicting type: ${conflicts.join('; ')}`);
     }
 
     // only a list with a known name left in it replaces the defaults: one that held nothing
@@ -835,7 +835,7 @@ export class TextureStore {
       emitSafe(this, OnError, {
         source: 'parse',
         error: new Error(
-          `[TextureStore] defaultTextureClasses names ${listCatalogValues(defaults.unknown)}, which no TextureFactory knows — left out`,
+          `TextureStore: defaultTextureClasses names ${listCatalogValues(defaults.unknown)}, which no TextureFactory knows — left out`,
         ),
       });
     }
@@ -857,7 +857,7 @@ export class TextureStore {
           source: 'parse',
           id,
           error: new Error(
-            `[TextureStore] item "${id}" names ${listCatalogValues(unknown)} in texture, which no TextureFactory knows — left out`,
+            `TextureStore: item "${id}" names ${listCatalogValues(unknown)} in texture, which no TextureFactory knows — left out`,
           ),
         });
       }
@@ -1092,7 +1092,7 @@ export class TextureStore {
         if (never.length) {
           // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
           console.warn(
-            `[TextureStore] on(${id}, ${String(type)}) is never called for "${id}": it is ${articleOf(resource.type)} "${resource.type}" resource, which never builds ${never.join(', ')}`,
+            `TextureStore: on(${id}, ${String(type)}) is never called for "${id}": it is ${articleOf(resource.type)} "${resource.type}" resource, which never builds ${never.join(', ')}`,
           );
         }
       }

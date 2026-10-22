@@ -155,13 +155,13 @@ describe('Map2DTileStreamer', () => {
       const create = () => new Map2DTileStreamer(0, 16);
 
       expect(create).toThrow(RangeError);
-      expect(create).toThrow('[Map2DTileStreamer] tileWidth must be a finite number above 0, got 0');
+      expect(create).toThrow('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0');
 
       const layer = new Map2DTileStreamer(8, 16);
       const write = () => (layer.tileWidth = 0);
 
       expect(write).toThrow(RangeError);
-      expect(write).toThrow('[Map2DTileStreamer] tileWidth must be a finite number above 0, got 0');
+      expect(write).toThrow('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0');
       expect(layer.tileWidth, 'tileWidth after a refused write').toBe(8);
     });
     test('xOffset, yOffset', () => {

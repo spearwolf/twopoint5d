@@ -204,7 +204,7 @@ describe('Map2D', () => {
 
       expect(write).toThrow(RangeError);
       // the tile grid is the one of map.tileStreamer, whose setter refuses the value and names itself
-      expect(write).toThrow('[Map2DTileStreamer] tileWidth must be a finite number above 0, got 0');
+      expect(write).toThrow('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0');
     });
   });
 

@@ -45,7 +45,7 @@ function showCanvasMaxResolutionWarning(w: number, h: number) {
   if (!canvasMaxResolutionWarningWasShown) {
     // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
-      `Oops, the canvas width or height should not be bigger than ${Display.MaxResolution} device pixels (${w}x${h} was requested).`,
+      `Display: the canvas width or height should not be bigger than ${Display.MaxResolution} device pixels (${w}x${h} was requested).`,
       'If you need more, please set Display.MaxResolution before you create a Display!',
     );
     canvasMaxResolutionWarningWasShown = true;
@@ -1179,11 +1179,8 @@ export class Display {
 
     if (isWebGLRenderer(domElementOrRenderer)) {
       // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
-      console.warn(
-        'The Display constructor expects a WebGPURenderer or an HTML element as the first argument.',
-        'Since twopoint5d@0.13 a WebGLRenderer is not supported anymore.',
-      );
-      throw new TypeError('The Display constructor expects a WebGPURenderer or an HTML element as the first argument!');
+      console.warn('new Display(): a WebGLRenderer is not supported — the first argument is a WebGPURenderer or an HTML element');
+      throw new TypeError('new Display(): the first argument is a WebGPURenderer or an HTML element');
     }
 
     if (isWebGPURenderer(domElementOrRenderer)) {
@@ -1249,7 +1246,7 @@ export class Display {
       // every wrong first argument gets the same answer, whatever it is: without this a null
       // would die inside init() with a TypeError that names neither this constructor nor what
       // it takes
-      throw new TypeError('The Display constructor expects a WebGPURenderer or an HTML element as the first argument!');
+      throw new TypeError('new Display(): the first argument is a WebGPURenderer or an HTML element');
     }
 
     // Both construction paths end with a renderer and both have to wait for the same promise.
@@ -1918,7 +1915,7 @@ export class Display {
     } catch {
       // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
-        `[Display] resize-to="${value}" is not a valid selector; the display falls back to its resizeToElement or the canvas`,
+        `Display: resize-to="${value}" is not a valid selector; the display falls back to its resizeToElement or the canvas`,
       );
       this.#resizeToSelector = {value, root, element: null, invalid: true};
       return undefined;

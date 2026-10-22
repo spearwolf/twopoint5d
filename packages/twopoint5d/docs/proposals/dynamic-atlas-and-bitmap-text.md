@@ -26,7 +26,7 @@ run time — labels, damage numbers, player names, an avatar from a url — and 
 font — the score, a dialog box, the demo scroller.
 
 ```ts
-import {BitmapFont, DynamicAtlas, FeatureSprites, TexturedSpriteKind, writeText} from '@spearwolf/twopoint5d';
+import {BitmapFont, DynamicAtlas, FeatureSprites, rewriteText, TexturedSpriteKind, writeText} from '@spearwolf/twopoint5d';
 
 declare const fnt: string; // the text of a .fnt file
 declare const fontTexture: import('three/webgpu').Texture;
@@ -43,7 +43,7 @@ panel.createSprite()?.setFrame(face);
 const [font] = BitmapFont.parse(fnt);
 const text = new FeatureSprites(TexturedSpriteKind, {capacity: 256, textures: {colorMap: fontTexture}});
 const glyphs = writeText(text, font, 'GREETINGS TO ALL SCENERS', {x: -200, y: 20, align: 'left'});
-for (const glyph of glyphs) text.freeSprite(glyph); // the caller frees them again
+rewriteText(text, glyphs, font, ''); // the caller frees them again, the last glyph first
 ```
 
 ## 2. What there is today
@@ -372,15 +372,22 @@ or a char whose `page` is not 0 — is refused:
 Each throws before the atlas holds a frame, naming the char by itself and its id where one is
 involved:
 
-- no `common`, or a `lineHeight`, `base`, `scaleW` or `scaleH` that is no finite number (the last
-  two above 0);
+- font data that is no object: `BitmapFont: the font data is null — a font is an object in the JSON layout, {pages, chars, common}`;
+- no `common`, or a `lineHeight`, `base`, `scaleW` or `scaleH` that is no finite number (all but
+  `base` above 0 — a line height of 0 would stack every line onto the first);
 - no `chars` array;
-- a char whose `id` is no whole number of 0 or more, or a field of §4.2 that is no finite number;
-  `width`, `height` below 0;
+- a char whose `id` is no whole number from 0 to 0x10FFFF, or a field of §4.2 that is no finite
+  number; `width`, `height` below 0;
 - a char that lies outside the page: `BitmapFont: the char "A" (65) reaches beyond the page of 128 × 64 — x 120 + width 12`;
 - two chars of one id;
-- a kerning pair whose fields are no finite numbers (pairs naming chars the font lacks are kept and
-  never met).
+- a kerning pair whose `first` or `second` is no code point — a whole number from 0 to 0x10FFFF — or
+  whose `amount` is no finite number (pairs naming chars the font lacks are kept and never met).
+  The pairs are stored under one number per pair, one to one for code points only; `kerning()`
+  answers 0 for a number that is no code point, so no number meets the pair of two others.
+
+A numeric entity in the XML that is no Unicode scalar value — beyond U+10FFFF, a surrogate — stays
+as it is written, as an entity the reader does not know does: entities stand only in text
+attributes (`face`, `charset`, `file`), and a number field holding one is refused by its name.
 
 ## 5. `layoutText()` and `writeText()` (module `text/`)
 
@@ -459,21 +466,41 @@ measured from — at its left edge, middle or right edge by `align`. To write on
   `lineTop − yoffset · s` (top), `width · s` wide and `height · s` high; the pen then moves on by
   `(xadvance + letterSpacing) · s`, and a kerning pair moves the second glyph of it — and the pen with
   it — by `amount · s` before that glyph is placed;
-- the width of a line is the pen after its last char less one `letterSpacing · s` — the spacing lies
-  between chars, not after the last; an empty line is 0 wide;
+- the width of a line is the pen after its last char that is no breakable space, less one
+  `letterSpacing · s` — the spacing lies between chars, not after the last; the spaces behind that
+  char hang out of the line, out of its width and its alignment, and an empty line or one of
+  nothing but spaces is 0 wide;
 - `align` moves the whole line: its left edge to `x` (`'left'`), `x − width / 2` (`'center'`),
   `x − width` (`'right'`);
 - `width` of the layout is its widest line, `height` is `lineCount · lineHeight · s`.
 
-Chars are read by code point (`for … of`), so a char beyond the BMP is one glyph. `\n` ends a line,
-`\r` is dropped. A char the font lacks is drawn as `fallback` when one is given, and otherwise
-skipped: it takes no room and breaks no kerning pair (the pair is formed by the chars on both sides
-of it). A char of width or height 0 — the space — moves the pen and yields no glyph.
+Chars are read by code point (`for … of`), so a char beyond the BMP is one glyph. Each falls into
+one class, tested in this order:
 
-**Word wrap** (`maxWidth`) is greedy: a line breaks at the last space (U+0020) before the word that
-would make it wider than `maxWidth`; the spaces at the break are dropped. A word wider than
-`maxWidth` on its own stays whole on a line of its own and overflows — no hyphenation. `\n` still
-breaks where it stands.
+- a **line end** — `\n`, U+2028, U+2029 — ends the line;
+- a **breakable space** — U+0020, the tab, U+1680, U+2000–U+2006, U+2008–U+200A, U+205F, U+3000 —
+  is a place to break and moves the pen: a tab as U+0020 (no tab stops), the others as their own
+  glyph or else as U+0020. It yields no glyph, whatever box the font gives it;
+- a **break without width** — U+200B, and a breakable space the font has neither glyph for — takes
+  no room and is a place to break before the next char;
+- a **no-break space** — U+00A0, U+2007, U+202F — is set as its own glyph or else as U+0020, holds
+  its word together, and is dropped without either;
+- a **control or format char** — Cc and Cf, among them `\r`, the soft hyphen, U+200C–U+200F,
+  U+2060, U+FEFF — is dropped: no glyph, no room, never the `fallback`;
+- **any other** char is drawn as its glyph, as `fallback` when the font lacks it and one is given,
+  and otherwise skipped. An ideograph or a kana (the scripts Han, Hiragana, Katakana) is a place to
+  break before itself, decided by the char of the text even where the `fallback` draws it.
+
+A char dropped or skipped takes no room and breaks no kerning pair (the pair is formed by the chars
+on both sides of it). A char of width or height 0 moves the pen and yields no glyph.
+
+**Word wrap** (`maxWidth`) is greedy: a line breaks before the word that would make it wider than
+`maxWidth` — at a breakable space, after U+200B, or before an ideograph or a kana; the spaces at the
+break are dropped, the spaces at the start of a line of the text stay. A line breaks only *before*
+an ideograph or a kana, so a closing mark after one (`。`, `」`, of the script Common) stays with it
+and never starts a line; there are no further line-breaking rules, and Hangul breaks at spaces. A
+word wider than `maxWidth` on its own stays whole on a line of its own and overflows — no
+hyphenation. A line end still breaks where it stands.
 
 Not allocation-free: every call builds a layout object per visible glyph. Lay a text out when it
 changes, not every frame.
@@ -494,11 +521,19 @@ Nothing else is written: a `Tint`, a `Rotation` or any other feature of the kind
 value of a new sprite (white, 0) until the caller writes it. A rotation turns a glyph about its
 position, so the base decides the pivot.
 
-It answers the handles, in reading order. The caller frees them —
-`for (const glyph of glyphs) sprites.freeSprite(glyph)` — and sets the font's texture as the
-`colorMap` of the sprites; `writeText()` sets no texture and keeps no reference.
+It answers the handles, in reading order. The caller frees them, the last glyph first —
+`freeSprite()` moves the last sprite of the pool into the gap, so a text at the end of its pool is
+popped and no other sprite moves — and sets the font's texture as the `colorMap` of the sprites;
+`writeText()` sets no texture and keeps no reference.
 
-### 5.4 Refusals of `writeText()` and `layoutText()`
+`rewriteText(sprites, glyphs, font, text, options?)` writes another text into the sprites of one:
+`glyphs` is the array `writeText()` or `rewriteText()` answered on these sprites. It reuses the
+glyphs in reading order, frees the ones left over from the last backwards, creates only the ones
+missing, writes frame, size and position as `writeText()` does, marks the slots of the reused
+glyphs for upload, and rewrites `glyphs` in place and answers it. A reused glyph keeps every value
+it does not write; `rewriteText(sprites, glyphs, font, '')` frees them all and empties the array.
+
+### 5.4 Refusals of `writeText()`, `rewriteText()` and `layoutText()`
 
 - sprites whose kind lacks `InstancePosition`, `QuadSize` or `AtlasFrame` (checked by identity of
   the features) — a `TypeError` before a sprite is created:
@@ -506,12 +541,19 @@ It answers the handles, in reading order. The caller frees them —
 - a pool that runs full: the sprites created so far are freed again, and a `RangeError` names the
   count — `writeText: "GREETINGS TO AL…" needs 21 sprites, and the pool ran full after 12 — give the sprites a larger capacity; no sprite was written`;
   `createSprite()`'s one-time warning goes out as well;
-- `scale` and `maxWidth` that are no finite number above 0, `x`, `y`, `z`, `letterSpacing` and
-  `lineHeight` that are no finite number, an `align` that is none of the three, a `fallback` that is
-  no single char or no glyph of the font — each naming the option and its value.
+- an error of `createSprite()` — under `grow`, a pool that cannot grow — goes on unchanged after
+  the sprites created so far are freed again;
+- `scale`, `lineHeight` and `maxWidth` that are no finite number above 0, `x`, `y`, `z` and
+  `letterSpacing` that are no finite number, an `align` that is none of the three, a `fallback` that
+  is no single char or no glyph of the font — each naming the option and its value:
+  `layoutText: lineHeight must be a finite number above 0, got 0`;
+- for `rewriteText()`, a glyph that is no sprite of these sprites — a `TypeError` naming its index,
+  before anything changes; on a pool that runs full or a throw of `createSprite()` the glyphs keep
+  the text they had.
 
-Disposed sprites — `geometry` gone — write nothing: `writeText()` answers an empty array (the
-mutating call with nothing left to act on, `resource-lifecycle.md` §3).
+Disposed sprites — `geometry` gone — write nothing: `writeText()` answers an empty array,
+`rewriteText()` empties `glyphs` and answers it (the mutating call with nothing left to act on,
+`resource-lifecycle.md` §3).
 
 ## 6. Ownership and lifecycle
 

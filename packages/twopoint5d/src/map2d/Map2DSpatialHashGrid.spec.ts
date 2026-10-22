@@ -32,7 +32,7 @@ describe('Map2DSpatialHashGrid', () => {
     const create = () => new Map2DSpatialHashGrid(0, 100);
 
     expect(create).toThrow(RangeError);
-    expect(create).toThrow('[Map2DSpatialHashGrid] tileWidth must be a finite number above 0, got 0');
+    expect(create).toThrow('Map2DSpatialHashGrid: tileWidth must be a finite number above 0, got 0');
   });
 
   test('add', () => {
@@ -236,7 +236,7 @@ describe('Map2DSpatialHashGrid', () => {
       }
 
       expect(() => new Map2DSpatialHashGrid(10, 10).add({aabb: new AABB2(0, 0, NaN, 10)})).toThrow(
-        '[Map2DSpatialHashGrid] the aabb of a renderable must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10',
+        'Map2DSpatialHashGrid: the aabb of a renderable must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10',
       );
     });
 
@@ -276,7 +276,7 @@ describe('Map2DSpatialHashGrid', () => {
         expect(() => grid.findWithin(aabb, [])).toThrow(RangeError);
       }
       expect(() => grid.findWithin(new AABB2(0, 0, NaN, 10))).toThrow(
-        '[Map2DSpatialHashGrid] the aabb of findWithin() must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10',
+        'Map2DSpatialHashGrid: the aabb of findWithin() must have a finite left, top, width and height, got left 0, top 0, width NaN, height 10',
       );
     });
 
@@ -287,7 +287,7 @@ describe('Map2DSpatialHashGrid', () => {
       expect(() => grid.getTiles(0, 0, Infinity, 1)).toThrow(RangeError);
       expect(() => grid.getTiles(0, 0, 1, NaN, [])).toThrow(RangeError);
       expect(() => grid.getTiles(0, 0, 1, Infinity)).toThrow(
-        '[Map2DSpatialHashGrid] the width and height of getTiles() must be finite numbers, got width 1, height Infinity',
+        'Map2DSpatialHashGrid: the width and height of getTiles() must be finite numbers, got width 1, height Infinity',
       );
     });
   });

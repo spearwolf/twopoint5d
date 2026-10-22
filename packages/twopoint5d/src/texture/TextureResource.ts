@@ -184,7 +184,7 @@ const SUBTYPES_BUILT_BY_TYPE: Record<TextureResourceType, readonly TextureResour
 // all — and this is the error it is skipped with.
 const wrongAnimationDataError = (resource: TextureResource, animation: string, shape: string | undefined): Error =>
   new Error(
-    `[TextureResource] animation "${animation}" of resource "${resource.id}" carries ${shape ?? 'no known'} data, ` +
+    `TextureResource: animation "${animation}" of resource "${resource.id}" carries ${shape ?? 'no known'} data, ` +
       `which a "${resource.type}" resource cannot use`,
   );
 
@@ -1059,7 +1059,7 @@ export class TextureResource {
         const {tileIds} = data as {tileIds: unknown};
         if (!Array.isArray(tileIds)) {
           throw new Error(
-            `[TextureResource] animation "${name}" of resource "${this.id}" carries tileIds of ${describeValue(tileIds)} ` +
+            `TextureResource: animation "${name}" of resource "${this.id}" carries tileIds of ${describeValue(tileIds)} ` +
               `— tileIds is an array of tile ids`,
           );
         }
@@ -1107,7 +1107,7 @@ export class TextureResource {
                   source: 'atlas',
                   url: atlasUrl,
                   status: response.status,
-                  error: new Error(`[TextureResource] fetch("${atlasUrl}") answered ${response.status} ${response.statusText}`),
+                  error: new Error(`TextureResource: fetch("${atlasUrl}") answered ${response.status} ${response.statusText}`),
                 },
               };
             } else {
@@ -1128,7 +1128,7 @@ export class TextureResource {
                   failure: {
                     source: 'atlas',
                     url: atlasUrl,
-                    error: new Error(`[TextureResource] the response of "${atlasUrl}" is no texture atlas json`),
+                    error: new Error(`TextureResource: the response of "${atlasUrl}" is no texture atlas json`),
                   },
                 };
               }
@@ -1173,7 +1173,7 @@ export class TextureResource {
           this.#fail('atlasImage', {
             source: 'atlas',
             url,
-            error: new Error(`[TextureResource] the response of "${url}" names no image and no overrideImageUrl was given`),
+            error: new Error(`TextureResource: the response of "${url}" names no image and no overrideImageUrl was given`),
           });
           return;
         }
@@ -1240,12 +1240,12 @@ export class TextureResource {
           const answered = (typeof result === 'object' && result !== null ? result : {}) as Partial<AtlasAdapterResultShape>;
           if (!(answered.atlas instanceof TextureAtlas)) {
             throw new Error(
-              `[TextureResource] the atlas adapter of resource "${this.id}" answered no atlas — an adapter answers {atlas, animations?}`,
+              `TextureResource: the atlas adapter of resource "${this.id}" answered no atlas — an adapter answers {atlas, animations?}`,
             );
           }
           if (answered.animations !== undefined && !(answered.animations instanceof FrameBasedAnimations)) {
             throw new Error(
-              `[TextureResource] the atlas adapter of resource "${this.id}" answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none`,
+              `TextureResource: the atlas adapter of resource "${this.id}" answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none`,
             );
           }
           atlas = answered.atlas;

@@ -151,7 +151,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
     if (this.isAttachedToGeometry) {
       throw new Error(
-        'resize() is only allowed before the pool is attached to a geometry: the three.js attributes and their GPU buffers are sized once from the pool capacity and cannot be grown or shrunk afterwards',
+        'VertexObjectPool#resize() is only allowed before the pool is attached to a geometry: the three.js attributes and their GPU buffers are sized once from the pool capacity and cannot be grown or shrunk afterwards',
       );
     }
 

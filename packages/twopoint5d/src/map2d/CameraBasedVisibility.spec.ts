@@ -1144,7 +1144,7 @@ describe('CameraBasedVisibility', () => {
       }
       expect(() => {
         visibility.frustumBoxScale = 0.5;
-      }).toThrow('[CameraBasedVisibility] frustumBoxScale must be a finite number of at least 1, got 0.5');
+      }).toThrow('CameraBasedVisibility: frustumBoxScale must be a finite number of at least 1, got 0.5');
 
       visibility.frustumBoxScale = 1;
       expect(visibility.frustumBoxScale).toBe(1);
@@ -1203,9 +1203,7 @@ describe('CameraBasedVisibility', () => {
         expect(visibility.depth, `depth after ${value}`).toBe(42);
       }
 
-      expect(() => (visibility.depth = -1)).toThrow(
-        '[CameraBasedVisibility] depth must be a finite number of at least 0, got -1',
-      );
+      expect(() => (visibility.depth = -1)).toThrow('CameraBasedVisibility: depth must be a finite number of at least 0, got -1');
 
       visibility.depth = 0;
       expect(visibility.depth).toBe(0);

@@ -7,8 +7,8 @@ import {
   TexturedSpriteKind,
   type TextureAtlas,
   type TextureAtlasFrame,
+  rewriteText,
   type WriteTextOptions,
-  writeText,
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {Color, Group, type Texture} from 'three/webgpu';
@@ -88,9 +88,12 @@ const easeInCubic = (t: number) => t * t * t;
 const approach = (value: number, target: number, rate: number, dt: number) => target + (value - target) * Math.exp(-rate * dt);
 const inside = (rect: Rect, x: number, y: number) => x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
 
-/** Text written with `writeText()`: freed and written anew when it changes, never every frame. */
+/**
+ * Text written with `rewriteText()` when it changes, never every frame: a new text reuses the sprites
+ * of the last one, and only the glyphs it has more or fewer are created or freed.
+ */
 class TextBlock {
-  glyphs: TexturedSprite[] = [];
+  readonly glyphs: TexturedSprite[] = [];
   #shown = 0;
 
   constructor(
@@ -99,8 +102,7 @@ class TextBlock {
   ) {}
 
   write(text: string, options: WriteTextOptions, color: Color): void {
-    this.clear();
-    this.glyphs = writeText(this.sprites, this.font, text, options);
+    rewriteText(this.sprites, this.glyphs, this.font, text, options);
     for (const glyph of this.glyphs) glyph.setColor(color, 1);
     this.#shown = this.glyphs.length;
   }
@@ -123,8 +125,7 @@ class TextBlock {
   }
 
   clear(): void {
-    for (const glyph of this.glyphs) this.sprites.freeSprite(glyph);
-    this.glyphs = [];
+    rewriteText(this.sprites, this.glyphs, this.font, '');
     this.#shown = 0;
   }
 }

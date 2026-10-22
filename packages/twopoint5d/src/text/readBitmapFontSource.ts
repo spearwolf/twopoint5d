@@ -1,4 +1,5 @@
 import type {BitmapFontData} from './BitmapFont.js';
+import {isScalarValue} from './codePoints.js';
 
 // The readers of the two string spellings of BMFont, text and XML, into the JSON layout. Neither
 // checks the values: `BitmapFont` does that for all three spellings alike.
@@ -71,10 +72,15 @@ const readText = (source: string): BitmapFontData => {
 
 const ENTITIES: Readonly<Record<string, string>> = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"};
 
+// A numeric entity that is no char — beyond U+10FFFF, a surrogate, or too large for a number — stays as
+// it is written, like a named entity it does not know. An entity stands only in a text attribute (`face`,
+// `charset`, `file`); in a number field `BitmapFont` refuses the string anyway, naming the field
 const decodeEntities = (value: string): string =>
   value.replace(/&(#x[0-9a-fA-F]+|#\d+|\w+);/g, (match, name: string) => {
-    if (name.startsWith('#x')) return String.fromCodePoint(Number.parseInt(name.slice(2), 16));
-    if (name.startsWith('#')) return String.fromCodePoint(Number(name.slice(1)));
+    if (name.startsWith('#')) {
+      const code = name.startsWith('#x') ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
+      return isScalarValue(code) ? String.fromCodePoint(code) : match;
+    }
     return ENTITIES[name] ?? match;
   });
 

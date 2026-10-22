@@ -52,13 +52,13 @@ export interface TileSetOptions {
 
 const assertOption = (valid: boolean, name: string, rule: string, value: unknown): void => {
   if (!valid) {
-    throw new RangeError(`[TileSet] ${name} must be ${rule}, got ${describeValue(value)}`);
+    throw new RangeError(`TileSet: ${name} must be ${rule}, got ${describeValue(value)}`);
   }
 };
 
 const assertFits = (fits: boolean, message: () => string): void => {
   if (!fits) {
-    throw new RangeError(`[TileSet] ${message()}`);
+    throw new RangeError(`TileSet: ${message()}`);
   }
 };
 
