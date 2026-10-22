@@ -6,9 +6,16 @@
 // Every fence is tracked, marked or not, because a `ts check` line inside another code
 // block (a four-backtick block that shows Markdown, say) is an example of the marker, not
 // the marker. Backtick and tilde fences count alike, and a fence counts where CommonMark
-// sees one: indented at most three columns past the start of its line, or past the content
-// of the list item it sits in, a tab moving on to the next multiple of four. A line
-// indented further is code of an indented block and neither opens nor closes a fence.
+// sees one: indented at most three columns past the start of its line or past the
+// content of the list item it sits in, the line of the item's marker included. A tab
+// moves on to the next multiple of four columns, before a fence as after a list marker.
+// A line indented further is code of an indented block and neither opens nor closes a
+// fence. A line of three or more of the same `*`, `-` or `_`, spaced or not, is a
+// thematic break and no list item.
+//
+// The code of a block loses the indentation CommonMark takes off it, up to the column of
+// its fence, and a snippet carries for each code line how far that moved its characters,
+// so that a diagnostic points at the column of the Markdown line, tabs and all.
 //
 // A marker that is nearly right (`js check`, `ts check strict`) is reported instead of
 // ignored: a typo must not drop a block out of the check without a word. So is a marker
@@ -20,11 +27,15 @@
 // blocks are neither compiled nor checked for their marker. A changelog without an
 // Unreleased section has no block to check.
 
-const OPENING_FENCE = /^([ \t]*)(`{3,}|~{3,})(.*)$/;
+// applied to the rest of a line behind its indentation and its list markers
+const OPENING_FENCE = /^(`{3,}|~{3,})(.*)$/;
 const CLOSING_FENCE = /^([ \t]*)(`{3,}|~{3,})\s*$/;
 const QUOTED_FENCE = /^\s*>[\s>]*(`{3,}|~{3,})(.*)$/;
-// a bullet or an ordered marker of a list item, and the spaces after it
-const LIST_ITEM = /^[ \t]*([-+*]|\d{1,9}[.)])( +|$)/;
+// a bullet or an ordered marker of a list item, and the spaces and tabs after it
+const LIST_ITEM = /^([-+*]|\d{1,9}[.)])([ \t]+|$)/;
+// CommonMark: three or more of the same `*`, `-` or `_`, spaced or not, make a thematic break,
+// which wins over a list item
+const THEMATIC_BREAK = /^([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 const LEADING_WHITESPACE = /^[ \t]*/;
 
 // CommonMark: a fence may be indented up to three columns past the start of its container,
@@ -32,14 +43,39 @@ const LEADING_WHITESPACE = /^[ \t]*/;
 const MAX_FENCE_INDENT = 3;
 
 /**
- * The column a run of leading spaces and tabs ends at: a tab moves on to the next multiple of 4.
+ * The column a run of spaces and tabs that starts at column `from` ends at: a tab moves on to the
+ * next multiple of 4.
  * @param {string} whitespace
+ * @param {number} [from]
  * @returns {number}
  */
-const columnsOf = (whitespace) => {
-  let column = 0;
+const columnsOf = (whitespace, from = 0) => {
+  let column = from;
   for (const char of whitespace) column = char === '\t' ? column + 4 - (column % 4) : column + 1;
   return column;
+};
+
+/**
+ * Takes up to `columns` columns of indentation off a code line, as CommonMark does with the lines
+ * of a fenced block: a tab counts up to the next multiple of 4, and one that reaches past `columns`
+ * leaves the rest of its width as spaces.
+ * @param {string} text
+ * @param {number} columns
+ * @returns {{code: string, offset: number}} `offset` is what a character index in `code` needs
+ *   added to point at the same character in `text`
+ */
+const stripIndent = (text, columns) => {
+  let column = 0;
+  let index = 0;
+  while (index < text.length && column < columns) {
+    const char = text[index];
+    if (char === ' ') column += 1;
+    else if (char === '\t') column += 4 - (column % 4);
+    else break;
+    index += 1;
+  }
+  const kept = column > columns ? ' '.repeat(column - columns) : '';
+  return {code: kept + text.slice(index), offset: index - kept.length};
 };
 
 const MARKER = ['ts', 'check'];
@@ -52,9 +88,11 @@ const UNRELEASED_HEADING = /^## \[Unreleased\]/;
  * @param {string} markdown
  * @param {string} file
  * @returns {{
- *   snippets: Array<{file: string, line: number, indent: number, code: string}>,
+ *   snippets: Array<{file: string, line: number, code: string, offsets: number[]}>,
  *   problems: Array<{file: string, line: number, message: string}>,
  * }}
+ *   `offsets` holds for each line of `code` what a character index of that line needs added to
+ *   point at the same character of the Markdown line.
  */
 export function extractSnippets(markdown, file) {
   const snippets = [];
@@ -70,12 +108,14 @@ export function extractSnippets(markdown, file) {
   /**
    * @typedef {object} OpenFence
    * @property {boolean} marked
-   * @property {number} indent the columns of the fence line itself
+   * @property {number} indent the column the fence starts at; CommonMark takes up to that many
+   *   columns off each code line
    * @property {number} base the content column of the list item the fence sits in, 0 outside a list
    * @property {'`' | '~'} fence
    * @property {number} size
    * @property {number} line
    * @property {string[]} code
+   * @property {number[]} offsets for each code line, the `offset` of `stripIndent()`
    */
   /** @type {OpenFence | null} */
   let open = null;
@@ -88,13 +128,17 @@ export function extractSnippets(markdown, file) {
 
     if (open == null) {
       if (text.trim() === '') return;
-      const indent = columnsOf(LEADING_WHITESPACE.exec(text)?.[0] ?? '');
-      // a line indented less than the content of a list item is outside that item. A lazy
-      // continuation line of a paragraph ends the item here, which CommonMark does not; only a fence
-      // four or more columns deep that follows such a line in the same item is read differently
+      const whitespace = LEADING_WHITESPACE.exec(text)?.[0] ?? '';
+      const indent = columnsOf(whitespace);
+      // a line indented less than the content of a list item is outside that item. Paragraphs are
+      // not tracked: a lazy continuation line of a paragraph ends the item here, and a list marker
+      // that may not interrupt a paragraph (an empty item, an ordered one that does not start at 1)
+      // starts one all the same, which CommonMark does neither; only a fence four or more columns
+      // deep that follows such a line is read differently
       while (listContent.length > 0 && /** @type {number} */ (listContent.at(-1)) > indent) listContent.pop();
-      const base = listContent.at(-1) ?? 0;
-      // code of an indented block, or text that goes on a paragraph: it opens no fence and no list item
+      let base = listContent.at(-1) ?? 0;
+      // code of an indented block, or text that goes on a paragraph: it opens no fence and no
+      // list item
       if (indent - base > MAX_FENCE_INDENT) return;
 
       // a heading inside a code block is code, so the sections are tracked between fences only
@@ -105,19 +149,31 @@ export function extractSnippets(markdown, file) {
         return;
       }
 
-      const match = OPENING_FENCE.exec(text);
-      if (match == null) {
-        const item = LIST_ITEM.exec(text);
-        if (item != null) {
-          const marker = /** @type {string} */ (item[1]);
-          const spaces = /** @type {string} */ (item[2]).length;
-          // CommonMark: the content starts after 1 to 4 spaces; after 5 or more, or at the end of the
-          // line, one column past the marker
-          listContent.push(indent + marker.length + (spaces >= 1 && spaces <= 4 ? spaces : 1));
-          return;
-        }
+      // the line is read from its first character on: a list marker hands the rest of the line on
+      // as the first line of its item, which may open a fence or start with another marker
+      let column = indent;
+      let rest = text.slice(whitespace.length);
+      for (;;) {
+        if (THEMATIC_BREAK.test(rest)) return;
+        const item = LIST_ITEM.exec(rest);
+        if (item == null) break;
+        const start = column + /** @type {string} */ (item[1]).length;
+        const end = columnsOf(/** @type {string} */ (item[2]), start);
+        rest = rest.slice(item[0].length);
+        // CommonMark: the content starts after 1 to 4 columns of spaces or tabs; on an otherwise
+        // empty line, or after 5 or more (the item starts with indented code), one column past the
+        // marker
+        const content = rest === '' || end - start > 4 ? start + 1 : end;
+        listContent.push(content);
+        // an empty first line, or one of indented code, opens no fence and holds no other marker
+        if (content !== end) return;
+        column = content;
+        base = content;
+      }
 
-        const quoted = inScope ? QUOTED_FENCE.exec(text) : null;
+      const match = OPENING_FENCE.exec(rest);
+      if (match == null) {
+        const quoted = inScope ? QUOTED_FENCE.exec(rest) : null;
         if (quoted != null) {
           // both groups of the pattern always take part in a match
           const quotedFence = /** @type {string} */ (quoted[1]);
@@ -137,29 +193,30 @@ export function extractSnippets(markdown, file) {
         return;
       }
       // the groups of the pattern always take part in a match
-      const run = /** @type {string} */ (match[2]);
-      const rest = /** @type {string} */ (match[3]);
+      const run = /** @type {string} */ (match[1]);
+      const info = /** @type {string} */ (match[2]);
       const fence = /** @type {'`' | '~'} */ (run.charAt(0));
       // CommonMark: the info string of a backtick fence holds no backtick, so a line such
       // as "```inline``` prose" opens nothing; the info string of a tilde fence may
-      if (fence === '`' && rest.includes('`')) return;
+      if (fence === '`' && info.includes('`')) return;
 
-      const info = rest.trim();
-      const words = info.split(/\s+/).filter(Boolean);
+      const marker = info.trim();
+      const words = marker.split(/\s+/).filter(Boolean);
       const marked = inScope && words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
 
       if (inScope && !marked && words.includes('check')) {
-        problems.push({file, line: lineNumber, message: `unknown marker \`${info}\` — only \`ts check\` is checked`});
+        problems.push({file, line: lineNumber, message: `unknown marker \`${marker}\` — only \`ts check\` is checked`});
       }
 
       open = {
         marked,
-        indent,
+        indent: column,
         base,
         fence,
         size: run.length,
         line: lineNumber,
         code: [],
+        offsets: [],
       };
       return;
     }
@@ -174,16 +231,16 @@ export function extractSnippets(markdown, file) {
       run.length >= open.size
     ) {
       if (open.marked) {
-        snippets.push({file, line: open.line + 1, indent: open.indent, code: open.code.join('\n')});
+        snippets.push({file, line: open.line + 1, code: open.code.join('\n'), offsets: open.offsets});
       }
       open = null;
       return;
     }
 
     if (open.marked) {
-      // a fence inside a list item is indented; CommonMark takes that much off every
-      // code line
-      open.code.push(text.replace(new RegExp(`^ {0,${open.indent}}`), ''));
+      const {code, offset} = stripIndent(text, open.indent);
+      open.code.push(code);
+      open.offsets.push(offset);
     }
   });
 

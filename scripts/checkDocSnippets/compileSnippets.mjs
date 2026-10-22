@@ -14,7 +14,7 @@ const VIRTUAL_DIR = '__doc_snippets__';
 
 /**
  * @param {{
- *   snippets: Array<{file: string, line: number, indent: number, code: string}>,
+ *   snippets: Array<{file: string, line: number, code: string, offsets: number[]}>,
  *   anchorDir: string,
  *   tsconfigPath: string,
  * }} params
@@ -77,7 +77,7 @@ export function compileSnippets({snippets, anchorDir, tsconfigPath}) {
     diagnostics.push({
       file: snippet.file,
       line: snippet.line + line,
-      column: character + 1 + snippet.indent,
+      column: character + 1 + (snippet.offsets[line] ?? 0),
       code: diagnostic.code,
       message,
     });
