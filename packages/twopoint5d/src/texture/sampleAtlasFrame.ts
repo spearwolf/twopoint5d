@@ -1,4 +1,4 @@
-import {clamp, float, mix, round, sub, texture, vec2} from 'three/tsl';
+import {clamp, float, mix, sub, texture, vec2} from 'three/tsl';
 import {
   LinearMipmapLinearFilter,
   LinearMipmapNearestFilter,
@@ -10,6 +10,7 @@ import {
 } from 'three/webgpu';
 
 import type {AtlasFrameTable} from './AtlasFrameTable.js';
+import {roundHalfUp} from './roundHalfUp.js';
 import {sampleFrameAt} from './sampleFrameAt.js';
 
 /** How {@link sampleAtlasFrame} treats a uv outside `[0, 1]` on one axis. */
@@ -62,8 +63,9 @@ const MIPMAP_FILTERS: readonly MinificationTextureFilter[] = [
  * describes. `map` is the image of the atlas, loaded with `flipY = false` as `TextureFactory` and
  * `TextureStore` load it; with `flipY = true` every frame is read from the wrong place.
  *
- * A float `index` is rounded, and every index is clamped to the frames of the table — silently: an
- * index past the last frame draws the last frame.
+ * A float `index` is rounded to the nearest frame, a half up — 2.5 draws frame 3 on WebGPU and WebGL 2
+ * alike —, and every index is clamped to the frames of the table — silently: an index past the last
+ * frame draws the last frame.
  *
  * With a `minFilter` of `map` that reads mipmaps, the sample takes explicit gradients, worked out from
  * the uv before the wrap, so a repeated frame shows no seam of the smallest mip level at its wraps. The
@@ -103,7 +105,7 @@ export function sampleAtlasFrame(
     throw new RangeError(`sampleAtlasFrame: the inset ${inset} is no finite number of 0 or more`);
   }
 
-  const frameIndex = clamp(round(typeof index === 'number' ? float(index) : index.toFloat()), 0, table.size - 1).toInt();
+  const frameIndex = clamp(roundHalfUp(typeof index === 'number' ? float(index) : index.toFloat()), 0, table.size - 1).toInt();
   const first = frameIndex.mul(3).toInt();
   const texCoords = table.element(first);
   const measures = table.element(first.add(1).toInt());

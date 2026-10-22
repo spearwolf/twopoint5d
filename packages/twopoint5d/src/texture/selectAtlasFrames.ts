@@ -1,4 +1,5 @@
 import type {AtlasFrameTableSelection} from './AtlasFrameTable.js';
+import {liveFrameIds} from './internals.js';
 import type {TextureAtlas, TextureAtlasFrame, TextureAtlasFrameName} from './TextureAtlas.js';
 
 /** The frames a selection takes out of an atlas, in its order, and the index of every name among them. */
@@ -10,7 +11,9 @@ export interface SelectedAtlasFrames {
 /**
  * The frames of `atlas` a selection names: a list of names in its order — a name listed twice keeps
  * its first index —, the names a `RegExp` matches as `TextureAtlas#frameNames()` answers them, or
- * without one every frame, its index its frame id. `where` names the caller in the errors.
+ * without one every frame the atlas has not let go of, in the order of their ids — the index of a
+ * frame its frame id, unless `DynamicAtlas#remove()` let go of a frame before it. `where` names the
+ * caller in the errors.
  *
  * @throws {Error} for a name the atlas does not hold.
  * @internal
@@ -22,8 +25,14 @@ export function selectAtlasFrames(
 ): SelectedAtlasFrames {
   const indices = new Map<TextureAtlasFrameName, number>();
   if (selection == null) {
-    const frames = Array.from({length: atlas.size}, (_, id) => atlas.get(id)!);
-    for (const name of atlas.frameNames()) indices.set(name, atlas.frameId(name)!);
+    // a frame DynamicAtlas#remove() let go of keeps its id and takes no index: its cell is cleared
+    const ids = atlas[liveFrameIds]();
+    const indexOfId = new Map<number, number>();
+    const frames = ids.map((id, index) => {
+      indexOfId.set(id, index);
+      return atlas.get(id)!;
+    });
+    for (const name of atlas.frameNames()) indices.set(name, indexOfId.get(atlas.frameId(name)!)!);
     return {frames, indices};
   }
   const names = Array.isArray(selection) ? selection : atlas.frameNames(selection as RegExp);

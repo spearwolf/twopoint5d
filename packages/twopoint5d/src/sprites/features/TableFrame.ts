@@ -1,5 +1,6 @@
 import {abs, add, atan, clamp, div, float, int, max, mul, round, step, sub} from 'three/tsl';
 import type {Node} from 'three/webgpu';
+import {roundHalfUp} from '../../texture/roundHalfUp.js';
 import {describeValue} from '../../utils/describeValue.js';
 import {cameraPositionLocal} from '../cameraNodes.js';
 import {texCoordsFromIndex} from '../node-utils.js';
@@ -8,17 +9,17 @@ import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 export interface TableFrameOptions {
   /**
    * How many views of each frame the table holds — a whole number of 2 or more. The shader reads the view
-   * the camera sees the sprite from out of the block of the frame, entry `round(frameIndex) · views + view`;
-   * the kind needs `Yaw` for the facing of the sprite.
+   * the camera sees the sprite from out of the block of the frame, entry
+   * `floor(frameIndex + 0.5) · views + view`; the kind needs `Yaw` for the facing of the sprite.
    */
   readonly views?: number;
 }
 
 export interface TableFrameApi {
   /**
-   * The frame the sprite shows — a frame number with views and without them. Rounded to a whole frame; a
-   * frame before the first or past the last of the table shows the first or the last frame, with views
-   * the view of that frame.
+   * The frame the sprite shows — a frame number with views and without them. Rounded to the nearest
+   * frame, a half up; a frame before the first or past the last of the table shows the first or the last
+   * frame, with views the view of that frame.
    *
    * `frameIndex` is a static attribute: a later change reaches the gpu once it is marked —
    * `spritePool.touchVO(sprite, 'frameIndex')` or `geometry.touch('frameIndex')` — or with every
@@ -103,7 +104,7 @@ export function tableFrame(options?: TableFrameOptions): SpriteFeature<TableFram
         // the entries of the table: its frames, or with views its frames times their views
         const entries = lookup(int(0)).x;
         const lastEntry = max(sub(entries, 1), float(0));
-        const frameIndex = round(attribute<'float'>('frameIndex'));
+        const frameIndex = roundHalfUp(attribute<'float'>('frameIndex'));
         let index: Node<'float'> = frameIndex;
         if (views !== undefined) {
           // entries is a whole number: half an entry more keeps the quotient 0.5 / views away from every

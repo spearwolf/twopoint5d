@@ -147,6 +147,25 @@ describe('TileSet', () => {
       );
     });
 
+    test('a tileCount that does not fit is refused, naming how many tiles fit, and the atlas handed in stays empty', () => {
+      const atlas = new TextureAtlas();
+      const create = () => new TileSet(atlas, new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileHeight: 16, tileCount: 17});
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(
+        'TileSet: the tileCount of 17 does not fit into the baseCoords: 16 tiles of 16 × 16 fit into 64 × 64 with margin 0, padding 0 and spacing 0',
+      );
+      expect(atlas.size).toBe(0);
+    });
+
+    test('a tileCount that fits exactly is laid in full', () => {
+      const atlas = new TextureAtlas();
+      const tiles = new TileSet(atlas, new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileHeight: 16, tileCount: 16});
+
+      expect(tiles.tileCount).toBe(16);
+      expect(atlas.size).toBe(16);
+    });
+
     test('a first tile that fills the baseCoords exactly is laid', () => {
       const tiles = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 256, tileHeight: 256});
 

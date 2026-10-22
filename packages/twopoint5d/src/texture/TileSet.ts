@@ -43,7 +43,10 @@ export interface TileSetOptions {
   /** The space around each tile inside its cell — a finite number of 0 or more. Defaults to 0. */
   padding?: number;
 
-  /** How many tiles the set holds — a whole number of 1 or more. Defaults to as many tiles as fit into the image. */
+  /**
+   * How many tiles the set holds — a whole number of 1 or more, no more than fit into the image. Defaults
+   * to as many tiles as fit into the image.
+   */
   tileCount?: number;
 
   /** The `tileId` of the first tile — a whole number. Defaults to 1. */
@@ -87,8 +90,9 @@ export class TileSet<D = TextureAtlasFrameData> {
   #firstFrameId = -1;
 
   /**
-   * How many tiles the layout holds: the option `tileCount`, or as many as fit into the `baseCoords`
-   * when none is given. The constructor lays the tiles out once, and the number does not change afterwards.
+   * How many tiles the layout holds: the option `tileCount` — the constructor refuses one that does not
+   * fit into the `baseCoords` —, or as many as fit into the `baseCoords` when none is given. The
+   * constructor lays the tiles out once, and the number does not change afterwards.
    */
   get tileCount(): number {
     return this.#tileCount;
@@ -106,7 +110,9 @@ export class TileSet<D = TextureAtlasFrameData> {
    * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if `margin`,
    * `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a whole number
    * of 1 or more, if `firstId` is not a whole number, if the width or height of the `baseCoords`
-   * is not finite, or if the first tile does not fit into the `baseCoords` with its `margin` and `padding`.
+   * is not finite, if the first tile does not fit into the `baseCoords` with its `margin` and `padding`,
+   * or if the tiles of a `tileCount` do not all fit into the `baseCoords`; the atlas handed in is then
+   * left as it was.
    */
   constructor(...args: [TextureAtlas<D>, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
@@ -245,15 +251,12 @@ export class TileSet<D = TextureAtlasFrameData> {
     let x = margin;
     let y = margin;
     let tileCount = 0;
+    // the top left of every tile, x and y in turn: the tiles go into the atlas only once their number
+    // is checked, so a refused tileCount leaves the atlas handed in as it was
+    const positions: number[] = [];
 
     while (tileCount < tileCountLimit) {
-      const coords = new TextureCoords(this.baseCoords, x + padding, y + padding, this.tileWidth, this.tileHeight);
-
-      const frameId = this.atlas.add(coords);
-
-      if (this.#firstFrameId === -1) {
-        this.#firstFrameId = frameId;
-      }
+      positions.push(x, y);
 
       ++tileCount;
 
@@ -272,6 +275,24 @@ export class TileSet<D = TextureAtlasFrameData> {
           break;
         }
       }
+    }
+
+    assertFits(
+      this.options.tileCount === undefined || tileCount === tileCountLimit,
+      () =>
+        `the tileCount of ${tileCountLimit} does not fit into the baseCoords: ${tileCount === 1 ? '1 tile' : `${tileCount} tiles`} of ${this.tileWidth} × ${this.tileHeight} fit into ${baseWidth} × ${baseHeight} with margin ${margin}, padding ${padding} and spacing ${spacing}`,
+    );
+
+    for (let i = 0; i < positions.length; i += 2) {
+      const coords = new TextureCoords(
+        this.baseCoords,
+        positions[i]! + padding,
+        positions[i + 1]! + padding,
+        this.tileWidth,
+        this.tileHeight,
+      );
+      const frameId = this.atlas.add(coords);
+      if (i === 0) this.#firstFrameId = frameId;
     }
 
     this.#tileCount = tileCount;

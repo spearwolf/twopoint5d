@@ -49,19 +49,23 @@ export class TexturePackerJson {
    * sprite feature and an animation `FrameBasedAnimations#add()` builds from the atlas lay it where the
    * untrimmed sprite has it.
    *
+   * `D` is the type of the frame entries: a json whose entries carry more than TexturePacker writes —
+   * Aseprite's `duration` — keeps that type in the atlas `parse()` answers, and a `target` takes frames
+   * of that type.
+   *
    * @throws {Error} if a frame name appears more than once in the json or is already taken in the `target`;
    * the `target` stays as it was.
    */
-  static parse(
-    data: TexturePackerJsonData,
+  static parse<D extends TexturePackerFrameData = TexturePackerFrameData>(
+    data: {frames: Record<string, D> | (D & {filename: string})[]; meta: TexturePackerMetaData},
     parentCoords?: TextureCoords,
-    target?: TextureAtlas,
-  ): [atlas: TextureAtlas, meta: TexturePackerMetaData] {
-    target ??= new TextureAtlas();
+    target?: TextureAtlas<D>,
+  ): [atlas: TextureAtlas<D>, meta: TexturePackerMetaData] {
+    target ??= new TextureAtlas<D>();
 
     parentCoords ??= new TextureCoords(0, 0, data.meta.size.w, data.meta.size.h);
 
-    const entries: [name: string, frameData: TexturePackerFrameData][] = Array.isArray(data.frames)
+    const entries: [name: string, frameData: D][] = Array.isArray(data.frames)
       ? data.frames.map((frameData) => [frameData.filename, frameData])
       : Object.entries(data.frames);
 

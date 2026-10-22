@@ -242,14 +242,19 @@ a frame then reads its own edge, not the padding.
   `atlas.frameId(name)` answer `undefined`, and `add(name, …)` may take it again — for a new cell.
   The cell is **not** reused: a shelf packer fragments, and a freed hole would have to fit the next
   frame exactly. The frame keeps its id, `atlas.get(id)` still answers it (showing a cleared
-  rectangle) and `atlas.size` stays. Answers `true`, or `false` for a name it does not hold.
+  rectangle) and `atlas.size` stays, but it leaves the random draws of the atlas (`randomFrame()`
+  and its siblings) and a table of every frame (`frameTable(atlas)`, `atlasFrameTable(atlas)`), and
+  the message of a full atlas counts only the frames it holds. Answers `true`, or `false` for a name
+  it does not hold.
 - `clear()` clears the canvas and the shelves and starts a **new** `TextureAtlas`: `atlas` answers
   the new one, frame ids start at 0 again. Frames, tables and prepared frames of before are stale.
   The `texture` and the `canvas` stay the same objects.
 
 `remove()` needs the atlas to forget a name. `TextureAtlas` gets a method under a module-internal
 symbol (`forgetFrameName` in `texture/internals.ts`, not in `public-api.ts`) that removes the name
-from the name map and the name list and leaves the frame at its id.
+from the name map and the name list and leaves the frame at its id; a second internal method,
+`liveFrameIds`, answers the ids of the frames whose name it has not let go of, which the random
+draws and a selection of every frame read.
 
 ### 3.7 Ownership and `dispose()`
 

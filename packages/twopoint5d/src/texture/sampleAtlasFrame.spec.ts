@@ -10,7 +10,7 @@ import {
 } from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {nodesOf, operatorOf, textureNodesOf} from '../testing/spriteGraph.js';
+import {evaluateNode, nodesOf, operatorOf, textureNodesOf} from '../testing/spriteGraph.js';
 import {AtlasFrameTable} from './AtlasFrameTable.js';
 import {type SampleAtlasFrameOptions, sampleAtlasFrame} from './sampleAtlasFrame.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -116,6 +116,23 @@ describe('sampleAtlasFrame()', () => {
     });
 
     expect([...nodesOf(color)].filter((node) => node instanceof ConditionalNode)).toEqual([]);
+  });
+
+  test('rounds a float index half up: 0.5, 1.5 and 2.5 read the frames 1, 2 and 3', () => {
+    const parent = new TextureCoords(0, 0, 16, 4);
+    const four = new AtlasFrameTable([0, 1, 2, 3].map((i) => new TextureCoords(parent, i * 4, 0, 4, 4)));
+    // the lowest element the graph reads is the texel of the tex coords of the frame, 3 · frame
+    const firstTexelOf = (index: number) => {
+      const color = sampleAtlasFrame(new Texture(), four, index, vec2(0.5, 0.5), {origin: 'top-left'});
+      const elements = [...nodesOf(color)].filter(
+        (node) =>
+          (node as unknown as {isArrayElementNode?: boolean}).isArrayElementNode &&
+          (node as unknown as {node: unknown}).node === four.node,
+      );
+      return Math.min(...elements.map((node) => evaluateNode((node as unknown as {indexNode: Node}).indexNode) as number));
+    };
+
+    expect([0.5, 1.5, 2.5].map(firstTexelOf)).toEqual([3, 6, 9]);
   });
 
   test('refuses an inset that is negative or no finite number', () => {

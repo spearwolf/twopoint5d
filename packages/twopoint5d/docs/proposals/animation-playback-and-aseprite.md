@@ -286,9 +286,12 @@ entry; the guide says to export without them.
   first frame (`0 1 2 3`, `2 1 0`, `1 2 3`, …), as Aseprite's player counts each direction as one
   pass. `"repeat": "1"` on a `forward` tag is a one-shot.
 - `options.playback`, `{[tagName]: AnimationPlayback}`, names the playback of a tag outright: the
-  frames follow `direction`, `repeat` is not applied. A name that is no tag of the sheet is refused
+  frames follow `direction`, `repeat` is not applied. It is read by its own keys only — an inherited
+  one such as `constructor` names no tag. A name that is no tag of the sheet is refused
   (`AsepriteJson: parse() got a playback for the tag "x", which the sheet does not carry — its
-  tags are: idle, walk, kick`).
+  tags are: idle, walk, kick`), and so is a value that is none of `'loop'`, `'once'` and
+  `'pingpong'`, naming the tag, before the first frame is added (`AsepriteJson: parse() got a
+  playback of "bounce" for the tag "walk" — a playback is 'loop', 'once' or 'pingpong'`).
 - Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside
   `0 … frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown
   `direction` (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name

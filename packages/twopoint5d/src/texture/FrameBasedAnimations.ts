@@ -2,6 +2,7 @@ import type {WebGPURenderer} from 'three/webgpu';
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
+import {isAnimationPlayback} from './animationPlayback.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
 import {isTextureSize, readMaxTextureSize} from './readMaxTextureSize.js';
 import {TextureAtlas} from './TextureAtlas.js';
@@ -101,8 +102,6 @@ export type AnimationTimingOptions = (
   | {duration?: never; frameRate?: never; durations: readonly number[]}
 ) & {playback?: AnimationPlayback};
 
-const PLAYBACKS: readonly AnimationPlayback[] = ['loop', 'once', 'pingpong'];
-
 /**
  * The most frames an animation with per-frame durations holds: the shader finds the frame of such
  * an animation by a binary search of a fixed 13 steps, which covers 8191 frames.
@@ -163,7 +162,7 @@ const resolveTiming = (
   // a catalog is json, so the playback is checked rather than trusted to the type; absent is
   // `undefined`, a `null` is a playback of the wrong kind
   const playback: unknown = timing.playback === undefined ? 'loop' : timing.playback;
-  if (!PLAYBACKS.includes(playback as AnimationPlayback)) {
+  if (!isAnimationPlayback(playback)) {
     throw new Error(
       `FrameBasedAnimations: add() got a playback of ${describeValue(playback)} for the animation \`${animNameInError(name)}\` — a playback is 'loop', 'once' or 'pingpong'`,
     );
@@ -176,17 +175,17 @@ const resolveTiming = (
       );
     }
     const durations = resolveDurations(timing.durations, frameCount, name);
-    return {duration: durations.reduce((sum, value) => sum + value, 0), durations, playback: playback as AnimationPlayback};
+    return {duration: durations.reduce((sum, value) => sum + value, 0), durations, playback};
   }
   if ('frameRate' in timing && timing.frameRate !== undefined) {
     return {
       duration: calculateDurationFromFrameRate(frameCount, timing.frameRate, name),
       durations: undefined,
-      playback: playback as AnimationPlayback,
+      playback,
     };
   }
   if ('duration' in timing && timing.duration !== undefined) {
-    return {duration: timing.duration, durations: undefined, playback: playback as AnimationPlayback};
+    return {duration: timing.duration, durations: undefined, playback};
   }
   throw new Error(
     `FrameBasedAnimations: add() got neither a duration nor a frameRate for the animation \`${animNameInError(name)}\``,

@@ -1,5 +1,6 @@
-import {abs, add, clamp, div, float, max, mix, mul, round, sRGBTransferOETF, step, sub, vec2, vec4} from 'three/tsl';
+import {abs, add, clamp, div, float, max, mix, mul, sRGBTransferOETF, step, sub, vec2, vec4} from 'three/tsl';
 import {type Node, SRGBColorSpace} from 'three/webgpu';
+import {roundHalfUp} from '../../texture/roundHalfUp.js';
 import {describeValue} from '../../utils/describeValue.js';
 import {asVec3} from '../typedNodes.js';
 import {ColorOrder, defineFeature, type SpriteFeature} from '../SpriteFeature.js';
@@ -12,7 +13,8 @@ export interface PaletteSwapOptions {
 export interface PaletteSwapApi {
   /**
    * The row of the palette the sprite is drawn in; row 0 holds the source colours, so a new sprite shows
-   * its own. Rounded to a whole row; a row past the last draws the last, a negative one row 0.
+   * its own. Rounded to the nearest row, a half up; a row past the last draws the last, a negative one
+   * row 0.
    *
    * `paletteRow` is a static attribute: a later change reaches the gpu once it is marked —
    * `spritePool.touchVO(sprite, 'paletteRow')` or `geometry.touch('paletteRow')`.
@@ -101,10 +103,14 @@ export function paletteSwap(options?: PaletteSwapOptions): SpriteFeature<Palette
           const inRange = mul(step(0, offset), sub(1, step(count, offset)));
           const safeCount = max(count, 1);
           const shifted = add(offset, uniform<'float'>('paletteShift').floor());
-          const cycled = add(first, sub(shifted, mul(safeCount, div(shifted, safeCount).floor())));
+          // shifted is a whole number, and the f32 division may lie a few ULP off: on a multiple of count it
+          // could floor one too low and the entry leave the range. Half a step further the quotient lies
+          // 0.5 / count away from every whole number, which no ULP of the division crosses — for a negative
+          // shifted as well: −3 floors to −1 and −4 to −2 at a count of 3
+          const cycled = add(first, sub(shifted, mul(safeCount, div(add(shifted, 0.5), safeCount).floor())));
           const entry = mix(index, cycled, inRange);
 
-          const row = clamp(round(attribute<'float'>('paletteRow')), float(0), max(sub(size.y, 1), float(0)));
+          const row = clamp(roundHalfUp(attribute<'float'>('paletteRow')), float(0), max(sub(size.y, 1), float(0)));
           const replacement = sample('palette', entryUv(max(entry, 0), row));
           return mix(color, vec4(replacement.rgb, color.a), step(0, index));
         },

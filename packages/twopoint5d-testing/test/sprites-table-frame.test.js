@@ -249,6 +249,24 @@ describe('sprites — tableFrame()', function () {
     }
   });
 
+  it('a frameIndex of 2.5 shows frame 3, one of 1.5 frame 2', async () => {
+    // sixteen frames of one colour each; a half rounds up on WebGPU and WebGL 2 alike
+    const textures = colourTable();
+    const sprites = keep(new FeatureSprites(TableKind, {capacity: 1, textures}));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+
+    for (const [frameIndex, frame] of [
+      [2.5, 3],
+      [1.5, 2],
+    ]) {
+      sprite.frameIndex = frameIndex;
+      sprites.spritePool.touchVO(sprite, 'frameIndex');
+      const rgb = await centreSeenFrom(sprites, 0);
+      expect(isNearColor(rgb, COLORS[frame]), `frameIndex ${frameIndex}: ${rgb}`).to.be.true;
+    }
+  });
+
   it('measures the views in the local space of a moved and turned mesh', async () => {
     const textures = colourTable();
     const sprites = keep(new FeatureSprites(ViewKind, {capacity: 1, textures}));

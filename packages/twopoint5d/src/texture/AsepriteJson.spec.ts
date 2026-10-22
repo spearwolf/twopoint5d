@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
-import {describe, expect, test} from 'vitest';
+import {describe, expect, expectTypeOf, test} from 'vitest';
 
-import {AsepriteJson, type AsepriteJsonData} from './AsepriteJson.js';
+import {type AsepriteFrameData, AsepriteJson, type AsepriteJsonData} from './AsepriteJson.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
@@ -193,11 +193,23 @@ describe('AsepriteJson', () => {
       expect(framesOf(data, 'kick', {playback: {kick: 'once'}})).toEqual(['f2', 'f1', 'f0']);
     });
 
+    test('a tag named constructor takes the playback of its direction when options.playback names other tags', () => {
+      const data = sheet(2, {frameTags: [{name: 'constructor', from: 0, to: 1, direction: 'forward'}]});
+
+      const [, , animations] = AsepriteJson.parse(data, {playback: {}});
+
+      expect(animations.animation('constructor').playback).toBe('loop');
+    });
+
     test('a sheet without tags answers an empty set of animations', () => {
       const [, , animations] = AsepriteJson.parse(sheet(2));
 
       expect(animations.hasAnimation('anim_0')).toBe(false);
       expect(() => animations.animation(0)).toThrow();
+    });
+
+    test('answers an atlas of AsepriteFrameData', () => {
+      expectTypeOf(AsepriteJson.parse(sheet(1))[0]).toEqualTypeOf<TextureAtlas<AsepriteFrameData>>();
     });
 
     test('takes the parent coords and the target atlas it is handed', () => {
@@ -270,6 +282,20 @@ describe('AsepriteJson', () => {
       expect(() => AsepriteJson.parse(data, {playback: {kick: 'once'}})).toThrow(
         'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: idle',
       );
+    });
+
+    test.each([
+      ['bounce', '"bounce"'],
+      [null, 'null'],
+      [1, '1'],
+    ])('refuses a playback of %s, naming the tag, and leaves the target atlas as it was', (value, shown) => {
+      const target = new TextureAtlas<never>();
+      const data = sheet(2, {frameTags: [{name: 'walk', from: 0, to: 1, direction: 'forward'}]});
+
+      expect(() => AsepriteJson.parse(data, {target: target as never, playback: {walk: value as never}})).toThrow(
+        `AsepriteJson: parse() got a playback of ${shown} for the tag "walk" — a playback is 'loop', 'once' or 'pingpong'`,
+      );
+      expect(target.size).toBe(0);
     });
 
     test('refuses a frame name twice in the layout "Array", naming the fix', () => {

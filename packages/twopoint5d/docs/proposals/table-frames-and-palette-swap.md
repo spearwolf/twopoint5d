@@ -112,8 +112,9 @@ export function frameTable(atlas: TextureAtlas<unknown>, selection?: AtlasFrameT
     `frameTrimMargins()` reads them — the frame texels of an animsMap of three texels a frame,
     always three, so the shader needs no branch;
   - the texels lie row by row in a texture `min(1 + 3n, maxTextureSize)` wide and as many rows high
-    as they take — the index → texel mapping of `texCoordsFromIndex()`. That mapping works in float, and
-    a float32 holds every whole number up to 2^24 exactly, so a table holds at most 2^24 texels —
+    as they take — the index → texel mapping of `texCoordsFromIndex()`, which works in int. The
+    shader reads the frame index of a sprite and the frame count of the header as floats, and a
+    float32 holds every whole number up to 2^24 exactly, so a table holds at most 2^24 texels —
     5 592 405 frames; one more is refused naming the count and the fix (several tables). A table that
     needs more rows than `maxTextureSize` — a small limit handed in — is refused naming both numbers.
 - `bakeDataTexture()` builds a new texture on every call and keeps no reference to it: the caller
@@ -156,7 +157,7 @@ export const TableFrame: SpriteFeature<TableFrameApi>; // tableFrame()
 
   ```
   entries = header.x                              // texel 0
-  index   = round(frameIndex)                     // with views: see §4.2
+  index   = floor(frameIndex + 0.5)               // with views: see §4.2
   entry   = clamp(index, 0, max(entries − 1, 0))
   first   = 1 + 3 · entry
   frame   = {texCoords: texel(first), flipDiagonal: texel(first + 1).z, trim: texel(first + 2)}
@@ -164,7 +165,8 @@ export const TableFrame: SpriteFeature<TableFrameApi>; // tableFrame()
 
 - **Out of range**: an index below 0 or past the last frame is clamped — silently, as
   `sampleAtlasFrame()` clamps: the sprite shows the first or the last frame. A fractional index is
-  rounded. The shader cannot throw; the guide says it.
+  rounded to the nearest frame, a half up, on WebGPU and WebGL 2 alike. The shader cannot throw; the
+  guide says it.
 
 ### 4.2 Directional frames — `views: n`
 
@@ -179,7 +181,7 @@ angle    = atan(toCamera.x, toCamera.z)                       // atan2: 0 along 
 step     = round((angle − yaw) / (2π / n))
 view     = step − n · floor((step + 0.5) / n)                 // 0 … n−1, for any yaw
 frames   = floor((entries + 0.5) / n)
-frame    = clamp(round(frameIndex), 0, max(frames − 1, 0))
+frame    = clamp(floor(frameIndex + 0.5), 0, max(frames − 1, 0))
 index    = frame · n + view
 entry    = clamp(index, 0, max(entries − 1, 0))                // only a table of fewer entries than n
 ```
@@ -192,11 +194,12 @@ entry    = clamp(index, 0, max(entries − 1, 0))                // only a table
   lookbook's `stalker` (`apps/lookbook/assets-src/README.md`, "boomer-shooter-corridor").
 - **The layout.** The `n` views of a frame are `n` consecutive entries, view 0 first. `frameIndex`
   counts frames, with views as without them, and the shader reads entry
-  `round(frameIndex) · n + view`; a `frameIndex` before the first or past the last frame shows the
-  matching view of the first or the last frame. The stalker's json lists every animation frame by
-  frame, inside a frame its views 0–7, so `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is that
-  layout as it is, and `frameIndex = frame` with no reordering. A sheet that counts its views
-  clockwise is read as view `(n − k) mod n`; the guide shows the one-line reorder of a name list.
+  `floor(frameIndex + 0.5) · n + view` — a half rounds up —; a `frameIndex` before the first or past
+  the last frame shows the matching view of the first or the last frame. The stalker's json lists
+  every animation frame by frame, inside a frame its views 0–7, so
+  `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is that layout as it is, and `frameIndex = frame`
+  with no reordering. A sheet that counts its views clockwise is read as view `(n − k) mod n`; the
+  guide shows the one-line reorder of a name list.
 - **Where it holds.** The angle lies in the xz plane of the mesh about +y: right for
   `axisBillboardPlacement()` (upright along +y), for `flatPlacement({orientation: 'yaw'})` and
   for `BillboardPlacement`. A mesh laid out in the xy plane with `axisBillboardPlacement({axis:
@@ -262,7 +265,7 @@ w, h     = textureSize('palette')
 entryUv(i, r) = ((i + 0.5) / w, (r + 0.5) / h)               // texel centres: exact under any filter
 match_i  = [max(|rgb − source_i.rgb|) < 1/512] · [i < w]      // as 0 or 1, by step(): no branch
 index    = −1, then for i = colors−1 … 0: index = mix(index, i, match_i)   // the first entry that matches wins
-row      = clamp(round(paletteRow), 0, h − 1)
+row      = clamp(floor(paletteRow + 0.5), 0, h − 1)                // a half up
 entry    = the cycled index (§5.3)
 out      = mix(color, vec4(palette(entry, row).rgb, color.a), [index ≥ 0])
 ```
@@ -291,11 +294,14 @@ shift = floor(paletteShift)
 entry = first + ((i − first + shift) mod count)               // mod by floor: any shift, either sign
 ```
 
-of its row; one outside the range with entry `i`. `setUniform('paletteShift', t * speed)` runs the
-colours through the range, one entry per whole step, the Deluxe Paint way; the default `(0, 0)` with
-a shift of 0 cycles nothing. The chrome font cycles entries 1–15: `setUniform('paletteCycle', 1,
-15)` (or `(1, 0)`). The uniforms are per mesh: sprites that cycle differently live in meshes of
-their own — or the row picks a differently ordered palette.
+of its row; one outside the range with entry `i`. The shader floors the quotient of the modulo as
+`floor((shifted + 0.5) / count)`, `shifted = i − first + shift` a whole number: half a step more
+keeps the quotient of an f32 division clear of every whole number.
+`setUniform('paletteShift', t * speed)` runs the colours through the range, one entry per whole
+step, the Deluxe Paint way; the default `(0, 0)` with a shift of 0 cycles nothing. The chrome font
+cycles entries 1–15: `setUniform('paletteCycle', 1, 15)` (or `(1, 0)`). The uniforms are per mesh:
+sprites that cycle differently live in meshes of their own — or the row picks a differently
+ordered palette.
 
 ## 6. The warning for a linear `colorMap` — `nearestTextures`
 

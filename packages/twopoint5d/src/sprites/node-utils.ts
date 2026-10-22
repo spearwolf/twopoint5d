@@ -1,4 +1,4 @@
-import {add, attribute, cross, div, float, mod, mul, normalize, sub, texture, vec2} from 'three/tsl';
+import {add, attribute, cross, div, float, mul, normalize, sub, texture, vec2} from 'three/tsl';
 import type {Node, Texture} from 'three/webgpu';
 
 import {cameraPositionLocal, cameraUpLocal} from './cameraNodes.js';
@@ -71,12 +71,17 @@ export const colorFromTextureByTexCoords = (
   return texture(colorMap, frameUv(texCoords, uv, params?.flipDiagonal));
 };
 
+// The column is worked out in int, from the row: a float modulo divides by the width in f32, and
+// neither WGSL nor GLSL ES rounds that division exactly — at a width that is no power of 2 the
+// quotient tips over to the next whole number, and the column reads the texel of its neighbour.
 export const texCoordsFromIndex = (mapSize: Node<'vec2'>, ndx: Node<'int'>) => {
   // vec2 texCoordsFromIndex(in vec2 mapSize, in int ndx) {
-  //   int column = int(mod(float(ndx), float(mapSize[0])));
-  const column = mod(ndx.toInt().toFloat(), mapSize.x.toFloat()).toInt();
-  //   int row = ndx / int(mapSize[0]);
-  const row = div(ndx, mapSize.x.toInt()).toInt();
+  //   int width = int(mapSize[0]);
+  //   int row = ndx / width;
+  //   int column = ndx - row * width;
+  const width = mapSize.x.toInt();
+  const row = div(ndx, width).toInt();
+  const column = sub(ndx, mul(row, width)).toInt();
   //   return (vec2(column, row) + 0.5) / vec2(mapSize[0], mapSize[1]);
   return div(add(vec2(column, row), float(0.5)), vec2(mapSize.x, mapSize.y));
 };

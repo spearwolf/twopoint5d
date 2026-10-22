@@ -1,6 +1,7 @@
 import {describe, expect, test} from 'vitest';
 
 import {AtlasFrameTable, atlasFrameTable} from './AtlasFrameTable.js';
+import {forgetFrameName} from './internals.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
@@ -59,6 +60,17 @@ describe('AtlasFrameTable', () => {
     expect(table.indexOf('turned')).toBe(sheet.frameId('turned'));
     expect(table.indexOf('trimmed')).toBe(sheet.frameId('trimmed'));
     expect(table.indexOf('missing')).toBe(-1);
+  });
+
+  test('a table of every frame leaves out a frame the atlas let go of, and indexOf() finds the others by name', () => {
+    const atlas = new TextureAtlas();
+    ['a', 'b', 'c'].forEach((name, i) => atlas.add(name, new TextureCoords(i * 2, 0, 2, 2)));
+    atlas[forgetFrameName]('b');
+
+    const table = AtlasFrameTable.fromAtlas(atlas);
+
+    expect(table.size).toBe(2);
+    expect([table.indexOf('a'), table.indexOf('c'), table.indexOf('b')]).toEqual([0, 1, -1]);
   });
 
   test('with a list of names the index is the position in that list', () => {

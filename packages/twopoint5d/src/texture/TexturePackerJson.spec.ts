@@ -1,7 +1,7 @@
-import {describe, expect, test} from 'vitest';
+import {describe, expect, expectTypeOf, test} from 'vitest';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
-import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
+import {type TexturePackerFrameData, TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
 
 const makeData = (): TexturePackerJsonData => ({
   frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}, b: {frame: {x: 8, y: 0, w: 8, h: 16}}},
@@ -175,5 +175,25 @@ describe('TexturePackerJson.parse()', () => {
       'TexturePackerJson: the frame name "b" is already taken in the target atlas',
     );
     expect(target.frameNames()).toEqual(['b']);
+  });
+});
+
+describe('the type of the frame data', () => {
+  test('a TexturePacker json answers an atlas of TexturePackerFrameData', () => {
+    expectTypeOf(TexturePackerJson.parse(makeData())[0]).toEqualTypeOf<TextureAtlas<TexturePackerFrameData>>();
+  });
+
+  test('frames that carry more than TexturePacker writes keep their type in the atlas and the target', () => {
+    type TimedFrameData = TexturePackerFrameData & {duration: number};
+    const frames: Record<string, TimedFrameData> = {a: {frame: {x: 0, y: 0, w: 8, h: 8}, duration: 120}};
+
+    const [atlas] = TexturePackerJson.parse(
+      {frames, meta: {image: 'a.png', size: {w: 16, h: 16}}},
+      undefined,
+      new TextureAtlas<TimedFrameData>(),
+    );
+
+    expectTypeOf(atlas).toEqualTypeOf<TextureAtlas<TimedFrameData>>();
+    expect(atlas.frame('a')!.data!.duration).toBe(120);
   });
 });

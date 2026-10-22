@@ -26,8 +26,8 @@ export const texturePackerAtlasAdapter: AtlasAdapter = (json, parentCoords) => {
 
 /** `AsepriteJson.parse()` as an adapter: the frames, and the frame tags as animations. */
 export const asepriteAtlasAdapter: AtlasAdapter = (json, parentCoords) => {
-  const [atlas, , animations] = AsepriteJson.parse(json as unknown as AsepriteJsonData, {parentCoords});
-  return {atlas: atlas as unknown as TextureAtlas, animations};
+  const [atlas, , animations] = AsepriteJson.parse(json as AsepriteJsonData, {parentCoords});
+  return {atlas, animations};
 };
 
 /** @internal An adapter of a registry, and the `meta.app` it reads. */

@@ -11,7 +11,8 @@ export type AtlasFrameTableEntry = TextureAtlasFrame<unknown> | TextureCoords;
 
 /**
  * The frames an {@link AtlasFrameTable} takes out of an atlas: a list of names, the names a `RegExp`
- * matches (as `TextureAtlas#frameNames()` answers them), or — without one — every frame.
+ * matches (as `TextureAtlas#frameNames()` answers them), or — without one — every frame the atlas
+ * has not let go of (`DynamicAtlas#remove()` lets go of one).
  */
 export type AtlasFrameTableSelection = readonly TextureAtlasFrameName[] | RegExp;
 
@@ -43,7 +44,8 @@ export class AtlasFrameTable {
 
   /**
    * A table of frames out of `atlas`: those of `selection`, in its order, or every frame of the atlas
-   * without one — then the index of a frame is its frame id.
+   * without one, leaving out a frame it has let go of — then the index of a frame is its frame id,
+   * unless `DynamicAtlas#remove()` let go of a frame before it.
    *
    * @throws {Error} if a name of the selection is not in the atlas, or the selection holds no frames.
    * @throws {RangeError} if it holds more than {@link AtlasFrameTable.MaxFrames} frames.

@@ -26,14 +26,15 @@ const WHERE = 'FrameTable';
 // the texels of one frame: tex coords, measures and diagonal flip, trim margins
 const TEXELS_PER_FRAME = 3;
 
-// the shader finds a texel by its index in float arithmetic (`texCoordsFromIndex()`), and a float32
-// holds every whole number up to 2^24 exactly: a texel past that would be read from its neighbour
+// A table holds at most 2^24 texels. The texel of an index is worked out in int (`texCoordsFromIndex()`), but the
+// shader reads the frame index of a sprite and the frame count in the header as floats, and a float32 holds every
+// whole number up to 2^24 exactly: under 2^24 texels both stay exact
 const MAX_TEXELS = 2 ** 24;
 
 /**
  * The frames a `tableFrame()` sprite picks from by index, baked into a data texture — the `frameTable`
- * of the sprites. The frames lie row by row, up to 5 592 405 of them — 2^24 texels, the most the shader
- * addresses exactly in float.
+ * of the sprites. The frames lie row by row, up to 5 592 405 of them — 2^24 texels, which keeps the frame
+ * index the shader reads as a float exact.
  *
  * `AtlasFrameTable` is the other table of the library: a uniform array of up to 341 frames for a
  * `NodeMaterial` of one's own and `sampleAtlasFrame()`.
@@ -45,7 +46,9 @@ export class FrameTable {
   /**
    * A table of frames out of `atlas`: those of `selection` in its order — a list of names, in which a
    * name listed twice keeps its first index, or a `RegExp`, the names it matches in the order they were
-   * added to the atlas, the order of its json — or, without one, every frame, the index its frame id.
+   * added to the atlas, the order of its json — or, without one, every frame the atlas has not let go of,
+   * in the order of their ids: the index of a frame its frame id, unless `DynamicAtlas#remove()` let go
+   * of a frame before it.
    *
    * @throws {Error} for a name the atlas does not hold, and a selection of no frames.
    */
@@ -98,8 +101,8 @@ export class FrameTable {
    * material it is handed to as `frameTable` borrows it.
    *
    * @throws {RangeError} for a `maxTextureSize` that is no whole number of 1 or more, a table of more
-   *   than 2^24 texels — 5 592 405 frames, the most texels the shader addresses exactly in float —, and a
-   *   table that needs more rows than the widest texture allowed.
+   *   than 2^24 texels — 5 592 405 frames —, and a table that needs more rows than the widest texture
+   *   allowed.
    */
   bakeDataTexture(options?: FrameTableBakeOptions): DataTexture {
     const given = options?.maxTextureSize;
@@ -115,7 +118,7 @@ export class FrameTable {
     const texelCount = 1 + entries.length * TEXELS_PER_FRAME;
     if (texelCount > MAX_TEXELS) {
       throw new RangeError(
-        `${WHERE}: ${entries.length} frames take ${texelCount} texels — the shader addresses ${MAX_TEXELS} (2^24) texels exactly in float; split them into several tables`,
+        `${WHERE}: ${entries.length} frames take ${texelCount} texels — a table holds at most ${MAX_TEXELS} (2^24) texels, which keeps the frame index the shader reads as a float exact; split them into several tables`,
       );
     }
     const width = Math.min(texelCount, maxTextureSize);
@@ -146,7 +149,9 @@ export class FrameTable {
 }
 
 /**
- * A table of frames out of `atlas` — the short form of {@link FrameTable.fromAtlas}.
+ * A table of frames out of `atlas` — the short form of {@link FrameTable.fromAtlas}: without a
+ * `selection` every frame the atlas has not let go of, the index of a frame its frame id unless
+ * `DynamicAtlas#remove()` let go of a frame before it.
  *
  * @throws {Error} for a name the atlas does not hold, and a selection of no frames.
  */

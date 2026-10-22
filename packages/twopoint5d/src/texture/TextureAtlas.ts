@@ -1,4 +1,4 @@
-import {forgetFrameName} from './internals.js';
+import {forgetFrameName, liveFrameIds} from './internals.js';
 import type {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
 
@@ -37,6 +37,9 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
   // the names in the order they were added, beside the map: a name is drawn at random by its
   // index, and frameNames() hands out a copy
   #frameNameList: TextureAtlasFrameName[] = [];
+  // the ids of the frames whose name was not let go of, ascending: a frame is drawn at random by its
+  // index here
+  #liveIds: number[] = [];
 
   /**
    * returns the frame id.
@@ -60,9 +63,14 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     } else {
       this.#frames.push({coords: args[0], data: args[1]});
     }
+    this.#liveIds.push(id);
     return id;
   }
 
+  /**
+   * How many frame ids the atlas has handed out: `get()` answers a frame for every id below it, a frame
+   * `DynamicAtlas#remove()` let go of included.
+   */
   get size(): number {
     return this.#frames.length;
   }
@@ -70,12 +78,21 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
   /**
    * @internal Lets go of the name: `frame()` and `frameId()` find it no longer, `frameNames()` leaves it
    * out, and `add()` takes it again for a new frame. The frame stays at its id, so `get()` and `size`
-   * are unchanged. Answers `false` for a name the atlas does not hold.
+   * are unchanged, but it leaves the random draws of the atlas and a selection of every frame. Answers
+   * `false` for a name the atlas does not hold.
    */
   [forgetFrameName](name: TextureAtlasFrameName): boolean {
-    if (!this.#frameNames.delete(name)) return false;
+    const id = this.#frameNames.get(name);
+    if (id === undefined) return false;
+    this.#frameNames.delete(name);
     this.#frameNameList.splice(this.#frameNameList.indexOf(name), 1);
+    this.#liveIds.splice(this.#liveIds.indexOf(id), 1);
     return true;
+  }
+
+  /** @internal The ids of the frames whose name was not let go of, ascending — the atlas's own array. */
+  [liveFrameIds](): readonly number[] {
+    return this.#liveIds;
   }
 
   get(id: number): TextureAtlasFrame<D> | undefined {
@@ -113,11 +130,18 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     return this.#frameNameList.slice();
   }
 
+  /**
+   * The id of a frame drawn at random among those the atlas has not let go of — `DynamicAtlas#remove()`
+   * lets go of one —, or `size`, an id without a frame, for an atlas without such a frame.
+   */
   randomFrameId(): number {
-    return rand(this.#frames.length);
+    return this.#liveIds[rand(this.#liveIds.length)] ?? this.#frames.length;
   }
 
-  /** A frame drawn at random, or `undefined` for an atlas without frames. */
+  /**
+   * A frame drawn at random among those the atlas has not let go of, or `undefined` for an atlas
+   * without such a frame.
+   */
   randomFrame(): TextureAtlasFrame<D> | undefined {
     return this.#frames[this.randomFrameId()];
   }
@@ -127,6 +151,7 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     return this.#frameNameList[rand(this.#frameNameList.length)];
   }
 
+  /** `count` frame ids, each drawn as {@link randomFrameId} draws one. */
   randomFrameIds(count: number): number[] {
     const frameIds: number[] = [];
     for (let i = 0; i < count; i++) {
@@ -135,7 +160,10 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     return frameIds;
   }
 
-  /** `count` frames drawn at random; every one of them is `undefined` for an atlas without frames. */
+  /**
+   * `count` frames drawn at random among those the atlas has not let go of; every one of them is
+   * `undefined` for an atlas without such a frame.
+   */
   randomFrames(count: number): (TextureAtlasFrame<D> | undefined)[] {
     const frames: (TextureAtlasFrame<D> | undefined)[] = [];
     for (let i = 0; i < count; i++) {

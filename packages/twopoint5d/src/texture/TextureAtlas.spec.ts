@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
-import {forgetFrameName} from './internals.js';
+import {forgetFrameName, liveFrameIds} from './internals.js';
 import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
@@ -409,6 +409,26 @@ describe('TextureAtlas', () => {
       expect(id).toBe(1);
       expect(atlas.frameId('a')).toBe(1);
       expect(atlas.frameNames()).toEqual(['a']);
+    });
+
+    test('a frame let go of leaves the random draws', () => {
+      const atlas = new TextureAtlas();
+      atlas.add('a', new TextureCoords(0, 0, 4, 4));
+      atlas.add('b', new TextureCoords(4, 0, 4, 4));
+      atlas[forgetFrameName]('a');
+
+      for (let i = 0; i < NO_LONGER_BE_A_COINCIDENCE; i++) {
+        expect(atlas.randomFrameId()).toBe(1);
+        expect(atlas.randomFrame()).toBe(atlas.get(1));
+      }
+      expect(atlas[liveFrameIds]()).toEqual([1]);
+
+      atlas[forgetFrameName]('b');
+
+      expect(atlas.randomFrameId()).toBe(2);
+      expect(atlas.randomFrame()).toBeUndefined();
+      expect(atlas.randomFrames(2)).toEqual([undefined, undefined]);
+      expect(atlas[liveFrameIds]()).toEqual([]);
     });
 
     test('a symbol is forgotten as well, and an unknown name answers false', () => {

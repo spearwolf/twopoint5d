@@ -5,6 +5,7 @@ import {prepareSpriteFrame} from '../sprites/features/AtlasFrame.js';
 import {asCanvas, FakeCanvas} from '../testing/fakeCanvas.js';
 import {AtlasFrameTable} from './AtlasFrameTable.js';
 import {DynamicAtlas, type DynamicAtlasImage} from './DynamicAtlas.js';
+import {frameTable} from './FrameTable.js';
 
 const atlasOn = (
   width: number,
@@ -19,6 +20,8 @@ const atlasOn = (
 const image = (width: number, height: number) => ({width, height}) as unknown as DynamicAtlasImage;
 
 const noop = () => {};
+
+const NO_LONGER_BE_A_COINCIDENCE = 23;
 
 // an image element that has loaded without a natural size: an SVG without width and height
 const svg = {width: 0, height: 0, naturalWidth: 0, naturalHeight: 0, complete: true} as unknown as DynamicAtlasImage;
@@ -624,6 +627,29 @@ describe('DynamicAtlas', () => {
     test('answers false for a name it does not hold', () => {
       const {atlas} = atlasOn(64, 32);
       expect(atlas.remove('nope')).toBe(false);
+    });
+
+    test('a removed frame leaves the random draws and a table of every frame', () => {
+      const {atlas} = atlasOn(64, 32);
+      atlas.add('a', noop, {width: 10, height: 8});
+      const kept = atlas.add('b', noop, {width: 10, height: 8});
+
+      atlas.remove('a');
+
+      for (let i = 0; i < NO_LONGER_BE_A_COINCIDENCE; i++) expect(atlas.atlas.randomFrame()).toBe(kept);
+      expect(frameTable(atlas.atlas).size).toBe(1);
+      expect(frameTable(atlas.atlas).indexOf('b')).toBe(0);
+    });
+
+    test('the message of a full atlas counts the frames it holds', () => {
+      const {atlas} = atlasOn(16, 16);
+      atlas.add('a', noop, {width: 6, height: 14});
+      atlas.add('b', noop, {width: 6, height: 14});
+      atlas.remove('a');
+
+      expect(() => atlas.add('more', noop, {width: 1, height: 1})).toThrow(
+        'DynamicAtlas: the atlas of 16 × 16 is full — the frame "more" of 1 × 1 does not fit beside the 1 frame packed into it; build a larger one — new DynamicAtlas({width: 32, height: 32}) — or clear() it',
+      );
     });
   });
 

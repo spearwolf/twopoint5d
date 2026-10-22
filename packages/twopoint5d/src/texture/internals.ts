@@ -61,7 +61,14 @@ export const atlasAdapterPicker: unique symbol = Symbol('TextureResource.atlasAd
 
 /**
  * The method of a `TextureAtlas` that lets go of a frame name: the name leaves the name map and the
- * name list, and the frame stays at its id. `DynamicAtlas#remove()` calls it, so that a removed name
- * can be added again.
+ * name list, and the frame stays at its id, but leaves the random draws of the atlas and a selection
+ * of every frame. `DynamicAtlas#remove()` calls it, so that a removed name can be added again.
  */
 export const forgetFrameName: unique symbol = Symbol('TextureAtlas.forgetFrameName');
+
+/**
+ * The method of a `TextureAtlas` that answers the ids of its frames that {@link forgetFrameName} has
+ * not let go of, ascending — its own array, not a copy. `selectAtlasFrames()` takes them for a
+ * selection of every frame.
+ */
+export const liveFrameIds: unique symbol = Symbol('TextureAtlas.liveFrameIds');

@@ -161,9 +161,10 @@ Everything is computed in the fragment stage; nothing passes through a varying.
 
 At the uv `p`:
 
-1. **Index.** A float index is rounded; every index is clamped to `[0, size − 1]`, so a stray
-   value draws the first or the last frame and never reads outside the array. The clamp is
-   silent — a shader has no way to report it — and the guide says so.
+1. **Index.** A float index is rounded to the nearest frame, a half up, on WebGPU and WebGL 2 alike;
+   every index is clamped to `[0, size − 1]`, so a stray value draws the first or the last frame and
+   never reads outside the array. The clamp is silent — a shader has no way to report it — and the
+   guide says so.
 2. **Origin.** `'bottom-left'` takes `p.y` as `1 − p.y` — three's `uv()` on its geometries
    counts v upwards; `'top-left'` takes `p` as it is — the convention of `TextureCoords`.
 3. **Wrap.** `'clamp'` clamps `p` to `[0, 1]`; `'repeat'` takes `fract(p)`.

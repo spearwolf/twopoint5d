@@ -13,6 +13,8 @@ import type {
 import {AttributeNode, Texture} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
+import {evaluateNode} from '../testing/spriteGraph.js';
+
 import {
   billboardVertexByInstancePosition,
   colorFromTextureByTexCoords,
@@ -174,6 +176,25 @@ describe('node-utils', () => {
       expect(height.node).toBe(mapSize);
       expect(height.components).toBe('y');
       expect(nodesOf(node.bNode).has(index)).toBe(false);
+    });
+
+    test('works out the column in int from the row, without a float modulo', () => {
+      const node = texCoordsFromIndex(vec2(3000, 8), int(5999));
+
+      const modulos = [...nodesOf(node)].filter((child) => (child as unknown as OperatorNode).op === '%');
+      expect(modulos).toEqual([]);
+    });
+
+    test.each([
+      [2999, 2999, 0],
+      [3000, 0, 1],
+      [5999, 2999, 1],
+      [16_777_215, 1215, 5592],
+    ])('answers the center of the texel of %i at a width of 3000', (ndx, column, row) => {
+      const [s, t] = evaluateNode(texCoordsFromIndex(vec2(3000, 5593), int(ndx))) as number[];
+
+      expect(s).toBeCloseTo((column + 0.5) / 3000);
+      expect(t).toBeCloseTo((row + 0.5) / 5593);
     });
   });
 });

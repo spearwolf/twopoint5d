@@ -1,6 +1,7 @@
 import {FloatType, NearestFilter, RGBAFormat, type WebGPURenderer} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {FrameTable, frameTable} from './FrameTable.js';
+import {forgetFrameName} from './internals.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
@@ -33,6 +34,17 @@ describe('FrameTable', () => {
       expect(table.size).toBe(6);
       expect(table.indexOf('walk_2')).toBe(2);
       expect(table.indexOf('idle_0')).toBe(4);
+    });
+
+    test('a table of every frame leaves out a frame the atlas let go of, and indexOf() finds the others by name', () => {
+      const atlas = new TextureAtlas();
+      ['a', 'b', 'c'].forEach((name, i) => atlas.add(name, new TextureCoords(root, i * 8, 0, 8, 8)));
+      atlas[forgetFrameName]('b');
+
+      const table = FrameTable.fromAtlas(atlas);
+
+      expect(table.size).toBe(2);
+      expect([table.indexOf('a'), table.indexOf('c'), table.indexOf('b')]).toEqual([0, 1, -1]);
     });
 
     test('the names a RegExp matches, in the order they were added', () => {
@@ -141,12 +153,12 @@ describe('FrameTable', () => {
       );
     });
 
-    test('refuses a table of more texels than the shader addresses exactly in float, 2^24', () => {
+    test('refuses a table of more than 2^24 texels', () => {
       // floor((2^24 − 1) / 3) frames fit; one more does not
       const table = new FrameTable(new Array(5_592_406).fill(new TextureCoords(root, 0, 0, 8, 8)));
       expect(() => table.bakeDataTexture()).toThrow(RangeError);
       expect(() => table.bakeDataTexture()).toThrow(
-        'FrameTable: 5592406 frames take 16777219 texels — the shader addresses 16777216 (2^24) texels exactly in float; split them into several tables',
+        'FrameTable: 5592406 frames take 16777219 texels — a table holds at most 16777216 (2^24) texels, which keeps the frame index the shader reads as a float exact; split them into several tables',
       );
     });
 

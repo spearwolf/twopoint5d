@@ -350,6 +350,9 @@ The frames keep their durations — as one `duration` when they are all alike, a
 they differ. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its frames
 played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1 is a
 one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code instead.
+It reads its own keys only — an inherited one such as `constructor` names no tag —, and a value
+that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the first
+frame goes into the atlas: a refused sheet leaves `options.target` as it was.
 
 ```ts check
 import {AnimatedSpriteKind, AsepriteJson, type AsepriteJsonData, FeatureSprites} from '@spearwolf/twopoint5d';
@@ -394,7 +397,7 @@ import {AsepriteJson, type AsepriteJsonData, TextureStore} from '@spearwolf/twop
 
 const store = new TextureStore();
 store.registerAtlasAdapter('fighter', (json, parentCoords) => {
-  const [atlas, , animations] = AsepriteJson.parse(json as unknown as AsepriteJsonData, {
+  const [atlas, , animations] = AsepriteJson.parse(json as AsepriteJsonData, {
     parentCoords,
     playback: {kick: 'once'},
   });
@@ -474,8 +477,11 @@ anything is cleared. An image element that has loaded without a natural size, an
 and `height`, is drawn at the size `add()` is given and by `redraw()` at the size of the frame;
 `add()` without a size refuses it. One that failed to load makes `drawImage()` throw: `add()` takes
 no cell for it, and `redraw()` leaves the frame cleared. **`remove(name)`** clears the frame and
-lets go of the name, not of its space — a shelf packer fragments; **`clear()`** starts over with a
-new `atlas`, frame ids from 0.
+lets go of the name, not of its space — a shelf packer fragments. The frame keeps its id, and
+`atlas.get(id)` still answers it, but it leaves the random draws of the atlas (`randomFrame()` and
+its siblings) and a table of every frame (`frameTable(atlas)`, `atlasFrameTable(atlas)`), and the
+message of a full atlas counts only the frames it holds. **`clear()`** starts over with a new
+`atlas`, frame ids from 0.
 
 The atlas draws, clears and extrudes in canvas pixels whatever the caller left on `context` — a
 transform, a `globalAlpha`, a composite operation — and gives that state back afterwards, so the
@@ -538,18 +544,19 @@ export function show(index: number) {
 ```
 
 - **`FrameTable`** takes the frames of an atlas as `AtlasFrameTable` does — a list of names in its
-  order, a `RegExp` (the names it matches, in the order of the json), or every frame by id — or a list
-  of frames and bare `TextureCoords` (`new FrameTable(frames)`); `indexOf(name)` answers the index. Its
-  bake is a float `DataTexture`, three texels a frame row by row: up to 5 592 405 frames — 2^24 texels,
-  the most the shader addresses exactly in float —, where `AtlasFrameTable`, the uniform array for a
-  material of one's own, stops at 341 frames. Every
-  bake is a new texture the caller owns; a frame changed afterwards reaches the sprites with the next
-  bake.
+  order, a `RegExp` (the names it matches, in the order of the json), or every frame by id, a frame
+  `DynamicAtlas#remove()` let go of left out — or a list of frames and bare `TextureCoords`
+  (`new FrameTable(frames)`); `indexOf(name)` answers the index. Its bake is a float `DataTexture`,
+  three texels a frame row by row: up to 5 592 405 frames — 2^24 texels, a bound that keeps the
+  frame index the shader reads as a float exact —, where `AtlasFrameTable`, the uniform array for a
+  material of one's own, stops at 341 frames. Every bake is a new texture the caller owns; a frame
+  changed afterwards reaches the sprites with the next bake.
 - **The frame** is drawn as `AtlasFrame` draws it: a turned frame upright, a trimmed frame where the
   untrimmed sprite has it.
-- **`frameIndex`** is rounded to a whole frame; one before the first or past the last frame of the
-  table shows the first or the last — the shader cannot throw. It is static; a sprite animated on the
-  CPU, which writes it every frame, takes `attributeUsage: {dynamic: ['frameIndex']}`.
+- **`frameIndex`** is rounded to the nearest frame, a half up; one before the first or past the last
+  frame of the table shows the first or the last — the shader cannot throw. It is static; a sprite
+  animated on the CPU, which writes it every frame, takes
+  `attributeUsage: {dynamic: ['frameIndex']}`.
 - Until the frame table has an image the sprite shows the whole `colorMap`.
 
 **Directional frames.** The 8-direction sprites of every boomer shooter, the cheap impostor of a tree:
@@ -597,10 +604,10 @@ export function frame(time: number) {
 }
 ```
 
-- **The views of a frame** are `n` consecutive entries of the table, view 0 first. `frameIndex` counts
-  frames as it does without views, and the shader reads entry `round(frameIndex) · n + view`; a
-  `frameIndex` past the last frame shows the matching view of the last frame, one before the first
-  that of the first.
+- **The views of a frame** are `n` consecutive entries of the table, view 0 first. `frameIndex`
+  counts frames as it does without views, and the shader reads entry
+  `floor(frameIndex + 0.5) · n + view`; a `frameIndex` past the last frame shows the matching view
+  of the last frame, one before the first that of the first.
 - **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of the
   sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front is
   where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh — `Object3D.rotation.y`
@@ -991,7 +998,8 @@ export function cycle(time: number) {
   and a flash act on the swapped colours — compares the colour of the color source with the first 16
   entries of row 0 (`paletteSwap({colors: n})` for 1 to 64) and draws it with that entry of the
   sprite's `paletteRow`, its alpha kept. The first entry it matches wins; a colour no entry holds stays
-  as it is. A `paletteRow` past the last row draws the last.
+  as it is. `paletteRow` is rounded to the nearest row, a half up; a `paletteRow` past the last row
+  draws the last.
 - **Exact colours.** The comparison allows `1/512` per channel, the rounding of 8-bit texels and no
   more. So the `colorMap` is read with `NearestFilter` and no mipmaps — a linear filter blends
   neighbouring texels into colours of no palette —, has no premultiplied edges, and lies in the same
@@ -2587,7 +2595,8 @@ material.colorNode = sampleAtlasFrame(atlasTexture, frames, attribute<'float'>('
 });
 ```
 
-**The table.** `atlasFrameTable(atlas)` takes every frame, the index of a frame its frame id;
+**The table.** `atlasFrameTable(atlas)` takes every frame, the index of a frame its frame id —
+a frame `DynamicAtlas#remove()` let go of is left out, and the frames after it move up one;
 with a list of names, or a `RegExp` matched as `frameNames()` matches it, the index is the
 position in that selection, and `indexOf(name)` answers it. `new AtlasFrameTable(frames)` takes
 a list of atlas frames or bare `TextureCoords`. A frame takes three `vec4` of a uniform array —
@@ -2616,8 +2625,9 @@ frame can repeat on a surface.
   needs transparency or an alpha test for it. `'stretch'` lays the trimmed area over the whole uv.
 - `inset` keeps the lookup that many texels of the drawn frame away from its edges, so that a
   linear sample, or a nearest one right at a wrap, does not reach the frame beside it in the atlas.
-- The index may be a number, an int node or a float node, which is rounded. Every index is clamped
-  to the frames of the table, **silently**: an index past the last frame draws the last frame.
+- The index may be a number, an int node or a float node, which is rounded to the nearest frame, a
+  half up, on WebGPU and WebGL 2 alike: 2.5 draws frame 3. Every index is clamped to the frames of
+  the table, **silently**: an index past the last frame draws the last frame.
 
 `atlasTexture` is the image of the atlas loaded with `flipY = false`, as `TextureFactory` and
 `TextureStore` load it; with `flipY = true` every frame is read from the wrong place, and nothing

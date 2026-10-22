@@ -1,8 +1,15 @@
-import {sRGBTransferOETF} from 'three/tsl';
-import {SRGBColorSpace, Texture} from 'three/webgpu';
+import {sRGBTransferOETF, uniform, vec2, vec4} from 'three/tsl';
+import {type Node, SRGBColorSpace, Texture, Vector2, Vector4} from 'three/webgpu';
 import {describe, expect, test, vi} from 'vitest';
 
-import {attributeNamesOf, nodesOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
+import {
+  attributeNamesOf,
+  evaluateNode,
+  nodesOf,
+  samplesTexture,
+  stubShaderContext,
+  textureNodesOf,
+} from '../../testing/spriteGraph.js';
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {defineSprite, type SpriteOf} from '../defineSprite.js';
 import {FeatureSpritesMaterial} from '../FeatureSprites/FeatureSpritesMaterial.js';
@@ -147,5 +154,27 @@ describe('paletteSwap()', () => {
     expect([material.colorNode, material.version]).toEqual([colorNode, version]);
     expect(samplesTexture(material.colorNode!, other)).toBe(true);
     material.dispose();
+  });
+
+  test('rounds paletteRow half up: 1.5 and 2.5 draw the rows 2 and 3', () => {
+    // the row of the replacement, the last lookup of the stage, in a palette of 16 × 8
+    const rowDrawn = (paletteRow: number) => {
+      const uvs: Node<'vec2'>[] = [];
+      PaletteSwap.color!.transform(uniform(new Vector4(0.5, 0.5, 0.5, 1)) as unknown as Node<'vec4'>, {
+        ...stubShaderContext(),
+        attribute: <T extends string>(name: string) => uniform(name === 'paletteRow' ? paletteRow : 0) as unknown as Node<T>,
+        uniform: <T extends string>(name: string) =>
+          (name === 'paletteCycle' ? uniform(new Vector2(0, 0)) : uniform(0)) as unknown as Node<T>,
+        sample: (_name, uv) => {
+          uvs.push(uv);
+          return vec4(0.5, 0.5, 0.5, 1) as unknown as Node<'vec4'>;
+        },
+        textureSize: () => vec2(16, 8) as unknown as Node<'vec2'>,
+      });
+      return (evaluateNode(uvs.at(-1)!) as number[])[1]! * 8 - 0.5;
+    };
+
+    expect(rowDrawn(2.5)).toBeCloseTo(3);
+    expect(rowDrawn(1.5)).toBeCloseTo(2);
   });
 });

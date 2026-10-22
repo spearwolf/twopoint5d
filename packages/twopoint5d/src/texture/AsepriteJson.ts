@@ -1,4 +1,5 @@
 import {describeValue} from '../utils/describeValue.js';
+import {isAnimationPlayback} from './animationPlayback.js';
 import {type AnimationPlayback, type AnimationTimingOptions, FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
@@ -109,7 +110,8 @@ export interface AsepriteParseOptions {
   target?: TextureAtlas<AsepriteFrameData>;
   /**
    * The playback of a tag by its name, in place of the one its `direction` and `repeat` give: the
-   * frames still follow the direction, the repeat is left out.
+   * frames still follow the direction, the repeat is left out. Only own keys name a tag — an inherited
+   * one such as `constructor` names none.
    */
   playback?: Readonly<Record<string, AnimationPlayback>>;
 }
@@ -127,6 +129,12 @@ const repeatOf = (tag: AsepriteFrameTag): number => {
     );
   }
   return count;
+};
+
+// an own key only: `{}` would answer Object.prototype.constructor for a tag named "constructor"
+const playbackOf = (options: AsepriteParseOptions | undefined, tagName: string): unknown => {
+  const playback = options?.playback;
+  return playback != null && Object.hasOwn(playback, tagName) ? playback[tagName] : undefined;
 };
 
 // The indices of the frames a tag shows, and the playback they are played with. A repeat of r ≥ 1 is
@@ -196,13 +204,15 @@ export class AsepriteJson {
    * one pass and leaves out the frame it turns on. The frames keep their durations, in seconds — as
    * `durations` when they differ, as one `duration` when they are all alike. `options.playback` names
    * the playback of a tag outright; its frames still follow the direction, and its repeat is left out.
+   * It is read by its own keys only: an inherited one such as `constructor` names no tag.
    *
    * Refused, with the tag named: a range outside the frames or running backwards, an unknown
    * direction, a repeat that is no whole number of 0 or more, two tags of one name, a frame without
    * a duration above zero, a tag that plays more than `FrameBasedAnimations.MaxFramesWithDurations`
-   * frames of differing durations, and a playback for a tag the sheet does not carry; a frame name
-   * twice in the layout "Array" is refused as well. Every check runs before the first frame is
-   * added: a refused sheet leaves `options.target` as it was.
+   * frames of differing durations, a playback that is none of `'loop'`, `'once'` and `'pingpong'`,
+   * and a playback for a tag the sheet does not carry; a frame name twice in the layout "Array" is
+   * refused as well. Every check runs before the first frame is added: a refused sheet leaves
+   * `options.target` as it was.
    */
   static parse(
     data: AsepriteJsonData,
@@ -228,6 +238,7 @@ export class AsepriteJson {
     }
     const plans: {name: string; timing: AnimationTimingOptions; frameNames: string[]}[] = [];
     const tagNames = new Set<string>();
+    const overrides = new Map<string, AnimationPlayback>();
     for (const tag of tags) {
       if (tagNames.has(tag.name)) {
         throw new Error(`AsepriteJson: two tags are named "${tag.name}" — rename one of them in Aseprite`);
@@ -250,6 +261,13 @@ export class AsepriteJson {
         );
       }
       repeatOf(tag);
+      const override = playbackOf(options, tag.name);
+      if (override !== undefined && !isAnimationPlayback(override)) {
+        throw new Error(
+          `AsepriteJson: parse() got a playback of ${describeValue(override)} for the tag "${tag.name}" — a playback is 'loop', 'once' or 'pingpong'`,
+        );
+      }
+      if (override !== undefined) overrides.set(tag.name, override);
       for (let index = tag.from; index <= tag.to; index++) {
         const [name, {duration}] = entries[index]!;
         if (typeof duration !== 'number' || !Number.isFinite(duration) || !(duration > 0)) {
@@ -260,7 +278,7 @@ export class AsepriteJson {
       }
     }
     for (const tag of tags) {
-      const {indices, playback} = framesOfTag(tag, options?.playback?.[tag.name]);
+      const {indices, playback} = framesOfTag(tag, overrides.get(tag.name));
       const durations = indices.map((index) => entries[index]![1].duration / 1000);
       const even = durations.every((duration) => duration === durations[0]);
       if (!even && indices.length > FrameBasedAnimations.MaxFramesWithDurations) {
@@ -291,8 +309,8 @@ export class AsepriteJson {
     const [atlas] = TexturePackerJson.parse(
       {frames, meta: data.meta},
       options?.parentCoords,
-      (options?.target ?? new TextureAtlas<AsepriteFrameData>()) as unknown as TextureAtlas,
-    ) as unknown as [TextureAtlas<AsepriteFrameData>];
+      options?.target ?? new TextureAtlas<AsepriteFrameData>(),
+    );
 
     // every plan was checked against what add() refuses: no add() below throws
     const animations = new FrameBasedAnimations();

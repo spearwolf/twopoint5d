@@ -1,8 +1,15 @@
-import {cameraPosition} from 'three/tsl';
-import {Texture} from 'three/webgpu';
+import {cameraPosition, uniform, vec2, vec4} from 'three/tsl';
+import {type Node, Texture} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {attributeNamesOf, nodesOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
+import {
+  attributeNamesOf,
+  evaluateNode,
+  nodesOf,
+  samplesTexture,
+  stubShaderContext,
+  textureNodesOf,
+} from '../../testing/spriteGraph.js';
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {defineSprite, type SpriteOf} from '../defineSprite.js';
 import {FeatureSpritesMaterial} from '../FeatureSprites/FeatureSpritesMaterial.js';
@@ -124,5 +131,26 @@ describe('tableFrame()', () => {
     expect(names).toContain('instancePosition');
     expect(nodesOf(material.colorNode!).has(cameraPosition)).toBe(true);
     material.dispose();
+  });
+
+  test('rounds frameIndex half up: 1.5 and 2.5 read the frames 2 and 3', () => {
+    // the texels the frame stage reads out of a table of 64 × 1 that holds 16 entries, sorted
+    const texelsRead = (frameIndex: number) => {
+      const uvs: Node<'vec2'>[] = [];
+      TableFrame.frame!({
+        ...stubShaderContext(),
+        attribute: <T extends string>(name: string) => uniform(name === 'frameIndex' ? frameIndex : 0) as unknown as Node<T>,
+        sample: (_name, uv) => {
+          uvs.push(uv);
+          return vec4(16, 0, 0, 0) as unknown as Node<'vec4'>;
+        },
+        textureSize: () => vec2(64, 1) as unknown as Node<'vec2'>,
+      });
+      return uvs.map((uv) => Math.round((evaluateNode(uv) as number[])[0]! * 64 - 0.5)).sort((a, b) => a - b);
+    };
+
+    // t = 1 + 3 · frame, the first texel of the frame
+    expect(texelsRead(2.5)).toEqual([0, 10, 11, 12]);
+    expect(texelsRead(1.5)).toEqual([0, 7, 8, 9]);
   });
 });

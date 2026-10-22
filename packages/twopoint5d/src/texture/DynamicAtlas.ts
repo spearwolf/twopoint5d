@@ -317,8 +317,10 @@ export class DynamicAtlas {
   /**
    * Clears the cell of the frame `name` and lets go of the name: {@link atlas} finds it no longer, and
    * `add()` may take it again — for a new cell. The cell is not reused, shelves fragment; the frame keeps
-   * its id, and `atlas.get(id)` still answers it. Answers `false` for a name the atlas does not hold, and
-   * once the atlas is disposed.
+   * its id, and `atlas.get(id)` still answers it, but it leaves the random draws of the atlas —
+   * `randomFrame()` and its siblings — and a table of every frame — `frameTable(atlas)`,
+   * `atlasFrameTable(atlas)` —, and the message of a full atlas counts only the frames it holds. Answers
+   * `false` for a name the atlas does not hold, and once the atlas is disposed.
    */
   remove(name: TextureAtlasFrameName): boolean {
     if (this.#disposed) return false;
@@ -431,7 +433,7 @@ export class DynamicAtlas {
     const last = this.#shelves.at(-1);
     const y = last === undefined ? padding : last.y + last.height + padding;
     if (y + cellHeight + padding > this.height) {
-      const count = this.#atlas.size;
+      const count = this.#cells.size;
       throw new RangeError(
         `${WHERE}: the atlas of ${this.width} × ${this.height} is full — the frame "${nameOf(name)}" of ${width} × ${height} does not fit beside ${count === 1 ? 'the 1 frame' : `the ${count} frames`} packed into it; build a larger one — new DynamicAtlas({width: ${2 * this.width}, height: ${2 * this.height}}) — or clear() it`,
       );
