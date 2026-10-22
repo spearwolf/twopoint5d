@@ -6,6 +6,8 @@ import {ImageLoader, type Texture} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {cmpAnimationsData} from './cmpAnimationsData.js';
+import {type AtlasJsonFetch, fetchAtlasJson} from './fetchAtlasJson.js';
 import {type AtlasAdapter, builtInAtlasAdapters, pickAtlasAdapter} from './atlasAdapters.js';
 import {
   atlasAdapterPicker,
@@ -17,8 +19,7 @@ import {
   type TextureImageSource,
   type TextureResourceLoadFailure,
 } from './internals.js';
-import {isAtlasJsonResponse, type AtlasJsonResponse} from './isAtlasJsonResponse.js';
-import {resolveRelativeUrl} from './resolveRelativeUrl.js';
+import type {AtlasJsonResponse} from './isAtlasJsonResponse.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -68,45 +69,47 @@ export const TextureResourceSubtypes = {
 /**
  * Public event-name constants emitted by `TextureResource`.
  *
- * The per-subtype events (`imageCoords`, `atlas`, `tileSet`, `texture`,
- * `frameBasedAnimations`) are retained — late subscribers see the latest value.
- * A value the resource takes back is not announced: rather than carrying `undefined`, its
- * retained event is cleared, and a subscriber that arrives later waits for the next value.
- * {@link TextureResource} lists when a value is taken back.
- *
- * `error` carries `{source: 'image'|'atlas', url, error}` for a fetch that failed, with a
- * `status: number` beside it when the atlas request answered with a status instead of a body —
- * an image that does not load comes out of the loader promise and has no status to name. The
- * same `source: 'atlas'` also carries `{url, error}` with no `status` for a fetch that
- * succeeded but answered with something that is not a texture atlas json, or with one that
- * names no image and was given no `overrideImageUrl` to fall back on, or whose `overrideImageUrl`
- * is cleared again — the response was a 200, so there is no status to name. It
- * carries `{source: 'texture', id, error}` for a failure behind an image that loaded
- * successfully — texture creation, or any value derived from it, such as an atlas or a tile
- * set — with no `url`, since none has failed. A subscriber of `imageCoords`, `atlas`, `tileSet`,
- * `texture` or `frameBasedAnimations` that throws keeps the value from no one: every other
- * subscriber is called and the retained value is written before the throw goes on. A throw
- * raised while the resource publishes what it loaded — its image, its atlas json and what is
- * built from them — is reported with the same `{source: 'texture', id, error}`; the value stays
- * published, and `TextureStore#getAsync()` does not reject on it. A tile set that `TileSet` refuses
- * is reported here whether the image arrives or the `tileSetOptions` change; the write that changed them
- * does not throw. An `atlasJson` that its atlas adapter cannot read is reported here as soon
- * as the image it names is there; the write that set it does not throw either. It carries
- * `{source: 'frameBasedAnimations', id, animation, error}` for an animation entry that is
- * skipped: one whose data is no object or does not fit this kind of resource, one whose data does not
- * let the animation be built — no `duration` and no `frameRate`, a `frameRate` of 0, `tileIds` that
- * are no array, a tile id, a `firstTileId` or a `tileCount` that `FrameBasedAnimations#add()` refuses,
- * a `frameNameQuery` that is neither a string nor a `RegExp` — and one whose frames come out empty,
- * a `frameNameQuery` that matches nothing or an empty list of `tileIds`.
- * Every other entry of the same map is registered all the same.
- *
- * An `error` listener that throws takes the event from no other listener: eventize reports the
- * throw on the console, and the resource goes on as it would without it — the other entries of
- * an animation map are registered, and a `TextureStore#getAsync()` that waits on the resource
- * hears the failure.
- *
- * `dispose` fires once at the start of `dispose()`. Every listener hears it, even behind one
- * that throws.
+ * - `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` carry the values of the
+ *   resource and are retained: a late subscriber sees the latest value.
+ *   - A value the resource takes back is not announced: rather than carrying `undefined`, its
+ *     retained event is cleared, and a subscriber that arrives later waits for the next value.
+ *     {@link TextureResource} lists when a value is taken back.
+ *   - A subscriber that throws keeps the value from no one: every other subscriber is called and
+ *     the retained value is written before the throw goes on.
+ * - `error` carries one payload per `source`:
+ *   - `{source: 'image', url, error}` — an image that does not load. The failure comes out of the
+ *     loader promise and has no status to name.
+ *   - `{source: 'atlas', url, status, error}` — an atlas request that answered with a status
+ *     instead of a body.
+ *   - `{source: 'atlas', url, error}`, with no `status` — a fetch of the atlas json that failed; a
+ *     response that is no texture atlas json; a json that names no image and was given no
+ *     `overrideImageUrl` to fall back on, or whose `overrideImageUrl` is cleared again. Such a
+ *     response was a 200, so there is no status to name.
+ *   - `{source: 'texture', id, error}`, with no `url`, since none has failed — a failure behind an
+ *     image that loaded successfully:
+ *     - the texture cannot be built, or a value derived from it, such as an atlas or a tile set;
+ *     - a throw raised while the resource publishes what it loaded — its image, its atlas json and
+ *       what is built from them. The value stays published, and `TextureStore#getAsync()` does not
+ *       reject on it;
+ *     - a tile set that `TileSet` refuses, whether the image arrives or the `tileSetOptions`
+ *       change. The write that changed them does not throw;
+ *     - an `atlasJson` that its atlas adapter cannot read, as soon as the image it names is there.
+ *       The write that set it does not throw either.
+ *   - `{source: 'frameBasedAnimations', id, animation, error}` — an animation entry that is skipped.
+ *     Every other entry of the same map is registered all the same. An entry is skipped
+ *     - whose data is no object or does not fit this kind of resource;
+ *     - whose data does not let the animation be built: no `duration` and no `frameRate`, a
+ *       `frameRate` of 0, `tileIds` that are no array, a tile id, a `firstTileId` or a `tileCount`
+ *       that `FrameBasedAnimations#add()` refuses, a `frameNameQuery` that is neither a string nor
+ *       a `RegExp`;
+ *     - whose frames come out empty: a `frameNameQuery` that matches nothing or an empty list of
+ *       `tileIds`.
+ *   - A listener that throws takes the event from no other listener: eventize reports the throw on
+ *     the console, and the resource goes on as it would without it — the other entries of an
+ *     animation map are registered, and a `TextureStore#getAsync()` that waits on the resource
+ *     hears the failure.
+ * - `dispose` fires once at the start of `dispose()`. Every listener hears it, even behind one that
+ *   throws.
  */
 export const TextureResourceEvents = {
   ImageCoords: TextureResourceSubtypes.ImageCoords,
@@ -188,9 +191,11 @@ const wrongAnimationDataError = (resource: TextureResource, animation: string, s
       `which a "${resource.type}" resource cannot use`,
   );
 
-// Only the shape of resource a property belongs to carries the signal behind it. Without
-// this the write would go nowhere and the getter next to it would keep answering
-// `undefined`, leaving the caller with no sign that the value never arrived.
+// Only the shape of resource a property belongs to carries the signal behind it. TypeScript refuses
+// the write, since no type of another shape names the property; JavaScript would quietly create an
+// own property the resource never reads, and reading it back would answer the value written, leaving
+// the caller with no sign that the value never arrived. The accessors of `refuseInputsOfOtherShapes()`
+// throw this instead.
 const wrongShapeError = (resource: TextureResource, property: string): TypeError => {
   const article = /^[aeiou]/.test(resource.type) ? 'an' : 'a';
   return new TypeError(`TextureResource "${resource.id}" is ${article} "${resource.type}" resource and has no "${property}"`);
@@ -199,7 +204,9 @@ const wrongShapeError = (resource: TextureResource, property: string): TypeError
 // An atlas resource takes the name of its image from its json. Writing that name from
 // outside would put the texture on one file while the atlas keeps describing another, and
 // nothing would ever bring the two back together: the json still names what it named, so
-// the atlas effect finds no reason to publish again and no error is raised either.
+// the atlas effect finds no reason to publish again and no error is raised either. TypeScript
+// refuses the write, `imageUrl` of an atlas is read-only; for JavaScript, which would quietly
+// create an own property the resource never reads, the setter on the prototype throws this.
 const derivedImageUrlError = (resource: TextureResource): TypeError =>
   new TypeError(
     `TextureResource "${resource.id}" is an "atlas" resource and takes its "imageUrl" from the atlas json ` +
@@ -210,71 +217,107 @@ const derivedImageUrlError = (resource: TextureResource): TypeError =>
 const BUILT_IN_ATLAS_ADAPTERS = builtInAtlasAdapters();
 const pickBuiltInAtlasAdapter = (json: TexturePackerJsonData): AtlasAdapter => pickAtlasAdapter(BUILT_IN_ATLAS_ADAPTERS, json);
 
-// the inputs only an atlas resource carries
-interface AtlasSignals {
-  readonly atlasAdapter: Signal<AtlasAdapter | undefined>;
-  readonly atlasUrl: Signal<string | undefined>;
-  readonly atlasJson: Signal<TexturePackerJsonData | undefined>;
-  // the json as `atlasUrl` delivered it, with a relative `meta.image` resolved against that url,
-  // but without the `overrideImageUrl` put in its place
-  readonly fetchedAtlasJson: Signal<FetchedAtlasJson | undefined>;
-  readonly overrideImageUrl: Signal<string | undefined>;
-}
-
 // `url` is the url this json came from — `atlasUrl` may already name the next one
 interface FetchedAtlasJson {
   readonly json: AtlasJsonResponse;
   readonly url: string;
 }
 
+// What the class of a shape reaches of the base: the signals of the base its inputs and effects
+// read and write, and the parts of the load bookkeeping a shape takes part in. The base builds it
+// once in its constructor, and `shapeContextOf()` hands it to the class of the shape — neither is
+// exported, so nothing outside this module reaches it.
+interface ShapeContext {
+  readonly imageUrl: Signal<string | undefined>;
+  readonly imageCoords: Signal<TextureCoords | undefined>;
+  readonly imageUrlOfCoords: Signal<string | undefined>;
+  readonly atlas: Signal<TextureAtlas | undefined>;
+  readonly tileSet: Signal<TileSet | undefined>;
+  readonly frameBasedAnimations: Signal<FrameBasedAnimations | undefined>;
+  readonly adapterAnimations: Signal<FrameBasedAnimations | undefined>;
+  readonly frameBasedAnimationsData: Signal<FrameBasedAnimationsDataMap | undefined>;
+  isDisposed(): boolean;
+  clearFailure(step: LoadStep): void;
+  fail(step: LoadStep, failure: TextureResourceLoadFailure): void;
+  registerAnimationsEffect<S extends TileSet | TextureAtlas>(
+    source: Signal<S | undefined>,
+    addEntry: (animations: FrameBasedAnimations, name: string, data: FrameBasedAnimationsData, source: S) => void,
+    baseAnimations?: Signal<FrameBasedAnimations | undefined>,
+  ): void;
+}
+
+// assigned by the `static {}` block of TextureResource, the one place that reads its `#context`:
+// that is how a `#` field gets a friend
+let shapeContextOf: (resource: TextureResource) => ShapeContext;
+
 export interface TextureResource extends EventizedObject {}
 
 /**
- * A single entry of a `TextureStore`: an image, a tile set or a texture atlas,
- * turned into a `Texture` and whatever else its shape brings with it.
+ * A single entry of a `TextureStore`: an image, a tile set or a texture atlas, turned into a
+ * `Texture` and whatever else its shape brings with it. The base of the three classes of resource,
+ * one per shape:
  *
- * The properties fall into two groups.
+ * - {@link ImageTextureResource} — an image;
+ * - {@link TileSetTextureResource} — an image cut into tiles;
+ * - {@link AtlasTextureResource} — a texture atlas json and the image it names.
  *
- * **Input** — write these to say what the resource is made of: `imageUrl`, `atlasUrl`,
- * `atlasJson`, `overrideImageUrl`, `atlasAdapter`, `tileSetOptions`, `frameBasedAnimationsData`,
- * `textureClasses`, `textureFactory` and `renderer`. `atlasJson` is both: an atlas
- * resource with an `atlasUrl` fetches the JSON and writes it here itself.
+ * Each class carries the inputs of its shape alone; {@link AnyTextureResource} is their union, and
+ * `type` narrows it to the class. Build one with its constructor, or with
+ * {@link TextureResource.fromImage}, {@link TextureResource.fromTileSet} or
+ * {@link TextureResource.fromAtlas}, which write its first values as well.
  *
- * **Output** — read-only, produced by the effects {@link TextureResource.activate} registers:
- * `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations`. Each of them is
- * also an event of the same name, retained, so a subscriber that arrives late still sees
- * the current value. A tile set resource takes its `tileSet`, `atlas` and `frameBasedAnimations`
- * back while its `tileSetOptions` are cleared or refused by `TileSet`, and an atlas resource
- * takes its `atlas` and `frameBasedAnimations` back while its `atlasJson` is cleared or cannot
- * be read once the image it names is there — the texture stays in both cases. Every resource
- * takes its `frameBasedAnimations` back while its `frameBasedAnimationsData` is cleared. The
- * getters answer `undefined`, and rather than announcing `undefined` the retained events are
- * cleared, so a subscriber that arrives later waits for the next value.
+ * **Inputs** of every shape — write these to say how the texture is built:
  *
- * An image or a tile set resource whose `imageUrl` is cleared takes its `imageCoords` and its
- * `texture` back the same way, together with everything built from them — the `tileSet`, its
- * `atlas` and the `frameBasedAnimations` — and releases the texture it built, since a
- * subscriber only borrows it. An image that is still loading when the url is cleared builds
- * nothing. An atlas resource whose json names no image, with no `overrideImageUrl` to fall back
- * on, has no `imageUrl` either and does the same.
+ * - `textureClasses` — the texture classes the texture is built with;
+ * - `textureFactory` — the factory that builds it; a `TextureStore` writes its shared one;
+ * - `renderer` — the renderer a resource on its own builds a factory for.
  *
- * A resource without a `textureFactory` loads its image all the same and publishes its
- * `imageCoords` and what is built from them — the `atlas`, the `tileSet` and the
- * `frameBasedAnimations`; only the `texture` waits for a factory. A factory that is cleared
- * leaves the texture it built standing for as long as the image stays the same, and a texture
- * built from another image than the one loaded now is taken back and released.
+ * The inputs that say what the resource is made of belong to the class of its shape: `imageUrl`,
+ * `tileSetOptions`, `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter` and
+ * `frameBasedAnimationsData`.
  *
- * `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter` and `tileSetOptions` belong to one shape of
- * resource each. Writing one on a resource of another shape throws a `TypeError`.
+ * **Outputs** — read-only, produced by the effects {@link TextureResource.activate} registers. Each
+ * of them is also an event of the same name, retained, so a subscriber that arrives late still sees
+ * the current value:
  *
- * `imageUrl` changes sides with the shape: an image and a tile set are told which file to
- * load, an atlas takes that name from `overrideImageUrl ?? atlasJson.meta.image` and reads
- * as output. Writing it on an atlas resource throws a `TypeError` — `overrideImageUrl` is
- * the way to send one to another image, and it keeps the atlas and the texture together.
+ * - `imageCoords` — the coordinates of the whole image;
+ * - `texture` — the texture built from the image;
+ * - `tileSet` — the tile set of a tile set resource;
+ * - `atlas` — the atlas of an atlas resource, and the atlas of the tile set of a tile set resource;
+ * - `frameBasedAnimations` — the animations of a tile set or an atlas resource.
+ *
+ * A shape that never builds an output narrows its getter to `undefined`.
+ *
+ * **What is taken back, and when.** The getter answers `undefined`, and rather than announcing
+ * `undefined` the retained event is cleared, so a subscriber that arrives later waits for the next
+ * value.
+ *
+ * - An image or a tile set resource whose `imageUrl` is cleared takes its `imageCoords` and its
+ *   `texture` back, together with everything built from them — the `tileSet`, its `atlas` and the
+ *   `frameBasedAnimations` — and releases the texture it built, since a subscriber only borrows it.
+ * - An image that is still loading when the url is cleared builds nothing.
+ * - An atlas resource whose json names no image, with no `overrideImageUrl` to fall back on, has no
+ *   `imageUrl` either and does the same.
+ * - A tile set resource takes its `tileSet`, `atlas` and `frameBasedAnimations` back while its
+ *   `tileSetOptions` are cleared or refused by `TileSet`. The texture stays.
+ * - An atlas resource takes its `atlas` and `frameBasedAnimations` back while its `atlasJson` is
+ *   cleared, or cannot be read once the image it names is there. The texture stays.
+ * - A tile set resource takes its `frameBasedAnimations` back while its `frameBasedAnimationsData`
+ *   is cleared, and an atlas resource while that data is cleared and its atlas adapter read no
+ *   animations out of the json.
+ *
+ * **Without a texture factory:**
+ *
+ * - the resource loads its image all the same and publishes its `imageCoords` and what is built
+ *   from them — the `atlas`, the `tileSet` and the `frameBasedAnimations`; only the `texture` waits
+ *   for a factory;
+ * - a factory that is cleared leaves the texture it built standing for as long as the image stays
+ *   the same;
+ * - a texture built from another image than the one loaded now is taken back and released.
  */
-export class TextureResource {
-  static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): TextureResource {
-    const resource = new TextureResource(id, 'image');
+export abstract class TextureResource {
+  static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): ImageTextureResource {
+    const resource = new ImageTextureResource(id);
 
     batch(() => {
       resource.imageUrl = imageUrl;
@@ -290,8 +333,8 @@ export class TextureResource {
     tileSetOptions: TileSetOptions,
     textureClasses?: TextureOptionClasses[],
     frameBasedAnimations?: FrameBasedAnimationsDataMap,
-  ): TextureResource {
-    const resource = new TextureResource(id, 'tileset');
+  ): TileSetTextureResource {
+    const resource = new TileSetTextureResource(id);
 
     batch(() => {
       resource.imageUrl = imageUrl;
@@ -309,8 +352,8 @@ export class TextureResource {
     overrideImageUrl?: string,
     textureClasses?: TextureOptionClasses[],
     frameBasedAnimations?: FrameBasedAnimationsDataMap,
-  ): TextureResource {
-    const resource = new TextureResource(id, 'atlas');
+  ): AtlasTextureResource {
+    const resource = new AtlasTextureResource(id);
 
     batch(() => {
       resource.atlasUrl = atlasUrl;
@@ -322,11 +365,9 @@ export class TextureResource {
     return resource;
   }
 
-  // the inputs of one shape each, created by the constructor for that shape and no other: a
-  // setter of another shape finds none and throws, and activate() registers the effects of the
-  // shape they belong to
-  readonly #tileSetOptions?: Signal<Readonly<TileSetOptions> | undefined>;
-  readonly #atlasSignals?: AtlasSignals;
+  static {
+    shapeContextOf = (resource) => resource.#context;
+  }
 
   // outputs sit on every resource, like the texture: a shape that builds no atlas or no tile
   // set leaves them `undefined`
@@ -337,9 +378,15 @@ export class TextureResource {
   // the animations the atlas adapter read out of the json, published beside the atlas; the catalog
   // entries of the resource are added to a copy of them
   #adapterAnimations = createSignal<FrameBasedAnimations | undefined>(undefined, {attach: this});
-  #frameBasedAnimationsData = createSignal<FrameBasedAnimationsDataMap | undefined>(undefined, {attach: this});
+  // compared by content: the same catalog parsed again writes new objects of the same data, and
+  // keeps the animations built from it
+  #frameBasedAnimationsData = createSignal<FrameBasedAnimationsDataMap | undefined>(undefined, {
+    compare: cmpAnimationsData,
+    attach: this,
+  });
 
   #textureClasses = createSignal<TextureOptionClasses[] | undefined>(undefined, {compare: cmpTexClasses, attach: this});
+  // an input of an image and a tile set resource, derived from the json of an atlas resource
   #imageUrl = createSignal<string | undefined>(undefined, {attach: this});
   #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpShallow, attach: this});
 
@@ -354,6 +401,8 @@ export class TextureResource {
   #textureFactory = createSignal<TextureFactory | undefined>(undefined, {attach: this});
   #texture = createSignal<Texture | undefined>(undefined, {attach: this});
   #renderer = createSignal<WebGPURenderer | undefined>(undefined, {attach: this});
+
+  readonly #context: ShapeContext;
 
   readonly id: string;
   readonly type: TextureResourceType;
@@ -378,130 +427,28 @@ export class TextureResource {
     this.#refCount += delta;
   }
 
-  // Every getter of this class answers `undefined` once dispose() has run, `refCount` aside:
+  // Every getter of a resource answers `undefined` once dispose() has run, `refCount` aside:
   // that one goes on counting the subscriptions that still hold the resource. A setter needs
   // no guard against a write that arrives too late: once dispose() has returned,
   // SignalGroup.delete(this) has taken the change bridges and the effects down, so nothing
-  // reads what such a write would still put into a signal. The setters that are tied to one
-  // shape of resource check the flag all the same — they throw on the wrong shape, and a
-  // disposed resource has to stay silent.
+  // reads what such a write would still put into a signal. The setters of the inputs of one
+  // shape check the flag all the same, and so do the accessors that refuse the inputs of
+  // another shape — those throw, and a disposed resource has to stay silent.
+
+  /**
+   * The url of the image the texture is built from: an input of an image and a tile set resource,
+   * and on an atlas resource the image its json names — the `overrideImageUrl` while one is set.
+   */
   get imageUrl(): string | undefined {
     return this.#disposed ? undefined : this.#imageUrl.value;
-  }
-
-  set imageUrl(val: string | undefined) {
-    if (this.#disposed) return;
-    // input on an image and a tile set, output on an atlas: there the atlas effect derives it
-    if (this.type === 'atlas') throw derivedImageUrlError(this);
-    this.#imageUrl.set(val);
   }
 
   get imageCoords(): TextureCoords | undefined {
     return this.#disposed ? undefined : this.#imageCoords.value;
   }
 
-  get atlasUrl(): string | undefined {
-    return this.#disposed ? undefined : this.#atlasSignals?.atlasUrl.value;
-  }
-
-  set atlasUrl(value: string | undefined) {
-    if (this.#disposed) return;
-    const signals = this.#atlasSignals;
-    if (!signals) throw wrongShapeError(this, 'atlasUrl');
-    if (value !== signals.atlasUrl.value) this.#atlasFetchDue = true;
-    signals.atlasUrl.set(value);
-  }
-
-  /**
-   * The atlas json of an atlas resource. For a json fetched from `atlasUrl`, `meta.image` names
-   * the image the texture is built from: the `overrideImageUrl` while one is set, the image the
-   * json names otherwise — a relative name resolved against `atlasUrl`, so it names the file
-   * next to the json. The `overrideImageUrl` is taken as written. A json written from outside
-   * replaces the fetched one and a fetch of `atlasUrl` that failed, and it cuts short a fetch
-   * that is still under way: neither the json nor a failure of that fetch arrives after the
-   * write. It has no url of its own and keeps its `meta.image` as written, and the image loader
-   * resolves a relative one against the document.
-   *
-   * While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`. A json
-   * that its atlas adapter cannot read — or an adapter that answers no `TextureAtlas`, or
-   * animations that are no `FrameBasedAnimations` — takes both back as well and is reported as an
-   * `error` with `source: 'texture'` once the image it names is there; writing it does not throw.
-   * The animations an adapter reads out of the json — the frame tags of an Aseprite json — are the
-   * `frameBasedAnimations` of the resource, and the entries of `frameBasedAnimationsData` are added
-   * to a copy of them; an entry named like one of them is skipped and reported.
-   * Written before {@link TextureResource.activate}, it takes the place of the fetch of the
-   * `atlasUrl` it was written after.
-   */
-  get atlasJson(): TexturePackerJsonData | undefined {
-    return this.#disposed ? undefined : this.#atlasSignals?.atlasJson.value;
-  }
-
-  set atlasJson(value: TexturePackerJsonData | undefined) {
-    if (this.#disposed) return;
-    const signals = this.#atlasSignals;
-    if (!signals) throw wrongShapeError(this, 'atlasJson');
-    // a fetch of `atlasUrl` that is still under way, and a fetch that activate() has yet to
-    // start, would replace this json once it arrives — through `#fetchedAtlasJson` and the atlas
-    // image effect — and its failure would hold back what this json brings
-    this.#atlasFetch?.abort();
-    this.#atlasFetch = undefined;
-    this.#atlasFetchDue = false;
-    // a json written from outside replaces the fetched one: a later change of the
-    // `overrideImageUrl` must not bring the fetched json back in its place
-    signals.fetchedAtlasJson.set(undefined);
-    // and a fetch that failed holds nothing back any more; its effect hangs off `atlasUrl`
-    // alone and would not run again to clear the record
-    this.#loadFailures.delete('atlasFetch');
-    signals.atlasJson.set(value);
-  }
-
-  get overrideImageUrl(): string | undefined {
-    return this.#disposed ? undefined : this.#atlasSignals?.overrideImageUrl.value;
-  }
-
-  set overrideImageUrl(value: string | undefined) {
-    if (this.#disposed) return;
-    const signals = this.#atlasSignals;
-    if (!signals) throw wrongShapeError(this, 'overrideImageUrl');
-    signals.overrideImageUrl.set(value);
-  }
-
   get atlas(): TextureAtlas | undefined {
     return this.#disposed ? undefined : this.#atlas.value;
-  }
-
-  /**
-   * The adapter that reads the `atlasJson` of an atlas resource into its `atlas` and, if the json
-   * names any, its animations — `undefined` to pick one by `meta.app` of the json: among the
-   * adapters of the `TextureStore` the resource belongs to, among `texturePackerAtlasAdapter` and
-   * `asepriteAtlasAdapter` for a resource on its own. A change reads the json again. Writing it on a
-   * resource of another shape throws a `TypeError`.
-   */
-  get atlasAdapter(): AtlasAdapter | undefined {
-    return this.#disposed ? undefined : this.#atlasSignals?.atlasAdapter.value;
-  }
-
-  set atlasAdapter(value: AtlasAdapter | undefined) {
-    if (this.#disposed) return;
-    const signals = this.#atlasSignals;
-    if (!signals) throw wrongShapeError(this, 'atlasAdapter');
-    signals.atlasAdapter.set(value);
-  }
-
-  /**
-   * The options of the tile set of a tile set resource. What is stored is a frozen copy: a change
-   * to the object after the write reaches the tile set only once it is written again, and writing
-   * it again after a change builds a new tile set.
-   */
-  get tileSetOptions(): Readonly<TileSetOptions> | undefined {
-    return this.#disposed ? undefined : this.#tileSetOptions?.value;
-  }
-
-  set tileSetOptions(value: TileSetOptions | undefined) {
-    if (this.#disposed) return;
-    const signal = this.#tileSetOptions;
-    if (!signal) throw wrongShapeError(this, 'tileSetOptions');
-    signal.set(value == null ? undefined : Object.freeze({...value}));
   }
 
   get tileSet(): TileSet | undefined {
@@ -510,14 +457,6 @@ export class TextureResource {
 
   get frameBasedAnimations(): FrameBasedAnimations | undefined {
     return this.#disposed ? undefined : this.#frameBasedAnimations.value;
-  }
-
-  get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
-    return this.#disposed ? undefined : this.#frameBasedAnimationsData.value;
-  }
-
-  set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
-    this.#frameBasedAnimationsData.set(value);
   }
 
   get textureClasses(): TextureOptionClasses[] | undefined {
@@ -560,15 +499,6 @@ export class TextureResource {
   [imageSource]?: TextureImageSource;
 
   /**
-   * How this resource picks an atlas adapter for a json by its `meta.app` while no `atlasAdapter`
-   * is written. The store it belongs to injects the pick among its registered adapters; a resource
-   * on its own picks among the built-in ones.
-   *
-   * @internal
-   */
-  [atlasAdapterPicker]?: (json: TexturePackerJsonData) => AtlasAdapter;
-
-  /**
    * The renderer a resource on its own builds its textures with. While no `textureFactory` was
    * written from outside — a `TextureStore` writes its shared one — the resource builds a
    * `TextureFactory` for it that starts from no texture class, as the factory of a store does,
@@ -596,43 +526,48 @@ export class TextureResource {
   // a result is published is no failure of the step: the result is there
   #loadFailures = new Map<LoadStep, TextureResourceLoadFailure>();
 
-  // the atlas fetch under way, if there is one: the run of the fetch effect that started it
-  // sets it and lets go of it when the fetch is over; that run's cleanup and the `atlasJson`
-  // setter cut it short
-  #atlasFetch?: AbortController;
-
-  // whether activate() starts the fetch of `atlasUrl`: a url that changes makes it due, and an
-  // `atlasJson` written after it takes its place, as it cuts short a fetch under way. Read by
-  // activate() alone — once the effects are registered, a new url starts its fetch by itself
-  #atlasFetchDue = false;
-
   #activated = false;
   #disposed = false;
 
   /**
-   * A resource of the given `type`, with the inputs of that shape and of no other: an `'atlas'`
-   * resource takes `atlasUrl`, `atlasJson` and `overrideImageUrl`, a `'tileset'` resource
-   * `tileSetOptions`, and {@link TextureResource.activate} registers the effects of that shape.
-   * The static factories {@link TextureResource.fromImage}, {@link TextureResource.fromTileSet}
-   * and {@link TextureResource.fromAtlas} build one the same way and write its first values.
+   * A resource of the given `type`, the shape the class that calls it stands for: an
+   * {@link ImageTextureResource}, a {@link TileSetTextureResource} or an
+   * {@link AtlasTextureResource}.
+   *
+   * @throws {TypeError} when it is called for the base itself, which only JavaScript can do
    */
-  constructor(id: string, type: TextureResourceType) {
+  protected constructor(id: string, type: TextureResourceType) {
+    if (new.target === TextureResource) {
+      // the fields above have created their signals by now; they go with the instance that is refused
+      SignalGroup.delete(this);
+      throw new TypeError(
+        'new TextureResource(): TextureResource is the base of the three shapes of resource — build an ImageTextureResource, ' +
+          'a TileSetTextureResource or an AtlasTextureResource, or call TextureResource.fromImage(), fromTileSet() or fromAtlas()',
+      );
+    }
+
     eventize(this);
 
     this.id = id;
     this.type = type;
 
-    if (type === 'tileset') {
-      this.#tileSetOptions = createSignal<Readonly<TileSetOptions> | undefined>(undefined, {compare: cmpShallow, attach: this});
-    } else if (type === 'atlas') {
-      this.#atlasSignals = {
-        atlasAdapter: createSignal<AtlasAdapter | undefined>(undefined, {attach: this}),
-        atlasUrl: createSignal<string | undefined>(undefined, {attach: this}),
-        atlasJson: createSignal<TexturePackerJsonData | undefined>(undefined, {attach: this}),
-        fetchedAtlasJson: createSignal<FetchedAtlasJson | undefined>(undefined, {attach: this}),
-        overrideImageUrl: createSignal<string | undefined>(undefined, {attach: this}),
-      };
-    }
+    this.#context = {
+      imageUrl: this.#imageUrl,
+      imageCoords: this.#imageCoords,
+      imageUrlOfCoords: this.#imageUrlOfCoords,
+      atlas: this.#atlas,
+      tileSet: this.#tileSet,
+      frameBasedAnimations: this.#frameBasedAnimations,
+      adapterAnimations: this.#adapterAnimations,
+      frameBasedAnimationsData: this.#frameBasedAnimationsData,
+      isDisposed: () => this.#disposed,
+      clearFailure: (step) => {
+        this.#loadFailures.delete(step);
+      },
+      fail: (step, failure) => this.#fail(step, failure),
+      registerAnimationsEffect: (source, addEntry, baseAnimations) =>
+        this.#registerAnimationsEffect(source, addEntry, baseAnimations),
+    };
 
     retain(this, ['imageCoords', 'atlas', 'tileSet', 'texture', 'frameBasedAnimations']);
   }
@@ -744,7 +679,7 @@ export class TextureResource {
    * Register the effects that turn the data of this resource into an atlas, a tile set
    * and a texture, and return `this`. Calling it more than once registers them once.
    *
-   * Which effects are registered follows the `type` of the resource, whatever values it holds at
+   * Which effects are registered follows the class of the resource, whatever values it holds at
    * the call: a `tileSetOptions` or an `atlasUrl` that is empty now and set later still reaches
    * them. What the resource holds at the call is taken up as if it were written right after it:
    * an `atlasJson` written before builds its atlas once the image it names is there, and the
@@ -756,7 +691,7 @@ export class TextureResource {
    * On a disposed resource this does nothing — no effect and no signal is created — and
    * returns `this`.
    */
-  activate(): TextureResource {
+  activate(): this {
     if (this.#disposed || this.#activated) return this;
     this.#activated = true;
 
@@ -786,16 +721,16 @@ export class TextureResource {
 
     this.#registerImageEffect();
 
-    // the type decides which effects run, not the values the resource holds at this call: the
+    // the class decides which effects run, not the values the resource holds at this call: the
     // inputs of its shape are there from the constructor on, and a value that arrives later
     // reaches the effects that read it
-    if (this.#tileSetOptions) this.#registerTileSetEffects(this.#tileSetOptions);
-    if (this.#atlasSignals) this.#registerAtlasEffects(this.#atlasSignals);
+    this.registerShapeEffects();
 
     // Standalone fallback: a resource on its own — its renderer written directly, with no
     // `TextureStore` around — builds a factory that starts from no texture class, as the factory
-    // of a store does. A new renderer brings a new factory with its anisotropy maximum; a factory
-    // written from outside, the shared one of a store among them, stays.
+    // of a store does. A new renderer brings a new factory, which asks that renderer for its
+    // anisotropy maximum at every texture it builds; a factory written from outside, the shared
+    // one of a store among them, stays.
 
     // the factory this fallback built and the renderer it built it for
     let fallback: {renderer: WebGPURenderer; factory: TextureFactory} | undefined;
@@ -819,15 +754,24 @@ export class TextureResource {
    *   and loads nothing by itself. The old name stays as an alias until a breaking release
    *   removes it.
    */
-  load(): TextureResource {
+  load(): this {
     return this.activate();
   }
+
+  /**
+   * Register the effects of the shape of this resource. {@link TextureResource.activate} calls it
+   * once, after the image effect and before the fallback of the texture factory.
+   *
+   * @internal
+   */
+  protected abstract registerShapeEffects(): void;
 
   #registerImageEffect(): void {
     // The image a resource on its own fetched last, handed out again to a run that asks for the same
     // url: a run without a factory loads the image, and the run the arriving factory starts asks for
-    // it once more. A load that failed is dropped, so the next run tries again. A resource of a store
-    // fetches through the image cache of the store instead, which shares one image for the same reason
+    // it once more. A load that failed is dropped, so the next run tries again, and so is the image
+    // once the url is cleared: nothing is built from it any more. A resource of a store fetches
+    // through the image cache of the store instead, which shares one image for the same reason
     let standalone: {url: string; image: Promise<HTMLImageElement>} | undefined;
     const loadStandalone = (url: string): Promise<HTMLImageElement> => {
       if (standalone?.url === url) return standalone.image;
@@ -856,6 +800,7 @@ export class TextureResource {
         // coordinates, and what the other effects build from them; the texture of the last factory
         // stays for as long as it was built from this very image
         if (!url) {
+          standalone = undefined;
           this.#takeBackImage();
           return;
         }
@@ -1000,296 +945,6 @@ export class TextureResource {
     }
   }
 
-  #registerTileSetEffects(tileSetOptions: Signal<Readonly<TileSetOptions> | undefined>): void {
-    createEffect(
-      () => {
-        this.#loadFailures.delete('tileSet');
-        const imageCoords = this.imageCoords;
-        const options = tileSetOptions.value;
-
-        let tileSet: TileSet | undefined;
-        let refusal: {error: unknown} | undefined;
-        if (imageCoords && options) {
-          try {
-            tileSet = new TileSet(imageCoords, options);
-          } catch (error) {
-            refusal = {error};
-          }
-        }
-
-        if (tileSet) {
-          // one batch: a subscriber of the tile set that throws makes its set() throw, and
-          // the atlas of that tile set would never reach the resource
-          const built = tileSet;
-          batch(() => {
-            this.#tileSet.set(built);
-            this.#atlas.set(built.atlas);
-          });
-          return;
-        }
-
-        // Nothing on the resource may have been built from an image or from options other than
-        // the current ones, so without a tile set from both of them the tile set, its atlas and
-        // the animations built on it are taken back — the animations here as well, because
-        // inside a batch the animation effect runs after this one and an error listener
-        // reading the resource would still find them. A refusal is reported here instead of
-        // thrown: thrown, it would reach whoever wrote the options — a setter, a
-        // `TextureStore#parse()` cut short before its ready event — or the image effect,
-        // whose load would then end as a texture failure.
-        this.#tileSet.set(undefined);
-        this.#atlas.set(undefined);
-        this.#frameBasedAnimations.set(undefined);
-
-        if (refusal) {
-          this.#fail('tileSet', {source: 'texture', id: this.id, error: refusal.error});
-        }
-      },
-      [this.#imageCoords, tileSetOptions],
-      {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
-    );
-
-    this.#registerAnimationsEffect(this.#tileSet, (animations, name, data, tileSet) => {
-      const shape = animationDataShape(data);
-      if (shape !== 'tileIds' && shape !== 'firstTileId') throw wrongAnimationDataError(this, name, shape);
-      // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
-      // place that refuses an entry carrying neither, with the name of the animation
-      if ('tileIds' in data) {
-        // add() would read a number here as a `firstTileId` and quietly build an animation
-        // over the whole tile set
-        const {tileIds} = data as {tileIds: unknown};
-        if (!Array.isArray(tileIds)) {
-          throw new Error(
-            `TextureResource: animation "${name}" of resource "${this.id}" carries tileIds of ${describeValue(tileIds)} ` +
-              `— tileIds is an array of tile ids`,
-          );
-        }
-        animations.add(name, data, tileSet, data.tileIds);
-      } else if ('firstTileId' in data) {
-        animations.add(name, data, tileSet, data.firstTileId, data.tileCount);
-      }
-    });
-  }
-
-  #registerAtlasEffects(signals: AtlasSignals): void {
-    const {
-      atlasAdapter: atlasAdapterSignal,
-      atlasUrl: atlasUrlSignal,
-      atlasJson: atlasJsonSignal,
-      fetchedAtlasJson: fetchedAtlasJsonSignal,
-      overrideImageUrl: overrideImageUrlSignal,
-    } = signals;
-    const atlasSignal = this.#atlas;
-
-    createEffect(
-      () => {
-        this.#loadFailures.delete('atlasFetch');
-        const atlasUrl = this.atlasUrl;
-        if (!atlasUrl) return;
-        const ac = new AbortController();
-        this.#atlasFetch = ac;
-        // No closing .catch() here either: once the try below is over, nothing throws any more —
-        // the #fail() of a fetch without a result and the `error` of a throw while publishing both
-        // go out with emitSafe()
-        void (async () => {
-          // the try holds the fetch and nothing else: writing the json publishes whatever it
-          // brings — with its image already there, the atlas within this very call — and a
-          // subscriber that throws there is no failure of the fetch
-          let result: {json: AtlasJsonResponse} | {failure: TextureResourceLoadFailure};
-          try {
-            const response = await fetch(atlasUrl, {signal: ac.signal});
-            if (ac.signal.aborted) return;
-            if (!response.ok) {
-              // without this check, a 4xx/5xx body that happens to satisfy
-              // isAtlasJsonResponse below would be taken for a valid atlas, and the status
-              // this branch reports would be lost
-              result = {
-                failure: {
-                  source: 'atlas',
-                  url: atlasUrl,
-                  status: response.status,
-                  error: new Error(`TextureResource: fetch("${atlasUrl}") answered ${response.status} ${response.statusText}`),
-                },
-              };
-            } else {
-              const atlasJson = await response.json();
-              if (ac.signal.aborted) return;
-              if (isAtlasJsonResponse(atlasJson)) {
-                // a relative image name is a file next to the atlas json, and `atlasUrl` here is the url
-                // this very json came from — the effect that picks the image may already see the next one
-                const image = atlasJson.meta.image;
-                result = {
-                  json:
-                    typeof image === 'string'
-                      ? {...atlasJson, meta: {...atlasJson.meta, image: resolveRelativeUrl(image, atlasUrl)}}
-                      : atlasJson,
-                };
-              } else {
-                result = {
-                  failure: {
-                    source: 'atlas',
-                    url: atlasUrl,
-                    error: new Error(`TextureResource: the response of "${atlasUrl}" is no texture atlas json`),
-                  },
-                };
-              }
-            }
-          } catch (error) {
-            if (ac.signal.aborted) return;
-            result = {failure: {source: 'atlas', url: atlasUrl, error}};
-          } finally {
-            if (this.#atlasFetch === ac) this.#atlasFetch = undefined;
-          }
-          if ('failure' in result) {
-            this.#fail('atlasFetch', result.failure);
-            return;
-          }
-          try {
-            fetchedAtlasJsonSignal.set({json: result.json, url: atlasUrl});
-          } catch (error) {
-            // signalize hands the throw of a subscriber to the writer once every effect has
-            // run: the json and what is built from it are published, so no record is kept
-            emitSafe(this, OnError, {source: 'texture', id: this.id, error});
-          }
-        })();
-        return () => {
-          ac.abort();
-          if (this.#atlasFetch === ac) this.#atlasFetch = undefined;
-        };
-      },
-      [atlasUrlSignal],
-      {attach: this},
-    );
-
-    createEffect(
-      () => {
-        this.#loadFailures.delete('atlasImage');
-        const fetched = fetchedAtlasJsonSignal.value;
-        if (!fetched) return;
-        const {json, url} = fetched;
-        const imageUrl = this.overrideImageUrl ?? json.meta.image;
-        if (typeof imageUrl !== 'string') {
-          // the json that is published stays as it was: a subscriber would get an `undefined`
-          // where the event type promises a value
-          this.#fail('atlasImage', {
-            source: 'atlas',
-            url,
-            error: new Error(`TextureResource: the response of "${url}" names no image and no overrideImageUrl was given`),
-          });
-          return;
-        }
-        // the resolved url goes into the published json, mirroring `TextureAtlasLoader`: `atlasJson`
-        // is typed as `TexturePackerJsonData`, whose `meta.image` is a `string`, so the resolved url
-        // has to land in the json itself rather than in a cast that would let the getter lie. The
-        // fetched json, without the override, stays in `#fetchedAtlasJson`, so an override that is
-        // cleared again gives the image back to the one the json names. Written straight onto the
-        // signal, because the public setter treats a write as a json from outside and drops the
-        // fetched one
-        atlasJsonSignal.set({...json, meta: {...json.meta, image: imageUrl}});
-      },
-      [fetchedAtlasJsonSignal, overrideImageUrlSignal],
-      {attach: this},
-    );
-
-    createEffect(
-      () => {
-        if (this.atlasJson) {
-          // straight onto the signal: on this shape of resource `imageUrl` is what the
-          // json says, and the setter that guards that turns a write away
-          this.#imageUrl.set(this.overrideImageUrl ?? this.atlasJson.meta.image);
-        }
-      },
-      [atlasJsonSignal, overrideImageUrlSignal],
-      {attach: this},
-    );
-
-    createEffect(
-      () => {
-        this.#loadFailures.delete('atlasParse');
-        const atlasJson = this.atlasJson;
-        // Nothing on the resource may have been built from a json other than the current
-        // one. The animations go back here as well, for the same reason as in the tile set
-        // effect: inside a batch the animation effect runs after this one, and an error
-        // listener reading the resource would still find them. The texture stays.
-        const takeBack = () => {
-          atlasSignal.set(undefined);
-          this.#adapterAnimations.set(undefined);
-          this.#frameBasedAnimations.set(undefined);
-        };
-        if (!atlasJson) {
-          takeBack();
-          return;
-        }
-        const imageCoords = this.imageCoords;
-        if (!imageCoords) {
-          // without an image nothing is built from one
-          takeBack();
-          return;
-        }
-        // an atlas describes the image its json names. While the image effect is still
-        // on its way to that image, the atlas of the one before stays published — it is
-        // not cleared, because a subscriber would get an `undefined` where the event
-        // type promises a TextureAtlas. The run this skips is taken up again as soon as
-        // the image arrives: that is what `#imageUrlOfCoords` sits in the dependencies
-        // for
-        if (this.#imageUrlOfCoords.value !== (this.overrideImageUrl ?? atlasJson.meta.image)) return;
-        let atlas: TextureAtlas;
-        let adapterAnimations: FrameBasedAnimations | undefined;
-        try {
-          const adapter = atlasAdapterSignal.value ?? (this[atlasAdapterPicker] ?? pickBuiltInAtlasAdapter)(atlasJson);
-          const result: unknown = adapter(atlasJson, imageCoords);
-          const answered = (typeof result === 'object' && result !== null ? result : {}) as Partial<AtlasAdapterResultShape>;
-          if (!(answered.atlas instanceof TextureAtlas)) {
-            throw new Error(
-              `TextureResource: the atlas adapter of resource "${this.id}" answered no atlas — an adapter answers {atlas, animations?}`,
-            );
-          }
-          if (answered.animations !== undefined && !(answered.animations instanceof FrameBasedAnimations)) {
-            throw new Error(
-              `TextureResource: the atlas adapter of resource "${this.id}" answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none`,
-            );
-          }
-          atlas = answered.atlas;
-          adapterAnimations = answered.animations;
-        } catch (error) {
-          // reported instead of thrown: thrown, it would reach whoever wrote the json — the
-          // `atlasJson` setter, a `TextureStore#parse()` — or the image effect, whose load
-          // would then end as a texture failure
-          takeBack();
-          this.#fail('atlasParse', {source: 'texture', id: this.id, error});
-          return;
-        }
-        // one batch: the animations effect reads both, and runs once for the pair
-        const built = atlas;
-        batch(() => {
-          this.#adapterAnimations.set(adapterAnimations);
-          atlasSignal.set(built);
-        });
-      },
-      [atlasJsonSignal, atlasAdapterSignal, this.#imageCoords, this.#imageUrlOfCoords],
-      {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
-    );
-
-    this.#registerAnimationsEffect(
-      this.#atlas,
-      (animations, name, data, atlas) => {
-        const shape = animationDataShape(data);
-        if (shape !== 'frameNameQuery') throw wrongAnimationDataError(this, name, shape);
-        // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
-        // place that refuses an entry carrying neither, with the name of the animation
-        if ('frameNameQuery' in data) animations.add(name, data, atlas, data.frameNameQuery);
-      },
-      this.#adapterAnimations,
-    );
-
-    // activate() takes up what the resource holds at this call as if it were written right after
-    // it. These effects have static dependencies and run on a change alone: a json written before
-    // the call builds its atlas once touched, and the fetch of `atlasUrl` starts only while it is
-    // due — an `atlasJson` written after that url takes its place, as it cuts short a fetch under
-    // way
-    if (atlasJsonSignal.value !== undefined) touch(atlasJsonSignal);
-    if (this.#atlasFetchDue) touch(atlasUrlSignal);
-  }
-
   // The animations of the current data, built out of the current tile set or atlas. `addEntry`
   // registers one entry or throws for it: an entry it throws for is skipped and reported, and every
   // other entry of the map is registered all the same. The entries go into a copy of the animations
@@ -1302,7 +957,7 @@ export class TextureResource {
     createEffect(
       () => {
         const from = source.value;
-        const animationsData = this.frameBasedAnimationsData;
+        const animationsData = this.#frameBasedAnimationsData.value;
         const base = baseAnimations?.value;
         // animations come only out of the current source and the current data or the animations
         // of the adapter; without either of them they are taken back, which clears the retained event
@@ -1332,3 +987,574 @@ export class TextureResource {
     );
   }
 }
+
+/**
+ * An image turned into a texture: `imageUrl` names the file to load. It builds `imageCoords` and a
+ * `texture` alone — its `atlas`, `tileSet` and `frameBasedAnimations` stay `undefined`.
+ *
+ * It has no input of another shape: TypeScript refuses a write to one, and in JavaScript the write
+ * throws a `TypeError`, while reading one answers `undefined`.
+ */
+export class ImageTextureResource extends TextureResource {
+  declare readonly type: 'image';
+
+  readonly #context = shapeContextOf(this);
+
+  constructor(id: string) {
+    super(id, 'image');
+  }
+
+  /**
+   * The url of the image to load. A cleared url takes the `imageCoords` and the `texture` back and
+   * releases the texture.
+   */
+  override get imageUrl(): string | undefined {
+    return super.imageUrl;
+  }
+
+  override set imageUrl(url: string | undefined) {
+    if (this.#context.isDisposed()) return;
+    this.#context.imageUrl.set(url);
+  }
+
+  override get atlas(): undefined {
+    return undefined;
+  }
+
+  override get tileSet(): undefined {
+    return undefined;
+  }
+
+  override get frameBasedAnimations(): undefined {
+    return undefined;
+  }
+
+  /** @internal */
+  protected override registerShapeEffects(): void {
+    // the image effect of the base is all an image needs
+  }
+}
+
+/**
+ * An image cut into tiles: `imageUrl` names the file to load, `tileSetOptions` how to cut it, and
+ * `frameBasedAnimationsData` the animations over its tiles. It builds `imageCoords`, a `texture`, a
+ * `tileSet`, the `atlas` of that tile set and `frameBasedAnimations`.
+ *
+ * It has no input of another shape: TypeScript refuses a write to one, and in JavaScript the write
+ * throws a `TypeError`, while reading one answers `undefined`.
+ */
+export class TileSetTextureResource extends TextureResource {
+  declare readonly type: 'tileset';
+
+  readonly #context = shapeContextOf(this);
+
+  readonly #tileSetOptions = createSignal<Readonly<TileSetOptions> | undefined>(undefined, {compare: cmpShallow, attach: this});
+
+  constructor(id: string) {
+    super(id, 'tileset');
+  }
+
+  /**
+   * The url of the image to load. A cleared url takes the `imageCoords` and the `texture` back,
+   * together with the `tileSet`, its `atlas` and the `frameBasedAnimations`, and releases the
+   * texture.
+   */
+  override get imageUrl(): string | undefined {
+    return super.imageUrl;
+  }
+
+  override set imageUrl(url: string | undefined) {
+    if (this.#context.isDisposed()) return;
+    this.#context.imageUrl.set(url);
+  }
+
+  /**
+   * The options of the tile set. What is stored is a frozen copy: a change to the object after the
+   * write reaches the tile set only once it is written again, and writing it again after a change
+   * builds a new tile set.
+   */
+  get tileSetOptions(): Readonly<TileSetOptions> | undefined {
+    return this.#context.isDisposed() ? undefined : this.#tileSetOptions.value;
+  }
+
+  set tileSetOptions(value: TileSetOptions | undefined) {
+    if (this.#context.isDisposed()) return;
+    this.#tileSetOptions.set(value == null ? undefined : Object.freeze({...value}));
+  }
+
+  /**
+   * The animations over the tiles of the tile set, by name: each entry names its tiles by `tileIds`
+   * or by `firstTileId` and `tileCount`.
+   *
+   * - It is compared by content: data equal to the current — the same catalog parsed again, for
+   *   one — keeps the animations, and no event goes out.
+   * - The object is kept as it was written: a change to it after the write reaches the resource
+   *   only with data that differs from it.
+   */
+  get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
+    return this.#context.isDisposed() ? undefined : this.#context.frameBasedAnimationsData.value;
+  }
+
+  set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
+    this.#context.frameBasedAnimationsData.set(value);
+  }
+
+  /** @internal */
+  protected override registerShapeEffects(): void {
+    const context = this.#context;
+    const tileSetOptions = this.#tileSetOptions;
+
+    createEffect(
+      () => {
+        context.clearFailure('tileSet');
+        const imageCoords = this.imageCoords;
+        const options = tileSetOptions.value;
+
+        let tileSet: TileSet | undefined;
+        let refusal: {error: unknown} | undefined;
+        if (imageCoords && options) {
+          try {
+            tileSet = new TileSet(imageCoords, options);
+          } catch (error) {
+            refusal = {error};
+          }
+        }
+
+        if (tileSet) {
+          // one batch: a subscriber of the tile set that throws makes its set() throw, and
+          // the atlas of that tile set would never reach the resource
+          const built = tileSet;
+          batch(() => {
+            context.tileSet.set(built);
+            context.atlas.set(built.atlas);
+          });
+          return;
+        }
+
+        // Nothing on the resource may have been built from an image or from options other than
+        // the current ones, so without a tile set from both of them the tile set, its atlas and
+        // the animations built on it are taken back — the animations here as well, because
+        // inside a batch the animation effect runs after this one and an error listener
+        // reading the resource would still find them. A refusal is reported here instead of
+        // thrown: thrown, it would reach whoever wrote the options — a setter, a
+        // `TextureStore#parse()` cut short before its ready event — or the image effect,
+        // whose load would then end as a texture failure.
+        context.tileSet.set(undefined);
+        context.atlas.set(undefined);
+        context.frameBasedAnimations.set(undefined);
+
+        if (refusal) {
+          context.fail('tileSet', {source: 'texture', id: this.id, error: refusal.error});
+        }
+      },
+      [context.imageCoords, tileSetOptions],
+      {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
+    );
+
+    context.registerAnimationsEffect(context.tileSet, (animations, name, data, tileSet) => {
+      const shape = animationDataShape(data);
+      if (shape !== 'tileIds' && shape !== 'firstTileId') throw wrongAnimationDataError(this, name, shape);
+      // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
+      // place that refuses an entry carrying neither, with the name of the animation
+      if ('tileIds' in data) {
+        // add() would read a number here as a `firstTileId` and quietly build an animation
+        // over the whole tile set
+        const {tileIds} = data as {tileIds: unknown};
+        if (!Array.isArray(tileIds)) {
+          throw new Error(
+            `TextureResource: animation "${name}" of resource "${this.id}" carries tileIds of ${describeValue(tileIds)} ` +
+              `— tileIds is an array of tile ids`,
+          );
+        }
+        animations.add(name, data, tileSet, data.tileIds);
+      } else if ('firstTileId' in data) {
+        animations.add(name, data, tileSet, data.firstTileId, data.tileCount);
+      }
+    });
+  }
+}
+
+/**
+ * A texture atlas json and the image it names. It builds `imageCoords`, a `texture`, an `atlas` and
+ * `frameBasedAnimations`, but never a `tileSet`.
+ *
+ * - `atlasUrl` names the json to fetch; the resource writes what it fetched to `atlasJson`.
+ * - `atlasJson` is input and output both: the json fetched from `atlasUrl`, or one written from
+ *   outside.
+ * - `overrideImageUrl` names another image than the one the json names.
+ * - `atlasAdapter` reads the json into the atlas and its animations.
+ * - `frameBasedAnimationsData` names the animations over the frames of the atlas.
+ *
+ * `imageUrl` is an output here: the resource takes it from `overrideImageUrl ?? atlasJson.meta.image`.
+ * TypeScript refuses a write to it, and in JavaScript the write throws a `TypeError` —
+ * `overrideImageUrl` is the way to send the resource to another image, and it keeps the atlas and
+ * the texture together.
+ *
+ * It has no input of another shape: TypeScript refuses a write to one, and in JavaScript the write
+ * throws a `TypeError`, while reading one answers `undefined`.
+ */
+export class AtlasTextureResource extends TextureResource {
+  declare readonly type: 'atlas';
+
+  readonly #context = shapeContextOf(this);
+
+  readonly #atlasAdapter = createSignal<AtlasAdapter | undefined>(undefined, {attach: this});
+  readonly #atlasUrl = createSignal<string | undefined>(undefined, {attach: this});
+  readonly #atlasJson = createSignal<TexturePackerJsonData | undefined>(undefined, {attach: this});
+  // the json as `atlasUrl` delivered it, with a relative `meta.image` resolved against that url,
+  // but without the `overrideImageUrl` put in its place
+  readonly #fetchedAtlasJson = createSignal<FetchedAtlasJson | undefined>(undefined, {attach: this});
+  readonly #overrideImageUrl = createSignal<string | undefined>(undefined, {attach: this});
+
+  // the atlas fetch under way, if there is one: the run of the fetch effect that started it
+  // sets it and lets go of it when the fetch is over; that run's cleanup and the `atlasJson`
+  // setter cut it short
+  #atlasFetch?: AbortController;
+
+  // whether activate() starts the fetch of `atlasUrl`: a url that changes makes it due, and an
+  // `atlasJson` written after it takes its place, as it cuts short a fetch under way. Read by
+  // activate() alone — once the effects are registered, a new url starts its fetch by itself
+  #atlasFetchDue = false;
+
+  constructor(id: string) {
+    super(id, 'atlas');
+  }
+
+  override get tileSet(): undefined {
+    return undefined;
+  }
+
+  /** The url of the atlas json. A change fetches the json at the new url. */
+  get atlasUrl(): string | undefined {
+    return this.#context.isDisposed() ? undefined : this.#atlasUrl.value;
+  }
+
+  set atlasUrl(value: string | undefined) {
+    if (this.#context.isDisposed()) return;
+    if (value !== this.#atlasUrl.value) this.#atlasFetchDue = true;
+    this.#atlasUrl.set(value);
+  }
+
+  /**
+   * The atlas json of the resource.
+   *
+   * - For a json fetched from `atlasUrl`, `meta.image` names the image the texture is built from:
+   *   the `overrideImageUrl` while one is set, the image the json names otherwise — a relative
+   *   name resolved against `atlasUrl`, so it names the file next to the json. The
+   *   `overrideImageUrl` is taken as written.
+   * - A json written from outside replaces the fetched one and a fetch of `atlasUrl` that failed,
+   *   and it cuts short a fetch that is still under way: neither the json nor a failure of that
+   *   fetch arrives after the write. It has no url of its own and keeps its `meta.image` as
+   *   written, and the image loader resolves a relative one against the document.
+   * - Written before {@link TextureResource.activate}, it takes the place of the fetch of the
+   *   `atlasUrl` it was written after.
+   * - While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`.
+   * - A json that its atlas adapter cannot read — or an adapter that answers no `TextureAtlas`, or
+   *   animations that are no `FrameBasedAnimations` — takes both back as well and is reported as an
+   *   `error` with `source: 'texture'` once the image it names is there; writing it does not throw.
+   * - The animations an adapter reads out of the json — the frame tags of an Aseprite json — are the
+   *   `frameBasedAnimations` of the resource, and the entries of `frameBasedAnimationsData` are added
+   *   to a copy of them; an entry named like one of them is skipped and reported.
+   */
+  get atlasJson(): TexturePackerJsonData | undefined {
+    return this.#context.isDisposed() ? undefined : this.#atlasJson.value;
+  }
+
+  set atlasJson(value: TexturePackerJsonData | undefined) {
+    if (this.#context.isDisposed()) return;
+    // a fetch of `atlasUrl` that is still under way, and a fetch that activate() has yet to
+    // start, would replace this json once it arrives — through `#fetchedAtlasJson` and the atlas
+    // image effect — and its failure would hold back what this json brings
+    this.#atlasFetch?.abort();
+    this.#atlasFetch = undefined;
+    this.#atlasFetchDue = false;
+    // a json written from outside replaces the fetched one: a later change of the
+    // `overrideImageUrl` must not bring the fetched json back in its place
+    this.#fetchedAtlasJson.set(undefined);
+    // and a fetch that failed holds nothing back any more; its effect hangs off `atlasUrl`
+    // alone and would not run again to clear the record
+    this.#context.clearFailure('atlasFetch');
+    this.#atlasJson.set(value);
+  }
+
+  /** The url of the image to build the texture from instead of the one the atlas json names. */
+  get overrideImageUrl(): string | undefined {
+    return this.#context.isDisposed() ? undefined : this.#overrideImageUrl.value;
+  }
+
+  set overrideImageUrl(value: string | undefined) {
+    if (this.#context.isDisposed()) return;
+    this.#overrideImageUrl.set(value);
+  }
+
+  /**
+   * The adapter that reads the `atlasJson` into the `atlas` and, if the json names any, its
+   * animations — `undefined` to pick one by `meta.app` of the json: among the adapters of the
+   * `TextureStore` the resource belongs to, among `texturePackerAtlasAdapter` and
+   * `asepriteAtlasAdapter` for a resource on its own. A change reads the json again.
+   */
+  get atlasAdapter(): AtlasAdapter | undefined {
+    return this.#context.isDisposed() ? undefined : this.#atlasAdapter.value;
+  }
+
+  set atlasAdapter(value: AtlasAdapter | undefined) {
+    if (this.#context.isDisposed()) return;
+    this.#atlasAdapter.set(value);
+  }
+
+  /**
+   * The animations over the frames of the atlas, by name: each entry names its frames by
+   * `frameNameQuery`. They are added to a copy of the animations the atlas adapter reads out of the
+   * json.
+   *
+   * - It is compared by content: data equal to the current — the same catalog parsed again, for
+   *   one — keeps the animations, and no event goes out. A `RegExp` equals one of the same `source`
+   *   and `flags`.
+   * - The object is kept as it was written: a change to it after the write reaches the resource
+   *   only with data that differs from it.
+   */
+  get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
+    return this.#context.isDisposed() ? undefined : this.#context.frameBasedAnimationsData.value;
+  }
+
+  set frameBasedAnimationsData(value: FrameBasedAnimationsDataMap | undefined) {
+    this.#context.frameBasedAnimationsData.set(value);
+  }
+
+  /**
+   * How this resource picks an atlas adapter for a json by its `meta.app` while no `atlasAdapter`
+   * is written. The store it belongs to injects the pick among its registered adapters; a resource
+   * on its own picks among the built-in ones.
+   *
+   * @internal
+   */
+  [atlasAdapterPicker]?: (json: TexturePackerJsonData) => AtlasAdapter;
+
+  /** @internal */
+  protected override registerShapeEffects(): void {
+    const context = this.#context;
+    const atlasUrlSignal = this.#atlasUrl;
+    const atlasJsonSignal = this.#atlasJson;
+    const fetchedAtlasJsonSignal = this.#fetchedAtlasJson;
+    const overrideImageUrlSignal = this.#overrideImageUrl;
+    const atlasAdapterSignal = this.#atlasAdapter;
+
+    createEffect(
+      () => {
+        context.clearFailure('atlasFetch');
+        const atlasUrl = this.atlasUrl;
+        if (!atlasUrl) return;
+        const ac = new AbortController();
+        this.#atlasFetch = ac;
+        // No closing .catch() here either: fetchAtlasJson() never rejects, and after it nothing
+        // throws any more — the fail() of a fetch without a result and the `error` of a throw while
+        // publishing both go out with emitSafe()
+        void (async () => {
+          // the fetch alone: writing the json publishes whatever it brings — with its image already
+          // there, the atlas within this very call — and a subscriber that throws there is no
+          // failure of the fetch
+          let result: AtlasJsonFetch | undefined;
+          try {
+            result = await fetchAtlasJson(atlasUrl, ac.signal);
+          } finally {
+            if (this.#atlasFetch === ac) this.#atlasFetch = undefined;
+          }
+          // cut short: by the cleanup of this run, by an `atlasJson` written meanwhile, or by dispose()
+          if (!result) return;
+          if ('failure' in result) {
+            context.fail('atlasFetch', result.failure);
+            return;
+          }
+          try {
+            fetchedAtlasJsonSignal.set({json: result.json, url: atlasUrl});
+          } catch (error) {
+            // signalize hands the throw of a subscriber to the writer once every effect has
+            // run: the json and what is built from it are published, so no record is kept
+            emitSafe(this, OnError, {source: 'texture', id: this.id, error});
+          }
+        })();
+        return () => {
+          ac.abort();
+          if (this.#atlasFetch === ac) this.#atlasFetch = undefined;
+        };
+      },
+      [atlasUrlSignal],
+      {attach: this},
+    );
+
+    createEffect(
+      () => {
+        context.clearFailure('atlasImage');
+        const fetched = fetchedAtlasJsonSignal.value;
+        if (!fetched) return;
+        const {json, url} = fetched;
+        const imageUrl = this.overrideImageUrl ?? json.meta.image;
+        if (typeof imageUrl !== 'string') {
+          // the json that is published stays as it was: a subscriber would get an `undefined`
+          // where the event type promises a value
+          context.fail('atlasImage', {
+            source: 'atlas',
+            url,
+            error: new Error(`TextureResource: the response of "${url}" names no image and no overrideImageUrl was given`),
+          });
+          return;
+        }
+        // the resolved url goes into the published json, mirroring `TextureAtlasLoader`: `atlasJson`
+        // is typed as `TexturePackerJsonData`, whose `meta.image` is a `string`, so the resolved url
+        // has to land in the json itself rather than in a cast that would let the getter lie. The
+        // fetched json, without the override, stays in `#fetchedAtlasJson`, so an override that is
+        // cleared again gives the image back to the one the json names. Written straight onto the
+        // signal, because the public setter treats a write as a json from outside and drops the
+        // fetched one
+        atlasJsonSignal.set({...json, meta: {...json.meta, image: imageUrl}});
+      },
+      [fetchedAtlasJsonSignal, overrideImageUrlSignal],
+      {attach: this},
+    );
+
+    createEffect(
+      () => {
+        if (this.atlasJson) {
+          // straight onto the signal: on this shape of resource `imageUrl` is what the
+          // json says, and has no setter
+          context.imageUrl.set(this.overrideImageUrl ?? this.atlasJson.meta.image);
+        }
+      },
+      [atlasJsonSignal, overrideImageUrlSignal],
+      {attach: this},
+    );
+
+    createEffect(
+      () => {
+        context.clearFailure('atlasParse');
+        const atlasJson = this.atlasJson;
+        // Nothing on the resource may have been built from a json other than the current
+        // one. The animations go back here as well, for the same reason as in the tile set
+        // effect: inside a batch the animation effect runs after this one, and an error
+        // listener reading the resource would still find them. The texture stays.
+        const takeBack = () => {
+          context.atlas.set(undefined);
+          context.adapterAnimations.set(undefined);
+          context.frameBasedAnimations.set(undefined);
+        };
+        if (!atlasJson) {
+          takeBack();
+          return;
+        }
+        const imageCoords = this.imageCoords;
+        if (!imageCoords) {
+          // without an image nothing is built from one
+          takeBack();
+          return;
+        }
+        // an atlas describes the image its json names. While the image effect is still
+        // on its way to that image, the atlas of the one before stays published — it is
+        // not cleared, because a subscriber would get an `undefined` where the event
+        // type promises a TextureAtlas. The run this skips is taken up again as soon as
+        // the image arrives: that is what `imageUrlOfCoords` sits in the dependencies
+        // for
+        if (context.imageUrlOfCoords.value !== (this.overrideImageUrl ?? atlasJson.meta.image)) return;
+        let atlas: TextureAtlas;
+        let adapterAnimations: FrameBasedAnimations | undefined;
+        try {
+          const adapter = atlasAdapterSignal.value ?? (this[atlasAdapterPicker] ?? pickBuiltInAtlasAdapter)(atlasJson);
+          const result: unknown = adapter(atlasJson, imageCoords);
+          const answered = (typeof result === 'object' && result !== null ? result : {}) as Partial<AtlasAdapterResultShape>;
+          if (!(answered.atlas instanceof TextureAtlas)) {
+            throw new Error(
+              `TextureResource: the atlas adapter of resource "${this.id}" answered no atlas — an adapter answers {atlas, animations?}`,
+            );
+          }
+          if (answered.animations !== undefined && !(answered.animations instanceof FrameBasedAnimations)) {
+            throw new Error(
+              `TextureResource: the atlas adapter of resource "${this.id}" answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none`,
+            );
+          }
+          atlas = answered.atlas;
+          adapterAnimations = answered.animations;
+        } catch (error) {
+          // reported instead of thrown: thrown, it would reach whoever wrote the json — the
+          // `atlasJson` setter, a `TextureStore#parse()` — or the image effect, whose load
+          // would then end as a texture failure
+          takeBack();
+          context.fail('atlasParse', {source: 'texture', id: this.id, error});
+          return;
+        }
+        // one batch: the animations effect reads both, and runs once for the pair
+        const built = atlas;
+        batch(() => {
+          context.adapterAnimations.set(adapterAnimations);
+          context.atlas.set(built);
+        });
+      },
+      [atlasJsonSignal, atlasAdapterSignal, context.imageCoords, context.imageUrlOfCoords],
+      {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
+    );
+
+    context.registerAnimationsEffect(
+      context.atlas,
+      (animations, name, data, atlas) => {
+        const shape = animationDataShape(data);
+        if (shape !== 'frameNameQuery') throw wrongAnimationDataError(this, name, shape);
+        // the entry goes in as the timing: add() reads its duration or frameRate, and it is the one
+        // place that refuses an entry carrying neither, with the name of the animation
+        if ('frameNameQuery' in data) animations.add(name, data, atlas, data.frameNameQuery);
+      },
+      context.adapterAnimations,
+    );
+
+    // activate() takes up what the resource holds at this call as if it were written right after
+    // it. These effects have static dependencies and run on a change alone: a json written before
+    // the call builds its atlas once touched, and the fetch of `atlasUrl` starts only while it is
+    // due — an `atlasJson` written after that url takes its place, as it cuts short a fetch under
+    // way
+    if (atlasJsonSignal.value !== undefined) touch(atlasJsonSignal);
+    if (this.#atlasFetchDue) touch(atlasUrlSignal);
+  }
+}
+
+/**
+ * A resource of any of the three shapes, as `TextureStore` hands it out. Its `type` narrows it to
+ * the class of its shape: after `resource.type === 'atlas'` it is an {@link AtlasTextureResource}.
+ */
+export type AnyTextureResource = ImageTextureResource | TileSetTextureResource | AtlasTextureResource;
+
+// The inputs of one shape stand on the class of that shape alone, and TypeScript refuses a write to
+// them on another: no type of that shape names them. JavaScript, the browser tests among it, would
+// quietly create an own property the resource never reads, and reading it back would answer the
+// value written. These accessors on the prototype of each shape catch it — the getter answers
+// `undefined`, the setter throws, and on a disposed resource it stays silent. No type names them.
+const refuseInputsOfOtherShapes = (shape: {readonly prototype: TextureResource}, inputs: readonly string[]): void => {
+  for (const input of inputs) {
+    Object.defineProperty(shape.prototype, input, {
+      configurable: true,
+      get: () => undefined,
+      set(this: TextureResource, _value: unknown) {
+        if (shapeContextOf(this).isDisposed()) return;
+        throw wrongShapeError(this, input);
+      },
+    });
+  }
+};
+
+refuseInputsOfOtherShapes(ImageTextureResource, [
+  'tileSetOptions',
+  'atlasUrl',
+  'atlasJson',
+  'overrideImageUrl',
+  'atlasAdapter',
+  'frameBasedAnimationsData',
+]);
+refuseInputsOfOtherShapes(TileSetTextureResource, ['atlasUrl', 'atlasJson', 'overrideImageUrl', 'atlasAdapter']);
+refuseInputsOfOtherShapes(AtlasTextureResource, ['tileSetOptions']);
+
+// `imageUrl` of an atlas is read-only for TypeScript; the getter of the base alone would make a
+// write from JavaScript throw a TypeError that says nothing of `overrideImageUrl`
+Object.defineProperty(AtlasTextureResource.prototype, 'imageUrl', {
+  configurable: true,
+  get: Object.getOwnPropertyDescriptor(TextureResource.prototype, 'imageUrl')?.get,
+  set(this: AtlasTextureResource, _value: unknown) {
+    if (shapeContextOf(this).isDisposed()) return;
+    throw derivedImageUrlError(this);
+  },
+});

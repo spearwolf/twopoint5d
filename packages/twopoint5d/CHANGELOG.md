@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `VOSortKeyName<VOType>`: the names `VertexObjectPool#sortBy()` takes as its key
 - add the guide `docs/map2d.md`: how a tile map is put together, under a camera and in a rectangle, how the defaults play together, what a change while the map runs takes, the debug view and who disposes what
 - add `IMapTileFactory#contentSerial` (optional) and `TileSpritesFactory#contentSerial`: a number that moves when what the factory builds for a coordinate changes, and on which `Map2DTileRenderer` builds its tiles again
+- add `ImageTextureResource`, `TileSetTextureResource` and `AtlasTextureResource`, one class per shape of `TextureResource`, each with the inputs of its shape alone — `imageUrl` on an image; `imageUrl`, `tileSetOptions` and `frameBasedAnimationsData` on a tile set; `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter` and `frameBasedAnimationsData` on an atlas — and their union `AnyTextureResource`, which `TextureStore` hands out and `type` narrows to the class of its shape. An output a shape never builds is `undefined` in its type: `atlas`, `tileSet` and `frameBasedAnimations` of an image, `tileSet` of an atlas
 
 ### Changed
 
@@ -96,6 +97,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TexturePackerJson.parse()` takes the type of the frame entries as a type parameter: the `target` it fills and the atlas it answers carry that type — `TextureAtlas<TexturePackerFrameData>` for a TexturePacker json, `TextureAtlas<AsepriteFrameData>` for the frames `AsepriteJson.parse()` hands it
 - `new TileSet()` throws a `RangeError` for a `tileCount` that does not fit into the `baseCoords` with its `margin`, `padding` and `spacing`, naming how many tiles fit, and leaves the atlas handed in as it was; a `TextureResource` reports it as an `error` with `source: 'texture'` (**BREAKING**). See the Migration Guide
 - every error message and warning of the library starts with its subject, unbracketed: the messages of `TextureStore`, `TextureResource`, `TileSet`, `CameraBasedVisibility`, `RectangularVisibilityArea`, `Map2DSpatialHashGrid`, `Map2DTileStreamer`, `Map2DTileCoordsUtil`, `PanControl2D` and `Display` read `Subject: …`, and those of `new Display()`, `StageRenderer#renderTo()`, `ProjectionPlane`, `RootRenderPipeline.buildOutputNode()`, `createBloomOutputNodeBuilder` and `VertexObjectPool#resize()` carry their subject in front. A log filter or a test on `[TextureStore]` matches on `TextureStore:`
+- `TextureResource` is the abstract base of `ImageTextureResource`, `TileSetTextureResource` and `AtlasTextureResource`: the inputs of a shape stand on its class alone, `imageUrl` of an atlas is read-only, `TextureResource.fromImage()`, `fromTileSet()` and `fromAtlas()` answer the class of the shape, `activate()` and `load()` answer `this`, and `TextureStore#whenResource()` and `onResource()` hand out `AnyTextureResource` (**BREAKING** for TypeScript). See the Migration Guide
+- `new TextureResource(id, type)` throws a `TypeError` that names the three classes; `new ImageTextureResource(id)`, `new TileSetTextureResource(id)` and `new AtlasTextureResource(id)` build a resource (**BREAKING**). See the Migration Guide
+- a write of `frameBasedAnimationsData` on an image resource throws the `TypeError` of an input of another shape in JavaScript, as `tileSetOptions` and the inputs of an atlas do; reading it answers `undefined` (**BREAKING**)
+- `frameBasedAnimationsData` of a `TextureResource` is compared by content — every field in its order, a `RegExp` by `source` and `flags` —: data equal to the current, such as the same catalog parsed again by `TextureStore#parse()`, keeps the `frameBasedAnimations` and announces nothing, so an `on(id, 'frameBasedAnimations')` bakes no new data texture for it
+- `TextureFactory` built with a renderer asks it for the anisotropy maximum at every texture it builds and caps against the maximum the renderer names at that moment; while the renderer names none, the texture gets no anisotropic filtering
 
 ### Removed
 
@@ -124,6 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PanControl2D#update()` takes a delta time that is no finite number above 0 as 0: a `NaN` moves the view by no speed field and emits no `OnPanControl2DUpdate` after the first
 - `sampleAtlasFrame()` rounds a float index half up, `floor(index + 0.5)`, on WebGPU and WebGL 2 alike: an index of 2.5 draws frame 3 on both
 - `AnimatedFrames` and `tableFrame()` find the texel of an index in int arithmetic, so a data texture whose width is no power of 2 — a `maxTextureSize` such as 3000 handed to the bake — reads every texel at its place
+- a `TextureFactory` built before `renderer.init()` of a WebGL backend — the factory of a `TextureStore` or of a `TextureResource` whose `renderer` is set before `init()` — gives the textures it builds after `init()` the anisotropy that backend names
+- a `TextureResource` on its own lets go of the image it fetched last once its `imageUrl` is cleared: a resource whose url stays cleared holds no image, and the same url written again fetches it anew
 
 ### Migration Guide
 
@@ -419,6 +427,35 @@ const tiles = new TileSet(new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileH
 import {TextureCoords, TileSet} from '@spearwolf/twopoint5d';
 
 const tiles = new TileSet(new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileHeight: 16, tileCount: 16});
+```
+
+#### The shapes of TextureResource
+
+`TextureResource` is the abstract base of one class per shape. Build a resource with the class of its shape, or with `TextureResource.fromImage()`, `fromTileSet()` or `fromAtlas()`, which answer that class. A resource out of `TextureStore#whenResource()` or `onResource()` is an `AnyTextureResource`: narrow it by `type` before writing an input of its shape. In JavaScript a write of an input of another shape throws a `TypeError`, `frameBasedAnimationsData` on an image resource among them.
+
+**Before**
+
+```ts
+const hero = new TextureResource('hero', 'atlas');
+hero.atlasUrl = 'hero.json';
+
+const fighter = await store.whenResource('fighter');
+fighter.overrideImageUrl = 'fighter-red.png';
+```
+
+**After**
+
+```ts check
+import {AtlasTextureResource, TextureStore} from '@spearwolf/twopoint5d';
+
+const hero = new AtlasTextureResource('hero');
+hero.atlasUrl = 'hero.json';
+
+const store = new TextureStore();
+store.parse({items: {fighter: {atlasUrl: 'fighter.json'}}});
+store.whenResource('fighter').then((fighter) => {
+  if (fighter.type === 'atlas') fighter.overrideImageUrl = 'fighter-red.png';
+});
 ```
 
 ## [0.23.0] - 2026-10-18

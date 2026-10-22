@@ -70,6 +70,34 @@ describe('TextureFactory', () => {
 
       expect(factory.update(new Texture(), 'anisotropy-4').anisotropy).toBe(2);
     });
+
+    test('a renderer that names its maximum only once it is initialized is asked again, and caps the next texture against it', () => {
+      let ready = false;
+      const renderer = {
+        getMaxAnisotropy: () => {
+          // what three answers out of a WebGL backend whose capabilities init() has not built yet
+          if (!ready) throw new TypeError("Cannot read properties of null (reading 'getMaxAnisotropy')");
+          return 4;
+        },
+      } as unknown as WebGPURenderer;
+      const factory = new TextureFactory(renderer, []);
+
+      expect(factory.getOptions(['anisotropy']).anisotropy).toBe(1);
+
+      ready = true;
+
+      expect(factory.getOptions(['anisotropy']).anisotropy).toBe(4);
+      expect(factory.update(new Texture(), 'anisotropy-2').anisotropy).toBe(2);
+    });
+
+    test('a renderer whose maximum changes caps against the one it names at the call', () => {
+      const maxima = [16, 2];
+      const renderer = {getMaxAnisotropy: () => maxima.shift() ?? 2} as unknown as WebGPURenderer;
+      const factory = new TextureFactory(renderer, []);
+
+      expect(factory.getOptions(['anisotropy-4']).anisotropy).toBe(4);
+      expect(factory.getOptions(['anisotropy-4']).anisotropy).toBe(2);
+    });
   });
 
   describe('two classes writing the same option: the one named last wins', () => {

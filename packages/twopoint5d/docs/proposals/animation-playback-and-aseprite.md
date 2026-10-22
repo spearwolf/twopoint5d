@@ -406,9 +406,10 @@ any adapter runs; a packer with another envelope is converted to it first.
 
 ### 6.3 `TextureResource`
 
-- New input on atlas resources: `atlasAdapter: AtlasAdapter | undefined` (the store writes the
-  adapter an item names, `undefined` otherwise); on another shape the setter throws the
-  `TypeError` of `wrongShapeError()`. A change parses the json again.
+- New input of `AtlasTextureResource`: `atlasAdapter: AtlasAdapter | undefined` (the store writes
+  the adapter an item names, `undefined` otherwise). The other shapes do not have it in their type,
+  and a write from JavaScript throws the `TypeError` of `wrongShapeError()`. A change parses the
+  json again.
 - The parse effect calls the adapter where it called `TexturePackerJson.parse()`. A throw, or an
   answer without a `TextureAtlas` as `atlas` (`TextureResource: the atlas adapter of resource
   "x" answered no atlas — an adapter answers {atlas, animations?}`), takes atlas and animations

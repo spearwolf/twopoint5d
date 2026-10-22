@@ -23,7 +23,7 @@ import {resolveRelativeUrl} from './resolveRelativeUrl.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
-import {TextureResource, TextureResourceEvents, type TextureResourceSubType} from './TextureResource.js';
+import {type AnyTextureResource, TextureResource, TextureResourceEvents, type TextureResourceSubType} from './TextureResource.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
 import {throwCollected} from '../utils/throwCollected.js';
@@ -339,7 +339,7 @@ export class TextureStore {
     return this.#disposed ? undefined : this.#textureFactory.value;
   }
 
-  #resources = new Map<string, TextureResource>();
+  #resources = new Map<string, AnyTextureResource>();
 
   // the atlas adapters by name, in the order they were registered: the pick by `meta.app` asks the
   // latest first
@@ -465,10 +465,14 @@ export class TextureStore {
    * {@link TextureStore.on} follows the values of a resource. The returned function takes back
    * a callback that is still waiting.
    *
+   * The resource is an {@link AnyTextureResource}: its `type` narrows it to the class of its shape
+   * before an input of that shape is written — after `resource.type === 'atlas'` it is an
+   * `AtlasTextureResource`.
+   *
    * On a disposed store this does nothing: the callback is never called, and the returned
    * unsubscribe function has nothing to take back.
    */
-  onResource(id: string, callback: (resource: TextureResource) => void): () => void {
+  onResource(id: string, callback: (resource: AnyTextureResource) => void): () => void {
     if (this.#disposed) return () => {};
 
     const resource = this.#resources.get(id);
@@ -476,7 +480,7 @@ export class TextureStore {
       callback(resource);
       return () => {};
     }
-    return once(this, `${OnResource}:${id}`, (resource: TextureResource) => callback(resource));
+    return once(this, `${OnResource}:${id}`, (resource: AnyTextureResource) => callback(resource));
   }
 
   // the adapter an item names, by its name; the names are checked before parse() writes anything
@@ -488,7 +492,7 @@ export class TextureStore {
   // with every `parse()` that brings it for as long as the subscription stands — the same instance
   // again included. `on()` and `getAsync()` need that, so that a resource which takes the place of
   // an evicted one reaches them; both skip an instance they already hold.
-  #followResource(id: string, callback: (resource: TextureResource) => void): () => void {
+  #followResource(id: string, callback: (resource: AnyTextureResource) => void): () => void {
     if (this.#disposed) return () => {};
 
     const resource = this.#resources.get(id);
@@ -496,7 +500,7 @@ export class TextureStore {
       callback(resource);
       return () => {};
     }
-    return on(this, `${OnResource}:${id}`, (resource) => {
+    return on(this, `${OnResource}:${id}`, (resource: AnyTextureResource) => {
       callback(resource);
     });
   }
@@ -518,10 +522,14 @@ export class TextureStore {
    * id is still not present — useful to surface configuration mistakes instead
    * of hanging promises.
    *
+   * The resource is an {@link AnyTextureResource}: its `type` narrows it to the class of its shape
+   * before an input of that shape is written — after `resource.type === 'atlas'` it is an
+   * `AtlasTextureResource`.
+   *
    * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
    * call on a store that is already disposed is rejected right away.
    */
-  async whenResource(id: string): Promise<TextureResource> {
+  async whenResource(id: string): Promise<AnyTextureResource> {
     const existing = this.#resources.get(id);
     if (existing) return existing;
     await this.#whenReady(`whenResource(${id})`);
@@ -866,11 +874,11 @@ export class TextureStore {
     const baseUrl = options?.baseUrl;
     const resolve = (url: string | undefined) => (url === undefined ? undefined : resolveRelativeUrl(url, baseUrl));
 
-    const updatedResources: TextureResource[] = [];
+    const updatedResources: AnyTextureResource[] = [];
 
     batch(() => {
       for (const [id, item] of Object.entries(data.items)) {
-        let resource: TextureResource | undefined = this.#resources.get(id);
+        let resource: AnyTextureResource | undefined = this.#resources.get(id);
 
         // the fields of a skipped item are never read: `tileSet: 5` would pass for a tile set.
         // A resource that already carries its id is announced all the same and stays out of
@@ -882,8 +890,10 @@ export class TextureStore {
 
         const textureClasses = joinTextureClasses(this.defaultTextureClasses, itemClasses.get(id));
 
+        // a resource that carries the id has the type the item asks for: the check of the conflicts
+        // above refused the parse otherwise, so narrowing by `type` picks the branch of the item
         if (item.tileSet) {
-          if (resource) {
+          if (resource?.type === 'tileset') {
             // The narrowing of `resource` does not reach into the callback, so it is bound here.
             const knownResource = resource;
             batch(() => {
@@ -902,7 +912,7 @@ export class TextureStore {
             );
           }
         } else if (item.atlasUrl) {
-          if (resource) {
+          if (resource?.type === 'atlas') {
             const knownResource = resource;
             batch(() => {
               knownResource.atlasAdapter = this.#namedAtlasAdapter(item.atlasAdapter);
@@ -912,17 +922,18 @@ export class TextureStore {
               knownResource.frameBasedAnimationsData = item.frameBasedAnimations;
             });
           } else {
-            resource = TextureResource.fromAtlas(
+            const created = TextureResource.fromAtlas(
               id,
               resolveRelativeUrl(item.atlasUrl, baseUrl),
               resolve(item.overrideImageUrl),
               textureClasses,
               item.frameBasedAnimations,
             );
-            resource.atlasAdapter = this.#namedAtlasAdapter(item.atlasAdapter);
+            created.atlasAdapter = this.#namedAtlasAdapter(item.atlasAdapter);
+            resource = created;
           }
         } else if (item.imageUrl) {
-          if (resource) {
+          if (resource?.type === 'image') {
             const knownResource = resource;
             batch(() => {
               knownResource.imageUrl = resolve(item.imageUrl);
@@ -939,7 +950,7 @@ export class TextureStore {
             // fetches the image, with or without a factory, and an image source set afterwards
             // would miss that fetch
             resource[imageSource] ??= this.#imageSource;
-            resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
+            if (resource.type === 'atlas') resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
             resource.textureFactory = this.#textureFactory.value;
             // A resource disposed directly leaves the store, so that the next parse() naming its id
             // builds a new one instead of writing into a resource that answers nothing any more. At
@@ -1065,7 +1076,7 @@ export class TextureStore {
       unsubscribeFromReady?.();
     };
 
-    const followed = (resource: TextureResource): void => {
+    const followed = (resource: AnyTextureResource): void => {
       // a subscription whose resource was still missing at the first ready listens for it
       // on the store for good, and every parse() that names the resource announces it
       // again; subscribing to the same instance anew would deliver its retained values a
@@ -1075,7 +1086,7 @@ export class TextureStore {
       clearSubTypeSubscriptions();
 
       resource[imageSource] ??= this.#imageSource;
-      resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
+      if (resource.type === 'atlas') resource[atlasAdapterPicker] ??= this.#pickAtlasAdapter;
       resource.activate();
       if (this.#textureFactory.value && !resource.textureFactory) {
         resource.textureFactory = this.#textureFactory.value;

@@ -49,3 +49,33 @@ describe('TextureFactory — anisotropic filtering against a real renderer', fun
     expect(texture).to.not.have.own.property('anisotrophy');
   });
 });
+
+describe('TextureFactory — built before the renderer is initialized', function () {
+  // a cold start of a context is slow on a software rasterizer
+  this.timeout(20000);
+
+  it('a factory built before init() of a WebGL backend caps against the maximum that backend names after it', async () => {
+    // forceWebGL: a WebGL backend from the start names no maximum before init(). A plain
+    // WebGPURenderer starts on the WebGPU backend even where the harness takes WebGPU away, and that
+    // backend names 16 before init()
+    const renderer = new WebGPURenderer({forceWebGL: true});
+    document.body.appendChild(renderer.domElement);
+    try {
+      const factory = new TextureFactory(renderer, []);
+
+      await renderer.init();
+
+      const texture = factory.update(new Texture(), 'anisotropy');
+
+      expect(texture.anisotropy, 'the anisotropy three.js will build the sampler with').to.equal(
+        Math.max(1, renderer.getMaxAnisotropy()),
+      );
+    } finally {
+      // awaited, as in the afterEach above: the context is given up only after an await of its own
+      await renderer.dispose();
+      if (renderer.domElement.parentNode) {
+        renderer.domElement.parentNode.removeChild(renderer.domElement);
+      }
+    }
+  });
+});

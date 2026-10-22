@@ -6,7 +6,13 @@ import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TexturePackerJson, type TexturePackerJsonData} from './TexturePackerJson.js';
-import {TextureResource, TextureResourceEvents, TextureResourceSubtypes} from './TextureResource.js';
+import {
+  type AnyTextureResource,
+  type AtlasTextureResource,
+  TextureResource,
+  TextureResourceEvents,
+  TextureResourceSubtypes,
+} from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
 import {TextureStore, TextureStoreEvents, type TextureStoreLoadOptions} from './TextureStore.js';
 import type {TileSet} from './TileSet.js';
@@ -18,6 +24,16 @@ const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve,
 // enough; `dispose` is there for the test that watches whether the store releases a renderer
 const makeRendererStub = ({maxAnisotropy = 16, dispose = () => {}}: {maxAnisotropy?: number; dispose?: () => void} = {}) =>
   ({getMaxAnisotropy: () => maxAnisotropy, dispose}) as unknown as WebGPURenderer;
+
+// a resource of the store narrowed to the shape its item was written as, so that a test can write
+// an input of that shape; a resource of another shape fails the test right here
+const ofShape = <T extends AnyTextureResource['type']>(
+  resource: AnyTextureResource | undefined,
+  type: T,
+): Extract<AnyTextureResource, {type: T}> => {
+  if (resource?.type !== type) throw new Error(`expected a "${type}" resource, got ${resource?.type ?? 'none'}`);
+  return resource as Extract<AnyTextureResource, {type: T}>;
+};
 
 // a promise that never settles would run into the vitest timeout instead of failing; this races it
 // against a short timer so a still-waiting promise reports itself as 'pending' in milliseconds
@@ -1237,6 +1253,25 @@ describe('TextureStore', () => {
       await expect(store.whenResource('missing')).rejects.toThrow(/missing/);
     });
 
+    test('whenResource() resolves a resource of any shape, and its type narrows it to the class of its shape', async () => {
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
+
+      const resource = await store.whenResource('a');
+
+      expectTypeOf(resource).toEqualTypeOf<AnyTextureResource>();
+      expect(resource.type).toBe('atlas');
+      if (resource.type === 'atlas') {
+        expectTypeOf(resource).toEqualTypeOf<AtlasTextureResource>();
+        expect(resource.atlasUrl).toBe('atlas.json');
+      }
+      store.onResource('a', (r) => {
+        expectTypeOf(r).toEqualTypeOf<AnyTextureResource>();
+      });
+
+      store.dispose();
+    });
+
     test('whenResource() waits until parse() is called', async () => {
       const store = new TextureStore();
       const p = store.whenResource('a');
@@ -1589,11 +1624,11 @@ describe('TextureStore', () => {
       };
       store.parse(initialData);
 
-      let resource: TextureResource | undefined;
+      let resource: AnyTextureResource | undefined;
       store.onResource('ts', (r) => {
         resource = r;
       });
-      expect(resource?.frameBasedAnimationsData).toEqual({walk: {duration: 1, tileIds: [1, 2, 3]}});
+      expect(ofShape(resource, 'tileset').frameBasedAnimationsData).toEqual({walk: {duration: 1, tileIds: [1, 2, 3]}});
 
       const updated: TextureStoreData = {
         defaultTextureClasses: [],
@@ -1607,7 +1642,7 @@ describe('TextureStore', () => {
       };
       store.parse(updated);
 
-      expect(resource?.frameBasedAnimationsData).toEqual({run: {duration: 0.5, tileIds: [4, 5]}});
+      expect(ofShape(resource, 'tileset').frameBasedAnimationsData).toEqual({run: {duration: 0.5, tileIds: [4, 5]}});
     });
 
     test('frameBasedAnimationsData is updated on existing Atlas resources', () => {
@@ -1622,11 +1657,11 @@ describe('TextureStore', () => {
         },
       };
       store.parse(initial);
-      let resource: TextureResource | undefined;
+      let resource: AnyTextureResource | undefined;
       store.onResource('a', (r) => {
         resource = r;
       });
-      expect(resource?.frameBasedAnimationsData).toEqual({idle: {duration: 1, frameNameQuery: 'idle.*'}});
+      expect(ofShape(resource, 'atlas').frameBasedAnimationsData).toEqual({idle: {duration: 1, frameNameQuery: 'idle.*'}});
 
       const updated: TextureStoreData = {
         defaultTextureClasses: [],
@@ -1639,8 +1674,60 @@ describe('TextureStore', () => {
       };
       store.parse(updated);
 
-      expect(resource?.frameBasedAnimationsData).toEqual({jump: {duration: 0.3, frameNameQuery: 'jump.*'}});
+      expect(ofShape(resource, 'atlas').frameBasedAnimationsData).toEqual({jump: {duration: 0.3, frameNameQuery: 'jump.*'}});
     });
+
+    test.each([
+      [
+        'a tile set item',
+        {
+          imageUrl: 'tiles.png',
+          tileSet: {tileWidth: 16, tileHeight: 16},
+          frameBasedAnimations: {walk: {duration: 1, tileIds: [1, 2]}, idle: {frameRate: 4, firstTileId: 3, tileCount: 2}},
+        },
+      ],
+      ['an atlas item', {atlasUrl: 'atlas.json', frameBasedAnimations: {idle: {duration: 1, frameNameQuery: 'idle'}}}],
+    ] satisfies Array<[string, TextureStoreData['items'][string]]>)(
+      "a parse of the same catalog again keeps the frameBasedAnimations of a resource and calls on(id, 'frameBasedAnimations') no second time: %s",
+      async (_name, item) => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(
+          async () =>
+            new Response(
+              JSON.stringify({
+                frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+                meta: {image: 'atlas.png', size: {w: 64, h: 64}},
+              }),
+            ),
+        );
+        vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+          async () => ({width: 64, height: 64}) as unknown as HTMLImageElement,
+        );
+        const catalog: TextureStoreData = {defaultTextureClasses: [], items: {r: item}};
+
+        const store = new TextureStore();
+        store.parse(catalog);
+        const callback = vi.fn();
+        const unsubscribe = store.on('r', 'frameBasedAnimations', callback);
+        const resource = await store.whenResource('r');
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        const animations = resource.frameBasedAnimations;
+        expect(animations).toBeDefined();
+        expect(callback).toHaveBeenCalledTimes(1);
+
+        // what JSON.parse() hands a parse of the same catalog again: the same content, every object new
+        store.parse(structuredClone(catalog));
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(resource.frameBasedAnimations).toBe(animations);
+        expect(callback).toHaveBeenCalledTimes(1);
+
+        unsubscribe();
+        store.dispose();
+      },
+    );
 
     test('parse({evictMissing: true}) disposes and removes resources the new data no longer names', () => {
       const store = new TextureStore();
@@ -1924,7 +2011,7 @@ describe('TextureStore', () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
 
-      const resource = await store.whenResource('a');
+      const resource = ofShape(await store.whenResource('a'), 'atlas');
       resource.textureFactory = factory as never;
 
       const tuples: Array<{atlasWidth: number | undefined; textureWidth: number}> = [];
@@ -1980,7 +2067,7 @@ describe('TextureStore', () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
 
-      const resource = await store.whenResource('a');
+      const resource = ofShape(await store.whenResource('a'), 'atlas');
       resource.textureFactory = factory as never;
 
       const tuples: Array<{atlasWidth: number | undefined; textureWidth: number}> = [];
@@ -1998,6 +2085,7 @@ describe('TextureStore', () => {
       // would leave the atlas describing a file the texture is not made of, and no later
       // json would ever bring the two back together
       const write = () => {
+        // @ts-expect-error the imageUrl of an atlas resource comes from its json and is read-only
         resource.imageUrl = 'other.png';
       };
 
@@ -2187,7 +2275,7 @@ describe('TextureStore', () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'a1.json'}}});
 
-      const resource = await store.whenResource('a');
+      const resource = ofShape(await store.whenResource('a'), 'atlas');
       resource.textureFactory = factory as never;
 
       const tuples: Array<{atlasImage: string | undefined; textureImage: string}> = [];
@@ -2497,7 +2585,7 @@ describe('TextureStore', () => {
 
       const store = new TextureStore(makeRendererStub());
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
-      const resource = await store.whenResource('a');
+      const resource = ofShape(await store.whenResource('a'), 'atlas');
 
       const failed = await settleWithin(store.getAsync('a', 'texture'));
       expect(messageOf(failed)).toBe('TextureStore: getAsync(a, texture) failed at the atlas step: "atlas.json"');
@@ -2540,7 +2628,7 @@ describe('TextureStore', () => {
       store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
       // subscribing loads the resource, and that sends the fetch off
       const atlas = store.getAsync('a', 'atlas');
-      const resource = await store.whenResource('a');
+      const resource = ofShape(await store.whenResource('a'), 'atlas');
 
       resource.atlasJson = {
         frames: {f0: {frame: {x: 0, y: 0, w: 10, h: 10}}},
@@ -3059,7 +3147,7 @@ describe('TextureStore', () => {
       await store.loadAsync('http://example.test/assets/catalog.json');
 
       const a = await store.whenResource('a');
-      const b = await store.whenResource('b');
+      const b = ofShape(await store.whenResource('b'), 'atlas');
       expect(a.imageUrl).toBe('http://example.test/assets/a.png');
       expect(b.atlasUrl).toBe('http://example.test/assets/atlas/b.json');
       expect(b.overrideImageUrl).toBe('http://example.test/img/b.png');

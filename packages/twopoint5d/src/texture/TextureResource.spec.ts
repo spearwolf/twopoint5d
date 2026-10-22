@@ -1,14 +1,21 @@
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {ImageLoader, Texture, type WebGPURenderer} from 'three/webgpu';
-import {afterEach, describe, expect, test, vi} from 'vitest';
+import {ImageLoader, NearestFilter, Texture, type WebGPURenderer} from 'three/webgpu';
+import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {atlasAdapterPicker, loadFailureFor} from './internals.js';
-import {TextureResource} from './TextureResource.js';
+import {
+  type AnyTextureResource,
+  AtlasTextureResource,
+  ImageTextureResource,
+  TextureResource,
+  TileSetTextureResource,
+} from './TextureResource.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
 import {TextureAtlas} from './TextureAtlas.js';
+import type {TileSet} from './TileSet.js';
 import type {FrameBasedAnimationsDataMap} from './types.js';
 
 const flushMicrotasks = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -778,6 +785,54 @@ describe('TextureResource', () => {
       fetchMock.mockRestore();
     });
 
+    test('frameBasedAnimationsData equal to the current, written as another object, keeps the animations', async () => {
+      const resource = await loadedTileSetResource();
+      const animations = resource.frameBasedAnimations;
+      const published = vi.fn();
+      on(resource, 'frameBasedAnimations', published);
+      published.mockClear();
+
+      resource.frameBasedAnimationsData = structuredClone(tileAnimationsData);
+
+      expect(resource.frameBasedAnimations).toBe(animations);
+      expect(published).not.toHaveBeenCalled();
+
+      resource.frameBasedAnimationsData = {walk: {duration: 1, firstTileId: 1, tileCount: 3}};
+
+      expect(resource.frameBasedAnimations).not.toBe(animations);
+      expect(published).toHaveBeenCalledTimes(1);
+
+      resource.dispose();
+    });
+
+    test('a frameNameQuery RegExp of the same source and flags keeps the animations, another flag builds new ones', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
+      );
+      // a catalog in JSON names a frameNameQuery as a string; FrameBasedAnimations#add() takes a RegExp as well
+      const query = (pattern: string, flags?: string) => new RegExp(pattern, flags) as unknown as string;
+      const resource = TextureResource.fromAtlas('deco', 'atlas.json', undefined, undefined, {
+        idle: {duration: 1, frameNameQuery: query('^idle', 'i')},
+      });
+      resource.activate();
+      await flushMicrotasks();
+      await flushMicrotasks();
+      const animations = resource.frameBasedAnimations;
+      expect(animations?.hasAnimation('idle')).toBe(true);
+
+      resource.frameBasedAnimationsData = {idle: {duration: 1, frameNameQuery: query('^idle', 'i')}};
+
+      expect(resource.frameBasedAnimations).toBe(animations);
+
+      resource.frameBasedAnimationsData = {idle: {duration: 1, frameNameQuery: query('^idle', 'iu')}};
+
+      expect(resource.frameBasedAnimations).not.toBe(animations);
+      expect(resource.frameBasedAnimations?.hasAnimation('idle')).toBe(true);
+
+      resource.dispose();
+    });
+
     test('animations cleared with their data come back with new data', async () => {
       const resource = await loadedTileSetResource();
 
@@ -800,12 +855,6 @@ describe('TextureResource', () => {
         idle: {duration: 1, frameNameQuery: 'idle.*'},
       });
       expect(resource.frameBasedAnimationsData).toEqual({idle: {duration: 1, frameNameQuery: 'idle.*'}});
-    });
-
-    test('fromImage accepts (but ignores) frameBasedAnimationsData setter without a signal', () => {
-      const resource = TextureResource.fromImage('i', 'img.png');
-      resource.frameBasedAnimationsData = {x: {duration: 1, tileIds: [1]}};
-      expect(resource.frameBasedAnimationsData).toEqual({x: {duration: 1, tileIds: [1]}});
     });
   });
 
@@ -1706,17 +1755,39 @@ describe('TextureResource', () => {
     });
   });
 
+  // TypeScript refuses each of these writes; the browser tests and every other caller in JavaScript
+  // reach the setters on the prototype of the shape, which throw
   describe('setters on the wrong shape', () => {
     test('an image resource refuses tileSetOptions', () => {
       const resource = TextureResource.fromImage('hero', 'hero.png');
 
       const write = () => {
+        // @ts-expect-error an image resource has no tileSetOptions
         resource.tileSetOptions = {tileWidth: 16};
       };
 
       expect(write).toThrow(TypeError);
       expect(write).toThrow('TextureResource "hero" is an "image" resource and has no "tileSetOptions"');
+      // @ts-expect-error an image resource has no tileSetOptions
       expect(resource.tileSetOptions).toBeUndefined();
+      expect(Object.hasOwn(resource, 'tileSetOptions')).toBe(false);
+
+      resource.dispose();
+    });
+
+    test('an image resource refuses frameBasedAnimationsData', () => {
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+
+      const write = () => {
+        // @ts-expect-error an image resource builds no animations and has no frameBasedAnimationsData
+        resource.frameBasedAnimationsData = {x: {duration: 1, tileIds: [1]}};
+      };
+
+      expect(write).toThrow(TypeError);
+      expect(write).toThrow('TextureResource "hero" is an "image" resource and has no "frameBasedAnimationsData"');
+      // @ts-expect-error an image resource has no frameBasedAnimationsData
+      expect(resource.frameBasedAnimationsData).toBeUndefined();
+      expect(Object.hasOwn(resource, 'frameBasedAnimationsData')).toBe(false);
 
       resource.dispose();
     });
@@ -1725,12 +1796,29 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
 
       const write = () => {
+        // @ts-expect-error a tile set resource has no atlasUrl
         resource.atlasUrl = 'x.json';
       };
 
       expect(write).toThrow(TypeError);
       expect(write).toThrow('TextureResource "tiles" is a "tileset" resource and has no "atlasUrl"');
+      // @ts-expect-error a tile set resource has no atlasUrl
       expect(resource.atlasUrl).toBeUndefined();
+      expect(Object.hasOwn(resource, 'atlasUrl')).toBe(false);
+
+      resource.dispose();
+    });
+
+    test('an atlas resource refuses tileSetOptions', () => {
+      const resource = TextureResource.fromAtlas('deco', 'deco.json');
+
+      const write = () => {
+        // @ts-expect-error an atlas resource has no tileSetOptions
+        resource.tileSetOptions = {tileWidth: 16};
+      };
+
+      expect(write).toThrow('TextureResource "deco" is an "atlas" resource and has no "tileSetOptions"');
+      expect(Object.hasOwn(resource, 'tileSetOptions')).toBe(false);
 
       resource.dispose();
     });
@@ -1739,36 +1827,118 @@ describe('TextureResource', () => {
       const resource = TextureResource.fromAtlas('deco', 'deco.json');
 
       const write = () => {
+        // @ts-expect-error the imageUrl of an atlas resource comes from its json and is read-only
         resource.imageUrl = 'other.png';
       };
 
       expect(write).toThrow(TypeError);
       expect(write).toThrow(/takes its "imageUrl" from the atlas json/);
       expect(resource.imageUrl).toBeUndefined();
+      expect(Object.hasOwn(resource, 'imageUrl')).toBe(false);
 
       resource.dispose();
     });
 
     test('a disposed resource swallows the write instead of throwing', () => {
-      const resource = TextureResource.fromImage('gone', 'gone.png');
-      resource.dispose();
+      const image = TextureResource.fromImage('gone', 'gone.png');
+      const atlas = TextureResource.fromAtlas('gone too', 'gone.json');
+      image.dispose();
+      atlas.dispose();
 
       expect(() => {
-        resource.tileSetOptions = {tileWidth: 16};
+        // @ts-expect-error an image resource has no tileSetOptions
+        image.tileSetOptions = {tileWidth: 16};
+        // @ts-expect-error the imageUrl of an atlas resource comes from its json and is read-only
+        atlas.imageUrl = 'other.png';
       }).not.toThrow();
     });
   });
 
-  describe('a resource built with its constructor', () => {
-    test("new TextureResource(id, 'atlas') takes an atlasUrl and builds its atlas once loaded", async () => {
+  describe('the types of the shapes', () => {
+    test('the static factories answer the class of the shape, and activate() and load() answer the same', () => {
+      const image = TextureResource.fromImage('hero', 'hero.png');
+      const tiles = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
+      const atlas = TextureResource.fromAtlas('deco', 'deco.json');
+
+      expectTypeOf(image).toEqualTypeOf<ImageTextureResource>();
+      expectTypeOf(tiles).toEqualTypeOf<TileSetTextureResource>();
+      expectTypeOf(atlas).toEqualTypeOf<AtlasTextureResource>();
+      expectTypeOf(image.activate()).toEqualTypeOf<ImageTextureResource>();
+      expectTypeOf(atlas.load()).toEqualTypeOf<AtlasTextureResource>();
+      expect([image, tiles, atlas].map((resource) => resource instanceof TextureResource)).toEqual([true, true, true]);
+
+      for (const resource of [image, tiles, atlas]) resource.dispose();
+    });
+
+    test('an output a shape never builds is undefined in its type', () => {
+      expectTypeOf<ImageTextureResource['atlas']>().toEqualTypeOf<undefined>();
+      expectTypeOf<ImageTextureResource['tileSet']>().toEqualTypeOf<undefined>();
+      expectTypeOf<ImageTextureResource['frameBasedAnimations']>().toEqualTypeOf<undefined>();
+      expectTypeOf<AtlasTextureResource['tileSet']>().toEqualTypeOf<undefined>();
+      expectTypeOf<TileSetTextureResource['tileSet']>().toEqualTypeOf<TileSet | undefined>();
+    });
+
+    test('the imageUrl of an atlas resource cannot be written', () => {
+      const atlas = new AtlasTextureResource('deco');
+      const tiles = new TileSetTextureResource('tiles');
+
+      expectTypeOf(atlas.imageUrl).toEqualTypeOf<string | undefined>();
+      expect(() => {
+        // @ts-expect-error the imageUrl of an atlas resource comes from its json and is read-only
+        atlas.imageUrl = 'other.png';
+      }).toThrow(TypeError);
+      tiles.imageUrl = 'tiles.png';
+      expect(tiles.imageUrl).toBe('tiles.png');
+
+      atlas.dispose();
+      tiles.dispose();
+    });
+
+    test('type narrows a resource of any shape to the class of its shape', () => {
+      const resource: AnyTextureResource = new AtlasTextureResource('deco');
+
+      if (resource.type === 'atlas') {
+        expectTypeOf(resource).toEqualTypeOf<AtlasTextureResource>();
+        resource.overrideImageUrl = 'deco.png';
+      }
+      expect(resource.type === 'atlas' && resource.overrideImageUrl).toBe('deco.png');
+
+      resource.dispose();
+    });
+  });
+
+  describe('a resource built with the constructor of its shape', () => {
+    test('new TextureResource(id, type) from JavaScript is refused: the base builds no resource of its own', () => {
+      // TypeScript refuses the call — the constructor of the base is protected and the class abstract —
+      // so the cast stands in for a caller in JavaScript
+      const Base = TextureResource as unknown as new (id: string, type: string) => TextureResource;
+
+      expect(() => new Base('sprites', 'atlas')).toThrow(TypeError);
+      expect(() => new Base('sprites', 'atlas')).toThrow(
+        'new TextureResource(): TextureResource is the base of the three shapes of resource — build an ImageTextureResource, ' +
+          'a TileSetTextureResource or an AtlasTextureResource, or call TextureResource.fromImage(), fromTileSet() or fromAtlas()',
+      );
+    });
+
+    test('a refused new TextureResource() leaves no signal behind', () => {
+      const Base = TextureResource as unknown as new (id: string, type: string) => TextureResource;
+      const before = getSignalsCount();
+
+      expect(() => new Base('sprites', 'atlas')).toThrow(TypeError);
+
+      expect(getSignalsCount()).toBe(before);
+    });
+
+    test('new AtlasTextureResource(id) takes an atlasUrl and builds its atlas once loaded', async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
       );
       const {factory} = makeTextureFactory();
 
-      const resource = new TextureResource('sprites', 'atlas');
+      const resource = new AtlasTextureResource('sprites');
 
+      expect(resource.type).toBe('atlas');
       expect(() => {
         resource.overrideImageUrl = undefined;
         resource.atlasUrl = 'atlas.json';
@@ -1789,13 +1959,14 @@ describe('TextureResource', () => {
       fetchMock.mockRestore();
     });
 
-    test("new TextureResource(id, 'tileset') takes tileSetOptions and builds its tile set once loaded", async () => {
+    test('new TileSetTextureResource(id) takes tileSetOptions and builds its tile set once loaded', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
       );
       const {factory} = makeTextureFactory();
 
-      const resource = new TextureResource('tiles', 'tileset');
+      const resource = new TileSetTextureResource('tiles');
+      expect(resource.type).toBe('tileset');
       resource.imageUrl = 'tiles.png';
       resource.tileSetOptions = {tileWidth: 16, tileHeight: 16};
       resource.textureFactory = factory;
@@ -1808,27 +1979,73 @@ describe('TextureResource', () => {
       resource.dispose();
     });
 
-    test("new TextureResource(id, 'image') carries no input of another shape", () => {
-      const resource = new TextureResource('hero', 'image');
+    test('new ImageTextureResource(id) carries no input of another shape', () => {
+      const resource = new ImageTextureResource('hero');
+      expect(resource.type).toBe('image');
 
       const writes: Record<string, () => void> = {
         tileSetOptions: () => {
+          // @ts-expect-error an image resource has no tileSetOptions
           resource.tileSetOptions = {tileWidth: 16};
         },
         atlasUrl: () => {
+          // @ts-expect-error an image resource has no atlasUrl
           resource.atlasUrl = 'hero.json';
         },
         atlasJson: () => {
+          // @ts-expect-error an image resource has no atlasJson
           resource.atlasJson = atlasJson;
         },
         overrideImageUrl: () => {
+          // @ts-expect-error an image resource has no overrideImageUrl
           resource.overrideImageUrl = 'hero.png';
+        },
+        atlasAdapter: () => {
+          // @ts-expect-error an image resource has no atlasAdapter
+          resource.atlasAdapter = undefined;
+        },
+        frameBasedAnimationsData: () => {
+          // @ts-expect-error an image resource has no frameBasedAnimationsData
+          resource.frameBasedAnimationsData = undefined;
         },
       };
 
       for (const [property, write] of Object.entries(writes)) {
         expect(write).toThrow(TypeError);
         expect(write).toThrow(`TextureResource "hero" is an "image" resource and has no "${property}"`);
+        // reading it answers undefined, and nothing was left on the resource
+        expect((resource as unknown as Record<string, unknown>)[property]).toBeUndefined();
+        expect(Object.hasOwn(resource, property)).toBe(false);
+      }
+
+      resource.dispose();
+    });
+
+    test('new TileSetTextureResource(id) carries no input of an atlas', () => {
+      const resource = new TileSetTextureResource('tiles');
+
+      const writes: Record<string, () => void> = {
+        atlasUrl: () => {
+          // @ts-expect-error a tile set resource has no atlasUrl
+          resource.atlasUrl = 'tiles.json';
+        },
+        atlasJson: () => {
+          // @ts-expect-error a tile set resource has no atlasJson
+          resource.atlasJson = atlasJson;
+        },
+        overrideImageUrl: () => {
+          // @ts-expect-error a tile set resource has no overrideImageUrl
+          resource.overrideImageUrl = 'tiles.png';
+        },
+        atlasAdapter: () => {
+          // @ts-expect-error a tile set resource has no atlasAdapter
+          resource.atlasAdapter = undefined;
+        },
+      };
+
+      for (const [property, write] of Object.entries(writes)) {
+        expect(write).toThrow(`TextureResource "tiles" is a "tileset" resource and has no "${property}"`);
+        expect(Object.hasOwn(resource, property)).toBe(false);
       }
 
       resource.dispose();
@@ -2211,6 +2428,25 @@ describe('TextureResource', () => {
       return errors;
     };
 
+    test('a resource on its own lets go of the image it fetched last once its imageUrl is cleared: the same url fetches again', async () => {
+      const loadAsync = loadByUrl();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      resource.activate();
+      await flushMicrotasks();
+      expect(resource.imageCoords).toBeDefined();
+
+      resource.imageUrl = undefined;
+      await flushMicrotasks();
+
+      resource.imageUrl = 'hero.png';
+      await flushMicrotasks();
+
+      expect(loadAsync).toHaveBeenCalledTimes(2);
+      expect(resource.imageCoords).toBeDefined();
+
+      resource.dispose();
+    });
+
     test('takes the texture and the imageCoords back and releases the texture', async () => {
       loadByUrl();
       const {factory, textures} = makeTextureFactory();
@@ -2407,6 +2643,48 @@ describe('TextureResource', () => {
       await flushMicrotasks();
 
       expect(resource.texture).toBeInstanceOf(Texture);
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+
+      resource.dispose();
+    });
+
+    test('a resource on its own fetches its image once across a change of its texture classes', async () => {
+      const loadSpy = loadByUrl();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      resource.renderer = rendererStub();
+      resource.activate();
+      await flushMicrotasks();
+      const first = resource.texture!;
+      expect(first).toBeInstanceOf(Texture);
+
+      resource.textureClasses = ['nearest'];
+      await flushMicrotasks();
+
+      const second = resource.texture!;
+      expect(second).toBeInstanceOf(Texture);
+      expect(second).not.toBe(first);
+      expect(second.magFilter).toBe(NearestFilter);
+      expect(second.image).toBe(first.image);
+      expect(loadSpy).toHaveBeenCalledTimes(1);
+
+      resource.dispose();
+    });
+
+    test('a resource on its own fetches its image once across another renderer', async () => {
+      const loadSpy = loadByUrl();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      resource.renderer = rendererStub();
+      resource.activate();
+      await flushMicrotasks();
+      const firstFactory = resource.textureFactory;
+      const first = resource.texture!;
+
+      resource.renderer = rendererStub();
+      await flushMicrotasks();
+
+      expect(resource.textureFactory).not.toBe(firstFactory);
+      expect(resource.texture).not.toBe(first);
+      expect(resource.texture!.image).toBe(first.image);
       expect(loadSpy).toHaveBeenCalledTimes(1);
 
       resource.dispose();
@@ -2630,12 +2908,12 @@ describe('TextureResource', () => {
 
     // an atlas resource on its own with `json` written, its image loaded: what it published, and
     // what it reported
-    const atlasResource = async (json: object, setup?: (resource: TextureResource) => void) => {
+    const atlasResource = async (json: object, setup?: (resource: AtlasTextureResource) => void) => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 16, height: 8, tag: 'sheet'}) as unknown as HTMLImageElement,
       );
       const {factory} = makeTextureFactory();
-      const resource = new TextureResource('sheet', 'atlas');
+      const resource = new AtlasTextureResource('sheet');
       const errors: Array<{source: string; animation?: string; error: Error}> = [];
       on(resource, 'error', (payload: {source: string; animation?: string; error: Error}) => {
         errors.push(payload);
@@ -2766,11 +3044,13 @@ describe('TextureResource', () => {
     });
 
     test('atlasAdapter belongs to an atlas resource', () => {
-      const resource = new TextureResource('image', 'image');
+      const resource = new ImageTextureResource('image');
 
       expect(() => {
+        // @ts-expect-error an image resource has no atlasAdapter
         resource.atlasAdapter = () => ({atlas: new TextureAtlas()});
       }).toThrow(new TypeError('TextureResource "image" is an "image" resource and has no "atlasAdapter"'));
+      // @ts-expect-error an image resource has no atlasAdapter
       expect(resource.atlasAdapter).toBeUndefined();
       resource.dispose();
     });

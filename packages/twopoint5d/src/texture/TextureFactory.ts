@@ -23,6 +23,13 @@ export interface TextureOptions {
   /**
    * The anisotropy the texture is given, counted as three.js counts it: 1 is none, a value
    * below 1 counts as 1, and the factory caps it at the maximum of its renderer.
+   *
+   * - A factory built with a renderer asks it at every `getOptions()`, `create()` and `update()`,
+   *   and when a texture of `load()` or `loadAsync()` arrives, and caps against the maximum the
+   *   renderer names at that moment.
+   * - While the renderer names none — a WebGL backend before `init()` — the texture gets no
+   *   anisotropic filtering.
+   * - A texture keeps what it was built with.
    */
   anisotropy: number;
   /**
@@ -157,7 +164,7 @@ const toMaxAnisotropy = (value: unknown): number =>
 
 // the renderer answers out of its backend, and a backend that has not been initialized
 // has none to ask — a WebGL fallback backend carries `capabilities: null` until `init()`
-// has run. An optional quality hint must not stop a factory from being built.
+// has run. An optional quality hint must not stop a texture from being built.
 const readMaxAnisotropy = (renderer: WebGPURenderer): number => {
   try {
     return toMaxAnisotropy(renderer.getMaxAnisotropy?.());
@@ -167,7 +174,11 @@ const readMaxAnisotropy = (renderer: WebGPURenderer): number => {
 };
 
 export class TextureFactory {
-  #maxAnisotropy = 0;
+  // Asked at every getOptions() and not kept: a renderer names its maximum out of its backend,
+  // a WebGL backend names none before init(), and a WebGPU backend names 16 before init() even
+  // where three replaces it with a WebGL backend once init() runs. The renderer answers out of a
+  // field, and getOptions() runs once per texture, not per frame
+  readonly #maxAnisotropy: () => number;
   // the options the classes are applied on top of, with the raw value of the anisotropy
   // classes under `anisotropy`; getOptions() turns it into the two counts it answers with
   #defaultOptions: Partial<TextureOptions>;
@@ -175,7 +186,11 @@ export class TextureFactory {
   textureLoader: TextureLoader;
 
   /**
-   * @param maxAnisotropyOrRenderer The anisotropy maximum, or the renderer that names it.
+   * @param maxAnisotropyOrRenderer The anisotropy maximum, or the renderer that names it. A
+   *   renderer is asked at every `getOptions()`, `create()` and `update()` and when a texture of
+   *   `load()` or `loadAsync()` arrives; the factory caps against the maximum it names at that
+   *   moment. While it names none — a WebGL backend before `init()` — the texture gets no
+   *   anisotropic filtering, and a texture keeps what it was built with.
    * @param defaultClassNames The texture classes every texture of this factory gets before the
    *   classes of the call.
    * @param defaultOptions Options laid over the seed `{anisotropy: 0, flipY: false}`: a key they
@@ -186,10 +201,13 @@ export class TextureFactory {
     defaultClassNames: Array<TextureOptionClasses> = ['nearest'],
     defaultOptions?: Partial<TextureOptions>,
   ) {
-    this.#maxAnisotropy =
-      typeof maxAnisotropyOrRenderer === 'number'
-        ? toMaxAnisotropy(maxAnisotropyOrRenderer)
-        : readMaxAnisotropy(maxAnisotropyOrRenderer);
+    if (typeof maxAnisotropyOrRenderer === 'number') {
+      const maxAnisotropy = toMaxAnisotropy(maxAnisotropyOrRenderer);
+      this.#maxAnisotropy = () => maxAnisotropy;
+    } else {
+      const renderer = maxAnisotropyOrRenderer;
+      this.#maxAnisotropy = () => readMaxAnisotropy(renderer);
+    }
     // every factory starts from this seed; `defaultOptions` are laid over it, and a key they leave out
     // or give as `undefined` keeps the value of the seed
     const {anisotrophy, ...given} = defaultOptions ?? {};
@@ -216,7 +234,7 @@ export class TextureFactory {
     const options = this.#mergeOptions(classNames);
     // one raw value, two counts: `anisotropy` is what update() gives the texture, and the
     // deprecated `anisotrophy` counts from 0, where 0 is none
-    const anisotropy = Math.min(options.anisotropy ?? 0, this.#maxAnisotropy);
+    const anisotropy = Math.min(options.anisotropy ?? 0, this.#maxAnisotropy());
     options.anisotropy = Math.max(1, anisotropy);
     options.anisotrophy = anisotropy;
     return options;
