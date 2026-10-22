@@ -303,6 +303,9 @@ describe('FeatureSprites with grow: true', () => {
       expect(() => new FeatureSprites(TexturedSpriteKind, {grow: 'yes' as unknown as boolean})).toThrow(
         new TypeError('FeatureSprites: grow is true or false, got "yes"'),
       );
+      expect(() => new FeatureSprites(TexturedSpriteKind, {grow: NaN as unknown as boolean})).toThrow(
+        new TypeError('FeatureSprites: grow is true or false, got NaN'),
+      );
     });
 
     test('to grow a geometry with pools attached, before anything is built', () => {

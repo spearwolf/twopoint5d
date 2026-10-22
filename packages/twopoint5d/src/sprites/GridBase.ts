@@ -1,9 +1,10 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {QuadBaseArgs, SpriteBase, SpriteBaseVO} from './SpriteBase.js';
 
 export interface GridBaseOptions {
-  /** The cells across, a whole number from 1 to 1024. */
+  /** The cells across, a whole number from 1 to 1024; `columns · rows` is at most 4096. */
   readonly columns: number;
-  /** The cells down, a whole number from 1 to 1024. */
+  /** The cells down, a whole number from 1 to 1024; `columns · rows` is at most 4096. */
   readonly rows: number;
 }
 
@@ -26,11 +27,14 @@ export interface GridBaseVO extends SpriteBaseVO {
   make(halfWidth?: number, halfHeight?: number, xOffset?: number, yOffset?: number): void;
 }
 
-// no GPU limit: it keeps a typo from building a base of a million vertices for every sprite
-const MAX_CELLS = 1024;
+// No GPU limit, either of them. 1024 cells per axis keep the grid line of every vertex exact in its
+// uv (`round(uv.x · columns)`); 4096 cells bound the base itself, whose indices stay in the cache
+// `grids` for the life of the page, so that a typo builds no base of a million vertices per sprite
+const MAX_CELLS_PER_AXIS = 1024;
+const MAX_GRID_CELLS = 4096;
 
 const isCount = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_CELLS;
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_CELLS_PER_AXIS;
 
 function gridPrototype(columns: number, rows: number): object {
   return {
@@ -85,8 +89,8 @@ const grids = new Map<string, GridBase>();
  * The uv of a vertex names its grid line exactly: `round(uv.x · columns)` is its column line,
  * `round(uv.y · rows)` its row line. Equal options answer the same frozen base.
  *
- * @throws a `TypeError` for options that are no object, and for a `columns` or `rows` that is no
- *   whole number from 1 to 1024
+ * @throws a `TypeError` for options that are no object, for a `columns` or `rows` that is no
+ *   whole number from 1 to 1024, and for a grid of more than 4096 cells
  */
 export function gridBase(options: GridBaseOptions): GridBase {
   if (options == null || typeof options !== 'object') {
@@ -99,9 +103,14 @@ export function gridBase(options: GridBaseOptions): GridBase {
   ] as const) {
     if (!isCount(value)) {
       throw new TypeError(
-        `gridBase: ${name} is ${typeof value === 'string' ? JSON.stringify(value) : String(value)} — columns and rows are whole numbers from 1 to ${MAX_CELLS}`,
+        `gridBase: ${name} is ${describeValue(value)} — columns and rows are whole numbers from 1 to ${MAX_CELLS_PER_AXIS}`,
       );
     }
+  }
+  if (columns * rows > MAX_GRID_CELLS) {
+    throw new TypeError(
+      `gridBase: a grid of ${columns} × ${rows} is ${columns * rows} cells — a grid holds at most ${MAX_GRID_CELLS}`,
+    );
   }
 
   const key = `${columns}x${rows}`;

@@ -124,6 +124,12 @@ describe('segmentPlacement()', () => {
     expect(() => segmentPlacement({plane: 'yz' as 'xy'})).toThrow(
       new TypeError(`segmentPlacement: the plane "yz" is neither 'xy' nor 'xz'`),
     );
+    expect(() => segmentPlacement({facing: NaN as unknown as 'plane'})).toThrow(
+      new TypeError(`segmentPlacement: the facing NaN is neither 'plane' nor 'camera'`),
+    );
+    expect(() => segmentPlacement({plane: NaN as unknown as 'xy'})).toThrow(
+      new TypeError(`segmentPlacement: the plane NaN is neither 'xy' nor 'xz'`),
+    );
     expect(() => segmentPlacement({facing: 'camera', plane: 'xy'})).toThrow(
       new TypeError(
         "segmentPlacement: a plane belongs to facing: 'plane' — a segment that faces the camera turns in every plane; drop the plane, or take facing: 'plane'",

@@ -9,10 +9,9 @@ import {BillboardReflectionPass, ReflectionPass, ShadowPass} from '../passes/pas
 import {AnimatedSpriteKind, TexturedSpriteKind} from '../presets.js';
 import {FeatureSpritesMaterial} from './FeatureSpritesMaterial.js';
 
-// The graphs the preset kinds and the passes over them built at the branch point of the pipeline
-// stages (main at 92508e8d, before the frame stages, the uv stages and ctx.uv), as graphSignature()
-// writes them. The kinds of today build them unchanged. A three bump that changes how its nodes are
-// built changes them too; then write them anew with UPDATE_SPRITE_GRAPHS=1 and read the diff.
+// The graphs the preset kinds and the passes over them build, as graphSignature() writes them. A
+// change to the graph of a preset feature, or a three bump that changes how its nodes are built,
+// changes them; then write them anew with UPDATE_SPRITE_GRAPHS=1 and read the diff.
 const FIXTURE = new URL('./fixtures/preset-graphs.json', import.meta.url);
 
 const withImage = (width = 4, height = 4) => {
@@ -48,7 +47,7 @@ const graphsNow = (): Record<string, {position: string; color: string}> => {
   return graphs;
 };
 
-describe('the preset kinds build the graphs they built before the pipeline stages', () => {
+describe('the preset kinds build the graphs of the fixture', () => {
   const now = graphsNow();
   if (process.env['UPDATE_SPRITE_GRAPHS'] === '1') writeFileSync(FIXTURE, `${JSON.stringify(now, null, 2)}\n`);
   const before = JSON.parse(readFileSync(FIXTURE, 'utf8')) as Record<string, {position: string; color: string}>;

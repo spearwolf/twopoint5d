@@ -63,7 +63,7 @@ const WHERE = 'FeatureSpritesMaterial';
 // the fields a placement may carry to stand in for another on a live material
 const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'checkKind', 'placement']);
 
-const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1) as unknown as Node<'vec4'>});
+const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1)});
 
 // uv is where the vertex lies on the untrimmed sprite, x to the right and y downwards. A trimmed
 // frame covers the part between its margins, so every corner moves to its corner of that part; y
@@ -72,7 +72,7 @@ const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1) as un
 const trimShift = (position: Node<'vec3'>, uv: Node<'vec2'>, trim: Node<'vec4'>): Node<'vec3'> => {
   const trimmedUv = add(trim.xy, mul(uv, sub(float(1), add(trim.xy, trim.zw))));
   const shift = sub(trimmedUv, uv);
-  return add(position, vec3(shift.x, shift.y.negate(), 0)) as unknown as Node<'vec3'>;
+  return add(position, vec3(shift.x, shift.y.negate(), 0));
 };
 
 /**
@@ -179,8 +179,8 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
           this.#samples.position.length = 0;
           this.#uv.position = undefined;
 
-          let position = attribute<'vec3'>('position') as unknown as Node<'vec3'>;
-          if (frame.trim != null) position = trimShift(position, attribute<'vec2'>('uv') as unknown as Node<'vec2'>, frame.trim);
+          let position: Node<'vec3'> = attribute<'vec3'>('position');
+          if (frame.trim != null) position = trimShift(position, attribute<'vec2'>('uv'), frame.trim);
           for (const feature of this.#pipeline.local) {
             if (this.#isActive(feature))
               position = feature.local!.transform(position, this.#shaderContext(feature, 'position', frame));
@@ -207,7 +207,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
           let color =
             source != null && this.#isActive(source)
               ? source.colorSource!(frame, this.#shaderContext(source, 'color', frame))
-              : (vec4(0.5, 0.5, 0.5, 1) as unknown as Node<'vec4'>);
+              : vec4(0.5, 0.5, 0.5, 1);
           for (const feature of this.#pipeline.color) {
             if (this.#isActive(feature)) color = feature.color!.transform(color, this.#shaderContext(feature, 'color', frame));
           }
@@ -323,7 +323,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   #uvOf(scope: StageScope, frame: SpriteFrameNodes): Node<'vec2'> {
     let uv = this.#uv[scope];
     if (uv == null) {
-      uv = attribute<'vec2'>('uv') as unknown as Node<'vec2'>;
+      uv = attribute<'vec2'>('uv');
       for (const feature of this.#pipeline.uv) {
         if (this.#isActive(feature)) uv = feature.uv!.transform(uv, {...this.#frameContext(feature, scope), frame, uv});
       }

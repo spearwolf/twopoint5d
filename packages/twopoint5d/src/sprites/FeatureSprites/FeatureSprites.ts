@@ -1,11 +1,12 @@
 import {type Camera, Matrix4, Mesh, type Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
 import type {VO, VOSortKey, VOSortKeyName, VOSortOptions} from '../../vertex-objects/types.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
+import {describeValue} from '../../utils/describeValue.js';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
-import {passFeatures, placementOfPass} from '../passes/passFeatures.js';
+import {checkPassFeatures, passFeatures, placementOfPass} from '../passes/passFeatures.js';
 import {resolvedUniformName, stageFeaturesOf} from '../passes/passUniformNames.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import {FeatureSpritesGeometry, type FeatureSpritesGeometryParameters} from './FeatureSpritesGeometry.js';
@@ -122,7 +123,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
   const {geometry, material, passes = [], capacity, attributeUsage, baseArgs, grow, ...materialParameters} = options;
 
   if (grow !== undefined && typeof grow !== 'boolean') {
-    throw new TypeError(`${WHERE}: grow is true or false, got ${JSON.stringify(grow)}`);
+    throw new TypeError(`${WHERE}: grow is true or false, got ${describeValue(grow)}`);
   }
   if (geometry != null) {
     if (geometry.kind !== kind) throw new TypeError(`${WHERE}: the geometry handed in was built for another sprite kind`);
@@ -150,6 +151,8 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
     if (passNames.has(pass.name)) throw new TypeError(`${WHERE}: two passes are named "${pass.name}"`);
     passNames.add(pass.name);
     passFeatures(kind, pass, WHERE);
+    // the sprites may start with another placement than the one of the kind, and every pass draws next to it
+    if (materialParameters.placement != null) checkPassFeatures(kind, pass, materialParameters.placement, WHERE);
   }
 
   const builtGeometry = geometry ?? new FeatureSpritesGeometry(kind, {capacity, attributeUsage, baseArgs});
@@ -256,8 +259,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    *   pass for them; the `isMaterial` and the `isTexture` they carry keep them out.
    * @throws a `TypeError` for a geometry or material of another kind, for parameters that would
    *   build a geometry or a material next to one handed in, for passes next to a material handed in
-   *   and for two passes of one name; an `Error` for a pass the kind cannot draw. A constructor that
-   *   throws leaves nothing behind it built.
+   *   and for two passes of one name; an `Error` for a pass the kind cannot draw, with the placement
+   *   the sprites start with. A constructor that throws leaves nothing behind it built.
    */
   constructor(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api> & {isMaterial?: never; isTexture?: never} = {}) {
     const {geometry, material, ownsGeometry, grows, resources} = resolveParts(kind, options);
@@ -497,11 +500,15 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * Swaps the placement of the material and of every pass material that draws with the placement
    * of the sprites — a pass that brings its own keeps it; see {@link FeatureSpritesMaterial.placement}.
    * Does nothing once disposed.
+   *
+   * @throws an `Error` for a placement a pass cannot draw next to, and what the material throws for a
+   *   placement it refuses; every material keeps its placement then
    */
   set placement(feature: SpriteFeature) {
     if (this.#material == null) return;
-    // the material checks first, so a refused placement reaches no pass; the pass materials judge it
-    // by the features of the kind as well, so they take what the material took
+    // every pass checks the placement against its features before any material takes it; then the
+    // material checks it, and the pass materials take what the material took
+    for (const mesh of Object.values(this.#passes)) checkPassFeatures(this.kind, mesh.pass, feature, WHERE);
     this.#material.placement = feature;
     for (const mesh of Object.values(this.#passes)) {
       if (placementOfPass(mesh.pass) == null) mesh.material.placement = feature;

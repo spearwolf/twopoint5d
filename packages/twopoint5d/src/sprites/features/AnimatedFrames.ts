@@ -1,7 +1,8 @@
-import {abs, add, clamp, div, float, int, max, min, mod, mul, select, step, sub, vec4} from 'three/tsl';
+import {add, div, float, int, max, min, mod, mul, select, step, sub, vec4} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {texCoordsFromIndex} from '../node-utils.js';
 import {defineFeature} from '../SpriteFeature.js';
+import {evenFrameOf} from './evenFrame.js';
 
 // The frame of an animation with per-frame durations is found by a binary search over the end
 // times of its frames, unrolled to a fixed count of steps, one bit of the frame count each: a TSL `Loop` needs a function stack
@@ -46,7 +47,7 @@ export const AnimatedFrames = defineFeature<AnimatedFramesApi>({
     const size = textureSize('animsMap');
     const time = uniform<'float'>('time');
     const anim = attribute<'vec2'>('anim');
-    const lookup = (index: Node<'int'>) => sample('animsMap', texCoordsFromIndex(size, index) as unknown as Node<'vec2'>);
+    const lookup = (index: Node<'int'>) => sample('animsMap', texCoordsFromIndex(size, index));
 
     // the header texel of an animation: [frameCount, duration, first frame texel, texelsPerFrame]
     const header = lookup(anim.x.toInt());
@@ -72,17 +73,9 @@ export const AnimatedFrames = defineFeature<AnimatedFramesApi>({
 
     const t = add(time, anim.y);
 
-    // One duration: the frames elapsed are t / duration · frameCount. 'loop' wraps them, 'once'
-    // clamps them, 'pingpong' runs a triangle wave over a turn of 2·frameCount − 2 frames, which
-    // shows each end frame once: 0 1 2 3 2 1 0 1 … Every branch is an int already: a select()
-    // converted to an int afterwards comes out of the WGSL builder as a float in one of the places
-    // it is read, and the shader fails to compile
+    // One duration: the frames elapsed are t / duration · frameCount
     const steps = mul(div(t, duration), frameCount);
-    const loopFrame = mod(steps, frameCount).floor().toInt();
-    const onceFrame = clamp(steps.floor(), float(0), lastFrame).toInt();
-    const turnStep = mod(steps, max(sub(mul(frameCount, 2), 2), float(1))).floor();
-    const pingpongFrame = sub(lastFrame, abs(sub(turnStep, lastFrame))).toInt();
-    const evenFrame = select(isPingpong, pingpongFrame, select(isOnce, onceFrame, loopFrame));
+    const evenFrame = evenFrameOf({steps, frameCount, lastFrame, isPingpong, isOnce});
 
     // Per-frame durations: the end time of frame k sits in the fourth component of its second
     // texel. The frame is the count of frames that end at or before the time searched for; the way
@@ -102,12 +95,12 @@ export const AnimatedFrames = defineFeature<AnimatedFramesApi>({
     );
     // an animation without durations searches no frame: every one of its steps reads the same texel
     const searchedFrames = select(hasDurations, frameCount, float(1));
-    let count: Node<'float'> = float(0) as unknown as Node<'float'>;
+    let count: Node<'float'> = float(0);
     for (let bit = SEARCH_STEPS - 1; bit >= 0; bit--) {
       const candidate = add(count, 2 ** bit);
-      const endTime = endTimeOf(sub(min(candidate, searchedFrames), 1) as unknown as Node<'float'>);
+      const endTime = endTimeOf(sub(min(candidate, searchedFrames), 1));
       // step(edge, x) is 1 for x ≥ edge: the frame before the candidate has ended
-      count = add(count, mul(step(endTime, searched), 2 ** bit)) as unknown as Node<'float'>;
+      count = add(count, mul(step(endTime, searched), 2 ** bit));
     }
     const walkedFrame = min(count, lastFrame).toInt();
 

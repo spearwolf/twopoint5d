@@ -1,6 +1,7 @@
 import {abs, add, clamp, div, float, max, mix, mul, round, sRGBTransferOETF, step, sub, vec2, vec4} from 'three/tsl';
 import {type Node, SRGBColorSpace} from 'three/webgpu';
 import {describeValue} from '../../utils/describeValue.js';
+import {asVec3} from '../typedNodes.js';
 import {ColorOrder, defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 
 export interface PaletteSwapOptions {
@@ -73,24 +74,23 @@ export function paletteSwap(options?: PaletteSwapOptions): SpriteFeature<Palette
           // both sides go back to the 8-bit values of the texture data before they are compared. The docs
           // ask for both textures in one colour space, so the one of the palette stands for both
           const encoded = colorSpace('palette') === SRGBColorSpace;
-          const dataOf = (rgb: Node<'vec3'>): Node<'vec3'> =>
-            encoded ? (sRGBTransferOETF(rgb) as unknown as Node<'vec3'>) : rgb;
-          const colorData = dataOf(color.rgb as unknown as Node<'vec3'>);
+          const dataOf = (rgb: Node<'vec3'>): Node<'vec3'> => (encoded ? asVec3(sRGBTransferOETF(rgb)) : rgb);
+          const colorData = dataOf(color.rgb);
           const width = size.x;
           // the centre of a texel: exact under any filter of the palette
           const entryUv = (entry: Node<'float'>, row: Node<'float'>) =>
-            vec2(div(add(entry, 0.5), max(width, 1)), div(add(row, 0.5), max(size.y, 1))) as unknown as Node<'vec2'>;
+            vec2(div(add(entry, 0.5), max(width, 1)), div(add(row, 0.5), max(size.y, 1)));
 
           // the comparisons unrolled, every lookup built here and no branch: the first entry that matches
           // wins, as the walk from the last entry to the first leaves it in `index`; −1 for no match
-          let index = float(-1) as unknown as Node<'float'>;
+          let index: Node<'float'> = float(-1);
           for (let i = colors - 1; i >= 0; i--) {
-            const source = sample('palette', entryUv(float(i) as unknown as Node<'float'>, float(0) as unknown as Node<'float'>));
-            const distance = abs(sub(colorData, dataOf(source.rgb as unknown as Node<'vec3'>)));
+            const source = sample('palette', entryUv(float(i), float(0)));
+            const distance = abs(sub(colorData, dataOf(source.rgb)));
             const far = max(distance.x, max(distance.y, distance.z));
             // step(edge, x) is 1 for x ≥ edge: close in every channel, and an entry the palette holds
             const matches = mul(sub(1, step(TOLERANCE, far)), step(i + 0.5, width));
-            index = mix(index, float(i), matches) as unknown as Node<'float'>;
+            index = mix(index, float(i), matches);
           }
 
           // the cycled entry: within [first, first + count) shifted by whole steps, the modulo by floor
@@ -102,14 +102,11 @@ export function paletteSwap(options?: PaletteSwapOptions): SpriteFeature<Palette
           const safeCount = max(count, 1);
           const shifted = add(offset, uniform<'float'>('paletteShift').floor());
           const cycled = add(first, sub(shifted, mul(safeCount, div(shifted, safeCount).floor())));
-          const entry = mix(index, cycled, inRange) as unknown as Node<'float'>;
+          const entry = mix(index, cycled, inRange);
 
           const row = clamp(round(attribute<'float'>('paletteRow')), float(0), max(sub(size.y, 1), float(0)));
-          const replacement = sample(
-            'palette',
-            entryUv(max(entry, 0) as unknown as Node<'float'>, row as unknown as Node<'float'>),
-          );
-          return mix(color, vec4(replacement.rgb, color.a), step(0, index)) as unknown as Node<'vec4'>;
+          const replacement = sample('palette', entryUv(max(entry, 0), row));
+          return mix(color, vec4(replacement.rgb, color.a), step(0, index));
         },
       },
     });

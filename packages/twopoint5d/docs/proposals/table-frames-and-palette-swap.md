@@ -136,7 +136,7 @@ export interface TableFrameOptions {
 }
 
 export interface TableFrameApi {
-  /** The entry of the frame table the sprite shows — with views, the first entry of the block of its views. */
+  /** The frame the sprite shows — a frame number with views and without them; with views the shader picks the view of the frame. */
   frameIndex: number;
 }
 
@@ -155,11 +155,11 @@ export const TableFrame: SpriteFeature<TableFrameApi>; // tableFrame()
   `size = ctx.textureSize('frameTable')`, four lookups:
 
   ```
-  count  = header.x                               // texel 0
-  index  = round(frameIndex) [+ view]
-  entry  = clamp(index, 0, max(count − 1, 0))
-  first  = 1 + 3 · entry
-  frame  = {texCoords: texel(first), flipDiagonal: texel(first + 1).z, trim: texel(first + 2)}
+  entries = header.x                              // texel 0
+  index   = round(frameIndex)                     // with views: see §4.2
+  entry   = clamp(index, 0, max(entries − 1, 0))
+  first   = 1 + 3 · entry
+  frame   = {texCoords: texel(first), flipDiagonal: texel(first + 1).z, trim: texel(first + 2)}
   ```
 
 - **Out of range**: an index below 0 or past the last frame is clamped — silently, as
@@ -169,15 +169,19 @@ export const TableFrame: SpriteFeature<TableFrameApi>; // tableFrame()
 ### 4.2 Directional frames — `views: n`
 
 `tableFrame({views: n})` requires `instancePosition` and `yaw` (`requires: ['instancePosition',
-'yaw']`) and adds the view to the index before the lookup, in the frame slot itself — a frame stage
-runs after the frame is resolved and could not change the entry (pipeline proposal §7.6):
+'yaw']`) and picks the view within the block of the frame before the lookup, in the frame slot
+itself — a frame stage runs after the frame is resolved and could not change the entry (pipeline
+proposal §7.6):
 
 ```
 toCamera = cameraPositionLocal() − instancePosition          // in the local space of the mesh
 angle    = atan(toCamera.x, toCamera.z)                       // atan2: 0 along +z, π/2 along +x
 step     = round((angle − yaw) / (2π / n))
-view     = step − n · floor(step / n)                         // 0 … n−1, for any yaw
-index    = round(frameIndex) + view
+view     = step − n · floor((step + 0.5) / n)                 // 0 … n−1, for any yaw
+frames   = floor((entries + 0.5) / n)
+frame    = clamp(round(frameIndex), 0, max(frames − 1, 0))
+index    = frame · n + view
+entry    = clamp(index, 0, max(entries − 1, 0))                // only a table of fewer entries than n
 ```
 
 - **The convention.** `yaw` turns the sprite as `Object3D.rotation.y` turns an object —
@@ -186,13 +190,13 @@ index    = round(frameIndex) + view
   seen from above, from the sprite's front: view 0 its front, and for `n = 8` view 2 its left side
   (the camera on the sprite's left, which is +x for a sprite facing +z). That is the order of the
   lookbook's `stalker` (`apps/lookbook/assets-src/README.md`, "boomer-shooter-corridor").
-- **The layout.** The `n` views of a frame are `n` consecutive entries, view 0 first:
-  `frameIndex` names the first entry of the block — `frameIndex = frame · n` — and the shader adds
-  the view. The stalker's json lists every animation frame by frame, inside a frame its views 0–7,
-  so `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is that layout as it is, and `frameIndex =
-  frame · 8` with no reordering. (The roadmap's sketch already "adds … to the index".) A sheet that
-  counts its views clockwise is read as view `(n − k) mod n`; the guide shows the one-line reorder of
-  a name list.
+- **The layout.** The `n` views of a frame are `n` consecutive entries, view 0 first. `frameIndex`
+  counts frames, with views as without them, and the shader reads entry
+  `round(frameIndex) · n + view`; a `frameIndex` before the first or past the last frame shows the
+  matching view of the first or the last frame. The stalker's json lists every animation frame by
+  frame, inside a frame its views 0–7, so `FrameTable.fromAtlas(atlas, /^stalker_walk_/)` is that
+  layout as it is, and `frameIndex = frame` with no reordering. A sheet that counts its views
+  clockwise is read as view `(n − k) mod n`; the guide shows the one-line reorder of a name list.
 - **Where it holds.** The angle lies in the xz plane of the mesh about +y: right for
   `axisBillboardPlacement()` (upright along +y), for `flatPlacement({orientation: 'yaw'})` and
   for `BillboardPlacement`. A mesh laid out in the xy plane with `axisBillboardPlacement({axis:
@@ -205,6 +209,11 @@ index    = round(frameIndex) + view
   whatever the yaw.
 - The math is branch-free (`floor`, no `%` on negative numbers, whose sign differs between WGSL
   and GLSL).
+- `step` and `entries` are whole numbers, and the f32 division may lie a few ULP off: on a multiple
+  of `n` a plain `floor(step / n)` could land one too low — a view of `n` — and `floor(entries / n)`
+  could leave the last frame of a table of `frames · n` entries out of reach. Half a step or an entry
+  more keeps the quotient `0.5 / n` away from every whole number, which no ULP of the division
+  crosses.
 - `views` that is no whole number of 2 or more is refused with a `TypeError`:
   `tableFrame: views must be a whole number of 2 or more, got 1 — leave views out for frames without views`.
 

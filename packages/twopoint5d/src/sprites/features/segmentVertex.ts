@@ -14,11 +14,10 @@ const NO_LENGTH = 1e-6;
 const ZENITH_SINE = 0.1;
 
 // v divided by its length, or the zero vector for one of no length — never NaN
-const unitOf = (v: Vec3): Vec3 => div(v, max(length(v), NO_LENGTH)) as unknown as Vec3;
+const unitOf = (v: Vec3): Vec3 => div(v, max(length(v), NO_LENGTH));
 
 // `value` where `size` reaches NO_LENGTH, `fallback` below it: a switch without a branch
-const orFallback = (fallback: Vec3, value: Vec3, size: Node<'float'>): Vec3 =>
-  mix(fallback, value, step(NO_LENGTH, size)) as unknown as Vec3;
+const orFallback = (fallback: Vec3, value: Vec3, size: Node<'float'>): Vec3 => mix(fallback, value, step(NO_LENGTH, size));
 
 /**
  * The vertex of a quad laid along a segment from `start` to `end`: `along` (the base uv.x, 0 at the
@@ -42,33 +41,31 @@ export function segmentVertex(params: {
   camera?: {readonly position: Vec3; readonly right: Vec3; readonly up: Vec3};
 }): Vec3 {
   const {local, start, end, along, facing, camera} = params;
-  const segment = sub(end, start) as unknown as Vec3;
+  const segment = sub(end, start);
   const size = length(segment);
-  const point = add(start, mul(segment, along)) as unknown as Vec3;
+  const point = add(start, mul(segment, along));
 
   let dir: Vec3;
   let across: Vec3;
   if (facing === 'camera') {
     dir = orFallback(camera!.right, unitOf(segment), size);
-    const look = unitOf(sub(camera!.position, point) as unknown as Vec3);
-    const facingAcross = cross(look, dir) as unknown as Vec3;
+    const look = unitOf(sub(camera!.position, point));
+    const facingAcross = cross(look, dir);
     const weight = max(sub(1, div(length(facingAcross), ZENITH_SINE)), 0);
     // the up of the camera less its part along the segment, to the side of the facing across so
     // that the two never cancel
-    const level = sub(camera!.up, mul(dir, dot(camera!.up, dir))) as unknown as Vec3;
+    const level = sub(camera!.up, mul(dir, dot(camera!.up, dir)));
     const side = sub(mul(step(0, dot(level, facingAcross)), 2), 1);
-    across = unitOf(add(facingAcross, mul(level, mul(side, weight))) as unknown as Vec3);
+    across = unitOf(add(facingAcross, mul(level, mul(side, weight))));
   } else {
-    dir = orFallback(vec3(1, 0, 0) as unknown as Vec3, unitOf(segment), size);
+    dir = orFallback(vec3(1, 0, 0), unitOf(segment), size);
     // the left of the direction in the plane: the quad of a segment along +X keeps the facing of a
     // flat sprite of that plane — +Y up and +Z out in 'xy', −Z up and +Y out in 'xz'
-    const inPlane = (facing === 'xy'
-      ? vec3(segment.y.negate(), segment.x, 0)
-      : vec3(segment.z, 0, segment.x.negate())) as unknown as Vec3;
-    const up = (facing === 'xy' ? vec3(0, 1, 0) : vec3(0, 0, -1)) as unknown as Vec3;
+    const inPlane = facing === 'xy' ? vec3(segment.y.negate(), segment.x, 0) : vec3(segment.z, 0, segment.x.negate());
+    const up = facing === 'xy' ? vec3(0, 1, 0) : vec3(0, 0, -1);
     across = orFallback(up, unitOf(inPlane), length(inPlane));
   }
-  const normal = cross(dir, across) as unknown as Vec3;
+  const normal = cross(dir, across);
 
-  return add(point, add(add(mul(dir, local.x), mul(across, local.y)), mul(normal, local.z))) as unknown as Vec3;
+  return add(point, add(add(mul(dir, local.x), mul(across, local.y)), mul(normal, local.z)));
 }

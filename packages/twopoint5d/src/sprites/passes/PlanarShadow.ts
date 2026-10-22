@@ -1,5 +1,4 @@
 import {div, dot, max, mul, sub} from 'three/tsl';
-import type {Node} from 'three/webgpu';
 import {defineFeature, MeshOrder} from '../SpriteFeature.js';
 
 // a vertex near or above a point light comes down to this share of the height of the light before
@@ -31,7 +30,7 @@ export const PlanarShadow = defineFeature({
       const excess = mul(light.w, max(sub(height, mul(lightHeight, CLAMPED_SHARE)), 0));
       const clamped = sub(p, mul(n, div(excess, dot(n, n))));
       const towardsLight = sub(light.xyz, mul(light.w, clamped));
-      return sub(clamped, mul(towardsLight, div(sub(height, excess), dot(n, towardsLight)))) as unknown as Node<'vec3'>;
+      return sub(clamped, mul(towardsLight, div(sub(height, excess), dot(n, towardsLight))));
     },
   },
 });

@@ -1,5 +1,4 @@
 import {add, mix, sub, vec3} from 'three/tsl';
-import type {Node} from 'three/webgpu';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import {defineFeature, LocalOrder} from '../SpriteFeature.js';
 import {type SliceWanted, sliceOf, untrimmedSizeOf} from './frameSlices.js';
@@ -76,8 +75,8 @@ export const Anchor = defineFeature<AnchorApi>({
     transform: (position, {attribute, frame}) => {
       const anchor = attribute<'vec2'>('anchor');
       // a point on the image: under a mirror of the image it lies mirrored on the quad
-      const a = (frame.mirror != null ? mix(anchor, sub(1, anchor), frame.mirror) : anchor) as unknown as Node<'vec2'>;
-      return add(position, vec3(sub(0.5, a.x), sub(a.y, 0.5), 0)) as unknown as Node<'vec3'>;
+      const a = frame.mirror != null ? mix(anchor, sub(1, anchor), frame.mirror) : anchor;
+      return add(position, vec3(sub(0.5, a.x), sub(a.y, 0.5), 0));
     },
   },
 });

@@ -112,8 +112,15 @@ describe('gridBase()', () => {
     [{columns: '3', rows: 3}, 'gridBase: columns is "3" — columns and rows are whole numbers from 1 to 1024'],
     [{rows: 3}, 'gridBase: columns is undefined — columns and rows are whole numbers from 1 to 1024'],
     [undefined, 'gridBase: takes {columns, rows} — gridBase({columns: 3, rows: 3})'],
+    [{columns: 1000, rows: 1000}, 'gridBase: a grid of 1000 × 1000 is 1000000 cells — a grid holds at most 4096'],
+    [{columns: 1024, rows: 5}, 'gridBase: a grid of 1024 × 5 is 5120 cells — a grid holds at most 4096'],
   ])('refuses %j', (options, message) => {
     expect(() => gridBase(options as never)).toThrow(new TypeError(message));
+  });
+
+  test('takes a grid of 4096 cells: 64 × 64 and 1024 × 4', () => {
+    expect(gridBase({columns: 64, rows: 64}).description.vertexCount).toBe(65 * 65);
+    expect(gridBase({columns: 1024, rows: 4}).description.vertexCount).toBe(1025 * 5);
   });
 
   test('builds a sprite geometry that draws two triangles per cell for every sprite', () => {

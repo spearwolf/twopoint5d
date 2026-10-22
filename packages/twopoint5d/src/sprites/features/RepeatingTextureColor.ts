@@ -1,7 +1,8 @@
 import {abs, add, div, float, length, max, mix, mul, step, sub, varying, vec2, vec4} from 'three/tsl';
-import {NearestFilter, type Node, type TextureNode} from 'three/webgpu';
+import {NearestFilter, type Node} from 'three/webgpu';
 import {sampleFrameAt} from '../../texture/sampleFrameAt.js';
 import {defineFeature} from '../SpriteFeature.js';
+import {asTextureNode} from '../typedNodes.js';
 
 // below this a thickness or a measure of the frame counts as none: the repeat stays finite
 const NO_LENGTH = 1e-6;
@@ -31,10 +32,10 @@ export const RepeatingTextureColor = defineFeature({
     // rather than handed over by the placement, which every segment placement may stand in for
     const ratio = varying(div(drawnLength, max(abs(size.y), NO_LENGTH)));
 
-    const flipDiagonal = (frame.flipDiagonal != null ? step(0.5, frame.flipDiagonal) : float(0)) as unknown as Node<'float'>;
+    const flipDiagonal = frame.flipDiagonal != null ? step(0.5, frame.flipDiagonal) : float(0);
     const texels = textureSize('colorMap');
     // the texels of the frame as it is drawn: under the diagonal flip u runs along the y of the texture
-    const drawn = mul(abs(frame.texCoords.zw), mix(texels.xy, texels.yx, flipDiagonal)) as unknown as Node<'vec2'>;
+    const drawn = mul(abs(frame.texCoords.zw), mix(texels.xy, texels.yx, flipDiagonal));
     const repeats = div(mul(ratio, max(drawn.y, NO_LENGTH)), max(drawn.x, NO_LENGTH));
 
     // A mirror left for right — Flip — draws the mirror image of the whole segment: the frame as it
@@ -47,25 +48,23 @@ export const RepeatingTextureColor = defineFeature({
     if (frame.mirror != null) {
       const mirrored = frame.mirror.x;
       const c = texCoords;
-      texCoords = vec4(add(c.x, mul(c.z, mirrored)), c.y, mul(c.z, sub(1, mul(2, mirrored))), c.w) as unknown as Node<'vec4'>;
-      along = mix(uv.x, sub(1, uv.x), mirrored) as unknown as Node<'float'>;
+      texCoords = vec4(add(c.x, mul(c.z, mirrored)), c.y, mul(c.z, sub(1, mul(2, mirrored))), c.w);
+      along = mix(uv.x, sub(1, uv.x), mirrored);
     }
 
     // ctx.uv read here, in the fragment graph: three interpolates the base uv, and the repeat wraps
     // per fragment
-    const position = vec2(mul(along, repeats), uv.y) as unknown as Node<'vec2'>;
+    const position = vec2(mul(along, repeats), uv.y);
 
     return sampleFrameAt(
       (st, gradX, gradY) => {
-        const lookup = sample('colorMap', st) as unknown as TextureNode;
+        const lookup = asTextureNode(sample('colorMap', st));
         // three reads a texture whose filters are both NearestFilter with textureLoad and binds no
         // sampler for it, and a grad() fails on WebGPU; that test is part of the shape of a texture,
         // so a texture swapped in without a rebuild passes it alike. Every other texture takes the
         // gradients — on one without mipmaps they sample what a plain lookup samples
         const {minFilter, magFilter} = lookup.value;
-        return (minFilter === NearestFilter && magFilter === NearestFilter
-          ? lookup
-          : lookup.grad(gradX, gradY)) as unknown as Node<'vec4'>;
+        return minFilter === NearestFilter && magFilter === NearestFilter ? lookup : lookup.grad(gradX, gradY);
       },
       {texCoords, flipDiagonal, drawnTexels: drawn},
       position,

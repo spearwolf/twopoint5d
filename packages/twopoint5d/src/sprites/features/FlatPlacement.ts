@@ -1,5 +1,6 @@
 import {add, cos, cross, mul, sin, sub, vec3} from 'three/tsl';
 import type {Node} from 'three/webgpu';
+import {describeValue} from '../../utils/describeValue.js';
 import {vertexByInstancePosition} from '../node-utils.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 
@@ -22,21 +23,21 @@ export interface FlatPlacementOptions {
 type Vec3 = Node<'vec3'>;
 
 // the quad of the XY plane laid onto the ground: x stays, y goes to -z, z to +y
-const onGround = (local: Vec3): Vec3 => vec3(local.x, local.z, local.y.negate()) as unknown as Vec3;
+const onGround = (local: Vec3): Vec3 => vec3(local.x, local.z, local.y.negate());
 
 // the turn of Object3D.rotation.y — counter-clockwise as seen from above — as one sine and one
 // cosine, where rotate() of three/tsl builds a matrix for each of the three axes
 const turnedAboutY = (v: Vec3, angle: Node<'float'>): Vec3 => {
   const c = cos(angle);
   const s = sin(angle);
-  return vec3(add(mul(c, v.x), mul(s, v.z)), v.y, sub(mul(c, v.z), mul(s, v.x))) as unknown as Vec3;
+  return vec3(add(mul(c, v.x), mul(s, v.z)), v.y, sub(mul(c, v.z), mul(s, v.x)));
 };
 
 // the turn of a unit quaternion, the one of Vector3#applyQuaternion: v + 2·q.xyz × (q.xyz × v + q.w·v),
 // two cross products where a matrix would take nine products to build and nine to apply
 const turnedBy = (v: Vec3, q: Node<'vec4'>): Vec3 => {
   const axis = q.xyz;
-  return add(v, mul(2, cross(axis, add(cross(axis, v), mul(q.w, v))))) as unknown as Vec3;
+  return add(v, mul(2, cross(axis, add(cross(axis, v), mul(q.w, v)))));
 };
 
 // one feature per set of options: the placement swap compares by identity, and the passes keep a
@@ -54,10 +55,10 @@ export function flatPlacement(options?: FlatPlacementOptions): SpriteFeature {
   const plane = options?.plane ?? 'xy';
   const orientation = options?.orientation;
   if (plane !== 'xy' && plane !== 'xz') {
-    throw new TypeError(`flatPlacement: the plane ${JSON.stringify(plane)} is neither 'xy' nor 'xz'`);
+    throw new TypeError(`flatPlacement: the plane ${describeValue(plane)} is neither 'xy' nor 'xz'`);
   }
   if (orientation !== undefined && orientation !== 'yaw' && orientation !== 'quaternion') {
-    throw new TypeError(`flatPlacement: the orientation ${JSON.stringify(orientation)} is neither 'yaw' nor 'quaternion'`);
+    throw new TypeError(`flatPlacement: the orientation ${describeValue(orientation)} is neither 'yaw' nor 'quaternion'`);
   }
 
   const key = orientation == null ? plane : `${plane}+${orientation}`;

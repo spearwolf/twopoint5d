@@ -14,15 +14,15 @@ type Vec3 = Node<'vec3'>;
 // the right and up of a quad facing along `look` (towards the viewer), up as close to `up` as that
 // allows — the frame of a billboard, which takes the up of the camera for `up`
 const facingFrame = (look: Vec3, up: Vec3): {right: Vec3; up: Vec3} => {
-  const right = normalize(cross(up, look)) as unknown as Vec3;
-  return {right, up: cross(look, right) as unknown as Vec3};
+  const right = normalize(cross(up, look));
+  return {right, up: cross(look, right)};
 };
 
 // v mirrored at a plane through the origin with the unit normal n
-const mirrored = (v: Vec3, n: Vec3): Vec3 => sub(v, mul(n, mul(2, dot(v, n)))) as unknown as Vec3;
+const mirrored = (v: Vec3, n: Vec3): Vec3 => sub(v, mul(n, mul(2, dot(v, n))));
 
 const onFrame = (origin: Vec3, vertex: Vec3, right: Vec3, up: Vec3): Vec3 =>
-  add(origin, add(mul(right, vertex.x), mul(up, vertex.y))) as unknown as Vec3;
+  add(origin, add(mul(right, vertex.x), mul(up, vertex.y)));
 
 /**
  * The vertex of a quad that turns about its instance position to face the light: x and y of the
@@ -44,11 +44,11 @@ export function lightFacingVertex(params: {
   cameraBack: Vec3;
 }): Vec3 {
   const {vertex, instancePosition, light, plane, cameraUp, cameraBack} = params;
-  const towardsLight = normalize(sub(light.xyz, mul(light.w, instancePosition))) as unknown as Vec3;
-  const normal = normalize(plane.xyz) as unknown as Vec3;
+  const towardsLight = normalize(sub(light.xyz, mul(light.w, instancePosition)));
+  const normal = normalize(plane.xyz);
   const sine = length(cross(normal, towardsLight));
   const viewWeight = max(sub(1, div(sine, ZENITH_SINE)), 0);
-  const up = add(normal, mul(sub(cameraUp, cameraBack), viewWeight)) as unknown as Vec3;
+  const up = add(normal, mul(sub(cameraUp, cameraBack), viewWeight));
   const frame = facingFrame(towardsLight, up);
   return onFrame(instancePosition, vertex, frame.right, frame.up);
 }
@@ -72,15 +72,15 @@ export function mirroredBillboardVertex(params: {
 }): Vec3 {
   const {vertex, instancePosition, plane, cameraPosition, cameraUp} = params;
   const size = length(plane.xyz);
-  const normal = div(plane.xyz, size) as unknown as Vec3;
+  const normal = div(plane.xyz, size);
   const offset = sub(dot(normal, instancePosition), div(plane.w, size));
-  const mirroredPosition = sub(instancePosition, mul(normal, mul(2, offset))) as unknown as Vec3;
+  const mirroredPosition = sub(instancePosition, mul(normal, mul(2, offset)));
 
-  const look = normalize(sub(cameraPosition, mirroredPosition)) as unknown as Vec3;
+  const look = normalize(sub(cameraPosition, mirroredPosition));
   const frame = facingFrame(look, cameraUp);
   // the normal as the camera sees it: carried into the plane of the billboard
-  const across = sub(normal, mul(look, dot(normal, look))) as unknown as Vec3;
-  const acrossUnit = div(across, max(length(across), NO_LENGTH)) as unknown as Vec3;
+  const across = sub(normal, mul(look, dot(normal, look)));
+  const acrossUnit = div(across, max(length(across), NO_LENGTH));
   const right = mirrored(frame.right, acrossUnit);
   const up = mirrored(frame.up, acrossUnit);
   // the vertex before the mirror: the flipped frame mirrored once more, about the instance position

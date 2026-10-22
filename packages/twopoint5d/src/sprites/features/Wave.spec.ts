@@ -93,6 +93,12 @@ describe('wave()', () => {
     expect(() => wave({weight: 'top', axis: 'w'} as unknown as WaveOptions)).toThrow(
       new TypeError(`wave: the axis "w" is none of 'x', 'y', 'z'`),
     );
+    expect(() => wave({weight: NaN} as unknown as WaveOptions)).toThrow(
+      new TypeError(`wave: the weight NaN is neither 'top' nor 'uniform'`),
+    );
+    expect(() => wave({weight: 'top', axis: NaN} as unknown as WaveOptions)).toThrow(
+      new TypeError(`wave: the axis NaN is none of 'x', 'y', 'z'`),
+    );
   });
 
   test("'top' moves a vertex along x by the amplitude times the square of how high it lies", () => {

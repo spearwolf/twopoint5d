@@ -1,5 +1,4 @@
 import {mul, vec4} from 'three/tsl';
-import type {Node} from 'three/webgpu';
 import {ColorOrder, defineFeature} from '../SpriteFeature.js';
 
 export interface FadeApi {
@@ -26,6 +25,6 @@ export const Fade = defineFeature<FadeApi>({
   },
   color: {
     order: ColorOrder.Fade,
-    transform: (color, {attribute}) => vec4(color.rgb, mul(color.a, attribute<'float'>('fade'))) as unknown as Node<'vec4'>,
+    transform: (color, {attribute}) => vec4(color.rgb, mul(color.a, attribute<'float'>('fade'))),
   },
 });

@@ -184,6 +184,16 @@ describe('flatPlacement()', () => {
     expect(() => flatPlacement({orientation: 'roll' as 'yaw'})).toThrow(
       new TypeError(`flatPlacement: the orientation "roll" is neither 'yaw' nor 'quaternion'`),
     );
+    expect(() => flatPlacement({plane: NaN as unknown as 'xy'})).toThrow(
+      new TypeError(`flatPlacement: the plane NaN is neither 'xy' nor 'xz'`),
+    );
+    expect(() => flatPlacement({orientation: NaN as unknown as 'yaw'})).toThrow(
+      new TypeError(`flatPlacement: the orientation NaN is neither 'yaw' nor 'quaternion'`),
+    );
+    // a BigInt, which JSON.stringify() cannot write, is shown as a number
+    expect(() => flatPlacement({plane: 1n as unknown as 'xy'})).toThrow(
+      new TypeError(`flatPlacement: the plane 1 is neither 'xy' nor 'xz'`),
+    );
   });
 
   test('reads the yaw or the orientation attribute only with its orientation', () => {
@@ -383,6 +393,9 @@ describe('axisBillboardPlacement()', () => {
   test('refuses an axis it does not know, naming it', () => {
     expect(() => axisBillboardPlacement({axis: 'x' as 'y'})).toThrow(
       new TypeError(`axisBillboardPlacement: the axis "x" is neither 'y' nor 'z'`),
+    );
+    expect(() => axisBillboardPlacement({axis: NaN as unknown as 'y'})).toThrow(
+      new TypeError(`axisBillboardPlacement: the axis NaN is neither 'y' nor 'z'`),
     );
   });
 

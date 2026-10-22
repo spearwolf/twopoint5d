@@ -212,19 +212,40 @@ describe('sprites — tableFrame()', function () {
     }
   });
 
-  it('a yaw turns the views with the sprite, and frameIndex picks the block of views', async () => {
+  it('a yaw turns the views with the sprite, and frameIndex picks the frame whose views the shader reads', async () => {
     const textures = colourTable();
     const sprites = keep(new FeatureSprites(ViewKind, {capacity: 1, textures}));
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
     // facing +x: the camera on +z sees the sprite from its right — view 6, two steps short of a turn
     sprite.yaw = Math.PI / 2;
-    sprite.frameIndex = 8;
+    sprite.frameIndex = 1;
     sprites.spritePool.touchVO(sprite);
 
     for (let k = 0; k < 8; k++) {
       const rgb = await centreSeenFrom(sprites, (k * Math.PI) / 4);
       expect(isNearColor(rgb, COLORS[8 + ((k + 6) % 8)]), `camera at ${k} · 45°: ${rgb}`).to.be.true;
+    }
+  });
+
+  it('a frameIndex past the last frame shows the view of the last frame, one below the first that of the first', async () => {
+    // sixteen entries: two frames of eight views each
+    const textures = colourTable();
+    const sprites = keep(new FeatureSprites(ViewKind, {capacity: 1, textures}));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+
+    for (const [frameIndex, frame] of [
+      [5, 1],
+      [-3, 0],
+      [0.6, 1],
+    ]) {
+      sprite.frameIndex = frameIndex;
+      sprites.spritePool.touchVO(sprite, 'frameIndex');
+      for (let k = 0; k < 8; k++) {
+        const rgb = await centreSeenFrom(sprites, (k * Math.PI) / 4);
+        expect(isNearColor(rgb, COLORS[frame * 8 + k]), `frameIndex ${frameIndex}, camera at ${k} · 45°: ${rgb}`).to.be.true;
+      }
     }
   });
 

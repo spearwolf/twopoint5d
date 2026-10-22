@@ -385,8 +385,10 @@ round, view *k* there is view (8 − *k*) mod 8 here.
 
 **Order in `stalker.json`** — animation by animation (`idle`, `walk`, `attack`, `hurt`, `dead`),
 inside one frame by frame, inside one frame the eight views 0–7. So
-`atlasFrameTable(atlas, /^stalker_walk_/)` lists the walk as `frame · 8 + view`: set
-`frameIndex = frame · 8` and `tableFrame({views: 8})` adds the view.
+`FrameTable.fromAtlas(atlas, /^stalker_walk_/)` — the data texture `tableFrame()` reads;
+`atlasFrameTable()` builds the `AtlasFrameTable` for uniform arrays — lists the walk as
+`frame · 8 + view`: set `frameIndex = frame` and `tableFrame({views: 8})` reads entry
+`frame · 8 + view`.
 
 **Pivot** — every frame is 64 × 64 and untrimmed; the stalker stands at x = 32 with its soles on
 row 62 and the outline below them on row 63, so the bottom centre of the frame is its foot

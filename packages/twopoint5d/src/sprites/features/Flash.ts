@@ -1,5 +1,4 @@
 import {mix, vec4} from 'three/tsl';
-import type {Node} from 'three/webgpu';
 import {ColorOrder, defineFeature} from '../SpriteFeature.js';
 
 export interface FlashApi {
@@ -43,7 +42,7 @@ export const Flash = defineFeature<FlashApi>({
     order: ColorOrder.Flash,
     transform: (color, {attribute}) => {
       const flash = attribute<'vec4'>('flash');
-      return vec4(mix(color.rgb, flash.rgb, flash.w), color.a) as unknown as Node<'vec4'>;
+      return vec4(mix(color.rgb, flash.rgb, flash.w), color.a);
     },
   },
 });

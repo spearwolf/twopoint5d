@@ -1,4 +1,4 @@
-import {add, attribute, float, round, sub, uniform, vec2} from 'three/tsl';
+import {add, attribute, float, floor, mod, round, sub, uniform, vec2} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
@@ -66,5 +66,28 @@ describe('evaluateNode()', () => {
       expect(evaluateNode(round(float(input)) as unknown as Node)).toBe(expected);
     }
     expect(evaluateNode(round(vec2(0.5, 1.5)) as unknown as Node)).toEqual([0, 2]);
+  });
+
+  test("'%' floors as WGSL's tsl_mod_float does: mod(-1, 4) is 3", () => {
+    expect(evaluateNode(mod(float(-1), float(4)) as unknown as Node)).toBe(3);
+    expect(evaluateNode(mod(float(5.5), float(4)) as unknown as Node)).toBe(1.5);
+    // x − y · floor(x / y): x / y underflows to −0, and the remainder stays the tiny negative x
+    expect(evaluateNode(mod(uniform(-Number.MIN_VALUE), float(4)) as unknown as Node)).toBe(-Number.MIN_VALUE);
+  });
+
+  test('floor takes a value down to the whole number below it', () => {
+    expect(evaluateNode(floor(float(-1.5)) as unknown as Node)).toBe(-2);
+    expect(evaluateNode(floor(vec2(2.7, -0.2)) as unknown as Node)).toEqual([2, -1]);
+  });
+
+  test('toUint() takes a negative value to 0, as WGSL u32() does', () => {
+    expect(evaluateNode(uniform(-1.5).toUint() as unknown as Node)).toBe(0);
+  });
+
+  test('toInt() cuts towards zero as WGSL i32() does, and toFloat() hands the value on', () => {
+    expect(evaluateNode(uniform(-1.5).toInt() as unknown as Node)).toBe(-1);
+    expect(evaluateNode(uniform(2.7).toInt() as unknown as Node)).toBe(2);
+    expect(evaluateNode(uniform(2.7).toUint() as unknown as Node)).toBe(2);
+    expect(evaluateNode(uniform(2.7).toFloat() as unknown as Node)).toBe(2.7);
   });
 });

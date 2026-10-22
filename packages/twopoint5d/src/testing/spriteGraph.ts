@@ -147,6 +147,8 @@ interface EvaluableNode {
   readonly elseNode?: Node;
   /** The parts of a JoinNode — `vec3(x, y, z)` built from nodes. */
   readonly nodes?: readonly Node[];
+  /** The type a ConvertNode — `toInt()`, `toFloat()` — converts its node to. */
+  readonly convertTo?: string;
 }
 
 // applies f component by component; a number meets every component of a vector
@@ -168,6 +170,16 @@ const OPERATORS: Readonly<Record<string, (x: number, y: number) => number>> = {
   '/': (x, y) => x / y,
   // a comparison answers 1 for true and 0 for false, which select() reads
   '<': (x, y) => (x < y ? 1 : 0),
+  // floored, x − y · floor(x / y): the formula of three's tsl_mod_float on WGSL and of GLSL's mod()
+  '%': (x, y) => x - y * Math.floor(x / y),
+};
+
+// WGSL's i32(f32) cuts towards zero, u32(f32) as well and takes a negative value to 0; a conversion
+// to float hands the value on
+const CONVERSIONS: Readonly<Record<string, (x: number) => number>> = {
+  int: Math.trunc,
+  uint: (x) => Math.max(0, Math.trunc(x)),
+  float: (x) => x,
 };
 
 // WGSL's round() takes a half to the even neighbour; GLSL ES leaves the direction of a half to
@@ -179,10 +191,12 @@ const roundHalfToEven = (x: number): number => {
 
 /**
  * Works out the value of a graph of constants and uniforms on the cpu: the arithmetic operators,
- * `<`, `select()`, swizzles, vectors joined from parts, varyings, `dot`, `cross`, `length`,
- * `normalize`, `max`, `min`, `clamp`, `step`, `abs`, `round`, `fract`, `mix`, `negate`, `sin` and
- * `cos` — what the frame, local, mesh, uv and color stages and the placements are built from. `round`
- * takes a half to the even neighbour, as WGSL does. Throws for any other node.
+ * `%`, `<`, `select()`, swizzles, vectors joined from parts, varyings, the conversions to int, uint
+ * and float, `dot`, `cross`, `length`, `normalize`, `max`, `min`, `clamp`, `step`, `abs`, `round`,
+ * `floor`, `fract`, `mix`, `negate`, `sin` and `cos` — what the frame, local, mesh, uv and color
+ * stages and the placements are built from. `round` takes a half to the even neighbour, as WGSL
+ * does; `%` is floored, as three's WGSL and GLSL's `mod()` are; a conversion to int or uint cuts
+ * towards zero, and one to uint takes a negative value to 0. Throws for any other node.
  */
 export function evaluateNode(root: Node): EvaluatedValue {
   return evaluateCached(root, new Map());
@@ -225,6 +239,10 @@ function evaluateUncached(root: Node, cache: Map<Node, EvaluatedValue>): Evaluat
   if (node.isOperatorNode && OPERATORS[node.op!] != null) {
     return zip(evaluate(node.aNode!), evaluate(node.bNode!), OPERATORS[node.op!]!);
   }
+  // three marks a ConvertNode by its type alone, as it does a JoinNode
+  if (node.type === 'ConvertNode' && CONVERSIONS[node.convertTo!] != null) {
+    return zip(evaluate(node.node!), 0, CONVERSIONS[node.convertTo!]!);
+  }
   if (node.type === 'ConditionalNode') {
     const condition = evaluate(node.condNode!);
     return evaluate(condition !== 0 ? node.ifNode! : node.elseNode!);
@@ -252,6 +270,8 @@ function evaluateUncached(root: Node, cache: Map<Node, EvaluatedValue>): Evaluat
         return zip(a, 0, Math.abs);
       case 'round':
         return zip(a, 0, roundHalfToEven);
+      case 'floor':
+        return zip(a, 0, Math.floor);
       case 'fract':
         return zip(a, 0, (x) => x - Math.floor(x));
       case 'length':

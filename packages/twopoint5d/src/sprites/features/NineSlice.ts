@@ -91,7 +91,7 @@ type Vec4 = Node<'vec4'>;
 type Float = Node<'float'>;
 
 // 1 on the grid line k, 0 on the others: line holds the whole numbers round() answers
-const on = (line: Float, k: number): Float => sub(1, min(abs(sub(line, k)), 1)) as unknown as Float;
+const on = (line: Float, k: number): Float => sub(1, min(abs(sub(line, k)), 1));
 
 // the insets left, top, right and bottom of the image as drawn — mirrored with it — and never below 0
 const drawnInsets = (insets: Vec4, mirror: Vec2 | undefined): Vec4 => {
@@ -104,7 +104,7 @@ const drawnInsets = (insets: Vec4, mirror: Vec2 | undefined): Vec4 => {
           mix(insets.z, insets.x, mirror.x),
           mix(insets.w, insets.y, mirror.y),
         );
-  return max(drawn, vec4(0, 0, 0, 0)) as unknown as Vec4;
+  return max(drawn, vec4(0, 0, 0, 0));
 };
 
 // the inner lines 1 and 2 of a line in [0, 1]: at `near` from its start and `far` from its end, both
@@ -113,7 +113,7 @@ const sliced = (value: Float, line: Float, near: Float, far: Float, startAt: Flo
   const sum = max(add(near, far), 1);
   const first = add(startAt, mul(direction, div(near, sum)));
   const second = add(startAt, mul(direction, sub(1, div(far, sum))));
-  return add(value, add(mul(on(line, 1), sub(first, value)), mul(on(line, 2), sub(second, value)))) as unknown as Float;
+  return add(value, add(mul(on(line, 1), sub(first, value)), mul(on(line, 2), sub(second, value))));
 };
 
 /**
@@ -200,19 +200,19 @@ export const NineSlice = defineFeature<NineSliceApi>({
     order: LocalOrder.Slice,
     transform: (position, {attribute, frame}) => {
       const uv = attribute<'vec2'>('uv');
-      const line = round(mul(uv, 3)) as unknown as Vec2;
+      const line = round(mul(uv, 3));
       const insets = drawnInsets(attribute<'vec4'>('sliceInsets'), frame.mirror);
-      const size = max(abs(attribute<'vec2'>('quadSize')), vec2(1e-6, 1e-6)) as unknown as Vec2;
+      const size = max(abs(attribute<'vec2'>('quadSize')), vec2(1e-6, 1e-6));
       // the border as fractions of the unit quad, which QuadSize scales by the size afterwards
-      const border = div(mul(insets, attribute<'float'>('sliceScale')), vec4(size.x, size.y, size.x, size.y)) as unknown as Vec4;
+      const border = div(mul(insets, attribute<'float'>('sliceScale')), vec4(size.x, size.y, size.x, size.y));
       // the unit quad of the default baseArgs: a vertex lies uv away from the top left corner
-      const left = sub(position.x, uv.x) as unknown as Float;
-      const top = add(position.y, uv.y) as unknown as Float;
+      const left = sub(position.x, uv.x);
+      const top = add(position.y, uv.y);
       return vec3(
         sliced(position.x, line.x, border.x, border.z, left, 1),
         sliced(position.y, line.y, border.y, border.w, top, -1),
         position.z,
-      ) as unknown as Node<'vec3'>;
+      );
     },
   },
   uv: {
@@ -221,14 +221,11 @@ export const NineSlice = defineFeature<NineSliceApi>({
       // the measures of the frame as drawn, in texels; (0, 0) while the colorMap is unset
       const size = textureSize('colorMap');
       const drawn = frame.flipDiagonal != null ? mix(size.xy, size.yx, step(0.5, frame.flipDiagonal)) : size;
-      const pixels = max(mul(abs(frame.texCoords.zw), drawn), vec2(1, 1)) as unknown as Vec2;
+      const pixels = max(mul(abs(frame.texCoords.zw), drawn), vec2(1, 1));
       const insets = drawnInsets(attribute<'vec4'>('sliceInsets'), frame.mirror);
-      const border = div(insets, vec4(pixels.x, pixels.y, pixels.x, pixels.y)) as unknown as Vec4;
-      const line = round(mul(attribute<'vec2'>('uv'), 3)) as unknown as Vec2;
-      return vec2(
-        sliced(uv.x, line.x, border.x, border.z, 0, 1),
-        sliced(uv.y, line.y, border.y, border.w, 0, 1),
-      ) as unknown as Vec2;
+      const border = div(insets, vec4(pixels.x, pixels.y, pixels.x, pixels.y));
+      const line = round(mul(attribute<'vec2'>('uv'), 3));
+      return vec2(sliced(uv.x, line.x, border.x, border.z, 0, 1), sliced(uv.y, line.y, border.y, border.w, 0, 1));
     },
   },
 });

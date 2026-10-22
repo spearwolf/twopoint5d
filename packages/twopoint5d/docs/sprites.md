@@ -174,8 +174,8 @@ flags.dispose();
   slot, the uv stages' result `ctx.uv` aside.
 - **One base per grid.** `gridBase({columns: 3, rows: 3})` answers the same frozen base every time,
   named `grid 3x3`, with its `columns` and `rows`: a feature that needs a grid recognizes it by
-  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024; anything else is
-  refused with a `TypeError`.
+  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024, and a grid holds at
+  most 4096 cells (`columns · rows`); anything else is refused with a `TypeError`.
 - **Everything else works on it unchanged**: the pool, every placement and pass, the trim shift —
   it moves every vertex by where it lies on the sprite — `AtlasFrame`, `AnimatedFrames` and
   `TextureColor`. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws.
@@ -546,14 +546,14 @@ export function show(index: number) {
   bake.
 - **The frame** is drawn as `AtlasFrame` draws it: a turned frame upright, a trimmed frame where the
   untrimmed sprite has it.
-- **`frameIndex`** is rounded to a whole entry; one before the first or past the last frame of the
+- **`frameIndex`** is rounded to a whole frame; one before the first or past the last frame of the
   table shows the first or the last — the shader cannot throw. It is static; a sprite animated on the
   CPU, which writes it every frame, takes `attributeUsage: {dynamic: ['frameIndex']}`.
 - Until the frame table has an image the sprite shows the whole `colorMap`.
 
 **Directional frames.** The 8-direction sprites of every boomer shooter, the cheap impostor of a tree:
-`tableFrame({views: n})` adds to `frameIndex` the view the camera sees the sprite from. It needs `Yaw`,
-the facing of the sprite, and `InstancePosition`:
+`tableFrame({views: n})` picks, in the frame `frameIndex`, the view the camera sees the sprite from. It
+needs `Yaw`, the facing of the sprite, and `InstancePosition`:
 
 ```ts check
 import {
@@ -591,13 +591,15 @@ stalker.setSize(2, 2);
 stalker.yaw = Math.PI / 2; // facing +x
 
 export function frame(time: number) {
-  stalker.frameIndex = (Math.floor(time / 0.15) % 4) * 8; // walk frame 0 … 3, eight views each
+  stalker.frameIndex = Math.floor(time / 0.15) % 4; // walk frame 0 … 3
   stalkers.update();
 }
 ```
 
-- **The views of a frame** are `n` consecutive entries of the table, view 0 first: `frameIndex` names
-  the first entry of the block, `frame · n`, and the shader adds the view.
+- **The views of a frame** are `n` consecutive entries of the table, view 0 first. `frameIndex` counts
+  frames as it does without views, and the shader reads entry `round(frameIndex) · n + view`; a
+  `frameIndex` past the last frame shows the matching view of the last frame, one before the first
+  that of the first.
 - **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of the
   sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front is
   where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh — `Object3D.rotation.y`
@@ -1484,7 +1486,9 @@ export function frame() {
   thickness and a round frame hide it for ropes; a mitred ribbon is a mesh of its own.
 - **Passes.** `ShadowPass` turns every sprite to the light about its instance position, and
   `BillboardReflectionPass` places it as a billboard there — of a segment, both would draw the quad
-  of its caps at its start, so both refuse a kind of segments, naming the pass to take.
+  of its caps at its start, so both refuse a kind of segments, and the sprites refuse a segment
+  placement swapped in under them through `placement` or handed in as the option `placement` —
+  each naming the pass to take.
   `SegmentShadowPass` projects each segment onto the ground as it lies: `ShadowPass` without the turn
   to the light, named `shadow` as well. `ReflectionPass` mirrors the placed vertex, which is the
   mirror image of a segment in a plane. A segment that faces the camera mirrors into a ribbon that
@@ -2173,8 +2177,9 @@ The rules:
   uniforms of `ShadowPass` and draws the same shadow a second time. This is not refused, since two
   passes may share a uniform on purpose — one `reflectionColor` for two reflections.
 - **Placement.** A placement swap on the sprites reaches every pass material that draws with the
-  placement of the sprites; a pass that brings its own keeps it. A placement the material of the
-  sprites refuses reaches no pass.
+  placement of the sprites; a pass that brings its own keeps it. A placement a pass cannot draw next
+  to is refused before any material takes it, and a placement the material of the sprites refuses
+  reaches no pass.
 - **`update()` once.** The pass meshes have no `update()` of their own; `update()` of the sprites
   uploads the geometry once for all of them. It also judges the `visible` hooks of the passes.
 - **Ownership.** The pass meshes are children of the sprites: they move with them and leave the

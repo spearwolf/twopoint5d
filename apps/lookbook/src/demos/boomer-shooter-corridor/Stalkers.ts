@@ -22,8 +22,8 @@ import {CORRIDOR_LENGTH, CORRIDOR_WIDTH, TILE} from './Corridor';
 
 const UprightPlacement = axisBillboardPlacement();
 
-// Directional sprites: `Yaw` is the heading of each stalker, and `tableFrame({views: 8})` adds to its
-// `frameIndex` the view the camera sees it from — front, front-left, left side … — in the shader.
+// Directional sprites: `Yaw` is the heading of each stalker, and `tableFrame({views: 8})` picks, in the
+// frame `frameIndex`, the view the camera sees it from — front, front-left, left side … — in the shader.
 // The axis billboard keeps it upright at any pitch of the camera; `Fade` and `Flash` take the hits.
 const StalkerKind = defineSprite({
   base: QuadBase,
@@ -94,7 +94,7 @@ export type HitResult = 'hit' | 'down' | 'miss';
  *
  * Every animation runs on the CPU: one frame table holds all 80 frames of `stalker.json` — idle,
  * walk, attack, hurt and dead, eight views each — and each frame of the game writes `frameIndex`, the
- * first entry of an eight-view block, `first(anim) + frame · 8`. The shader adds the view.
+ * frame `first(anim) + frame`. The shader picks the view.
  */
 export class Stalkers {
   readonly sprites: StalkerSprites;
@@ -105,9 +105,10 @@ export class Stalkers {
 
   constructor({atlas, texture}: {atlas: TextureAtlas; texture: Texture}, count: number) {
     // the json lists the frames animation by animation, frame by frame, the eight views of a frame in a
-    // row: the table as it is, and the walk's frame 1 is `first.walk + 1 · 8`
+    // row: the table as it is, eight entries a frame, and the walk's frame 1 is `first.walk + 1`
     const table = FrameTable.fromAtlas(atlas, /^stalker_/);
-    this.#first = Object.fromEntries(ANIMS.map((anim) => [anim, table.indexOf(`stalker_${anim}_0_0`)])) as Record<Anim, number>;
+    const firstFrame = (anim: Anim) => table.indexOf(`stalker_${anim}_0_0`) / 8;
+    this.#first = Object.fromEntries(ANIMS.map((anim) => [anim, firstFrame(anim)])) as Record<Anim, number>;
     this.#frameTable = table.bakeDataTexture();
 
     this.sprites = new FeatureSprites(StalkerKind, {
@@ -195,7 +196,7 @@ export class Stalkers {
   }
 
   #setFrame(stalker: Stalker, anim: Anim, frame: number) {
-    stalker.sprite.frameIndex = this.#first[anim] + frame * 8;
+    stalker.sprite.frameIndex = this.#first[anim] + frame;
   }
 
   #respawn(stalker: Stalker, cameraZ: number) {

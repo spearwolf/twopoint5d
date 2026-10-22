@@ -1,5 +1,6 @@
-import {type Node, SRGBColorSpace, Texture} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {sRGBTransferOETF} from 'three/tsl';
+import {SRGBColorSpace, Texture} from 'three/webgpu';
+import {describe, expect, test, vi} from 'vitest';
 
 import {attributeNamesOf, nodesOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
 import {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
@@ -25,14 +26,18 @@ const makePalette = (width = 16, height = 4) => {
   return texture;
 };
 
+// a spy that hands every call on to three: the stage calls sRGBTransferOETF() once per colour it
+// encodes while it builds the colour graph, and the count says which branch it took. The spy wraps a
+// call rather than the function: what Fn() answers is a proxy that reads every property off its
+// FnNode, which has no `apply`, and vi.fn() calls an implementation through its `apply`
+vi.mock('three/tsl', async (importOriginal) => {
+  const tsl = await importOriginal<typeof import('three/tsl')>();
+  const encode = tsl.sRGBTransferOETF;
+  return {...tsl, sRGBTransferOETF: vi.fn((...args: Parameters<typeof encode>) => encode(...args))};
+});
+
 const lookupsOf = (root: Parameters<typeof textureNodesOf>[0], palette: Texture) =>
   new Set(textureNodesOf(root).filter((node) => node.value === palette)).size;
-
-// the calls of sRGBTransferOETF() in the graph below `root`, known by the layout of the function they call
-const encodingsOf = (root: Node) =>
-  [...nodesOf(root)].filter(
-    (node) => (node as unknown as {shaderNode?: {layout?: {name?: string}}}).shaderNode?.layout?.name === 'sRGBTransferOETF',
-  ).length;
 
 describe('paletteSwap()', () => {
   test('answers one frozen feature per set of options', () => {
@@ -103,14 +108,19 @@ describe('paletteSwap()', () => {
   });
 
   test('encodes the colour and every entry back to sRGB under an srgb palette, and nothing under another', () => {
+    const encode = vi.mocked(sRGBTransferOETF);
     const srgb = makePalette();
     srgb.colorSpace = SRGBColorSpace;
+    encode.mockClear();
     const material = new FeatureSpritesMaterial(kind, {textures: {colorMap: new Texture(), palette: srgb}});
 
     // the colour of the color source once, and the sixteen entries it is compared with
-    expect(encodingsOf(material.colorNode!)).toBe(1 + 16);
+    expect(material.colorNode).toBeDefined();
+    expect(encode).toHaveBeenCalledTimes(1 + 16);
+    encode.mockClear();
     material.setTexture('palette', makePalette());
-    expect(encodingsOf(material.colorNode!)).toBe(0);
+    expect(material.colorNode).toBeDefined();
+    expect(encode).toHaveBeenCalledTimes(0);
     material.dispose();
   });
 

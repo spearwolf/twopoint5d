@@ -1,5 +1,4 @@
 import {div, dot, length, mul, sub} from 'three/tsl';
-import type {Node} from 'three/webgpu';
 import {defineFeature, MeshOrder} from '../SpriteFeature.js';
 
 /**
@@ -17,7 +16,7 @@ export const MirrorAtPlane = defineFeature({
       const size = length(plane.xyz);
       const n = div(plane.xyz, size);
       const d = div(plane.w, size);
-      return sub(p, mul(n, mul(2, sub(dot(n, p), d)))) as unknown as Node<'vec3'>;
+      return sub(p, mul(n, mul(2, sub(dot(n, p), d))));
     },
   },
 });

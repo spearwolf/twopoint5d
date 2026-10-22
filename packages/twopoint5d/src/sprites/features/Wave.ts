@@ -1,5 +1,5 @@
 import {add, mix, mul, sin, sub, vec3} from 'three/tsl';
-import type {Node} from 'three/webgpu';
+import {describeValue} from '../../utils/describeValue.js';
 import {defineFeature, MeshOrder, type SpriteFeature} from '../SpriteFeature.js';
 
 export interface WaveOptions {
@@ -45,11 +45,11 @@ export function wave(options: WaveOptions): SpriteFeature {
   }
   const {weight} = options;
   if (!WEIGHTS.includes(weight)) {
-    throw new TypeError(`wave: the weight ${JSON.stringify(weight)} is neither 'top' nor 'uniform'`);
+    throw new TypeError(`wave: the weight ${describeValue(weight)} is neither 'top' nor 'uniform'`);
   }
   const axis = options.axis ?? (weight === 'top' ? 'x' : 'y');
   if (!AXES.includes(axis)) {
-    throw new TypeError(`wave: the axis ${JSON.stringify(axis)} is none of 'x', 'y', 'z'`);
+    throw new TypeError(`wave: the axis ${describeValue(axis)} is none of 'x', 'y', 'z'`);
   }
 
   const key = `${weight}+${axis}`;
@@ -87,7 +87,7 @@ export function wave(options: WaveOptions): SpriteFeature {
             amount = mul(amount, mul(height, height));
           }
           const offset = axis === 'x' ? vec3(amount, 0, 0) : axis === 'y' ? vec3(0, amount, 0) : vec3(0, 0, amount);
-          return add(position, offset) as unknown as Node<'vec3'>;
+          return add(position, offset);
         },
       },
     });

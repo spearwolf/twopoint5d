@@ -1,5 +1,4 @@
 import {abs, add, mix, mul, step, sub, vec4} from 'three/tsl';
-import type {Node} from 'three/webgpu';
 import {defineFeature, FrameOrder} from '../SpriteFeature.js';
 
 export interface FlipApi {
@@ -39,16 +38,16 @@ export const Flip = defineFeature<FlipApi>({
     order: FrameOrder.Flip,
     transform: (frame, {attribute}) => {
       // 0 or 1, whatever was written: a mix() by it never draws a squeezed image
-      const flip = step(0.5, attribute<'vec2'>('flip')) as unknown as Node<'vec2'>;
+      const flip = step(0.5, attribute<'vec2'>('flip'));
       const {texCoords: c} = frame;
-      const trim = frame.trim ?? (vec4(0, 0, 0, 0) as unknown as Node<'vec4'>);
+      const trim = frame.trim ?? vec4(0, 0, 0, 0);
       // the drawn x is the s axis for every frame, a turned one included: a mirror of it is (s + u, −u)
       const texCoords = vec4(
         add(c.x, mul(c.z, flip.x)),
         add(c.y, mul(c.w, flip.y)),
         mul(c.z, sub(1, mul(2, flip.x))),
         mul(c.w, sub(1, mul(2, flip.y))),
-      ) as unknown as Node<'vec4'>;
+      );
       return {
         ...frame,
         texCoords,
@@ -57,9 +56,9 @@ export const Flip = defineFeature<FlipApi>({
           mix(trim.y, trim.w, flip.y),
           mix(trim.z, trim.x, flip.x),
           mix(trim.w, trim.y, flip.y),
-        ) as unknown as Node<'vec4'>,
+        ),
         // two mirrors along one axis cancel
-        mirror: frame.mirror != null ? (abs(sub(frame.mirror, flip)) as unknown as Node<'vec2'>) : flip,
+        mirror: frame.mirror != null ? abs(sub(frame.mirror, flip)) : flip,
       };
     },
   },

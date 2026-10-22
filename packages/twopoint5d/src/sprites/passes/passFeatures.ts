@@ -118,16 +118,36 @@ export function passFeatures(kind: SpriteKind, pass: SpritePass, where: string):
       }
     }
   }
+  const folded = foldFeatures(kind, pass, kind.pipeline.placement!);
+  runPassChecks(kind, pass, folded, where);
+  return folded;
+}
+
+/**
+ * Runs the `checkKind` of every feature of `pass` on the features a material of the pass over `kind`
+ * folds when the sprites draw with `placement` in place of the placement of the kind, in the words
+ * of `where` — what passFeatures() runs for the placement of the kind. @internal
+ */
+export function checkPassFeatures(kind: SpriteKind, pass: SpritePass, placement: SpriteFeature, where: string): void {
+  runPassChecks(kind, pass, foldFeatures(kind, pass, placement), where);
+}
+
+// The features of the kind, without the ones `without` names, plus the stage features of the pass, with
+// `placement` in the place of the placement of the kind. A pass that brings a placement draws with it:
+// the placement feature stays, without its placement stage
+function foldFeatures(kind: SpriteKind, pass: SpritePass, placement: SpriteFeature): readonly SpriteFeature[] {
   const without = new Set(pass.without ?? []);
   const kindPlacement = kind.pipeline.placement!;
-  const own = placementOfPass(pass) != null;
+  const stand = placementOfPass(pass) != null ? withoutPlacement(placement) : placement;
   // the data features of the kind stay: a pass leaves out stages, and they bring none
   const kept = kind.features
     .filter(({name}) => !without.has(name))
-    .map((feature) => (own && feature === kindPlacement ? withoutPlacement(feature) : feature));
-  const folded = Object.freeze([...kept, ...stageFeaturesOf(pass)]);
+    .map((feature) => (feature === kindPlacement ? stand : feature));
+  return Object.freeze([...kept, ...stageFeaturesOf(pass)]);
+}
+
+function runPassChecks(kind: SpriteKind, pass: SpritePass, folded: readonly SpriteFeature[], where: string): void {
   for (const feature of pass.features) {
     runCheckKind(feature, {base: kind.base, features: folded}, `${where}: feature "${feature.name}" of pass "${pass.name}"`);
   }
-  return folded;
 }

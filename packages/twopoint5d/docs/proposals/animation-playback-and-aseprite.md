@@ -202,9 +202,14 @@ mode, as today.
 
 | playback | frame |
 | --- | --- |
-| loop | `floor(mod(s, N))` — unchanged |
+| loop | `clamp(floor(mod(s, N)), 0, N − 1)` |
 | once | `clamp(floor(s), 0, N − 1)` |
-| pingpong | `k = floor(mod(s, max(2N − 2, 1)))`, frame `(N − 1) − abs(k − (N − 1))` |
+| pingpong | `k = floor(mod(s, max(2N − 2, 1)))`, frame `clamp((N − 1) − abs(k − (N − 1)), 0, N − 1)` |
+
+The clamps of loop and pingpong hold the frame within the animation: the f32 division in `mod` may
+lie several ULP off, `floor` then lands on `−1` or `N`, and the shader would read a header texel as
+tex coords. At that edge a `−1` shows the first frame rather than the last — a frame of the
+animation rather than header data.
 
 The ping-pong is a triangle wave that shows the end frames once per turn: with 4 frames
 `0 1 2 3 2 1 0 1 2 3 …`, with 2 frames `0 1 0 1 …`, with 1 frame `0`. `mod` is floored in both

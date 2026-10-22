@@ -1,3 +1,4 @@
+import {describeValue} from '../../utils/describeValue.js';
 import {cameraPositionLocal, cameraRightLocal, cameraUpLocal} from '../cameraNodes.js';
 import {defineFeature, type SpriteFeature, type SpriteKindShape} from '../SpriteFeature.js';
 import {Rotation} from './Rotation.js';
@@ -64,7 +65,7 @@ const NAMES: Readonly<Record<SegmentFacing, string>> = {
 export function segmentPlacement(options?: SegmentPlacementOptions): SpriteFeature {
   const facing = options?.facing ?? 'plane';
   if (facing !== 'plane' && facing !== 'camera') {
-    throw new TypeError(`segmentPlacement: the facing ${JSON.stringify(facing)} is neither 'plane' nor 'camera'`);
+    throw new TypeError(`segmentPlacement: the facing ${describeValue(facing)} is neither 'plane' nor 'camera'`);
   }
   if (facing === 'camera' && options?.plane !== undefined) {
     throw new TypeError(
@@ -73,7 +74,7 @@ export function segmentPlacement(options?: SegmentPlacementOptions): SpriteFeatu
   }
   const plane = options?.plane ?? 'xy';
   if (plane !== 'xy' && plane !== 'xz') {
-    throw new TypeError(`segmentPlacement: the plane ${JSON.stringify(plane)} is neither 'xy' nor 'xz'`);
+    throw new TypeError(`segmentPlacement: the plane ${describeValue(plane)} is neither 'xy' nor 'xz'`);
   }
 
   const key: SegmentFacing = facing === 'camera' ? 'camera' : plane;

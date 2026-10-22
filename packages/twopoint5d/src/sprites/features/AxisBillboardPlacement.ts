@@ -1,3 +1,4 @@
+import {describeValue} from '../../utils/describeValue.js';
 import {cameraPositionLocal, cameraRightLocal} from '../cameraNodes.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 import {axisBillboardVertex} from './axisBillboardVertex.js';
@@ -31,7 +32,7 @@ const placements = new Map<string, SpriteFeature>();
 export function axisBillboardPlacement(options?: AxisBillboardPlacementOptions): SpriteFeature {
   const axis = options?.axis ?? 'y';
   if (axis !== 'y' && axis !== 'z') {
-    throw new TypeError(`axisBillboardPlacement: the axis ${JSON.stringify(axis)} is neither 'y' nor 'z'`);
+    throw new TypeError(`axisBillboardPlacement: the axis ${describeValue(axis)} is neither 'y' nor 'z'`);
   }
   let feature = placements.get(axis);
   if (feature == null) {

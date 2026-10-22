@@ -24,13 +24,13 @@ export function axisBillboardVertex(params: {
   cameraRight: Vec3;
 }): Vec3 {
   const {vertex, instancePosition, axis, cameraPosition, cameraRight} = params;
-  const look = normalize(sub(cameraPosition, instancePosition)) as unknown as Vec3;
+  const look = normalize(sub(cameraPosition, instancePosition));
   // cross(axis, look), and the right of the camera less its part along the axis, as swizzles
-  const across = (axis === 'y' ? vec3(look.z, 0, look.x.negate()) : vec3(look.y.negate(), look.x, 0)) as unknown as Vec3;
-  const level = (axis === 'y' ? vec3(cameraRight.x, 0, cameraRight.z) : vec3(cameraRight.x, cameraRight.y, 0)) as unknown as Vec3;
+  const across = axis === 'y' ? vec3(look.z, 0, look.x.negate()) : vec3(look.y.negate(), look.x, 0);
+  const level = axis === 'y' ? vec3(cameraRight.x, 0, cameraRight.z) : vec3(cameraRight.x, cameraRight.y, 0);
   const weight = max(sub(1, div(length(across), ZENITH_SINE)), 0);
-  const aligned = select(dot(level, across).lessThan(0), level.negate(), level) as unknown as Vec3;
-  const right = normalize(add(across, mul(aligned, weight))) as unknown as Vec3;
-  const up = (axis === 'y' ? vec3(0, 1, 0) : vec3(0, 0, 1)) as unknown as Vec3;
-  return add(instancePosition, add(mul(right, vertex.x), mul(up, vertex.y))) as unknown as Vec3;
+  const aligned = select(dot(level, across).lessThan(0), level.negate(), level);
+  const right = normalize(add(across, mul(aligned, weight)));
+  const up = axis === 'y' ? vec3(0, 1, 0) : vec3(0, 0, 1);
+  return add(instancePosition, add(mul(right, vertex.x), mul(up, vertex.y)));
 }
