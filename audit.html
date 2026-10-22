@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-10-22T09:56:48.689Z"
+    "generatedAt": "2026-10-22T14:24:55.651Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -310,11 +310,9 @@
           "high": 0,
           "medium": 0,
           "low": 0,
-          "info": 1
+          "info": 0
         },
-        "byCategory": {
-          "readability": 1
-        }
+        "byCategory": {}
       },
       "harness": {
         "executiveSummary": "Das Gerüst ist streng: strict-TS mit begründeten Ausnahmen, vier parallele Gate-Jobs, SHA-gepinnte Actions, Trusted Publishing, Allokations-Specs und Browsertests unter drei Backends. Die Lücken liegen an den neuen Features: `AdaptiveResolution` wird gegen einen Stub getestet, der genau die Kippfälle (Messung über `enabled = false` hinweg, Rundungsstufen ohne Wirkung) nicht erzeugt, der Browsertest prüft Dispose nicht wirklich, und `src/display` sowie `src/controls` haben als einzige Module keine Coverage-Schwelle (Display.ts liegt bei etwa 73 %). Die Skripte unter `scripts/` sind sauber; offen sind nur Limits und Fehlerpfade im Preview-Generator und im Cache-Server.",
@@ -342,7 +340,7 @@
         "name": "workspace",
         "path": ".",
         "reviewedLoc": 1686,
-        "findings": 1,
+        "findings": 0,
         "score": 100
       },
       {
@@ -361,7 +359,7 @@
       }
     ],
     "previousDate": "2026-09-26",
-    "resolvedCount": 122,
+    "resolvedCount": 123,
     "deltaCause": "mixed",
     "deltaExplanation": "49 der 90 neuen Findings liegen in Dateien, die dieser Lauf zum ersten Mal liest — fast durchweg Code, der seit dem 2026-09-26 entstanden ist: `text/`, die neuen Sprite-Features und Passes, `SpritePicker`, `AdaptiveResolution`, `FrameTable` und `DynamicAtlas`. 41 liegen in schon gelesenen Dateien; laut `git blame` stammen 18 Findings aus Remediation-Commits und 23 aus Zeilen, die älter sind als der Vorlauf. Der Vorwert 100 war kein Audit, sondern das nachgerechnete Backlog nach dem Sprint »issue-frei« vom 2026-09-30.",
     "scoreModel": 2,
@@ -384,18 +382,14 @@
       "high": 0,
       "medium": 0,
       "low": 0,
-      "info": 1
+      "info": 0
     },
-    "byCategory": {
-      "readability": 1
-    },
+    "byCategory": {},
     "byComponent": {},
     "counts": {
-      "findings": 1,
+      "findings": 0,
       "improvements": 0,
-      "byStatus": {
-        "new": 1
-      }
+      "byStatus": {}
     },
     "deltaBreakdown": {
       "code": 41,
@@ -593,25 +587,7 @@
       ]
     }
   },
-  "findings": [
-    {
-      "id": "READ-004",
-      "package": "workspace",
-      "status": "new",
-      "effort": "S",
-      "category": "readability",
-      "domain": "code",
-      "severity": "info",
-      "title": "Überflüssiges `return;` am Ende des Zeilen-Callbacks in extractSnippets.mjs streichen",
-      "location": "scripts/checkDocSnippets/extractSnippets.mjs:265",
-      "description": "Das `return;` nach der Zuweisung `open = {…}` ist die letzte Anweisung des `forEach`-Callbacks und bewirkt nichts; die übrigen frühen `return`s des Callbacks tragen, dieses liest sich, als folge danach noch etwas. Aufgefallen im Remediation-Lauf vom 2026-10-21 (Reviewer, Drain-Runde 2).",
-      "recommendation": "Die Zeile streichen.",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-10-21"
-      }
-    }
-  ],
+  "findings": [],
   "openQuestions": [
     "Ist Supersampling über `resolutionScale > 1` bzw. `AdaptiveResolutionOptions.maxScale > 1` gewollt? Davon hängt ab, ob geklemmt oder die Budget-Zusage in der TSDoc von `maxPixels` angepasst wird.",
     "Ist `RectangularVisibilityArea` für Kachelgrößen unter 1 bzw. nicht-dyadische Größen (0.1, 0.3) gedacht? Die Specs nutzen nur Grids von 50 und 100; davon hängt ab, ob der Befund zum Tile-Reuse im Normalbetrieb liegt.",
@@ -633,7 +609,7 @@
       "Die Fix-Bilanz ist heuristisch über `git blame` der Hauptfundstelle: 18 Findings gehen auf Commits mit Trailer `Remediation-Run` seit dem 2026-09-26 zurück und tragen `origin: induced`, 23 auf Zeilen von vor dem Vorlauf; die übrigen 65 entstanden in normaler Weiterentwicklung.",
       "Theme `light` aus dem Vorlauf übernommen.",
       "Nachgeführt vom Remediation-Lauf vom 2026-10-21 (6 Pakete, 6 Commits 328f7a8e..dbc69f47 auf `main`): 24 Findings ab medium geschlossen, je mit Reviewer-Urteil samt Fundstelle und Commit-Hash; 5 Nebenbefunde und 11 kleine Reviewer-Befunde neu aufgenommen. BUG-011 (low) wurde in Paket 1 mit erledigt, bleibt aber mangels eigenem Reviewer-Urteil stehen. Der Code wurde seit dem Audit nicht neu geprüft; Score und Zählungen sind die Formel des Audits auf das veränderte Backlog.",
-      "Nachgeführt nach dem Remediation-Lauf vom 2026-10-21/22 (Plan vom 2026-10-21): 21 Pakete in 21 Commits (b998e803..0b02d70b), alle 98 Findings mit Reviewer-Urteil und Commit-Hash geschlossen (eines davon als gegenstandslos bestätigt, behoben schon in 328f7a8e); 28 Nebenbefunde im Lauf behoben; offen bleibt ein vom Lauf induzierter Info-Befund. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt nach dem Remediation-Lauf vom 2026-10-21/22 (Plan vom 2026-10-21): 21 Pakete in 21 Commits (b998e803..0b02d70b), alle 98 Findings mit Reviewer-Urteil und Commit-Hash geschlossen (eines davon als gegenstandslos bestätigt, behoben schon in 328f7a8e); 28 Nebenbefunde im Lauf behoben; der eine vom Lauf induzierte Info-Befund (überflüssiges return am Ende eines forEach-Callbacks in scripts/checkDocSnippets/extractSnippets.mjs) ist im Anschluss von Hand behoben, Skript-Tests und Biome grün. Das Backlog ist leer. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "acknowledged": [
@@ -1111,8 +1087,8 @@
       "source": "remediation",
       "ref": "2026-10-21",
       "fixed": 98,
-      "inducedFixed": 9,
-      "inducedOpen": 1,
+      "inducedFixed": 10,
+      "inducedOpen": 0,
       "discovered": 28,
       "attribution": "reviewed"
     }

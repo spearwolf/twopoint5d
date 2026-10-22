@@ -262,7 +262,6 @@ export function extractSnippets(markdown, file) {
       code: [],
       offsets: [],
     };
-    return;
   });
 
   // the callback above assigns `open`, which the compiler does not follow
