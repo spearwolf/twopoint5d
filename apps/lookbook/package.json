@@ -21,16 +21,16 @@
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
-    "astro": "^7.3.5",
+    "astro": "^7.4.1",
     "lil-gui": "^0.21.0",
-    "marked": "^18.0.14",
+    "marked": "^18.1.1",
     "tailwindcss": "^4.3.3",
     "three": "catalog:"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
+    "@astrojs/check": "^0.9.11",
     "@types/node": "^24.19.2",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "typescript": "^6.0.3"
   }
 }
