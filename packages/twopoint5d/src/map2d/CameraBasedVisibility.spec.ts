@@ -15,6 +15,7 @@ import {
 import type {MockInstance} from 'vitest';
 import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
 import type {TileBox} from './CameraBasedVisibility.js';
+import {setReversedDepth} from '../testing/threeInternals.js';
 import {CameraBasedVisibility} from './CameraBasedVisibility.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import {packTileCoords} from './tileKeys.js';
@@ -132,7 +133,8 @@ function makeCameraCloserToThePlaneThanItsNearPlane(): PerspectiveCamera {
 /**
  * Puts the camera into a coordinate system and a depth direction the way the renderer does on its
  * first frame: both fields set, the projection built again from them. three exposes
- * `reversedDepth` as a getter only; the renderer writes `_reversedDepth`, and so does this helper.
+ * `reversedDepth` as a getter only; the renderer writes it behind the getter, and so does this helper
+ * through `setReversedDepth()`.
  */
 function inCoordinateSystem<C extends PerspectiveCamera | OrthographicCamera>(
   camera: C,
@@ -140,7 +142,7 @@ function inCoordinateSystem<C extends PerspectiveCamera | OrthographicCamera>(
   reversedDepth: boolean,
 ): C {
   camera.coordinateSystem = coordinateSystem;
-  (camera as unknown as {_reversedDepth: boolean})._reversedDepth = reversedDepth;
+  setReversedDepth(camera, reversedDepth);
   camera.updateProjectionMatrix();
   return camera;
 }

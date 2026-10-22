@@ -107,6 +107,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   // its key function, which may neither create nor free: a free followed by a create leaves usedCount
   // where it was, and the keys read so far would belong to slots that have moved
   #slotChanges = 0;
+  // rises when slots below usedCount change places: a sort that moves one, and usedCount going down —
+  // a freeVO() moves the last vertex object into the slot it frees. SpritePicker holds the vertex
+  // objects of a draw against it
+  #slotMoves = 0;
 
   constructor(descriptor: VertexObjectDescriptor | VertexObjectDescription, capacityOrData: number | VertexObjectBuffersData) {
     super(descriptor, capacityOrData);
@@ -342,6 +346,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   /** @internal */
   protected override onUsedCountShrunk(from: number, to: number): void {
     this.#slotChanges++;
+    this.#slotMoves++;
     for (let i = to; i < from; i++) {
       const vo = this.#voIndex[i];
       // only a slot that holds a vertex object is written: resize() calls the setter after it has
@@ -581,6 +586,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
     let last = n - 1;
     while (order[last] === last) last--;
 
+    this.#slotMoves++;
     this.#permuteBuffers(order, first, last);
     this.#permuteVOs(order, first, last);
     this.buffer.touch(first, last);
@@ -623,6 +629,34 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       moving[i] = undefined;
       if (vo != null) setVOIndex(vo, i);
     }
+  }
+
+  /**
+   * How often the slots in use have changed places: it rises with a sort that moves a slot and
+   * whenever `usedCount` goes down — {@link freeVO} moves the last vertex object into the slot it
+   * frees. {@link createVO} and `createFromAttributes()` add a slot behind the others and leave it.
+   * The same value at two moments says that no slot below `usedCount` has moved between them.
+   *
+   * @internal
+   */
+  get slotMoves(): number {
+    return this.#slotMoves;
+  }
+
+  /**
+   * Copies the vertex objects of the slots in use into `into`, slot by slot from 0, and cuts `into`
+   * to `usedCount`. A slot that holds none yet — filled through `createFromAttributes()`,
+   * `fromBuffersData()` or the buffers data handed to the constructor — is `undefined` there: unlike
+   * {@link getVO} it builds no vertex object and calls no hook. On a disposed pool `into` comes back
+   * empty.
+   *
+   * @internal
+   */
+  copyVOsInto(into: Array<(VOType & VO) | undefined>): void {
+    const n = this.isDisposed ? 0 : this.usedCount;
+    const vos = this.#voIndex;
+    for (let i = 0; i < n; i++) into[i] = vos[i];
+    into.length = n;
   }
 
   /**

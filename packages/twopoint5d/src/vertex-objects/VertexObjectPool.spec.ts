@@ -1634,4 +1634,75 @@ describe('VertexObjectPool', () => {
     // (f) has no subject here: both classes under test are the pool others take slots from,
     // not a holder that borrows one.
   });
+
+  describe('copyVOsInto() and slotMoves, which SpritePicker reads', () => {
+    interface Keyed extends VO {
+      key: number;
+    }
+    const keyedDescription: VertexObjectDescription = {attributes: {key: {size: 1}}};
+
+    test('copyVOsInto() copies the vertex objects of the slots in use by slot, leaves a slot without one empty, cuts the array to usedCount and builds none', () => {
+      const pool = new VertexObjectPool<Keyed>(keyedDescription, 4);
+      const vo0 = pool.createVO()!;
+      const vo1 = pool.createVO()!;
+      pool.createFromAttributes({key: [7]});
+      const hook = vi.fn();
+      pool.onCreateVO = hook;
+      const stale = {} as Keyed & VO;
+      const into: Array<(Keyed & VO) | undefined> = [stale, stale, stale, stale, stale];
+
+      pool.copyVOsInto(into);
+
+      expect(into).toEqual([vo0, vo1, undefined]);
+      expect(into).toHaveLength(3);
+      expect(into[0]).toBe(vo0);
+      expect(into[1]).toBe(vo1);
+      expect(hook).not.toHaveBeenCalled();
+      // the copy has built nothing ahead of getVO()
+      const vo2 = pool.getVO(2)!;
+      expect(hook).toHaveBeenCalledOnce();
+      expect(hook).toHaveBeenCalledWith(vo2);
+    });
+
+    test('copyVOsInto() leaves the array empty on a disposed pool', () => {
+      const pool = new VertexObjectPool<Keyed>(keyedDescription, 4);
+      pool.createVO();
+      pool.createVO();
+      pool.dispose();
+      const into: Array<(Keyed & VO) | undefined> = [undefined, undefined];
+
+      pool.copyVOsInto(into);
+
+      expect(into).toHaveLength(0);
+    });
+
+    test('slotMoves rises with a sort that moves a slot and whenever usedCount goes down, and not with a sort that moves nothing, createVO() or createFromAttributes()', () => {
+      const pool = new VertexObjectPool<Keyed>(keyedDescription, 8);
+      for (const key of [1, 2, 3, 4, 5]) pool.createVO()!.key = key;
+      const step = (what: string, operation: () => unknown, rise: number) => {
+        const before = pool.slotMoves;
+        operation();
+        expect(pool.slotMoves - before, what).toBe(rise);
+      };
+
+      step('a sort that moves nothing', () => expect(pool.sortBy('key')).toBe(false), 0);
+      step('a sort that moves', () => expect(pool.sortBy('key', {descending: true})).toBe(true), 1);
+      step('sortByKeys() that moves', () => expect(pool.sortByKeys([5, 4, 3, 2, 1])).toBe(true), 1);
+      step('freeVO() of a slot in the middle', () => pool.freeVO(pool.getVO(2)!), 1);
+      step('freeVO() of the last slot', () => pool.freeVO(pool.getVO(pool.usedCount - 1)!), 1);
+      step(
+        'usedCount going down',
+        () => {
+          pool.usedCount = 1;
+        },
+        1,
+      );
+      step('clear()', () => pool.clear(), 1);
+      step('createVO()', () => pool.createVO(), 0);
+      step('createFromAttributes()', () => pool.createFromAttributes({key: [9, 8]}), 0);
+
+      const target = new VertexObjectPool<Keyed>(pool.descriptor, 8);
+      step('the source of an adoption', () => target.adoptVOs(pool), 1);
+    });
+  });
 });

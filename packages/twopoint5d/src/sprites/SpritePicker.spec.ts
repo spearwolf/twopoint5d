@@ -18,7 +18,8 @@ import {
 import {float} from 'three/tsl';
 import {describe, expect, expectTypeOf, test, vi} from 'vitest';
 
-import {graphSignature, nodesOf} from '../testing/spriteGraph.js';
+import {graphSignature} from '../testing/spriteGraph.js';
+import {pickOutputOf, setReversedDepth} from '../testing/threeInternals.js';
 import {defineSprite} from './defineSprite.js';
 import {BillboardPlacement} from './features/BillboardPlacement.js';
 import {FlatPlacement} from './features/FlatPlacement.js';
@@ -26,6 +27,7 @@ import {InstancePosition} from './features/InstancePosition.js';
 import {QuadSize} from './features/QuadSize.js';
 import {TextureColor} from './features/TextureColor.js';
 import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
+import {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js';
 import {FeatureSpritesMaterial} from './FeatureSprites/FeatureSpritesMaterial.js';
 import {ShadowPass} from './passes/passPresets.js';
 import {TexturedSpriteKind} from './presets.js';
@@ -141,7 +143,7 @@ function makeRenderer() {
     getDrawingBufferSize: (target: {set(x: number, y: number): unknown}) => target.set(...state.drawingBuffer),
     render(scene: Object3D, camera: Camera) {
       if (state.reversedDepthBuffer && !camera.reversedDepth) {
-        (camera as unknown as {_reversedDepth: boolean})._reversedDepth = true;
+        setReversedDepth(camera, true);
         (camera as unknown as {updateProjectionMatrix(): void}).updateProjectionMatrix();
       }
       rendered.push({
@@ -185,6 +187,17 @@ function makeSprites(count: number, options = {}) {
 }
 
 const center = {x: 0, y: 0};
+
+// the matrix that blows the pixel under `center` up to the target: the pixel (32, 16) of the drawing
+// buffer of 64 × 32, whose centre is (0.015625, 0.03125)
+const centerPixel = () => {
+  const [w, h, cx, cy] = [64, 32, (32.5 / 64) * 2 - 1, (16.5 / 32) * 2 - 1];
+  return new Matrix4().set(w, 0, 0, -w * cx, 0, h, 0, -h * cy, 0, 0, 1, 0, 0, 0, 0, 1);
+};
+
+const expectCloseTo = (actual: Matrix4, expected: Matrix4) => {
+  actual.elements.forEach((value, i) => expect(value, `element ${i}`).toBeCloseTo(expected.elements[i]!, 12));
+};
 
 describe('SpritePicker', () => {
   describe('pick() refuses', () => {
@@ -287,6 +300,24 @@ describe('SpritePicker', () => {
       expect(rendered).toHaveLength(0);
       for (const sprites of [hidden, underHidden, empty]) sprites.dispose();
     });
+
+    test('for a mesh whose material is not visible, and draws the others of the list', async () => {
+      const {renderer, rendered} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const hidden = makeSprites(1).sprites;
+      hidden.material!.visible = false;
+      const shown = makeSprites(1).sprites;
+
+      expect(await picker.pick(makeCamera(), center, [hidden])).toBeUndefined();
+      expect(rendered).toHaveLength(0);
+
+      await picker.pick(makeCamera(), center, [hidden, shown]);
+      expect(rendered[0]!.children).toHaveLength(1);
+      expect((rendered[0]!.children[0] as unknown as {geometry: unknown}).geometry).toBe(shown.geometry);
+      hidden.dispose();
+      shown.dispose();
+      picker.dispose();
+    });
   });
 
   test('draws the meshes left in the list, each once, and answers the sprite of the pixel', async () => {
@@ -376,6 +407,46 @@ describe('SpritePicker', () => {
       picker.dispose();
     });
 
+    test('is taken from a copy of the handles, without a look-up of each slot', async () => {
+      const {renderer, state} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {sprites, all} = makeSprites(3);
+      const getVO = vi.spyOn(sprites.spritePool!, 'getVO');
+      state.pixel = [2, 1, 0, 1];
+
+      expect(await picker.pick(makeCamera(), center, [sprites])).toEqual({sprites, sprite: all[1], index: 1});
+      expect(getVO).not.toHaveBeenCalled();
+      sprites.dispose();
+      picker.dispose();
+    });
+
+    test('gives a sprite without a handle its handle when the pick hits it, and nothing once the slots have moved since the draw', async () => {
+      const {renderer, state} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 3});
+      const pool = sprites.spritePool!;
+      pool.createFromAttributes({instancePosition: [0, 0, 0, 1, 0, 0, 2, 0, 0]});
+      const hook = vi.fn();
+      pool.onCreateVO = hook;
+      state.pixel = [2, 1, 0, 1];
+
+      const hit = await picker.pick(makeCamera(), center, [sprites]);
+      expect(hit?.index).toBe(1);
+      expect(hit?.sprite).toBe(pool.getVO(1));
+      expect(hook).toHaveBeenCalledOnce();
+
+      // the slot 0 holds no handle at the draw; a sort moves the slots before the read back
+      const pending = deferred<Float32Array>();
+      state.readBack = pending.promise;
+      const picked = picker.pick(makeCamera(), center, [sprites]);
+      expect(sprites.sortBy('x', {descending: true})).toBe(true);
+      pending.resolve(new Float32Array([1, 1, 0, 1]));
+      expect(await picked).toBeUndefined();
+      expect(hook).toHaveBeenCalledOnce();
+      sprites.dispose();
+      picker.dispose();
+    });
+
     test('carries the type of the kinds listed', async () => {
       const {renderer} = makeRenderer();
       const picker = new SpritePicker(renderer);
@@ -434,7 +505,7 @@ describe('SpritePicker', () => {
       picker.dispose();
     });
 
-    test('prepares a camera of another coordinate system or depth convention as the renderer would', async () => {
+    test('prepares the coordinate system of a camera as the renderer would, and leaves its depth convention alone', async () => {
       const {renderer, rendered, state} = makeRenderer();
       const picker = new SpritePicker(renderer);
       const {sprites} = makeSprites(1);
@@ -450,16 +521,69 @@ describe('SpritePicker', () => {
 
       state.reversedDepthBuffer = true;
       await picker.pick(camera, center, [sprites]);
-      expect(camera.reversedDepth).toBe(true);
-      expect(update).toHaveBeenCalledTimes(2);
-      // the camera of the pick carries the projection it was handed, which three's preparation keeps
-      expect(rendered[1]!.projection.elements).not.toEqual(new Matrix4().elements);
+      expect(camera.reversedDepth).toBe(false);
+      expect(update).toHaveBeenCalledOnce();
+      // three's own projection onto a reversed depth buffer, blown up to the pixel under the pointer
+      const reference = camera.clone();
+      setReversedDepth(reference, true);
+      reference.updateProjectionMatrix();
+      expectCloseTo(rendered[1]!.projection, centerPixel().multiply(reference.projectionMatrix));
 
       // a camera without a projection of its own to update keeps the one it has
       const plain = new Camera();
       plain.projectionMatrix.copy(camera.projectionMatrix);
       await expect(picker.pick(plain, center, [sprites])).resolves.toBeUndefined();
       expect(plain.coordinateSystem).toBe(WebGPUCoordinateSystem);
+      sprites.dispose();
+      picker.dispose();
+    });
+
+    const makePerspective = () => new PerspectiveCamera(60, 1, 0.1, 100);
+    const makeOrthographic = () => new OrthographicCamera(-4, 4, 4, -4, 0.1, 100);
+    test.each([
+      ['perspective', 'WebGPU', WebGPUCoordinateSystem, makePerspective],
+      ['orthographic', 'WebGPU', WebGPUCoordinateSystem, makeOrthographic],
+      ['perspective', 'WebGL', WebGLCoordinateSystem, makePerspective],
+      ['orthographic', 'WebGL', WebGLCoordinateSystem, makeOrthographic],
+    ] as const)(
+      'turns the projection to a reversed depth buffer as three builds it, %s under %s',
+      async (_kind, _name, cs, make) => {
+        const {renderer, rendered, state} = makeRenderer();
+        state.coordinateSystem = cs;
+        state.reversedDepthBuffer = true;
+        const picker = new SpritePicker(renderer);
+        const {sprites} = makeSprites(1);
+        const camera = make();
+        camera.position.z = 10;
+        camera.coordinateSystem = cs;
+        camera.updateProjectionMatrix();
+
+        await picker.pick(camera, center, [sprites]);
+
+        const reference = camera.clone();
+        setReversedDepth(reference, true);
+        reference.updateProjectionMatrix();
+        expectCloseTo(rendered[0]!.projection, centerPixel().multiply(reference.projectionMatrix));
+        expect(camera.reversedDepth).toBe(false);
+        sprites.dispose();
+        picker.dispose();
+      },
+    );
+
+    test('takes the projection of a camera three has prepared for a reversed depth buffer as it is', async () => {
+      const {renderer, rendered, state} = makeRenderer();
+      state.reversedDepthBuffer = true;
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      const camera = makeCamera();
+      setReversedDepth(camera, true);
+      camera.updateProjectionMatrix();
+      const update = vi.spyOn(camera, 'updateProjectionMatrix');
+
+      await picker.pick(camera, center, [sprites]);
+
+      expect(rendered[0]!.projection.elements).toEqual(centerPixel().multiply(camera.projectionMatrix).elements);
+      expect(update).not.toHaveBeenCalled();
       sprites.dispose();
       picker.dispose();
     });
@@ -532,6 +656,40 @@ describe('SpritePicker', () => {
       sprites.dispose();
       picker.dispose();
     });
+
+    test('takes the pointer and the list as they are at the call, while the renderer initializes', async () => {
+      const {renderer, state, rendered, fake} = makeRenderer();
+      state.initialized = false;
+      const init = deferred<void>();
+      fake.init.mockImplementation(() => init.promise);
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      const other = makeSprites(1).sprites;
+      const camera = makeCamera();
+      const pointer = {x: 0.1, y: -0.3};
+      const list: (typeof sprites)[] = [sprites];
+
+      const picked = picker.pick(camera, pointer, list);
+      // a caller that reuses its pointer and its list
+      pointer.x = 0.9;
+      pointer.y = 0.9;
+      list[0] = other;
+      list.push(new Group() as unknown as typeof sprites);
+      init.resolve();
+      await picked;
+
+      expect(rendered).toHaveLength(1);
+      const {children, projection} = rendered[0]!;
+      expect(children).toHaveLength(1);
+      expect((children[0] as unknown as {geometry: unknown}).geometry).toBe(sprites.geometry);
+      // the pixel (35, 11) of the drawing buffer of 64 × 32, under the pointer as it was at the call
+      const [w, h, cx, cy] = [64, 32, 0.109375, -0.28125];
+      const pixel = new Matrix4().set(w, 0, 0, -w * cx, 0, h, 0, -h * cy, 0, 0, 1, 0, 0, 0, 0, 1);
+      expect(projection.elements).toEqual(pixel.multiply(camera.projectionMatrix).elements);
+      sprites.dispose();
+      other.dispose();
+      picker.dispose();
+    });
   });
 
   describe('the pick material', () => {
@@ -556,12 +714,9 @@ describe('SpritePicker', () => {
         true,
       ]);
       // the output is the slot + 1 out of instanceIndex, and the mesh number of the list
-      const output = nodesOf(material.outputNode!);
-      expect([...output].some((node) => (node as unknown as {scope?: string}).scope === 'instance')).toBe(true);
-      const meshNumber = [...output].find((node) => (node as unknown as {isUniformNode?: boolean}).isUniformNode) as unknown as {
-        value: number;
-      };
-      expect(meshNumber.value).toBe(1);
+      const {readsInstanceIndex, meshNumber} = pickOutputOf(material.outputNode!);
+      expect(readsInstanceIndex).toBe(true);
+      expect(meshNumber?.value).toBe(1);
       sprites.dispose();
       colorMap.dispose();
       picker.dispose();
@@ -606,9 +761,7 @@ describe('SpritePicker', () => {
       const a = makeSprites(1).sprites;
       const b = makeSprites(1).sprites;
       const numberOf = (child: Object3D) =>
-        [...nodesOf((child as unknown as {material: FeatureSpritesMaterial}).material.outputNode!)].find(
-          (node) => (node as unknown as {isUniformNode?: boolean}).isUniformNode,
-        ) as unknown as {value: number};
+        pickOutputOf((child as unknown as {material: FeatureSpritesMaterial}).material.outputNode!).meshNumber!;
 
       await picker.pick(makeCamera(), center, [a, b]);
       const [meshA, meshB] = rendered[0]!.children;
@@ -664,11 +817,10 @@ describe('SpritePicker', () => {
     });
   });
 
-  test('the pick mesh follows the geometry, the world matrix, the layers and the render order of the sprites', async () => {
-    vi.spyOn(console, 'info').mockImplementation(() => {});
+  test('the pick mesh follows the world matrix, the layers and the render order of the sprites, and is kept between picks', async () => {
     const {renderer, rendered} = makeRenderer();
     const picker = new SpritePicker(renderer);
-    const {sprites} = makeSprites(1, {grow: true});
+    const {sprites} = makeSprites(1);
     const parent = new Group();
     parent.position.set(5, 0, 0);
     parent.add(sprites);
@@ -677,7 +829,6 @@ describe('SpritePicker', () => {
     sprites.renderOrder = 7;
 
     await picker.pick(makeCamera(), center, [sprites]);
-    sprites.createSprite();
     await picker.pick(makeCamera(), center, [sprites]);
 
     const mesh = rendered[1]!.children[0] as unknown as Object3D & {geometry: unknown};
@@ -692,6 +843,56 @@ describe('SpritePicker', () => {
       false,
     ]);
     sprites.dispose();
+    picker.dispose();
+  });
+
+  test('a growth lets the pick mesh and its material go with the geometry it disposes, and the next pick builds them on the new one', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const {renderer, rendered} = makeRenderer();
+    const picker = new SpritePicker(renderer);
+    const {sprites} = makeSprites(1, {grow: true});
+    await picker.pick(makeCamera(), center, [sprites]);
+    const first = rendered[0]!.children[0] as unknown as Object3D & {material: FeatureSpritesMaterial; geometry: unknown};
+    const materialDispose = vi.spyOn(first.material, 'dispose');
+    const meshDisposed = vi.fn();
+    first.addEventListener('dispose', meshDisposed);
+
+    // the pool is full: the sprites grow, and dispose the geometry the pick mesh draws
+    sprites.createSprite();
+
+    expect(materialDispose).toHaveBeenCalledOnce();
+    expect(meshDisposed).toHaveBeenCalledOnce();
+    await picker.pick(makeCamera(), center, [sprites]);
+    const next = rendered[1]!.children[0] as unknown as Object3D & {geometry: unknown};
+    expect(next).not.toBe(first);
+    expect(next.geometry).toBe(sprites.geometry);
+    sprites.dispose();
+    expect(materialDispose).toHaveBeenCalledOnce();
+    picker.dispose();
+  });
+
+  test('a geometry put into the slot gets a pick mesh of its own, and the one before goes', async () => {
+    const {renderer, rendered} = makeRenderer();
+    const picker = new SpritePicker(renderer);
+    const {sprites} = makeSprites(1);
+    const other = new FeatureSpritesGeometry(TexturedSpriteKind, {capacity: 2});
+    other.instancedPool.createVO();
+    await picker.pick(makeCamera(), center, [sprites]);
+    const first = rendered[0]!.children[0] as unknown as Object3D & {material: FeatureSpritesMaterial};
+    const materialDispose = vi.spyOn(first.material, 'dispose');
+
+    sprites.geometry = other;
+    await picker.pick(makeCamera(), center, [sprites]);
+
+    const next = rendered[1]!.children[0] as unknown as Object3D & {geometry: unknown};
+    expect(next).not.toBe(first);
+    expect(next.geometry).toBe(other);
+    expect(materialDispose).toHaveBeenCalledOnce();
+    // the geometry stays the caller's
+    expect(() => {
+      sprites.dispose();
+      other.dispose();
+    }).not.toThrow();
     picker.dispose();
   });
 

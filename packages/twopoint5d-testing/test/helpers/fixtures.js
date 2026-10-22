@@ -78,10 +78,15 @@ export function makeIframeDocument({width, height} = {}) {
   return {iframe, doc: /** @type {Document} */ (iframe.contentDocument)};
 }
 
+// the errors display.dispose() threw in the teardown of the running test, for the hook below
+const teardownErrors = [];
+
 /**
- * Teardown must not mask the failure that got it here: no display, or a display that fails to
- * go down. It calls `dispose()` and nothing else — a disposed display refuses `start()`, and a
- * start in the teardown would cost a renderer init per test.
+ * Teardown must not mask the failure that got it here: no display is fine, and an error
+ * `dispose()` throws is held for the hook below, which reports it once the dom is cleaned up — it
+ * fails a test that passed and logs it for one that failed. It calls `dispose()` and nothing else —
+ * a disposed display refuses `start()`, and a start in the teardown would cost a renderer init per
+ * test.
  *
  * @param {Display | undefined} display
  */
@@ -89,10 +94,27 @@ export function disposeDisplay(display) {
   if (!display) return;
   try {
     display.dispose();
-  } catch {
-    // ignore — the fixture still has to leave the dom
+  } catch (error) {
+    teardownErrors.push(error);
   }
 }
+
+// Registered on the root suite of every test file that imports this module, so it runs after the
+// afterEach hooks of the file's own suites — the dom is cleaned up when it throws
+afterEach(function () {
+  if (teardownErrors.length === 0) return;
+  const errors = teardownErrors.splice(0);
+  if (this.currentTest?.state === 'failed') {
+    // biome-ignore lint/suspicious/noConsole: the teardown error goes into the log beside the failure it must not mask
+    console.error(`display.dispose() threw in the teardown of "${this.currentTest.fullTitle()}":`, ...errors);
+    return;
+  }
+  // the reporter prints the message alone, so it carries the errors as well
+  throw new AggregateError(
+    errors,
+    `display.dispose() threw in the teardown of "${this.currentTest?.fullTitle()}": ${errors.map(String).join('; ')}`,
+  );
+});
 
 /**
  * Resolves once renderer.dispose() has settled — the release of a display happens after its dispose() has returned.
@@ -126,6 +148,28 @@ export function whenPageAnimates() {
       });
     });
   });
+}
+
+// --- console ---
+
+/**
+ * Runs `body` with `console.info` silenced and puts it back afterwards, also when `body` throws or
+ * its promise rejects — for a test whose code notes something on the console on purpose, such as
+ * the first growth of `FeatureSprites`.
+ *
+ * @template T
+ * @param {() => T | Promise<T>} body
+ * @returns {Promise<T>}
+ */
+export async function withSilencedInfo(body) {
+  // biome-ignore lint/suspicious/noConsole: held to be put back, not called
+  const info = console.info;
+  console.info = () => {};
+  try {
+    return await body();
+  } finally {
+    console.info = info;
+  }
 }
 
 // --- input for PanControl2D ---

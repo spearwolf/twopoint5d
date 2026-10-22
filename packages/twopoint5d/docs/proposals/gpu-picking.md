@@ -7,9 +7,14 @@ the pointer" and "Performance", and the browser proofs in
 - the list is typed `readonly FeatureSprites<any>[]`, not `FeatureSprites<object>[]`: `FeatureSprites`
   is invariant in its handle type — the `onCreateVO` hook of its pool takes one —, so a mesh of a
   kind is no `FeatureSprites<object>` (§2);
-- the picker's camera takes the coordinate system of the renderer before every pick; the reversed
-  depth it leaves to the renderer, which marks it and calls its `updateProjectionMatrix()` — a no-op
-  there, the projection is the one handed in (§3.3);
+- the picker's camera takes the coordinate system of the renderer before every pick; the depth
+  convention of the caller's camera stays as it is, and under a reversed depth buffer the picker turns
+  the depth row of the projection over itself (§3.3);
+- the pick meshes go with the geometry they draw and are built anew after a growth or a geometry put
+  into the slot (§3.2, §5);
+- the snapshot copies the handles without `getVO()`; a slot without a handle gets one only when the
+  pick hits it (§4);
+- a mesh whose material is not visible is left out (§3.2);
 - a drawing buffer of no pixels counts as one pixel, so the matrix of §3.3 stays finite (§3.3).
 
 Phase F, part 3, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.10, the
@@ -132,15 +137,18 @@ hit.
 ### 3.2 The pick mesh and the scene
 
 Per listed mesh a `Mesh` over the geometry of the sprites with the pick material, held with it, in
-a `Scene` of the picker's own. Before every pick it takes from the sprites: the geometry (a growth
-replaces it — three follows a geometry of another id, as it does for the sprites), the world matrix
-(after `updateWorldMatrix(true, false)` of the sprites), `layers` and `renderOrder`.
+a `Scene` of the picker's own. The geometry is the one the sprites hold when the pick mesh is built;
+a growth disposes it, and a geometry put into the slot is another one — either way the pick mesh and
+its material go, and the next pick builds both on the geometry the sprites hold then (§5). Before
+every pick it takes from the sprites the world matrix (after `updateWorldMatrix(true, false)` of the
+sprites), `layers` and `renderOrder`.
 `matrixAutoUpdate` and `matrixWorldAutoUpdate` are off on the mesh and the scene, so three does not
 compute the matrix a second time.
 
 A listed mesh is **left out** when it is disposed, when it or one of its ancestors is not `visible`,
-and when its pool holds no sprite. A mesh listed twice is drawn once, at its first place. Nothing
-left to draw answers `undefined` without a draw.
+when its material is not `visible` — three draws none of these —, and when its pool holds no sprite.
+A mesh listed twice is drawn once, at its first place. Nothing left to draw answers `undefined`
+without a draw.
 
 ### 3.3 The pixel under the pointer
 
@@ -167,12 +175,16 @@ A camera of the picker's own (a three `Camera`) draws one pixel:
   pixel: the fragment is evaluated where the screen evaluates the fragment of that pixel, and a
   derivative across it — the mip level of a texture — is the derivative across a screen pixel.
   Perspective and orthographic cameras alike; the depth rows stay as they are.
-- `camera` is prepared as the renderer prepares it before it draws: a camera of another coordinate
-  system than the renderer, or without reversed depth under a renderer with a reversed depth buffer,
-  is switched and its `updateProjectionMatrix()` called — what the next `render()` would do anyway.
-  The picker's camera takes the `coordinateSystem` of the renderer; under a reversed depth buffer the
-  renderer marks it reversed and calls its `updateProjectionMatrix()`, which does nothing — the
-  projection is the one handed in, reversed already.
+- `camera` takes the coordinate system of the renderer as the renderer sets it before it draws: a
+  camera of another coordinate system is switched and its `updateProjectionMatrix()` called — what
+  the next `render()` would do anyway. Its depth convention stays as it is: three keeps it behind a
+  getter and sets it inside `render()`. Under a reversed depth buffer and a camera without reversed
+  depth, the picker turns the projection over itself — three's reversed projection is the plain one
+  with its depth row turned, `z' = w − z` from the 0 … 1 of WebGPU and `z' = (w − z)/2` from the
+  −1 … 1 of WebGL (three 0.186.1, `Matrix4#makePerspective()` and `#makeOrthographic()`); a camera
+  three has drawn with is reversed already and taken as it is. The picker's camera takes the
+  `coordinateSystem` of the renderer; under a reversed depth buffer the renderer marks it reversed
+  and calls its `updateProjectionMatrix()`, which does nothing — the projection is the one handed in.
 - A pointer outside `[-1, 1]²` answers `undefined` without a draw. The pointer is a point of the view
   of `camera`; the snapping uses the drawing buffer of the renderer — for a camera that draws a part
   of the canvas (a viewport of its own) the snapping is off by less than a pixel.
@@ -220,14 +232,22 @@ stands there now. A mesh sorted every frame — the vector balls, a y-sorted top
 slots every frame, so a check for staleness would refuse almost every pick there.
 
 So the picker resolves in the frame it draws: **at the draw it takes a snapshot of the handles of
-every drawn mesh** — `spritePool.getVO(i)` for every slot in use, into an array the picker keeps and
-reuses — and the read back looks the slot up there. The answer is the handle that was drawn under the
+every drawn mesh** — the handles of the slots in use copied as they stand (`copyVOsInto()`, an
+internal member of the pool), into an array the picker keeps and reuses — and the read back looks
+the slot up there. The answer is the handle that was drawn under the
 pointer; a sort or a growth since then changes nothing about it. A sprite freed since answers
 `undefined`: the handle is no longer in the pool of its mesh (`containsVO()` — a handle is never
 handed out twice, `createVO()` builds a new one). `index` is the slot it was drawn from.
 
-The cost is one `getVO()` per sprite of the listed meshes per pick, and no allocation once the arrays
-are as long as the pools (one per mesh drawn by a pick in flight, returned when it resolves).
+A slot that holds no handle at the draw — filled through `createFromAttributes()` — stays empty in
+the snapshot, so the pick builds no handle and calls no `onCreateVO` hook for a sprite it does not
+hit. When the pick hits it, the handle comes from `getVO()` — as long as no slot has moved since the
+draw: the pool counts every sort that moves a slot and every drop of `usedCount` (`slotMoves`, an
+internal member), and the snapshot holds the count of the draw. Moved since, or another pool after a
+growth, the answer is `undefined`.
+
+The cost is one copied reference per sprite of the listed meshes per pick, and no allocation once the
+arrays are as long as the pools (one per mesh drawn by a pick in flight, returned when it resolves).
 
 ## 5. Refusals, ownership, disposal
 
@@ -245,7 +265,11 @@ are as long as the pools (one per mesh drawn by a pick in flight, returned when 
   resources of its mesh and does not release them.
 - **A mesh disposed**: the picker listens to three's `dispose` event of every mesh it has drawn and
   releases its pick mesh and pick material then — the event comes before the sprites release their
-  resources, so the pick material goes before what it reads.
+  resources, so the pick material goes before what it reads. It listens to the `dispose` event of the
+  geometry the pick mesh draws as well: a growth disposes it, and the pick mesh and its material go
+  with it, so neither the picker nor three's render object of the pick mesh holds the geometry until
+  the next pick. (three's render list of the pick scene still names it until a render finds that list
+  unused for more than 10 frames of the animation loop, or the next pick fills it anew.)
 - **`dispose()`**: releases the target, every pick mesh (three's `dispose` event, so the renderer
   drops its render objects) and every pick material, stops listening to the meshes, and rejects every
   pick still in flight with `SpritePicker#pick(): the picker was disposed before the pick was read
@@ -257,25 +281,38 @@ are as long as the pools (one per mesh drawn by a pick in flight, returned when 
 - `src/sprites/SpritePicker.spec.ts`, against a fake renderer that records what it is asked and
   answers the pixel a test sets: the refusals of §5; a pointer outside the view and an empty list
   answer `undefined` without a draw; disposed, invisible (and under an invisible parent) and empty
-  meshes are left out; a mesh listed twice is drawn once; the projection of §3.3 for a pointer, the
-  pixel centre snapped, the view and the layers of the camera; the coordinate system and the reversed
-  depth prepared; the renderer state restored, also when `render()` throws; the read back resolved to
-  mesh and handle; a sort, a `freeSprite()` and a growth between the draw and the read back; the
-  mesh number written per pick; the pick material — kind, the resources of the mesh, the placement,
-  `outputNode` built from `instanceIndex` and the mesh number, blending and depth, the copied
-  parameters — cached, given a swapped placement, rebuilt for other resources; the geometry, world
-  matrix, layers and render order of the pick mesh follow the sprites; a mesh disposed releases its
-  pick material; `dispose()` releases the target and every material, rejects a pick in flight, and a
-  later `pick()` answers `undefined`; an uninitialized renderer is awaited; the type of the result over
-  a list of two kinds (`expectTypeOf`).
+  meshes and meshes of an invisible material are left out; a mesh listed twice is drawn once; the
+  pointer and the list taken at the call while the renderer initializes; the projection of §3.3 for
+  a pointer, the pixel centre snapped, the view and the layers of the camera; the coordinate system
+  prepared and the depth convention of the camera left alone, the projection turned to a reversed
+  depth buffer as three builds it — perspective and orthographic, under both coordinate systems —
+  and a camera three has prepared taken as it is; the renderer state restored, also when `render()`
+  throws; the read back resolved to mesh and handle from a copy of the handles, without `getVO()`; a
+  sprite without a handle given one when hit, and `undefined` once the slots moved; a sort, a
+  `freeSprite()` and a growth between the draw and the read back; the mesh number written per pick;
+  the pick material — kind, the resources of the mesh, the placement, `outputNode` built from
+  `instanceIndex` and the mesh number, blending and depth, the copied parameters — cached, given a
+  swapped placement, rebuilt for other resources; the world matrix, layers and render order of the
+  pick mesh follow the sprites; a growth and a geometry put into the slot release the pick mesh and
+  build it anew; a mesh disposed releases its pick material; `dispose()` releases the target and
+  every material, rejects a pick in flight, and a later `pick()` answers `undefined`; an
+  uninitialized renderer is awaited; the type of the result over a list of two kinds
+  (`expectTypeOf`).
 - Browser test `packages/twopoint5d-testing/test/sprites-picking.test.js`, under WebGPU and WebGL 2,
   through a `Display`: two overlapping sprites — the front one wins in the overlap, the back one where
   it shows alone; the transparent corner of the front sprite's frame picks the sprite behind it; after
   `sortBy()` the same handles answer; a `BillboardPlacement` and an `AxisBillboardPlacement` mesh under
   a camera that looks down at a slant; two meshes in one list — the right mesh; a mesh with
   `grow: true` picked at a sprite created past its first capacity; a sprite faded to 0 is not hit;
-  nothing under the pointer answers `undefined`; and the canvas renders as before after a pick (the
-  clear color and the render target restored).
+  nothing under the pointer answers `undefined`; the front sprite under a reversed depth buffer,
+  through a camera three has not drawn with and one it has; the geometry a growth replaced collected
+  without another pick (Chromium, which has `gc()`); `renderer.info.memory` unchanged over 50 picks
+  and back where it was once the mesh, the picker and the texture are disposed; and the canvas
+  renders as before after a pick (the clear color and the render target restored).
+- `src/vertex-objects/VertexObjectPool.spec.ts`: `copyVOsInto()` and `slotMoves`.
+- `src/testing/threeInternals.spec.ts`: the two places where the specs read three's internals — the
+  depth convention behind `Camera#reversedDepth` and the structure of the pick output — fail there
+  when a bump of three moves them.
 
 ## 7. The guide
 

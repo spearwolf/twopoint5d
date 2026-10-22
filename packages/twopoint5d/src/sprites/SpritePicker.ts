@@ -15,10 +15,12 @@ import {
   type TypedArray,
   type UniformNode,
   Vector2,
+  WebGLCoordinateSystem,
 } from 'three/webgpu';
 import type {VO} from '../vertex-objects/types.js';
 import type {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import {FeatureSprites} from './FeatureSprites/FeatureSprites.js';
+import type {FeatureSpritesGeometry} from './FeatureSprites/FeatureSpritesGeometry.js';
 import {FeatureSpritesMaterial} from './FeatureSprites/FeatureSpritesMaterial.js';
 
 /** What {@link SpritePicker.pick} found under the pointer. */
@@ -60,18 +62,43 @@ const MAX_SPRITES_PER_MESH = 2 ** 24;
 
 const WHERE = 'SpritePicker#pick()';
 
+// three's projection for a reversed depth buffer is the plain one with its depth row turned over:
+// z' = w - z from the 0 … 1 of WebGPU, z' = (w - z) / 2 from the -1 … 1 of WebGL — the near plane
+// at 1, the far plane at 0 (three 0.186.1, Matrix4#makePerspective() and #makeOrthographic())
+// biome-ignore format: the matrix row by row
+const REVERSE_DEPTH_WEBGPU = new Matrix4().set(
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, -1, 1,
+  0, 0, 0, 1,
+);
+// biome-ignore format: the matrix row by row
+const REVERSE_DEPTH_WEBGL = new Matrix4().set(
+  1, 0, 0, 0,
+  0, 1, 0, 0,
+  0, 0, -0.5, 0.5,
+  0, 0, 0, 1,
+);
+
 interface PickEntry {
   readonly mesh: Mesh;
   readonly material: FeatureSpritesMaterial;
+  /** The geometry of the sprites the pick mesh is built on and draws. */
+  readonly geometry: FeatureSpritesGeometry;
   /** The place of the mesh in the list of a pick, from 1: what the green of the target says. */
   readonly meshNumber: UniformNode<'float', number>;
+  /** Releases the entry; it listens to the sprites and to {@link geometry}. */
   readonly onDispose: () => void;
 }
 
 /** A mesh drawn by a pick, and its handles as they stood at the draw. */
 interface Drawn {
   readonly sprites: FeatureSprites;
-  readonly handles: (VO | undefined)[];
+  /** The pool the mesh was drawn from. */
+  readonly pool: VertexObjectPool<object & VO>;
+  /** The `slotMoves` of {@link pool} at the draw. */
+  readonly slotMoves: number;
+  readonly handles: ((object & VO) | undefined)[];
 }
 
 /**
@@ -86,7 +113,8 @@ class PickCamera extends Camera {
 const hasProjectionUpdate = (camera: Camera): camera is Camera & {updateProjectionMatrix(): void} =>
   typeof (camera as {updateProjectionMatrix?: unknown}).updateProjectionMatrix === 'function';
 
-// three draws an object only while it and every ancestor is visible
+// three draws an object only while it and every ancestor is visible — and none whose material is
+// not visible, which #gather() asks beside it
 function isShown(object: Object3D): boolean {
   for (let node: Object3D | null = object; node != null; node = node.parent) {
     if (!node.visible) return false;
@@ -103,7 +131,9 @@ function isShown(object: Object3D): boolean {
  * what lies behind. The nearest sprite wins.
  *
  * The renderer stays the caller's; the picker owns its render target, and a pick material and a pick
- * mesh per mesh it has drawn, which go when that mesh is disposed or with {@link dispose}.
+ * mesh per mesh it has drawn, which go when that mesh is disposed, when the geometry they draw is
+ * disposed — a growth does that —, or with {@link dispose}; the next pick of the mesh builds them
+ * anew.
  */
 export class SpritePicker {
   /** The renderer it draws with; it stays the caller's. */
@@ -117,7 +147,7 @@ export class SpritePicker {
   readonly #clearColor = new Color();
   readonly #pending = new Set<(error: Error) => void>();
   // the arrays of handles of the picks that have resolved, for the next ones to fill
-  readonly #spareHandles: (VO | undefined)[][] = [];
+  readonly #spareHandles: ((object & VO) | undefined)[][] = [];
   #target: RenderTarget | undefined;
   #disposed = false;
 
@@ -140,14 +170,19 @@ export class SpritePicker {
    * nearest to the camera there — its mesh, its handle and the slot it was drawn from — or
    * `undefined` for nothing. The answer comes a frame later, once the gpu has drawn and the pixel is
    * read back; the handle is the one drawn under the pointer, whatever a sort or a growth has moved
-   * since, and a sprite freed since answers `undefined`.
+   * since, and a sprite freed since answers `undefined`. A sprite without a handle — written into the
+   * pool through `createFromAttributes()` — gets one when the pick hits it, as `getVO()` gives it,
+   * and answers `undefined` when a sort, a free or a growth has moved the slots since the draw.
    *
-   * Call it after the `update()` of the sprites, as the render: it draws what they uploaded. Only
+   * Call it after the `update()` of the sprites, as the render: it draws what they uploaded. The
+   * pointer and the list are taken as they are at the call; the camera is read at the draw: its
+   * coordinate system is set to the renderer's, as its next render would, and its depth convention
+   * is left alone — under a reversed depth buffer the pick turns its projection over itself. Only
    * the sprites are drawn, not their passes. A mesh that is disposed, not visible (or under a parent
-   * that is not) or holds no sprite is left out; a mesh listed twice is drawn once, at its first
-   * place. A pointer outside the view answers `undefined` without a draw. The state of the renderer
-   * the pick changes — render target, MRT, clear color, the `autoClear` flags — is restored before
-   * it returns.
+   * that is not), whose material is not visible, or that holds no sprite is left out; a mesh listed
+   * twice is drawn once, at its first place. A pointer outside the view answers `undefined` without
+   * a draw. The state of the renderer the pick changes — render target, MRT, clear color, the
+   * `autoClear` flags — is restored before it returns.
    *
    * @param pointer the point of the view of `camera` in normalized device coordinates, snapped to
    *   the centre of the pixel of the renderer's drawing buffer it lies in
@@ -155,7 +190,8 @@ export class SpritePicker {
    * @throws (rejects with) a `TypeError` for a camera that is no three.js camera, a pointer whose `x`
    *   or `y` is no finite number, a list that is no array and an entry that is no `FeatureSprites`; a
    *   `RangeError` for a mesh of more than 2^24 sprites, whose slots the float target cannot name;
-   *   an `Error` for a pick still in flight when the picker is disposed
+   *   an `Error` for a pick still in flight when the picker is disposed; and whatever the
+   *   `onCreateVO` hook of the pool throws for a sprite without a handle
    */
   // FeatureSprites is invariant in its handle type — the onCreateVO hook of its pool takes one —, so
   // only `any` admits a list of meshes of several kinds
@@ -172,9 +208,14 @@ export class SpritePicker {
     }
     if (this.#disposed) return Promise.resolve(undefined);
 
+    // taken now: a caller that reuses its pointer or its list while the renderer initializes changes
+    // neither what is drawn nor what checkArguments() has seen
+    const at: PickPointer = {x: pointer.x, y: pointer.y};
+    const list: FeatureSprites[] = [...sprites];
+
     return new Promise((resolve, reject) => {
       this.#pending.add(reject);
-      this.#pick(camera, pointer, sprites).then(
+      this.#pick(camera, at, list).then(
         (hit) => {
           if (this.#pending.delete(reject)) resolve(hit as SpritePickOf<S[number]> | undefined);
         },
@@ -216,7 +257,7 @@ export class SpritePicker {
     for (let k = 0; k < list.length; k++) {
       const sprites = list[k]!;
       const pool = sprites.spritePool;
-      if (pool === undefined || pool.usedCount === 0 || !isShown(sprites)) continue;
+      if (pool === undefined || pool.usedCount === 0 || !isShown(sprites) || sprites.material?.visible === false) continue;
       if (drawn.some((record) => record.sprites === sprites)) continue;
       // refused, not drawn: above it two slots read back as one, and the pick would name the wrong sprite
       if (pool.usedCount > MAX_SPRITES_PER_MESH) {
@@ -226,17 +267,17 @@ export class SpritePicker {
       }
       const entry = this.#sync(sprites, k + 1);
       scene.add(entry.mesh);
-      drawn[k] = {sprites, handles: this.#handlesOf(pool)};
+      drawn[k] = {sprites, pool, slotMoves: pool.slotMoves, handles: this.#handlesOf(pool)};
     }
     return drawn;
   }
 
-  // the handles of every slot in use as they stand at the draw: the read back resolves the slot here,
-  // before a sort, a freeSprite() or a growth can move it
-  #handlesOf(pool: VertexObjectPool<object & VO>): (VO | undefined)[] {
+  // the handles of every slot in use as they stand at the draw, copied without a look-up: the read
+  // back resolves the slot here, before a sort, a freeSprite() or a growth can move it. A slot
+  // without a handle stays empty and gets one only when the pick hits it
+  #handlesOf(pool: VertexObjectPool<object & VO>): ((object & VO) | undefined)[] {
     const handles = this.#spareHandles.pop() ?? [];
-    const n = pool.usedCount;
-    for (let i = 0; i < n; i++) handles[i] = pool.getVO(i);
+    pool.copyVOsInto(handles);
     return handles;
   }
 
@@ -244,8 +285,9 @@ export class SpritePicker {
     // the mesh is not disposed — it has a pool —, so it has its material
     const material = sprites.material!;
     let entry = this.#entries.get(sprites);
-    // a material swapped on the mesh reads other uniforms and textures: the pick material reads them too
-    if (entry !== undefined && entry.material.resources !== material.resources) {
+    // a material swapped on the mesh reads other uniforms and textures, a geometry put into the slot is
+    // another to draw: for either the pick mesh is built anew
+    if (entry !== undefined && (entry.material.resources !== material.resources || entry.geometry !== sprites.geometry)) {
       this.#release(sprites, entry);
       entry = undefined;
     }
@@ -266,8 +308,6 @@ export class SpritePicker {
     entry.meshNumber.value = meshNumber;
 
     const {mesh} = entry;
-    // a growth, or a geometry the caller puts into the slot, gives the sprites a new geometry, which three follows by its id
-    mesh.geometry = sprites.geometry!;
     sprites.updateWorldMatrix(true, false);
     mesh.matrixWorld.copy(sprites.matrixWorld);
     mesh.layers.mask = sprites.layers.mask;
@@ -290,7 +330,8 @@ export class SpritePicker {
     // fragment the alpha test of the sprite drops is dropped here too, and no stage can change the id
     pickMaterial.outputNode = vec4(add(float(instanceIndex), 1), meshNumber, 0, 1) as unknown as Node;
 
-    const mesh = new Mesh(sprites.geometry, pickMaterial);
+    const geometry = sprites.geometry!;
+    const mesh = new Mesh(geometry, pickMaterial);
     mesh.name = 'twopoint5d.SpritePicker';
     mesh.frustumCulled = false;
     mesh.matrixAutoUpdate = false;
@@ -299,17 +340,23 @@ export class SpritePicker {
     const entry: PickEntry = {
       mesh,
       material: pickMaterial,
+      geometry,
       meshNumber,
       // three's dispose event comes before the sprites release their resources: the pick material goes first
       onDispose: () => this.#release(sprites, entry),
     };
     sprites.addEventListener('dispose', entry.onDispose);
+    // a growth disposes the geometry the pick mesh draws; three's render object of the pick mesh would
+    // hold it, typed arrays and all, up to the next pick of these sprites — the pick mesh and the pick
+    // material go with it, and the next pick builds both on the new one
+    geometry.addEventListener('dispose', entry.onDispose);
     this.#entries.set(sprites, entry);
     return entry;
   }
 
   #release(sprites: FeatureSprites, entry: PickEntry): void {
     sprites.removeEventListener('dispose', entry.onDispose);
+    entry.geometry.removeEventListener('dispose', entry.onDispose);
     this.#entries.delete(sprites);
     entry.mesh.removeFromParent();
     // three's dispose event for the pick mesh, so the renderer drops its render objects
@@ -321,17 +368,10 @@ export class SpritePicker {
   #aim(camera: Camera, pointer: PickPointer): void {
     const {renderer} = this;
     // as the renderer prepares a camera before it draws, which it would do on its next render anyway
-    let stale = false;
     if (camera.coordinateSystem !== renderer.coordinateSystem) {
       camera.coordinateSystem = renderer.coordinateSystem;
-      stale = true;
+      if (hasProjectionUpdate(camera)) camera.updateProjectionMatrix();
     }
-    if (renderer.reversedDepthBuffer && !camera.reversedDepth) {
-      // the field behind the getter, written as the renderer writes it
-      (camera as unknown as {_reversedDepth: boolean})._reversedDepth = true;
-      stale = true;
-    }
-    if (stale && hasProjectionUpdate(camera)) camera.updateProjectionMatrix();
     camera.updateWorldMatrix(true, false);
 
     const pick = this.#camera;
@@ -357,6 +397,14 @@ export class SpritePicker {
       0, 0, 0, 1,
     );
     pick.projectionMatrix.multiplyMatrices(this.#pixel, camera.projectionMatrix);
+    // three keeps the depth convention of a camera behind a getter and sets it inside render(): the
+    // pick takes the projection the camera has and turns it to the reversed depth buffer itself,
+    // and the caller's camera keeps its own
+    if (renderer.reversedDepthBuffer && !camera.reversedDepth) {
+      pick.projectionMatrix.premultiply(
+        renderer.coordinateSystem === WebGLCoordinateSystem ? REVERSE_DEPTH_WEBGL : REVERSE_DEPTH_WEBGPU,
+      );
+    }
     pick.projectionMatrixInverse.copy(pick.projectionMatrix).invert();
   }
 
@@ -443,9 +491,17 @@ function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly 
 function resolvePixel(pixel: TypedArray, drawn: readonly Drawn[]): SpritePick | undefined {
   const slot = Math.round(pixel[0]!) - 1;
   const record = drawn[Math.round(pixel[1]!) - 1];
-  if (slot < 0 || record === undefined) return undefined;
-  const sprite = record.handles[slot];
+  // only a slot that was drawn
+  if (slot < 0 || record === undefined || slot >= record.handles.length) return undefined;
+  const pool = record.sprites.spritePool;
+  let sprite = record.handles[slot];
+  if (sprite === undefined) {
+    // the slot held no handle at the draw — filled through createFromAttributes() —: it gets one
+    // as getVO() gives it, as long as no sort, free or growth has moved the slots since
+    if (pool !== record.pool || pool.slotMoves !== record.slotMoves) return undefined;
+    sprite = pool.getVO(slot);
+  }
   // a sprite freed since the draw is in the pool of its mesh no more
-  if (sprite === undefined || record.sprites.spritePool?.containsVO(sprite) !== true) return undefined;
-  return {sprites: record.sprites, sprite: sprite as object & VO, index: slot};
+  if (sprite === undefined || pool?.containsVO(sprite) !== true) return undefined;
+  return {sprites: record.sprites, sprite, index: slot};
 }

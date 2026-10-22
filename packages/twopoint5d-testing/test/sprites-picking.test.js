@@ -19,7 +19,7 @@ import {
   Tint,
 } from '@spearwolf/twopoint5d';
 import {Color, OrthographicCamera, PerspectiveCamera, Scene, Vector3} from 'three/webgpu';
-import {disposeDisplay, makeColorTexture, makeContainer} from './helpers/fixtures.js';
+import {disposeDisplay, makeColorTexture, makeContainer, withSilencedInfo} from './helpers/fixtures.js';
 
 const WHITE = [255, 255, 255, 255];
 const CLEAR = [0, 0, 0, 0];
@@ -120,6 +120,54 @@ describe('sprites — picking', function () {
     expect(frontAlone?.sprite === front).to.be.true;
   });
 
+  it('picks the front sprite under a reversed depth buffer, through a camera three has not drawn with and one it has', async () => {
+    const reversedHost = makeContainer({width: 64, height: 64});
+    let reversed;
+    let reversedPicker;
+    try {
+      reversed = new Display(reversedHost, {reversedDepthBuffer: true});
+      await reversed.start();
+      reversedPicker = new SpritePicker(reversed.renderer);
+      const {renderer} = reversed;
+      if (reversed.isWebGPUBackend) {
+        // WebGL 2 falls back to a plain depth buffer without EXT_clip_control (three 0.186.1, WebGLBackend.js)
+        expect(renderer.reversedDepthBuffer, 'WebGPU takes a reversed depth buffer').to.be.true;
+      }
+      const {sprites, all} = makeSprites(FlatKind, [
+        [-0.5, 0, 0],
+        [0.5, 0, 1],
+      ]);
+      const front = all[1];
+      const perspective = new PerspectiveCamera(50, 1, 0.1, 100);
+      perspective.position.set(0, 0, 10);
+      perspective.lookAt(0, 0, 0);
+
+      for (const {name, camera} of [
+        {name: 'flat', camera: makeFlatCamera()},
+        {name: 'perspective', camera: perspective},
+      ]) {
+        const first = await reversedPicker.pick(camera, pointerAt(camera, 0, 0), [sprites]);
+        expect(first?.sprite === front, `${name}: the front sprite through a camera three has not drawn with`).to.be.true;
+        expect(camera.reversedDepth, `${name}: the camera keeps its depth convention`).to.be.false;
+
+        const scene = new Scene();
+        scene.add(sprites);
+        renderer.render(scene, camera);
+        scene.remove(sprites);
+        expect(camera.reversedDepth, `${name}: three prepares the camera for its depth buffer`).to.equal(
+          renderer.reversedDepthBuffer,
+        );
+
+        const second = await reversedPicker.pick(camera, pointerAt(camera, 0, 0), [sprites]);
+        expect(second?.sprite === front, `${name}: the front sprite through a camera three has drawn with`).to.be.true;
+      }
+    } finally {
+      reversedPicker?.dispose();
+      disposeDisplay(reversed);
+      reversedHost.remove();
+    }
+  });
+
   it('picks the sprite behind through the transparent corner of a frame', async () => {
     const camera = makeFlatCamera();
     // the top left texel of the frame is transparent: the quarter of each sprite left of and above its centre
@@ -212,9 +260,7 @@ describe('sprites — picking', function () {
   });
 
   it('picks a sprite created past the first capacity of a mesh that grows', async () => {
-    const info = console.info;
-    console.info = () => {};
-    try {
+    await withSilencedInfo(async () => {
       const camera = makeFlatCamera();
       const {sprites, all} = makeSprites(
         FlatKind,
@@ -230,15 +276,11 @@ describe('sprites — picking', function () {
 
       expect(sprites.spritePool.capacity).to.equal(4);
       expect(hit?.sprite === all[2] && hit.index === 2).to.be.true;
-    } finally {
-      console.info = info;
-    }
+    });
   });
 
   it('picks again after a growth of a mesh it has drawn, and a sort or a growth after the call changes nothing', async () => {
-    const info = console.info;
-    console.info = () => {};
-    try {
+    await withSilencedInfo(async () => {
       const camera = makeFlatCamera();
       const {sprites, all} = makeSprites(FlatKind, [[-2, 0, 0]], {capacity: 1, grow: true});
       const first = await picker.pick(camera, pointerAt(camera, -2, 0), [sprites]);
@@ -269,9 +311,38 @@ describe('sprites — picking', function () {
       expect(moved?.sprite === all[0] && moved.index === 0, 'the handle drawn, slot 0 at the draw').to.be.true;
       expect(sprites.spritePool.getVO(0) === all[0], 'the sort moved it').to.be.false;
       expect(sprites.spritePool.containsVO(all[0])).to.be.true;
-    } finally {
-      console.info = info;
-    }
+    });
+  });
+
+  it('lets the geometry a growth replaced go, without another pick', async function () {
+    // Firefox has no gc() to call
+    if (typeof globalThis.gc !== 'function') this.skip();
+    const {renderer} = display;
+    const camera = makeFlatCamera();
+    const old = await withSilencedInfo(async () => {
+      const {sprites} = makeSprites(FlatKind, [[-2, 0, 0]], {capacity: 1, grow: true});
+      const hit = await picker.pick(camera, pointerAt(camera, -2, 0), [sprites]);
+      expect(hit, 'the pick drew the geometry').to.not.be.undefined;
+      const ref = new WeakRef(sprites.geometry);
+      // the growth disposes the geometry the pick mesh draws
+      sprites.createSprite();
+      sprites.update();
+      return ref;
+    });
+
+    // three keeps the render list of the last pick, the geometry in it, until a render finds it unused
+    // for more than 10 frames of the animation loop — the frames of an app that renders on
+    const pickedAt = renderer.info.frame;
+    while (renderer.info.frame - pickedAt <= 10) await new Promise((resolve) => requestAnimationFrame(resolve));
+    renderer.render(new Scene(), camera);
+
+    // a WeakRef keeps its target alive up to the end of the task it was made or read in
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    for (let i = 0; i < 3; i++) globalThis.gc({execution: 'sync', type: 'major'});
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // a boolean: chai would print a geometry it finds alive, which walks three's object graph for minutes
+    expect(old.deref() === undefined, 'the geometry the growth replaced is collected').to.be.true;
   });
 
   it('answers two picks in flight at once, each from its own list', async () => {
@@ -383,5 +454,39 @@ describe('sprites — picking', function () {
     const scene = new Scene();
     scene.add(sprites);
     expect(() => renderer.render(scene, camera)).to.not.throw();
+  });
+
+  it('builds nothing more over 50 picks, and gives back what it built with the mesh and with dispose()', async () => {
+    const memory = () => {
+      const {textures, renderTargets, uniformBuffers, programs, geometries, attributes} = display.renderer.info.memory;
+      return {textures, renderTargets, uniformBuffers, programs, geometries, attributes};
+    };
+    const camera = makeFlatCamera();
+    // not drawn on the screen: the only render objects of the sprites are the ones of the pick
+    const {sprites} = makeSprites(FlatKind, [[0, 0, 0]]);
+    const colorMap = sprites.getTexture('colorMap');
+    const before = memory();
+
+    await picker.pick(camera, pointerAt(camera, 0, 0), [sprites]);
+    const afterFirst = memory();
+    for (let i = 0; i < 49; i++) await picker.pick(camera, pointerAt(camera, 0, 0), [sprites]);
+    expect(memory(), 'after 50 picks').to.deep.equal(afterFirst);
+
+    // the pick mesh and its render object go with the mesh, the geometry of the sprites with them
+    sprites.dispose();
+    const {uniformBuffers, programs, geometries, attributes} = memory();
+    expect({uniformBuffers, programs, geometries, attributes}, 'once the sprites are disposed').to.deep.equal({
+      uniformBuffers: before.uniformBuffers,
+      programs: before.programs,
+      geometries: before.geometries,
+      attributes: before.attributes,
+    });
+
+    picker.dispose();
+    expect(memory().renderTargets, 'once the picker is disposed').to.equal(before.renderTargets);
+
+    // the color map is the caller's
+    colorMap.dispose();
+    expect(memory().textures, 'once the color map is disposed').to.equal(before.textures);
   });
 });

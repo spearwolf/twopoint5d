@@ -1748,15 +1748,18 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
 - **The nearest sprite wins**, by the depth test, whatever the sprites blend or write. At one depth —
   a 2D scene on one plane — the sprite drawn later wins, as on the screen: the later slot of a mesh,
   the later mesh by `renderOrder`. Only the sprites are drawn, not their passes: a shadow or a
-  reflection is nothing to hit. A mesh that is disposed, not visible or empty is left out.
+  reflection is nothing to hit. A mesh that is disposed, not visible, whose material is not visible,
+  or empty is left out.
 - **One frame of latency.** The answer comes once the gpu has drawn and the pixel is read back — fine
   for a click, and for hover every frame too. Pick after `update()`, as you render.
 - **Sorted and growing meshes work.** The pick resolves a slot to its handle as the slots stood at the
   draw, so a `sortBy()`, a `sortByViewDepth()` or a growth before the read back changes nothing
-  about the answer; a sprite freed in between answers `undefined`. The price is one look-up per sprite
-  of the listed meshes per pick.
+  about the answer; a sprite freed in between answers `undefined`. The price is a copy of one
+  reference per sprite of the listed meshes per pick. A sprite without a handle — written into the
+  pool through `createFromAttributes()` — gets one when the pick hits it, and answers `undefined`
+  when a sort, a free or a growth moved the slots before the read back.
 - **The cost** of a pick is a draw of the listed meshes into one pixel — every vertex of every
-  sprite, a fragment only under the pointer — and that look-up. List the meshes that can be hit, not
+  sprite, a fragment only under the pointer — and that copy. List the meshes that can be hit, not
   the whole scene.
 - **The renderer** is left as the pick found it: render target, MRT, clear colour and the `autoClear`
   flags. The picker draws into a 1 × 1 float target — three's WebGL 2 backend reads no integer
@@ -1764,12 +1767,16 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   exactly, up to 2²⁴ sprites per mesh; a mesh of more is refused with a `RangeError` before the draw
   rather than answered with the wrong sprite. A material's `side`, alpha test, opacity, `maskNode`,
   `alphaHash` and `alphaToCoverage` reach its pick as they reach the screen.
-- **Ownership.** The renderer, the camera and the meshes stay the caller's. The picker builds a pick
-  material per mesh on the uniforms and textures of that mesh — a `setUniform()` or `setTexture()`
-  reaches the pick as it reaches the sprites —, follows a swapped placement, and releases it when the
-  mesh is disposed. `dispose()` releases the target and every pick material and rejects every pick
-  still in flight; a `pick()` after it answers `undefined`. A camera, a pointer or a list of the wrong
-  shape is refused with a `TypeError` that names the fix.
+- **Ownership.** The renderer, the camera and the meshes stay the caller's. The camera takes the
+  coordinate system of the renderer, as its next render would; its depth convention stays as it is —
+  under a reversed depth buffer the pick turns its projection over itself. The pointer and the list
+  are taken as they are at the call. The picker builds a pick mesh and a pick material per mesh on
+  the geometry, the uniforms and the textures of that mesh — a `setUniform()` or `setTexture()`
+  reaches the pick as it reaches the sprites —, follows a swapped placement, releases them when the
+  mesh is disposed, and builds them anew after a growth or a geometry put into the slot. `dispose()`
+  releases the target and every pick material and rejects every pick still in flight; a `pick()`
+  after it answers `undefined`. A camera, a pointer or a list of the wrong shape is refused with a
+  `TypeError` that names the fix.
 
 ## Presets
 
@@ -2711,9 +2718,10 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
 - Under `grow: true` a `createSprite()` that finds room allocates the sprite and nothing else, and
   `update()` after a growth allocates nothing; the growth itself is the hitch, copying and uploading
   every sprite the mesh holds (see "FeatureSprites").
-- A pick of `SpritePicker` draws the listed meshes into one pixel and looks up one handle per sprite
-  of them; it allocates its promise and three's read back per call — a tool for clicks and hover,
-  not for every sprite every frame (see "Picking: which sprite is under the pointer").
+- A pick of `SpritePicker` draws the listed meshes into one pixel and copies one handle per sprite
+  of them; it allocates its promise, a copy of the pointer and of the list, and three's read back per
+  call — a tool for clicks and hover, not for every sprite every frame (see "Picking: which sprite is
+  under the pointer").
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
   with bindings and `visible` hooks as well; the allocation spec holds a plane and a light

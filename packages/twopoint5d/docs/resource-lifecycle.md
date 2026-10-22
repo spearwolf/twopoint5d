@@ -101,10 +101,11 @@ geometry and the material it built, and what the caller put there stays the call
 [`SpritePicker`](../src/sprites/SpritePicker.ts) owns its render target and, per mesh it
 has drawn, a pick mesh and a pick material built on the uniforms and textures of that
 mesh; the renderer, the camera and the meshes stay the caller's. It listens to three's
-`dispose` event of each mesh and releases that pick material then — the event comes
-before the mesh releases the resources the pick material reads. Its `dispose()` releases
-the target and every pick material, stops listening, and rejects every pick still in
-flight (section 3).
+`dispose` event of each mesh and of the geometry it draws, and releases the pick mesh
+and the pick material then — the event of the mesh comes before the mesh releases the
+resources the pick material reads, and the one of the geometry comes with a growth; the
+next pick builds them anew. Its `dispose()` releases the target and every pick material,
+stops listening, and rejects every pick still in flight (section 3).
 
 ## 2. Idempotence
 
