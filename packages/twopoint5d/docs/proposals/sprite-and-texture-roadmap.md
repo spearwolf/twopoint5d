@@ -478,9 +478,11 @@ sprites.setTexture('colorMap', labels.texture);
 
 - A shelf packer on a canvas, a `CanvasTexture`, an ordinary `TextureAtlas` — so every feature,
   `AtlasFrameTable` and `sampleAtlasFrame()` read its frames unchanged.
-- `add()` marks the texture for upload; `remove()` frees the cell for the next frame that fits and
-  `clear()` starts over. A full atlas throws, naming its size — no silent growth that would move
-  every frame.
+- `add()` marks the texture for upload — or, once `upload(renderer)` has been called, notes its cell
+  for the next call (§3.3 of
+  [`dynamic-atlas-and-bitmap-text.md`](dynamic-atlas-and-bitmap-text.md)); `remove()` frees the cell
+  for the next frame that fits and `clear()` starts over. A full atlas throws, naming its size — no
+  silent growth that would move every frame.
 - `padding` and `extrude` against bleeding, the same reasons `inset` exists in the mesh helper.
 
 Verdict: small, independent of the pipeline work, and it turns "one draw call per label" into

@@ -69,7 +69,7 @@ rewriteText(text, glyphs, font, ''); // the caller frees them again, the last gl
 - Vitest runs under Node: there is no `OffscreenCanvas`, no `document`, no `DOMParser`.
 
 The roadmap's sketch is right about the code with one exception: `TextureAtlas` has no way to let
-go of a name, which `remove()` needs (§3.4) — a module-internal method is added for it.
+go of a name, which `remove()` needs (§3.6) — a module-internal method is added for it.
 
 ## 3. `DynamicAtlas` (module `texture/`)
 
@@ -208,7 +208,7 @@ A frame that does not fit throws a `RangeError` and changes nothing:
 - larger than the atlas can hold at all:
   `DynamicAtlas: the frame "big" of 2000 × 40 does not fit into an atlas of 1024 × 1024 with padding 1 and extrude 0 — build a larger atlas`
 - no room left:
-  `DynamicAtlas: the atlas of 1024 × 1024 is full — the frame "label-31" of 96 × 16 does not fit beside the 30 frames in it; build a larger one — new DynamicAtlas({width: 2048, height: 2048}) — or clear() it`
+  `DynamicAtlas: the atlas of 1024 × 1024 is full — the frame "label-31" of 96 × 16 does not fit beside the 30 frames packed into it; build a larger one — new DynamicAtlas({width: 2048, height: 2048}) — or clear() it`
 
 There is no silent growth: a larger canvas would move every frame and invalidate every `s, t, u, v`
 written to a sprite.
@@ -255,13 +255,14 @@ a frame then reads its own edge, not the padding.
   — a callback with `(context, width, height)`, an image scaled to it — and extrudes again. The
   frame object, its id and its coords stay: every sprite showing it shows the new picture after the
   next upload, nothing is written to them. A score counter or a health label redraws; it does not
-  add again. A name the atlas does not hold throws
-  (`DynamicAtlas: there is no frame "hp" to redraw — add() it first`), and so does an image element
-  that is still loading, a closed `ImageBitmap` or a canvas of no size, before anything is cleared.
-  An image element that has loaded without a natural size is drawn at the size of the frame. A
-  callback or an image that throws — one that failed to load among them — leaves the frame as far as
-  it got — its cell cleared, perhaps drawn in part — and marked for upload (in a `finally`); the
-  frame, its name and its cell stay.
+  add again. A name the atlas does not hold throws (`DynamicAtlas: there is no frame "hp" to redraw
+  — add() it first`), and so does an image element that is still loading, a closed `ImageBitmap` or
+  a canvas of no size, before anything is cleared. An image element that has loaded without a
+  natural size is drawn at the size of the frame. A callback or an image that throws — one that
+  failed to load among them — leaves the frame as far as it got — its cell cleared, perhaps drawn in
+  part — and marked for upload (in a `finally`) as every change is (§3.3): the whole texture before
+  the first `upload()`, its cell for the next `upload()` after it; the frame, its name and its cell
+  stay.
 - The cell of every frame is kept in a private map, apart from `data`: a caller who changes
   `frame.data` moves nothing, and `redraw()` and `remove()` still work on the cell the frame was packed
   into.

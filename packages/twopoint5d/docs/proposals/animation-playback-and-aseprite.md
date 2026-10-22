@@ -115,8 +115,8 @@ New refusals of `add()`, each an `Error` that names the animation:
 | a frame name of the list not in the atlas | `` the frame name "x" at index 1 for the animation "a", which the atlas does not carry `` |
 | a list entry no string | `` a frame name of X at index 1 for the animation "a" — a frame name is a string `` |
 
-The old precedence of `frameRate` over `duration` when both are given (the types forbid it, a
-json catalog may not) stays as it is — changing it would break such a catalog.
+Where a json catalog gives both `frameRate` and `duration` (the types forbid it), `frameRate` wins;
+refusing the pair would break such a catalog.
 
 ### 3.3 Reading an animation back
 
@@ -153,7 +153,7 @@ names and ids and the same counter of anonymous names; adding to one leaves the 
 through and holds its last frame — that is the whole one-shot API. `anim` is static: the write
 needs `spritePool.touchVO(sprite, 'anim')` (or a geometry with `attributeUsage: {dynamic:
 ['anim']}`). Before its start (`time + animOffset < 0`) a `'once'` shows its first frame; a
-`'loop'` and a `'pingpong'` run on backwards in their cycle, as they do today.
+`'loop'` and a `'pingpong'` run on backwards in their cycle.
 
 ## 4. The animsMap
 
@@ -163,21 +163,22 @@ Decision 1 of the master plan: the documented first header texel keeps its layou
 texel joins it. It sits **right after the frames of its animation**, so a reader finds it from
 the first header alone, and the frames of the first animation still begin at texel `n`:
 
-- texels `0 … n−1`: `[frameCount, duration, firstFrameTexel, texelsPerFrame]`, as before;
+- texels `0 … n−1`: the first header texel of each animation, `[frameCount, duration,
+  firstFrameTexel, texelsPerFrame]`;
 - from texel `n` on, for each animation in the order of the ids: its frames, `texelsPerFrame`
   texels each, then its **second header texel** `[playback, hasDurations, cycleDuration, −2]` at
   `firstFrameTexel + frameCount · texelsPerFrame`;
 - `playback` is `0` loop, `1` once, `2` pingpong; `hasDurations` is `1` for an animation with
   `durations`, `0` otherwise; `cycleDuration` as in §3.3;
-- the fourth component `−2` marks the texel as a second header; `AnimatedFrames` takes a texel
-  whose fourth component lies below `−1.5` for one. No texel of the old layout goes below `−1`: a
-  header has `texelsPerFrame ≥ 0`, a size texel `0`, trim margins `0 … 1`, and the `v` of tex
-  coords is a fraction of the image — negative for a frame with `FLIP_VERTICAL` (every frame
+- the fourth component `−2` marks the texel as a second header; `AnimatedFrames` takes a texel whose
+  fourth component lies below `−1.5` for one. No first header texel and no frame texel goes below
+  `−1`: a header has `texelsPerFrame ≥ 0`, a size texel `0`, trim margins `0 … 1`, and the `v` of
+  tex coords is a fraction of the image — negative for a frame with `FLIP_VERTICAL` (every frame
   TexturePacker turned carries `FLIP_DIAGONAL | FLIP_VERTICAL`), `−1` exactly for such a frame as
   high as its image. A first draft marked with `−1` and read anything negative as a mark, which a
-  turned first frame of the next animation passed for; with `−2` an animsMap of the old layout,
-  one built by hand among them, plays as it did — every animation loops at one duration — as long
-  as its frames lie within their image.
+  turned first frame of the next animation passed for; with `−2` an animsMap without second header
+  texels, one built by hand among them, plays every animation as a loop at one duration, as long as
+  its frames lie within their image.
 - the second frame texel becomes `[width, height, flipDiagonal, endTime]`: `endTime` is the end
   of the frame within the animation in seconds (the running sum of `durations`) for an animation
   with durations, `0` for any other.
@@ -193,10 +194,10 @@ them right; the CHANGELOG says it under "Changed".
 
 ### 4.2 The frame index — shader math
 
-`T = time + animOffset`, `N = frameCount`, `D = duration`, `C = cycleDuration`. The second header
-is read at `firstFrameTexel + N · max(texelsPerFrame, 1)`; when its fourth component is not below
-`−1.5`, `playback = 0` and `hasDurations = 0` (the old layout). `D = 0` shows frame 0 in every
-mode, as today.
+`T = time + animOffset`, `N = frameCount`, `D = duration`, `C = cycleDuration`. The second header is
+read at `firstFrameTexel + N · max(texelsPerFrame, 1)`; when its fourth component is not below
+`−1.5`, `playback = 0` and `hasDurations = 0` (an animsMap without second header texels). `D = 0`
+shows frame 0 in every mode.
 
 **One duration** (`hasDurations = 0`), `s = T / D · N` the frames elapsed:
 
@@ -354,9 +355,9 @@ AsepriteJson.parse(data: AsepriteJsonData, options?: AsepriteParseOptions):
 ```
 
 The frames go through `TexturePackerJson.parse()` (rotation, a name taken in `target` — refused
-before anything is written), the tags through `FrameBasedAnimations#add(name,
-timing, atlas, frameNames)`. A sheet without tags answers an empty `FrameBasedAnimations`. Each
-call builds a new `FrameBasedAnimations`; a bake of it belongs to the caller as before.
+before anything is written), the tags through `FrameBasedAnimations#add(name, timing, atlas,
+frameNames)`. A sheet without tags answers an empty `FrameBasedAnimations`. Each call builds a new
+`FrameBasedAnimations`; a bake of it belongs to the caller, as every bake does.
 
 ## 6. Atlas adapters in `TextureStore`
 
@@ -378,7 +379,7 @@ export const asepriteAtlasAdapter: AtlasAdapter;        // AsepriteJson.parse, t
 Two corrections of the roadmap's sketch `(json) => {atlas, meta, animations?}`:
 
 - the adapter takes the image's coords too — the resource lays the frames out on the image it
-  loaded, which is how `TexturePackerJson.parse()` is called today;
+  loaded, as it does for `TexturePackerJson.parse()`;
 - it answers no `meta`: the resource keeps none — its `atlasJson` is the json as read.
 
 An adapter reads the envelope TexturePacker, free-tex-packer and Aseprite share, because the
@@ -411,9 +412,9 @@ any adapter runs; a packer with another envelope is converted to it first.
   and a write from JavaScript throws the `TypeError` of `wrongShapeError()`. A change parses the
   json again.
 - The parse effect calls the adapter where it called `TexturePackerJson.parse()`. A throw, or an
-  answer without a `TextureAtlas` as `atlas` (`TextureResource: the atlas adapter of resource
-  "x" answered no atlas — an adapter answers {atlas, animations?}`), takes atlas and animations
-  back and is reported as today (`source: 'texture'`, step `atlasParse`). An `animations` that is
+  answer without a `TextureAtlas` as `atlas` (`TextureResource: the atlas adapter of resource "x"
+  answered no atlas — an adapter answers {atlas, animations?}`), takes atlas and animations back and
+  is reported as a failed parse is (`source: 'texture'`, step `atlasParse`). An `animations` that is
   no `FrameBasedAnimations` is refused the same way.
 
 ### 6.4 The animations of an item
@@ -421,7 +422,7 @@ any adapter runs; a packer with another envelope is converted to it first.
 The atlas effect publishes the adapter's `animations` beside the atlas (one batch). The
 animations effect then publishes:
 
-- neither adapter animations nor catalog entries: none, as today;
+- neither adapter animations nor catalog entries: none;
 - otherwise a `clone()` of the adapter's animations (or a new, empty one) with every catalog entry
   of the item added — an entry named like a tag is refused by `add()` as a duplicate name and
   reported (`source: 'frameBasedAnimations'`), the tag stays.
@@ -441,10 +442,9 @@ store.registerAtlasAdapter('fighter', (json, parentCoords) => {
 
 ## 7. Ownership and lifecycle
 
-Nothing new owns a GPU resource. `AsepriteJson.parse()` and the adapters build plain objects; a
-bake stays the caller's. The resource publishes a new `FrameBasedAnimations` per run of its
-effect, as today; `clone()` copies only JS objects. `registerAtlasAdapter()` keeps functions,
-released with the store.
+Nothing new owns a GPU resource. `AsepriteJson.parse()` and the adapters build plain objects; a bake
+stays the caller's. The resource publishes a new `FrameBasedAnimations` per run of its effect;
+`clone()` copies only JS objects. `registerAtlasAdapter()` keeps functions, released with the store.
 
 ## 8. Fixtures
 

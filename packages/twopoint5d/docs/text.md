@@ -101,9 +101,9 @@ that every `yoffset` is measured from; a baseline at `b` is `y: b + font.base * 
 - a glyph's box lies at `pen + xoffset · s` and `lineTop − yoffset · s`, `width · s` × `height · s`;
 - the pen moves on by `(xadvance + letterSpacing) · s`, and a kerning pair moves the second glyph by
   its `amount · s`;
-- a line is as wide as the pen after its last char that is no space, less one `letterSpacing · s` —
-  the spacing lies between chars —, and `align` puts its left edge (`'left'`), its middle
-  (`'center'`) or its right edge (`'right'`) on `x`, line by line.
+- a line is as wide as the pen after its last char that is no breakable space, less one
+  `letterSpacing · s` — the spacing lies between chars —, and `align` puts its left edge (`'left'`),
+  its middle (`'center'`) or its right edge (`'right'`) on `x`, line by line.
 
 **The anchor of the base.** A sprite is placed by its position, and the base decides where its quad
 lies around it. `writeText()` reads the extents of the base out of the geometry's `position`
@@ -127,32 +127,32 @@ upload itself: its new frame and size, and a tint written after the call, go up 
 
 **Chars.** Read by code point, so a char beyond the BMP is one glyph. Each falls into one class:
 
-| class | chars | set as |
-| --- | --- | --- |
-| line end | `\n`, U+2028, U+2029 | ends the line |
-| breakable space | U+0020, tab, U+1680, U+2000–U+2006, U+2008–U+200A, U+205F, U+3000 | a tab as U+0020, the others as their own glyph or else as U+0020 |
-| break without width | U+200B, and a breakable space the font has neither glyph for | takes no room |
-| no-break space | U+00A0, U+2007, U+202F | its own glyph or else U+0020, else dropped |
-| control and format | `\r`, a soft hyphen, U+200C–U+200F, U+2060, U+FEFF and every other of Cc and Cf | dropped |
-| any other | | its glyph, else `fallback`, else skipped |
+| class | chars | set as | at a line break |
+| --- | --- | --- | --- |
+| line end | `\n`, U+2028, U+2029 | nothing | ends the line |
+| breakable space | U+0020, tab, U+1680, U+2000–U+2006, U+2008–U+200A, U+205F, U+3000 | a tab as U+0020, the others as their own glyph or else as U+0020; no sprite | a place to break; dropped at a break, hangs at the end of a line |
+| break without width | U+200B, and a breakable space the font has neither glyph for | nothing: no room, no sprite | a place to break before the next char |
+| no-break space | U+00A0, U+2007, U+202F | its own glyph or else U+0020, else dropped | holds its word together |
+| control and format | `\r`, a soft hyphen, U+200C–U+200F, U+2060, U+FEFF and every other of Cc and Cf | dropped: no room, no sprite | none |
+| any other | | its glyph, else `fallback`, else skipped | a place to break before an ideograph or a kana that is drawn |
 
-A space moves the pen and yields no sprite, even where the font gives it a box. A char the font
-lacks is drawn as `fallback` when one is given (`{fallback: '?'}`) and otherwise skipped; a
-`fallback` is never drawn for a space, a line end, or a control or format char. A char dropped or
-skipped takes no room, and the kerning pair forms across it. A tab is one space wide: there are no
-tab stops.
+A breakable space moves the pen and yields no sprite, even where the font gives it a box; a no-break
+space yields one where its glyph has a box. A char the font lacks is drawn as `fallback` when one is
+given (`{fallback: '?'}`) and otherwise skipped; a `fallback` is never drawn for a space, a line
+end, or a control or format char. A char dropped or skipped takes no room, and the kerning pair
+forms across it. A tab is one space wide: there are no tab stops.
 
 **Word wrap.** With `maxWidth`, in units of the mesh, a line breaks before the word that would make
 it wider: at a breakable space, after U+200B, or before an ideograph or a kana (the scripts Han,
-Hiragana and Katakana). The spaces at the break are dropped. A mark after an ideograph — `。`, `」`
-— stays with the char before it, so a closing mark never starts a line. An ideograph or a kana the
-font lacks and no `fallback` draws is skipped and leaves no place to break. A word wider than
-`maxWidth` on its own stays whole on a line of its own and overflows — there is no hyphenation.
+Hiragana and Katakana). The breakable spaces at the break are dropped. A mark after an ideograph —
+`。`, `」` — stays with the char before it, so a closing mark never starts a line. An ideograph or a
+kana the font lacks and no `fallback` draws is skipped and leaves no place to break. A word wider
+than `maxWidth` on its own stays whole on a line of its own and overflows — there is no hyphenation.
 `lineHeight` takes the place of the font's, in pixels of the font, above 0.
 
-**Spaces at the end of a line** hang out of it: they count neither in its width nor in its
-alignment nor in the `width` of the layout, so `'Score: 100 '` stands where `'Score: 100'` does, and
-a line of nothing but spaces is 0 wide.
+**Breakable spaces at the end of a line** hang out of it: they count neither in its width nor in
+its alignment nor in the `width` of the layout, so `'Score: 100 '` stands where `'Score: 100'`
+does, and a line of nothing but breakable spaces is 0 wide.
 
 **Freeing.** The sprites are the caller's. To change a text, `rewriteText(sprites, glyphs, font,
 next, options?)` writes the next one into the sprites of the last: it reuses the glyphs in reading

@@ -241,7 +241,8 @@ What to know about it:
   to `minScale` brings the frames no sooner, and the controller goes back as above: the descent,
   the return, and the pace it found to measure against. Where the load comes and goes, the frames
   come at no steady pace, and the scale stays down — `minScale` is how far that goes — until clean
-  frames bring it back through the tries up, one every 180 clean frames.
+  frames bring it back through the tries up: the first after 180 clean frames, and twice as
+  many after each try that failed, up to 3600.
 - Under a `pixelZoom` the controller holds still: pixel art keeps its size.
 - `adaptive.enabled = false` holds it still and gives the display back the `resolutionScale` it had
   when the controller took over last; `true` takes over again, counting the windows toward the next

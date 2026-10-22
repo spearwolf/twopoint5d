@@ -475,17 +475,18 @@ that throws leaves the atlas as it was. The frame is untrimmed; its `data` is th
 canvas, `{frame: {x, y, w, h}}` — a copy: the atlas keeps the cell of every frame itself, and a
 change to `data` moves nothing. **`redraw(name, source)`** draws a frame anew at its size, in place:
 a score, a health label. A redraw that throws leaves the frame as far as it got — its cell cleared,
-perhaps drawn in part — and marked for upload; the frame and its name stay, so the next `redraw()`
-mends it. An image element that is still loading (`complete` still `false`), a closed `ImageBitmap`
-and a canvas of no size are refused by `add()` — with or without a size — and by `redraw()`, before
-anything is cleared. An image element that has loaded without a natural size, an SVG without `width`
-and `height`, is drawn at the size `add()` is given and by `redraw()` at the size of the frame;
-`add()` without a size refuses it. One that failed to load has no natural size either: `add()`
-refuses it without a size and takes no cell for it, `drawImage()` throws for it with one, and
-`redraw()` leaves the frame cleared. **`remove(name)`** clears the frame and lets go of its name
-and its cell. The frame keeps its id, and `atlas.get(id)` still answers it — its coords show the
-cell, cleared until another frame is packed into it, and that frame afterwards —, but it leaves the
-random draws of the atlas (`randomFrame()` and its siblings) and a table of every frame
+perhaps drawn in part — and marked for upload like any change — the whole texture until the first
+`upload()`, its cell for the next `upload()` from then on; the frame and its name stay, so the next
+`redraw()` mends it. An image element that is still loading (`complete` still `false`), a closed
+`ImageBitmap` and a canvas of no size are refused by `add()` — with or without a size — and by
+`redraw()`, before anything is cleared. An image element that has loaded without a natural size, an
+SVG without `width` and `height`, is drawn at the size `add()` is given and by `redraw()` at the
+size of the frame; `add()` without a size refuses it. One that failed to load has no natural size
+either: `add()` refuses it without a size and takes no cell for it, `drawImage()` throws for it with
+one, and `redraw()` leaves the frame cleared. **`remove(name)`** clears the frame and lets go of its
+name and its cell. The frame keeps its id, and `atlas.get(id)` still answers it — its coords show
+the cell, cleared until another frame is packed into it, and that frame afterwards —, but it leaves
+the random draws of the atlas (`randomFrame()` and its siblings) and a table of every frame
 (`frameTable(atlas)`, `atlasFrameTable(atlas)`), and the message of a full atlas counts only the
 frames it holds. **`clear()`** starts over with a new `atlas`, frame ids from 0.
 

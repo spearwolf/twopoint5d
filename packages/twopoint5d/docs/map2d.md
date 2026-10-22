@@ -195,11 +195,11 @@ export function teardown() {
 }
 ```
 
-The tile boxes go into the map node, in whose space they are computed. The plane, the points and
-the frustum boxes are in world space and go into the root of the scene graph above the map, as that
-root is at each `helpers.update()`: a map added to the scene after the helpers were switched on, or
-moved into another scene graph, takes them along. `RectangularVisibilityAreaHelpers` does the same
-for the rectangle of a `RectangularVisibilityArea`.
+The tile boxes go into the map node, in whose space they are computed. The plane, the points and the
+frustum boxes are in world space and go into the root of the scene graph above the map, as that root
+is at each `helpers.update()`: a map added to the scene after the helpers were switched on, or moved
+into another scene graph, takes them along. `RectangularVisibilityAreaHelpers` keeps the rectangle
+of a `RectangularVisibilityArea` in the node `add()` names: it goes into no root and follows none.
 
 ## Who disposes what
 

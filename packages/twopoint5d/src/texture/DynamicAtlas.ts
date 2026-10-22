@@ -324,11 +324,11 @@ export class DynamicAtlas {
    * its id and its coords, so every sprite that shows it shows the new picture after the next upload,
    * without a write to it.
    *
-   * A draw callback or an image that throws leaves the frame as far as it got — its cell cleared, perhaps
-   * drawn in part — and marked for upload; the frame, its name and its cell stay, and the error goes on to
-   * the caller. An image element that is still loading, a closed ImageBitmap and a canvas of no size are
-   * refused before anything is cleared. An image element that has loaded without a natural size is drawn
-   * at the size of the frame; one that failed to load makes `drawImage()` throw and leaves the frame
+   * A draw callback or an image that throws leaves the frame as far as it got — its cell cleared, perhaps drawn in part — and
+   * marked for upload as any change is — the whole texture until the first {@link upload}, its cell for the next `upload()` from
+   * then on; the frame, its name and its cell stay, and the error goes on to the caller. An image element that is still loading,
+   * a closed ImageBitmap and a canvas of no size are refused before anything is cleared. An image element that has loaded without
+   * a natural size is drawn at the size of the frame; one that failed to load makes `drawImage()` throw and leaves the frame
    * cleared, like any image that throws.
    *
    * A frame redrawn every frame — a counter, a timer — wants {@link upload} before each render: it copies

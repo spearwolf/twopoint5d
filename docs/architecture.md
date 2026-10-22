@@ -310,24 +310,24 @@ wire it up.
 The publishable artifact is therefore `dist/`, not the source package directory.
 `publishNpmPkg` runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` first and then
 publishes `dist/`. It skips a version npm already lists and takes npm's `E404` for a first
-publish. Before it asks npm anything it copies `LICENSE` from the workspace root, and
-`CHANGELOG.md` and the README from the directory it is started in, into the package
-directory; the README is `README-pkg.md`, or `README.md` if there is none, and ships as
-`README.md`. A workspace `.npmrc` goes along if there is one, so that `npm show` and
-`npm publish` read the same one. A `-dev` version is skipped before any of this.
-`npm show` asks the registry from `publishConfig.registry` of the manifest, handed over as
-`npm_config_registry`, because that is the registry `npm publish` uploads to — it takes
-`publishConfig` over every config file and environment variable, and `npm show` reads none
-of it. `checkManifest` refuses a `publishConfig.registry` that is no http or https URL.
-`npm show` gets 60 s; a registry that does not answer in time ends the script with a line
-that says so, exit code 1, and a killed npm is never taken for a first publish. `npm
-publish` gets no time limit: one killed in the middle of the upload leaves an uncertain
-state, and the job as a whole is bounded by `timeout-minutes` in `deploy.yml`.
-`publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and exit code 1 on a
-missing directory, on a second one and on any other option — a misspelled `--dry-run`
-included — before it asks npm. npm is asked with `npm show .` in the package directory,
-so the name comes from the manifest that `npm publish` reads there and no value from it
-stands on a command line. npm runs without a shell; on Windows, where `npm` is an
+publish. Before it asks npm anything, and so also for a version it then skips, it copies
+`LICENSE` from the workspace root, and `CHANGELOG.md` and the README from the directory it
+is started in, into the package directory; the README is `README-pkg.md`, or `README.md`
+if there is none, and ships as `README.md`. A workspace `.npmrc` goes along if there is
+one, so that `npm show` and `npm publish` read the same one. A `-dev` version is skipped
+before any of this. `npm show` asks the registry from `publishConfig.registry` of the
+manifest, handed over as `npm_config_registry`, because that is the registry `npm publish`
+uploads to — it takes `publishConfig` over every config file and environment variable, and
+`npm show` reads none of it. `checkManifest` refuses a `publishConfig.registry` that is no
+http or https URL. `npm show` gets 60 s; a registry that does not answer in time ends the
+script with a line that says so, exit code 1, and a killed npm is never taken for a first
+publish. `npm publish` gets no time limit: one killed in the middle of the upload leaves
+an uncertain state, and the job as a whole is bounded by `timeout-minutes` in
+`deploy.yml`. `publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and
+exit code 1 on a missing directory, on a second one and on any other option — a misspelled
+`--dry-run` included — before it asks npm. npm is asked with `npm show .` in the package
+directory, so the name comes from the manifest that `npm publish` reads there and no value
+from it stands on a command line. npm runs without a shell; on Windows, where `npm` is an
 `npm.cmd` that Node starts only through `cmd.exe`, it runs as a single string of literals,
 and an argument with any character besides letters, digits and `_ @ . / -` is refused on
 every platform. Every failure — a manifest that is unreadable or has no `name` or
@@ -386,12 +386,13 @@ only a TypeScript consumer needs it.
 `.github/dependabot.yml` has Dependabot look at `npm` and `github-actions` once a week.
 The minor and patch updates of the toolchain arrive as one pull request, the group
 `toolchain`. The four catalog entries stay out of it: a jump of `three` moves the peer
-range of the library and is a release of its own, because the catalog range lands
-verbatim in the published manifest. So each of them, and every major update, comes as a
-pull request by itself, to be reviewed on its own. `playwright` stays out of the group as
-well: each of its updates brings the Chromium and Firefox the browser suite runs on, so
-it comes as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one
-carries a comment that names the advisory it answers and says when the entry can go.
+range of the library and is a release of its own, because the catalog range lands verbatim
+in the published manifest. So each of them, and every major update but those of
+`typescript` and `@types/node`, which it ignores (see below), comes as a pull request by
+itself, to be reviewed on its own. `playwright` stays out of the group as well: each of
+its updates brings the Chromium and Firefox the browser suite runs on, so it comes as a
+pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
+comment that names the advisory it answers and says when the entry can go.
 
 The repo runs two TypeScripts. `typescript` in the root is 7.x, the native compiler: its
 `tsc` builds the library and runs every type check but the lookbook's. TypeScript 7
