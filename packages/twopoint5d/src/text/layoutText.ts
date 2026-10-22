@@ -256,8 +256,8 @@ const wrap = (font: BitmapFont, entries: readonly Entry[], maxWidth: number, let
  * Chars are read by code point. `\n`, U+2028 and U+2029 end a line. A breakable space — U+0020, the tab,
  * U+1680, U+2000–U+2006, U+2008–U+200A, U+205F, U+3000 — moves the pen and yields no glyph: a tab by the
  * advance of U+0020, the others by their own glyph or else by U+0020; one the font has neither for takes
- * no room. A no-break space — U+00A0, U+2007, U+202F — is set as its own glyph or else as U+0020, yields a glyph
- * where that one has a box, holds its word together, and is dropped without either.
+ * no room. A no-break space — U+00A0, U+2007, U+202F — is set as its own glyph or else as U+0020, yields a
+ * glyph where the glyph it is set as has a box, holds its word together, and is dropped without either.
  * Control and format chars (`\r`, a soft hyphen, U+200B–U+200F, U+FEFF …) are dropped: no glyph, no room,
  * never the `fallback`. Any other char the font lacks is drawn as `fallback`, or skipped without taking
  * room. A kerning pair forms across a char that is dropped or skipped. A char of 0 × 0 yields no glyph.

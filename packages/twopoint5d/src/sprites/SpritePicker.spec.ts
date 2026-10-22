@@ -226,6 +226,41 @@ describe('SpritePicker', () => {
       await expect(picker.pick(makeCamera(), 5 as unknown as {x: number; y: number}, [])).rejects.toThrow('got 5');
     });
 
+    test('reads x and y of the pointer once, for the check, the message and the pick', async () => {
+      const {renderer} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      const countingPointer = (x: number, y: number) => {
+        const reads = {x: 0, y: 0};
+        const pointer = {
+          get x() {
+            reads.x++;
+            return x;
+          },
+          get y() {
+            reads.y++;
+            return y;
+          },
+        };
+        return {pointer, reads};
+      };
+
+      const valid = countingPointer(0, 0);
+      await picker.pick(makeCamera(), valid.pointer, [sprites]);
+      expect(valid.reads).toEqual({x: 1, y: 1});
+
+      const refused = countingPointer(Number.NaN, 0);
+      await expect(picker.pick(makeCamera(), refused.pointer, [sprites])).rejects.toThrow(
+        new TypeError(
+          'SpritePicker#pick(): the pointer is {x, y} in normalized device coordinates, -1 to 1 — got {x: NaN, y: 0}',
+        ),
+      );
+      expect(refused.reads).toEqual({x: 1, y: 1});
+
+      sprites.dispose();
+      picker.dispose();
+    });
+
     test('a list that is no array, and an entry that is no FeatureSprites', async () => {
       const {renderer} = makeRenderer();
       const picker = new SpritePicker(renderer);
@@ -290,6 +325,34 @@ describe('SpritePicker', () => {
 
     a.dispose();
     b.dispose();
+    picker.dispose();
+  });
+
+  test('a pick whose copy of the handles throws gives the handle array back', async () => {
+    const {renderer} = makeRenderer();
+    const picker = new SpritePicker(renderer);
+    const a = makeSprites(1).sprites;
+    const taken: unknown[][] = [];
+    const copyVOsInto = a.spritePool!.copyVOsInto.bind(a.spritePool!);
+    const copy = vi.spyOn(a.spritePool!, 'copyVOsInto').mockImplementation((into) => {
+      taken.push(into);
+      return copyVOsInto(into);
+    });
+
+    await picker.pick(makeCamera(), center, [a]);
+    const first = taken[0];
+
+    copy.mockImplementationOnce((into) => {
+      taken.push(into);
+      throw new Error('copy failed');
+    });
+    await expect(picker.pick(makeCamera(), center, [a])).rejects.toThrow('copy failed');
+    expect(taken.at(-1), 'the throwing copy was handed the spare array').toBe(first);
+
+    await picker.pick(makeCamera(), center, [a]);
+    expect(taken.at(-1), 'the handle array the throwing copy took').toBe(first);
+
+    a.dispose();
     picker.dispose();
   });
 

@@ -113,11 +113,10 @@ describe('TextureAtlas', () => {
       const bar = Symbol('bar');
 
       atlas.add(bar, new TextureCoords());
+      atlas.add('foo', new TextureCoords());
 
       expect(() => atlas.add(bar, new TextureCoords())).toThrow('TextureAtlas: the frame name Symbol(bar) is already taken');
-      expect(() => atlas.add('foo', new TextureCoords()) && atlas.add('foo', new TextureCoords())).toThrow(
-        'TextureAtlas: the frame name "foo" is already taken',
-      );
+      expect(() => atlas.add('foo', new TextureCoords())).toThrow('TextureAtlas: the frame name "foo" is already taken');
     });
   });
   describe('frameNames', () => {

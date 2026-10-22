@@ -202,16 +202,16 @@ export class SpritePicker {
     pointer: PickPointer,
     sprites: S,
   ): Promise<SpritePickOf<S[number]> | undefined> {
+    let at: PickPointer;
     try {
-      checkArguments(camera, pointer, sprites);
+      at = checkArguments(camera, pointer, sprites);
     } catch (error) {
       return Promise.reject(error);
     }
     if (this.#disposed) return Promise.resolve(undefined);
 
-    // taken now: a caller that reuses its pointer or its list while the renderer initializes changes
-    // neither what is drawn nor what checkArguments() has seen
-    const at: PickPointer = {x: pointer.x, y: pointer.y};
+    // taken now: a caller that reuses its list while the renderer initializes changes neither what is
+    // drawn nor what checkArguments() has seen
     const list: FeatureSprites[] = [...sprites];
 
     return new Promise((resolve, reject) => {
@@ -269,17 +269,14 @@ export class SpritePicker {
       }
       const entry = this.#sync(sprites, k + 1);
       scene.add(entry.mesh);
-      drawn[k] = {sprites, pool, slotMoves: pool.slotMoves, handles: this.#handlesOf(pool)};
+      // in drawn before the copy: whatever throws from here on, the finally of #pick() gives the array back
+      const record: Drawn = {sprites, pool, slotMoves: pool.slotMoves, handles: this.#spareHandles.pop() ?? []};
+      drawn[k] = record;
+      // the handles of every slot in use as they stand at the draw, copied without a look-up: the read
+      // back resolves the slot here, before a sort, a freeSprite() or a growth can move it. A slot
+      // without a handle stays empty and gets one only when the pick hits it
+      pool.copyVOsInto(record.handles);
     }
-  }
-
-  // the handles of every slot in use as they stand at the draw, copied without a look-up: the read
-  // back resolves the slot here, before a sort, a freeSprite() or a growth can move it. A slot
-  // without a handle stays empty and gets one only when the pick hits it
-  #handlesOf(pool: VertexObjectPool<object & VO>): ((object & VO) | undefined)[] {
-    const handles = this.#spareHandles.pop() ?? [];
-    pool.copyVOsInto(handles);
-    return handles;
   }
 
   #sync(sprites: FeatureSprites, meshNumber: number): PickEntry {
@@ -469,15 +466,19 @@ export class SpritePicker {
   }
 }
 
-function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly unknown[]): void {
+// checks the arguments of pick() and answers the pointer as a copy, its x and y read once: the check,
+// the message and the pick see the same values
+function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly unknown[]): PickPointer {
   if ((camera as {isCamera?: unknown} | null)?.isCamera !== true) {
     throw new TypeError(`${WHERE}: the camera is no three.js Camera`);
   }
-  if (!Number.isFinite(pointer?.x) || !Number.isFinite(pointer?.y)) {
+  const x = pointer?.x;
+  const y = pointer?.y;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
     const got =
       typeof pointer !== 'object' || pointer === null
         ? describeValue(pointer)
-        : `{x: ${describeValue(pointer.x)}, y: ${describeValue(pointer.y)}}`;
+        : `{x: ${describeValue(x)}, y: ${describeValue(y)}}`;
     throw new TypeError(`${WHERE}: the pointer is {x, y} in normalized device coordinates, -1 to 1 — got ${got}`);
   }
   if (!Array.isArray(sprites)) {
@@ -488,6 +489,7 @@ function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly 
       throw new TypeError(`${WHERE}: the entry ${k} of the list is no FeatureSprites — the picker draws FeatureSprites alone`);
     }
   }
+  return {x, y};
 }
 
 // the red of the pixel is the slot + 1 (0: nothing), the green the place of the mesh in the list + 1

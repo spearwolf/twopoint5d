@@ -30,13 +30,13 @@ test('ignores blocks whose info string is `ts`, `js` or `json`', () => {
 
 test('strips the fence indentation from the code and reports per line what it took off', () => {
   const {snippets} = extractSnippets(
-    doc('- item', '', `  ${FENCE}ts check`, '  const a = 1;', '    const b = 2;', ' x', `  ${FENCE}`),
+    doc('- item', '', `   ${FENCE}ts check`, '   const a = 1;', '     const b = 2;', '  x', `   ${FENCE}`),
     'a.md',
   );
 
   // up to the indentation of the fence goes, deeper indentation stays, a shallower line loses
   // what it has
-  assert.deepEqual(snippets, [{file: 'a.md', line: 4, code: 'const a = 1;\n  const b = 2;\nx', offsets: [2, 2, 1]}]);
+  assert.deepEqual(snippets, [{file: 'a.md', line: 4, code: 'const a = 1;\n  const b = 2;\nx', offsets: [3, 3, 2]}]);
 });
 
 test('a fence indented four spaces at the top level opens no block: the line is code of an indented block', () => {
@@ -104,6 +104,42 @@ test('a line less indented than the content of a list item ends it: a fence afte
   assert.deepEqual(snippets, []);
 });
 
+const NEVER_CLOSED_AT_5 = {
+  file: 'a.md',
+  line: 3,
+  message: 'code block marked `ts check` is never closed — its list item ends at line 5',
+};
+
+test('a line less indented than the content of its list item ends the item and the open block in it: a marked one is a problem with its fence line, and the next block is found', () => {
+  // the second line ending the item is the marker of the next item
+  for (const ending of ['next', '- next']) {
+    const {snippets, problems} = extractSnippets(
+      doc('- item', '', `  ${FENCE}ts check`, '  const a = 1;', ending, '', `${FENCE}ts check`, 'const c = 3;', FENCE),
+      'a.md',
+    );
+
+    assert.deepEqual(snippets, [{file: 'a.md', line: 8, code: 'const c = 3;', offsets: [0]}], ending);
+    assert.deepEqual(problems, [NEVER_CLOSED_AT_5], ending);
+  }
+});
+
+test('a fence less indented than the content of its list item ends the item instead of closing the block, and opens a block of its own', () => {
+  const {snippets, problems} = extractSnippets(doc('- item', '', `  ${FENCE}ts check`, '  const a = 1;', FENCE), 'a.md');
+
+  assert.deepEqual(snippets, []);
+  assert.deepEqual(problems, [NEVER_CLOSED_AT_5]);
+});
+
+test('a blank line in a block of a list item is code and ends nothing', () => {
+  const {snippets, problems} = extractSnippets(
+    doc('- item', '', `  ${FENCE}ts check`, '  const a = 1;', '', '  const b = 2;', `  ${FENCE}`),
+    'a.md',
+  );
+
+  assert.deepEqual(snippets, [{file: 'a.md', line: 4, code: 'const a = 1;\n\nconst b = 2;', offsets: [2, 0, 2]}]);
+  assert.deepEqual(problems, []);
+});
+
 test('a tab after a list marker counts to the next multiple of four: a fence at the content of the item opens a block', () => {
   const expected = [{file: 'a.md', line: 4, code: 'const a = 1;', offsets: [4]}];
   const rest = ['', `    ${FENCE}ts check`, '    const a = 1;', `    ${FENCE}`];
@@ -165,6 +201,26 @@ test('a marked fence in a blockquote on the line of a list marker is a problem w
         'a code block marked `ts check` inside a blockquote is not checked — only a `ts check` block outside a quote is compiled',
     },
   ]);
+});
+
+test('a marked fence in a list item inside a blockquote is a problem with its line', () => {
+  const message =
+    'a code block marked `ts check` inside a blockquote is not checked — only a `ts check` block outside a quote is compiled';
+
+  for (const markdown of [
+    doc(`> - ${FENCE}ts check`, '>   const a = 1;', `>   ${FENCE}`),
+    doc(`> 1. ${TILDES}ts check`, '>    const a = 1;', `>    ${TILDES}`),
+    doc(`- > - ${FENCE}ts check`, '  >   const a = 1;', `  >   ${FENCE}`),
+    doc(`>- ${FENCE}ts check`, '>  const a = 1;', `>  ${FENCE}`),
+  ]) {
+    const {snippets, problems} = extractSnippets(markdown, 'a.md');
+
+    assert.deepEqual(snippets, [], markdown);
+    assert.deepEqual(problems, [{file: 'a.md', line: 1, message}], markdown);
+  }
+
+  // no space behind the marker: no list item, so no fence
+  assert.deepEqual(extractSnippets(doc(`> -${FENCE}ts check`), 'a.md').problems, []);
 });
 
 test('a tab before the code of a block counts as columns: the code loses as much as its fence is deep', () => {

@@ -56,17 +56,25 @@ describe('layoutText()', () => {
       expect(layout.height).toBe(12);
     });
 
-    test('a space moves the pen and yields no glyph', () => {
+    test('a breakable space moves the pen and yields no glyph', () => {
       const layout = layoutText(font, ' A ');
       expect(boxes(layout)).toEqual([['A', 0, 3, -1, 3, 4]]);
       expect(layout.width).toBe(7);
     });
 
-    test('a space yields no glyph even where the font gives it a box', () => {
+    test('a breakable space yields no glyph even where the font gives it a box', () => {
       const data = tinyFontData();
       Object.assign(data.chars[0]!, {x: 12, y: 4, width: 2, height: 2});
       const boxed = new BitmapFont(data);
       expect(boxes(layoutText(boxed, 'A A')).map(([char]) => char)).toEqual(['A', 'A']);
+    });
+
+    test('a no-break space yields a glyph where the glyph it is set as has a box', () => {
+      const data = tinyFontData();
+      Object.assign(data.chars[0]!, {x: 12, y: 4, width: 2, height: 2});
+      const boxed = new BitmapFont(data);
+      // tinyFontData has no U+00A0: it is set as U+0020, which has a box here
+      expect(boxes(layoutText(boxed, 'A\u00A0A')).map(([char]) => char)).toEqual(['A', ' ', 'A']);
     });
 
     test('reads chars by code point', () => {

@@ -11,7 +11,9 @@
 // moves on to the next multiple of four columns, before a fence as after a list marker.
 // A line indented further is code of an indented block and neither opens nor closes a
 // fence. A line of three or more of the same `*`, `-` or `_`, spaced or not, is a
-// thematic break and no list item.
+// thematic break and no list item. A block inside a list item ends with the item, at the
+// first line that is not blank and is indented less than the item's content; a marked
+// block that ends so is reported, as one that never closes is.
 //
 // The code of a block loses the indentation CommonMark takes off it, up to the column of
 // its fence, and a snippet carries for each code line how far that moved its characters,
@@ -19,8 +21,8 @@
 //
 // A marker that is nearly right (`js check`, `ts check strict`) is reported instead of
 // ignored: a typo must not drop a block out of the check without a word. So is a marker
-// inside a blockquote: `checkDocSnippets` does not unwrap quotes, and the block would
-// otherwise fall out of the check in silence.
+// inside a blockquote, in a list item of the quote as well: `checkDocSnippets` does not
+// unwrap quotes, and the block would otherwise fall out of the check in silence.
 //
 // In a `CHANGELOG.md` only the `## [Unreleased]` section counts, up to the next `## [`
 // heading: a released section is history and shows the API of its release, so its
@@ -30,7 +32,9 @@
 // applied to the rest of a line behind its indentation and its list markers
 const OPENING_FENCE = /^(`{3,}|~{3,})(.*)$/;
 const CLOSING_FENCE = /^([ \t]*)(`{3,}|~{3,})\s*$/;
-const QUOTED_FENCE = /^\s*>[\s>]*(`{3,}|~{3,})(.*)$/;
+// a quote marker, then any more quote markers, list markers and spaces, then a fence: a list marker
+// counts only with a space or a tab behind it, as CommonMark has it
+const QUOTED_FENCE = /^\s*>(?:[ \t>]|(?:[-+*]|\d{1,9}[.)])(?=[ \t]))*(`{3,}|~{3,})(.*)$/;
 // a bullet or an ordered marker of a list item, and the spaces and tabs after it
 const LIST_ITEM = /^([-+*]|\d{1,9}[.)])([ \t]+|$)/;
 // CommonMark: three or more of the same `*`, `-` or `_`, spaced or not, make a thematic break,
@@ -110,7 +114,8 @@ export function extractSnippets(markdown, file) {
    * @property {boolean} marked
    * @property {number} indent the column the fence starts at; CommonMark takes up to that many
    *   columns off each code line
-   * @property {number} base the content column of the list item the fence sits in, 0 outside a list
+   * @property {number} base the content column of the list item the fence sits in, 0 outside a list;
+   *   a line that is not blank and is indented less ends the item and the block
    * @property {'`' | '~'} fence
    * @property {number} size
    * @property {number} line
@@ -126,122 +131,138 @@ export function extractSnippets(markdown, file) {
   lines.forEach((text, index) => {
     const lineNumber = index + 1;
 
-    if (open == null) {
-      if (text.trim() === '') return;
+    if (open != null) {
+      // CommonMark: a line that is not blank and is indented less than the content of the list
+      // item the block sits in ends the item, and the block with it — code has no lazy
+      // continuation. The line is read again below, outside the block: it may open the next one
       const whitespace = LEADING_WHITESPACE.exec(text)?.[0] ?? '';
-      const indent = columnsOf(whitespace);
-      // a line indented less than the content of a list item is outside that item. Paragraphs are
-      // not tracked: a lazy continuation line of a paragraph ends the item here, and a list marker
-      // that may not interrupt a paragraph (an empty item, an ordered one that does not start at 1)
-      // starts one all the same, which CommonMark does neither; only a fence four or more columns
-      // deep that follows such a line is read differently
-      while (listContent.length > 0 && /** @type {number} */ (listContent.at(-1)) > indent) listContent.pop();
-      let base = listContent.at(-1) ?? 0;
-      // code of an indented block, or text that goes on a paragraph: it opens no fence and no
-      // list item
-      if (indent - base > MAX_FENCE_INDENT) return;
-
-      // a heading inside a code block is code, so the sections are tracked between fences only
-      if (isChangelog && VERSION_HEADING.test(text)) {
-        // the first `## [` heading after `## [Unreleased]` ends the section for good
-        inScope = !unreleasedSeen && UNRELEASED_HEADING.test(text);
-        if (inScope) unreleasedSeen = true;
-        return;
-      }
-
-      // the line is read from its first character on: a list marker hands the rest of the line on
-      // as the first line of its item, which may open a fence or start with another marker
-      let column = indent;
-      let rest = text.slice(whitespace.length);
-      for (;;) {
-        if (THEMATIC_BREAK.test(rest)) return;
-        const item = LIST_ITEM.exec(rest);
-        if (item == null) break;
-        const start = column + /** @type {string} */ (item[1]).length;
-        const end = columnsOf(/** @type {string} */ (item[2]), start);
-        rest = rest.slice(item[0].length);
-        // CommonMark: the content starts after 1 to 4 columns of spaces or tabs; on an otherwise
-        // empty line, or after 5 or more (the item starts with indented code), one column past the
-        // marker
-        const content = rest === '' || end - start > 4 ? start + 1 : end;
-        listContent.push(content);
-        // an empty first line, or one of indented code, opens no fence and holds no other marker
-        if (content !== end) return;
-        column = content;
-        base = content;
-      }
-
-      const match = OPENING_FENCE.exec(rest);
-      if (match == null) {
-        const quoted = inScope ? QUOTED_FENCE.exec(rest) : null;
-        if (quoted != null) {
-          // both groups of the pattern always take part in a match
-          const quotedFence = /** @type {string} */ (quoted[1]);
-          const quotedRest = /** @type {string} */ (quoted[2]);
-          // a quoted fence is never tracked as open: its code lines start with `>` themselves
-          if (!(quotedFence.startsWith('`') && quotedRest.includes('`'))) {
-            const info = quotedRest.trim();
-            if (info.split(/\s+/).includes('check')) {
-              problems.push({
-                file,
-                line: lineNumber,
-                message: `a code block marked \`${info}\` inside a blockquote is not checked — only a \`ts check\` block outside a quote is compiled`,
-              });
-            }
+      if (text.trim() !== '' && columnsOf(whitespace) < open.base) {
+        if (open.marked) {
+          problems.push({
+            file,
+            line: open.line,
+            message: `code block marked \`ts check\` is never closed — its list item ends at line ${lineNumber}`,
+          });
+        }
+        open = null;
+      } else {
+        const closing = CLOSING_FENCE.exec(text);
+        // CommonMark: only a run of the same character, at least as long as the opening one, closes
+        const run = /** @type {string} */ (closing?.[2]);
+        if (
+          closing != null &&
+          columnsOf(/** @type {string} */ (closing[1])) - open.base <= MAX_FENCE_INDENT &&
+          run.charAt(0) === open.fence &&
+          run.length >= open.size
+        ) {
+          if (open.marked) {
+            snippets.push({file, line: open.line + 1, code: open.code.join('\n'), offsets: open.offsets});
           }
+          open = null;
+          return;
+        }
+
+        if (open.marked) {
+          const {code, offset} = stripIndent(text, open.indent);
+          open.code.push(code);
+          open.offsets.push(offset);
         }
         return;
       }
-      // the groups of the pattern always take part in a match
-      const run = /** @type {string} */ (match[1]);
-      const info = /** @type {string} */ (match[2]);
-      const fence = /** @type {'`' | '~'} */ (run.charAt(0));
-      // CommonMark: the info string of a backtick fence holds no backtick, so a line such
-      // as "```inline``` prose" opens nothing; the info string of a tilde fence may
-      if (fence === '`' && info.includes('`')) return;
+    }
 
-      const marker = info.trim();
-      const words = marker.split(/\s+/).filter(Boolean);
-      const marked = inScope && words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
+    if (text.trim() === '') return;
+    const whitespace = LEADING_WHITESPACE.exec(text)?.[0] ?? '';
+    const indent = columnsOf(whitespace);
+    // a line indented less than the content of a list item is outside that item. Paragraphs are
+    // not tracked: a lazy continuation line of a paragraph ends the item here, and a list marker
+    // that may not interrupt a paragraph (an empty item, an ordered one that does not start at 1)
+    // starts one all the same, which CommonMark does neither; only a fence four or more columns
+    // deep that follows such a line is read differently
+    while (listContent.length > 0 && /** @type {number} */ (listContent.at(-1)) > indent) listContent.pop();
+    let base = listContent.at(-1) ?? 0;
+    // code of an indented block, or text that goes on a paragraph: it opens no fence and no
+    // list item
+    if (indent - base > MAX_FENCE_INDENT) return;
 
-      if (inScope && !marked && words.includes('check')) {
-        problems.push({file, line: lineNumber, message: `unknown marker \`${marker}\` — only \`ts check\` is checked`});
-      }
-
-      open = {
-        marked,
-        indent: column,
-        base,
-        fence,
-        size: run.length,
-        line: lineNumber,
-        code: [],
-        offsets: [],
-      };
+    // a heading inside a code block is code, so the sections are tracked between fences only
+    if (isChangelog && VERSION_HEADING.test(text)) {
+      // the first `## [` heading after `## [Unreleased]` ends the section for good
+      inScope = !unreleasedSeen && UNRELEASED_HEADING.test(text);
+      if (inScope) unreleasedSeen = true;
       return;
     }
 
-    const closing = CLOSING_FENCE.exec(text);
-    // CommonMark: only a run of the same character, at least as long as the opening one, closes
-    const run = /** @type {string} */ (closing?.[2]);
-    if (
-      closing != null &&
-      columnsOf(/** @type {string} */ (closing[1])) - open.base <= MAX_FENCE_INDENT &&
-      run.charAt(0) === open.fence &&
-      run.length >= open.size
-    ) {
-      if (open.marked) {
-        snippets.push({file, line: open.line + 1, code: open.code.join('\n'), offsets: open.offsets});
-      }
-      open = null;
-      return;
+    // the line is read from its first character on: a list marker hands the rest of the line on
+    // as the first line of its item, which may open a fence or start with another marker
+    let column = indent;
+    let rest = text.slice(whitespace.length);
+    for (;;) {
+      if (THEMATIC_BREAK.test(rest)) return;
+      const item = LIST_ITEM.exec(rest);
+      if (item == null) break;
+      const start = column + /** @type {string} */ (item[1]).length;
+      const end = columnsOf(/** @type {string} */ (item[2]), start);
+      rest = rest.slice(item[0].length);
+      // CommonMark: the content starts after 1 to 4 columns of spaces or tabs; on an otherwise
+      // empty line, or after 5 or more (the item starts with indented code), one column past the
+      // marker
+      const content = rest === '' || end - start > 4 ? start + 1 : end;
+      listContent.push(content);
+      // an empty first line, or one of indented code, opens no fence and holds no other marker
+      if (content !== end) return;
+      column = content;
+      base = content;
     }
 
-    if (open.marked) {
-      const {code, offset} = stripIndent(text, open.indent);
-      open.code.push(code);
-      open.offsets.push(offset);
+    const match = OPENING_FENCE.exec(rest);
+    if (match == null) {
+      const quoted = inScope ? QUOTED_FENCE.exec(rest) : null;
+      if (quoted != null) {
+        // both groups of the pattern always take part in a match
+        const quotedFence = /** @type {string} */ (quoted[1]);
+        const quotedRest = /** @type {string} */ (quoted[2]);
+        // a quoted fence is never tracked as open: its code lines start with `>` themselves
+        if (!(quotedFence.startsWith('`') && quotedRest.includes('`'))) {
+          const info = quotedRest.trim();
+          if (info.split(/\s+/).includes('check')) {
+            problems.push({
+              file,
+              line: lineNumber,
+              message: `a code block marked \`${info}\` inside a blockquote is not checked — only a \`ts check\` block outside a quote is compiled`,
+            });
+          }
+        }
+      }
+      return;
     }
+    // the groups of the pattern always take part in a match
+    const run = /** @type {string} */ (match[1]);
+    const info = /** @type {string} */ (match[2]);
+    const fence = /** @type {'`' | '~'} */ (run.charAt(0));
+    // CommonMark: the info string of a backtick fence holds no backtick, so a line such
+    // as "```inline``` prose" opens nothing; the info string of a tilde fence may
+    if (fence === '`' && info.includes('`')) return;
+
+    const marker = info.trim();
+    const words = marker.split(/\s+/).filter(Boolean);
+    const marked = inScope && words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
+
+    if (inScope && !marked && words.includes('check')) {
+      problems.push({file, line: lineNumber, message: `unknown marker \`${marker}\` — only \`ts check\` is checked`});
+    }
+
+    open = {
+      marked,
+      indent: column,
+      base,
+      fence,
+      size: run.length,
+      line: lineNumber,
+      code: [],
+      offsets: [],
+    };
+    return;
   });
 
   // the callback above assigns `open`, which the compiler does not follow

@@ -11,9 +11,7 @@ export function runCheckKind(feature: SpriteFeature, kind: SpriteKindShape, wher
   try {
     feature.checkKind(kind);
   } catch (error) {
-    throw new Error(
-      `${where}: ${error instanceof Error ? error.message : typeof error === 'string' ? error : describeValue(error)}`,
-      {cause: error},
-    );
+    const message = error instanceof Error ? error.message : typeof error === 'string' ? error : describeValue(error);
+    throw new Error(`${where}: ${message}`, {cause: error});
   }
 }
