@@ -115,7 +115,10 @@ describe('sprites — PaletteSwap', function () {
     return item;
   };
 
-  /** Renders `sprites` seen straight on, `size` pixels square at one pixel a unit, and answers the colour at a point of the view, y up. */
+  /**
+   * Renders `sprites` seen straight on, `size` pixels square at one pixel a unit, and answers the colour
+   * at a point of the view, y up.
+   */
   const render = async (sprites, size, topDown) => {
     const target = keep(new RenderTarget(size, size));
     const scene = new Scene();

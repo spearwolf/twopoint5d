@@ -149,6 +149,11 @@ root.add(ui);
 Options: `{color?: boolean; depth?: boolean; stencil?: boolean}`, all default
 `false` except `depth`.
 
+A `ClearStage` works without a pipeline and in Mode C (a pipeline without
+`buildOutputNode` that is not a `RootRenderPipeline`), where all stages draw into
+one target. Under a composing pipeline it is refused, see "Composing + non-pass
+stages" in the pitfalls.
+
 ### Render order
 
 `renderOrder` is a comma-separated list of stage names. `*` is the wildcard
@@ -331,11 +336,17 @@ target of its own from the pool. The pass-target a composing parent samples
 through `asPassNode()` is never pooled: the parent samples the pass-targets of
 all its children in one run of its pipeline.
 
-The pool lends a target only for the exact width, height, `type` and `samples`
-it was built with, and releases every free target before it builds a new one.
-Renderers of different sizes on one pool build a new target on every switch
-between them — give each size a pool of its own. The pool belongs to whoever
-built it: `StageRenderer#dispose()` leaves it alone.
+The pool lends a target in exactly the width and height asked for, with the
+`type` and `samples` it was built with. When no free target has the size, the
+oldest free one of that type and those samples is resized to it — the same
+object, so the `texture()` node of Mode C and the pipeline on it stay across a
+change of the pixel ratio — and every other free target is released; with no
+such target all free ones are released and a new one is built. A renderer that
+borrows while another one draws finds its old target released after a change
+of size and gets a new one. Renderers of different sizes on one pool resize
+its target on every switch between them and allocate new GPU memory each time —
+give each size a pool of its own. The pool belongs to whoever built it:
+`StageRenderer#dispose()` leaves it alone.
 
 ```ts check
 import {Display, OrthographicProjection, RootRenderPipeline, Stage2D, StageRenderer, StageRenderTargetPool} from '@spearwolf/twopoint5d';
@@ -754,8 +765,11 @@ What this layer does on top of the general rules in
   color space, and are restored afterwards — also when a stage throws.
 - **Composing + non-pass stages**: under a pipeline with `buildOutputNode` or a
   `RootRenderPipeline`, every stage in the list must implement `asPassNode()`.
-  `ClearStage` doesn't — keep it for non-pipeline layering only. The renderer
-  throws with a clear message in that case.
+  `ClearStage` doesn't — keep it for layering without a pipeline and in Mode C.
+  `add()` refuses such a stage under a composing pipeline with a `TypeError`
+  that names it, and so do the `pipeline` and the `buildOutputNode` setter when
+  the write would make the renderer compose while a stage without `asPassNode()`
+  is among its stages; the pipeline or the builder from before stays.
 - **Pipeline lifecycle**: a `pipeline`, an `outputRenderTarget`, an
   `internalTargetPool` and a builder assigned as `buildOutputNode` belong to
   whoever assigned them. Dispose the previous instance yourself when you

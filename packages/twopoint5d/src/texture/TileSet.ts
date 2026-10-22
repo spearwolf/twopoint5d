@@ -64,7 +64,8 @@ const assertFits = (fits: boolean, message: () => string): void => {
 
 /**
  * The `TileSet` maps _tileIds_ to _frameIds_.
- * Unlike the `frameId` of {@link TextureAtlas}, the `tileId` starts at 1 by default (but is optionally configurable using the `firstId` option).
+ * Unlike the `frameId` of {@link TextureAtlas}, the `tileId` starts at 1 by default (but is optionally
+ * configurable using the `firstId` option).
  * The `frameId` range of a `TileSet` starts at `firstFrameId` and goes without gaps to up to `firstFrameId + tileCount - 1`.
  *
  * `D` is the type of the frame data of its atlas: a `TileSet` over an atlas with a data type of its

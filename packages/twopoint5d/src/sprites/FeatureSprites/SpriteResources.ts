@@ -256,7 +256,9 @@ export class SpriteResources {
   /**
    * Sets the texture `name`. It stays the caller's; {@link dispose} does not release it. A texture
    * of the same kind as the one set costs no rebuild; another kind, or a change between none and
-   * one, rebuilds the graphs that read it. Does nothing once disposed.
+   * one, rebuilds the graphs that read it. With the texture that is set already it does nothing:
+   * the kind of a texture whose filters or format changed is read by {@link touchTexture}. Does
+   * nothing once disposed.
    */
   setTexture(name: string, texture: Texture | undefined): void {
     const slot = this.#slot(name);
@@ -265,8 +267,11 @@ export class SpriteResources {
   }
 
   /**
-   * Re-reads the texture `name`. `TextureLoader` writes a loaded image into the same texture
-   * without an event; call this once it has loaded. Does nothing once disposed.
+   * Re-reads the image and the kind of the texture `name`. `TextureLoader` writes a loaded image
+   * into the same texture without an event, and a change of its filters, `colorSpace`, `type` or
+   * `format` can make it a texture of another kind (see `textureShapeKey()`), which the graphs
+   * learn here and then rebuild for. Call it after the load and after such a change. Does nothing
+   * once disposed.
    */
   touchTexture(name: string): void {
     const slot = this.#slot(name);

@@ -2,7 +2,7 @@ import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {mul} from 'three/tsl';
 import type {MeshBasicMaterial, Vector3, Vector4} from 'three/webgpu';
-import {Mesh, Object3D, PlaneGeometry, PointLight, Scene, Texture} from 'three/webgpu';
+import {Mesh, Object3D, PerspectiveCamera, PlaneGeometry, PointLight, Scene, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {nodesOf} from '../../testing/spriteGraph.js';
@@ -1061,6 +1061,34 @@ describe('FeatureSprites', () => {
       sprites.freeSprite(a);
       expect(other.instancedPool.usedCount).toBe(1);
       expect(sprites.passes['shadow']!.geometry).toBe(other);
+
+      sprites.dispose();
+      other.dispose();
+    });
+
+    test('sortByViewDepth() sorts the pool of a geometry put into the slot, past the capacity the sprites were built with', () => {
+      const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, passes: [ShadowPass]});
+      const built = sprites.geometry!;
+      const other = new FeatureSpritesGeometry(TexturedSpriteKind, 4);
+      sprites.geometry = other;
+      const [a, b, c] = [0, -5, -2].map((z) => {
+        const sprite = sprites.createSprite()!;
+        sprite.setPosition(0, 0, z);
+        return sprite;
+      });
+      // looks along -z: the farthest sprite has the lowest view depth and is drawn first
+      const camera = new PerspectiveCamera();
+      camera.position.set(0, 0, 10);
+      const movesBefore = other.instancedPool.slotMoves;
+
+      expect(sprites.sortByViewDepth(camera)).toBe(true);
+
+      expect(other.instancedPool.getVO(0)).toBe(b);
+      expect(other.instancedPool.getVO(1)).toBe(c);
+      expect(other.instancedPool.getVO(2)).toBe(a);
+      expect(other.instancedPool.slotMoves).toBeGreaterThan(movesBefore);
+      expect(sprites.passes['shadow']!.geometry).toBe(other);
+      expect(built.instancedPool.usedCount).toBe(0);
 
       sprites.dispose();
       other.dispose();

@@ -8,7 +8,10 @@ export interface IDemo {
   description?: string;
   url: string;
   href: string;
-  /** `<name>.webp` in `public/images/demo-preview/`, `<name>` being the demo page; written by `pnpm lookbook:generate-previews`. */
+  /**
+   * `<name>.webp` in `public/images/demo-preview/`, `<name>` being the demo page; written by
+   * `pnpm lookbook:generate-previews`.
+   */
   previewImage: string;
   tags?: string[];
   /**

@@ -22,10 +22,15 @@ interface StageRenderTargetPoolEntry {
  * samples the pass-targets of all its children in one run of its pipeline, so each child keeps
  * its own.
  *
- * A target is lent only for the exact width, height, `type` and `samples` it was built with. When
- * no free target fits, the pool releases every free target before it builds a new one, so nothing
- * of an earlier size stays behind after a resize. A pool that renderers of different sizes share
- * builds a new target on every switch between them — give each size a pool of its own.
+ * A target is lent in exactly the width and height asked for, with the `type` and `samples` it was
+ * built with. When no free target has the size, the oldest free one of that type and those
+ * samples is resized to it — the same object, so the `texture()` node of Mode C and the pipeline
+ * on it stay across a change of the pixel ratio — and every other free target is released; with
+ * no such target all free ones are released and a new one is built. A pool that renderers of
+ * different sizes share resizes its target on every switch between them, and allocates new GPU
+ * memory each time — give each size a pool of its own. A renderer that borrows while another
+ * one draws — a Mode C child under a Mode C parent — finds its old target released after a change
+ * of size and gets a new one: the borrow that changed the size released the other free targets.
  *
  * Renderers that draw in the same order every frame borrow the same target every frame, so the
  * `texture()` node of Mode C and the pipeline built on it stay.
@@ -44,8 +49,9 @@ export class StageRenderTargetPool {
 
   /**
    * Lends a target of exactly `width`×`height` pixels, of the texture `type` and the `samples`
-   * asked for — a free one that fits, or a new one. `width` and `height` are the pixels of the
-   * target itself, not a logical size. Every `acquire()` is paired with one {@link release} of
+   * asked for: a free one of that size; else the oldest free one of that type and those samples,
+   * resized; else a new one. `width` and `height` are the pixels of the target itself, not a
+   * logical size. Every `acquire()` is paired with one {@link release} of
    * the target it answered; code of your own may borrow from the same pool on the same terms.
    *
    * Throws an error naming the class and the state once {@link dispose} has run.
@@ -66,8 +72,25 @@ export class StageRenderTargetPool {
       }
     }
 
-    // nothing free fits: whatever is free is of a size, a type or a sample count nobody asks for
-    // right now, and would otherwise hold its GPU memory for good after a resize
+    // no free target has the size: the oldest free one of the type and the samples takes it. It stays
+    // the same object, so the texture() node of Mode C and the pipeline on it stay, and three.js
+    // releases the GPU memory of the old size in setSize()
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i]!;
+      if (entry.lent) continue;
+      const rt = entry.renderTarget;
+      if (rt.texture.type === type && rt.samples === samples) {
+        rt.setSize(width, height);
+        entry.lent = true;
+        // whatever else is free is of a size, a type or a sample count nobody asks for right now,
+        // and would otherwise hold its GPU memory for good after a resize; the entry just lent
+        // keeps its place
+        this.#releaseFreeTargets();
+        return rt;
+      }
+    }
+
+    // nothing free has the type and the samples either
     this.#releaseFreeTargets();
 
     const renderTarget = new RenderTarget(width, height, {type, samples});

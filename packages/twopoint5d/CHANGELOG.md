@@ -82,6 +82,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VertexObjectPool#sortBy()` takes as a name only a number property of `VOType` (`VOSortKeyName<VOType>`), and any string on a pool without a vertex object type (**BREAKING** for TypeScript). See the Migration Guide
 - `Dependencies#value()` answers `Shape[K] | null | undefined`: `null` after an `update()` that wrote `null` (**BREAKING** for TypeScript). See the Migration Guide
 - `VertexObjectPool#adoptVOs()` hands the `onCreateVO` hook of the source to a pool without a hook of its own; the source keeps its hook
+- `StageRenderer#add()` refuses a stage without `asPassNode()` — a `ClearStage`, say — under a composing pipeline (`buildOutputNode` over a pipeline, or a `RootRenderPipeline`) with a `TypeError` that names the stage, before the stage gets the size, joins `stages` or is announced; the `pipeline` and the `buildOutputNode` setter refuse a pipeline or a builder that would compose such a stage among the `stages` and keep the value they had (**BREAKING**). See the Migration Guide
+- `StageRenderTargetPool#acquire()` resizes the oldest free target of the type and the samples asked for when no free target has the size, and releases the other free targets; the `texture()` node of Mode C and the pipeline on it stay across a change of the pixel ratio
+- the TSDoc of `dispose()` of `StageRenderer`, `Stage2D` and `Canvas2DStage` and of `StageRenderer#add()`, `remove()` and `parent` names what reaches the caller — one error unchanged, several as an `AggregateError` — and leaves the order of the errors open
+- the TSDoc and the sprites guide say that `setTexture()` with the texture that is set does nothing, and that a change of its filters, `colorSpace`, `type` or `format` needs `touchTexture()` to give the graphs the new kind of the texture
 
 ### Removed
 
@@ -103,6 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a `VertexObjectPool` whose vertex objects another pool adopted stays usable: a later `createVO()` gives the replacement of its `onCreateVO` hook its own slot, and two pools can adopt each other's vertex objects back and forth without `createVO()` hanging
 - `VertexObjectPool#sortBy()` refuses a key function that frees a vertex object and creates another, which leaves `usedCount` where it was, as it refuses one that changes the count
 - `VertexObjectPool#createVO()` gives its slot back when the `voInitialize` or the `onCreateVO` hook throws, and `getVO()` leaves no vertex object in its slot then; the error reaches the caller as it was thrown
+- `StageRenderer` calls `releasePassNodeMemory()` only on a stage that has the method: a stage flagged `isStage2D` without it leaves through `remove()`, `dispose()` and a write that leaves the composed mode without an error
 
 ### Migration Guide
 
@@ -308,6 +313,28 @@ const record: AttributeBuffer = {bufferName, itemSize, dataType, usageType, type
 const moved = buffer.buffers.get('position')!.serial !== seenSerial;
 const record: AttributeBuffer = {bufferName, itemSize, dataType, usageType, typedArray, serial: 0, dirtySince: 0, pickedUpSerial: 0, dirtyRanges, dirtyRangeCount: 0};
 ```
+
+#### A stage without `asPassNode()` under a composing pipeline
+
+Under a pipeline with `buildOutputNode` or a `RootRenderPipeline`, every stage draws into a target with a depth buffer of its own and the composition lays them over each other, so a `ClearStage` has nothing to clear there. `add()` throws a `TypeError` for it, and the `pipeline` and `buildOutputNode` setters throw while one is among the stages.
+
+**Before**
+
+```ts
+root.buildOutputNode = (passes) => passes[0]!;
+root.pipeline = pipeline;
+root.add(world).add(new ClearStage({depth: true})).add(ui);
+```
+
+**After**
+
+```ts
+root.buildOutputNode = (passes) => passes[0]!;
+root.pipeline = pipeline;
+root.add(world).add(ui);
+```
+
+A stage of your own gets an `asPassNode(renderer)` that answers its pass node. Without a pipeline and in Mode C, the `ClearStage` works as before.
 
 ## [0.23.0] - 2026-10-18
 

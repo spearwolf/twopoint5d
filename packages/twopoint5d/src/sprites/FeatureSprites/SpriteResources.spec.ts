@@ -119,6 +119,24 @@ describe('SpriteResources', () => {
     resources.dispose();
   });
 
+  test('a change of the filters of the texture that is set keeps its shape until touchTexture(), which then gives it the shape of its new kind', () => {
+    const resources = new SpriteResources([color]);
+    const texture = new Texture();
+    texture.minFilter = NearestFilter;
+    texture.magFilter = NearestFilter;
+    resources.setTexture('colorMap', texture);
+    const shape = resources.shapeOf('colorMap');
+
+    texture.minFilter = LinearFilter;
+    texture.magFilter = LinearFilter;
+    resources.setTexture('colorMap', texture);
+    expect(resources.shapeOf('colorMap'), 'setTexture() with the texture that is set does nothing').toBe(shape);
+
+    resources.touchTexture('colorMap');
+    expect(resources.shapeOf('colorMap')).not.toBe(shape);
+    resources.dispose();
+  });
+
   test('a texture of the same kind keeps the shape and notifies nobody; another kind changes it', () => {
     const resources = new SpriteResources([color]);
     resources.setTexture('colorMap', new Texture());

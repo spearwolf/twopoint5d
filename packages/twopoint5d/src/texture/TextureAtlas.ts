@@ -2,7 +2,10 @@ import {forgetFrameName} from './internals.js';
 import type {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
 
-/** The data a frame of a {@link TextureAtlas} carries when the atlas names no type of its own: its entry in a TexturePacker json. */
+/**
+ * The data a frame of a {@link TextureAtlas} carries when the atlas names no type of its own: its entry
+ * in a TexturePacker json.
+ */
 export type TextureAtlasFrameData = TexturePackerFrameData;
 
 export interface TextureAtlasFrame<D = TextureAtlasFrameData> {

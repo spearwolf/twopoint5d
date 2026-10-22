@@ -50,6 +50,18 @@ export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
 type StageRendererMode = 'plain' | 'pipeline-only' | 'composed';
 
+const NO_PASS_NODE =
+  'has no asPassNode(), and a pipeline with buildOutputNode or a RootRenderPipeline composes the pass node of every stage';
+
+// a mode is a function of the two inputs alone, so a write can ask for the mode it would bring about
+function modeOf(
+  pipeline: RenderPipeline | undefined,
+  buildOutputNode: StageRendererBuildOutputNode | undefined,
+): StageRendererMode {
+  if (pipeline == null) return 'plain';
+  return buildOutputNode != null || pipeline instanceof RootRenderPipeline ? 'composed' : 'pipeline-only';
+}
+
 // one message for every member that refuses to answer once the renderer is gone, so the class
 // and the state are always in the text a caller reads out of a foreign stack
 function disposedError(member: string): Error {
@@ -268,18 +280,18 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * here or of `OnStageRemoved` at a previous `StageRenderer` while this renderer leaves its
    * holder, one of `OnAddToParent` as it joins a host: every listener hears its event, the
    * renderer leaves its holder and joins the new one, and the errors reach the caller
-   * afterwards — one unchanged, several as an `AggregateError` in the order they arose. An
+   * afterwards — one unchanged, several as an `AggregateError`. An
    * unsubscribe of the host this renderer leaves that throws is taken the same way: the
    * renderer gives up its other subscription there all the same, and the error joins those of
-   * the listeners, ahead of them. A listener that disposes this renderer or gives it another
+   * the listeners. A listener that disposes this renderer or gives it another
    * holder while it leaves its holder ends the assignment there. For a `StageRenderer`
    * assigned here, {@link add} says the same.
    *
    * A host whose `onResize()` or `onRenderFrame()` throws as this renderer joins it
    * holds nothing of it: the renderer gives back the subscription the host had handed
    * out and joins no holder — `parent` answers `undefined`, and `OnAddToParent` does
-   * not go out. The error of the host joins those of the move out, after them, and an
-   * unsubscribe that throws while the renderer gives back joins after it.
+   * not go out. The error of the host joins those of the move out, and so does that of an
+   * unsubscribe that throws while the renderer gives back.
    */
   get parent(): StageRendererParentType | undefined {
     return this.#parent;
@@ -544,6 +556,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `attach()`, the write is a silent no-op. Assigning a different pipeline
    * gives it this renderer's `outputNode` on the next render.
    *
+   * A pipeline that composes — with {@link buildOutputNode} set, or a `RootRenderPipeline` — takes
+   * the pass node of every stage: while a stage without `asPassNode()`, a `ClearStage` say, is among
+   * the {@link stages}, the write throws a `TypeError` that names the stage and the pipeline
+   * stays the one it was.
+   *
    * In Mode C, the output node is rebuilt only for a new pipeline or after
    * {@link invalidateOutputNode}; stages, their order and names, their scenes
    * and their cameras leave it standing. A write that leaves this mode
@@ -564,6 +581,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   set pipeline(pipeline: RenderPipeline | undefined) {
     if (this.#disposed) return;
     if (this.#pipeline !== pipeline) {
+      if (modeOf(pipeline, this.#buildOutputNode) === 'composed') {
+        this.#refuseStageWithoutPassNode('StageRenderer#pipeline cannot take the pipeline');
+      }
       const previousMode = this.#renderMode();
       this.#pipeline = pipeline;
       // a pipeline arrives with an outputNode of its own; the next render writes this renderer's into it
@@ -622,7 +642,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * here with an error naming the call and the state, and the callback set before stays.
    *
    * A disposed renderer answers `undefined` here and takes no new one: like
-   * `pipeline`, the write is a silent no-op.
+   * `pipeline`, the write is a silent no-op. A builder over a {@link pipeline} composes the pass
+   * node of every stage: while a stage without `asPassNode()`, a `ClearStage` say, is among the
+   * {@link stages}, the write throws a `TypeError` that names the stage and the builder stays
+   * the one it was. Without a pipeline the builder composes nothing and is taken.
    */
   get buildOutputNode(): StageRendererBuildOutputNode | undefined {
     return this.#buildOutputNode;
@@ -633,6 +656,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (this.#buildOutputNode !== buildOutputNode) {
       if ((buildOutputNode as Partial<OutputNodeBuilder> | undefined)?.isDisposed === true) {
         throw new Error('StageRenderer#buildOutputNode cannot take the builder: that builder has been disposed');
+      }
+      if (modeOf(this.#pipeline, buildOutputNode) === 'composed') {
+        this.#refuseStageWithoutPassNode('StageRenderer#buildOutputNode cannot take the builder');
       }
       const previousMode = this.#renderMode();
       this.#buildOutputNode = buildOutputNode;
@@ -702,8 +728,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (stage instanceof StageRenderer) {
       stage.#targets.releasePassTarget();
     } else if ((stage as Partial<Stage2D>).isStage2D === true) {
-      // recognized by its flag, as isStage2DWithoutCamera() does: no runtime import of Stage2D
-      (stage as Stage2D).releasePassNodeMemory();
+      // the flag recognizes a Stage2D without a runtime import of Stage2D, as isStage2DWithoutCamera()
+      // does; an object with the flag from another copy of the library, or a double, need not have the method
+      (stage as Partial<Stage2D>).releasePassNodeMemory?.();
     }
   }
 
@@ -781,8 +808,16 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * pipeline samples the internal target (Mode C).
    */
   #renderMode(): StageRendererMode {
-    if (this.#pipeline == null) return 'plain';
-    return this.#buildOutputNode != null || this.#pipeline instanceof RootRenderPipeline ? 'composed' : 'pipeline-only';
+    return modeOf(this.#pipeline, this.#buildOutputNode);
+  }
+
+  /**
+   * Refuses, with a `TypeError` that starts with `refusal`, a write that would make this renderer
+   * compose while a stage among its stages has no `asPassNode()` to compose.
+   */
+  #refuseStageWithoutPassNode(refusal: string): void {
+    const bare = this.#stages.find((item) => !hasAsPassNode(item.stage));
+    if (bare) throw new TypeError(`${refusal}: the stage ${JSON.stringify(bare.stage.name)} ${NO_PASS_NODE}`);
   }
 
   /**
@@ -1113,14 +1148,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * A listener that throws does not hold up the teardown — one of `OnStageRemoved` or
    * `OnRemoveFromParent` while the renderer lets go of its stages and its holder, or one of
    * `OnStageDispose`: every subscriber hears its event, the renderer is torn down completely,
-   * and the errors reach the caller afterwards — one unchanged, several as an `AggregateError`
-   * in the order they arose: that of the {@link remove} of each stage that threw, in the order
-   * of `stages`; then those of leaving the holder — of an unsubscribe of the host that threw,
-   * then of the `OnRemoveFromParent` listeners here, then of the `remove()` of a parent
-   * `StageRenderer`; then that of the `OnStageDispose` listeners. Each is as it was thrown — an
-   * `AggregateError` itself when more than one listener of one event threw, or when both
-   * events of a `remove()` did. An unsubscribe of the host that throws holds up nothing
-   * either: the renderer gives up its other subscription there all the same.
+   * and the errors reach the caller afterwards — one unchanged, several as an `AggregateError`.
+   * An unsubscribe of the host that throws joins them and holds up nothing: the renderer gives
+   * up its other subscription there all the same.
    *
    * The plain state stays writable, it just no longer drives anything: `resize()` writes
    * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,
@@ -1172,6 +1202,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
     off(this);
 
+    // the errors stand in the order of the teardown above, which is no promise to the caller
     throwCollected(
       errors,
       'StageRenderer#dispose(): more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose or unsubscribe of the host threw',
@@ -1229,7 +1260,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * is not added, the error of its `resize()` comes out of this call, and
    * neither this renderer nor the stage has changed. A disposed stage — one
    * whose `isDisposed` is `true` — is refused with an error naming the call
-   * and the state.
+   * and the state. So is a stage without `asPassNode()`, a `ClearStage` say,
+   * while this renderer composes — {@link buildOutputNode} over a {@link pipeline},
+   * or a `RootRenderPipeline`: a `TypeError` that names the stage, thrown before
+   * the stage gets the size, joins {@link stages} or is announced.
    *
    * Emits `OnStageAdded`. Warns when {@link renderOrder} lists the stage's
    * `name` and another stage already carries it.
@@ -1244,10 +1278,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `StageRenderer` while the child leaves that holder, one of `OnStageAdded`
    * here or of `OnAddToParent` at the child: every listener hears its event,
    * the stage is added, and the errors reach the caller afterwards — one
-   * unchanged, several as an `AggregateError` in the order they arose. An
+   * unchanged, several as an `AggregateError`. An
    * unsubscribe of the host a child leaves that throws is taken the same way:
    * the child gives up its other subscription there all the same, and the
-   * error joins those of the listeners, ahead of them. The size stays the
+   * error joins those of the listeners. The size stays the
    * exception: a stage that refuses it is not added. A listener that disposes
    * this renderer or the child, or gives the child another holder, while the
    * child leaves its previous one ends the call there: the child is not
@@ -1272,6 +1306,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // a disposed stage never announces its end again: listed, it would stay in here for good
     if ((stage as {isDisposed?: unknown}).isDisposed === true) {
       throw new Error(`StageRenderer#add() cannot take the stage ${JSON.stringify(stage.name)}: that stage has been disposed`);
+    }
+
+    // every stage of a composing renderer hands in its pass node: refused here, the stage would
+    // make every frame throw from the rebuild of the output node
+    if (this.#renderMode() === 'composed' && !hasAsPassNode(stage)) {
+      throw new TypeError(`StageRenderer#add() cannot take the stage ${JSON.stringify(stage.name)}: that stage ${NO_PASS_NODE}`);
     }
 
     const item: StageItem = {stage, width: 0, height: 0};
@@ -1356,8 +1396,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `OnStageRemoved` hears it, and so does every listener of
    * `OnRemoveFromParent` at a removed child, which leaves this renderer and
    * releases its pass-target all the same. The errors reach the caller
-   * afterwards — one unchanged, several as an `AggregateError`, those of
-   * `OnStageRemoved` first.
+   * afterwards — one unchanged, several as an `AggregateError`.
    */
   remove(stage: IStage): this {
     const index = this.#getIndex(stage);

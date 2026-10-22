@@ -49,13 +49,14 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor`, `RepeatingTextureColor` |
 | `color` | any, by `order` | `PaletteSwap`, `paletteSwap()`, `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
-The order bands `FrameOrder` (`Flip 100`), `LocalOrder` (`Anchor 100, Flip 150, Slice 175, Scale
-200, Shear 300, Rotate 400`), `MeshOrder` (`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`)
-and `ColorOrder` (`Palette 50, Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of
-your own. Two stages of one order run in the order of the feature list. No built-in feature sits in
-`ColorOrder.Mask` since `ShadowMask` moved to `ColorOrder.Pass`. `ColorOrder.Pass` is the
-band of the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` —
-after every color stage of the kind.
+The order bands `FrameOrder` (`Flip 100`), `LocalOrder`
+(`Anchor 100, Flip 150, Slice 175, Scale 200, Shear 300, Rotate 400`), `MeshOrder`
+(`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`) and `ColorOrder`
+(`Palette 50, Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of your
+own. Two stages of one order run in the order of the feature list. No built-in feature sits in
+`ColorOrder.Mask` since `ShadowMask` moved to `ColorOrder.Pass`. `ColorOrder.Pass` is the band of
+the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` — after
+every color stage of the kind.
 
 A **frame stage** changes the frame after the frame slot has answered it, and everything that
 reads the frame — the trim shift, every stage, the color source — reads the changed one: a mirror
@@ -1060,12 +1061,16 @@ material.dispose();
 Without a frame feature the frame is the whole texture, untrimmed and unturned; without a color
 source the sprite is flat grey, and the color stages — `Tint` among them — work on that grey. A
 feature whose textures are not all set drops out of the graph until they are: a kind with
-`TextureColor` draws its sprites flat grey, tinted, while no `colorMap` is set. A texture declared with `needsImage`
-counts as set only once its image has measures.
+`TextureColor` draws its sprites flat grey, tinted, while no `colorMap` is set. A texture declared
+with `needsImage` counts as set only once its image has measures.
 
 `setTexture(name, texture)` and `getTexture(name)` take the names the features declare; a texture
 stays the caller's, and `dispose()` does not release it. `TextureLoader` writes a loaded image into
 the same texture without an event, so `touchTexture(name)` re-reads it once it has loaded.
+`setTexture()` with the texture that is set already does nothing, and a change of its filters,
+`colorSpace`, `type` or `format` can make it a texture of another kind — from `NearestFilter` to
+`LinearFilter`, say: call `touchTexture(name)` after such a change, and the graphs that read it
+are rebuilt as for another texture.
 
 A texture of the same kind as the one set takes its place without a rebuild: the texture nodes
 of the graphs get it as their value. Of the same kind means alike in `colorSpace`, `type` and
@@ -1261,10 +1266,10 @@ unit length, one of another length scales the sprite by the square of it. Take `
 about +Y is all a sprite needs — a quarter of the bytes and a number to write instead of four —
 and `Orientation` where a sprite leaves the vertical.
 
-A sprite whose yaw or quaternion turns its back to the camera is culled under `FrontSide` — for signs on a
-facade that is what you want. A cut-out seen from both sides draws with `side: DoubleSide` and
-shows its back mirrored; the color stage of a feature of your own can tell the back by
-`frontFacing` of `three/tsl`.
+A sprite whose yaw or quaternion turns its back to the camera is culled under `FrontSide` — for
+signs on a facade that is what you want. A cut-out seen from both sides draws with
+`side: DoubleSide` and shows its back mirrored; the color stage of a feature of your own can tell
+the back by `frontFacing` of `three/tsl`.
 
 `BillboardPlacement` stands in for every form of `flatPlacement()` and back; a sprite kind with
 `Yaw` or `Orientation` keeps the attribute under a billboard and ignores it.
@@ -1590,8 +1595,9 @@ bullets.update();
   attached through `attachInstancedPool()` cannot grow, and the `createSprite()` that would grow it
   throws, naming both ways out. Nor does a geometry the caller put into the `geometry` slot: a growth
   replaces only the geometry the mesh built, and the `createSprite()` that would grow another throws,
-  naming the ways out — the built one back into the slot, or a capacity that fits. The pool behind it is `VertexObjectPool#adoptVOs()` — see
-  [the vertex objects](../src/vertex-objects/README.md#growing-a-pool).
+  naming the ways out — the built one back into the slot, or a capacity that fits. The pool behind
+  it is `VertexObjectPool#adoptVOs()` — see [the vertex
+  objects](../src/vertex-objects/README.md#growing-a-pool).
 
 **Ownership.** The mesh disposes the geometry and the material it built, and nothing else. A
 `geometry` or a `material` handed in, and every texture, stays the caller's; `dispose()` leaves
@@ -1601,11 +1607,12 @@ the caller's as well: `dispose()` releases the ones the mesh built even then, an
 other. A geometry put into the `geometry` slot is the geometry of the sprites from then on: the mesh
 and every pass mesh draw it, `createSprite()`, `freeSprite()`, `sortBy()`, `sortByViewDepth()` and
 `spritePool` work on its pool, and a handle of the geometry before stays with that one. A material put
-into the `material` slot changes only how the mesh draws. `placement`, `uniforms`, `setUniform()`, `bindUniform()`, the textures and the passes stay
-with the material of the sprites — the built one or the one handed in — whatever the slot holds;
-a material put into the slot that is to draw with the uniforms and textures of the sprites is built
-on them before the swap, `new FeatureSpritesMaterial(kind, {resources: sprites.material.resources})`
-— as `SpritePicker` builds its pick material.
+into the `material` slot changes only how the mesh draws. `placement`, `uniforms`, `setUniform()`,
+`bindUniform()`, the textures and the passes stay with the material of the sprites — the built one
+or the one handed in — whatever the slot holds; a material put into the slot that is to draw with
+the uniforms and textures of the sprites is built on them before the swap,
+`new FeatureSpritesMaterial(kind, {resources: sprites.material.resources})` — as `SpritePicker`
+builds its pick material.
 
 **Refusals.** A `TypeError` instead of a mismatch: a `geometry` or a `material` built for another
 sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a `geometry`; any material
@@ -1786,11 +1793,12 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
 
 Two kinds ship ready-made, with the layout, the names and the start values of the textured and the
 animated sprites of earlier versions: `TexturedSpriteKind` (`InstancePosition`, `FlatPlacement`,
-`QuadSize`, `Rotation`, `AtlasFrame`, `TextureColor`, `Tint`) and `AnimatedSpriteKind` (`InstancePosition`,
-`FlatPlacement`, `QuadSize`, `Rotation`, `AnimatedFrames`, `TextureColor` — no tint). Both sit on `QuadBase`.
-A kind with one more feature is a `defineSprite()` away. `TexturedSprite` and `AnimatedSprite` are
-their sprite handles, `SpriteOf<typeof TexturedSpriteKind>` and `SpriteOf<typeof AnimatedSpriteKind>`:
-the type of a pool or a function that takes their sprites, `VertexObjectPool<TexturedSprite>`.
+`QuadSize`, `Rotation`, `AtlasFrame`, `TextureColor`, `Tint`) and `AnimatedSpriteKind`
+(`InstancePosition`, `FlatPlacement`, `QuadSize`, `Rotation`, `AnimatedFrames`, `TextureColor` — no
+tint). Both sit on `QuadBase`. A kind with one more feature is a `defineSprite()` away.
+`TexturedSprite` and `AnimatedSprite` are their sprite handles,
+`SpriteOf<typeof TexturedSpriteKind>` and `SpriteOf<typeof AnimatedSpriteKind>`: the type of a pool
+or a function that takes their sprites, `VertexObjectPool<TexturedSprite>`.
 
 ```ts check
 import {FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
@@ -2006,16 +2014,16 @@ feature of the material declares. The material throws, naming the feature, for a
 `colorSpace(name)` answers the `colorSpace` of the texture as it is set — `undefined` while it is
 unset, or for `needsImage` until its image has measures — and is a tracked read: a texture in
 another colour space builds the graph anew, so a stage can work in the values of the texture data
-(`PaletteSwap` encodes both colours back to sRGB for an `srgb` palette before it compares them). `textureSize()` of a set
-texture is the size of the texture the shader binds, read on the gpu — it follows an image that a
-loader fills in after `setTexture()`, and a texture of the same kind swapped in without a rebuild;
-for a texture declared with `needsImage` it is a uniform, re-read by `touchTexture(name)`. The size
-of a texture of another feature — the `colorMap` of the color source, to know a frame in texels — is
-`(0, 0)` while that texture is unset, and the stage does not wait for it: a stage that divides by it
-takes `max(size, 1)`. Every stage after the frame slot gets `frame`, the frame after the
-frame stages, and `uv`, the uv after the uv stages — built the first time a stage of a graph reads
-it, so a graph that never reads it builds no uv stage; in a uv stage `uv` is the stage's own input.
-`attribute('uv')` stays the base uv, where the vertex lies on the base.
+(`PaletteSwap` encodes both colours back to sRGB for an `srgb` palette before it compares them).
+`textureSize()` of a set texture is the size of the texture the shader binds, read on the gpu — it
+follows an image that a loader fills in after `setTexture()`, and a texture of the same kind swapped
+in without a rebuild; for a texture declared with `needsImage` it is a uniform, re-read by
+`touchTexture(name)`. The size of a texture of another feature — the `colorMap` of the color source,
+to know a frame in texels — is `(0, 0)` while that texture is unset, and the stage does not wait for
+it: a stage that divides by it takes `max(size, 1)`. Every stage after the frame slot gets `frame`,
+the frame after the frame stages, and `uv`, the uv after the uv stages — built the first time a
+stage of a graph reads it, so a graph that never reads it builds no uv stage; in a uv stage `uv` is
+the stage's own input. `attribute('uv')` stays the base uv, where the vertex lies on the base.
 
 `sample()` builds its lookup when the graph is built, and the material keeps the node to hand it
 a new texture of the same kind. A lookup made inside a TSL `Fn`, `If` or `Loop` callback, which
@@ -2147,8 +2155,9 @@ colorMap.dispose();
 The rules:
 
 - **No data.** A pass draws the data of the sprites. `definePass()` refuses a feature that brings
-  attributes, methods, `initialize()` or usage aliases, and two features of one name. Everything a pass reads comes from a feature of the kind; a `requires` of a pass feature
-  is met by the kind or by the pass, or the sprites refuse the pass.
+  attributes, methods, `initialize()` or usage aliases, and two features of one name. Everything a
+  pass reads comes from a feature of the kind; a `requires` of a pass feature is met by the kind or
+  by the pass, or the sprites refuse the pass.
 - **`without`** leaves out the stages of features of the kind, by name; their data stays. The
   sprites refuse a name the kind does not hold and the placement — a pass draws with the
   placement of the sprites or brings one of its own. A `without` ties a pass to the kinds that
@@ -2187,15 +2196,15 @@ The rules:
   `material` is the material of the pass. `dispose()` releases the pass meshes, their materials
   and the shared uniforms and textures, and `passes` is empty afterwards; a geometry handed in
   and every texture stay the caller's. The pass meshes draw the geometry in the `geometry` slot of
-  the sprites and follow a geometry put there, as they follow a growth. Passes need a material the sprites build, so they are
-  refused next to a `material` handed in.
+  the sprites and follow a geometry put there, as they follow a growth. Passes need a material the
+  sprites build, so they are refused next to a `material` handed in.
 
 Four passes ship ready-made. All are `transparent`, write no depth, draw both sides of a triangle
 (`side: DoubleSide`) and take a `renderOrder` of -1; `ShadowPass` takes a polygon offset as well
-(`polygonOffset`, with a factor and units of -1), and so does `SegmentShadowPass`. A plane is `[n.x, n.y, n.z, d]`, the plane
-`dot(n, p) = d` in the local space of the mesh; `n` need not be a unit vector, so `[0, 2, 0, 4]`
-is the plane `y = 2`. A ground or a light in the scene graph need not be worked out by hand —
-see "Binding uniforms to the scene graph" below:
+(`polygonOffset`, with a factor and units of -1), and so does `SegmentShadowPass`. A plane is
+`[n.x, n.y, n.z, d]`, the plane `dot(n, p) = d` in the local space of the mesh; `n` need not be a
+unit vector, so `[0, 2, 0, 4]` is the plane `y = 2`. A ground or a light in the scene graph need not
+be worked out by hand — see "Binding uniforms to the scene graph" below:
 
 | pass | features | uniforms (start value) | what it draws |
 | --- | --- | --- | --- |
@@ -2254,8 +2263,9 @@ The shadow follows the light, not the placement, so it does not change under a p
 and it ignores the plane and the turn of `flatPlacement()`. For sprites that lie in the ground —
 decals, `GroundPlacement` — the turn is wrong: they would throw the shadow of a standing quad. A
 pass that projects the sprites as they stand leaves the placement out: `SegmentShadowPass`, which is
-`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` and draws segment sprites as well. It keeps the yaw or the
-quaternion, too, and throws the shadow of a sign as it is turned — thin where the light grazes it.
+`definePass({...ShadowPass, features: [PlanarShadow, ShadowMask]})` and draws segment sprites as
+well. It keeps the yaw or the quaternion, too, and throws the shadow of a sign as it is turned —
+thin where the light grazes it.
 
 **The reflection of a billboard.** `ReflectionPass` mirrors the placed vertex, which is right for a
 flat sprite: its mirror image is what the camera would see in the mirror. A billboard faces the
@@ -2303,8 +2313,8 @@ ground turns it whenever the shadow falls towards the camera, as it does for a s
 the front and above under a light from above and behind it — the start value of `shadowLight`
 is one. three decides what to cull by the `side` of the material and the world matrix of the mesh,
 never by the vertex shader, so with the default `FrontSide` such a reflection or shadow is culled
-and nothing is drawn. Every pass that ships therefore draws with `DoubleSide`, and so does a pass of one's
-own that mirrors or projects.
+and nothing is drawn. Every pass that ships therefore draws with `DoubleSide`, and so does a pass of
+one's own that mirrors or projects.
 
 **The scene around them.** Each preset expects something of the ground it is drawn on:
 
@@ -2313,10 +2323,10 @@ own that mirrors or projects.
   shadow in front of the ground, so it wins the depth test. It writes no depth, so whatever stands
   on the ground still covers it.
 - **`ReflectionPass`** and **`BillboardReflectionPass`** lie on the far side of `mirrorPlane`,
-  behind the ground the camera looks at. An opaque ground hides it: three draws opaque meshes before transparent ones, and the
-  reflection then fails the depth test. Draw the ground transparent, so that it comes after the
-  reflection and lets it show through, or switch the depth test of the pass off —
-  `sprites.passes['reflection']!.material.depthTest = false` — which draws the reflection over
+  behind the ground the camera looks at. An opaque ground hides it: three draws opaque meshes before
+  transparent ones, and the reflection then fails the depth test. Draw the ground transparent, so
+  that it comes after the reflection and lets it show through, or switch the depth test of the pass
+  off — `sprites.passes['reflection']!.material.depthTest = false` — which draws the reflection over
   everything drawn before it.
 
 A second light throws a second shadow through a renamed copy of `ShadowPass`: the same features,
@@ -2347,9 +2357,9 @@ per frame, for every pass that has one, and the answer decides whether the pass 
 `uniform(name)` answers the uniform the features of the pass read under `name`, through
 `uniformNames`: the hook of a renamed copy judges the renamed uniforms. The lookup reaches every
 uniform of the sprites, not only those of the pass — the `time` of an animated kind resolves —
-and throws from `update()` for a name that is no uniform of the sprites at all. The hook runs every frame and must allocate nothing, so it reads the
-`value` of a node and does not build a vector. `definePass()` refuses a `visible` that is no
-function.
+and throws from `update()` for a name that is no uniform of the sprites at all. The hook runs every
+frame and must allocate nothing, so it reads the `value` of a node and does not build a vector.
+`definePass()` refuses a `visible` that is no function.
 
 `ShadowPass` carries `shadowFallsOnPlane`. The sprites stand on the side of `groundPlane` its
 normal points to, so the shadow falls only if the light lights that side. For a direction
@@ -2582,9 +2592,10 @@ with a list of names, or a `RegExp` matched as `frameNames()` matches it, the in
 position in that selection, and `indexOf(name)` answers it. `new AtlasFrameTable(frames)` takes
 a list of atlas frames or bare `TextureCoords`. A frame takes three `vec4` of a uniform array —
 the three texels of a frame in the animsMap: tex coords, `[width, height, flipDiagonal, 0]` (a `0`
-where the animsMap keeps the end time), trim margins — so a turned, flipped or trimmed frame needs nothing of the caller. `update()` reads the
-frames again after their `coords` changed and allocates nothing; three uploads the array with
-every render. The table owns no GPU resource and has no `dispose()`.
+where the animsMap keeps the end time), trim margins — so a turned, flipped or trimmed frame needs
+nothing of the caller. `update()` reads the frames again after their `coords` changed and allocates
+nothing; three uploads the array with every render. The table owns no GPU resource and has no
+`dispose()`.
 
 A table holds at most `AtlasFrameTable.MaxFrames`, 341 frames: WebGL 2 promises 16 KiB for a
 uniform block, and the constructor refuses more with a `RangeError` — split them into several

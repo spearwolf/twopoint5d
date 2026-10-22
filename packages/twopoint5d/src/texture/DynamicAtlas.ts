@@ -184,7 +184,10 @@ export class DynamicAtlas {
     this.#texture = texture;
   }
 
-  /** The frames of the atlas — an ordinary `TextureAtlas`, and a new one after {@link clear}. Still answers after {@link dispose}. */
+  /**
+   * The frames of the atlas — an ordinary `TextureAtlas`, and a new one after {@link clear}. Still
+   * answers after {@link dispose}.
+   */
   get atlas(): TextureAtlas {
     return this.#atlas;
   }

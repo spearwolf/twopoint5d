@@ -94,9 +94,9 @@ The two types go into `types.ts`, which the module exports as `export type *`.
   A key function that returns a fractional value — or `-0`, which is no small integer either — may
   cost a heap number of 16 B per call where V8 does not inline it (the rule of `AGENTS.md`); the
   TSDoc says so and names the property form as the one that never does.
-- **A key array** (`sortByKeys`) is the form for keys computed in bulk — the view depth of
-  `FeatureSprites#sortByViewDepth()` (§3.2) is one. An array shorter than `usedCount` is refused
-  with a `RangeError` that names both numbers, before anything moves.
+- **A key array** (`sortByKeys`) is the form for keys that come about outside the pool, in one go —
+  one array for two pools that pair their slots by index. An array shorter than `usedCount` is
+  refused with a `RangeError` that names both numbers, before anything moves.
 
 ### 2.3 The order
 
@@ -222,10 +222,10 @@ class FeatureSprites<Api> {
   `matrixWorldInverse` of a camera) — the `update()` of the sprites refreshes its own matrix for
   the bindings the same way.
 - Only the third row of the product is needed: `depth = m[2]·x + m[6]·y + m[10]·z + m[14]`, read
-  from the `instancePosition` attribute of the pool straight out of its typed array into a
-  `Float64Array` of keys the sprites hold, then `spritePool.sortByKeys(keys)`. The position is the
-  centre of the sprite; a placement that moves the quad away from it (an anchor, a shear) does not
-  enter the depth.
+  from the `instancePosition` attribute of the pool straight out of its typed array into the sort
+  scratch of the pool (`prepareSortKeys()`, internal), then `spritePool.sortByPreparedKeys()`. The
+  position is the centre of the sprite; a placement that moves the quad away from it (an anchor, a
+  shear) does not enter the depth.
 - Perspective and orthographic cameras alike: view-space `z` orders both.
 - A kind **without `instancePosition`** has no position to measure. Every built-in placement
   requires `InstancePosition`, so only a kind with a placement of its own meets this:
@@ -233,7 +233,7 @@ class FeatureSprites<Api> {
   > `FeatureSprites#sortByViewDepth(): the sprites of this kind have no instancePosition to measure the view depth at — add InstancePosition to the features of the kind, or sort by a key of your own with sortBy()`
 
   An `Error`, thrown before anything is read; a disposed mesh answers `false` first, without it.
-- Allocation-free per frame once the key array is there (it grows with the capacity) — held by
+- Allocation-free per frame once the scratch of the pool is there (it grows with the capacity) — held by
   `src/sprites/hot-path-allocations.spec.ts`. The vector-balls demo of the next wave calls it every
   frame on some 500 billboards.
 

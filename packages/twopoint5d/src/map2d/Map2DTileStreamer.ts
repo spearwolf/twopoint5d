@@ -12,8 +12,8 @@ import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisi
  * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X and the same with `r`,
  * `tileHeight` and `yOffset` along the rows — it is not centered on its coordinates.
  *
- * Visibility is checked based on the _view center position_ (`centerX` + `centerY`) and a _visibilitor_ (see `IMap2DVisibilitor`).
- * The view center means what the visibilitor makes of it — see {@link centerX}: under
+ * Visibility is checked based on the _view center position_ (`centerX` + `centerY`) and a _visibilitor_
+ * (see `IMap2DVisibilitor`). The view center means what the visibilitor makes of it — see {@link centerX}: under
  * `CameraBasedVisibility` with its default `lookAtCenter = false` it shifts the map under the
  * camera and stays `0` for a world-fixed map under a moving camera.
  *

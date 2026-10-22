@@ -12,9 +12,15 @@ export interface VertexObjectProperty {
   readonly kind: 'value' | 'valuesGetter' | 'valuesSetter';
   /** The attribute the property belongs to. */
   readonly attribute: VertexAttributeDescriptor;
-  /** For a `'value'`: the vertex within the attribute; `0` for the attribute of one value under its own name and for the methods. */
+  /**
+   * For a `'value'`: the vertex within the attribute; `0` for the attribute of one value under its own
+   * name and for the methods.
+   */
   readonly vertexIndex: number;
-  /** For a `'value'`: the component within the vertex; `0` for the attribute of one value under its own name and for the methods. */
+  /**
+   * For a `'value'`: the component within the vertex; `0` for the attribute of one value under its own
+   * name and for the methods.
+   */
   readonly componentIndex: number;
 }
 

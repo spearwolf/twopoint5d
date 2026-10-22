@@ -6,7 +6,8 @@ export interface WaveOptions {
   /**
    * `'top'` sways the sprite — grass, flags, seaweed: the top moves by the full amount, the foot
    * stays, weighted by `(1 − uv.y)²` of the base uv, so a sprite on `gridBase()` bends where one on
-   * the quad shears. It is the top of the image: under `flipY` the bottom of the quad sways. `'uniform'` moves the whole sprite — the glyphs of a sine scroller.
+   * the quad shears. It is the top of the image: under `flipY` the bottom of the quad sways.
+   * `'uniform'` moves the whole sprite — the glyphs of a sine scroller.
    */
   readonly weight: 'top' | 'uniform';
   /** The axis of the mesh the vertices move along: `'x'` for `'top'`, `'y'` for `'uniform'` by default. */

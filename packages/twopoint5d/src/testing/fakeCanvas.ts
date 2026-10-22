@@ -55,7 +55,10 @@ export class FakeCanvasContext {
     return this.calls.filter((call) => call.op === op);
   }
 
-  /** The calls that draw or clear — every one but `save`, `restore`, `setTransform`, `translate`, `beginPath`, `rect` and `clip`. */
+  /**
+   * The calls that draw or clear — every one but `save`, `restore`, `setTransform`, `translate`,
+   * `beginPath`, `rect` and `clip`.
+   */
   get drawCalls(): FakeCanvasCall[] {
     const bookkeeping = new Set(['save', 'restore', 'setTransform', 'translate', 'beginPath', 'rect', 'clip']);
     return this.calls.filter((call) => !bookkeeping.has(call.op));

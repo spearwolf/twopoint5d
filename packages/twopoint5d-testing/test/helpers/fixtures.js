@@ -570,7 +570,14 @@ export function expectSameCells(actual, expected, what) {
  * multiple of it — see {@link rgbAt}.
  *
  * @param {ArrayLike<number>} pixels
- * @param {{size: number, pixelsPerUnit: number, topDown: boolean, black: number[], colorAt: (x: number, y: number) => number[], edgeMargin?: number}} model
+ * @param {{
+ *   size: number,
+ *   pixelsPerUnit: number,
+ *   topDown: boolean,
+ *   black: number[],
+ *   colorAt: (x: number, y: number) => number[],
+ *   edgeMargin?: number,
+ * }} model
  * @returns {{checked: number, lit: number, differing: string[]}}
  */
 export function compareWithModel(pixels, {size, pixelsPerUnit, topDown, black, colorAt, edgeMargin = 0.75}) {

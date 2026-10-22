@@ -87,9 +87,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    */
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
-  // the scratch of sortBy() and sortByKeys(), built by the first sort, grown with the capacity and
-  // let go of by dispose(): the keys, the order of the slots and the merge scratch of the sort, the
-  // vertex objects on their way to a new slot, and one buffer for the copy of every attribute buffer
+  // the scratch of sortBy(), sortByKeys() and prepareSortKeys(), built by the first sort, grown with the
+  // capacity and let go of by dispose(): the keys, the order of the slots and the merge scratch of the
+  // sort, the vertex objects on their way to a new slot, and one buffer for the copy of every attribute
+  // buffer
   // with a view of it per data type
   #sortKeys: Float64Array | undefined;
   #sortOrder: Uint32Array | undefined;
@@ -488,9 +489,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
   /**
    * Puts the slots in use into the order of `keys`: `keys[i]` is the key of the vertex object in
-   * slot `i`, for every slot below `usedCount`; the keys beyond are not read. The form for keys
-   * worked out in bulk, as `FeatureSprites#sortByViewDepth()` does. The array is read, not written,
-   * and still names the slots of before once the call returns.
+   * slot `i`, for every slot below `usedCount`; the keys beyond are not read. The form for keys that
+   * come about outside the pool, in one go — one array for two pools that pair their slots by index
+   * (see {@link sortBy}). The array is read, not written, and still names the slots of before once
+   * the call returns.
    *
    * Everything else is {@link sortBy}: the order, what moves, what is marked for upload, the
    * scratch, a disposed pool.
@@ -511,6 +513,39 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
 
     const own = this.#prepareSort();
     for (let i = 0; i < n; i++) own[i] = keys[i]!;
+    return this.#sortByOwnKeys(n, options?.descending === true);
+  }
+
+  /**
+   * The keys of the next sort: the scratch of this pool, made to fit the capacity. The caller writes
+   * the key of slot `i` at index `i` for every slot below `usedCount` and calls
+   * {@link sortByPreparedKeys} right after, before anything sorts this pool. Allocates only when the
+   * capacity has grown since the last sort.
+   *
+   * @internal
+   */
+  prepareSortKeys(): Float64Array {
+    return this.#prepareSort();
+  }
+
+  /**
+   * Sorts the slots in use by the keys written into {@link prepareSortKeys}. Everything else is
+   * {@link sortBy}: the order, what moves, what is marked for upload, `slotMoves` rising when a slot
+   * moves, a disposed pool.
+   *
+   * @returns whether a slot moved; `false` on a disposed pool and with fewer than two slots in use
+   * @throws an `Error` when no keys are prepared for the capacity of this pool; nothing has moved then
+   * @internal
+   */
+  sortByPreparedKeys(options?: VOSortOptions): boolean {
+    if (this.isDisposed) return false;
+    const n = this.usedCount;
+    if (n < 2) return false;
+    if (this.#sortKeys === undefined || this.#sortKeys.length < this.capacity) {
+      throw new Error(
+        'VertexObjectPool#sortByPreparedKeys(): no keys are prepared for the capacity of this pool — call prepareSortKeys() first',
+      );
+    }
     return this.#sortByOwnKeys(n, options?.descending === true);
   }
 

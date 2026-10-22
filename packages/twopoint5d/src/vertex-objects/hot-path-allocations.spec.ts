@@ -306,6 +306,30 @@ describe('vertex objects on the hot path', () => {
       pool.dispose();
     });
 
+    test('prepareSortKeys(), the keys written into it and sortByPreparedKeys() allocate nothing once the scratch is there', async () => {
+      const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 1000);
+      for (let i = 0; i < 1000; i++) pool.createVO();
+      const source = Float64Array.from({length: 1000}, (_, i) => ((i * 7919) % 1000) / 3);
+
+      let calls = 0;
+      let moved = 0;
+      const bytesPerRound = await measureSettledBytes(() => {
+        for (let i = 0; i < 10; i++) {
+          pool.prepareSortKeys().set(source);
+          if (pool.sortByPreparedKeys()) moved++;
+          pool.prepareSortKeys().set(source);
+          if (pool.sortByPreparedKeys(descending)) moved++;
+          calls += 2;
+        }
+      });
+      const bytesPerCall = bytesPerRound / 20;
+
+      expect(moved, 'the sorts that moved a slot').toBe(calls);
+
+      expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+      pool.dispose();
+    });
+
     test('sortBy() by a key function of whole numbers allocates nothing once the scratch is there', async () => {
       const pool = new VertexObjectPool<SpriteVO>(spriteDescription, 1000);
       // whole numbers: a fractional key crossing the call is boxed wherever V8 does not inline the key

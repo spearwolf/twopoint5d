@@ -76,8 +76,8 @@ built with `grow: true`:
    of the old attributes.
 5. `createVO()` on the new pool hands out the sprite the caller asked for.
 
-`FeatureSprites#sortByViewDepth()` grows its key array with the capacity already; the new pool
-builds its sort scratch on its first sort, as every pool does. A sort, a `freeSprite()` and an
+`FeatureSprites#sortByViewDepth()` writes into the sort scratch of the pool, which the new pool
+builds on its first sort, as every pool does. A sort, a `freeSprite()` and an
 `update()` after a growth work on the new pool as on any.
 
 **The price** — what the roadmap calls a frame hitch: the copy of every used slot of every buffer

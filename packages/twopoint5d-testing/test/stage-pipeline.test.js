@@ -417,7 +417,11 @@ describe('StageRenderer — pipeline integration', () => {
    * a `RenderPipeline` and the `buildOutputNode` `makeBuild` answers.
    *
    * @param {() => import('@spearwolf/twopoint5d').StageRendererBuildOutputNode & {dispose?: () => void}} makeBuild
-   * @param {(ctx: {sr: StageRenderer, target: RenderTarget, renderer: import('three/webgpu').WebGPURenderer}) => Promise<void>} run
+   * @param {(ctx: {
+   *   sr: StageRenderer,
+   *   target: RenderTarget,
+   *   renderer: import('three/webgpu').WebGPURenderer,
+   * }) => Promise<void>} run
    * @param {string} [color] the color of the square, white by default
    */
   async function withSquare(makeBuild, run, color = '#fff') {

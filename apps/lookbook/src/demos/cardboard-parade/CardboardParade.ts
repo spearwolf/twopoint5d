@@ -134,8 +134,9 @@ interface Print {
 
 /**
  * A toy theatre on a turntable: a fence around the rim with a panel fallen over, a village of houses
- * and trees, leaning signposts at the crossroads, figures that walk in circles and leave footprints, each with a blob shadow. Three
- * sprite meshes — props, walkers, ground — draw all of it, whatever way each cut-out faces.
+ * and trees, leaning signposts at the crossroads, figures that walk in circles and leave footprints,
+ * each with a blob shadow. Three sprite meshes — props, walkers, ground — draw all of it, whatever way
+ * each cut-out faces.
  */
 export class CardboardParade extends Group {
   readonly props: FeatureSpritesOf<typeof PropKind>;

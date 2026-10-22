@@ -362,6 +362,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
    * read it and sets `needsUpdate`; three takes program and pipeline out of its caches for a source
    * it has built before. Do not alternate such textures every frame.
    *
+   * With the texture that is set already it does nothing; see {@link SpriteResources.setTexture}.
    * Once disposed, a material that built its resources does nothing here. One handed its resources
    * writes through to them still, and the other materials that read them take the texture.
    */
@@ -370,9 +371,10 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   }
 
   /**
-   * Re-reads the texture `name` once a loader filled in its image; see
-   * {@link SpriteResources.touchTexture}. Once disposed, a material that built its resources does
-   * nothing here; one handed its resources passes the call on to them still.
+   * Re-reads the texture `name` once a loader filled in its image, or its filters, `colorSpace`,
+   * `type` or `format` changed; see {@link SpriteResources.touchTexture}. Once disposed, a material
+   * that built its resources does nothing here; one handed its resources passes the call on to them
+   * still.
    */
   touchTexture(name: string): void {
     this.resources.touchTexture(name);

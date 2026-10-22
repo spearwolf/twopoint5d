@@ -39,8 +39,9 @@ export interface FeatureSpritesOptions<Api extends object = object>
 
 /**
  * The mesh of one pass of a {@link FeatureSprites}: its child, over the geometry of the sprites — it
- * follows a geometry put into their `geometry` slot — with a material of its own built for the pass. It has no `update()`; the sprites update the geometry
- * once per frame for every pass. The sprites build and release it.
+ * follows a geometry put into their `geometry` slot — with a material of its own built for the pass.
+ * It has no `update()`; the sprites update the geometry once per frame for every pass. The sprites
+ * build and release it.
  */
 export class FeatureSpritesPass<Api extends object = object> extends Mesh {
   declare material: FeatureSpritesMaterial<Api>;
@@ -250,8 +251,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   // createSprite() says once that the pool is full, or — under grow — that it grew
   #warnedFull = false;
   #notedGrowth = false;
-  // sortByViewDepth(): the depth of every sprite, grown with the capacity, and the camera's view of the mesh
-  #depthKeys: Float64Array | undefined;
+  // sortByViewDepth(): the camera's view of the mesh
   readonly #modelView = new Matrix4();
 
   /**
@@ -472,11 +472,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     const m10 = m[10]!;
     const m14 = m[14]!;
 
-    let keys = this.#depthKeys;
-    if (keys === undefined || keys.length < pool.capacity) {
-      keys = new Float64Array(pool.capacity);
-      this.#depthKeys = keys;
-    }
+    // the depth goes straight into the sort scratch of the pool
+    const keys = pool.prepareSortKeys();
 
     // straight from the buffer, as a sort by a value property reads it: no value crosses a call
     const record = pool.buffer.buffers.get(layout.bufferName)!;
@@ -488,7 +485,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
       keys[i] = m2 * positions[p]! + m6 * positions[p + 1]! + m10 * positions[p + 2]! + m14;
     }
 
-    return pool.sortByKeys(keys);
+    return pool.sortByPreparedKeys();
   }
 
   /** The placement of the material of the sprites — `undefined` once disposed. */
@@ -583,8 +580,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   }
 
   /**
-   * Re-reads the texture `name` once a loader filled in its image; see
-   * {@link FeatureSpritesMaterial.touchTexture}. Does nothing once disposed.
+   * Re-reads the texture `name` once a loader filled in its image, or its filters, `colorSpace`,
+   * `type` or `format` changed; see {@link FeatureSpritesMaterial.touchTexture}. Does nothing once
+   * disposed.
    */
   touchTexture(name: string): void {
     this.#material?.touchTexture(name);
@@ -649,7 +647,6 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     this.#boundNames.length = 0;
     this.#boundSources.length = 0;
     this.#boundVectors.length = 0;
-    this.#depthKeys = undefined;
 
     // what was built here goes, whatever stands in its slot; what stands in a slot without being built
     // here is let go of, not disposed

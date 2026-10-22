@@ -162,6 +162,9 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
   gate: it runs every spec without coverage. The thresholds sit two points under the level
   measured when they were set, globally and per module: the measured percentage rounded
   down, minus two. A regression turns the gate red, a line that moves does not.
+  `src/sprites/**` is the exception and stands at 100 % for statements, branches,
+  functions and lines: the sprite module was rebuilt with complete coverage as a
+  requirement, and a line without a test there is a regression, not noise.
   `src/display/Stylesheets.ts` is not counted: it writes into a real `CSSStyleSheet`,
   which the specs, run under Node without a DOM, do not have, and the browser suite
   covers it.
@@ -237,9 +240,9 @@ cache holds the browsers and not the system libraries they link against. That is
 `archive.ubuntu.com` and waited on a silent connection for over twenty minutes: apt has
 no overall timeout. The job therefore gives apt a 30-second network timeout and three
 retries (`/etc/apt/apt.conf.d/99ci-network-timeouts`), cuts each attempt of
-`install-deps` off after three minutes and tries three times. The key follows the root `playwright`, so the root
-`playwright` and the one `@web/test-runner-playwright` resolves have to be the same
-version.
+`install-deps` off after three minutes and tries three times. The key follows the root
+`playwright`, so the root `playwright` and the one `@web/test-runner-playwright` resolves
+have to be the same version.
 
 Nx indexes its local cache in a database named after the machine id, and every runner
 comes with a new one, so a restored Nx cache directory would never hit. Nx does take
@@ -287,7 +290,8 @@ the specifier standing as well. If a `catalog:`, `workspace:`, `link:`, `file:` 
 `portal:` specifier is left in the manifest afterwards, the build fails — npm installs none
 of these protocols, and the last three point at a path on the machine that builds the
 package, which the consumer does not have. A value that is no string, a `null` or a
-number, stays standing with a warning, and the build fails on it the same way, with a message that names the section, the name and the value. The script writes
+number, stays standing with a warning, and the build fails on it the same way, with a
+message that names the section, the name and the value. The script writes
 `dist/package.json` only into an existing `dist/` and stops without the compiled library,
 with the hint to compile first; an input file it cannot read stops it with the path and
 the reason. Since `dist/` is what gets published, `main`, `module`, `types`, `typings`,

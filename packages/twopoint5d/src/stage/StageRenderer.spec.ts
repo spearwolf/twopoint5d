@@ -19,6 +19,7 @@ import {type IStageDispose, OnAddToParent, OnRemoveFromParent, OnStageAdded, OnS
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
+import {ClearStage} from './ClearStage.js';
 import {createBloomOutputNodeBuilder} from './outputNodeBuilders.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
@@ -313,6 +314,31 @@ describe('StageRenderer', () => {
       sr.clearStencilBuffer = false;
       sr.renderTo(renderer as any);
       expect(renderer.clear).toHaveBeenCalledWith(false, true, false);
+    });
+  });
+
+  describe('ClearStage', () => {
+    it('a ClearStage draws its clear in the plain mode and in Mode C', () => {
+      // the clears of the stage: depth alone, as the defaults say
+      const clearsOfStage = () =>
+        renderer.clear.mock.calls.filter((args) => args[0] === false && args[1] === true && args[2] === false);
+
+      const plain = new StageRenderer();
+      plain.resize(100, 100);
+      plain.add(new ClearStage());
+      plain.renderTo(renderer as any);
+      expect(clearsOfStage()).toHaveLength(1);
+      expect(renderer.clear).toHaveBeenCalledTimes(1);
+
+      renderer.clear.mockClear();
+      const modeC = new StageRenderer();
+      modeC.resize(100, 100);
+      modeC.add(new ClearStage());
+      modeC.pipeline = makePipelineMock() as any;
+      modeC.renderTo(renderer as any);
+      expect(clearsOfStage()).toHaveLength(1);
+      // the clear of the internal target to transparent black comes along
+      expect(renderer.clear).toHaveBeenCalledWith(true, true, false);
     });
   });
 
@@ -2666,21 +2692,98 @@ describe('StageRenderer', () => {
       });
     });
 
-    it('throws when a stage in the build path has no asPassNode()', () => {
-      const sr = new StageRenderer();
-      sr.resize(100, 100);
-      sr.add(fakeStage('bare'));
-      sr.buildOutputNode = ((nodes: unknown[]) => nodes[0]) as any;
-      sr.pipeline = {outputNode: undefined, needsUpdate: false, render: vi.fn(), dispose: vi.fn()} as any;
-      expect(() => sr.renderTo(renderer as any)).toThrow(/StageRenderer#renderTo\(\) cannot compose the stage "bare"/);
-    });
+    describe('a stage without asPassNode()', () => {
+      const composing: [string, (sr: StageRenderer) => void][] = [
+        [
+          'buildOutputNode and a pipeline',
+          (sr) => {
+            sr.buildOutputNode = (passes) => passes[0]!;
+            sr.pipeline = makePipelineMock() as any;
+          },
+        ],
+        [
+          'a RootRenderPipeline',
+          (sr) => {
+            sr.pipeline = fakeRootPipeline() as any;
+          },
+        ],
+      ];
 
-    it('throws the same error under a RootRenderPipeline without buildOutputNode', () => {
-      const sr = new StageRenderer();
-      sr.resize(100, 100);
-      sr.add(fakeStage('bare'));
-      sr.pipeline = fakeRootPipeline() as any;
-      expect(() => sr.renderTo(renderer as any)).toThrow(/StageRenderer#renderTo\(\) cannot compose the stage "bare"/);
+      it('add() refuses a stage without asPassNode() under a composing pipeline, before it sizes, lists or announces it', () => {
+        for (const [label, compose] of composing) {
+          const sr = new StageRenderer();
+          sr.resize(100, 100);
+          compose(sr);
+          const announced = vi.fn();
+          on(sr, OnStageAdded, announced);
+          const bare = fakeStage('bare');
+
+          expect(() => sr.add(bare), label).toThrow(TypeError);
+          expect(() => sr.add(bare), label).toThrow(
+            /StageRenderer#add\(\) cannot take the stage "bare": that stage has no asPassNode\(\)/,
+          );
+
+          expect(bare.resize, label).not.toHaveBeenCalled();
+          expect(sr.stages, label).toHaveLength(0);
+          expect(announced, label).not.toHaveBeenCalled();
+        }
+      });
+
+      it('the pipeline setter refuses a pipeline that composes while a stage without asPassNode() is among the stages, and keeps the one it had', () => {
+        const sr = new StageRenderer();
+        const modeC = makePipelineMock();
+        sr.pipeline = modeC as any;
+        sr.add(fakeStage('bare'));
+
+        expect(() => {
+          sr.pipeline = fakeRootPipeline() as any;
+        }).toThrow(/StageRenderer#pipeline cannot take the pipeline: the stage "bare" has no asPassNode\(\)/);
+        expect(sr.pipeline).toBe(modeC);
+
+        const withBuilder = new StageRenderer();
+        withBuilder.add(fakeStage('bare'));
+        withBuilder.buildOutputNode = (passes) => passes[0]!;
+        expect(() => {
+          withBuilder.pipeline = makePipelineMock() as any;
+        }).toThrow(/StageRenderer#pipeline cannot take the pipeline: the stage "bare" has no asPassNode\(\)/);
+        expect(withBuilder.pipeline).toBeUndefined();
+
+        // a pipeline that does not compose is taken
+        const other = makePipelineMock();
+        sr.pipeline = other as any;
+        expect(sr.pipeline).toBe(other);
+      });
+
+      it('the buildOutputNode setter refuses a builder over a pipeline while a stage without asPassNode() is among the stages, and keeps the one it had', () => {
+        const sr = new StageRenderer();
+        sr.pipeline = makePipelineMock() as any;
+        sr.add(fakeStage('bare'));
+        const builder = (passes: Node[]) => passes[0]!;
+
+        expect(() => {
+          sr.buildOutputNode = builder;
+        }).toThrow(/StageRenderer#buildOutputNode cannot take the builder: the stage "bare" has no asPassNode\(\)/);
+        expect(sr.buildOutputNode).toBeUndefined();
+
+        // without a pipeline the builder composes nothing
+        const withoutPipeline = new StageRenderer();
+        withoutPipeline.add(fakeStage('bare'));
+        withoutPipeline.buildOutputNode = builder;
+        expect(withoutPipeline.buildOutputNode).toBe(builder);
+      });
+
+      it('renderTo() throws for a stage that has lost its asPassNode() since it was added', () => {
+        const sr = new StageRenderer();
+        sr.resize(100, 100);
+        const stage: Record<string, unknown> = {...fakeStage('lost'), asPassNode: vi.fn(() => fakePassNode('lost'))};
+        sr.add(stage as any);
+        sr.buildOutputNode = (passes) => passes[0]!;
+        sr.pipeline = makePipelineMock() as any;
+
+        delete stage['asPassNode'];
+
+        expect(() => sr.renderTo(renderer as any)).toThrow(/StageRenderer#renderTo\(\) cannot compose the stage "lost"/);
+      });
     });
 
     it('nested StageRenderer is pre-rendered into its pass target before parent pipeline runs', () => {
@@ -3012,6 +3115,36 @@ describe('StageRenderer', () => {
       expect(rtDispose.callCount).toBe(0);
       expect(stage.releasePassNodeMemory).not.toHaveBeenCalled();
     });
+
+    it('a stage flagged isStage2D without releasePassNodeMemory() leaves through remove(), dispose() and a write that leaves the composed mode', () => {
+      // the flag of a Stage2D from another copy of the library, or a double: the method is not there
+      const flaggedWithoutMethod = (name: string) => {
+        const {releasePassNodeMemory: _omitted, ...stage} = fakeStage2D(name);
+        return stage as any;
+      };
+
+      const removed = new StageRenderer();
+      removed.resize(50, 50);
+      const stageOfRemove = flaggedWithoutMethod('remove');
+      removed.add(stageOfRemove);
+      expect(() => removed.remove(stageOfRemove)).not.toThrow();
+      expect(removed.hasStage(stageOfRemove)).toBe(false);
+
+      const disposed = new StageRenderer();
+      disposed.resize(50, 50);
+      disposed.add(flaggedWithoutMethod('dispose'));
+      expect(() => disposed.dispose()).not.toThrow();
+
+      const composed = new StageRenderer();
+      composed.resize(50, 50);
+      composed.add(flaggedWithoutMethod('composed'));
+      composed.buildOutputNode = (passes) => passes[0]!;
+      composed.pipeline = makePipelineMock() as any;
+      composed.renderTo(renderer as any);
+      expect(() => {
+        composed.pipeline = undefined;
+      }).not.toThrow();
+    });
   });
 
   describe('a pixel ratio change at the same logical size', () => {
@@ -3048,22 +3181,25 @@ describe('StageRenderer', () => {
       expect(sizeOf(first)).toEqual([75, 75]);
     });
 
-    it('a target borrowed from the pool follows the ratio in the next frame, and the pool releases the one of the old size', () => {
+    it('a target borrowed from the pool follows the ratio in the next frame as the same object, and Mode C keeps its texture node and its pipeline', () => {
       const {sr, targets} = makeModeC();
+      const pipeline = sr.pipeline as unknown as ReturnType<typeof makePipelineMock>;
       const pool = new StageRenderTargetPool();
       sr.internalTargetPool = pool;
       sr.renderTo(renderer as any);
       const first = targets[0]!;
       expect(sizeOf(first)).toEqual([50, 50]);
-      const firstDispose = sandbox.spy(first, 'dispose');
+      const outputNode = pipeline.outputNode;
+      expect(outputNode, 'wired to the target').toBeDefined();
+      pipeline.needsUpdate = false;
 
       renderer.getPixelRatio.mockReturnValue(1.5);
       sr.renderTo(renderer as any);
 
-      const second = targets[1]!;
-      expect(second, 'another target').not.toBe(first);
-      expect(sizeOf(second)).toEqual([75, 75]);
-      expect(firstDispose.callCount, 'the target of the old size').toBe(1);
+      expect(targets[1], 'the same target').toBe(first);
+      expect(sizeOf(first)).toEqual([75, 75]);
+      expect(pipeline.needsUpdate, 'the pipeline has nothing to rebuild').toBe(false);
+      expect(pipeline.outputNode, 'the same texture node').toBe(outputNode);
       pool.dispose();
     });
 
@@ -3145,7 +3281,8 @@ describe('StageRenderer', () => {
     it('behaves as documented after dispose()', () => {
       const host = makeHost();
       const sr = new StageRenderer(host);
-      const stage = fakeStage('s');
+      // buildOutputNode below composes it, and a composing renderer takes a stage with a pass node only
+      const stage = {...fakeStage('s'), asPassNode: vi.fn(() => ({}) as Node)};
       sr.add(stage);
       sr.pipeline = makePipelineMock() as any;
 

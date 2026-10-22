@@ -46,9 +46,30 @@ describe('StageRenderTargetPool', () => {
     expect(pool.acquire(200, 100, FloatType, 4), 'the second one built').toBe(second);
   });
 
-  const other: [string, [number, number, TextureDataType, number]][] = [
+  const resized: [string, [number, number, TextureDataType, number]][] = [
     ['width', [300, 100, FloatType, 4]],
     ['height', [200, 150, FloatType, 4]],
+  ];
+
+  for (const [what, args] of resized) {
+    it(`resizes the oldest free target of the type and the samples for another ${what}, the same object`, () => {
+      const pool = new StageRenderTargetPool();
+      const old = pool.acquire(200, 100, FloatType, 4);
+      pool.release(old);
+      const texture = old.texture;
+      const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+      const rt = pool.acquire(...args);
+
+      expect(rt).toBe(old);
+      expect(rt.texture, 'the texture stays').toBe(texture);
+      expect([rt.width, rt.height, rt.texture.type, rt.samples]).toEqual(args);
+      expect(rtDispose.callCount, 'one release, by setSize()').toBe(1);
+      expect(rtDispose.firstCall.thisValue).toBe(old);
+    });
+  }
+
+  const other: [string, [number, number, TextureDataType, number]][] = [
     ['type', [200, 100, HalfFloatType, 4]],
     ['samples', [200, 100, FloatType, 0]],
   ];
@@ -68,6 +89,25 @@ describe('StageRenderTargetPool', () => {
       expect(rtDispose.firstCall.thisValue, 'of the free old target').toBe(old);
     });
   }
+
+  it('resizes the oldest of two free targets of the type and the samples asked for and releases the other', () => {
+    const pool = new StageRenderTargetPool();
+    const first = pool.acquire(200, 100, FloatType, 4);
+    const second = pool.acquire(200, 100, FloatType, 4);
+    pool.release(first);
+    pool.release(second);
+    const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+    const rt = pool.acquire(300, 150, FloatType, 4);
+
+    expect(rt, 'the one built first').toBe(first);
+    expect([rt.width, rt.height]).toEqual([300, 150]);
+    expect(rtDispose.getCalls().map((call) => call.thisValue)).toEqual([first, second]);
+
+    pool.release(rt);
+    expect(pool.acquire(300, 150, FloatType, 4), 'the resized one is lent again').toBe(first);
+    expect(pool.acquire(200, 100, FloatType, 4), 'the other is gone').not.toBe(second);
+  });
 
   it('keeps a target that is out when it builds one of another size', () => {
     const pool = new StageRenderTargetPool();

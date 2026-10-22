@@ -447,10 +447,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * listener of `OnStageDispose` that throws does not hold up the teardown: every
    * subscriber hears the event, the instance is torn down completely, and the error
    * reaches the caller afterwards — one unchanged, several as an `AggregateError`. An
-   * error from releasing the pass node reaches the caller as well: on its own unchanged,
-   * together with that of the listeners as an `AggregateError` of the error of the
-   * listeners and that of the release, in this order — the first an `AggregateError`
-   * itself when more than one listener threw.
+   * error from releasing the pass node reaches the caller as well, by the same rule.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -474,6 +471,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       errors.push(error);
     }
 
+    // the errors stand in the order of the teardown above, which is no promise to the caller
     throwCollected(errors, 'Stage2D#dispose(): a listener of the dispose event threw, and so did the release of the pass node');
   }
 }

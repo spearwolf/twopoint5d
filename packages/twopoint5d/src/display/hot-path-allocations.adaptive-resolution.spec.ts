@@ -30,8 +30,9 @@ const CALLS = 1000;
 
 // a whole number: a round hands its calls no fraction it works out (AGENTS.md)
 const GPU_MS = 10;
-// answers synchronously, so the measurement and the window it fills fall inside the round
-// biome-ignore lint/suspicious/noThenProperty: the stand-in of the promise resolveTimestampsAsync() answers, which the controller only calls then() on
+// answers synchronously, so the measurement and the window it fills fall inside the round; the
+// controller only calls then() on what resolveTimestampsAsync() answers
+// biome-ignore lint/suspicious/noThenProperty: a stand-in for the promise resolveTimestampsAsync() answers
 const measurement = {then: (onFulfilled: (ms: number) => void) => onFulfilled(GPU_MS)};
 
 /**

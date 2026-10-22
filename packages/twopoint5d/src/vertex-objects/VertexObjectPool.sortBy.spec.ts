@@ -577,6 +577,92 @@ describe('VertexObjectPool#sortByKeys()', () => {
   });
 });
 
+describe('VertexObjectPool#sortByPreparedKeys()', () => {
+  const writeKeys = (pool: VertexObjectPool<Thing>, keys: number[]) => {
+    const own = pool.prepareSortKeys();
+    keys.forEach((key, i) => {
+      own[i] = key;
+    });
+  };
+
+  test('sorts the slots in use by the keys written into prepareSortKeys(), in both directions and with a NaN last', () => {
+    const {pool, things} = makeThings([0, 0, 0, 0, 0]);
+
+    writeKeys(pool, [0.5, -1, Number.NaN, 3, 0.25]);
+    expect(pool.sortByPreparedKeys()).toBe(true);
+    expect(idsInSlotOrder(pool)).toEqual([1, 4, 0, 3, 2]);
+    things.forEach((thing, id) => expectThing(thing, id, 0));
+
+    // the keys name the slots of before: each sort takes keys of its own
+    writeKeys(pool, [1, 2, 3, 4, Number.NaN]);
+    expect(pool.sortByPreparedKeys({descending: true})).toBe(true);
+    expect(idsInSlotOrder(pool)).toEqual([3, 0, 4, 1, 2]);
+    pool.dispose();
+  });
+
+  test('raises slotMoves when a slot moves and leaves it when none does', () => {
+    const {pool} = makeThings([0, 0, 0]);
+    const before = pool.slotMoves;
+
+    writeKeys(pool, [1, 2, 3]);
+    expect(pool.sortByPreparedKeys()).toBe(false);
+    expect(pool.slotMoves).toBe(before);
+
+    writeKeys(pool, [3, 2, 1]);
+    expect(pool.sortByPreparedKeys()).toBe(true);
+    expect(pool.slotMoves).toBeGreaterThan(before);
+    pool.dispose();
+  });
+
+  test('answers false on a disposed pool and with fewer than two slots in use', () => {
+    const one = makeThings([0], 4).pool;
+    writeKeys(one, [1]);
+    expect(one.sortByPreparedKeys()).toBe(false);
+    one.dispose();
+
+    const {pool} = makeThings([0, 0]);
+    writeKeys(pool, [2, 1]);
+    pool.dispose();
+    expect(pool.sortByPreparedKeys()).toBe(false);
+  });
+
+  test('refuses a sort before prepareSortKeys() has made the keys fit the capacity', () => {
+    const {pool} = makeThings([0, 0], 2);
+    expect(() => pool.sortByPreparedKeys(), 'no keys yet').toThrow(
+      new Error(
+        'VertexObjectPool#sortByPreparedKeys(): no keys are prepared for the capacity of this pool — call prepareSortKeys() first',
+      ),
+    );
+
+    writeKeys(pool, [2, 1]);
+    pool.sortByPreparedKeys();
+    pool.resize(6);
+    expect(() => pool.sortByPreparedKeys(), 'keys of the old capacity').toThrow(/call prepareSortKeys\(\) first/);
+    expect(idsInSlotOrder(pool)).toEqual([1, 0]);
+
+    writeKeys(pool, [2, 1]);
+    expect(pool.sortByPreparedKeys()).toBe(true);
+    expect(idsInSlotOrder(pool)).toEqual([0, 1]);
+    pool.dispose();
+  });
+
+  test('prepareSortKeys() answers the same array until the capacity grows', () => {
+    const {pool} = makeThings([0, 0], 2);
+    const keys = pool.prepareSortKeys();
+
+    expect(keys).toBeInstanceOf(Float64Array);
+    expect(keys.length).toBe(2);
+    expect(pool.prepareSortKeys()).toBe(keys);
+
+    pool.resize(6);
+    const grown = pool.prepareSortKeys();
+    expect(grown).not.toBe(keys);
+    expect(grown.length).toBe(6);
+    expect(pool.prepareSortKeys()).toBe(grown);
+    pool.dispose();
+  });
+});
+
 function rangesOf(geometry: BufferGeometry, attrName: string): {start: number; count: number}[] {
   const attr = geometry.getAttribute(attrName) as BufferAttribute | InterleavedBufferAttribute;
   const buffer: BufferLike = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute

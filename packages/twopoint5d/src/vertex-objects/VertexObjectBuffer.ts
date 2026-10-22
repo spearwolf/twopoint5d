@@ -13,7 +13,10 @@ const insertDirtyRange: typeof insertRange = insertRange;
 
 /** Where one attribute of a vertex object sits inside the buffer that holds it. */
 export interface AttributeBufferLayout {
-  /** The buffer this attribute shares with every other attribute that names it; all of them agree on data type, normalization and usage. */
+  /**
+   * The buffer this attribute shares with every other attribute that names it; all of them agree on data
+   * type, normalization and usage.
+   */
   bufferName: string;
   /** The attribute this layout is about, named as the description names it. */
   attributeName: string;

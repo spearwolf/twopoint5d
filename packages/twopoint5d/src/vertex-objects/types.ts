@@ -19,7 +19,8 @@ export type TypedArray =
   | Int8Array;
 
 /**
- * The element type of the buffer an attribute is stored in, named as the typed array that holds it: `'float32'` is a `Float32Array`.
+ * The element type of the buffer an attribute is stored in, named as the typed array that holds it:
+ * `'float32'` is a `Float32Array`.
  * `'float64'` and `'uint8clamped'` have no WebGPU vertex format, and a `VertexObjectDescriptor` refuses an attribute of either.
  */
 export type VertexAttributeDataType =
@@ -269,8 +270,8 @@ export interface VO {
  * V8 boxes a fractional value that crosses a call it does not inline as an argument of its own,
  * a heap number of 16 B. That allocation belongs to the calling code: a loop that writes
  * fractional values fills a tuple it reuses and hands that on, as the sprite features
- * (`InstancePosition`, `QuadSize`, `AtlasFrame`, `Tint`) and `TileSpritesFactory` do. It is the type to give the `set…` method of a
- * vertex object interface.
+ * (`InstancePosition`, `QuadSize`, `AtlasFrame`, `Tint`) and `TileSpritesFactory` do. It is the type
+ * to give the `set…` method of a vertex object interface.
  */
 export type VOAttrSetter = (...values: number[] | [ArrayLike<number>]) => void;
 
@@ -322,7 +323,10 @@ export interface VOSortOptions {
 /** The three.js buffer a geometry holds the values of an attribute in — interleaved when several attributes share one. */
 export type BufferLike = InterleavedBuffer | BufferAttribute;
 
-/** The three.js draw usage constant a buffer is created with, chosen by the {@link VertexAttributeUsageType} of its attributes. */
+/**
+ * The three.js draw usage constant a buffer is created with, chosen by the {@link VertexAttributeUsageType}
+ * of its attributes.
+ */
 export type DrawUsageType = typeof DynamicDrawUsage | typeof StaticDrawUsage | typeof StreamDrawUsage;
 
 /**

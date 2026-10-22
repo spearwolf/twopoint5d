@@ -47,7 +47,11 @@ import {
 const TARGET_SIZE = 64;
 
 /** @typedef {import('@spearwolf/twopoint5d').SpriteFeature<{flipX: number, flipY: number}>} FlipFeature */
-/** @typedef {import('@spearwolf/twopoint5d').SpriteFeature<{setSliceInsets(left: number, top: number, right: number, bottom: number): void}>} NineSliceFeature */
+/**
+ * @typedef {import('@spearwolf/twopoint5d').SpriteFeature<{
+ *   setSliceInsets(left: number, top: number, right: number, bottom: number): void,
+ * }>} NineSliceFeature
+ */
 
 /**
  * An attribute of the kind as a TSL vector: the typed `attribute<T>()` of a stage context takes a
