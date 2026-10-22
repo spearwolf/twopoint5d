@@ -232,9 +232,11 @@ export class SpritePicker {
     if (this.#disposed) return undefined;
 
     // from here on everything runs in one go, up to the read back
-    const drawn = this.#gather(list);
-    if (drawn.length === 0) return undefined;
+    const drawn: Drawn[] = [];
     try {
+      // inside the try: a refusal halfway through the list gives back what the meshes before it took
+      this.#gather(list, drawn);
+      if (drawn.length === 0) return undefined;
       this.#aim(camera, pointer);
       const pixel = await this.#draw();
       return resolvePixel(pixel, drawn);
@@ -249,9 +251,8 @@ export class SpritePicker {
     }
   }
 
-  /** The meshes to draw, by their place in the list; the pick meshes in the scene, synced. */
-  #gather(list: readonly FeatureSprites[]): Drawn[] {
-    const drawn: Drawn[] = [];
+  /** Fills `drawn` with the meshes to draw, by their place in the list; the pick meshes in the scene, synced. */
+  #gather(list: readonly FeatureSprites[], drawn: Drawn[]): void {
     const scene = this.#scene;
     scene.clear();
     for (let k = 0; k < list.length; k++) {
@@ -269,7 +270,6 @@ export class SpritePicker {
       scene.add(entry.mesh);
       drawn[k] = {sprites, pool, slotMoves: pool.slotMoves, handles: this.#handlesOf(pool)};
     }
-    return drawn;
   }
 
   // the handles of every slot in use as they stand at the draw, copied without a look-up: the read

@@ -188,7 +188,7 @@ export function rewriteText<Api extends TextSpriteApi>(
 ): (Api & VO)[] {
   const {layout, z} = prepare(REWRITE, sprites, font, text, options);
   const pool = sprites.spritePool;
-  // disposed sprites hold no sprite, so none of the glyphs is theirs any more
+  // disposed sprites hold no sprite, so no glyph belongs to them
   if (pool == null) {
     glyphs.length = 0;
     return glyphs;

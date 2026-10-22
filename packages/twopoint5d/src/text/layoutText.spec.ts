@@ -213,8 +213,19 @@ describe('layoutText()', () => {
       expect(boxes(layout).map(([, line]) => line)).toEqual([0, 0, 1]);
     });
 
-    test('a skipped ideograph leaves the place to break before the next char', () => {
-      expect(layoutText(font, 'AV日AV', {maxWidth: 8}).lineCount).toBe(2);
+    test('a skipped ideograph leaves no place to break: the chars on both sides of it stay one word', () => {
+      expect(layoutText(font, 'AV日AV', {maxWidth: 8}).lineCount).toBe(1);
+    });
+
+    test('a closing mark after a skipped ideograph stays on the line of the char before it', () => {
+      const data = tinyFontData();
+      const dash = data.chars.find(({id}) => id === 45)!;
+      data.chars = [...data.chars, {...dash, id: 0x3002}];
+      const marked = new BitmapFont(data);
+
+      const layout = layoutText(marked, 'AV日。', {maxWidth: 8});
+      expect(layout.lineCount).toBe(1);
+      expect(layout.glyphs.map(({line}) => line)).toEqual([0, 0, 0]);
     });
   });
 

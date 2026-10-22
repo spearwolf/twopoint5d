@@ -526,7 +526,8 @@ one class, tested in this order:
   U+2060, U+FEFF — is dropped: no glyph, no room, never the `fallback`;
 - **any other** char is drawn as its glyph, as `fallback` when the font lacks it and one is given,
   and otherwise skipped. An ideograph or a kana (the scripts Han, Hiragana, Katakana) is a place to
-  break before itself, decided by the char of the text even where the `fallback` draws it.
+  break before itself, decided by the char of the text even where the `fallback` draws it; one the
+  font lacks and no `fallback` draws is skipped and leaves none.
 
 A char dropped or skipped takes no room and breaks no kerning pair (the pair is formed by the chars
 on both sides of it). A char of width or height 0 moves the pen and yields no glyph.

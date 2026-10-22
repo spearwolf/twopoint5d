@@ -294,7 +294,8 @@ export class AdaptiveResolution {
    * `true` by default. `false` holds the controller still, drops a measurement still in flight
    * and gives the display back the {@link Display.resolutionScale} it had when the controller took
    * over last — `1` where that was no positive finite number, which the display counts as `1`;
-   * `true` takes over again from the scale the display has then. After
+   * `true` takes over again from the scale the display has then, counting the windows toward the next
+   * step up from 0 while the pace it found and the waits it doubled stay. After
    * {@link AdaptiveResolution.dispose}, and once the display is disposed, it keeps its value and a
    * write does nothing.
    */
@@ -343,12 +344,17 @@ export class AdaptiveResolution {
   }
 
   // The highest step at or below the scale the display has — one that is no positive finite
-  // number counts as 1, as it does for the display. A takeover starts afresh
+  // number counts as 1, as it does for the display. A takeover starts every try afresh — a descent,
+  // a step up and the windows counted toward the next one —, and keeps what the tries have taught:
+  // the pace a descent found and the waits that failed steps up doubled
   #takeOverScale(): void {
     const scale = isPositiveFinite(this.display.resolutionScale) ? this.display.resolutionScale : 1;
     this.#scaleBefore = scale;
     this.#pacingDescentFrom = -1;
     this.#gpuStepUpPending = false;
+    this.#gpuGoodWindows = 0;
+    this.#pacingCleanFrames = 0;
+    this.#pacingProbeWindows = 0;
     const level = this.#levels.findIndex((step) => step <= scale + 1e-6);
     this.#setLevel(level === -1 ? this.#levels.length - 1 : level);
   }

@@ -145,7 +145,8 @@ tab stops.
 **Word wrap.** With `maxWidth`, in units of the mesh, a line breaks before the word that would make
 it wider: at a breakable space, after U+200B, or before an ideograph or a kana (the scripts Han,
 Hiragana and Katakana). The spaces at the break are dropped. A mark after an ideograph — `。`, `」`
-— stays with the char before it, so a closing mark never starts a line. A word wider than
+— stays with the char before it, so a closing mark never starts a line. An ideograph or a kana the
+font lacks and no `fallback` draws is skipped and leaves no place to break. A word wider than
 `maxWidth` on its own stays whole on a line of its own and overflows — there is no hyphenation.
 `lineHeight` takes the place of the font's, in pixels of the font, above 0.
 

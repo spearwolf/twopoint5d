@@ -263,6 +263,34 @@ describe('SpritePicker', () => {
     picker.dispose();
   });
 
+  test('a refused pick gives back the handles and the pick meshes of the entries before the one it refuses', async () => {
+    const {renderer, rendered} = makeRenderer();
+    const picker = new SpritePicker(renderer);
+    const a = makeSprites(1).sprites;
+    const b = makeSprites(1).sprites;
+    const taken: unknown[][] = [];
+    const copyVOsInto = a.spritePool!.copyVOsInto.bind(a.spritePool!);
+    vi.spyOn(a.spritePool!, 'copyVOsInto').mockImplementation((into) => {
+      taken.push(into);
+      return copyVOsInto(into);
+    });
+
+    await picker.pick(makeCamera(), center, [a]);
+    const pickMesh = rendered[0]!.children[0]!;
+    const first = taken[0];
+
+    vi.spyOn(b.spritePool!, 'usedCount', 'get').mockReturnValue(2 ** 24 + 1);
+    await expect(picker.pick(makeCamera(), center, [a, b])).rejects.toThrow(RangeError);
+    expect(pickMesh.parent, 'the pick mesh of the entry before the refused one').toBeNull();
+
+    await picker.pick(makeCamera(), center, [a]);
+    expect(taken.at(-1), 'the handle array the refused pick gave back').toBe(first);
+
+    a.dispose();
+    b.dispose();
+    picker.dispose();
+  });
+
   describe('draws nothing and answers undefined', () => {
     test('for a pointer outside the view', async () => {
       const {renderer, rendered, fake} = makeRenderer();

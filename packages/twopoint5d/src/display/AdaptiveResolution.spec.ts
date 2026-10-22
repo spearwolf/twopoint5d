@@ -670,6 +670,51 @@ describe('AdaptiveResolution', () => {
       expect(untouched.display.resolutionScale, 'off, on and off again').toBe(0.9);
     });
 
+    it('a takeover counts the good windows of gpu-time toward a step up from 0', async () => {
+      const {display, gpu, frames} = makeDisplay({timestamps: true, resolutionScale: 0.75});
+      gpu.ms = 1;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 2 * 12);
+      expect(adaptive.scale, 'two good windows are no step up yet').toBe(0.75);
+
+      adaptive.enabled = false;
+      adaptive.enabled = true;
+      await frames(SETTLE + 12);
+      expect(adaptive.scale, 'the first good window of the new takeover').toBe(0.75);
+
+      await frames(2 * 12);
+      expect(adaptive.scale, 'the third good window of the new takeover').toBe(0.875);
+    });
+
+    it('a takeover counts the clean frames of frame-pacing toward a try up from 0', async () => {
+      const {display, frames} = makeDisplay({resolutionScale: 0.75});
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 150);
+      expect(adaptive.scale, 'five clean windows are no try up yet').toBe(0.75);
+
+      adaptive.enabled = false;
+      adaptive.enabled = true;
+      await frames(SETTLE + 30);
+      expect(adaptive.scale, 'the first clean window of the new takeover').toBe(0.75);
+
+      await frames(150);
+      expect(adaptive.scale, 'the 180 clean frames of the new takeover').toBe(0.875);
+    });
+
+    it('a takeover ends a try up of frame-pacing that is still being judged', async () => {
+      const {display, frames} = makeDisplay({resolutionScale: 0.75});
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 180);
+      expect(adaptive.scale, 'the try up runs, two windows to judge it are open').toBe(0.875);
+
+      adaptive.enabled = false;
+      expect(display.resolutionScale).toBe(0.75);
+      adaptive.enabled = true;
+      expect(display.resolutionScale).toBe(0.75);
+      await frames(SETTLE + 180);
+      expect(adaptive.scale, 'the new takeover counts its own 180 clean frames').toBe(0.875);
+    });
+
     it('lets go and gives the display its scale back with dispose()', async () => {
       const {display, gpu, renderer, frames} = makeDisplay({timestamps: true});
       gpu.ms = 15;

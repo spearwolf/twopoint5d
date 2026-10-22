@@ -70,7 +70,8 @@ const ZERO_WIDTH_BREAK = '\u200b';
 const NO_BREAK_SPACE = /^[\u00a0\u2007\u202f]$/u;
 const CONTROL_OR_FORMAT = /^[\p{Cc}\p{Cf}]$/u;
 // a line may break before an ideograph or a kana; a mark after it (。, 」, of the script Common) stays
-// with the char before, so a closing mark never starts a line
+// with the char before, so a closing mark never starts a line. One the font lacks and no fallback draws
+// is skipped and leaves no place to break
 const BREAK_BEFORE = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]$/u;
 
 // a char of a line set in the font: its glyph, whether it is a breakable space, and whether the line
@@ -149,8 +150,10 @@ const entriesOf = (font: BitmapFont, text: string, fallback: BitmapFontGlyph | u
     } else if (CONTROL_OR_FORMAT.test(char)) {
       continue;
     } else {
-      if (BREAK_BEFORE.test(char)) pendingBreak = true;
       glyph = font.glyph(char) ?? fallback;
+      // the place to break before an ideograph or a kana goes with its glyph: one skipped leaves none,
+      // so the mark after it stays with the char before
+      if (glyph !== undefined && BREAK_BEFORE.test(char)) pendingBreak = true;
     }
     if (glyph !== undefined) {
       lines.at(-1)!.push({glyph, space: false, breakBefore: pendingBreak});
@@ -262,7 +265,8 @@ const wrap = (font: BitmapFont, entries: readonly Entry[], maxWidth: number, let
  * out of its width and its alignment. With `maxWidth` a line breaks before the word that would make it
  * wider — at a breakable space, after U+200B, or before an ideograph or a kana (Han, Hiragana, Katakana) —
  * the spaces at the break dropped; a word wider on its own overflows. A mark after an ideograph stays with
- * it, so a closing mark never starts a line.
+ * it, so a closing mark never starts a line. An ideograph or a kana the font lacks and no `fallback`
+ * draws is skipped and leaves no place to break.
  *
  * Every call builds a layout object per glyph: lay a text out when it changes, not every frame.
  *

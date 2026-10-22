@@ -1062,7 +1062,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const stage = stageItem.stage;
     if (!hasAsPassNode(stage)) {
       throw new TypeError(
-        `StageRenderer#renderTo() cannot compose the stage ${JSON.stringify(stage.name)}: that stage has no asPassNode(), and a pipeline with buildOutputNode or a RootRenderPipeline composes the pass node of every stage`,
+        `StageRenderer#renderTo() cannot compose the stage ${JSON.stringify(stage.name)}: that stage ${NO_PASS_NODE}`,
       );
     }
     return stage.asPassNode(renderer);

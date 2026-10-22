@@ -432,7 +432,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    *   {@link getVO} gives it.
    *
    * The order is stable: equal keys keep the slot order they had. `descending` puts the highest key
-   * first, and a `NaN` key goes last in either direction.
+   * first, and a `NaN` key goes last in either direction, behind every number, infinities included.
    *
    * Every buffer of the pool moves along, as whole vertex objects, and every vertex object keeps its
    * values and stays the same object: its index follows its slot, as it does when {@link freeVO}
@@ -454,7 +454,6 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    *   did stands — a `freeVO()` has moved the last vertex object into the freed slot, as it always
    *   does. A key function that throws — or an `onCreateVO` hook of a slot the sort materializes —
    *   leaves the sort undone as well.
-   *   `NaN` keys go behind every number, infinities included
    */
   sortBy(key: VOSortKeyName<VOType> | VOSortKey<VOType>, options?: VOSortOptions): boolean {
     if (this.isDisposed) return false;

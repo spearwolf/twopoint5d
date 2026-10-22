@@ -244,9 +244,10 @@ What to know about it:
   frames bring it back through the tries up, one every 180 clean frames.
 - Under a `pixelZoom` the controller holds still: pixel art keeps its size.
 - `adaptive.enabled = false` holds it still and gives the display back the `resolutionScale` it had
-  when the controller took over last; `true` takes over again. It takes over a scale that is no
-  positive finite number as `1`, and gives `1` back. `adaptive.dispose()` lets go for good, and
-  gives that scale back as well. A disposed display lets go of its controller, and
+  when the controller took over last; `true` takes over again, counting the windows toward the next
+  step up from 0 while the pace it found and the waits it doubled stay. It takes over a scale that
+  is no positive finite number as `1`, and gives `1` back. `adaptive.dispose()` lets go for good,
+  and gives that scale back as well. A disposed display lets go of its controller, and
   `adaptive.isDisposed` says whether it has let go.
 - A display carries one controller at a time. `new AdaptiveResolution(display)` throws while
   another one holds the display, enabled or not, and on a disposed display.
