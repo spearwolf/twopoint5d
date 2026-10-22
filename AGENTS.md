@@ -211,5 +211,15 @@ libraries.
   `Stage2D` + `StageRenderer` idioms
 - [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a
   description declares and which accessors it generates
+- The guides of the library: [sprites](packages/twopoint5d/docs/sprites.md),
+  [text](packages/twopoint5d/docs/text.md), [tile maps](packages/twopoint5d/docs/map2d.md),
+  [display](packages/twopoint5d/docs/display.md) — written for the users of the library;
+  they describe the code as it is, with no internals and no history, and a new or changed
+  feature changes its guide section in the same commit
+- [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers of
+  the library: the idea of each feature, its inner workings and the basis of its build; no
+  tutorial for users. They may lag behind the code, and where one disagrees with a guide,
+  the guide holds. Read the one for a feature before building or changing it, and the
+  README for how guides and proposals divide their readers
 - [Monorepo architecture](docs/architecture.md) — Nx targets and caching, the build and
   publish pipeline, the CI gate
