@@ -4,6 +4,7 @@ import {Sprite, SpriteMaterial, Texture, type Scene} from 'three/webgpu';
 import {Chronometer} from '../display/Chronometer.js';
 import {OnCanvas2DStageDispose, OnCanvas2DStageRender, OnCanvas2DStageResize} from '../events.js';
 import {TextureFactory} from '../texture/TextureFactory.js';
+import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
@@ -196,7 +197,21 @@ export class Canvas2DStage {
     previous?.dispose();
   }
 
+  /**
+   * Hands the size of the area the stage is drawn into — the size a `Display` reports with
+   * `OnDisplayResize`, for one — to {@link stageRenderer}, which hands it on to {@link stage}:
+   * the stage takes its camera from it, and before the first call nothing is drawn.
+   *
+   * Width and height must be finite numbers: `NaN` and an infinite value are refused with a
+   * `RangeError` that names this call, before the size reaches the renderer — on a disposed
+   * stage as well. A width or a height of 0 or below goes on to `StageRenderer#resize()` as it is.
+   */
   setContainerSize(width: number, height: number): void {
+    // checked here although StageRenderer#resize() checks the same: the refusal names the call
+    // the caller made, and a disposed stage, which hands nothing on, refuses it all the same
+    assertFinite(width, 'Canvas2DStage#setContainerSize()', 'width');
+    assertFinite(height, 'Canvas2DStage#setContainerSize()', 'height');
+
     if (this.#disposed) return;
 
     // the renderer hands the size on to every stage it holds, this one included: its own
@@ -315,7 +330,8 @@ export class Canvas2DStage {
    *
    * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
    * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do nothing;
-   * `setCanvasSize()` still refuses a size that is no finite number above 0.
+   * `setCanvasSize()` still refuses a size that is no finite number above 0, and
+   * `setContainerSize()` one that is no finite number.
    * `canvas`, `renderer`, `projection`, `scene`, `sprite` and `needsUpdate` keep the values the
    * stage was left with. {@link width} and {@link height} read `canvas.width` and `canvas.height`,
    * so they keep answering with whatever stands at the canvas — including what the caller sets

@@ -319,6 +319,40 @@ describe('Canvas2DStage', () => {
 
       expect(() => stage.setCanvasSize(NaN, 10)).toThrow(failure);
     });
+
+    test('setContainerSize() refuses a width or a height that is no finite number in its own name, also after dispose()', () => {
+      const stage = makeStage();
+      stage.setContainerSize(320, 240);
+      const resize = sandbox.spy(stage.stageRenderer, 'resize');
+
+      expect(() => stage.setContainerSize(NaN, 240)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): width must be a finite number, got NaN'),
+      );
+      expect(() => stage.setContainerSize(320, Infinity)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): height must be a finite number, got Infinity'),
+      );
+      expect(resize.called, 'the size does not reach the stage renderer').toBe(false);
+      expect([stage.stageRenderer.width, stage.stageRenderer.height], 'the renderer keeps its size').toEqual([320, 240]);
+
+      stage.dispose();
+
+      expect(() => stage.setContainerSize(NaN, 240)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): width must be a finite number, got NaN'),
+      );
+    });
+
+    test('setContainerSize() hands a size of 0 and a negative one on to the stage renderer as they are', () => {
+      const stage = makeStage();
+      const resize = sandbox.stub(stage.stageRenderer, 'resize');
+
+      stage.setContainerSize(0, 0);
+      stage.setContainerSize(-320, 240);
+
+      expect(resize.args).toEqual([
+        [0, 0],
+        [-320, 240],
+      ]);
+    });
   });
 
   describe('render()', () => {
