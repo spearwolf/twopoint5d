@@ -121,7 +121,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ChunkQuadTreeNode#findChunks()` and `#findChunksAt()` empty the `out` array before they fill it, as `Map2DSpatialHashGrid#findWithin()` and `#getTiles()` do (**BREAKING**). See the Migration Guide
 - `ChunkQuadTreeNode.IntersectDistanceFactor` and `BeforeAfterDeltaFactor` are `static readonly`, and `originX`, `originY`, `isLeaf`, `chunks` (`readonly ChunkType[]`) and `nodes` (`Readonly<IChunkQuadTreeChildNodes>`) of a node are read-only (**BREAKING**). See the Migration Guide
 - `RepeatingTilesProvider#getTileIdAt()` and `#getTileIdsWithin()` throw a `RangeError` naming the call for a coordinate that is no whole number and for a width or a height that is no whole number of 0 or more, before a cell of the target is written
-- `Map2D` and `Map2DTileStreamer` throw a `RangeError` for an `xOffset`, a `yOffset`, a `centerX` or a `centerY` that is no finite number, in the setters and the constructor of the streamer; a refused value leaves the one before and clears no tile. The setters of `Map2D` name `Map2D` in the message, for `tileWidth` and `tileHeight` as well. The constructors of `Map2DTileCoordsUtil` and `Map2DSpatialHashGrid` refuse an `xOffset` or a `yOffset` that is no finite number with a `RangeError`
+- `Map2D` and `Map2DTileStreamer` throw a `RangeError` for an `xOffset`, a `yOffset`, a `centerX` or a `centerY` that is no finite number, in the setters and the constructor of the streamer; a refused value leaves the one before and clears no tile. The setters of `Map2D` name `Map2D` in the message, for `tileWidth` and `tileHeight` as well. The constructors of `Map2DTileCoordsUtil` and `Map2DSpatialHashGrid` refuse an `xOffset` or a `yOffset` that is no finite number with a `RangeError`, and so do the setters `xOffset` and `yOffset` of `Map2DTileCoordsUtil`, which leave the offset as it was
+- `computeVisibleTiles()` of `CameraBasedVisibility` and of `RectangularVisibilityArea` throws a `RangeError` for a `centerPoint` that is not two finite numbers, before anything changes; `Map2DTileStreamer` checks its center before it hands it on
+- `TileBox` names the packed key of its tile coordinate `packedKey` and types every field as present: `coords`, `box`, `frustumBox`, `centerWorld`, `distanceToCamera` and `primary` carry a value on every tile of `CameraBasedVisibility#visibles`, and `map2dTile` is `IMap2DTileCoords | undefined` (**BREAKING**). See the Migration Guide
 - `DataIdsChunk2D` holds neither its params object nor, once the first read has decoded it, its base64 string; `protected data` is gone, and `prepareData()` takes the string as its argument (**BREAKING** for a subclass). See the Migration Guide
 - perf `Map2DSpatialHashGrid#findWithin()` and `#getTiles()` over more cells than the grid holds walk the cells it holds instead of the cells of the query
 - perf `base64toUint32Arr()` lays the array over the decoded bytes without a copy when the byte order asked for is the one of the host
@@ -178,6 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureStore#parse()` runs to its end behind a subscriber of a resource that throws while the values are written, a callback of `on()` among them: every item is written, `ready` and the `resource:<id>` events go out, `evictMissing` runs, and the throw goes out last as an `error` with `source: 'parse'`; `TextureStore#loadAsync()` resolves with the store
 - `TextureStore#registerAtlasAdapter()` registers nothing on a disposed store; it still refuses the arguments it refuses on a live one
 - `Map2DTileRenderer#clearTiles()` brings its factory up to date itself: after `Map2D#visibilitor = undefined`, after `Map2D#clearTiles()` under a visibilitor without an answer and after `Map2DTileStreamer#removeTileRenderer()`, no tile stays drawn up to the next update cycle
+- `CameraBasedVisibility` keeps the tiles nearest to the camera under `maxVisibleTiles` also on a map node that is tilted or stands upright: the margin by which the search goes on beyond the furthest kept tile is the diagonal of a tile in the plane of the map
 
 ### Migration Guide
 
@@ -410,18 +413,22 @@ A stage of your own gets an `asPassNode(renderer)` that answers its pass node. W
 
 `visibles`, `pointsOnPlane` and the fields of a `TileBox` are the visibility's own and written again by every recomputation. Whoever sorts or filters copies the list first; whoever needs a `TileBox` beyond the next recomputation copies the fields they need. `pointOnPlane` and `CameraBasedVisibility.Plane` are getters: an assignment to either throws a `TypeError` in strict code, and `Plane` answers a new copy on every access, so a change to it reaches no visibility.
 
+The packed key of a `TileBox` is `packedKey`, the number `packTileCoords(x, y)` answers; the `id` of a `Map2DTileCoords` is the string `tileKey(x, y)`. A `TileBox` has no `id`: in JavaScript as well, `tile.id` reads `undefined`, and whoever read it reads `tile.packedKey`. Every field of a `TileBox` is typed as present, and a `!` behind one is no longer needed; `map2dTile` is `IMap2DTileCoords | undefined`.
+
 **Before**
 
 ```ts
 const nearestFirst = visibility.visibles.sort((a, b) => a.distanceToCamera! - b.distanceToCamera!);
 const kept = visibility.visibles[0];
+const byKey = new Map(visibility.visibles.map((tile) => [tile.id, tile]));
 ```
 
 **After**
 
 ```ts
-const nearestFirst = [...visibility.visibles].sort((a, b) => a.distanceToCamera! - b.distanceToCamera!);
+const nearestFirst = [...visibility.visibles].sort((a, b) => a.distanceToCamera - b.distanceToCamera);
 const {x, y} = visibility.visibles[0]!;
+const byKey = new Map(visibility.visibles.map((tile) => [tile.packedKey, tile]));
 ```
 
 #### The tile pattern of RepeatingTilesProvider

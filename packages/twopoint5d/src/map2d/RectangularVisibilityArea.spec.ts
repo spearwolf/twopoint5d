@@ -224,6 +224,32 @@ describe('RectangularVisibilityArea', () => {
         }
       }
     });
+
+    test('refuses a center point that is no pair of finite numbers before anything changes', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const firstTiles = [...first.tiles];
+      expect(firstTiles.length).toBeGreaterThan(0);
+
+      for (const [centerPoint, quoted] of [
+        [[NaN, 0], '[NaN, 0]'],
+        [[0, Infinity], '[0, Infinity]'],
+        [[-Infinity, 0], '[-Infinity, 0]'],
+      ] as const) {
+        const compute = () => area.computeVisibleTiles(first.tiles, [centerPoint[0], centerPoint[1]], tileCoords, matrixWorld);
+
+        expect(compute).toThrow(RangeError);
+        expect(compute).toThrow(
+          `RectangularVisibilityArea: the center point of computeVisibleTiles() must be two finite numbers, got ${quoted}`,
+        );
+      }
+
+      const after = area.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(after.tiles, 'the tiles of the call before').toEqual(firstTiles);
+      expect(after.reuseTiles, 'the tiles handed back for reuse').toBe(after.tiles);
+      expect(after.createTiles).toBeUndefined();
+    });
   });
 
   describe('maxVisibleTiles', () => {

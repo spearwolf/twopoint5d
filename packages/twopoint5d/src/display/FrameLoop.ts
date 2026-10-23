@@ -62,7 +62,10 @@ class RAF {
   // the null of stop() included; one failure is reported once
   #reportedLoopError: unknown = NO_LOOP_ERROR;
 
-  constructor(private readonly renderer?: ISetAnimationLoop) {
+  readonly #renderer?: ISetAnimationLoop;
+
+  constructor(renderer?: ISetAnimationLoop) {
+    this.#renderer = renderer;
     eventize(this);
   }
 
@@ -87,7 +90,7 @@ class RAF {
   }
 
   #onAnimationFrame = (now: number) => {
-    if (this.renderer == null) {
+    if (this.#renderer == null) {
       this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
     }
 
@@ -105,8 +108,8 @@ class RAF {
 
   start() {
     if (this.#rafID !== 0) return;
-    if (this.renderer) {
-      this.#handleLoopResult(this.renderer.setAnimationLoop(this.#onAnimationFrame));
+    if (this.#renderer) {
+      this.#handleLoopResult(this.#renderer.setAnimationLoop(this.#onAnimationFrame));
       this.#rafID = 1; // Using 1 to indicate that the renderer is set
     } else {
       this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
@@ -118,8 +121,8 @@ class RAF {
     // global that a bare node process does not have
     if (this.#rafID === 0) return;
 
-    if (this.renderer) {
-      this.#handleLoopResult(this.renderer.setAnimationLoop(null));
+    if (this.#renderer) {
+      this.#handleLoopResult(this.#renderer.setAnimationLoop(null));
     } else {
       cancelAnimationFrame(this.#rafID);
     }
@@ -279,12 +282,12 @@ export class FrameLoop {
     return this.#subscribers.size;
   }
 
-  private readonly raf: RAF;
+  readonly #raf: RAF;
 
   // the shape is written out, so the published signature names nothing the package keeps inside
   constructor(maxFps = 0, renderer?: {setAnimationLoop(callback: ((now: number) => unknown) | null): unknown}) {
     eventize(this);
-    this.raf = RAF.get(renderer);
+    this.#raf = RAF.get(renderer);
     this.setFps(maxFps);
   }
 
@@ -306,7 +309,7 @@ export class FrameLoop {
       this.#subscribers.add(target);
 
       if (this.subscriptionCount === 1) {
-        this.raf.attach(this, this.#onRAF);
+        this.#raf.attach(this, this.#onRAF);
       }
 
       on(this as FrameLoop, FrameLoop.OnFrame, target);
@@ -325,7 +328,7 @@ export class FrameLoop {
       off(this, FrameLoop.OnFrame, target);
 
       if (this.subscriptionCount === 0) {
-        this.raf.detach(this);
+        this.#raf.detach(this);
         // the first frame after the loop runs again would measure the whole span in which nobody
         // asked for a frame, and the maxFps grid would still stand where it stood before it —
         // the driver starts its fps window anew for the same reason

@@ -104,6 +104,12 @@ explicit instruction.
   is not published until you add it to its module's `public-api.ts`.
 - **Imports.** Relative imports carry the `.js` suffix (NodeNext) even though the
   sources are `.ts`. Types use `import type` — lint enforces it.
+- **Private members.** In `packages/twopoint5d/src` a member private to its class is an
+  ECMAScript private member — `#field`, `#method()`, `static #helper()` —, never
+  TypeScript's `private`, whose member stays reachable at run time; that holds for
+  constructor parameters too. `protected` stays for what a subclass reads. A `#` method
+  allocates no more on a hot path than a public one, and `pnpm test:allocations` holds the
+  hot paths free of allocations.
 - **Error and warning messages** start with their subject, unbracketed: the class
   (`BitmapFont: …`), the call — `VertexObjectPool#sortBy(): …`, `new Display(): …`,
   `RootRenderPipeline.buildOutputNode(): …` —, or a function by its bare name

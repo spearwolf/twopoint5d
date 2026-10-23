@@ -218,17 +218,20 @@ and its `Map2DTileRenderer`s. Visibility is pluggable: `CameraBasedVisibility` c
 tiles against the camera frustum, nearest to the camera first and up to
 `maxVisibleTiles` of them, `RectangularVisibilityArea` uses a plain rectangle of at most
 `maxVisibleTiles` tiles, and both have `*Helpers` classes that visualise what they
-decided. Once a frame loop has settled, neither visibility allocates anything in
-`computeVisibleTiles()` — `src/map2d/hot-path-allocations.spec.ts` holds them to it —,
-and a tile that enters the view costs its `Map2DTileCoords`. Both name each
-recomputation with the `serial` of its result, and `Map2DTileStreamer` leaves a renderer
-out of `update()` while the result carries the `serial` that renderer last laid out in a
-closed cycle and it reports no `hasPendingTiles`: a standing view costs no pass over the
-tiles. `Map2DTileCoords`, `Map2DTileCoordsUtil` and `tileKeys` define the coordinate and
-key scheme — every tile coordinate has exactly one key, and code that invents a second
-spelling reintroduces duplicate tiles. `chunk-quad-tree/` and `Map2DSpatialHashGrid` are
-the spatial indexes tile providers query; both empty an `out` array before they fill it.
-The guide is [`docs/map2d.md`](./map2d.md).
+decided. `CameraBasedVisibility` searches from the camera outwards over the two heaps of
+`tileDistanceHeaps.ts` and keeps the slot of every tile in a `TileSlotPool`, which hands
+the slot of a tile that leaves the view to one that enters it. Once a frame loop has
+settled, neither visibility allocates anything in `computeVisibleTiles()` —
+`src/map2d/hot-path-allocations.spec.ts` holds them to it —, and a tile that enters the
+view costs its `Map2DTileCoords`. Both name each recomputation with the `serial` of its
+result, and `Map2DTileStreamer` leaves a renderer out of `update()` while the result
+carries the `serial` that renderer last laid out in a closed cycle and it reports no
+`hasPendingTiles`: a standing view costs no pass over the tiles. `Map2DTileCoords`,
+`Map2DTileCoordsUtil` and `tileKeys` define the coordinate and key scheme — every tile
+coordinate has exactly one key, and code that invents a second spelling reintroduces
+duplicate tiles. `chunk-quad-tree/` and `Map2DSpatialHashGrid` are the spatial indexes
+tile providers query; both empty an `out` array before they fill it. The guide is
+[`docs/map2d.md`](./map2d.md).
 
 ## 3. Resource lifecycle
 

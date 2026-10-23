@@ -49,7 +49,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
       this.update();
     } else {
       this.#helpers.remove();
-      this.releaseNode();
+      this.#releaseNode();
     }
   }
 
@@ -58,7 +58,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
    * manager to take down, and the manager disposes what it takes down — a helper that
    * kept the reference would write into a released geometry on the next update.
    */
-  private releaseNode(): void {
+  #releaseNode(): void {
     this.#viewRectHelper = undefined;
   }
 
@@ -72,7 +72,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
     if (this.#disposed) return;
     if (this.#helpers.scene === scene) return;
     this.#helpers.scene = scene;
-    this.releaseNode();
+    this.#releaseNode();
   }
 
   /**
@@ -90,7 +90,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
     if (this.#disposed) return;
     if (this.#helpers.scene !== scene) return;
     this.#helpers.remove();
-    this.releaseNode();
+    this.#releaseNode();
   }
 
   /**
@@ -144,7 +144,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
     this.#show = false;
     // the manager takes the node out of the scene and disposes it
     this.#helpers.scene = undefined;
-    this.releaseNode();
+    this.#releaseNode();
     this.#viewRect = undefined;
   }
 }

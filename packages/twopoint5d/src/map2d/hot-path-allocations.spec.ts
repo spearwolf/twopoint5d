@@ -506,9 +506,10 @@ describe('CameraBasedVisibilityHelpers on the hot path', () => {
     ).toBeLessThan(BYTES_PER_RECOMPUTATION_LIMIT);
 
     // after the measurement, so that the spy costs the measured rounds nothing: every update() of
-    // a round rebuilds, and the bytes above are the bytes of a rebuild
-    const createHelpers = vi.spyOn(helpers as unknown as {createHelpers: () => void}, 'createHelpers');
+    // a round rebuilds, and the bytes above are the bytes of a rebuild. A rebuild reads the
+    // visible tiles of the visibility once, and an update() reads them nowhere else
+    const readVisibles = vi.spyOn(visibility, 'visibles', 'get');
     round();
-    expect(createHelpers, 'rebuilds in a round').toHaveBeenCalledTimes(RECOMPUTATIONS_PER_ROUND);
+    expect(readVisibles, 'rebuilds in a round').toHaveBeenCalledTimes(RECOMPUTATIONS_PER_ROUND);
   });
 });

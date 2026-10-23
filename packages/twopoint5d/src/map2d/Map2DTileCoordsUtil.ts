@@ -1,3 +1,4 @@
+import type {Vector2} from 'three/webgpu';
 import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {AABB2} from './AABB2.js';
@@ -60,6 +61,10 @@ export interface TilesWithinCoords {
   columns: number;
 }
 
+// where `Map2DTileCoordsUtil` keeps its two offsets in its typed array
+const X_OFFSET = 0;
+const Y_OFFSET = 1;
+
 /**
  * The Map2DTileCoordsUtil does the mapping from _2D_ coordinates to _tile_ coordinates.
  *
@@ -96,22 +101,45 @@ export class Map2DTileCoordsUtil {
     this.#tileHeight = height;
   }
 
+  // The offsets of the grid, at `X_OFFSET` and `Y_OFFSET`, in a typed array, which holds a double
+  // as it is. A `#` field would box every double written to it: the emitted class declares the
+  // field before the constructor assigns it, and that leaves V8 a tagged field.
+  readonly #offsets = new Float64Array(2);
+
   /**
    * Where the tile grid starts on the x axis, in _world space_: a tile `(c, r)` covers
    * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile is anchored at that
    * corner, not centered on its coordinates, so the `xOffset` that centers the grid on the origin
-   * is `-tileWidth / 2`. The constructor refuses an offset that is no finite number with a
-   * `RangeError`.
+   * is `-tileWidth / 2`.
+   *
+   * Takes a finite number; anything else throws a `RangeError` and leaves the offset as it was —
+   * in the constructor as well.
    */
-  xOffset: number;
+  get xOffset(): number {
+    return this.#offsets[X_OFFSET]!;
+  }
+
+  set xOffset(offset: number) {
+    assertFinite(offset, 'Map2DTileCoordsUtil', 'xOffset');
+    this.#offsets[X_OFFSET] = offset;
+  }
 
   /**
    * Where the tile grid starts on the y axis, in _world space_: a tile `(c, r)` covers
    * `[r · tileHeight + yOffset, (r + 1) · tileHeight + yOffset)` on Y — corner-anchored like
-   * {@link xOffset}, not centered. The constructor refuses an offset that is no finite number with
-   * a `RangeError`.
+   * {@link xOffset}, not centered.
+   *
+   * Takes a finite number; anything else throws a `RangeError` and leaves the offset as it was —
+   * in the constructor as well.
    */
-  yOffset: number;
+  get yOffset(): number {
+    return this.#offsets[Y_OFFSET]!;
+  }
+
+  set yOffset(offset: number) {
+    assertFinite(offset, 'Map2DTileCoordsUtil', 'yOffset');
+    this.#offsets[Y_OFFSET] = offset;
+  }
 
   // the rectangle and the answer the public queries hand `computeTilesWithinArea()`, written
   // again on every call
@@ -119,32 +147,52 @@ export class Map2DTileCoordsUtil {
   readonly #tilesWithin: TilesWithinCoords = createTilesWithinCoords();
 
   constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
-    // through the setters, so a grid of 0 is refused here as much as it is later on
+    // through the setters, so a grid of 0 or an offset that is no finite number is refused here as
+    // much as it is later on
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
-    this.xOffset = assertFinite(xOffset, 'Map2DTileCoordsUtil', 'xOffset');
-    this.yOffset = assertFinite(yOffset, 'Map2DTileCoordsUtil', 'yOffset');
+    this.xOffset = xOffset;
+    this.yOffset = yOffset;
   }
 
+  // `copy()` and `equals()` read and write the private fields: `source` and `other` are instances
+  // that checked their values, and `CameraBasedVisibility` copies the grid on every call, so no
+  // getter runs on this way
   copy(source: Map2DTileCoordsUtil): Map2DTileCoordsUtil {
-    this.tileWidth = source.tileWidth;
-    this.tileHeight = source.tileHeight;
-    this.xOffset = source.xOffset;
-    this.yOffset = source.yOffset;
+    this.#tileWidth = source.#tileWidth;
+    this.#tileHeight = source.#tileHeight;
+    this.#offsets[X_OFFSET] = source.#offsets[X_OFFSET]!;
+    this.#offsets[Y_OFFSET] = source.#offsets[Y_OFFSET]!;
     return this;
   }
 
   clone(): Map2DTileCoordsUtil {
-    return new Map2DTileCoordsUtil(this.tileWidth, this.tileHeight, this.xOffset, this.yOffset);
+    return new Map2DTileCoordsUtil(this.#tileWidth, this.#tileHeight, this.#offsets[X_OFFSET]!, this.#offsets[Y_OFFSET]!);
   }
 
   equals(other: Map2DTileCoordsUtil): boolean {
     return (
-      this.tileWidth === other.tileWidth &&
-      this.tileHeight === other.tileHeight &&
-      this.xOffset === other.xOffset &&
-      this.yOffset === other.yOffset
+      this.#tileWidth === other.#tileWidth &&
+      this.#tileHeight === other.#tileHeight &&
+      this.#offsets[X_OFFSET] === other.#offsets[X_OFFSET] &&
+      this.#offsets[Y_OFFSET] === other.#offsets[Y_OFFSET]
     );
+  }
+
+  /**
+   * Writes {@link xOffset} into `target.x` and {@link yOffset} into `target.y`, and returns
+   * `target`.
+   *
+   * For the visibilities, which ask on every frame: a double a call the compiler does not inline
+   * answers is boxed, one held in the field of an object is not.
+   *
+   * @internal
+   */
+  readOffset(target: Vector2): Vector2 {
+    const offsets = this.#offsets;
+    target.x = offsets[X_OFFSET]!;
+    target.y = offsets[Y_OFFSET]!;
+    return target;
   }
 
   /**
@@ -210,7 +258,9 @@ export class Map2DTileCoordsUtil {
     const {left, top, width, height} = area;
     const tileWidth = this.#tileWidth;
     const tileHeight = this.#tileHeight;
-    const {xOffset, yOffset} = this;
+    const offsets = this.#offsets;
+    const xOffset = offsets[X_OFFSET]!;
+    const yOffset = offsets[Y_OFFSET]!;
 
     const tileLeft = Math.floor((left - xOffset) / tileWidth);
     const tileTop = Math.floor((top - yOffset) / tileHeight);

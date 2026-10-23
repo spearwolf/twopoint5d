@@ -73,7 +73,7 @@ export class Canvas2DStage {
   // the material this stage built and releases; the slot of the sprite may hold another one
   readonly #material: SpriteMaterial;
 
-  // the material starts out with a blank texture, and the first updateTexture() swaps it for the
+  // the material starts out with a blank texture, and the first `#updateTexture()` swaps it for the
   // one the factory built — after that this field is all that still points at it
   #placeholderTexture: Texture;
 
@@ -163,7 +163,7 @@ export class Canvas2DStage {
     this.scene.add(this.sprite);
   }
 
-  private updateTexture(): void {
+  #updateTexture(): void {
     if (!this.needsUpdate) return;
 
     // WebGPU builds no texture of width or height 0, and three.js hands the size of the image on
@@ -278,15 +278,15 @@ export class Canvas2DStage {
       // ahead of the event: a listener reads sprite and view in the new size already
       this.#followCanvasSize();
 
-      this.dispatchEvent(OnCanvas2DStageResize);
+      this.#dispatchEvent(OnCanvas2DStageResize);
 
       this.#lastWidth = this.width;
       this.#lastHeight = this.height;
     }
 
-    this.dispatchEvent(OnCanvas2DStageRender);
+    this.#dispatchEvent(OnCanvas2DStageRender);
 
-    this.updateTexture();
+    this.#updateTexture();
 
     if (now === undefined || deltaTime === undefined || frameNo === undefined) {
       if (this.#clock) {
@@ -305,7 +305,7 @@ export class Canvas2DStage {
     this.stageRenderer.renderTo(this.renderer);
   }
 
-  private dispatchEvent(eventName: typeof OnCanvas2DStageResize | typeof OnCanvas2DStageRender): void {
+  #dispatchEvent(eventName: typeof OnCanvas2DStageResize | typeof OnCanvas2DStageRender): void {
     emit(this, eventName, this);
   }
 

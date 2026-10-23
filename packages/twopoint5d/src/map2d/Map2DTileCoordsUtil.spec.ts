@@ -78,6 +78,28 @@ describe('Map2DTileCoordsUtil', () => {
     test('names the value it refuses', () => {
       expect(() => new Map2DTileCoordsUtil(16, 16, NaN)).toThrow('Map2DTileCoordsUtil: xOffset must be a finite number, got NaN');
     });
+    test.each([NaN, Infinity, -Infinity])(
+      'the xOffset setter refuses %p with a RangeError and keeps the offset it had',
+      (offset) => {
+        const view = new Map2DTileCoordsUtil(16, 16, 4, 8);
+        const write = () => (view.xOffset = offset);
+
+        expect(write).toThrow(RangeError);
+        expect(write).toThrow(`Map2DTileCoordsUtil: xOffset must be a finite number, got ${offset}`);
+        expect(view.xOffset, 'xOffset after a refused write').toBe(4);
+      },
+    );
+    test.each([NaN, Infinity, -Infinity])(
+      'the yOffset setter refuses %p with a RangeError and keeps the offset it had',
+      (offset) => {
+        const view = new Map2DTileCoordsUtil(16, 16, 4, 8);
+        const write = () => (view.yOffset = offset);
+
+        expect(write).toThrow(RangeError);
+        expect(write).toThrow(`Map2DTileCoordsUtil: yOffset must be a finite number, got ${offset}`);
+        expect(view.yOffset, 'yOffset after a refused write').toBe(8);
+      },
+    );
   });
   describe('getTileCoords()', () => {
     test('without offset', () => {

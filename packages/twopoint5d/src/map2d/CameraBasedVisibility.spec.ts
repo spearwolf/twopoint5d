@@ -454,7 +454,7 @@ describe('CameraBasedVisibility', () => {
       visibility = new CameraBasedVisibility(makeTopDownCamera());
       visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
 
-      const distances = visibility.visibles.map((v) => v.distanceToCamera!);
+      const distances = visibility.visibles.map((v) => v.distanceToCamera);
       const sorted = [...distances].sort((a, b) => a - b);
       expect(distances).toEqual(sorted);
     });
@@ -513,7 +513,7 @@ describe('CameraBasedVisibility', () => {
       };
 
       for (const tile of visibility.visibles) {
-        const {left, top, width, height} = tile.coords!;
+        const {left, top, width, height} = tile.coords;
         const where = `tile ${tile.x},${tile.y}`;
 
         // built the way `setBox()` builds it
@@ -527,9 +527,9 @@ describe('CameraBasedVisibility', () => {
           .applyMatrix4(matrix);
         const centerWorld = new Vector3(left + width / 2, 0, top + height / 2).applyMatrix4(toTileBoxSpace).applyMatrix4(matrix);
 
-        expectCloseTo(tile.frustumBox!.min, frustumBox.min, `${where}, frustumBox.min`);
-        expectCloseTo(tile.frustumBox!.max, frustumBox.max, `${where}, frustumBox.max`);
-        expectCloseTo(tile.centerWorld!, centerWorld, `${where}, centerWorld`);
+        expectCloseTo(tile.frustumBox.min, frustumBox.min, `${where}, frustumBox.min`);
+        expectCloseTo(tile.frustumBox.max, frustumBox.max, `${where}, frustumBox.max`);
+        expectCloseTo(tile.centerWorld, centerWorld, `${where}, centerWorld`);
       }
     });
 
@@ -573,12 +573,12 @@ describe('CameraBasedVisibility', () => {
       // Warm-up frame.
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
       const warmIds = first.tiles.map((t) => t.id).sort();
-      const warmTileBoxes = new Map(visibility.visibles.map((v) => [v.id, v]));
+      const warmTileBoxes = new Map(visibility.visibles.map((v) => [v.packedKey, v]));
       const warmFrustumBoxes = new Map<number, Box3>();
       const warmCenterWorlds = new Map<number, Vector3>();
       for (const v of visibility.visibles) {
-        warmFrustumBoxes.set(v.id, v.frustumBox!);
-        warmCenterWorlds.set(v.id, v.centerWorld!);
+        warmFrustumBoxes.set(v.packedKey, v.frustumBox);
+        warmCenterWorlds.set(v.packedKey, v.centerWorld);
       }
 
       // Force a re-compute by changing matrixWorld — the gate compares by value, so it is the
@@ -591,9 +591,9 @@ describe('CameraBasedVisibility', () => {
 
       // Same tile set ⇒ same pooled TileBox objects, same Box3 / Vector3 instances.
       for (const v of visibility.visibles) {
-        expect(warmTileBoxes.get(v.id), `tile box for ${v.x},${v.y} is the pooled instance`).toBe(v);
-        expect(warmFrustumBoxes.get(v.id), `frustumBox for ${v.x},${v.y} is reused`).toBe(v.frustumBox);
-        expect(warmCenterWorlds.get(v.id), `centerWorld for ${v.x},${v.y} is reused`).toBe(v.centerWorld);
+        expect(warmTileBoxes.get(v.packedKey), `tile box for ${v.x},${v.y} is the pooled instance`).toBe(v);
+        expect(warmFrustumBoxes.get(v.packedKey), `frustumBox for ${v.x},${v.y} is reused`).toBe(v.frustumBox);
+        expect(warmCenterWorlds.get(v.packedKey), `centerWorld for ${v.x},${v.y} is reused`).toBe(v.centerWorld);
       }
     });
 
@@ -604,7 +604,7 @@ describe('CameraBasedVisibility', () => {
       const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
       const warmBoxes = new Set<TileBox>(visibility.visibles);
       const warmShells = new Set(visibility.visibles.map((v) => v.map2dTile));
-      const warmIds = new Set(visibility.visibles.map((v) => v.id));
+      const warmIds = new Set(visibility.visibles.map((v) => v.packedKey));
       expect(warmBoxes.size).toBeGreaterThan(0);
 
       // Drive the center point tens of tile widths away, so none of the warm-up tiles is
@@ -617,8 +617,8 @@ describe('CameraBasedVisibility', () => {
 
       for (const v of handedOn) {
         const where = `tile box now at ${v.x},${v.y}`;
-        expect(warmIds.has(v.id), `${where} carries a tile of the far frame`).toBe(false);
-        expect(v.id, where).toBe(packTileCoords(v.x, v.y));
+        expect(warmIds.has(v.packedKey), `${where} carries a tile of the far frame`).toBe(false);
+        expect(v.packedKey, where).toBe(packTileCoords(v.x, v.y));
         expect(warmShells.has(v.map2dTile), `${where} carries a Map2DTileCoords of its own`).toBe(false);
         expect(v.map2dTile!.x, where).toBe(v.x);
         expect(v.map2dTile!.y, where).toBe(v.y);
@@ -688,17 +688,17 @@ describe('CameraBasedVisibility', () => {
           fresh.computeVisibleTiles([], center, grid, matrix);
 
           const where = `${name}, center ${center}`;
-          expect(panned.visibles.map((v) => v.id).sort(), `${where}: the same tiles`).toEqual(
-            fresh.visibles.map((v) => v.id).sort(),
+          expect(panned.visibles.map((v) => v.packedKey).sort(), `${where}: the same tiles`).toEqual(
+            fresh.visibles.map((v) => v.packedKey).sort(),
           );
           expect(
             panned.visibles.map((v) => v.distanceToCamera),
             `${where}: the same order of the distances`,
           ).toEqual(fresh.visibles.map((v) => v.distanceToCamera));
 
-          const byId = new Map(fresh.visibles.map((v) => [v.id, v]));
+          const byId = new Map(fresh.visibles.map((v) => [v.packedKey, v]));
           for (const tile of panned.visibles) {
-            const reference = byId.get(tile.id)!;
+            const reference = byId.get(tile.packedKey)!;
             const at = `${where}, tile ${tile.x},${tile.y}`;
             expect(tile.x, at).toBe(reference.x);
             expect(tile.y, at).toBe(reference.y);
@@ -781,6 +781,36 @@ describe('CameraBasedVisibility', () => {
       for (const tile of second.tiles) {
         expect(ofTheOldGrid.has(tile), `tile ${tile.id} of the new grid is an object of its own`).toBe(false);
       }
+    });
+
+    test('refuses a center point that is no pair of finite numbers before anything changes', () => {
+      visibility = new CameraBasedVisibility(makeTopDownCamera());
+
+      const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+      const firstTiles = [...first.tiles];
+      const serial = visibility.serial;
+      expect(firstTiles.length).toBeGreaterThan(0);
+
+      for (const [centerPoint, quoted] of [
+        [[NaN, 0], '[NaN, 0]'],
+        [[0, Infinity], '[0, Infinity]'],
+        [[-Infinity, 0], '[-Infinity, 0]'],
+      ] as const) {
+        const compute = () =>
+          visibility.computeVisibleTiles(first.tiles, [centerPoint[0], centerPoint[1]], tileCoords, matrixWorld);
+
+        expect(compute).toThrow(RangeError);
+        expect(compute).toThrow(
+          `CameraBasedVisibility: the center point of computeVisibleTiles() must be two finite numbers, got ${quoted}`,
+        );
+      }
+
+      const after = visibility.computeVisibleTiles(first.tiles, [0, 0], tileCoords, matrixWorld)!;
+
+      expect(visibility.serial, 'no recomputation ran').toBe(serial);
+      expect(after.changed).toBe(false);
+      expect(after.tiles, 'the tiles of the call before').toEqual(firstTiles);
+      expect(after.reuseTiles, 'the tiles handed back for reuse').toBe(after.tiles);
     });
   });
 
@@ -961,7 +991,7 @@ describe('CameraBasedVisibility', () => {
     /** The tiles that went into the visible set without being held against the frustum. */
     function untestedVisibles(): TileBox[] {
       const tested = new Set<Box3>(intersectsBox.mock.calls.map(([box]) => box));
-      return visibility.visibles.filter((tile) => !tested.has(tile.frustumBox!));
+      return visibility.visibles.filter((tile) => !tested.has(tile.frustumBox));
     }
 
     beforeEach(() => {
@@ -991,7 +1021,7 @@ describe('CameraBasedVisibility', () => {
       const frustum = makeFrustum(camera);
 
       for (const tile of untestedVisibles()) {
-        expect(frustum.intersectsBox(tile.frustumBox!), `tile ${tile.x},${tile.y} is in the view frustum`).toBe(true);
+        expect(frustum.intersectsBox(tile.frustumBox), `tile ${tile.x},${tile.y} is in the view frustum`).toBe(true);
       }
     });
 
@@ -1085,7 +1115,7 @@ describe('CameraBasedVisibility', () => {
           grid.tileWidth,
           grid.tileHeight,
         ]);
-        tile.box!.getSize(size);
+        tile.box.getSize(size);
         expect(size.x, `${at}: box width`).toBeCloseTo(grid.tileWidth, 9);
         expect(size.z, `${at}: box depth`).toBeCloseTo(grid.tileHeight, 9);
       }
@@ -1180,9 +1210,9 @@ describe('CameraBasedVisibility', () => {
         const where = `tile ${tile.x},${tile.y}`;
         // tile width times two, depth (50) times two, within the height the view frustum covers,
         // tile height times two
-        expect(tile.frustumBox!.getSize(size).toArray(), where).toEqual([200, 100, 200]);
-        tile.frustumBox!.getCenter(center);
-        tile.box!.getCenter(tileCenter);
+        expect(tile.frustumBox.getSize(size).toArray(), where).toEqual([200, 100, 200]);
+        tile.frustumBox.getCenter(center);
+        tile.box.getCenter(tileCenter);
         expect(Math.abs(center.x - tileCenter.x), `${where}, x`).toBeLessThan(1e-6);
         expect(Math.abs(center.z - tileCenter.z), `${where}, z`).toBeLessThan(1e-6);
       }
@@ -1219,8 +1249,8 @@ describe('CameraBasedVisibility', () => {
       for (const tile of visibility.visibles) {
         const where = `tile ${tile.x},${tile.y}`;
         // the difference, not the corners: `0 * -0.5` is `-0`
-        expect(tile.box!.max.y - tile.box!.min.y, `${where}, box`).toBe(0);
-        expect(tile.frustumBox!.max.y - tile.frustumBox!.min.y, `${where}, frustum box`).toBe(0);
+        expect(tile.box.max.y - tile.box.min.y, `${where}, box`).toBe(0);
+        expect(tile.frustumBox.max.y - tile.frustumBox.min.y, `${where}, frustum box`).toBe(0);
       }
     });
 
@@ -1257,10 +1287,10 @@ describe('CameraBasedVisibility', () => {
       expect(visibility.visibles.length).toBeGreaterThan(0);
       for (const tile of visibility.visibles) {
         const where = `tile ${tile.x},${tile.y}`;
-        expect(tile.frustumBox!.min.y, `${where}, frustum box`).toBeCloseTo(-50, 6);
-        expect(tile.frustumBox!.max.y, `${where}, frustum box`).toBeCloseTo(99.9, 6);
-        expect(tile.box!.min.y, `${where}, box`).toBe(-200);
-        expect(tile.box!.max.y, `${where}, box`).toBe(200);
+        expect(tile.frustumBox.min.y, `${where}, frustum box`).toBeCloseTo(-50, 6);
+        expect(tile.frustumBox.max.y, `${where}, frustum box`).toBeCloseTo(99.9, 6);
+        expect(tile.box.min.y, `${where}, box`).toBe(-200);
+        expect(tile.box.max.y, `${where}, box`).toBe(200);
       }
     });
 
@@ -1281,9 +1311,9 @@ describe('CameraBasedVisibility', () => {
       expect(flat.visibles.length, 'the flat boxes').toBeGreaterThan(0);
       expect(deep.visibles.length, 'the boxes of the default depth').toBeGreaterThan(0);
       // the cut column holds the flat tile, so it passes each plane the flat tile passes
-      const deepIds = new Set(deep.visibles.map((tile) => tile.id));
+      const deepIds = new Set(deep.visibles.map((tile) => tile.packedKey));
       for (const tile of flat.visibles) {
-        expect(deepIds.has(tile.id), `tile ${tile.x},${tile.y}`).toBe(true);
+        expect(deepIds.has(tile.packedKey), `tile ${tile.x},${tile.y}`).toBe(true);
       }
     });
   });
@@ -1295,11 +1325,16 @@ describe('CameraBasedVisibility', () => {
     type Scene = {fov: number; far: number; position: Vec3; target: Vec3; center: [number, number]};
     const horizon = (position: Vec3, target: Vec3): Scene => ({fov: 75, far: 1000, position, target, center: [0, 0]});
 
-    const makeCamera = ({fov, far, position, target}: Scene): PerspectiveCamera => {
+    /** The camera of `scene`, turned along with a map node that `turn` turns. */
+    const makeCamera = ({fov, far, position, target}: Scene, turn?: Matrix4): PerspectiveCamera => {
       const camera = new PerspectiveCamera(fov, 1.6, 0.1, far);
       camera.position.set(...position);
       camera.lookAt(...target);
       camera.updateMatrixWorld();
+      if (turn !== undefined) {
+        camera.applyMatrix4(turn);
+        camera.updateMatrixWorld();
+      }
       camera.updateProjectionMatrix();
       return camera;
     };
@@ -1309,10 +1344,13 @@ describe('CameraBasedVisibility', () => {
       camera: PerspectiveCamera | OrthographicCamera,
       tileCoords: Map2DTileCoordsUtil,
       center: [number, number] = [0, 0],
+      matrixWorld = new Matrix4(),
+      depth?: number,
     ): readonly TileBox[] {
       const visibility = new CameraBasedVisibility(camera);
       visibility.maxVisibleTiles = Infinity;
-      visibility.computeVisibleTiles([], center, tileCoords, new Matrix4());
+      if (depth !== undefined) visibility.depth = depth;
+      visibility.computeVisibleTiles([], center, tileCoords, matrixWorld);
       return visibility.visibles;
     }
 
@@ -1328,17 +1366,19 @@ describe('CameraBasedVisibility', () => {
       expect(result.tiles, where).toHaveLength(limit);
       expect(result.createTiles, where).toHaveLength(limit);
 
-      const inReference = new Set(reference.map((tile) => tile.id));
+      const inReference = new Set(reference.map((tile) => tile.packedKey));
       for (const tile of visibility.visibles) {
-        expect(inReference.has(tile.id), `${where}: tile ${tile.x},${tile.y} is in the view`).toBe(true);
+        expect(inReference.has(tile.packedKey), `${where}: tile ${tile.x},${tile.y} is in the view`).toBe(true);
       }
 
-      const kept = new Set(visibility.visibles.map((tile) => tile.id));
-      const farthestKept = Math.max(...visibility.visibles.map((tile) => tile.distanceToCamera!));
-      const nearestLeftOut = Math.min(...reference.filter((tile) => !kept.has(tile.id)).map((tile) => tile.distanceToCamera!));
+      const kept = new Set(visibility.visibles.map((tile) => tile.packedKey));
+      const farthestKept = Math.max(...visibility.visibles.map((tile) => tile.distanceToCamera));
+      const nearestLeftOut = Math.min(
+        ...reference.filter((tile) => !kept.has(tile.packedKey)).map((tile) => tile.distanceToCamera),
+      );
       expect(farthestKept, `${where}: no tile left out lies nearer than one kept`).toBeLessThanOrEqual(nearestLeftOut + 1e-6);
 
-      const distances = visibility.visibles.map((tile) => tile.distanceToCamera!);
+      const distances = visibility.visibles.map((tile) => tile.distanceToCamera);
       expect(distances, `${where}: nearest first`).toEqual([...distances].sort((a, b) => a - b));
     }
 
@@ -1348,7 +1388,7 @@ describe('CameraBasedVisibility', () => {
       intersectsBox: MockInstance<Frustum['intersectsBox']>,
     ): TileBox[] {
       const tested = new Set<Box3>(intersectsBox.mock.calls.map(([box]) => box));
-      return visibility.visibles.filter((tile) => !tested.has(tile.frustumBox!));
+      return visibility.visibles.filter((tile) => !tested.has(tile.frustumBox));
     }
 
     test('defaults to 10000', () => {
@@ -1469,6 +1509,45 @@ describe('CameraBasedVisibility', () => {
       }
     });
 
+    test('keeps the nearest tiles under a small limit on a map node that stands upright', () => {
+      // The map and the camera turn together, so the view stays the same. A tile much longer than
+      // it is wide, on a map of depth 0, shows whether the margin holds the long edge of the tile:
+      // standing upright, that edge points along the y axis of the world. Under a quarter turn the
+      // box in world space is the turned box itself.
+      const cases: {name: string; turn: Matrix4; grid: () => Map2DTileCoordsUtil}[] = [
+        {
+          name: 'turned about x, the rows pointing up',
+          turn: new Matrix4().makeRotationX(-Math.PI / 2),
+          grid: () => new Map2DTileCoordsUtil(2, 32),
+        },
+        {
+          name: 'turned about z, the columns pointing up',
+          turn: new Matrix4().makeRotationZ(Math.PI / 2),
+          grid: () => new Map2DTileCoordsUtil(32, 2),
+        },
+      ];
+      const scenes: Scene[] = [
+        {fov: 40, far: 700, position: [0, 130, 0], target: [170, 0, 190], center: [0, 0]},
+        {fov: 45, far: 800, position: [0, 120, 0], target: [200, 0, 200], center: [0, 0]},
+      ];
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      for (const {name, turn, grid} of cases) {
+        for (const scene of scenes) {
+          const reference = unlimitedVisibles(makeCamera(scene, turn), grid(), scene.center, turn, 0);
+
+          for (let limit = 1; limit <= 15; ++limit) {
+            const visibility = new CameraBasedVisibility(makeCamera(scene, turn));
+            visibility.depth = 0;
+            visibility.maxVisibleTiles = limit;
+            const result = visibility.computeVisibleTiles([], scene.center, grid(), turn)!;
+
+            expectTheNearest(visibility, result, reference, limit, `${name}, camera to ${scene.target}, limit ${limit}`);
+          }
+        }
+      }
+    });
+
     test('keeps the nearest tiles of each view when one visibility follows a camera that moves and climbs', () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -1553,9 +1632,9 @@ describe('CameraBasedVisibility', () => {
       for (const tile of visibility.visibles) {
         const local = new Vector3(tile.x * 256 + 128 - 128 - 100, 0, tile.y * 256 + 128 - 128 - 50);
         const where = `tile ${tile.x},${tile.y}`;
-        expect(tile.centerWorld!.distanceTo(local.clone().applyMatrix4(matrix)), where).toBeLessThan(1e-6);
-        expect(tile.box!.getCenter(center).distanceTo(local), where).toBeLessThan(1e-6);
-        expect(tile.frustumBox!.containsPoint(tile.centerWorld!), where).toBe(true);
+        expect(tile.centerWorld.distanceTo(local.clone().applyMatrix4(matrix)), where).toBeLessThan(1e-6);
+        expect(tile.box.getCenter(center).distanceTo(local), where).toBeLessThan(1e-6);
+        expect(tile.frustumBox.containsPoint(tile.centerWorld), where).toBe(true);
       }
     });
 
@@ -1594,6 +1673,21 @@ describe('CameraBasedVisibility', () => {
       }
 
       expect(visibility.visibles.length).toBeGreaterThan(0);
+    });
+
+    test('types every field of a TileBox as present and names its packed key packedKey', () => {
+      const visibility = new CameraBasedVisibility(makeTopDownCamera());
+      visibility.computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(10, 10), new Matrix4());
+
+      const tile: TileBox = visibility.visibles[0]!;
+      const distance: number = tile.distanceToCamera;
+      const box: Box3 = tile.frustumBox;
+      // @ts-expect-error the packed key is packedKey; an id is the string key of a Map2DTileCoords
+      void tile.id;
+
+      expect(tile.packedKey).toBe(packTileCoords(tile.x, tile.y));
+      expect(distance).toBeGreaterThan(0);
+      expect(box.containsPoint(tile.centerWorld)).toBe(true);
     });
 
     test('CameraBasedVisibility.Plane is a new copy on every access', () => {

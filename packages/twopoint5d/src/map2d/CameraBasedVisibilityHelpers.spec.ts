@@ -4,6 +4,7 @@ import {describe, expect, test, vi} from 'vitest';
 
 import type {CameraBasedVisibility, TileBox} from './CameraBasedVisibility.js';
 import {CameraBasedVisibilityHelpers} from './CameraBasedVisibilityHelpers.js';
+import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import {packTileCoords} from './tileKeys.js';
 
@@ -12,12 +13,16 @@ import {packTileCoords} from './tileKeys.js';
 // because the tile helpers are built from it.
 function makeTileBox(x: number, y: number, primary: boolean): TileBox {
   return {
-    id: packTileCoords(x, y),
+    packedKey: packTileCoords(x, y),
     x,
     y,
+    coords: createTilesWithinCoords(),
     primary,
     box: new Box3(new Vector3(x, 0, y), new Vector3(x + 1, 1, y + 1)),
     frustumBox: new Box3(new Vector3(x - 1, -1, y - 1), new Vector3(x + 2, 2, y + 2)),
+    centerWorld: new Vector3(x + 0.5, 0, y + 0.5),
+    distanceToCamera: 0,
+    map2dTile: undefined,
   };
 }
 

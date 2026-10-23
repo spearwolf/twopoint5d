@@ -164,7 +164,8 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
    * answers `undefined`.
    *
    * Throws a `RangeError` when the rectangle covers more than {@link maxVisibleTiles} tiles of the
-   * grid, before anything of the result is written; the next call computes again.
+   * grid, before anything of the result is written; the next call computes again. A `centerPoint`
+   * that is not two finite numbers throws a `RangeError` before anything changes.
    */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],
@@ -172,13 +173,20 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     map2dTileCoords: Map2DTileCoordsUtil,
     matrixWorld: Matrix4,
   ): IMap2DVisibleTiles | undefined {
-    if (this.width === 0 || this.height === 0) {
-      return this.#switchedOff(previousTiles);
-    }
-
     // read by index: a tuple of doubles destructured in the signature costs an allocation per call
     const centerX = centerPoint[0];
     const centerY = centerPoint[1];
+    // checked inline and not through `assertFinite()`: a double handed to a call the compiler does
+    // not inline is boxed
+    if (!(Number.isFinite(centerX) && Number.isFinite(centerY))) {
+      throw new RangeError(
+        `RectangularVisibilityArea: the center point of computeVisibleTiles() must be two finite numbers, got ${describeValue(centerPoint)}`,
+      );
+    }
+
+    if (this.width === 0 || this.height === 0) {
+      return this.#switchedOff(previousTiles);
+    }
 
     // asked before changed() writes the new state over it: the answer is what the previous call
     // was given, and `Dependencies` hands out its own clone
@@ -282,7 +290,11 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       }
     }
 
-    const offset = this.#offset.set(map2dTileCoords.xOffset - centerX, map2dTileCoords.yOffset - centerY);
+    // the offset of the grid through `readOffset()`, field by field: a getter the compiler leaves
+    // un-inlined boxes the double it answers
+    const offset = map2dTileCoords.readOffset(this.#offset);
+    offset.x -= centerX;
+    offset.y -= centerY;
     const translate = this.#translate.setFromMatrixPosition(matrixWorld);
 
     const tiles = this.#tiles;

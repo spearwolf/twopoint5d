@@ -280,13 +280,13 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
 
     this.#chunks = straddlers;
 
-    this.#nodes.northEast = ChunkQuadTreeNode.makeChild(ne, maxChunkNodes);
-    this.#nodes.northWest = ChunkQuadTreeNode.makeChild(nw, maxChunkNodes);
-    this.#nodes.southEast = ChunkQuadTreeNode.makeChild(se, maxChunkNodes);
-    this.#nodes.southWest = ChunkQuadTreeNode.makeChild(sw, maxChunkNodes);
+    this.#nodes.northEast = ChunkQuadTreeNode.#makeChild(ne, maxChunkNodes);
+    this.#nodes.northWest = ChunkQuadTreeNode.#makeChild(nw, maxChunkNodes);
+    this.#nodes.southEast = ChunkQuadTreeNode.#makeChild(se, maxChunkNodes);
+    this.#nodes.southWest = ChunkQuadTreeNode.#makeChild(sw, maxChunkNodes);
   }
 
-  private static makeChild<T extends IDataChunk2D>(bucket: T[], maxChunkNodes: number): ChunkQuadTreeNode<T> | null {
+  static #makeChild<T extends IDataChunk2D>(bucket: T[], maxChunkNodes: number): ChunkQuadTreeNode<T> | null {
     if (bucket.length === 0) return null;
     const child = new ChunkQuadTreeNode<T>();
     // Take ownership of the bucket array — it's freshly created in `subdivide()`.
@@ -315,17 +315,17 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     // would have put it
     if (chunk.right <= originX) {
       if (chunk.bottom <= originY) {
-        this.appendToNode(Quadrant.NorthWest, chunk);
+        this.#appendToNode(Quadrant.NorthWest, chunk);
       } else if (chunk.top >= originY) {
-        this.appendToNode(Quadrant.SouthWest, chunk);
+        this.#appendToNode(Quadrant.SouthWest, chunk);
       } else {
         this.#chunks.push(chunk);
       }
     } else if (chunk.left >= originX) {
       if (chunk.bottom <= originY) {
-        this.appendToNode(Quadrant.NorthEast, chunk);
+        this.#appendToNode(Quadrant.NorthEast, chunk);
       } else if (chunk.top >= originY) {
-        this.appendToNode(Quadrant.SouthEast, chunk);
+        this.#appendToNode(Quadrant.SouthEast, chunk);
       } else {
         this.#chunks.push(chunk);
       }
@@ -334,7 +334,7 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     }
   }
 
-  private appendToNode(quadrant: Quadrant, chunk: ChunkType) {
+  #appendToNode(quadrant: Quadrant, chunk: ChunkType) {
     const node = this.#nodes[quadrant];
     if (node) {
       node.appendChunk(chunk);
