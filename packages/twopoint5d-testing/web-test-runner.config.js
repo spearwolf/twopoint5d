@@ -63,6 +63,10 @@ export default {
       // comes back invalid, and Dawn drops the instance — every device of the page is lost
       // ("A valid external Instance reference no longer exists"). macOS needs the first of the
       // three, Linux all of them.
+      // --disable-accelerated-2d-canvas: on macOS a 2D canvas still draws on the GPU, and
+      // copyExternalImageToTexture() cannot take its texture into a SwiftShader device — every
+      // upload of a CanvasTexture fails as "CopyTextureForBrowser from [Invalid Texture]" and the
+      // texture stays black. Drawn in software, the canvas copies on every platform.
       args: [
         '--enable-precise-memory-info',
         '--js-flags=--expose-gc',
@@ -71,6 +75,7 @@ export default {
         '--use-angle=swiftshader',
         '--enable-features=Vulkan',
         '--use-vulkan=swiftshader',
+        '--disable-accelerated-2d-canvas',
       ],
     }),
     backendLauncher('chromium', 'WebGL2', {
