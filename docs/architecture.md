@@ -85,6 +85,13 @@ invalidate the cache. `scripts/checkDocSnippets/typecheckInputs.test.mjs` asks N
 inputs it resolves and fails on a tracked `*.md` outside them; a doc in a new place gets
 its glob there.
 
+The inputs of `test`, `coverage` and `allocations` are `vitestDefaults` and every file
+under `src/`, not only its `.ts` files: specs read fixtures at runtime — bitmap fonts,
+atlas JSON, images and the graphs of `presetGraphs.spec.ts` under `src/**/fixtures/` —,
+and a changed fixture has to run them again.
+`scripts/nxInputs/libraryVitestInputs.test.mjs` asks Nx for the inputs it resolves for the
+three targets and fails on a tracked file under `src/` outside them.
+
 Named inputs worth knowing: `sharedTsconfigs` (root + project tsconfig),
 `makePackageJson` (everything that feeds the publish manifest, the root `package.json`
 included — change any of it and the library rebuilds).
@@ -174,8 +181,9 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
 ### In CI
 
 `.github/workflows/ci.yml` runs the gate on every push and on every pull request from a
-fork, in four jobs side by side — one matrix job per part: `ci:checks`, `test:coverage`,
-`test:allocations` and, under `xvfb-run`, `test:browser`. `fail-fast` is off, so a red job
+fork, in five jobs side by side — one matrix job per part, `ci:checks` twice: `ci:checks`
+on Node 24 and on Node 26, the two lines `engines` allows, then `test:coverage`,
+`test:allocations` and, under `xvfb-run`, `test:browser` on 24 alone. `fail-fast` is off, so a red job
 does not hide the verdict of the others, and "Re-run failed jobs" repeats only the part
 that failed. Every job and every long step carries a `timeout-minutes`; a hosted job
 otherwise runs for six hours. A pull request from a branch of this repository skips its
@@ -194,11 +202,13 @@ waiting run of the same ref, except on `main`, where the group is the commit: ev
 there gets its own run, which nothing cancels, because `deploy.yml` follows each
 successful one.
 
-The step `Audit dependencies` follows the install in the job `ci:checks` and runs
-`pnpm audit --audit-level=high`. It reports high and critical advisories without failing
-the run: the published package declares peer dependencies only (`lintPkg` holds that), so
-whatever the audit finds sits in tooling, and Dependabot proposes the update that fixes it
-(§5). Dependabot also keeps the commit SHAs of the actions, and the version comment next
+The step `Audit dependencies` follows the install in the Node 24 job of `ci:checks` and
+runs `pnpm audit --audit-level=high`; the dependencies are the same under both Node lines.
+It reports high and critical advisories without failing the run: the published package
+declares peer dependencies only (`lintPkg` holds that), so whatever the audit finds sits
+in tooling, and Dependabot proposes the update that fixes it (§5). A hit, or an audit that
+gets no answer from the registry, puts a warning on the summary page of the run and the
+report into the job summary; an audit that times out leaves the job green. Dependabot also keeps the commit SHAs of the actions, and the version comment next
 to each, current.
 
 The benchmarks run in a workflow of their own, `.github/workflows/bench.yml`: nightly on
@@ -250,10 +260,12 @@ results from a self-hosted remote cache, so the job starts `scripts/ci/nxCacheSe
 on `127.0.0.1:47873`, serving `$RUNNER_TEMP/nx-cache` with a random per-run token, and
 hands `NX_SELF_HOSTED_REMOTE_CACHE_SERVER` and `NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN`
 to every later step. Each job keeps a cache of its own — `actions/cache` restores that
-directory under `nx-<os>-<job>-<hash of pnpm-lock.yaml>-<commit sha>`, falling back to the
-newest entry of the same job and lockfile and then to the newest entry of the job at all.
-Four jobs of one commit would otherwise race for one key, and only the first save would
-count. The server touches every entry it serves. After a green run the job deletes each
+directory under `nx-<os>-<job>-node<line>-<hash of pnpm-lock.yaml>-<commit sha>`, falling
+back to the newest entry of the same job and lockfile and then to the newest entry of the
+job at all. Five jobs of one commit would otherwise race for one key, and only the first
+save would count. The Node line stands in the key because the Nx hash of a task leaves it
+out: the Node 26 job would otherwise replay the results of the Node 24 job and check
+nothing. The server touches every entry it serves. After a green run the job deletes each
 entry older than the server start — what this run neither used nor wrote — and saves the
 directory under the commit's key, so each saved state holds exactly the results of one
 green job of one commit and does not grow from run to run. A red job saves nothing, and
@@ -393,6 +405,15 @@ its updates brings the Chromium and Firefox the browser suite runs on, so it com
 pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
 comment that names the advisory it answers and says when the entry can go.
 
+pnpm resolves no version younger than a day (`minimumReleaseAge: 1440` in
+`pnpm-workspace.yaml`): a compromised release is usually found and pulled within hours,
+and the day keeps it out of every fresh resolution. The packages under `@spearwolf/` are
+exempt (`minimumReleaseAgeExclude`), so a release of eventize or signalize can be taken
+the day it is published. Dependabot waits the same day (`cooldown`), or the install of an
+update to a younger version would fail. `pnpm outdated -r` lists what is behind in every
+project of the workspace, the catalog entries included; an update comes through Dependabot
+or by hand, a catalog entry in `pnpm-workspace.yaml`.
+
 The repo runs two TypeScripts. `typescript` in the root is 7.x, the native compiler: its
 `tsc` builds the library and runs every type check but the lookbook's. TypeScript 7
 exports no compiler API under `typescript` (only `typescript/unstable/*`, whose shape
@@ -416,12 +437,14 @@ Node and pnpm versions come from `engines` in the root `package.json`: Node
 `^24.16.0 || >=26.3.0` — the 25.x line is out — and pnpm `>=10.22.0`. The exact pnpm
 is `packageManager` in the root `package.json`; `pnpm/action-setup` in both workflows
 reads it from there and names no version of its own. `.nvmrc`, `mise.toml` and the
-`node-version` of the CI workflows name a plain `24`. They answer which version to
+`node-version` of the CI workflows name a plain `24`, and the job `ci:checks` of `ci.yml`
+runs on a plain `26` as well (§3), so that the second branch of the range is covered by a
+run too. Such a plain major answers which version to
 install, not which ones are allowed, and none of them understands an alternative like
 `||`; a `24` picks the newest 24.x the tool can get and lands inside the range, while a
 narrower `24.16` would pin the minor line and cut the repo off from later 24.x releases.
-`@types/node` stays on the 24 line, the lowest `engines` allows and the one the workflows
-run on: the types of a later line would let a script or a spec call an API Node 24 lacks,
+`@types/node` stays on the 24 line, the lowest `engines` allows and the one every workflow
+runs on: the types of a later line would let a script or a spec call an API Node 24 lacks,
 and only a run on 24 would notice. `.github/dependabot.yml` therefore ignores its major
 updates; they move with the `node-version` of the workflows. Two manifests name it: the
 root `package.json` for the scripts and specs, and `apps/lookbook/package.json`, where it
@@ -451,9 +474,9 @@ wait two seconds at most, the first one with a warning on the console when it ru
 Firefox 155 under WebGPU needs the frames to keep drawing for the tests that follow.
 
 The helpers of the publish pipeline, the CI cache server, the code block check and the
-Nameable-Types check run under `node --test` (`pnpm test:scripts`), and four more specs
+Nameable-Types check run under `node --test` (`pnpm test:scripts`), and five more specs
 share that run. The Nx project `scripts` has no `test` target, so `pnpm test` leaves all
-of them out. The four are:
+of them out. The five are:
 
 - `scripts/lookbook/rainbowLineScript.test.mjs` holds `apps/lookbook/public/js/` to the
   script `@spearwolf/astro-rainbow-line` loads at runtime. Nothing in the repo
@@ -464,6 +487,9 @@ of them out. The four are:
   sources, so the spec needs no build.
 - `scripts/checkDocSnippets/typecheckInputs.test.mjs` runs git and Nx itself: it holds
   the Markdown inputs of `twopoint5d-testing:typecheck` to the files git tracks.
+- `scripts/nxInputs/libraryVitestInputs.test.mjs` runs git and Nx as well: it holds the
+  inputs of the library's `test`, `coverage` and `allocations` to every file git tracks
+  under `packages/twopoint5d/src/`, fixtures included (§2).
 - `scripts/publishNpmPkg/builtinImportsOnly.test.mjs` holds `publishNpmPkg.mjs` and its
   helpers to imports of Node's built-ins and of each other, because the publish job of
   the deploy installs nothing (§4).

@@ -31,6 +31,9 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 `engines` in `package.json`.
 
 - `pnpm install`
+- `pnpm outdated -r` — what is behind in every project of the workspace, the catalog
+  included; updates come through Dependabot (`.github/dependabot.yml`), and pnpm installs
+  no release younger than a day (`minimumReleaseAge` in `pnpm-workspace.yaml`)
 - `pnpm exec playwright install chromium firefox` — the browsers for
   `pnpm test:browser`; once after the first install and after every Playwright bump
 - `pnpm lint` — `biome ci`: Biome's linter and formatter check, nothing written;
@@ -60,9 +63,10 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   exports, one that holds the preview images of the lookbook to its demos, ids and card
   size, one that holds the view-transition names of the lookbook's navbar to its two
   pages and the stylesheets to those names, one that asks Nx whether every tracked
-  Markdown file is an input of the docs' type check, and one that holds the publish
-  script to Node's built-ins; the Nx project `scripts` has no `test` target, so
-  `pnpm test` leaves them out
+  Markdown file is an input of the docs' type check, one that asks Nx whether every
+  tracked file under the library's `src/` is an input of its Vitest targets, and one that
+  holds the publish script to Node's built-ins; the Nx project `scripts` has no `test`
+  target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
@@ -88,7 +92,7 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, then `ci:checks` (lint,
   build, typecheck, checkPkgTypes, checkNameableTypes, lintPkg, test:scripts), then
   test:coverage, test:allocations, test:browser. Run it before committing. CI runs the
-  four parts as parallel jobs.
+  four parts as parallel jobs, `ci:checks` once on Node 24 and once on Node 26.
 
 Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
 explicit instruction.

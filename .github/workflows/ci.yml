@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   gate:
-    # The gate of `pnpm run ci`, cut into four jobs that run side by side: a red one names
+    # The gate of `pnpm run ci`, cut into five jobs that run side by side: a red one names
     # its part of the gate, the others still report theirs, and "Re-run failed jobs" repeats
     # only what failed. The deploy workflow follows the conclusion of the whole run, so every
     # job has to pass.
@@ -40,20 +40,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # ci:checks runs on both Node lines engines allows: it is the part in which Node
+        # runs the tooling itself — the build, the type checks, the package checks and
+        # the node --test specs of the scripts. The other parts run on 24 alone
         include:
           - task: checks
-            name: Lint, build and check
+            name: Lint, build and check (Node 24)
             run: pnpm run ci:checks
+            node: 24
+          - task: checks
+            name: Lint, build and check (Node 26)
+            run: pnpm run ci:checks
+            node: 26
           - task: coverage
             name: Unit tests with coverage
             run: pnpm run test:coverage
+            node: 24
           - task: allocations
             name: Hot-path allocations
             run: pnpm run test:allocations
+            node: 24
           - task: browser
             name: Browser tests
             run: xvfb-run pnpm run test:browser
             browsers: true
+            node: 24
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,7 +77,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: pnpm
 
       - name: Install dependencies
@@ -76,9 +87,26 @@ jobs:
       - name: Audit dependencies
         # reports high and critical advisories without failing the run: the published
         # package declares peer dependencies only (lintPkg holds that), so whatever this
-        # finds sits in tooling, and Dependabot proposes the update that fixes it
-        if: matrix.task == 'checks'
-        run: pnpm audit --audit-level=high
+        # finds sits in tooling, and Dependabot proposes the update that fixes it. A hit
+        # puts a warning on the summary page of the run and the report into the job
+        # summary, where it does not sit unread in the log of a green step;
+        # continue-on-error keeps an audit that times out from failing the job. The
+        # dependencies are the same under both Node lines, so one job audits them
+        if: matrix.task == 'checks' && matrix.node == 24
+        run: |
+          status=0
+          pnpm audit --audit-level=high > "$RUNNER_TEMP/pnpm-audit.txt" 2>&1 || status=$?
+          cat "$RUNNER_TEMP/pnpm-audit.txt"
+          if [ "$status" -ne 0 ]; then
+            echo "::warning title=pnpm audit::pnpm audit --audit-level=high exited with $status: high or critical advisories, or no answer from the registry. The job summary holds the report."
+            {
+              echo '### pnpm audit --audit-level=high'
+              echo
+              echo '```'
+              cat "$RUNNER_TEMP/pnpm-audit.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
         continue-on-error: true
         timeout-minutes: 2
 
@@ -127,11 +155,13 @@ jobs:
         with:
           path: ${{ runner.temp }}/nx-cache
           # one cache per job: each saves what its own tasks produced, and two jobs of the
-          # same commit would otherwise race for the same key
-          key: nx-${{ runner.os }}-${{ matrix.task }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          # same commit would otherwise race for the same key. The Node line is part of the
+          # key because the Nx hash of a task leaves it out: the Node 26 job would otherwise
+          # replay what the Node 24 job computed and check nothing
+          key: nx-${{ runner.os }}-${{ matrix.task }}-node${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
-            nx-${{ runner.os }}-${{ matrix.task }}-${{ hashFiles('pnpm-lock.yaml') }}-
-            nx-${{ runner.os }}-${{ matrix.task }}-
+            nx-${{ runner.os }}-${{ matrix.task }}-node${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-${{ matrix.task }}-node${{ matrix.node }}-
 
       - name: Start the Nx cache server
         # Nx indexes its local cache in a database named after the machine id, so a
