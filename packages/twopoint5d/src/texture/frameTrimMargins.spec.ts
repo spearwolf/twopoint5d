@@ -30,6 +30,23 @@ describe('frameTrimMargins()', () => {
     expect(frameTrimMargins(data)).toEqual([0, 0, 0, 0]);
   });
 
+  test.each<[string, {x: number; y: number; w: number; h: number}]>([
+    ['a w of 0', {x: 1, y: 2, w: 0, h: 1}],
+    ['an h of 0', {x: 1, y: 2, w: 2, h: 0}],
+    ['an x of -1', {x: -1, y: 2, w: 2, h: 1}],
+    ['a y of -1', {x: 1, y: -1, w: 2, h: 1}],
+    ['an x + w beyond the width', {x: 4, y: 2, w: 2, h: 1}],
+    ['a y + h beyond the height', {x: 1, y: 3, w: 2, h: 2}],
+  ])('gives four zeros to a spriteSourceSize that does not lie within the sourceSize: %s', (_, spriteSourceSize) => {
+    expect(frameTrimMargins({spriteSourceSize, sourceSize: {w: 5, h: 4}})).toEqual([0, 0, 0, 0]);
+  });
+
+  test('keeps the margins of a trimmed area that reaches the edges of the sourceSize', () => {
+    const margins = frameTrimMargins({spriteSourceSize: {x: 3, y: 2, w: 2, h: 2}, sourceSize: {w: 5, h: 4}});
+
+    expect(margins).toEqual([0.6, 0.5, 0, 0]);
+  });
+
   test('reads the margins off the two rectangles, not off the trimmed flag', () => {
     const margins = frameTrimMargins({trimmed: false, spriteSourceSize: {x: 1, y: 2, w: 2, h: 1}, sourceSize: {w: 5, h: 4}});
 

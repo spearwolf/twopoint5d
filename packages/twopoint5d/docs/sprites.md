@@ -239,9 +239,24 @@ and `setColor(color)` writes them; `setColorValues()` writes its numbers as they
 A frame is three values: `texCoords` (`s, t, u, v`), `texFlipDiagonal` — a TexturePacker frame
 turned by 90°, read with the two lookup components swapped — and `texTrim`, the margins a
 packer cut off, as fractions of the untrimmed sprite. `setFrame(frame)` writes all three for a
-frame of any atlas; the margins come from TexturePacker data and are zero for every other.
+frame of any atlas; the margins come from TexturePacker data, and are zero for every other and
+for a frame whose `spriteSourceSize` does not lie within its `sourceSize`.
+`frameTrimMargins(data, target?)` works them out by the same rule, for a feature or a material of
+your own; with a `target` of its own the call allocates nothing.
+
+```ts check
+import {frameTrimMargins, type FrameTrimMargins, type TextureAtlasFrame} from '@spearwolf/twopoint5d';
+
+declare const frame: TextureAtlasFrame<unknown>;
+
+const margins: FrameTrimMargins = frameTrimMargins(frame.data);
+```
+
 `TexturePackerJson` reads the "JSON Hash" and "JSON Array" exports of TexturePacker and of
-free-tex-packer alike, rotated and trimmed frames included.
+free-tex-packer alike, rotated and trimmed frames included. It refuses a frame that is no object
+or has no `frame`, a number of `frame` that is no finite number of 0 or more (a `RangeError`), and
+— without `parentCoords` — a `meta.size` without an area above 0, each naming the frame or the
+field, before the first frame goes into the atlas: a refused json leaves the `target` as it was.
 
 The quad of the sprite stands for the **untrimmed** sprite: size a sprite that shows trimmed
 frames by the `sourceSize` of its frames, not by the measures of their `coords`.
@@ -346,7 +361,9 @@ with one animation per frame tag:
 | `pingpong_reverse` | `to` … `from` | `'pingpong'` |
 
 The frames keep their durations — as one `duration` when they are all alike, as `durations` when
-they differ. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its frames
+they differ. Every frame carries its duration, and Aseprite writes one above 0 for each; a frame
+without it, in a tag or not, is refused with a `RangeError` naming it, before the first frame goes
+into the atlas. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its frames
 played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1 is a
 one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code instead.
 It reads its own keys only — an inherited one such as `constructor` names no tag —, and a value

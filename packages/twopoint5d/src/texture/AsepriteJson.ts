@@ -1,4 +1,6 @@
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
+import {isObject} from '../utils/isObject.js';
 import {isAnimationPlayback} from './animationPlayback.js';
 import {type AnimationPlayback, type AnimationTimingOptions, FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
@@ -207,26 +209,46 @@ export class AsepriteJson {
    * It is read by its own keys only: an inherited one such as `constructor` names no tag.
    *
    * Refused, with the tag named: a range outside the frames or running backwards, an unknown
-   * direction, a repeat that is no whole number of 0 or more, two tags of one name, a frame without
-   * a duration above zero, a tag that plays more than `FrameBasedAnimations.MaxFramesWithDurations`
-   * frames of differing durations, a playback that is none of `'loop'`, `'once'` and `'pingpong'`,
-   * and a playback for a tag the sheet does not carry; a frame name twice in the layout "Array" is
-   * refused as well. Every check runs before the first frame is added: a refused sheet leaves
-   * `options.target` as it was.
+   * direction, a repeat that is no whole number of 0 or more, two tags of one name, a tag that plays
+   * more than `FrameBasedAnimations.MaxFramesWithDurations` frames of differing durations, a playback
+   * that is none of `'loop'`, `'once'` and `'pingpong'`, and a playback for a tag the sheet does not
+   * carry. Refused as well: a frame name twice in the layout "Array"; a frame — in a tag or outside
+   * every tag — without a duration above zero, with a `RangeError` naming the frame; a frame or a frame
+   * tag that is no object, and `meta.frameTags` that is no list, with a `TypeError`; and what
+   * `TexturePackerJson.parse()` refuses of a frame and of `meta.size`. Every check runs before the
+   * first frame is added: a refused sheet leaves `options.target` as it was.
    */
   static parse(
     data: AsepriteJsonData,
     options?: AsepriteParseOptions,
   ): [atlas: TextureAtlas<AsepriteFrameData>, meta: AsepriteMetaData, animations: FrameBasedAnimations] {
+    const isArray = Array.isArray(data.frames);
+    // a filename is only read from an object: an entry that is no object is refused below, by its index
     const entries: [name: string, frameData: AsepriteJsonFrameData][] = Array.isArray(data.frames)
-      ? data.frames.map((frameData) => [frameData.filename, frameData])
+      ? data.frames.map((frameData: unknown) => [
+          (isObject(frameData) ? frameData['filename'] : undefined) as string,
+          frameData as AsepriteJsonFrameData,
+        ])
       : Object.entries(data.frames);
-    const tags = data.meta.frameTags ?? [];
+    const tags: unknown = data.meta.frameTags ?? [];
     const slices = data.meta.slices ?? [];
+
+    if (!Array.isArray(tags)) {
+      throw new TypeError(`AsepriteJson: meta.frameTags is ${describeValue(tags)} — Aseprite writes the frame tags as a list`);
+    }
 
     // Everything is checked and every animation planned before the first frame is added, so a
     // refused sheet leaves the target as it was. A name twice in "Array" would overwrite its first
     // frame below; Aseprite writes it when the filename format has no {frame}
+    for (const [index, [name, frameData]] of entries.entries()) {
+      if (!isObject(frameData)) {
+        throw new TypeError(
+          isArray
+            ? `AsepriteJson: the frame ${index} of the "Array" frames is ${describeValue(frameData)} — a frame of the json is an object`
+            : `AsepriteJson: the frame "${name}" is ${describeValue(frameData)} — a frame of the json is an object`,
+        );
+      }
+    }
     const frameNames = new Set<string>();
     for (const [name] of entries) {
       if (frameNames.has(name)) {
@@ -236,10 +258,20 @@ export class AsepriteJson {
       }
       frameNames.add(name);
     }
+    // every frame, not only those of a tag: the frames of the atlas are typed to carry their duration
+    for (const [name, {duration}] of entries) {
+      assertPositiveFinite(duration, 'AsepriteJson', `the duration of the frame "${name}"`);
+    }
     const plans: {name: string; timing: AnimationTimingOptions; frameNames: string[]}[] = [];
     const tagNames = new Set<string>();
     const overrides = new Map<string, AnimationPlayback>();
-    for (const tag of tags) {
+    for (const [index, tag] of tags.entries()) {
+      if (!isObject(tag)) {
+        throw new TypeError(`AsepriteJson: the frame tag ${index} is ${describeValue(tag)} — a frame tag is an object`);
+      }
+    }
+    const frameTags = tags as AsepriteFrameTag[];
+    for (const tag of frameTags) {
       if (tagNames.has(tag.name)) {
         throw new Error(`AsepriteJson: two tags are named "${tag.name}" — rename one of them in Aseprite`);
       }
@@ -268,16 +300,8 @@ export class AsepriteJson {
         );
       }
       if (override !== undefined) overrides.set(tag.name, override);
-      for (let index = tag.from; index <= tag.to; index++) {
-        const [name, {duration}] = entries[index]!;
-        if (typeof duration !== 'number' || !Number.isFinite(duration) || !(duration > 0)) {
-          throw new Error(
-            `AsepriteJson: the frame "${name}" carries a duration of ${describeValue(duration)} — Aseprite writes one in ms above zero for every frame`,
-          );
-        }
-      }
     }
-    for (const tag of tags) {
+    for (const tag of frameTags) {
       const {indices, playback} = framesOfTag(tag, overrides.get(tag.name));
       const durations = indices.map((index) => entries[index]![1].duration / 1000);
       const even = durations.every((duration) => duration === durations[0]);

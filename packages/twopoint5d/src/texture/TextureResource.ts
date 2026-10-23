@@ -121,7 +121,10 @@ export const TextureResourceEvents = {
   Error: 'error',
 } as const;
 
-const cmpTexClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
+const cmpTexClasses = (
+  a: readonly TextureOptionClasses[] | undefined,
+  b: readonly TextureOptionClasses[] | undefined,
+): boolean => {
   if (a === b) {
     return true;
   }
@@ -300,8 +303,9 @@ export interface TextureResource extends EventizedObject {}
  *   `texture` back, together with everything built from them — the `tileSet`, its `atlas` and the
  *   `frameBasedAnimations` — and releases the texture it built, since a subscriber only borrows it.
  * - An image that is still loading when the url is cleared builds nothing.
- * - An atlas resource whose json names no image, with no `overrideImageUrl` to fall back on, has no
- *   `imageUrl` either and does the same.
+ * - An atlas resource whose json names no image, with no `overrideImageUrl` to fall back on — never
+ *   set, or cleared again —, has no `imageUrl` either and does the same; a json it fetched is taken
+ *   back with it.
  * - A tile set resource takes its `tileSet`, `atlas` and `frameBasedAnimations` back while its
  *   `tileSetOptions` are cleared or refused by `TileSet`. The texture stays.
  * - An atlas resource takes its `atlas` and `frameBasedAnimations` back while its `atlasJson` is
@@ -320,12 +324,12 @@ export interface TextureResource extends EventizedObject {}
  * - a texture built from another image than the one loaded now is taken back and released.
  */
 export abstract class TextureResource {
-  static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): ImageTextureResource {
+  static fromImage(id: string, imageUrl: string, textureClasses?: readonly TextureOptionClasses[]): ImageTextureResource {
     const resource = new ImageTextureResource(id);
 
     batch(() => {
       resource.imageUrl = imageUrl;
-      resource.textureClasses = textureClasses?.slice();
+      resource.textureClasses = textureClasses;
     });
 
     return resource;
@@ -335,7 +339,7 @@ export abstract class TextureResource {
     id: string,
     imageUrl: string | undefined,
     tileSetOptions: TileSetOptions,
-    textureClasses?: TextureOptionClasses[],
+    textureClasses?: readonly TextureOptionClasses[],
     frameBasedAnimations?: FrameBasedAnimationsDataMap,
   ): TileSetTextureResource {
     const resource = new TileSetTextureResource(id);
@@ -343,7 +347,7 @@ export abstract class TextureResource {
     batch(() => {
       resource.imageUrl = imageUrl;
       resource.tileSetOptions = tileSetOptions;
-      resource.textureClasses = textureClasses?.slice();
+      resource.textureClasses = textureClasses;
       resource.frameBasedAnimationsData = frameBasedAnimations;
     });
 
@@ -354,7 +358,7 @@ export abstract class TextureResource {
     id: string,
     atlasUrl: string,
     overrideImageUrl?: string,
-    textureClasses?: TextureOptionClasses[],
+    textureClasses?: readonly TextureOptionClasses[],
     frameBasedAnimations?: FrameBasedAnimationsDataMap,
   ): AtlasTextureResource {
     const resource = new AtlasTextureResource(id);
@@ -362,7 +366,7 @@ export abstract class TextureResource {
     batch(() => {
       resource.atlasUrl = atlasUrl;
       resource.overrideImageUrl = overrideImageUrl;
-      resource.textureClasses = textureClasses?.slice();
+      resource.textureClasses = textureClasses;
       resource.frameBasedAnimationsData = frameBasedAnimations;
     });
 
@@ -389,7 +393,10 @@ export abstract class TextureResource {
     attach: this,
   });
 
-  #textureClasses = createSignal<TextureOptionClasses[] | undefined>(undefined, {compare: cmpTexClasses, attach: this});
+  #textureClasses = createSignal<readonly TextureOptionClasses[] | undefined>(undefined, {
+    compare: cmpTexClasses,
+    attach: this,
+  });
   // an input of an image and a tile set resource, derived from the json of an atlas resource
   #imageUrl = createSignal<string | undefined>(undefined, {attach: this});
   #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpShallow, attach: this});
@@ -445,7 +452,8 @@ export abstract class TextureResource {
 
   /**
    * The url of the image the texture is built from: an input of an image and a tile set resource,
-   * and on an atlas resource the image its json names — the `overrideImageUrl` while one is set.
+   * and on an atlas resource the image its json names — the `overrideImageUrl` while one is set;
+   * `undefined` while neither names one.
    *
    * Answers `undefined` once {@link TextureResource.dispose} has run.
    */
@@ -493,17 +501,18 @@ export abstract class TextureResource {
   /**
    * The texture classes the texture is built with; an empty list is stored as `undefined`.
    *
+   * The setter stores a frozen copy of what is written: a change to the array handed in does not
+   * reach the resource, and writing it again after a change builds the texture with the new
+   * classes. The getter answers that copy; to change the classes, write a new array.
+   *
    * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
-  get textureClasses(): TextureOptionClasses[] | undefined {
+  get textureClasses(): readonly TextureOptionClasses[] | undefined {
     return this.#disposed ? undefined : this.#textureClasses.value;
   }
 
-  set textureClasses(value: TextureOptionClasses[] | undefined) {
-    if (Array.isArray(value) && value.length === 0) {
-      value = undefined;
-    }
-    this.#textureClasses.set(value);
+  set textureClasses(value: readonly TextureOptionClasses[] | undefined) {
+    this.#textureClasses.set(Array.isArray(value) && value.length > 0 ? Object.freeze([...value]) : undefined);
   }
 
   /**
@@ -544,6 +553,9 @@ export abstract class TextureResource {
    * written from outside — a `TextureStore` writes its shared one — the resource builds a
    * `TextureFactory` for it that starts from no texture class, as the factory of a store does,
    * and a new one whenever another renderer is written; the texture follows the new factory.
+   * Clearing it takes the factory built for it back — a factory written from outside stays —, so
+   * the resource no longer holds the renderer; the texture stays for as long as the image stays the
+   * same, as with a cleared `textureFactory`, and a new texture waits for a factory.
    *
    * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
@@ -773,14 +785,23 @@ export abstract class TextureResource {
     // `TextureStore` around — builds a factory that starts from no texture class, as the factory
     // of a store does. A new renderer brings a new factory, which asks that renderer for its
     // anisotropy maximum at every texture it builds; a factory written from outside, the shared
-    // one of a store among them, stays.
+    // one of a store among them, stays. Clearing the renderer takes the factory built for it back —
+    // a factory written from outside stays —, so the resource no longer holds the renderer; the
+    // texture stays for as long as the image stays the same, as with a cleared `textureFactory`,
+    // and a new texture waits for a factory.
 
     // the factory this fallback built and the renderer it built it for
     let fallback: {renderer: WebGPURenderer; factory: TextureFactory} | undefined;
     createEffect(
       () => {
         const renderer = this.#renderer.get();
-        if (!renderer || renderer === fallback?.renderer) return;
+        if (!renderer) {
+          // the factory holds the renderer, and every later texture would still be built for the old one
+          if (fallback !== undefined && this.#textureFactory.value === fallback.factory) this.textureFactory = undefined;
+          fallback = undefined;
+          return;
+        }
+        if (renderer === fallback?.renderer) return;
         const factory = this.#textureFactory.value;
         if (factory && factory !== fallback?.factory) return;
         fallback = {renderer, factory: new TextureFactory(renderer, [])};
@@ -894,7 +915,7 @@ export abstract class TextureResource {
     url: string,
     image: HTMLImageElement,
     factory: TextureFactory,
-    classes: TextureOptionClasses[] | undefined,
+    classes: readonly TextureOptionClasses[] | undefined,
   ): void {
     // the coordinates first, so a throw there leaves no texture behind that nobody
     // releases. There is no failed url to name here, so the resource is reported
@@ -1316,6 +1337,8 @@ export class AtlasTextureResource extends TextureResource {
    * - Written before {@link TextureResource.activate}, it takes the place of the fetch of the
    *   `atlasUrl` it was written after.
    * - While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`.
+   * - A json fetched from `atlasUrl` that names no image, while no `overrideImageUrl` is set, is not
+   *   offered: `atlasJson` answers `undefined`, and the failure is an `error` with `source: 'atlas'`.
    * - A json that its atlas adapter cannot read — or an adapter that answers no `TextureAtlas`, or
    *   animations that are no `FrameBasedAnimations` — takes both back as well and is reported as an
    *   `error` with `source: 'texture'` once the image it names is there; writing it does not throw.
@@ -1468,8 +1491,16 @@ export class AtlasTextureResource extends TextureResource {
         const {json, url} = fetched;
         const imageUrl = this.overrideImageUrl ?? json.meta.image;
         if (typeof imageUrl !== 'string') {
-          // the json that is published stays as it was: a subscriber would get an `undefined`
-          // where the event type promises a value
+          // The json and `imageUrl` go back together, so nothing on the resource names the image of
+          // an override that is gone — the state of a fetched json without an image that never had
+          // an override. The atlas effect then takes the atlas and the animations back, the image
+          // effect the coordinates and the texture. The effect that derives `imageUrl` from the json
+          // ends in the same state whichever of the two runs first: before this one it writes the
+          // old value again, after it it finds no json
+          batch(() => {
+            atlasJsonSignal.set(undefined);
+            context.imageUrl.set(undefined);
+          });
           context.fail('atlasImage', {
             source: 'atlas',
             url,

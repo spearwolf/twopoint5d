@@ -385,7 +385,7 @@ describe('TextureStore', () => {
         items: {a: {imageUrl: 'a.png'}},
       });
 
-      expect(resource?.textureClasses?.sort()).toEqual(['linear', 'no-flipy'].sort());
+      expect([...(resource?.textureClasses ?? [])].sort()).toEqual(['linear', 'no-flipy'].sort());
     });
 
     test('an assignment reaches a resource with the next parse() that names it', async () => {

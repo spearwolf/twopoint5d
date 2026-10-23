@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs';
 import {describe, expect, expectTypeOf, test} from 'vitest';
 
 import {type AsepriteFrameData, AsepriteJson, type AsepriteJsonData} from './AsepriteJson.js';
+import {asepriteAtlasAdapter} from './atlasAdapters.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
@@ -280,7 +281,63 @@ describe('AsepriteJson', () => {
       const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward'}]}, [100, 0]);
 
       expect(() => AsepriteJson.parse(data)).toThrow(
-        'AsepriteJson: the frame "f1" carries a duration of 0 — Aseprite writes one in ms above zero for every frame',
+        new RangeError('AsepriteJson: the duration of the frame "f1" must be a finite number above 0, got 0'),
+      );
+    });
+
+    test('refuses a frame outside every tag without a duration above 0, with a RangeError naming it, before the first frame reaches options.target', () => {
+      const target = new TextureAtlas<never>();
+      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 0, direction: 'forward'}]}, [100, 100, NaN]);
+
+      expect(() => AsepriteJson.parse(data, {target: target as never})).toThrow(
+        new RangeError('AsepriteJson: the duration of the frame "f2" must be a finite number above 0, got NaN'),
+      );
+      expect(target.size).toBe(0);
+    });
+
+    test('refuses a sheet with a frame without its area and leaves options.target as it was', () => {
+      const target = new TextureAtlas<never>();
+      const data = sheet(2);
+      delete (data.frames as Record<string, {frame?: unknown}>)['f1']!.frame;
+
+      expect(() => AsepriteJson.parse(data, {target: target as never})).toThrow(
+        new TypeError(
+          'TexturePackerJson: the frame "f1" has a frame of undefined — its area in the image is an object {x, y, w, h}',
+        ),
+      );
+      expect(target.size).toBe(0);
+    });
+
+    test('refuses a frame that is no object, by its name or by its index', () => {
+      const hash = sheet(2);
+      (hash.frames as Record<string, unknown>)['f1'] = null;
+      const array = {...sheet(1), frames: [7]};
+
+      expect(() => AsepriteJson.parse(hash)).toThrow(
+        new TypeError('AsepriteJson: the frame "f1" is null — a frame of the json is an object'),
+      );
+      expect(() => AsepriteJson.parse(array as never)).toThrow(
+        new TypeError('AsepriteJson: the frame 0 of the "Array" frames is 7 — a frame of the json is an object'),
+      );
+    });
+
+    test('refuses meta.frameTags that is no list, and a frame tag that is no object', () => {
+      expect(() => AsepriteJson.parse(sheet(2, {frameTags: {name: 'a'} as never}))).toThrow(
+        new TypeError('AsepriteJson: meta.frameTags is {name: "a"} — Aseprite writes the frame tags as a list'),
+      );
+      expect(() => AsepriteJson.parse(sheet(2, {frameTags: [null as never]}))).toThrow(
+        new TypeError('AsepriteJson: the frame tag 0 is null — a frame tag is an object'),
+      );
+    });
+
+    test('asepriteAtlasAdapter refuses a json whose frames carry no duration', () => {
+      const json = {
+        frames: {a: {frame: {x: 0, y: 0, w: 4, h: 4}}},
+        meta: {app: 'https://www.aseprite.org/', image: 's.png', size: {w: 4, h: 4}},
+      };
+
+      expect(() => asepriteAtlasAdapter(json, new TextureCoords(0, 0, 4, 4))).toThrow(
+        new RangeError('AsepriteJson: the duration of the frame "a" must be a finite number above 0, got undefined'),
       );
     });
 

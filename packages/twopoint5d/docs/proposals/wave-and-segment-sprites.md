@@ -328,18 +328,22 @@ export interface FrameToSample {
   readonly texCoords: Node<'vec4'>;
   /** Exactly 1 for a frame with `FLIP_DIAGONAL`, 0 otherwise: the axes are swapped by `mix()` with it. */
   readonly flipDiagonal: Node<'float'>;
-  /** `[left, top, right, bottom]`, read for `trim: 'mask'`. */
-  readonly margins?: Node<'vec4'>;
   /** The texels of the frame as drawn — `height × width` under the diagonal flip; read for an inset. */
-  readonly drawnTexels?: Node<'vec2'>;
+  readonly drawnTexels: Node<'vec2'>;
 }
+
+/** @internal */
+export type FrameSampleOptions = {readonly wrap: readonly [AtlasFrameWrap, AtlasFrameWrap]; readonly inset: number} & (
+  | {readonly trim: 'stretch'}
+  | {readonly trim: 'mask'; /** `[left, top, right, bottom]`, as `frameTrimMargins()` answers them. */ readonly margins: Node<'vec4'>}
+);
 
 /** @internal */
 export function sampleFrameAt(
   lookup: (st: Node<'vec2'>, gradX: Node<'vec2'>, gradY: Node<'vec2'>) => Node<'vec4'>,
   frame: FrameToSample,
   position: Node<'vec2'>,
-  options: {readonly wrap: readonly [AtlasFrameWrap, AtlasFrameWrap]; readonly trim: 'mask' | 'stretch'; readonly inset: number},
+  options: FrameSampleOptions,
 ): Node<'vec4'>;
 ```
 
@@ -354,7 +358,8 @@ export function sampleFrameAt(
   st)`, with `.grad()` unless both filters are `NearestFilter` (§4.3). A gradient node no lookup
   takes is no part of the graph.
 - `sampleAtlasFrame()` keeps its checks, its index clamp and its origin, and reads `flipDiagonal`,
-  the margins and `drawnTexels = mix(measures.xy, measures.yx, flipDiagonal)` out of the table. Its
+  the margins and `drawnTexels = mix(measures.xy, measures.yx, flipDiagonal)` out of the table, and
+  hands the margins on with `trim: 'mask'`. Its
   graph and its pixels stay as they are: its specs and `texture-atlas-frame-sampling.test.js` hold
   it.
 

@@ -297,12 +297,13 @@ entry; the guide says to export without them.
 - Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside
   `0 … frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown
   `direction` (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name
-  (`… — rename one of them in Aseprite`), a frame of a tag without a `duration` above 0
-  (`AsepriteJson: the frame "x" carries a duration of 0 — Aseprite writes one in ms above zero for every frame`),
-  and a tag whose `repeat` plays more than `FrameBasedAnimations.MaxFramesWithDurations` (8191)
+  (`… — rename one of them in Aseprite`), and a tag whose `repeat` plays more than `FrameBasedAnimations.MaxFramesWithDurations` (8191)
   frames of differing durations (`AsepriteJson: the tag "x" plays 9000 frames with their own
   durations — … at most 8191 frames; lower its repeat`). A tag of even durations has no such
   limit of its own: a bake refuses what does not fit.
+- A frame without a `duration` above 0, in a tag or outside every tag, is refused with a
+  `RangeError` naming it (`AsepriteJson: the duration of the frame "x" must be a finite number above
+  0, got 0`); `meta.frameTags` that is no list, and a tag that is no object, with a `TypeError`.
 - A frame name twice in the layout "Array" — Aseprite writes it when the filename format holds no
   `{frame}` — is refused (`AsepriteJson: the frame name "x" appears twice — export with a filename
   format that contains {frame}`); in "Hash" a second key is gone by the time `JSON.parse()` is done.

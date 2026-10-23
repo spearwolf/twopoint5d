@@ -74,7 +74,8 @@ Not the goal:
   `FLIP_DIAGONAL` the lookup `(s + a·u, t + b·v)` swaps its two components. A rotated
   TexturePacker frame arrives as `FLIP_DIAGONAL | FLIP_VERTICAL`.
 - `frameTrimMargins()` answers what a packer cut off a frame, as fractions of the untrimmed
-  sprite, `[left, top, right, bottom]`.
+  sprite, `[left, top, right, bottom]` — exported, with its type `FrameTrimMargins`; four zeros for
+  a frame whose `spriteSourceSize` does not lie within its `sourceSize`.
 - `FrameBasedAnimations#bakeDataTexture()` lays frames out as up to three RGBA texels:
   `[s, t, u, v]`, `[width, height, flipDiagonal, endTime]`, `[left, top, right, bottom]`. The table
   takes the layout of all three.
