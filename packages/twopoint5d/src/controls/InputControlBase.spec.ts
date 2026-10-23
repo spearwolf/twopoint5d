@@ -142,6 +142,27 @@ describe('InputControlBase', () => {
       expect(calls, 'no handler is reached any more').toBe(0);
     });
 
+    test('destroyAllListeners() empties its list also when unsubscribe() of a subclass throws', () => {
+      class ThrowingControl extends TestControl {
+        override unsubscribe() {
+          super.unsubscribe();
+          throw new Error('unsubscribe fails on purpose');
+        }
+      }
+      const host = new EventTarget();
+      const control = new ThrowingControl();
+      let calls = 0;
+      control.listen(host, 'ping', () => {
+        calls += 1;
+      });
+
+      expect(() => control.destroyAllListeners()).toThrow('unsubscribe fails on purpose');
+
+      control.subscribe();
+      host.dispatchEvent(new Event('ping'));
+      expect(calls).toBe(0);
+    });
+
     // (c) every public member behaves after dispose() as its TSDoc says
     test('behaves as documented after dispose()', () => {
       const host = new EventTarget();

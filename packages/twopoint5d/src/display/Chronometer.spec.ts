@@ -66,7 +66,7 @@ describe('Chronometer', () => {
     chronus.update(5200);
 
     expect(chronus.isRunning).toBe(false);
-    expect(chronus.deltaTime).toBe(500);
+    expect(chronus.deltaTime).toBe(0);
     expect(chronus.time).toBe(1500);
     expect(chronus.lostTime).toBe(700);
   });
@@ -80,7 +80,7 @@ describe('Chronometer', () => {
     chronus.update(5350);
 
     expect(chronus.isRunning).toBe(false);
-    expect(chronus.deltaTime).toBe(500);
+    expect(chronus.deltaTime).toBe(0);
     expect(chronus.time).toBe(1500);
     expect(chronus.lostTime).toBe(850);
   });
@@ -286,14 +286,14 @@ describe('Chronometer', () => {
       expect(chronus.rawDeltaTime, 'after reset()').toBe(0);
     });
 
-    it('stays as it was with an update() while stopped', () => {
+    it('is 0, as deltaTime is, after an update() while stopped', () => {
       const chronus = new Chronometer(0, 0.1);
       chronus.update(0.5);
       chronus.stop(0.5);
       chronus.update(2);
 
-      expect(chronus.deltaTime).toBe(0.1);
-      expect(chronus.rawDeltaTime).toBe(0.5);
+      expect(chronus.deltaTime).toBe(0);
+      expect(chronus.rawDeltaTime).toBe(0);
     });
   });
 

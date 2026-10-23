@@ -422,7 +422,9 @@ export class AdaptiveResolution {
 
     if (this.#method === 'gpu-time') {
       this.#sampleGpuTime();
-    } else {
+    } else if (this.display.isRunning) {
+      // a frame a paused display renders lies between no two animation frames of the page: its
+      // rawDeltaTime is 0 and says nothing about the pace
       this.#readRafInterval(rawDeltaTime, fromLoop);
       this.#samplePacing();
     }

@@ -148,7 +148,11 @@ pixels, and `AdaptiveResolution`, which sets the resolution scale by what every 
 — see [the display guide](display.md). The policy — the bounds of the ratio, the budget, the scale,
 the rounding to an eighth, the zoom in whole device pixels — is a pure function in
 `src/display/resolveDrawingBuffer.ts`, which the display measures with and `AdaptiveResolution`
-predicts its steps with.
+predicts its steps with. The handover of a canvas between two displays — waiting for the release
+of the one before, keeping its WebGL context lost but restorable, giving a canvas that was handed
+in back as the display found it — is an internal module, `src/display/canvasHandover.ts`, which
+`Display` enters at two places: `waitForCanvas()` before the init of its renderer and
+`releaseRenderer()` after `dispose()`.
 
 ### `stage/`
 

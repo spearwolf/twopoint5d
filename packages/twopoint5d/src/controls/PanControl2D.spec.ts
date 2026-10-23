@@ -1,4 +1,4 @@
-import {emit, on} from '@spearwolf/eventize';
+import {emit, getSubscriptionCount, on} from '@spearwolf/eventize';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 import {
@@ -7,6 +7,7 @@ import {
   OnPanControl2DUpdate,
   type PanControl2DUpdateProps,
 } from '../events.js';
+import {Stylesheets} from '../display/Stylesheets.js';
 import {PanControl2D, type PanControl2DOptions} from './PanControl2D.js';
 
 // Stylesheets writes into a real CSSStyleSheet, and there is no document here to hold one
@@ -264,6 +265,24 @@ describe('PanControl2D', () => {
 
       key('keydown', {code: 'ArrowUp', keyCode: 38});
       expect(control.speedNorth).toBe(100);
+    });
+
+    it('copies keys and keyCodes of the options: a rebinding in place on one control leaves the options and a second control built from them as they are', () => {
+      const keys: [string, string, string, string] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      const keyCodes: [number, number, number, number] = [38, 40, 37, 39];
+      const first = makeControl({keys, keyCodes});
+      const second = makeControl({keys, keyCodes});
+
+      first.keys[2] = 'KeyJ';
+      first.keyCodes[0] = 73;
+
+      expect(keys).toEqual(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+      expect(keyCodes).toEqual([38, 40, 37, 39]);
+      expect(second.keys).toEqual(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+      key('keydown', {code: 'ArrowLeft'});
+      expect(second.speedWest).toBe(100);
+      expect(first.speedWest).toBe(0);
     });
 
     it('keys win over keyCodes when both are set', () => {
@@ -561,6 +580,49 @@ describe('PanControl2D', () => {
       pointer('pointerup', {buttons: 0});
 
       expect(restored).toHaveBeenCalledExactlyOnceWith(control);
+    });
+
+    it('a restoreCursor listener that throws does not stop dispose(): every listener hears it, the cursor rule goes back, the control lets go of its listeners, then dispose() throws its error', () => {
+      const control = makeControl();
+      const error = new Error('restoreCursor listener fails on purpose');
+      control.onRestoreCursor(() => {
+        throw error;
+      });
+      const heard = vi.fn();
+      control.onRestoreCursor(heard);
+      drag(1);
+      vi.mocked(Stylesheets.releaseRule).mockClear();
+
+      expect(() => control.dispose()).toThrow(error);
+
+      expect(heard).toHaveBeenCalledExactlyOnceWith(control);
+      expect(Stylesheets.releaseRule).toHaveBeenCalledOnce();
+      expect(vi.mocked(Stylesheets.releaseRule).mock.calls[0]?.[0]).toBe('PanControl2D-none');
+      expect(getSubscriptionCount(control)).toBe(0);
+      expect(control.isDisposed).toBe(true);
+      expect(() => control.dispose()).not.toThrow();
+    });
+
+    it('pointerDisabled = true with a restoreCursor listener that throws: every listener hears it, the pointer is off, then the setter throws', () => {
+      const control = makeControl();
+      const error = new Error('restoreCursor listener fails on purpose');
+      const hidden = vi.fn();
+      control.onHideCursor(hidden);
+      control.onRestoreCursor(() => {
+        throw error;
+      });
+      const heard = vi.fn();
+      control.onRestoreCursor(heard);
+      drag(1);
+      expect(hidden).toHaveBeenCalledOnce();
+
+      expect(() => {
+        control.pointerDisabled = true;
+      }).toThrow(error);
+
+      expect(heard).toHaveBeenCalledOnce();
+      drag(1);
+      expect(hidden).toHaveBeenCalledOnce();
     });
 
     it('update() on a disposed control leaves the view where it is and emits nothing', () => {

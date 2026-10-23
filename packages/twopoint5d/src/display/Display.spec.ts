@@ -1,4 +1,4 @@
-import {getSubscriptionCount, on, once} from '@spearwolf/eventize';
+import {getSubscriptionCount, off, on, once} from '@spearwolf/eventize';
 import type {WebGPURenderer} from 'three/webgpu';
 import {afterEach, beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
 import {
@@ -837,6 +837,34 @@ describe('Display', () => {
 
       // one second of wall clock; maxDeltaTime cuts every frame of the display to 1/30
       expect(Math.abs(sim.tickTime - 1)).toBeLessThanOrEqual(sim.fixedDelta);
+    });
+
+    it('a frame of its own while the display pauses lets no time pass: deltaTime and rawDeltaTime are 0, now stays, and a FixedFrameLoop does not tick', async () => {
+      vi.spyOn(performance, 'now').mockReturnValue(1000);
+      const {display, frame} = makeDisplay();
+      const sim = new FixedFrameLoop(display);
+      await display.start();
+      frame(1016);
+      display.stop();
+
+      const nowBefore = display.now;
+      const tickNo = sim.tickNo;
+      const props: DisplayEventProps[] = [];
+      on(display, OnDisplayRenderFrame, (p: DisplayEventProps) => {
+        props.push({...p});
+      });
+
+      display.renderFrame(1100);
+      display.renderFrame(1200);
+      display.renderFrame(1300);
+
+      expect(props).toHaveLength(3);
+      for (const p of props) {
+        expect(p.deltaTime).toBe(0);
+        expect(p.rawDeltaTime).toBe(0);
+        expect(p.now).toBeCloseTo(nowBefore, 9);
+      }
+      expect(sim.tickNo).toBe(tickNo);
     });
 
     it('maxFps holds back the frames that come in faster than it allows', async () => {
@@ -2327,6 +2355,17 @@ describe('Display', () => {
         display.dispose();
 
         expect(observer.disconnect).toHaveBeenCalled();
+      });
+
+      it('takes the visibilitychange listener and the IntersectionObserver down on dispose() also after an off(display) of the caller', () => {
+        const {display} = makeDisplay({pauseOutsideViewport: true});
+        const [, listener] = doc.addEventListener.mock.calls.find(([type]) => type === 'visibilitychange')!;
+
+        off(display);
+        display.dispose();
+
+        expect(doc.removeEventListener).toHaveBeenCalledWith('visibilitychange', listener, false);
+        expect(observers[0]!.disconnect).toHaveBeenCalledTimes(1);
       });
 
       it('does nothing where IntersectionObserver does not exist', () => {

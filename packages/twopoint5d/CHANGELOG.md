@@ -103,10 +103,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a write of `frameBasedAnimationsData` on an image resource throws the `TypeError` of an input of another shape in JavaScript, as `tileSetOptions` and the inputs of an atlas do; reading it answers `undefined` (**BREAKING**)
 - `frameBasedAnimationsData` of a `TextureResource` is compared by content, every field in its order and a `RegExp` by `source` and `flags`: data equal to the current, such as the same catalog parsed again by `TextureStore#parse()`, keeps the `frameBasedAnimations` and announces nothing, so an `on(id, 'frameBasedAnimations')` bakes no new data texture for it
 - `TextureFactory` built with a renderer asks it for the anisotropy maximum at every texture it builds and caps against the maximum the renderer names at that moment; while the renderer names none, the texture gets no anisotropic filtering
+- `Chronometer#update()` on a stopped chronometer sets `deltaTime` and `rawDeltaTime` to `0`: no active phase elapses in a pause. `stop()` leaves both as they are until the next `update()`. Code that still needs the delta of the last running frame reads it before that `update()`
+- `PanControl2D` works on copies of the arrays `keys` and `keyCodes` of its options: a rebinding in place (`control.keys[0] = 'ArrowUp'`) changes neither the options nor another control built from them; whoever wants to rebind several controls writes into each
 
 ### Removed
 
 - remove `VertexObjectBuffer#pickUpDirtyRange()`, and `dirtyFrom` and `dirtyTo` of `AttributeBuffer` (**BREAKING**). See the Migration Guide
+- remove `Stylesheets.getGlobalSheet()`, deprecated in 0.22.0 (**BREAKING**). See the Migration Guide
 
 ### Fixed
 
@@ -137,6 +140,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnimatedFrames` and `tableFrame()` find the texel of an index in int arithmetic, so a data texture whose width is no power of 2 — a `maxTextureSize` such as 3000 handed to the bake — reads every texel at its place
 - a `TextureFactory` built before `renderer.init()` of a WebGL backend — the factory of a `TextureStore` or of a `TextureResource` whose `renderer` is set before `init()` — gives the textures it builds after `init()` the anisotropy that backend names
 - a `TextureResource` on its own lets go of the image it fetched last once its `imageUrl` is cleared: a resource whose url stays cleared holds no image, and the same url written again fetches it anew
+- a frame that `Display#renderFrame()` renders during the pause gives its listeners a `deltaTime` and `rawDeltaTime` of `0` and leaves `now` where it is: a `FixedFrameLoop` on the display does not tick, and an `AdaptiveResolution` in `frame-pacing` reads no pace from the frame
+- `Display#dispose()` takes the `visibilitychange` listener on the document and the `IntersectionObserver` of `pauseOutsideViewport` down also after an `off(display)` of the caller
+- `PanControl2D#dispose()` gives the cursor rule back and lets go of every listener also when a listener of `OnPanControl2DRestoreCursor` throws: every listener hears the event, and `dispose()` throws the error once the control is down — an `AggregateError` when more than one listener throws; `pointerDisabled = true` and `unsubscribe()` likewise let every listener hear it before they throw, and `InputControlBase#destroyAllListeners()` empties its list also when the `unsubscribe()` of a subclass throws
 
 ### Migration Guide
 
@@ -477,6 +483,26 @@ store.parse({items: {fighter: {atlasUrl: 'fighter.json'}}});
 store.whenResource('fighter').then((fighter) => {
   if (fighter.type === 'atlas') fighter.overrideImageUrl = 'fighter-red.png';
 });
+```
+
+#### `Stylesheets.getGlobalSheet()`
+
+There is one sheet per document or shadow root. `Stylesheets.getSheet()` takes the same `root`.
+
+**Before**
+
+```ts
+const sheet = Stylesheets.getGlobalSheet(shadowRoot);
+```
+
+**After**
+
+```ts check
+import {Stylesheets} from '@spearwolf/twopoint5d';
+
+const sheet = Stylesheets.getSheet(document.head);
+
+export {sheet};
 ```
 
 ## [0.23.0] - 2026-10-18

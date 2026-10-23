@@ -234,6 +234,8 @@ dispose(): void {
     errors.push(error);
   }
   this.frameLoop.stop(this);
+  this.#stopSizeWatch();
+  this.#stopVisibilityWatch();
   try {
     // the listeners are still attached here: this event is what tells them to let go,
     // and off(this) below is what makes it the last event this display ever emits.
@@ -270,6 +272,11 @@ dispose(): void {
   }
 }
 ```
+
+What an instance has hung on the DOM, on the window or on an observer itself, its `dispose()`
+takes down directly — never through a listener of its own dispose event. An `off(instance)` of
+the caller, the obvious way to get rid of one's own listeners, would take that listener along,
+and the document would keep the instance alive.
 
 **Order rule:** release your own resources **before** tearing down the signal group. A
 resource reachable only through a signal is unreachable once that signal is destroyed,
@@ -339,7 +346,8 @@ of them, or accept the growth. `vertex-objects-heap.test.js` in
    from a pool or a factory, and touch nothing handed in — unless the place that accepts
    it promises the take-over in its own TSDoc (section 1).
 2. Make it idempotent — by flag, or by construction (section 2).
-3. Emit the dispose event, then `off(this)`.
+3. Emit the dispose event, then `off(this)`; take down what this instance hung on the DOM
+   directly, not through a listener of its own dispose event (section 4).
 4. `SignalGroup.delete(this)` after your own release; never `SignalGroup.destroy()`.
 5. Place `super.dispose()` first or last by the rule in section 5, with the reason as a
    comment at the call.
