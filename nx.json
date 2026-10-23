@@ -63,6 +63,7 @@
       "{workspaceRoot}/scripts/makePackageJson.mjs",
       "{workspaceRoot}/scripts/makePackageJson/*.mjs",
       "!{workspaceRoot}/scripts/makePackageJson/*.test.mjs",
+      "{workspaceRoot}/scripts/publishNpmPkg/findUnpublishableSpecifiers.mjs",
       "{workspaceRoot}/pnpm-workspace.yaml"
     ],
     "vitestDefaults": [

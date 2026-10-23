@@ -8,6 +8,11 @@ import {pipeline} from 'node:stream/promises';
 // 20 MiB; the bound keeps a runaway Content-Length from filling the runner's disk
 export const MAX_ENTRY_BYTES = 512 * 1024 * 1024;
 
+// what `node:http` (`aborted`, measured under Node 24.21 as ECONNRESET without a `syscall`)
+// and `stream.pipeline` report when the client closes the connection before the body is
+// through
+const CLIENT_GONE = new Set(['ECONNRESET', 'ERR_STREAM_PREMATURE_CLOSE']);
+
 /**
  * Nx indexes its local cache in a database named after the machine id, so a new CI runner
  * does not know a restored cache directory. Nx does take task results from a remote cache
@@ -25,7 +30,8 @@ export function createCacheServer({dir, token, maxEntryBytes = MAX_ENTRY_BYTES})
   const expectedDigest = sha256(`Bearer ${token}`);
 
   return http.createServer((req, res) => {
-    handle(req, res).catch(() => {
+    handle(req, res).catch((err) => {
+      logFailure(req, err);
       if (!res.headersSent) {
         reply(req, res, 500);
       } else {
@@ -55,19 +61,33 @@ export function createCacheServer({dir, token, maxEntryBytes = MAX_ENTRY_BYTES})
   }
 
   async function serve(req, res, file) {
-    let stat;
+    // the open handle reads the entry even if a cleanup run removes its name from now on
+    let handle;
     try {
-      stat = await fs.promises.stat(file);
+      handle = await fs.promises.open(file, 'r');
     } catch (err) {
       if (/** @type {NodeJS.ErrnoException} */ (err).code === 'ENOENT') return reply(req, res, 404);
       throw err;
     }
-    // the workflow drops every entry whose mtime is older than the server start before it
-    // saves the cache
-    const now = new Date();
-    await fs.promises.utimes(file, now, now);
-    res.writeHead(200, {'Content-Type': 'application/octet-stream', 'Content-Length': stat.size});
-    await pipeline(fs.createReadStream(file), res).catch(() => res.destroy());
+    let stream;
+    let size;
+    try {
+      size = (await handle.stat()).size;
+      // the workflow drops every entry whose mtime is older than the server start before it
+      // saves the cache
+      const now = new Date();
+      await handle.utimes(now, now);
+      stream = handle.createReadStream();
+    } finally {
+      // the stream closes the handle itself, once it has taken it over
+      if (stream === undefined) await handle.close();
+    }
+    res.writeHead(200, {'Content-Type': 'application/octet-stream', 'Content-Length': size});
+    await pipeline(stream, res).catch((err) => {
+      // the 200 is on its way already, nothing is left to answer with
+      if (!clientWentAway(err)) logFailure(req, err);
+      res.destroy();
+    });
   }
 
   async function store(req, res, hash, file) {
@@ -80,9 +100,13 @@ export function createCacheServer({dir, token, maxEntryBytes = MAX_ENTRY_BYTES})
     const out = fs.createWriteStream(partial, {flags: 'wx'});
     try {
       await pipeline(req, out);
-    } catch {
-      // the client went away mid-body; nobody is left to answer
+    } catch (err) {
       await fs.promises.rm(partial, {force: true});
+      if (!clientWentAway(err)) {
+        // the disk or the directory failed, and the client is still waiting for an answer
+        throw err;
+      }
+      // the client went away mid-body; nobody is left to answer
       res.destroy();
       return;
     }
@@ -106,6 +130,15 @@ async function publish(partial, file) {
     if (/** @type {NodeJS.ErrnoException} */ (err).code === 'EEXIST') return 409;
     throw err;
   }
+}
+
+function clientWentAway(err) {
+  return CLIENT_GONE.has(err?.code);
+}
+
+// the headers stay out of the log: `Authorization` carries the token
+function logFailure(req, err) {
+  console.error(`nx cache server: ${req.method} ${req.url} failed: ${err instanceof Error ? err.message : String(err)}`);
 }
 
 function sha256(text) {

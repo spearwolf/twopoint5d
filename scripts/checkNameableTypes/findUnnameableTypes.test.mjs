@@ -123,8 +123,35 @@ test('a row whose file and name the accepted map lists is accepted, every other 
   const other = {name: 'Table', file: 'b.d.ts', line: 1, uses: ['f']};
   const unlisted = {name: 'Other', file: 'a.d.ts', line: 2, uses: ['f']};
 
-  const {accepted, offenders} = partitionAccepted([listed, other, unlisted], new Map([['a.d.ts:Table', 'a lookup table']]));
+  const {accepted, offenders, stale} = partitionAccepted(
+    [listed, other, unlisted],
+    new Map([
+      ['a.d.ts:Table', 'a lookup table'],
+      ['a.d.ts:Gone', 'renamed'],
+    ]),
+  );
 
   assert.deepEqual(accepted, [listed]);
   assert.deepEqual(offenders, [other, unlisted]);
+  assert.deepEqual(stale, ['a.d.ts:Gone']);
+});
+
+test('declarations that do not compile throw, naming the file, the line and the diagnostic of each', () => {
+  assert.throws(
+    () =>
+      find({
+        'index.d.ts': [
+          "import type { Gone } from './gone.js';",
+          'export declare function f(): Gone;',
+          'export declare function g(): Missing;',
+          '',
+        ].join('\n'),
+      }),
+    (/** @type {Error} */ err) => {
+      assert.match(err.message, /^the declarations do not compile, and what they fail to resolve would go unchecked:/);
+      assert.match(err.message, /index\.d\.ts:1 {2}Cannot find module '\.\/gone\.js'/);
+      assert.match(err.message, /index\.d\.ts:3 {2}Cannot find name 'Missing'/);
+      return true;
+    },
+  );
 });

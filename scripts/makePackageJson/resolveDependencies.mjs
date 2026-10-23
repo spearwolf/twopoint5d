@@ -4,7 +4,8 @@ import {valid, validRange} from 'semver';
 
 /**
  * Replaces the `catalog:`, `workspace:` and `*` specifiers of a dependency section by the
- * version ranges they stand for. A specifier nothing resolves stays as it is.
+ * version ranges they stand for. A specifier nothing resolves stays as it is, and
+ * `findUnpublishableSpecifiers` refuses it, a bare `*` included.
  */
 export function resolveDependencies(dependenciesSection, context) {
   if (dependenciesSection) {

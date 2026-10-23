@@ -9,6 +9,7 @@ import {
   EVENT_GENERATE_PREVIEW,
   PREVIEW_HEIGHT,
   PREVIEW_WIDTH,
+  chromiumGpuArgs,
   parsePreviewArgs,
   recordPreviewEvent,
   refuseScreenshot,
@@ -20,6 +21,22 @@ import {listDemoPages, listLookbookDemos} from './lookbookDemos.mjs';
 const lookbookFile = (rel) => fileURLToPath(new URL(`../../apps/lookbook/src/${rel}`, import.meta.url));
 
 describe('the configuration of the preview generator', () => {
+  it('asks Chromium for Vulkan on Linux only', () => {
+    const vulkan = ['--use-angle=vulkan', '--enable-features=Vulkan'];
+    for (const flag of vulkan) {
+      assert.ok(chromiumGpuArgs('linux').includes(flag), `linux lacks ${flag}`);
+    }
+    for (const platform of ['darwin', 'win32']) {
+      for (const flag of vulkan) {
+        assert.ok(!chromiumGpuArgs(platform).includes(flag), `${platform} carries ${flag}`);
+      }
+    }
+    for (const platform of ['linux', 'darwin', 'win32']) {
+      assert.ok(chromiumGpuArgs(platform).includes('--enable-unsafe-webgpu'));
+      assert.ok(chromiumGpuArgs(platform).includes('--ignore-gpu-blocklist'));
+    }
+  });
+
   it('listens for the event the lookbook dispatches', () => {
     const source = fs.readFileSync(lookbookFile('components/constants.ts'), 'utf8');
     const match = source.match(/EVENT_GENERATE_PREVIEW = '([^']+)'/);

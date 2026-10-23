@@ -198,7 +198,7 @@ jobs:
           key: ${{ steps.nx-cache.outputs.cache-primary-key }}
 
       - name: Show the Nx cache server log
-        if: failure()
+        if: ${{ !cancelled() }}
         run: cat "$RUNNER_TEMP/nx-cache-server.log" || true
 
       - name: Archive coverage report

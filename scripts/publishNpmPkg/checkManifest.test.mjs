@@ -38,4 +38,18 @@ describe('checkManifest', () => {
     assert.doesNotThrow(() => checkManifest({name: 'x', version: '1.0.0', publishConfig: {access: 'public'}}));
     assert.doesNotThrow(() => checkManifest({name: 'x', version: '1.0.0'}));
   });
+
+  it('a manifest that still carries a catalog:, workspace: or bare * specifier is refused, naming each', () => {
+    const manifest = {
+      name: 'x',
+      version: '1.0.0',
+      peerDependencies: {three: 'catalog:', a: 'workspace:^'},
+      dependencies: {b: '*'},
+    };
+
+    assert.throws(() => checkManifest(manifest), {
+      message:
+        /^dependencies\.b is "\*", which lets in any version.*; peerDependencies\.three is "catalog:", which resolves to no version range; peerDependencies\.a is "workspace:\^", which resolves to no version range — publish the dist\/ that makePackageJson\.mjs writes$/,
+    });
+  });
 });
