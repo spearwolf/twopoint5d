@@ -191,7 +191,7 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
       target = new Uint32Array(width * height);
     } else if (target.length < width * height) {
       throw new RangeError(
-        `RepeatingTilesProvider: a target for ${width}x${height} tile ids needs ${width * height} cells, got ${target.length}`,
+        `RepeatingTilesProvider#getTileIdsWithin(): a target for ${width}x${height} tile ids needs ${width * height} cells, got ${target.length}`,
       );
     }
 
