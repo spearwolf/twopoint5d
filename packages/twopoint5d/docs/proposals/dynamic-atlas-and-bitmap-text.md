@@ -410,7 +410,8 @@ or a char whose `page` is not 0 — is refused:
 ### 4.4 Refusals
 
 Each throws before the atlas holds a frame, naming the char by itself and its id where one is
-involved:
+involved. A number of the font — a metric of `common`, a field of a char, the `amount` of a kerning
+pair — is refused with a `RangeError`, every other refusal with an `Error`:
 
 - font data that is no object:
   `BitmapFont: the font data is null — a font is an object in the JSON layout, {pages, chars, common}`;

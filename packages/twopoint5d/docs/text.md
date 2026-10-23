@@ -50,14 +50,16 @@ answers its amount and `font.info.size` keeps the value as written.
 onto one page, in BMFont with a larger texture size. `BitmapFont.parse(source, {parentCoords})`
 reads a page that was packed into a larger image, at the coords given.
 
-**Refusals.** Each names what is wrong and where: a source in none of the three spellings, JSON that
-does not parse, font data that is no object, a font without a `common` block or with a `lineHeight`,
-`base`, `scaleW` or `scaleH` that is no number — `lineHeight`, `scaleW` and `scaleH` above 0 —, no
-`chars`, more than one page, a char with an id that is no whole number from 0 to 0x10FFFF, a field
-that is no number, a negative position or size, a glyph that reaches beyond the page, two chars of
-one id, a kerning pair whose chars are no code points or whose `amount` is no number. A numeric
-entity in the XML that is no code point stays as it is written, like an entity the reader does not
-know.
+**Refusals.** Each names what is wrong and where. A number of the font is refused with a
+`RangeError`: a `lineHeight`, `base`, `scaleW` or `scaleH` of the `common` block that is no finite
+number — `lineHeight`, `scaleW` and `scaleH` above 0 —, a field of a char that is no finite number,
+a negative position or size of a char, and a kerning pair whose `amount` is no finite number.
+Everything else is refused with an `Error`: a source in none of the three spellings, JSON that does
+not parse, font data that is no object, a font without a `common` block, without `chars` or with
+more than one page, a char with an id that is no whole number from 0 to 0x10FFFF, a glyph that
+reaches beyond the page, two chars of one id, and a kerning pair whose chars are no code points. A
+numeric entity in the XML that is no code point stays as it is written, like an entity the reader
+does not know.
 
 A font and its atlas are plain data: nothing to dispose. The page texture is the caller's.
 
