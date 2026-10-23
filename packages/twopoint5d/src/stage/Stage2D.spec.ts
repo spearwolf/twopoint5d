@@ -1,4 +1,4 @@
-import {emit, getSubscriptionCount, on} from '@spearwolf/eventize';
+import {emit, getSubscriptionCount, on, once} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {Object3D, OrthographicCamera, type PassNode, PerspectiveCamera, Scene, type WebGPURenderer} from 'three/webgpu';
@@ -966,6 +966,141 @@ describe('Stage2D', () => {
     });
 
     // (f) has no subject here: this stage takes no slot from a pool and no tile from a factory.
+  });
+
+  describe('a listener of a change of state that throws', () => {
+    it('a camera listener that throws as the previous projection lets go of its camera leaves the stage with the camera of the new one', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(800, 600);
+      const previousCamera = stage.camera;
+      const failure = new Error('the listener failed');
+      // throws once, for the drop of the camera of the previous projection
+      const listener = vi.fn().mockImplementationOnce(() => {
+        throw failure;
+      });
+      on(stage, OnStageAfterCameraChanged, listener);
+
+      expect(() => {
+        stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+      }).toThrow(failure);
+
+      expect(stage.camera).toBeDefined();
+      expect(stage.camera).not.toBe(previousCamera);
+      expect([stage.width, stage.height]).toEqual([320, 240]);
+      expect(listener, 'the drop and the new camera').toHaveBeenCalledTimes(2);
+    });
+
+    it('a camera listener that takes the projection away as the previous one lets go of its camera leaves the stage without one', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(800, 600);
+      once(stage, OnStageAfterCameraChanged, () => {
+        stage.projection = undefined;
+      });
+
+      expect(() => {
+        stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+      }).not.toThrow();
+
+      expect(stage.projection).toBeUndefined();
+      expect(stage.camera).toBeUndefined();
+      expect([stage.width, stage.height]).toEqual([0, 0]);
+    });
+
+    it('a first-frame listener that throws leaves the first frame behind it', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(320, 200);
+      const failure = new Error('the listener failed');
+      on(stage, OnStageFirstFrame, () => {
+        throw failure;
+      });
+      const second = vi.fn();
+      on(stage, OnStageFirstFrame, second);
+      const frames: number[] = [];
+      on(stage, OnStageUpdateFrame, ({frameNo}: {frameNo: number}) => {
+        frames.push(frameNo);
+      });
+
+      expect(() => stage.updateFrame(1, 0.016, 1)).toThrow(failure);
+
+      expect(second, 'the listener behind the one that throws').toHaveBeenCalledTimes(1);
+      expect(stage.isFirstFrame).toBe(false);
+      expect(frames, 'frame 1 reaches OnStageUpdateFrame all the same').toEqual([1]);
+
+      expect(() => stage.updateFrame(2, 0.016, 2)).not.toThrow();
+      expect(second, 'no second first frame').toHaveBeenCalledTimes(1);
+      expect(frames).toEqual([1, 2]);
+
+      const late = vi.fn();
+      on(stage, OnStageFirstFrame, late);
+      expect(late).toHaveBeenCalledTimes(1);
+      expect(late.mock.calls[0]![0]).toMatchObject({stage, frameNo: 1});
+    });
+
+    it('a resize listener that throws leaves the stage the new container, and the listener behind it hears the size', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(800, 600);
+      const failure = new Error('the listener failed');
+      on(stage, OnStageResize, () => {
+        throw failure;
+      });
+      const second = vi.fn();
+      on(stage, OnStageResize, second);
+
+      expect(() => stage.resize(640, 640)).toThrow(failure);
+
+      expect([stage.containerWidth, stage.containerHeight]).toEqual([640, 640]);
+      expect([stage.width, stage.height]).toEqual([640, 640]);
+      expect(second).toHaveBeenCalledTimes(1);
+      expect(second.mock.calls[0]![0]).toMatchObject({stage, width: 640, height: 640});
+    });
+
+    it('a camera listener and a resize listener that throw on the first resize() with an area come out as one AggregateError', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.needsUpdate = true;
+      const cameraFailure = new Error('the camera listener failed');
+      const resizeFailure = new Error('the resize listener failed');
+      on(stage, OnStageAfterCameraChanged, () => {
+        throw cameraFailure;
+      });
+      on(stage, OnStageResize, () => {
+        throw resizeFailure;
+      });
+
+      let caught: unknown;
+      try {
+        stage.resize(800, 600);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([cameraFailure, resizeFailure]);
+      expect((caught as AggregateError).message).toBe(
+        'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged and OnStageResize threw',
+      );
+      expect(stage.camera).toBeDefined();
+      expect([stage.containerWidth, stage.containerHeight]).toEqual([800, 600]);
+      expect([stage.width, stage.height]).toEqual([640, 480]);
+      expect(stage.needsUpdate).toBe(false);
+    });
+
+    it('a scene listener that throws leaves the stage with the new scene and every listener heard it', () => {
+      const stage = new Stage2D();
+      const next = new Scene();
+      const failure = new Error('the listener failed');
+      on(stage, OnStageAfterSceneChanged, () => {
+        throw failure;
+      });
+      const second = vi.fn();
+      on(stage, OnStageAfterSceneChanged, second);
+
+      expect(() => {
+        stage.scene = next;
+      }).toThrow(failure);
+
+      expect(stage.scene).toBe(next);
+      expect(second).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('does not expose the removed clearColor / clearAlpha / autoClear properties', () => {

@@ -48,7 +48,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   /**
    * The `THREE.Scene` this stage renders. A new scene applies from the next frame on, in every
    * mode of a `StageRenderer`: every change emits `OnStageAfterSceneChanged` with the scene it
-   * replaced, and a renderer that composes pass nodes builds its output node anew on it.
+   * replaced, and a renderer that composes pass nodes builds its output node anew on it. Every
+   * listener hears the event, also behind one that throws; the stage has taken the new scene by
+   * then, and the error reaches the caller afterwards — one unchanged, several as an
+   * `AggregateError`.
    *
    * The scene belongs to the caller: a new one leaves the previous one as it is. After
    * {@link dispose} a write goes through and announces nothing.
@@ -66,7 +69,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     if (this.#disposed) return;
 
     const args: StageAfterSceneChangedArgs = [this, prevScene];
-    emit(this, OnStageAfterSceneChanged, ...args);
+    emitStrict(this, OnStageAfterSceneChanged, ...args);
   }
 
   /**
@@ -107,7 +110,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * `resize()` with an area, for specs that give no view, and after an assignment to
    * `projection` until the new projection gives one. A `resize()` to a width or a height that is
    * not a finite number above 0 keeps the size, as it keeps the camera. `OnStageResize` announces
-   * every new view, and none of the drops to 0.
+   * every new view, and none of the drops to 0. Every listener hears it, also behind one that
+   * throws; the stage has taken the new size and the container by then, and the error reaches the
+   * caller afterwards — one unchanged, several as an `AggregateError`.
    */
   get width(): number {
     return this.#width;
@@ -131,14 +136,27 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       this.#projection = projection;
       // the size and the camera of the previous projection go first, the camera announced as the
       // camera it was: a listener to that change reads no size the stage has no view for.
-      // updateProjection() then gives the view and the camera of the new one, if the container has
-      // an area for it and its specs give a view
+      // #updateProjection() then gives the view and the camera of the new one, if the container
+      // has an area for it and its specs give a view
       this.#width = 0;
       this.#height = 0;
+      const errors: unknown[] = [];
       this.#updateCamera(() => {
         this.#cameraFromProjection = undefined;
-      });
-      this.updateProjection(true);
+      }, errors);
+      // a listener of the drop that throws does not keep the stage from the camera of the new
+      // projection; one that disposes the stage, or takes the projection away, does
+      if (this.projection != null && !this.#disposed) {
+        try {
+          this.#updateProjection(this.#containerWidth, this.#containerHeight, errors);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      throwCollected(
+        errors,
+        'Stage2D#projection: more than one of the listeners of OnStageAfterCameraChanged and OnStageResize and the new projection threw',
+      );
     }
   }
 
@@ -164,6 +182,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * whose camera you place yourself gets no projection.
    *
    * Every change of the camera emits `OnStageAfterCameraChanged` with the camera it replaced.
+   * Every listener hears it, also behind one that throws; the stage has taken the new camera by
+   * then, and the error reaches the caller afterwards — one unchanged, several as an
+   * `AggregateError`.
    */
   get camera(): Camera | undefined {
     return this.#cameraUserOverride ?? this.#cameraFromProjection;
@@ -172,17 +193,34 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   set camera(camera: Camera | undefined) {
     if (this.#disposed) return;
 
-    this.#updateCamera(() => void (this.#cameraUserOverride = camera));
+    const errors: unknown[] = [];
+    this.#updateCamera(() => void (this.#cameraUserOverride = camera), errors);
     // without an override the projection's camera takes over, created now if there is none yet
-    if (this.camera == null) this.updateProjection(true);
+    if (this.camera == null && this.projection != null && !this.#disposed) {
+      try {
+        this.#updateProjection(this.#containerWidth, this.#containerHeight, errors);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    throwCollected(
+      errors,
+      'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged and OnStageResize and the projection threw',
+    );
   }
 
-  #updateCamera = (updateCallback: () => void) => {
+  // the change is made before anyone hears of it, and every listener hears it: what they throw
+  // goes into `errors` for the public call to throw once its state stands
+  #updateCamera = (updateCallback: () => void, errors: unknown[]) => {
     const prevCamera = this.camera;
     updateCallback();
     if (prevCamera !== this.camera) {
       const args: StageAfterCameraChangedArgs = [this, prevCamera];
-      emit(this, OnStageAfterCameraChanged, ...args);
+      try {
+        emitStrict(this, OnStageAfterCameraChanged, ...args);
+      } catch (error) {
+        errors.push(error);
+      }
     }
   };
 
@@ -211,8 +249,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       this.#containerHeight = containerHeight;
 
       if (this.projection) {
+        const errors: unknown[] = [];
         try {
-          this.#updateProjection(containerWidth, containerHeight);
+          this.#updateProjection(containerWidth, containerHeight, errors);
         } catch (error) {
           // the container of a resize the projection refuses is not the container this stage
           // shows: it keeps the one it had, and the very same size is worth another attempt as
@@ -221,6 +260,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
           this.#containerHeight = prevContainerHeight;
           throw error;
         }
+        // a listener that throws finds the container, the view and the camera taken
+        throwCollected(errors, 'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged and OnStageResize threw');
       }
     }
   }
@@ -229,11 +270,19 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     if (this.#disposed) return;
 
     if ((forceUpdate || this.needsUpdate) && this.projection) {
-      this.#updateProjection(this.#containerWidth, this.#containerHeight);
+      // inside the branch: updateFrame() calls this method in every frame
+      const errors: unknown[] = [];
+      this.#updateProjection(this.#containerWidth, this.#containerHeight, errors);
+      throwCollected(
+        errors,
+        'Stage2D#updateProjection(): more than one listener of OnStageAfterCameraChanged and OnStageResize threw',
+      );
     }
   }
 
-  #updateProjection = (width: number, height: number): void => {
+  // what the projection throws leaves this call with the state it found; what a listener throws
+  // goes into `errors`, after the state stands
+  #updateProjection = (width: number, height: number, errors: unknown[]): void => {
     // a container whose width or height is not a finite number above 0 has no aspect ratio to fit
     // a view into: the stage keeps the camera and the size it has, and creates neither before the
     // first resize() with an area
@@ -255,13 +304,13 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     this.#width = w;
     this.#height = h;
 
+    let created: Camera | undefined;
+
     try {
       if (this.camera != null) {
         this.projection!.updateCamera(this.camera);
       } else {
-        this.#updateCamera(() => {
-          this.#cameraFromProjection = this.projection!.createCamera();
-        });
+        created = this.projection!.createCamera();
       }
     } catch (error) {
       // a view no camera was built for or placed with is a view this stage never reached and
@@ -272,13 +321,25 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       throw error;
     }
 
+    // the announcements come after the state stands, outside the rollback above: a listener that
+    // throws undoes nothing the stage has taken. The camera goes first, then the size
+    if (created != null) {
+      this.#updateCamera(() => {
+        this.#cameraFromProjection = created;
+      }, errors);
+    }
+
     if (prevWidth !== w || prevHeight !== h) {
       const props: StageResizeProps = {
         stage: this,
         width: w,
         height: h,
       };
-      emit(this, OnStageResize, props);
+      try {
+        emitStrict(this, OnStageResize, props);
+      } catch (error) {
+        errors.push(error);
+      }
     }
   };
 
@@ -296,6 +357,12 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * this call, and the flag then stays set —, then emits `OnStageFirstFrame` in the first frame
    * with a camera and `OnStageUpdateFrame` in every frame with a camera. Does nothing on a
    * disposed stage.
+   *
+   * Every listener of `OnStageFirstFrame` hears it, also behind one that throws; the first frame
+   * is over by then — `isFirstFrame` is `false`, a later subscriber gets the retained props, and
+   * the listeners of `OnStageUpdateFrame` get the frame all the same — and the error reaches the
+   * caller afterwards, one unchanged, several as an `AggregateError`. `OnStageUpdateFrame` goes
+   * out through `emit()`: a listener that throws ends the frame for the listeners behind it.
    */
   updateFrame(now: number, deltaTime: number, frameNo: number): void {
     if (this.#disposed) return;
@@ -323,8 +390,27 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     props.frameNo = frameNo;
 
     if (this.isFirstFrame) {
-      emit(this, OnStageFirstFrame, {stage: this, now, deltaTime, frameNo} satisfies StageUpdateFrameProps);
+      const errors: unknown[] = [];
+      try {
+        emitStrict(this, OnStageFirstFrame, {stage: this, now, deltaTime, frameNo} satisfies StageUpdateFrameProps);
+      } catch (error) {
+        errors.push(error);
+      }
+      // the first frame is over whatever its listeners threw; emitStrict() has written the retained props
       this.isFirstFrame = false;
+      if (errors.length > 0) {
+        // the frame goes on: the listeners of OnStageUpdateFrame get frame 1 all the same
+        try {
+          emit(this, OnStageUpdateFrame, props);
+        } catch (error) {
+          errors.push(error);
+        }
+        throwCollected(
+          errors,
+          'Stage2D#updateFrame(): a listener of OnStageFirstFrame threw, and so did one of OnStageUpdateFrame',
+        );
+        return;
+      }
     }
 
     emit(this, OnStageUpdateFrame, props);

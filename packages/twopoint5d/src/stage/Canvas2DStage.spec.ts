@@ -1,6 +1,6 @@
 import {emit, on} from '@spearwolf/eventize';
 import {createSandbox} from 'sinon';
-import type {PassNode, WebGPURenderer} from 'three/webgpu';
+import {type PassNode, SpriteMaterial, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {
@@ -258,6 +258,69 @@ describe('Canvas2DStage', () => {
     }).toThrow(TypeError);
   });
 
+  describe('a canvas resized in place', () => {
+    test('brings sprite and view to the new size before OnCanvas2DStageResize goes out', () => {
+      const canvas = makeCanvas(64, 64);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+      stage.render();
+      const scaleAtResize: number[] = [];
+      on(stage, OnCanvas2DStageResize, () => {
+        scaleAtResize.push(stage.sprite.scale.x);
+      });
+
+      canvas.width = 48;
+      canvas.height = 32;
+      stage.render();
+
+      expect(stage.sprite.scale.toArray()).toEqual([48, 32, 1]);
+      expect(stage.projection.viewSpecs).toMatchObject({width: 48, height: 32});
+      expect(scaleAtResize, 'a listener reads the new size already').toEqual([48]);
+    });
+
+    test('uploads no canvas without area, and keeps needsUpdate for the first render() with one', () => {
+      const canvas = makeCanvas(32, 16);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+
+      canvas.width = 0;
+      stage.render();
+
+      expect(stage.texture, 'no texture without area').toBeUndefined();
+      expect(stage.needsUpdate).toBe(true);
+
+      canvas.width = 32;
+      stage.render();
+
+      expect(stage.texture).toBeDefined();
+      expect(stage.needsUpdate).toBe(false);
+    });
+  });
+
+  describe('sizes', () => {
+    test('the constructor refuses a width or a height that is not a finite number above 0', () => {
+      expect(() => new Canvas2DStage(makeRenderer(), 0, 10)).toThrow(
+        new RangeError('new Canvas2DStage(): width must be a finite number above 0, got 0'),
+      );
+      expect(() => new Canvas2DStage(makeRenderer(), NaN, 10)).toThrow(
+        new RangeError('new Canvas2DStage(): width must be a finite number above 0, got NaN'),
+      );
+      expect(() => new Canvas2DStage(makeRenderer(), 10, -1)).toThrow(
+        new RangeError('new Canvas2DStage(): height must be a finite number above 0, got -1'),
+      );
+    });
+
+    test('setCanvasSize() refuses a width that is not a finite number above 0, also after dispose()', () => {
+      const stage = makeStage();
+      const failure = new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number above 0, got NaN');
+
+      expect(() => stage.setCanvasSize(NaN, 10)).toThrow(failure);
+      expect([stage.width, stage.height], 'the canvas keeps its size').toEqual([32, 16]);
+
+      stage.dispose();
+
+      expect(() => stage.setCanvasSize(NaN, 10)).toThrow(failure);
+    });
+  });
+
   describe('render()', () => {
     test('render(now, deltaTime, frameNo) hands the frame to the stage renderer before it draws', () => {
       const stage = makeStage();
@@ -348,6 +411,26 @@ describe('Canvas2DStage', () => {
       expect(canvas.width, 'the canvas keeps its size').toBe(64);
       expect(canvas.height).toBe(48);
       expect(geometryDispose.called, 'THREE.Sprite shares one geometry across every sprite').toBe(false);
+    });
+
+    // (b) a material set into the slot of the sprite belongs to the caller
+    test('releases the sprite material it built, and leaves one set into the slot to the caller', () => {
+      const stage = makeStage();
+      const own = stage.sprite.material;
+      const replacement = new SpriteMaterial();
+      stage.sprite.material = replacement;
+      const ownDispose = sandbox.spy(own, 'dispose');
+      const replacementDispose = sandbox.spy(replacement, 'dispose');
+
+      stage.render();
+
+      expect(own.map, 'the canvas texture goes into the material of the stage').toBe(stage.texture);
+      expect(replacement.map, 'and not into the one set into the slot').toBe(null);
+
+      stage.dispose();
+
+      expect(ownDispose.calledOnce, 'the material the stage built').toBe(true);
+      expect(replacementDispose.called, 'the material of the caller').toBe(false);
     });
 
     // (c) every public member behaves after dispose() as its TSDoc says

@@ -105,6 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureFactory` built with a renderer asks it for the anisotropy maximum at every texture it builds and caps against the maximum the renderer names at that moment; while the renderer names none, the texture gets no anisotropic filtering
 - `Chronometer#update()` on a stopped chronometer sets `deltaTime` and `rawDeltaTime` to `0`: no active phase elapses in a pause. `stop()` leaves both as they are until the next `update()`. Code that still needs the delta of the last running frame reads it before that `update()`
 - `PanControl2D` works on copies of the arrays `keys` and `keyCodes` of its options: a rebinding in place (`control.keys[0] = 'ArrowUp'`) changes neither the options nor another control built from them; whoever wants to rebind several controls writes into each
+- `OrthographicProjectionSpecs` and `ParallaxProjectionSpecs` take no `anchorPosition`: they build on the new type `ProjectionFitSpecs`, the arms of `FitIntoRectangleSpecs` without it, and a projection centers its view on the projection plane (**BREAKING** for TypeScript). See the Migration Guide
+- a write to `StageRenderer#parent`, `attach()` and the constructor refuse a disposed `StageRenderer` and a host whose `isDisposed` is `true` with an error that names the call and the state, before the renderer leaves its holder; `IStageRendererHost` has the optional member `isDisposed`, which `Display` answers (**BREAKING**). See the Migration Guide
 
 ### Removed
 
@@ -143,6 +145,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a frame that `Display#renderFrame()` renders during the pause gives its listeners a `deltaTime` and `rawDeltaTime` of `0` and leaves `now` where it is: a `FixedFrameLoop` on the display does not tick, and an `AdaptiveResolution` in `frame-pacing` reads no pace from the frame
 - `Display#dispose()` takes the `visibilitychange` listener on the document and the `IntersectionObserver` of `pauseOutsideViewport` down also after an `off(display)` of the caller
 - `PanControl2D#dispose()` gives the cursor rule back and lets go of every listener also when a listener of `OnPanControl2DRestoreCursor` throws: every listener hears the event, and `dispose()` throws the error once the control is down — an `AggregateError` when more than one listener throws; `pointerDisabled = true` and `unsubscribe()` likewise let every listener hear it before they throw, and `InputControlBase#destroyAllListeners()` empties its list also when the `unsubscribe()` of a subclass throws
+- `StageRenderer#add()` refuses a `StageRenderer` that is the renderer it is added to or holds it, further up as well, with an error that names the call and the stage, before anything moves; a write to `parent` goes through `add()` and refuses it the same way
+- `StageRenderer#resize()` refuses a width or a height that is `NaN` or infinite with a `RangeError` that names the call, before anything changes, and the render targets of a `StageRenderer` get at least 1 × 1 device pixels also for a `width` or `height` that is no finite number
+- every listener of `OnStageAfterCameraChanged`, `OnStageAfterSceneChanged`, `OnStageResize` and `OnStageFirstFrame` of a `Stage2D` hears the event, also behind one that throws: the stage has taken the camera, the scene, the container and the size or the end of its first frame by then, a composing `StageRenderer` builds its output node anew, a new projection gives its camera, `isFirstFrame` turns `false` and frame 1 reaches the listeners of `OnStageUpdateFrame`; the error reaches the caller afterwards — one unchanged, several as an `AggregateError`
+- `Canvas2DStage` brings sprite and view to the size of a canvas handed to its constructor and resized in place, on the next `render()` and before `OnCanvas2DStageResize` goes out, as `setCanvasSize()` does
+- `Canvas2DStage` writes the canvas texture into the `SpriteMaterial` it built and `dispose()` releases that one, also after the caller set another into the `material` slot of `sprite`, which stays the caller's
+- `Canvas2DStage` uploads no canvas of width or height 0 — WebGPU builds no texture without area —, and `needsUpdate` stays set for the first `render()` with one
+- `new Canvas2DStage(renderer, width, height)` and `setCanvasSize()` refuse a width or a height that is no finite number above 0 with a `RangeError` that names the call, before anything is built or written; `setCanvasSize()` refuses it on a disposed stage as well
+- `new ProjectionPlane()`, and with it a projection, refuses a plane description that is neither one of the four nor a `THREE.Plane` with a `TypeError` that quotes it and names the four
 
 ### Migration Guide
 
@@ -503,6 +513,50 @@ import {Stylesheets} from '@spearwolf/twopoint5d';
 const sheet = Stylesheets.getSheet(document.head);
 
 export {sheet};
+```
+
+#### The projection specs without `anchorPosition`
+
+No projection ever read `anchorPosition`: the view stands in the middle of the projection plane, with the field or without it. Leave it out.
+
+**Before**
+
+```ts
+new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 480, anchorPosition: 'top left'});
+```
+
+**After**
+
+```ts check
+import {OrthographicProjection} from '@spearwolf/twopoint5d';
+
+const projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 480});
+
+export {projection};
+```
+
+A view anchored in its container is the caller's to place: `fitIntoRectangle()` gives the size of the view, `calculateAnchorOffset()` its offset for an `anchorPosition`, and the camera is set from both.
+
+#### A disposed holder of a `StageRenderer`
+
+A disposed `StageRenderer` and a host whose `isDisposed` is `true` never drive a renderer again; a write to `parent`, `attach()` and the constructor throw for them. Ask `isDisposed` first, or build a new holder.
+
+**Before**
+
+```ts
+child.parent = holder;
+```
+
+**After**
+
+```ts check
+import {StageRenderer} from '@spearwolf/twopoint5d';
+
+declare const child: StageRenderer;
+declare let holder: StageRenderer;
+
+if (holder.isDisposed) holder = new StageRenderer();
+child.parent = holder;
 ```
 
 ## [0.23.0] - 2026-10-18

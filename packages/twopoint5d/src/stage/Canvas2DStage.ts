@@ -4,6 +4,7 @@ import {Sprite, SpriteMaterial, Texture, type Scene} from 'three/webgpu';
 import {Chronometer} from '../display/Chronometer.js';
 import {OnCanvas2DStageDispose, OnCanvas2DStageRender, OnCanvas2DStageResize} from '../events.js';
 import {TextureFactory} from '../texture/TextureFactory.js';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
@@ -13,7 +14,7 @@ export type Canvas2DStageFitType = 'contain' | 'cover';
 
 /**
  * The view specs a `Canvas2DStage` drives: a `contain`/`cover` fit with both sides given.
- * That is one arm of the `FitIntoRectangleSpecs` union, and writing `width` and `height`
+ * That is one arm of the `ProjectionFitSpecs` union, and writing `width` and `height`
  * through the union itself is not possible — its `pixelZoom` arm carries neither. The stage
  * holds the object it hands to its projection, so both read the same specs.
  */
@@ -40,10 +41,16 @@ export class Canvas2DStage {
 
   readonly canvas: HTMLCanvasElement;
 
+  /**
+   * The width of the {@link canvas}. It changes through `setCanvasSize()`, or — for a canvas
+   * handed to the constructor — directly at `canvas.width`; then the next `render()` brings sprite
+   * and view to the new size before `OnCanvas2DStageResize` goes out.
+   */
   get width(): number {
     return this.canvas.width;
   }
 
+  /** The height of the {@link canvas}; it changes as {@link width} does. */
   get height(): number {
     return this.canvas.height;
   }
@@ -55,7 +62,15 @@ export class Canvas2DStage {
     return this.stage.scene;
   }
 
+  /**
+   * The sprite that shows the canvas, through a `SpriteMaterial` the stage built. A material the
+   * caller sets into the slot stays the caller's: {@link dispose} leaves it as it is, and the
+   * stage goes on writing the canvas texture into its own material.
+   */
   readonly sprite: Sprite;
+
+  // the material this stage built and releases; the slot of the sprite may hold another one
+  readonly #material: SpriteMaterial;
 
   // the material starts out with a blank texture, and the first updateTexture() swaps it for the
   // one the factory built — after that this field is all that still points at it
@@ -83,7 +98,9 @@ export class Canvas2DStage {
   /**
    * Set `needsUpdate` to `true` after every change of the canvas content: the next `render()`
    * uploads it. It starts out `true`, so the first `render()` shows what the canvas already
-   * carries — a canvas handed to the constructor that was painted before included.
+   * carries — a canvas handed to the constructor that was painted before included. A canvas
+   * without area — a width or a height of 0 — is not uploaded, and the flag stays set for the
+   * first `render()` with one.
    */
   needsUpdate = true;
 
@@ -101,6 +118,13 @@ export class Canvas2DStage {
       | [canvas: HTMLCanvasElement, fit: Canvas2DStageFitType]
   ) {
     eventize(this);
+
+    if (typeof args[0] === 'number') {
+      // before anything is built: a canvas without area has nothing to show, and the sprite and
+      // the view would take its size
+      assertPositiveFinite(args[0], 'new Canvas2DStage()', 'width');
+      assertPositiveFinite(args[1], 'new Canvas2DStage()', 'height');
+    }
 
     this.renderer = renderer;
     this.stageRenderer = new StageRenderer();
@@ -130,8 +154,8 @@ export class Canvas2DStage {
 
     this.#placeholderTexture = new Texture();
 
-    const material = new SpriteMaterial({map: this.#placeholderTexture});
-    this.sprite = new Sprite(material);
+    this.#material = new SpriteMaterial({map: this.#placeholderTexture});
+    this.sprite = new Sprite(this.#material);
 
     this.sprite.scale.set(this.width, this.height, 1);
 
@@ -140,6 +164,11 @@ export class Canvas2DStage {
 
   private updateTexture(): void {
     if (!this.needsUpdate) return;
+
+    // WebGPU builds no texture of width or height 0, and three.js hands the size of the image on
+    // unchecked (Textures#updateTexture()): a canvas without area waits, flag and all, for the
+    // first render() with one
+    if (this.canvas.width === 0 || this.canvas.height === 0) return;
 
     this.needsUpdate = false;
 
@@ -159,8 +188,8 @@ export class Canvas2DStage {
     this.#textureWidth = this.canvas.width;
     this.#textureHeight = this.canvas.height;
 
-    this.sprite.material.map = this.#texture;
-    this.sprite.material.needsUpdate = true;
+    this.#material.map = this.#texture;
+    this.#material.needsUpdate = true;
 
     // the material points at the successor before the predecessor falls: nothing ever reads
     // a texture that is already released
@@ -177,11 +206,26 @@ export class Canvas2DStage {
   }
 
   setCanvasSize(width: number, height: number): void {
-    // the canvas may have been handed in, and a disposed stage does not write to it
-    if (this.#disposed || (this.width === width && this.height === height)) return;
+    // refused on a disposed stage as well: a size that is no size is wrong whatever the state
+    assertPositiveFinite(width, 'Canvas2DStage#setCanvasSize()', 'width');
+    assertPositiveFinite(height, 'Canvas2DStage#setCanvasSize()', 'height');
 
-    this.canvas.width = width;
-    this.canvas.height = height;
+    // the canvas may have been handed in, and a disposed stage does not write to it
+    if (this.#disposed) return;
+
+    if (this.width !== width || this.height !== height) {
+      this.canvas.width = width;
+      this.canvas.height = height;
+    }
+
+    this.#followCanvasSize();
+  }
+
+  // sprite and view take the size the canvas has — read from the canvas, which rounds a width or a
+  // height it is given down to a whole number, and which its owner may have resized in place
+  #followCanvasSize(): void {
+    const {width, height} = this;
+    if (this.#viewSpecs.width === width && this.#viewSpecs.height === height) return;
 
     this.sprite.scale.set(width, height, 1);
 
@@ -195,8 +239,9 @@ export class Canvas2DStage {
   #frameNo = 0;
 
   /**
-   * Draws one frame, in this order: `OnCanvas2DStageResize` if the canvas size changed since the
-   * last frame, `OnCanvas2DStageRender` — the moment to draw into the canvas and set
+   * Draws one frame, in this order: sprite and view follow a new canvas size, and
+   * `OnCanvas2DStageResize` goes out, if the canvas size changed since the last frame,
+   * `OnCanvas2DStageRender` — the moment to draw into the canvas and set
    * `needsUpdate` —, the upload of the canvas, `stageRenderer.updateFrame()` and
    * `stageRenderer.renderTo()`.
    *
@@ -215,6 +260,9 @@ export class Canvas2DStage {
     if (this.#disposed) return;
 
     if (this.width !== this.#lastWidth || this.height !== this.#lastHeight) {
+      // ahead of the event: a listener reads sprite and view in the new size already
+      this.#followCanvasSize();
+
       this.dispatchEvent(OnCanvas2DStageResize);
 
       this.#lastWidth = this.width;
@@ -254,18 +302,20 @@ export class Canvas2DStage {
   }
 
   /**
-   * Release the three.js resources this stage built for itself: the sprite material, the blank
-   * texture the material starts out with, the texture the stage built last from the canvas — each
-   * earlier one was released when its successor took its place —, the {@link StageRenderer} and
-   * the {@link Stage2D} behind {@link stage}. The sprite leaves the scene before its material goes,
-   * so no frame reaches a sprite without one.
+   * Release the three.js resources this stage built for itself: the sprite material it built — a
+   * material the caller set into the slot of {@link sprite} stays the caller's —, the blank texture
+   * that material starts out with, the texture the stage built last from the canvas — each earlier
+   * one was released when its successor took its place —, the {@link StageRenderer} and the
+   * {@link Stage2D} behind {@link stage}. The sprite leaves the scene before the material goes, so
+   * no frame reaches a sprite without one.
    *
    * The `WebGPURenderer` and a canvas handed to the constructor belong to the caller and are
    * left untouched — the canvas keeps the size and the content it had. `THREE.Sprite` shares
    * one geometry across every sprite of the module; it is not this stage's to release.
    *
    * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
-   * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do nothing.
+   * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do nothing;
+   * `setCanvasSize()` still refuses a size that is no finite number above 0.
    * `canvas`, `renderer`, `projection`, `scene`, `sprite` and `needsUpdate` keep the values the
    * stage was left with. {@link width} and {@link height} read `canvas.width` and `canvas.height`,
    * so they keep answering with whatever stands at the canvas — including what the caller sets
@@ -297,7 +347,7 @@ export class Canvas2DStage {
     // out of the scene graph before the material goes — a sprite without one cannot be drawn
     this.sprite.removeFromParent();
 
-    this.sprite.material.dispose();
+    this.#material.dispose();
     this.#placeholderTexture.dispose();
     this.#texture?.dispose();
     this.#texture = undefined;

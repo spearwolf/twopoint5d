@@ -22,6 +22,7 @@ import {
   type StageAddedProps,
   type StageRemovedProps,
 } from '../events.js';
+import {assertFinite} from '../utils/assertFinite.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import type {IPassProvider} from './IPassProvider.js';
@@ -269,12 +270,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * The host or the `StageRenderer` that drives this renderer, `undefined` for none.
    *
    * Assigning a `StageRenderer` goes through its {@link add}, and everything `add()` says holds
-   * here: the size comes first, so a stage of this renderer that refuses it makes the assignment
-   * throw that error and leaves this renderer with the holder it had; a disposed target renderer
-   * takes nothing, and the assignment silently leaves this renderer with its holder. Assigning a
-   * host takes this renderer out of the renderer or the host that held it and wires it into the
-   * frame loop of the new one; assigning `undefined` lets go of the holder. On a disposed renderer
-   * the assignment does nothing.
+   * here, the refusal of a renderer that this renderer holds included: the size comes first, so a
+   * stage of this renderer that refuses it makes the assignment throw that error and leaves this
+   * renderer with the holder it had. A disposed `StageRenderer` and a host whose `isDisposed` is
+   * `true` are refused with an error naming the call and the state, before this renderer leaves
+   * its holder. Assigning a host takes this renderer out of the renderer or the host that held it
+   * and wires it into the frame loop of the new one; assigning `undefined` lets go of the holder.
+   * On a disposed renderer the assignment does nothing.
    *
    * A listener that throws does not cut the assignment short — one of `OnRemoveFromParent`
    * here or of `OnStageRemoved` at a previous `StageRenderer` while this renderer leaves its
@@ -299,6 +301,16 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   set parent(parent: StageRendererParentType | undefined) {
     if (this.#disposed) return;
     if (this.#parent === parent) return;
+
+    // a disposed holder never drives this renderer again: taken, the renderer would look attached
+    // and never draw
+    if (parent?.isDisposed === true) {
+      throw new Error(
+        parent instanceof StageRenderer
+          ? `StageRenderer#parent cannot take the renderer "${parent.name}": that renderer has been disposed`
+          : 'StageRenderer#parent cannot take the host: that host has been disposed',
+      );
+    }
 
     if (parent instanceof StageRenderer) {
       // add() moves this renderer: the size first, then out of its previous holder, then in
@@ -402,7 +414,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Passing a parent enables the auto-driven frame loop — do not also drive
    * `updateFrame()`/`renderTo()` from your own handler (see class docs).
    * A host that throws as the renderer subscribes makes the constructor throw that
-   * error and keeps no subscription of the renderer, see {@link parent}.
+   * error and keeps no subscription of the renderer, see {@link parent}. A parent that has
+   * been disposed makes the constructor throw an error naming the state.
    */
   constructor(parent?: StageRendererParentType) {
     eventize(this);
@@ -440,11 +453,17 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `errors` of the `AggregateError` stands in the order in which the stages were added, the
    * error of a render target first.
    *
+   * Width and height must be finite numbers: `NaN` and an infinite value are refused with a
+   * `RangeError` that names the call, before anything changes.
+   *
    * The call goes through {@link stages} as they stood when it began: a stage that `add()` or
    * `remove()` brings in or takes out during the call is reached from the next call on, see
    * {@link orderedStages}.
    */
   resize(width: number, height: number): void {
+    assertFinite(width, 'StageRenderer#resize()', 'width');
+    assertFinite(height, 'StageRenderer#resize()', 'height');
+
     // the stage items are the record of which size each stage carries: while one of them still
     // owes the size this renderer answers with, the call has work to do — a stage that took a
     // size the renderer gave up again is reached by no other call
@@ -1150,10 +1169,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * up its other subscription there all the same.
    *
    * The plain state stays writable, it just no longer drives anything: `resize()` writes
-   * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to,
-   * `setClearColor()` and the clear fields still take values, and `invalidateOutputNode()`
-   * still marks the output node for a rebuild that never comes. `outputRenderTarget`, `name`
-   * and `renderOrder` keep the values the renderer was left with.
+   * `width` and `height` and finds neither a stage nor a `RenderTarget` to pass them on to — a
+   * width or a height that is `NaN` or infinite it refuses with its `RangeError` as on a live
+   * renderer —, `setClearColor()` and the clear fields still take values, and
+   * `invalidateOutputNode()` still marks the output node for a rebuild that never comes.
+   * `outputRenderTarget`, `name` and `renderOrder` keep the values the renderer was left with.
    *
    * No `RenderTarget` is built after this call: `renderTo()` and `updateFrame()` do nothing,
    * `asPassNode()` throws an error naming the class and the state, and a write to `pipeline`,
@@ -1257,7 +1277,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * is not added, the error of its `resize()` comes out of this call, and
    * neither this renderer nor the stage has changed. A disposed stage — one
    * whose `isDisposed` is `true` — is refused with an error naming the call
-   * and the state. So is a stage without `asPassNode()`, a `ClearStage` say,
+   * and the state. A `StageRenderer` that is this renderer or holds it — as its
+   * `parent` or further up — is refused with an error naming the call and the
+   * stage, before the stage gets the size: the two would draw each other
+   * without end. So is a stage without `asPassNode()`, a `ClearStage` say,
    * while this renderer composes — {@link buildOutputNode} over a {@link pipeline},
    * or a `RootRenderPipeline`: a `TypeError` that names the stage, thrown before
    * the stage gets the size, joins {@link stages} or is announced.
@@ -1302,6 +1325,20 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // a disposed stage never announces its end again: listed, it would stay in here for good
     if ((stage as {isDisposed?: unknown}).isDisposed === true) {
       throw new Error(`StageRenderer#add() cannot take the stage "${stage.name}": that stage has been disposed`);
+    }
+
+    // a renderer that is this one, or holds it further up, would draw itself without end: every
+    // resize(), updateFrame() and renderTo() would go round in a circle
+    if (stage instanceof StageRenderer) {
+      for (let holder: StageRendererParentType | undefined = this; holder instanceof StageRenderer; holder = holder.#parent) {
+        if (holder === stage) {
+          throw new Error(
+            holder === this
+              ? `StageRenderer#add() cannot take the stage "${stage.name}": that stage is this renderer`
+              : `StageRenderer#add() cannot take the stage "${stage.name}": that stage holds this renderer`,
+          );
+        }
+      }
     }
 
     // every stage of a composing renderer hands in its pass node: refused here, the stage would

@@ -59,7 +59,7 @@ fast and need the canonical idioms.
 | `IStage` | `{name, resize, updateFrame}` | Lifecycle contract: a sized object with a per-frame tick. |
 | `IRenderable` | `{renderTo(renderer)}` | "Draw yourself into this renderer." |
 | `IPassProvider` | `{asPassNode(renderer) → Node}` | TSL contribution: returns a node usable inside a parent's `RenderPipeline`. |
-| `IStageRendererHost` | `{onResize, onRenderFrame}` | What a `StageRenderer` needs from its frame-loop host. `Display` satisfies this structurally. |
+| `IStageRendererHost` | `{onResize, onRenderFrame, isDisposed?}` | What a `StageRenderer` needs from its frame-loop host. `Display` satisfies this structurally. |
 
 ---
 
@@ -190,7 +190,9 @@ root.add(world);
 
 `root.add(hud)` and `new StageRenderer(root)` are the same move: either way
 `hud.parent` is `root` afterwards. A renderer has one holder — an `add()` to
-another renderer, or an `attach(host)`, takes it out of the first.
+another renderer, or an `attach(host)`, takes it out of the first. A renderer
+takes neither itself nor one that holds it: `add()` and `parent` refuse both
+with an error, before anything has moved.
 
 When the parent has a `pipeline` + `buildOutputNode`, the child renderer's
 `asPassNode()` returns a `texture(...)` node — see "Mode D" and "Mode E"
@@ -609,10 +611,19 @@ On `Stage2D`:
 - `OnStageDispose` — once, from `dispose()`, before the stage stops listening; every
   `StageRenderer` that holds the stage takes it out on it.
 
+A listener of `OnStageAfterCameraChanged`, `OnStageAfterSceneChanged`, `OnStageResize` or
+`OnStageFirstFrame` that throws does not cut short the call that sends it: every listener
+hears the event, the stage has taken the new camera, scene, size or the end of its first
+frame, and the error reaches the caller afterwards — one unchanged, several as an
+`AggregateError`. `OnStageUpdateFrame` goes out through `emit()`: a listener that throws
+ends the frame for the listeners behind it.
+
 On `Canvas2DStage`:
 
 - `OnCanvas2DStageResize` — from `render()`, when the canvas has another size than at
-  the previous `render()`, the first `render()` included.
+  the previous `render()`, the first `render()` included. Sprite and view follow the new
+  size before it goes out, after `setCanvasSize()` as after a write to `canvas.width` or
+  `canvas.height` of a canvas handed to the constructor.
 - `OnCanvas2DStageRender` — from every `render()`, before the canvas is uploaded: draw
   into the canvas here and set `needsUpdate`.
 - `OnCanvas2DStageDispose` — once, from `dispose()`, before the stage stops listening.
@@ -637,6 +648,11 @@ const host: IStageRendererHost = {
 
 new StageRenderer(host).add(stage);
 ```
+
+A host may answer `isDisposed`; the member is optional, and a host without it counts as
+alive. A host whose `isDisposed` is `true` is refused: `new StageRenderer(host)`,
+`attach(host)` and a write to `parent` throw, and the renderer stays with the holder it
+had.
 
 The renderer books each unsubscribe as soon as the host hands it out and calls it once:
 when it leaves the host — through a write to `parent`, `attach()`, `detach()`, an
@@ -689,7 +705,8 @@ What this layer does on top of the general rules in
   `StageRenderer` refuses it.
 - A disposed `StageRenderer` builds no further `RenderTarget`: `asPassNode()` throws,
   `renderTo()` does nothing — it neither draws nor clears the caller's target — and a
-  write to `pipeline`, `buildOutputNode` or `internalTargetPool` falls through.
+  write to `pipeline`, `buildOutputNode` or `internalTargetPool` falls through. Another
+  renderer refuses it as its `parent`, as it refuses a host whose `isDisposed` is `true`.
 - A builder from `createBloomOutputNodeBuilder()` belongs to the caller. Each call
   releases the bloom node the call before built, once the new output node stands —
   neither the renderer nor three's `RenderPipeline` releases an `outputNode` a rebuild
@@ -713,7 +730,8 @@ What this layer does on top of the general rules in
   and `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()` and a write to
   `projection` or `camera` do nothing. Every `StageRenderer` that holds the stage takes
   it out on its `OnStageDispose`, even behind a listener of that event that throws.
-- `Canvas2DStage.dispose()` releases the sprite material, the blank texture the material
+- `Canvas2DStage.dispose()` releases the sprite material it built — one the caller set
+  into the slot of `sprite` stays the caller's —, the blank texture that material
   starts out with and the texture the stage built last from the canvas — each earlier
   one was released when its successor took its place —, its `StageRenderer` and the
   `Stage2D` its constructor built, and leaves the `WebGPURenderer` and a canvas handed

@@ -96,6 +96,9 @@ so read them from the mesh afresh. A `geometry` handed in is never replaced: `gr
 to one is refused. Where the caller replaces a resource by putting another into the
 `geometry` or `material` slot of the mesh, `FeatureSprites#dispose()` still releases the
 geometry and the material it built, and what the caller put there stays the caller's.
+[`Canvas2DStage#dispose()`](../src/stage/Canvas2DStage.ts) does the same for the
+`material` slot of its `sprite`: it releases the `SpriteMaterial` it built, and goes on
+writing the canvas texture into that one while another sits in the slot.
 
 **What an instance builds on a borrowed resource goes when that resource goes.**
 [`SpritePicker`](../src/sprites/SpritePicker.ts) owns its render target and, per mesh it

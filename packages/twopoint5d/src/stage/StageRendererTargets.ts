@@ -5,6 +5,7 @@
 // `StageRenderer` reaches it.
 
 import {RenderTarget, type WebGPURenderer} from 'three/webgpu';
+import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import type {StageRenderTargetPool} from './StageRenderTargetPool.js';
 
 export class StageRendererTargets {
@@ -131,9 +132,13 @@ export class StageRendererTargets {
     if (own && own !== this.#lent) own.dispose();
   }
 
-  /** Width or height a `RenderTarget` has to have, in device pixels, for the logical `size`. */
+  /**
+   * Width or height a `RenderTarget` has to have, in device pixels, for the logical `size`. A size
+   * that is not a finite number — written into the public `width` or `height` of a `StageRenderer`
+   * past its `resize()` — gives the minimum as well.
+   */
   #deviceSize(size: number): number {
-    return Math.max(1, Math.floor(size * this.#pixelRatio));
+    return isFiniteNumber(size) ? Math.max(1, Math.floor(size * this.#pixelRatio)) : 1;
   }
 
   #resize(rt: RenderTarget, width: number, height: number): void {

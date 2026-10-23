@@ -21,6 +21,17 @@ describe('OrthographicProjection', () => {
       expect(projection.projectionPlane).toBeDefined();
     });
 
+    it('takes no anchorPosition: the view stands in the middle of the projection plane', () => {
+      const projection = new OrthographicProjection('xy|bottom-left', {
+        fit: 'contain',
+        width: 640,
+        height: 480,
+        // @ts-expect-error a projection places no anchor
+        anchorPosition: 'top left',
+      });
+      expect(projection.viewSpecs).toMatchObject({fit: 'contain', width: 640, height: 480});
+    });
+
     it('fills the container when built without specs', () => {
       const projection = new OrthographicProjection();
       expect(projection.viewSpecs).toEqual({fit: 'fill'});

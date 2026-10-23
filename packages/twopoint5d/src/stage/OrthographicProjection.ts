@@ -6,14 +6,18 @@ import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IProjection, ProjectionViewRect} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
-import {fitIntoRectangle, type FitIntoRectangleSpecs} from './fitIntoRectangle.js';
+import {fitIntoRectangle, type ProjectionFitSpecs} from './fitIntoRectangle.js';
 
 // the camera values for specs that leave one out or give one no camera can be built from
 const DEFAULT_NEAR = 0.1;
 const DEFAULT_FAR = 100000;
 const DEFAULT_DISTANCE_TO_PROJECTION_PLANE = 100;
 
-export type OrthographicProjectionSpecs = FitIntoRectangleSpecs & {
+/**
+ * How an `OrthographicProjection` fits its view into the container, and where its camera sits.
+ * The view stands in the middle of the projection plane; the specs take no `anchorPosition`.
+ */
+export type OrthographicProjectionSpecs = ProjectionFitSpecs & {
   /**
    * How far the camera sits from the projection plane. Defaults to `100`; a value that is not a
    * finite number counts as not given. 0 and negative values are kept.

@@ -22,4 +22,9 @@ export type StageRendererHostEventHandler = (handler: (props: DisplayEventProps)
 export interface IStageRendererHost {
   onResize: StageRendererHostEventHandler;
   onRenderFrame: StageRendererHostEventHandler;
+  /**
+   * `true` once the host has been disposed, as `Display#isDisposed` answers. A `StageRenderer`
+   * refuses a host that answers `true` here; a host without the member counts as alive.
+   */
+  readonly isDisposed?: boolean;
 }
