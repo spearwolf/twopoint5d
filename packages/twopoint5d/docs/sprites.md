@@ -414,7 +414,8 @@ until `store.renderer` is set. A `getAsync()` after a subtype its resource never
 animation data and whose adapter reads none — rejects instead of waiting.
 
 An item that names an adapter the store does not know builds no resource and is reported as an
-`error` of the store. An adapter reads the envelope the three packers share — `frames`,
+`error` of the store; a field the type of an item does not read — an `imageUrl` beside an
+`atlasUrl` — is left out and reported the same way. An adapter reads the envelope the three packers share — `frames`,
 `meta.size`, `meta.image` — since the resource reads the image out of the json before any adapter
 runs; a packer of another format is converted to that envelope first.
 

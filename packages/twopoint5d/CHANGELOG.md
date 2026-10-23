@@ -107,6 +107,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PanControl2D` works on copies of the arrays `keys` and `keyCodes` of its options: a rebinding in place (`control.keys[0] = 'ArrowUp'`) changes neither the options nor another control built from them; whoever wants to rebind several controls writes into each
 - `OrthographicProjectionSpecs` and `ParallaxProjectionSpecs` take no `anchorPosition`: they build on the new type `ProjectionFitSpecs`, the arms of `FitIntoRectangleSpecs` without it, and a projection centers its view on the projection plane (**BREAKING** for TypeScript). See the Migration Guide
 - a write to `StageRenderer#parent`, `attach()` and the constructor refuse a disposed `StageRenderer` and a host whose `isDisposed` is `true` with an error that names the call and the state, before the renderer leaves its holder; `IStageRendererHost` has the optional member `isDisposed`, which `Display` answers (**BREAKING**). See the Migration Guide
+- `TextureStore#parse()` throws a `TypeError` for items whose type conflicts with the resource that already carries their id, as its TSDoc says; it is still `instanceof Error`
+- `TextureStore#parse()` reports every field the type of an item does not read — an `imageUrl` beside an `atlasUrl`, an `atlasUrl` or an `overrideImageUrl` on a tile set, `frameBasedAnimations` on an image — in one `error` event of the item with `source: 'parse'`, and a tile set item without an `imageUrl`, which it builds all the same: `TextureStore: item "hero" builds an "atlas" resource, which reads no imageUrl — left out`. An `atlasAdapter` on an item that is no atlas is reported in the same words. The static `TextureStore.loadAsync()` rejects such a catalog (**BREAKING**). See the Migration Guide
+- `TextureStore#getAsync()`, `acquireAsync()`, `get()` and `whenResource()` say why the last `parse()` refused the item of an id they give up on — `TextureStore: no resource with id "a" — its item names no tileSet, atlasUrl or imageUrl and builds no resource` — and carry the error of the `error` event of that item as their `cause`
+- the `AbortError`s of `TextureStore` start with `TextureStore: ` and name the call with its arguments: `TextureStore: getAsync("a", "texture") aborted before subscription`
+- the `AggregateError` that `Display#start()` throws when a listener of start and one of the pause after it both throw starts with `Display: `
+- `BitmapFont` refuses a metric of `common`, a field of a char and the `amount` of a kerning pair with a `RangeError`, still `instanceof Error`; the messages of a char and of a pair read `BitmapFont: the x of the char "A" (65) must be a finite number, got NaN` and `BitmapFont: the amount of kerning pair 0 must be a finite number, got NaN`
+- error messages cut a string of more than 120 UTF-16 units short after its first 120, with `…`, and show a typed array by its kind and at most eight entries, `Float32Array [1.5, NaN]`, instead of every element of it
 
 ### Removed
 
@@ -153,6 +160,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Canvas2DStage` uploads no canvas of width or height 0 — WebGPU builds no texture without area —, and `needsUpdate` stays set for the first `render()` with one
 - `new Canvas2DStage(renderer, width, height)` and `setCanvasSize()` refuse a width or a height that is no finite number above 0 with a `RangeError` that names the call, before anything is built or written; `setCanvasSize()` refuses it on a disposed stage as well
 - `new ProjectionPlane()`, and with it a projection, refuses a plane description that is neither one of the four nor a `THREE.Plane` with a `TypeError` that quotes it and names the four
+- `TextureStore#parse()` runs to its end behind a subscriber of a resource that throws while the values are written, a callback of `on()` among them: every item is written, `ready` and the `resource:<id>` events go out, `evictMissing` runs, and the throw goes out last as an `error` with `source: 'parse'`; `TextureStore#loadAsync()` resolves with the store
+- `TextureStore#registerAtlasAdapter()` registers nothing on a disposed store; it still refuses the arguments it refuses on a live one
 
 ### Migration Guide
 
@@ -557,6 +566,30 @@ declare let holder: StageRenderer;
 
 if (holder.isDisposed) holder = new StageRenderer();
 child.parent = holder;
+```
+
+#### A catalog item with a field its type does not read
+
+The static `TextureStore.loadAsync()` rejects a catalog with an item that names a field its type does not read, or a tile set item without an `imageUrl`, as it rejects every other failure the attempt reports. Take the field out of the item — an atlas reads its image from its json or from `overrideImageUrl`, never from `imageUrl` —, or load with the instance method, which reports the field as an `error` event and resolves.
+
+**Before**
+
+```ts
+// catalog.json: {"items": {"hero": {"atlasUrl": "hero.json", "imageUrl": "hero-red.png"}}}
+const store = await TextureStore.loadAsync('catalog.json');
+```
+
+**After**
+
+```ts check
+import {TextureStore} from '@spearwolf/twopoint5d';
+
+// catalog.json: {"items": {"hero": {"atlasUrl": "hero.json", "overrideImageUrl": "hero-red.png"}}}
+const store = TextureStore.loadAsync('catalog.json');
+
+// or the catalog as it is: the field goes out as an `error` event, and the promise resolves
+const lenient = new TextureStore();
+const loaded = lenient.loadAsync('catalog.json');
 ```
 
 ## [0.23.0] - 2026-10-18

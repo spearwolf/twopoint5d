@@ -299,6 +299,7 @@ describe('BitmapFont', () => {
     ])('common.%s of %o', (key, value, message) => {
       const data = tinyFont();
       (data.common as unknown as Record<string, unknown>)[key] = value;
+      expect(() => new BitmapFont(data)).toThrow(RangeError);
       expect(() => new BitmapFont(data)).toThrow(message);
     });
 
@@ -324,21 +325,49 @@ describe('BitmapFont', () => {
       [
         'an id that is no whole number',
         {id: 6.5},
+        Error,
         'BitmapFont: a char has the id 6.5 — an id is a whole number from 0 to 0x10FFFF',
       ],
       [
         'an id above 0x10FFFF',
         {id: 0x110000},
+        Error,
         'BitmapFont: a char has the id 1114112 — an id is a whole number from 0 to 0x10FFFF',
       ],
-      ['a field that is no number', {xadvance: '4'}, 'BitmapFont: the char "A" (65) has an xadvance of "4" — a finite number'],
-      ['a negative width', {width: -1}, 'BitmapFont: the char "A" (65) has a width of -1 — 0 or more'],
-      ['a negative x', {x: -1}, 'BitmapFont: the char "A" (65) has an x of -1 — 0 or more'],
-      ['a char beyond the page', {x: 14}, 'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — x 14 + width 3'],
-      ['a char below the page', {y: 5}, 'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — y 5 + height 4'],
-    ])('%s', (_, change, message) => {
+      [
+        'a field that is no number',
+        {xadvance: '4'},
+        RangeError,
+        'BitmapFont: the xadvance of the char "A" (65) must be a finite number, got "4"',
+      ],
+      [
+        'a negative width',
+        {width: -1},
+        RangeError,
+        'BitmapFont: the width of the char "A" (65) must be a finite number of 0 or more, got -1',
+      ],
+      [
+        'a negative x',
+        {x: -1},
+        RangeError,
+        'BitmapFont: the x of the char "A" (65) must be a finite number of 0 or more, got -1',
+      ],
+      [
+        'a char beyond the page',
+        {x: 14},
+        Error,
+        'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — x 14 + width 3',
+      ],
+      [
+        'a char below the page',
+        {y: 5},
+        Error,
+        'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — y 5 + height 4',
+      ],
+    ])('%s', (_, change, errorClass, message) => {
       const data = tinyFont();
       Object.assign(data.chars[1]!, change);
+      expect(() => new BitmapFont(data)).toThrow(errorClass);
       expect(() => new BitmapFont(data)).toThrow(message);
     });
 
@@ -365,7 +394,8 @@ describe('BitmapFont', () => {
     test('a kerning pair whose amount is no number', () => {
       const data = tinyFont();
       data.kernings = [{first: 65, second: 86, amount: Number.NaN}];
-      expect(() => new BitmapFont(data)).toThrow('BitmapFont: kerning pair 0 has an amount of NaN — a finite number');
+      expect(() => new BitmapFont(data)).toThrow(RangeError);
+      expect(() => new BitmapFont(data)).toThrow('BitmapFont: the amount of kerning pair 0 must be a finite number, got NaN');
     });
 
     test('a pair of chars the font lacks is kept and never met', () => {

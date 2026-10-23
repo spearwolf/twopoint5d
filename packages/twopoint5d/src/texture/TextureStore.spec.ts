@@ -347,6 +347,25 @@ describe('TextureStore', () => {
     // textures rather than lending them — nothing it hands out is ever given back.
   });
 
+  describe('a disposed store', () => {
+    test('clearUnused() answers 0 and throws nothing', () => {
+      const store = new TextureStore();
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+      store.dispose();
+
+      expect(store.clearUnused()).toBe(0);
+    });
+
+    test('registerAtlasAdapter() still refuses what it cannot register, and takes a valid adapter without a throw', () => {
+      const store = new TextureStore();
+      store.dispose();
+      const adapter = () => ({atlas: new TextureAtlas()});
+
+      expect(() => store.registerAtlasAdapter('', adapter)).toThrow(TypeError);
+      expect(() => store.registerAtlasAdapter('x', adapter)).not.toThrow();
+    });
+  });
+
   describe('defaultTextureClasses, a field the next parse() reads', () => {
     test('changing defaultTextureClasses propagates merged classes into existing resources on next parse()', () => {
       const store = new TextureStore();
@@ -486,7 +505,9 @@ describe('TextureStore', () => {
       const ac = new AbortController();
       ac.abort();
       const pAborted = store.getAsync('a', ['texture', 'imageCoords'], {signal: ac.signal});
-      await expect(pAborted).rejects.toThrow('getAsync() aborted before subscription');
+      await expect(pAborted).rejects.toThrow(
+        'TextureStore: getAsync("a", ["texture", "imageCoords"]) aborted before subscription',
+      );
       // no image arrives and no renderer is set, so `p` is still pending when the store goes away
       store.dispose();
       await expect(p).rejects.toThrow(/this store has been disposed/);
@@ -743,7 +764,7 @@ describe('TextureStore', () => {
 
       expect(settled).toBeInstanceOf(DOMException);
       expect((settled as DOMException).name).toBe('AbortError');
-      expect((settled as DOMException).message).toBe(`loadAsync("${catalogUrl}") aborted`);
+      expect((settled as DOMException).message).toBe(`TextureStore: loadAsync("${catalogUrl}") aborted`);
       expect(fetchMock).not.toHaveBeenCalled();
       expect(addEventListener).not.toHaveBeenCalled();
 
@@ -902,7 +923,7 @@ describe('TextureStore', () => {
         expect(settledFirst).toBeInstanceOf(DOMException);
         expect((settledFirst as DOMException).name).toBe('AbortError');
         expect((settledFirst as DOMException).message).toBe(
-          `loadAsync("${firstUrl}") aborted: a later loadAsync() on this store took its place`,
+          `TextureStore: loadAsync("${firstUrl}") aborted: a later loadAsync() on this store took its place`,
         );
         expect(settledSecond).toBe(store);
         expect(fetchMock.mock.calls[0]![1]!.signal!.aborted).toBe(true);
@@ -1066,14 +1087,16 @@ describe('TextureStore', () => {
 
       const ac = new AbortController();
       ac.abort();
-      await expect(store.get('a', 'texture', {signal: ac.signal})).rejects.toThrow('get() aborted before subscription');
+      await expect(store.get('a', 'texture', {signal: ac.signal})).rejects.toThrow(
+        'TextureStore: get("a", "texture") aborted before subscription',
+      );
 
       // a store that has not parsed yet keeps the get() waiting until the signal aborts
       const waiting = new TextureStore();
       const pending = new AbortController();
       const aborted = waiting.get('b', 'texture', {signal: pending.signal});
       pending.abort();
-      await expect(aborted).rejects.toThrow('get("b", "texture") aborted');
+      await expect(aborted).rejects.toThrow('TextureStore: get("b", "texture") aborted');
       waiting.dispose();
 
       store.dispose();
@@ -1200,12 +1223,12 @@ describe('TextureStore', () => {
       const aborted = new AbortController();
       aborted.abort();
       await expect(store.acquireAsync('a', 'texture', {signal: aborted.signal})).rejects.toThrow(
-        'acquireAsync() aborted before subscription',
+        'TextureStore: acquireAsync("a", "texture") aborted before subscription',
       );
       const ac = new AbortController();
       const waiting = store.acquireAsync('a', 'texture', {signal: ac.signal});
       ac.abort();
-      await expect(waiting).rejects.toThrow('acquireAsync("a", "texture") aborted');
+      await expect(waiting).rejects.toThrow('TextureStore: acquireAsync("a", "texture") aborted');
 
       const pending = store.acquireAsync('a', 'texture');
       store.dispose();
@@ -1578,12 +1601,13 @@ describe('TextureStore', () => {
       // the ready event is retained, so subscribing replays the parse that has already run
       readyCount = 0;
 
-      expect(() =>
+      const conflicting = () =>
         store.parse({
           defaultTextureClasses: [],
           items: {a: {imageUrl: 'a2.png'}, b: {tileSet: {tileWidth: 8, tileHeight: 8}}},
-        }),
-      ).toThrow(
+        });
+      expect(conflicting).toThrow(TypeError);
+      expect(conflicting).toThrow(
         'TextureStore: parse() found 1 item(s) of a conflicting type: "b" is a "image" resource and cannot become "tileset"',
       );
 
@@ -1595,12 +1619,13 @@ describe('TextureStore', () => {
       const store = new TextureStore();
       store.parse({defaultTextureClasses: ['nearest'], items: {a: {imageUrl: 'a.png'}}});
 
-      expect(() =>
+      const conflicting = () =>
         store.parse({
           defaultTextureClasses: ['linear'],
           items: {a: {tileSet: {tileWidth: 8, tileHeight: 8}}},
-        }),
-      ).toThrow(
+        });
+      expect(conflicting).toThrow(TypeError);
+      expect(conflicting).toThrow(
         'TextureStore: parse() found 1 item(s) of a conflicting type: "a" is a "image" resource and cannot become "tileset"',
       );
 
@@ -3134,6 +3159,101 @@ describe('TextureStore', () => {
         'TextureStore: defaultTextureClasses names "nearset", which no TextureFactory knows — left out',
       );
     });
+
+    test.each([
+      [
+        'an atlas item with an imageUrl',
+        {atlasUrl: 'a.json', imageUrl: 'a.png'},
+        'atlas',
+        'TextureStore: item "a" builds an "atlas" resource, which reads no imageUrl — left out',
+      ],
+      [
+        'a tile set item with an atlasUrl, an overrideImageUrl and an atlasAdapter',
+        {
+          imageUrl: 'a.png',
+          tileSet: {tileWidth: 8, tileHeight: 8},
+          atlasUrl: 'a.json',
+          overrideImageUrl: 'o.png',
+          atlasAdapter: 'aseprite',
+        },
+        'tileset',
+        'TextureStore: item "a" builds a "tileset" resource, which reads no overrideImageUrl, atlasUrl, atlasAdapter — left out',
+      ],
+      [
+        'an image item with an overrideImageUrl and frameBasedAnimations',
+        {imageUrl: 'a.png', overrideImageUrl: 'o.png', frameBasedAnimations: {walk: {frameRate: 10, tileIds: [1]}}},
+        'image',
+        'TextureStore: item "a" builds an "image" resource, which reads no overrideImageUrl, frameBasedAnimations — left out',
+      ],
+    ])(
+      '%s is reported in one parse error naming every field its type does not read, and the resource is built',
+      async (_name, item, type, message) => {
+        const store = new TextureStore();
+        const errors = collectErrors(store);
+
+        store.parse({items: {a: item}} as never);
+
+        expect(errors.map(({source, id, error}) => [source, id, error.message])).toEqual([['parse', 'a', message]]);
+        expect((await store.whenResource('a')).type).toBe(type);
+        store.dispose();
+      },
+    );
+
+    test('a tile set item without an imageUrl is reported as a parse error and built all the same', async () => {
+      const store = new TextureStore();
+      const errors = collectErrors(store);
+
+      store.parse({items: {t: {tileSet: {tileWidth: 8, tileHeight: 8}}}});
+
+      expect(errors.map(({source, id, error}) => [source, id, error.message])).toEqual([
+        [
+          'parse',
+          't',
+          'TextureStore: item "t" builds a "tileset" resource without an imageUrl — it loads no image, and a getAsync() of its texture or tile set waits until an imageUrl is written to the resource',
+        ],
+      ]);
+      expect((await store.whenResource('t')).type).toBe('tileset');
+      store.dispose();
+    });
+
+    test('getAsync() and whenResource() say why the item of an id built no resource, with the error of its parse error as the cause', async () => {
+      const store = new TextureStore();
+      const errors = collectErrors(store);
+
+      store.parse({items: {a: {}, b: {tileSet: 5}}} as never);
+
+      expect(errors.map(({id}) => id)).toEqual(['a', 'b']);
+      const a = await settleWithin(store.getAsync('a', 'texture'));
+      expect(a).toBeInstanceOf(Error);
+      expect((a as Error).message).toBe(
+        'TextureStore: no resource with id "a" — its item names no tileSet, atlasUrl or imageUrl and builds no resource',
+      );
+      expect((a as Error).cause).toBe(errors[0]!.error);
+      const b = await settleWithin(store.whenResource('b'));
+      expect(b).toBeInstanceOf(Error);
+      expect((b as Error).message).toBe(
+        'TextureStore: no resource with id "b" — its item builds no resource: tileSet is 5, not an object',
+      );
+      expect((b as Error).cause).toBe(errors[1]!.error);
+      // an id the catalog does not name at all
+      expect(((await settleWithin(store.getAsync('x', 'texture'))) as Error).message).toBe(
+        'TextureStore: no resource with id "x" — check your TextureStoreData.items keys.',
+      );
+      store.dispose();
+    });
+
+    test('the next parse() that builds the item or names it no more forgets why it built no resource', async () => {
+      const store = new TextureStore();
+
+      store.parse({items: {a: {}, b: {tileSet: 5}}} as never);
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+
+      expect((await store.whenResource('a')).type).toBe('image');
+      const b = await settleWithin(store.whenResource('b'));
+      expect((b as Error).message).toBe('TextureStore: no resource with id "b" — check your TextureStoreData.items keys.');
+      expect((b as Error).cause).toBeUndefined();
+      store.dispose();
+    });
   });
 
   describe('loadAsync() resolves the relative urls of a catalog against the catalog', () => {
@@ -3437,6 +3557,76 @@ describe('TextureStore', () => {
     });
   });
 
+  describe('parse() goes on behind a subscriber of a resource that throws', () => {
+    const stubImage = () => ({width: 16, height: 16}) as unknown as HTMLImageElement;
+    // absolute urls, so that a catalog fetched by loadAsync() names the same files as one parsed directly
+    const catalog = (frameRate: number, bUrl: string, withC: boolean): TextureStoreData => ({
+      items: {
+        t: {
+          imageUrl: 'http://example.test/t.png',
+          tileSet: {tileWidth: 8, tileHeight: 8},
+          frameBasedAnimations: {walk: {frameRate, tileIds: [1, 2]}},
+        },
+        b: {imageUrl: bUrl},
+        ...(withC ? {c: {imageUrl: 'http://example.test/c.png'}} : {}),
+      },
+    });
+
+    // a store whose `t` has its animations and a subscriber of them that throws from its second call on
+    const storeWithThrowingSubscriber = async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(async () => stubImage());
+      const store = new TextureStore(makeRendererStub());
+      store.parse(catalog(10, 'http://example.test/b.png', true));
+      const subscriberError = new Error('a subscriber that throws');
+      let calls = 0;
+      store.on('t', 'frameBasedAnimations', () => {
+        calls++;
+        if (calls > 1) throw subscriberError;
+      });
+      await store.getAsync('t', 'frameBasedAnimations');
+      const b = await store.whenResource('b');
+      const c = await store.whenResource('c');
+
+      const events: unknown[] = [];
+      on(store, TextureStoreEvents.Ready, () => events.push('ready'));
+      // the ready event is retained, so subscribing replays the parse that has already run
+      events.length = 0;
+      on(store, `${TextureStoreEvents.Resource}:t`, () => events.push('resource:t'));
+      on(store, `${TextureStoreEvents.Resource}:b`, () => events.push('resource:b'));
+      on(c, TextureResourceEvents.Dispose, () => events.push('dispose:c'));
+      on(store, TextureStoreEvents.Error, (payload: unknown) => events.push(payload));
+
+      return {store, b, c, subscriberError, events, calls: () => calls};
+    };
+
+    test('parse() writes every item, announces them, evicts and reports the throw last as a parse error without an id', async () => {
+      const {store, b, c, subscriberError, events, calls} = await storeWithThrowingSubscriber();
+
+      expect(() => store.parse(catalog(20, 'http://example.test/b2.png', false), {evictMissing: true})).not.toThrow();
+
+      expect(calls()).toBe(2);
+      expect(events).toEqual(['ready', 'resource:t', 'resource:b', 'dispose:c', {source: 'parse', error: subscriberError}]);
+      expect(b.imageUrl).toBe('http://example.test/b2.png');
+      expect(c.imageUrl).toBeUndefined();
+      expect(await settleWithin(store.whenResource('c'))).toBeInstanceOf(Error);
+      store.dispose();
+    });
+
+    test('loadAsync() resolves with the store, and the throw goes out as a parse error', async () => {
+      const {store, b, c, subscriberError, events} = await storeWithThrowingSubscriber();
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(catalog(20, 'http://example.test/b2.png', false))),
+      );
+
+      expect(await settleWithin(store.loadAsync('http://example.test/data.json', {evictMissing: true}))).toBe(store);
+
+      expect(events).toEqual(['ready', 'resource:t', 'resource:b', 'dispose:c', {source: 'parse', error: subscriberError}]);
+      expect(b.imageUrl).toBe('http://example.test/b2.png');
+      expect(c.imageUrl).toBeUndefined();
+      store.dispose();
+    });
+  });
+
   describe('atlas adapters', () => {
     const asepriteJson = {
       frames: {
@@ -3625,10 +3815,7 @@ describe('TextureStore', () => {
       store.parse({items: {tiles: {imageUrl: 'tiles.png', atlasAdapter: 'aseprite'}}});
 
       expect(errors.map(({id, error}) => [id, error.message])).toEqual([
-        [
-          'tiles',
-          'TextureStore: item "tiles" names the atlasAdapter "aseprite", but atlasAdapter only reads an atlas — left out',
-        ],
+        ['tiles', 'TextureStore: item "tiles" builds an "image" resource, which reads no atlasAdapter — left out'],
       ]);
       expect((await store.whenResource('tiles')).type).toBe('image');
       store.dispose();

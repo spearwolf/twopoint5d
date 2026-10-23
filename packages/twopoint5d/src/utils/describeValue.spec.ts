@@ -7,6 +7,32 @@ describe('describeValue', () => {
     expect(describeValue('a "b"')).toBe('"a "b""');
   });
 
+  test('cuts a string of more than 120 UTF-16 units short after 120, and keeps one of 120 whole', () => {
+    expect(describeValue('a'.repeat(121))).toBe(`"${'a'.repeat(120)}…"`);
+    expect(describeValue('a'.repeat(120))).toBe(`"${'a'.repeat(120)}"`);
+  });
+
+  test('ends a string it cuts short before a surrogate pair that unit 120 would split', () => {
+    // the emoji takes the units 119 and 120 — the 120th unit is its high surrogate
+    const value = `${'a'.repeat(119)}😀${'b'.repeat(10)}`;
+    expect(describeValue(value)).toBe(`"${'a'.repeat(119)}…"`);
+  });
+
+  test('cuts a long string short inside an array as well', () => {
+    expect(describeValue(['a'.repeat(200)])).toBe(`["${'a'.repeat(120)}…"]`);
+  });
+
+  test('shows a typed array by its kind and its entries, at most eight of them', () => {
+    expect(describeValue(new Float32Array([1.5, Number.NaN]))).toBe('Float32Array [1.5, NaN]');
+    expect(describeValue(new Uint8Array(10))).toBe('Uint8Array [0, 0, 0, 0, 0, 0, 0, 0, …]');
+    expect(describeValue(new BigInt64Array([1n]))).toBe('BigInt64Array [1n]');
+    expect(describeValue([[[new Float32Array([1])]]])).toBe('[[[Float32Array […]]]]');
+  });
+
+  test('shows a DataView as String() does', () => {
+    expect(describeValue(new DataView(new ArrayBuffer(4)))).toBe('[object DataView]');
+  });
+
   test('shows a BigInt with its n', () => {
     expect(describeValue(1n)).toBe('1n');
   });

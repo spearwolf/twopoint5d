@@ -161,7 +161,7 @@ export class DisplayStateMachine {
           // neither error goes missing: the one of the start, and the one of the pause after it
           throw new AggregateError(
             [startError, pauseError],
-            'start(): a listener of start threw, and a listener of pause threw in the pause that followed',
+            'Display: a listener of start threw, and a listener of pause threw in the pause that followed',
             {cause: pauseError},
           );
         }

@@ -323,6 +323,7 @@ describe('DisplayStateMachine', () => {
     }
 
     expect(thrown).toBeInstanceOf(AggregateError);
+    expect((thrown as AggregateError).message).toMatch(/^Display: /);
     expect((thrown as AggregateError).errors).toEqual([startError, pauseError]);
     expect(pauses).toBe(1);
     expect(stateMachine.state).toBe(DisplayStateMachine.PAUSED);

@@ -1,5 +1,8 @@
 const MAX_ENTRIES = 8;
 const MAX_DEPTH = 3;
+// long enough for the urls a message writes as the argument of a call, short of a `data:` url or a
+// JSON body
+const MAX_STRING_LENGTH = 120;
 
 const BARE_KEY = /^[A-Za-z_$][\w$]*$/;
 
@@ -10,9 +13,12 @@ const BARE_KEY = /^[A-Za-z_$][\w$]*$/;
  * not `1`), a function by its name, never its source, and an array or a plain object by its
  * content (`[1.5, NaN, -1]`, `{value: 1n}`), so that one object is told apart from another. Up
  * to eight entries per container and three levels deep are shown, the rest as `…` — that keeps
- * a message short for a large array and ends a cycle. Everything else is written as `String()`
- * writes it. `JSON.stringify()` is no option: it throws for a BigInt, and the message would be
- * lost.
+ * a message short for a large array and ends a cycle. A string of more than 120 UTF-16 units
+ * shows its first 120 and `…` (`"abc…"`), one less where the 120th would split a surrogate
+ * pair, inside an array or an object as well. A typed array is shown by its kind and its
+ * entries, as an array is (`Float32Array [1.5, NaN]`); a `DataView` is not one of them.
+ * Everything else is written as `String()` writes it. `JSON.stringify()` is no option: it
+ * throws for a BigInt, and the message would be lost.
  *
  * An accessor of a plain object or an array stands as `[Getter]`, `[Setter]` or
  * `[Getter/Setter]` and is not called: a message runs no code of the caller. A value that
@@ -33,7 +39,7 @@ function describeAt(value: unknown, depth: number): string {
 }
 
 function describeUnguarded(value: unknown, depth: number): string {
-  if (typeof value === 'string') return `"${value}"`;
+  if (typeof value === 'string') return describeString(value);
   if (typeof value === 'bigint') return `${value}n`;
   if (typeof value === 'function') return value.name ? `[Function: ${value.name}]` : '[Function]';
   if (Array.isArray(value)) {
@@ -43,6 +49,15 @@ function describeUnguarded(value: unknown, depth: number): string {
     for (let index = 0; index < count; index++) shown.push(describeProperty(value, index, depth));
     return `[${joinEntries(shown, value.length)}]`;
   }
+  if (isTypedArray(value)) {
+    // the kind first: a Float32Array of [1, 2] is not the array [1, 2]
+    const kind = Object.prototype.toString.call(value).slice(8, -1);
+    if (depth > MAX_DEPTH) return `${kind} […]`;
+    const shown: string[] = [];
+    const count = Math.min(value.length, MAX_ENTRIES);
+    for (let index = 0; index < count; index++) shown.push(describeAt(value[index], depth + 1));
+    return `${kind} [${joinEntries(shown, value.length)}]`;
+  }
   if (isPlainObject(value)) {
     if (depth > MAX_DEPTH) return '{…}';
     const keys = Object.keys(value);
@@ -50,6 +65,20 @@ function describeUnguarded(value: unknown, depth: number): string {
     return `{${joinEntries(shown, keys.length)}}`;
   }
   return String(value);
+}
+
+function describeString(value: string): string {
+  if (value.length <= MAX_STRING_LENGTH) return `"${value}"`;
+  // a cut between the two halves of a surrogate pair would leave half a char in the message
+  const high = value.charCodeAt(MAX_STRING_LENGTH - 1);
+  const end = high >= 0xd800 && high <= 0xdbff ? MAX_STRING_LENGTH - 1 : MAX_STRING_LENGTH;
+  return `"${value.slice(0, end)}…"`;
+}
+
+type TypedArray = ArrayLike<number | bigint>;
+
+function isTypedArray(value: unknown): value is TypedArray {
+  return ArrayBuffer.isView(value) && !(value instanceof DataView);
 }
 
 /** Reads an entry through its own descriptor, so that no getter of the caller runs. */

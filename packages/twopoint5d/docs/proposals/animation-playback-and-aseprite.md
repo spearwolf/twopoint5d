@@ -399,7 +399,7 @@ any adapter runs; a packer with another envelope is converted to it first.
   (`TextureStore: item "fighter" names the atlasAdapter "asprite", which this store does not
   know — known: texturepacker, aseprite; register it with registerAtlasAdapter() before parse()`);
   `atlasAdapter` that is no string is a field of the wrong type; on an item without `atlasUrl` it
-  is reported and ignored (`… atlasAdapter only reads an atlas — left out`).
+  is reported and ignored (`… builds a "tileset" resource, which reads no atlasAdapter — left out`).
 - An item that names none is read by the adapter whose `app` matches `meta.app` of its json —
   the latest registered first — and by `'texturepacker'` when none does or `meta.app` is no string.
 - A `TextureResource` on its own (no store) picks among the two built-ins the same way.
