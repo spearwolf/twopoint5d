@@ -209,6 +209,33 @@ export async function withSilencedInfo(body) {
   }
 }
 
+// --- unhandled rejections ---
+
+/**
+ * Settles once the browser has reported every rejection that went unhandled before the call. It
+ * leaves a rejection of its own unhandled one task later and waits for the browser to report it:
+ * the browser reports unhandled rejections in the order they occurred, so the control comes after
+ * all of them. The control goes through `twopoint5dExpectRejection()`, which an init script of
+ * web-test-runner.config.js puts into the page, and its report reaches neither the console nor the
+ * browser logs of the run nor a listener of the test. A browser that reported none would hold the
+ * test up until its timeout — red, not green.
+ *
+ * @returns {Promise<void>}
+ */
+export function whenRejectionsReported() {
+  const expectRejection = Reflect.get(globalThis, 'twopoint5dExpectRejection');
+  if (typeof expectRejection !== 'function') {
+    throw new Error('no twopoint5dExpectRejection() in this page — see web-test-runner.config.js');
+  }
+  const control = new Error('the control rejection of whenRejectionsReported()');
+  const reported = expectRejection(control);
+  setTimeout(() => {
+    // left unhandled on purpose: it is the control the hook waits for
+    void Promise.reject(control);
+  }, 0);
+  return reported;
+}
+
 // --- input for PanControl2D ---
 
 /**

@@ -19,6 +19,7 @@ function backendLauncher(product, backend, launchOptions) {
     launchOptions,
     async createPage({context}) {
       await context.addInitScript(pinBackend, backend);
+      await context.addInitScript(takeExpectedRejections);
       return context.newPage();
     },
   });
@@ -38,6 +39,38 @@ function backendLauncher(product, backend, launchOptions) {
 function pinBackend(backend) {
   Object.defineProperty(globalThis, 'twopoint5dTestBackend', {value: backend});
   if (backend === 'WebGL2') delete Navigator.prototype.gpu;
+}
+
+/**
+ * Runs in the page before any of its scripts, like pinBackend(). It leaves
+ * `globalThis.twopoint5dExpectRejection(reason)` behind, which `whenRejectionsReported()` in
+ * test/helpers/fixtures.js calls: the promise it returns settles once the browser reports `reason`
+ * as an unhandled rejection, and that report goes no further. The runner puts a logger of
+ * @web/browser-logs into every page, which writes each unhandled rejection into the browser logs
+ * as "An error was thrown in a Promise outside a test", whether a listener prevented its default
+ * or not. Only a listener added before the logger's keeps a rejection that a test leaves
+ * unhandled on purpose out of them, and an init script runs before every script of the page.
+ */
+function takeExpectedRejections() {
+  /** @type {Map<unknown, () => void>} */
+  const expected = new Map();
+  Object.defineProperty(globalThis, 'twopoint5dExpectRejection', {
+    /** @param {unknown} reason */
+    value: (reason) =>
+      new Promise((resolve) => {
+        expected.set(reason, resolve);
+      }),
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const settle = expected.get(event.reason);
+    if (settle === undefined) return;
+    expected.delete(event.reason);
+    // off the console of the browser
+    event.preventDefault();
+    // and away from the logger and from every listener a test adds
+    event.stopImmediatePropagation();
+    settle();
+  });
 }
 
 export default {

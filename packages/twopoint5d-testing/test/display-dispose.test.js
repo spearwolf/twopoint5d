@@ -2,7 +2,7 @@ import {on} from '@spearwolf/eventize';
 import {expect} from '@esm-bundle/chai';
 import {Display, OnDisplayDispose} from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
-import {disposeDisplay, makeContainer, whenPageAnimates, whenReleased} from './helpers/fixtures.js';
+import {disposeDisplay, makeContainer, whenPageAnimates, whenRejectionsReported, whenReleased} from './helpers/fixtures.js';
 
 /**
  * The backend of a renderer, read only now: three can fall back to the WebGL backend during
@@ -30,33 +30,6 @@ async function expectLiveBackend(display) {
   } else {
     expect(backend.gl.isContextLost(), 'the context of the second display').to.equal(false);
   }
-}
-
-/**
- * Settles once the browser has reported every rejection that went unhandled before the call. It
- * leaves a rejection of its own unhandled one task later and waits for its `unhandledrejection`
- * event: the browser reports unhandled rejections in the order they occurred, so the control
- * comes after all of them. A browser that reported none would hold the test up until its
- * timeout — red, not green.
- *
- * @returns {Promise<void>}
- */
-function whenRejectionsReported() {
-  const control = new Error('the control rejection of whenRejectionsReported()');
-  return new Promise((resolve) => {
-    /** @param {PromiseRejectionEvent} event */
-    const onUnhandledRejection = (event) => {
-      if (event.reason !== control) return;
-      event.preventDefault();
-      window.removeEventListener('unhandledrejection', onUnhandledRejection);
-      resolve();
-    };
-    window.addEventListener('unhandledrejection', onUnhandledRejection);
-    setTimeout(() => {
-      // left unhandled on purpose: it is the control the listener waits for
-      void Promise.reject(control);
-    }, 0);
-  });
 }
 
 describe('Display — the contract after dispose()', function () {

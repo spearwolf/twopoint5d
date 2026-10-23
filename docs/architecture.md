@@ -247,6 +247,16 @@ that fails then: it holds the backend three picked to the pinned one, read throu
 `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>` into the "Browser logs" of
 each launcher.
 
+The runner puts a logger into every page that writes each unhandled rejection into the
+"Browser logs" as "An error was thrown in a Promise outside a test", with its stack,
+whether a listener prevented its default or not. A test that leaves a rejection unhandled
+on purpose — the control of `whenRejectionsReported()` in `test/helpers/fixtures.js`,
+which waits for the browser to report every rejection before it — hands it to
+`twopoint5dExpectRejection()`, which a second init script of each launcher puts into the
+page. Its listener comes before the logger's and takes the report off the page, so a green
+run writes no error text; `test/harness-rejections.test.js` fails when the logger hears of
+the control.
+
 Only the job of the browser tests installs Playwright. The browsers are cached under the
 key `playwright-<os>-<version>-<browsers>`, the version being what `pnpm exec playwright
 --version` reports from the root package and the browsers those the two install steps
