@@ -1,3 +1,4 @@
+import {truncateArray} from '../../utils/truncateArray.js';
 import type {AABB2} from '../AABB2.js';
 import type {IDataChunk2D} from './IDataChunk2D.js';
 
@@ -104,8 +105,18 @@ const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
  * With `findChunks*()` all chunks in a certain area are found.
  */
 export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
-  static IntersectDistanceFactor = Math.PI;
-  static BeforeAfterDeltaFactor = Math.PI;
+  /**
+   * The weight of the chunks an axis cuts through in the score `subdivide()` picks the axis of a
+   * node by — the higher, the more an axis that cuts through chunks loses against one that passes
+   * between them. π.
+   */
+  static readonly IntersectDistanceFactor = Math.PI;
+
+  /**
+   * The weight of the difference between the share of the chunks before an axis and the share
+   * after it in that score — the higher, the more an axis that splits the chunks unevenly loses. π.
+   */
+  static readonly BeforeAfterDeltaFactor = Math.PI;
 
   //
   //               -y
@@ -122,30 +133,67 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   //               +y
   //
 
-  // Both origins are set in the same step that clears `isLeaf` — `subdivide()` — and `clear()`
+  // Both origins are set in the same step that clears `#isLeaf` — `subdivide()` — and `clear()`
   // takes both back together with it. A node that is not a leaf therefore carries both, which is
   // what the reads below rest on; they do not repeat this note.
-  originX: number | null = null;
-  originY: number | null = null;
+  #originX: number | null = null;
+  #originY: number | null = null;
 
-  chunks: ChunkType[];
+  #chunks: ChunkType[];
 
-  isLeaf = true;
+  #isLeaf = true;
 
-  readonly nodes: IChunkQuadTreeChildNodes<ChunkType> = {
+  readonly #nodes: IChunkQuadTreeChildNodes<ChunkType> = {
     northEast: null,
     northWest: null,
     southEast: null,
     southWest: null,
   };
 
+  /**
+   * Where the vertical axis of this node lies, `null` on a leaf; `subdivide()` sets both origins,
+   * `clear()` takes both back.
+   */
+  get originX(): number | null {
+    return this.#originX;
+  }
+
+  /**
+   * Where the horizontal axis of this node lies, `null` on a leaf; `subdivide()` sets both
+   * origins, `clear()` takes both back.
+   */
+  get originY(): number | null {
+    return this.#originY;
+  }
+
+  /**
+   * The chunks this node holds itself: every chunk on a leaf, the chunks that cross an axis on a
+   * node that is split. The array of the node, handed out read-only and without a copy —
+   * `appendChunk()`, `subdivide()` and `clear()` change it.
+   */
+  get chunks(): readonly ChunkType[] {
+    return this.#chunks;
+  }
+
+  /** Whether this node has no children: `true` until `subdivide()` splits it. */
+  get isLeaf(): boolean {
+    return this.#isLeaf;
+  }
+
+  /**
+   * The four children, `null` where a quadrant holds no chunk, all four `null` on a leaf.
+   */
+  get nodes(): Readonly<IChunkQuadTreeChildNodes<ChunkType>> {
+    return this.#nodes;
+  }
+
   constructor(chunks?: ChunkType | ChunkType[]) {
     if (chunks === undefined) {
-      this.chunks = [];
+      this.#chunks = [];
     } else if (Array.isArray(chunks)) {
-      this.chunks = chunks.slice();
+      this.#chunks = chunks.slice();
     } else {
-      this.chunks = [chunks];
+      this.#chunks = [chunks];
     }
   }
 
@@ -153,7 +201,7 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
    * Whether `subdivide()` can split this node itself: a leaf with more than one chunk.
    */
   canSubdivide() {
-    return this.isLeaf && this.chunks.length > 1;
+    return this.#isLeaf && this.#chunks.length > 1;
   }
 
   /**
@@ -162,14 +210,14 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
    * itself remains reusable — call `appendChunk()` / `subdivide()` again.
    */
   clear(): void {
-    this.chunks = [];
-    this.isLeaf = true;
-    this.originX = null;
-    this.originY = null;
-    this.nodes.northEast = null;
-    this.nodes.northWest = null;
-    this.nodes.southEast = null;
-    this.nodes.southWest = null;
+    this.#chunks = [];
+    this.#isLeaf = true;
+    this.#originX = null;
+    this.#originY = null;
+    this.#nodes.northEast = null;
+    this.#nodes.northWest = null;
+    this.#nodes.southEast = null;
+    this.#nodes.southWest = null;
   }
 
   /**
@@ -185,22 +233,22 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
    * `appendChunk()` has filled since are split too.
    */
   subdivide(maxChunkNodes = 2): void {
-    if (!this.isLeaf) {
-      for (const child of Object.values(this.nodes)) child?.subdivide(maxChunkNodes);
+    if (!this.#isLeaf) {
+      for (const child of Object.values(this.#nodes)) child?.subdivide(maxChunkNodes);
       return;
     }
-    if (!this.canSubdivide() || this.chunks.length <= maxChunkNodes) return;
+    if (!this.canSubdivide() || this.#chunks.length <= maxChunkNodes) return;
 
-    const chunks = this.chunks.slice(0);
+    const chunks = this.#chunks.slice(0);
     const xAxis = findAxis(chunks, 'right', 'left');
     const yAxis = findAxis(chunks, 'bottom', 'top');
     if (!xAxis || !yAxis) return;
 
     const originX = xAxis.origin;
     const originY = yAxis.origin;
-    this.originX = originX;
-    this.originY = originY;
-    this.isLeaf = false;
+    this.#originX = originX;
+    this.#originY = originY;
+    this.#isLeaf = false;
 
     // Partition into the four quadrants in a single pass and keep straddlers
     // (chunks that cross either axis) at this node.
@@ -230,19 +278,19 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
       }
     }
 
-    this.chunks = straddlers;
+    this.#chunks = straddlers;
 
-    this.nodes.northEast = ChunkQuadTreeNode.makeChild(ne, maxChunkNodes);
-    this.nodes.northWest = ChunkQuadTreeNode.makeChild(nw, maxChunkNodes);
-    this.nodes.southEast = ChunkQuadTreeNode.makeChild(se, maxChunkNodes);
-    this.nodes.southWest = ChunkQuadTreeNode.makeChild(sw, maxChunkNodes);
+    this.#nodes.northEast = ChunkQuadTreeNode.makeChild(ne, maxChunkNodes);
+    this.#nodes.northWest = ChunkQuadTreeNode.makeChild(nw, maxChunkNodes);
+    this.#nodes.southEast = ChunkQuadTreeNode.makeChild(se, maxChunkNodes);
+    this.#nodes.southWest = ChunkQuadTreeNode.makeChild(sw, maxChunkNodes);
   }
 
   private static makeChild<T extends IDataChunk2D>(bucket: T[], maxChunkNodes: number): ChunkQuadTreeNode<T> | null {
     if (bucket.length === 0) return null;
     const child = new ChunkQuadTreeNode<T>();
     // Take ownership of the bucket array — it's freshly created in `subdivide()`.
-    child.chunks = bucket;
+    child.#chunks = bucket;
     child.subdivide(maxChunkNodes);
     return child;
   }
@@ -255,13 +303,13 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
    * Splits no node — call `subdivide()` on the root after appending.
    */
   appendChunk(chunk: ChunkType) {
-    if (this.isLeaf) {
-      this.chunks.push(chunk);
+    if (this.#isLeaf) {
+      this.#chunks.push(chunk);
       return;
     }
 
-    const originX = this.originX!;
-    const originY = this.originY!;
+    const originX = this.#originX!;
+    const originY = this.#originY!;
 
     // the same order as the distribution in `subdivide()`, so that a chunk lands where `subdivide()`
     // would have put it
@@ -271,7 +319,7 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
       } else if (chunk.top >= originY) {
         this.appendToNode(Quadrant.SouthWest, chunk);
       } else {
-        this.chunks.push(chunk);
+        this.#chunks.push(chunk);
       }
     } else if (chunk.left >= originX) {
       if (chunk.bottom <= originY) {
@@ -279,84 +327,92 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
       } else if (chunk.top >= originY) {
         this.appendToNode(Quadrant.SouthEast, chunk);
       } else {
-        this.chunks.push(chunk);
+        this.#chunks.push(chunk);
       }
     } else {
-      this.chunks.push(chunk);
+      this.#chunks.push(chunk);
     }
   }
 
   private appendToNode(quadrant: Quadrant, chunk: ChunkType) {
-    const node = this.nodes[quadrant];
+    const node = this.#nodes[quadrant];
     if (node) {
       node.appendChunk(chunk);
     } else {
-      this.nodes[quadrant] = new ChunkQuadTreeNode(chunk);
+      this.#nodes[quadrant] = new ChunkQuadTreeNode(chunk);
     }
   }
 
   /**
    * Collects every chunk that intersects `aabb`.
    *
-   * Pass an `out` array to reuse storage in hot paths (e.g. per-frame visibility
-   * queries) — entries are appended without resetting `out`. The same array is
-   * returned for chaining.
+   * With `out`, that array is emptied, filled and handed back — as
+   * `Map2DSpatialHashGrid#findWithin()` does —, so a caller that asks every frame keeps one array
+   * and the query allocates nothing.
    */
   findChunks(aabb: AABB2, out: ChunkType[] = []): ChunkType[] {
-    const local = this.chunks;
+    truncateArray(out);
+    this.#collectChunks(aabb, out);
+    return out;
+  }
+
+  // the recursion of findChunks(): the children collect into `out` without emptying it again
+  #collectChunks(aabb: AABB2, out: ChunkType[]): void {
+    const local = this.#chunks;
     for (let i = 0, n = local.length; i < n; i++) {
       // The loop bound is `n`, taken from `local.length`.
       const c = local[i]!;
       if (c.isIntersecting(aabb)) out.push(c);
     }
-    if (this.isNorthWest(aabb)) this.nodes.northWest!.findChunks(aabb, out);
-    if (this.isNorthEast(aabb)) this.nodes.northEast!.findChunks(aabb, out);
-    if (this.isSouthEast(aabb)) this.nodes.southEast!.findChunks(aabb, out);
-    if (this.isSouthWest(aabb)) this.nodes.southWest!.findChunks(aabb, out);
-    return out;
+    if (this.isNorthWest(aabb)) this.#nodes.northWest!.#collectChunks(aabb, out);
+    if (this.isNorthEast(aabb)) this.#nodes.northEast!.#collectChunks(aabb, out);
+    if (this.isSouthEast(aabb)) this.#nodes.southEast!.#collectChunks(aabb, out);
+    if (this.isSouthWest(aabb)) this.#nodes.southWest!.#collectChunks(aabb, out);
   }
 
   isNorthWest(aabb: AABB2): boolean {
-    return this.nodes.northWest != null && aabb.isNorthWest(this.originX!, this.originY!);
+    return this.#nodes.northWest != null && aabb.isNorthWest(this.#originX!, this.#originY!);
   }
 
   isNorthEast(aabb: AABB2): boolean {
-    return this.nodes.northEast != null && aabb.isNorthEast(this.originX!, this.originY!);
+    return this.#nodes.northEast != null && aabb.isNorthEast(this.#originX!, this.#originY!);
   }
 
   isSouthEast(aabb: AABB2): boolean {
-    return this.nodes.southEast != null && aabb.isSouthEast(this.originX!, this.originY!);
+    return this.#nodes.southEast != null && aabb.isSouthEast(this.#originX!, this.#originY!);
   }
 
   isSouthWest(aabb: AABB2): boolean {
-    return this.nodes.southWest != null && aabb.isSouthWest(this.originX!, this.originY!);
+    return this.#nodes.southWest != null && aabb.isSouthWest(this.#originX!, this.#originY!);
   }
 
   /**
    * Collects every chunk that holds data at `(x, y)`, from this node down to the leaf the point
    * lies in.
    *
-   * Pass an `out` array to reuse storage in hot paths — entries are appended without resetting
-   * `out`. The same array is returned.
+   * With `out`, that array is emptied, filled and handed back — as
+   * `Map2DSpatialHashGrid#findWithin()` does —, so a caller that asks every frame keeps one array
+   * and the query allocates nothing.
    */
   findChunksAt(x: number, y: number, out: ChunkType[] = []): ChunkType[] {
+    truncateArray(out);
     let node: ChunkQuadTreeNode<ChunkType> | null = this;
     while (node !== null) {
-      const local = node.chunks;
+      const local = node.#chunks;
       for (let i = 0, n = local.length; i < n; i++) {
         // The loop bound is `n`, taken from `local.length`.
         const chunk = local[i]!;
         if (chunk.containsDataAt(x, y)) out.push(chunk);
       }
-      if (node.isLeaf) break;
+      if (node.#isLeaf) break;
       node =
-        x < node.originX!
-          ? y < node.originY!
-            ? node.nodes.northWest
-            : node.nodes.southWest
-          : y < node.originY!
-            ? node.nodes.northEast
-            : node.nodes.southEast;
+        x < node.#originX!
+          ? y < node.#originY!
+            ? node.#nodes.northWest
+            : node.#nodes.southWest
+          : y < node.#originY!
+            ? node.#nodes.northEast
+            : node.#nodes.southEast;
     }
     return out;
   }

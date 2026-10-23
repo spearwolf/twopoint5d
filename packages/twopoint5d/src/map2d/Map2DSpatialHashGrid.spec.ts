@@ -35,6 +35,16 @@ describe('Map2DSpatialHashGrid', () => {
     expect(create).toThrow('Map2DSpatialHashGrid: tileWidth must be a finite number above 0, got 0');
   });
 
+  test('an offset that is not finite is refused', () => {
+    const createX = () => new Map2DSpatialHashGrid(10, 10, NaN);
+    const createY = () => new Map2DSpatialHashGrid(10, 10, 0, Infinity);
+
+    expect(createX).toThrow(RangeError);
+    expect(createX).toThrow('Map2DSpatialHashGrid: xOffset must be a finite number, got NaN');
+    expect(createY).toThrow(RangeError);
+    expect(createY).toThrow('Map2DSpatialHashGrid: yOffset must be a finite number, got Infinity');
+  });
+
   test('add', () => {
     const grid = new Map2DSpatialHashGrid(100, 100);
     const a: IMap2DRenderableArea = {aabb: new AABB2(10, 20, 150, 150)};
@@ -221,6 +231,104 @@ describe('Map2DSpatialHashGrid', () => {
     grid.add(p);
 
     expect(grid.findWithin(new AABB2(100, 100, 0, 0))?.has(p)).toBe(true);
+  });
+
+  test('findWithin() and getTiles() over far more cells than the grid holds answer from the cells it holds', {
+    timeout: 2000,
+  }, () => {
+    const grid = new Map2DSpatialHashGrid(1, 1);
+    // four cells
+    const a: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 2, 2)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(10, 10, 1, 1)};
+    const c: IMap2DRenderableArea = {aabb: new AABB2(-5, 3, 1, 1)};
+    grid.add(a, b, c);
+
+    // 2e6 × 2e6 cells
+    const everything = new AABB2(-1e6, -1e6, 2e6, 2e6);
+    expect(grid.findWithin(everything), 'findWithin()').toEqual(new Set([a, b, c]));
+
+    const out: IMap2DRenderableArea[] = [];
+    grid.findWithin(everything, out);
+    expect(out, 'findWithin() with out').toHaveLength(3);
+    expect(new Set(out), 'findWithin() with out').toEqual(new Set([a, b, c]));
+
+    expect(grid.getTiles(-1e6, -1e6, 2e6, 2e6), 'getTiles()').toEqual(new Set([a, b, c]));
+    grid.getTiles(-1e6, -1e6, 2e6, 2e6, out);
+    expect(out, 'getTiles() with out').toHaveLength(3);
+    expect(new Set(out), 'getTiles() with out').toEqual(new Set([a, b, c]));
+
+    // up to the cell (0, 0), which only a lies in
+    expect(grid.findWithin(new AABB2(-1e6, -1e6, 1e6 + 0.5, 1e6 + 0.5)), 'up to (0, 0)').toEqual(new Set([a]));
+  });
+
+  test('the cells a renderable leaves come out of the query over the grid', () => {
+    const grid = new Map2DSpatialHashGrid(1, 1);
+    const a: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 2, 2)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(10, 10, 1, 1)};
+    const c: IMap2DRenderableArea = {aabb: new AABB2(-5, 3, 1, 1)};
+    const everything = new AABB2(-1e6, -1e6, 2e6, 2e6);
+    const out: IMap2DRenderableArea[] = [];
+    grid.add(a, b, c);
+
+    grid.remove(b);
+    expect(grid.findWithin(everything), 'b removed').toEqual(new Set([a, c]));
+
+    grid.add(b);
+    expect(grid.findWithin(everything), 'b added again').toEqual(new Set([a, b, c]));
+
+    a.aabb = new AABB2(-20, -20, 3, 3);
+    grid.add(a);
+    grid.findWithin(everything, out);
+    expect(
+      out.filter((r) => r === a),
+      'a, once',
+    ).toHaveLength(1);
+    expect(new Set(out), 'a moved').toEqual(new Set([a, b, c]));
+  });
+
+  describe('maxCellsPerRenderable', () => {
+    test('add() refuses an aabb that reaches into more than maxCellsPerRenderable cells and adds none of the renderables', () => {
+      const grid = new Map2DSpatialHashGrid(1, 1);
+      const small: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 1, 1)};
+      const large: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 300, 300)};
+      const add = () => grid.add(small, large);
+
+      expect(add).toThrow(RangeError);
+      expect(add).toThrow(
+        'Map2DSpatialHashGrid: the aabb of a renderable reaches into 90000 cells, more than maxCellsPerRenderable (65536) — give the grid larger cells or raise maxCellsPerRenderable',
+      );
+      expect(grid.getTile(0, 0), 'the cell of the small one').toBeUndefined();
+
+      const nine: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 3, 3)};
+      grid.maxCellsPerRenderable = 4;
+      expect(() => grid.add(nine), 'nine cells over 4').toThrow(RangeError);
+      grid.maxCellsPerRenderable = 9;
+      grid.add(nine);
+      expect(grid.getTile(2, 2)?.has(nine), 'nine cells under 9').toBe(true);
+    });
+
+    test('defaults to 65 536', () => {
+      expect(new Map2DSpatialHashGrid().maxCellsPerRenderable).toBe(65_536);
+    });
+
+    test.each([0, -1, 1.5, NaN])('the setter refuses %p and keeps the value it had', (value) => {
+      const grid = new Map2DSpatialHashGrid();
+      grid.maxCellsPerRenderable = 100;
+      const write = () => (grid.maxCellsPerRenderable = value);
+
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow(
+        `Map2DSpatialHashGrid: maxCellsPerRenderable must be a whole number above 0 or Infinity, got ${value}`,
+      );
+      expect(grid.maxCellsPerRenderable).toBe(100);
+    });
+
+    test('the setter takes Infinity', () => {
+      const grid = new Map2DSpatialHashGrid();
+      grid.maxCellsPerRenderable = Infinity;
+
+      expect(grid.maxCellsPerRenderable).toBe(Infinity);
+    });
   });
 
   describe('an aabb that is not finite', () => {

@@ -148,7 +148,9 @@ export interface IMap2DTileRenderer {
    * Clear all tiles from the renderer.
    * It will be called independently of the update cycle.
    * `Map2DTileStreamer` calls it when it takes the renderer off, and before it lays out a whole
-   * new tile set.
+   * new tile set. The renderer takes its tiles down within the call, out of what it draws as
+   * well: no `endUpdatingTiles()` follows a clear when the streamer has no visibilitor or the
+   * visibilitor has no answer.
    */
   clearTiles(): void;
 

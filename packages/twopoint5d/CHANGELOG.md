@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `IMapTileFactory#contentSerial` (optional) and `TileSpritesFactory#contentSerial`: a number that moves when what the factory builds for a coordinate changes, and on which `Map2DTileRenderer` builds its tiles again
 - add `ImageTextureResource`, `TileSetTextureResource` and `AtlasTextureResource`, one class per shape of `TextureResource`, each with the inputs of its shape alone — `imageUrl` on an image; `imageUrl`, `tileSetOptions` and `frameBasedAnimationsData` on a tile set; `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter` and `frameBasedAnimationsData` on an atlas — and their union `AnyTextureResource`, which `TextureStore` hands out and `type` narrows to the class of its shape. An output a shape never builds is `undefined` in its type: `atlas`, `tileSet` and `frameBasedAnimations` of an image, `tileSet` of an atlas
 - add `frameTrimMargins(data, target?)` and its type `FrameTrimMargins` to the exports: the trim margins of a frame by the rule `AtlasFrame#setFrame()`, `prepareSpriteFrame()`, `AtlasFrameTable`, `FrameTable` and `FrameBasedAnimations#bakeDataTexture()` write them with; with a `target` of its own the call allocates nothing
+- add `RectangularVisibilityArea#maxVisibleTiles`, 10 000 by default, a whole number above 0 or `Infinity`: a rectangle that covers more tiles of the grid throws a `RangeError` before it builds a tile, and the next call computes again (**BREAKING** for an area of more than 10 000 tiles, which ran before). See the Migration Guide
+- add `Map2DSpatialHashGrid#maxCellsPerRenderable`, 65 536 (256 × 256) by default, a whole number above 0 or `Infinity`: `add()` refuses a renderable whose `aabb` reaches into more cells with a `RangeError` and adds none of the renderables it is handed (**BREAKING** for a renderable of more than 65 536 cells, which was added before). See the Migration Guide
 
 ### Changed
 
@@ -116,6 +118,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `BitmapFont` refuses a metric of `common`, a field of a char and the `amount` of a kerning pair with a `RangeError`, still `instanceof Error`; the messages of a char and of a pair read `BitmapFont: the x of the char "A" (65) must be a finite number, got NaN` and `BitmapFont: the amount of kerning pair 0 must be a finite number, got NaN`
 - error messages cut a string of more than 120 UTF-16 units short after its first 120, with `…`, and show a typed array by its kind and at most eight entries, `Float32Array [1.5, NaN]`, instead of every element of it
 - `TextureResource#textureClasses` stores a frozen copy of what is written, and its getter answers `readonly TextureOptionClasses[] | undefined` (**BREAKING**): an array changed and written again builds the texture with the new classes. `TextureResource.fromImage()`, `fromTileSet()`, `fromAtlas()` and `TextureFactory#getOptions()` take `readonly` arrays. See the Migration Guide
+- `ChunkQuadTreeNode#findChunks()` and `#findChunksAt()` empty the `out` array before they fill it, as `Map2DSpatialHashGrid#findWithin()` and `#getTiles()` do (**BREAKING**). See the Migration Guide
+- `ChunkQuadTreeNode.IntersectDistanceFactor` and `BeforeAfterDeltaFactor` are `static readonly`, and `originX`, `originY`, `isLeaf`, `chunks` (`readonly ChunkType[]`) and `nodes` (`Readonly<IChunkQuadTreeChildNodes>`) of a node are read-only (**BREAKING**). See the Migration Guide
+- `RepeatingTilesProvider#getTileIdAt()` and `#getTileIdsWithin()` throw a `RangeError` naming the call for a coordinate that is no whole number and for a width or a height that is no whole number of 0 or more, before a cell of the target is written
+- `Map2D` and `Map2DTileStreamer` throw a `RangeError` for an `xOffset`, a `yOffset`, a `centerX` or a `centerY` that is no finite number, in the setters and the constructor of the streamer; a refused value leaves the one before and clears no tile. The setters of `Map2D` name `Map2D` in the message, for `tileWidth` and `tileHeight` as well. The constructors of `Map2DTileCoordsUtil` and `Map2DSpatialHashGrid` refuse an `xOffset` or a `yOffset` that is no finite number with a `RangeError`
+- `DataIdsChunk2D` holds neither its params object nor, once the first read has decoded it, its base64 string; `protected data` is gone, and `prepareData()` takes the string as its argument (**BREAKING** for a subclass). See the Migration Guide
+- perf `Map2DSpatialHashGrid#findWithin()` and `#getTiles()` over more cells than the grid holds walk the cells it holds instead of the cells of the query
+- perf `base64toUint32Arr()` lays the array over the decoded bytes without a copy when the byte order asked for is the one of the host
 
 ### Removed
 
@@ -168,6 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new ProjectionPlane()`, and with it a projection, refuses a plane description that is neither one of the four nor a `THREE.Plane` with a `TypeError` that quotes it and names the four
 - `TextureStore#parse()` runs to its end behind a subscriber of a resource that throws while the values are written, a callback of `on()` among them: every item is written, `ready` and the `resource:<id>` events go out, `evictMissing` runs, and the throw goes out last as an `error` with `source: 'parse'`; `TextureStore#loadAsync()` resolves with the store
 - `TextureStore#registerAtlasAdapter()` registers nothing on a disposed store; it still refuses the arguments it refuses on a live one
+- `Map2DTileRenderer#clearTiles()` brings its factory up to date itself: after `Map2D#visibilitor = undefined`, after `Map2D#clearTiles()` under a visibilitor without an answer and after `Map2DTileStreamer#removeTileRenderer()`, no tile stays drawn up to the next update cycle
 
 ### Migration Guide
 
@@ -616,6 +626,132 @@ import {TextureResource} from '@spearwolf/twopoint5d';
 const resource = TextureResource.fromImage('hero', 'hero.png', ['nearest']);
 
 resource.textureClasses = [...(resource.textureClasses ?? []), 'linear'];
+```
+
+#### A RectangularVisibilityArea over more than 10 000 tiles
+
+An area that covers more than `maxVisibleTiles` tiles of its grid throws a `RangeError` on the next `update()`. The default area of 320 × 240 on the default grid of 1 covers 76 800. Give the map larger tiles, make the area smaller, or raise the limit.
+
+**Before**
+
+```ts
+const map2d = new Map2D();
+map2d.visibilitor = new RectangularVisibilityArea(); // 76 800 tiles of 1
+```
+
+**After**
+
+```ts check
+import {Map2D, RectangularVisibilityArea} from '@spearwolf/twopoint5d';
+
+const map2d = new Map2D();
+map2d.tileWidth = 32;
+map2d.tileHeight = 32;
+map2d.visibilitor = new RectangularVisibilityArea(); // 10 × 8 tiles of 32
+
+// or keep the grid and raise the limit
+const area = new RectangularVisibilityArea();
+area.maxVisibleTiles = 80_000;
+```
+
+#### A renderable of the spatial hash grid over more than 65 536 cells
+
+`Map2DSpatialHashGrid#add()` refuses a renderable whose `aabb` reaches into more than `maxCellsPerRenderable` cells. Give the grid larger cells or raise the limit.
+
+**Before**
+
+```ts
+const grid = new Map2DSpatialHashGrid(1, 1);
+grid.add({aabb: new AABB2(0, 0, 1000, 1000)}); // 1 000 000 cells
+```
+
+**After**
+
+```ts check
+import {AABB2, Map2DSpatialHashGrid} from '@spearwolf/twopoint5d';
+
+const grid = new Map2DSpatialHashGrid(16, 16);
+grid.add({aabb: new AABB2(0, 0, 1000, 1000)}); // 63 × 63 cells
+
+// or keep the cells and raise the limit
+const fine = new Map2DSpatialHashGrid(1, 1);
+fine.maxCellsPerRenderable = 1_000_000;
+fine.add({aabb: new AABB2(0, 0, 1000, 1000)});
+```
+
+#### The out array of the chunk queries
+
+`ChunkQuadTreeNode#findChunks()` and `#findChunksAt()` empty the `out` array they are handed before they fill it. A caller that collected the chunks of several queries in one array collects them in a list of its own.
+
+**Before**
+
+```ts
+const found: StringDataChunk2D[] = [];
+root.findChunks(a, found);
+root.findChunks(b, found); // the chunks of a and of b
+```
+
+**After**
+
+```ts check
+import {AABB2, ChunkQuadTreeNode, StringDataChunk2D} from '@spearwolf/twopoint5d';
+
+const root = new ChunkQuadTreeNode<StringDataChunk2D>([
+  new StringDataChunk2D({x: 0, y: 0, width: 8, height: 8, data: 'A'.repeat(64)}),
+]);
+const out: StringDataChunk2D[] = [];
+const found: StringDataChunk2D[] = [];
+for (const query of [new AABB2(0, 0, 4, 4), new AABB2(4, 4, 4, 4)]) {
+  found.push(...root.findChunks(query, out));
+}
+```
+
+#### The state of a ChunkQuadTreeNode
+
+`originX`, `originY`, `isLeaf`, `chunks` and `nodes` of a node are read-only, and so are the factors `ChunkQuadTreeNode.IntersectDistanceFactor` and `BeforeAfterDeltaFactor`. Build a tree through the constructor, `appendChunk()`, `subdivide()` and `clear()`.
+
+**Before**
+
+```ts
+node.chunks.push(chunk);
+node.isLeaf = true;
+```
+
+**After**
+
+```ts check
+import {ChunkQuadTreeNode, StringDataChunk2D} from '@spearwolf/twopoint5d';
+
+const node = new ChunkQuadTreeNode<StringDataChunk2D>();
+node.appendChunk(new StringDataChunk2D({x: 0, y: 0, width: 1, height: 1, data: 'A'}));
+node.subdivide();
+node.clear(); // a leaf again, without chunks
+```
+
+#### A subclass of DataIdsChunk2D
+
+`DataIdsChunk2D` has no `protected data` any more. A subclass that overrides `prepareData()` gets the base64 string of its params as the argument.
+
+**Before**
+
+```ts
+class MyChunk extends DataIdsChunk2D {
+  protected override prepareData(): Uint32Array {
+    return decode((this.data as StringDataIdsChunk2DParams).data);
+  }
+}
+```
+
+**After**
+
+```ts check
+import {base64toUint32Arr, DataIdsChunk2D} from '@spearwolf/twopoint5d';
+
+class MyChunk extends DataIdsChunk2D {
+  protected override prepareData(base64: string): Uint32Array {
+    return base64toUint32Arr(base64);
+  }
+}
 ```
 
 ## [0.23.0] - 2026-10-18

@@ -21,7 +21,7 @@ import {description, title} from './_quadtree-playground.json';
 
 <script>
   import {on} from '@spearwolf/eventize';
-  import {ChunkQuadTreeNode, Display, OnDisplayRenderFrame, OnDisplayResize, type DisplayEventProps} from '@spearwolf/twopoint5d';
+  import {Display, OnDisplayRenderFrame, OnDisplayResize, type DisplayEventProps} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {QuadTreeVisualization} from '~demos/quadtree-playground/QuadTreeVisualization';
   import {getDemoUi} from '~demos/utils/demoUi';
@@ -60,13 +60,8 @@ import {description, title} from './_quadtree-playground.json';
     randomChunkCount: 100,
     sortedChunkCount: 100,
     maxChunkNodes: 10,
-    intersectDistanceFactor: ChunkQuadTreeNode.IntersectDistanceFactor,
-    beforeAfterDeltaFactor: ChunkQuadTreeNode.BeforeAfterDeltaFactor,
 
     makeRandomQuadTree: () => {
-      ChunkQuadTreeNode.IntersectDistanceFactor = actions.intersectDistanceFactor;
-      ChunkQuadTreeNode.BeforeAfterDeltaFactor = actions.beforeAfterDeltaFactor;
-
       visual.makeRandomQuadTree(actions.randomChunkCount, actions.sortedChunkCount, actions.maxChunkNodes);
     },
   };
@@ -74,7 +69,5 @@ import {description, title} from './_quadtree-playground.json';
   gui.add(actions, 'randomChunkCount', 0, 1000, 1).name('random placed chunks');
   gui.add(actions, 'sortedChunkCount', 0, 1000, 1).name('sorted grid chunks');
   gui.add(actions, 'maxChunkNodes', 2, 30, 1).name('max chunk nodes');
-  gui.add(actions, 'intersectDistanceFactor', 0.1, 10).name('intersect distance factor');
-  gui.add(actions, 'beforeAfterDeltaFactor', 0.1, 10).name('before after delta factor');
   gui.add(actions, 'makeRandomQuadTree').name('make random chunks');
 </script>

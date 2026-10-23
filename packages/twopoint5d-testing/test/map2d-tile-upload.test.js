@@ -116,4 +116,24 @@ describe('map2d — tile attribute upload', function () {
     expect(tileSprites.geometry.instancedPool.usedCount, 'tiles still on screen').to.equal(usedCount);
     expect(tileRenderer.node.position.x, 'the renderer node follows the view').to.equal(nodeX - 10);
   });
+
+  it('taking the visibilitor away draws no tile from the next frame on', async function () {
+    const {map2d, tileSprites} = makeMap(new RectangularVisibilityArea(1024, 1024));
+    scene.add(map2d);
+
+    map2d.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    expect(tileSprites.geometry.instanceCount, 'tiles drawn in the first frame').to.be.greaterThan(0);
+
+    map2d.visibilitor = undefined;
+
+    map2d.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    expect(tileSprites.geometry.instanceCount, 'instances drawn after the visibilitor went').to.equal(0);
+    expect(tileSprites.geometry.instancedPool.usedCount, 'tiles held after the visibilitor went').to.equal(0);
+  });
 });

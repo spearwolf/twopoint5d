@@ -9,6 +9,7 @@ import {AABB2} from '../AABB2.js';
 import {Map2DTileCoords} from '../Map2DTileCoords.js';
 import {Map2D} from '../Map2D.js';
 import {Map2DTileRenderer} from '../Map2DTileRenderer.js';
+import {Map2DTileStreamer} from '../Map2DTileStreamer.js';
 import {RectangularVisibilityArea} from '../RectangularVisibilityArea.js';
 import {RepeatingTilesProvider} from '../RepeatingTilesProvider.js';
 import {noTileCapacity} from '../constants.js';
@@ -476,6 +477,50 @@ describe('TileSpritesFactory', () => {
       } finally {
         warn.mockRestore();
       }
+    });
+
+    // a map of 3 × 3 tiles of 100 or more, whose first update has drawn its tiles
+    const makeDrawnMap = () => {
+      const geometry = new TileSpritesGeometry(64);
+      const factory = new TileSpritesFactory(new TileSprites(geometry), makeTileSet(), new RepeatingTilesProvider(1));
+      const renderer = new Map2DTileRenderer(factory);
+      const area = new RectangularVisibilityArea(300, 300);
+      const map = new Map2D(new Map2DTileStreamer(100, 100));
+      map.visibilitor = area;
+      map.addTileRenderer(renderer);
+      map.update();
+      expect(geometry.instanceCount, 'the instance count after the first update').toBeGreaterThan(0);
+      return {geometry, renderer, area, map};
+    };
+
+    test('taking the visibilitor away leaves no tile in the instance count after the next update', () => {
+      const {geometry, map} = makeDrawnMap();
+
+      map.visibilitor = undefined;
+      map.update();
+
+      expect(geometry.instanceCount, 'instanceCount').toBe(0);
+      expect(geometry.instancedPool.usedCount, 'usedCount').toBe(0);
+    });
+
+    test('a clear under a visibilitor without an answer leaves no tile in the instance count', () => {
+      const {geometry, area, map} = makeDrawnMap();
+
+      // the clear empties the tile list, and the switched-off area answers an empty one with
+      // `undefined`: no update cycle follows
+      area.width = 0;
+      map.clearTiles();
+      map.update();
+
+      expect(geometry.instanceCount, 'instanceCount').toBe(0);
+    });
+
+    test('a renderer taken off the streamer leaves no tile in the instance count', () => {
+      const {geometry, renderer, map} = makeDrawnMap();
+
+      map.tileStreamer.removeTileRenderer(renderer);
+
+      expect(geometry.instanceCount, 'instanceCount').toBe(0);
     });
   });
 

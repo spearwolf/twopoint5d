@@ -1,5 +1,6 @@
 import type {Object3D} from 'three/webgpu';
 import {Vector3} from 'three/webgpu';
+import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
@@ -21,6 +22,11 @@ import type {IMap2DTileCoords, IMap2DTileRenderer, IMap2DVisibilitor, IMap2DVisi
  * Tile rendering is delegated to a _renderer_ (see `IMap2DTileRenderer`).
  */
 export class Map2DTileStreamer {
+  // The view center, x and y, in a typed array, which holds a double as it is. A `#` field would
+  // box every double written to it: the emitted class declares the field before the constructor
+  // assigns it, and that leaves V8 a tagged field.
+  readonly #center = new Float64Array(2);
+
   /**
    * The view center on the map plane, handed to the visibilitor on every {@link update}. What it
    * does is the visibilitor's to say:
@@ -36,15 +42,33 @@ export class Map2DTileStreamer {
    * - `RectangularVisibilityArea`: the map point the visible rectangle is laid out around — its
    *   center. The rectangle appears at the origin of the map node, so `(centerX, centerY)` is the
    *   map point shown there.
+   *
+   * Takes a finite number; anything else throws a `RangeError` and leaves the view center as it
+   * was.
    */
-  centerX = 0;
+  get centerX(): number {
+    return this.#center[0]!;
+  }
+
+  set centerX(x: number) {
+    assertFinite(x, 'Map2DTileStreamer', 'centerX');
+    this.#center[0] = x;
+  }
 
   /**
    * The view center on the map plane, along the same axis as the rows of the tile grid. See
    * {@link centerX} for what the value means under each visibilitor — it always describes one
-   * point `(centerX, centerY)` together with it.
+   * point `(centerX, centerY)` together with it. Takes a finite number; anything else throws a
+   * `RangeError` and leaves the view center as it was.
    */
-  centerY = 0;
+  get centerY(): number {
+    return this.#center[1]!;
+  }
+
+  set centerY(y: number) {
+    assertFinite(y, 'Map2DTileStreamer', 'centerY');
+    this.#center[1] = y;
+  }
 
   #visibilitor?: IMap2DVisibilitor;
 
@@ -116,13 +140,15 @@ export class Map2DTileStreamer {
    * origin is `-tileWidth / 2`. Defaults to `0`.
    *
    * Changing it clears the tiles, as every grid change does: the next {@link update} lays out the
-   * whole tile set again.
+   * whole tile set again. A finite number; writing anything else throws a `RangeError`, leaves the
+   * offset as it was and clears nothing.
    */
   get xOffset(): number {
     return this.#tileCoords.xOffset;
   }
 
   set xOffset(offset: number) {
+    assertFinite(offset, 'Map2DTileStreamer', 'xOffset');
     if (this.#tileCoords.xOffset === offset) return;
     this.#tileCoords.xOffset = offset;
     this.clearTiles();
@@ -133,13 +159,15 @@ export class Map2DTileStreamer {
    * visibilitor's translation and the map node's world transform. A tile `(c, r)` covers
    * `[r · tileHeight + yOffset, (r + 1) · tileHeight + yOffset)` there — corner-anchored like
    * {@link xOffset}, not centered. Defaults to `0`, and changing it clears the tiles as every grid
-   * change does.
+   * change does. A finite number; writing anything else throws a `RangeError`, leaves the offset as
+   * it was and clears nothing.
    */
   get yOffset(): number {
     return this.#tileCoords.yOffset;
   }
 
   set yOffset(offset: number) {
+    assertFinite(offset, 'Map2DTileStreamer', 'yOffset');
     if (this.#tileCoords.yOffset === offset) return;
     this.#tileCoords.yOffset = offset;
     this.clearTiles();
@@ -169,6 +197,8 @@ export class Map2DTileStreamer {
     // holds in its hands
     assertPositiveFinite(tileWidth, 'Map2DTileStreamer', 'tileWidth');
     assertPositiveFinite(tileHeight, 'Map2DTileStreamer', 'tileHeight');
+    assertFinite(xOffset, 'Map2DTileStreamer', 'xOffset');
+    assertFinite(yOffset, 'Map2DTileStreamer', 'yOffset');
 
     this.#tileCoords = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
@@ -242,8 +272,8 @@ export class Map2DTileStreamer {
 
     node.updateWorldMatrix(true, false);
 
-    this.#viewCenter[0] = this.centerX;
-    this.#viewCenter[1] = this.centerY;
+    this.#viewCenter[0] = this.#center[0]!;
+    this.#viewCenter[1] = this.#center[1]!;
     const visible: IMap2DVisibleTiles | undefined = visibilitor.computeVisibleTiles(
       this.#tiles,
       this.#viewCenter,

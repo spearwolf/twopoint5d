@@ -8,6 +8,10 @@ function ids(tiles: IMap2DTileCoords[] | undefined): string[] {
   return (tiles ?? []).map((t) => t.id).sort();
 }
 
+function views(tiles: IMap2DTileCoords[] | undefined): string[] {
+  return (tiles ?? []).map((t) => `${t.id} ${t.view.left} ${t.view.top} ${t.view.width} ${t.view.height}`).sort();
+}
+
 describe('RectangularVisibilityArea', () => {
   describe('computeVisibleTiles()', () => {
     let tileCoords: Map2DTileCoordsUtil;
@@ -219,6 +223,108 @@ describe('RectangularVisibilityArea', () => {
           expect(new Set(ids(result.tiles)).size, `axis ${axis}, step ${i}: no tile twice`).toBe(result.tiles.length);
         }
       }
+    });
+  });
+
+  describe('maxVisibleTiles', () => {
+    let tileCoords: Map2DTileCoordsUtil;
+    let matrixWorld: Matrix4;
+
+    beforeEach(() => {
+      tileCoords = new Map2DTileCoordsUtil(100, 100);
+      matrixWorld = new Matrix4();
+    });
+
+    test('defaults to 10 000', () => {
+      expect(new RectangularVisibilityArea().maxVisibleTiles).toBe(10_000);
+    });
+
+    test('the default area on the default grid covers more and throws', () => {
+      // 320 × 240 tiles of 1
+      const compute = () =>
+        new RectangularVisibilityArea().computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(1, 1), matrixWorld);
+
+      expect(compute).toThrow(RangeError);
+      expect(compute).toThrow(
+        'RectangularVisibilityArea: the area covers 76800 tiles of the grid, more than maxVisibleTiles (10000) — make the area smaller or the tiles larger, or raise maxVisibleTiles',
+      );
+    });
+
+    test('a refused call is refused again, and a raised limit answers the tiles', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      area.maxVisibleTiles = 4;
+      const compute = () => area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      expect(compute, 'the first call').toThrow(RangeError);
+      expect(compute, 'the same call again, which no cached result answers').toThrow(RangeError);
+
+      area.maxVisibleTiles = 100;
+      const result = compute();
+      const fresh = new RectangularVisibilityArea(320, 240).computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+
+      expect(ids(result?.tiles)).toEqual(ids(fresh?.tiles));
+      expect(result?.tiles.length).toBeGreaterThan(0);
+    });
+
+    test('a moved center that covers more tiles is refused, and refused again', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      area.maxVisibleTiles = 16;
+
+      // around [0, 0] the area spans -160 … 160 and -120 … 120: columns -2 … 1 and rows -2 … 1,
+      // 4 × 4 tiles
+      const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld);
+      expect(first?.tiles, 'the tiles around [0, 0]').toHaveLength(16);
+
+      // around [50, 0] it spans -110 … 210: columns -2 … 2, 5 × 4 tiles
+      const moved = () => area.computeVisibleTiles([], [50, 0], tileCoords, matrixWorld);
+      expect(moved, 'the call around [50, 0]').toThrow('the area covers 20 tiles of the grid, more than maxVisibleTiles (16)');
+      expect(moved, 'the same call again, instead of the result around [0, 0]').toThrow(RangeError);
+    });
+
+    test('a grid change a refused call saw reaches the next call that computes', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      // 4 × 4 tiles of 100 on grid A, ids -2 … 1 on both axes
+      const gridA = new Map2DTileCoordsUtil(100, 100);
+      // 8 × 6 tiles of 50 on grid B, whose ids cover those of grid A
+      const gridB = new Map2DTileCoordsUtil(50, 50);
+      area.maxVisibleTiles = 16;
+
+      // copied: the list of the result is written again by the next call that computes
+      const previousTiles = [...area.computeVisibleTiles([], [0, 0], gridA, matrixWorld)!.tiles];
+      const previousIds = ids(previousTiles);
+      expect(previousTiles, 'the tiles on grid A').toHaveLength(16);
+
+      expect(() => area.computeVisibleTiles(previousTiles, [0, 0], gridB, matrixWorld), 'the call on grid B').toThrow(RangeError);
+
+      area.maxVisibleTiles = 100;
+      const result = area.computeVisibleTiles(previousTiles, [0, 0], gridB, matrixWorld)!;
+      // given no tiles: a fresh area has no grid before it to tell the tiles of grid A apart
+      const fresh = new RectangularVisibilityArea(320, 240).computeVisibleTiles([], [0, 0], gridB, matrixWorld)!;
+
+      expect(result.reuseTiles, 'no tile of grid A is reused on grid B').toHaveLength(0);
+      expect(ids(result.removeTiles)).toEqual(previousIds);
+      expect(result.changed).toBe(true);
+      // by id and by view: the ids of grid A recur on grid B, the views of its tiles do not
+      expect(views(result.tiles)).toEqual(views(fresh.tiles));
+    });
+
+    test.each([0, -1, 1.5, NaN, '5'])('the setter refuses %p and keeps the value it had', (value) => {
+      const area = new RectangularVisibilityArea();
+      area.maxVisibleTiles = 50;
+      const write = () => {
+        area.maxVisibleTiles = value as number;
+      };
+
+      expect(write).toThrow(RangeError);
+      expect(write).toThrow('RectangularVisibilityArea: maxVisibleTiles must be a whole number above 0 or Infinity, got');
+      expect(area.maxVisibleTiles).toBe(50);
+    });
+
+    test('the setter takes Infinity', () => {
+      const area = new RectangularVisibilityArea();
+      area.maxVisibleTiles = Infinity;
+
+      expect(area.maxVisibleTiles).toBe(Infinity);
     });
   });
 

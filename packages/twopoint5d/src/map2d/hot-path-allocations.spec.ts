@@ -297,6 +297,22 @@ describe('Map2D on the hot path', () => {
     ).toBeLessThan(BYTES_PER_RECOMPUTATION_LIMIT);
     expectFactoryLeftAlone(factory, round);
   });
+
+  test('writing the view center of a map allocates nothing', async () => {
+    const {map2d} = makeMap();
+
+    // whole numbers from the counter: the round hands the setters no fractional value it works out
+    // itself (see the rule on allocation rounds in AGENTS.md)
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS_PER_ROUND; i++) {
+        map2d.centerX = i & 1023;
+        map2d.centerY = i & 511;
+      }
+    });
+    const bytesPerCall = bytesPerRound / (2 * CALLS_PER_ROUND);
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
 });
 
 describe('RectangularVisibilityArea on the hot path', () => {
@@ -408,6 +424,29 @@ describe('Map2DSpatialHashGrid on the hot path', () => {
       for (let i = 0; i < CALLS_PER_ROUND; i++) {
         // 64 × 64 queries on an 8 × 8 raster over the area, whole numbers only
         query.set((i & 7) * 48, ((i >> 3) & 7) * 48, 64, 64);
+        hits += grid.findWithin(query, out).length;
+      }
+    });
+    const bytesPerCall = bytesPerRound / CALLS_PER_ROUND;
+
+    expect(hits, 'renderables found').toBeGreaterThan(0);
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  test('findWithin() with an out array over more cells than the grid holds allocates nothing', async () => {
+    const grid = new Map2DSpatialHashGrid<{aabb: AABB2}>(16, 16);
+    // 200 boxes of 20 × 20 spread over 512 × 512, at fractional places
+    for (let i = 0; i < 200; i++) {
+      grid.add({aabb: new AABB2((i * 97.25) % 492, (i * 53.5) % 492, 20, 20)});
+    }
+    // 512 × 512 cells, more than the boxes lie in
+    const query = new AABB2().set(-4096, -4096, 8192, 8192);
+    const out: {aabb: AABB2}[] = [];
+
+    // a Smi, so that keeping count allocates nothing inside the round
+    let hits = 0;
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS_PER_ROUND; i++) {
         hits += grid.findWithin(query, out).length;
       }
     });

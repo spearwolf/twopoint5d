@@ -353,6 +353,39 @@ describe('Map2DTileRenderer', () => {
       expect(update.calledOnce, 'factory.update()').toBe(true);
     });
 
+    test('outside an update cycle hands the emptied factory to update() itself', () => {
+      const tileFactory = makeTileFactory();
+      const renderer = new Map2DTileRenderer(tileFactory);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.endUpdatingTiles();
+
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.clearTiles();
+
+      expect(update.callCount, 'factory.update()').toBe(1);
+    });
+
+    test('the clear a new contentSerial brings on leaves the upload to endUpdatingTiles()', () => {
+      const tileFactory = {...makeTileFactory(), contentSerial: 0};
+      const renderer = new Map2DTileRenderer(tileFactory);
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      renderer.addTile(new Map2DTileCoords(0, 0));
+      renderer.endUpdatingTiles();
+
+      tileFactory.contentSerial = 1;
+      const update = sandbox.spy(tileFactory, 'update');
+
+      renderer.beginUpdatingTiles(new Vector3(), true);
+      expect(update.callCount, 'factory.update() after beginUpdatingTiles()').toBe(0);
+
+      renderer.endUpdatingTiles();
+      expect(update.callCount, 'factory.update() after endUpdatingTiles()').toBe(1);
+    });
+
     test('hands every tile to destroyTile() once, also when a destroyTile() threw and the clear is repeated', () => {
       const tiles: FakeTile[] = [];
       const destroyed: FakeTile[] = [];

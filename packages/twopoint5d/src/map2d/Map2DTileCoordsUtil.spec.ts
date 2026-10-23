@@ -61,6 +61,24 @@ describe('Map2DTileCoordsUtil', () => {
       expect(view.tileHeight, 'tileHeight after a refused write').toBe(16);
     });
   });
+
+  describe('an offset that is not finite', () => {
+    test.each([NaN, Infinity, -Infinity])('the constructor refuses %p as xOffset', (offset) => {
+      const create = () => new Map2DTileCoordsUtil(16, 16, offset, 0);
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(`Map2DTileCoordsUtil: xOffset must be a finite number, got ${offset}`);
+    });
+    test.each([NaN, Infinity, -Infinity])('the constructor refuses %p as yOffset', (offset) => {
+      const create = () => new Map2DTileCoordsUtil(16, 16, 0, offset);
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(`Map2DTileCoordsUtil: yOffset must be a finite number, got ${offset}`);
+    });
+    test('names the value it refuses', () => {
+      expect(() => new Map2DTileCoordsUtil(16, 16, NaN)).toThrow('Map2DTileCoordsUtil: xOffset must be a finite number, got NaN');
+    });
+  });
   describe('getTileCoords()', () => {
     test('without offset', () => {
       expect(new Map2DTileCoordsUtil(32, 16).getTileCoords(4, 17, 70, 20)).toEqual([0, 1, 3, 2]);

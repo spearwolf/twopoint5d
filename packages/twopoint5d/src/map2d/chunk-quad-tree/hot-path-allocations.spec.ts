@@ -1,7 +1,6 @@
 import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../../testing/measureSettledBytes.js';
-import {truncateArray} from '../../utils/truncateArray.js';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';
 import {StringDataChunk2D} from './StringDataChunk2D.js';
 
@@ -23,14 +22,11 @@ describe('ChunkQuadTreeNode on the hot path', () => {
     const root = new ChunkQuadTreeNode(chunks);
     root.subdivide();
 
-    // emptied with truncateArray(): `length = 0` gives the backing store up, and the next push
-    // builds it again
     const out: StringDataChunk2D[] = [];
     // a Smi, so that keeping count allocates nothing inside the round
     let found = 0;
     const bytesPerRound = await measureSettledBytes(() => {
       for (let i = 0; i < CALLS_PER_ROUND; i++) {
-        truncateArray(out);
         // runs through the 128 × 128 cells of the chunks, a different point on every call
         root.findChunksAt((i * 37) & 127, (i * 91) & 127, out);
         found += out.length;

@@ -12,6 +12,18 @@ const wrap = (i: number, n: number): number => ((i % n) + n) % n;
 // or a negative one would be answered as another id there than by getTileIdAt()
 const MAX_TILE_ID = 0xffffffff;
 
+// A tile coordinate and a count of tiles are whole numbers; `Number.isInteger()` takes NaN and the
+// infinities out as well. `min` is given for the counts only, which start at 0.
+function assertWholeNumber(value: number, call: string, name: string, min?: number): void {
+  if (min === undefined) {
+    if (!Number.isInteger(value)) {
+      throw new RangeError(`${call}: ${name} must be a whole number, got ${describeValue(value)}`);
+    }
+  } else if (!Number.isInteger(value) || value < min) {
+    throw new RangeError(`${call}: ${name} must be a whole number of ${min} or more, got ${describeValue(value)}`);
+  }
+}
+
 /**
  * The `RepeatingTilesProvider` repeats a 2D pattern of tile IDs endlessly.
  * If you want you can limit the repeat to only horizontal or only vertical.
@@ -101,7 +113,16 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
     this.limitToAxis = limitToAxis;
   }
 
+  /**
+   * The tile id at `(col, row)` of the repeated pattern, `0` outside the axis it repeats along and
+   * for a pattern without cells. `col` and `row` are whole numbers in _tile space_; anything else
+   * throws a `RangeError`.
+   */
   getTileIdAt(col: number, row: number): number {
+    // before the guard below: an invalid coordinate is invalid whatever pattern stands there
+    assertWholeNumber(col, 'RepeatingTilesProvider#getTileIdAt()', 'col');
+    assertWholeNumber(row, 'RepeatingTilesProvider#getTileIdAt()', 'row');
+
     // the guard `getTileIdsWithin()` opens with: a pattern without cells has no id to answer
     // with, and the `% 0` in `wrap()` would turn the index into NaN
     if (this.#cols === 0 || this.#rows === 0) return 0;
@@ -153,13 +174,19 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
    * `(left, top)`, row by row: the id of the tile `(left + i, top + j)` is at index
    * `j * width + i`, the value that {@link getTileIdAt} gives for that tile.
    *
-   * All four numbers are given in _tile space_ and are integers.
+   * All four numbers are whole numbers in _tile space_, `width` and `height` 0 or more; anything
+   * else throws a `RangeError` before a cell is written.
    *
    * @param target - takes the ids; its first `width * height` cells are overwritten, the cells
    *   behind them stay as they are. A shorter one throws a `RangeError`.
    * @returns `target`, or a new `Uint32Array` of `width * height` ids without one.
    */
   getTileIdsWithin(left: number, top: number, width: number, height: number, target?: Uint32Array): Uint32Array {
+    assertWholeNumber(left, 'RepeatingTilesProvider#getTileIdsWithin()', 'left');
+    assertWholeNumber(top, 'RepeatingTilesProvider#getTileIdsWithin()', 'top');
+    assertWholeNumber(width, 'RepeatingTilesProvider#getTileIdsWithin()', 'width', 0);
+    assertWholeNumber(height, 'RepeatingTilesProvider#getTileIdsWithin()', 'height', 0);
+
     if (target === undefined) {
       target = new Uint32Array(width * height);
     } else if (target.length < width * height) {

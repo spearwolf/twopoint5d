@@ -164,6 +164,15 @@ describe('Map2DTileStreamer', () => {
       expect(write).toThrow('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0');
       expect(layer.tileWidth, 'tileWidth after a refused write').toBe(8);
     });
+    test('an offset that is not finite is refused', () => {
+      const createX = () => new Map2DTileStreamer(8, 16, NaN);
+      const createY = () => new Map2DTileStreamer(8, 16, 0, NaN);
+
+      expect(createX).toThrow(RangeError);
+      expect(createX).toThrow('Map2DTileStreamer: xOffset must be a finite number, got NaN');
+      expect(createY).toThrow(RangeError);
+      expect(createY).toThrow('Map2DTileStreamer: yOffset must be a finite number, got NaN');
+    });
     test('xOffset, yOffset', () => {
       let layer = new Map2DTileStreamer(1, 1);
       expect(layer.xOffset).toEqual(0);
@@ -205,6 +214,46 @@ describe('Map2DTileStreamer', () => {
       };
       layer.addTileRenderer(renderer);
       expect(layer.renderers.has(renderer)).toBeTruthy();
+    });
+  });
+
+  describe('the view center and the offsets', () => {
+    test.each([NaN, Infinity])('the centerX and centerY setters refuse %p and keep the view center', (value) => {
+      const streamer = new Map2DTileStreamer(1, 1);
+      streamer.centerX = 3;
+      streamer.centerY = 4;
+      const writeX = () => (streamer.centerX = value);
+      const writeY = () => (streamer.centerY = value);
+
+      expect(writeX).toThrow(RangeError);
+      expect(writeX).toThrow(`Map2DTileStreamer: centerX must be a finite number, got ${value}`);
+      expect(writeY).toThrow(RangeError);
+      expect(writeY).toThrow(`Map2DTileStreamer: centerY must be a finite number, got ${value}`);
+      expect(streamer.centerX, 'centerX after a refused write').toBe(3);
+      expect(streamer.centerY, 'centerY after a refused write').toBe(4);
+    });
+
+    test('names the view center it refuses', () => {
+      const streamer = new Map2DTileStreamer(1, 1);
+
+      expect(() => (streamer.centerX = NaN)).toThrow('Map2DTileStreamer: centerX must be a finite number, got NaN');
+    });
+
+    test.each([NaN, Infinity, -Infinity])('the xOffset and yOffset setters refuse %p and clear no tile', (value) => {
+      const streamer = new Map2DTileStreamer(1, 1, 2, 3);
+      const renderer = makeRecordingRenderer();
+      streamer.addTileRenderer(renderer);
+      streamer.visibilitor = makeCachingVisibilitor([tileA, tileB]);
+      const node = new Object3D();
+      streamer.update(node);
+
+      expect(() => (streamer.xOffset = value)).toThrow(`Map2DTileStreamer: xOffset must be a finite number, got ${value}`);
+      expect(() => (streamer.yOffset = value)).toThrow(`Map2DTileStreamer: yOffset must be a finite number, got ${value}`);
+      streamer.update(node);
+
+      expect(streamer.xOffset, 'xOffset after a refused write').toBe(2);
+      expect(streamer.yOffset, 'yOffset after a refused write').toBe(3);
+      expect(renderer.cleared, 'clears').toBe(0);
     });
   });
 

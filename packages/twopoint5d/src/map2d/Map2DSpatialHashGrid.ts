@@ -1,3 +1,4 @@
+import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
 import {undefinedValueError} from '../utils/expectDefined.js';
@@ -19,6 +20,9 @@ export type Map2DSpatialHashGridKeyType = string;
 // table that finds the cell
 interface GridCell<Renderable> extends TileSlotTableEntry<GridCell<Renderable>> {
   readonly renderables: Set<Renderable>;
+  // where the cell stands in the list of the occupied cells, so that it leaves that list without
+  // a search
+  index: number;
 }
 
 // Where `add()` put a renderable, and the last query that handed it out — so that a query hands a
@@ -55,6 +59,12 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
 
   readonly #cells = new TileSlotTable<GridCell<Renderable>>();
 
+  // The cells that hold a renderable, in no order, so that a query over more cells than these
+  // walks them instead of its own rectangle.
+  readonly #occupied: GridCell<Renderable>[] = [];
+
+  #maxCellsPerRenderable = 65_536;
+
   // The cells `add()` put a renderable into, so `remove()` finds them whatever the `aabb` of the
   // renderable says by then.
   readonly #placements = new Map<Renderable, Placement<Renderable>>();
@@ -72,8 +82,31 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     // holds in its hands
     assertPositiveFinite(tileWidth, 'Map2DSpatialHashGrid', 'tileWidth');
     assertPositiveFinite(tileHeight, 'Map2DSpatialHashGrid', 'tileHeight');
+    assertFinite(xOffset, 'Map2DSpatialHashGrid', 'xOffset');
+    assertFinite(yOffset, 'Map2DSpatialHashGrid', 'yOffset');
 
     this.#tileCoordsUtil = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
+  }
+
+  /**
+   * The most cells one renderable may reach into. {@link add} refuses an `aabb` that reaches into
+   * more, before the first renderable moves. 65 536 (256 × 256) by default; `Infinity` turns the
+   * limit off. A new value applies to the next `add()` and moves nothing that lies in the grid.
+   *
+   * Takes a whole number above 0 or `Infinity` and throws a `RangeError` for anything else,
+   * keeping the value it had.
+   */
+  get maxCellsPerRenderable(): number {
+    return this.#maxCellsPerRenderable;
+  }
+
+  set maxCellsPerRenderable(value: number) {
+    if (!(Number.isInteger(value) && value >= 1) && value !== Infinity) {
+      throw new RangeError(
+        `Map2DSpatialHashGrid: maxCellsPerRenderable must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
+      );
+    }
+    this.#maxCellsPerRenderable = value;
   }
 
   /**
@@ -84,13 +117,20 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * lies, until it is added again (it then moves to the cells of its current `aabb`) or removed.
    *
    * Throws a `RangeError` for an `aabb` whose left, top, width or height is not a finite number,
-   * and then adds none of the renderables.
+   * and for one that reaches into more than {@link maxCellsPerRenderable} cells, and then adds none
+   * of the renderables.
    */
   add(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
     // every aabb is checked before the first renderable moves, so that an add() that throws leaves
     // the grid as it was — a renderable the grid holds stays in its cells as well
     for (const renderable of renderables) {
       assertFiniteAABB(renderable.aabb, 'the aabb of a renderable');
+      const {columns, rows} = this.#cellsOf(renderable.aabb);
+      if (columns * rows > this.#maxCellsPerRenderable) {
+        throw new RangeError(
+          `Map2DSpatialHashGrid: the aabb of a renderable reaches into ${columns * rows} cells, more than maxCellsPerRenderable (${this.#maxCellsPerRenderable}) — give the grid larger cells or raise maxCellsPerRenderable`,
+        );
+      }
     }
     for (const renderable of renderables) {
       this.#takeOut(renderable);
@@ -101,8 +141,9 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
         for (let x = tileLeft; x < tileLeft + columns; x++) {
           let cell = this.#cells.get(x, y);
           if (cell === undefined) {
-            cell = {x, y, nextInBucket: undefined, renderables: new Set()};
+            cell = {x, y, nextInBucket: undefined, renderables: new Set(), index: this.#occupied.length};
             this.#cells.add(cell);
+            this.#occupied.push(cell);
           }
           cell.renderables.add(renderable);
           cells.push(cell);
@@ -132,6 +173,14 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
       cell.renderables.delete(renderable);
       if (cell.renderables.size === 0) {
         this.#cells.remove(cell);
+        // swapped out: the last cell of the list takes the place of this one
+        const occupied = this.#occupied;
+        const last = occupied.pop();
+        if (last === undefined) throw undefinedValueError('the occupied cells of the grid');
+        if (last !== cell) {
+          occupied[cell.index] = last;
+          last.index = cell.index;
+        }
       }
     }
     this.#placements.delete(renderable);
@@ -155,6 +204,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * With `out` that array is emptied, filled with every renderable within once and handed back —
    * empty rather than `undefined` when nothing lies within —, so a caller that asks every frame
    * keeps one array and the query allocates nothing. The order of the renderables is not defined.
+   * A query costs the cells of its rectangle or the cells the grid holds, whichever are fewer.
    *
    * Throws a `RangeError` for an `aabb` whose left, top, width or height is not a finite number.
    */
@@ -173,6 +223,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * With `out` that array is emptied, filled with every renderable within once and handed back —
    * empty rather than `undefined` when nothing lies within —, so a caller that asks every frame
    * keeps one array and the query allocates nothing. The order of the renderables is not defined.
+   * A query costs the cells of its rectangle or the cells the grid holds, whichever are fewer.
    *
    * Throws a `RangeError` for a `width` or `height` that is not a finite number.
    */
@@ -205,41 +256,73 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   }
 
   // The range is read from an object rather than handed over as four numbers: a fractional number
-  // that goes as an argument into a call V8 does not inline is boxed on the heap.
+  // that goes as an argument into a call V8 does not inline is boxed on the heap. A range over more
+  // cells than the grid holds walks the cells it holds and takes those within the very bounds of
+  // the loop over the range, so that fractions and negative extents from getTiles() find the same.
   #collect(range: TilesWithinCoords, out: Renderable[]): Renderable[] {
     truncateArray(out);
     const stamp = ++this.#queryStamp;
     const {tileLeft, tileTop, columns, rows} = range;
+    const occupied = this.#occupied;
+    if (rows * columns > occupied.length) {
+      for (let i = 0; i < occupied.length; i++) {
+        // The loop bound is `occupied.length`.
+        const cell = occupied[i]!;
+        if (cell.x >= tileLeft && cell.x < tileLeft + columns && cell.y >= tileTop && cell.y < tileTop + rows) {
+          this.#collectCell(cell, stamp, out);
+        }
+      }
+      return out;
+    }
     for (let y = tileTop; y < tileTop + rows; y++) {
       for (let x = tileLeft; x < tileLeft + columns; x++) {
         const cell = this.#cells.get(x, y);
-        if (cell === undefined) continue;
-        for (const renderable of cell.renderables) {
-          const placement = this.#placements.get(renderable);
-          if (placement === undefined) throw undefinedValueError('the placement of a renderable in the grid');
-          if (placement.queryStamp !== stamp) {
-            placement.queryStamp = stamp;
-            out.push(renderable);
-          }
-        }
+        if (cell !== undefined) this.#collectCell(cell, stamp, out);
       }
     }
     return out;
   }
 
+  #collectCell(cell: GridCell<Renderable>, stamp: number, out: Renderable[]): void {
+    for (const renderable of cell.renderables) {
+      const placement = this.#placements.get(renderable);
+      if (placement === undefined) throw undefinedValueError('the placement of a renderable in the grid');
+      if (placement.queryStamp !== stamp) {
+        placement.queryStamp = stamp;
+        out.push(renderable);
+      }
+    }
+  }
+
   #gather(range: TilesWithinCoords): Set<Renderable> | undefined {
     let renderables: Set<Renderable> | undefined;
     const {tileLeft, tileTop, columns, rows} = range;
+    const occupied = this.#occupied;
+    if (rows * columns > occupied.length) {
+      for (let i = 0; i < occupied.length; i++) {
+        // The loop bound is `occupied.length`.
+        const cell = occupied[i]!;
+        if (cell.x >= tileLeft && cell.x < tileLeft + columns && cell.y >= tileTop && cell.y < tileTop + rows) {
+          renderables ??= new Set();
+          this.#gatherCell(cell, renderables);
+        }
+      }
+      return renderables;
+    }
     for (let y = tileTop; y < tileTop + rows; y++) {
       for (let x = tileLeft; x < tileLeft + columns; x++) {
         const cell = this.#cells.get(x, y);
         if (cell === undefined) continue;
         renderables ??= new Set();
-        for (const renderable of cell.renderables) {
-          renderables.add(renderable);
-        }
+        this.#gatherCell(cell, renderables);
       }
     }
     return renderables;
+  }
+
+  #gatherCell(cell: GridCell<Renderable>, renderables: Set<Renderable>): void {
+    for (const renderable of cell.renderables) {
+      renderables.add(renderable);
+    }
   }
 }

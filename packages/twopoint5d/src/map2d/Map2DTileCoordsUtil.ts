@@ -1,3 +1,4 @@
+import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {AABB2} from './AABB2.js';
 import {createTilesWithinCoords} from './createTilesWithinCoords.js';
@@ -99,14 +100,16 @@ export class Map2DTileCoordsUtil {
    * Where the tile grid starts on the x axis, in _world space_: a tile `(c, r)` covers
    * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile is anchored at that
    * corner, not centered on its coordinates, so the `xOffset` that centers the grid on the origin
-   * is `-tileWidth / 2`.
+   * is `-tileWidth / 2`. The constructor refuses an offset that is no finite number with a
+   * `RangeError`.
    */
   xOffset: number;
 
   /**
    * Where the tile grid starts on the y axis, in _world space_: a tile `(c, r)` covers
    * `[r · tileHeight + yOffset, (r + 1) · tileHeight + yOffset)` on Y — corner-anchored like
-   * {@link xOffset}, not centered.
+   * {@link xOffset}, not centered. The constructor refuses an offset that is no finite number with
+   * a `RangeError`.
    */
   yOffset: number;
 
@@ -119,8 +122,8 @@ export class Map2DTileCoordsUtil {
     // through the setters, so a grid of 0 is refused here as much as it is later on
     this.tileWidth = tileWidth;
     this.tileHeight = tileHeight;
-    this.xOffset = xOffset;
-    this.yOffset = yOffset;
+    this.xOffset = assertFinite(xOffset, 'Map2DTileCoordsUtil', 'xOffset');
+    this.yOffset = assertFinite(yOffset, 'Map2DTileCoordsUtil', 'yOffset');
   }
 
   copy(source: Map2DTileCoordsUtil): Map2DTileCoordsUtil {
