@@ -254,7 +254,7 @@ conditions and cleanup.
 - `*.spec.ts` next to the source, run by Vitest inside this package. Logic, coordinate
   math, buffer bookkeeping, descriptor parsing.
 - `*.test.js` in `packages/twopoint5d-testing/test/`, run by `@web/test-runner` in real
-  Chromium and Firefox. Anything that needs a GPU context: geometry uploads, shader
+  Chromium, Firefox and WebKit. Anything that needs a GPU context: geometry uploads, shader
   compilation, visual results.
 
 A change to rendering or GPU-buffer code needs both.

@@ -9,7 +9,16 @@ import {
   TextureCoords,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeColorTexture,
+  makeContainer,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
@@ -25,9 +34,6 @@ const COLORS = [
 ];
 
 describe('sprites — AnimatedFrames plays once, ping-pong and per-frame durations', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(30000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -43,6 +49,7 @@ describe('sprites — AnimatedFrames plays once, ping-pong and per-frame duratio
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -70,7 +77,7 @@ describe('sprites — AnimatedFrames plays once, ping-pong and per-frame duratio
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const colorMap = makeColorTexture(COLORS);
+    const colorMap = keep(makeColorTexture(COLORS));
     const sheet = new TextureCoords(0, 0, COLORS.length, 1);
     const anims = new FrameBasedAnimations();
     for (const {name, timing, frames} of animations) {
@@ -80,11 +87,11 @@ describe('sprites — AnimatedFrames plays once, ping-pong and per-frame duratio
         frames.map((i) => new TextureCoords(sheet, i, 0, 1, 1)),
       );
     }
-    const animsMap = anims.bakeDataTexture();
+    const animsMap = keep(anims.bakeDataTexture());
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 1);
-    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}});
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
+    const geometry = keep(new FeatureSpritesGeometry(AnimatedSpriteKind, 1));
+    const material = keep(new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}}));
+    const sprites = keep(new FeatureSprites(AnimatedSpriteKind, {geometry, material}));
     sprites.frustumCulled = false;
 
     const sprite = geometry.instancedPool.createVO();
@@ -103,12 +110,6 @@ describe('sprites — AnimatedFrames plays once, ping-pong and per-frame duratio
       const rgb = rgbAt(await renderToPixels(display.renderer, scene, camera, target), TARGET_SIZE, CENTER, CENTER);
       shown.push(COLORS.findIndex((color) => isNearColor(rgb, color)));
     }
-
-    sprites.dispose();
-    geometry.dispose();
-    material.dispose();
-    colorMap.dispose();
-    animsMap.dispose();
 
     return shown;
   }

@@ -16,7 +16,9 @@ import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   diffPixels,
   disposeDisplay,
+  disposeKept,
   isNearColor,
+  keep,
   makeColorTexture,
   makeContainer,
   renderToPixels,
@@ -35,9 +37,6 @@ const FadingKind = defineSprite({
 });
 
 describe('sprites — Fade and Flash', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
@@ -50,6 +49,7 @@ describe('sprites — Fade and Flash', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -66,8 +66,8 @@ describe('sprites — Fade and Flash', function () {
   }
 
   it('a faded sprite blends to half its color, a flashed one mixes towards the flash color and keeps its alpha', async function () {
-    const colorMap = makeColorTexture([RED]);
-    const sprites = new FeatureSprites(FadingKind, {capacity: 2, textures: {colorMap}, transparent: true});
+    const colorMap = keep(makeColorTexture([RED]));
+    const sprites = keep(new FeatureSprites(FadingKind, {capacity: 2, textures: {colorMap}, transparent: true}));
     sprites.frustumCulled = false;
 
     const faded = sprites.createSprite();
@@ -84,8 +84,6 @@ describe('sprites — Fade and Flash', function () {
     scene.add(sprites);
     sprites.update();
     const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
-    sprites.dispose();
-    colorMap.dispose();
 
     const fadedRgb = rgbAt(pixels, TARGET_SIZE, CENTER - 2 * PIXELS_PER_UNIT, CENTER);
     const flashedRgb = rgbAt(pixels, TARGET_SIZE, CENTER + 2 * PIXELS_PER_UNIT, CENTER);
@@ -94,15 +92,17 @@ describe('sprites — Fade and Flash', function () {
   });
 
   it('the shadow of a flashing sprite is the shadow of a plain one', async function () {
-    const colorMap = makeColorTexture([RED]);
+    const colorMap = keep(makeColorTexture([RED]));
 
     async function shadowOf(flashAmount) {
-      const sprites = new FeatureSprites(FadingKind, {
-        capacity: 1,
-        textures: {colorMap},
-        uniforms: {shadowLight: [-0.5, 0, 1, 0], groundPlane: [0, 0, 1, 0], shadowColor: [0, 0, 1, 1]},
-        passes: [ShadowPass],
-      });
+      const sprites = keep(
+        new FeatureSprites(FadingKind, {
+          capacity: 1,
+          textures: {colorMap},
+          uniforms: {shadowLight: [-0.5, 0, 1, 0], groundPlane: [0, 0, 1, 0], shadowColor: [0, 0, 1, 1]},
+          passes: [ShadowPass],
+        }),
+      );
       sprites.frustumCulled = false;
       sprites.passes['shadow'].frustumCulled = false;
       // the sprite itself stays out of the picture: only its shadow is compared
@@ -115,14 +115,11 @@ describe('sprites — Fade and Flash', function () {
       const scene = new Scene();
       scene.add(sprites);
       sprites.update();
-      const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
-      sprites.dispose();
-      return pixels;
+      return renderToPixels(display.renderer, scene, makeCamera(), target);
     }
 
     const plain = await shadowOf(0);
     const flashing = await shadowOf(1);
-    colorMap.dispose();
 
     const {lit, differing} = diffPixels(plain, flashing);
     expect(lit, 'the shadow is drawn').to.be.above(0);

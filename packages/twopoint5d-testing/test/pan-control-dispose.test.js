@@ -23,8 +23,9 @@ describe('PanControl2D — the contract after dispose()', () => {
     control = undefined;
   });
 
-  // Assertion (a) of the dispose test pattern — "releases what it built itself" — has no
-  // subject here. The control allocates a map of pointer states and a set of DOM listeners;
+  // Assertion (a) of the dispose test pattern in
+  // packages/twopoint5d/docs/resource-lifecycle.md (§7) — "releases what it built itself" — has
+  // no subject here. The control allocates a map of pointer states and a set of DOM listeners;
   // neither is a resource with a dispose() to spy on, and the listeners are what the cases
   // below observe through their effect.
 

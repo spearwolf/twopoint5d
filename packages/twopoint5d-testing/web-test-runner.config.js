@@ -8,7 +8,7 @@ import {playwrightLauncher} from '@web/test-runner-playwright';
  * A Playwright launcher whose pages render under `backend`, named after both — the reporter
  * keys its results and browser logs by that name.
  *
- * @param {'chromium' | 'firefox'} product
+ * @param {'chromium' | 'firefox' | 'webkit'} product
  * @param {Backend} backend
  * @param {import('playwright').LaunchOptions} launchOptions
  */
@@ -49,7 +49,8 @@ export default {
   plugins: [esbuildPlugin({target: 'auto'})],
   // Every test file runs under both backends of three's WebGPURenderer. Which one a browser
   // would pick on its own depends on the machine — headless Chromium has no WebGPU without a
-  // flag, headless Firefox has no adapter at all — so each launcher pins its backend and
+  // flag, headless Firefox has no adapter at all, and Playwright's WebKit offers no
+  // navigator.gpu — so WebKit runs under WebGL 2 alone, and each launcher pins its backend and
   // renderer-backend.test.js fails when three ends up on another one.
   browsers: [
     backendLauncher('chromium', 'WebGPU', {
@@ -95,11 +96,17 @@ export default {
         'webgl.force-enabled': true,
       },
     }),
+    // WebKit, the engine of Safari. Playwright 1.63.0 ships WebKit 26.6, whose pages have no
+    // navigator.gpu (measured on macOS), so it renders under WebGL 2; it needs no flags.
+    backendLauncher('webkit', 'WebGL2', {}),
   ],
   testFramework: {
     config: {
       ui: 'bdd',
-      timeout: '10000',
+      // a cold start of the renderer — adapter and device under WebGPU, on CI on SwiftShader —
+      // falls into the first hook or the first test of a case, and hooks run on this budget as
+      // well. A file that needs more says why beside its own this.timeout()
+      timeout: '20000',
     },
   },
   testRunnerHtml: (testFramework) =>

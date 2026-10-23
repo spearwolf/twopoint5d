@@ -23,6 +23,8 @@ import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   diffPixels,
   disposeDisplay,
+  disposeKept,
+  keep,
   isNearColor,
   makeColorTexture,
   makeContainer,
@@ -54,13 +56,9 @@ const FlatViewKind = defineSprite({
 const COLORS = Array.from({length: 16}, (_, i) => [(i * 16 + 8) % 256, 255 - i * 15, i % 2 === 0 ? 40 : 220, 255]);
 
 describe('sprites — tableFrame()', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
-  const disposables = [];
 
   beforeEach(async () => {
     host = makeContainer();
@@ -70,7 +68,7 @@ describe('sprites — tableFrame()', function () {
   });
 
   afterEach(() => {
-    for (const item of disposables.splice(0)) item.dispose();
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -78,11 +76,6 @@ describe('sprites — tableFrame()', function () {
     host?.parentNode?.removeChild(host);
     host = undefined;
   });
-
-  const keep = (item) => {
-    disposables.push(item);
-    return item;
-  };
 
   /** Renders `sprites` alone, seen straight on from +z, 8 units across. */
   const renderFront = async (sprites) => {

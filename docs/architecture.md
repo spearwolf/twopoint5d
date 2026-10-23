@@ -219,9 +219,10 @@ is kept for 3. The timings are archived, not held to a limit: a shared runner's 
 vary too much for a gate, and a regression shows only in the series over weeks. What can
 be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
 
-The browser suite runs every test file in three browsers, each pinned to one backend of
-three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2` and `Firefox WebGL2`
-(`packages/twopoint5d-testing/web-test-runner.config.js`). Left to themselves the
+The browser suite runs every test file in four browsers, each pinned to one backend of
+three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2`, `Firefox WebGL2` and
+`Webkit WebGL2` (`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter names a
+launcher after the capitalized product and the backend). Left to themselves the
 browsers would pick by machine — headless Chromium offers WebGPU only behind
 `--enable-unsafe-webgpu`, headless Firefox 155 finds no adapter — and measured with
 Playwright 1.63.0 both ended up on WebGL2, so WebGPU went untested. Now an init script
@@ -233,7 +234,8 @@ SwiftShader as well (`--use-angle=swiftshader`, and on Linux through Vulkan:
 take the canvas texture of a SwiftShader device, and Dawn drops the instance with every
 device of the page ("A valid external Instance reference no longer exists"). Measured
 with Playwright 1.63.0 on macOS and in its `v1.63.0-noble` image on arm64 and amd64:
-macOS needs the first flag, Linux all three.
+macOS needs the first flag, Linux all three. WebKit runs under WebGL 2 alone: Playwright's
+WebKit offers no `navigator.gpu` (measured with Playwright 1.63.0, WebKit 26.6, on macOS).
 
 three falls back to WebGL2 without a word when WebGPU fails its init, and every other
 test would then pass on the wrong backend. `test/renderer-backend.test.js` is the one
@@ -243,8 +245,10 @@ that fails then: it holds the backend three picked to the pinned one, read throu
 each launcher.
 
 Only the job of the browser tests installs Playwright. The browsers are cached under the
-key `playwright-<os>-<version>`, the version being what `pnpm exec playwright --version`
-reports from the root package. A hit still runs `playwright install-deps`, since the
+key `playwright-<os>-<version>-<browsers>`, the version being what `pnpm exec playwright
+--version` reports from the root package and the browsers those the two install steps
+fetch: a cache saved before a browser joined them would restore without it, and its launcher
+would find no browser. A hit still runs `playwright install-deps`, since the
 cache holds the browsers and not the system libraries they link against. That is an
 `apt-get update` and `install`, which once fell back from the Azure mirror to
 `archive.ubuntu.com` and waited on a silent connection for over twenty minutes: apt has
@@ -401,7 +405,7 @@ range of the library and is a release of its own, because the catalog range land
 in the published manifest. So each of them, and every major update but those of
 `typescript` and `@types/node`, which it ignores (see below), comes as a pull request by
 itself, to be reviewed on its own. `playwright` stays out of the group as well: each of
-its updates brings the Chromium and Firefox the browser suite runs on, so it comes as a
+its updates brings the Chromium, Firefox and WebKit the browser suite runs on, so it comes as a
 pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
 comment that names the advisory it answers and says when the entry can go.
 
@@ -457,15 +461,21 @@ Two runners, deliberately in separate packages:
 
 - Vitest in `packages/twopoint5d` (tag `ci`) — unit and logic tests as `*.spec.ts` next
   to the source. No browser dependencies in the library package.
-- `@web/test-runner` with Playwright Chromium and Firefox in `packages/twopoint5d-testing`
+- `@web/test-runner` with Playwright Chromium, Firefox and WebKit in `packages/twopoint5d-testing`
   (tag `browser`) — `*.test.js` under `test/`, for anything that needs a real GPU context,
-  every file under WebGPU in Chromium and under WebGL 2 in Chromium and Firefox.
+  every file under WebGPU in Chromium and under WebGL 2 in Chromium, Firefox and WebKit.
   `pnpm install` downloads no browsers; they come from
-  `pnpm exec playwright install chromium firefox`. The `*.test.js` files are type-checked
+  `pnpm exec playwright install chromium firefox webkit`. The `*.test.js` files are type-checked
   with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from JSDoc —
-  vertex object interfaces, descriptions. The package is `"private": true`: it is a test
-  harness, never a release, so npm refuses to publish it and `pnpm publish -r` passes it
-  by.
+  vertex object interfaces, descriptions. `strictNullChecks` stays off for the browser
+  tests. Switched on, TypeScript 7.0.2 reports 828 errors in 56 files of the suite
+  (measured in October 2026): three in four are `'display' is possibly 'undefined'` and
+  its kin — a fixture variable that a `beforeEach` assigns and an `afterEach` clears, an
+  order the checker cannot see —, and most of the rest hand the same variables on as
+  arguments. A cast at each of them would find nothing; a nullability error against the
+  public API shows in the library's own specs, which the root config checks strictly.
+  The package is `"private": true`: it is a test harness, never a release, so npm
+  refuses to publish it and `pnpm publish -r` passes it by.
 
 A browser test takes its display down with `dispose()` alone: `Display#dispose()`
 stops the loop right away and releases the renderer only once the GPU has run the work

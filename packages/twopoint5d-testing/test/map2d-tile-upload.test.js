@@ -4,9 +4,6 @@ import {Scene} from 'three/webgpu';
 import {makeContainer, disposeDisplay, bufferOf, makeCamera, makeMap} from './helpers/fixtures.js';
 
 describe('map2d — tile attribute upload', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

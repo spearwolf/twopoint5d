@@ -119,9 +119,11 @@ jobs:
         if: matrix.browsers
         id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        # the key names the browsers the two install steps below fetch: a cache saved before a
+        # browser joined them would restore without it, and its launcher would find no browser
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-firefox-webkit
 
       - name: Bound the network waits of apt
         # apt-get update once fell back from the Azure mirror to archive.ubuntu.com and
@@ -134,7 +136,7 @@ jobs:
 
       - name: Install Playwright browsers and their system libraries
         if: matrix.browsers && steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
         timeout-minutes: 8
 
       - name: Install the system libraries of the Playwright browsers
@@ -143,7 +145,7 @@ jobs:
         if: matrix.browsers && steps.playwright-cache.outputs.cache-hit == 'true'
         run: |
           for attempt in 1 2 3; do
-            timeout 180 pnpm exec playwright install-deps chromium firefox && exit 0
+            timeout 180 pnpm exec playwright install-deps chromium firefox webkit && exit 0
             echo "::warning::playwright install-deps failed or stalled (attempt $attempt of 3)"
           done
           exit 1

@@ -34,7 +34,7 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm outdated -r` — what is behind in every project of the workspace, the catalog
   included; updates come through Dependabot (`.github/dependabot.yml`), and pnpm installs
   no release younger than a day (`minimumReleaseAge` in `pnpm-workspace.yaml`)
-- `pnpm exec playwright install chromium firefox` — the browsers for
+- `pnpm exec playwright install chromium firefox webkit` — the browsers for
   `pnpm test:browser`; once after the first install and after every Playwright bump
 - `pnpm lint` — `biome ci`: Biome's linter and formatter check, nothing written;
   `pnpm format` writes the formatting and the safe lint fixes (`biome check --write`).

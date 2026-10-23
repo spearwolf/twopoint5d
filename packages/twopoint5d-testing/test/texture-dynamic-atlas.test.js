@@ -27,9 +27,6 @@ function halves(ctx, first, second, split = 'horizontal') {
 }
 
 describe('texture — DynamicAtlas', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;

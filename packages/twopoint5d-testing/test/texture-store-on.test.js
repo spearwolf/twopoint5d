@@ -77,9 +77,6 @@ const CATALOG = {
 };
 
 describe('TextureStore.on() — black-box workflow', function () {
-  // image+atlas loading over HTTP can take a moment in Firefox
-  this.timeout(15000);
-
   /** @type {TextureStore | undefined} */
   let store;
   /** @type {string | undefined} */

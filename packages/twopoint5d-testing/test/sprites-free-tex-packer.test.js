@@ -1,7 +1,16 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, FeatureSprites, TexturedSpriteKind, TexturePackerJson} from '@spearwolf/twopoint5d';
 import {NearestFilter, OrthographicCamera, RenderTarget, Scene, TextureLoader} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeContainer, readsTopDown, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeContainer,
+  readsTopDown,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // a real export of free-tex-packer-core, see its README; the test runner serves the repo root
 const FIXTURES = '/packages/twopoint5d/src/texture/fixtures/free-tex-packer';
@@ -22,9 +31,6 @@ const CELLS = [
 ];
 
 describe('sprites — the frames of a free-tex-packer sheet', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
@@ -37,6 +43,7 @@ describe('sprites — the frames of a free-tex-packer sheet', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -50,13 +57,13 @@ describe('sprites — the frames of a free-tex-packer sheet', function () {
 
     const json = await (await fetch(`${FIXTURES}/sheet-hash.json`)).json();
     const [atlas] = TexturePackerJson.parse(json);
-    const sheet = await new TextureLoader().loadAsync(`${FIXTURES}/sheet.png`);
+    const sheet = keep(await new TextureLoader().loadAsync(`${FIXTURES}/sheet.png`));
     sheet.flipY = false;
     sheet.magFilter = NearestFilter;
     sheet.minFilter = NearestFilter;
     sheet.generateMipmaps = false;
 
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap: sheet}});
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap: sheet}}));
     sprites.frustumCulled = false;
     // each sprite one unit per texel of its untrimmed source, its middle at x
     const placed = {gem: -4, hero: 3.5};
@@ -76,8 +83,6 @@ describe('sprites — the frames of a free-tex-packer sheet', function () {
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
     const pixels = await renderToPixels(display.renderer, scene, camera, target);
-    sprites.dispose();
-    sheet.dispose();
 
     /** The color at the texel `(sx, sy)` of the source image — from its top left — of the sprite `name`. */
     const colorAt = (name, sx, sy) => {

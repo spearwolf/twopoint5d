@@ -10,7 +10,16 @@ import {
   TexturePackerJson,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeContainer, makeTrimmedSheet, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeContainer,
+  makeTrimmedSheet,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 16 world units across 64 pixels: one unit is 4 pixels
 const TARGET_SIZE = 64;
@@ -48,9 +57,6 @@ function cellColors(pixels, spriteX) {
 }
 
 describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed sprite has it', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -66,6 +72,7 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -102,9 +109,11 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
 
   async function renderTexturedKind(candidateFrameName) {
     const {texture, json} = makeTrimmedSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
 
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap: texture}});
+    // the mesh releases the material it built around the texture; the texture stays the caller's
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap: texture}}));
     sprites.frustumCulled = false;
 
     const reference = sprites.createSprite();
@@ -123,28 +132,28 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
 
     const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
 
-    // the mesh releases the material it built around the texture; the texture stays the caller's
-    sprites.dispose();
-    texture.dispose();
-
     return pixels;
   }
 
   async function renderAnimatedKind(candidateFrameQuery) {
     const {texture, json} = makeTrimmedSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
 
     const anims = new FrameBasedAnimations();
     anims.add('reference', 1, atlas, '^reference$');
     anims.add('candidate', 1, atlas, candidateFrameQuery);
-    const animsMap = anims.bakeDataTexture();
+    const animsMap = keep(anims.bakeDataTexture());
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 2);
-    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {
-      textures: {colorMap: texture, animsMap},
-      uniforms: {time: 0},
-    });
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
+    // the mesh gives geometry and material up; both, like the two textures, are the caller's
+    const geometry = keep(new FeatureSpritesGeometry(AnimatedSpriteKind, 2));
+    const material = keep(
+      new FeatureSpritesMaterial(AnimatedSpriteKind, {
+        textures: {colorMap: texture, animsMap},
+        uniforms: {time: 0},
+      }),
+    );
+    const sprites = keep(new FeatureSprites(AnimatedSpriteKind, {geometry, material}));
     sprites.frustumCulled = false;
 
     const reference = geometry.instancedPool.createVO();
@@ -164,13 +173,6 @@ describe('sprites — a trimmed TexturePacker frame is drawn where its untrimmed
     sprites.update();
 
     const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
-
-    // the mesh gives geometry and material up; both, like the two textures, are the caller's
-    sprites.dispose();
-    geometry.dispose();
-    material.dispose();
-    texture.dispose();
-    animsMap.dispose();
 
     return pixels;
   }

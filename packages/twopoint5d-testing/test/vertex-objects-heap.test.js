@@ -64,9 +64,6 @@ describe('vertex-objects — heap', function () {
     }
   });
 
-  // the display comes up in the hook — renderer init included — and hooks have their own budget
-  this.timeout(30000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

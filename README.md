@@ -196,12 +196,12 @@ Install the dependencies with:
 $ pnpm install
 ```
 
-The browser tests in `pnpm cbt` need Chromium and Firefox from Playwright.
+The browser tests in `pnpm cbt` need Chromium, Firefox and WebKit from Playwright.
 `pnpm install` does not download them, so fetch them once, and again after every
 Playwright bump (on Linux, add `--with-deps` if system libraries are missing):
 
 ```sh
-$ pnpm exec playwright install chromium firefox
+$ pnpm exec playwright install chromium firefox webkit
 ```
 
 ### 2. Build and test everything

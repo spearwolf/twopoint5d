@@ -2,7 +2,16 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeColorTexture,
+  makeContainer,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
@@ -14,9 +23,6 @@ const GREEN = [0, 255, 0, 255];
 const RED = [255, 0, 0, 255];
 
 describe('sprites — TexturedSpriteKind draws its color map', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -32,6 +38,7 @@ describe('sprites — TexturedSpriteKind draws its color map', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -53,7 +60,8 @@ describe('sprites — TexturedSpriteKind draws its color map', function () {
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}});
+    keep(colorMap);
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}}));
     sprites.frustumCulled = false;
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
@@ -66,10 +74,6 @@ describe('sprites — TexturedSpriteKind draws its color map', function () {
     sprites.update();
 
     const pixels = await renderToPixels(display.renderer, scene, camera, target);
-
-    // the mesh releases the material it built around the texture; the texture stays the caller's
-    sprites.dispose();
-    colorMap.dispose();
 
     return rgbAt(pixels, TARGET_SIZE, CENTER, CENTER);
   }
@@ -93,10 +97,11 @@ describe('sprites — TexturedSpriteKind draws its color map', function () {
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const red = makeColorTexture([RED, RED, RED, RED], 2, 2);
-    const green = makeColorTexture([GREEN, GREEN, GREEN, GREEN], 2, 2);
+    const red = keep(makeColorTexture([RED, RED, RED, RED], 2, 2));
+    const green = keep(makeColorTexture([GREEN, GREEN, GREEN, GREEN], 2, 2));
 
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: red}});
+    // the mesh releases the material it built around a texture; the textures stay the caller's
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: red}}));
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
     sprite.setPosition(0, 0, 0);
@@ -116,10 +121,6 @@ describe('sprites — TexturedSpriteKind draws its color map', function () {
 
     // the swap reached the gpu through the texture node alone, without a new color graph
     const rebuilt = sprites.material.colorNode !== colorNode || sprites.material.version !== version;
-
-    sprites.dispose();
-    red.dispose();
-    green.dispose();
 
     expect(before, 'the red of the first texture').to.satisfy((c) => isNearColor(c, [255, 0, 0]));
     expect(rebuilt, 'the color graph was built anew').to.equal(false);

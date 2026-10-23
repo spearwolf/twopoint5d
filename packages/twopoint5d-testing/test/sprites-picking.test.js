@@ -19,7 +19,7 @@ import {
   Tint,
 } from '@spearwolf/twopoint5d';
 import {Color, OrthographicCamera, PerspectiveCamera, Scene, Vector3} from 'three/webgpu';
-import {disposeDisplay, makeColorTexture, makeContainer, withSilencedInfo} from './helpers/fixtures.js';
+import {disposeDisplay, disposeKept, keep, makeColorTexture, makeContainer, withSilencedInfo} from './helpers/fixtures.js';
 
 const WHITE = [255, 255, 255, 255];
 const CLEAR = [0, 0, 0, 0];
@@ -45,27 +45,21 @@ const pointerAt = (camera, x, y, z = 0) => {
 };
 
 describe('sprites — picking', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let picker;
-  let disposables;
 
   beforeEach(async () => {
     host = makeContainer({width: 64, height: 64});
     display = new Display(host);
     await display.start();
     picker = new SpritePicker(display.renderer);
-    disposables = [];
   });
 
   afterEach(() => {
     picker?.dispose();
     picker = undefined;
-    for (const disposable of disposables) disposable.dispose();
-    disposables = undefined;
+    disposeKept();
     disposeDisplay(display);
     display = undefined;
     host?.parentNode?.removeChild(host);
@@ -87,9 +81,8 @@ describe('sprites — picking', function () {
    * @param {Record<string, any>} [options] `texels`, `capacity` and the options of the sprites
    */
   const makeSprites = (kind, positions, {texels = [WHITE], capacity = positions.length, ...options} = {}) => {
-    const colorMap = makeColorTexture(texels, texels.length === 4 ? 2 : 1, texels.length === 4 ? 2 : 1);
-    const sprites = new FeatureSprites(kind, {capacity, textures: {colorMap}, ...options});
-    disposables.push(sprites, colorMap);
+    const colorMap = keep(makeColorTexture(texels, texels.length === 4 ? 2 : 1, texels.length === 4 ? 2 : 1));
+    const sprites = keep(new FeatureSprites(kind, {capacity, textures: {colorMap}, ...options}));
     const all = positions.map(([x, y, z]) => {
       const sprite = sprites.createSprite();
       sprite.setSize(2, 2);
@@ -372,9 +365,8 @@ describe('sprites — picking', function () {
     // a frame of 4 × 4 texels whose top left texel is transparent, its border one texel: the panel of
     // 4 × 4 units keeps that texel 1 unit square in its corner, where a stretched frame would make it 2
     const texels = Array.from({length: 16}, (_, i) => (i === 0 ? CLEAR : WHITE));
-    const colorMap = makeColorTexture(texels, 4, 4);
-    const panels = new FeatureSprites(PanelKind, {capacity: 1, textures: {colorMap}});
-    disposables.push(panels, colorMap);
+    const colorMap = keep(makeColorTexture(texels, 4, 4));
+    const panels = keep(new FeatureSprites(PanelKind, {capacity: 1, textures: {colorMap}}));
     const panel = panels.createSprite();
     panel.setTexCoords(0, 0, 1, 1);
     panel.setSliceInsets(1, 1, 1, 1);
@@ -405,8 +397,9 @@ describe('sprites — picking', function () {
       2,
       2,
     );
-    const swapped = new FeatureSprites(SwappedKind, {capacity: 1, textures: {colorMap, palette}});
-    disposables.push(swapped, colorMap, palette);
+    keep(colorMap);
+    keep(palette);
+    const swapped = keep(new FeatureSprites(SwappedKind, {capacity: 1, textures: {colorMap, palette}}));
     const sprite = swapped.createSprite();
     sprite.setSize(2, 2);
     sprite.setPosition(0, 0, 1);

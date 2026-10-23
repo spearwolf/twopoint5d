@@ -24,7 +24,9 @@ import {
   cellColors,
   diffPixels,
   disposeDisplay,
+  disposeKept,
   expectSameCells,
+  keep,
   makeCameraAboveGround,
   makeColorTexture,
   makeContainer,
@@ -62,9 +64,6 @@ const REFERENCE = [
 ];
 
 describe('sprites — Flip', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
@@ -77,6 +76,7 @@ describe('sprites — Flip', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -104,6 +104,7 @@ describe('sprites — Flip', function () {
   it('keeps a trimmed animated sprite on its foot under every playback, the mirror image of the untrimmed sprite', async function () {
     const PPU = 3;
     const {texture, json} = makeTrimmedSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
     const anims = new FrameBasedAnimations();
     // every frame shows the same picture, trimmed or trimmed and turned
@@ -111,8 +112,8 @@ describe('sprites — Flip', function () {
     anims.add('once', {duration: 1, playback: 'once'}, atlas, ['trimmed-turned', 'trimmed']);
     anims.add('pingpong', {duration: 1, playback: 'pingpong'}, atlas, ['trimmed', 'trimmed-turned', 'trimmed']);
     anims.add('durations', {durations: [0.2, 0.8], playback: 'loop'}, atlas, ['trimmed', 'trimmed-turned']);
-    const animsMap = anims.bakeDataTexture();
-    const sprites = new FeatureSprites(AnimatedFlipKind, {capacity: 4, textures: {colorMap: texture, animsMap}});
+    const animsMap = keep(anims.bakeDataTexture());
+    const sprites = keep(new FeatureSprites(AnimatedFlipKind, {capacity: 4, textures: {colorMap: texture, animsMap}}));
     const places = {loop: [-5, 4], once: [5, 4], pingpong: [-5, -4], durations: [5, -4]};
     for (const [name, [x, y]] of Object.entries(places)) {
       const sprite = sprites.createSprite();
@@ -133,17 +134,14 @@ describe('sprites — Flip', function () {
         expectSameCells(cellColors(pixels, TARGET_SIZE, PPU, topDown, x, y, 5, 4), expected, `"${name}" at ${time} s`);
       }
     }
-
-    sprites.dispose();
-    texture.dispose();
-    animsMap.dispose();
   });
 
   it('mirrors a trimmed frame upside down and along both axes, a turned one as well', async function () {
     const PPU = 3;
     const {texture, json} = makeTrimmedSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
-    const sprites = new FeatureSprites(FlipKind, {capacity: 4, textures: {colorMap: texture}});
+    const sprites = keep(new FeatureSprites(FlipKind, {capacity: 4, textures: {colorMap: texture}}));
     const place = (name, x, y, flipX, flipY) => {
       const sprite = sprites.createSprite();
       sprite.setSize(5, 4);
@@ -158,8 +156,6 @@ describe('sprites — Flip', function () {
 
     const topDown = await readsTopDown(display.renderer, target);
     const pixels = await render([sprites], makeCamera(PPU));
-    sprites.dispose();
-    texture.dispose();
 
     const reference = cellColors(pixels, TARGET_SIZE, PPU, topDown, -5, 4, 5, 4);
     expectSameCells(reference, REFERENCE, 'the untrimmed sprite');
@@ -172,9 +168,12 @@ describe('sprites — Flip', function () {
   it('flips a sprite on gridBase({columns: 4, rows: 2}) as on the quad', async function () {
     const PPU = 3;
     const {texture, json} = makeTrimmedSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
-    const quads = new FeatureSprites(FlipKind, {capacity: 1, textures: {colorMap: texture}});
-    const grids = new FeatureSprites(flipKindOn(gridBase({columns: 4, rows: 2})), {capacity: 1, textures: {colorMap: texture}});
+    const quads = keep(new FeatureSprites(FlipKind, {capacity: 1, textures: {colorMap: texture}}));
+    const grids = keep(
+      new FeatureSprites(flipKindOn(gridBase({columns: 4, rows: 2})), {capacity: 1, textures: {colorMap: texture}}),
+    );
     for (const [sprites, x] of /** @type {const} */ ([
       [quads, -5],
       [grids, 5],
@@ -188,9 +187,6 @@ describe('sprites — Flip', function () {
 
     const topDown = await readsTopDown(display.renderer, target);
     const pixels = await render([quads, grids], makeCamera(PPU));
-    quads.dispose();
-    grids.dispose();
-    texture.dispose();
 
     expectSameCells(cellColors(pixels, TARGET_SIZE, PPU, topDown, -5, 0, 5, 4), mirroredX(REFERENCE), 'on the quad');
     expectSameCells(cellColors(pixels, TARGET_SIZE, PPU, topDown, 5, 0, 5, 4), mirroredX(REFERENCE), 'on the grid');
@@ -199,9 +195,10 @@ describe('sprites — Flip', function () {
   it('mirrors the frame tableFrame() picks, a trimmed and a turned trimmed one', async function () {
     const PPU = 3;
     const {texture, json} = makeTrimmedSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
-    const frameTable = FrameTable.fromAtlas(atlas, ['reference', 'trimmed', 'trimmed-turned']).bakeDataTexture();
-    const sprites = new FeatureSprites(TableFlipKind, {capacity: 3, textures: {colorMap: texture, frameTable}});
+    const frameTable = keep(FrameTable.fromAtlas(atlas, ['reference', 'trimmed', 'trimmed-turned']).bakeDataTexture());
+    const sprites = keep(new FeatureSprites(TableFlipKind, {capacity: 3, textures: {colorMap: texture, frameTable}}));
     const places = [-6, 0, 6];
     places.forEach((x, index) => {
       const sprite = sprites.createSprite();
@@ -213,9 +210,6 @@ describe('sprites — Flip', function () {
 
     const topDown = await readsTopDown(display.renderer, target);
     const pixels = await render([sprites], makeCamera(PPU));
-    sprites.dispose();
-    texture.dispose();
-    frameTable.dispose();
 
     for (const [index, x] of places.entries()) {
       expectSameCells(
@@ -238,8 +232,10 @@ describe('sprites — Flip', function () {
 
     /** Renders one sprite standing on the XZ ground with its shadow and its reflection, the sprites themselves left out. */
     async function renderPasses(texels, flipX) {
-      const colorMap = makeColorTexture(texels, 3, 2);
-      const sprites = new FeatureSprites(FlipKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass, ReflectionPass]});
+      const colorMap = keep(makeColorTexture(texels, 3, 2));
+      const sprites = keep(
+        new FeatureSprites(FlipKind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass, ReflectionPass]}),
+      );
       sprites.material.visible = false;
       sprites.setUniform('shadowColor', 0, 0, 1, 1);
       sprites.setUniform('shadowLight', -0.5, 1, 0.25, 0);
@@ -250,8 +246,6 @@ describe('sprites — Flip', function () {
       sprite.setTexCoords(0, 0, 1, 1);
       sprite.flipX = flipX;
       const pixels = await render([sprites], makeCameraAboveGround(TARGET_SIZE, PPU));
-      sprites.dispose();
-      colorMap.dispose();
       return pixels;
     }
 

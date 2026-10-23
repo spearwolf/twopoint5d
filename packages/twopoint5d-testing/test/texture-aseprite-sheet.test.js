@@ -1,7 +1,7 @@
 import {expect} from '@esm-bundle/chai';
 import {AnimatedSpriteKind, Display, FeatureSprites, TextureStore} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {disposeDisplay, disposeKept, isNearColor, keep, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
 
 // the dev server of web-test-runner serves the repo root
 const SHEET_URL = '/packages/twopoint5d/src/texture/fixtures/aseprite/fighter-hash.json';
@@ -33,8 +33,6 @@ function paintSheet() {
 }
 
 describe('texture — an Aseprite sheet through the TextureStore', function () {
-  this.timeout(30000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -50,6 +48,7 @@ describe('texture — an Aseprite sheet through the TextureStore', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -61,17 +60,17 @@ describe('texture — an Aseprite sheet through the TextureStore', function () {
   });
 
   it('publishes the tags of the sheet, and the one-shot kick plays its frames at their durations and holds the last', async function () {
-    const store = new TextureStore(display.renderer);
+    const store = keep(new TextureStore(display.renderer));
     store.parse({items: {fighter: {atlasUrl: SHEET_URL, overrideImageUrl: paintSheet()}}});
 
     const [colorMap, animations] = await store.getAsync('fighter', ['texture', 'frameBasedAnimations']);
-    const animsMap = animations.bakeDataTexture();
+    const animsMap = keep(animations.bakeDataTexture());
 
     const half = TARGET_SIZE / PIXELS_PER_UNIT / 2;
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {capacity: 1, textures: {colorMap, animsMap}});
+    const sprites = keep(new FeatureSprites(AnimatedSpriteKind, {capacity: 1, textures: {colorMap, animsMap}}));
     sprites.frustumCulled = false;
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
@@ -93,10 +92,6 @@ describe('texture — an Aseprite sheet through the TextureStore', function () {
 
     const tagNames = ['idle', 'walk', 'kick', 'block', 'spin'].filter((tag) => animations.hasAnimation(tag));
     const {playback, cycleDuration} = animations.animation('kick');
-
-    sprites.dispose();
-    animsMap.dispose();
-    store.dispose();
 
     expect(tagNames, 'the tags of the sheet').to.deep.equal(['idle', 'walk', 'kick', 'block', 'spin']);
     expect([playback, Math.round(cycleDuration * 1000)], 'the kick is a one-shot of 400 ms').to.deep.equal(['once', 400]);

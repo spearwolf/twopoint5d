@@ -15,9 +15,6 @@ const extraInstancedDescription = {
 };
 
 describe('vertex-objects — dispose', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

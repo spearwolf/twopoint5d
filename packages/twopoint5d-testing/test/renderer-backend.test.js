@@ -3,9 +3,6 @@ import {Display} from '@spearwolf/twopoint5d';
 import {disposeDisplay, expectedBackend, makeContainer} from './helpers/fixtures.js';
 
 describe('renderer backend', function () {
-  // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

@@ -6,9 +6,6 @@ import {disposeDisplay, makeContainer} from './helpers/fixtures.js';
 // sits in. What the canvas carries is read through getComputedStyle(): the touch-action="none"
 // attribute the display also writes is not CSS and does not count.
 describe('Display — where the rules of a display live', function () {
-  // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement[]} */

@@ -3,9 +3,6 @@ import {TextureFactory} from '@spearwolf/twopoint5d';
 import {Texture, WebGPURenderer} from 'three/webgpu';
 
 describe('TextureFactory — anisotropic filtering against a real renderer', function () {
-  // a cold webgpu start — adapter plus device — is slow
-  this.timeout(20000);
-
   /** @type {WebGPURenderer | undefined} */
   let renderer;
 
@@ -51,9 +48,6 @@ describe('TextureFactory — anisotropic filtering against a real renderer', fun
 });
 
 describe('TextureFactory — built before the renderer is initialized', function () {
-  // a cold start of a context is slow on a software rasterizer
-  this.timeout(20000);
-
   it('a factory built before init() of a WebGL backend caps against the maximum that backend names after it', async () => {
     // forceWebGL: a WebGL backend from the start names no maximum before init(). A plain
     // WebGPURenderer starts on the WebGPU backend even where the harness takes WebGPU away, and that

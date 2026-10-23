@@ -9,7 +9,7 @@ import {
   TexturedSpriteKind,
 } from '@spearwolf/twopoint5d';
 import {Color, RenderPipeline, RenderTarget} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, rgbAt} from './helpers/fixtures.js';
+import {disposeDisplay, disposeKept, isNearColor, keep, makeColorTexture, makeContainer, rgbAt} from './helpers/fixtures.js';
 
 const TARGET_SIZE = 64;
 const CENTER = TARGET_SIZE / 2;
@@ -18,9 +18,6 @@ const SPRITE_SIZE = 16;
 const PROBE = CENTER + SPRITE_SIZE / 2 + 6;
 
 describe('sprites — glow: a tint above white and the bloom of the stage', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
 
@@ -31,6 +28,7 @@ describe('sprites — glow: a tint above white and the bloom of the stage', func
   });
 
   afterEach(() => {
+    disposeKept();
     disposeDisplay(display);
     display = undefined;
     host?.parentNode?.removeChild(host);
@@ -44,10 +42,10 @@ describe('sprites — glow: a tint above white and the bloom of the stage', func
    */
   async function render(tint, {bloom = true} = {}) {
     const renderer = display.renderer;
-    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
-    const colorMap = makeColorTexture([[255, 255, 255, 255]]);
+    const target = keep(new RenderTarget(TARGET_SIZE, TARGET_SIZE));
+    const colorMap = keep(makeColorTexture([[255, 255, 255, 255]]));
     const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}});
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}}));
     const sprite = sprites.createSprite();
     sprite.setSize(SPRITE_SIZE, SPRITE_SIZE);
     sprite.setTexCoords(0, 0, 1, 1);
@@ -58,26 +56,21 @@ describe('sprites — glow: a tint above white and the bloom of the stage', func
     const sr = new StageRenderer().setClearColor(new Color('#000'), 1).add(stage);
     const pipeline = new RenderPipeline(renderer);
     const glow = bloom ? createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 1}) : undefined;
-    try {
-      sr.pipeline = pipeline;
-      /** @type {(passes: import('three/webgpu').Node[]) => import('three/webgpu').Node} */
-      const passAlone = (passes) => passes[0];
-      sr.buildOutputNode = glow ?? passAlone;
-      sr.outputRenderTarget = target;
-      sr.resize(TARGET_SIZE, TARGET_SIZE);
-      sr.renderTo(renderer);
-      const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, TARGET_SIZE, TARGET_SIZE);
-      return {center: rgbAt(pixels, TARGET_SIZE, CENTER, CENTER), probe: rgbAt(pixels, TARGET_SIZE, PROBE, CENTER)};
-    } finally {
-      // the renderer lets go first, then the builder, the stage, the pipeline and the rest
-      sr.dispose();
-      glow?.dispose();
-      stage.dispose();
-      pipeline.dispose();
-      sprites.dispose();
-      colorMap.dispose();
-      target.dispose();
-    }
+    // the renderer lets go first, then the builder, the stage and the pipeline
+    keep(pipeline);
+    keep(stage);
+    if (glow) keep(glow);
+    keep(sr);
+
+    sr.pipeline = pipeline;
+    /** @type {(passes: import('three/webgpu').Node[]) => import('three/webgpu').Node} */
+    const passAlone = (passes) => passes[0];
+    sr.buildOutputNode = glow ?? passAlone;
+    sr.outputRenderTarget = target;
+    sr.resize(TARGET_SIZE, TARGET_SIZE);
+    sr.renderTo(renderer);
+    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, TARGET_SIZE, TARGET_SIZE);
+    return {center: rgbAt(pixels, TARGET_SIZE, CENTER, CENTER), probe: rgbAt(pixels, TARGET_SIZE, PROBE, CENTER)};
   }
 
   it('the stage alone draws nothing beside the sprite', async function () {

@@ -4,9 +4,6 @@ import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
 import {disposeDisplay, whenPageAnimates, whenReleased} from './helpers/fixtures.js';
 
 describe('Display — the constructor that adopts a renderer', function () {
-  // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {WebGPURenderer | undefined} */

@@ -1,7 +1,7 @@
 import {expect} from '@esm-bundle/chai';
 import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
-import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
+import {makeContainer, disposeDisplay, disposeKept, keep} from './helpers/fixtures.js';
 
 /** @import {TextureNode} from 'three/webgpu' */
 
@@ -19,6 +19,7 @@ describe('StageRenderer — integration with Display', () => {
   let host;
 
   afterEach(() => {
+    disposeKept();
     disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
@@ -158,7 +159,7 @@ describe('StageRenderer — integration with Display', () => {
     display.renderer.setPixelRatio(2);
     expect(display.renderer.getPixelRatio(), 'pixel ratio the renderer reports').to.equal(2);
 
-    const sr = new StageRenderer();
+    const sr = keep(new StageRenderer());
     sr.resize(100, 50);
 
     const passNode = /** @type {TextureNode} */ (sr.asPassNode(display.renderer));
@@ -166,7 +167,5 @@ describe('StageRenderer — integration with Display', () => {
 
     sr.resize(300, 150);
     expect(imageSize(passNode)).to.deep.equal([600, 300]);
-
-    sr.dispose();
   });
 });

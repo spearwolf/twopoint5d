@@ -78,7 +78,7 @@ export function makeIframeDocument({width, height} = {}) {
   return {iframe, doc: /** @type {Document} */ (iframe.contentDocument)};
 }
 
-// the errors display.dispose() threw in the teardown of the running test, for the hook below
+// the errors a dispose() threw in the teardown of the running test, for the hook below
 const teardownErrors = [];
 
 /**
@@ -106,15 +106,52 @@ afterEach(function () {
   const errors = teardownErrors.splice(0);
   if (this.currentTest?.state === 'failed') {
     // biome-ignore lint/suspicious/noConsole: the teardown error goes into the log beside the failure it must not mask
-    console.error(`display.dispose() threw in the teardown of "${this.currentTest.fullTitle()}":`, ...errors);
+    console.error(`dispose() threw in the teardown of "${this.currentTest.fullTitle()}":`, ...errors);
     return;
   }
   // the reporter prints the message alone, so it carries the errors as well
   throw new AggregateError(
     errors,
-    `display.dispose() threw in the teardown of "${this.currentTest?.fullTitle()}": ${errors.map(String).join('; ')}`,
+    `dispose() threw in the teardown of "${this.currentTest?.fullTitle()}": ${errors.map(String).join('; ')}`,
   );
 });
+
+// --- what a test builds itself ---
+
+/** @type {{dispose(): unknown}[]} */
+const kept = [];
+
+/**
+ * Hands `item` back and keeps it for {@link disposeKept}, which the `afterEach` of the suite
+ * calls: what a test builds itself — a render target, a pipeline, a geometry, a material,
+ * sprites — is released after the test, also when an assertion fails half way through it.
+ * Keep a part before what holds it, so that the holder lets go first.
+ *
+ * @template {{dispose(): unknown}} T
+ * @param {T} item
+ * @returns {T}
+ */
+export function keep(item) {
+  kept.push(item);
+  return item;
+}
+
+/**
+ * Releases what {@link keep} kept, the last one kept first. Call it in `afterEach` before
+ * `disposeDisplay()`: the items were drawn with the renderer of that display. An error a
+ * `dispose()` throws is held for the hook above, like one of {@link disposeDisplay}, and the
+ * items after it are released all the same.
+ */
+export function disposeKept() {
+  while (kept.length > 0) {
+    const item = kept.pop();
+    try {
+      item.dispose();
+    } catch (error) {
+      teardownErrors.push(error);
+    }
+  }
+}
 
 /**
  * Resolves once renderer.dispose() has settled — the release of a display happens after its dispose() has returned.
