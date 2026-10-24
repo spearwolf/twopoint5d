@@ -15,7 +15,8 @@ const BARE_KEY = /^[A-Za-z_$][\w$]*$/;
  * to eight entries per container and three levels deep are shown, the rest as `…` — that keeps
  * a message short for a large array and ends a cycle. A string of more than 120 UTF-16 units
  * shows its first 120 and `…` (`"abc…"`), one less where the 120th would split a surrogate
- * pair, inside an array or an object as well. A typed array is shown by its kind and its
+ * pair, inside an array or an object as well, and so does the key of an object, always in double
+ * quotes then. A typed array is shown by its kind and its
  * entries, as an array is (`Float32Array [1.5, NaN]`); a `DataView` is not one of them.
  * Everything else is written as `String()` writes it. `JSON.stringify()` is no option: it
  * throws for a BigInt, and the message would be lost.
@@ -96,8 +97,9 @@ function joinEntries(shown: string[], total: number): string {
   return shown.join(', ');
 }
 
+// a key of more than MAX_STRING_LENGTH units is cut like a string, so it is quoted even if it would be bare
 function describeKey(key: string): string {
-  return BARE_KEY.test(key) ? key : `"${key}"`;
+  return key.length <= MAX_STRING_LENGTH && BARE_KEY.test(key) ? key : describeString(key);
 }
 
 function isPlainObject(value: unknown): value is object {

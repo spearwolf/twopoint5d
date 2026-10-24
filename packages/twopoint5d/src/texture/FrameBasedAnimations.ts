@@ -10,6 +10,10 @@ import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TileSet} from './TileSet.js';
 
+/**
+ * The name of an animation, a string or a symbol. An animation added without a name, or with the
+ * empty string, is given `anim_0`, `anim_1` and so on by {@link FrameBasedAnimations.add}.
+ */
 export type AnimName = string | symbol;
 
 /**
@@ -19,12 +23,20 @@ export type AnimName = string | symbol;
  */
 export type AnimationPlayback = 'loop' | 'once' | 'pingpong';
 
+/**
+ * The record a {@link FrameBasedAnimations} keeps for each registered animation. A caller reads an
+ * animation through {@link FrameBasedAnimations.animation}, which answers a {@link FrameBasedAnimationInfo}.
+ */
 export interface FrameBasedAnimDef {
+  /** The coords of the frames, in the order they are played. */
   frames: TextureCoords[];
   /** Seconds, the frames once through; the sum of `durations` where there are some. */
   duration: number;
+  /** The name of the animation. */
   name: AnimName;
+  /** The id `add()` answered for the animation: 0 for the first one registered, one more for each after it. */
   id: number;
+  /** What the animation does once its frames are through. */
   playback: AnimationPlayback;
   /** Seconds per frame, in the order of `frames`, or `undefined` for an animation of one duration. */
   durations: readonly number[] | undefined;
@@ -32,11 +44,18 @@ export interface FrameBasedAnimDef {
 
 /** What {@link FrameBasedAnimations.animation} answers about a registered animation. Frozen. */
 export interface FrameBasedAnimationInfo {
+  /**
+   * The id `add()` answered for the animation: 0 for the first one registered, one more for each after
+   * it. A sprite writes it as its `animId`, and `animation()` reads it back.
+   */
   readonly id: number;
+  /** The name of the animation. */
   readonly name: AnimName;
+  /** How many frames the animation runs through, once. */
   readonly frameCount: number;
   /** Seconds, the frames once through; the sum of `durations` where there are some. */
   readonly duration: number;
+  /** What the animation does once its frames are through. */
   readonly playback: AnimationPlayback;
   /** Seconds per frame, or `undefined` for an animation of one duration. */
   readonly durations: readonly number[] | undefined;
@@ -47,6 +66,7 @@ export interface FrameBasedAnimationInfo {
   readonly cycleDuration: number;
 }
 
+/** The options of {@link FrameBasedAnimations.bakeDataTexture}. */
 export interface BakeTextureOptions {
   /**
    * Gives every frame a second texel, `[width, height, flipDiagonal, endTime]`. A bake with a frame
@@ -312,6 +332,10 @@ const renderFloatsBuffer = (
   return floatsBuffer;
 };
 
+/**
+ * Registers animations over the frames of a {@link TextureAtlas}, of a {@link TileSet} or of a list of
+ * {@link TextureCoords}, and bakes them into a data texture that `AnimatedFrames` reads.
+ */
 export class FrameBasedAnimations {
   /**
    * The widest data texture a bake builds when it is told no limit: 8192 texels, the

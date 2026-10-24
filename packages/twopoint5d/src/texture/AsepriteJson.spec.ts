@@ -397,6 +397,187 @@ describe('AsepriteJson', () => {
       expect(AsepriteJson.parse(data)[2].animation('a').frameCount).toBe(9000);
     });
 
+    describe('the shape of the json', () => {
+      const target = () => new TextureAtlas<AsepriteFrameData>();
+
+      test.each([undefined, null, 'x', 3])('refuses a json that is %j', (data) => {
+        const t = target();
+        expect(() => AsepriteJson.parse(data as never, {target: t})).toThrow(TypeError);
+        expect(() => AsepriteJson.parse(data as never, {target: t})).toThrow(
+          `AsepriteJson: the json is ${data === undefined ? 'undefined' : JSON.stringify(data)} — Aseprite writes an object {frames, meta}`,
+        );
+        expect(t.size).toBe(0);
+      });
+
+      test.each([undefined, null, 'x', 3])('refuses frames that are %j', (frames) => {
+        const data = {...sheet(1), frames} as never;
+        expect(() => AsepriteJson.parse(data)).toThrow(TypeError);
+        expect(() => AsepriteJson.parse(data)).toThrow(
+          `AsepriteJson: the json has frames of ${frames === undefined ? 'undefined' : JSON.stringify(frames)} — Aseprite writes the frames as an object ("Hash") or a list ("Array")`,
+        );
+      });
+
+      test.each([undefined, null, 'x'])('refuses a meta that is %j, with parentCoords as well', (meta) => {
+        const data = {...sheet(1), meta} as never;
+        const message = `AsepriteJson: the json has a meta of ${meta === undefined ? 'undefined' : JSON.stringify(meta)} — Aseprite writes meta as an object`;
+        expect(() => AsepriteJson.parse(data)).toThrow(TypeError);
+        expect(() => AsepriteJson.parse(data)).toThrow(message);
+        expect(() => AsepriteJson.parse(data, {parentCoords: new TextureCoords(0, 0, 4, 4)})).toThrow(message);
+      });
+
+      test('refuses a frame of the layout "Array" without a string filename, before the duplicate and duration checks', () => {
+        const entry = {frame: {x: 0, y: 0, w: 4, h: 4}, duration: 100};
+        const t = target();
+        const data = {frames: [entry, {...entry, filename: 7}], meta: sheet(1).meta} as never;
+        expect(() => AsepriteJson.parse(data, {target: t})).toThrow(TypeError);
+        expect(() => AsepriteJson.parse(data, {target: t})).toThrow(
+          'AsepriteJson: the frame 0 of the "Array" frames has a filename of undefined — a frame of that layout is named by its filename, a string',
+        );
+        expect(t.size).toBe(0);
+      });
+
+      test.each([undefined, null, 3])('refuses a frame tag with a name of %j', (name) => {
+        const data = sheet(2, {frameTags: [{name, from: 0, to: 1, direction: 'forward'} as never]});
+        expect(() => AsepriteJson.parse(data)).toThrow(TypeError);
+        expect(() => AsepriteJson.parse(data)).toThrow(
+          `AsepriteJson: the frame tag 0 has a name of ${name === undefined ? 'undefined' : JSON.stringify(name)} — a frame tag is named by a string`,
+        );
+      });
+
+      test('takes a frame tag named by the empty string; the animation gets a name of the counter', () => {
+        const data = sheet(2, {frameTags: [{name: '', from: 0, to: 1, direction: 'forward'}]});
+        expect(AsepriteJson.parse(data)[2].animation('anim_0').frameCount).toBe(2);
+      });
+    });
+
+    describe('meta.slices', () => {
+      const rect = {x: 0, y: 0, w: 2, h: 2};
+      const slice = (over: Record<string, unknown> = {}, key: Record<string, unknown> = {}) =>
+        ({name: 's', keys: [{frame: 0, bounds: rect, ...key}], ...over}) as never;
+      const slicesOf = (...slices: unknown[]) => sheet(2, {slices: slices as never});
+
+      test('takes a sheet whose slices have no keys, no center and no pivot, and a key past the frames', () => {
+        const [atlas] = AsepriteJson.parse(
+          slicesOf(slice({keys: undefined}), slice({name: 't', keys: null}), slice({name: 'u'}, {frame: 9}), {
+            name: 'v',
+            keys: [{frame: 0, bounds: rect, center: null, pivot: undefined}],
+          }),
+        );
+        expect(Object.keys(atlas.frame('f0')!.data!.slices)).toEqual(['v']);
+      });
+
+      test('takes a pivot outside the bounds and a bounds of x, y below 0', () => {
+        expect(() =>
+          AsepriteJson.parse(slicesOf(slice({}, {bounds: {x: -3, y: -3, w: 0, h: 0}, pivot: {x: -9, y: 99}}))),
+        ).not.toThrow();
+      });
+
+      test.each([
+        [
+          'meta.slices that is no list',
+          {...sheet(1), meta: {...sheet(1).meta, slices: 'x'}},
+          TypeError,
+          'meta.slices is "x" — Aseprite writes the slices as a list',
+        ],
+        ['a slice that is no object', slicesOf(3), TypeError, 'the slice 0 is 3 — a slice is an object'],
+        [
+          'a slice without a name',
+          slicesOf(slice({name: undefined})),
+          TypeError,
+          'the slice 0 has a name of undefined — a slice is named by a string',
+        ],
+        [
+          'two slices of one name',
+          slicesOf(slice(), slice()),
+          Error,
+          'two slices are named "s" — rename one of them in Aseprite',
+        ],
+        [
+          'keys that are no list',
+          slicesOf(slice({keys: 'x'})),
+          TypeError,
+          'the slice "s" has keys of "x" — Aseprite writes the keys of a slice as a list',
+        ],
+        [
+          'a key that is no object',
+          slicesOf(slice({keys: [4]})),
+          TypeError,
+          'the key 0 of the slice "s" is 4 — a key of a slice is an object',
+        ],
+        [
+          'a key frame of 1.5',
+          slicesOf(slice({}, {frame: 1.5})),
+          RangeError,
+          'the frame of the key 0 of the slice "s" must be a whole number of 0 or more, got 1.5',
+        ],
+        [
+          'a key frame below 0',
+          slicesOf(slice({}, {frame: -1})),
+          RangeError,
+          'the frame of the key 0 of the slice "s" must be a whole number of 0 or more, got -1',
+        ],
+        [
+          'a key without a frame',
+          slicesOf(slice({}, {frame: undefined})),
+          RangeError,
+          'the frame of the key 0 of the slice "s" must be a whole number of 0 or more, got undefined',
+        ],
+        [
+          'bounds that are missing',
+          slicesOf(slice({}, {bounds: undefined})),
+          TypeError,
+          'the bounds of the key 0 of the slice "s" is undefined — a rectangle of a slice is an object {x, y, w, h}',
+        ],
+        [
+          'a center that is no object',
+          slicesOf(slice({}, {center: 5})),
+          TypeError,
+          'the center of the key 0 of the slice "s" is 5 — a rectangle of a slice is an object {x, y, w, h}',
+        ],
+        [
+          'an x of NaN in the bounds',
+          slicesOf(slice({}, {bounds: {...rect, x: NaN}})),
+          RangeError,
+          'the x of the bounds of the key 0 of the slice "s" must be a finite number, got NaN',
+        ],
+        [
+          'a y of "1" in the center',
+          slicesOf(slice({}, {center: {...rect, y: '1'}})),
+          RangeError,
+          'the y of the center of the key 0 of the slice "s" must be a finite number, got "1"',
+        ],
+        [
+          'a w of -1 in the bounds',
+          slicesOf(slice({}, {bounds: {...rect, w: -1}})),
+          RangeError,
+          'the w of the bounds of the key 0 of the slice "s" must be a finite number of 0 or more, got -1',
+        ],
+        [
+          'an h of Infinity in the center',
+          slicesOf(slice({}, {center: {...rect, h: Infinity}})),
+          RangeError,
+          'the h of the center of the key 0 of the slice "s" must be a finite number, got Infinity',
+        ],
+        [
+          'a pivot that is no object',
+          slicesOf(slice({}, {pivot: 'x'})),
+          TypeError,
+          'the pivot of the key 0 of the slice "s" is "x" — a pivot is an object {x, y}',
+        ],
+        [
+          'a pivot x of NaN',
+          slicesOf(slice({}, {pivot: {x: NaN, y: 0}})),
+          RangeError,
+          'the x of the pivot of the key 0 of the slice "s" must be a finite number, got NaN',
+        ],
+      ])('refuses %s', (_, data, errorClass, message) => {
+        const t = new TextureAtlas<AsepriteFrameData>();
+        expect(() => AsepriteJson.parse(data as AsepriteJsonData, {target: t})).toThrow(errorClass);
+        expect(() => AsepriteJson.parse(data as AsepriteJsonData, {target: t})).toThrow(`AsepriteJson: ${message}`);
+        expect(t.size).toBe(0);
+      });
+    });
+
     test('a refused sheet leaves the target atlas as it was', () => {
       const target = new TextureAtlas<never>();
 

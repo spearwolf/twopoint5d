@@ -29,6 +29,7 @@ import {TextureCoords} from './TextureCoords.js';
 // +---------------------------------------------+
 //
 
+/** The layout of a {@link TileSet}: the size of a tile, the spaces around and between tiles, how many there are and where their ids start. */
 export interface TileSetOptions {
   /** The width of one tile — a finite number above 0. Defaults to the width of the `baseCoords`. */
   tileWidth?: number;
@@ -82,7 +83,15 @@ export class TileSet<D = TextureAtlasFrameData> {
    */
   static readonly MaxTiles: number = 1_048_576;
 
+  /**
+   * The atlas that holds the frame of every tile — the one handed to the constructor, or one the
+   * constructor built when none was given.
+   */
   readonly atlas: TextureAtlas<D>;
+  /**
+   * The area the tiles lie in, the whole image of the tile set or a part of it. The tile size, the
+   * `margin`, the `padding` and the `spacing` are in its units.
+   */
   readonly baseCoords: TextureCoords;
 
   /**
@@ -137,10 +146,12 @@ export class TileSet<D = TextureAtlasFrameData> {
     this.#createTextureCoords();
   }
 
+  /** The width of one tile, in the units of the `baseCoords`: the option `tileWidth`, or the width of the `baseCoords`. */
   get tileWidth(): number {
     return this.options.tileWidth ?? this.baseCoords.width;
   }
 
+  /** The height of one tile, in the units of the `baseCoords`: the option `tileHeight`, or the height of the `baseCoords`. */
   get tileHeight(): number {
     return this.options.tileHeight ?? this.baseCoords.height;
   }
@@ -166,18 +177,25 @@ export class TileSet<D = TextureAtlasFrameData> {
     return this.firstFrameId + this.tileCount - 1;
   }
 
+  /**
+   * The option `tileCount`, or `Infinity` when none was given. It is the limit that was asked for;
+   * the number of tiles the set holds is {@link tileCount}.
+   */
   get tileCountLimit(): number {
     return this.options.tileCount ?? Infinity;
   }
 
+  /** The space around the whole grid of tiles, in the units of the `baseCoords`: the option `margin`, or 0. */
   get margin(): number {
     return this.options.margin ?? 0;
   }
 
+  /** The space around each tile inside its cell, in the units of the `baseCoords`: the option `padding`, or 0. */
   get padding(): number {
     return this.options.padding ?? 0;
   }
 
+  /** The space between two neighbouring tiles, in the units of the `baseCoords`: the option `spacing`, or 0. */
   get spacing(): number {
     return this.options.spacing ?? 0;
   }
@@ -190,10 +208,12 @@ export class TileSet<D = TextureAtlasFrameData> {
     return ((((tileId - this.firstId) % this.tileCount) + this.tileCount) % this.tileCount) + this.firstFrameId;
   }
 
+  /** A `tileId` drawn at random from `firstId` to `lastId`, each as likely as any other. */
   randomTileId(): number {
     return this.firstId + randomInt(this.tileCount);
   }
 
+  /** The `frameId` of a tile drawn at random, from `firstFrameId` to `lastFrameId`, each as likely as any other. */
   randomFrameId(): number {
     return this.firstFrameId + randomInt(this.tileCount);
   }
@@ -206,6 +226,7 @@ export class TileSet<D = TextureAtlasFrameData> {
     return this.atlas.get(this.frameId(tileId))!;
   }
 
+  /** The frame of a tile drawn at random, as {@link randomFrameId} draws it. */
   randomFrame(): TextureAtlasFrame<D> {
     return this.atlas.get(this.randomFrameId())!;
   }

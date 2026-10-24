@@ -373,6 +373,8 @@ It reads its own keys only — an inherited one such as `constructor` names no t
 that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the first
 frame goes into the atlas: a refused sheet leaves `options.target` as it was.
 
+A json that Aseprite does not write that way — without `frames` or `meta`, a frame of the layout "Array" without a `filename`, a tag or a slice without a `name`, slice keys, `bounds`, `center` or `pivot` the parser cannot read, two slices of one name — is refused before the first frame goes into the atlas, and the error names what is wrong.
+
 ```ts check
 import {AnimatedSpriteKind, AsepriteJson, type AsepriteJsonData, FeatureSprites} from '@spearwolf/twopoint5d';
 import type {Texture} from 'three/webgpu';

@@ -4,6 +4,13 @@ import {forgetFrameName, liveFrameIds} from './internals.js';
 import type {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
 
+// a count of random draws is a whole number of 0 or more; `Number.isInteger()` takes NaN and the infinities out too
+function assertCount(count: unknown, call: string): asserts count is number {
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+    throw new RangeError(`TextureAtlas#${call}(): count must be a whole number of 0 or more, got ${describeValue(count)}`);
+  }
+}
+
 /**
  * The data a frame of a {@link TextureAtlas} carries when the atlas names no type of its own: its entry
  * in a TexturePacker json.
@@ -170,8 +177,13 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     return this.#frameNameList[randomInt(this.#frameNameList.length)];
   }
 
-  /** `count` frame ids, each drawn as {@link randomFrameId} draws one. */
+  /**
+   * `count` frame ids, each drawn as {@link randomFrameId} draws one; `[]` for a `count` of 0.
+   *
+   * @throws {RangeError} if `count` is no whole number of 0 or more.
+   */
   randomFrameIds(count: number): number[] {
+    assertCount(count, 'randomFrameIds');
     const frameIds: number[] = [];
     for (let i = 0; i < count; i++) {
       frameIds.push(this.randomFrameId());
@@ -181,9 +193,12 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
 
   /**
    * `count` frames drawn at random among those the atlas has not let go of; every one of them is
-   * `undefined` for an atlas without such a frame.
+   * `undefined` for an atlas without such a frame; `[]` for a `count` of 0.
+   *
+   * @throws {RangeError} if `count` is no whole number of 0 or more.
    */
   randomFrames(count: number): (TextureAtlasFrame<D> | undefined)[] {
+    assertCount(count, 'randomFrames');
     const frames: (TextureAtlasFrame<D> | undefined)[] = [];
     for (let i = 0; i < count; i++) {
       frames.push(this.randomFrame());
@@ -191,8 +206,14 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     return frames;
   }
 
-  /** `count` frame names drawn at random; every one of them is `undefined` for an atlas without named frames. */
+  /**
+   * `count` frame names drawn at random; every one of them is `undefined` for an atlas without named
+   * frames; `[]` for a `count` of 0.
+   *
+   * @throws {RangeError} if `count` is no whole number of 0 or more.
+   */
   randomFrameNames(count: number): (TextureAtlasFrameName | undefined)[] {
+    assertCount(count, 'randomFrameNames');
     const names: (TextureAtlasFrameName | undefined)[] = [];
     for (let i = 0; i < count; i++) {
       names.push(this.randomFrameName());

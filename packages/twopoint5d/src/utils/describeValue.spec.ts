@@ -172,4 +172,31 @@ describe('describeValue', () => {
   ])('shows anything else as String() does: %s', (value, written) => {
     expect(describeValue(value)).toBe(written);
   });
+
+  describe('a key of an object', () => {
+    test('cuts a bare key of more than 120 units short and quotes it', () => {
+      const key = 'a'.repeat(121);
+      expect(describeValue({[key]: 1})).toBe(`{"${'a'.repeat(120)}…": 1}`);
+    });
+
+    test('cuts a key with a space of more than 120 units short', () => {
+      const key = `a ${'b'.repeat(120)}`;
+      expect(describeValue({[key]: 1})).toBe(`{"${key.slice(0, 120)}…": 1}`);
+    });
+
+    test('keeps a bare key of exactly 120 units bare and whole', () => {
+      const key = 'a'.repeat(120);
+      expect(describeValue({[key]: 1})).toBe(`{${key}: 1}`);
+    });
+
+    test('keeps a quoted key of exactly 120 units whole', () => {
+      const key = `a ${'b'.repeat(118)}`;
+      expect(describeValue({[key]: 1})).toBe(`{"${key}": 1}`);
+    });
+
+    test('ends a key it cuts short before a surrogate pair that unit 120 would split', () => {
+      const key = `${'a'.repeat(119)}😀b`;
+      expect(describeValue({[key]: 1})).toBe(`{"${'a'.repeat(119)}…": 1}`);
+    });
+  });
 });

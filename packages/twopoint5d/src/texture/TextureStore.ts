@@ -944,7 +944,7 @@ export class TextureStore {
       if ('refused' in checked) continue;
       const existing = this.#resources.get(id);
       if (existing && existing.type !== checked.type) {
-        conflicts.push(`"${id}" is a "${existing.type}" resource and cannot become "${checked.type}"`);
+        conflicts.push(`"${id}" is ${articleOf(existing.type)} "${existing.type}" resource and cannot become "${checked.type}"`);
       }
     }
 

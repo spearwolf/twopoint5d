@@ -308,6 +308,15 @@ entry; the guide says to export without them.
 - A frame name twice in the layout "Array" — Aseprite writes it when the filename format holds no
   `{frame}` — is refused (`AsepriteJson: the frame name "x" appears twice — export with a filename
   format that contains {frame}`); in "Hash" a second key is gone by the time `JSON.parse()` is done.
+- A json, `frames` or `meta` that is no object, a frame of the layout "Array" without a string
+  `filename` and a tag without a string `name` are refused with a `TypeError`. The slices of
+  `meta.slices` are held to the checks the tags have: `meta.slices` that is no list, a slice that is no
+  object or has no string `name`, keys that are no list (absent or `null` is no keys), a key that is
+  no object, and a `bounds` (required), `center` or `pivot` (absent or `null` is missing) that is no
+  object, are a `TypeError`; a `frame` of a key that is no whole number `≥ 0` and an `x`, `y`, `w` or
+  `h` that is no finite number, or a `w` or `h` below 0, are a `RangeError`; two slices of one name
+  are an `Error` (`… — rename one of them in Aseprite`). A `frame` past the last frame is fine: the
+  key then holds at no frame, and a `pivot` may lie outside the `bounds`.
 - Every check runs before the first frame is added, the animations are planned there as well:
   a refused sheet leaves `options.target` as it was, and no `add()` that follows throws.
 
@@ -342,7 +351,7 @@ export interface AsepriteFrameData extends TexturePackerFrameData {
 A slice key holds from its `frame` up to the frame before the next key; frames before the first
 key carry no entry for that slice. `NineSlice` (phase D) reads `center` and `bounds`, `Anchor`
 (phase D) `pivot`; both convert to fractions of the frame themselves. `meta.slices` stays in
-`meta` unchanged.
+`meta` unchanged; the slices are checked before a frame is added (§5.2).
 
 ### 5.4 The signature
 

@@ -289,6 +289,24 @@ describe('TextureAtlas', () => {
     expect(typeof names[0] === 'string').toBeTruthy();
   });
 
+  describe('a count of random frames', () => {
+    const atlas = new TextureAtlas();
+    atlas.add('a', new TextureCoords());
+
+    test.each(['randomFrameIds', 'randomFrames', 'randomFrameNames'] as const)('%s(0) answers an empty list', (method) => {
+      expect(atlas[method](0)).toEqual([]);
+    });
+
+    test.each([NaN, -1, 2.5, '3', Infinity])('refuses the count %j with a RangeError naming the call', (count) => {
+      for (const method of ['randomFrameIds', 'randomFrames', 'randomFrameNames'] as const) {
+        expect(() => atlas[method](count as number)).toThrow(RangeError);
+        expect(() => atlas[method](count as number)).toThrow(
+          `TextureAtlas#${method}(): count must be a whole number of 0 or more, got ${typeof count === 'string' ? `"${count}"` : count}`,
+        );
+      }
+    });
+  });
+
   describe('index boundaries', () => {
     test('get(), frame() and frameId() at and past the edges', () => {
       const atlas = new TextureAtlas();

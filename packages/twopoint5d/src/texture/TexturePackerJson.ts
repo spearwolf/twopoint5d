@@ -61,7 +61,7 @@ export class TexturePackerJson {
    *
    * Every frame is checked before the first one is added to the `target`.
    *
-   * @throws {TypeError} if a frame is no object, its `frame` is no object, a frame of the "JSON Array"
+   * @throws {TypeError} if the json is no object, its `frames` are neither an object nor a list, a frame is no object, its `frame` is no object, a frame of the "JSON Array"
    * format has a `filename` that is no string, or — without `parentCoords` — the json has no `meta.size`;
    * the `target` stays as it was.
    * @throws {RangeError} if an `x`, `y`, `w` or `h` of a `frame` is no finite number of 0 or more, or —
@@ -76,6 +76,18 @@ export class TexturePackerJson {
     target?: TextureAtlas<D>,
   ): [atlas: TextureAtlas<D>, meta: TexturePackerMetaData] {
     target ??= new TextureAtlas<D>();
+
+    if (!isObject(data)) {
+      throw new TypeError(
+        `TexturePackerJson: the json is ${describeValue(data)} — a texture atlas json is an object {frames, meta}`,
+      );
+    }
+    const jsonFrames: unknown = data.frames;
+    if (!Array.isArray(jsonFrames) && !isObject(jsonFrames)) {
+      throw new TypeError(
+        `TexturePackerJson: the json has frames of ${describeValue(jsonFrames)} — the frames are an object ("JSON Hash") or a list ("JSON Array")`,
+      );
+    }
 
     if (parentCoords === undefined) {
       const size: unknown = isObject(data.meta) ? data.meta.size : undefined;

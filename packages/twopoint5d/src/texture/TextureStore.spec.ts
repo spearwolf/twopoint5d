@@ -1634,7 +1634,7 @@ describe('TextureStore', () => {
         });
       expect(conflicting).toThrow(TypeError);
       expect(conflicting).toThrow(
-        'TextureStore: parse() found 1 item(s) of a conflicting type: "b" is a "image" resource and cannot become "tileset"',
+        'TextureStore: parse() found 1 item(s) of a conflicting type: "b" is an "image" resource and cannot become "tileset"',
       );
 
       expect(a.imageUrl).toBe('a.png');
@@ -1652,7 +1652,7 @@ describe('TextureStore', () => {
         });
       expect(conflicting).toThrow(TypeError);
       expect(conflicting).toThrow(
-        'TextureStore: parse() found 1 item(s) of a conflicting type: "a" is a "image" resource and cannot become "tileset"',
+        'TextureStore: parse() found 1 item(s) of a conflicting type: "a" is an "image" resource and cannot become "tileset"',
       );
 
       expect(store.defaultTextureClasses).toEqual(['nearest']);
@@ -3120,7 +3120,7 @@ describe('TextureStore', () => {
       const errors = collectErrors(store);
 
       expect(() => store.parse({items: {a: {tileSet: {tileWidth: 8, tileHeight: 8}}, b: {imageUrl: 5}}} as never)).toThrow(
-        'TextureStore: parse() found 1 item(s) of a conflicting type: "a" is a "image" resource and cannot become "tileset"',
+        'TextureStore: parse() found 1 item(s) of a conflicting type: "a" is an "image" resource and cannot become "tileset"',
       );
 
       expect(errors).toHaveLength(0);
