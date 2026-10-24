@@ -1,4 +1,5 @@
 import {describe, expect, test} from 'vitest';
+import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 
 describe('Map2DTileCoordsUtil', () => {
@@ -284,6 +285,58 @@ describe('Map2DTileCoordsUtil', () => {
         tileHeight: 16,
         columns: 2,
         rows: 2,
+      });
+    });
+  });
+
+  describe('a selection that is no finite area', () => {
+    const methods = ['getTileCoords', 'computeTilesWithinCoords'] as const;
+
+    const selection = (field: string, value: unknown): [unknown, unknown, unknown, unknown] => {
+      const args: [unknown, unknown, unknown, unknown] = [1, 2, 3, 4];
+      args[['left', 'top', 'width', 'height'].indexOf(field)] = value;
+      return args;
+    };
+
+    const refusals: [string, string, unknown][] = [];
+    for (const field of ['left', 'top']) {
+      for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, '3']) {
+        refusals.push([field, 'a finite number', value]);
+      }
+    }
+    for (const field of ['width', 'height']) {
+      for (const value of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+        refusals.push([field, 'a finite number of 0 or more', value]);
+      }
+    }
+
+    describe.each(methods)('%s()', (method) => {
+      test.each(refusals)('refuses %s that is %s: %p', (field, what, value) => {
+        const grid = new Map2DTileCoordsUtil(16, 16);
+        const args = selection(field, value) as [number, number, number, number];
+        const call = () => (grid[method] as (...a: unknown[]) => unknown)(...args);
+
+        expect(call).toThrow(RangeError);
+        expect(call).toThrow(
+          `Map2DTileCoordsUtil#${method}(): ${field} must be ${what}, got ${typeof value === 'string' ? `"${value}"` : String(value)}`,
+        );
+      });
+
+      test('leaves target as it was', () => {
+        const grid = new Map2DTileCoordsUtil(16, 16);
+        const tuple: [number, number, number, number] = [7, 7, 7, 7];
+        const within: TilesWithinCoords = {...createTilesWithinCoords(), rows: 7, columns: 7};
+        const target = method === 'getTileCoords' ? tuple : within;
+        const before = structuredClone(target);
+
+        expect(() => (grid[method] as (...a: unknown[]) => unknown)(Number.NaN, 0, 1, 1, target)).toThrow(RangeError);
+        expect(target).toEqual(before);
+      });
+
+      test('takes a width and a height of 0', () => {
+        const grid = new Map2DTileCoordsUtil(16, 16);
+
+        expect(() => (grid[method] as (...a: unknown[]) => unknown)(0, 0, 0, 0)).not.toThrow();
       });
     });
   });

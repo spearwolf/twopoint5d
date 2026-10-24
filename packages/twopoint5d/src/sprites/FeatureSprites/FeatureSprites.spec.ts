@@ -295,6 +295,33 @@ describe('FeatureSprites', () => {
     expect(() => sprites.update()).not.toThrow();
   });
 
+  describe('once the sprites are disposed', () => {
+    test('the placement setter turns away a feature that cannot stand in, and a malformed one', () => {
+      const sprites = new FeatureSprites(kind);
+      const start = kind.pipeline.placement!.name;
+      sprites.dispose();
+
+      expect(() => {
+        sprites.placement = Tint;
+      }).toThrow(
+        new TypeError(`FeatureSprites: feature "tint" contributes no placement stage and cannot stand in for "${start}"`),
+      );
+      expect(() => {
+        sprites.placement = {name: 'odd', placement: 5} as never;
+      }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function'));
+      expect(sprites.placement).toBeUndefined();
+    });
+
+    test('bindUniform() turns away what is no source', () => {
+      const sprites = new FeatureSprites(kind);
+      sprites.dispose();
+
+      expect(() => sprites.bindUniform('x', {} as never)).toThrow(
+        new TypeError('FeatureSprites: bindUniform("x") takes a source with a type of vec3 or vec4 and a write()'),
+      );
+    });
+  });
+
   describe('dispose()', () => {
     test('disposes the geometry and the material it built itself', () => {
       const sprites = new FeatureSprites(kind);
@@ -435,6 +462,25 @@ describe('FeatureSprites', () => {
       expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
     });
 
+    test.each([
+      ['options that are null', null, 'the options must be an object, got null'],
+      ['options that are a number', 5, 'the options must be an object, got 5'],
+      ['options that are an array', [], 'the options must be an object, got []'],
+      ['passes that are a number', {passes: 5}, 'passes is a list of passes, got 5'],
+      ['passes that are a string', {passes: 'ab'}, 'passes is a list of passes, got "ab"'],
+      ['passes that are null', {passes: null}, 'passes is a list of passes, got null'],
+      ['a pass that is null', {passes: [null]}, 'a pass is an object with a name and features, got null'],
+    ])('refuses %s and leaves nothing built', (_label, options, message) => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(kind, options as never)).toThrow(new TypeError(`FeatureSprites: ${message}`));
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
     test('leaves a geometry handed in alone when the material it builds is refused', () => {
       const geometry = new FeatureSpritesGeometry(kind, 1);
       const geometryDispose = sandbox.spy(geometry, 'dispose');
@@ -512,7 +558,7 @@ describe('FeatureSprites', () => {
       sprites.dispose();
     });
 
-    test('lets a placement the material of the sprites refuses reach no pass', () => {
+    test('lets a placement that cannot stand in reach no pass', () => {
       const sprites = new FeatureSprites(kind, {passes: [shadow]});
 
       expect(() => {

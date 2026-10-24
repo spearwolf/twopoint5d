@@ -159,6 +159,11 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
    * split into the tiles to create and to reuse, with the tiles of `previousTiles` that fall out
    * as `removeTiles`.
    *
+   * While nothing the result depends on has changed and `previousTiles` is the `tiles` list of the
+   * last result — the list `Map2DTileStreamer` hands back —, the call hands that result back as it
+   * stands, `serial` included: every tile reused, none to create or to remove. Any other list is
+   * held against a computation of its own.
+   *
    * While a side of the area is `0` the area is switched off: a call hands every tile of
    * `previousTiles` back in `removeTiles` and lays out none, and a call that is given no tile
    * answers `undefined`.
@@ -209,7 +214,9 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     seenCenter[1] = centerY;
     const depsChanged = objectsChanged || centerChanged;
 
-    if (!depsChanged && !this.needsUpdate && this.#visibleTiles != null) {
+    // the result stands only for the list it gave out as `tiles`: another list can hold tiles that
+    // fall out, or lack tiles the result lists
+    if (!depsChanged && !this.needsUpdate && this.#visibleTiles != null && previousTiles === this.#visibleTiles.tiles) {
       this.#visibleTiles.createTiles = undefined;
       this.#visibleTiles.reuseTiles = this.#visibleTiles.tiles;
       this.#visibleTiles.removeTiles = undefined;

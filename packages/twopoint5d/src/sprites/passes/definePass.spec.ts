@@ -1,8 +1,15 @@
 import {describe, expect, test} from 'vitest';
 
+import {defineSprite} from '../defineSprite.js';
+import {FeatureSprites} from '../FeatureSprites/FeatureSprites.js';
+import {FlatPlacement} from '../features/FlatPlacement.js';
+import {InstancePosition} from '../features/InstancePosition.js';
+import {QuadBase} from '../SpriteBase.js';
 import {defineFeature} from '../SpriteFeature.js';
 import {definePass} from './definePass.js';
 import {ShadowPass} from './passPresets.js';
+
+const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement]});
 
 const mask = defineFeature({name: 'mask', uniforms: {shadowColor: [0, 0, 0, 0.5]}, color: {order: 150, transform: (c) => c}});
 
@@ -85,6 +92,94 @@ describe('definePass()', () => {
     expect(() => definePass({name: 'p', features: [], visible: true as never})).toThrow(
       'definePass: the visible of pass "p" is no function',
     );
+  });
+
+  describe('the shape of a pass', () => {
+    const shapes: [string, unknown, string, typeof TypeError | typeof RangeError][] = [
+      ['a pass that is null', null, 'a pass is an object with a name and features, got null', TypeError],
+      ['a pass that is a number', 5, 'a pass is an object with a name and features, got 5', TypeError],
+      ['a pass that is an array', [], 'a pass is an object with a name and features, got []', TypeError],
+      ['features that are undefined', {name: 'p'}, 'the features of pass "p" are no list of features, got undefined', TypeError],
+      [
+        'features that are a string',
+        {name: 'p', features: 'ab'},
+        'the features of pass "p" are no list of features, got "ab"',
+        TypeError,
+      ],
+      [
+        'features that are a Set',
+        {name: 'p', features: new Set()},
+        'the features of pass "p" are no list of features, got [object Set]',
+        TypeError,
+      ],
+      [
+        'a without that is a string',
+        {name: 'p', features: [], without: 'tint'},
+        'the without of pass "p" is no list of feature names, got "tint"',
+        TypeError,
+      ],
+      [
+        'a without that holds a number',
+        {name: 'p', features: [], without: ['tint', 5]},
+        'the without of pass "p" is no list of feature names, got ["tint", 5]',
+        TypeError,
+      ],
+      [
+        'uniformNames that are a number',
+        {name: 'p', features: [], uniformNames: 5},
+        'the uniformNames of pass "p" are no record of uniform names, got 5',
+        TypeError,
+      ],
+      [
+        'uniformNames that are an array',
+        {name: 'p', features: [], uniformNames: []},
+        'the uniformNames of pass "p" are no record of uniform names, got []',
+        TypeError,
+      ],
+      [
+        'a material that is a number',
+        {name: 'p', features: [], material: 5},
+        'the material of pass "p" is no record of material parameters, got 5',
+        TypeError,
+      ],
+      [
+        'a material that is an array',
+        {name: 'p', features: [], material: []},
+        'the material of pass "p" is no record of material parameters, got []',
+        TypeError,
+      ],
+      [
+        'a renderOrder that is NaN',
+        {name: 'p', features: [], renderOrder: Number.NaN},
+        'the renderOrder of pass "p" must be a finite number, got NaN',
+        RangeError,
+      ],
+      [
+        'a renderOrder that is a string',
+        {name: 'p', features: [], renderOrder: '1'},
+        'the renderOrder of pass "p" must be a finite number, got "1"',
+        RangeError,
+      ],
+    ];
+
+    test.each(shapes)('refuses %s', (_label, pass, message, errorClass) => {
+      const define = () => definePass(pass as never);
+
+      expect(define).toThrow(errorClass);
+      expect(define).toThrow(`definePass: ${message}`);
+    });
+
+    test('takes null for without, uniformNames, material and renderOrder as not brought', () => {
+      expect(() =>
+        definePass({name: 'p', features: [], without: null, uniformNames: null, material: null, renderOrder: null} as never),
+      ).not.toThrow();
+    });
+
+    test('is checked by FeatureSprites for a pass that never went through definePass()', () => {
+      for (const [, pass, message] of shapes) {
+        expect(() => new FeatureSprites(kind, {passes: [pass as never]}), message).toThrow(`FeatureSprites: ${message}`);
+      }
+    });
   });
 
   describe('uniformNames', () => {

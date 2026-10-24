@@ -73,6 +73,19 @@ describe('tableFrame()', () => {
     );
   });
 
+  test.each([
+    [5, '5'],
+    ['x', '"x"'],
+    [null, 'null'],
+  ])('refuses options of %o that are no object', (options, shown) => {
+    expect(() => tableFrame(options as never)).toThrow(TypeError);
+    expect(() => tableFrame(options as never)).toThrow(`tableFrame: the options must be an object, {views?}, got ${shown}`);
+  });
+
+  test('takes options that are undefined', () => {
+    expect(() => tableFrame(undefined)).not.toThrow();
+  });
+
   test('takes views up to 64', () => {
     expect(tableFrame({views: 64}).name).toBe('tableFrame+views64');
   });

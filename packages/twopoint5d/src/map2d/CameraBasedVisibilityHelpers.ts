@@ -1,6 +1,8 @@
 import type {ColorRepresentation, LineBasicMaterial, Object3D} from 'three/webgpu';
 import {Box3, Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector2, Vector3} from 'three/webgpu';
+import {assertFinite} from '../utils/assertFinite.js';
 import {Dependencies, type DependencyValues} from '../utils/Dependencies.js';
+import {describeValue} from '../utils/describeValue.js';
 import type {CameraBasedVisibility, TileBox} from './CameraBasedVisibility.js';
 import {HelpersManager} from './HelpersManager.js';
 import type {IMap2DVisibilitorHelpers} from './types.js';
@@ -49,16 +51,66 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   #show = false;
   #disposed = false;
 
+  // read by `update()` through the fields, never through the accessors: an accessor the compiler
+  // leaves un-inlined boxes the double it answers
+  #maxDebugHelpers = 9;
+  #tileBoxHelperExpand = -0.01;
+  #frustumBoxHelperExpand = 0;
+
   /**
    * How many frustum box helpers are built for the tiles that are not primary — every tile but
    * those around the points where a probe ray met the plane: the tile a point lies in and those a
    * rectangle of one tile size around it reaches into. The frustum boxes of the primary tiles and
    * the tile boxes are not meant: those follow the number of visible tiles.
+   *
+   * A whole number of 0 or more, or `Infinity`; any other value throws a `RangeError` and the
+   * field keeps what it held. Taken and checked after {@link dispose} as well.
    */
-  maxDebugHelpers = 9;
+  get maxDebugHelpers(): number {
+    return this.#maxDebugHelpers;
+  }
 
-  tileBoxHelperExpand = -0.01;
-  frustumBoxHelperExpand = 0;
+  set maxDebugHelpers(value: number) {
+    if (!(Number.isInteger(value) && value >= 0) && value !== Infinity) {
+      throw new RangeError(
+        `CameraBasedVisibilityHelpers: maxDebugHelpers must be a whole number of 0 or more, or Infinity, got ${describeValue(value)}`,
+      );
+    }
+    this.#maxDebugHelpers = value;
+  }
+
+  /**
+   * The factor of its size by which the box of a tile helper grows on every side: the box is
+   * widened by its size times this factor, so `0.1` adds a tenth of the size on each side and a
+   * negative value shrinks the box. The default `-0.01` keeps the boxes of neighbouring tiles
+   * apart.
+   *
+   * Any finite number; another value throws a `RangeError` and the field keeps what it held.
+   * Taken and checked after {@link dispose} as well.
+   */
+  get tileBoxHelperExpand(): number {
+    return this.#tileBoxHelperExpand;
+  }
+
+  set tileBoxHelperExpand(value: number) {
+    this.#tileBoxHelperExpand = assertFinite(value, 'CameraBasedVisibilityHelpers', 'tileBoxHelperExpand');
+  }
+
+  /**
+   * The factor of its size by which the box of a frustum helper grows on every side, as
+   * {@link tileBoxHelperExpand} does for the tile boxes. The default `0` draws the boxes as they
+   * are.
+   *
+   * Any finite number; another value throws a `RangeError` and the field keeps what it held.
+   * Taken and checked after {@link dispose} as well.
+   */
+  get frustumBoxHelperExpand(): number {
+    return this.#frustumBoxHelperExpand;
+  }
+
+  set frustumBoxHelperExpand(value: number) {
+    this.#frustumBoxHelperExpand = assertFinite(value, 'CameraBasedVisibilityHelpers', 'frustumBoxHelperExpand');
+  }
 
   frustumBoxHelperColor = new Color(0x777777);
   frustumBoxPrimaryHelperColor = new Color(0xffffff);
@@ -212,7 +264,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
       // The loop bound is `visibles.length`.
       const tile = visibles[i]!;
 
-      if (!tile.primary && debugHelpers < this.maxDebugHelpers) {
+      if (!tile.primary && debugHelpers < this.#maxDebugHelpers) {
         debugHelpers += 1;
         this.#placeFrustumBoxHelper(tile.frustumBox, this.frustumBoxHelperColor);
       }
@@ -260,7 +312,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     helper.box.copy(box);
     // the factor is read here and multiplied in place rather than handed on as an argument: a
     // fractional value handed to a call the compiler does not inline is boxed, once per box
-    const expand = frustumBox ? this.frustumBoxHelperExpand : this.tileBoxHelperExpand;
+    const expand = frustumBox ? this.#frustumBoxHelperExpand : this.#tileBoxHelperExpand;
     const size = helper.box.getSize(_size);
     size.x *= expand;
     size.y *= expand;
@@ -365,12 +417,12 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
 
     const seen = this.#seenKnobs;
     const numbersChanged =
-      this.maxDebugHelpers !== seen[SEEN_MAX_DEBUG_HELPERS] ||
-      this.tileBoxHelperExpand !== seen[SEEN_TILE_BOX_HELPER_EXPAND] ||
-      this.frustumBoxHelperExpand !== seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND];
-    seen[SEEN_MAX_DEBUG_HELPERS] = this.maxDebugHelpers;
-    seen[SEEN_TILE_BOX_HELPER_EXPAND] = this.tileBoxHelperExpand;
-    seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND] = this.frustumBoxHelperExpand;
+      this.#maxDebugHelpers !== seen[SEEN_MAX_DEBUG_HELPERS] ||
+      this.#tileBoxHelperExpand !== seen[SEEN_TILE_BOX_HELPER_EXPAND] ||
+      this.#frustumBoxHelperExpand !== seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND];
+    seen[SEEN_MAX_DEBUG_HELPERS] = this.#maxDebugHelpers;
+    seen[SEEN_TILE_BOX_HELPER_EXPAND] = this.#tileBoxHelperExpand;
+    seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND] = this.#frustumBoxHelperExpand;
 
     const knobsChanged = colorsChanged || numbersChanged;
 
@@ -387,8 +439,8 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
    *
    * Afterwards {@link isDisposed} is `true` and {@link show} answers `false`, while a write to
    * `show`, {@link add}, {@link remove}, {@link update} and a second {@link dispose} do
-   * nothing. The public fields of this class still take values, and none of them has an effect
-   * any more.
+   * nothing. The public fields of this class still take values and go on turning away invalid
+   * ones, and none of them has an effect any more.
    */
   dispose(): void {
     if (this.#disposed) return;

@@ -600,6 +600,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * indices belong to a grid this one cannot place. A first call has no earlier grid to hold
    * against and takes `previousTiles` as belonging to the grid it is given.
    *
+   * While nothing the result depends on has changed and `previousTiles` is the `tiles` list of the
+   * last result — the list `Map2DTileStreamer` hands back —, the call hands that result back as it
+   * stands, `serial` included: every tile reused, none to create or to remove. Any other list is
+   * held against a computation of its own. After an `undefined` answer only an empty
+   * `previousTiles` gets `undefined` again.
+   *
    * `tiles` of the result lists the tiles in the order of {@link visibles}, nearest to the
    * camera first.
    *
@@ -636,7 +642,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     // class reads none of them.
     this.camera.updateWorldMatrix(true, false);
 
-    if (!this.#dependenciesChanged(matrixWorld)) {
+    // the result stands only for the list it gave out as `tiles` — and `undefined` only for an empty
+    // list: any other list can hold tiles that fall out, and those have to go out in `removeTiles`
+    if (
+      !this.#dependenciesChanged(matrixWorld) &&
+      (this.#visibleTiles === undefined ? previousTiles.length === 0 : previousTiles === this.#visibleTiles.tiles)
+    ) {
       if (this.#visibleTiles) {
         this.#visibleTiles.createTiles = undefined;
         this.#visibleTiles.reuseTiles = this.#visibleTiles.tiles;

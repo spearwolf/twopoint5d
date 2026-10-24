@@ -1198,7 +1198,8 @@ placed = instancePosition + turn · plane · local
 feature, which the placement swap needs. `FlatPlacement` is `flatPlacement()`, `GroundPlacement` is
 `flatPlacement({plane: 'xz'})`. The six forms are named `flatPlacement`, `groundPlacement`,
 `flatPlacement+yaw`, `groundPlacement+yaw`, `flatPlacement+quaternion` and
-`groundPlacement+quaternion`; a plane or an orientation it does not know throws a `TypeError`.
+`groundPlacement+quaternion`; a plane or an orientation it does not know, and options that are no
+object, throw a `TypeError`.
 
 ```ts check
 import {
@@ -1376,7 +1377,8 @@ markers.dispose();
   within a sine of 0.1 of the normal. A sprite seen exactly along its axis is a line either way.
 - `axisBillboardPlacement()` returns one frozen feature per axis; `AxisBillboardPlacement` is
   `axisBillboardPlacement()`. The two forms are named `axisBillboardPlacement` and
-  `axisBillboardPlacement+z`; an axis other than `'y'` and `'z'` throws a `TypeError`.
+  `axisBillboardPlacement+z`; an axis other than `'y'` and `'z'`, and options that are no object,
+  throw a `TypeError`.
 - It brings nothing but its placement stage, so it stands in for `FlatPlacement`, every
   `flatPlacement()` and `BillboardPlacement` on a live material, and they for it. A kind with `Yaw`
   or `Orientation` keeps the attribute under it and ignores it.
@@ -1482,8 +1484,8 @@ export function frame() {
   `segmentPlacement+camera` — bring nothing but their placement stage and their check, so they stand
   in for each other on a live material. A flat placement or a billboard may stand in for one too,
   and draws the quad of `QuadSize` at the start of each segment — rarely what a rope wants.
-  `segmentPlacement()` refuses a facing or a plane it does not know, and a `plane` next to
-  `facing: 'camera'`, with a `TypeError`.
+  `segmentPlacement()` refuses a facing or a plane it does not know, a `plane` next to
+  `facing: 'camera'` and options that are no object with a `TypeError`.
 - **The texture along the segment.** `TextureColor` stretches the frame from end to end.
   `RepeatingTextureColor` repeats it, its texels kept square: `(length / thickness) / aspect` times,
   with `length` the segment and its caps, `thickness` the `height` and `aspect` the width over the
@@ -1671,8 +1673,11 @@ for it is disposed first, so a refused constructor leaves nothing behind.
 **After `dispose()`.** The mesh leaves the scene graph and fires the `dispose` event of three.
 `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`;
 `createSprite()` and `getTexture()` answer `undefined`; `freeSprite()`, `setUniform()`,
-`setTexture()`, `touchTexture()`, `update()` and the `placement` setter do nothing; `sortBy()` and
-`sortByViewDepth()` answer `false`; `passes` is empty. A second `dispose()` does nothing.
+`setTexture()`, `touchTexture()` and `update()` do nothing; `sortBy()` and `sortByViewDepth()`
+answer `false`; `passes` is empty. `bindUniform()` binds nothing and the `placement` setter changes
+nothing, and both go on refusing what they refuse otherwise: `bindUniform()` something that is no
+source, the setter a malformed feature and one that cannot stand in for the placement of the kind.
+A second `dispose()` does nothing.
 
 ## Draw order: sorting the sprites
 
@@ -2211,6 +2216,10 @@ colorMap.dispose();
 
 The rules:
 
+- **The shape.** `definePass()` refuses a pass that is no object with a `TypeError`, and so does it
+  `features` that are no list, a `without` that is no list of names, `uniformNames` or `material`
+  that are no objects; a `renderOrder` that is no finite number throws a `RangeError`. The sprites
+  check the same for a pass that never went through `definePass()`, in their own name.
 - **No data.** A pass draws the data of the sprites. `definePass()` refuses a feature that brings
   attributes, methods, `initialize()` or usage aliases, and two features of one name. Everything a
   pass reads comes from a feature of the kind; a `requires` of a pass feature is met by the kind or
@@ -2565,8 +2574,9 @@ The rules of `bindUniform()` and `unbindUniform()`:
 - **Every pass.** The uniforms are shared, so a bound uniform reaches the sprites and every pass
   that reads it, a renamed one of a copy of `ShadowPass` included.
 - **Ownership.** The nodes and the `Plane` a source reads stay the caller's. `dispose()` drops
-  every binding, so the sprites hold no node after it; afterwards `bindUniform()` and
-  `unbindUniform()` do nothing, as `setUniform()` does.
+  every binding, so the sprites hold no node after it; afterwards `bindUniform()` binds nothing and
+  still throws a `TypeError` for something that is no source, and `unbindUniform()` does nothing, as
+  `setUniform()` does.
 - **A material handed in.** Bindings write into the uniforms of the material of the sprites, so they
   work with a `material` handed in as well — for the uniforms that material holds —, and never into
   a material put into the `material` slot later. A material shared by several

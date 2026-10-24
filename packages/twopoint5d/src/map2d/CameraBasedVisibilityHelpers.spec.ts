@@ -479,4 +479,75 @@ describe('CameraBasedVisibilityHelpers', () => {
       }
     });
   });
+
+  describe('the number fields', () => {
+    const subject = 'CameraBasedVisibilityHelpers';
+
+    test.each([Number.NaN, -1, 2.5])('maxDebugHelpers refuses %p and keeps its value', (value) => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+      const set = () => {
+        helpers.maxDebugHelpers = value;
+      };
+
+      expect(set).toThrow(RangeError);
+      expect(set).toThrow(`${subject}: maxDebugHelpers must be a whole number of 0 or more, or Infinity, got ${String(value)}`);
+      expect(helpers.maxDebugHelpers).toBe(9);
+    });
+
+    test('maxDebugHelpers takes 0, a whole number and Infinity', () => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      for (const value of [0, 3, Number.POSITIVE_INFINITY]) {
+        helpers.maxDebugHelpers = value;
+        expect(helpers.maxDebugHelpers).toBe(value);
+      }
+    });
+
+    test.each([
+      ['tileBoxHelperExpand', -0.01],
+      ['frustumBoxHelperExpand', 0],
+    ] as const)('%s refuses NaN and Infinity and keeps its value', (name, start) => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+        const set = () => {
+          helpers[name] = value;
+        };
+        expect(set).toThrow(RangeError);
+        expect(set).toThrow(`${subject}: ${name} must be a finite number, got ${String(value)}`);
+        expect(helpers[name]).toBe(start);
+      }
+    });
+
+    test.each(['tileBoxHelperExpand', 'frustumBoxHelperExpand'] as const)('%s takes any sign', (name) => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      helpers[name] = -0.5;
+      expect(helpers[name]).toBe(-0.5);
+      helpers[name] = 0.5;
+      expect(helpers[name]).toBe(0.5);
+    });
+
+    test('they refuse and keep taking values after dispose()', () => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+      helpers.dispose();
+
+      expect(() => {
+        helpers.maxDebugHelpers = 2.5;
+      }).toThrow(RangeError);
+      expect(() => {
+        helpers.tileBoxHelperExpand = Number.NaN;
+      }).toThrow(RangeError);
+      expect(() => {
+        helpers.frustumBoxHelperExpand = Number.NaN;
+      }).toThrow(RangeError);
+
+      helpers.maxDebugHelpers = Number.POSITIVE_INFINITY;
+      helpers.tileBoxHelperExpand = 0.25;
+      helpers.frustumBoxHelperExpand = 0.5;
+      expect(helpers.maxDebugHelpers).toBe(Number.POSITIVE_INFINITY);
+      expect(helpers.tileBoxHelperExpand).toBe(0.25);
+      expect(helpers.frustumBoxHelperExpand).toBe(0.5);
+    });
+  });
 });

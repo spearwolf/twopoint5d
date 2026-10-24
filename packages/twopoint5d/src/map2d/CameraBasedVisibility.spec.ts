@@ -18,6 +18,8 @@ import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
 import type {TileBox} from './CameraBasedVisibility.js';
 import {setReversedDepth} from '../testing/threeInternals.js';
 import {CameraBasedVisibility} from './CameraBasedVisibility.js';
+import {AABB2} from './AABB2.js';
+import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import {packTileCoords} from './tileKeys.js';
 import type {IMap2DVisibleTiles} from './types.js';
@@ -389,6 +391,57 @@ describe('CameraBasedVisibility', () => {
       expect(second.createTiles).toBeUndefined();
       expect(second.removeTiles).toBeUndefined();
       expect(second.reuseTiles).toBe(tilesRef);
+    });
+
+    describe('hands its last result back only for the tiles list of that result', () => {
+      test('an empty list gets every tile to create', () => {
+        visibility = new CameraBasedVisibility(makeTopDownCamera());
+        const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+        const firstIds = ids(first.tiles);
+        const firstSerial = first.serial!;
+
+        const second = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+
+        expect(ids(second.createTiles)).toEqual(firstIds);
+        expect(second.reuseTiles ?? []).toHaveLength(0);
+        expect(second.removeTiles ?? []).toHaveLength(0);
+        expect(second.serial).toBeGreaterThan(firstSerial);
+      });
+
+      test('a tile that falls out comes back in removeTiles', () => {
+        visibility = new CameraBasedVisibility(makeTopDownCamera());
+        const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+        const firstIds = ids(first.tiles);
+        const outside = new Map2DTileCoords(999, 999, new AABB2(99900, 99900, 100, 100));
+
+        const second = visibility.computeVisibleTiles([outside, ...first.tiles], [0, 0], tileCoords, matrixWorld)!;
+
+        expect(second.removeTiles).toEqual([outside]);
+        expect(ids(second.reuseTiles)).toEqual(firstIds);
+        expect(second.createTiles ?? []).toHaveLength(0);
+      });
+
+      test('another list of the same tiles reuses every one', () => {
+        visibility = new CameraBasedVisibility(makeTopDownCamera());
+        const first = visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+        const firstIds = ids(first.tiles);
+
+        const second = visibility.computeVisibleTiles([...first.tiles], [0, 0], tileCoords, matrixWorld)!;
+
+        expect(ids(second.reuseTiles)).toEqual(firstIds);
+        expect(second.createTiles ?? []).toHaveLength(0);
+        expect(second.removeTiles ?? []).toHaveLength(0);
+      });
+
+      test('a list after an undefined answer goes out in removeTiles', () => {
+        visibility = new CameraBasedVisibility(makeOrthoCameraLookingHorizontally());
+        expect(visibility.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)).toBeUndefined();
+        const tile = new Map2DTileCoords(1, 1, new AABB2(100, 100, 100, 100));
+
+        const second = visibility.computeVisibleTiles([tile], [0, 0], tileCoords, matrixWorld);
+
+        expect(second?.removeTiles).toEqual([tile]);
+      });
     });
 
     test('the result carries the serial of the recomputation it comes from', () => {

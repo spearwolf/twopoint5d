@@ -60,6 +60,19 @@ describe('paletteSwap()', () => {
     expect(paletteSwap({colors: 32}).name).toBe('paletteSwap+32');
   });
 
+  test.each([
+    [5, '5'],
+    ['x', '"x"'],
+    [null, 'null'],
+  ])('refuses options of %o that are no object', (options, shown) => {
+    expect(() => paletteSwap(options as never)).toThrow(TypeError);
+    expect(() => paletteSwap(options as never)).toThrow(`paletteSwap: the options must be an object, {colors?}, got ${shown}`);
+  });
+
+  test('takes options that are undefined', () => {
+    expect(() => paletteSwap(undefined)).not.toThrow();
+  });
+
   test('declares paletteRow, the palette, the cycling uniforms and the colorMap it reads texel for texel', () => {
     expect(PaletteSwap.attributes).toEqual({paletteRow: {size: 1}});
     expect(PaletteSwap.textures).toEqual({palette: {}});

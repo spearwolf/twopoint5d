@@ -244,6 +244,9 @@ export interface IMap2DVisibilitor {
    * `removeTiles`. A first call has no earlier grid to hold against and takes `previousTiles` as
    * belonging to the grid it is given.
    *
+   * A visibilitor that keeps its last result hands it back unchanged only for the `tiles` list of
+   * exactly that result; any other `previousTiles` it holds against a computation.
+   *
    * `centerPoint` is read during the call: `Map2DTileStreamer` hands over a tuple it reuses, so a
    * visibilitor that wants the values afterwards copies them.
    */

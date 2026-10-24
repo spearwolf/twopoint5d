@@ -32,12 +32,19 @@ export interface SpritePass {
 }
 
 /**
- * Checks a pass and freezes it: a name, features of distinct names, each checked as
- * `defineFeature()` checks one, that bring no data — no attributes, methods, `initialize`, usage
- * aliases or placement — and a `without` that names no feature twice. It freezes copies of
- * `features`, `without` and `material`, so the arrays and the object handed in stay the caller's.
- * What can only be checked against a sprite kind, `FeatureSpritesMaterial` checks when it is built
- * for the pass.
+ * Checks a pass and freezes it: an object with a name; `features`, a list of features of distinct
+ * names, each checked as `defineFeature()` checks one, that bring no data — no attributes, methods,
+ * `initialize` or usage aliases — and at most one placement among them; `without`, a list of
+ * feature names that names none twice; `visible`, a function; `uniformNames` and `material`,
+ * objects; and `renderOrder`, a finite number. It freezes copies of `features`, `without`,
+ * `material` and `uniformNames`, so the arrays and the objects handed in stay the caller's. What
+ * can only be checked against a sprite kind, `FeatureSpritesMaterial` checks when it is built for
+ * the pass.
+ *
+ * @throws a `TypeError` for a pass that is no object, a name that is missing, `features`, `without`,
+ * `uniformNames` or `material` that cannot be read as what they are, or a feature that is
+ * malformed, brings data, repeats a name or is a second placement, a RangeError for a
+ * `renderOrder` that is no finite number
  */
 export function definePass(pass: SpritePass): SpritePass {
   checkPass(pass, 'definePass');

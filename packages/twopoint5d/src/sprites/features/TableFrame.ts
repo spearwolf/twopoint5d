@@ -2,6 +2,7 @@ import {abs, add, atan, clamp, div, float, int, max, mul, round, step, sub} from
 import type {Node} from 'three/webgpu';
 import {roundHalfUp} from '../../texture/roundHalfUp.js';
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
 import {cameraPositionLocal} from '../cameraNodes.js';
 import {texCoordsFromIndex} from '../node-utils.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
@@ -81,9 +82,12 @@ const viewOf = (
  * the xz plane of the mesh: right for `axisBillboardPlacement()`, `BillboardPlacement` and
  * `flatPlacement({orientation: 'yaw'})`.
  *
- * @throws a `TypeError` for `views` that is no whole number from 2 to 64
+ * @throws a `TypeError` for options that are no object, and for `views` that is no whole number from 2 to 64
  */
 export function tableFrame(options?: TableFrameOptions): SpriteFeature<TableFrameApi> {
+  if (options !== undefined && !isObject(options as unknown)) {
+    throw new TypeError(`tableFrame: the options must be an object, {views?}, got ${describeValue(options)}`);
+  }
   const views = options?.views;
   if (views !== undefined && !(typeof views === 'number' && Number.isInteger(views) && views >= 2 && views <= MAX_VIEWS)) {
     throw new TypeError(

@@ -1,5 +1,6 @@
 import type {LineBasicMaterial, Object3D} from 'three/webgpu';
 import {Box3, Box3Helper, Color} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 import {HelpersManager} from './HelpersManager.js';
 import type {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
 import type {IMap2DVisibilitorHelpers} from './types.js';
@@ -7,7 +8,8 @@ import type {IMap2DVisibilitorHelpers} from './types.js';
 export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelpers {
   visibilityArea: RectangularVisibilityArea;
 
-  viewRectHelperHeight = 20;
+  // read by `update()` through the field, not through the accessor
+  #viewRectHelperHeight = 20;
   viewRectHelperColor = new Color(0xffffff);
 
   #viewRect?: Box3 = undefined;
@@ -23,6 +25,25 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
 
   constructor(visibilityArea: RectangularVisibilityArea) {
     this.visibilityArea = visibilityArea;
+  }
+
+  /**
+   * The height of the box that shows the visible rectangular area, in world units.
+   *
+   * A finite number of 0 or more; any other value throws a `RangeError` and the field keeps what
+   * it held. Taken and checked after {@link dispose} as well.
+   */
+  get viewRectHelperHeight(): number {
+    return this.#viewRectHelperHeight;
+  }
+
+  set viewRectHelperHeight(value: number) {
+    if (!(Number.isFinite(value) && value >= 0)) {
+      throw new RangeError(
+        `RectangularVisibilityAreaHelpers: viewRectHelperHeight must be a finite number of 0 or more, got ${describeValue(value)}`,
+      );
+    }
+    this.#viewRectHelperHeight = value;
   }
 
   /** `true` once {@link dispose} has run. */
@@ -109,7 +130,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
 
     const halfWidth = this.visibilityArea.width / 2;
     const halfHeight = this.visibilityArea.height / 2;
-    const viewRectHelperHalfHeight = this.viewRectHelperHeight / 2;
+    const viewRectHelperHalfHeight = this.#viewRectHelperHeight / 2;
 
     // written in place: the node built from this box reads it again on every frame
     const viewRect = (this.#viewRect ??= new Box3());

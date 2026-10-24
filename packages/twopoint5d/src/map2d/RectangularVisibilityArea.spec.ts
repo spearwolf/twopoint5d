@@ -1,5 +1,7 @@
 import {Matrix4} from 'three/webgpu';
 import {beforeEach, describe, expect, test} from 'vitest';
+import {AABB2} from './AABB2.js';
+import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
 import type {IMap2DTileCoords} from './types.js';
@@ -51,6 +53,47 @@ describe('RectangularVisibilityArea', () => {
       expect(second.createTiles).toBeUndefined();
       expect(second.removeTiles).toBeUndefined();
       expect(second.changed).toBe(false);
+    });
+
+    describe('hands its last result back only for the tiles list of that result', () => {
+      test('an empty list gets every tile to create', () => {
+        const area = new RectangularVisibilityArea(320, 240);
+        const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+        const firstIds = ids(first.tiles);
+        const firstSerial = first.serial!;
+
+        const second = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+
+        expect(ids(second.createTiles)).toEqual(firstIds);
+        expect(second.reuseTiles).toHaveLength(0);
+        expect(second.removeTiles).toHaveLength(0);
+        expect(second.serial).toBeGreaterThan(firstSerial);
+      });
+
+      test('a tile that falls out comes back in removeTiles', () => {
+        const area = new RectangularVisibilityArea(320, 240);
+        const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+        const firstIds = ids(first.tiles);
+        const outside = new Map2DTileCoords(999, 999, new AABB2(99900, 99900, 100, 100));
+
+        const second = area.computeVisibleTiles([outside, ...first.tiles], [0, 0], tileCoords, matrixWorld)!;
+
+        expect(second.removeTiles).toEqual([outside]);
+        expect(ids(second.reuseTiles)).toEqual(firstIds);
+        expect(second.createTiles).toHaveLength(0);
+      });
+
+      test('another list of the same tiles reuses every one', () => {
+        const area = new RectangularVisibilityArea(320, 240);
+        const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
+        const firstIds = ids(first.tiles);
+
+        const second = area.computeVisibleTiles([...first.tiles], [0, 0], tileCoords, matrixWorld)!;
+
+        expect(ids(second.reuseTiles)).toEqual(firstIds);
+        expect(second.createTiles).toHaveLength(0);
+        expect(second.removeTiles).toHaveLength(0);
+      });
     });
 
     test('a moved center recomputes', () => {

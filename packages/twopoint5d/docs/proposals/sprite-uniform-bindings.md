@@ -163,8 +163,9 @@ class FeatureSprites {
   does not throw — a caller who sets a start value before binding is not wrong — and the docs say
   that the binding wins.
 - **Lifecycle.** The nodes and the `Plane` stay the caller's. `dispose()` drops every binding, so
-  the sprites hold no node after it. After `dispose()`, `bindUniform()` and `unbindUniform()` do
-  nothing, as `setUniform()` does.
+  the sprites hold no node after it. After `dispose()`, `bindUniform()` binds nothing and still
+  throws a `TypeError` for something that is no source, and `unbindUniform()` does nothing, as
+  `setUniform()` does.
 - **A material handed in.** Bindings write into the uniforms of the material of the sprites — the
   one they were built with —, so they work with a material handed in as well, for the uniforms that
   material holds, and never reach a material put into the `material` slot later. A material shared

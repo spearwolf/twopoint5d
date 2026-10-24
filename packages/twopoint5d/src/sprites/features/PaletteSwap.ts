@@ -2,6 +2,7 @@ import {abs, add, clamp, div, float, max, mix, mul, sRGBTransferOETF, step, sub,
 import {type Node, SRGBColorSpace} from 'three/webgpu';
 import {roundHalfUp} from '../../texture/roundHalfUp.js';
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
 import {asVec3} from '../typedNodes.js';
 import {ColorOrder, defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 
@@ -50,9 +51,12 @@ const TOLERANCE = 1 / 512;
  * edges, and both textures in the same colour space. The feature names the `colorMap` in `nearestTextures`, so
  * the sprites say once when it is filtered otherwise. Every fragment reads `colors + 1` texels of the palette.
  *
- * @throws a `TypeError` for `colors` that is no whole number from 1 to 64
+ * @throws a `TypeError` for options that are no object, and for `colors` that is no whole number from 1 to 64
  */
 export function paletteSwap(options?: PaletteSwapOptions): SpriteFeature<PaletteSwapApi> {
+  if (options !== undefined && !isObject(options as unknown)) {
+    throw new TypeError(`paletteSwap: the options must be an object, {colors?}, got ${describeValue(options)}`);
+  }
   const colors = options?.colors ?? 16;
   if (!(typeof colors === 'number' && Number.isInteger(colors) && colors >= 1 && colors <= 64)) {
     throw new TypeError(`paletteSwap: colors must be a whole number from 1 to 64, got ${describeValue(colors)}`);

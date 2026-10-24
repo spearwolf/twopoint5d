@@ -760,11 +760,13 @@ declare function definePass(pass: SpritePass): SpritePass;
 ```
 
 `definePass()` checks what a pass can be checked for on its own and freezes it, with frozen copies
-of `features`, `without`, `material` and `uniformNames`: a name, a `visible` that is a function,
-features of distinct names, each checked as `defineFeature()` checks one, **no data** — a feature
-of a pass brings no attributes, methods, `initialize` or usage aliases, since the pool and the
-sprite handle are those of the kind —, at most one placement among the features, and a `without`
-that names no feature twice. The `visible` hook and the renames of `uniformNames` are
+of `features`, `without`, `material` and `uniformNames`: an object with a name, a `visible` that is a
+function, `features` as a list of features of distinct names, each checked as `defineFeature()`
+checks one, **no data** — a feature of a pass brings no attributes, methods, `initialize` or usage
+aliases, since the pool and the sprite handle are those of the kind —, at most one placement among
+the features, a `without` as a list of names that names none twice, `uniformNames` and `material` as
+objects, and a `renderOrder` that is a finite number (`TypeError`, a `RangeError` for the
+`renderOrder`). The sprites run the same check for a pass that never went through `definePass()`. The `visible` hook and the renames of `uniformNames` are
 [`sprite-uniform-bindings.md`](sprite-uniform-bindings.md) §5 and §6.
 
 What only a kind can tell is checked where a material of the pass is built — by

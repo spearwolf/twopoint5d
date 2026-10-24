@@ -65,6 +65,57 @@ const WHERE = 'FeatureSpritesMaterial';
 // the fields a placement may carry to stand in for another on a live material
 const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'checkKind', 'placement']);
 
+/**
+ * Checks that `feature`, a feature that is well formed, can stand in for the placement of `kind`:
+ * it contributes a placement stage and, unless it is `start`, nothing else, the kind holds every
+ * feature it requires, and its `checkKind`, if any, takes the kind with it in place of the
+ * placement of the kind. `start` is the placement the position graph begins with, which the rules
+ * leave out; `current` is the one `feature` would replace, the one the messages name. The rules
+ * hang on the kind alone, so the sprites run them after a `dispose()` as well.
+ *
+ * @internal
+ *
+ * @throws a `TypeError` naming both features for a placement that cannot stand in, an `Error` naming
+ *   the feature for one whose `checkKind` refuses the kind
+ */
+export function checkPlacementStandIn(
+  kind: SpriteKind,
+  start: SpriteFeature,
+  current: SpriteFeature,
+  feature: SpriteFeature,
+  where: string,
+): void {
+  if (feature.placement == null) {
+    throw new TypeError(
+      `${where}: feature "${feature.name}" contributes no placement stage and cannot stand in for "${current.name}"`,
+    );
+  }
+  if (feature === start) return;
+  const extra = Object.keys(feature).filter(
+    (key) => !PLACEMENT_ONLY.has(key) && (feature as unknown as Record<string, unknown>)[key] != null,
+  );
+  if (extra.length > 0) {
+    throw new TypeError(
+      `${where}: feature "${feature.name}" brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for "${current.name}"`,
+    );
+  }
+  // the sprites are built from the kind alone, so the kind's features are the yardstick, not the ones a material folds
+  const held = new Set(kind.features.map(({name}) => name));
+  for (const required of feature.requires ?? []) {
+    if (!held.has(required)) {
+      throw new TypeError(
+        `${where}: feature "${feature.name}" requires feature "${required}", which the sprite kind does not hold`,
+      );
+    }
+  }
+  const kindPlacement = kind.pipeline.placement;
+  runCheckKind(
+    feature,
+    {base: kind.base, features: kind.features.map((held) => (held === kindPlacement ? feature : held))},
+    `${where}: feature "${feature.name}"`,
+  );
+}
+
 const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1)});
 
 // uv is where the vertex lies on the untrimmed sprite, x to the right and y downwards. A trimmed
@@ -406,37 +457,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
 
   set placement(feature: SpriteFeature) {
     checkFeature(feature, WHERE);
-    const current = this.#placement.value;
-    if (feature.placement == null) {
-      throw new TypeError(
-        `${WHERE}: feature "${feature.name}" contributes no placement stage and cannot stand in for "${current.name}"`,
-      );
-    }
-    if (feature !== this.#pipeline.placement) {
-      const extra = Object.keys(feature).filter(
-        (key) => !PLACEMENT_ONLY.has(key) && (feature as unknown as Record<string, unknown>)[key] != null,
-      );
-      if (extra.length > 0) {
-        throw new TypeError(
-          `${WHERE}: feature "${feature.name}" brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for "${current.name}"`,
-        );
-      }
-      // the sprites are built from the kind alone, so the kind's features are the yardstick, not the ones this material folds
-      const held = new Set(this.kind.features.map(({name}) => name));
-      for (const required of feature.requires ?? []) {
-        if (!held.has(required)) {
-          throw new TypeError(
-            `${WHERE}: feature "${feature.name}" requires feature "${required}", which the sprite kind does not hold`,
-          );
-        }
-      }
-      const kindPlacement = this.kind.pipeline.placement;
-      runCheckKind(
-        feature,
-        {base: this.kind.base, features: this.kind.features.map((held) => (held === kindPlacement ? feature : held))},
-        `${WHERE}: feature "${feature.name}"`,
-      );
-    }
+    checkPlacementStandIn(this.kind, this.#pipeline.placement!, this.#placement.value, feature, WHERE);
     this.#placement.set(feature);
   }
 

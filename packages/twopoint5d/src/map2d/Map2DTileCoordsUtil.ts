@@ -1,6 +1,7 @@
 import type {Vector2} from 'three/webgpu';
 import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
+import {describeValue} from '../utils/describeValue.js';
 import {AABB2} from './AABB2.js';
 import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 
@@ -205,6 +206,8 @@ export class Map2DTileCoordsUtil {
    * @param height - the height of the selection rectangle in _world space_
    * @param target - the tuple to write the answer into and to return, which allocates nothing;
    * without one, the answer is a new tuple
+   * @throws a RangeError for a left or a top that is no finite number and a width or a height that is
+   * no finite number of 0 or more; target stays as it was
    */
   getTileCoords(
     left: number,
@@ -213,6 +216,20 @@ export class Map2DTileCoordsUtil {
     height: number,
     target?: [tileLeft: number, tileTop: number, columns: number, rows: number],
   ): [tileLeft: number, tileTop: number, columns: number, rows: number] {
+    // checked inline and not through `assertFinite()`: a double handed to a call the compiler does
+    // not inline is boxed
+    if (
+      !(
+        Number.isFinite(left) &&
+        Number.isFinite(top) &&
+        Number.isFinite(width) &&
+        width >= 0 &&
+        Number.isFinite(height) &&
+        height >= 0
+      )
+    ) {
+      Map2DTileCoordsUtil.#refuseSelection('getTileCoords', left, top, width, height);
+    }
     const within = this.computeTilesWithinArea(this.#area.set(left, top, width, height), this.#tilesWithin);
 
     if (target === undefined) return [within.tileLeft, within.tileTop, within.columns, within.rows];
@@ -233,6 +250,8 @@ export class Map2DTileCoordsUtil {
    * @param height - the height of the selection rectangle in _world space_
    * @param target - the object to write every field of the answer into and to return, which
    * allocates nothing; without one, the answer is a new object
+   * @throws a RangeError for a left or a top that is no finite number and a width or a height that is
+   * no finite number of 0 or more; target stays as it was
    */
   computeTilesWithinCoords(
     left: number,
@@ -241,6 +260,20 @@ export class Map2DTileCoordsUtil {
     height: number,
     target?: TilesWithinCoords,
   ): TilesWithinCoords {
+    // checked inline and not through `assertFinite()`: a double handed to a call the compiler does
+    // not inline is boxed
+    if (
+      !(
+        Number.isFinite(left) &&
+        Number.isFinite(top) &&
+        Number.isFinite(width) &&
+        width >= 0 &&
+        Number.isFinite(height) &&
+        height >= 0
+      )
+    ) {
+      Map2DTileCoordsUtil.#refuseSelection('computeTilesWithinCoords', left, top, width, height);
+    }
     return this.computeTilesWithinArea(this.#area.set(left, top, width, height), target ?? createTilesWithinCoords());
   }
 
@@ -282,5 +315,19 @@ export class Map2DTileCoordsUtil {
     target.rows = rows;
     target.columns = columns;
     return target;
+  }
+
+  static #refuseSelection(where: string, left: number, top: number, width: number, height: number): never {
+    const subject = `Map2DTileCoordsUtil#${where}()`;
+    if (!Number.isFinite(left)) {
+      throw new RangeError(`${subject}: left must be a finite number, got ${describeValue(left)}`);
+    }
+    if (!Number.isFinite(top)) {
+      throw new RangeError(`${subject}: top must be a finite number, got ${describeValue(top)}`);
+    }
+    if (!(Number.isFinite(width) && width >= 0)) {
+      throw new RangeError(`${subject}: width must be a finite number of 0 or more, got ${describeValue(width)}`);
+    }
+    throw new RangeError(`${subject}: height must be a finite number of 0 or more, got ${describeValue(height)}`);
   }
 }

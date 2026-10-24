@@ -217,7 +217,8 @@ entry    = clamp(index, 0, max(entries − 1, 0))                // only a table
   could leave the last frame of a table of `frames · n` entries out of reach. Half a step or an
   entry more keeps the quotient `0.5 / n` away from every whole number, which no ULP of the division
   crosses.
-- `views` that is no whole number from 2 to 64 is refused with a `TypeError`:
+- Options that are no object, and `views` that is no whole number from 2 to 64, are refused with a
+  `TypeError`; the message for `views` reads:
   `tableFrame: views must be a whole number from 2 to 64, got 1 — leave views out for frames without views`.
   The bound keeps a caller who derives `views` from data from filling the cache of one feature per
   number of views, which stays for the life of the page; no directional sheet has more views.
@@ -252,7 +253,8 @@ export const ColorOrder: {Palette: 50, Tint: 100, Mask: 150, Fade: 200, Flash: 3
 - **Uniforms** `paletteShift` (float, 0) and `paletteCycle` (vec2, `(0, 0)`): see §5.3.
 - **A color stage at `ColorOrder.Palette` (50)** — a new band, before `Tint`, so a tint, a fade and
   a flash act on the swapped colours. `ColorOrder` gains the key; nothing else moves.
-- `colors` that is no whole number from 1 to 64 is refused with a `TypeError`. 16 covers both
+- Options that are no object, and `colors` that is no whole number from 1 to 64, are refused with a
+  `TypeError`. 16 covers both
   lookbook palettes (`goblin-palette.png`, `chrome-32-palette.png`, 16 × 4 each); 64 bounds the
   cost.
 

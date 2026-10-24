@@ -259,8 +259,8 @@ export class Map2DTileStreamer {
       for (const tileRenderer of this.renderers) {
         tileRenderer.clearTiles();
       }
-      // a new list, not `length = 0`: the visibilitor holds this very array as the tile set of
-      // its last result, and its cache path hands that result back untouched by previousTiles
+      // a new list, not `length = 0`: the visibilitor holds this very array as the `tiles` of its
+      // last result; a list of its own makes it work out the whole set again
       this.#tiles = [];
       this.#laidOutSerials = new WeakMap();
       this.#clearTilesOnNextUpdate = false;
