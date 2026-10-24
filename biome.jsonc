@@ -49,6 +49,18 @@
     "experimentalFullSupportEnabled": true,
     "formatter": {"enabled": true, "indentScriptAndStyle": true, "selfCloseVoidElements": "always"}
   },
+  // the Markdown files keep the layout their authors gave them: the formatter Biome turns
+  // on from 2.6 pads every table to its widest cell, rewrites the emphasis markers and
+  // formats the code inside the fenced blocks
+  "markdown": {
+    "formatter": {"enabled": false}
+  },
+  // the YAML files stay unformatted too: pnpm writes pnpm-lock.yaml and the catalog of
+  // pnpm-workspace.yaml with single quotes on every install, which the formatter Biome
+  // turns on from 2.6 would turn into double quotes
+  "yaml": {
+    "formatter": {"enabled": false}
+  },
   // the imports keep the order their authors gave them
   "assist": {
     "actions": {"source": {"organizeImports": "off"}}
