@@ -36,8 +36,8 @@ importers:
         specifier: ^24.19.2
         version: 24.19.2
       '@types/sinon':
-        specifier: ^22.0.1
-        version: 22.0.1
+        specifier: ^22.0.0
+        version: 22.0.0
       '@types/three':
         specifier: 'catalog:'
         version: 0.186.0
@@ -1506,8 +1506,11 @@ packages:
   '@types/serve-static@2.2.0':
     resolution: {integrity: sha512-8mam4H1NHLtu7nmtalF7eyBH14QyOASmcxHhSfEoRyr0nP/YdoesEtU+uSRvMe96TW/HPTtkoKqQLl53N7UXMQ==}
 
-  '@types/sinon@22.0.1':
-    resolution: {integrity: sha512-MThluJXPmpBY+Z5S3565F2z+hjkCXnBrr36j2mitVQ7JUtxA+A+YQhs+0Q6J8jxb0SVJvydO+6NWfj9EBzpiBQ==}
+  '@types/sinon@22.0.0':
+    resolution: {integrity: sha512-TDbVpbccc2HfiqHR09Argj3mHV1KMW7sCCKj52fsl8lbRLkEn7fB1966EWhOKWUBcqfBueZuPoA7/OK1CKiy3g==}
+
+  '@types/sinonjs__fake-timers@15.0.1':
+    resolution: {integrity: sha512-Ko2tjWJq8oozHzHV+reuvS5KYIRAokHnGbDwGh/J64LntgpbuylF74ipEL24HCyRjf9FOlBiBHWBR1RlVKsI1w==}
 
   '@types/stats.js@0.17.4':
     resolution: {integrity: sha512-jIBvWWShCvlBqBNIZt0KAshWpvSjhkwkEu4ZUcASoAvhmrgAUI2t1dXrjSL4xXVLB4FznPrIsX3nKXFl/Dt4vA==}
@@ -5254,9 +5257,11 @@ snapshots:
       '@types/http-errors': 2.0.5
       '@types/node': 24.19.2
 
-  '@types/sinon@22.0.1':
+  '@types/sinon@22.0.0':
     dependencies:
-      '@sinonjs/fake-timers': 15.4.0
+      '@types/sinonjs__fake-timers': 15.0.1
+
+  '@types/sinonjs__fake-timers@15.0.1': {}
 
   '@types/stats.js@0.17.4': {}
 

@@ -43,7 +43,7 @@
     "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "2.6.2",
     "@types/node": "^24.19.2",
-    "@types/sinon": "^22.0.1",
+    "@types/sinon": "^22.0.0",
     "@types/three": "catalog:",
     "@typescript/typescript6": "^6.0.2",
     "@vitest/coverage-v8": "^5.0.5",
