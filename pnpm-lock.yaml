@@ -7,8 +7,8 @@ settings:
 catalogs:
   default:
     '@spearwolf/eventize':
-      specifier: ^6.2.0
-      version: 6.2.0
+      specifier: ^6.3.0
+      version: 6.3.0
     '@spearwolf/signalize':
       specifier: ^1.0.0
       version: 1.0.0
@@ -85,10 +85,10 @@ importers:
         version: 2.1.0(astro@7.4.2(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
       '@spearwolf/eventize':
         specifier: 'catalog:'
-        version: 6.2.0
+        version: 6.3.0
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 1.0.0(@spearwolf/eventize@6.2.0)
+        version: 1.0.0(@spearwolf/eventize@6.3.0)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../../packages/twopoint5d
@@ -128,10 +128,10 @@ importers:
     dependencies:
       '@spearwolf/eventize':
         specifier: 'catalog:'
-        version: 6.2.0
+        version: 6.3.0
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 1.0.0(@spearwolf/eventize@6.2.0)
+        version: 1.0.0(@spearwolf/eventize@6.3.0)
       '@types/three':
         specifier: 'catalog:'
         version: 0.186.0
@@ -143,10 +143,10 @@ importers:
     dependencies:
       '@spearwolf/eventize':
         specifier: 'catalog:'
-        version: 6.2.0
+        version: 6.3.0
       '@spearwolf/signalize':
         specifier: 'catalog:'
-        version: 1.0.0(@spearwolf/eventize@6.2.0)
+        version: 1.0.0(@spearwolf/eventize@6.3.0)
       '@spearwolf/twopoint5d':
         specifier: workspace:*
         version: link:../twopoint5d
@@ -1285,8 +1285,8 @@ packages:
     peerDependencies:
       astro: '>=5'
 
-  '@spearwolf/eventize@6.2.0':
-    resolution: {integrity: sha512-Tqc90j9w87+4HlOEnmNApT/6eyy+laXKRG+C/ZQJeCDb8T3kPSnTIwA/Uet3RM+qeYOw5kq/ZMqb5AYkIN3mzw==}
+  '@spearwolf/eventize@6.3.0':
+    resolution: {integrity: sha512-xEW+SdkgZeQPTIFFc3tLQ1RWqlaI03vgiJI6m0qi0b0qzrd32X98feO78CwsvV0DEaczCkXSA1aSI311ZgNpEw==}
     engines: {node: '>=18.16'}
 
   '@spearwolf/signalize@1.0.0':
@@ -5044,11 +5044,11 @@ snapshots:
     dependencies:
       astro: 7.4.2(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
 
-  '@spearwolf/eventize@6.2.0': {}
+  '@spearwolf/eventize@6.3.0': {}
 
-  '@spearwolf/signalize@1.0.0(@spearwolf/eventize@6.2.0)':
+  '@spearwolf/signalize@1.0.0(@spearwolf/eventize@6.3.0)':
     dependencies:
-      '@spearwolf/eventize': 6.2.0
+      '@spearwolf/eventize': 6.3.0
 
   '@tailwindcss/node@4.3.3':
     dependencies:
