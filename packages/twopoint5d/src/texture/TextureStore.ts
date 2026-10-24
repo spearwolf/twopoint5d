@@ -50,6 +50,9 @@ export type TextureResourceSubTypeMap = {
 
 /**
  * Helper type to recursively map a tuple of TextureResourceSubType to their corresponding types.
+ *
+ * @deprecated A step of {@link MapSubTypes}, not a name to use outside the library. It stays exported until
+ *   a breaking release.
  */
 export type MapTuple<T extends readonly TextureResourceSubType[]> = T extends readonly [
   infer First extends TextureResourceSubType,
@@ -61,6 +64,11 @@ export type MapTuple<T extends readonly TextureResourceSubType[]> = T extends re
 /**
  * Maps an array of TextureResourceSubType to a tuple of their corresponding types.
  * For single types, returns the mapped type directly.
+ *
+ * @deprecated A helper of the signatures of {@link TextureStore}, not a name to use: name the value of one
+ *   subtype as `TextureResourceSubTypeMap['atlas']`, and the values of a list as a tuple of them,
+ *   `[TextureResourceSubTypeMap['atlas'], TextureResourceSubTypeMap['texture']]`. It stays exported until a
+ *   breaking release.
  */
 export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (keyof TextureResourceSubTypeMap)[]> =
   T extends keyof TextureResourceSubTypeMap
@@ -68,6 +76,16 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
     : T extends readonly TextureResourceSubType[]
       ? MapTuple<T>
       : never;
+
+/**
+ * The payload of an `error` event of a {@link TextureStore}: a `fetch` that failed or answered
+ * with a status, with the url of the request, or a `parse` failure — with the url of the catalog
+ * when `loadAsync()` could not parse its body, with the id of the item at fault, or with neither
+ * for what belongs to the catalog as a whole. {@link TextureStoreEvents} says when each goes out.
+ */
+export type TextureStoreErrorEvent =
+  | {readonly source: 'fetch'; readonly url: string | URL; readonly status?: number; readonly error: unknown}
+  | {readonly source: 'parse'; readonly url?: string | URL; readonly id?: string; readonly error: unknown};
 
 /**
  * Public event-name constants emitted by `TextureStore`.
@@ -85,7 +103,7 @@ export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (ke
  *   place of an evicted one included. Whoever wants the raw event subscribes to `resource:<id>`
  *   on the store directly.
  * - `Dispose`: fires once when `dispose()` is called.
- * - `Error`: fires with `{source: 'fetch'|'parse', url?, id?, status?, error}`.
+ * - `Error`: fires with a {@link TextureStoreErrorEvent}, `{source: 'fetch'|'parse', url?, id?, status?, error}`.
  *   `fetch` covers a request that failed and a response that answered with a status;
  *   `parse` a body that is no JSON, a `parse()` that threw — data without an items object
  *   among it —, an item that builds no resource because it names no source or carries a
@@ -112,6 +130,11 @@ const OnRendererChanged = TextureStoreEvents.RendererChanged;
 const OnResource = TextureStoreEvents.Resource;
 const OnDispose = TextureStoreEvents.Dispose;
 const OnError = TextureStoreEvents.Error;
+
+// every error event of the store goes out here, so that its payload is held to the type
+const reportError = (store: TextureStore, event: TextureStoreErrorEvent): void => {
+  emitSafe(store, OnError, event);
+};
 
 // The store defaults come first and an item's own classes last: two equally broad
 // classes writing the same option are decided by their order, so the item has the
@@ -194,8 +217,11 @@ const loadFailedError = (source: string, what: string | URL | undefined, cause: 
 
 // one message for a getAsync() whose resource reported a failure that keeps a value it asks for
 // from arriving, naming the step that failed and the url it failed on, if there is one
-const resourceFailedError = (what: string, {source, url, error}: TextureResourceLoadFailure): Error =>
-  new Error(`TextureStore: ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
+const resourceFailedError = (what: string, failure: TextureResourceLoadFailure): Error => {
+  const {source, error} = failure;
+  const url = 'url' in failure ? failure.url : undefined;
+  return new Error(`TextureStore: ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
+};
 
 const articleOf = (type: string): string => (/^[aeiou]/.test(type) ? 'an' : 'a');
 
@@ -331,15 +357,15 @@ export class TextureStore {
 
     // the first failure the attempt reports, whether or not it keeps the catalog from parsing
     let failure: Error | undefined;
-    const unsubscribeFromError = on(
-      store,
-      OnError,
-      ({source, url: failedUrl, id, error}: {source: string; url?: string | URL; id?: string; error: unknown}) => {
-        // a failure that names neither a url nor an item — a texture class in the
-        // defaultTextureClasses of the catalog — belongs to the catalog as a whole
-        failure ??= loadFailedError(source, failedUrl ?? id ?? url, error);
-      },
-    );
+    const unsubscribeFromError = on(store, OnError, (event: TextureStoreErrorEvent) => {
+      // a failure that names neither a url nor an item — a texture class in the
+      // defaultTextureClasses of the catalog — belongs to the catalog as a whole
+      failure ??= loadFailedError(
+        event.source,
+        event.url ?? (event.source === 'parse' ? event.id : undefined) ?? url,
+        event.error,
+      );
+    });
 
     try {
       await store.loadAsync(url, options);
@@ -718,7 +744,7 @@ export class TextureStore {
       // emitSafe(): every listener hears it, and one that throws is reported on the console by
       // eventize instead of taking the place of the rejection this caller is owed
       const failed = (source: 'fetch' | 'parse', error: unknown, status?: number): Error => {
-        emitSafe(this, OnError, status === undefined ? {source, url, error} : {source, url, status, error});
+        reportError(this, status === undefined ? {source, url, error} : {source, url, status, error});
         return loadFailedError(source, url, error);
       };
 
@@ -900,7 +926,7 @@ export class TextureStore {
     // last, once the parse is through: the subscriber has heard its value, and its throw belongs
     // to no item
     if (publishError) {
-      emitSafe(this, OnError, {source: 'parse', error: publishError.error});
+      reportError(this, {source: 'parse', error: publishError.error});
     }
   }
 
@@ -996,7 +1022,7 @@ export class TextureStore {
   // what it is built without. emitSafe(): a listener that throws takes the event from no other
   #reportItemProblems({defaults, items}: CheckedCatalog): void {
     if (defaults?.unknown.length) {
-      emitSafe(this, OnError, {
+      reportError(this, {
         source: 'parse',
         error: new Error(
           `TextureStore: defaultTextureClasses names ${listCatalogValues(defaults.unknown)}, which no TextureFactory knows — left out`,
@@ -1005,11 +1031,11 @@ export class TextureStore {
     }
     for (const [id, checked] of items) {
       if ('refused' in checked) {
-        emitSafe(this, OnError, {source: 'parse', id, error: checked.refused.error});
+        reportError(this, {source: 'parse', id, error: checked.refused.error});
         continue;
       }
       for (const note of checked.notes) {
-        emitSafe(this, OnError, {source: 'parse', id, error: note});
+        reportError(this, {source: 'parse', id, error: note});
       }
     }
   }
@@ -1163,7 +1189,7 @@ export class TextureStore {
       try {
         resource.dispose();
       } catch (error) {
-        emitSafe(this, OnError, {source: 'parse', id, error});
+        reportError(this, {source: 'parse', id, error});
       }
     }
   }

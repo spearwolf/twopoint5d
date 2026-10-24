@@ -108,7 +108,7 @@ New refusals of `add()`, each an `Error` that names the animation:
 | case | message (after `FrameBasedAnimations: add() got`) |
 | --- | --- |
 | `playback` not one of the three | `` a playback of X for the animation "a" — a playback is 'loop', 'once' or 'pingpong' `` |
-| `durations` beside `duration` or `frameRate` | `` durations and a duration (or frameRate) for the animation "a" — give one of duration, frameRate and durations `` |
+| more than one of `durations`, `duration` and `frameRate` | `` a duration and a frameRate for the animation "a" — give one of duration, frameRate and durations `` |
 | `durations` no array | `` durations of X for the animation "a" — durations is an array of seconds, one per frame `` |
 | wrong count | `` 3 durations for the 4 frames of the animation "a" — give one duration per frame `` |
 | a value not finite or not above 0 | `` a duration of X at index 2 for the animation "a" — a frame duration is a finite number of seconds above zero `` |
@@ -116,8 +116,9 @@ New refusals of `add()`, each an `Error` that names the animation:
 | a frame name of the list not in the atlas | `` the frame name "x" at index 1 for the animation "a", which the atlas does not carry `` |
 | a list entry no string | `` a frame name of X at index 1 for the animation "a" — a frame name is a string `` |
 
-Where a json catalog gives both `frameRate` and `duration` (the types forbid it), `frameRate` wins;
-refusing the pair would break such a catalog.
+A json catalog that gives more than one of them has that entry refused like any other timing the
+types forbid: the `TextureResource` reports it as an `error` with `source: 'frameBasedAnimations'`
+and registers the other entries of the map.
 
 ### 3.3 Reading an animation back
 

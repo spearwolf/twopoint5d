@@ -57,20 +57,37 @@ const computeBounds = (current: TextureCoords): typeof scratch => {
  * A rotated TexturePacker frame arrives as `FLIP_DIAGONAL | FLIP_VERTICAL`.
  */
 export class TextureCoords {
+  /** The bit of `flip` that mirrors the drawn horizontal axis. */
   static readonly FLIP_HORIZONTAL = 1;
+  /** The bit of `flip` that mirrors the drawn vertical axis. */
   static readonly FLIP_VERTICAL = 2;
+  /** The bit of `flip` that swaps the axes. */
   static readonly FLIP_DIAGONAL = 4;
 
+  /** The left edge of the area in pixels, relative to `parent` — not to the texture, where there is one. */
   x = 0;
+  /** The top edge of the area in pixels, relative to `parent` — not to the texture, where there is one. */
   y = 0;
 
+  /** The width of the area in the texture, in pixels; under `FLIP_DIAGONAL` it is drawn as the height. */
   width = 0;
+  /** The height of the area in the texture, in pixels; under `FLIP_DIAGONAL` it is drawn as the width. */
   height = 0;
 
+  /**
+   * The flip bits of the area, an OR of {@link TextureCoords.FLIP_HORIZONTAL},
+   * {@link TextureCoords.FLIP_VERTICAL} and {@link TextureCoords.FLIP_DIAGONAL}; 0 for none.
+   */
   flip = 0;
 
+  /** The area `x` and `y` are relative to; without one they are relative to the texture itself. */
   parent?: TextureCoords;
 
+  /**
+   * Takes three forms: without arguments every value is 0; `(parent, x?, y?, width?, height?)` gives
+   * the area relative to `parent`; `(x?, y?, width?, height?)` gives it relative to the texture. A value
+   * left out is 0, and `flip` starts at 0.
+   */
   constructor(
     ...args:
       | []
@@ -91,6 +108,9 @@ export class TextureCoords {
     }
   }
 
+  /**
+   * A new instance with the same values and the same `parent` — the parent itself, not a copy of it.
+   */
   clone(): TextureCoords {
     const texCoords = new TextureCoords();
     texCoords.parent = this.parent;
@@ -102,6 +122,7 @@ export class TextureCoords {
     return texCoords;
   }
 
+  /** The topmost ancestor up the chain of parents, or the instance itself where it has no `parent`. */
   get root(): TextureCoords {
     let root: TextureCoords = this;
     while (root.parent) {
@@ -110,6 +131,7 @@ export class TextureCoords {
     return root;
   }
 
+  /** Whether `FLIP_HORIZONTAL` is set; a write sets or clears that bit and leaves the others. */
   get flipH(): boolean {
     return (this.flip & TextureCoords.FLIP_HORIZONTAL) > 0;
   }
@@ -119,6 +141,7 @@ export class TextureCoords {
       (flip ? TextureCoords.FLIP_HORIZONTAL : 0) | (this.flip & (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_DIAGONAL));
   }
 
+  /** Whether `FLIP_VERTICAL` is set; a write sets or clears that bit and leaves the others. */
   get flipV(): boolean {
     return (this.flip & TextureCoords.FLIP_VERTICAL) > 0;
   }
@@ -128,6 +151,7 @@ export class TextureCoords {
       (flip ? TextureCoords.FLIP_VERTICAL : 0) | (this.flip & (TextureCoords.FLIP_HORIZONTAL | TextureCoords.FLIP_DIAGONAL));
   }
 
+  /** Whether `FLIP_DIAGONAL` is set; a write sets or clears that bit and leaves the others. */
   get flipD(): boolean {
     return (this.flip & TextureCoords.FLIP_DIAGONAL) > 0;
   }
@@ -137,42 +161,69 @@ export class TextureCoords {
       (flip ? TextureCoords.FLIP_DIAGONAL : 0) | (this.flip & (TextureCoords.FLIP_VERTICAL | TextureCoords.FLIP_HORIZONTAL));
   }
 
+  /** Toggles `FLIP_HORIZONTAL` and answers `this`. */
   flipHorizontal(): TextureCoords {
     this.flipH = !this.flipH;
     return this;
   }
 
+  /** Toggles `FLIP_VERTICAL` and answers `this`. */
   flipVertical(): TextureCoords {
     this.flipV = !this.flipV;
     return this;
   }
 
+  /** Toggles `FLIP_DIAGONAL` and answers `this`. */
   flipDiagonal(): TextureCoords {
     this.flipD = !this.flipD;
     return this;
   }
 
+  /**
+   * The `s` of the corner the lookup starts at, in texture coordinates from 0 to 1 of the root, after the
+   * flips. Walks the chain of parents once; `getTexCoords()` answers all four values in one walk.
+   */
   get s(): number {
     return computeBounds(this)[0];
   }
 
+  /**
+   * The `t` of the corner the lookup starts at, in texture coordinates from 0 to 1 of the root, after the
+   * flips. Walks the chain of parents once; `getTexCoords()` answers all four values in one walk.
+   */
   get t(): number {
     return computeBounds(this)[1];
   }
 
+  /**
+   * The `s` of the opposite corner, in texture coordinates from 0 to 1 of the root, after the flips. Walks
+   * the chain of parents once; `getTexCoords()` answers all four values in one walk.
+   */
   get s1(): number {
     return computeBounds(this)[2];
   }
 
+  /**
+   * The `t` of the opposite corner, in texture coordinates from 0 to 1 of the root, after the flips. Walks
+   * the chain of parents once; `getTexCoords()` answers all four values in one walk.
+   */
   get t1(): number {
     return computeBounds(this)[3];
   }
 
+  /**
+   * `s1 - s`: negative where the axis is mirrored. Walks the chain of parents once; `getTexCoords()` answers
+   * all four values in one walk.
+   */
   get u(): number {
     const bounds = computeBounds(this);
     return bounds[2] - bounds[0];
   }
 
+  /**
+   * `t1 - t`: negative where the axis is mirrored. Walks the chain of parents once; `getTexCoords()` answers
+   * all four values in one walk.
+   */
   get v(): number {
     const bounds = computeBounds(this);
     return bounds[3] - bounds[1];

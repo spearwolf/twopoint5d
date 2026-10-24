@@ -1,3 +1,8 @@
+/**
+ * A shallow copy of `o` without `keys`: every own enumerable key, string and symbol alike, but those
+ * named. `undefined` for an `o` of `null` or `undefined`. An own key `__proto__` stays a field of the
+ * copy and does not set its prototype.
+ */
 export const unpick = <T extends object>(o: T | null | undefined, ...keys: (keyof T)[]): Partial<T> | undefined => {
   if (o == null) return undefined;
 

@@ -14,7 +14,7 @@ import {
   TextureResourceSubtypes,
 } from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
-import {TextureStore, TextureStoreEvents, type TextureStoreLoadOptions} from './TextureStore.js';
+import {TextureStore, type TextureStoreErrorEvent, TextureStoreEvents, type TextureStoreLoadOptions} from './TextureStore.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
 
@@ -582,6 +582,32 @@ describe('TextureStore', () => {
         expect(event.source).toBe('fetch');
         expect(event.status).toBe(404);
         expect(readyHandler).not.toHaveBeenCalled();
+      } finally {
+        fetchMock.mockRestore();
+      }
+    });
+
+    test('the error events of a fetch that answers with a status are TextureStoreErrorEvents, narrowed by their source', async () => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}', {status: 404}));
+      try {
+        const store = new TextureStore();
+        const errors: TextureStoreErrorEvent[] = [];
+        on(store, 'error', (event: TextureStoreErrorEvent) => {
+          errors.push(event);
+        });
+        await expect(store.loadAsync('http://example.test/missing.json')).rejects.toThrow();
+
+        expect(errors).toHaveLength(1);
+        const [event] = errors;
+        expect(event!.source).toBe('fetch');
+        if (event!.source === 'fetch') {
+          expect(event!.url).toBe('http://example.test/missing.json');
+          expect(event!.status).toBe(404);
+        }
+
+        // @ts-expect-error — a fetch failure names its url
+        const missing: TextureStoreErrorEvent = {source: 'fetch', error: 1};
+        expect(missing.source).toBe('fetch');
       } finally {
         fetchMock.mockRestore();
       }

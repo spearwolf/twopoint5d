@@ -17,13 +17,17 @@ of `public-api.ts` files _is_ the package's API contract:
 
 - Anything not re-exported through a `public-api.ts` is internal. Consumers get no deep
   imports, so internal files can be renamed and reshaped freely.
+- `display/`, `texture/`, `map2d/` (with `chunk-quad-tree/`) and `sprites/` name their
+  exports one by one, because their files export for their neighbours as well: a new
+  export of such a file stays internal until it is listed. A helper listed only because
+  an earlier release published it carries `@deprecated`.
 - A new public symbol is not published until it is added to its module's
   `public-api.ts`. `pnpm checkNameableTypes` fails the build when a published
   declaration references a type that consumers cannot name — usually the symptom of a
   type that was forgotten here.
 - Type-only exports go through `export type` — `export type * from './types.js'`, or a
-  named `export type {…}` list in a module that names its exports one by one, as
-  `display/` does — matching Biome's `useImportType` on the import side.
+  named `export type {…}` list in a module that names its exports one by one, as the
+  four modules above do — matching Biome's `useImportType` on the import side.
 
 ## 2. Layers
 

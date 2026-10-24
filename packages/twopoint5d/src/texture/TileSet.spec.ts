@@ -174,6 +174,44 @@ describe('TileSet', () => {
     });
   });
 
+  describe('TileSet.MaxTiles', () => {
+    test('TileSet.MaxTiles is 2 ** 20', () => {
+      expect(TileSet.MaxTiles).toBe(2 ** 20);
+    });
+
+    test('refuses more than TileSet.MaxTiles tiles without a tileCount before it lays one, and leaves the atlas handed in empty', () => {
+      const atlas = new TextureAtlas();
+      const create = () => new TileSet(atlas, new TextureCoords(0, 0, 2048, 1024), {tileWidth: 1, tileHeight: 1});
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(/2097152 tiles of 1 × 1 fit into 2048 × 1024 .* a tile set holds at most 1048576/);
+      expect(atlas.size).toBe(0);
+    });
+
+    test('refuses a tileCount above TileSet.MaxTiles', () => {
+      const create = () => new TileSet(new TextureCoords(0, 0, 2048, 1024), {tileWidth: 1, tileHeight: 1, tileCount: 1048577});
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(/tileCount must be a whole number from 1 to 1048576, got 1048577/);
+    });
+
+    test('refuses a tileWidth of 0.001 on a 64 × 64 image', () => {
+      const atlas = new TextureAtlas();
+      const create = () => new TileSet(atlas, new TextureCoords(0, 0, 64, 64), {tileWidth: 0.001, tileHeight: 0.001});
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(/a tile set holds at most 1048576/);
+      expect(atlas.size).toBe(0);
+    });
+
+    test('takes a tileCount within MaxTiles from an image that holds far more', () => {
+      const tiles = new TileSet(new TextureCoords(0, 0, 8192, 8192), {tileWidth: 1, tileHeight: 1, tileCount: 16});
+
+      expect(tiles.tileCount).toBe(16);
+      expect(tiles.frame(tiles.lastId).coords).toMatchObject({x: 15, y: 0});
+    });
+  });
+
   describe('the options are a frozen copy', () => {
     test('a change to the object handed in reaches neither the getters nor frameId()', () => {
       const options = {tileWidth: 16, tileHeight: 16, firstId: 1};

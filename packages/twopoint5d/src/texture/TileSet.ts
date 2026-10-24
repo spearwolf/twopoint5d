@@ -1,4 +1,5 @@
 import {describeValue} from '../utils/describeValue.js';
+import {randomInt} from '../utils/randomInt.js';
 import {TextureAtlas, type TextureAtlasFrame, type TextureAtlasFrameData} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 
@@ -28,8 +29,6 @@ import {TextureCoords} from './TextureCoords.js';
 // +---------------------------------------------+
 //
 
-const rand = (max: number) => (Math.random() * max) | 0;
-
 export interface TileSetOptions {
   /** The width of one tile — a finite number above 0. Defaults to the width of the `baseCoords`. */
   tileWidth?: number;
@@ -44,8 +43,9 @@ export interface TileSetOptions {
   padding?: number;
 
   /**
-   * How many tiles the set holds — a whole number of 1 or more, no more than fit into the image. Defaults
-   * to as many tiles as fit into the image.
+   * How many tiles the set holds — a whole number from 1 to {@link TileSet.MaxTiles}, no more than fit
+   * into the image. Defaults to as many tiles as fit into the image, which may be no more than
+   * `MaxTiles`.
    */
   tileCount?: number;
 
@@ -75,6 +75,13 @@ const assertFits = (fits: boolean, message: () => string): void => {
  * own takes that type on. The frames the `TileSet` lays out itself carry no data.
  */
 export class TileSet<D = TextureAtlasFrameData> {
+  /**
+   * The most tiles a tile set holds: 2^20 — every tile of 8 × 8 texels or more on an image of
+   * 8192 × 8192, the largest 2D texture every WebGPU device takes. `new TileSet()` refuses a set
+   * of more, and a `tileCount` above it, before it lays a tile.
+   */
+  static readonly MaxTiles: number = 1_048_576;
+
   readonly atlas: TextureAtlas<D>;
   readonly baseCoords: TextureCoords;
 
@@ -111,8 +118,9 @@ export class TileSet<D = TextureAtlasFrameData> {
    * `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a whole number
    * of 1 or more, if `firstId` is not a whole number, if the width or height of the `baseCoords`
    * is not finite, if the first tile does not fit into the `baseCoords` with its `margin` and `padding`,
-   * or if the tiles of a `tileCount` do not all fit into the `baseCoords`; the atlas handed in is then
-   * left as it was.
+   * if the tiles of a `tileCount` do not all fit into the `baseCoords`, a `tileCount` above
+   * {@link TileSet.MaxTiles}, more than `MaxTiles` tiles that fit without a `tileCount`; the atlas
+   * handed in is then left as it was.
    */
   constructor(...args: [TextureAtlas<D>, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
@@ -183,11 +191,11 @@ export class TileSet<D = TextureAtlasFrameData> {
   }
 
   randomTileId(): number {
-    return this.firstId + rand(this.tileCount);
+    return this.firstId + randomInt(this.tileCount);
   }
 
   randomFrameId(): number {
-    return this.firstFrameId + rand(this.tileCount);
+    return this.firstFrameId + randomInt(this.tileCount);
   }
 
   /**
@@ -202,15 +210,33 @@ export class TileSet<D = TextureAtlasFrameData> {
     return this.atlas.get(this.randomFrameId())!;
   }
 
+  // How many cells of `outer` with `spacing` between them fit along `extent` with `margin` at both
+  // ends; the caller has made sure the first one fits. The quotient is rounded once and can land one
+  // off where the cells meet the bound exactly, so the count is held to the test the layout places a
+  // cell by. A count past 2^53 is far over MaxTiles, and so is Infinity, which a tile of a denormal
+  // width yields: neither is corrected, and the caller refuses both. The first cell is there in any
+  // case, whatever the rounding of the quotient says.
+  static #cellsAlong(extent: number, margin: number, outer: number, spacing: number): number {
+    const step = outer + spacing;
+    let count = Math.floor((extent - 2 * margin - outer) / step) + 1;
+    if (Number.isSafeInteger(count)) {
+      if (margin + count * step + outer + margin <= extent) count += 1;
+      else if (count > 1 && margin + (count - 1) * step + outer + margin > extent) count -= 1;
+    }
+    return Math.max(count, 1);
+  }
+
   #createTextureCoords = (): void => {
     const {width: baseWidth, height: baseHeight} = this.baseCoords;
 
     const {padding, margin, spacing, tileCountLimit} = this;
 
-    // The layout loop ends only if every step moves forward and the image bounds are finite. The
-    // values come unchecked out of catalog json (`TextureStore.parse()` → `TextureResource.fromTileSet()`
-    // → `new TileSet()` inside an effect), and one that does not hold would freeze the page
-    // synchronously — so they are refused before the loop starts.
+    // The number of tiles is worked out from these values, and it takes a step that moves forward and
+    // image bounds that are finite. The values come unchecked out of catalog json
+    // (`TextureStore.parse()` → `TextureResource.fromTileSet()` → `new TileSet()` inside an effect), and
+    // one that does not hold would count no number or an endless one — so they are refused before the
+    // count. The number of tiles is held to MaxTiles before the first one is laid as well: a tiny
+    // tileWidth out of the catalog would fill the memory otherwise.
     assertOption(Number.isFinite(baseWidth), 'baseCoords.width', 'a finite number', baseWidth);
     assertOption(Number.isFinite(baseHeight), 'baseCoords.height', 'a finite number', baseHeight);
     assertOption(Number.isFinite(this.tileWidth) && this.tileWidth > 0, 'tileWidth', 'a finite number above 0', this.tileWidth);
@@ -224,9 +250,10 @@ export class TileSet<D = TextureAtlasFrameData> {
     assertOption(Number.isFinite(padding) && padding >= 0, 'padding', 'a finite number of 0 or more', padding);
     assertOption(Number.isFinite(spacing) && spacing >= 0, 'spacing', 'a finite number of 0 or more', spacing);
     assertOption(
-      tileCountLimit === Infinity || (Number.isInteger(tileCountLimit) && tileCountLimit >= 1),
+      tileCountLimit === Infinity ||
+        (Number.isInteger(tileCountLimit) && tileCountLimit >= 1 && tileCountLimit <= TileSet.MaxTiles),
       'tileCount',
-      'a whole number of 1 or more',
+      `a whole number from 1 to ${TileSet.MaxTiles}`,
       tileCountLimit,
     );
     // the ids of the tiles are counted from here: a string would be concatenated, not added
@@ -235,8 +262,8 @@ export class TileSet<D = TextureAtlasFrameData> {
     const tileOuterWidth = this.tileWidth + padding * 2;
     const tileOuterHeight = this.tileHeight + padding * 2;
 
-    // the first tile is laid without a look at the bounds, so it is checked here: every tile laid
-    // after it is checked in the loop, and with the first one inside, tileCount is 1 or more
+    // the first tile is checked here, and with it inside, the count of every axis is 1 or more:
+    // #cellsAlong() counts the cells that follow it
     assertFits(
       margin * 2 + tileOuterWidth <= baseWidth,
       () =>
@@ -248,49 +275,29 @@ export class TileSet<D = TextureAtlasFrameData> {
         `the first tile does not fit into the height of the baseCoords: margin, padding and tileHeight take ${margin * 2 + tileOuterHeight}, the baseCoords are ${baseHeight} high`,
     );
 
-    let x = margin;
-    let y = margin;
-    let tileCount = 0;
-    // the top left of every tile, x and y in turn: the tiles go into the atlas only once their number
-    // is checked, so a refused tileCount leaves the atlas handed in as it was
-    const positions: number[] = [];
-
-    while (tileCount < tileCountLimit) {
-      positions.push(x, y);
-
-      ++tileCount;
-
-      if (tileCount === tileCountLimit) {
-        break;
-      }
-
-      const xOffsetNext = tileOuterWidth + spacing;
-
-      if (x + xOffsetNext + tileOuterWidth + margin <= baseWidth) {
-        x += xOffsetNext;
-      } else {
-        x = margin;
-        y += tileOuterHeight + spacing;
-        if (y + tileOuterHeight + margin > baseHeight) {
-          break;
-        }
-      }
-    }
+    const columns = TileSet.#cellsAlong(baseWidth, margin, tileOuterWidth, spacing);
+    const rows = TileSet.#cellsAlong(baseHeight, margin, tileOuterHeight, spacing);
+    const fitting = columns * rows;
 
     assertFits(
-      this.options.tileCount === undefined || tileCount === tileCountLimit,
+      this.options.tileCount !== undefined || fitting <= TileSet.MaxTiles,
       () =>
-        `the tileCount of ${tileCountLimit} does not fit into the baseCoords: ${tileCount === 1 ? '1 tile' : `${tileCount} tiles`} of ${this.tileWidth} × ${this.tileHeight} fit into ${baseWidth} × ${baseHeight} with margin ${margin}, padding ${padding} and spacing ${spacing}`,
+        `${fitting} tiles of ${this.tileWidth} × ${this.tileHeight} fit into ${baseWidth} × ${baseHeight} with margin ${margin}, padding ${padding} and spacing ${spacing} — a tile set holds at most ${TileSet.MaxTiles}; give a tileCount, or larger tiles`,
+    );
+    assertFits(
+      this.options.tileCount === undefined || tileCountLimit <= fitting,
+      () =>
+        `the tileCount of ${tileCountLimit} does not fit into the baseCoords: ${fitting === 1 ? '1 tile' : `${fitting} tiles`} of ${this.tileWidth} × ${this.tileHeight} fit into ${baseWidth} × ${baseHeight} with margin ${margin}, padding ${padding} and spacing ${spacing}`,
     );
 
-    for (let i = 0; i < positions.length; i += 2) {
-      const coords = new TextureCoords(
-        this.baseCoords,
-        positions[i]! + padding,
-        positions[i + 1]! + padding,
-        this.tileWidth,
-        this.tileHeight,
-      );
+    const tileCount = this.options.tileCount ?? fitting;
+
+    // the tiles go into the atlas only once their number is checked, so a refused set leaves the
+    // atlas handed in as it was; they fill the rows from the top left
+    for (let i = 0; i < tileCount; i++) {
+      const x = margin + (i % columns) * (tileOuterWidth + spacing);
+      const y = margin + Math.floor(i / columns) * (tileOuterHeight + spacing);
+      const coords = new TextureCoords(this.baseCoords, x + padding, y + padding, this.tileWidth, this.tileHeight);
       const frameId = this.atlas.add(coords);
       if (i === 0) this.#firstFrameId = frameId;
     }

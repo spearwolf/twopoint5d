@@ -1,6 +1,15 @@
 // the byte order of the host, which a Uint32Array laid over a buffer reads in
 const HOST_IS_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
+/**
+ * The uint32 values of a base64 string: the string is decoded to its bytes, and every group of four
+ * bytes becomes one value, read little-endian by default or big-endian with `isLittleEndian` set to
+ * `false`. A trailing byte group shorter than 4 has no value to make and is left out.
+ *
+ * @deprecated A helper of {@link DataIdsChunk2D}, not a name to use outside the library: a subclass that
+ *   overrides `prepareData()` decodes the ids through `super.prepareData(base64)`. It stays exported until a
+ *   breaking release.
+ */
 export function base64toUint32Arr(base64: string, isLittleEndian = true): Uint32Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);

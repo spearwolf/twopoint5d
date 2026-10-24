@@ -67,6 +67,16 @@ export const TextureResourceSubtypes = {
 } as const satisfies Record<string, TextureResourceSubType>;
 
 /**
+ * The payload of an `error` event of a {@link TextureResource}, one shape per `source`;
+ * {@link TextureResourceEvents} says when each goes out.
+ */
+export type TextureResourceErrorEvent =
+  | {readonly source: 'image'; readonly url: string; readonly error: unknown}
+  | {readonly source: 'atlas'; readonly url: string; readonly status?: number; readonly error: unknown}
+  | {readonly source: 'texture'; readonly id: string; readonly error: unknown}
+  | {readonly source: 'frameBasedAnimations'; readonly id: string; readonly animation: string; readonly error: unknown};
+
+/**
  * Public event-name constants emitted by `TextureResource`.
  *
  * - `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` carry the values of the
@@ -76,7 +86,7 @@ export const TextureResourceSubtypes = {
  *     {@link TextureResource} lists when a value is taken back.
  *   - A subscriber that throws keeps the value from no one: every other subscriber is called and
  *     the retained value is written before the throw goes on.
- * - `error` carries one payload per `source`:
+ * - `error` carries a {@link TextureResourceErrorEvent}, one shape per `source`:
  *   - `{source: 'image', url, error}` — an image that does not load. The failure comes out of the
  *     loader promise and has no status to name.
  *   - `{source: 'atlas', url, status, error}` — an atlas request that answered with a status
@@ -98,8 +108,9 @@ export const TextureResourceSubtypes = {
  *   - `{source: 'frameBasedAnimations', id, animation, error}` — an animation entry that is skipped.
  *     Every other entry of the same map is registered all the same. An entry is skipped
  *     - whose data is no object or does not fit this kind of resource;
- *     - whose data does not let the animation be built: no `duration` and no `frameRate`, a
- *       `frameRate` of 0, `tileIds` that are no array, a tile id, a `firstTileId` or a `tileCount`
+ *     - whose data does not let the animation be built: no `duration` and no `frameRate`, timing
+ *       that gives more than one of `duration`, `frameRate` and `durations`, a `frameRate` of 0,
+ *       `tileIds` that are no array, a tile id, a `firstTileId` or a `tileCount`
  *       that `FrameBasedAnimations#add()` refuses, a `frameNameQuery` that is neither a string nor
  *       a `RegExp`;
  *     - whose frames come out empty: a `frameNameQuery` that matches nothing or an empty list of
@@ -147,6 +158,12 @@ const cmpShallow = <T extends object>(a: T | undefined, b: T | undefined): boole
 
 const OnDispose = TextureResourceEvents.Dispose;
 const OnError = TextureResourceEvents.Error;
+
+// every error event of a resource goes out here, so that its payload is held to the type; at module
+// level, because the three shapes of resource below need it as well and reach no # method of the base
+const reportError = (resource: TextureResource, event: TextureResourceErrorEvent): void => {
+  emitSafe(resource, OnError, event);
+};
 
 // Everything derived from an image runs before the bridges that carry the values out as
 // events, which have no priority and sit at 0. The image effect writes the coordinates and
@@ -694,7 +711,7 @@ export abstract class TextureResource {
   // the record goes in before the event goes out: a listener of the error event reads it
   #fail(step: LoadStep, failure: TextureResourceLoadFailure): void {
     this.#loadFailures.set(step, failure);
-    emitSafe(this, OnError, failure);
+    reportError(this, failure);
   }
 
   /** @internal */
@@ -959,7 +976,7 @@ export abstract class TextureResource {
       previous?.dispose();
     }
     if (publishError) {
-      emitSafe(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
+      reportError(this, {source: 'texture', id: this.id, error: publishError.error});
     }
   }
 
@@ -996,7 +1013,7 @@ export abstract class TextureResource {
       stale?.dispose();
     }
     if (publishError) {
-      emitSafe(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
+      reportError(this, {source: 'texture', id: this.id, error: publishError.error});
     }
   }
 
@@ -1052,7 +1069,7 @@ export abstract class TextureResource {
             // global error channel of signalize, no animation of the whole map is registered,
             // and the caller is told nothing. emitSafe() for the same reason: an error listener
             // that throws would take the rest of the map with it.
-            emitSafe(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
+            reportError(this, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
           }
         }
         this.#frameBasedAnimations.set(animations);
@@ -1471,7 +1488,7 @@ export class AtlasTextureResource extends TextureResource {
           } catch (error) {
             // signalize hands the throw of a subscriber to the writer once every effect has
             // run: the json and what is built from it are published, so no record is kept
-            emitSafe(this, OnError, {source: 'texture', id: this.id, error});
+            reportError(this, {source: 'texture', id: this.id, error});
           }
         })();
         return () => {

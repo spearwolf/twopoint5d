@@ -22,10 +22,13 @@ export type DynamicAtlasSource = DynamicAtlasDraw | DynamicAtlasImage;
 
 /** The size of a frame of a {@link DynamicAtlas}, in texels; rounded up to whole texels. */
 export interface DynamicAtlasSize {
+  /** The width of the frame in texels, rounded up to a whole texel. */
   width: number;
+  /** The height of the frame in texels, rounded up to a whole texel. */
   height: number;
 }
 
+/** How a {@link DynamicAtlas} is built: its size or a canvas of one's own, the spacing of its frames and its filter. */
 export interface DynamicAtlasOptions {
   /** The width of the atlas in texels — a whole number of 1 or more. Required without a `canvas`. */
   width?: number;
@@ -127,9 +130,13 @@ const buildCanvas = (width: number, height: number): HTMLCanvasElement | Offscre
  * {@link upload}; {@link dispose} releases them. A canvas handed in stays the caller's.
  */
 export class DynamicAtlas {
+  /** The width of the area the frames are packed into, in texels: the option, or the width of the canvas handed in. */
   readonly width: number;
+  /** The height of the area the frames are packed into, in texels: the option, or the height of the canvas handed in. */
   readonly height: number;
+  /** The clear texels between two frames and between a frame and the edge: the option, 1 without it. */
   readonly padding: number;
+  /** How many texels the edge of every frame is repeated outwards: the option, 0 without it. */
   readonly extrude: number;
 
   readonly #canvas: HTMLCanvasElement | OffscreenCanvas;
@@ -254,6 +261,7 @@ export class DynamicAtlas {
     return this.#context;
   }
 
+  /** `true` from the first {@link dispose} on. */
   get isDisposed(): boolean {
     return this.#disposed;
   }

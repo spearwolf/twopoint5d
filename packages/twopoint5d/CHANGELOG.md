@@ -62,6 +62,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `frameTrimMargins(data, target?)` and its type `FrameTrimMargins` to the exports: the trim margins of a frame by the rule `AtlasFrame#setFrame()`, `prepareSpriteFrame()`, `AtlasFrameTable`, `FrameTable` and `FrameBasedAnimations#bakeDataTexture()` write them with; with a `target` of its own the call allocates nothing
 - add `RectangularVisibilityArea#maxVisibleTiles`, 10 000 by default, a whole number above 0 or `Infinity`: a rectangle that covers more tiles of the grid throws a `RangeError` before it builds a tile, and the next call computes again (**BREAKING** for an area of more than 10 000 tiles, which ran before). See the Migration Guide
 - add `Map2DSpatialHashGrid#maxCellsPerRenderable`, 65 536 (256 × 256) by default, a whole number above 0 or `Infinity`: `add()` refuses a renderable whose `aabb` reaches into more cells with a `RangeError` and adds none of the renderables it is handed (**BREAKING** for a renderable of more than 65 536 cells, which was added before). See the Migration Guide
+- add `TextureResourceErrorEvent` and `TextureStoreErrorEvent`, the payloads of the `error` events of `TextureResource` and `TextureStore` as unions over `source`
+- add `TileSet.MaxTiles`, the most tiles a tile set holds: 2^20, every tile of 8 × 8 texels or more on an image of 8192 × 8192
 
 ### Changed
 
@@ -131,6 +133,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `defineSprite()`, `definePass()` and the `placement` of `FeatureSprites` and `FeatureSpritesMaterial` check a feature that never passed through `defineFeature()` the same way, in their own name, and `defineSprite()` refuses options that are no object, a base that is none and features that are no list (**BREAKING**). See the Migration Guide
 - `defineFeature()`, `QuadBase`, `gridBase()` and `defineSprite()` freeze what they answer all the way down — a write into the attributes, methods, uniforms, textures or stages of a feature, or into the description of a base or a kind, throws a `TypeError` (**BREAKING**). The description of a kind is a copy of its own; the features handed to `defineSprite()` and the base stay as their authors left them. See the Migration Guide
 - `tableFrame()` takes `views` from 2 to 64 (**BREAKING**). See the Migration Guide
+- `new TileSet()` works out how many tiles fit and refuses more than `TileSet.MaxTiles` of them without a `tileCount`, and a `tileCount` above it, with a `RangeError` before it lays a tile (**BREAKING**). See the Migration Guide
+- `FrameBasedAnimations#add()` refuses timing that gives more than one of `duration`, `frameRate` and `durations` with an error that names the animation and the fields; a `TextureResource` skips such an entry of its animation data and reports it with `source: 'frameBasedAnimations'` (**BREAKING** for JavaScript and catalog json). See the Migration Guide
+- `FrameBasedAnimations.MaxTextureSize` is `static readonly`: a bake takes a limit of its own through `maxTextureSize` or `renderer` (**BREAKING** for TypeScript). See the Migration Guide
+
+### Deprecated
+
+- deprecate `MapTuple`, `MapSubTypes` and `base64toUint32Arr`: helpers of `TextureStore` and `DataIdsChunk2D` the public surface carries without meaning to. Name a value of `getAsync()` through `TextureResourceSubTypeMap`; a subclass of `DataIdsChunk2D` decodes its ids through `super.prepareData(base64)`. They stay until a breaking release takes them out
 
 ### Removed
 
@@ -754,6 +763,8 @@ node.clear(); // a leaf again, without chunks
 
 `DataIdsChunk2D` has no `protected data` any more. A subclass that overrides `prepareData()` gets the base64 string of its params as the argument.
 
+The ids as `DataIdsChunk2D` decodes them come from `super.prepareData(base64)`.
+
 **Before**
 
 ```ts
@@ -767,11 +778,13 @@ class MyChunk extends DataIdsChunk2D {
 **After**
 
 ```ts check
-import {base64toUint32Arr, DataIdsChunk2D} from '@spearwolf/twopoint5d';
+import {DataIdsChunk2D} from '@spearwolf/twopoint5d';
+
+declare function decode(base64: string): Uint32Array;
 
 class MyChunk extends DataIdsChunk2D {
   protected override prepareData(base64: string): Uint32Array {
-    return base64toUint32Arr(base64);
+    return decode(base64);
   }
 }
 ```
@@ -855,6 +868,69 @@ const show = (sprite: TableFrameApi, frame: number, view: number) => {
   sprite.frameIndex = frame * VIEWS + view;
 };
 const feature = TableFrame;
+```
+
+#### A TileSet of more than 1 048 576 tiles
+
+`new TileSet()` refuses a set of more than `TileSet.MaxTiles` tiles — 1 048 576 — with a `RangeError` before it lays a tile: without a `tileCount` when more tiles fit into the `baseCoords`, and a `tileCount` above it. Give a `tileCount` of the tiles you use, or larger tiles.
+
+**Before**
+
+```ts
+const tiles = new TileSet(new TextureCoords(0, 0, 2048, 1024), {tileWidth: 1, tileHeight: 1}); // 2 097 152 tiles
+```
+
+**After**
+
+```ts check
+import {TextureCoords, TileSet} from '@spearwolf/twopoint5d';
+
+const tiles = new TileSet(new TextureCoords(0, 0, 2048, 1024), {tileWidth: 1, tileHeight: 1, tileCount: 4096});
+const largerTiles = new TileSet(new TextureCoords(0, 0, 2048, 1024), {tileWidth: 8, tileHeight: 8});
+```
+
+#### Animation timing with more than one of duration, frameRate and durations
+
+`FrameBasedAnimations#add()` refuses timing that gives more than one of `duration`, `frameRate` and `durations`, and a `TextureResource` skips such an entry of its animation data and reports it as an `error` with `source: 'frameBasedAnimations'`. Timing that gave both `duration` and `frameRate` got its duration from `frameRate`: keep `frameRate` and drop `duration`.
+
+**Before**
+
+```ts
+animations.add('walk', {duration: 1, frameRate: 12} as never, frames);
+// or in the catalog json: {"duration": 1, "frameRate": 12, "tileIds": [1, 2, 3]}
+```
+
+**After**
+
+```ts check
+import {FrameBasedAnimations, TextureCoords} from '@spearwolf/twopoint5d';
+
+declare const frames: TextureCoords[];
+
+const animations = new FrameBasedAnimations();
+animations.add('walk', {frameRate: 12}, frames);
+// in the catalog json: {"frameRate": 12, "tileIds": [1, 2, 3]}
+```
+
+#### A bake limit set through FrameBasedAnimations.MaxTextureSize
+
+`FrameBasedAnimations.MaxTextureSize` is `static readonly`, and a write to it does not compile. Hand the limit to the bake. The bound of a `tileCount` in `add()` is 8192.
+
+**Before**
+
+```ts
+FrameBasedAnimations.MaxTextureSize = 4096;
+animations.bakeDataTexture();
+```
+
+**After**
+
+```ts check
+import {FrameBasedAnimations} from '@spearwolf/twopoint5d';
+
+declare const animations: FrameBasedAnimations;
+
+const animsMap = animations.bakeDataTexture({maxTextureSize: 4096});
 ```
 
 ## [0.23.0] - 2026-10-18

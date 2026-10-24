@@ -2,11 +2,11 @@ import {DataTexture, FloatType, RGBAFormat, type WebGPURenderer} from 'three/web
 import {describeValue} from '../utils/describeValue.js';
 import type {AtlasFrameTableSelection} from './AtlasFrameTable.js';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
-import {frameTrimMargins} from './frameTrimMargins.js';
+import {writeTableEntryTexels} from './frameTexels.js';
 import {isTextureSize, readMaxTextureSize} from './readMaxTextureSize.js';
 import {selectAtlasFrames} from './selectAtlasFrames.js';
 import type {TextureAtlas, TextureAtlasFrame, TextureAtlasFrameName} from './TextureAtlas.js';
-import {TextureCoords} from './TextureCoords.js';
+import type {TextureCoords} from './TextureCoords.js';
 
 /** A frame of a {@link FrameTable}: a frame of an atlas, or bare `TextureCoords`, which are untrimmed. */
 export type FrameTableEntry = TextureAtlasFrame<unknown> | TextureCoords;
@@ -131,14 +131,8 @@ export class FrameTable {
 
     const data = new Float32Array(width * height * 4);
     data[0] = entries.length;
-    const texCoords: [number, number, number, number] = [0, 0, 0, 0];
-    const trim: [number, number, number, number] = [0, 0, 0, 0];
     entries.forEach((entry, k) => {
-      const coords = entry instanceof TextureCoords ? entry : entry.coords;
-      const offset = (1 + k * TEXELS_PER_FRAME) * 4;
-      data.set(coords.getTexCoords(texCoords), offset);
-      data.set([coords.width, coords.height, coords.flipD ? 1 : 0, 0], offset + 4);
-      data.set(frameTrimMargins(entry instanceof TextureCoords ? undefined : entry.data, trim), offset + 8);
+      writeTableEntryTexels(data, (1 + k * TEXELS_PER_FRAME) * 4, entry);
     });
 
     const texture = new DataTexture(data, width, height, RGBAFormat, FloatType);

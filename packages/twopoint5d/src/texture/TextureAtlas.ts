@@ -1,4 +1,5 @@
 import {describeValue} from '../utils/describeValue.js';
+import {randomInt} from '../utils/randomInt.js';
 import {forgetFrameName, liveFrameIds} from './internals.js';
 import type {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
@@ -9,21 +10,29 @@ import type {TexturePackerFrameData} from './TexturePackerJson.js';
  */
 export type TextureAtlasFrameData = TexturePackerFrameData;
 
+/**
+ * A frame of a {@link TextureAtlas}: its `coords`, the area of the frame in the image, and the
+ * `data` it was added with, of the type `D` the atlas names — absent for a frame added without.
+ */
 export interface TextureAtlasFrame<D = TextureAtlasFrameData> {
   coords: TextureCoords;
   data?: D;
 }
 
+/** The arguments of {@link TextureAtlas.add} for a frame without a name: its coords and its data, if any. */
 export type TextureAtlasArgs<D = TextureAtlasFrameData> = [coords: TextureCoords, data?: D];
 
+/**
+ * The name of a frame of a {@link TextureAtlas}: a string or a symbol. A frame named by a symbol is
+ * found by `frame()` and `frameId()`, but not by `frameNames(match)`, which matches strings only.
+ */
 export type TextureAtlasFrameName = string | symbol;
 
+/** The arguments of {@link TextureAtlas.add} for a named frame: its name, its coords and its data, if any. */
 export type NamedTextureAtlasArgs<D = TextureAtlasFrameData> = [name: TextureAtlasFrameName, coords: TextureCoords, data?: D];
 
 const isNamedTextureAtlasArgs = <D>(args: TextureAtlasArgs<D> | NamedTextureAtlasArgs<D>): args is NamedTextureAtlasArgs<D> =>
   typeof args[0] === 'string' || typeof args[0] === 'symbol';
-
-const rand = (max: number) => (Math.random() * max) | 0;
 
 /**
  * Frames of a texture, each with its `TextureCoords`, reachable by id and, if it has one, by name.
@@ -43,8 +52,8 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
   #liveIds: number[] = [];
 
   /**
-   * returns the frame id.
-   * the frame id starts at 0 and increases by 1 each time you add another frame.
+   * Adds a frame and answers its id: the frame id starts at 0 and increases by 1 each time you add
+   * another frame.
    *
    * A name belongs to exactly one frame: a second frame offered under a name that is
    * already taken is refused with an error, and the atlas is left as it was.
@@ -96,14 +105,23 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
     return this.#liveIds;
   }
 
+  /**
+   * The frame under `id`, a frame `DynamicAtlas#remove()` let go of included, or `undefined` for an
+   * `id` without a frame — one of `size` or more, a negative one, or one that is no whole number.
+   */
   get(id: number): TextureAtlasFrame<D> | undefined {
     return this.#frames[id];
   }
 
+  /**
+   * The id of the frame named `name`, or `undefined` for a name the atlas does not hold — a name
+   * `DynamicAtlas#remove()` let go of among them.
+   */
   frameId(name: TextureAtlasFrameName): number | undefined {
     return this.#frameNames.get(name);
   }
 
+  /** The frame named `name`, or `undefined` for a name the atlas does not hold. */
   frame(name: TextureAtlasFrameName): TextureAtlasFrame<D> | undefined {
     const frameId = this.#frameNames.get(name);
     return frameId != null ? this.#frames[frameId] : undefined;
@@ -136,7 +154,7 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
    * lets go of one —, or `size`, an id without a frame, for an atlas without such a frame.
    */
   randomFrameId(): number {
-    return this.#liveIds[rand(this.#liveIds.length)] ?? this.#frames.length;
+    return this.#liveIds[randomInt(this.#liveIds.length)] ?? this.#frames.length;
   }
 
   /**
@@ -149,7 +167,7 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
 
   /** A frame name drawn at random, or `undefined` for an atlas without named frames. */
   randomFrameName(): TextureAtlasFrameName | undefined {
-    return this.#frameNameList[rand(this.#frameNameList.length)];
+    return this.#frameNameList[randomInt(this.#frameNameList.length)];
   }
 
   /** `count` frame ids, each drawn as {@link randomFrameId} draws one. */

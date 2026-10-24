@@ -767,13 +767,9 @@ describe('FrameBasedAnimations', () => {
 
       animations.add('walk', 1.0, frames);
 
-      const maxBefore = FrameBasedAnimations.MaxTextureSize;
-      FrameBasedAnimations.MaxTextureSize = 2;
-      try {
-        expect(() => animations.bakeDataTexture()).toThrow(/3 frame\(s\) in 1 animation\(s\).*8 texels.*maximum of 2/);
-      } finally {
-        FrameBasedAnimations.MaxTextureSize = maxBefore;
-      }
+      expect(() => animations.bakeDataTexture({maxTextureSize: 2})).toThrow(
+        /3 frame\(s\) in 1 animation\(s\).*8 texels.*maximum of 2/,
+      );
     });
 
     test('should handle reasonable number of animations', () => {
@@ -842,6 +838,15 @@ describe('FrameBasedAnimations', () => {
 
     test('MaxTextureSize is 8192 texels, the maxTextureDimension2D every WebGPU device offers', () => {
       expect(FrameBasedAnimations.MaxTextureSize).toBe(8192);
+    });
+
+    test('MaxTextureSize is read-only for TypeScript', () => {
+      // never called: the check is the one of the compiler
+      const write = () => {
+        // @ts-expect-error — the limit of a bake is an option of the bake
+        FrameBasedAnimations.MaxTextureSize = 4096;
+      };
+      expect(write).toBeTypeOf('function');
     });
 
     test('without a limit named a bake of 16384 texels is refused, naming 8192', () => {
@@ -1195,16 +1200,18 @@ describe('FrameBasedAnimations', () => {
       expect(animations.animation('a').durations).toBeUndefined();
     });
 
-    test.each([[{durations: [0.1, 0.1], duration: 1}], [{durations: [0.1, 0.1], frameRate: 10}]])(
-      'refuses durations beside a duration or a frameRate: %j',
-      (timing) => {
-        const animations = new FrameBasedAnimations();
+    test.each([
+      [{durations: [0.1, 0.1], duration: 1}, 'durations and a duration'],
+      [{durations: [0.1, 0.1], frameRate: 10}, 'durations and a frameRate'],
+      [{duration: 1, frameRate: 10}, 'a duration and a frameRate'],
+      [{durations: [0.1, 0.1], duration: 1, frameRate: 10}, 'durations, a duration and a frameRate'],
+    ])('refuses timing that gives more than one of duration, frameRate and durations: %j', (timing, fields) => {
+      const animations = new FrameBasedAnimations();
 
-        expect(() => animations.add('a', timing as never, frames(2))).toThrow(
-          'for the animation "a" — give one of duration, frameRate and durations',
-        );
-      },
-    );
+      expect(() => animations.add('a', timing as never, frames(2))).toThrow(
+        `FrameBasedAnimations: add() got ${fields} for the animation "a" — give one of duration, frameRate and durations`,
+      );
+    });
 
     test.each([['0.1'], [{}], [5]])('refuses durations of %j that are no array', (durations) => {
       const animations = new FrameBasedAnimations();

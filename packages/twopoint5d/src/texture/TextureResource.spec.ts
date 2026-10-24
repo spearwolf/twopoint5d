@@ -12,6 +12,7 @@ import {
   AtlasTextureResource,
   ImageTextureResource,
   TextureResource,
+  type TextureResourceErrorEvent,
   TileSetTextureResource,
 } from './TextureResource.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
@@ -651,6 +652,38 @@ describe('TextureResource', () => {
       );
 
       // the entry beside it is registered all the same
+      expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);
+
+      resource.dispose();
+    });
+
+    test('an animation entry with a duration and a frameRate is skipped and reported, and the other entries are registered', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
+        // json may carry both timing fields, which the type forbids
+        walk: {duration: 1, frameRate: 12, tileIds: [1, 2]},
+        idle: {duration: 1, tileIds: [3, 4]},
+      } as unknown as FrameBasedAnimationsDataMap);
+      resource.activate();
+
+      const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'frameBasedAnimations', id: 'tiles', animation: 'walk'});
+      expect(errors[0]!.error.message).toBe(
+        'FrameBasedAnimations: add() got a duration and a frameRate for the animation "walk" — give one of duration, frameRate and durations',
+      );
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
       expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);
 
       resource.dispose();
@@ -1533,6 +1566,35 @@ describe('TextureResource', () => {
       expect(errors[0]!.source).toBe('image');
       expect(errors[0]!.url).toBe('hero.png');
       expect(errors[0]!.error).toBe(loadError);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+    });
+
+    test('the error events of an image that fails to load are TextureResourceErrorEvents, narrowed by their source', async () => {
+      const loadError = new Error('boom');
+      const loadAsyncSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(() => Promise.reject(loadError));
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      const errors: TextureResourceErrorEvent[] = [];
+      on(resource, 'error', (event: TextureResourceErrorEvent) => {
+        errors.push(event);
+      });
+
+      resource.activate();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      const [event] = errors;
+      expect(event!.source).toBe('image');
+      if (event!.source === 'image') expect(event!.url).toBe('hero.png');
+      expect(event!.error).toBe(loadError);
+
+      // @ts-expect-error — an image failure names its url
+      const missing: TextureResourceErrorEvent = {source: 'image', error: new Error('x')};
+      expect(missing.source).toBe('image');
 
       resource.dispose();
       loadAsyncSpy.mockRestore();

@@ -28,6 +28,12 @@ export function getHorizontalInnerMargin(style: CSSStyleDeclaration): number {
   return getHorizontalBorder(style) + getHorizontalPadding(style);
 }
 
+/**
+ * The width and height of the content area of `element` in CSS pixels: its `getBoundingClientRect()`
+ * less the borders and the padding of both sides. `style` defaults to `getComputedStyle(element)`, and
+ * the answer carries the `style` it used. A transformed element is measured with its transform, as
+ * `getBoundingClientRect()` measures it.
+ */
 export function getContentAreaSize(
   element: Element,
   style?: CSSStyleDeclaration,

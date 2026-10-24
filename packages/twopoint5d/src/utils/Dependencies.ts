@@ -205,6 +205,12 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
     return changed;
   }
 
+  /**
+   * Empties the state: afterwards {@link value} answers `undefined` for every key, and the next
+   * {@link equals} or {@link changed} compares with a state in which every key is absent — equal to
+   * values that are all absent, different from any that is present. A key with `clone` and `copy`
+   * gets a new clone with the next {@link update}.
+   */
   clear(): void {
     this.#state.clear();
   }
