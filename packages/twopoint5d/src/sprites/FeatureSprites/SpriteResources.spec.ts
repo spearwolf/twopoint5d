@@ -189,6 +189,36 @@ describe('SpriteResources', () => {
     expect(getEffectsCount()).toBe(effects);
   });
 
+  describe('refuses', () => {
+    test.each([
+      ['features that are a number', 5, undefined, 'features is a list of features, got 5'],
+      ['features that are undefined', undefined, undefined, 'features is a list of features, got undefined'],
+      [
+        'a feature with uniforms that are no record',
+        [{name: 'odd', uniforms: 5}],
+        undefined,
+        'the uniforms of feature "odd" are no record of uniform declarations, got 5',
+      ],
+      ['options that are null', [anim], null, 'the options must be an object, got null'],
+      ['options that are a number', [anim], 5, 'the options must be an object, got 5'],
+      ['textures that are a number', [anim], {textures: 5}, 'textures must be an object of textures by name, got 5'],
+      ['uniforms that are an array', [anim], {uniforms: []}, 'uniforms must be an object of values by name, got []'],
+    ])('%s and builds nothing', (_label, features, options, message) => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new SpriteResources(features as never, options as never)).toThrow(
+        new TypeError(`SpriteResources: ${message}`),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('in the words of the caller it is handed', () => {
+      expect(() => new SpriteResources(5 as never, {}, 'Mine')).toThrow(
+        new TypeError('Mine: features is a list of features, got 5'),
+      );
+    });
+  });
+
   describe('dispose()', () => {
     test('does NOT dispose a texture it holds', () => {
       const texture = new Texture();

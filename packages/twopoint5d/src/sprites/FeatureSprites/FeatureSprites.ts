@@ -7,7 +7,7 @@ import {throwCollected} from '../../utils/throwCollected.js';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
 import {checkFeature} from '../checkFeature.js';
-import type {SpriteKind} from '../defineSprite.js';
+import {checkSpriteKind, type SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {checkPass, checkPassFeatures, passFeatures, placementOfPass} from '../passes/passFeatures.js';
 import {resolvedUniformName, stageFeaturesOf} from '../passes/passUniformNames.js';
@@ -18,6 +18,10 @@ import {checkPlacementStandIn, FeatureSpritesMaterial, type FeatureSpritesMateri
 import {SpriteResources, type SpriteUniformNode} from './SpriteResources.js';
 
 // the mesh draws the sprites themselves; a pass material is built next to it, never as its material
+/**
+ * The options of {@link FeatureSprites}: those of the geometry and of the material side by side,
+ * and `geometry`, `material`, `grow` and `passes`. Every field is optional.
+ */
 export interface FeatureSpritesOptions<Api extends object = object>
   extends FeatureSpritesGeometryParameters,
     Omit<FeatureSpritesMaterialParameters, 'resources' | 'pass'> {
@@ -55,7 +59,10 @@ const callerError = (where: string, error: unknown): unknown =>
  * build and release it.
  */
 export class FeatureSpritesPass<Api extends object = object> extends Mesh {
+  /** The material built for {@link pass}; the sprites build and release it. */
   declare material: FeatureSpritesMaterial<Api>;
+
+  /** The pass this mesh draws. */
   readonly pass: SpritePass;
 
   #enabled = true;
@@ -64,6 +71,10 @@ export class FeatureSpritesPass<Api extends object = object> extends Mesh {
   readonly #uniform: (name: string) => SpriteUniformNode;
   readonly #where: string;
 
+  /**
+   * The sprites build one per pass, over their geometry and with the material built for the pass;
+   * it is not built on its own.
+   */
   constructor(geometry: FeatureSpritesGeometry<Api>, material: FeatureSpritesMaterial<Api>, pass: SpritePass) {
     super(geometry, material);
     this.pass = pass;
@@ -139,6 +150,10 @@ type UniformBinding =
       readonly vector: Vector4;
     };
 
+// a three.js object is named by its type, anything else as describeValue() writes it
+const describePart = (value: unknown, flag: 'isBufferGeometry' | 'isMaterial'): string =>
+  isObject(value) && value[flag] === true && typeof value['type'] === 'string' ? value['type'] : describeValue(value);
+
 const definedKeys = (record: object): string[] =>
   Object.entries(record)
     .filter(([, value]) => value !== undefined)
@@ -157,6 +172,8 @@ interface ResolvedParts<Api extends object> {
 // leaves nothing behind: every check runs before anything is built, and when the shared resources
 // or the material cannot be built, what was built for them goes first
 function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api>): ResolvedParts<Api> {
+  // the kind is the first argument, so it is checked first
+  checkSpriteKind(kind, WHERE);
   // the default of the constructor holds for `undefined` alone
   if (!isObject(options as unknown) || Array.isArray(options)) {
     throw new TypeError(`${WHERE}: the options must be an object, got ${describeValue(options)}`);
@@ -171,6 +188,11 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
     throw new TypeError(`${WHERE}: grow is true or false, got ${describeValue(grow)}`);
   }
   if (geometry != null) {
+    if (!(geometry instanceof FeatureSpritesGeometry)) {
+      throw new TypeError(
+        `${WHERE}: the geometry handed in is no FeatureSpritesGeometry, got ${describePart(geometry, 'isBufferGeometry')}`,
+      );
+    }
     if (geometry.kind !== kind) throw new TypeError(`${WHERE}: the geometry handed in was built for another sprite kind`);
     if (grow === true) {
       throw new TypeError(
@@ -182,6 +204,11 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
     }
   }
   if (material != null) {
+    if (!(material instanceof FeatureSpritesMaterial)) {
+      throw new TypeError(
+        `${WHERE}: the material handed in is no FeatureSpritesMaterial, got ${describePart(material, 'isMaterial')}`,
+      );
+    }
     if (material.kind !== kind) throw new TypeError(`${WHERE}: the material handed in was built for another sprite kind`);
     const given = definedKeys(materialParameters);
     if (given.length > 0) throw new TypeError(`${WHERE}: ${given.join(', ')} build a material, and a material was handed in`);
@@ -274,6 +301,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    */
   declare material: FeatureSpritesMaterial<Api> | undefined;
 
+  /** The sprite kind the mesh draws, handed to the constructor. */
   readonly kind: SpriteKind<Api>;
 
   // the geometry this mesh built, `undefined` for one handed in: the one dispose() and a growth release,
@@ -302,10 +330,17 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   /**
    * @param options every field is optional, so another three.js `Material` or a `Texture` would
    *   pass for them; the `isMaterial` and the `isTexture` they carry keep them out.
-   * @throws a `TypeError` for a geometry or material of another kind, for parameters that would
-   *   build a geometry or a material next to one handed in, for passes next to a material handed in
-   *   and for two passes of one name, for options that are no object and for `passes` that are no list; an `Error` for a pass the kind cannot draw, with the placement
-   *   the sprites start with. A constructor that throws leaves nothing behind it built.
+   * @throws a `TypeError` for a kind that did not come from `defineSprite()`, for a `geometry` or a
+   *   `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, for a geometry or
+   *   material of another kind, for parameters that would build a geometry or a material next to
+   *   one handed in, for passes next to a material handed in and for two passes of one name, for
+   *   options that are no object, for `passes` that are no list and for a `grow` that is neither
+   *   `true` nor `false`; an `Error` for a pass the kind cannot draw, with the placement the
+   *   sprites start with; what `new FeatureSpritesGeometry()` and `new FeatureSpritesMaterial()`
+   *   refuse of the options, in their name; and what `new SpriteResources()` refuses of `textures`
+   *   and `uniforms`, in the name of the class that builds the resources — `FeatureSpritesMaterial`
+   *   without passes, `FeatureSprites` with them. A constructor that throws leaves nothing behind
+   *   it built.
    */
   constructor(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api> & {isMaterial?: never; isTexture?: never} = {}) {
     const {geometry, material, ownsGeometry, grows, resources} = resolveParts(kind, options);

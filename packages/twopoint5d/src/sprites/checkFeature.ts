@@ -13,9 +13,9 @@ const isStringList = (value: unknown): value is readonly string[] =>
 /**
  * Checks a feature on its own, in the words of `where`: that it is an object with a name, and
  * every field it brings for its type. `defineFeature()` runs it, and so does every place that takes
- * a feature — `defineSprite()`, `definePass()` and the placement swap —, since a plain object
- * passes for one. What can only be checked against the other features of a kind, `defineSprite()`
- * checks. @internal
+ * a feature — `defineSprite()`, `definePass()`, `new SpriteResources()` and the placement swap —,
+ * since a plain object passes for one. What can only be checked against the other features of a
+ * kind, `defineSprite()` checks. @internal
  *
  * @throws a `TypeError` naming the feature and the field
  */

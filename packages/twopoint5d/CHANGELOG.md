@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Map2DTileCoordsUtil#getTileCoords()` and `#computeTilesWithinCoords()` refuse a selection that is no finite area with a `RangeError` that names the call and the field — `left` and `top` take a finite number, `width` and `height` a finite number of 0 or more — and leave `target` as it was. The fields `maxDebugHelpers`, `tileBoxHelperExpand` and `frustumBoxHelperExpand` of `CameraBasedVisibilityHelpers` and `viewRectHelperHeight` of `RectangularVisibilityAreaHelpers` refuse the values the helpers cannot draw with, after `dispose()` as well
 - `definePass()` — and every place that takes a pass — refuses a pass that is no object, or whose `features`, `without`, `uniformNames`, `material` or `renderOrder` it cannot read, with a `TypeError` that names the pass and the field (a `RangeError` for a `renderOrder` that is no finite number); `tableFrame()`, `paletteSwap()`, `axisBillboardPlacement()`, `flatPlacement()`, `segmentPlacement()` and `new FeatureSprites()` refuse options that are no object, and `new FeatureSprites()` refuses `passes` that are no list
+- `new FeatureSprites()`, `new FeatureSpritesGeometry()` and `new FeatureSpritesMaterial()` refuse a kind that did not come from `defineSprite()` — a copy of one included — with a `TypeError` that names the class, before anything is built (**BREAKING**). See the Migration Guide. `new FeatureSpritesGeometry()` refuses parameters that are neither a number nor an object, `baseArgs` that are no list and an `attributeUsage` that is no object of name lists; `baseArgs: null` takes the `defaultArgs` of the base. `new FeatureSpritesMaterial()` refuses options that are no object and `resources` that are no `SpriteResources`. `new SpriteResources()` refuses `features` that are no list, a feature as `defineFeature()` refuses it, options that are no object and `textures` or `uniforms` that are no object by name. `new FeatureSprites()` refuses a `geometry` or a `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`
 - the `placement` setter of `FeatureSprites` refuses a placement that cannot stand in in its own name, before a pass or the material sees it, and goes on refusing what it refuses otherwise once the sprites are disposed; `bindUniform()` of disposed sprites goes on refusing what is no source
 - `ShadowMask` and `Darken` run in `ColorOrder.Pass` (were `ColorOrder.Mask` and `ColorOrder.Fade`): a `Flash` no longer turns the shadow of `ShadowPass` into the flash color, and the reflection of `ReflectionPass` and `BillboardReflectionPass` flashes darkened
 - `FrameBasedAnimations#bakeDataTexture()` writes a second header texel behind the frames of each animation, `[playback, hasDurations, cycleDuration, -2]` — the `-2` marks it, since no texel of a header or a frame lying within its image goes below `-1` (the `v` of a frame flipped vertically as high as its image), and the end time of a frame of an animation with `durations` into the fourth component of its second texel, `[width, height, flipDiagonal, endTime]`; an animation with durations gives every frame of the bake a second texel. The first header texel keeps its layout and the frames of the first animation still begin at texel `n`, but the frames of every later animation begin one texel later per animation before them: a reader of its own that follows `firstFrameTexel` of the header reads them right, one that counted the texels itself has to follow it
@@ -199,6 +200,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Canvas2DStage` uploads no canvas of width or height 0 — WebGPU builds no texture without area —, and `needsUpdate` stays set for the first `render()` with one
 - `new Canvas2DStage(renderer, width, height)` and `setCanvasSize()` refuse a width or a height that is no finite number of 1 or more — a canvas rounds its width and its height down to whole numbers and would have no area below 1 — with a `RangeError` that names the call, before anything is built or written; `setCanvasSize()` refuses it on a disposed stage as well. `setContainerSize()` refuses a width or a height that is `NaN` or infinite with a `RangeError` that names it, before the size reaches `stageRenderer`, also on a disposed stage; 0 and negative values go on to `StageRenderer#resize()` as they are
 - every listener of `OnCanvas2DStageResize` hears the event from `Canvas2DStage#render()`, also behind one that throws: the stage has taken the new size — the next `render()` sends no second event for it —, the frame is uploaded and drawn, and the error reaches the caller afterwards — one unchanged, several as an `AggregateError`
+- every listener of `OnTick` of a `FixedFrameLoop` hears each tick, also behind one that throws: the tick counts — the next frame does not run it again —, the frame goes on with its remaining ticks and `OnRender`, and the error reaches the caller of the frame afterwards — one unchanged, several as an `AggregateError`
+- `Canvas2DStage#setCanvasSize()` with the size the canvas has — a fraction rounded down to it included — leaves the canvas and what is drawn on it as they are
 - `getContentAreaSize()` and the measurement of the size source of a `Display` take the borders and the padding of an element a CSS transform scales off in the scale of that transform: an element under `scale(2)` measures twice its content box
 - `new ProjectionPlane()`, and with it a projection, refuses a plane description that is neither one of the four nor a `THREE.Plane` with a `TypeError` that quotes it and names the four
 - `TextureStore#parse()` runs to its end behind a subscriber of a resource that throws while the values are written, a callback of `on()` among them: every item is written, `ready` and the `resource:<id>` events go out, `evictMissing` runs, and the throw goes out last as an `error` with `source: 'parse'`; `TextureStore#loadAsync()` resolves with the store
@@ -1030,6 +1033,28 @@ declare const atlas: TextureAtlas;
 declare const n: number;
 
 atlas.randomFrames(Math.floor(n / 2));
+```
+
+#### A sprite kind that did not come from defineSprite()
+
+A sprite kind comes from `defineSprite()` alone. A copy of one (`{...kind}`, `Object.create(kind)`) or an object of the same shape ran none of its checks, and `new FeatureSprites()`, `new FeatureSpritesGeometry()` and `new FeatureSpritesMaterial()` refuse it with a `TypeError`. A variant of a kind is a call of `defineSprite()` with the changed inputs.
+
+**Before**
+
+```ts
+const variant = {...kind};
+const sprites = new FeatureSprites(variant);
+```
+
+**After**
+
+```ts check
+import {defineSprite, FeatureSprites, FlatPlacement, InstancePosition, QuadBase, Tint} from '@spearwolf/twopoint5d';
+
+const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement]});
+// a variant: defineSprite() once more, with the inputs of the kind and what changes
+const variant = defineSprite({base: kind.base, features: [...kind.features, Tint]});
+const sprites = new FeatureSprites(variant);
 ```
 
 ## [0.23.0] - 2026-10-18

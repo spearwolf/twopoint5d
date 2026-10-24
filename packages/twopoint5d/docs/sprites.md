@@ -1070,13 +1070,18 @@ for `instancePosition`, `texCoords` for the three frame attributes — and throw
 kind does not know. A geometry built with `attributeUsage` shares its prototype with no other.
 `baseArgs` hands `make()` of the base other arguments: `[halfWidth, halfHeight, xOffset,
 yOffset]` for `QuadBase`. The trim margins still move the corners by the measure of the unit quad.
+The geometry takes only a kind out of `defineSprite()`, its parameters as a number or an object,
+`baseArgs` as a list and `attributeUsage` as an object of name lists; anything else throws a
+`TypeError` before anything is built.
 
 ## The material: textures, uniforms and rebuilds
 
 `FeatureSpritesMaterial` folds the pipeline of a kind into `positionNode` and `colorNode`. It takes
 the kind and, besides every three.js material parameter, its own options: `name`, `textures` and
 `uniforms` to start with, and `resources` — the uniforms and textures of a `SpriteResources`
-shared with other materials, which then stay the caller's.
+shared with other materials, which then stay the caller's. It takes only a kind out of
+`defineSprite()`, its options as an object, `resources` as a `SpriteResources` and `textures` and
+`uniforms` as objects by name; anything else throws a `TypeError`.
 
 ```ts check
 import {
@@ -1664,9 +1669,14 @@ to draw with the uniforms and textures of the sprites is built on them before th
 `new FeatureSpritesMaterial(kind, {resources: sprites.material.resources})` — as `SpritePicker`
 builds its pick material.
 
-**Refusals.** A `TypeError` instead of a mismatch: a `geometry` or a `material` built for another
-sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a `geometry`; any
-material parameter next to a `material`. A material that cannot be built (a `placement` that cannot
+**Refusals.** A `TypeError` instead of a mismatch: a kind that did not come from `defineSprite()`;
+options that are no object, `passes` that are no list, a `grow` that is neither `true` nor `false`;
+a `geometry` or a `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, or one
+built for another sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a
+`geometry`; any material parameter next to a `material`. The geometry and the material the
+constructor builds throw their own refusals in their own name — `baseArgs` that are no list —, and
+the uniforms and textures in the name of the class that builds them: `FeatureSpritesMaterial`
+without passes, `FeatureSprites` with them — `textures` that are no object. A material that cannot be built (a `placement` that cannot
 stand in, a texture name no feature declares) throws as well, and the geometry the constructor built
 for it is disposed first, so a refused constructor leaves nothing behind.
 

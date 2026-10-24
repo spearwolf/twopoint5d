@@ -65,6 +65,21 @@ export type SpriteKindApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
 
 const WHERE = 'defineSprite';
 
+// every kind defineSprite() hands out. A kind is checked once, there: a copy, or an object of the
+// same shape, ran none of those checks
+const spriteKinds = new WeakSet<object>();
+
+/**
+ * Checks, in the words of `where`, that `kind` came from {@link defineSprite}. @internal
+ *
+ * @throws a `TypeError` that quotes the value
+ */
+export function checkSpriteKind(kind: unknown, where: string): asserts kind is SpriteKind {
+  if (!spriteKinds.has(kind as object)) {
+    throw new TypeError(`${where}: the kind must be a sprite kind from defineSprite(), got ${describeValue(kind)}`);
+  }
+}
+
 const sizeOf = (attribute: VertexAttributeDescription | undefined): number =>
   attribute == null
     ? 0
@@ -280,5 +295,7 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
 
   for (const feature of features) runCheckKind(feature, {base, features}, `${WHERE}: feature "${feature.name}"`);
 
-  return Object.freeze({base, features, description, usageAliases, pipeline});
+  const kind = Object.freeze({base, features, description, usageAliases, pipeline});
+  spriteKinds.add(kind);
+  return kind;
 }

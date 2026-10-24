@@ -22,6 +22,8 @@ import {
   Vector4,
 } from 'three/webgpu';
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
+import {checkFeature} from '../checkFeature.js';
 import {textureShapeKey} from '../textureShapeKey.js';
 import {collectSpriteDeclarations} from '../spriteDeclarations.js';
 import type {SpriteFeature, SpriteUniformValue} from '../SpriteFeature.js';
@@ -38,6 +40,8 @@ export interface SpriteResourcesOptions {
   /** Start values that replace the declared ones, by declared name. */
   uniforms?: Readonly<Record<string, SpriteUniformValue | undefined>>;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
 
 type ImageLike = {width?: number; height?: number} | null | undefined;
 
@@ -94,6 +98,8 @@ interface TextureSlot {
 export class SpriteResources {
   /** The uniforms by declared name. Readable and writable after `dispose()`: they are values, not resources. */
   readonly uniforms: Readonly<Record<string, SpriteUniformNode>>;
+
+  /** The names of the textures the features declare, in the order they are first declared. */
   readonly textureNames: readonly string[];
 
   readonly #where: string;
@@ -101,14 +107,41 @@ export class SpriteResources {
   readonly #uniformSizes = new Map<string, number>();
   #disposed = false;
 
+  /** `true` once {@link dispose} has run. */
   get isDisposed(): boolean {
     return this.#disposed;
   }
 
+  /**
+   * Builds the uniforms and textures `features` declare: every uniform at its start value or the
+   * one in `options.uniforms`, every texture set to the one in `options.textures`. `where` names
+   * the caller in the messages, `SpriteResources` without one.
+   *
+   * @throws a `TypeError` for `features` that are no list, for a feature that is malformed — see
+   *   `defineFeature()` —, for options that are no object and for `textures` or `uniforms` that
+   *   are no object by name, and for a start value of another shape than its uniform; an `Error`
+   *   for a uniform or a texture no feature declares, and for declarations of one name that
+   *   collide — each before any signal is built.
+   */
   constructor(features: Iterable<SpriteFeature>, options: SpriteResourcesOptions = {}, where = 'SpriteResources') {
     this.#where = where;
+    // the form of the arguments first: what the declarations and the signals read of them would
+    // otherwise throw without a subject, or pass over a part left out unseen
+    if (features == null || typeof (features as Partial<Iterable<unknown>>)[Symbol.iterator] !== 'function') {
+      throw new TypeError(`${where}: features is a list of features, got ${describeValue(features)}`);
+    }
+    if (!isRecord(options as unknown)) {
+      throw new TypeError(`${where}: the options must be an object, got ${describeValue(options)}`);
+    }
+    if (options.textures != null && !isRecord(options.textures as unknown)) {
+      throw new TypeError(`${where}: textures must be an object of textures by name, got ${describeValue(options.textures)}`);
+    }
+    if (options.uniforms != null && !isRecord(options.uniforms as unknown)) {
+      throw new TypeError(`${where}: uniforms must be an object of values by name, got ${describeValue(options.uniforms)}`);
+    }
     // read twice below: once for the declarations, once for the textures read texel for texel
     features = [...features];
+    for (const feature of features) checkFeature(feature, where);
     const declarations = collectSpriteDeclarations(features, where);
 
     const uniforms: Record<string, SpriteUniformNode> = {};

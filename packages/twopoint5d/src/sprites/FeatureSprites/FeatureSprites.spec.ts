@@ -1,8 +1,18 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {mul} from 'three/tsl';
-import type {MeshBasicMaterial, Vector3, Vector4} from 'three/webgpu';
-import {Mesh, Object3D, PerspectiveCamera, PlaneGeometry, PointLight, Scene, Texture} from 'three/webgpu';
+import type {Vector3, Vector4} from 'three/webgpu';
+import {
+  BufferGeometry,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  PerspectiveCamera,
+  PlaneGeometry,
+  PointLight,
+  Scene,
+  Texture,
+} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {nodesOf} from '../../testing/spriteGraph.js';
@@ -478,6 +488,87 @@ describe('FeatureSprites', () => {
       expect(() => new FeatureSprites(kind, options as never)).toThrow(new TypeError(`FeatureSprites: ${message}`));
 
       expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test.each([
+      ['undefined', undefined, 'undefined'],
+      ['a number', 5, '5'],
+      ['an empty object', {}, '{}'],
+    ])('refuses a kind that is %s and leaves nothing built', (_label, value, quoted) => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(value as never)).toThrow(
+        new TypeError(`FeatureSprites: the kind must be a sprite kind from defineSprite(), got ${quoted}`),
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses a copy of a kind, which ran none of the checks of defineSprite(), and leaves nothing built', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites({...kind})).toThrow(
+        /^FeatureSprites: the kind must be a sprite kind from defineSprite\(\), got \{/,
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test.each([
+      [
+        'a BufferGeometry',
+        {geometry: new BufferGeometry()},
+        'the geometry handed in is no FeatureSpritesGeometry, got BufferGeometry',
+      ],
+      ['a number as geometry', {geometry: 5}, 'the geometry handed in is no FeatureSpritesGeometry, got 5'],
+      [
+        'a MeshBasicMaterial',
+        {material: new MeshBasicMaterial()},
+        'the material handed in is no FeatureSpritesMaterial, got MeshBasicMaterial',
+      ],
+    ])('refuses %s and leaves nothing built', (_label, options, message) => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(kind, options as never)).toThrow(new TypeError(`FeatureSprites: ${message}`));
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses baseArgs that are no list in the name of the geometry, and leaves nothing built', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(kind, {baseArgs: 5 as never})).toThrow(
+        new TypeError('FeatureSpritesGeometry: baseArgs is a list of arguments, got 5'),
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses textures that are no object in the name of whoever builds the resources, and leaves nothing behind', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+
+      expect(() => new FeatureSprites(kind, {textures: 5 as never})).toThrow(
+        new TypeError('FeatureSpritesMaterial: textures must be an object of textures by name, got 5'),
+      );
+      // with passes the sprites build the resources every material shares
+      expect(() => new FeatureSprites(kind, {textures: 5 as never, passes: [ShadowPass]})).toThrow(
+        new TypeError('FeatureSprites: textures must be an object of textures by name, got 5'),
+      );
+
       expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
     });
 

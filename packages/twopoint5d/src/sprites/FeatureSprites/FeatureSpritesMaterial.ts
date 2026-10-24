@@ -10,8 +10,10 @@ import {
 } from '@spearwolf/signalize';
 import {add, attribute, float, mul, sub, texture, textureSize as textureSizeOf, vec2, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
+import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
 import {checkFeature} from '../checkFeature.js';
-import type {SpriteKind} from '../defineSprite.js';
+import {checkSpriteKind, type SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
 import {runCheckKind} from '../runCheckKind.js';
@@ -135,9 +137,16 @@ const trimShift = (position: Node<'vec3'>, uv: Node<'vec2'>, trim: Node<'vec4'>)
  * frame falls back to its defaults, the color source to flat grey.
  */
 export class FeatureSpritesMaterial<Api extends object = object> extends NodeMaterial {
+  /** Marks a `FeatureSpritesMaterial`, as the `is…` flags of three do. */
   readonly isFeatureSpritesMaterial = true;
 
+  /** The sprite kind the material draws. */
   readonly kind: SpriteKind<Api>;
+
+  /**
+   * The uniforms and textures the material reads: the `resources` handed in, which stay the
+   * caller's, or its own from `textures` and `uniforms`, which {@link dispose} releases.
+   */
   readonly resources: SpriteResources;
   /** The pass this material draws, `undefined` for the material of the sprites themselves. */
   readonly pass: SpritePass | undefined;
@@ -159,8 +168,23 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   /**
    * @param options every one of them is optional, so another three.js `Material` or a `Texture`
    *   would pass for them; the `isMaterial` and the `isTexture` they carry keep them out.
+   * @throws a `TypeError` for a kind that did not come from `defineSprite()`, for options that are
+   *   no object, for `resources` that are no `SpriteResources`, for `resources` next to `textures`
+   *   or `uniforms`, for `resources` that have been disposed or lack what a feature declares, for
+   *   a `placement` that is malformed or cannot stand in for the placement of the kind, and for a
+   *   pass that is malformed — a `RangeError` for a `renderOrder` that is no finite number —; an
+   *   `Error` for a pass the kind cannot draw and for a placement whose `checkKind` refuses the
+   *   kind; and what `new SpriteResources()` refuses of `textures` and `uniforms`, in the name of
+   *   this class. A constructor that throws leaves nothing behind it built.
    */
   constructor(kind: SpriteKind<Api>, options?: FeatureSpritesMaterialParameters & {isMaterial?: never; isTexture?: never}) {
+    // the kind and the form of the options before anything is built; null is refused, only
+    // undefined counts as no options
+    checkSpriteKind(kind, WHERE);
+    if (options !== undefined && (!isObject(options as unknown) || Array.isArray(options))) {
+      throw new TypeError(`${WHERE}: the options must be an object, got ${describeValue(options)}`);
+    }
+
     super();
 
     // the options of this material stay out of setValues(): Material.setValues() warns about every
@@ -185,6 +209,9 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
       ...Object.keys(kind.base.description.attributes),
     ]);
 
+    if (resources != null && !(resources instanceof SpriteResources)) {
+      throw new TypeError(`${WHERE}: resources must be a SpriteResources, got ${describeValue(resources)}`);
+    }
     if (resources != null && (textures != null || uniforms != null)) {
       throw new TypeError(`${WHERE}: textures and uniforms belong to the resources handed in`);
     }

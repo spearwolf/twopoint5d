@@ -177,6 +177,48 @@ describe('FeatureSpritesMaterial', () => {
     });
   });
 
+  describe('refuses', () => {
+    test.each([
+      ['undefined', undefined, 'undefined'],
+      ['a number', 5, '5'],
+      ['an empty object', {}, '{}'],
+    ])('a kind that is %s and builds nothing', (_label, value, quoted) => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(value as never)).toThrow(
+        new TypeError(`FeatureSpritesMaterial: the kind must be a sprite kind from defineSprite(), got ${quoted}`),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('a copy of a kind, which ran none of the checks of defineSprite(), and builds nothing', () => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial({...TexturedKind})).toThrow(
+        /^FeatureSpritesMaterial: the kind must be a sprite kind from defineSprite\(\), got \{/,
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test.each([
+      ['options that are null', null, 'the options must be an object, got null'],
+      ['options that are a number', 5, 'the options must be an object, got 5'],
+      ['options that are a string', 'x', 'the options must be an object, got "x"'],
+      ['options that are an array', [], 'the options must be an object, got []'],
+      ['resources that are a number', {resources: 5}, 'resources must be a SpriteResources, got 5'],
+      ['resources that are a plain object', {resources: {}}, 'resources must be a SpriteResources, got {}'],
+      ['textures that are a number', {textures: 5}, 'textures must be an object of textures by name, got 5'],
+      ['uniforms that are a string', {uniforms: 'ab'}, 'uniforms must be an object of values by name, got "ab"'],
+    ])('%s and builds nothing', (_label, options, message) => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, options as never)).toThrow(
+        new TypeError(`FeatureSpritesMaterial: ${message}`),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+  });
+
   describe('the position graph', () => {
     test('adds the instance position last, flat by default', () => {
       const material = new FeatureSpritesMaterial(TexturedKind);

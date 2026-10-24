@@ -190,6 +190,15 @@ class RAF {
 
 export interface FrameLoop extends EventizedObject {}
 
+/**
+ * Sends {@link FrameLoop.OnFrame} to every target on it, once per animation frame — out of the
+ * animation loop of the renderer handed in, or out of `requestAnimationFrame` without one —, at
+ * most `maxFps` times per second. The payload carries `now`, `lastNow` and `deltaTime` in
+ * seconds, `frameNo` and `measuredFps`.
+ *
+ * The loops share one driver per renderer and one without; a driver runs as long as a loop on it
+ * has a target. A `Display` builds one for itself.
+ */
 export class FrameLoop {
   /**
    * The name of the event every frame goes out under; a target handed to {@link start} receives
@@ -291,7 +300,11 @@ export class FrameLoop {
     return this.#measuredFps;
   }
 
-  get subscriptionCount() {
+  /**
+   * The number of targets on the loop: {@link start} adds a target that is not on it yet,
+   * {@link stop} and {@link clear} take them off. Above 0 the loop takes frames from its driver.
+   */
+  get subscriptionCount(): number {
     return this.#subscribers.size;
   }
 
@@ -351,7 +364,12 @@ export class FrameLoop {
     };
   }
 
-  stop(target: object) {
+  /**
+   * Takes `target` off the loop; a target that is not on it, `null` and `undefined` change
+   * nothing. With the last target the loop lets go of its driver, and the first frame after the
+   * next {@link start} has a `deltaTime` of 0 and begins the `maxFps` schedule anew.
+   */
+  stop(target: object): void {
     if (target == null) return;
     if (this.#subscribers.has(target)) {
       this.#subscribers.delete(target);
@@ -416,7 +434,8 @@ export class FrameLoop {
     });
   };
 
-  clear() {
+  /** Takes every target off the loop, as {@link stop} does one after the other. */
+  clear(): void {
     for (const target of Array.from(this.#subscribers)) {
       this.stop(target);
     }

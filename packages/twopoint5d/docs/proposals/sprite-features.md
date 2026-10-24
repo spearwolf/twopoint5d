@@ -615,6 +615,12 @@ other.
   `attributeUsage` it copies the description through `cloneVertexObjectDescription()`, the usage
   words of the kind as its aliases, and refuses a name that is neither an attribute nor a usage
   word of the kind, listing those it knows; such a geometry shares its prototype with no other.
+  Before anything is built it refuses with a `TypeError` a kind that did not come from
+  `defineSprite()` — a kind is told by where it came from, not by its shape, since a copy of a
+  kind ran none of the checks of `defineSprite()` —, parameters that are neither a number nor an
+  object, `baseArgs` that are no list and an `attributeUsage`
+  that is no object of name lists; a `baseArgs` or `attributeUsage` of `null` counts as not handed
+  in.
 - **`SpriteResources`** — the uniforms and textures a set of features declares, held once: one
   uniform node per declared uniform, at its start value or the one handed in, written by
   `setUniform(name, x, y?, z?, w?)`, which allocates nothing and keeps working after `dispose()`;
@@ -622,11 +628,15 @@ other.
   texture declared with `needsImage` until its image has measures — and a size uniform kept
   current. `setTexture()`, `getTexture()` and `touchTexture()` take the declared names; a texture
   stays the caller's. `dispose()` destroys the size effects first, clears the textures while their
-  signals live and then deletes its signal group.
+  signals live and then deletes its signal group. Before any signal exists it refuses, in the words
+  of the `where` it is handed, `features` that are no iterable, a feature as `defineFeature()`
+  refuses it, options that are no object and `textures` or `uniforms` that are no object by name.
 - **`FeatureSpritesMaterial`** — a `NodeMaterial` built from the kind,
   `new FeatureSpritesMaterial(kind, {name, textures, uniforms, placement, resources, pass, …})`,
   every other option a three.js material parameter for `setValues()`, without `positionNode` and
-  `colorNode`, behind the `isMaterial?: never; isTexture?: never` guard. It builds:
+  `colorNode`, behind the `isMaterial?: never; isTexture?: never` guard. It refuses with a
+  `TypeError`, before `super()`, a kind that did not come from `defineSprite()` and options that
+  are no object (`null` included), and `resources` that are no `SpriteResources`. It builds:
   - its `SpriteResources` from `textures` and `uniforms`, or takes `resources` handed in — which
     stay the caller's, are refused next to `textures` or `uniforms`, refused once disposed and
     refused when they lack what a feature declares
@@ -656,8 +666,14 @@ other.
 - **`FeatureSprites`** — the `VertexObjects` mesh of a kind, `new FeatureSprites(kind, options)`,
   its options those of the geometry and of the material side by side, plus `geometry`, `material`
   and `passes` (§6). It builds the geometry and the material it is not handed and owns exactly
-  those; a geometry or a material of another kind, and parameters that would build one next to one
-  handed in, are refused with a `TypeError`, and a refused constructor leaves nothing behind.
+  those; a kind that did not come from `defineSprite()`, options that are no object, `passes` that
+  are no list, a `grow` that is no boolean, a `geometry` or `material` that is no
+  `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, one of another kind, and parameters that
+  would build one next to one handed in, are refused with a `TypeError`. What the geometry and the
+  material refuse of the options they refuse in their own name; what the uniforms and textures
+  refuse, in the name of the class that builds them — `FeatureSpritesMaterial` without passes,
+  `FeatureSprites` with them, which builds the resources every material shares. A refused
+  constructor leaves nothing behind.
   `createSprite()` answers a sprite at the values of an unused slot, or `undefined` once the pool
   is full — and says so once on the console —; `freeSprite()` gives one back, the last sprite
   moving into its slot; `spritePool` is the pool. `placement`, `uniforms`, `setUniform()` and the

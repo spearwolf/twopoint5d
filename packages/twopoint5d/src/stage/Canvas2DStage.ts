@@ -12,6 +12,11 @@ import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
 
+/**
+ * How the view brings the canvas into the container: `'contain'` shows the whole canvas and
+ * leaves the rest of the container empty where the aspect ratios differ, `'cover'` fills the
+ * container and cuts off what of the canvas does not fit.
+ */
 export type Canvas2DStageFitType = 'contain' | 'cover';
 
 /**
@@ -42,8 +47,24 @@ function assertCanvasSide(value: unknown, subject: string, name: string): number
 
 export interface Canvas2DStage extends EventizedObject {}
 
+/**
+ * A 2D canvas in a three.js scene: a {@link Stage2D} with an orthographic projection shows the
+ * canvas on a sprite, fitted into the container. Draw into the canvas in
+ * `OnCanvas2DStageRender`, set {@link needsUpdate}, and call {@link render} once per frame — the
+ * stage drives its {@link StageRenderer} itself. {@link dispose} releases what the stage built.
+ */
 export class Canvas2DStage {
+  /**
+   * The `WebGPURenderer` handed to the constructor, which {@link render} draws with; it stays the
+   * caller's.
+   */
   readonly renderer: WebGPURenderer;
+
+  /**
+   * The `StageRenderer` the stage builds and {@link stage} hangs in: {@link setContainerSize}
+   * hands it the size of the container, {@link render} updates and draws it, and {@link dispose}
+   * disposes it.
+   */
   readonly stageRenderer: StageRenderer;
 
   #fit: Canvas2DStageFitType = 'contain';
@@ -66,6 +87,10 @@ export class Canvas2DStage {
     this.stage.updateProjection(true);
   }
 
+  /**
+   * The canvas the stage shows: built by the constructor in the size handed in, or the one handed
+   * in, which stays the caller's — {@link dispose} leaves it as it is.
+   */
   readonly canvas: HTMLCanvasElement;
 
   /**
@@ -82,9 +107,19 @@ export class Canvas2DStage {
     return this.canvas.height;
   }
 
+  /**
+   * The orthographic projection of {@link stage}, `'xy|bottom-left'`, fitted to the canvas size
+   * with {@link fit}.
+   */
   readonly projection: OrthographicProjection;
+
+  /**
+   * The `Stage2D` that shows the canvas on {@link sprite}; the constructor builds it, and
+   * {@link dispose} disposes it.
+   */
   readonly stage: Stage2D;
 
+  /** The scene of {@link stage}; it holds {@link sprite}. */
   get scene(): Scene {
     return this.stage.scene;
   }
@@ -258,6 +293,20 @@ export class Canvas2DStage {
     this.stageRenderer.resize(width, height);
   }
 
+  /**
+   * Gives the canvas the size `width` × `height` and brings sprite and view there at once; the
+   * next {@link render} sends `OnCanvas2DStageResize` if the size changed since the last frame.
+   *
+   * The canvas takes whole numbers and rounds down — `setCanvasSize(10.5, 8)` gives canvas,
+   * sprite and view 10 × 8. A call with the size the canvas has leaves it standing, content and
+   * all; a call with another size clears it, as every write to `canvas.width` does: draw anew in
+   * `OnCanvas2DStageResize` or `OnCanvas2DStageRender` and set {@link needsUpdate}. A canvas
+   * handed to the constructor belongs to the caller, and the call writes its width and height. On
+   * a disposed stage a valid call does nothing.
+   *
+   * @throws {RangeError} for a width or a height that is no finite number of 1 or more, naming
+   *   this call, before anything is written — after {@link dispose} as well.
+   */
   setCanvasSize(width: number, height: number): void {
     // refused on a disposed stage as well: a size that is no size is wrong whatever the state
     assertCanvasSide(width, 'Canvas2DStage#setCanvasSize()', 'width');
@@ -266,7 +315,9 @@ export class Canvas2DStage {
     // the canvas may have been handed in, and a disposed stage does not write to it
     if (this.#disposed) return;
 
-    if (this.width !== width || this.height !== height) {
+    // the canvas takes whole numbers, and every write to its width clears it: a size it has
+    // already is not written
+    if (this.width !== Math.floor(width) || this.height !== Math.floor(height)) {
       this.canvas.width = width;
       this.canvas.height = height;
     }

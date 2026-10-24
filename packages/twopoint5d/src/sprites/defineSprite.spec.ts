@@ -5,7 +5,8 @@ import {voInitialize} from '../vertex-objects/constants.js';
 import {getDescriptorOf} from '../vertex-objects/getDescriptorOf.js';
 import type {VO} from '../vertex-objects/types.js';
 import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
-import {defineSprite, type SpriteKindApiOf, type SpriteOf} from './defineSprite.js';
+import {checkSpriteKind, defineSprite, type SpriteKindApiOf, type SpriteOf} from './defineSprite.js';
+import {TexturedSpriteKind} from './presets.js';
 import {QuadBase, type SpriteBase} from './SpriteBase.js';
 import {ColorOrder, defineFeature, LocalOrder, type SpriteFeature} from './SpriteFeature.js';
 
@@ -542,6 +543,41 @@ describe('defineSprite()', () => {
       expect(() => defineSprite({base: QuadBase, features: [position, flat, throwing(Object.create(null))]})).toThrow(
         'defineSprite: feature "picky": {}',
       );
+    });
+  });
+
+  describe('checkSpriteKind()', () => {
+    test('takes every kind out of defineSprite()', () => {
+      const kind = defineSprite({base: QuadBase, features: [position, flat]});
+
+      expect(() => checkSpriteKind(kind, 'Mine')).not.toThrow();
+      expect(() => checkSpriteKind(TexturedSpriteKind, 'Mine')).not.toThrow();
+    });
+
+    test.each([
+      ['undefined', undefined, 'undefined'],
+      ['a number', 5, '5'],
+      ['an empty object', {}, '{}'],
+    ])('refuses %s in the words of its caller', (_, value, quoted) => {
+      expect(() => checkSpriteKind(value, 'Mine')).toThrow(
+        new TypeError(`Mine: the kind must be a sprite kind from defineSprite(), got ${quoted}`),
+      );
+    });
+
+    test('refuses a copy of a kind and an object built on one, which ran none of the checks', () => {
+      const kind = defineSprite({base: QuadBase, features: [position, flat]});
+      const prefix = 'Mine: the kind must be a sprite kind from defineSprite(), got ';
+
+      for (const copy of [{...kind}, Object.create(kind)]) {
+        let thrown: unknown;
+        try {
+          checkSpriteKind(copy, 'Mine');
+        } catch (error) {
+          thrown = error;
+        }
+        expect(thrown).toBeInstanceOf(TypeError);
+        expect((thrown as TypeError).message.startsWith(prefix)).toBe(true);
+      }
     });
   });
 });

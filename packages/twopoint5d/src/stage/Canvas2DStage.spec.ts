@@ -52,6 +52,30 @@ function makeRoundingCanvas(width: number, height: number) {
   } as unknown as HTMLCanvasElement;
 }
 
+// a rounding canvas that counts the writes to its width and its height: each of them clears a
+// canvas of the DOM
+function makeCountingCanvas(width: number, height: number) {
+  const canvas = makeRoundingCanvas(width, height);
+  const writes = {count: 0};
+  const counted = {
+    get width() {
+      return canvas.width;
+    },
+    set width(value: number) {
+      writes.count += 1;
+      canvas.width = value;
+    },
+    get height() {
+      return canvas.height;
+    },
+    set height(value: number) {
+      writes.count += 1;
+      canvas.height = value;
+    },
+  } as unknown as HTMLCanvasElement;
+  return {canvas: counted, writes};
+}
+
 // without a setContainerSize() the Stage2D has no camera and renderTo() falls through inside it, so
 // render() runs to the end under node without three.js ever drawing
 function makeStage() {
@@ -416,6 +440,23 @@ describe('Canvas2DStage', () => {
 
       expect([stage.width, stage.height]).toEqual([1, 1]);
       expect(stage.projection.viewSpecs).toMatchObject({width: 1, height: 1});
+    });
+
+    test('setCanvasSize() leaves a canvas of the size it is given, rounded down, as it is', () => {
+      const {canvas, writes} = makeCountingCanvas(10, 8);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+
+      stage.setCanvasSize(10.5, 8.9);
+
+      expect(writes.count, 'a write would clear the canvas').toBe(0);
+      expect([stage.width, stage.height]).toEqual([10, 8]);
+
+      stage.setCanvasSize(12, 8);
+
+      expect(writes.count).toBeGreaterThan(0);
+      expect([stage.width, stage.height]).toEqual([12, 8]);
+      expect(stage.sprite.scale.toArray()).toEqual([12, 8, 1]);
+      expect(stage.projection.viewSpecs).toMatchObject({width: 12, height: 8});
     });
 
     test('setContainerSize() refuses a width or a height that is no finite number in its own name, also after dispose()', () => {
