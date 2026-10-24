@@ -1,3 +1,4 @@
+import {checkFeature} from '../checkFeature.js';
 import type {SpriteKind} from '../defineSprite.js';
 import {runCheckKind} from '../runCheckKind.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
@@ -15,9 +16,9 @@ export const placementOfPass = (pass: SpritePass): SpriteFeature | undefined =>
 
 /**
  * Checks what a pass can be checked for on its own, in the words of `where`: a name, features of
- * distinct names that bring no data and at most one placement among them, and a `without` that
- * names no feature twice. `definePass()` runs it, and so does every place that takes a pass, since
- * a plain object passes for one.
+ * distinct names, each checked as `defineFeature()` checks one, that bring no data and at most one
+ * placement among them, and a `without` that names no feature twice. `definePass()` runs it, and
+ * so does every place that takes a pass, since a plain object passes for one.
  *
  * @internal
  */
@@ -28,6 +29,7 @@ export function checkPass(pass: SpritePass, where: string): void {
   }
   const names = new Set<string>();
   for (const feature of pass.features) {
+    checkFeature(feature, where);
     if (names.has(feature.name)) throw new TypeError(`${where}: pass "${pass.name}" lists feature "${feature.name}" twice`);
     names.add(feature.name);
     for (const field of DATA_FIELDS) {

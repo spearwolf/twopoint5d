@@ -92,6 +92,7 @@ interface TextureSlot {
  * the shape stays `undefined` until the image has measures.
  */
 export class SpriteResources {
+  /** The uniforms by declared name. Readable and writable after `dispose()`: they are values, not resources. */
   readonly uniforms: Readonly<Record<string, SpriteUniformNode>>;
   readonly textureNames: readonly string[];
 

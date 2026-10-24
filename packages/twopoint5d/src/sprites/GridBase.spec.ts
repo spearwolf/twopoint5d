@@ -44,6 +44,21 @@ describe('gridBase()', () => {
     expect(grid.defaultArgs).toEqual([0.5, 0.5]);
   });
 
+  test('answers a base frozen all the way down, its description and the prototype of its base vertex included', () => {
+    const grid = gridBase({columns: 3, rows: 3});
+    const {description} = grid;
+
+    expect(Object.isFrozen(description)).toBe(true);
+    expect(Object.isFrozen(description.attributes)).toBe(true);
+    expect(Object.isFrozen(description.attributes['position'])).toBe(true);
+    expect(Object.isFrozen(description.indices)).toBe(true);
+    expect(Object.isFrozen(description.basePrototype)).toBe(true);
+    expect(Object.isFrozen(grid.defaultArgs)).toBe(true);
+    expect(() => {
+      description.indices!.push(0);
+    }).toThrow(TypeError);
+  });
+
   test('is (columns + 1) × (rows + 1) vertices with a position of 3 and a uv of 2 values, no property per vertex', () => {
     const {description} = gridBase({columns: 4, rows: 2});
 

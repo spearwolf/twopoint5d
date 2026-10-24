@@ -1,6 +1,7 @@
 import type {Node} from 'three/webgpu';
-import {describeValue} from '../utils/describeValue.js';
+import {deepFreeze} from '../utils/deepFreeze.js';
 import type {VertexAttributesType} from '../vertex-objects/types.js';
+import {checkFeature} from './checkFeature.js';
 import type {SpriteBase} from './SpriteBase.js';
 
 /** What the frame slot answers. Where no feature fills the slot, the material uses the defaults named here. */
@@ -192,37 +193,17 @@ export interface SpriteKindShape {
   readonly features: readonly SpriteFeature[];
 }
 
-const STAGE_SLOTS = ['frameStage', 'local', 'mesh', 'uv', 'color'] as const;
-
 /**
- * Checks a feature on its own and freezes it. What can only be checked against the other
- * features of a kind — names, requires, cardinality — `defineSprite()` checks.
+ * Checks a feature on its own — every field it brings for its type — and freezes it, the records and
+ * lists inside included: `attributes`, `methods`, `uniforms`, `textures`, the stages … A record or
+ * list the feature shares with other code is frozen along with it. What can only be checked against
+ * the other features of a kind — names, requires, cardinality — `defineSprite()` checks.
+ *
+ * @throws a `TypeError` naming the feature and the field
  */
 export function defineFeature<Api extends object = object>(feature: SpriteFeature<Api>): SpriteFeature<Api> {
-  if (typeof feature.name !== 'string' || feature.name === '') {
-    throw new TypeError('defineFeature: a feature needs a name');
-  }
-  for (const slot of STAGE_SLOTS) {
-    const stage = feature[slot];
-    if (stage != null && !Number.isFinite(stage.order)) {
-      throw new TypeError(
-        `defineFeature: the ${slot} stage of feature "${feature.name}" needs a finite order, got ${describeValue(stage.order)}`,
-      );
-    }
-  }
-  if (feature.checkKind != null && typeof feature.checkKind !== 'function') {
-    throw new TypeError(`defineFeature: the checkKind of feature "${feature.name}" is no function`);
-  }
-  if (
-    feature.nearestTextures != null &&
-    !(Array.isArray(feature.nearestTextures) && feature.nearestTextures.every((name) => typeof name === 'string'))
-  ) {
-    throw new TypeError(`defineFeature: the nearestTextures of feature "${feature.name}" is no list of texture names`);
-  }
-  if (feature.requires?.includes(feature.name)) {
-    throw new TypeError(`defineFeature: feature "${feature.name}" requires itself`);
-  }
-  return Object.freeze({...feature});
+  checkFeature(feature, 'defineFeature');
+  return deepFreeze({...feature});
 }
 
 /**

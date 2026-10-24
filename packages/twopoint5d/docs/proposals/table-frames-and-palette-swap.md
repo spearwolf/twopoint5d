@@ -132,7 +132,7 @@ export function frameTable(atlas: TextureAtlas<unknown>, selection?: AtlasFrameT
 
 ```ts
 export interface TableFrameOptions {
-  /** How many views of each frame the table holds, picked by the angle of the camera — a whole number of 2 or more. */
+  /** How many views of each frame the table holds, picked by the angle of the camera — a whole number from 2 to 64. */
   readonly views?: number;
 }
 
@@ -217,8 +217,10 @@ entry    = clamp(index, 0, max(entries − 1, 0))                // only a table
   could leave the last frame of a table of `frames · n` entries out of reach. Half a step or an
   entry more keeps the quotient `0.5 / n` away from every whole number, which no ULP of the division
   crosses.
-- `views` that is no whole number of 2 or more is refused with a `TypeError`:
-  `tableFrame: views must be a whole number of 2 or more, got 1 — leave views out for frames without views`.
+- `views` that is no whole number from 2 to 64 is refused with a `TypeError`:
+  `tableFrame: views must be a whole number from 2 to 64, got 1 — leave views out for frames without views`.
+  The bound keeps a caller who derives `views` from data from filling the cache of one feature per
+  number of views, which stays for the life of the page; no directional sheet has more views.
 
 ## 5. `PaletteSwap` (module `sprites/`)
 

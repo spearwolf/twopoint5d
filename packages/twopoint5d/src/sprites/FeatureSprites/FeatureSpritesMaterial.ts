@@ -10,6 +10,7 @@ import {
 } from '@spearwolf/signalize';
 import {add, attribute, float, mul, sub, texture, textureSize as textureSizeOf, vec2, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
+import {checkFeature} from '../checkFeature.js';
 import type {SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
@@ -47,7 +48,8 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
   /**
    * Builds the material for this pass over the kind: from the features of the kind without the
    * stages of those `without` names, plus the features of the pass. The material parameters of the
-   * pass come first, so a parameter handed in here wins over one of the pass.
+   * pass come first, so a parameter handed in here wins over one of the pass; one handed in as
+   * `undefined` counts as not handed in.
    */
   pass?: SpritePass;
 }
@@ -113,8 +115,13 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
     // the options of this material stay out of setValues(): Material.setValues() warns about every
     // key whose current value is undefined
     const {name, textures, uniforms, placement, resources, pass, ...ownParameters} = options ?? {};
-    // the parameters of the pass first, so that a parameter handed in wins
-    const materialParameters = {...pass?.material, ...ownParameters};
+    // the parameters of the pass first, so that a parameter handed in wins; one handed in as
+    // undefined counts as not handed in, as FeatureSprites counts it, and setValues() never sees it
+    const materialParameters = {
+      ...pass?.material,
+      // a filter that only takes entries out leaves the type of the others as it is
+      ...(Object.fromEntries(Object.entries(ownParameters).filter(([, value]) => value !== undefined)) as typeof ownParameters),
+    };
 
     this.kind = kind;
     this.name = name ?? 'twopoint5d.FeatureSpritesMaterial';
@@ -389,14 +396,16 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
    * rebuilds the position graph; three serves a source it has built before from its caches.
    * Keeps its last value once disposed, and a write there reaches nothing that renders.
    *
-   * @throws a `TypeError` naming both features for a placement that cannot stand in, an `Error`
-   *   naming it for one whose `checkKind` refuses the kind
+   * @throws a `TypeError` naming both features for a placement that cannot stand in, a `TypeError`
+   *   for a feature that is malformed — see `defineFeature()` —, an `Error` naming it for one whose
+   *   `checkKind` refuses the kind
    */
   get placement(): SpriteFeature {
     return this.#placement.value;
   }
 
   set placement(feature: SpriteFeature) {
+    checkFeature(feature, WHERE);
     const current = this.#placement.value;
     if (feature.placement == null) {
       throw new TypeError(

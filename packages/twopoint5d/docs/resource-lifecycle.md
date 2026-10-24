@@ -144,8 +144,9 @@ get isDisposed(): boolean {
 
 ## 3. After `dispose()`
 
-Every public member of a disposed instance behaves in one of exactly three ways, picked
-by its declared type. Its TSDoc says which.
+Every public member of a disposed instance behaves in one of three ways, picked by its
+declared type — or, for a member over plain values, keeps working (below). Its TSDoc
+says which.
 
 1. **Type admits absence → answer `undefined`.** `T | undefined` is a value the caller
    handles anyway.
@@ -163,9 +164,20 @@ by its declared type. Its TSDoc says which.
    [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts) keeps
    rejecting a mismatched capacity.
 
-This rules out the fourth reaction — a `TypeError` from deep inside the class because a
-field quietly became `undefined`, where the caller learns nothing and the stack points
-at the wrong line.
+**A member over plain values keeps working.** What it reads or writes is no resource the
+instance gives back — a uniform, the placement a graph was last built with —, so after
+`dispose()` it answers and takes values as before, and a write reaches only what still
+reads them: the other materials that share the resources, or nothing that renders.
+[`SpriteResources`](../src/sprites/FeatureSprites/SpriteResources.ts) keeps `uniforms`,
+`uniform()`, `setUniform()`, `textureSize()` and `declares()`;
+[`FeatureSpritesMaterial`](../src/sprites/FeatureSprites/FeatureSpritesMaterial.ts) keeps
+`uniforms`, `setUniform()` and the getter `placement` — the setter checks what it is
+handed and changes nothing that renders — and, with resources handed in, `getTexture()`,
+`setTexture()` and `touchTexture()`, which act on those resources, alive and the
+caller's. A new member keeps working only over state of this kind.
+
+This rules out a `TypeError` from deep inside the class because a field quietly became
+`undefined`, where the caller learns nothing and the stack points at the wrong line.
 
 A pending promise does not survive either — anything a caller is still awaiting when
 `dispose()` runs is rejected as part of it.

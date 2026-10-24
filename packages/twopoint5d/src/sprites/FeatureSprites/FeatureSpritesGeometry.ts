@@ -28,9 +28,13 @@ export interface FeatureSpritesGeometryParameters {
 
 const WHERE = 'FeatureSpritesGeometry';
 
-// the descriptor grown() hands the constructor it calls, read there in place of the description of
-// the kind and cleared again before grown() goes on: no parameter of the public constructor carries it
-let descriptorOfGrowth: VertexObjectDescriptor | undefined;
+// the key under which grown() hands the constructor the descriptor of the geometry it grows from:
+// a symbol of this module, which no caller of the public constructor holds
+const growthDescriptor = Symbol('growthDescriptor');
+
+interface GrowthParameters extends FeatureSpritesGeometryParameters {
+  readonly [growthDescriptor]?: VertexObjectDescriptor;
+}
 
 function descriptionOf(
   kind: SpriteKind,
@@ -69,13 +73,10 @@ export class FeatureSpritesGeometry<Api extends object = object> extends Instanc
   readonly kind: SpriteKind<Api>;
 
   constructor(kind: SpriteKind<Api>, parameters: number | FeatureSpritesGeometryParameters = 100) {
-    const {
-      capacity = 100,
-      attributeUsage,
-      baseArgs = kind.base.defaultArgs,
-    } = typeof parameters === 'number' ? {capacity: parameters} : parameters;
+    const options: GrowthParameters = typeof parameters === 'number' ? {capacity: parameters} : parameters;
+    const {capacity = 100, attributeUsage, baseArgs = kind.base.defaultArgs} = options;
 
-    super(descriptorOfGrowth ?? descriptionOf(kind as SpriteKind, attributeUsage), capacity, kind.base.description);
+    super(options[growthDescriptor] ?? descriptionOf(kind as SpriteKind, attributeUsage), capacity, kind.base.description);
 
     this.kind = kind;
     this.name = 'twopoint5d.FeatureSpritesGeometry';
@@ -95,13 +96,8 @@ export class FeatureSpritesGeometry<Api extends object = object> extends Instanc
    * @internal
    */
   grown(capacity: number): FeatureSpritesGeometry<Api> {
-    descriptorOfGrowth = this.instancedPool.descriptor;
-    let grown: FeatureSpritesGeometry<Api>;
-    try {
-      grown = new FeatureSpritesGeometry(this.kind, capacity);
-    } finally {
-      descriptorOfGrowth = undefined;
-    }
+    const parameters: GrowthParameters = {capacity, [growthDescriptor]: this.instancedPool.descriptor};
+    const grown = new FeatureSpritesGeometry(this.kind, parameters);
     grown.name = this.name;
     grown.basePool.buffer.copy(this.basePool.buffer);
     grown.instancedPool.adoptVOs(this.instancedPool);

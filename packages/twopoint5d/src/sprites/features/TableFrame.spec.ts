@@ -65,11 +65,16 @@ describe('tableFrame()', () => {
     ['8', '"8"'],
     [Number.NaN, 'NaN'],
     [Infinity, 'Infinity'],
+    [65, '65'],
   ])('refuses views of %o', (views, shown) => {
     expect(() => tableFrame({views: views as number})).toThrow(TypeError);
     expect(() => tableFrame({views: views as number})).toThrow(
-      `tableFrame: views must be a whole number of 2 or more, got ${shown} — leave views out for frames without views`,
+      `tableFrame: views must be a whole number from 2 to 64, got ${shown} — leave views out for frames without views`,
     );
+  });
+
+  test('takes views up to 64', () => {
+    expect(tableFrame({views: 64}).name).toBe('tableFrame+views64');
   });
 
   test('a sprite starts at frame index 0, whatever its slot held before', () => {

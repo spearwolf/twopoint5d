@@ -45,6 +45,15 @@ describe('definePass()', () => {
     );
   });
 
+  test('checks each feature as defineFeature() checks one, in its own name', () => {
+    expect(() =>
+      definePass({name: 'p', features: [{name: 'f', color: {order: Number.NaN, transform: (c: unknown) => c}} as never]}),
+    ).toThrow(new TypeError('definePass: the color stage of feature "f" needs a finite order, got NaN'));
+    expect(() => definePass({name: 'p', features: [null as never]})).toThrow(
+      new TypeError('definePass: a feature is an object with a name, got null'),
+    );
+  });
+
   test('freezes copies of its features, without and material, and leaves the ones handed in alone', () => {
     const features = [mask];
     const without = ['tint'];

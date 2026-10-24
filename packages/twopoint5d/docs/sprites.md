@@ -15,8 +15,9 @@ A **sprite kind** is a base and a list of features, put together once with `defi
 - uniforms and textures, which the material holds
 - at most one shader stage per pipeline slot (see "The pipeline")
 
-`defineFeature()` checks a feature on its own; `defineSprite()` checks it against the others of a
-kind. A kind is immutable: a sprite with one more feature is a sprite of another kind.
+`defineFeature()` checks a feature on its own; `defineSprite()` checks every feature on its own as
+well, and against the others of a kind. A kind is immutable: a sprite with one more feature is a
+sprite of another kind.
 
 The **base** is the geometry every sprite of a kind is drawn from. `QuadBase` is the quad of
 four vertices the built-in kinds use: the unit quad `[-0.5, 0.5]²` on the XY plane, centred on the
@@ -175,8 +176,10 @@ flags.dispose();
   slot, the uv stages' result `ctx.uv` aside.
 - **One base per grid.** `gridBase({columns: 3, rows: 3})` answers the same frozen base every time,
   named `grid 3x3`, with its `columns` and `rows`: a feature that needs a grid recognizes it by
-  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024, and a grid holds
-  at most 4096 cells (`columns · rows`); anything else is refused with a `TypeError`.
+  identity in its `checkKind`. Every grid built stays for the life of the page, so `gridBase()` is
+  meant for a few fixed grids, not for sizes derived from data. Columns and rows are whole numbers
+  from 1 to 1024, and a grid holds at most 4096 cells (`columns · rows`); anything else is refused
+  with a `TypeError`.
 - **Everything else works on it unchanged**: the pool, every placement and pass, the trim shift —
   it moves every vertex by where it lies on the sprite — `AtlasFrame`, `AnimatedFrames` and
   `TextureColor`. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws.
@@ -637,10 +640,10 @@ export function frame(time: number) {
 }
 ```
 
-- **The views of a frame** are `n` consecutive entries of the table, view 0 first. `frameIndex`
-  counts frames as it does without views, and the shader reads entry
-  `floor(frameIndex + 0.5) · n + view`; a `frameIndex` past the last frame shows the matching view
-  of the last frame, one before the first that of the first.
+- **The views of a frame** — `n` is a whole number from 2 to 64 — are `n` consecutive entries of
+  the table, view 0 first. `frameIndex` counts frames as it does without views, and the shader
+  reads entry `floor(frameIndex + 0.5) · n + view`; a `frameIndex` past the last frame shows the
+  matching view of the last frame, one before the first that of the first.
 - **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of
   the sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front
   is where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh —
@@ -1922,12 +1925,12 @@ which three does without an event — takes `touchTexture('animsMap')` once the 
 
 ## Writing a feature
 
-A feature is a plain object handed to `defineFeature()`, which checks it on its own and freezes
-it. This one turns a sprite grey — a statue of stone, a frozen enemy, a locked item: an attribute
-of one value per sprite, `dynamic` because it may change from frame to frame, a property
-`grayscale` on the handle, a start value of 0, and a color stage that mixes the color towards its
-luminance. The stage runs at `ColorOrder.Tint - 25`, in the gap between the palette swap and the
-tint, so a tint colors the grey — a statue in blue.
+A feature is a plain object handed to `defineFeature()`, which checks every field of it and
+freezes it, the records and lists inside included. This one turns a sprite grey — a statue of
+stone, a frozen enemy, a locked item: an attribute of one value per sprite, `dynamic` because it
+may change from frame to frame, a property `grayscale` on the handle, a start value of 0, and a
+color stage that mixes the color towards its luminance. The stage runs at `ColorOrder.Tint - 25`,
+in the gap between the palette swap and the tint, so a tint colors the grey — a statue in blue.
 
 ```ts check
 import {
@@ -2051,6 +2054,11 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   `wave` — `defineSprite()` asks the `checkKind` of the first before every other check, so that it
   can say why a kind takes one; a check that lets it pass leaves the plain refusal, `two features
   are named "wave"`.
+
+A field of the wrong type — a stage without a `transform`, a method that is no function, a texture
+declared with anything but `{}` or `{needsImage: true}` — is refused with a `TypeError` naming the
+feature and the field. `defineSprite()`, `definePass()` and the placement swap hold a feature that
+never passed through `defineFeature()` to the same rules.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
@@ -2402,8 +2410,10 @@ per frame, for every pass that has one, and the answer decides whether the pass 
 `uniform(name)` answers the uniform the features of the pass read under `name`, through
 `uniformNames`: the hook of a renamed copy judges the renamed uniforms. The lookup reaches every
 uniform of the sprites, not only those of the pass — the `time` of an animated kind resolves —
-and throws from `update()` for a name that is no uniform of the sprites at all. The hook runs every
-frame and must allocate nothing, so it reads the `value` of a node and does not build a vector.
+and throws from `update()` for a name that is no uniform of the sprites at all. A hook that throws
+stops neither the other passes nor the upload: `update()` throws once it is done, naming the pass,
+and the pass keeps the visibility of its last judgement. The hook runs every frame and must
+allocate nothing, so it reads the `value` of a node and does not build a vector.
 `definePass()` refuses a `visible` that is no function.
 
 `ShadowPass` carries `shadowFallsOnPlane`. The sprites stand on the side of `groundPlane` its
@@ -2559,7 +2569,8 @@ sprites and their parents and inverts it, then lets every source write its unifo
 of the bindings, then judges the `visible` hook of every pass, and uploads the geometry last.
 The hooks therefore judge the values the bindings wrote in the same call: a light bound below the
 ground leaves the shadow out in that very frame. Without bindings and hooks `update()` is the
-upload alone.
+upload alone. A source or a hook that throws stops neither the others nor the upload; `update()`
+throws what they threw at its end, naming the uniform or the pass.
 
 `update()` refreshes the world matrices it reads itself, because the renderer runs
 `scene.updateMatrixWorld()` only inside `render()`, after `update()`. A node moved after

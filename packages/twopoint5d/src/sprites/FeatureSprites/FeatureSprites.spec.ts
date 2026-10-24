@@ -201,6 +201,17 @@ describe('FeatureSprites', () => {
     sprites.dispose();
   });
 
+  test('the placement setter refuses a malformed feature as defineFeature() would, and every material keeps its placement', () => {
+    const sprites = new FeatureSprites(kind, {passes: [definePass({name: 'plain', features: []})]});
+
+    expect(() => {
+      sprites.placement = {name: 'odd', placement: 5} as never;
+    }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function'));
+    expect(sprites.placement).toBe(FlatPlacement);
+    expect(sprites.passes['plain']!.material.placement).toBe(FlatPlacement);
+    sprites.dispose();
+  });
+
   test('textures and uniforms pass through to the material', () => {
     const timedKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, TextureColor]});
     const sprites = new FeatureSprites(timedKind);
@@ -404,6 +415,23 @@ describe('FeatureSprites', () => {
       expect(() => new FeatureSprites(kind, {capacity: 4, textures: {unknown: new Texture()}})).toThrow();
 
       expect(geometryDispose.callCount).toBe(2);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses a malformed placement option in its own name and leaves nothing built', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+      const odd = {name: 'odd', placement: 5} as never;
+
+      expect(() => new FeatureSprites(kind, {placement: odd})).toThrow(
+        new TypeError('FeatureSprites: the placement of feature "odd" is no function'),
+      );
+      expect(() => new FeatureSprites(kind, {placement: odd, passes: [ShadowPass]})).toThrow(
+        new TypeError('FeatureSprites: the placement of feature "odd" is no function'),
+      );
+
+      expect(geometryDispose.called).toBe(false);
       expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
     });
 
@@ -989,6 +1017,132 @@ describe('FeatureSprites', () => {
       sprites.bindUniform('lift', lift);
       sprites.update();
       expect((sprites.uniforms!['lift']!.value as Vector3).toArray()).toEqual([2, 4, 8]);
+      sprites.dispose();
+    });
+  });
+
+  describe('update() behind code of the caller that throws', () => {
+    const thrown = (run: () => void): Error => {
+      try {
+        run();
+      } catch (error) {
+        return error as Error;
+      }
+      throw new Error('nothing was thrown');
+    };
+    const throwingSource = (message: string): SpriteUniformSource => ({
+      type: 'vec4',
+      write() {
+        throw new Error(message);
+      },
+    });
+    const below = () => {
+      const lamp = new Object3D();
+      lamp.position.set(0, -4, 0);
+      return lamp;
+    };
+
+    test('update() uploads what the pools marked when the visible hook of a pass throws, and names the pass', () => {
+      const cause = new Error('the hook broke');
+      const boom = definePass({
+        name: 'boom',
+        features: [],
+        visible: () => {
+          throw cause;
+        },
+      });
+      const sprites = new FeatureSprites(kind, {capacity: 4, passes: [boom]});
+      sprites.createSprite();
+      sprites.createSprite();
+      const upload = sandbox.spy(sprites.geometry!, 'update');
+
+      const error = thrown(() => sprites.update());
+
+      expect(error.message).toBe('FeatureSprites: the visible of pass "boom" threw: the hook broke');
+      expect(error.cause).toBe(cause);
+      expect(upload.callCount).toBe(1);
+      expect(sprites.geometry!.instanceCount).toBe(2);
+      sprites.dispose();
+    });
+
+    test('update() writes the other bindings and judges every pass behind a source that throws', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      sprites.bindUniform('groundPlane', throwingSource('the source broke'));
+      sprites.bindUniform('shadowLight', lightOf(below()));
+      const upload = sandbox.spy(sprites.geometry!, 'update');
+
+      const error = thrown(() => sprites.update());
+
+      expect(error.message).toBe('FeatureSprites: the source bound to the uniform "groundPlane" threw: the source broke');
+      expect((sprites.uniforms!['shadowLight']!.value as Vector4).toArray()).toEqual([0, -4, 0, 1]);
+      expect(sprites.passes['shadow']!.visible).toBe(false);
+      expect(upload.callCount).toBe(1);
+      sprites.dispose();
+    });
+
+    test('update() throws an AggregateError when more than one source or hook threw', () => {
+      const boom = definePass({
+        name: 'boom',
+        features: [],
+        visible: () => {
+          throw 'the hook broke';
+        },
+      });
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass, boom]});
+      sprites.bindUniform('groundPlane', throwingSource('the source broke'));
+
+      const error = thrown(() => sprites.update());
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect(error.message).toBe('FeatureSprites#update(): more than one bound source or visible hook threw');
+      expect((error as AggregateError).errors.map(({message}: Error) => message)).toEqual([
+        'FeatureSprites: the source bound to the uniform "groundPlane" threw: the source broke',
+        'FeatureSprites: the visible of pass "boom" threw: the hook broke',
+      ]);
+      sprites.dispose();
+    });
+
+    test('a pass whose hook throws keeps the visibility of its last judgement', () => {
+      let verdict: boolean | 'throw' = false;
+      const moody = definePass({
+        name: 'moody',
+        features: [],
+        visible: () => {
+          if (verdict === 'throw') throw new Error('no verdict');
+          return verdict;
+        },
+      });
+      const sprites = new FeatureSprites(kind, {passes: [moody]});
+      const mesh = sprites.passes['moody']!;
+
+      sprites.update();
+      expect(mesh.visible).toBe(false);
+      verdict = 'throw';
+      expect(() => sprites.update()).toThrow('FeatureSprites: the visible of pass "moody" threw: no verdict');
+      expect(mesh.visible).toBe(false);
+      mesh.enabled = true;
+      expect(mesh.visible).toBe(false);
+
+      verdict = true;
+      sprites.update();
+      expect(mesh.visible).toBe(true);
+      verdict = 'throw';
+      expect(() => sprites.update()).toThrow();
+      expect(mesh.visible).toBe(true);
+      sprites.dispose();
+    });
+
+    test('a hook that asks uniform() for an undeclared name throws that refusal as it is', () => {
+      const peek = definePass({name: 'peek', features: [], visible: (uniform) => uniform('nothing') != null});
+      const sprites = new FeatureSprites(kind, {passes: [peek]});
+      const upload = sandbox.spy(sprites.geometry!, 'update');
+
+      const error = thrown(() => sprites.update());
+
+      expect(error.message).toBe(
+        'FeatureSprites: the visible of pass "peek" reads the uniform "nothing", which no feature of these sprites declares',
+      );
+      expect(upload.callCount).toBe(1);
       sprites.dispose();
     });
   });

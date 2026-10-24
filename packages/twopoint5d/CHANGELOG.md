@@ -127,6 +127,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DataIdsChunk2D` holds neither its params object nor, once the first read has decoded it, its base64 string; `protected data` is gone, and `prepareData()` takes the string as its argument (**BREAKING** for a subclass). See the Migration Guide
 - perf `Map2DSpatialHashGrid#findWithin()` and `#getTiles()` over more cells than the grid holds walk the cells it holds instead of the cells of the query
 - perf `base64toUint32Arr()` lays the array over the decoded bytes without a copy when the byte order asked for is the one of the host
+- `defineFeature()` checks every field of a feature for its type — `attributes`, `usageAliases`, `methods`, `initialize`, `uniforms`, `textures`, `frame`, `placement`, `colorSource`, the `transform` of every stage, `requires` — with a `TypeError` naming the feature and the field (**BREAKING**). See the Migration Guide
+- `defineSprite()`, `definePass()` and the `placement` of `FeatureSprites` and `FeatureSpritesMaterial` check a feature that never passed through `defineFeature()` the same way, in their own name, and `defineSprite()` refuses options that are no object, a base that is none and features that are no list (**BREAKING**). See the Migration Guide
+- `defineFeature()`, `QuadBase`, `gridBase()` and `defineSprite()` freeze what they answer all the way down — a write into the attributes, methods, uniforms, textures or stages of a feature, or into the description of a base or a kind, throws a `TypeError` (**BREAKING**). The description of a kind is a copy of its own; the features handed to `defineSprite()` and the base stay as their authors left them. See the Migration Guide
+- `tableFrame()` takes `views` from 2 to 64 (**BREAKING**). See the Migration Guide
 
 ### Removed
 
@@ -181,6 +185,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureStore#registerAtlasAdapter()` registers nothing on a disposed store; it still refuses the arguments it refuses on a live one
 - `Map2DTileRenderer#clearTiles()` brings its factory up to date itself: after `Map2D#visibilitor = undefined`, after `Map2D#clearTiles()` under a visibilitor without an answer and after `Map2DTileStreamer#removeTileRenderer()`, no tile stays drawn up to the next update cycle
 - `CameraBasedVisibility` keeps the tiles nearest to the camera under `maxVisibleTiles` also on a map node that is tilted or stands upright: the margin by which the search goes on beyond the furthest kept tile is the diagonal of a tile in the plane of the map
+- `FeatureSprites#update()` uploads the sprites of the frame when a bound source or a `visible` hook throws, lets every other source and hook run, and throws afterwards, naming the uniform or the pass (several as an `AggregateError`); a pass whose hook threw keeps the visibility of its last judgement
+- a material parameter handed to `FeatureSpritesMaterial` or `FeatureSprites` as `undefined` leaves the one of the pass in place and is not passed to `setValues()`
 
 ### Migration Guide
 
@@ -759,6 +765,87 @@ class MyChunk extends DataIdsChunk2D {
     return base64toUint32Arr(base64);
   }
 }
+```
+
+#### A feature written as a plain object
+
+`defineSprite()`, `definePass()` and the `placement` setters hold a feature that never passed through `defineFeature()` to the rules of `defineFeature()`, and `defineFeature()` checks every field: a field of the wrong type is refused with a `TypeError` that names the feature and the field. Bring the field into the type `SpriteFeature` gives it — a stage is `{order, transform}`, a method a function, a texture `{}` or `{needsImage: true}`.
+
+**Before**
+
+```ts
+const glow = {name: 'glow', textures: {glowMap: true}, color: {order: 150}};
+defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, glow as never]});
+```
+
+**After**
+
+```ts check
+import {ColorOrder, defineFeature, defineSprite, FlatPlacement, InstancePosition, QuadBase} from '@spearwolf/twopoint5d';
+
+const glow = defineFeature({
+  name: 'glow',
+  textures: {glowMap: {}},
+  color: {order: ColorOrder.Tint + 25, transform: (color) => color},
+});
+const GlowKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, glow]});
+```
+
+#### A write into a feature, a base or a sprite kind
+
+The features out of `defineFeature()` — every built-in one among them —, `QuadBase`, the bases of `gridBase()` and every sprite kind are frozen down to their records and lists, and a write throws a `TypeError`. Another usage of an attribute is `attributeUsage` of the geometry; any other variant is a feature or a kind of its own.
+
+**Before**
+
+```ts
+(Tint.attributes!['color'] as {usage?: string}).usage = 'dynamic';
+Tint.methods!['setTint'] = setTint;
+```
+
+**After**
+
+```ts check
+import {
+  ColorOrder,
+  defineFeature,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  Tint,
+} from '@spearwolf/twopoint5d';
+
+const TintedKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, Tint]});
+// another usage: asked of the geometry, not written into the feature
+const sprites = new FeatureSprites(TintedKind, {attributeUsage: {dynamic: ['color']}});
+
+// another variant: a feature of its own, built from the fields of the one it varies — a tint that
+// colors the flash as well
+const LateTint = defineFeature({...Tint, name: 'lateTint', color: {...Tint.color!, order: ColorOrder.Flash + 50}});
+```
+
+#### More than 64 views in tableFrame()
+
+`tableFrame()` refuses `views` above 64; no directional sheet has more. A table of more entries per frame is a table without views, and the sprite writes the entry it shows into `frameIndex`.
+
+**Before**
+
+```ts
+const Many = tableFrame({views: 128});
+```
+
+**After**
+
+```ts check
+import {TableFrame, type TableFrameApi} from '@spearwolf/twopoint5d';
+
+const VIEWS = 128;
+// the kind takes TableFrame; the entry of frame `frame` seen in view `view`
+const show = (sprite: TableFrameApi, frame: number, view: number) => {
+  sprite.frameIndex = frame * VIEWS + view;
+};
+const feature = TableFrame;
 ```
 
 ## [0.23.0] - 2026-10-18

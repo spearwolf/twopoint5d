@@ -2,7 +2,7 @@ import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {add, modelViewMatrix, vec3, vec4} from 'three/tsl';
 import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
-import {AdditiveBlending, NearestFilter, NoColorSpace, SRGBColorSpace, Texture} from 'three/webgpu';
+import {AdditiveBlending, DoubleSide, NearestFilter, NoColorSpace, SRGBColorSpace, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {attributeNamesOf, nodesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
@@ -378,6 +378,16 @@ describe('FeatureSpritesMaterial', () => {
       }).toThrow(
         'FeatureSpritesMaterial: feature "heavy" brings attributes besides its placement stage; the sprites were built without them, so it cannot stand in for "flatPlacement"',
       );
+      material.dispose();
+    });
+
+    test('refuses a malformed feature as defineFeature() would, and keeps its placement', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(() => {
+        material.placement = {name: 'odd', placement: 5} as never;
+      }).toThrow(new TypeError('FeatureSpritesMaterial: the placement of feature "odd" is no function'));
+      expect(material.placement).toBe(FlatPlacement);
       material.dispose();
     });
 
@@ -811,6 +821,17 @@ describe('FeatureSpritesMaterial', () => {
       expect(material.alphaTest).toBe(0.25);
       expect(material.alphaTestNode).toBeNull();
       material.dispose();
+    });
+
+    test('a parameter handed in as undefined leaves the one of the pass, and nothing is said on the console', () => {
+      const warn = sandbox.stub(console, 'warn');
+      const material = new FeatureSpritesMaterial(TexturedKind, {pass: ShadowPass, side: undefined});
+      const sprites = new FeatureSprites(TexturedKind, {side: undefined});
+
+      expect(material.side).toBe(DoubleSide);
+      expect(warn.called).toBe(false);
+      material.dispose();
+      sprites.dispose();
     });
 
     test('takes a pass feature whose requires the kind or the pass meets', () => {

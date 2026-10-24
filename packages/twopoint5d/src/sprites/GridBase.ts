@@ -1,3 +1,4 @@
+import {deepFreeze} from '../utils/deepFreeze.js';
 import {describeValue} from '../utils/describeValue.js';
 import type {QuadBaseArgs, SpriteBase, SpriteBaseVO} from './SpriteBase.js';
 
@@ -87,7 +88,9 @@ const grids = new Map<string, GridBase>();
  * bends the sprite — a wave — needs it; every other sprite takes the quad.
  *
  * The uv of a vertex names its grid line exactly: `round(uv.x · columns)` is its column line,
- * `round(uv.y · rows)` its row line. Equal options answer the same frozen base.
+ * `round(uv.y · rows)` its row line. Equal options answer the same frozen base. Every grid built
+ * stays for the life of the page — the identity is what a feature recognizes its base by —, so
+ * `gridBase()` is meant for a few fixed grids, not for sizes derived from data.
  *
  * @throws a `TypeError` for options that are no object, for a `columns` or `rows` that is no
  *   whole number from 1 to 1024, and for a grid of more than 4096 cells
@@ -116,7 +119,7 @@ export function gridBase(options: GridBaseOptions): GridBase {
   const key = `${columns}x${rows}`;
   let grid = grids.get(key);
   if (grid == null) {
-    grid = Object.freeze({
+    grid = deepFreeze({
       name: `grid ${key}`,
       columns,
       rows,
@@ -129,7 +132,7 @@ export function gridBase(options: GridBaseOptions): GridBase {
         },
         basePrototype: gridPrototype(columns, rows),
       },
-      defaultArgs: Object.freeze([0.5, 0.5] as const),
+      defaultArgs: [0.5, 0.5] as const,
     });
     grids.set(key, grid);
   }

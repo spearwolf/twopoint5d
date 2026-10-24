@@ -176,7 +176,9 @@ export function gridBase(options: GridBaseOptions): GridBase;
 - **One frozen base per option set**, memoized by `columns × rows` as `flatPlacement()` memoizes
   its features: `gridBase({columns: 3, rows: 3}) === gridBase({columns: 3, rows: 3})`, so a
   feature recognizes its base by identity (§6) and every geometry of the kind shares one
-  descriptor. Name: `grid 3x3`.
+  descriptor; every grid built stays for the life of the page, so `gridBase()` is meant for a few
+  fixed grids, not for sizes derived from data. Frozen all the way down, its description and the
+  prototype of its base vertex included. Name: `grid 3x3`.
 - **Layout** — as `QuadBase` lays out four, on more vertices: `(columns + 1) × (rows + 1)`
   vertices, row by row from the top, left to right; vertex `k = j · (columns + 1) + i` for the
   column line `i ∈ 0 … columns` and the row line `j ∈ 0 … rows`:

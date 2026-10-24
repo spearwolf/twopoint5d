@@ -20,6 +20,21 @@ describe('QuadBase', () => {
     expect(QuadBase.defaultArgs).toEqual([0.5, 0.5]);
   });
 
+  test('is frozen all the way down, its description and the prototype of its base vertex included', () => {
+    const {description} = QuadBase;
+
+    expect(Object.isFrozen(QuadBase)).toBe(true);
+    expect(Object.isFrozen(description)).toBe(true);
+    expect(Object.isFrozen(description.attributes)).toBe(true);
+    expect(Object.isFrozen((description.attributes['position'] as {components: string[]}).components)).toBe(true);
+    expect(Object.isFrozen(description.indices)).toBe(true);
+    expect(Object.isFrozen(description.basePrototype)).toBe(true);
+    expect(Object.isFrozen(QuadBase.defaultArgs)).toBe(true);
+    expect(() => {
+      description.indices!.push(0);
+    }).toThrow(TypeError);
+  });
+
   test('makes the unit quad around the origin from its default arguments, uv (0,0) at the top left', () => {
     const {pool, quad} = makeQuad(...QuadBase.defaultArgs);
 

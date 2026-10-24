@@ -168,9 +168,15 @@ class FeatureSprites {
    `worldToSprites.copy(this.matrixWorld).invert()` into a `Matrix4` of the instance. For every
    binding `source.write(vector, worldToSprites)`, where `vector` is the `value` of the uniform
    node, looked up once in `bindUniform()` — the uniforms are shared, so every pass reads the value.
-   The bindings live in parallel arrays, walked by index.
+   Each binding is one entry that pairs the source with the vector of its uniform, by type; the
+   list is walked by index.
 2. For every pass with a `visible` hook: its visibility for this frame (§5).
 3. `super.update()`, the upload of the geometry.
+
+A source or a hook that throws stops neither the others nor the upload: once the upload is done,
+`update()` throws what it threw, naming the uniform of the source or the pass of the hook —
+`FeatureSprites: the visible of pass "shadow" threw: …` —, several as an `AggregateError`. A pass
+whose hook threw keeps the visibility of its last judgement.
 
 Without bindings and without a pass that has a hook, `update()` is the upload alone.
 

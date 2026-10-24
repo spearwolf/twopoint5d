@@ -161,6 +161,29 @@ describe('sprites — a shadow pass', function () {
     }
   });
 
+  it('draws the sprites of a frame in which the visible hook of a pass throws', async function () {
+    const brokenShadow = definePass({
+      ...ShadowPass,
+      name: 'brokenShadow',
+      visible() {
+        throw new Error('the hook broke');
+      },
+    });
+    const colorMap = keep(makeColorTexture([RED, RED, RED, RED], 2, 2));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [brokenShadow]}));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(-1, 0, 4);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+
+    expect(() => sprites.update()).to.throw('FeatureSprites: the visible of pass "brokenShadow" threw: the hook broke');
+    const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
+  });
+
   /**
    * Renders a sprite 2 units square standing at the origin with its shadow, the light and the ground
    * at their start values, through makeCameraAboveGround() — over an opaque ground mesh in the plane
