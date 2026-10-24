@@ -402,18 +402,20 @@ describe('AsepriteJson', () => {
 
       test.each([undefined, null, 'x', 3])('refuses a json that is %j', (data) => {
         const t = target();
-        expect(() => AsepriteJson.parse(data as never, {target: t})).toThrow(TypeError);
         expect(() => AsepriteJson.parse(data as never, {target: t})).toThrow(
-          `AsepriteJson: the json is ${data === undefined ? 'undefined' : JSON.stringify(data)} — Aseprite writes an object {frames, meta}`,
+          new TypeError(
+            `AsepriteJson: the json is ${data === undefined ? 'undefined' : JSON.stringify(data)} — Aseprite writes an object {frames, meta}`,
+          ),
         );
         expect(t.size).toBe(0);
       });
 
       test.each([undefined, null, 'x', 3])('refuses frames that are %j', (frames) => {
         const data = {...sheet(1), frames} as never;
-        expect(() => AsepriteJson.parse(data)).toThrow(TypeError);
         expect(() => AsepriteJson.parse(data)).toThrow(
-          `AsepriteJson: the json has frames of ${frames === undefined ? 'undefined' : JSON.stringify(frames)} — Aseprite writes the frames as an object ("Hash") or a list ("Array")`,
+          new TypeError(
+            `AsepriteJson: the json has frames of ${frames === undefined ? 'undefined' : JSON.stringify(frames)} — Aseprite writes the frames as an object ("Hash") or a list ("Array")`,
+          ),
         );
       });
 
@@ -429,18 +431,20 @@ describe('AsepriteJson', () => {
         const entry = {frame: {x: 0, y: 0, w: 4, h: 4}, duration: 100};
         const t = target();
         const data = {frames: [entry, {...entry, filename: 7}], meta: sheet(1).meta} as never;
-        expect(() => AsepriteJson.parse(data, {target: t})).toThrow(TypeError);
         expect(() => AsepriteJson.parse(data, {target: t})).toThrow(
-          'AsepriteJson: the frame 0 of the "Array" frames has a filename of undefined — a frame of that layout is named by its filename, a string',
+          new TypeError(
+            'AsepriteJson: the frame 0 of the "Array" frames has a filename of undefined — a frame of that layout is named by its filename, a string',
+          ),
         );
         expect(t.size).toBe(0);
       });
 
       test.each([undefined, null, 3])('refuses a frame tag with a name of %j', (name) => {
         const data = sheet(2, {frameTags: [{name, from: 0, to: 1, direction: 'forward'} as never]});
-        expect(() => AsepriteJson.parse(data)).toThrow(TypeError);
         expect(() => AsepriteJson.parse(data)).toThrow(
-          `AsepriteJson: the frame tag 0 has a name of ${name === undefined ? 'undefined' : JSON.stringify(name)} — a frame tag is named by a string`,
+          new TypeError(
+            `AsepriteJson: the frame tag 0 has a name of ${name === undefined ? 'undefined' : JSON.stringify(name)} — a frame tag is named by a string`,
+          ),
         );
       });
 

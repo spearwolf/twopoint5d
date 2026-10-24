@@ -67,9 +67,10 @@ describe('tableFrame()', () => {
     [Infinity, 'Infinity'],
     [65, '65'],
   ])('refuses views of %o', (views, shown) => {
-    expect(() => tableFrame({views: views as number})).toThrow(TypeError);
     expect(() => tableFrame({views: views as number})).toThrow(
-      `tableFrame: views must be a whole number from 2 to 64, got ${shown} — leave views out for frames without views`,
+      new TypeError(
+        `tableFrame: views must be a whole number from 2 to 64, got ${shown} — leave views out for frames without views`,
+      ),
     );
   });
 

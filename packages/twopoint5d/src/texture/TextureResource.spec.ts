@@ -1909,8 +1909,7 @@ describe('TextureResource', () => {
         resource.tileSetOptions = {tileWidth: 16};
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow('TextureResource "hero" is an "image" resource and has no "tileSetOptions"');
+      expect(write).toThrow(new TypeError('TextureResource "hero" is an "image" resource and has no "tileSetOptions"'));
       // @ts-expect-error an image resource has no tileSetOptions
       expect(resource.tileSetOptions).toBeUndefined();
       expect(Object.hasOwn(resource, 'tileSetOptions')).toBe(false);
@@ -1926,8 +1925,7 @@ describe('TextureResource', () => {
         resource.frameBasedAnimationsData = {x: {duration: 1, tileIds: [1]}};
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow('TextureResource "hero" is an "image" resource and has no "frameBasedAnimationsData"');
+      expect(write).toThrow(new TypeError('TextureResource "hero" is an "image" resource and has no "frameBasedAnimationsData"'));
       // @ts-expect-error an image resource has no frameBasedAnimationsData
       expect(resource.frameBasedAnimationsData).toBeUndefined();
       expect(Object.hasOwn(resource, 'frameBasedAnimationsData')).toBe(false);
@@ -1943,8 +1941,7 @@ describe('TextureResource', () => {
         resource.atlasUrl = 'x.json';
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow('TextureResource "tiles" is a "tileset" resource and has no "atlasUrl"');
+      expect(write).toThrow(new TypeError('TextureResource "tiles" is a "tileset" resource and has no "atlasUrl"'));
       // @ts-expect-error a tile set resource has no atlasUrl
       expect(resource.atlasUrl).toBeUndefined();
       expect(Object.hasOwn(resource, 'atlasUrl')).toBe(false);
@@ -1974,8 +1971,11 @@ describe('TextureResource', () => {
         resource.imageUrl = 'other.png';
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow(/takes its "imageUrl" from the atlas json/);
+      expect(write).toThrow(
+        new TypeError(
+          'TextureResource "deco" is an "atlas" resource and takes its "imageUrl" from the atlas json — write "overrideImageUrl" instead',
+        ),
+      );
       expect(resource.imageUrl).toBeUndefined();
       expect(Object.hasOwn(resource, 'imageUrl')).toBe(false);
 
@@ -2056,10 +2056,11 @@ describe('TextureResource', () => {
       // so the cast stands in for a caller in JavaScript
       const Base = TextureResource as unknown as new (id: string, type: string) => TextureResource;
 
-      expect(() => new Base('sprites', 'atlas')).toThrow(TypeError);
       expect(() => new Base('sprites', 'atlas')).toThrow(
-        'new TextureResource(): TextureResource is the base of the three shapes of resource — build an ImageTextureResource, ' +
-          'a TileSetTextureResource or an AtlasTextureResource, or call TextureResource.fromImage(), fromTileSet() or fromAtlas()',
+        new TypeError(
+          'new TextureResource(): TextureResource is the base of the three shapes of resource — build an ImageTextureResource, ' +
+            'a TileSetTextureResource or an AtlasTextureResource, or call TextureResource.fromImage(), fromTileSet() or fromAtlas()',
+        ),
       );
     });
 
@@ -2154,8 +2155,7 @@ describe('TextureResource', () => {
       };
 
       for (const [property, write] of Object.entries(writes)) {
-        expect(write).toThrow(TypeError);
-        expect(write).toThrow(`TextureResource "hero" is an "image" resource and has no "${property}"`);
+        expect(write).toThrow(new TypeError(`TextureResource "hero" is an "image" resource and has no "${property}"`));
         // reading it answers undefined, and nothing was left on the resource
         expect((resource as unknown as Record<string, unknown>)[property]).toBeUndefined();
         expect(Object.hasOwn(resource, property)).toBe(false);

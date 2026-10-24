@@ -281,9 +281,10 @@ describe('RectangularVisibilityArea', () => {
       ] as const) {
         const compute = () => area.computeVisibleTiles(first.tiles, [centerPoint[0], centerPoint[1]], tileCoords, matrixWorld);
 
-        expect(compute).toThrow(RangeError);
         expect(compute).toThrow(
-          `RectangularVisibilityArea: the center point of computeVisibleTiles() must be two finite numbers, got ${quoted}`,
+          new RangeError(
+            `RectangularVisibilityArea: the center point of computeVisibleTiles() must be two finite numbers, got ${quoted}`,
+          ),
         );
       }
 
@@ -313,9 +314,10 @@ describe('RectangularVisibilityArea', () => {
       const compute = () =>
         new RectangularVisibilityArea().computeVisibleTiles([], [0, 0], new Map2DTileCoordsUtil(1, 1), matrixWorld);
 
-      expect(compute).toThrow(RangeError);
       expect(compute).toThrow(
-        'RectangularVisibilityArea: the area covers 76800 tiles of the grid, more than maxVisibleTiles (10000) — make the area smaller or the tiles larger, or raise maxVisibleTiles',
+        new RangeError(
+          'RectangularVisibilityArea: the area covers 76800 tiles of the grid, more than maxVisibleTiles (10000) — make the area smaller or the tiles larger, or raise maxVisibleTiles',
+        ),
       );
     });
 
@@ -346,8 +348,11 @@ describe('RectangularVisibilityArea', () => {
 
       // around [50, 0] it spans -110 … 210: columns -2 … 2, 5 × 4 tiles
       const moved = () => area.computeVisibleTiles([], [50, 0], tileCoords, matrixWorld);
-      expect(moved, 'the call around [50, 0]').toThrow('the area covers 20 tiles of the grid, more than maxVisibleTiles (16)');
-      expect(moved, 'the same call again, instead of the result around [0, 0]').toThrow(RangeError);
+      const refusal = new RangeError(
+        'RectangularVisibilityArea: the area covers 20 tiles of the grid, more than maxVisibleTiles (16) — make the area smaller or the tiles larger, or raise maxVisibleTiles',
+      );
+      expect(moved, 'the call around [50, 0]').toThrow(refusal);
+      expect(moved, 'the same call again, instead of the result around [0, 0]').toThrow(refusal);
     });
 
     test('a grid change a refused call saw reaches the next call that computes', () => {
@@ -421,15 +426,22 @@ describe('RectangularVisibilityArea', () => {
       expect(result.changed).toBe(true);
     });
 
-    test.each([0, -1, 1.5, NaN, '5'])('the setter refuses %p and keeps the value it had', (value) => {
+    test.each([
+      [0, '0'],
+      [-1, '-1'],
+      [1.5, '1.5'],
+      [NaN, 'NaN'],
+      ['5', '"5"'],
+    ])('the setter refuses %p and keeps the value it had', (value, written) => {
       const area = new RectangularVisibilityArea();
       area.maxVisibleTiles = 50;
       const write = () => {
         area.maxVisibleTiles = value as number;
       };
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow('RectangularVisibilityArea: maxVisibleTiles must be a whole number above 0 or Infinity, got');
+      expect(write).toThrow(
+        new RangeError(`RectangularVisibilityArea: maxVisibleTiles must be a whole number above 0 or Infinity, got ${written}`),
+      );
       expect(area.maxVisibleTiles).toBe(50);
     });
 
@@ -493,30 +505,26 @@ describe('RectangularVisibilityArea', () => {
     test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a width of %s', (v) => {
       const create = () => new RectangularVisibilityArea(v, 240);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow(`RectangularVisibilityArea: width must be 0 or a finite number above 0, got ${v}`);
+      expect(create).toThrow(new RangeError(`RectangularVisibilityArea: width must be 0 or a finite number above 0, got ${v}`));
     });
 
     test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a height of %s', (v) => {
       const create = () => new RectangularVisibilityArea(320, v);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow(`RectangularVisibilityArea: height must be 0 or a finite number above 0, got ${v}`);
+      expect(create).toThrow(new RangeError(`RectangularVisibilityArea: height must be 0 or a finite number above 0, got ${v}`));
     });
 
     test('a width that is a string is quoted in the message', () => {
       const create = () => new RectangularVisibilityArea('5' as unknown as number, 240);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow('RectangularVisibilityArea: width must be 0 or a finite number above 0, got "5"');
+      expect(create).toThrow(new RangeError('RectangularVisibilityArea: width must be 0 or a finite number above 0, got "5"'));
     });
 
     test('a refused width leaves the width as it was', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const write = () => (area.width = -1);
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow('RectangularVisibilityArea: width must be 0 or a finite number above 0, got -1');
+      expect(write).toThrow(new RangeError('RectangularVisibilityArea: width must be 0 or a finite number above 0, got -1'));
       expect(area.width).toBe(320);
     });
 
@@ -524,8 +532,7 @@ describe('RectangularVisibilityArea', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const write = () => (area.height = -1);
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow('RectangularVisibilityArea: height must be 0 or a finite number above 0, got -1');
+      expect(write).toThrow(new RangeError('RectangularVisibilityArea: height must be 0 or a finite number above 0, got -1'));
       expect(area.height).toBe(240);
     });
 

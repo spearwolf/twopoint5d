@@ -36,29 +36,25 @@ describe('Map2DTileCoordsUtil', () => {
     test.each([0, -1, NaN, Infinity])('the constructor refuses %p as tileWidth', (width) => {
       const create = () => new Map2DTileCoordsUtil(width, 16);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow(`Map2DTileCoordsUtil: tileWidth must be a finite number above 0, got ${width}`);
+      expect(create).toThrow(new RangeError(`Map2DTileCoordsUtil: tileWidth must be a finite number above 0, got ${width}`));
     });
     test.each([0, -1, NaN, Infinity])('the constructor refuses %p as tileHeight', (height) => {
       const create = () => new Map2DTileCoordsUtil(16, height);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow(`Map2DTileCoordsUtil: tileHeight must be a finite number above 0, got ${height}`);
+      expect(create).toThrow(new RangeError(`Map2DTileCoordsUtil: tileHeight must be a finite number above 0, got ${height}`));
     });
     test.each([0, -1, NaN, Infinity])('the tileWidth setter refuses %p', (width) => {
       const view = new Map2DTileCoordsUtil(16, 16);
       const write = () => (view.tileWidth = width);
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow(`Map2DTileCoordsUtil: tileWidth must be a finite number above 0, got ${width}`);
+      expect(write).toThrow(new RangeError(`Map2DTileCoordsUtil: tileWidth must be a finite number above 0, got ${width}`));
       expect(view.tileWidth, 'tileWidth after a refused write').toBe(16);
     });
     test.each([0, -1, NaN, Infinity])('the tileHeight setter refuses %p', (height) => {
       const view = new Map2DTileCoordsUtil(16, 16);
       const write = () => (view.tileHeight = height);
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow(`Map2DTileCoordsUtil: tileHeight must be a finite number above 0, got ${height}`);
+      expect(write).toThrow(new RangeError(`Map2DTileCoordsUtil: tileHeight must be a finite number above 0, got ${height}`));
       expect(view.tileHeight, 'tileHeight after a refused write').toBe(16);
     });
   });
@@ -67,14 +63,12 @@ describe('Map2DTileCoordsUtil', () => {
     test.each([NaN, Infinity, -Infinity])('the constructor refuses %p as xOffset', (offset) => {
       const create = () => new Map2DTileCoordsUtil(16, 16, offset, 0);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow(`Map2DTileCoordsUtil: xOffset must be a finite number, got ${offset}`);
+      expect(create).toThrow(new RangeError(`Map2DTileCoordsUtil: xOffset must be a finite number, got ${offset}`));
     });
     test.each([NaN, Infinity, -Infinity])('the constructor refuses %p as yOffset', (offset) => {
       const create = () => new Map2DTileCoordsUtil(16, 16, 0, offset);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow(`Map2DTileCoordsUtil: yOffset must be a finite number, got ${offset}`);
+      expect(create).toThrow(new RangeError(`Map2DTileCoordsUtil: yOffset must be a finite number, got ${offset}`));
     });
     test('names the value it refuses', () => {
       expect(() => new Map2DTileCoordsUtil(16, 16, NaN)).toThrow('Map2DTileCoordsUtil: xOffset must be a finite number, got NaN');
@@ -85,8 +79,7 @@ describe('Map2DTileCoordsUtil', () => {
         const view = new Map2DTileCoordsUtil(16, 16, 4, 8);
         const write = () => (view.xOffset = offset);
 
-        expect(write).toThrow(RangeError);
-        expect(write).toThrow(`Map2DTileCoordsUtil: xOffset must be a finite number, got ${offset}`);
+        expect(write).toThrow(new RangeError(`Map2DTileCoordsUtil: xOffset must be a finite number, got ${offset}`));
         expect(view.xOffset, 'xOffset after a refused write').toBe(4);
       },
     );
@@ -96,8 +89,7 @@ describe('Map2DTileCoordsUtil', () => {
         const view = new Map2DTileCoordsUtil(16, 16, 4, 8);
         const write = () => (view.yOffset = offset);
 
-        expect(write).toThrow(RangeError);
-        expect(write).toThrow(`Map2DTileCoordsUtil: yOffset must be a finite number, got ${offset}`);
+        expect(write).toThrow(new RangeError(`Map2DTileCoordsUtil: yOffset must be a finite number, got ${offset}`));
         expect(view.yOffset, 'yOffset after a refused write').toBe(8);
       },
     );
@@ -316,9 +308,10 @@ describe('Map2DTileCoordsUtil', () => {
         const args = selection(field, value) as [number, number, number, number];
         const call = () => (grid[method] as (...a: unknown[]) => unknown)(...args);
 
-        expect(call).toThrow(RangeError);
         expect(call).toThrow(
-          `Map2DTileCoordsUtil#${method}(): ${field} must be ${what}, got ${typeof value === 'string' ? `"${value}"` : String(value)}`,
+          new RangeError(
+            `Map2DTileCoordsUtil#${method}(): ${field} must be ${what}, got ${typeof value === 'string' ? `"${value}"` : String(value)}`,
+          ),
         );
       });
 

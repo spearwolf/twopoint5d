@@ -852,9 +852,10 @@ describe('CameraBasedVisibility', () => {
         const compute = () =>
           visibility.computeVisibleTiles(first.tiles, [centerPoint[0], centerPoint[1]], tileCoords, matrixWorld);
 
-        expect(compute).toThrow(RangeError);
         expect(compute).toThrow(
-          `CameraBasedVisibility: the center point of computeVisibleTiles() must be two finite numbers, got ${quoted}`,
+          new RangeError(
+            `CameraBasedVisibility: the center point of computeVisibleTiles() must be two finite numbers, got ${quoted}`,
+          ),
         );
       }
 

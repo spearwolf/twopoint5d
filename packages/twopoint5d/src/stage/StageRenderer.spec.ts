@@ -2912,9 +2912,10 @@ describe('StageRenderer', () => {
           on(sr, OnStageAdded, announced);
           const bare = fakeStage('bare');
 
-          expect(() => sr.add(bare), label).toThrow(TypeError);
           expect(() => sr.add(bare), label).toThrow(
-            /StageRenderer#add\(\) cannot take the stage "bare": that stage has no asPassNode\(\)/,
+            new TypeError(
+              'StageRenderer#add() cannot take the stage "bare": that stage has no asPassNode(), and a pipeline with buildOutputNode or a RootRenderPipeline composes the pass node of every stage',
+            ),
           );
 
           expect(bare.resize, label).not.toHaveBeenCalled();

@@ -260,9 +260,10 @@ resolves).
   (`… the pointer is {x, y} in normalized device coordinates, -1 to 1 — got {x: NaN, y: 0}`);
   `sprites` that is no array (`… takes a list of FeatureSprites, got undefined — pick(camera,
   pointer, [sprites])`); an entry that is no `FeatureSprites` (`… the entry 1 of the list is no
-  FeatureSprites, got Group — the picker draws FeatureSprites alone`). A listed mesh of more than 2²⁴ sprites rejects the pick with a `RangeError` before anything is
-  drawn
-  (`… the entry 0 of the list holds 16777217 sprites, and the float target names a slot exactly up to 16777216 — split the sprites into meshes of at most 16777216`).
+  FeatureSprites, got Group — the picker draws FeatureSprites alone`). A listed mesh of more than
+  2²⁴ sprites rejects the pick with a `RangeError` before anything is drawn (`… the entry 0 of the
+  list holds 16777217 sprites, and the float target names a slot exactly up to 16777216 — split the
+  sprites into meshes of at most 16777216`).
 - **Ownership**: the renderer, the camera and every mesh stay the caller's. The picker owns its
   target, its scene, its camera, its pick meshes and pick materials. A pick material borrows the
   resources of its mesh and does not release them.

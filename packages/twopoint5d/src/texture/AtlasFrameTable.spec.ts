@@ -117,8 +117,11 @@ describe('AtlasFrameTable', () => {
 
     expect(AtlasFrameTable.MaxFrames).toBe(341);
     expect(new AtlasFrameTable(Array.from({length: AtlasFrameTable.MaxFrames}, () => coords)).size).toBe(341);
-    expect(() => new AtlasFrameTable(Array.from({length: AtlasFrameTable.MaxFrames + 1}, () => coords))).toThrow(RangeError);
-    expect(() => new AtlasFrameTable(Array.from({length: AtlasFrameTable.MaxFrames + 1}, () => coords))).toThrow(/341/);
+    expect(() => new AtlasFrameTable(Array.from({length: AtlasFrameTable.MaxFrames + 1}, () => coords))).toThrow(
+      new RangeError(
+        'AtlasFrameTable: 342 frames are more than the 341 a uniform block of 16 KiB holds — split them into several tables',
+      ),
+    );
   });
 
   test('update() reads the frames again into the values it holds', () => {

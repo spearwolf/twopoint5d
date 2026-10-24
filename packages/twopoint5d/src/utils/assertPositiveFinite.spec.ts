@@ -5,8 +5,7 @@ describe('assertPositiveFinite', () => {
   test('a string is quoted in the message', () => {
     const check = () => assertPositiveFinite('abc', 'Subject', 'size');
 
-    expect(check).toThrow(RangeError);
-    expect(check).toThrow('Subject: size must be a finite number above 0, got "abc"');
+    expect(check).toThrow(new RangeError('Subject: size must be a finite number above 0, got "abc"'));
   });
 
   test.each([

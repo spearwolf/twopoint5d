@@ -81,9 +81,10 @@ describe('RepeatingTilesProvider', () => {
           tiles.tileIds = pattern as number[][];
         };
 
-        expect(assign).toThrow(RangeError);
         expect(assign).toThrow(
-          `RepeatingTilesProvider: a tile id is a whole number from 0 to 4294967295, but row ${row}, column ${col} holds ${shown}`,
+          new RangeError(
+            `RepeatingTilesProvider: a tile id is a whole number from 0 to 4294967295, but row ${row}, column ${col} holds ${shown}`,
+          ),
         );
         expect(tiles.tileIds).toEqual([[1, 2]]);
         expect(tiles.getTileIdAt(0, 0)).toBe(1);
@@ -349,8 +350,9 @@ describe('RepeatingTilesProvider', () => {
         (name) => {
           const read = () => providers[name]().getTileIdsWithin(0, 0, 3, 2, new Uint32Array(5));
 
-          expect(read).toThrow(RangeError);
-          expect(read).toThrow('RepeatingTilesProvider#getTileIdsWithin(): a target for 3x2 tile ids needs 6 cells, got 5');
+          expect(read).toThrow(
+            new RangeError('RepeatingTilesProvider#getTileIdsWithin(): a target for 3x2 tile ids needs 6 cells, got 5'),
+          );
         },
       );
 
@@ -371,8 +373,9 @@ describe('RepeatingTilesProvider', () => {
         const target = new Uint32Array(8).fill(666);
         const read = () => providers[name]().getTileIdsWithin(...argsWith(arg, value), target);
 
-        expect(read).toThrow(RangeError);
-        expect(read).toThrow(`RepeatingTilesProvider#getTileIdsWithin(): ${arg} must be a whole number, got ${value}`);
+        expect(read).toThrow(
+          new RangeError(`RepeatingTilesProvider#getTileIdsWithin(): ${arg} must be a whole number, got ${value}`),
+        );
         expect(Array.from(target), 'target').toEqual(new Array(8).fill(666));
       });
 
@@ -380,9 +383,8 @@ describe('RepeatingTilesProvider', () => {
         const target = new Uint32Array(8).fill(666);
         const read = () => providers[name]().getTileIdsWithin(...argsWith(arg, value), target);
 
-        expect(read).toThrow(RangeError);
         expect(read).toThrow(
-          `RepeatingTilesProvider#getTileIdsWithin(): ${arg} must be a whole number of 0 or more, got ${value}`,
+          new RangeError(`RepeatingTilesProvider#getTileIdsWithin(): ${arg} must be a whole number of 0 or more, got ${value}`),
         );
         expect(Array.from(target), 'target').toEqual(new Array(8).fill(666));
       });
@@ -405,8 +407,7 @@ describe('RepeatingTilesProvider', () => {
       )('%s: getTileIdAt() refuses a %s of %p', (name, arg, value) => {
         const read = () => (arg === 'col' ? providers[name]().getTileIdAt(value, 0) : providers[name]().getTileIdAt(0, value));
 
-        expect(read).toThrow(RangeError);
-        expect(read).toThrow(`RepeatingTilesProvider#getTileIdAt(): ${arg} must be a whole number, got ${value}`);
+        expect(read).toThrow(new RangeError(`RepeatingTilesProvider#getTileIdAt(): ${arg} must be a whole number, got ${value}`));
       });
 
       test('getTileIdAt() names the coordinate it refuses', () => {

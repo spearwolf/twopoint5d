@@ -197,14 +197,14 @@ export function gridBase(options: GridBaseOptions): GridBase;
 - **The grid line of a vertex** is exact in its uv: `round(uv.x · columns)` is `i`, `round(uv.y ·
   rows)` is `j` — `i / columns` is stored as the `float32` nearest to it, and the rounding takes
   it back for every `columns ≤ 1024`. A stage reads the base uv through `ctx.attribute('uv')`.
-- **Refusals** (`TypeError`, before anything is built): options that are no object
-  (`gridBase: takes {columns, rows}, got undefined — gridBase({columns: 3, rows: 3})`); a
-  `columns` or `rows` that is no whole number from 1 to 1024 (`gridBase: columns is 2.5 — columns
-  and rows are whole numbers from 1 to 1024`); a grid of more than 4096 cells (`gridBase: a grid of 1000 × 1000 is
-  1000000 cells — a grid holds at most 4096`). Neither is a limit of the GPU: 1024 per axis keeps
-  the grid line of every vertex exact in its uv, and 4096 cells keep a typo (`columns: 1000, rows:
-  1000`) from building a base of a million vertices for every sprite, whose indices the cache of
-  bases would hold for the life of the page.
+- **Refusals** (`TypeError`, before anything is built): options that are no object (`gridBase: takes
+  {columns, rows}, got undefined — gridBase({columns: 3, rows: 3})`); a `columns` or `rows` that is
+  no whole number from 1 to 1024 (`gridBase: columns is 2.5 — columns and rows are whole numbers
+  from 1 to 1024`); a grid of more than 4096 cells (`gridBase: a grid of 1000 × 1000 is 1000000
+  cells — a grid holds at most 4096`). Neither is a limit of the GPU: 1024 per axis keeps the grid
+  line of every vertex exact in its uv, and 4096 cells keep a typo (`columns: 1000, rows: 1000`)
+  from building a base of a million vertices for every sprite, whose indices the cache of bases
+  would hold for the life of the page.
 - `QuadBase` is unchanged. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws, with
   another vertex order.
 

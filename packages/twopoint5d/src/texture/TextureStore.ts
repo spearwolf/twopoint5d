@@ -92,7 +92,8 @@ export type TextureStoreErrorEvent =
  *
  * - `Ready` (retained): fires once per `parse()` call after all signals have settled.
  *   Payload: the `TextureStore` instance. Every listener hears it and the retained value is
- *   written, even behind one that throws.
+ *   written, even behind one that throws. A `whenReady()`, `whenResource()`, `getAsync()`, `get()`,
+ *   `acquireAsync()` or `on()` that a listener starts hears this `ready`, behind the last listener.
  * - `RendererChanged` (retained): fires whenever `renderer` is reassigned (incl. `undefined`).
  *   Payload: the new `WebGPURenderer | undefined`. Every listener hears it and the retained
  *   value is written, even behind one that throws; the throw goes on to whoever wrote
@@ -470,9 +471,11 @@ export class TextureStore {
   // whenResource() say it when they give up on the id
   #refusedItems = new Map<string, ItemRefusal>();
 
-  // Set while ready goes out: what a listener of it books through #onReadyOnce() waits here. The
-  // retained ready value is written only after the last listener, so a once() booked meanwhile
-  // would hear neither this ready nor a replay
+  // Set while ready goes out: what a listener of it books through #onReadyOnce() waits here and
+  // hears this ready behind the last listener, ahead of the resource:<id> events. eventize writes
+  // the retained ready value only after the last listener, so a once() booked meanwhile would hear
+  // the ready of the parse() before at once, and in the first parse(), which has none before it,
+  // no ready until the next parse()
   #readyLate: Array<() => void> | undefined;
 
   // the atlas adapters by name, in the order they were registered: the pick by `meta.app` asks the
@@ -918,14 +921,17 @@ export class TextureStore {
    *
    * A listener of `ready`, `resource:<id>` or `error` that throws changes nothing of the parse:
    * every listener hears its event, eventize reports the throw on the console, and `parse()` goes
-   * on and returns as usual. Nor does a subscriber of a resource — of {@link TextureStore.on} among
-   * them — that throws while the values are written: every subscriber hears its value, the parse
-   * runs to its end, and the throw goes out after `evictMissing` as an `error` event with `source:
-   * 'parse'` and no id. `parse()` throws for data it refuses before anything is written or
-   * emitted — and for a throw of the loop that writes the items, which leaves the items before it
-   * written and emits nothing. A resource that `evictMissing` disposes is removed even when a
-   * listener of its `dispose` event throws; that throw goes out as an `error` event with `source:
-   * 'parse'` and the id of the resource.
+   * on and returns as usual. What a listener of `ready` starts — `whenReady()`, `whenResource()`,
+   * `getAsync()`, `get()`, `acquireAsync()`, `on()` — hears that `ready` behind the last listener
+   * of it, ahead of the `resource:<id>` events; should one of them throw as it hears it, the throw
+   * is reported on the console as well, and `parse()` goes on. Nor does a subscriber of a resource
+   * — of {@link TextureStore.on} among them — that throws while the values are written: every
+   * subscriber hears its value, the parse runs to its end, and the throw goes out after
+   * `evictMissing` as an `error` event with `source: 'parse'` and no id. `parse()` throws for data
+   * it refuses before anything is written or emitted — and for a throw of the loop that writes the
+   * items, which leaves the items before it written and emits nothing. A resource that
+   * `evictMissing` disposes is removed even when a listener of its `dispose` event throws; that
+   * throw goes out as an `error` event with `source: 'parse'` and the id of the resource.
    *
    * On a disposed store this does nothing: no resource is built, and none is updated.
    */
@@ -962,12 +968,17 @@ export class TextureStore {
       emitSafe(this, OnReady, this);
       // the subscriptions a listener of ready booked while it went out hear this ready now, as the
       // ones that were there before it did. One of them may book or give back another, so the list
-      // is read until it is empty
+      // is read until it is empty. A throw goes to the console, as emitSafe() reports the throw of a
+      // subscription booked before the parse(), and the next one hears this ready all the same
       while (late.length > 0) {
         try {
           late.shift()?.();
         } catch (error) {
-          reportError(this, {source: 'parse', error});
+          // biome-ignore lint/suspicious/noConsole: the report emitSafe() gives a subscription booked before the parse()
+          console.error(
+            'TextureStore: a subscription that a listener of ready started threw as it heard that ready — parse() goes on',
+            error,
+          );
         }
       }
     } finally {

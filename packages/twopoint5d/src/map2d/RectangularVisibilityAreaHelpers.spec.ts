@@ -206,9 +206,10 @@ describe('RectangularVisibilityAreaHelpers', () => {
         helpers.viewRectHelperHeight = value;
       };
 
-      expect(set).toThrow(RangeError);
       expect(set).toThrow(
-        `RectangularVisibilityAreaHelpers: viewRectHelperHeight must be a finite number of 0 or more, got ${String(value)}`,
+        new RangeError(
+          `RectangularVisibilityAreaHelpers: viewRectHelperHeight must be a finite number of 0 or more, got ${String(value)}`,
+        ),
       );
       expect(helpers.viewRectHelperHeight).toBe(20);
     });

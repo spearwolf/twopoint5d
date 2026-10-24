@@ -202,8 +202,7 @@ describe('Map2D', () => {
       const map = new Map2D();
       const write = () => (map.tileWidth = 0);
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow('Map2D: tileWidth must be a finite number above 0, got 0');
+      expect(write).toThrow(new RangeError('Map2D: tileWidth must be a finite number above 0, got 0'));
     });
 
     test.each([
@@ -223,8 +222,7 @@ describe('Map2D', () => {
         map[name] = value;
       };
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow(`Map2D: ${name} must be ${rule}, got ${value}`);
+      expect(write).toThrow(new RangeError(`Map2D: ${name} must be ${rule}, got ${value}`));
       expect(streamer[name], `${name} of the streamer`).toBe(before);
     });
 

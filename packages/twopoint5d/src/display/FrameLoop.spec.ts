@@ -241,11 +241,16 @@ describe('FrameLoop', () => {
     );
   });
 
-  it.each([NaN, Infinity, -Infinity, -1, '30'])('new FrameLoop() refuses %o in its own name', (maxFps) => {
+  it.each([
+    [NaN, 'NaN'],
+    [Infinity, 'Infinity'],
+    [-Infinity, '-Infinity'],
+    [-1, '-1'],
+    ['30', '"30"'],
+  ])('new FrameLoop() refuses %o in its own name', (maxFps, written) => {
     expect(() => new FrameLoop(maxFps as number, makeFakeRenderer())).toThrow(
-      /^new FrameLoop\(\): maxFps must be a finite number of 0 or more, got /,
+      new RangeError(`new FrameLoop(): maxFps must be a finite number of 0 or more, got ${written}`),
     );
-    expect(() => new FrameLoop(maxFps as number, makeFakeRenderer())).toThrow(RangeError);
   });
 
   it('takes a maxFps of 0 and of -0 as no limit', () => {

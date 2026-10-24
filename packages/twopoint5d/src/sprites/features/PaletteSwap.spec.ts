@@ -91,9 +91,8 @@ describe('paletteSwap()', () => {
     [Number.NaN, 'NaN'],
     [-Infinity, '-Infinity'],
   ])('refuses colors of %o', (colors, shown) => {
-    expect(() => paletteSwap({colors: colors as number})).toThrow(TypeError);
     expect(() => paletteSwap({colors: colors as number})).toThrow(
-      `paletteSwap: colors must be a whole number from 1 to 64, got ${shown}`,
+      new TypeError(`paletteSwap: colors must be a whole number from 1 to 64, got ${shown}`),
     );
   });
 

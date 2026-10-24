@@ -602,24 +602,21 @@ describe('VertexObjectPool', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
       const run = () => pool.resize(-1);
-      expect(run).toThrow(RangeError);
-      expect(run).toThrow('VertexObjectPool#resize(): capacity must be a non-negative integer, got -1');
+      expect(run).toThrow(new RangeError('VertexObjectPool#resize(): capacity must be a non-negative integer, got -1'));
     });
 
     test('resize names a capacity given as a string in quotes', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
       const run = () => pool.resize('4' as never);
-      expect(run).toThrow(RangeError);
-      expect(run).toThrow('VertexObjectPool#resize(): capacity must be a non-negative integer, got "4"');
+      expect(run).toThrow(new RangeError('VertexObjectPool#resize(): capacity must be a non-negative integer, got "4"'));
     });
 
     test('resize throws error for non-integer capacity', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
 
       const run = () => pool.resize(10.5);
-      expect(run).toThrow(RangeError);
-      expect(run).toThrow('VertexObjectPool#resize(): capacity must be a non-negative integer, got 10.5');
+      expect(run).toThrow(new RangeError('VertexObjectPool#resize(): capacity must be a non-negative integer, got 10.5'));
     });
 
     test('shrinking unlinks every vertex object beyond the new capacity', () => {
@@ -1088,14 +1085,14 @@ describe('VertexObjectPool', () => {
       // a string per case, not one RegExp: the text of 1.5 holds a dot
       for (const capacity of [1.5, -1, NaN]) {
         const build = () => new VertexObjectPool(descriptor, capacity);
-        expect(build, String(capacity)).toThrow(RangeError);
-        expect(build, String(capacity)).toThrow(`VOBufferPool: capacity must be a non-negative integer, got ${capacity}`);
+        expect(build, String(capacity)).toThrow(
+          new RangeError(`VOBufferPool: capacity must be a non-negative integer, got ${capacity}`),
+        );
       }
 
       const buffersData = new VertexObjectPool(descriptor, 2).toBuffersData();
       const build = () => new VertexObjectPool(descriptor, {...buffersData, capacity: 1.5});
-      expect(build).toThrow(RangeError);
-      expect(build).toThrow('VOBufferPool: buffersData.capacity must be a non-negative integer, got 1.5');
+      expect(build).toThrow(new RangeError('VOBufferPool: buffersData.capacity must be a non-negative integer, got 1.5'));
     });
 
     test('fromBuffersData() refuses an array of another type and leaves the pool as it was', () => {
@@ -1111,8 +1108,11 @@ describe('VertexObjectPool', () => {
           buffers: {...buffersData.buffers, dynamic_float32: new Uint32Array(4 * 4 * 3)},
         });
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow(/"dynamic_float32"/);
+      expect(write).toThrow(
+        new TypeError(
+          'VOBufferPool#fromBuffersData(): buffer "dynamic_float32" holds float32 data and takes a Float32Array, got Uint32Array',
+        ),
+      );
       expect(pool.usedCount).toBe(2);
       expect(pool.buffer.buffers.get('dynamic_float32')!.typedArray).toBe(before);
     });
@@ -1130,8 +1130,11 @@ describe('VertexObjectPool', () => {
           buffers: {...buffersData.buffers, static_float32: new Float32Array(4 * 4 * 4 + 1)},
         });
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow(/"static_float32" takes at most 64 elements/);
+      expect(write).toThrow(
+        new RangeError(
+          'VOBufferPool#fromBuffersData(): buffer "static_float32" takes at most 64 elements (capacity × vertexCount × itemSize), got 65',
+        ),
+      );
       expect(pool.usedCount).toBe(2);
       expect(pool.buffer.buffers.get('static_float32')!.typedArray).toBe(before);
     });
@@ -1142,9 +1145,8 @@ describe('VertexObjectPool', () => {
 
       const write = () => pool.fromBuffersData(buffersData);
 
-      expect(write).toThrow(RangeError);
       expect(write, 'the message names the class, the method and the two values').toThrow(
-        'VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, 4, got 2',
+        new RangeError('VOBufferPool#fromBuffersData(): buffersData.capacity must be the capacity of this pool, 4, got 2'),
       );
     });
   });

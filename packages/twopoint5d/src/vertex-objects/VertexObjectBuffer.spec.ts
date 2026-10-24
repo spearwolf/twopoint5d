@@ -435,8 +435,9 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => target.copy(source, 2);
 
-      expect(run).toThrow(RangeError);
-      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#copy\(\)/);
+      expect(run, 'the message names the class and the method').toThrow(
+        new RangeError('VertexObjectBuffer#copy(): 3 objects at offset 2 do not fit a buffer of 4'),
+      );
       expect(lastElements(target), 'a refused call leaves the target as it was').toEqual([7, 7]);
     });
 
@@ -450,9 +451,10 @@ describe('VertexObjectBuffer', () => {
       const source = new Float32Array(typedArray!.length + 2 * itemSize);
       const run = () => buffer.copyArray(source, 'dynamic_float32');
 
-      expect(run).toThrow(RangeError);
       expect(run, 'the message names the class, the method and the buffer').toThrow(
-        /VertexObjectBuffer#copyArray\(\).*"dynamic_float32"/,
+        new RangeError(
+          'VertexObjectBuffer#copyArray(): buffer "dynamic_float32" takes 3 objects at offset 0, which does not fit a buffer of 2',
+        ),
       );
       expect(lastElements(buffer), 'a refused call leaves the buffer as it was').toEqual([7, 7]);
     });
@@ -466,8 +468,9 @@ describe('VertexObjectBuffer', () => {
       const before = contentsOf(target);
       const run = () => target.copy(source, 0.5);
 
-      expect(run).toThrow(RangeError);
-      expect(run, 'the message names the class, the method and the value').toThrow(/VertexObjectBuffer#copy\(\).*0\.5/);
+      expect(run, 'the message names the class, the method and the value').toThrow(
+        new RangeError('VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got 0.5'),
+      );
       // half an object is a whole number of elements wherever itemSize is even, so the write
       // would land inside object 0 and shift every value against the layout
       expect(contentsOf(target), 'no element of any buffer was written').toEqual(before);
@@ -481,8 +484,9 @@ describe('VertexObjectBuffer', () => {
       const before = contentsOf(buffer);
       const run = () => buffer.copyArray(new Float32Array(4), 'dynamic_float32', 0.5);
 
-      expect(run).toThrow(RangeError);
-      expect(run, 'the message names the class, the method and the value').toThrow(/VertexObjectBuffer#copyArray\(\).*0\.5/);
+      expect(run, 'the message names the class, the method and the value').toThrow(
+        new RangeError('VertexObjectBuffer#copyArray(): targetObjectOffset must be a non-negative integer, got 0.5'),
+      );
       expect(contentsOf(buffer), 'no element of any buffer was written').toEqual(before);
     });
 
@@ -490,8 +494,9 @@ describe('VertexObjectBuffer', () => {
       const target = new VertexObjectBuffer(makeDescriptor(), 4);
       const source = new VertexObjectBuffer(makeDescriptor(), 1);
 
-      expect(() => target.copy(source, offset)).toThrow(RangeError);
-      expect(() => target.copy(source, offset)).toThrow(`got ${offset}`);
+      expect(() => target.copy(source, offset)).toThrow(
+        new RangeError(`VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got ${offset}`),
+      );
     });
   });
 
@@ -520,8 +525,11 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => target.copy(source);
 
-      expect(run).toThrow(RangeError);
-      expect(run, 'the message names the class, the method and the buffer').toThrow(/VertexObjectBuffer#copy\(\).*"second"/);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(
+        new RangeError(
+          'VertexObjectBuffer#copy(): buffer "second" takes 4 elements per vertex in the source and 1 here: both buffers have to be built from the same vertex object description',
+        ),
+      );
       // as many objects as the target holds, so the object count alone lets this copy through
       expect(contentsOfFirst(target), 'the buffer that would have fit is untouched').toEqual(new Array(8).fill(7));
     });
@@ -551,8 +559,11 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => target.copy(source);
 
-      expect(run).toThrow(RangeError);
-      expect(run, 'the message names the class, the method and the buffer').toThrow(/VertexObjectBuffer#copy\(\).*"second"/);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(
+        new RangeError(
+          'VertexObjectBuffer#copy(): buffer "second" takes 2 elements per vertex in the source and 4 here: both buffers have to be built from the same vertex object description',
+        ),
+      );
       // the narrower source fits into the target element for element, so a length alone lets this
       // copy through — and every value of it would land at the stride of the wider layout
       expect(contentsOfFirst(target), 'the buffer that would have fit is untouched').toEqual(new Array(8).fill(7));
@@ -575,8 +586,11 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => target.copy(source);
 
-      expect(run).toThrow(TypeError);
-      expect(run, 'the message names the class, the method and the buffer').toThrow(/VertexObjectBuffer#copy\(\).*"second"/);
+      expect(run, 'the message names the class, the method and the buffer').toThrow(
+        new TypeError(
+          'VertexObjectBuffer#copy(): buffer "second" is of data type uint32 in the source and float32 here: both buffers have to be built from the same vertex object description',
+        ),
+      );
       expect(contentsOfFirst(target), 'the buffer of the matching type is untouched').toEqual(new Array(8).fill(7));
     });
 
@@ -594,9 +608,10 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => target.copy(source);
 
-      expect(run).toThrow(RangeError);
       expect(run, 'the message names the class, the method and both vertex counts').toThrow(
-        /VertexObjectBuffer#copy\(\): the source has a vertexCount of 1, this buffer one of 4:/,
+        new RangeError(
+          'VertexObjectBuffer#copy(): the source has a vertexCount of 1, this buffer one of 4: both buffers have to be built from the same vertex object description',
+        ),
       );
       expect(contentsOfFirst(target), 'the only buffer of the target is untouched').toEqual(new Array(32).fill(7));
     });
@@ -766,8 +781,9 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => vob.copyAttributes({v: [1, 2, 3, 4]}, -1);
 
-      expect(run).toThrow(RangeError);
-      expect(run).toThrow(/VertexObjectBuffer#copyAttributes\(\).*-1/);
+      expect(run).toThrow(
+        new RangeError('VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got -1'),
+      );
       expect(Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial])).toEqual(before);
     });
 
@@ -777,8 +793,9 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => vob.copyAttributes({v: [1, 2, 3, 4]}, 1.5);
 
-      expect(run).toThrow(RangeError);
-      expect(run).toThrow(/VertexObjectBuffer#copyAttributes\(\).*1\.5/);
+      expect(run).toThrow(
+        new RangeError('VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got 1.5'),
+      );
       expect(Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial])).toEqual(before);
     });
 
@@ -795,8 +812,11 @@ describe('VertexObjectBuffer', () => {
 
       const run = () => vob.toAttributeArrays(['v'], 2, 6);
 
-      expect(run).toThrow(RangeError);
-      expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#toAttributeArrays\(\)/);
+      expect(run, 'the message names the class and the method').toThrow(
+        new RangeError(
+          'VertexObjectBuffer#toAttributeArrays(): startIndex and endIndex must be integers with 0 ≤ startIndex ≤ endIndex ≤ 4, got 2 and 6',
+        ),
+      );
     });
 
     test('toAttributeArrays() turns away a negative start', () => {
@@ -1044,9 +1064,10 @@ describe('VertexObjectBuffer', () => {
         test('refuses an array of another type', () => {
           const build = () => new VertexObjectBuffer(makeSource(), buffersData({static_float32: new Uint32Array(floatLength)}));
 
-          expect(build).toThrow(TypeError);
           expect(build).toThrow(
-            /VertexObjectBuffer: buffer "static_float32" holds float32 data and takes a Float32Array, got Uint32Array/,
+            new TypeError(
+              'VertexObjectBuffer: buffer "static_float32" holds float32 data and takes a Float32Array, got Uint32Array',
+            ),
           );
           expect(() => new VertexObjectBuffer(makeSource(), buffersData({static_uint32: [1, 2, 3, 4, 5, 6]}))).toThrow(
             /takes a Uint32Array, got Array/,
@@ -1056,16 +1077,22 @@ describe('VertexObjectBuffer', () => {
         test('refuses an array shorter than the layout', () => {
           const build = () => new VertexObjectBuffer(makeSource(), buffersData({static_uint32: new Uint32Array(uintLength - 1)}));
 
-          expect(build).toThrow(RangeError);
-          expect(build).toThrow(/buffer "static_uint32" takes exactly 6 elements .*, got 5/);
+          expect(build).toThrow(
+            new RangeError(
+              'VertexObjectBuffer: buffer "static_uint32" takes exactly 6 elements (capacity × vertexCount × itemSize), got 5',
+            ),
+          );
         });
 
         test('refuses an array longer than the layout', () => {
           const build = () =>
             new VertexObjectBuffer(makeSource(), buffersData({static_float32: new Float32Array(floatLength + 1)}));
 
-          expect(build).toThrow(RangeError);
-          expect(build).toThrow(/buffer "static_float32" takes exactly 12 elements/);
+          expect(build).toThrow(
+            new RangeError(
+              'VertexObjectBuffer: buffer "static_float32" takes exactly 12 elements (capacity × vertexCount × itemSize), got 13',
+            ),
+          );
         });
 
         test('takes a typed array from another realm', () => {
@@ -1103,25 +1130,24 @@ describe('VertexObjectBuffer', () => {
         test.each([1.5, NaN, -1, Infinity, -Infinity])('refuses a capacity of %s and names it', (capacity) => {
           const build = () => new VertexObjectBuffer(makeSource(), capacity);
 
-          expect(build).toThrow(RangeError);
           // a string, not a RegExp: the text of 1.5 holds a dot
-          expect(build).toThrow(`VertexObjectBuffer: capacity must be a non-negative integer, got ${capacity}`);
+          expect(build).toThrow(new RangeError(`VertexObjectBuffer: capacity must be a non-negative integer, got ${capacity}`));
         });
 
         test.each([1.5, NaN, -1, undefined])('refuses a buffersData.capacity of %s and names it', (capacity) => {
           const build = () => new VertexObjectBuffer(makeSource(), {capacity, usedCount: 0, buffers: {}} as never);
 
-          expect(build).toThrow(RangeError);
           expect(build).toThrow(
-            `VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got ${String(capacity)}`,
+            new RangeError(`VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got ${String(capacity)}`),
           );
         });
 
         test('refuses a buffersData.capacity given as a string, quoting it', () => {
           const build = () => new VertexObjectBuffer(makeSource(), {capacity: '4', usedCount: 0, buffers: {}} as never);
 
-          expect(build).toThrow(RangeError);
-          expect(build).toThrow('VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got "4"');
+          expect(build).toThrow(
+            new RangeError('VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got "4"'),
+          );
         });
 
         test('takes a capacity of 0', () => {
@@ -1233,8 +1259,11 @@ describe('VertexObjectBuffer', () => {
           buffers: {static_uint8N: new Uint8Array(capacity * vertexCount * 6)},
         });
 
-      expect(build).toThrow(RangeError);
-      expect(build).toThrow(`exactly ${capacity * vertexCount * 8}`);
+      expect(build).toThrow(
+        new RangeError(
+          `VertexObjectBuffer: buffer "static_uint8N" takes exactly ${capacity * vertexCount * 8} elements (capacity × vertexCount × itemSize), got ${capacity * vertexCount * 6}`,
+        ),
+      );
     });
 
     test('toBuffersData() of one pool fits a second pool of the same description', () => {

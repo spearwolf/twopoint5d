@@ -441,8 +441,9 @@ describe('BitmapFont', () => {
     test('a kerning pair whose amount is no number', () => {
       const data = tinyFont();
       data.kernings = [{first: 65, second: 86, amount: Number.NaN}];
-      expect(() => new BitmapFont(data)).toThrow(RangeError);
-      expect(() => new BitmapFont(data)).toThrow('BitmapFont: the amount of kerning pair 0 must be a finite number, got NaN');
+      expect(() => new BitmapFont(data)).toThrow(
+        new RangeError('BitmapFont: the amount of kerning pair 0 must be a finite number, got NaN'),
+      );
     });
 
     test('a pair of chars the font lacks is kept and never met', () => {

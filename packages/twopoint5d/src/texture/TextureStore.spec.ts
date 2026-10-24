@@ -14,7 +14,13 @@ import {
   TextureResourceSubtypes,
 } from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
-import {TextureStore, type TextureStoreErrorEvent, TextureStoreEvents, type TextureStoreLoadOptions} from './TextureStore.js';
+import {
+  TextureStore,
+  type TextureStoreErrorEvent,
+  TextureStoreEvents,
+  type TextureStoreLease,
+  type TextureStoreLoadOptions,
+} from './TextureStore.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
 
@@ -1656,9 +1662,10 @@ describe('TextureStore', () => {
           defaultTextureClasses: [],
           items: {a: {imageUrl: 'a2.png'}, b: {tileSet: {tileWidth: 8, tileHeight: 8}}},
         });
-      expect(conflicting).toThrow(TypeError);
       expect(conflicting).toThrow(
-        'TextureStore: parse() found 1 item(s) of a conflicting type: "b" is an "image" resource and cannot become "tileset"',
+        new TypeError(
+          'TextureStore: parse() found 1 item(s) of a conflicting type: "b" is an "image" resource and cannot become "tileset"',
+        ),
       );
 
       expect(a.imageUrl).toBe('a.png');
@@ -1674,9 +1681,10 @@ describe('TextureStore', () => {
           defaultTextureClasses: ['linear'],
           items: {a: {tileSet: {tileWidth: 8, tileHeight: 8}}},
         });
-      expect(conflicting).toThrow(TypeError);
       expect(conflicting).toThrow(
-        'TextureStore: parse() found 1 item(s) of a conflicting type: "a" is an "image" resource and cannot become "tileset"',
+        new TypeError(
+          'TextureStore: parse() found 1 item(s) of a conflicting type: "a" is an "image" resource and cannot become "tileset"',
+        ),
       );
 
       expect(store.defaultTextureClasses).toEqual(['nearest']);
@@ -2168,8 +2176,11 @@ describe('TextureStore', () => {
         resource.imageUrl = 'other.png';
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow(/takes its "imageUrl" from the atlas json/);
+      expect(write).toThrow(
+        new TypeError(
+          'TextureResource "a" is an "atlas" resource and takes its "imageUrl" from the atlas json — write "overrideImageUrl" instead',
+        ),
+      );
 
       await flushMicrotasks();
       await flushMicrotasks();
@@ -3048,18 +3059,18 @@ describe('TextureStore', () => {
     ])('data %s throws a TypeError naming what items is', (_name, data, described) => {
       const store = new TextureStore();
 
-      expect(() => store.parse(data as never)).toThrow(TypeError);
       expect(() => store.parse(data as never)).toThrow(
-        `TextureStore: parse() got texture store data whose items is ${described} — items is an object of resource items by id`,
+        new TypeError(
+          `TextureStore: parse() got texture store data whose items is ${described} — items is an object of resource items by id`,
+        ),
       );
     });
 
     test('data that is no object throws a TypeError naming what it is', () => {
       const store = new TextureStore();
 
-      expect(() => store.parse(null as never)).toThrow(TypeError);
       expect(() => store.parse(null as never)).toThrow(
-        'TextureStore: parse() got null instead of texture store data, an object with an items object',
+        new TypeError('TextureStore: parse() got null instead of texture store data, an object with an items object'),
       );
     });
 
@@ -3077,9 +3088,10 @@ describe('TextureStore', () => {
       readyCount = 0;
 
       const data = {defaultTextureClasses: 'linear', items: {a: {imageUrl: 'a2.png'}, b: {imageUrl: 'b.png'}}};
-      expect(() => store.parse(data as never)).toThrow(TypeError);
       expect(() => store.parse(data as never)).toThrow(
-        'TextureStore: parse() got texture store data whose defaultTextureClasses is "linear" — defaultTextureClasses is an array of texture class names',
+        new TypeError(
+          'TextureStore: parse() got texture store data whose defaultTextureClasses is "linear" — defaultTextureClasses is an array of texture class names',
+        ),
       );
 
       expect(a.imageUrl).toBe('a.png');
@@ -3322,6 +3334,10 @@ describe('TextureStore', () => {
       expect(refusal).toEqual(new Error('TextureStore: no resource with id "a" — check your TextureStoreData.items keys.'));
       store.dispose();
     });
+  });
+
+  describe('what a listener of ready starts hears that ready', () => {
+    const noResourceX = new Error('TextureStore: no resource with id "x" — check your TextureStoreData.items keys.');
 
     test('a listener of ready hears why an item was refused', async () => {
       const store = new TextureStore();
@@ -3357,6 +3373,182 @@ describe('TextureStore', () => {
 
       const coords = await store.getAsync('a', 'imageCoords');
       expect(await heard).toBe(coords);
+      store.dispose();
+    });
+
+    test('on() holds its resource before resource:<id> goes out, and hands its callback the value', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      let refCount: number | undefined;
+      on(store, `${TextureStoreEvents.Resource}:a`, (resource: AnyTextureResource) => {
+        refCount = resource.refCount;
+      });
+      const callback = vi.fn();
+      once(store, TextureStoreEvents.Ready, () => {
+        store.on('a', 'imageCoords', callback);
+      });
+
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+
+      expect(refCount).toBe(1);
+      const coords = await store.getAsync('a', 'imageCoords');
+      expect(callback).toHaveBeenCalledExactlyOnceWith(coords);
+      store.dispose();
+    });
+
+    test('whenReady() resolves, and acquireAsync() holds the value of a built item and rejects for a refused one with the reason', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      let ready: Promise<unknown> | undefined;
+      let leaseA: Promise<unknown> | undefined;
+      let leaseB: Promise<unknown> | undefined;
+      once(store, TextureStoreEvents.Ready, () => {
+        ready = settleWithin(store.whenReady());
+        leaseA = settleWithin(store.acquireAsync('a', 'imageCoords'), 1000);
+        leaseB = settleWithin(store.acquireAsync('b', 'imageCoords'), 1000);
+      });
+
+      store.parse({items: {a: {imageUrl: 'a.png'}, b: {tileSet: 5}}} as never);
+
+      expect(await ready).toBe(store);
+      const lease = (await leaseA) as TextureStoreLease<unknown>;
+      expect(lease.value).toBe(await store.getAsync('a', 'imageCoords'));
+      const resource = await store.whenResource('a');
+      expect(resource.refCount).toBe(1);
+      lease.release();
+      expect(resource.refCount).toBe(0);
+      expect(await leaseB).toEqual(
+        new Error('TextureStore: no resource with id "b" — its item builds no resource: tileSet is 5, not an object'),
+      );
+      store.dispose();
+    });
+
+    test('a subscription given back at once leaves the others it started in their place', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      const released = vi.fn();
+      const heard = vi.fn();
+      let missing: Promise<unknown> | undefined;
+      once(store, TextureStoreEvents.Ready, () => {
+        const giveBack = store.on('a', 'imageCoords', released);
+        store.on('a', 'imageCoords', heard);
+        giveBack();
+        missing = settleWithin(store.getAsync('x', 'imageCoords'));
+      });
+
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+
+      const coords = await store.getAsync('a', 'imageCoords');
+      expect(released).not.toHaveBeenCalled();
+      expect(heard).toHaveBeenCalledExactlyOnceWith(coords);
+      expect(await missing).toEqual(noResourceX);
+      store.dispose();
+    });
+
+    test('dispose() behind a getAsync() and a whenReady() it started cancels both, and parse() returns', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      let asked: Promise<unknown> | undefined;
+      let ready: Promise<unknown> | undefined;
+      once(store, TextureStoreEvents.Ready, () => {
+        asked = settleWithin(store.getAsync('a', 'imageCoords'));
+        ready = settleWithin(store.whenReady());
+        store.dispose();
+      });
+
+      expect(() => store.parse({items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
+
+      expect(await asked).toEqual(
+        new Error('TextureStore: getAsync("a", "imageCoords") was cancelled: this store has been disposed'),
+      );
+      expect(await ready).toEqual(new Error('TextureStore: whenReady() was cancelled: this store has been disposed'));
+    });
+
+    test('what a subscription it started books in turn hears the same ready', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+      await store.getAsync('a', 'imageCoords');
+      let missing: Promise<unknown> | undefined;
+      let armed = false;
+      on(store, TextureStoreEvents.Ready, () => {
+        if (!armed) return;
+        armed = false;
+        store.on('a', 'imageCoords', () => {
+          missing ??= settleWithin(store.getAsync('x', 'imageCoords'));
+        });
+      });
+
+      armed = true;
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+
+      expect(missing).toBeDefined();
+      expect(await missing).toEqual(noResourceX);
+      store.dispose();
+    });
+
+    const throwOnActivate = () => {
+      const thrown = new Error('activate threw');
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      vi.spyOn(TextureResource.prototype, 'activate').mockImplementation(() => {
+        throw thrown;
+      });
+      return thrown;
+    };
+
+    test('a throw of what it starts goes to the console, and the parse goes on to the next one and to resource:<id>', async () => {
+      const thrown = throwOnActivate();
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const store = new TextureStore();
+      const errors: TextureStoreErrorEvent[] = [];
+      on(store, TextureStoreEvents.Error, (event: TextureStoreErrorEvent) => {
+        errors.push(event);
+      });
+      const announced = vi.fn();
+      on(store, `${TextureStoreEvents.Resource}:a`, announced);
+      let missing: Promise<unknown> | undefined;
+      once(store, TextureStoreEvents.Ready, () => {
+        store.on('a', 'imageCoords', () => {});
+        missing = settleWithin(store.getAsync('x', 'imageCoords'));
+      });
+
+      expect(() => store.parse({items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
+
+      expect(consoleError).toHaveBeenCalledExactlyOnceWith(
+        'TextureStore: a subscription that a listener of ready started threw as it heard that ready — parse() goes on',
+        thrown,
+      );
+      expect(errors).toEqual([]);
+      expect(announced).toHaveBeenCalledOnce();
+      expect(await missing).toEqual(noResourceX);
+      store.dispose();
+    });
+
+    test('booked before the parse(), the same throw sends no error event either', () => {
+      throwOnActivate();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const store = new TextureStore();
+      const errors: TextureStoreErrorEvent[] = [];
+      on(store, TextureStoreEvents.Error, (event: TextureStoreErrorEvent) => {
+        errors.push(event);
+      });
+      store.on('a', 'imageCoords', () => {});
+
+      expect(() => store.parse({items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
+
+      expect(errors).toEqual([]);
       store.dispose();
     });
   });

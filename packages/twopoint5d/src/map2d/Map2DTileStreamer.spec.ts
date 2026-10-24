@@ -154,24 +154,20 @@ describe('Map2DTileStreamer', () => {
     test('a tile size that cannot be divided by is refused', () => {
       const create = () => new Map2DTileStreamer(0, 16);
 
-      expect(create).toThrow(RangeError);
-      expect(create).toThrow('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0');
+      expect(create).toThrow(new RangeError('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0'));
 
       const layer = new Map2DTileStreamer(8, 16);
       const write = () => (layer.tileWidth = 0);
 
-      expect(write).toThrow(RangeError);
-      expect(write).toThrow('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0');
+      expect(write).toThrow(new RangeError('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0'));
       expect(layer.tileWidth, 'tileWidth after a refused write').toBe(8);
     });
     test('an offset that is not finite is refused', () => {
       const createX = () => new Map2DTileStreamer(8, 16, NaN);
       const createY = () => new Map2DTileStreamer(8, 16, 0, NaN);
 
-      expect(createX).toThrow(RangeError);
-      expect(createX).toThrow('Map2DTileStreamer: xOffset must be a finite number, got NaN');
-      expect(createY).toThrow(RangeError);
-      expect(createY).toThrow('Map2DTileStreamer: yOffset must be a finite number, got NaN');
+      expect(createX).toThrow(new RangeError('Map2DTileStreamer: xOffset must be a finite number, got NaN'));
+      expect(createY).toThrow(new RangeError('Map2DTileStreamer: yOffset must be a finite number, got NaN'));
     });
     test('xOffset, yOffset', () => {
       let layer = new Map2DTileStreamer(1, 1);
@@ -225,10 +221,8 @@ describe('Map2DTileStreamer', () => {
       const writeX = () => (streamer.centerX = value);
       const writeY = () => (streamer.centerY = value);
 
-      expect(writeX).toThrow(RangeError);
-      expect(writeX).toThrow(`Map2DTileStreamer: centerX must be a finite number, got ${value}`);
-      expect(writeY).toThrow(RangeError);
-      expect(writeY).toThrow(`Map2DTileStreamer: centerY must be a finite number, got ${value}`);
+      expect(writeX).toThrow(new RangeError(`Map2DTileStreamer: centerX must be a finite number, got ${value}`));
+      expect(writeY).toThrow(new RangeError(`Map2DTileStreamer: centerY must be a finite number, got ${value}`));
       expect(streamer.centerX, 'centerX after a refused write').toBe(3);
       expect(streamer.centerY, 'centerY after a refused write').toBe(4);
     });

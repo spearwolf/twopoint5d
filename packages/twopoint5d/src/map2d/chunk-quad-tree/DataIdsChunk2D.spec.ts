@@ -30,10 +30,8 @@ describe('DataIdsChunk2D', () => {
     const tooShort = () => new DataIdsChunk2D({x: 0, y: 0, width: 2, height: 2, uint32Arr: new Uint32Array(3)});
     const tooLong = () => new DataIdsChunk2D({x: 0, y: 0, width: 2, height: 2, uint32Arr: new Uint32Array(5)});
 
-    expect(tooShort).toThrow(RangeError);
-    expect(tooShort).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3');
-    expect(tooLong).toThrow(RangeError);
-    expect(tooLong).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 5');
+    expect(tooShort).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3'));
+    expect(tooLong).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 5'));
   });
 
   test('refuses base64 data that does not hold width × height ids on the first read', () => {
@@ -42,11 +40,9 @@ describe('DataIdsChunk2D', () => {
 
     const read = () => chunk.readDataIdAt(0, 0);
 
-    expect(read).toThrow(RangeError);
-    expect(read).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3');
+    expect(read).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3'));
     // the refusal is not cached: the next read throws again
-    expect(read).toThrow(RangeError);
-    expect(read).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3');
+    expect(read).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3'));
   });
 
   test('reads the ids of base64 data row by row', () => {

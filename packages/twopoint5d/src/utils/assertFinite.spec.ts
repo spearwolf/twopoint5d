@@ -5,8 +5,7 @@ describe('assertFinite', () => {
   test('a string is quoted in the message', () => {
     const check = () => assertFinite('abc', 'Subject', 'x');
 
-    expect(check).toThrow(RangeError);
-    expect(check).toThrow('Subject: x must be a finite number, got "abc"');
+    expect(check).toThrow(new RangeError('Subject: x must be a finite number, got "abc"'));
   });
 
   test.each([

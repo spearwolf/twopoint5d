@@ -32,18 +32,15 @@ describe('Map2DSpatialHashGrid', () => {
   test('a tile size that cannot be divided by is refused', () => {
     const create = () => new Map2DSpatialHashGrid(0, 100);
 
-    expect(create).toThrow(RangeError);
-    expect(create).toThrow('Map2DSpatialHashGrid: tileWidth must be a finite number above 0, got 0');
+    expect(create).toThrow(new RangeError('Map2DSpatialHashGrid: tileWidth must be a finite number above 0, got 0'));
   });
 
   test('an offset that is not finite is refused', () => {
     const createX = () => new Map2DSpatialHashGrid(10, 10, NaN);
     const createY = () => new Map2DSpatialHashGrid(10, 10, 0, Infinity);
 
-    expect(createX).toThrow(RangeError);
-    expect(createX).toThrow('Map2DSpatialHashGrid: xOffset must be a finite number, got NaN');
-    expect(createY).toThrow(RangeError);
-    expect(createY).toThrow('Map2DSpatialHashGrid: yOffset must be a finite number, got Infinity');
+    expect(createX).toThrow(new RangeError('Map2DSpatialHashGrid: xOffset must be a finite number, got NaN'));
+    expect(createY).toThrow(new RangeError('Map2DSpatialHashGrid: yOffset must be a finite number, got Infinity'));
   });
 
   test('add', () => {
@@ -307,9 +304,10 @@ describe('Map2DSpatialHashGrid', () => {
       const large: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 300, 300)};
       const add = () => grid.add(small, large);
 
-      expect(add).toThrow(RangeError);
       expect(add).toThrow(
-        'Map2DSpatialHashGrid: the aabb of a renderable reaches into 90000 cells, more than maxCellsPerRenderable (65536) — give the grid larger cells or raise maxCellsPerRenderable',
+        new RangeError(
+          'Map2DSpatialHashGrid: the aabb of a renderable reaches into 90000 cells, more than maxCellsPerRenderable (65536) — give the grid larger cells or raise maxCellsPerRenderable',
+        ),
       );
       expect(grid.getTile(0, 0), 'the cell of the small one').toBeUndefined();
 
@@ -330,9 +328,8 @@ describe('Map2DSpatialHashGrid', () => {
       grid.maxCellsPerRenderable = 100;
       const write = () => (grid.maxCellsPerRenderable = value);
 
-      expect(write).toThrow(RangeError);
       expect(write).toThrow(
-        `Map2DSpatialHashGrid: maxCellsPerRenderable must be a whole number above 0 or Infinity, got ${value}`,
+        new RangeError(`Map2DSpatialHashGrid: maxCellsPerRenderable must be a whole number above 0 or Infinity, got ${value}`),
       );
       expect(grid.maxCellsPerRenderable).toBe(100);
     });

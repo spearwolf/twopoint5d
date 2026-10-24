@@ -160,9 +160,10 @@ describe('FrameTable', () => {
     test('refuses a table of more than 2^24 texels', () => {
       // floor((2^24 − 1) / 3) frames fit; one more does not
       const table = new FrameTable(new Array(5_592_406).fill(new TextureCoords(root, 0, 0, 8, 8)));
-      expect(() => table.bakeDataTexture()).toThrow(RangeError);
       expect(() => table.bakeDataTexture()).toThrow(
-        'FrameTable: 5592406 frames take 16777219 texels — a table holds at most 16777216 (2^24) texels, which keeps the frame index the shader reads as a float exact; split them into several tables',
+        new RangeError(
+          'FrameTable: 5592406 frames take 16777219 texels — a table holds at most 16777216 (2^24) texels, which keeps the frame index the shader reads as a float exact; split them into several tables',
+        ),
       );
     });
 

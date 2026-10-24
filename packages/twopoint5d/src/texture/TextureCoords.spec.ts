@@ -266,9 +266,8 @@ describe('TextureCoords', () => {
       const tex = makeTex(0);
       const target = [7, 7, 7];
 
-      expect(() => tex.getTexCoords(target)).toThrow(RangeError);
       expect(() => tex.getTexCoords(target)).toThrow(
-        'TextureCoords: getTexCoords() got a target of 3 values, s, t, u and v are 4',
+        new RangeError('TextureCoords: getTexCoords() got a target of 3 values, s, t, u and v are 4'),
       );
       expect(target).toEqual([7, 7, 7]);
     });

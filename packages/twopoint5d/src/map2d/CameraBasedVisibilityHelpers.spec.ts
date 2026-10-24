@@ -489,8 +489,9 @@ describe('CameraBasedVisibilityHelpers', () => {
         helpers.maxDebugHelpers = value;
       };
 
-      expect(set).toThrow(RangeError);
-      expect(set).toThrow(`${subject}: maxDebugHelpers must be a whole number of 0 or more, or Infinity, got ${String(value)}`);
+      expect(set).toThrow(
+        new RangeError(`${subject}: maxDebugHelpers must be a whole number of 0 or more, or Infinity, got ${String(value)}`),
+      );
       expect(helpers.maxDebugHelpers).toBe(9);
     });
 
@@ -513,8 +514,7 @@ describe('CameraBasedVisibilityHelpers', () => {
         const set = () => {
           helpers[name] = value;
         };
-        expect(set).toThrow(RangeError);
-        expect(set).toThrow(`${subject}: ${name} must be a finite number, got ${String(value)}`);
+        expect(set).toThrow(new RangeError(`${subject}: ${name} must be a finite number, got ${String(value)}`));
         expect(helpers[name]).toBe(start);
       }
     });
