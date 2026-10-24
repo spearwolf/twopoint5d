@@ -961,6 +961,21 @@ describe('Display', () => {
       vi.stubGlobal('window', {devicePixelRatio, performance});
     };
 
+    it('leaves a canvas apart from the document unread and measures it 0 × 0, and measures it once it is in', () => {
+      const {display, canvas} = makeDisplayOnCanvas({isConnected: false});
+
+      expect(canvas.getBoundingClientRect, 'getBoundingClientRect()').not.toHaveBeenCalled();
+      expect(getComputedStyleStub, 'getComputedStyle()').not.toHaveBeenCalled();
+      expect(display.width).toBe(0);
+      expect(display.height).toBe(0);
+
+      Object.assign(canvas, {isConnected: true});
+      display.resize();
+
+      expect(display.width).toBe(320);
+      expect(display.height).toBe(200);
+    });
+
     it('clamps the drawing buffer to MaxResolution in device pixels', () => {
       stubDevicePixelRatio(2);
       const {display, renderer} = makeDisplay({resizeTo: () => [5000, 100]});

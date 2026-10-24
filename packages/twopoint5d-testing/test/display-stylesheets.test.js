@@ -38,6 +38,10 @@ describe('Display — where the rules of a display live', function () {
     }, 'the constructor').to.not.throw();
 
     document.body.appendChild(host);
+    // before the first frame: WebKit on macOS works the style of the page out anew while it
+    // draws one, which hid a root that had left its adopted sheets out until then
+    expect(getComputedStyle(canvas).touchAction, 'the touch-action of the canvas once the host is in').to.equal('none');
+
     await display.start();
     await display.nextFrame();
 

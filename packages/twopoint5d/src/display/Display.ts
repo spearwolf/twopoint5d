@@ -63,6 +63,15 @@ function isHTMLElement(value: unknown): value is HTMLElement {
   return view != null && value instanceof view.HTMLElement;
 }
 
+// An element apart from the document measures 0 × 0 and has no style to read, and the display
+// leaves it unread. WebKit gets more out of such a read: once the style or the layout of an element
+// in a shadow root has been worked out while its host is not in the document, that root leaves its
+// adopted stylesheets out after the host goes in — the rules of Stylesheets with them — until its
+// adoptedStyleSheets are written again. Only an element that says it is apart counts as apart
+function isApart(element: Element): boolean {
+  return element.isConnected === false;
+}
+
 // one message for every member that refuses to answer once the display is gone, so the class
 // and the state are always in the text a caller reads out of a foreign stack
 function disposedError(member: string): Error {
@@ -1442,6 +1451,11 @@ export class Display {
     } else {
       const element = this.#sizeSourceElement;
       if (element != null) {
+        if (isApart(element)) {
+          this.#measuredWidth = 0;
+          this.#measuredHeight = 0;
+          return;
+        }
         // the content area: the client rect minus padding and border, both in the scale the
         // transforms give the element
         const rect = element.getBoundingClientRect();
@@ -1493,10 +1507,11 @@ export class Display {
     let cssWidth = wPx;
     let cssHeight = hPx;
 
-    const canvasStyle = this.#getCanvasStyle(canvas);
-    const canvasIsContentBox = getIsContentBox(canvasStyle);
-    const canvasHorizontalInnerMargin = getHorizontalInnerMargin(canvasStyle);
-    const canvasVerticalInnerMargin = getVerticalInnerMargin(canvasStyle);
+    // a canvas apart from the document has neither borders nor padding to read
+    const canvasStyle = isApart(canvas) ? undefined : this.#getCanvasStyle(canvas);
+    const canvasIsContentBox = canvasStyle != null && getIsContentBox(canvasStyle);
+    const canvasHorizontalInnerMargin = canvasStyle != null ? getHorizontalInnerMargin(canvasStyle) : 0;
+    const canvasVerticalInnerMargin = canvasStyle != null ? getVerticalInnerMargin(canvasStyle) : 0;
 
     if (canvasIsContentBox && canvas !== sizeRefElement) {
       wPx -= canvasHorizontalInnerMargin;
