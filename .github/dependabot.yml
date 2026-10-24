@@ -35,6 +35,12 @@ updates:
       # manifests that name it: the root and apps/lookbook
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # 22.0.1 adds an index.d.mts that exports sinon as a default only, so the named
+      # imports of the specs (`import {createSandbox} from 'sinon'`) no longer compile
+      # under NodeNext, although the ESM build of sinon exports them. Drop the entry once
+      # a later release types the named exports again
+      - dependency-name: '@types/sinon'
+        versions: ['22.0.1']
   # keeps the commit SHAs the workflows pin, and the version comment next to each, current
   - package-ecosystem: github-actions
     directory: /

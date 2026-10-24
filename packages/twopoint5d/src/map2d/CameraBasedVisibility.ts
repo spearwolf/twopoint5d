@@ -1148,7 +1148,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const dz = az - bz;
     const sumSq = sx * sx + sy * sy + sz * sz;
     const differenceSq = dx * dx + dy * dy + dz * dz;
-    stop[SEARCH_STOP_FOOTPRINT_DIAGONAL] = Math.sqrt(sumSq > differenceSq ? sumSq : differenceSq);
+    stop[SEARCH_STOP_FOOTPRINT_DIAGONAL] = Math.sqrt(Math.max(sumSq, differenceSq));
     this.#updateSearchStop();
   }
 

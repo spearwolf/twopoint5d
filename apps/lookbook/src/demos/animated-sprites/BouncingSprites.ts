@@ -69,7 +69,7 @@ export class BouncingSprites {
   }
 
   destroySprites(count: number) {
-    count = count > this.sprites.length ? this.sprites.length : count;
+    count = Math.min(count, this.sprites.length);
 
     for (let i = 0; i < count; i++) {
       const spriteIndex = Math.floor(Math.random() * this.sprites.length);
