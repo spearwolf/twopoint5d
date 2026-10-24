@@ -105,6 +105,15 @@ clean → ci:checks → test:coverage → test:allocations → test:browser
 ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableTypes → lintPkg → test:scripts
 ```
 
+The chain is the script `ci:gate`; `pnpm run ci` runs it through
+`scripts/ci/runExclusive.mjs`, which holds the lock `.nx/ci-gate.lock` while the gate
+runs. Two gates in one checkout break each other: the `clean` of the second deletes the
+`dist/` the browser tests of the first are loading, and stopping them leaves Nx a failed
+run beside a passing one of the same hash, which it reports as a flaky task. So a second
+`pnpm run ci` refuses with exit code 1 while the process the lock names lives, and takes
+the lock over once that process is gone. A second gate goes into a `git worktree`, which
+has a `dist/` and a lock of its own. `ci:gate` called directly takes no lock.
+
 - `lint` = `biome ci .`: Biome checks the formatting of every `.ts`, `.js`, `.mjs`,
   `.astro`, `.json`, `.jsonc` and `.css` file outside the ignores in `biome.jsonc`,
   lints all of them but the stylesheets, and writes nothing; `pnpm format` writes.
@@ -157,22 +166,21 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
   relative paths and its own `#` subpath imports only. The library reaches its
   consumers with peer dependencies only, and the non-blocking audit step in CI relies on
   that (see below).
-- `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the
-  publish pipeline's helpers and of `makePackageJson.mjs`,
-  `checkPeerDependenciesOnly.mjs` and `checkNameableTypes.mjs` themselves (§4, §6), of
-  the CI cache server and its entry script, of the helpers of the code block check and
-  of the Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`), of
-  the helpers of the lookbook's preview generator
-  (`scripts/lookbook/demoPreviewConfig.mjs`, `previewServer.mjs`, `webpSize.mjs`), the
-  check that the publish script and its helpers import nothing but Node's built-ins, the
-  check that every tracked Markdown file is an input of `twopoint5d-testing:typecheck`,
-  the check that every file git tracks under
+- `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the publish
+  pipeline's helpers and of `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs` and
+  `checkNameableTypes.mjs` themselves (§4, §6), of the CI cache server and its entry
+  script, of the lock of the gate, of the helpers of the code block check and of the
+  Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`), of the
+  helpers of the lookbook's preview generator (`scripts/lookbook/demoPreviewConfig.mjs`,
+  `previewServer.mjs`, `webpSize.mjs`), the check that the publish script and its helpers
+  import nothing but Node's built-ins, the check that every tracked Markdown file is an
+  input of `twopoint5d-testing:typecheck`, the check that every file git tracks under
   `packages/twopoint5d/src/` is an input of the library's `test`, `coverage` and
   `allocations`, the check that every capitalised tag of the lookbook demos names an
-  export of the library, the check that the lookbook serves the script `RainbowLine`
-  loads at runtime, the check of the lookbook's preview images against its demos, their
-  ids and the size of the card, and the check of the view-transition names of the
-  lookbook's navbar against its two pages and the stylesheets.
+  export of the library, the check that the lookbook serves the script `RainbowLine` loads
+  at runtime, the check of the lookbook's preview images against its demos, their ids and
+  the size of the card, and the check of the view-transition names of the lookbook's
+  navbar against its two pages and the stylesheets.
 - `test:coverage` runs the library's Vitest project `specs` once, with coverage, against
   the thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the
   gate: it runs every spec without coverage. The thresholds sit two points under the level
@@ -417,7 +425,8 @@ it — a version bump whose deploy waits behind another would never be published
   no tag.
 
 Changes under `scripts/` are changes to the publish pipeline. Treat them accordingly.
-The exception is `scripts/ci/`, which only the CI workflow runs.
+The exception is `scripts/ci/`: the cache server of the CI workflow and the lock of the
+local gate (§3), neither of which publishes anything.
 
 ## 5. Shared dependency versions
 
@@ -543,13 +552,14 @@ no `test` target, so `pnpm test` leaves all of them out. The seven are:
   helpers to imports of Node's built-ins and of each other, because the publish job of
   the deploy installs nothing (§4).
 
-Four specs start a script itself, as a child process: `makePackageJson.mjs` in a throwaway
+Five specs start a script itself, as a child process: `makePackageJson.mjs` in a throwaway
 project directory, `checkPeerDependenciesOnly.mjs` against a throwaway manifest,
-`checkNameableTypes.mjs` against throwaway declaration files and
-`scripts/ci/nxCacheServer.mjs` with a command line it refuses, because their exit codes,
-their messages and the manifest the first one does not write are wiring that no helper
-test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon as its
-arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file system.
+`checkNameableTypes.mjs` against throwaway declaration files,
+`scripts/ci/nxCacheServer.mjs` with a command line it refuses and
+`scripts/ci/runExclusive.mjs` around Node one-liners and a throwaway lock, because their
+exit codes, their messages and the manifest the first one does not write are wiring that
+no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon
+as its arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 

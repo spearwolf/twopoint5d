@@ -57,16 +57,16 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server, the docs' code block check, the Nameable-Types check and the lookbook's
   preview generator (`scripts/**/*.test.mjs`), plus specs that start
-  `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs` and
-  `nxCacheServer.mjs` as child processes, one that checks the lookbook's vendored
-  `rainbow-line` script, one that holds the tags and routes of the lookbook's demo
-  metadata to the library's exports, one that holds the preview images of the lookbook to
-  its demos, ids and card size, one that holds the view-transition names of the lookbook's
-  navbar to its two pages and the stylesheets to those names, one that asks Nx whether
-  every tracked Markdown file is an input of the docs' type check, one that asks Nx
-  whether every tracked file under the library's `src/` is an input of its Vitest targets,
-  and one that holds the publish script to Node's built-ins; the Nx project `scripts` has
-  no `test` target, so `pnpm test` leaves them out
+  `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs`,
+  `nxCacheServer.mjs` and `runExclusive.mjs` as child processes, one that checks the
+  lookbook's vendored `rainbow-line` script, one that holds the tags and routes of the
+  lookbook's demo metadata to the library's exports, one that holds the preview images of
+  the lookbook to its demos, ids and card size, one that holds the view-transition names
+  of the lookbook's navbar to its two pages and the stylesheets to those names, one that
+  asks Nx whether every tracked Markdown file is an input of the docs' type check, one
+  that asks Nx whether every tracked file under the library's `src/` is an input of its
+  Vitest targets, and one that holds the publish script to Node's built-ins; the Nx
+  project `scripts` has no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
@@ -92,7 +92,9 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, then `ci:checks` (lint,
   build, typecheck, checkPkgTypes, checkNameableTypes, lintPkg, test:scripts), then
   test:coverage, test:allocations, test:browser. Run it before committing. CI runs the
-  four parts as parallel jobs, `ci:checks` once on Node 24 and once on Node 26.
+  four parts as parallel jobs, `ci:checks` once on Node 24 and once on Node 26. Locally
+  it runs the chain `ci:gate` under the lock `.nx/ci-gate.lock`
+  (`scripts/ci/runExclusive.mjs`) and refuses while another run holds it in this checkout.
 
 Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
 explicit instruction.
@@ -154,7 +156,8 @@ explicit instruction.
 - **Publishing** happens from the generated `dist/`, never from `packages/twopoint5d/`.
   `scripts/` is the publish pipeline — changes there can break the published package.
   `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions: the Nx cache server
-  of the CI workflow, and the check of the docs' code blocks, which publishes nothing.
+  of the CI workflow and the lock of the local gate, and the check of the docs' code
+  blocks, none of which publishes anything.
   `scripts/publishNpmPkg.mjs` and `scripts/publishNpmPkg/` import nothing but Node's
   built-ins (`node:`) and each other, because the publish job of the deploy installs
   nothing; `builtinImportsOnly.test.mjs` fails on anything else.
@@ -196,6 +199,15 @@ explicit instruction.
   A fence counts where CommonMark sees one: indented at most three columns past
   the start of its line or past the content of its list item; a line indented
   further is code of an indented block and opens no block.
+- **One gate per checkout.** Two runs side by side in one checkout — of `pnpm run ci`, of
+  `clean`, of a build — delete the `dist/` the other is reading. Nx then records the run
+  that broke as failed beside a passing run of the same hash and reports a flaky task
+  that is none. `pnpm run ci` refuses a second run by its lock; `ci:gate` called directly
+  and the single targets take no lock, so do not start them beside a running gate. Work
+  that has to run in parallel — a second agent, a second gate — goes into a `git
+  worktree`, which has a `dist/` and a lock of its own. Stop a run of your own through
+  its own handle (its background task, its pid), never by a pattern such as `pkill -f
+  web-test-runner`, which reaches the runs of others as well.
 - **Commits** follow [Conventional
   Commits](https://www.conventionalcommits.org/en/v1.0.0/). Code, comments and docs are
   written in English.
