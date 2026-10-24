@@ -45,7 +45,7 @@ describe('definePass()', () => {
   });
 
   test('refuses a pass without a name, two features of one name and a feature it leaves out twice', () => {
-    expect(() => definePass({name: '', features: []})).toThrow('definePass: a pass needs a name');
+    expect(() => definePass({name: '', features: []})).toThrow('definePass: a pass needs a name, got ""');
     expect(() => definePass({name: 'p', features: [mask, mask]})).toThrow('definePass: pass "p" lists feature "mask" twice');
     expect(() => definePass({name: 'p', features: [], without: ['tint', 'tint']})).toThrow(
       'definePass: pass "p" leaves out feature "tint" twice',
@@ -90,7 +90,7 @@ describe('definePass()', () => {
 
     expect(definePass({name: 'p', features: [], visible}).visible).toBe(visible);
     expect(() => definePass({name: 'p', features: [], visible: true as never})).toThrow(
-      'definePass: the visible of pass "p" is no function',
+      'definePass: the visible of pass "p" is no function, got true',
     );
   });
 
@@ -200,7 +200,7 @@ describe('definePass()', () => {
         'definePass: pass "moon" renames the uniform "groundPlane" to an empty name',
       );
       expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: 7 as never}})).toThrow(
-        'definePass: pass "moon" renames the uniform "groundPlane" to a name that is not a string',
+        'definePass: pass "moon" renames the uniform "groundPlane" to a name that is not a string, got 7',
       );
       expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {groundPlane: 'moon', shadowLight: 'moon'}})).toThrow(
         'definePass: pass "moon" renames the uniforms "groundPlane" and "shadowLight" both to "moon"',

@@ -43,8 +43,8 @@ export interface SpritePass {
  *
  * @throws a `TypeError` for a pass that is no object, a name that is missing, `features`, `without`,
  * `uniformNames` or `material` that cannot be read as what they are, or a feature that is
- * malformed, brings data, repeats a name or is a second placement, a RangeError for a
- * `renderOrder` that is no finite number
+ * malformed, brings data, repeats a name or is a second placement, each quoting the value it
+ * refuses, a RangeError for a `renderOrder` that is no finite number
  */
 export function definePass(pass: SpritePass): SpritePass {
   checkPass(pass, 'definePass');

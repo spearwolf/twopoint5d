@@ -1081,7 +1081,9 @@ the kind and, besides every three.js material parameter, its own options: `name`
 `uniforms` to start with, and `resources` — the uniforms and textures of a `SpriteResources`
 shared with other materials, which then stay the caller's. It takes only a kind out of
 `defineSprite()`, its options as an object, `resources` as a `SpriteResources` and `textures` and
-`uniforms` as objects by name; anything else throws a `TypeError`.
+`uniforms` as objects by name, each start value of the type of its uniform — a finite number for a
+`float`, 2 to 4 finite numbers for a `vec2` to `vec4`; anything else throws a `TypeError`. A start
+value of `undefined` or `null` keeps the one the feature declares.
 
 ```ts check
 import {
@@ -2026,8 +2028,8 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`initialize()`** — writes the neutral values into a slot `createSprite()` hands out: a freed
   slot comes back with the values of its last sprite, and without `initialize()` a new sprite
   keeps them. It runs for every sprite created, so it allocates nothing.
-- **`uniforms`** — start values by name: a number for a `float`, 2 to 4 numbers for a `vec2` to
-  `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0, shared:
+- **`uniforms`** — start values by name: a finite number for a `float`, 2 to 4 finite numbers for a
+  `vec2` to `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0, shared:
   true}`: the features that declare a name shared, with the same type and start value, hold one
   uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`, so
   a wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name, or
@@ -2076,7 +2078,8 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
 A field of the wrong type — a stage without a `transform`, a method that is no function, a texture
 declared with anything but `{}` or `{needsImage: true}` — is refused with a `TypeError` naming the
-feature and the field. `defineSprite()`, `definePass()` and the placement swap hold a feature that
+feature and the field and quoting the value. `defineSprite()`, `definePass()` and the placement
+swap hold a feature that
 never passed through `defineFeature()` to the same rules.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,

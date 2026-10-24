@@ -365,12 +365,12 @@ describe('defineSprite()', () => {
       [
         'a method that is no function',
         {name: 'odd', methods: {go: 1}},
-        'defineSprite: the method "go" of feature "odd" is no function',
+        'defineSprite: the method "go" of feature "odd" is no function, got 1',
       ],
       [
         'a colorSource that is no function',
         {name: 'odd', colorSource: 5},
-        'defineSprite: the colorSource of feature "odd" is no function',
+        'defineSprite: the colorSource of feature "odd" is no function, got 5',
       ],
       ['null', null, 'defineSprite: a feature is an object with a name, got null'],
     ])(

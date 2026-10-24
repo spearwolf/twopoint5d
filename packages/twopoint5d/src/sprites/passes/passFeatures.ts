@@ -34,7 +34,7 @@ const isStringList = (value: unknown): value is readonly string[] =>
  *
  * @internal
  *
- * @throws a `TypeError` naming the pass and the field, a `RangeError` for a `renderOrder` that is no
+ * @throws a `TypeError` naming the pass and the field and quoting the value it refuses, a `RangeError` for a `renderOrder` that is no
  * finite number
  */
 export function checkPass(pass: unknown, where: string): asserts pass is SpritePass {
@@ -42,9 +42,9 @@ export function checkPass(pass: unknown, where: string): asserts pass is SpriteP
     throw new TypeError(`${where}: a pass is an object with a name and features, got ${describeValue(pass)}`);
   }
   const {name, visible, features, without, uniformNames, material, renderOrder} = pass;
-  if (typeof name !== 'string' || name === '') throw new TypeError(`${where}: a pass needs a name`);
+  if (typeof name !== 'string' || name === '') throw new TypeError(`${where}: a pass needs a name, got ${describeValue(name)}`);
   if (visible != null && typeof visible !== 'function') {
-    throw new TypeError(`${where}: the visible of pass "${name}" is no function`);
+    throw new TypeError(`${where}: the visible of pass "${name}" is no function, got ${describeValue(visible)}`);
   }
   // an array and not any iterable: the code that draws the pass calls `find()`, `map()` and `filter()`
   if (!Array.isArray(features)) {
@@ -98,7 +98,9 @@ export function checkPass(pass: unknown, where: string): asserts pass is SpriteP
       throw new TypeError(`${where}: pass "${name}" renames the uniform "${uniform}", which no feature of the pass declares`);
     }
     if (typeof target !== 'string') {
-      throw new TypeError(`${where}: pass "${name}" renames the uniform "${uniform}" to a name that is not a string`);
+      throw new TypeError(
+        `${where}: pass "${name}" renames the uniform "${uniform}" to a name that is not a string, got ${describeValue(target)}`,
+      );
     }
     if (target === '') {
       throw new TypeError(`${where}: pass "${name}" renames the uniform "${uniform}" to an empty name`);

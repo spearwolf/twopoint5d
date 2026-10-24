@@ -25,7 +25,7 @@ import {describeValue} from '../../utils/describeValue.js';
 import {isObject} from '../../utils/isObject.js';
 import {checkFeature} from '../checkFeature.js';
 import {textureShapeKey} from '../textureShapeKey.js';
-import {collectSpriteDeclarations} from '../spriteDeclarations.js';
+import {collectSpriteDeclarations, isUniformValue} from '../spriteDeclarations.js';
 import type {SpriteFeature, SpriteUniformValue} from '../SpriteFeature.js';
 
 export type SpriteUniformNode =
@@ -37,7 +37,11 @@ export type SpriteUniformNode =
 export interface SpriteResourcesOptions {
   /** The textures to start with, by declared name. They stay the caller's. */
   textures?: Readonly<Record<string, Texture | undefined>>;
-  /** Start values that replace the declared ones, by declared name. */
+  /**
+   * Start values that replace the declared ones, by declared name, each of the type of its uniform:
+   * a finite number for a `float`, a list of 2 to 4 finite numbers for a `vec2` to `vec4`.
+   * `undefined` or `null` keeps the declared one.
+   */
   uniforms?: Readonly<Record<string, SpriteUniformValue | undefined>>;
 }
 
@@ -119,9 +123,10 @@ export class SpriteResources {
    *
    * @throws a `TypeError` for `features` that are no list, for a feature that is malformed — see
    *   `defineFeature()` —, for options that are no object and for `textures` or `uniforms` that
-   *   are no object by name, and for a start value of another shape than its uniform; an `Error`
-   *   for a uniform or a texture no feature declares, and for declarations of one name that
-   *   collide — each before any signal is built.
+   *   are no object by name, and for a start value in `options.uniforms` that is not of the type of
+   *   its uniform — a finite number for a `float`, 2 to 4 finite numbers for a `vec2` to `vec4` —;
+   *   an `Error` for a uniform or a texture no feature declares, and for declarations of one name
+   *   that collide — each before any signal is built.
    */
   constructor(features: Iterable<SpriteFeature>, options: SpriteResourcesOptions = {}, where = 'SpriteResources') {
     this.#where = where;
@@ -152,9 +157,16 @@ export class SpriteResources {
     this.uniforms = Object.freeze(uniforms);
 
     for (const [name, value] of Object.entries(options.uniforms ?? {})) {
-      if (value === undefined) continue;
+      // undefined and null keep the start value the feature declares
+      if (value == null) continue;
       const size = this.#assertUniform(name);
-      if (sizeOfValue(value) !== size) throw this.#shapeError(name, size);
+      // the rule of a declared start value: a string or a list of anything but finite numbers has a
+      // length as well, and would reach the vector as it is
+      if (!isUniformValue(value) || sizeOfValue(value) !== size) {
+        throw new TypeError(
+          `${where}: the uniform "${name}" is a ${VECTOR_TYPES[size - 1]} and takes ${size === 1 ? 'a finite number' : `${size} finite numbers`} as its start value, got ${describeValue(value)}`,
+        );
+      }
       this.setUniform(name, ...((typeof value === 'number' ? [value] : value) as [number, number?, number?, number?]));
     }
 

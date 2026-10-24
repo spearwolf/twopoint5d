@@ -12,7 +12,8 @@ export interface SpriteDeclarations {
 
 const VECTOR_TYPES = ['float', 'vec2', 'vec3', 'vec4'] as const;
 
-const isUniformValue = (value: unknown): value is SpriteUniformValue =>
+/** Whether `value` is a start value of a uniform: a finite number, or a list of 2 to 4 finite numbers. @internal */
+export const isUniformValue = (value: unknown): value is SpriteUniformValue =>
   (typeof value === 'number' && Number.isFinite(value)) ||
   (Array.isArray(value) &&
     value.length >= 2 &&

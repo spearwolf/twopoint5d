@@ -37,7 +37,10 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
   name?: string;
   /** The textures to start with, by the names the features declare. They stay the caller's. */
   textures?: Readonly<Record<string, Texture | undefined>>;
-  /** Start values of uniforms, by the names the features declare. */
+  /**
+   * Start values of uniforms, by the names the features declare, each of the type of its uniform —
+   * see `SpriteResourcesOptions`.
+   */
   uniforms?: Readonly<Record<string, SpriteUniformValue | undefined>>;
   /** Another placement to start with — see {@link FeatureSpritesMaterial.placement}. */
   placement?: SpriteFeature;

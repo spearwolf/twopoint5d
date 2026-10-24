@@ -216,7 +216,7 @@ describe('FeatureSprites', () => {
 
     expect(() => {
       sprites.placement = {name: 'odd', placement: 5} as never;
-    }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function'));
+    }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'));
     expect(sprites.placement).toBe(FlatPlacement);
     expect(sprites.passes['plain']!.material.placement).toBe(FlatPlacement);
     sprites.dispose();
@@ -318,7 +318,7 @@ describe('FeatureSprites', () => {
       );
       expect(() => {
         sprites.placement = {name: 'odd', placement: 5} as never;
-      }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function'));
+      }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'));
       expect(sprites.placement).toBeUndefined();
     });
 
@@ -462,10 +462,10 @@ describe('FeatureSprites', () => {
       const odd = {name: 'odd', placement: 5} as never;
 
       expect(() => new FeatureSprites(kind, {placement: odd})).toThrow(
-        new TypeError('FeatureSprites: the placement of feature "odd" is no function'),
+        new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'),
       );
       expect(() => new FeatureSprites(kind, {placement: odd, passes: [ShadowPass]})).toThrow(
-        new TypeError('FeatureSprites: the placement of feature "odd" is no function'),
+        new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'),
       );
 
       expect(geometryDispose.called).toBe(false);

@@ -428,7 +428,7 @@ describe('FeatureSpritesMaterial', () => {
 
       expect(() => {
         material.placement = {name: 'odd', placement: 5} as never;
-      }).toThrow(new TypeError('FeatureSpritesMaterial: the placement of feature "odd" is no function'));
+      }).toThrow(new TypeError('FeatureSpritesMaterial: the placement of feature "odd" is no function, got 5'));
       expect(material.placement).toBe(FlatPlacement);
       material.dispose();
     });
@@ -727,6 +727,17 @@ describe('FeatureSpritesMaterial', () => {
       expect(material.uniforms['time']!.value).toBe(3);
       expect(material.version).toBe(version);
       material.dispose();
+    });
+
+    test('refuses a start value that is no finite number in the words of the material', () => {
+      const timed = defineFeature({name: 'timed', uniforms: {time: 0}});
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, timed]});
+
+      expect(() => new FeatureSpritesMaterial(kind, {uniforms: {time: Number.NaN}})).toThrow(
+        new TypeError(
+          'FeatureSpritesMaterial: the uniform "time" is a float and takes a finite number as its start value, got NaN',
+        ),
+      );
     });
   });
 

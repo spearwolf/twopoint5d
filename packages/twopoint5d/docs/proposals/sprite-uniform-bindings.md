@@ -272,7 +272,7 @@ class FeatureSpritesPass {
   the sprites at all: `FeatureSprites: the visible of pass "…" reads the uniform "…", which no
   feature of these sprites declares`.
 - `definePass()` refuses a `visible` that is no function (`definePass: the visible of pass "…" is
-  no function`), and freezes the pass along with it.
+  no function, got …`), and freezes the pass along with it.
 - **`ShadowPass`** ships the hook `shadowFallsOnPlane` (`passPresets.ts`, exported), and
   `SegmentShadowPass`, a copy of it, carries it as well. With `groundPlane = (n, d)` and
   `shadowLight = (l, w)`, `h_L = dot(n, l) − w · d`:

@@ -278,7 +278,8 @@ declare function defineFeature<Api extends object = object>(feature: SpriteFeatu
 ```
 
 `defineFeature()` checks a feature on its own — every field for its type, with a `TypeError` naming
-the feature and the field: a name, a record of attribute descriptions for `attributes`, of lists of
+the feature, the field and the value: a name, a record of attribute descriptions for
+`attributes`, of lists of
 names for `usageAliases`, of functions for `methods` and of `{}` or `{needsImage: true}` for
 `textures`, a record for `uniforms`, functions for `initialize`, `frame`, `placement`,
 `colorSource` and `checkKind`, a finite `order` and a `transform` for every ordered stage, lists of
@@ -630,7 +631,9 @@ other.
   stays the caller's. `dispose()` destroys the size effects first, clears the textures while their
   signals live and then deletes its signal group. Before any signal exists it refuses, in the words
   of the `where` it is handed, `features` that are no iterable, a feature as `defineFeature()`
-  refuses it, options that are no object and `textures` or `uniforms` that are no object by name.
+  refuses it, options that are no object, `textures` or `uniforms` that are no object by name and a
+  start value in `uniforms` that is not of the type of its uniform — a finite number or 2 to 4 of them, the rule
+  of the declared start values; `null` keeps the declared one, as `undefined` does.
 - **`FeatureSpritesMaterial`** — a `NodeMaterial` built from the kind,
   `new FeatureSpritesMaterial(kind, {name, textures, uniforms, placement, resources, pass, …})`,
   every other option a three.js material parameter for `setValues()`, without `positionNode` and
@@ -781,8 +784,8 @@ function, `features` as a list of features of distinct names, each checked as `d
 checks one, **no data** — a feature of a pass brings no attributes, methods, `initialize` or usage
 aliases, since the pool and the sprite handle are those of the kind —, at most one placement among
 the features, a `without` as a list of names that names none twice, `uniformNames` and `material` as
-objects, and a `renderOrder` that is a finite number (`TypeError`, a `RangeError` for the
-`renderOrder`). The sprites run the same check for a pass that never went through `definePass()`. The `visible` hook and the renames of `uniformNames` are
+objects, and a `renderOrder` that is a finite number (`TypeError`, each quoting the value it
+refuses, a `RangeError` for the `renderOrder`). The sprites run the same check for a pass that never went through `definePass()`. The `visible` hook and the renames of `uniformNames` are
 [`sprite-uniform-bindings.md`](sprite-uniform-bindings.md) §5 and §6.
 
 What only a kind can tell is checked where a material of the pass is built — by

@@ -32,11 +32,15 @@ const malformedFeatures = (where: string): [string, unknown, string][] => [
     {name: 'odd', methods: [1]},
     `${where}: the methods of feature "odd" are no record of functions, got [1]`,
   ],
-  ['a method that is no function', {name: 'odd', methods: {go: 1}}, `${where}: the method "go" of feature "odd" is no function`],
+  [
+    'a method that is no function',
+    {name: 'odd', methods: {go: 1}},
+    `${where}: the method "go" of feature "odd" is no function, got 1`,
+  ],
   [
     'an initialize that is no function',
     {name: 'odd', initialize: true},
-    `${where}: the initialize of feature "odd" is no function`,
+    `${where}: the initialize of feature "odd" is no function, got true`,
   ],
   [
     'uniforms that are no record',
@@ -58,12 +62,16 @@ const malformedFeatures = (where: string): [string, unknown, string][] => [
     {name: 'odd', textures: {x: {needsImage: 'yes'}}},
     `${where}: the texture "x" of feature "odd" is declared with {needsImage: "yes"}; a texture takes {} or {needsImage: true}`,
   ],
-  ['a frame that is no function', {name: 'odd', frame: {}}, `${where}: the frame of feature "odd" is no function`],
-  ['a placement that is no function', {name: 'odd', placement: 5}, `${where}: the placement of feature "odd" is no function`],
+  ['a frame that is no function', {name: 'odd', frame: {}}, `${where}: the frame of feature "odd" is no function, got {}`],
+  [
+    'a placement that is no function',
+    {name: 'odd', placement: 5},
+    `${where}: the placement of feature "odd" is no function, got 5`,
+  ],
   [
     'a colorSource that is no function',
     {name: 'odd', colorSource: 5},
-    `${where}: the colorSource of feature "odd" is no function`,
+    `${where}: the colorSource of feature "odd" is no function, got 5`,
   ],
   [
     'a stage that is no record',
@@ -78,12 +86,23 @@ const malformedFeatures = (where: string): [string, unknown, string][] => [
   [
     'a stage without a transform',
     {name: 'odd', local: {order: 1}},
-    `${where}: the local stage of feature "odd" needs a transform function`,
+    `${where}: the local stage of feature "odd" needs a transform function, got undefined`,
   ],
   [
     'requires that is no list',
     {name: 'odd', requires: 'abc'},
-    `${where}: the requires of feature "odd" is no list of feature names`,
+    `${where}: the requires of feature "odd" is no list of feature names, got "abc"`,
+  ],
+  ['a name that is no string', {name: 5}, `${where}: a feature needs a name, got 5`],
+  [
+    'a checkKind that is no function',
+    {name: 'odd', checkKind: 'grid'},
+    `${where}: the checkKind of feature "odd" is no function, got "grid"`,
+  ],
+  [
+    'nearestTextures that is no list',
+    {name: 'odd', nearestTextures: 'colorMap'},
+    `${where}: the nearestTextures of feature "odd" is no list of texture names, got "colorMap"`,
   ],
 ];
 
@@ -97,7 +116,7 @@ describe('defineFeature()', () => {
   });
 
   test('refuses a feature without a name', () => {
-    expect(() => defineFeature({name: ''})).toThrow('defineFeature: a feature needs a name');
+    expect(() => defineFeature({name: ''})).toThrow('defineFeature: a feature needs a name, got ""');
   });
 
   test.each(['frameStage', 'local', 'mesh', 'uv', 'color'] as const)('refuses a %s stage without a finite order', (slot) => {
@@ -117,27 +136,31 @@ describe('defineFeature()', () => {
   test('refuses a checkKind that is no function', () => {
     const feature = {name: 'odd', checkKind: 'grid'} as unknown as SpriteFeature;
 
-    expect(() => defineFeature(feature)).toThrow('defineFeature: the checkKind of feature "odd" is no function');
+    expect(() => defineFeature(feature)).toThrow('defineFeature: the checkKind of feature "odd" is no function, got "grid"');
   });
 
-  test.each([['colorMap'], [['colorMap', 3]], [{colorMap: true}]])('refuses the nearestTextures %o', (nearestTextures) => {
+  test.each([
+    ['colorMap', '"colorMap"'],
+    [['colorMap', 3], '["colorMap", 3]'],
+    [{colorMap: true}, '{colorMap: true}'],
+  ])('refuses the nearestTextures %o', (nearestTextures, quoted) => {
     const feature = {name: 'odd', nearestTextures} as unknown as SpriteFeature;
 
     expect(() => defineFeature(feature)).toThrow(
-      'defineFeature: the nearestTextures of feature "odd" is no list of texture names',
+      `defineFeature: the nearestTextures of feature "odd" is no list of texture names, got ${quoted}`,
     );
   });
 
   test.each(malformedFeatures('defineFeature'))('refuses %s', (_, feature, message) => {
     expect(() => defineFeature(feature as SpriteFeature)).toThrow(TypeError);
-    expect(() => defineFeature(feature as SpriteFeature)).toThrow(message);
+    expect(() => defineFeature(feature as SpriteFeature)).toThrow(new TypeError(message));
   });
 
   test('checks the stages in the order of their slots, each for a record, its order and its transform', () => {
     const feature = {name: 'odd', frameStage: {order: 1}, color: {order: Number.NaN}} as unknown as SpriteFeature;
 
     expect(() => defineFeature(feature)).toThrow(
-      'defineFeature: the frameStage stage of feature "odd" needs a transform function',
+      'defineFeature: the frameStage stage of feature "odd" needs a transform function, got undefined',
     );
   });
 

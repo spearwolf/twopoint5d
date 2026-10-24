@@ -314,7 +314,7 @@ readonly checkKind?: (kind: SpriteKindShape) => void;
 - A placement may carry `checkKind` and still stand in for another on a live material: the swap
   calls it with the features of the kind, the new placement in place of the kind's.
 - `defineFeature()` refuses a `checkKind` that is no function (`defineFeature: the checkKind of
-  feature "x" is no function`).
+  feature "x" is no function, got "grid"`).
 - Phase D uses it twice (§7): `NineSlice` refuses a base other than `gridBase({columns: 3, rows:
   3})`, and `segmentPlacement()` refuses `Rotation` and `Shear` next to it.
 

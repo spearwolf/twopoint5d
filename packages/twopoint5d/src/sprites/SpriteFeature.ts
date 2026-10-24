@@ -98,7 +98,7 @@ export interface SpriteTextureDeclaration {
   readonly needsImage?: boolean;
 }
 
-/** The start value of a uniform: a number is a `float`, 2 to 4 numbers a `vec2` to `vec4`. */
+/** The start value of a uniform: a finite number is a `float`, 2 to 4 finite numbers a `vec2` to `vec4`. */
 export type SpriteUniformValue =
   | number
   | readonly [number, number]
@@ -199,7 +199,7 @@ export interface SpriteKindShape {
  * list the feature shares with other code is frozen along with it. What can only be checked against
  * the other features of a kind — names, requires, cardinality — `defineSprite()` checks.
  *
- * @throws a `TypeError` naming the feature and the field
+ * @throws a `TypeError` naming the feature and the field and quoting the value it refuses
  */
 export function defineFeature<Api extends object = object>(feature: SpriteFeature<Api>): SpriteFeature<Api> {
   checkFeature(feature, 'defineFeature');
