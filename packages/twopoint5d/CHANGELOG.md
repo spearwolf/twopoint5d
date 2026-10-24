@@ -67,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- upgrade the `@spearwolf/eventize` peer dependency to `^6.3.0` (was `^6.2.0`). eventize 6.3 changes types only: a helper generic over the event key forwards to the standalone `emit()` and its five siblings without a cast. See the Migration Guide
 - `Map2DTileCoordsUtil#getTileCoords()` and `#computeTilesWithinCoords()` refuse a selection that is no finite area with a `RangeError` that names the call and the field — `left` and `top` take a finite number, `width` and `height` a finite number of 0 or more — and leave `target` as it was. The fields `maxDebugHelpers`, `tileBoxHelperExpand` and `frustumBoxHelperExpand` of `CameraBasedVisibilityHelpers` and `viewRectHelperHeight` of `RectangularVisibilityAreaHelpers` refuse the values the helpers cannot draw with, after `dispose()` as well
 - `definePass()` — and every place that takes a pass — refuses a pass that is no object, or whose `features`, `without`, `uniformNames`, `material` or `renderOrder` it cannot read, with a `TypeError` that names the pass and the field and quotes the value (a `RangeError` for a `renderOrder` that is no finite number); `tableFrame()`, `paletteSwap()`, `axisBillboardPlacement()`, `flatPlacement()`, `segmentPlacement()` and `new FeatureSprites()` refuse options that are no object, and `new FeatureSprites()` refuses `passes` that are no list
 - `SpritePicker#pick()`, `gridBase()` and `FeatureSprites#bindUniform()` quote the value they refuse, as every other refusal of the library does — a three.js object by its `type`: `SpritePicker#pick(): the camera is no three.js Camera, got Mesh`
@@ -1114,6 +1115,30 @@ chronometer.update();
 
 export {last};
 ```
+
+#### The `@spearwolf/eventize` peer dependency range
+
+**Before**
+
+```json
+{
+  "dependencies": {
+    "@spearwolf/eventize": "^6.2.0"
+  }
+}
+```
+
+**After**
+
+```json
+{
+  "dependencies": {
+    "@spearwolf/eventize": "^6.3.0"
+  }
+}
+```
+
+A project on eventize 6.2 meets a peer conflict until it moves to 6.3; nothing at run time changes.
 
 ## [0.23.0] - 2026-10-18
 
