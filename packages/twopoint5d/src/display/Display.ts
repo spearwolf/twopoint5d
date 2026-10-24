@@ -1749,17 +1749,17 @@ export class Display {
    * Tears the display down.
    *
    * Before it returns, `dispose()` stops the frame loop, takes the `visibilitychange` listener and
-   * the observer of {@link DisplayParameters.pauseOutsideViewport} down, fires `OnDisplayDispose`, drops every
-   * listener, gives up {@link Display.renderer} and takes a container this display built out of
-   * the DOM, with the canvas in it. The renderer itself is released after the return, with
-   * `renderer.dispose()`: once its init is through and the GPU has run the work submitted to it,
-   * or for two seconds at most, and goes on with a warning on the console after that. Under
+   * the observer of {@link DisplayParameters.pauseOutsideViewport} down, fires `OnDisplayDispose`,
+   * drops every listener, gives up {@link Display.renderer} and takes a container this display
+   * built out of the DOM, with the canvas in it. The renderer itself is released after the return,
+   * with `renderer.dispose()`: once its init is through and the GPU has run the work submitted to
+   * it, or for two seconds at most, and goes on with a warning on the console after that. Under
    * WebGPU the release then waits until the page has drawn two more animation frames, or for two
    * more seconds while it draws none: under Firefox with WebGPU the page otherwise stops its
    * `requestAnimationFrame` when the canvas stays in the document — a canvas handed to the
    * constructor, or that of an adopted renderer. The two seconds count only while the page is
-   * visible. A hidden page presents the canvas once it is visible again, so it holds the release
-   * — and a display built on a canvas handed in meanwhile — until then.
+   * visible. A hidden page presents the canvas once it is visible again, so it holds the release —
+   * and a display built on a canvas handed in meanwhile — until then.
    *
    * A canvas handed to the constructor goes back to the caller as the display found it: its
    * classes, the inline `width`, `height` and `image-rendering`, the `touch-action` attribute

@@ -61,14 +61,15 @@ export class TexturePackerJson {
    *
    * Every frame is checked before the first one is added to the `target`.
    *
-   * @throws {TypeError} if the json is no object, its `frames` are neither an object nor a list, a frame is no object, its `frame` is no object, a frame of the "JSON Array"
-   * format has a `filename` that is no string, or — without `parentCoords` — the json has no `meta.size`;
-   * the `target` stays as it was.
-   * @throws {RangeError} if an `x`, `y`, `w` or `h` of a `frame` is no finite number of 0 or more, or —
-   * without `parentCoords` — the `w` or `h` of `meta.size` is no finite number above 0; the `target` stays
-   * as it was.
-   * @throws {Error} if a frame name appears more than once in the json or is already taken in the `target`;
-   * the `target` stays as it was.
+   * @throws {TypeError} if the json is no object, its `frames` are neither an object nor a list, a
+   * frame is no object, its `frame` is no object, a frame of the "JSON Array" format has a
+   * `filename` that is no string, or — without `parentCoords` — the json has no `meta.size`; the
+   * `target` stays as it was.
+   * @throws {RangeError} if an `x`, `y`, `w` or `h` of a `frame` is no finite number of 0 or more,
+   * or — without `parentCoords` — the `w` or `h` of `meta.size` is no finite number above 0; the
+   * `target` stays as it was.
+   * @throws {Error} if a frame name appears more than once in the json or is already taken in the
+   * `target`; the `target` stays as it was.
    */
   static parse<D extends TexturePackerFrameData = TexturePackerFrameData>(
     data: {frames: Record<string, D> | (D & {filename: string})[]; meta: TexturePackerMetaData},

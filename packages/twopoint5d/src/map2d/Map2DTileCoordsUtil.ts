@@ -108,10 +108,11 @@ export class Map2DTileCoordsUtil {
   readonly #offsets = new Float64Array(2);
 
   /**
-   * Where the tile grid starts on the x axis, in _world space_: a tile `(c, r)` covers
-   * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile is anchored at that
-   * corner, not centered on its coordinates, so the `xOffset` that centers the grid on the origin
-   * is `-tileWidth / 2`.
+   * Where the tile grid starts on the x axis, in _world space_: a tile `(c, r)` covers `[c ·
+   * tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile is anchored at that corner,
+   * not centered on its coordinates, so the `xOffset` that centers the grid on the origin is
+   * `-tileWidth / 2`. Like {@link tileWidth}, {@link tileHeight} and {@link yOffset} it is an
+   * accessor: a spread or `Object.keys()` of an instance does not list it.
    *
    * Takes a finite number; anything else throws a `RangeError` and leaves the offset as it was —
    * in the constructor as well.
@@ -159,6 +160,10 @@ export class Map2DTileCoordsUtil {
   // `copy()` and `equals()` read and write the private fields: `source` and `other` are instances
   // that checked their values, and `CameraBasedVisibility` copies the grid on every call, so no
   // getter runs on this way
+  /**
+   * Takes the tile size and the offsets of `source`. `source` is an instance of this class as
+   * this copy of the library defines it; one of another copy throws a `TypeError`.
+   */
   copy(source: Map2DTileCoordsUtil): Map2DTileCoordsUtil {
     this.#tileWidth = source.#tileWidth;
     this.#tileHeight = source.#tileHeight;
@@ -171,6 +176,11 @@ export class Map2DTileCoordsUtil {
     return new Map2DTileCoordsUtil(this.#tileWidth, this.#tileHeight, this.#offsets[X_OFFSET]!, this.#offsets[Y_OFFSET]!);
   }
 
+  /**
+   * Whether `other` describes the same grid: the same tile size and the same offsets. `other`
+   * is an instance of this class as this copy of the library defines it; one of another copy
+   * throws a `TypeError`.
+   */
   equals(other: Map2DTileCoordsUtil): boolean {
     return (
       this.#tileWidth === other.#tileWidth &&

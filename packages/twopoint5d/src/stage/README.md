@@ -618,6 +618,14 @@ frame, and the error reaches the caller afterwards — one unchanged, several as
 `AggregateError`. `OnStageUpdateFrame` goes out through `emit()`: a listener that throws
 ends the frame for the listeners behind it.
 
+Under a `StageRenderer` an error out of `Stage2D#resize()` counts as the stage refusing
+the size, also when the stage took the size and only a listener threw: the renderer and
+the `StageItem` of that stage keep the size they had, and the next `resize()` with that
+size hands it to the stage again. A pending `needsUpdate` that `updateFrame()` applies
+sends `OnStageAfterCameraChanged` and `OnStageResize` as well; a listener that throws
+there ends the frame before `OnStageFirstFrame` and `OnStageUpdateFrame`, and the error
+reaches the caller of `updateFrame()`.
+
 On `Canvas2DStage`:
 
 - `OnCanvas2DStageResize` — from `render()`, when the canvas has another size than at

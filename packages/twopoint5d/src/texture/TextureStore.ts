@@ -103,19 +103,18 @@ export type TextureStoreErrorEvent =
  *   place of an evicted one included. Whoever wants the raw event subscribes to `resource:<id>`
  *   on the store directly.
  * - `Dispose`: fires once when `dispose()` is called.
- * - `Error`: fires with a {@link TextureStoreErrorEvent}, `{source: 'fetch'|'parse', url?, id?, status?, error}`.
- *   `fetch` covers a request that failed and a response that answered with a status;
- *   `parse` a body that is no JSON, a `parse()` that threw — data without an items object
- *   among it —, an item that builds no resource because it names no source or carries a
- *   field of the wrong type, texture class names no `TextureFactory` knows, which are
- *   left out, a field the type of an item does not read, which is left out, a tile set item
- *   without an `imageUrl`, which is built all the same, a subscriber of a resource that throws
- *   while `parse()` writes the values, and a listener of the `dispose` event of a resource that
- *   `evictMissing` disposes that throws. The `atlas`, `image` and `texture` failures of a resource are emitted by
- *   `TextureResource` and are subscribed there; {@link TextureStore.getAsync} is rejected on
- *   those that keep a value it asks for from arriving, as its TSDoc sets out. An `error`
- *   listener that throws takes the event from no other listener: eventize reports the throw on
- *   the console.
+ * - `Error`: fires with a {@link TextureStoreErrorEvent}, `{source: 'fetch'|'parse', url?, id?,
+ *   status?, error}`. `fetch` covers a request that failed and a response that answered with a
+ *   status; `parse` a body that is no JSON, a `parse()` that threw — data without an items object
+ *   among it —, an item that builds no resource because it names no source or carries a field of
+ *   the wrong type, texture class names no `TextureFactory` knows, which are left out, a field the
+ *   type of an item does not read, which is left out, a tile set item without an `imageUrl`, which
+ *   is built all the same, a subscriber of a resource that throws while `parse()` writes the
+ *   values, and a listener of the `dispose` event of a resource that `evictMissing` disposes that
+ *   throws. The `atlas`, `image` and `texture` failures of a resource are emitted by
+ *   `TextureResource` and are subscribed there; {@link TextureStore.getAsync} is rejected on those
+ *   that keep a value it asks for from arriving, as its TSDoc sets out. An `error` listener that
+ *   throws takes the event from no other listener: eventize reports the throw on the console.
  */
 export const TextureStoreEvents = {
   Ready: 'ready',
@@ -875,14 +874,14 @@ export class TextureStore {
    * covers, and what it does not.
    *
    * A listener of `ready`, `resource:<id>` or `error` that throws changes nothing of the parse:
-   * every listener hears its event, eventize reports the throw on the console, and `parse()`
-   * goes on and returns as usual. Nor does a subscriber of a resource — of
-   * {@link TextureStore.on} among them — that throws while the values are written: every
-   * subscriber hears its value, the parse runs to its end, and the throw goes out after
-   * `evictMissing` as an `error` event with `source: 'parse'` and no id. `parse()` throws only for
-   * data it refuses before anything is written or emitted. A resource that `evictMissing` disposes is removed even when a listener
-   * of its `dispose` event throws; that throw goes out as an `error` event with
-   * `source: 'parse'` and the id of the resource.
+   * every listener hears its event, eventize reports the throw on the console, and `parse()` goes
+   * on and returns as usual. Nor does a subscriber of a resource — of {@link TextureStore.on} among
+   * them — that throws while the values are written: every subscriber hears its value, the parse
+   * runs to its end, and the throw goes out after `evictMissing` as an `error` event with `source:
+   * 'parse'` and no id. `parse()` throws only for data it refuses before anything is written or
+   * emitted. A resource that `evictMissing` disposes is removed even when a listener of its
+   * `dispose` event throws; that throw goes out as an `error` event with `source: 'parse'` and the
+   * id of the resource.
    *
    * On a disposed store this does nothing: no resource is built, and none is updated.
    */

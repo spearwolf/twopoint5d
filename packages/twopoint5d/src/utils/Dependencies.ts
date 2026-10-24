@@ -11,7 +11,10 @@ export type DependencyKey = string;
 export interface DependencyCallbacks<T = unknown> {
   /** Whether two present values are the same state. It is not asked for two identical values. */
   equals(a: T, b: T): boolean;
-  /** A copy of `source` that the state keeps as its own. Used with `copy`; without either, the state keeps the value itself. */
+  /**
+   * A copy of `source` that the state keeps as its own. Used with `copy`; without either, the state
+   * keeps the value itself.
+   */
   clone?(source: T): T;
   /** Writes `source` into `target`, the clone the state holds, in place. Used with `clone`. */
   copy?(source: T, target: T): void;

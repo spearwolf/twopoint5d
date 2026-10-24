@@ -138,7 +138,7 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
 - `checkPkgTypes` runs Are-The-Types-Wrong against the built `dist/` with the profile
   `esm-only`: the package is ESM only, so `node10` and a `require` from CommonJS lie
   outside, and every other resolution has to succeed.
--  `checkNameableTypes` (`scripts/checkNameableTypes.mjs`) walks `dist/lib/index.d.ts` and
+- `checkNameableTypes` (`scripts/checkNameableTypes.mjs`) walks `dist/lib/index.d.ts` and
   fails on published declarations that reference a type consumers cannot name. It reads
   its compiler options from the root `tsconfig.json`, as the code block check does, and
   follows a reference in every form the declarations carry — a type reference, a `typeof`
@@ -192,24 +192,23 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
 `.github/workflows/ci.yml` runs the gate on every push and on every pull request from a
 fork, in five jobs side by side — one matrix job per part, `ci:checks` twice: `ci:checks`
 on Node 24 and on Node 26, the two lines `engines` allows, then `test:coverage`,
-`test:allocations` and, under `xvfb-run`, `test:browser` on 24 alone. `fail-fast` is off, so a red job
-does not hide the verdict of the others, and "Re-run failed jobs" repeats only the part
-that failed. Every job and every long step carries a `timeout-minutes`; a hosted job
-otherwise runs for six hours. A pull request from a branch of this repository skips its
-`pull_request` run: the push of that branch has sent the same commit through the gate
-already, and the second run would only double the minutes. The workflow has no path
+`test:allocations` and, under `xvfb-run`, `test:browser` on 24 alone. `fail-fast` is off,
+so a red job does not hide the verdict of the others, and "Re-run failed jobs" repeats
+only the part that failed. Every job and every long step carries a `timeout-minutes`; a
+hosted job otherwise runs for six hours. A pull request from a branch of this repository
+skips its `pull_request` run: the push of that branch has sent the same commit through the
+gate already, and the second run would only double the minutes. The workflow has no path
 filter: Markdown is an input of `twopoint5d-testing:typecheck` (§2), so a push that
 changes nothing but docs runs the gate as well, and the Nx cache answers every target
-whose inputs the push leaves alone. Every action is pinned to a full commit SHA
-with a `# vX.Y.Z` comment naming the release, so a moved tag cannot swap the code that
-runs. The workflow reads `contents` only. Every checkout, here and in `deploy.yml`, sets
+whose inputs the push leaves alone. Every action is pinned to a full commit SHA with a `#
+vX.Y.Z` comment naming the release, so a moved tag cannot swap the code that runs. The
+workflow reads `contents` only. Every checkout, here and in `deploy.yml`, sets
 `persist-credentials: false`: no job pushes from a checkout — the `tag` job of
-`deploy.yml` writes its ref through the REST API (§4) — so no token lies in
-`.git/config` for an install script to find. The concurrency group of the workflow is the
-ref: the branch, or the merge ref of a pull request. A newer push cancels the running or
-waiting run of the same ref, except on `main`, where the group is the commit: every commit
-there gets its own run, which nothing cancels, because `deploy.yml` follows each
-successful one.
+`deploy.yml` writes its ref through the REST API (§4) — so no token lies in `.git/config`
+for an install script to find. The concurrency group of the workflow is the ref: the
+branch, or the merge ref of a pull request. A newer push cancels the running or waiting
+run of the same ref, except on `main`, where the group is the commit: every commit there
+gets its own run, which nothing cancels, because `deploy.yml` follows each successful one.
 
 The step `Audit dependencies` follows the install in the Node 24 job of `ci:checks` and
 runs `pnpm audit --audit-level=high`; the dependencies are the same under both Node lines.
@@ -217,8 +216,8 @@ It reports high and critical advisories without failing the run: the published p
 declares peer dependencies only (`lintPkg` holds that), so whatever the audit finds sits
 in tooling, and Dependabot proposes the update that fixes it (§5). A hit, or an audit that
 gets no answer from the registry, puts a warning on the summary page of the run and the
-report into the job summary; an audit that times out leaves the job green. Dependabot also keeps the commit SHAs of the actions, and the version comment next
-to each, current.
+report into the job summary; an audit that times out leaves the job green. Dependabot also
+keeps the commit SHAs of the actions, and the version comment next to each, current.
 
 The benchmarks run in a workflow of their own, `.github/workflows/bench.yml`: nightly on
 `main` and by hand (`workflow_dispatch`) on any branch. It installs the workspace root and
@@ -230,21 +229,21 @@ be counted — the heap bytes of a hot-path call — the allocation specs hold i
 
 The browser suite runs every test file in four browsers, each pinned to one backend of
 three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2`, `Firefox WebGL2` and
-`Webkit WebGL2` (`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter names a
-launcher after the capitalized product and the backend). Left to themselves the
+`Webkit WebGL2` (`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter
+names a launcher after the capitalized product and the backend). Left to themselves the
 browsers would pick by machine — headless Chromium offers WebGPU only behind
 `--enable-unsafe-webgpu`, headless Firefox 155 finds no adapter — and measured with
-Playwright 1.63.0 both ended up on WebGL2, so WebGPU went untested. Now an init script
-of each launcher sets the backend before the page loads: for WebGL2 it takes
-`navigator.gpu` away, and three falls back as it does for a user without WebGPU. Chromium
-WebGPU runs on SwiftShader, the software adapter Chromium ships, with its compositor on
-SwiftShader as well (`--use-angle=swiftshader`, and on Linux through Vulkan:
-`--enable-features=Vulkan --use-vulkan=swiftshader`). A compositor on anything else cannot
-take the canvas texture of a SwiftShader device, and Dawn drops the instance with every
-device of the page ("A valid external Instance reference no longer exists"). Measured
-with Playwright 1.63.0 on macOS and in its `v1.63.0-noble` image on arm64 and amd64:
-macOS needs the first flag, Linux all three. WebKit runs under WebGL 2 alone: Playwright's
-WebKit offers no `navigator.gpu` (measured with Playwright 1.63.0, WebKit 26.6, on macOS).
+Playwright 1.63.0 both ended up on WebGL2, so WebGPU went untested. Now an init script of
+each launcher sets the backend before the page loads: for WebGL2 it takes `navigator.gpu`
+away, and three falls back as it does for a user without WebGPU. Chromium WebGPU runs on
+SwiftShader, the software adapter Chromium ships, with its compositor on SwiftShader as
+well (`--use-angle=swiftshader`, and on Linux through Vulkan: `--enable-features=Vulkan
+--use-vulkan=swiftshader`). A compositor on anything else cannot take the canvas texture
+of a SwiftShader device, and Dawn drops the instance with every device of the page ("A
+valid external Instance reference no longer exists"). Measured with Playwright 1.63.0 on
+macOS and in its `v1.63.0-noble` image on arm64 and amd64: macOS needs the first flag,
+Linux all three. WebKit runs under WebGL 2 alone: Playwright's WebKit offers no
+`navigator.gpu` (measured with Playwright 1.63.0, WebKit 26.6, on macOS).
 
 three falls back to WebGL2 without a word when WebGPU fails its init, and every other
 test would then pass on the wrong backend. `test/renderer-backend.test.js` is the one
@@ -257,25 +256,25 @@ The runner puts a logger into every page that writes each unhandled rejection in
 "Browser logs" as "An error was thrown in a Promise outside a test", with its stack,
 whether a listener prevented its default or not. A test that leaves a rejection unhandled
 on purpose — the control of `whenRejectionsReported()` in `test/helpers/fixtures.js`,
-which waits for the browser to report every rejection before it — hands it to
-`twopoint5dExpectRejection()`, which a second init script of each launcher puts into the
-page. Its listener comes before the logger's and takes the report off the page, so a green
-run writes no error text; `test/harness-rejections.test.js` fails when the logger hears of
-the control.
+which waits until the browser has reported every rejection that went unhandled before it
+was called — hands it to `twopoint5dExpectRejection()`, which a second init script of each
+launcher puts into the page. Its listener comes before the logger's and takes the report
+off the page, so a green run writes no error text; `test/harness-rejections.test.js` fails
+when the logger hears of the control.
 
 Only the job of the browser tests installs Playwright. The browsers are cached under the
 key `playwright-<os>-<version>-<browsers>`, the version being what `pnpm exec playwright
 --version` reports from the root package and the browsers those the two install steps
-fetch: a cache saved before a browser joined them would restore without it, and its launcher
-would find no browser. A hit still runs `playwright install-deps`, since the
+fetch: a cache saved before a browser joined them would restore without it, and its
+launcher would find no browser. A hit still runs `playwright install-deps`, since the
 cache holds the browsers and not the system libraries they link against. That is an
 `apt-get update` and `install`, which once fell back from the Azure mirror to
-`archive.ubuntu.com` and waited on a silent connection for over twenty minutes: apt has
-no overall timeout. The job therefore gives apt a 30-second network timeout and three
-retries (`/etc/apt/apt.conf.d/99ci-network-timeouts`), cuts each attempt of
-`install-deps` off after three minutes and tries three times. The key follows the root
-`playwright`, so the root `playwright` and the one `@web/test-runner-playwright` resolves
-have to be the same version.
+`archive.ubuntu.com` and waited on a silent connection for over twenty minutes: apt has no
+overall timeout. The job therefore gives apt a 30-second network timeout and three retries
+(`/etc/apt/apt.conf.d/99ci-network-timeouts`), cuts each attempt of `install-deps` off
+after three minutes and tries three times. The key follows the root `playwright`, so the
+root `playwright` and the one `@web/test-runner-playwright` resolves have to be the same
+version.
 
 Nx indexes its local cache in a database named after the machine id, and every runner
 comes with a new one, so a restored Nx cache directory would never hit. Nx does take
@@ -436,8 +435,8 @@ range of the library and is a release of its own, because the catalog range land
 in the published manifest. So each of them, and every major update but those of
 `typescript` and `@types/node`, which it ignores (see below), comes as a pull request by
 itself, to be reviewed on its own. `playwright` stays out of the group as well: each of
-its updates brings the Chromium, Firefox and WebKit the browser suite runs on, so it comes as a
-pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
+its updates brings the Chromium, Firefox and WebKit the browser suite runs on, so it comes
+as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
 comment that names the advisory it answers and says when the entry can go.
 
 pnpm resolves no version younger than a day (`minimumReleaseAge: 1440` in
@@ -492,11 +491,11 @@ Two runners, deliberately in separate packages:
 
 - Vitest in `packages/twopoint5d` (tag `ci`) — unit and logic tests as `*.spec.ts` next
   to the source. No browser dependencies in the library package.
-- `@web/test-runner` with Playwright Chromium, Firefox and WebKit in `packages/twopoint5d-testing`
-  (tag `browser`) — `*.test.js` under `test/`, for anything that needs a real GPU context,
-  every file under WebGPU in Chromium and under WebGL 2 in Chromium, Firefox and WebKit.
-  `pnpm install` downloads no browsers; they come from
-  `pnpm exec playwright install chromium firefox webkit`. The `*.test.js` files are type-checked
+- `@web/test-runner` with Playwright Chromium, Firefox and WebKit in
+  `packages/twopoint5d-testing` (tag `browser`) — `*.test.js` under `test/`, for anything
+  that needs a real GPU context, every file under WebGPU in Chromium and under WebGL 2 in
+  Chromium, Firefox and WebKit. `pnpm install` downloads no browsers; they come from `pnpm
+  exec playwright install chromium firefox webkit`. The `*.test.js` files are type-checked
   with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from JSDoc —
   vertex object interfaces, descriptions. `strictNullChecks` stays off for the browser
   tests. Switched on, TypeScript 7.0.2 reports 828 errors in 56 files of the suite
@@ -504,9 +503,9 @@ Two runners, deliberately in separate packages:
   its kin — a fixture variable that a `beforeEach` assigns and an `afterEach` clears, an
   order the checker cannot see —, and most of the rest hand the same variables on as
   arguments. A cast at each of them would find nothing; a nullability error against the
-  public API shows in the library's own specs, which the root config checks strictly.
-  The package is `"private": true`: it is a test harness, never a release, so npm
-  refuses to publish it and `pnpm publish -r` passes it by.
+  public API shows in the library's own specs, which the root config checks strictly. The
+  package is `"private": true`: it is a test harness, never a release, so npm refuses to
+  publish it and `pnpm publish -r` passes it by.
 
 A browser test takes its display down with `dispose()` alone: `Display#dispose()`
 stops the loop right away and releases the renderer only once the GPU has run the work

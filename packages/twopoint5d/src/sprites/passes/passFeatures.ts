@@ -34,8 +34,8 @@ const isStringList = (value: unknown): value is readonly string[] =>
  *
  * @internal
  *
- * @throws a `TypeError` naming the pass and the field and quoting the value it refuses, a `RangeError` for a `renderOrder` that is no
- * finite number
+ * @throws a `TypeError` naming the pass and the field and quoting the value it refuses, a
+ * `RangeError` for a `renderOrder` that is no finite number
  */
 export function checkPass(pass: unknown, where: string): asserts pass is SpritePass {
   if (!isRecord(pass)) {

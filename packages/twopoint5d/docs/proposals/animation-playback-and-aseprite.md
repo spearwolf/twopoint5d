@@ -295,13 +295,13 @@ entry; the guide says to export without them.
   tags are: idle, walk, kick`), and so is a value that is none of `'loop'`, `'once'` and
   `'pingpong'`, naming the tag, before the first frame is added (`AsepriteJson: parse() got a
   playback of "bounce" for the tag "walk" — a playback is 'loop', 'once' or 'pingpong'`).
-- Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside
-  `0 … frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown
-  `direction` (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name
-  (`… — rename one of them in Aseprite`), and a tag whose `repeat` plays more than `FrameBasedAnimations.MaxFramesWithDurations` (8191)
-  frames of differing durations (`AsepriteJson: the tag "x" plays 9000 frames with their own
-  durations — … at most 8191 frames; lower its repeat`). A tag of even durations has no such
-  limit of its own: a bake refuses what does not fit.
+- Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside `0 …
+  frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown `direction`
+  (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name (`… — rename one
+  of them in Aseprite`), and a tag whose `repeat` plays more than
+  `FrameBasedAnimations.MaxFramesWithDurations` (8191) frames of differing durations (`AsepriteJson:
+  the tag "x" plays 9000 frames with their own durations — … at most 8191 frames; lower its
+  repeat`). A tag of even durations has no such limit of its own: a bake refuses what does not fit.
 - A frame without a `duration` above 0, in a tag or outside every tag, is refused with a
   `RangeError` naming it (`AsepriteJson: the duration of the frame "x" must be a finite number above
   0, got 0`); `meta.frameTags` that is no list, and a tag that is no object, with a `TypeError`.
@@ -310,13 +310,13 @@ entry; the guide says to export without them.
   format that contains {frame}`); in "Hash" a second key is gone by the time `JSON.parse()` is done.
 - A json, `frames` or `meta` that is no object, a frame of the layout "Array" without a string
   `filename` and a tag without a string `name` are refused with a `TypeError`. The slices of
-  `meta.slices` are held to the checks the tags have: `meta.slices` that is no list, a slice that is no
-  object or has no string `name`, keys that are no list (absent or `null` is no keys), a key that is
-  no object, and a `bounds` (required), `center` or `pivot` (absent or `null` is missing) that is no
-  object, are a `TypeError`; a `frame` of a key that is no whole number `≥ 0` and an `x`, `y`, `w` or
-  `h` that is no finite number, or a `w` or `h` below 0, are a `RangeError`; two slices of one name
-  are an `Error` (`… — rename one of them in Aseprite`). A `frame` past the last frame is fine: the
-  key then holds at no frame, and a `pivot` may lie outside the `bounds`.
+  `meta.slices` are held to the checks the tags have: `meta.slices` that is no list, a slice that is
+  no object or has no string `name`, keys that are no list (absent or `null` is no keys), a key that
+  is no object, and a `bounds` (required), `center` or `pivot` (absent or `null` is missing) that is
+  no object, are a `TypeError`; a `frame` of a key that is no whole number `≥ 0` and an `x`, `y`,
+  `w` or `h` that is no finite number, or a `w` or `h` below 0, are a `RangeError`; two slices of
+  one name are an `Error` (`… — rename one of them in Aseprite`). A `frame` past the last frame is
+  fine: the key then holds at no frame, and a `pivot` may lie outside the `bounds`.
 - Every check runs before the first frame is added, the animations are planned there as well:
   a refused sheet leaves `options.target` as it was, and no `add()` that follows throws.
 

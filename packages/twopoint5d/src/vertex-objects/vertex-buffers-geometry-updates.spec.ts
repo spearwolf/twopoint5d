@@ -1809,8 +1809,9 @@ describe('vertex-buffers-geometry-updates', () => {
   // The gpu reads the arrays of the pool as the descriptor lays them out: nothing is copied or
   // widened on the way. three widens the array of an 8- or 16-bit integer BufferAttribute without
   // `normalized` to 32 bits as it builds its gpu buffer (`WebGPUAttributeUtils#createAttribute()`,
-  // held by `threeVertexLayout.spec.ts`) and leaves an InterleavedBuffer as it is, so such a buffer always reaches three as one; an
-  // attribute of one value of these types is laid out as a 32-bit integer by the descriptor
+  // held by `threeVertexLayout.spec.ts`) and leaves an InterleavedBuffer as it is, so such a buffer
+  // always reaches three as one; an attribute of one value of these types is laid out as a 32-bit
+  // integer by the descriptor
   describe('the arrays three gets are the arrays of the pool', () => {
     interface OffsetVO extends VO {
       dx: number;

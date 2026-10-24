@@ -358,6 +358,11 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * with a camera and `OnStageUpdateFrame` in every frame with a camera. Does nothing on a
    * disposed stage.
    *
+   * A listener of `OnStageAfterCameraChanged` or `OnStageResize` that throws while that pending
+   * update runs ends the frame: the camera and the size stand, the error reaches the caller —
+   * one unchanged, several as an `AggregateError` — and neither `OnStageFirstFrame` nor
+   * `OnStageUpdateFrame` goes out in it; the first frame comes with the next call.
+   *
    * Every listener of `OnStageFirstFrame` hears it, also behind one that throws; the first frame
    * is over by then — `isFirstFrame` is `false`, a later subscriber gets the retained props, and
    * the listeners of `OnStageUpdateFrame` get the frame all the same — and the error reaches the

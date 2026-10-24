@@ -333,7 +333,7 @@ export interface FrameToSample {
 }
 
 /** @internal */
-export type FrameSampleOptions = {readonly wrap: readonly [AtlasFrameWrap, AtlasFrameWrap]; readonly inset: number} & (
+export type FrameSampleOptions = {readonly wrap: readonly [u: AtlasFrameWrap, v: AtlasFrameWrap]; readonly inset: number} & (
   | {readonly trim: 'stretch'}
   | {readonly trim: 'mask'; /** `[left, top, right, bottom]`, as `frameTrimMargins()` answers them. */ readonly margins: Node<'vec4'>}
 );

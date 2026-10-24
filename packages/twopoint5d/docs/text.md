@@ -202,8 +202,8 @@ const {width, height, lineCount, glyphs} = layoutText(font, 'INVENTORY FULL', {s
 export const panelSize = {width: width + 8, height: height + 8, lineCount, firstGlyph: glyphs[0]};
 ```
 
-`layoutText()` refuses its options and a text that is no string as `writeText()` does, with the
-same error classes.
+`layoutText()` refuses the options it shares with `writeText()` — all but `z` — and a text that is
+no string as `writeText()` does, with the same error classes.
 
 ## A sine scroller
 

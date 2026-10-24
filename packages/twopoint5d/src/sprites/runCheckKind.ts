@@ -1,7 +1,10 @@
 import {describeValue} from '../utils/describeValue.js';
 import type {SpriteFeature, SpriteKindShape} from './SpriteFeature.js';
 
-/** What a thrown value says: the message of an `Error`, a string as it is, anything else as `describeValue()` shows it. @internal */
+/**
+ * What a thrown value says: the message of an `Error`, a string as it is, anything else as
+ * `describeValue()` shows it. @internal
+ */
 export const thrownMessage = (error: unknown): string =>
   error instanceof Error ? error.message : typeof error === 'string' ? error : describeValue(error);
 

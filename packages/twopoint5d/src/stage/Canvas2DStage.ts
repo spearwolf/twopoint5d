@@ -442,11 +442,11 @@ export class Canvas2DStage {
    * left untouched — the canvas keeps the size and the content it had. `THREE.Sprite` shares
    * one geometry across every sprite of the module; it is not this stage's to release.
    *
-   * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
-   * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do nothing;
-   * `setCanvasSize()` still refuses a size that is no finite number of 1 or more,
-   * `setContainerSize()` one that is no finite number, and a write to `fit` one that is neither
-   * `'contain'` nor `'cover'`.
+   * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, `render()` and a further
+   * `dispose()` do nothing, and `setCanvasSize()`, `setContainerSize()` and a write to `fit`
+   * change nothing — they still refuse what they refuse on a live stage: a size that is no finite
+   * number of 1 or more, one that is no finite number, and a fit that is neither `'contain'` nor
+   * `'cover'`.
    * `canvas`, `renderer`, `projection`, `scene`, `sprite` and `needsUpdate` keep the values the
    * stage was left with. {@link width} and {@link height} read `canvas.width` and `canvas.height`,
    * so they keep answering with whatever stands at the canvas — including what the caller sets

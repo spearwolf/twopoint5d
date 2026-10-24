@@ -19,6 +19,14 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
   declare readonly basePool?: VertexObjectPool<VOBaseType>;
   declare readonly instancedPool: VertexObjectPool<VOInstancedType>;
 
+  /**
+   * Builds the instanced pool and the base from a pool, a descriptor or a description each, or
+   * takes the base from a `BufferGeometry`, as {@link InstancedVOBufferGeometry} does.
+   *
+   * @throws what the constructor of {@link InstancedVOBufferGeometry} throws. Whatever this
+   *   constructor throws, a pool it built from a descriptor or description is disposed, and a
+   *   pool handed in is left as it was.
+   */
   constructor(
     ...args:
       | [VertexObjectPool<VOInstancedType> | VertexObjectDescriptor | VertexObjectDescription, number, BufferGeometry]

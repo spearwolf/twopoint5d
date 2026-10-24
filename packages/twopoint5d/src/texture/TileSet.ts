@@ -29,11 +29,16 @@ import {TextureCoords} from './TextureCoords.js';
 // +---------------------------------------------+
 //
 
-/** The layout of a {@link TileSet}: the size of a tile, the spaces around and between tiles, how many there are and where their ids start. */
+/**
+ * The layout of a {@link TileSet}: the size of a tile, the spaces around and between tiles, how
+ * many there are and where their ids start.
+ */
 export interface TileSetOptions {
   /** The width of one tile — a finite number above 0. Defaults to the width of the `baseCoords`. */
   tileWidth?: number;
-  /** The height of one tile — a finite number above 0. Defaults to the height of the `baseCoords`. */
+  /**
+   * The height of one tile — a finite number above 0. Defaults to the height of the `baseCoords`.
+   */
   tileHeight?: number;
 
   /** The space around the whole grid of tiles — a finite number of 0 or more. Defaults to 0. */
@@ -123,13 +128,13 @@ export class TileSet<D = TextureAtlasFrameData> {
   }
 
   /**
-   * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if `margin`,
-   * `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a whole number
-   * of 1 or more, if `firstId` is not a whole number, if the width or height of the `baseCoords`
-   * is not finite, if the first tile does not fit into the `baseCoords` with its `margin` and `padding`,
-   * if the tiles of a `tileCount` do not all fit into the `baseCoords`, a `tileCount` above
-   * {@link TileSet.MaxTiles}, more than `MaxTiles` tiles that fit without a `tileCount`; the atlas
-   * handed in is then left as it was.
+   * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if
+   * `margin`, `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a
+   * whole number of 1 or more, if `firstId` is not a whole number, if the width or height of the
+   * `baseCoords` is not finite, if the first tile does not fit into the `baseCoords` with its
+   * `margin` and `padding`, if the tiles of a `tileCount` do not all fit into the `baseCoords`, if
+   * a `tileCount` lies above {@link TileSet.MaxTiles}, or if more than `MaxTiles` tiles fit without
+   * a `tileCount`; the atlas handed in is then left as it was.
    */
   constructor(...args: [TextureAtlas<D>, TextureCoords, TileSetOptions?] | [TextureCoords, TileSetOptions?]) {
     if (args[0] instanceof TextureAtlas) {
@@ -146,12 +151,18 @@ export class TileSet<D = TextureAtlasFrameData> {
     this.#createTextureCoords();
   }
 
-  /** The width of one tile, in the units of the `baseCoords`: the option `tileWidth`, or the width of the `baseCoords`. */
+  /**
+   * The width of one tile, in the units of the `baseCoords`: the option `tileWidth`, or the width
+   * of the `baseCoords`.
+   */
   get tileWidth(): number {
     return this.options.tileWidth ?? this.baseCoords.width;
   }
 
-  /** The height of one tile, in the units of the `baseCoords`: the option `tileHeight`, or the height of the `baseCoords`. */
+  /**
+   * The height of one tile, in the units of the `baseCoords`: the option `tileHeight`, or the
+   * height of the `baseCoords`.
+   */
   get tileHeight(): number {
     return this.options.tileHeight ?? this.baseCoords.height;
   }
@@ -185,17 +196,26 @@ export class TileSet<D = TextureAtlasFrameData> {
     return this.options.tileCount ?? Infinity;
   }
 
-  /** The space around the whole grid of tiles, in the units of the `baseCoords`: the option `margin`, or 0. */
+  /**
+   * The space around the whole grid of tiles, in the units of the `baseCoords`: the option
+   * `margin`, or 0.
+   */
   get margin(): number {
     return this.options.margin ?? 0;
   }
 
-  /** The space around each tile inside its cell, in the units of the `baseCoords`: the option `padding`, or 0. */
+  /**
+   * The space around each tile inside its cell, in the units of the `baseCoords`: the option
+   * `padding`, or 0.
+   */
   get padding(): number {
     return this.options.padding ?? 0;
   }
 
-  /** The space between two neighbouring tiles, in the units of the `baseCoords`: the option `spacing`, or 0. */
+  /**
+   * The space between two neighbouring tiles, in the units of the `baseCoords`: the option
+   * `spacing`, or 0.
+   */
   get spacing(): number {
     return this.options.spacing ?? 0;
   }
@@ -213,7 +233,10 @@ export class TileSet<D = TextureAtlasFrameData> {
     return this.firstId + randomInt(this.tileCount);
   }
 
-  /** The `frameId` of a tile drawn at random, from `firstFrameId` to `lastFrameId`, each as likely as any other. */
+  /**
+   * The `frameId` of a tile drawn at random, from `firstFrameId` to `lastFrameId`, each as likely
+   * as any other.
+   */
   randomFrameId(): number {
     return this.firstFrameId + randomInt(this.tileCount);
   }
@@ -232,11 +255,12 @@ export class TileSet<D = TextureAtlasFrameData> {
   }
 
   // How many cells of `outer` with `spacing` between them fit along `extent` with `margin` at both
-  // ends; the caller has made sure the first one fits. The quotient is rounded once and can land one
-  // off where the cells meet the bound exactly, so the count is held to the test the layout places a
-  // cell by. A count past 2^53 is far over MaxTiles, and so is Infinity, which a tile of a denormal
-  // width yields: neither is corrected, and the caller refuses both. The first cell is there in any
-  // case, whatever the rounding of the quotient says.
+  // ends; the caller has made sure the first one fits. The quotient is rounded once and can land
+  // one off where the cells meet the bound exactly, so the count is held to the test the layout
+  // places a cell by. A count past 2^53 is far over MaxTiles, and so is Infinity, which a tile of a
+  // denormal width yields: neither is corrected. Without a tileCount the caller refuses both; with
+  // one, the tiles of that count all fit into the first row, and the caller lays them there. The
+  // first cell is there in any case, whatever the rounding of the quotient says.
   static #cellsAlong(extent: number, margin: number, outer: number, spacing: number): number {
     const step = outer + spacing;
     let count = Math.floor((extent - 2 * margin - outer) / step) + 1;

@@ -626,13 +626,13 @@ other.
   uniform node per declared uniform, at its start value or the one handed in, written by
   `setUniform(name, x, y?, z?, w?)`, which allocates nothing and keeps working after `dispose()`;
   per declared texture a signal, a memo of its shape over `textureShapeKey()` — `undefined` for a
-  texture declared with `needsImage` until its image has measures — and a size uniform kept
-  current. `setTexture()`, `getTexture()` and `touchTexture()` take the declared names; a texture
-  stays the caller's. `dispose()` destroys the size effects first, clears the textures while their
-  signals live and then deletes its signal group. Before any signal exists it refuses, in the words
-  of the `where` it is handed, `features` that are no iterable, a feature as `defineFeature()`
-  refuses it, options that are no object, `textures` or `uniforms` that are no object by name and a
-  start value in `uniforms` that is not of the type of its uniform — a finite number or 2 to 4 of them, the rule
+  texture declared with `needsImage` until its image has measures — and a size uniform kept current.
+  `setTexture()`, `getTexture()` and `touchTexture()` take the declared names; a texture stays the
+  caller's. `dispose()` destroys the size effects first, clears the textures while their signals
+  live and then deletes its signal group. Before any signal exists it refuses, in the words of the
+  `where` it is handed, `features` that are no iterable, a feature as `defineFeature()` refuses it,
+  options that are no object, `textures` or `uniforms` that are no object by name and a start value
+  in `uniforms` that is not of the type of its uniform — a finite number or 2 to 4 of them, the rule
   of the declared start values; `null` keeps the declared one, as `undefined` does.
 - **`FeatureSpritesMaterial`** — a `NodeMaterial` built from the kind,
   `new FeatureSpritesMaterial(kind, {name, textures, uniforms, placement, resources, pass, …})`,
@@ -779,13 +779,14 @@ declare function definePass(pass: SpritePass): SpritePass;
 ```
 
 `definePass()` checks what a pass can be checked for on its own and freezes it, with frozen copies
-of `features`, `without`, `material` and `uniformNames`: an object with a name, a `visible` that is a
-function, `features` as a list of features of distinct names, each checked as `defineFeature()`
+of `features`, `without`, `material` and `uniformNames`: an object with a name, a `visible` that is
+a function, `features` as a list of features of distinct names, each checked as `defineFeature()`
 checks one, **no data** — a feature of a pass brings no attributes, methods, `initialize` or usage
 aliases, since the pool and the sprite handle are those of the kind —, at most one placement among
 the features, a `without` as a list of names that names none twice, `uniformNames` and `material` as
 objects, and a `renderOrder` that is a finite number (`TypeError`, each quoting the value it
-refuses, a `RangeError` for the `renderOrder`). The sprites run the same check for a pass that never went through `definePass()`. The `visible` hook and the renames of `uniformNames` are
+refuses, a `RangeError` for the `renderOrder`). The sprites run the same check for a pass that never
+went through `definePass()`. The `visible` hook and the renames of `uniformNames` are
 [`sprite-uniform-bindings.md`](sprite-uniform-bindings.md) §5 and §6.
 
 What only a kind can tell is checked where a material of the pass is built — by

@@ -285,21 +285,21 @@ export class AsepriteJson {
    * It is read by its own keys only: an inherited one such as `constructor` names no tag.
    *
    * Refused, with the tag named: a range outside the frames or running backwards, an unknown
-   * direction, a repeat that is no whole number of 0 or more, two tags of one name, a tag that plays
-   * more than `FrameBasedAnimations.MaxFramesWithDurations` frames of differing durations, a playback
-   * that is none of `'loop'`, `'once'` and `'pingpong'`, and a playback for a tag the sheet does not
-   * carry. Refused as well: a frame name twice in the layout "Array"; a frame — in a tag or outside
-   * every tag — without a duration above zero, with a `RangeError` naming the frame; a frame or a frame
-   * tag that is no object, and `meta.frameTags` that is no list, with a `TypeError`; and what
-   * `TexturePackerJson.parse()` refuses of a frame and of `meta.size`. A json, its `frames` or its
-   * `meta` that is no object, a frame of the layout "Array" without a string `filename` and a tag
-   * without a string `name` are refused with a `TypeError` as well, and so are `meta.slices` that is no
-   * list, a slice that is no object or has no string `name`, keys that are no list, a key that is no
-   * object, and a `bounds`, `center` or `pivot` that is no object. A `frame` of a slice key that is no
-   * whole number of 0 or more, and a coordinate of a `bounds`, `center` or `pivot` that is no finite
-   * number or, as `w` or `h`, lies below 0, are refused with a `RangeError`; two slices of one name
-   * with an `Error`. Every check runs before the
-   * first frame is added: a refused sheet leaves `options.target` as it was.
+   * direction, a repeat that is no whole number of 0 or more, two tags of one name, a tag that
+   * plays more than `FrameBasedAnimations.MaxFramesWithDurations` frames of differing durations, a
+   * playback that is none of `'loop'`, `'once'` and `'pingpong'`, and a playback for a tag the
+   * sheet does not carry. Refused as well: a frame name twice in the layout "Array"; a frame — in a
+   * tag or outside every tag — without a duration above zero, with a `RangeError` naming the frame;
+   * a frame or a frame tag that is no object, and `meta.frameTags` that is no list, with a
+   * `TypeError`; and what `TexturePackerJson.parse()` refuses of a frame and of `meta.size`. A
+   * json, its `frames` or its `meta` that is no object, a frame of the layout "Array" without a
+   * string `filename` and a tag without a string `name` are refused with a `TypeError` as well, and
+   * so are `meta.slices` that is no list, a slice that is no object or has no string `name`, keys
+   * that are no list, a key that is no object, and a `bounds`, `center` or `pivot` that is no
+   * object. A `frame` of a slice key that is no whole number of 0 or more, and a coordinate of a
+   * `bounds`, `center` or `pivot` that is no finite number or, as `w` or `h`, lies below 0, are
+   * refused with a `RangeError`; two slices of one name with an `Error`. Every check runs before
+   * the first frame is added: a refused sheet leaves `options.target` as it was.
    */
   static parse(
     data: AsepriteJsonData,

@@ -85,10 +85,10 @@ const ENTITIES: ReadonlyMap<string, string> = new Map([
   ['apos', "'"],
 ]);
 
-// A numeric entity that is no char — beyond U+10FFFF, a surrogate, or too large for a number — stays as
-// it is written, like a named entity it does not know: a name outside the five of XML — `&constructor;`
-// as well — stays as it is written. An entity stands only in a text attribute (`face`, `charset`,
-// `file`); in a number field `BitmapFont` refuses the string anyway, naming the field
+// A numeric entity that is no char — beyond U+10FFFF, a surrogate, or too large for a number —
+// and a named entity outside the five of XML — `&constructor;` as well — stay as they are
+// written. An entity stands only in a text attribute (`face`, `charset`, `file`); in a number
+// field `BitmapFont` refuses the string anyway, naming the field
 const decodeEntities = (value: string): string =>
   value.replace(/&(#x[0-9a-fA-F]+|#\d+|\w+);/g, (match, name: string) => {
     if (name.startsWith('#')) {

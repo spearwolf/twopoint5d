@@ -44,11 +44,11 @@ the renderer, and the display leaves that context lost but restorable. Only a `D
 built on the canvas afterwards brings it back; a `WebGPURenderer` or a
 `getContext('webgl2')` of the caller's own on that canvas gets the lost context. A
 `Display` constructor that throws after it has built or taken over its renderer leaves
-nothing behind — it releases the renderer, gives a canvas handed in back and takes its
-own container out, as `dispose()` would. The constructors of `InstancedVOBufferGeometry`
-and `InstancedVertexObjectGeometry` and `InstancedVOBufferGeometry#attachInstancedPool()` do
-the same for the pools they build from a descriptor: one that throws disposes them and
-leaves a pool handed in as it was.
+nothing behind — it releases the renderer, gives a canvas handed in back and takes its own
+container out, as `dispose()` would. The constructors of `InstancedVOBufferGeometry` and
+`InstancedVertexObjectGeometry` and `InstancedVOBufferGeometry#attachInstancedPool()` do
+the same for the pools they build from a descriptor or a description: one that throws
+disposes them and leaves a pool handed in as it was.
 
 Reference implementation —
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) marks what it built and
@@ -107,13 +107,13 @@ writing the canvas texture into that one while another sits in the slot.
 [`SpritePicker`](../src/sprites/SpritePicker.ts) owns its render target and, per mesh it
 has drawn, a pick mesh and a pick material built on the uniforms and textures of that
 mesh; the renderer, the camera and the meshes stay the caller's. It listens to three's
-`dispose` event of each mesh and of the geometry it draws, and releases the pick mesh
-and the pick material then — the event of the mesh comes before the mesh releases the
+`dispose` event of each mesh and of the geometry it draws, and releases the pick mesh and
+the pick material then — the event of the mesh comes before the mesh releases the
 resources the pick material reads, and the one of the geometry comes with a growth; the
 next pick builds them anew. Up to one of those events it holds each mesh it has drawn,
-whether a later pick lists it or not: a mesh its owner drops without `dispose()` lives as long
-as the picker. Its `dispose()` releases the target and every pick material,
-stops listening, and rejects every pick still in flight (section 3).
+whether a later pick lists it or not: a mesh its owner drops without `dispose()` lives as
+long as the picker. Its `dispose()` releases the target and every pick material, stops
+listening, and rejects every pick still in flight (section 3).
 
 ## 2. Idempotence
 
@@ -293,10 +293,10 @@ dispose(): void {
 }
 ```
 
-What an instance has hung on the DOM, on the window or on an observer itself, its `dispose()`
-takes down directly — never through a listener of its own dispose event. An `off(instance)` of
-the caller, the obvious way to get rid of one's own listeners, would take that listener along,
-and the document would keep the instance alive.
+What an instance has hung on the DOM, on the window or on an observer itself, its
+`dispose()` takes down directly — never through a listener of its own dispose event. An
+`off(instance)` of the caller, the obvious way to get rid of one's own listeners, would
+take that listener along, and the document would keep the instance alive.
 
 **Order rule:** release your own resources **before** tearing down the signal group. A
 resource reachable only through a signal is unreachable once that signal is destroyed,

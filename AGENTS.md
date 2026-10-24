@@ -56,35 +56,35 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   CI workflow: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
   cache server, the docs' code block check, the Nameable-Types check and the lookbook's
-  preview generator (`scripts/**/*.test.mjs`), plus specs that start `makePackageJson.mjs`,
-  `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs` and `nxCacheServer.mjs` as
-  child processes, one that checks the lookbook's vendored `rainbow-line` script, one
-  that holds the tags and routes of the lookbook's demo metadata to the library's
-  exports, one that holds the preview images of the lookbook to its demos, ids and card
-  size, one that holds the view-transition names of the lookbook's navbar to its two
-  pages and the stylesheets to those names, one that asks Nx whether every tracked
-  Markdown file is an input of the docs' type check, one that asks Nx whether every
-  tracked file under the library's `src/` is an input of its Vitest targets, and one that
-  holds the publish script to Node's built-ins; the Nx project `scripts` has no `test`
-  target, so `pnpm test` leaves them out
+  preview generator (`scripts/**/*.test.mjs`), plus specs that start
+  `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs` and
+  `nxCacheServer.mjs` as child processes, one that checks the lookbook's vendored
+  `rainbow-line` script, one that holds the tags and routes of the lookbook's demo
+  metadata to the library's exports, one that holds the preview images of the lookbook to
+  its demos, ids and card size, one that holds the view-transition names of the lookbook's
+  navbar to its two pages and the stylesheets to those names, one that asks Nx whether
+  every tracked Markdown file is an input of the docs' type check, one that asks Nx
+  whether every tracked file under the library's `src/` is an input of its Vitest targets,
+  and one that holds the publish script to Node's built-ins; the Nx project `scripts` has
+  no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
   `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
   Markdown files; the tests and the blocks are checked against the built library
-- `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook> and on every network
-  interface (`server.host: true`). Run it once and pass on every URL it prints, the network
-  ones included — they change with the network, so none is written down here. No port check
-  before, no polling or probe after. Started by an agent, Astro moves the server into the
-  background by itself, prints its URLs and the command returns while the server keeps
-  running; `pnpm exec astro dev status`, `… logs` and `… stop` in `apps/lookbook` reach it.
-  Started in a terminal, it stays in the foreground
+- `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook> and on every
+  network interface (`server.host: true`). Run it once and pass on every URL it prints,
+  the network ones included — they change with the network, so none is written down here.
+  No port check before, no polling or probe after. Started by an agent, Astro moves the
+  server into the background by itself, prints its URLs and the command returns while the
+  server keeps running; `pnpm exec astro dev status`, `… logs` and `… stop` in
+  `apps/lookbook` reach it. Started in a terminal, it stays in the foreground
 - `pnpm lookbook:assets` — regenerates the generated assets of the lookbook demos under
-  `apps/lookbook/public/assets/<demo>/` from `apps/lookbook/assets-src/`; `--only=<demo>,…`
-  for some, `--skip-render` reuses Blender's render cache. Not part of `pnpm run ci`: the
-  outputs are committed, and a change to an asset is a commit of its generator and its output
-  together. Every output file, frame name, palette and font metric is documented in
-  `apps/lookbook/assets-src/README.md`
+  `apps/lookbook/public/assets/<demo>/` from `apps/lookbook/assets-src/`;
+  `--only=<demo>,…` for some, `--skip-render` reuses Blender's render cache. Not part of
+  `pnpm run ci`: the outputs are committed, and a change to an asset is a commit of its
+  generator and its output together. Every output file, frame name, palette and font
+  metric is documented in `apps/lookbook/assets-src/README.md`
 - `pnpm lookbook:generate-previews` — the preview image of every lookbook demo, through
   Playwright's Chromium against `astro preview`; `--only=<name>,…` for some. Not part of
   `pnpm run ci`: it needs a browser and writes binary files. The protocol is in
@@ -140,7 +140,8 @@ explicit instruction.
   check outside the lookbook. TypeScript 7 exports no compiler API under `typescript`, so
   a script that needs one imports the classic API from `@typescript/typescript6`, never
   from `typescript`. The lookbook keeps its own `typescript` 6 for `astro check`, whose
-  peer range ends at 6 ([monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions)).
+  peer range ends at 6 ([monorepo architecture
+  §5](docs/architecture.md#5-shared-dependency-versions)).
 - **`apps/lookbook/public/js/rainbow-line-v0.6.0.js`** is the web component behind every
   `RainbowLine` from `@spearwolf/astro-rainbow-line`. That component emits
   `<script src="${BASE_URL}/js/rainbow-line-v0.6.0.js">` at runtime and expects the file
@@ -222,14 +223,15 @@ libraries.
 - [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a
   description declares and which accessors it generates
 - The guides of the library: [sprites](packages/twopoint5d/docs/sprites.md),
-  [text](packages/twopoint5d/docs/text.md), [tile maps](packages/twopoint5d/docs/map2d.md),
-  [display](packages/twopoint5d/docs/display.md) — written for the users of the library;
-  they describe the code as it is, with no internals and no history, and a new or changed
-  feature changes its guide section in the same commit
-- [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers of
-  the library: the idea of each feature, its inner workings and the basis of its build; no
-  tutorial for users. They may lag behind the code, and where one disagrees with a guide,
-  the guide holds. Read the one for a feature before building or changing it, and the
-  README for how guides and proposals divide their readers
+  [text](packages/twopoint5d/docs/text.md), [tile
+  maps](packages/twopoint5d/docs/map2d.md), [display](packages/twopoint5d/docs/display.md)
+  — written for the users of the library; they describe the code as it is, with no
+  internals and no history, and a new or changed feature changes its guide section in the
+  same commit
+- [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers
+  of the library: the idea of each feature, its inner workings and the basis of its build;
+  no tutorial for users. They may lag behind the code, and where one disagrees with a
+  guide, the guide holds. Read the one for a feature before building or changing it, and
+  the README for how guides and proposals divide their readers
 - [Monorepo architecture](docs/architecture.md) — Nx targets and caching, the build and
   publish pipeline, the CI gate

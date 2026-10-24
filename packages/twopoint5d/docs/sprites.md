@@ -366,14 +366,17 @@ with one animation per frame tag:
 The frames keep their durations — as one `duration` when they are all alike, as `durations` when
 they differ. Every frame carries its duration, and Aseprite writes one above 0 for each; a frame
 without it, in a tag or not, is refused with a `RangeError` naming it, before the first frame goes
-into the atlas. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its frames
-played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1 is a
-one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code instead.
-It reads its own keys only — an inherited one such as `constructor` names no tag —, and a value
-that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the first
-frame goes into the atlas: a refused sheet leaves `options.target` as it was.
+into the atlas. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its
+frames played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1
+is a one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code
+instead. It reads its own keys only — an inherited one such as `constructor` names no tag —, and a
+value that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the
+first frame goes into the atlas: a refused sheet leaves `options.target` as it was.
 
-A json that Aseprite does not write that way — without `frames` or `meta`, a frame of the layout "Array" without a `filename`, a tag or a slice without a `name`, slice keys, `bounds`, `center` or `pivot` the parser cannot read, two slices of one name — is refused before the first frame goes into the atlas, and the error names what is wrong.
+A json that Aseprite does not write that way — without `frames` or `meta`, a frame of the layout
+"Array" without a `filename`, a tag or a slice without a `name`, slice keys, `bounds`, `center` or
+`pivot` the parser cannot read, two slices of one name — is refused before the first frame goes into
+the atlas, and the error names what is wrong.
 
 ```ts check
 import {AnimatedSpriteKind, AsepriteJson, type AsepriteJsonData, FeatureSprites} from '@spearwolf/twopoint5d';
@@ -436,10 +439,10 @@ until `store.renderer` is set. A `getAsync()` after a subtype its resource never
 animation data and whose adapter reads none — rejects instead of waiting.
 
 An item that names an adapter the store does not know builds no resource and is reported as an
-`error` of the store; a field the type of an item does not read — an `imageUrl` beside an
-`atlasUrl` — is left out and reported the same way. An adapter reads the envelope the three packers share — `frames`,
-`meta.size`, `meta.image` — since the resource reads the image out of the json before any adapter
-runs; a packer of another format is converted to that envelope first.
+`error` of the store; a field the type of an item does not read — an `imageUrl` beside an `atlasUrl`
+— is left out and reported the same way. An adapter reads the envelope the three packers share —
+`frames`, `meta.size`, `meta.image` — since the resource reads the image out of the json before any
+adapter runs; a packer of another format is converted to that envelope first.
 
 ### Atlases built at run time: `DynamicAtlas`
 
@@ -1173,12 +1176,13 @@ material.placement = FlatPlacement;
 material.dispose();
 ```
 
-Another placement takes the place of the current one only when it contributes a placement stage
-and nothing else — no attributes, methods, uniforms or textures, because the sprites and the
-material were built without them — and the kind holds every feature it `requires`. It may bring a
-`checkKind` of its own, which is shown the kind with it in place of the kind's placement. Anything
-else throws a `TypeError` naming both features, a refusal of its `checkKind` an `Error` naming it.
-The placement of the kind always comes back, whatever it brings. A write of the placement the material holds builds nothing.
+Another placement takes the place of the current one only when it contributes a placement stage and
+nothing else — no attributes, methods, uniforms or textures, because the sprites and the material
+were built without them — and the kind holds every feature it `requires`. It may bring a `checkKind`
+of its own, which is shown the kind with it in place of the kind's placement. Anything else throws a
+`TypeError` naming both features, a refusal of its `checkKind` an `Error` naming it. The placement
+of the kind always comes back, whatever it brings. A write of the placement the material holds
+builds nothing.
 
 A change rebuilds the position graph and sets `needsUpdate`; three serves a shader source it has
 built before from its caches, so the second swap back and forth is cheap. Do not swap every frame.
@@ -1678,9 +1682,10 @@ built for another sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow
 `geometry`; any material parameter next to a `material`. The geometry and the material the
 constructor builds throw their own refusals in their own name — `baseArgs` that are no list —, and
 the uniforms and textures in the name of the class that builds them: `FeatureSpritesMaterial`
-without passes, `FeatureSprites` with them — `textures` that are no object. A material that cannot be built (a `placement` that cannot
-stand in, a texture name no feature declares) throws as well, and the geometry the constructor built
-for it is disposed first, so a refused constructor leaves nothing behind.
+without passes, `FeatureSprites` with them — `textures` that are no object. A material that cannot
+be built (a `placement` that cannot stand in, a texture name no feature declares) throws as well,
+and the geometry the constructor built for it is disposed first, so a refused constructor leaves
+nothing behind.
 
 **After `dispose()`.** The mesh leaves the scene graph and fires the `dispose` event of three.
 `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`;
@@ -2008,9 +2013,9 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
 - **`name`** — required, unique within a kind; every error about the feature names it, and
   `requires` of other features refers to it.
-- **`attributes`** — instance attributes in the form of a vertex object description (see
-  [vertex objects](../src/vertex-objects/README.md)). They are merged into the one description of the kind, so an
-  attribute name is unique across the features and must not be one of the base (`position`,
+- **`attributes`** — instance attributes in the form of a vertex object description (see [vertex
+  objects](../src/vertex-objects/README.md)). They are merged into the one description of the kind,
+  so an attribute name is unique across the features and must not be one of the base (`position`,
   `uv`); the merged layout has to fit into one sprite. An attribute is `static` unless it says
   otherwise: give one that changes every frame `usage: 'dynamic'`.
 - **`usageAliases`** — words a caller of `attributeUsage` may use for attributes of this feature,
@@ -2029,11 +2034,11 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   slot comes back with the values of its last sprite, and without `initialize()` a new sprite
   keeps them. It runs for every sprite created, so it allocates nothing.
 - **`uniforms`** — start values by name: a finite number for a `float`, 2 to 4 finite numbers for a
-  `vec2` to `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0, shared:
-  true}`: the features that declare a name shared, with the same type and start value, hold one
-  uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`, so
-  a wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name, or
-  two shared ones of another type or start value, are refused, naming the fix. Every stage of the
+  `vec2` to `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0,
+  shared: true}`: the features that declare a name shared, with the same type and start value, hold
+  one uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`,
+  so a wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name,
+  or two shared ones of another type or start value, are refused, naming the fix. Every stage of the
   kind reads every uniform, through `uniform(name)` of its context.
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
   counts as set only once its image has measures. A name is unique across the kind. The textures
@@ -2078,9 +2083,8 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
 A field of the wrong type — a stage without a `transform`, a method that is no function, a texture
 declared with anything but `{}` or `{needsImage: true}` — is refused with a `TypeError` naming the
-feature and the field and quoting the value. `defineSprite()`, `definePass()` and the placement
-swap hold a feature that
-never passed through `defineFeature()` to the same rules.
+feature and the field and quoting the value. `defineSprite()`, `definePass()` and the placement swap
+hold a feature that never passed through `defineFeature()` to the same rules.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
@@ -2229,10 +2233,10 @@ colorMap.dispose();
 
 The rules:
 
-- **The shape.** `definePass()` refuses a pass that is no object with a `TypeError`, and so does it
-  `features` that are no list, a `without` that is no list of names, `uniformNames` or `material`
-  that are no objects; a `renderOrder` that is no finite number throws a `RangeError`. The sprites
-  check the same for a pass that never went through `definePass()`, in their own name.
+- **The shape.** `definePass()` refuses with a `TypeError` a pass that is no object, `features` that
+  are no list, a `without` that is no list of names, and `uniformNames` or `material` that are no
+  objects; a `renderOrder` that is no finite number throws a `RangeError`. The sprites check the
+  same for a pass that never went through `definePass()`, in their own name.
 - **No data.** A pass draws the data of the sprites. `definePass()` refuses a feature that brings
   attributes, methods, `initialize()` or usage aliases, and two features of one name. Everything a
   pass reads comes from a feature of the kind; a `requires` of a pass feature is met by the kind or

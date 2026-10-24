@@ -443,12 +443,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * whose message counts the stages that refused; a render target that refuses the size joins
    * that error without counting as one of them.
    *
-   * While a stage refuses the size, this renderer answers with the size it carried before the
-   * call, and the {@link StageItem} of that stage keeps the size it carried — a stage that took
-   * the new size keeps it, item and all. The very same call therefore goes through again as soon
-   * as the refusing stage fits, and reaches exactly the stages that do not have the size yet. A
-   * call is carried out as long as one stage still owes the size this renderer answers with, so
-   * the size this renderer fell back to reaches the stages that moved past it.
+   * While a stage refuses the size, this renderer answers with the size it carried before the call,
+   * and the {@link StageItem} of that stage keeps the size it carried — a stage that took the new
+   * size keeps it, item and all. The very same call therefore goes through again as soon as the
+   * refusing stage fits, and reaches exactly the stages that do not have the size yet. A call is
+   * carried out as long as one stage still owes the size this renderer answers with, so the size
+   * this renderer fell back to reaches the stages that moved past it. A stage counts as refusing
+   * whenever its `resize()` throws — a {@link Stage2D} also throws once it has taken the size, when
+   * a listener of its camera change or resize threw.
    *
    * `errors` of the `AggregateError` stands in the order in which the stages were added, the
    * error of a render target first.

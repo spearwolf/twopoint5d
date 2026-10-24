@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add playback modes and per-frame durations to `FrameBasedAnimations#add()`: the timing options take `playback` — `'loop'` (the default), `'once'`, which holds the last frame, or `'pingpong'`, which runs back and forth and shows each end frame once per turn (`0 1 2 3 2 1 0 1 …`) — and `durations`, seconds per frame in place of a `duration` or a `frameRate`, whose sum is the duration of the animation. `add()` refuses a playback that is none of the three, durations beside a duration or a frameRate, durations that are no array, of another count than the frames or with a value that is no finite number above zero, and more than 8191 frames with durations — `FrameBasedAnimations.MaxFramesWithDurations` — each naming the animation. The catalog types of `TextureStore` take both fields as well
 - add `FrameBasedAnimations#add(name, timing, atlas, frameNames)`: the frames of an atlas named in a list, in the order of the list and as often as they are named, with their trim margins; a name the atlas does not carry and an entry that is no string are refused, naming the index
 - add `FrameBasedAnimations#animation(nameOrId)`, a frozen `FrameBasedAnimationInfo` — frame count, duration, playback, per-frame durations and `cycleDuration`, the seconds after which a `'once'` holds its last frame and a `'pingpong'` starts its next turn — and `FrameBasedAnimations#clone()`, a copy under the same names and ids that grows apart from the original. `FrameBasedAnimDef` gains `playback` and `durations`
-- add `AsepriteJson.parse(json, options?)`, which reads the json of Aseprite's "Export Sprite Sheet" in the layout "Hash" or "Array" into an atlas, its `meta` and a `FrameBasedAnimations` with one animation per frame tag: `forward` and `reverse` loop, `pingpong` and `pingpong_reverse` run back and forth, the reversed directions over the frames backwards; the durations of the frames come along (ms to s), a `repeat` of `r` ≥ 1 becomes a one-shot over the frames played `r` times, and `options.playback` names the playback of a tag from code. Every frame's `data` adds its `index` and the `slices` in force at it (`bounds`, `center`, `pivot`). A range outside the frames, an unknown direction, a bad repeat, two tags of one name, a frame name twice in the layout "Array", a repeat that plays more than 8191 frames of differing durations and a playback in `options.playback` that is none of `'loop'`, `'once'` and `'pingpong'` are refused, naming the tag or the frame; so is a frame without a duration above 0, in a tag or outside every tag, with a `RangeError` naming it, `meta.frameTags` that is no list and a frame tag or a frame that is no object, with a `TypeError`, a json, `frames` or `meta` that is no object, a frame of the layout "Array" without a string `filename` and a frame tag without a string `name`, with a `TypeError` as well, `meta.slices` that is no list, a slice that is no object or without a string `name`, keys that are no list, a key that is no object and a `bounds`, `center` or `pivot` that is no object, with a `TypeError`, a `frame` of a slice key that is no whole number of 0 or more and a coordinate of a `bounds`, `center` or `pivot` that is no finite number (or, as `w` or `h`, lies below 0), with a `RangeError`, two slices of one name, and what `TexturePackerJson.parse()` refuses of a frame and of `meta.size` — all before the first frame reaches `options.target`; `options.playback` is read by its own keys only, so an inherited one such as `constructor` names no tag. `docs/sprites.md` has the rules under "Aseprite sheets"
+- add `AsepriteJson.parse(json, options?)`, which reads the json of Aseprite's "Export Sprite Sheet" in the layout "Hash" or "Array" into an atlas, its `meta` and a `FrameBasedAnimations` with one animation per frame tag: `forward` and `reverse` loop, `pingpong` and `pingpong_reverse` run back and forth, the reversed directions over the frames backwards; the durations of the frames come along (ms to s), a `repeat` of `r` ≥ 1 becomes a one-shot over the frames played `r` times, and `options.playback` names the playback of a tag from code. Every frame's `data` adds its `index` and the `slices` in force at it (`bounds`, `center`, `pivot`). A range outside the frames, an unknown direction, a bad repeat, two tags of one name, a frame name twice in the layout "Array", a repeat that plays more than 8191 frames of differing durations and a playback in `options.playback` that is none of `'loop'`, `'once'` and `'pingpong'` are refused, naming the tag or the frame; so are a frame without a duration above 0, in a tag or outside every tag, with a `RangeError` naming it, `meta.frameTags` that is no list and a frame tag or a frame that is no object, with a `TypeError`, a json, `frames` or `meta` that is no object, a frame of the layout "Array" without a string `filename` and a frame tag without a string `name`, with a `TypeError` as well, `meta.slices` that is no list, a slice that is no object or without a string `name`, keys that are no list, a key that is no object and a `bounds`, `center` or `pivot` that is no object, with a `TypeError`, a `frame` of a slice key that is no whole number of 0 or more and a coordinate of a `bounds`, `center` or `pivot` that is no finite number (or, as `w` or `h`, lies below 0), with a `RangeError`, two slices of one name, and what `TexturePackerJson.parse()` refuses of a frame and of `meta.size` — all before the first frame reaches `options.target`; `options.playback` is read by its own keys only, so an inherited one such as `constructor` names no tag. `docs/sprites.md` has the rules under "Aseprite sheets"
 - add atlas adapters to `TextureStore`: `registerAtlasAdapter(name, adapter, {app})` registers a function `(json, parentCoords) => {atlas, animations?}` under a name, a catalog item names one with `atlasAdapter`, and an item that names none is read by the latest registered adapter whose `app` matches `meta.app` of its json, else by `'texturepacker'`. The store starts with `'texturepacker'` (`texturePackerAtlasAdapter`, TexturePacker and free-tex-packer) and `'aseprite'` (`asepriteAtlasAdapter`), so an Aseprite item publishes its frame tags as its `frameBasedAnimations` without configuration; the item's own animation entries are added to a copy of them, and one named like a tag is skipped and reported. `TextureResource#atlasAdapter` is the input behind it on an atlas resource. An item naming an adapter the store does not know builds no resource and is reported; an adapter that throws or answers no `TextureAtlas` is reported as a failure of the atlas
 - add frame stages and uv stages to the sprite pipeline: a feature's `frameStage` — `{order, transform(frame, ctx)}`, in the bands of `FrameOrder` (`Flip 100`) — changes the frame after the frame slot (or the defaults) and before the trim shift and both pipelines read it; a feature's `uv` — a stage on a `vec2`, in the bands of `UvOrder` (`Slice 100`) — moves where the color source samples. Every stage after the frame slot reads the result as `ctx.uv`, built the first time a stage of a graph reads it, so a graph that never reads it builds no uv stage; `TextureColor` samples at `ctx.uv` and builds the graph it built before. A pass brings both like any other stage, and a renamed copy of `uniformNames` wraps them
 - add `checkKind` to the sprite features: `({base, features}) => void` throws for a kind the feature cannot work in, with a message that names the fix. `defineSprite()` runs it after every check of its own and refuses the kind as `defineSprite: feature "name": <message>`, with the thrown error as the `cause`; a pass runs the checks of its features against the features it draws with, and a placement that carries one still stands in on a live material, its check run against the kind with it in place of the kind's placement. `defineFeature()` refuses a `checkKind` that is no function. The type `SpriteKindShape` names what it is shown
@@ -112,7 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a write of `frameBasedAnimationsData` on an image resource throws the `TypeError` of an input of another shape in JavaScript, as `tileSetOptions` and the inputs of an atlas do; reading it answers `undefined` (**BREAKING**)
 - `frameBasedAnimationsData` of a `TextureResource` is compared by content, every field in its order and a `RegExp` by `source` and `flags`: data equal to the current, such as the same catalog parsed again by `TextureStore#parse()`, keeps the `frameBasedAnimations` and announces nothing, so an `on(id, 'frameBasedAnimations')` bakes no new data texture for it
 - `TextureFactory` built with a renderer asks it for the anisotropy maximum at every texture it builds and caps against the maximum the renderer names at that moment; while the renderer names none, the texture gets no anisotropic filtering
-- `Chronometer#update()` on a stopped chronometer sets `deltaTime` and `rawDeltaTime` to `0`: no active phase elapses in a pause. `stop()` leaves both as they are until the next `update()`. Code that still needs the delta of the last running frame reads it before that `update()`
+- `Chronometer#update()` on a stopped chronometer sets `deltaTime` and `rawDeltaTime` to `0`: no active phase elapses in a pause. `stop()` leaves both as they are until the next `update()` (**BREAKING**). See the Migration Guide
 - `PanControl2D` works on copies of the arrays `keys` and `keyCodes` of its options: a rebinding in place (`control.keys[0] = 'ArrowUp'`) changes neither the options nor another control built from them; whoever wants to rebind several controls writes into each
 - `OrthographicProjectionSpecs` and `ParallaxProjectionSpecs` take no `anchorPosition`: they build on the new type `ProjectionFitSpecs`, the arms of `FitIntoRectangleSpecs` without it, and a projection centers its view on the projection plane (**BREAKING** for TypeScript). See the Migration Guide
 - a write to `StageRenderer#parent`, `attach()` and the constructor refuse a disposed `StageRenderer` and a host whose `isDisposed` is `true` with an error that names the call and the state, before the renderer leaves its holder; `IStageRendererHost` has the optional member `isDisposed`, which `Display` answers (**BREAKING**). See the Migration Guide
@@ -127,7 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ChunkQuadTreeNode#findChunks()` and `#findChunksAt()` empty the `out` array before they fill it, as `Map2DSpatialHashGrid#findWithin()` and `#getTiles()` do (**BREAKING**). See the Migration Guide
 - `ChunkQuadTreeNode.IntersectDistanceFactor` and `BeforeAfterDeltaFactor` are `static readonly`, and `originX`, `originY`, `isLeaf`, `chunks` (`readonly ChunkType[]`) and `nodes` (`Readonly<IChunkQuadTreeChildNodes>`) of a node are read-only (**BREAKING**). See the Migration Guide
 - `RepeatingTilesProvider#getTileIdAt()` and `#getTileIdsWithin()` throw a `RangeError` naming the call for a coordinate that is no whole number and for a width or a height that is no whole number of 0 or more, before a cell of the target is written; the `RangeError` of `getTileIdsWithin()` for a `target` shorter than `width × height` names the call as well
-- `Map2D` and `Map2DTileStreamer` throw a `RangeError` for an `xOffset`, a `yOffset`, a `centerX` or a `centerY` that is no finite number, in the setters and the constructor of the streamer; a refused value leaves the one before and clears no tile. The setters of `Map2D` name `Map2D` in the message, for `tileWidth` and `tileHeight` as well. The constructors of `Map2DTileCoordsUtil` and `Map2DSpatialHashGrid` refuse an `xOffset` or a `yOffset` that is no finite number with a `RangeError`, and so do the setters `xOffset` and `yOffset` of `Map2DTileCoordsUtil`, which leave the offset as it was
+- `Map2D` and `Map2DTileStreamer` throw a `RangeError` for an `xOffset`, a `yOffset`, a `centerX` or a `centerY` that is no finite number, in the setters and the constructor of the streamer; a refused value leaves the one before and clears no tile. The setters of `Map2D` name `Map2D` in the message, for `tileWidth` and `tileHeight` as well. The constructors of `Map2DTileCoordsUtil` and `Map2DSpatialHashGrid` refuse an `xOffset` or a `yOffset` that is no finite number with a `RangeError`, and so do the setters `xOffset` and `yOffset` of `Map2DTileCoordsUtil`, which leave the offset as it was. `xOffset` and `yOffset` of `Map2DTileCoordsUtil` are accessors, as `tileWidth` and `tileHeight` are: a spread, `Object.keys()` or a comparison field by field of an instance lists none of the four, and `copy()` and `equals()` take only an instance of the class this copy of the library defines — one of another copy throws a `TypeError`
 - `computeVisibleTiles()` of `CameraBasedVisibility` and of `RectangularVisibilityArea` throws a `RangeError` for a `centerPoint` that is not two finite numbers, before anything changes; `Map2DTileStreamer` checks its center before it hands it on
 - `TileBox` names the packed key of its tile coordinate `packedKey` and types every field as present: `coords`, `box`, `frustumBox`, `centerWorld`, `distanceToCamera` and `primary` carry a value on every tile of `CameraBasedVisibility#visibles`, and `map2dTile` is `IMap2DTileCoords | undefined` (**BREAKING**). See the Migration Guide
 - `DataIdsChunk2D` holds neither its params object nor, once the first read has decoded it, its base64 string; `protected data` is gone, and `prepareData()` takes the string as its argument (**BREAKING** for a subclass). See the Migration Guide
@@ -143,7 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FrameLoop#setFps()` and `new FrameLoop()` throw a `RangeError` for a `maxFps` that is no finite number of 0 or more — `NaN`, an infinite value, a negative one —, and `setFps()` keeps the limit it has (**BREAKING**). A `maxFps` of `Display` that is no positive finite number gives the frame loop no limit, as `adaptiveResolution` reads it. See the Migration Guide
 - `FrameLoop.OnFrame`, `FixedFrameLoop.OnTick` and `FixedFrameLoop.OnRender` are `static readonly` (**BREAKING** for TypeScript), and a `FrameLoop` subscribes, emits and unsubscribes under the event name of its module, whatever stands at the static. See the Migration Guide
 - `new Canvas2DStage()` and a write to `fit` refuse a fit other than `'contain'` and `'cover'` with a `TypeError` that names the call — the constructor before anything is built, the write on a disposed stage as well, and the fit stays as it is (**BREAKING**). See the Migration Guide
-- `TextureAtlas#randomFrameIds()`, `#randomFrames()` and `#randomFrameNames()` throw a `RangeError` that names the call for a `count` that is no whole number of 0 or more (**BREAKING**): a fractional `count` returned entries, `NaN` and a negative one `[]`, and `Infinity` ran until memory was full. See the Migration Guide
+- `TextureAtlas#randomFrameIds()`, `#randomFrames()` and `#randomFrameNames()` throw a `RangeError` that names the call for a `count` that is no whole number of 0 or more (**BREAKING** for a fractional `count`, `NaN` and a negative one). See the Migration Guide
 
 ### Deprecated
 
@@ -216,7 +216,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - on a mesh scaled evenly, `segmentPlacement({facing: 'camera'})` draws the caps quad of a segment of no length at the scale of the mesh, and it, `axisBillboardPlacement()` and the placement of `ShadowPass` weigh the camera within their turnover at a sine of 0.1 as on a mesh of scale 1: the right, the up and the back of the camera they read are unit vectors in the local space of the mesh
 - `lightOf()` refuses a node that is no `Object3D`, and `planeOf()` a target that is neither an `Object3D` nor a `Plane`, options that are no object and an `options.plane` that is no `Plane`, each with a `TypeError` that names the function and quotes the value; `planeOf()` refuses a plane whose normal or constant is no finite number with a `RangeError` that names the field. Both refuse at the call, before the source reaches `bindUniform()`
 - a second `dispose()` of a `VOBufferGeometry`, a `VertexObjectGeometry`, an `InstancedVOBufferGeometry` or an `InstancedVertexObjectGeometry` does nothing and sends no second `dispose` event, and a listener of that event that throws holds up none of the teardown: the pools are released or given back, the attributes and the index leave the geometry, and the error reaches the caller afterwards
-- `InstancedVOBufferGeometry#attachInstancedPool()` disposes the pool it built from a descriptor when it refuses the slots that pool would take, and a throw while the attributes of a pool are built leaves the geometry as it was: the route that holds the name keeps its pool and its attributes, a pool handed in is no longer counted as attached, and its attribute names stay free; the constructors of `InstancedVOBufferGeometry` and `InstancedVertexObjectGeometry` dispose the pools they built when they throw — a base capacity they refuse, or a disposed pool on the other side
+- `InstancedVOBufferGeometry#attachInstancedPool()` disposes the pool it built from a descriptor when it refuses the slots that pool would take, and a throw while the attributes of a pool are built leaves the geometry as it was: the route that holds the name keeps its pool and its attributes, a pool handed in is left unattached, and its attribute names stay free; the constructors of `InstancedVOBufferGeometry` and `InstancedVertexObjectGeometry` dispose the pools they built when they throw — a base capacity they refuse, or a disposed pool on the other side
 - an attribute that `detachInstancedPool()` leaves behind for the dispose event of the geometry lets go of the typed array of its pool: a pool released with its route is not kept alive by the geometry until it is disposed
 - `InstancedVOBufferGeometry#update()` of a geometry built from a `BufferGeometry` keeps the draw range it copied from it, and one set on it since; a geometry with a base pool takes its draw range from that pool on every `update()`
 - `new SpriteResources()` — and with it the `uniforms` of `new FeatureSpritesMaterial()` and `new FeatureSprites()` — refuses a start value that is not of the type of its uniform with a `TypeError` that names the uniform and quotes the value, before any signal is built: a finite number for a `float`, a list of 2 to 4 finite numbers for a `vec2` to `vec4`, the rule the start values a feature declares follow. A start value of `null` keeps the declared one, as `undefined` does
@@ -568,7 +568,7 @@ store.whenResource('fighter').then((fighter) => {
 
 #### `Stylesheets.getGlobalSheet()`
 
-There is one sheet per document or shadow root. `Stylesheets.getSheet()` takes the same `root`.
+There is one sheet per document or shadow root. `Stylesheets.getSheet()` takes the same `root`, so `getSheet(shadowRoot)` replaces `getGlobalSheet(shadowRoot)` one for one.
 
 **Before**
 
@@ -581,7 +581,9 @@ const sheet = Stylesheets.getGlobalSheet(shadowRoot);
 ```ts check
 import {Stylesheets} from '@spearwolf/twopoint5d';
 
-const sheet = Stylesheets.getSheet(document.head);
+declare const shadowRoot: ShadowRoot;
+
+const sheet = Stylesheets.getSheet(shadowRoot);
 
 export {sheet};
 ```
@@ -647,11 +649,11 @@ const store = await TextureStore.loadAsync('catalog.json');
 import {TextureStore} from '@spearwolf/twopoint5d';
 
 // catalog.json: {"items": {"hero": {"atlasUrl": "hero.json", "overrideImageUrl": "hero-red.png"}}}
-const store = TextureStore.loadAsync('catalog.json');
+const store = await TextureStore.loadAsync('catalog.json');
 
 // or the catalog as it is: the field goes out as an `error` event, and the promise resolves
 const lenient = new TextureStore();
-const loaded = lenient.loadAsync('catalog.json');
+const loaded = await lenient.loadAsync('catalog.json');
 ```
 
 #### The texture classes of a TextureResource
@@ -875,14 +877,39 @@ const Many = tableFrame({views: 128});
 **After**
 
 ```ts check
-import {TableFrame, type TableFrameApi} from '@spearwolf/twopoint5d';
+import {
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  FrameTable,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TableFrame,
+  type TextureAtlas,
+  TextureColor,
+} from '@spearwolf/twopoint5d';
+import type {Texture} from 'three/webgpu';
+
+declare const atlas: TextureAtlas; // ship_000 … ship_<n>, 128 views a frame, frame by frame
+declare const colorMap: Texture;
 
 const VIEWS = 128;
-// the kind takes TableFrame; the entry of frame `frame` seen in view `view`
-const show = (sprite: TableFrameApi, frame: number, view: number) => {
-  sprite.frameIndex = frame * VIEWS + view;
-};
-const feature = TableFrame;
+const Ship = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TableFrame, TextureColor]});
+const frameTable = FrameTable.fromAtlas(atlas, /^ship_/).bakeDataTexture(); // the caller's
+const ships = new FeatureSprites(Ship, {
+  capacity: 16,
+  attributeUsage: {dynamic: ['frameIndex']},
+  textures: {colorMap, frameTable},
+});
+
+const ship = ships.createSprite()!;
+ship.setSize(64, 64);
+
+// every frame: the entry of frame `frame` in the view the game picks from the camera, 0 to 127
+export function show(frame: number, view: number) {
+  ship.frameIndex = frame * VIEWS + view;
+}
 ```
 
 #### A TileSet of more than 1 048 576 tiles
@@ -1056,6 +1083,32 @@ const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlac
 // a variant: defineSprite() once more, with the inputs of the kind and what changes
 const variant = defineSprite({base: kind.base, features: [...kind.features, Tint]});
 const sprites = new FeatureSprites(variant);
+```
+
+#### The deltas of a stopped Chronometer
+
+An `update()` of a stopped `Chronometer` sets `deltaTime` and `rawDeltaTime` to `0`, and so does a `renderFrame()` of a paused `Display` for the props it hands out. Code that needs the delta of the last running frame reads it before that `update()`.
+
+**Before**
+
+```ts
+chronometer.stop();
+chronometer.update();
+const last = chronometer.deltaTime; // the delta of the last running frame
+```
+
+**After**
+
+```ts check
+import {Chronometer} from '@spearwolf/twopoint5d';
+
+const chronometer = new Chronometer();
+// read before the update() of the pause, which sets it to 0
+const last = chronometer.deltaTime;
+chronometer.stop();
+chronometer.update();
+
+export {last};
 ```
 
 ## [0.23.0] - 2026-10-18

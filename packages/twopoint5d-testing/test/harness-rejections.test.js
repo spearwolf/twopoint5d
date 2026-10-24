@@ -4,8 +4,8 @@ import {whenRejectionsReported} from './helpers/fixtures.js';
 // The runner writes every unhandled rejection of a page into the browser logs of the run, as
 // "An error was thrown in a Promise outside a test" with its stack. The control rejection of
 // whenRejectionsReported() is left unhandled on purpose and must not show there: a green run that
-// prints an error text teaches its readers to look past one. This file holds the helper and the
-// init script of web-test-runner.config.js that takes the control off the page to each other.
+// prints an error text teaches its readers to look past one. This file checks that the helper and
+// the init script of web-test-runner.config.js that takes the control off the page work together.
 
 describe('whenRejectionsReported()', function () {
   it('writes nothing to the console', async () => {
