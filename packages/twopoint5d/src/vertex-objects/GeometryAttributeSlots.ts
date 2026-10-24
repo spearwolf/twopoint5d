@@ -36,7 +36,8 @@ type SlotClaim = {
  *
  * Claims stack only as far as the constructor of the geometry lays them down. Every slot name
  * this bookkeeping has ever seen is remembered, and {@link everHeld} lets the geometry refuse a
- * later route that would take one of them.
+ * later route that would take one of them. A route that is withdrawn before it reached the
+ * renderer is the one exception: its names are forgotten again.
  */
 export class GeometryAttributeSlots {
   readonly #slots: Map<string, SlotClaim[]> = new Map();
@@ -112,6 +113,33 @@ export class GeometryAttributeSlots {
     }
 
     return changed;
+  }
+
+  /**
+   * Take back the claims of a route whose attributes never reached the renderer: the attempt of
+   * an attach that failed half way. Its attributes leave the geometry, and a slot no claim is
+   * left on is forgotten as if it had never been held — the geometry refused every name it had
+   * held before the attempt, so none of these was taken before it.
+   */
+  withdrawRoute(geometry: BufferGeometry, route: AttributeRoute): void {
+    for (const [attrName, claims] of this.#slots) {
+      const held = claims.findIndex((claim) => claim.route === route);
+      if (held < 0) continue;
+
+      const wasOnTop = held === claims.length - 1;
+      claims.splice(held, 1);
+      if (!wasOnTop) continue;
+
+      if (claims.length === 0) {
+        geometry.deleteAttribute(attrName);
+        // deleting the entry the Map iteration is currently on is allowed
+        this.#slots.delete(attrName);
+        this.#everHeld.delete(attrName);
+      } else {
+        // the claim underneath keeps its name held: it was there before the attempt
+        geometry.setAttribute(attrName, expectDefined(claims[claims.length - 1], `the topmost claim of slot "${attrName}"`).attr);
+      }
+    }
   }
 
   #claim(attrName: string, route: AttributeRoute | undefined, attr: BufferAttribute | InterleavedBufferAttribute): void {

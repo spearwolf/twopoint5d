@@ -45,7 +45,10 @@ built on the canvas afterwards brings it back; a `WebGPURenderer` or a
 `getContext('webgl2')` of the caller's own on that canvas gets the lost context. A
 `Display` constructor that throws after it has built or taken over its renderer leaves
 nothing behind — it releases the renderer, gives a canvas handed in back and takes its
-own container out, as `dispose()` would.
+own container out, as `dispose()` would. The constructors of `InstancedVOBufferGeometry`
+and `InstancedVertexObjectGeometry` and `InstancedVOBufferGeometry#attachInstancedPool()` do
+the same for the pools they build from a descriptor: one that throws disposes them and
+leaves a pool handed in as it was.
 
 Reference implementation —
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) marks what it built and
@@ -312,13 +315,21 @@ the call goes out while every slot is still filled.
 
 ```ts
 override dispose(): void {
-  // the renderer reads the attributes of this geometry once more while it handles the
-  // dispose event, and reaches for the id of a slot before it checks that the slot is
-  // filled — so the event goes out while every slot is still there
-  super.dispose();
+  if (this.#disposed) return;
+  this.#disposed = true;
 
-  this.#attachments.detachAll();
-  // … release the attribute slots, the index and the owned pools
+  try {
+    // the renderer reads the attributes of this geometry once more while it handles the
+    // dispose event, and reaches for the id of a slot before it checks that the slot is
+    // filled — so the event goes out while every slot is still there
+    super.dispose();
+  } finally {
+    // a listener of the dispose event that throws holds up none of the teardown: its error
+    // reaches the caller once the geometry is down, and a second dispose() has nothing left
+    // to do
+    this.#attachments.detachAll();
+    // … release the attribute slots, the index and the owned pools
+  }
 }
 ```
 

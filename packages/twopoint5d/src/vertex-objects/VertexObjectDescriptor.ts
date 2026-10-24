@@ -11,12 +11,14 @@ import {vertexObjectPropertyNames} from './vertexObjectPropertyNames.js';
 
 const isPositiveInteger = (value: number) => Number.isInteger(value) && value >= 1;
 
-// three 0.186.1 takes the vertex format of an attribute of one value from a table that knows the
-// 32-bit types alone (`WebGPUAttributeUtils.js:32–36`, `:518–520`) — which is why an 8- or 16-bit
+// three takes the vertex format of an attribute of one value from a table that knows the 32-bit
+// types alone (the table `typeArraysToVertexFormatPrefixForItemSize1` that
+// `WebGPUAttributeUtils#_getVertexFormat()` reads for one value) — which is why an 8- or 16-bit
 // integer of one value is laid out in 32 bits (`VertexAttributeDescriptor#dataType`) — and the
-// format of a larger one from the typed array and `normalized` (`:12–26`, `:522–541`). WebGPU
-// itself has no format for 64-bit values, none that normalizes 32-bit integers or floats, and none
-// of more than four values. `Uint8ClampedArray` is in none of the tables.
+// format of a larger one from the typed array and `normalized` (`typedArraysToVertexFormatPrefix`
+// for more) — `threeVertexLayout.spec.ts` holds it. WebGPU itself has no format for 64-bit values,
+// none that normalizes 32-bit integers or floats, and none of more than four values.
+// `Uint8ClampedArray` is in none of the tables.
 const typesWithoutVertexFormat: ReadonlySet<VertexAttributeDataType> = new Set(['float64', 'uint8clamped']);
 const normalizableTypes: ReadonlySet<VertexAttributeDataType> = new Set(['int8', 'uint8', 'int16', 'uint16']);
 

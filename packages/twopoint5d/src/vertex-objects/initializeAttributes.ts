@@ -14,10 +14,11 @@ import {createIndicesArray} from './createIndicesArray.js';
 import {expectDefined} from '../utils/expectDefined.js';
 import {toDrawUsage} from './toDrawUsage.js';
 
-// three 0.186.1 widens the array of an 8- or 16-bit integer BufferAttribute without `normalized`
-// to 32 bits as it builds its gpu buffer, and from then on uploads from that copy
-// (`WebGPUAttributeUtils.js:82–107`). It leaves an InterleavedBuffer as it is and gives it the
-// format of its own type (`sint16x2`, `uint8x4`, …), so a buffer of these types reaches three as one
+// three widens the array of an 8- or 16-bit integer BufferAttribute without `normalized` to 32
+// bits as it builds its gpu buffer, and from then on uploads from that copy
+// (`WebGPUAttributeUtils#createAttribute()`, held by `threeVertexLayout.spec.ts`). It leaves an
+// InterleavedBuffer as it is and gives it the format of its own type (`sint16x2`, `uint8x4`, …), so
+// a buffer of these types reaches three as one
 const typesThreeWidens: ReadonlySet<VertexAttributeDataType> = new Set(['int8', 'int16', 'uint8', 'uint16']);
 
 /**
@@ -55,8 +56,9 @@ function initializeRoute(
     // a buffer of one attribute with padding behind it goes the interleaved way as well: a
     // BufferAttribute of the padded itemSize would show the shader the padding as a component, one
     // of the attribute's size would read the array at the wrong stride. An InterleavedBuffer carries
-    // the stride, and three never pads one — it has no itemSize (`WebGPUAttributeUtils.js:119`), and
-    // its arrayStride is `stride × BYTES_PER_ELEMENT` (`:304`)
+    // the stride, and three never pads one — it has no itemSize (`createAttribute()` pads a buffer
+    // attribute by its itemSize), and its arrayStride is `stride × BYTES_PER_ELEMENT`
+    // (`createShaderVertexBuffers()`)
     const first = descriptor.attributes.get(attributes[0]!.attributeName);
     const padded = attributes.length === 1 && first?.size !== buffer.itemSize;
     // every attribute of a buffer agrees on type and `normalized` (`VertexObjectDescriptor`)

@@ -110,6 +110,18 @@ Accessors generated per descriptor with `new Function` would help only there, an
 would need `unsafe-eval` in the Content Security Policy of every application that turns
 them on, so the factories are shared on purpose.
 
+Methods on the hot path that take any number of values read them through `arguments`,
+never through a rest parameter: `touch()` and `touchAttributes()` of both geometries,
+`VertexObjectPool#touchVO()` and the generated `set…()` of an attribute of more than
+sixteen values. Once the method of a second geometry class has run, V8 builds the rest
+array on every call — 56 B with a single argument, measured on Node 24 —, while
+`arguments` stays off the heap as long as the method itself reads only its `length` and
+its elements; handing it to another function makes V8 build the object. Read with many
+separate values it costs as well (112 B with twelve values), which is why the generated
+setters of up to sixteen values declare their parameters one by one.
+`src/vertex-objects/hot-path-allocations.spec.ts` measures `touch()`, `touchVO()` and the
+setter of more than sixteen values.
+
 ### `texture/`
 
 `TextureAtlas` and `TileSet` describe where a frame lives inside an image;

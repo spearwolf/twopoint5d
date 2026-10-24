@@ -16,12 +16,14 @@ const indexKey: typeof voIndex = voIndex;
 // accessor and knows the prototype already, so that costs nothing measurable; docs/architecture.md
 // (the section on vertex-objects/) has the numbers and says why the accessors are not generated per
 // descriptor
+//
+// every accessor below takes for granted what it does not check: a vertex object alive in its
+// pool has its buffer, that buffer holds its typed array and lists the record of every buffer of
+// its descriptor at the position the accessor was built with. These accessors run per sprite
+// and per frame, so they assert it (`!`) rather than pay for a check on every value
 const makeAttributeGetter = (bufferIndex: number, instanceOffset: number, attrOffset: number) => {
   return function getAttribute(this: VO) {
-    // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // lists the record of every buffer of its descriptor at the position this accessor was built
-    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
-    // a check on every value
+    // the vertex object is alive in its pool: see above the factories
     const idx = this[indexKey] * instanceOffset + attrOffset;
     const buf = this[bufferKey]!.bufferList[bufferIndex]!;
     return buf.typedArray![idx];
@@ -30,10 +32,7 @@ const makeAttributeGetter = (bufferIndex: number, instanceOffset: number, attrOf
 
 const makeAttributeSetter = (bufferIndex: number, instanceOffset: number, attrOffset: number) => {
   return function setAttribute(this: VO, value: number) {
-    // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // lists the record of every buffer of its descriptor at the position this accessor was built
-    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
-    // a check on every value
+    // the vertex object is alive in its pool: see above the factories
     const idx = this[indexKey] * instanceOffset + attrOffset;
     const buf = this[bufferKey]!.bufferList[bufferIndex]!;
     buf.typedArray![idx] = value;
@@ -51,10 +50,7 @@ const makeAttributeValuesGetter = (
 ) => {
   const count = vertexCount * attrSize;
   return function getAttributeValues(this: VO, target?: TypedArray | number[]) {
-    // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // lists the record of every buffer of its descriptor at the position this accessor was built
-    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
-    // a check on every value
+    // the vertex object is alive in its pool: see above the factories
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
     const buf = this[bufferKey]!.bufferList[bufferIndex]!;
     const source = buf.typedArray!;
@@ -115,10 +111,7 @@ const makeFixedAttributeValueSetter = (
   // declared one by one, not as a rest parameter: a rest parameter allocates a fresh array on
   // every call, and these setters run per sprite and per frame
   return function setAttributeValues(this: VO, v0?: number | ArrayLike<number>, v1?: number, v2?: number, v3?: number) {
-    // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // lists the record of every buffer of its descriptor at the position this accessor was built
-    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
-    // a check on every value
+    // the vertex object is alive in its pool: see above the factories
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
     const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
     if (typeof v0 === 'object' && v0 !== null) {
@@ -166,10 +159,7 @@ const makeWideAttributeValueSetter = (
     v14?: number,
     v15?: number,
   ) {
-    // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // lists the record of every buffer of its descriptor at the position this accessor was built
-    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
-    // a check on every value
+    // the vertex object is alive in its pool: see above the factories
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
     const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
     if (typeof v0 === 'object' && v0 !== null) {
@@ -196,10 +186,9 @@ const makeWideAttributeValueSetter = (
   };
 };
 
-// read through `arguments` rather than a rest parameter: a rest parameter builds an array on every
-// call, 56 B even around a single array-like. `arguments` stays free with an array-like, while
-// separate values make V8 build the object on every call (112 B with twelve values, measured on
-// Node 24) — which is why the setters of up to sixteen values declare their parameters
+// read through `arguments` rather than a rest parameter: docs/architecture.md, `vertex-objects/`,
+// has why and what each costs — separate values cost as well, which is why the setters of up to
+// sixteen values declare their parameters
 const makeAttributeValueSetter = (
   bufferIndex: number,
   bufferItemSize: number,
@@ -209,10 +198,7 @@ const makeAttributeValueSetter = (
 ) => {
   const count = vertexCount * attrSize;
   return function setAttributeValues(this: VO) {
-    // a vertex object alive in its pool has its buffer, that buffer holds its typed array and
-    // lists the record of every buffer of its descriptor at the position this accessor was built
-    // with; these accessors run per sprite and per frame, so they assert that rather than pay for
-    // a check on every value
+    // the vertex object is alive in its pool: see above the factories
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
     const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
     // biome-ignore lint/complexity/noArguments: see the comment above the factory

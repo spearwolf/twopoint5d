@@ -7,9 +7,11 @@ import type {
   VertexAttributeUsageType,
 } from './types.js';
 
-// three 0.186.1 builds no vertex format of one value for an 8- or 16-bit integer: its table for one
-// value knows the 32-bit types alone (`WebGPUAttributeUtils.js:32–36`, `:518–520`). Such an attribute
-// is laid out in 32 bits from the start, so the gpu reads the array of the pool as it is
+// three builds no vertex format of one value for an 8- or 16-bit integer: its table for one value
+// knows the 32-bit types alone (the table `typeArraysToVertexFormatPrefixForItemSize1` that
+// `WebGPUAttributeUtils#_getVertexFormat()` reads for one value — `threeVertexLayout.spec.ts` holds
+// it). Such an attribute is laid out in 32 bits from the start, so the gpu reads the array of the
+// pool as it is
 const LAYOUT_OF_ONE_VALUE: Partial<Record<VertexAttributeDataType, VertexAttributeDataType>> = {
   int8: 'int32',
   int16: 'int32',

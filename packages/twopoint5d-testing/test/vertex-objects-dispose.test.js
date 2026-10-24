@@ -173,7 +173,9 @@ describe('vertex-objects — dispose', function () {
     const {geometry, material} = makeGeometryWithExtraRoute();
     await renderOnce(new VertexObjects(geometry, material));
 
+    const extraAttribute = geometry.getAttribute('extraOffset');
     geometry.detachInstancedPool('extra');
+    expect(extraAttribute.array.length, 'the attribute left behind lets go of the array of its pool').to.equal(0);
     geometry.dispose();
 
     expect(display.renderer.info.memory.attributes).to.equal(attributesBefore);

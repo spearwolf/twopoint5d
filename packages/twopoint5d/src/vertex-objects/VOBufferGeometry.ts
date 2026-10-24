@@ -82,31 +82,40 @@ export class VOBufferGeometry extends BufferGeometry {
    * After this call the geometry holds no route, no buffer and no pool of its own any more.
    * What stays behind belongs to the attributes that are still there: their serials from the
    * last `update()`. `update()` is a no-op from here on — see {@link update}.
+   *
+   * A second call does nothing. A listener of the dispose event that throws holds up none of
+   * this: its error reaches the caller once the geometry is down.
    */
   override dispose(): void {
+    if (this.#disposed) return;
     this.#disposed = true;
 
-    // the renderer reads the attributes of this geometry once more while it handles the
-    // dispose event, and reaches for the id of a slot before it checks that the slot is
-    // filled — so the event goes out while every slot is still there
-    super.dispose();
+    try {
+      // the renderer reads the attributes of this geometry once more while it handles the
+      // dispose event, and reaches for the id of a slot before it checks that the slot is
+      // filled — so the event goes out while every slot is still there
+      super.dispose();
+    } finally {
+      // a listener of the dispose event that throws holds up none of the teardown: its error
+      // reaches the caller once the geometry is down, and a second dispose() has nothing left
+      // to do
+      this.#attachments.detachAll();
 
-    this.#attachments.detachAll();
+      // an attribute left behind would still read from the pool arrays, and a geometry put back
+      // into a scene after dispose() would have the renderer build fresh gpu buffers from them
+      this.#slots.releaseRoute(this, this.#buffers);
+      this.setIndex(null);
 
-    // an attribute left behind would still read from the pool arrays, and a geometry put back
-    // into a scene after dispose() would have the renderer build fresh gpu buffers from them
-    this.#slots.releaseRoute(this, this.#buffers);
-    this.setIndex(null);
+      if (this.#attachments.owns(this.pool)) {
+        this.pool.dispose();
+      }
 
-    if (this.#attachments.owns(this.pool)) {
-      this.pool.dispose();
+      this.#buffers.clear();
+      this.#bufferSerials.clear();
+      this.#attachments.clear();
+      // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
+      this.#routes.clear();
     }
-
-    this.#buffers.clear();
-    this.#bufferSerials.clear();
-    this.#attachments.clear();
-    // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
-    this.#routes.clear();
   }
 
   /**
@@ -116,9 +125,8 @@ export class VOBufferGeometry extends BufferGeometry {
    */
   touchAttributes(...attrNames: string[]): void;
   touchAttributes(): void {
-    // read through `arguments` rather than the rest parameter of the signature: once the method of
-    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
-    // argument, measured on Node 24), while `arguments` stayed free in every order
+    // read through `arguments` rather than the rest parameter of the signature:
+    // docs/architecture.md, `vertex-objects/`
     // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
       // biome-ignore lint/complexity/noArguments: see the comment above the loop
@@ -145,9 +153,8 @@ export class VOBufferGeometry extends BufferGeometry {
    */
   touch(...args: Array<string | TouchBuffersType>): void;
   touch(): void {
-    // read through `arguments` rather than the rest parameter of the signature: once the method of
-    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
-    // argument, measured on Node 24), while `arguments` stayed free in every order
+    // read through `arguments` rather than the rest parameter of the signature:
+    // docs/architecture.md, `vertex-objects/`
     // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
       // biome-ignore lint/complexity/noArguments: see the comment above the loop
