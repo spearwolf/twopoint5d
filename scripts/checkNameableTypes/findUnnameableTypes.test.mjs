@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {after, test} from 'node:test';
 import {readCompilerOptions} from '../shared/readCompilerOptions.mjs';
-import {findUnnameableTypes, partitionAccepted} from './findUnnameableTypes.mjs';
+import {entryKeyOf, findUnnameableTypes, partitionAccepted} from './findUnnameableTypes.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..');
 const compilerOptions = readCompilerOptions(path.join(repoRoot, 'tsconfig.json'));
@@ -123,8 +123,46 @@ test('a row whose file and name the accepted map lists is accepted, every other 
   const other = {name: 'Table', file: 'b.d.ts', line: 1, uses: ['f']};
   const unlisted = {name: 'Other', file: 'a.d.ts', line: 2, uses: ['f']};
 
-  const {accepted, offenders} = partitionAccepted([listed, other, unlisted], new Map([['a.d.ts:Table', 'a lookup table']]));
+  const {accepted, offenders, stale} = partitionAccepted(
+    [listed, other, unlisted],
+    new Map([
+      ['a.d.ts:Table', 'a lookup table'],
+      ['a.d.ts:Gone', 'renamed'],
+    ]),
+  );
 
   assert.deepEqual(accepted, [listed]);
   assert.deepEqual(offenders, [other, unlisted]);
+  assert.deepEqual(stale, ['a.d.ts:Gone']);
+});
+
+test('declarations that do not compile throw, naming the file, the line and the diagnostic of each', () => {
+  assert.throws(
+    () =>
+      find({
+        'index.d.ts': [
+          "import type { Gone } from './gone.js';",
+          'export declare function f(): Gone;',
+          'export declare function g(): Missing;',
+          '',
+        ].join('\n'),
+      }),
+    (/** @type {Error} */ err) => {
+      assert.match(err.message, /^the declarations do not compile, and what they fail to resolve would go unchecked:/);
+      assert.match(err.message, /index\.d\.ts:1 {2}Cannot find module '\.\/gone\.js'/);
+      assert.match(err.message, /index\.d\.ts:3 {2}Cannot find name 'Missing'/);
+      return true;
+    },
+  );
+});
+
+test('entryKeyOf() writes the key of an entry with / on Windows and POSIX alike', () => {
+  assert.equal(
+    entryKeyOf('C:\\ws\\packages\\twopoint5d\\dist\\lib\\index.d.ts', 'C:\\ws', path.win32),
+    'packages/twopoint5d/dist/lib/index.d.ts',
+  );
+  assert.equal(
+    entryKeyOf('/ws/packages/twopoint5d/dist/lib/index.d.ts', '/ws', path.posix),
+    'packages/twopoint5d/dist/lib/index.d.ts',
+  );
 });

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import YAML from 'yaml';
-import {findUnpublishableSpecifiers} from './makePackageJson/findUnpublishableSpecifiers.mjs';
+import {describeUnpublishable, findUnpublishableSpecifiers} from './publishNpmPkg/findUnpublishableSpecifiers.mjs';
 import {removeDistPathPrefix} from './makePackageJson/removeDistPathPrefix.mjs';
 import {resolveDependencies} from './makePackageJson/resolveDependencies.mjs';
 
@@ -57,13 +57,12 @@ for (const [key, value] of Object.entries(packageJsonOverride)) {
 // override brings would keep its dist/ prefix otherwise
 removeDistPathPrefix(outPackageJson);
 
-// a manifest that still names a pnpm protocol or a path on this machine cannot be installed from npm
+// a manifest that still names a pnpm protocol, a path on this machine or a `*` nothing resolved
+// cannot be installed from npm
 const unpublishable = findUnpublishableSpecifiers(outPackageJson);
 if (unpublishable.length > 0) {
-  for (const {section, name, specifier} of unpublishable) {
-    console.error(
-      `cannot publish ${inPackageJson.name}: ${section}.${name} is ${JSON.stringify(specifier)}, which resolves to no version range`,
-    );
+  for (const entry of unpublishable) {
+    console.error(`cannot publish ${inPackageJson.name}: ${describeUnpublishable(entry)}`);
   }
   process.exit(1);
 }

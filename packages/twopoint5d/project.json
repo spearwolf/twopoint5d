@@ -23,16 +23,16 @@
       ]
     },
     "test": {
-      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"]
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*"]
     },
     "coverage": {
       "cache": true,
-      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"],
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*"],
       "outputs": ["{projectRoot}/coverage"]
     },
     "allocations": {
       "cache": true,
-      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*.ts"]
+      "inputs": ["vitestDefaults", "{projectRoot}/src/**/*"]
     },
     "bench": {
       "cache": false

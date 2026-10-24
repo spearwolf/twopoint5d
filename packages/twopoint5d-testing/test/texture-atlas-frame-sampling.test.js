@@ -6,6 +6,8 @@ import {
   compareWithModel,
   countMixed,
   disposeDisplay,
+  disposeKept,
+  keep,
   makeColorTexture,
   makeContainer,
   makeMipmappedChecker,
@@ -46,17 +48,12 @@ const either =
     models.map((model) => model(x, y)).find((color) => color !== BLACK) ?? BLACK;
 
 describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s own', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
   let host;
   /** @type {RenderTarget | undefined} */
   let target;
-  /** @type {(() => void)[]} */
-  let disposals = [];
 
   beforeEach(async () => {
     host = makeContainer();
@@ -66,8 +63,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
   });
 
   afterEach(() => {
-    for (const dispose of disposals) dispose();
-    disposals = [];
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -87,16 +83,12 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
 
   /** A plane `width × height` units large at `(x, 0)` whose material takes `colorNode`. */
   function makePlane(scene, width, height, x, colorNode) {
-    const geometry = new PlaneGeometry(width, height);
-    const material = new MeshBasicNodeMaterial();
+    const geometry = keep(new PlaneGeometry(width, height));
+    const material = keep(new MeshBasicNodeMaterial());
     material.colorNode = colorNode;
     const mesh = new Mesh(geometry, material);
     mesh.position.x = x;
     scene.add(mesh);
-    disposals.push(() => {
-      geometry.dispose();
-      material.dispose();
-    });
     return mesh;
   }
 
@@ -120,7 +112,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
 
   it('draws a turned frame upright, as the upright one, with three’s uv counted from the bottom left', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
-    disposals.push(() => texture.dispose());
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
     const table = AtlasFrameTable.fromAtlas(atlas, ['upright', 'turned']);
 
@@ -133,7 +125,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
 
   it('takes a uv counted from the top left with the origin top-left', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
-    disposals.push(() => texture.dispose());
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
     const table = AtlasFrameTable.fromAtlas(atlas);
     const fromTop = vec2(uv().x, float(1).sub(uv().y));
@@ -146,7 +138,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
 
   it('repeats a frame inside its own area, without the frame beside it in the sheet bleeding in', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
-    disposals.push(() => texture.dispose());
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
     const table = AtlasFrameTable.fromAtlas(atlas, ['upright', 'turned']);
     const twice = uv().mul(2);
@@ -160,7 +152,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
 
   it('repeats a turned frame as the upright one', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
-    disposals.push(() => texture.dispose());
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
     const table = AtlasFrameTable.fromAtlas(atlas, ['upright', 'turned']);
     const twice = uv().mul(2);
@@ -173,7 +165,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
 
   it('wraps each axis on its own: repeated across, held at the top and bottom edges', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
-    disposals.push(() => texture.dispose());
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
     const table = AtlasFrameTable.fromAtlas(atlas, ['upright']);
     // u runs over two frames; v from −0.5 at the bottom of the plane to 1.5 at its top, so half a
@@ -198,7 +190,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
   it('lays a trimmed frame where the untrimmed sprite has it, and draws nothing around it', async function () {
     // the image is the trimmed area of a sprite of 5 × 4, one texel in from its left and top edges
     const texture = makeColorTexture(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
-    disposals.push(() => texture.dispose());
+    keep(texture);
     const [atlas] = TexturePackerJson.parse({
       frames: {
         trimmed: {
@@ -222,7 +214,7 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
 
   it('repeats a frame of a mipmapped atlas without a seam at its wraps, where a bare fract() shows one', async function () {
     const map = makeMipmappedChecker();
-    disposals.push(() => map.dispose());
+    keep(map);
     const [atlas] = TexturePackerJson.parse({
       frames: {checker: {frame: {x: 0, y: 0, w: 4, h: 4}}},
       meta: {image: 'checker.png', size: {w: 4, h: 4}},

@@ -1,3 +1,4 @@
+import {deepFreeze} from '../utils/deepFreeze.js';
 import type {VertexObjectDescription, VO} from '../vertex-objects/types.js';
 
 /**
@@ -93,9 +94,10 @@ class QuadBasePrototype {
 
 /**
  * The quad every built-in sprite kind is drawn from: four vertices with `position` and `uv`, two
- * triangles, and a `make(halfWidth, halfHeight, xOffset, yOffset)` that lays them out.
+ * triangles, and a `make(halfWidth, halfHeight, xOffset, yOffset)` that lays them out. Frozen all
+ * the way down, its description and the prototype of its base vertex included.
  */
-export const QuadBase: SpriteBase<QuadBaseArgs> = Object.freeze({
+export const QuadBase: SpriteBase<QuadBaseArgs> = deepFreeze({
   name: 'quad',
   description: {
     vertexCount: 4,
@@ -119,5 +121,5 @@ export const QuadBase: SpriteBase<QuadBaseArgs> = Object.freeze({
     },
     basePrototype: QuadBasePrototype.prototype,
   },
-  defaultArgs: Object.freeze([0.5, 0.5] as const),
+  defaultArgs: [0.5, 0.5] as const,
 });

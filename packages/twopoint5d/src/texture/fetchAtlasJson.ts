@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {TextureResourceLoadFailure} from './internals.js';
 import {type AtlasJsonResponse, isAtlasJsonResponse} from './isAtlasJsonResponse.js';
 import {resolveRelativeUrl} from './resolveRelativeUrl.js';
@@ -29,7 +30,7 @@ export const fetchAtlasJson = async (url: string, signal: AbortSignal): Promise<
           source: 'atlas',
           url,
           status: response.status,
-          error: new Error(`TextureResource: fetch("${url}") answered ${response.status} ${response.statusText}`),
+          error: new Error(`TextureResource: fetch(${describeValue(url)}) answered ${response.status} ${response.statusText}`),
         },
       };
     }

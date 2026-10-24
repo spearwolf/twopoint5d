@@ -1,7 +1,8 @@
 import type {ColorRepresentation, LineBasicMaterial, Object3D} from 'three/webgpu';
-import {Box3, Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector3} from 'three/webgpu';
+import {Box3, Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector2, Vector3} from 'three/webgpu';
+import {assertFinite} from '../utils/assertFinite.js';
 import {Dependencies, type DependencyValues} from '../utils/Dependencies.js';
-import {undefinedValueError} from '../utils/expectDefined.js';
+import {describeValue} from '../utils/describeValue.js';
 import type {CameraBasedVisibility, TileBox} from './CameraBasedVisibility.js';
 import {HelpersManager} from './HelpersManager.js';
 import type {IMap2DVisibilitorHelpers} from './types.js';
@@ -50,16 +51,66 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   #show = false;
   #disposed = false;
 
+  // read by `update()` through the fields, never through the accessors: an accessor the compiler
+  // leaves un-inlined boxes the double it answers
+  #maxDebugHelpers = 9;
+  #tileBoxHelperExpand = -0.01;
+  #frustumBoxHelperExpand = 0;
+
   /**
    * How many frustum box helpers are built for the tiles that are not primary — every tile but
    * those around the points where a probe ray met the plane: the tile a point lies in and those a
    * rectangle of one tile size around it reaches into. The frustum boxes of the primary tiles and
    * the tile boxes are not meant: those follow the number of visible tiles.
+   *
+   * A whole number of 0 or more, or `Infinity`; any other value throws a `RangeError` and the
+   * field keeps what it held. Taken and checked after {@link dispose} as well.
    */
-  maxDebugHelpers = 9;
+  get maxDebugHelpers(): number {
+    return this.#maxDebugHelpers;
+  }
 
-  tileBoxHelperExpand = -0.01;
-  frustumBoxHelperExpand = 0;
+  set maxDebugHelpers(value: number) {
+    if (!(Number.isInteger(value) && value >= 0) && value !== Infinity) {
+      throw new RangeError(
+        `CameraBasedVisibilityHelpers: maxDebugHelpers must be a whole number of 0 or more, or Infinity, got ${describeValue(value)}`,
+      );
+    }
+    this.#maxDebugHelpers = value;
+  }
+
+  /**
+   * The factor of its size by which the box of a tile helper grows on every side: the box is
+   * widened by its size times this factor, so `0.1` adds a tenth of the size on each side and a
+   * negative value shrinks the box. The default `-0.01` keeps the boxes of neighbouring tiles
+   * apart.
+   *
+   * Any finite number; another value throws a `RangeError` and the field keeps what it held.
+   * Taken and checked after {@link dispose} as well.
+   */
+  get tileBoxHelperExpand(): number {
+    return this.#tileBoxHelperExpand;
+  }
+
+  set tileBoxHelperExpand(value: number) {
+    this.#tileBoxHelperExpand = assertFinite(value, 'CameraBasedVisibilityHelpers', 'tileBoxHelperExpand');
+  }
+
+  /**
+   * The factor of its size by which the box of a frustum helper grows on every side, as
+   * {@link tileBoxHelperExpand} does for the tile boxes. The default `0` draws the boxes as they
+   * are.
+   *
+   * Any finite number; another value throws a `RangeError` and the field keeps what it held.
+   * Taken and checked after {@link dispose} as well.
+   */
+  get frustumBoxHelperExpand(): number {
+    return this.#frustumBoxHelperExpand;
+  }
+
+  set frustumBoxHelperExpand(value: number) {
+    this.#frustumBoxHelperExpand = assertFinite(value, 'CameraBasedVisibilityHelpers', 'frustumBoxHelperExpand');
+  }
 
   frustumBoxHelperColor = new Color(0x777777);
   frustumBoxPrimaryHelperColor = new Color(0xffffff);
@@ -109,12 +160,15 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   // change.
   readonly #seenKnobs = new Float64Array([NaN, NaN, NaN]);
 
-  // Scratch of `updatePlaneHelpers()`: the points that mark the axes of the plane, written again on
-  // every build. `placePointHelper()` copies a point, so the next build may write over them.
+  // Scratch of `#updatePlaneHelpers()`: the points that mark the axes of the plane, written again on
+  // every build. `#placePointHelper()` copies a point, so the next build may write over them.
   readonly #planeAxisOrigin = new Vector3();
   readonly #planeAxisShift = new Vector3();
   readonly #planeAxisX = new Vector3();
   readonly #planeAxisY = new Vector3();
+  // the offset of the grid of the visibility, read once per build through `readOffset()`: a getter
+  // the compiler leaves un-inlined boxes the double it answers, one held in a field is not
+  readonly #planeGridOffset = new Vector2();
 
   constructor(public readonly cameraBasedVisibility: CameraBasedVisibility) {}
 
@@ -145,22 +199,24 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
       this.update();
     } else {
       this.#helpers.remove();
-      this.releasePools();
+      this.#releasePools();
     }
   }
 
-  private createHelpers(): void {
+  #createHelpers(): void {
     this.#pointCount = 0;
     this.#frustumBoxCount = 0;
     this.#tileBoxCount = 0;
 
-    this.updatePlaneHelpers();
-    this.updateTileHelpers(this.cameraBasedVisibility.visibles);
+    this.#updatePlaneHelpers();
+    this.#updateTileHelpers(this.cameraBasedVisibility.visibles);
 
-    this.hideSurplus();
+    this.#hideSurplus();
   }
 
-  private updatePlaneHelpers(): void {
+  #updatePlaneHelpers(): void {
+    this.cameraBasedVisibility.map2dTileCoords.readOffset(this.#planeGridOffset);
+
     if (this.#planeHelper === undefined) {
       // the helper holds the plane as a reference and follows it on its own
       this.#planeHelper = new PlaneHelper(this.cameraBasedVisibility.planeWorld, 100, 0x20f040);
@@ -168,7 +224,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     }
 
     if (this.cameraBasedVisibility.pointOnPlane) {
-      this.placePointHelper(this.cameraBasedVisibility.pointOnPlane, 10, 0xc0c0c0);
+      this.#placePointHelper(this.cameraBasedVisibility.pointOnPlane, 10, 0xc0c0c0);
     }
 
     // the further points the probe rays of the view frustum found — the first of them is the
@@ -176,30 +232,28 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     const pointsOnPlane = this.cameraBasedVisibility.pointsOnPlane;
     for (let i = 1; i < pointsOnPlane.length; ++i) {
       // The loop bound is `pointsOnPlane.length`.
-      this.placePointHelper(pointsOnPlane[i]!, 6, 0x20c0ff);
+      this.#placePointHelper(pointsOnPlane[i]!, 6, 0x20c0ff);
     }
 
-    this.placePointHelper(this.cameraBasedVisibility.planeOrigin, 5, 0x406090);
+    this.#placePointHelper(this.cameraBasedVisibility.planeOrigin, 5, 0x406090);
 
-    const origin = this.makePointOnPlane(0, 0, this.#planeAxisOrigin);
+    const origin = this.#makePointOnPlane(0, 0, this.#planeAxisOrigin);
     const shift = this.#planeAxisShift.subVectors(this.cameraBasedVisibility.planeOrigin, origin);
-    const axisX = this.makePointOnPlane(50, 0, this.#planeAxisX).add(shift);
-    const axisY = this.makePointOnPlane(0, 50, this.#planeAxisY).add(shift);
+    const axisX = this.#makePointOnPlane(50, 0, this.#planeAxisX).add(shift);
+    const axisY = this.#makePointOnPlane(0, 50, this.#planeAxisY).add(shift);
 
-    this.placePointHelper(axisX, 5, 0xff0000);
-    this.placePointHelper(axisY, 5, 0x00ff00);
+    this.#placePointHelper(axisX, 5, 0xff0000);
+    this.#placePointHelper(axisY, 5, 0x00ff00);
   }
 
-  private updateTileHelpers(visibles: readonly TileBox[]): void {
+  #updateTileHelpers(visibles: readonly TileBox[]): void {
     // the frustum boxes of the primary tiles first, the ones of the other tiles after them
     for (let i = 0; i < visibles.length; ++i) {
       // The loop bound is `visibles.length`.
       const tile = visibles[i]!;
       if (!tile.primary) continue;
 
-      const frustumBox = tile.frustumBox;
-      if (frustumBox == null) throw undefinedValueError(`the frustum box of tile ${tile.x},${tile.y}`);
-      this.placeFrustumBoxHelper(frustumBox, this.frustumBoxPrimaryHelperColor);
+      this.#placeFrustumBoxHelper(tile.frustumBox, this.frustumBoxPrimaryHelperColor);
     }
 
     // counted rather than read off the loop index: `maxDebugHelpers` is a number of helpers, and
@@ -210,20 +264,16 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
       // The loop bound is `visibles.length`.
       const tile = visibles[i]!;
 
-      if (!tile.primary && debugHelpers < this.maxDebugHelpers) {
+      if (!tile.primary && debugHelpers < this.#maxDebugHelpers) {
         debugHelpers += 1;
-        const frustumBox = tile.frustumBox;
-        if (frustumBox == null) throw undefinedValueError(`the frustum box of tile ${tile.x},${tile.y}`);
-        this.placeFrustumBoxHelper(frustumBox, this.frustumBoxHelperColor);
+        this.#placeFrustumBoxHelper(tile.frustumBox, this.frustumBoxHelperColor);
       }
 
-      const box = tile.box;
-      if (box == null) throw undefinedValueError(`the box of tile ${tile.x},${tile.y}`);
-      this.placeTileBoxHelper(box, tile.primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor);
+      this.#placeTileBoxHelper(tile.box, tile.primary ? this.tileBoxPrimaryHelperColor : this.tileBoxHelperColor);
     }
   }
 
-  private placePointHelper(point: Vector3, size: number, color: ColorRepresentation): void {
+  #placePointHelper(point: Vector3, size: number, color: ColorRepresentation): void {
     let helper = this.#pointHelpers[this.#pointCount];
     if (helper === undefined) {
       helper = new PointHelper();
@@ -237,19 +287,19 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     this.#pointCount += 1;
   }
 
-  private placeFrustumBoxHelper(box: Box3, color: Color): void {
-    this.placeBoxHelper(this.#frustumBoxHelpers, this.#frustumBoxCount, true, box, color);
+  #placeFrustumBoxHelper(box: Box3, color: Color): void {
+    this.#placeBoxHelper(this.#frustumBoxHelpers, this.#frustumBoxCount, true, box, color);
     this.#frustumBoxCount += 1;
   }
 
-  private placeTileBoxHelper(box: Box3, color: Color): void {
-    this.placeBoxHelper(this.#tileBoxHelpers, this.#tileBoxCount, false, box, color);
+  #placeTileBoxHelper(box: Box3, color: Color): void {
+    this.#placeBoxHelper(this.#tileBoxHelpers, this.#tileBoxCount, false, box, color);
     this.#tileBoxCount += 1;
   }
 
   // `frustumBox` names the pool: a frustum box is in world space and goes into the root, a tile
   // box is in the local space of the map node and goes into the scene
-  private placeBoxHelper(pool: Box3Helper[], index: number, frustumBox: boolean, box: Box3, color: Color): void {
+  #placeBoxHelper(pool: Box3Helper[], index: number, frustumBox: boolean, box: Box3, color: Color): void {
     let helper = pool[index];
     if (helper === undefined) {
       // its own Box3: the helper follows whatever sits in `box`, and the boxes of a TileBox
@@ -262,7 +312,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     helper.box.copy(box);
     // the factor is read here and multiplied in place rather than handed on as an argument: a
     // fractional value handed to a call the compiler does not inline is boxed, once per box
-    const expand = frustumBox ? this.frustumBoxHelperExpand : this.tileBoxHelperExpand;
+    const expand = frustumBox ? this.#frustumBoxHelperExpand : this.#tileBoxHelperExpand;
     const size = helper.box.getSize(_size);
     size.x *= expand;
     size.y *= expand;
@@ -274,7 +324,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   }
 
   /** A node the current set does not need stays in the pool and out of sight. */
-  private hideSurplus(): void {
+  #hideSurplus(): void {
     for (let i = this.#pointCount; i < this.#pointHelpers.length; ++i) this.#pointHelpers[i]!.visible = false;
     for (let i = this.#frustumBoxCount; i < this.#frustumBoxHelpers.length; ++i) this.#frustumBoxHelpers[i]!.visible = false;
     for (let i = this.#tileBoxCount; i < this.#tileBoxHelpers.length; ++i) this.#tileBoxHelpers[i]!.visible = false;
@@ -285,7 +335,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
    * to take down, and the manager disposes what it takes down — a pool that kept its entries
    * would hand out released geometry on the next update.
    */
-  private releasePools(): void {
+  #releasePools(): void {
     this.#planeHelper = undefined;
     this.#pointHelpers.length = 0;
     this.#frustumBoxHelpers.length = 0;
@@ -296,9 +346,9 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     this.#builtSerial = -1;
   }
 
-  private makePointOnPlane(x: number, y: number, target: Vector3): Vector3 {
+  #makePointOnPlane(x: number, y: number, target: Vector3): Vector3 {
     return target
-      .set(this.cameraBasedVisibility.map2dTileCoords.xOffset + x, 0, this.cameraBasedVisibility.map2dTileCoords.yOffset + y)
+      .set(this.#planeGridOffset.x + x, 0, this.#planeGridOffset.y + y)
       .applyMatrix4(this.cameraBasedVisibility.matrixWorld);
   }
 
@@ -315,7 +365,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     if (this.#disposed) return;
     if (this.#helpers.scene === scene) return;
     this.#helpers.scene = scene;
-    this.releasePools();
+    this.#releasePools();
   }
 
   /**
@@ -334,7 +384,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     if (this.#disposed) return;
     if (this.#helpers.scene !== scene) return;
     this.#helpers.remove();
-    this.releasePools();
+    this.#releasePools();
   }
 
   /**
@@ -367,19 +417,19 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
 
     const seen = this.#seenKnobs;
     const numbersChanged =
-      this.maxDebugHelpers !== seen[SEEN_MAX_DEBUG_HELPERS] ||
-      this.tileBoxHelperExpand !== seen[SEEN_TILE_BOX_HELPER_EXPAND] ||
-      this.frustumBoxHelperExpand !== seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND];
-    seen[SEEN_MAX_DEBUG_HELPERS] = this.maxDebugHelpers;
-    seen[SEEN_TILE_BOX_HELPER_EXPAND] = this.tileBoxHelperExpand;
-    seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND] = this.frustumBoxHelperExpand;
+      this.#maxDebugHelpers !== seen[SEEN_MAX_DEBUG_HELPERS] ||
+      this.#tileBoxHelperExpand !== seen[SEEN_TILE_BOX_HELPER_EXPAND] ||
+      this.#frustumBoxHelperExpand !== seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND];
+    seen[SEEN_MAX_DEBUG_HELPERS] = this.#maxDebugHelpers;
+    seen[SEEN_TILE_BOX_HELPER_EXPAND] = this.#tileBoxHelperExpand;
+    seen[SEEN_FRUSTUM_BOX_HELPER_EXPAND] = this.#frustumBoxHelperExpand;
 
     const knobsChanged = colorsChanged || numbersChanged;
 
     if (!knobsChanged && this.#builtSerial === this.cameraBasedVisibility.serial) return;
 
     this.#builtSerial = this.cameraBasedVisibility.serial;
-    this.createHelpers();
+    this.#createHelpers();
   }
 
   /**
@@ -389,8 +439,8 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
    *
    * Afterwards {@link isDisposed} is `true` and {@link show} answers `false`, while a write to
    * `show`, {@link add}, {@link remove}, {@link update} and a second {@link dispose} do
-   * nothing. The public fields of this class still take values, and none of them has an effect
-   * any more.
+   * nothing. The public fields of this class still take values and go on turning away invalid
+   * ones, and none of them has an effect any more.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -400,6 +450,6 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
     this.#show = false;
     // the manager takes every node out of the scene and the root above it and disposes it
     this.#helpers.scene = undefined;
-    this.releasePools();
+    this.#releasePools();
   }
 }

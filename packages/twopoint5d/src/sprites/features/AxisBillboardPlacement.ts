@@ -1,4 +1,5 @@
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
 import {cameraPositionLocal, cameraRightLocal} from '../cameraNodes.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 import {axisBillboardVertex} from './axisBillboardVertex.js';
@@ -27,9 +28,12 @@ const placements = new Map<string, SpriteFeature>();
  * stage and swaps with `FlatPlacement`, every `flatPlacement()` and `BillboardPlacement` on a live
  * material.
  *
- * @throws a `TypeError` for an axis it does not know
+ * @throws a `TypeError` for options that are no object, and for an axis it does not know
  */
 export function axisBillboardPlacement(options?: AxisBillboardPlacementOptions): SpriteFeature {
+  if (options !== undefined && !isObject(options as unknown)) {
+    throw new TypeError(`axisBillboardPlacement: the options must be an object, {axis?}, got ${describeValue(options)}`);
+  }
   const axis = options?.axis ?? 'y';
   if (axis !== 'y' && axis !== 'z') {
     throw new TypeError(`axisBillboardPlacement: the axis ${describeValue(axis)} is neither 'y' nor 'z'`);

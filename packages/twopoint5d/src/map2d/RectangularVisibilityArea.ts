@@ -26,12 +26,14 @@ interface AreaDependencies {
 export class RectangularVisibilityArea implements IMap2DVisibilitor {
   #width = 0;
   #height = 0;
+  #maxVisibleTiles = 10_000;
 
   /**
    * Forces the next {@link computeVisibleTiles} to compute a fresh tile set instead of handing
-   * back the previous one. The `width` and `height` setters raise it, and anyone who changed
-   * something this area cannot see may raise it too. `computeVisibleTiles()` puts it back to
-   * `false` as it recomputes, so one `true` buys exactly one recomputation.
+   * back the previous one. The `width`, `height` and `maxVisibleTiles` setters raise it, a call
+   * the limit refuses leaves it raised, and anyone who changed something this area cannot see may
+   * raise it too. `computeVisibleTiles()` puts it back to `false` as it recomputes, so one `true`
+   * buys exactly one recomputation.
    */
   needsUpdate = true;
 
@@ -57,6 +59,10 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
   // counts the recomputations; the result carries it as `serial`
   #serial = 0;
+
+  // A refused call has taken the new grid into the snapshot already; the grid change it saw must
+  // reach the next call that computes.
+  #gridChangeRefused = false;
 
   // What the grid is asked about and what it answers. The rectangle goes in as an object: a
   // double handed to a call the compiler does not inline is boxed, one held in the field of an
@@ -123,13 +129,48 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   }
 
   /**
+   * The most tiles the rectangle may cover on the grid of a call. A call whose rectangle covers
+   * more throws a `RangeError` before it builds a tile, and the next call computes again: the
+   * limit catches an area too wide for its tiles before one frame builds tens of thousands of
+   * them. Defaults to 10 000, as `CameraBasedVisibility#maxVisibleTiles`; `Infinity` turns it
+   * off.
+   *
+   * Takes a whole number above 0 or `Infinity` and throws a `RangeError` for anything else,
+   * keeping the value it had. A new value recomputes on the next call.
+   */
+  get maxVisibleTiles(): number {
+    return this.#maxVisibleTiles;
+  }
+
+  set maxVisibleTiles(value: number) {
+    if (!(Number.isInteger(value) && value >= 1) && value !== Infinity) {
+      throw new RangeError(
+        `RectangularVisibilityArea: maxVisibleTiles must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
+      );
+    }
+    if (this.#maxVisibleTiles !== value) {
+      this.#maxVisibleTiles = value;
+      this.needsUpdate = true;
+    }
+  }
+
+  /**
    * Returns the tiles the rectangle covers on the `map2dTileCoords` grid around `centerPoint`,
    * split into the tiles to create and to reuse, with the tiles of `previousTiles` that fall out
    * as `removeTiles`.
    *
+   * While nothing the result depends on has changed and `previousTiles` is the `tiles` list of the
+   * last result — the list `Map2DTileStreamer` hands back —, the call hands that result back as it
+   * stands, `serial` included: every tile reused, none to create or to remove. Any other list is
+   * held against a computation of its own.
+   *
    * While a side of the area is `0` the area is switched off: a call hands every tile of
    * `previousTiles` back in `removeTiles` and lays out none, and a call that is given no tile
    * answers `undefined`.
+   *
+   * Throws a `RangeError` when the rectangle covers more than {@link maxVisibleTiles} tiles of the
+   * grid, before anything of the result is written; the next call computes again. A `centerPoint`
+   * that is not two finite numbers throws a `RangeError` before anything changes.
    */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],
@@ -137,13 +178,20 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     map2dTileCoords: Map2DTileCoordsUtil,
     matrixWorld: Matrix4,
   ): IMap2DVisibleTiles | undefined {
-    if (this.width === 0 || this.height === 0) {
-      return this.#switchedOff(previousTiles);
-    }
-
     // read by index: a tuple of doubles destructured in the signature costs an allocation per call
     const centerX = centerPoint[0];
     const centerY = centerPoint[1];
+    // checked inline and not through `assertFinite()`: a double handed to a call the compiler does
+    // not inline is boxed
+    if (!(Number.isFinite(centerX) && Number.isFinite(centerY))) {
+      throw new RangeError(
+        `RectangularVisibilityArea: the center point of computeVisibleTiles() must be two finite numbers, got ${describeValue(centerPoint)}`,
+      );
+    }
+
+    if (this.width === 0 || this.height === 0) {
+      return this.#switchedOff(previousTiles);
+    }
 
     // asked before changed() writes the new state over it: the answer is what the previous call
     // was given, and `Dependencies` hands out its own clone
@@ -152,7 +200,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     // a tile of another grid carries indices this grid cannot place: `tile.x - tileLeft` lands
     // outside the occupancy array — or, worse, inside it on the wrong cell, where it marks a
     // place as taken that nothing covers
-    const tileGridChanged = storedTileCoords != null && !storedTileCoords.equals(map2dTileCoords);
+    const tileGridChanged = this.#gridChangeRefused || (storedTileCoords != null && !storedTileCoords.equals(map2dTileCoords));
 
     // always ask both halves, even when needsUpdate already forces the recompute: asking is what
     // keeps each snapshot current, and a snapshot left behind reports a change on the next call
@@ -166,16 +214,15 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     seenCenter[1] = centerY;
     const depsChanged = objectsChanged || centerChanged;
 
-    if (!depsChanged && !this.needsUpdate && this.#visibleTiles != null) {
+    // the result stands only for the list it gave out as `tiles`: another list can hold tiles that
+    // fall out, or lack tiles the result lists
+    if (!depsChanged && !this.needsUpdate && this.#visibleTiles != null && previousTiles === this.#visibleTiles.tiles) {
       this.#visibleTiles.createTiles = undefined;
       this.#visibleTiles.reuseTiles = this.#visibleTiles.tiles;
       this.#visibleTiles.removeTiles = undefined;
       this.#visibleTiles.changed = false;
       return this.#visibleTiles;
     }
-
-    this.needsUpdate = false;
-    this.#serial += 1;
 
     const {width, height} = this;
 
@@ -186,14 +233,28 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     area.height = height;
     const tileCoords = map2dTileCoords.computeTilesWithinArea(area, this.#tileCoords);
 
+    const tilesLength = tileCoords.rows * tileCoords.columns;
+    if (tilesLength > this.#maxVisibleTiles) {
+      // the gate has taken the new center and objects in already: a refused call must not leave
+      // the next one the cached result of an earlier call, nor let it compare against the grid
+      // it refused
+      this.needsUpdate = true;
+      this.#gridChangeRefused = tileGridChanged;
+      throw new RangeError(
+        `RectangularVisibilityArea: the area covers ${tilesLength} tiles of the grid, more than maxVisibleTiles (${this.#maxVisibleTiles}) — make the area smaller or the tiles larger, or raise maxVisibleTiles`,
+      );
+    }
+
+    this.needsUpdate = false;
+    this.#gridChangeRefused = false;
+    this.#serial += 1;
+
     const reuseTiles = this.#reuseTiles;
     const removeTiles = this.#removeTiles;
     const createTiles = this.#createTiles;
     truncateArray(reuseTiles);
     truncateArray(removeTiles);
     truncateArray(createTiles);
-
-    const tilesLength = tileCoords.rows * tileCoords.columns;
 
     let tileCreated = this.#tileCreated;
     if (tileCreated == null || tileCreated.length < tilesLength) {
@@ -236,7 +297,11 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
       }
     }
 
-    const offset = this.#offset.set(map2dTileCoords.xOffset - centerX, map2dTileCoords.yOffset - centerY);
+    // the offset of the grid through `readOffset()`, field by field: a getter the compiler leaves
+    // un-inlined boxes the double it answers
+    const offset = map2dTileCoords.readOffset(this.#offset);
+    offset.x -= centerX;
+    offset.y -= centerY;
     const translate = this.#translate.setFromMatrixPosition(matrixWorld);
 
     const tiles = this.#tiles;

@@ -31,7 +31,10 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 `engines` in `package.json`.
 
 - `pnpm install`
-- `pnpm exec playwright install chromium firefox` — the browsers for
+- `pnpm outdated -r` — what is behind in every project of the workspace, the catalog
+  included; updates come through Dependabot (`.github/dependabot.yml`), and pnpm installs
+  no release younger than a day (`minimumReleaseAge` in `pnpm-workspace.yaml`)
+- `pnpm exec playwright install chromium firefox webkit` — the browsers for
   `pnpm test:browser`; once after the first install and after every Playwright bump
 - `pnpm lint` — `biome ci`: Biome's linter and formatter check, nothing written;
   `pnpm format` writes the formatting and the safe lint fixes (`biome check --write`).
@@ -52,35 +55,36 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   which the nightly workflow `bench.yml` archives. Not part of `pnpm run ci` nor of the
   CI workflow: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
-  cache server, the docs' code block check and the Nameable-Types check
-  (`scripts/**/*.test.mjs`), plus specs that start `makePackageJson.mjs`,
-  `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs` and `nxCacheServer.mjs` as
-  child processes, one that checks the lookbook's vendored `rainbow-line` script, one
-  that holds the tags and routes of the lookbook's demo metadata to the library's
-  exports, one that holds the preview images of the lookbook to its demos, ids and card
-  size, one that holds the view-transition names of the lookbook's navbar to its two
-  pages and the stylesheets to those names, one that asks Nx whether every tracked
-  Markdown file is an input of the docs' type check, and one that holds the publish
-  script to Node's built-ins; the Nx project `scripts` has no `test` target, so
-  `pnpm test` leaves them out
+  cache server, the docs' code block check, the Nameable-Types check and the lookbook's
+  preview generator (`scripts/**/*.test.mjs`), plus specs that start
+  `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs`,
+  `nxCacheServer.mjs` and `runExclusive.mjs` as child processes, one that checks the
+  lookbook's vendored `rainbow-line` script, one that holds the tags and routes of the
+  lookbook's demo metadata to the library's exports, one that holds the preview images of
+  the lookbook to its demos, ids and card size, one that holds the view-transition names
+  of the lookbook's navbar to its two pages and the stylesheets to those names, one that
+  asks Nx whether every tracked Markdown file is an input of the docs' type check, one
+  that asks Nx whether every tracked file under the library's `src/` is an input of its
+  Vitest targets, and one that holds the publish script to Node's built-ins; the Nx
+  project `scripts` has no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
   `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
   Markdown files; the tests and the blocks are checked against the built library
-- `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook> and on every network
-  interface (`server.host: true`). Run it once and pass on every URL it prints, the network
-  ones included — they change with the network, so none is written down here. No port check
-  before, no polling or probe after. Started by an agent, Astro moves the server into the
-  background by itself, prints its URLs and the command returns while the server keeps
-  running; `pnpm exec astro dev status`, `… logs` and `… stop` in `apps/lookbook` reach it.
-  Started in a terminal, it stays in the foreground
+- `pnpm lookbook` — Astro dev server at <http://localhost:4321/lookbook> and on every
+  network interface (`server.host: true`). Run it once and pass on every URL it prints,
+  the network ones included — they change with the network, so none is written down here.
+  No port check before, no polling or probe after. Started by an agent, Astro moves the
+  server into the background by itself, prints its URLs and the command returns while the
+  server keeps running; `pnpm exec astro dev status`, `… logs` and `… stop` in
+  `apps/lookbook` reach it. Started in a terminal, it stays in the foreground
 - `pnpm lookbook:assets` — regenerates the generated assets of the lookbook demos under
-  `apps/lookbook/public/assets/<demo>/` from `apps/lookbook/assets-src/`; `--only=<demo>,…`
-  for some, `--skip-render` reuses Blender's render cache. Not part of `pnpm run ci`: the
-  outputs are committed, and a change to an asset is a commit of its generator and its output
-  together. Every output file, frame name, palette and font metric is documented in
-  `apps/lookbook/assets-src/README.md`
+  `apps/lookbook/public/assets/<demo>/` from `apps/lookbook/assets-src/`;
+  `--only=<demo>,…` for some, `--skip-render` reuses Blender's render cache. Not part of
+  `pnpm run ci`: the outputs are committed, and a change to an asset is a commit of its
+  generator and its output together. Every output file, frame name, palette and font
+  metric is documented in `apps/lookbook/assets-src/README.md`
 - `pnpm lookbook:generate-previews` — the preview image of every lookbook demo, through
   Playwright's Chromium against `astro preview`; `--only=<name>,…` for some. Not part of
   `pnpm run ci`: it needs a browser and writes binary files. The protocol is in
@@ -88,7 +92,9 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm run ci` (alias `pnpm cbt`) — the full gate: clean, then `ci:checks` (lint,
   build, typecheck, checkPkgTypes, checkNameableTypes, lintPkg, test:scripts), then
   test:coverage, test:allocations, test:browser. Run it before committing. CI runs the
-  four parts as parallel jobs.
+  four parts as parallel jobs, `ci:checks` once on Node 24 and once on Node 26. Locally
+  it runs the chain `ci:gate` under the lock `.nx/ci-gate.lock`
+  (`scripts/ci/runExclusive.mjs`) and refuses while another run holds it in this checkout.
 
 Never run `pnpm publishNpmPkg` or anything in `scripts/publishNpmPkg.mjs` without an
 explicit instruction.
@@ -100,6 +106,12 @@ explicit instruction.
   is not published until you add it to its module's `public-api.ts`.
 - **Imports.** Relative imports carry the `.js` suffix (NodeNext) even though the
   sources are `.ts`. Types use `import type` — lint enforces it.
+- **Private members.** In `packages/twopoint5d/src` a member private to its class is an
+  ECMAScript private member — `#field`, `#method()`, `static #helper()` —, never
+  TypeScript's `private`, whose member stays reachable at run time; that holds for
+  constructor parameters too. `protected` stays for what a subclass reads. A `#` method
+  allocates no more on a hot path than a public one, and `pnpm test:allocations` holds the
+  hot paths free of allocations.
 - **Error and warning messages** start with their subject, unbracketed: the class
   (`BitmapFont: …`), the call — `VertexObjectPool#sortBy(): …`, `new Display(): …`,
   `RootRenderPipeline.buildOutputNode(): …` —, or a function by its bare name
@@ -116,9 +128,9 @@ explicit instruction.
   (`getAsync("hero", ["atlas", "texture"])`) go through it as well; a name typed as a
   string, one that tells instances apart or one a look-up did not find, is quoted by hand
   (`"${name}"`), which writes the same. A three.js object refused for its class is named
-  by its `type`. A failure of `expectDefined()` reports a broken invariant of the library,
-  not a refusal, and names no subject; the refusals a feature's `checkKind` throws get
-  theirs from `defineSprite()`.
+  by its `type`, through `describeThreeValue()` in `src/utils/`. A failure of
+  `expectDefined()` reports a broken invariant of the library, not a refusal, and names no
+  subject; the refusals a feature's `checkKind` throws get theirs from `defineSprite()`.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. They are peer dependencies of
@@ -130,7 +142,8 @@ explicit instruction.
   check outside the lookbook. TypeScript 7 exports no compiler API under `typescript`, so
   a script that needs one imports the classic API from `@typescript/typescript6`, never
   from `typescript`. The lookbook keeps its own `typescript` 6 for `astro check`, whose
-  peer range ends at 6 ([monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions)).
+  peer range ends at 6 ([monorepo architecture
+  §5](docs/architecture.md#5-shared-dependency-versions)).
 - **`apps/lookbook/public/js/rainbow-line-v0.6.0.js`** is the web component behind every
   `RainbowLine` from `@spearwolf/astro-rainbow-line`. That component emits
   `<script src="${BASE_URL}/js/rainbow-line-v0.6.0.js">` at runtime and expects the file
@@ -143,7 +156,8 @@ explicit instruction.
 - **Publishing** happens from the generated `dist/`, never from `packages/twopoint5d/`.
   `scripts/` is the publish pipeline — changes there can break the published package.
   `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions: the Nx cache server
-  of the CI workflow, and the check of the docs' code blocks, which publishes nothing.
+  of the CI workflow and the lock of the local gate, and the check of the docs' code
+  blocks, none of which publishes anything.
   `scripts/publishNpmPkg.mjs` and `scripts/publishNpmPkg/` import nothing but Node's
   built-ins (`node:`) and each other, because the publish job of the deploy installs
   nothing; `builtinImportsOnly.test.mjs` fails on anything else.
@@ -185,6 +199,15 @@ explicit instruction.
   A fence counts where CommonMark sees one: indented at most three columns past
   the start of its line or past the content of its list item; a line indented
   further is code of an indented block and opens no block.
+- **One gate per checkout.** Two runs side by side in one checkout — of `pnpm run ci`, of
+  `clean`, of a build — delete the `dist/` the other is reading. Nx then records the run
+  that broke as failed beside a passing run of the same hash and reports a flaky task
+  that is none. `pnpm run ci` refuses a second run by its lock; `ci:gate` called directly
+  and the single targets take no lock, so do not start them beside a running gate. Work
+  that has to run in parallel — a second agent, a second gate — goes into a `git
+  worktree`, which has a `dist/` and a lock of its own. Stop a run of your own through
+  its own handle (its background task, its pid), never by a pattern such as `pkill -f
+  web-test-runner`, which reaches the runs of others as well.
 - **Commits** follow [Conventional
   Commits](https://www.conventionalcommits.org/en/v1.0.0/). Code, comments and docs are
   written in English.
@@ -212,14 +235,15 @@ libraries.
 - [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a
   description declares and which accessors it generates
 - The guides of the library: [sprites](packages/twopoint5d/docs/sprites.md),
-  [text](packages/twopoint5d/docs/text.md), [tile maps](packages/twopoint5d/docs/map2d.md),
-  [display](packages/twopoint5d/docs/display.md) — written for the users of the library;
-  they describe the code as it is, with no internals and no history, and a new or changed
-  feature changes its guide section in the same commit
-- [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers of
-  the library: the idea of each feature, its inner workings and the basis of its build; no
-  tutorial for users. They may lag behind the code, and where one disagrees with a guide,
-  the guide holds. Read the one for a feature before building or changing it, and the
-  README for how guides and proposals divide their readers
+  [text](packages/twopoint5d/docs/text.md), [tile
+  maps](packages/twopoint5d/docs/map2d.md), [display](packages/twopoint5d/docs/display.md)
+  — written for the users of the library; they describe the code as it is, with no
+  internals and no history, and a new or changed feature changes its guide section in the
+  same commit
+- [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers
+  of the library: the idea of each feature, its inner workings and the basis of its build;
+  no tutorial for users. They may lag behind the code, and where one disagrees with a
+  guide, the guide holds. Read the one for a feature before building or changing it, and
+  the README for how guides and proposals divide their readers
 - [Monorepo architecture](docs/architecture.md) — Nx targets and caching, the build and
   publish pipeline, the CI gate

@@ -8,7 +8,7 @@ import {playwrightLauncher} from '@web/test-runner-playwright';
  * A Playwright launcher whose pages render under `backend`, named after both — the reporter
  * keys its results and browser logs by that name.
  *
- * @param {'chromium' | 'firefox'} product
+ * @param {'chromium' | 'firefox' | 'webkit'} product
  * @param {Backend} backend
  * @param {import('playwright').LaunchOptions} launchOptions
  */
@@ -19,6 +19,7 @@ function backendLauncher(product, backend, launchOptions) {
     launchOptions,
     async createPage({context}) {
       await context.addInitScript(pinBackend, backend);
+      await context.addInitScript(takeExpectedRejections);
       return context.newPage();
     },
   });
@@ -40,6 +41,38 @@ function pinBackend(backend) {
   if (backend === 'WebGL2') delete Navigator.prototype.gpu;
 }
 
+/**
+ * Runs in the page before any of its scripts, like pinBackend(). It leaves
+ * `globalThis.twopoint5dExpectRejection(reason)` behind, which `whenRejectionsReported()` in
+ * test/helpers/fixtures.js calls: the promise it returns settles once the browser reports `reason`
+ * as an unhandled rejection, and that report goes no further. The runner puts a logger of
+ * @web/browser-logs into every page, which writes each unhandled rejection into the browser logs
+ * as "An error was thrown in a Promise outside a test", whether a listener prevented its default
+ * or not. Only a listener added before the logger's keeps a rejection that a test leaves
+ * unhandled on purpose out of them, and an init script runs before every script of the page.
+ */
+function takeExpectedRejections() {
+  /** @type {Map<unknown, () => void>} */
+  const expected = new Map();
+  Object.defineProperty(globalThis, 'twopoint5dExpectRejection', {
+    /** @param {unknown} reason */
+    value: (reason) =>
+      new Promise((resolve) => {
+        expected.set(reason, resolve);
+      }),
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const settle = expected.get(event.reason);
+    if (settle === undefined) return;
+    expected.delete(event.reason);
+    // off the console of the browser
+    event.preventDefault();
+    // and away from the logger and from every listener a test adds
+    event.stopImmediatePropagation();
+    settle();
+  });
+}
+
 export default {
   nodeResolve: true,
   // in a monorepo you need to set set the root dir to resolve modules
@@ -49,7 +82,8 @@ export default {
   plugins: [esbuildPlugin({target: 'auto'})],
   // Every test file runs under both backends of three's WebGPURenderer. Which one a browser
   // would pick on its own depends on the machine — headless Chromium has no WebGPU without a
-  // flag, headless Firefox has no adapter at all — so each launcher pins its backend and
+  // flag, headless Firefox has no adapter at all, and Playwright's WebKit offers no
+  // navigator.gpu — so WebKit runs under WebGL 2 alone, and each launcher pins its backend and
   // renderer-backend.test.js fails when three ends up on another one.
   browsers: [
     backendLauncher('chromium', 'WebGPU', {
@@ -63,6 +97,10 @@ export default {
       // comes back invalid, and Dawn drops the instance — every device of the page is lost
       // ("A valid external Instance reference no longer exists"). macOS needs the first of the
       // three, Linux all of them.
+      // --disable-accelerated-2d-canvas: on macOS a 2D canvas still draws on the GPU, and
+      // copyExternalImageToTexture() cannot take its texture into a SwiftShader device — every
+      // upload of a CanvasTexture fails as "CopyTextureForBrowser from [Invalid Texture]" and the
+      // texture stays black. Drawn in software, the canvas copies on every platform.
       args: [
         '--enable-precise-memory-info',
         '--js-flags=--expose-gc',
@@ -71,6 +109,7 @@ export default {
         '--use-angle=swiftshader',
         '--enable-features=Vulkan',
         '--use-vulkan=swiftshader',
+        '--disable-accelerated-2d-canvas',
       ],
     }),
     backendLauncher('chromium', 'WebGL2', {
@@ -90,11 +129,17 @@ export default {
         'webgl.force-enabled': true,
       },
     }),
+    // WebKit, the engine of Safari. Playwright 1.63.0 ships WebKit 26.6, whose pages have no
+    // navigator.gpu (measured on macOS), so it renders under WebGL 2; it needs no flags.
+    backendLauncher('webkit', 'WebGL2', {}),
   ],
   testFramework: {
     config: {
       ui: 'bdd',
-      timeout: '10000',
+      // a cold start of the renderer — adapter and device under WebGPU, on CI on SwiftShader —
+      // falls into the first hook or the first test of a case, and hooks run on this budget as
+      // well. A file that needs more says why beside its own this.timeout()
+      timeout: '20000',
     },
   },
   testRunnerHtml: (testFramework) =>

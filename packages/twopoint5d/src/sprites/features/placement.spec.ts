@@ -177,6 +177,20 @@ describe('flatPlacement()', () => {
     },
   );
 
+  test.each([
+    [5, '5'],
+    ['x', '"x"'],
+    [null, 'null'],
+  ])('refuses options of %o that are no object', (options, shown) => {
+    expect(() => flatPlacement(options as never)).toThrow(
+      new TypeError(`flatPlacement: the options must be an object, {plane?, orientation?}, got ${shown}`),
+    );
+  });
+
+  test('takes options that are undefined', () => {
+    expect(() => flatPlacement(undefined)).not.toThrow();
+  });
+
   test('refuses a plane or an orientation it does not know', () => {
     expect(() => flatPlacement({plane: 'yz' as 'xy'})).toThrow(
       new TypeError(`flatPlacement: the plane "yz" is neither 'xy' nor 'xz'`),
@@ -375,6 +389,20 @@ describe('Orientation', () => {
 });
 
 describe('axisBillboardPlacement()', () => {
+  test.each([
+    [5, '5'],
+    ['x', '"x"'],
+    [null, 'null'],
+  ])('refuses options of %o that are no object', (options, shown) => {
+    expect(() => axisBillboardPlacement(options as never)).toThrow(
+      new TypeError(`axisBillboardPlacement: the options must be an object, {axis?}, got ${shown}`),
+    );
+  });
+
+  test('takes options that are undefined', () => {
+    expect(() => axisBillboardPlacement(undefined)).not.toThrow();
+  });
+
   test('answers one feature per axis: AxisBillboardPlacement for the default', () => {
     expect(axisBillboardPlacement()).toBe(AxisBillboardPlacement);
     expect(axisBillboardPlacement({})).toBe(AxisBillboardPlacement);

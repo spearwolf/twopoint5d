@@ -128,11 +128,10 @@ export function sampleAtlasFrame(
     {
       texCoords,
       flipDiagonal,
-      margins,
       // the texels of the frame as it is drawn: under the diagonal flip it is `height` wide and `width` high
       drawnTexels: mix(measures.xy, measures.yx, flipDiagonal) as unknown as Node<'vec2'>,
     },
     position,
-    {wrap: [wrapU, wrapV], trim, inset},
+    trim === 'mask' ? {wrap: [wrapU, wrapV], trim, margins, inset} : {wrap: [wrapU, wrapV], trim, inset},
   );
 }

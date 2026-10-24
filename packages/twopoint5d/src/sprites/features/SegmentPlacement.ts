@@ -1,4 +1,5 @@
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
 import {cameraPositionLocal, cameraRightLocal, cameraUpLocal} from '../cameraNodes.js';
 import {defineFeature, type SpriteFeature, type SpriteKindShape} from '../SpriteFeature.js';
 import {Rotation} from './Rotation.js';
@@ -59,10 +60,13 @@ const NAMES: Readonly<Record<SegmentFacing, string>> = {
  * `Rotation` or `Shear` is refused: a segment lies along its ends. So is a kind with `NineSlice`,
  * which sets its border in the local quad, where a segment holds only its caps.
  *
- * @throws a `TypeError` for a facing or a plane it does not know, and for a plane next to
+ * @throws a `TypeError` for options that are no object, for a facing or a plane it does not know, and for a plane next to
  *   `facing: 'camera'`
  */
 export function segmentPlacement(options?: SegmentPlacementOptions): SpriteFeature {
+  if (options !== undefined && !isObject(options as unknown)) {
+    throw new TypeError(`segmentPlacement: the options must be an object, {facing?, plane?}, got ${describeValue(options)}`);
+  }
   const facing = options?.facing ?? 'plane';
   if (facing !== 'plane' && facing !== 'camera') {
     throw new TypeError(`segmentPlacement: the facing ${describeValue(facing)} is neither 'plane' nor 'camera'`);

@@ -9,9 +9,6 @@ const SETTLE_FRAMES = 30;
 const GPU_WINDOW = 12;
 
 describe('Display — adaptiveResolution on a real renderer', function () {
-  // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

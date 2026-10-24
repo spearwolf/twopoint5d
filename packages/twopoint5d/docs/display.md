@@ -245,6 +245,9 @@ What to know about it:
   frames bring it back through the tries up: the first after 180 clean frames, and twice as
   many after each try that failed, up to 3600.
 - Under a `pixelZoom` the controller holds still: pixel art keeps its size.
+- A frame that a display renders while it is not running — paused, or not started yet: a
+  `renderFrame()` of your own — has no interval between animation frames: `frame-pacing` judges none
+  of them, `gpu-time` measures it like any other.
 - `adaptive.enabled = false` holds it still and gives the display back the `resolutionScale` it had
   when the controller took over last; `true` takes over again, counting the windows toward the next
   step up from 0 while the pace it found and the waits it doubled stay. It takes over a scale that

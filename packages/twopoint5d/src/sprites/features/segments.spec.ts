@@ -117,6 +117,20 @@ describe('segmentPlacement()', () => {
     }
   });
 
+  test.each([
+    [5, '5'],
+    ['x', '"x"'],
+    [null, 'null'],
+  ])('refuses options of %o that are no object', (options, shown) => {
+    expect(() => segmentPlacement(options as never)).toThrow(
+      new TypeError(`segmentPlacement: the options must be an object, {facing?, plane?}, got ${shown}`),
+    );
+  });
+
+  test('takes options that are undefined', () => {
+    expect(() => segmentPlacement(undefined)).not.toThrow();
+  });
+
   test('refuses a facing or a plane it does not know, and a plane next to the camera', () => {
     expect(() => segmentPlacement({facing: 'light' as 'plane'})).toThrow(
       new TypeError(`segmentPlacement: the facing "light" is neither 'plane' nor 'camera'`),

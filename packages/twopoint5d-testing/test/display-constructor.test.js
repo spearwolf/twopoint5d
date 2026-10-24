@@ -22,9 +22,6 @@ function makeRendererStub(canvas, initResult) {
 }
 
 describe('Display — what the constructor accepts and what it reports', function () {
-  // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

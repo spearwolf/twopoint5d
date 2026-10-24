@@ -30,10 +30,8 @@ describe('DataIdsChunk2D', () => {
     const tooShort = () => new DataIdsChunk2D({x: 0, y: 0, width: 2, height: 2, uint32Arr: new Uint32Array(3)});
     const tooLong = () => new DataIdsChunk2D({x: 0, y: 0, width: 2, height: 2, uint32Arr: new Uint32Array(5)});
 
-    expect(tooShort).toThrow(RangeError);
-    expect(tooShort).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3');
-    expect(tooLong).toThrow(RangeError);
-    expect(tooLong).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 5');
+    expect(tooShort).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3'));
+    expect(tooLong).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 5'));
   });
 
   test('refuses base64 data that does not hold width × height ids on the first read', () => {
@@ -42,11 +40,9 @@ describe('DataIdsChunk2D', () => {
 
     const read = () => chunk.readDataIdAt(0, 0);
 
-    expect(read).toThrow(RangeError);
-    expect(read).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3');
+    expect(read).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3'));
     // the refusal is not cached: the next read throws again
-    expect(read).toThrow(RangeError);
-    expect(read).toThrow('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3');
+    expect(read).toThrow(new RangeError('DataIdsChunk2D: a chunk of 2x2 takes 4 ids, got 3'));
   });
 
   test('reads the ids of base64 data row by row', () => {
@@ -96,5 +92,56 @@ describe('DataIdsChunk2D', () => {
     });
 
     expect(() => chunk.readDataIdAt(0, 0)).toThrow(/gzip/);
+  });
+
+  test('holds on to neither its params nor its base64 string once the first read has decoded it', async () => {
+    const gc = (globalThis as {gc?: () => void}).gc;
+    expect(gc, 'the workers run with --expose-gc').toBeTypeOf('function');
+
+    // built in a scope of its own, so that nothing in this test holds the params
+    const [chunk, ref] = ((): [DataIdsChunk2D, WeakRef<object>] => {
+      const params = {x: 0, y: 0, width: 2, height: 2, data: 'AQAAAAIAAAADAAAABAAAAA=='};
+      const chunk = new DataIdsChunk2D(params);
+      chunk.readDataIdAt(0, 0);
+      return [chunk, new WeakRef(params)];
+    })();
+
+    // a WeakRef keeps its target alive until the job it was made in has ended
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    gc!();
+
+    expect(ref.deref(), 'the params').toBeUndefined();
+    expect(chunk.readDataIdAt(0, 0), 'the id at (0, 0)').toBe(1);
+  });
+
+  test('holds on to its params no more when they carry a uint32Arr', async () => {
+    const gc = (globalThis as {gc?: () => void}).gc;
+    expect(gc, 'the workers run with --expose-gc').toBeTypeOf('function');
+
+    const [chunk, ref] = ((): [DataIdsChunk2D, WeakRef<object>] => {
+      const params = {x: 0, y: 0, width: 2, height: 2, uint32Arr: new Uint32Array([1, 2, 3, 4])};
+      const chunk = new DataIdsChunk2D(params);
+      return [chunk, new WeakRef(params)];
+    })();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    gc!();
+
+    expect(ref.deref(), 'the params').toBeUndefined();
+    expect(chunk.readDataIdAt(0, 0), 'the id at (0, 0)').toBe(1);
+  });
+
+  test('hands a subclass that overrides prepareData() the base64 string of its params', () => {
+    const seen: string[] = [];
+    class RecordingChunk extends DataIdsChunk2D {
+      protected override prepareData(base64: string): Uint32Array {
+        seen.push(base64);
+        return super.prepareData(base64);
+      }
+    }
+    const chunk = new RecordingChunk({x: 0, y: 0, width: 2, height: 2, data: 'AQAAAAIAAAADAAAABAAAAA=='});
+
+    expect(chunk.readDataIdAt(1, 1)).toBe(4);
+    expect(seen).toEqual(['AQAAAAIAAAADAAAABAAAAA==']);
   });
 });

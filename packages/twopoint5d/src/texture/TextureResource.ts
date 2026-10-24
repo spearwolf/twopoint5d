@@ -67,6 +67,16 @@ export const TextureResourceSubtypes = {
 } as const satisfies Record<string, TextureResourceSubType>;
 
 /**
+ * The payload of an `error` event of a {@link TextureResource}, one shape per `source`;
+ * {@link TextureResourceEvents} says when each goes out.
+ */
+export type TextureResourceErrorEvent =
+  | {readonly source: 'image'; readonly url: string; readonly error: unknown}
+  | {readonly source: 'atlas'; readonly url: string; readonly status?: number; readonly error: unknown}
+  | {readonly source: 'texture'; readonly id: string; readonly error: unknown}
+  | {readonly source: 'frameBasedAnimations'; readonly id: string; readonly animation: string; readonly error: unknown};
+
+/**
  * Public event-name constants emitted by `TextureResource`.
  *
  * - `imageCoords`, `atlas`, `tileSet`, `texture` and `frameBasedAnimations` carry the values of the
@@ -76,7 +86,7 @@ export const TextureResourceSubtypes = {
  *     {@link TextureResource} lists when a value is taken back.
  *   - A subscriber that throws keeps the value from no one: every other subscriber is called and
  *     the retained value is written before the throw goes on.
- * - `error` carries one payload per `source`:
+ * - `error` carries a {@link TextureResourceErrorEvent}, one shape per `source`:
  *   - `{source: 'image', url, error}` — an image that does not load. The failure comes out of the
  *     loader promise and has no status to name.
  *   - `{source: 'atlas', url, status, error}` — an atlas request that answered with a status
@@ -98,8 +108,9 @@ export const TextureResourceSubtypes = {
  *   - `{source: 'frameBasedAnimations', id, animation, error}` — an animation entry that is skipped.
  *     Every other entry of the same map is registered all the same. An entry is skipped
  *     - whose data is no object or does not fit this kind of resource;
- *     - whose data does not let the animation be built: no `duration` and no `frameRate`, a
- *       `frameRate` of 0, `tileIds` that are no array, a tile id, a `firstTileId` or a `tileCount`
+ *     - whose data does not let the animation be built: no `duration` and no `frameRate`, timing
+ *       that gives more than one of `duration`, `frameRate` and `durations`, a `frameRate` of 0,
+ *       `tileIds` that are no array, a tile id, a `firstTileId` or a `tileCount`
  *       that `FrameBasedAnimations#add()` refuses, a `frameNameQuery` that is neither a string nor
  *       a `RegExp`;
  *     - whose frames come out empty: a `frameNameQuery` that matches nothing or an empty list of
@@ -121,7 +132,10 @@ export const TextureResourceEvents = {
   Error: 'error',
 } as const;
 
-const cmpTexClasses = (a: TextureOptionClasses[] | undefined, b: TextureOptionClasses[] | undefined): boolean => {
+const cmpTexClasses = (
+  a: readonly TextureOptionClasses[] | undefined,
+  b: readonly TextureOptionClasses[] | undefined,
+): boolean => {
   if (a === b) {
     return true;
   }
@@ -144,6 +158,12 @@ const cmpShallow = <T extends object>(a: T | undefined, b: T | undefined): boole
 
 const OnDispose = TextureResourceEvents.Dispose;
 const OnError = TextureResourceEvents.Error;
+
+// every error event of a resource goes out here, so that its payload is held to the type; at module
+// level, because the three shapes of resource below need it as well and reach no # method of the base
+const reportError = (resource: TextureResource, event: TextureResourceErrorEvent): void => {
+  emitSafe(resource, OnError, event);
+};
 
 // Everything derived from an image runs before the bridges that carry the values out as
 // events, which have no priority and sit at 0. The image effect writes the coordinates and
@@ -300,8 +320,9 @@ export interface TextureResource extends EventizedObject {}
  *   `texture` back, together with everything built from them — the `tileSet`, its `atlas` and the
  *   `frameBasedAnimations` — and releases the texture it built, since a subscriber only borrows it.
  * - An image that is still loading when the url is cleared builds nothing.
- * - An atlas resource whose json names no image, with no `overrideImageUrl` to fall back on, has no
- *   `imageUrl` either and does the same.
+ * - An atlas resource whose json names no image, with no `overrideImageUrl` to fall back on — never
+ *   set, or cleared again —, has no `imageUrl` either and does the same; a json it fetched is taken
+ *   back with it.
  * - A tile set resource takes its `tileSet`, `atlas` and `frameBasedAnimations` back while its
  *   `tileSetOptions` are cleared or refused by `TileSet`. The texture stays.
  * - An atlas resource takes its `atlas` and `frameBasedAnimations` back while its `atlasJson` is
@@ -320,12 +341,12 @@ export interface TextureResource extends EventizedObject {}
  * - a texture built from another image than the one loaded now is taken back and released.
  */
 export abstract class TextureResource {
-  static fromImage(id: string, imageUrl: string, textureClasses?: TextureOptionClasses[]): ImageTextureResource {
+  static fromImage(id: string, imageUrl: string, textureClasses?: readonly TextureOptionClasses[]): ImageTextureResource {
     const resource = new ImageTextureResource(id);
 
     batch(() => {
       resource.imageUrl = imageUrl;
-      resource.textureClasses = textureClasses?.slice();
+      resource.textureClasses = textureClasses;
     });
 
     return resource;
@@ -335,7 +356,7 @@ export abstract class TextureResource {
     id: string,
     imageUrl: string | undefined,
     tileSetOptions: TileSetOptions,
-    textureClasses?: TextureOptionClasses[],
+    textureClasses?: readonly TextureOptionClasses[],
     frameBasedAnimations?: FrameBasedAnimationsDataMap,
   ): TileSetTextureResource {
     const resource = new TileSetTextureResource(id);
@@ -343,7 +364,7 @@ export abstract class TextureResource {
     batch(() => {
       resource.imageUrl = imageUrl;
       resource.tileSetOptions = tileSetOptions;
-      resource.textureClasses = textureClasses?.slice();
+      resource.textureClasses = textureClasses;
       resource.frameBasedAnimationsData = frameBasedAnimations;
     });
 
@@ -354,7 +375,7 @@ export abstract class TextureResource {
     id: string,
     atlasUrl: string,
     overrideImageUrl?: string,
-    textureClasses?: TextureOptionClasses[],
+    textureClasses?: readonly TextureOptionClasses[],
     frameBasedAnimations?: FrameBasedAnimationsDataMap,
   ): AtlasTextureResource {
     const resource = new AtlasTextureResource(id);
@@ -362,7 +383,7 @@ export abstract class TextureResource {
     batch(() => {
       resource.atlasUrl = atlasUrl;
       resource.overrideImageUrl = overrideImageUrl;
-      resource.textureClasses = textureClasses?.slice();
+      resource.textureClasses = textureClasses;
       resource.frameBasedAnimationsData = frameBasedAnimations;
     });
 
@@ -389,7 +410,10 @@ export abstract class TextureResource {
     attach: this,
   });
 
-  #textureClasses = createSignal<TextureOptionClasses[] | undefined>(undefined, {compare: cmpTexClasses, attach: this});
+  #textureClasses = createSignal<readonly TextureOptionClasses[] | undefined>(undefined, {
+    compare: cmpTexClasses,
+    attach: this,
+  });
   // an input of an image and a tile set resource, derived from the json of an atlas resource
   #imageUrl = createSignal<string | undefined>(undefined, {attach: this});
   #imageCoords = createSignal<TextureCoords | undefined>(undefined, {compare: cmpShallow, attach: this});
@@ -408,7 +432,9 @@ export abstract class TextureResource {
 
   readonly #context: ShapeContext;
 
+  /** The id a `TextureStore` carries this resource under; it still answers after {@link TextureResource.dispose}. */
   readonly id: string;
+  /** The shape of this resource; it still answers after {@link TextureResource.dispose}. */
   readonly type: TextureResourceType;
 
   #refCount = 0;
@@ -420,6 +446,9 @@ export abstract class TextureResource {
    * `{evictMissing: true}` dispose a resource only while this is 0.
    *
    * Read-only: the store that holds the resource keeps the count.
+   *
+   * Goes on counting once {@link TextureResource.dispose} has run, until the last subscription that
+   * holds the resource lets go.
    */
   get refCount(): number {
     return this.#refCount;
@@ -440,39 +469,74 @@ export abstract class TextureResource {
 
   /**
    * The url of the image the texture is built from: an input of an image and a tile set resource,
-   * and on an atlas resource the image its json names — the `overrideImageUrl` while one is set.
+   * and on an atlas resource the image its json names — the `overrideImageUrl` while one is set;
+   * `undefined` while neither names one.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run.
    */
   get imageUrl(): string | undefined {
     return this.#disposed ? undefined : this.#imageUrl.value;
   }
 
+  /**
+   * The coordinates of the whole image, or `undefined` while no image is loaded.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run.
+   */
   get imageCoords(): TextureCoords | undefined {
     return this.#disposed ? undefined : this.#imageCoords.value;
   }
 
+  /**
+   * The atlas of an atlas resource, or of the tile set of a tile set resource; `undefined` while
+   * there is none.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run.
+   */
   get atlas(): TextureAtlas | undefined {
     return this.#disposed ? undefined : this.#atlas.value;
   }
 
+  /**
+   * The tile set of a tile set resource, or `undefined` while there is none.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run.
+   */
   get tileSet(): TileSet | undefined {
     return this.#disposed ? undefined : this.#tileSet.value;
   }
 
+  /**
+   * The animations of a tile set or an atlas resource, or `undefined` while there are none.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run.
+   */
   get frameBasedAnimations(): FrameBasedAnimations | undefined {
     return this.#disposed ? undefined : this.#frameBasedAnimations.value;
   }
 
-  get textureClasses(): TextureOptionClasses[] | undefined {
+  /**
+   * The texture classes the texture is built with; an empty list is stored as `undefined`.
+   *
+   * The setter stores a frozen copy of what is written: a change to the array handed in does not
+   * reach the resource, and writing it again after a change builds the texture with the new
+   * classes. The getter answers that copy; to change the classes, write a new array.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
+   */
+  get textureClasses(): readonly TextureOptionClasses[] | undefined {
     return this.#disposed ? undefined : this.#textureClasses.value;
   }
 
-  set textureClasses(value: TextureOptionClasses[] | undefined) {
-    if (Array.isArray(value) && value.length === 0) {
-      value = undefined;
-    }
-    this.#textureClasses.set(value);
+  set textureClasses(value: readonly TextureOptionClasses[] | undefined) {
+    this.#textureClasses.set(Array.isArray(value) && value.length > 0 ? Object.freeze([...value]) : undefined);
   }
 
+  /**
+   * The factory that builds the texture; a `TextureStore` writes its shared one.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
+   */
   get textureFactory(): TextureFactory | undefined {
     return this.#disposed ? undefined : this.#textureFactory.value;
   }
@@ -506,6 +570,11 @@ export abstract class TextureResource {
    * written from outside — a `TextureStore` writes its shared one — the resource builds a
    * `TextureFactory` for it that starts from no texture class, as the factory of a store does,
    * and a new one whenever another renderer is written; the texture follows the new factory.
+   * Clearing it takes the factory built for it back — a factory written from outside stays —, so
+   * the resource no longer holds the renderer; the texture stays for as long as the image stays the
+   * same, as with a cleared `textureFactory`, and a new texture waits for a factory.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   get renderer(): WebGPURenderer | undefined {
     return this.#disposed ? undefined : this.#renderer.value;
@@ -642,7 +711,7 @@ export abstract class TextureResource {
   // the record goes in before the event goes out: a listener of the error event reads it
   #fail(step: LoadStep, failure: TextureResourceLoadFailure): void {
     this.#loadFailures.set(step, failure);
-    emitSafe(this, OnError, failure);
+    reportError(this, failure);
   }
 
   /** @internal */
@@ -733,14 +802,23 @@ export abstract class TextureResource {
     // `TextureStore` around — builds a factory that starts from no texture class, as the factory
     // of a store does. A new renderer brings a new factory, which asks that renderer for its
     // anisotropy maximum at every texture it builds; a factory written from outside, the shared
-    // one of a store among them, stays.
+    // one of a store among them, stays. Clearing the renderer takes the factory built for it back —
+    // a factory written from outside stays —, so the resource no longer holds the renderer; the
+    // texture stays for as long as the image stays the same, as with a cleared `textureFactory`,
+    // and a new texture waits for a factory.
 
     // the factory this fallback built and the renderer it built it for
     let fallback: {renderer: WebGPURenderer; factory: TextureFactory} | undefined;
     createEffect(
       () => {
         const renderer = this.#renderer.get();
-        if (!renderer || renderer === fallback?.renderer) return;
+        if (!renderer) {
+          // the factory holds the renderer, and every later texture would still be built for the old one
+          if (fallback !== undefined && this.#textureFactory.value === fallback.factory) this.textureFactory = undefined;
+          fallback = undefined;
+          return;
+        }
+        if (renderer === fallback?.renderer) return;
         const factory = this.#textureFactory.value;
         if (factory && factory !== fallback?.factory) return;
         fallback = {renderer, factory: new TextureFactory(renderer, [])};
@@ -814,62 +892,17 @@ export abstract class TextureResource {
         // swapped in between cannot make this run give back what it never took
         const lease: ImageLease | undefined = this[imageSource]?.acquire(url);
 
-        // No closing .catch(): the `error` events below go out with emitSafe() and throw nothing,
-        // so what either handler still throws is a dispose listener of the texture this run
-        // replaces. It throws out of the `finally` below before a throw that the batch handed back
-        // has gone out as an `error` event, takes its place, is no failure of this step and ends
-        // as an unhandled rejection
+        // No closing .catch(): the `error` events go out with emitSafe() and throw nothing, so
+        // what either handler still throws is a dispose listener of the texture this run
+        // replaces. It throws out of the `finally` of #publishImageWithTexture() or
+        // #publishImageWithoutTexture() before a throw that the batch handed back has gone out as
+        // an `error` event, takes its place, is no failure of this step and ends as an unhandled
+        // rejection
         (lease?.image ?? loadStandalone(url)).then(
           (image) => {
             if (aborted) return;
-            if (!factory) {
-              this.#publishImageWithoutTexture(url, image);
-              return;
-            }
-            // the coordinates first, so a throw there leaves no texture behind that nobody
-            // releases. There is no failed url to name here, so the resource is reported
-            let coords: TextureCoords;
-            let texture: Texture;
-            try {
-              coords = new TextureCoords(0, 0, image.width, image.height);
-              texture = factory.create(image, ...(classes ?? []));
-            } catch (error) {
-              this.#fail('image', {source: 'texture', id: this.id, error});
-              return;
-            }
-            texture.name = this.id;
-            // The resource owns the texture before it publishes it: a subscriber that throws
-            // inside the batch, or one that disposes this resource, cannot skip the handover —
-            // dispose() releases whatever is owned at that moment. The predecessor stays alive
-            // while it is still the published value and is released only after the batch, once
-            // the successor is on the signal and no reader can reach it
-            const previous = this.#ownTexture;
-            this.#ownTexture = texture;
-            this.#ownTextureUrl = url;
-            let publishError: {error: unknown} | undefined;
-            try {
-              // one batch: the three values reach their effects together, and the higher
-              // priority of everything derived from the image — the atlas among it — puts
-              // those runs ahead of the bridge that carries the texture out
-              batch(() => {
-                this.#imageUrlOfCoords.set(url);
-                this.#imageCoords.set(coords);
-                this.#texture.set(texture);
-              });
-            } catch (error) {
-              // a subscriber that throws inside the batch lands here: signalize propagates
-              // inline, isolates the throw and rethrows it to the writer once delivery ends,
-              // several at once as an AggregateError, and the writer is the batch() itself.
-              // Every value is published by then and every subscriber has heard it, so the step
-              // has its result: the throw is reported without a record that would hold a value
-              // back, and whether this run was cut short in the meantime changes nothing
-              publishError = {error};
-            } finally {
-              previous?.dispose();
-            }
-            if (publishError) {
-              emitSafe(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
-            }
+            if (factory) this.#publishImageWithTexture(url, image, factory, classes);
+            else this.#publishImageWithoutTexture(url, image);
           },
           (error) => {
             // the second parameter of .then() sees exactly the rejection of the image load
@@ -889,6 +922,62 @@ export abstract class TextureResource {
       },
       {attach: this},
     );
+  }
+
+  // What a run with a factory publishes of the image it loaded: the coordinates, the texture it
+  // builds of the image with the texture classes of the run, and with them whatever the other
+  // effects build out of them — in one batch. The texture this one takes the place of is released
+  // after the batch. A failure to build either value is a failure of the image step
+  #publishImageWithTexture(
+    url: string,
+    image: HTMLImageElement,
+    factory: TextureFactory,
+    classes: readonly TextureOptionClasses[] | undefined,
+  ): void {
+    // the coordinates first, so a throw there leaves no texture behind that nobody
+    // releases. There is no failed url to name here, so the resource is reported
+    let coords: TextureCoords;
+    let texture: Texture;
+    try {
+      coords = new TextureCoords(0, 0, image.width, image.height);
+      texture = factory.create(image, ...(classes ?? []));
+    } catch (error) {
+      this.#fail('image', {source: 'texture', id: this.id, error});
+      return;
+    }
+    texture.name = this.id;
+    // The resource owns the texture before it publishes it: a subscriber that throws
+    // inside the batch, or one that disposes this resource, cannot skip the handover —
+    // dispose() releases whatever is owned at that moment. The predecessor stays alive
+    // while it is still the published value and is released only after the batch, once
+    // the successor is on the signal and no reader can reach it
+    const previous = this.#ownTexture;
+    this.#ownTexture = texture;
+    this.#ownTextureUrl = url;
+    let publishError: {error: unknown} | undefined;
+    try {
+      // one batch: the three values reach their effects together, and the higher
+      // priority of everything derived from the image — the atlas among it — puts
+      // those runs ahead of the bridge that carries the texture out
+      batch(() => {
+        this.#imageUrlOfCoords.set(url);
+        this.#imageCoords.set(coords);
+        this.#texture.set(texture);
+      });
+    } catch (error) {
+      // a subscriber that throws inside the batch lands here: signalize propagates
+      // inline, isolates the throw and rethrows it to the writer once delivery ends,
+      // several at once as an AggregateError, and the writer is the batch() itself.
+      // Every value is published by then and every subscriber has heard it, so the step
+      // has its result: the throw is reported without a record that would hold a value
+      // back, and whether this run was cut short in the meantime changes nothing
+      publishError = {error};
+    } finally {
+      previous?.dispose();
+    }
+    if (publishError) {
+      reportError(this, {source: 'texture', id: this.id, error: publishError.error});
+    }
   }
 
   // What a run without a factory publishes of the image it loaded: the coordinates, and with them
@@ -924,7 +1013,7 @@ export abstract class TextureResource {
       stale?.dispose();
     }
     if (publishError) {
-      emitSafe(this, OnError, {source: 'texture', id: this.id, error: publishError.error});
+      reportError(this, {source: 'texture', id: this.id, error: publishError.error});
     }
   }
 
@@ -980,7 +1069,7 @@ export abstract class TextureResource {
             // global error channel of signalize, no animation of the whole map is registered,
             // and the caller is told nothing. emitSafe() for the same reason: an error listener
             // that throws would take the rest of the map with it.
-            emitSafe(this, OnError, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
+            reportError(this, {source: 'frameBasedAnimations', id: this.id, animation: name, error});
           }
         }
         this.#frameBasedAnimations.set(animations);
@@ -1010,6 +1099,8 @@ export class ImageTextureResource extends TextureResource {
   /**
    * The url of the image to load. A cleared url takes the `imageCoords` and the `texture` back and
    * releases the texture.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   override get imageUrl(): string | undefined {
     return super.imageUrl;
@@ -1061,6 +1152,8 @@ export class TileSetTextureResource extends TextureResource {
    * The url of the image to load. A cleared url takes the `imageCoords` and the `texture` back,
    * together with the `tileSet`, its `atlas` and the `frameBasedAnimations`, and releases the
    * texture.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   override get imageUrl(): string | undefined {
     return super.imageUrl;
@@ -1075,6 +1168,8 @@ export class TileSetTextureResource extends TextureResource {
    * The options of the tile set. What is stored is a frozen copy: a change to the object after the
    * write reaches the tile set only once it is written again, and writing it again after a change
    * builds a new tile set.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   get tileSetOptions(): Readonly<TileSetOptions> | undefined {
     return this.#context.isDisposed() ? undefined : this.#tileSetOptions.value;
@@ -1093,6 +1188,8 @@ export class TileSetTextureResource extends TextureResource {
    *   one — keeps the animations, and no event goes out.
    * - The object is kept as it was written: a change to it after the write reaches the resource
    *   only with data that differs from it.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
     return this.#context.isDisposed() ? undefined : this.#context.frameBasedAnimationsData.value;
@@ -1228,7 +1325,11 @@ export class AtlasTextureResource extends TextureResource {
     return undefined;
   }
 
-  /** The url of the atlas json. A change fetches the json at the new url. */
+  /**
+   * The url of the atlas json. A change fetches the json at the new url.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
+   */
   get atlasUrl(): string | undefined {
     return this.#context.isDisposed() ? undefined : this.#atlasUrl.value;
   }
@@ -1253,12 +1354,16 @@ export class AtlasTextureResource extends TextureResource {
    * - Written before {@link TextureResource.activate}, it takes the place of the fetch of the
    *   `atlasUrl` it was written after.
    * - While it is cleared, the resource offers no `atlas` and no `frameBasedAnimations`.
+   * - A json fetched from `atlasUrl` that names no image, while no `overrideImageUrl` is set, is not
+   *   offered: `atlasJson` answers `undefined`, and the failure is an `error` with `source: 'atlas'`.
    * - A json that its atlas adapter cannot read — or an adapter that answers no `TextureAtlas`, or
    *   animations that are no `FrameBasedAnimations` — takes both back as well and is reported as an
    *   `error` with `source: 'texture'` once the image it names is there; writing it does not throw.
    * - The animations an adapter reads out of the json — the frame tags of an Aseprite json — are the
    *   `frameBasedAnimations` of the resource, and the entries of `frameBasedAnimationsData` are added
    *   to a copy of them; an entry named like one of them is skipped and reported.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   get atlasJson(): TexturePackerJsonData | undefined {
     return this.#context.isDisposed() ? undefined : this.#atlasJson.value;
@@ -1281,7 +1386,11 @@ export class AtlasTextureResource extends TextureResource {
     this.#atlasJson.set(value);
   }
 
-  /** The url of the image to build the texture from instead of the one the atlas json names. */
+  /**
+   * The url of the image to build the texture from instead of the one the atlas json names.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
+   */
   get overrideImageUrl(): string | undefined {
     return this.#context.isDisposed() ? undefined : this.#overrideImageUrl.value;
   }
@@ -1296,6 +1405,8 @@ export class AtlasTextureResource extends TextureResource {
    * animations — `undefined` to pick one by `meta.app` of the json: among the adapters of the
    * `TextureStore` the resource belongs to, among `texturePackerAtlasAdapter` and
    * `asepriteAtlasAdapter` for a resource on its own. A change reads the json again.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   get atlasAdapter(): AtlasAdapter | undefined {
     return this.#context.isDisposed() ? undefined : this.#atlasAdapter.value;
@@ -1316,6 +1427,8 @@ export class AtlasTextureResource extends TextureResource {
    *   and `flags`.
    * - The object is kept as it was written: a change to it after the write reaches the resource
    *   only with data that differs from it.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
    */
   get frameBasedAnimationsData(): FrameBasedAnimationsDataMap | undefined {
     return this.#context.isDisposed() ? undefined : this.#context.frameBasedAnimationsData.value;
@@ -1375,7 +1488,7 @@ export class AtlasTextureResource extends TextureResource {
           } catch (error) {
             // signalize hands the throw of a subscriber to the writer once every effect has
             // run: the json and what is built from it are published, so no record is kept
-            emitSafe(this, OnError, {source: 'texture', id: this.id, error});
+            reportError(this, {source: 'texture', id: this.id, error});
           }
         })();
         return () => {
@@ -1395,8 +1508,16 @@ export class AtlasTextureResource extends TextureResource {
         const {json, url} = fetched;
         const imageUrl = this.overrideImageUrl ?? json.meta.image;
         if (typeof imageUrl !== 'string') {
-          // the json that is published stays as it was: a subscriber would get an `undefined`
-          // where the event type promises a value
+          // The json and `imageUrl` go back together, so nothing on the resource names the image of
+          // an override that is gone — the state of a fetched json without an image that never had
+          // an override. The atlas effect then takes the atlas and the animations back, the image
+          // effect the coordinates and the texture. The effect that derives `imageUrl` from the json
+          // ends in the same state whichever of the two runs first: before this one it writes the
+          // old value again, after it it finds no json
+          batch(() => {
+            atlasJsonSignal.set(undefined);
+            context.imageUrl.set(undefined);
+          });
           context.fail('atlasImage', {
             source: 'atlas',
             url,

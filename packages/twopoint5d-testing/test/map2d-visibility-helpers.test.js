@@ -29,9 +29,6 @@ function boxSignature(nodes) {
 }
 
 describe('map2d — visibility helper nodes', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

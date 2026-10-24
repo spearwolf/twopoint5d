@@ -201,6 +201,109 @@ describe('TexturePackerJson.parse()', () => {
 
     expect(atlas.frameNames()).toEqual(['']);
   });
+
+  test('refuses a frame without its area with a TypeError naming it, and leaves the target as it was', () => {
+    const target = new TextureAtlas();
+    target.add('x', new TextureCoords(0, 0, 4, 4));
+    const data = {
+      frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}, b: {}},
+      meta: {image: 'a.png', size: {w: 16, h: 16}},
+    } as unknown as TexturePackerJsonData;
+
+    expect(() => TexturePackerJson.parse(data, undefined, target)).toThrow(
+      new TypeError(
+        'TexturePackerJson: the frame "b" has a frame of undefined — its area in the image is an object {x, y, w, h}',
+      ),
+    );
+    expect(target.frameNames()).toEqual(['x']);
+  });
+
+  test.each([
+    ['x', NaN, 'TexturePackerJson: the x of the frame "b" must be a finite number, got NaN'],
+    ['w', -1, 'TexturePackerJson: the w of the frame "b" must be a finite number of 0 or more, got -1'],
+    ['h', Infinity, 'TexturePackerJson: the h of the frame "b" must be a finite number, got Infinity'],
+    ['y', '4', 'TexturePackerJson: the y of the frame "b" must be a finite number, got "4"'],
+  ])(
+    'refuses a measure of a frame that is no finite number of 0 or more with a RangeError naming the frame and the field (%s: %s)',
+    (key, value, message) => {
+      const target = new TextureAtlas();
+      const data = {
+        frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}, b: {frame: {x: 8, y: 0, w: 8, h: 8, [key]: value}}},
+        meta: {image: 'a.png', size: {w: 16, h: 16}},
+      } as unknown as TexturePackerJsonData;
+
+      expect(() => TexturePackerJson.parse(data, undefined, target)).toThrow(new RangeError(message));
+      expect(target.frameNames()).toEqual([]);
+    },
+  );
+
+  test('refuses an entry that is no object', () => {
+    const hash = {frames: {a: null}, meta: {image: 'a.png', size: {w: 16, h: 16}}} as unknown as TexturePackerJsonData;
+    const array = {frames: [null], meta: {image: 'a.png', size: {w: 16, h: 16}}} as unknown as TexturePackerJsonData;
+
+    expect(() => TexturePackerJson.parse(hash)).toThrow(
+      new TypeError('TexturePackerJson: the frame "a" is null — a frame of the json is an object'),
+    );
+    expect(() => TexturePackerJson.parse(array)).toThrow(
+      new TypeError('TexturePackerJson: the frame 0 of the "JSON Array" frames is null — a frame of the json is an object'),
+    );
+  });
+
+  test('without parentCoords, refuses a meta.size without an area above 0', () => {
+    const withMeta = (meta: unknown) =>
+      ({frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}}, meta}) as unknown as TexturePackerJsonData;
+
+    expect(() => TexturePackerJson.parse(withMeta({image: 'a.png', size: {w: 0, h: 16}}))).toThrow(
+      new RangeError('TexturePackerJson: the w of meta.size must be a finite number above 0, got 0'),
+    );
+    expect(() => TexturePackerJson.parse(withMeta({image: 'a.png', size: {w: NaN, h: 16}}))).toThrow(
+      new RangeError('TexturePackerJson: the w of meta.size must be a finite number above 0, got NaN'),
+    );
+    expect(() => TexturePackerJson.parse(withMeta({image: 'a.png'}))).toThrow(
+      new TypeError(
+        'TexturePackerJson: the json has a meta.size of undefined — without parentCoords the frames are laid out in meta.size, an object {w, h}',
+      ),
+    );
+  });
+
+  test('takes a frame of no area', () => {
+    const [atlas] = TexturePackerJson.parse({
+      frames: {empty: {frame: {x: 4, y: 4, w: 0, h: 8}}},
+      meta: {image: 'a.png', size: {w: 16, h: 16}},
+    });
+
+    expect(atlas.frame('empty')!.coords).toMatchObject({x: 4, y: 4, width: 0, height: 8});
+  });
+
+  test.each([undefined, null, 'x', 3])('refuses a json that is %j with a TypeError', (data) => {
+    const target = new TextureAtlas();
+    expect(() => TexturePackerJson.parse(data as never, new TextureCoords(0, 0, 8, 8), target)).toThrow(
+      new TypeError(
+        `TexturePackerJson: the json is ${data === undefined ? 'undefined' : JSON.stringify(data)} — a texture atlas json is an object {frames, meta}`,
+      ),
+    );
+    expect(target.size).toBe(0);
+  });
+
+  test.each([undefined, null, 'x', 3])('refuses frames that are %j with a TypeError', (frames) => {
+    const data = {frames, meta: {image: 'a.png', size: {w: 16, h: 16}}} as never;
+    expect(() => TexturePackerJson.parse(data)).toThrow(
+      new TypeError(
+        `TexturePackerJson: the json has frames of ${frames === undefined ? 'undefined' : JSON.stringify(frames)} — the frames are an object ("JSON Hash") or a list ("JSON Array")`,
+      ),
+    );
+  });
+
+  test('takes a meta.size it does not read when parentCoords are given', () => {
+    const data = {
+      frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+      meta: {image: 'a.png', size: {w: 0, h: NaN}},
+    } as unknown as TexturePackerJsonData;
+
+    const [atlas] = TexturePackerJson.parse(data, new TextureCoords(0, 0, 32, 32));
+
+    expect(atlas.frameNames()).toEqual(['a']);
+  });
 });
 
 describe('the type of the frame data', () => {

@@ -1,16 +1,13 @@
 import {expect} from '@esm-bundle/chai';
 import {BillboardPlacement, Display, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {Group, OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {coveredBox, disposeDisplay, makeContainer, renderToPixels} from './helpers/fixtures.js';
+import {coveredBox, disposeDisplay, disposeKept, keep, makeContainer, renderToPixels} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
 const PIXELS_PER_UNIT = 8;
 
 describe('sprites — billboards on a moved and turned mesh', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -26,6 +23,7 @@ describe('sprites — billboards on a moved and turned mesh', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -46,7 +44,7 @@ describe('sprites — billboards on a moved and turned mesh', function () {
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.set(2, 0, 10);
 
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, placement: BillboardPlacement});
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, placement: BillboardPlacement}));
     sprites.frustumCulled = false;
     const sprite = sprites.createSprite();
     sprite.setSize(width, height);
@@ -57,8 +55,6 @@ describe('sprites — billboards on a moved and turned mesh', function () {
     sprites.update();
 
     const pixels = await renderToPixels(display.renderer, scene, camera, target);
-
-    sprites.dispose();
 
     return coveredBox(pixels, TARGET_SIZE);
   }

@@ -76,6 +76,7 @@ function makeDisplay({
     resolutionScale,
     pixelZoom: 0,
     isDisposed: false,
+    isRunning: true,
     devicePixelRatio,
     maxPixelRatio,
     maxPixels,
@@ -445,6 +446,19 @@ describe('AdaptiveResolution', () => {
       expect(adaptive.scale).toBe(1);
 
       await frames(1, {deltaMs: 40});
+      expect(adaptive.scale).toBe(0.875);
+    });
+
+    it('takes no pace from a frame of a paused display', async () => {
+      const {display, frames} = makeDisplay();
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 27);
+      Object.assign(display, {isRunning: false});
+      await frames(5, {deltaMs: 0, fromLoop: false});
+      Object.assign(display, {isRunning: true});
+      await frames(3, {deltaMs: 40});
+
+      // three late frames of 30
       expect(adaptive.scale).toBe(0.875);
     });
 

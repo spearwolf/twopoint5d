@@ -93,11 +93,12 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     if (tileFactory === null) return;
 
     // the factory builds something else for a coordinate now: every tile goes back, every hole is
-    // asked about again, and the tiles handed in for reuse are built anew. The serial is taken
-    // over only once clearTiles() has come back, so that one that throws is tried again
+    // asked about again, and the tiles handed in for reuse are built anew; the endUpdatingTiles()
+    // of this cycle uploads what the clear gave back. The serial is taken over only once the tiles
+    // are given back, so that a clear that throws is tried again
     const contentSerial = tileFactory.contentSerial;
     if (contentSerial !== this.#builtContentSerial) {
-      this.clearTiles();
+      this.#giveBackTiles(tileFactory);
       this.#builtContentSerial = contentSerial;
     }
 
@@ -195,15 +196,32 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     }
   }
 
+  /**
+   * Gives every tile this renderer holds back to the factory through
+   * {@link IMapTileFactory.destroyTile}, forgets the coordinates the factory answered `undefined`
+   * for, and brings the factory up to date through {@link IMapTileFactory.update} when it gave a
+   * tile back or a write still waits for its upload: outside an update cycle no
+   * {@link endUpdatingTiles} follows that would, and the tiles given back would go on being drawn.
+   * {@link hasPendingTiles} stays `true` up to the end of the next update cycle. When
+   * `destroyTile()` or `update()` throws, the error goes on; a second call gives back the tiles
+   * that remain and uploads.
+   */
   clearTiles(): void {
     const tileFactory = this.tileFactory;
     if (tileFactory === null) return;
 
+    this.#giveBackTiles(tileFactory);
+    // outside an update cycle no endUpdatingTiles() follows that would upload the slots given
+    // back — without the upload the tiles go on being drawn
+    this.#uploadWrites(tileFactory);
+  }
+
+  #giveBackTiles(tileFactory: IMapTileFactory): void {
     this.#cleared = true;
     this.#declined.clear();
 
-    // the serial gate in endUpdatingTiles() exists to keep the attribute buffers off the bus
-    // when nothing was written — and a clear that finds nothing writes nothing. The emptied
+    // the serial gate in #uploadWrites() exists to keep the attribute buffers off the bus when
+    // nothing was written — and a clear that finds nothing writes nothing. The emptied
     // `#declined` alone is no reason either: a refused tile never sat in a buffer. Counted before
     // the loop: a destroyTile() that throws has freed the slots before it already, and their
     // upload must not get lost.
@@ -217,16 +235,20 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     }
   }
 
+  #uploadWrites(tileFactory: IMapTileFactory): void {
+    const dataSerial = this.#dataSerial;
+    if (this.#updateDataSerial < dataSerial) {
+      tileFactory.update();
+      // only once update() has come back: one that throws leaves the upload to the next call
+      this.#updateDataSerial = dataSerial;
+    }
+  }
+
   endUpdatingTiles(): void {
     const tileFactory = this.tileFactory;
     if (tileFactory === null) return;
 
-    const dataSerial = this.#dataSerial;
-    if (this.#updateDataSerial < dataSerial) {
-      tileFactory.update();
-      // only once update() has come back: one that throws leaves the upload to the next cycle
-      this.#updateDataSerial = dataSerial;
-    }
+    this.#uploadWrites(tileFactory);
     // closed only now: a throw in update() leaves the cycle open, and hasPendingTiles says so
     this.#updating = false;
   }
@@ -248,8 +270,10 @@ export class Map2DTileRenderer implements IMap2DTileRenderer {
     if (tileFactory === null) return;
 
     // a tile is a slot the factory handed out through createTile(); giving it back is the
-    // other half of that call, and clearTiles() is the one place in this class that does it
-    this.clearTiles();
+    // other half of that call, and #giveBackTiles() is the one place in this class that does it —
+    // here without the upload: the content of the factory leaves `node` right after, and whoever
+    // serves the factory next uploads with its first cycle
+    this.#giveBackTiles(tileFactory);
 
     tileFactory.removeFromNode(this.node);
     this.tileFactory = null;

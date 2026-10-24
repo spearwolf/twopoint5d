@@ -5,7 +5,8 @@ import {voInitialize} from '../vertex-objects/constants.js';
 import {getDescriptorOf} from '../vertex-objects/getDescriptorOf.js';
 import type {VO} from '../vertex-objects/types.js';
 import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
-import {defineSprite, type SpriteKindApiOf, type SpriteOf} from './defineSprite.js';
+import {checkSpriteKind, defineSprite, type SpriteKindApiOf, type SpriteOf} from './defineSprite.js';
+import {TexturedSpriteKind} from './presets.js';
 import {QuadBase, type SpriteBase} from './SpriteBase.js';
 import {ColorOrder, defineFeature, LocalOrder, type SpriteFeature} from './SpriteFeature.js';
 
@@ -338,7 +339,7 @@ describe('defineSprite()', () => {
       const bad = defineFeature({name: 'bad', uniforms: {light: [1, 2, 3, 4, 5] as unknown as number}});
 
       expect(() => defineSprite({base: QuadBase, features: [position, flat, bad]})).toThrow(
-        'defineSprite: feature "bad" starts the uniform "light" with [1, 2, 3, 4, 5]; a uniform takes a number, 2 to 4 numbers, or {value, shared}',
+        'defineSprite: feature "bad" starts the uniform "light" with [1, 2, 3, 4, 5]; a uniform takes a finite number, 2 to 4 finite numbers, or {value, shared}',
       );
     });
 
@@ -348,6 +349,54 @@ describe('defineSprite()', () => {
       expect(() => defineSprite({base: QuadBase, features: [position, textured]})).toThrow(
         'defineSprite: feature "textured" contributes the placement and declares textures; the placement runs always and cannot wait for a texture',
       );
+    });
+
+    test.each([
+      [
+        'a stage of no finite order',
+        {name: 'odd', local: {order: Number.NaN, transform: (input: unknown) => input}},
+        'defineSprite: the local stage of feature "odd" needs a finite order, got NaN',
+      ],
+      [
+        'a texture declared with null',
+        {name: 'odd', textures: {x: null}},
+        'defineSprite: the texture "x" of feature "odd" is declared with null; a texture takes {} or {needsImage: true}',
+      ],
+      [
+        'a method that is no function',
+        {name: 'odd', methods: {go: 1}},
+        'defineSprite: the method "go" of feature "odd" is no function, got 1',
+      ],
+      [
+        'a colorSource that is no function',
+        {name: 'odd', colorSource: 5},
+        'defineSprite: the colorSource of feature "odd" is no function, got 5',
+      ],
+      ['null', null, 'defineSprite: a feature is an object with a name, got null'],
+    ])(
+      'a feature that never passed through defineFeature() as defineFeature() would, in its own name — %s',
+      (_, feature, message) => {
+        expect(() => defineSprite({base: QuadBase, features: [position, flat, feature as never]})).toThrow(TypeError);
+        expect(() => defineSprite({base: QuadBase, features: [position, flat, feature as never]})).toThrow(message);
+      },
+    );
+
+    test('options that are no object, a base that is none and features that are no list', () => {
+      expect(() => defineSprite(undefined as never)).toThrow('defineSprite: takes {base, features}, got undefined');
+      expect(() => defineSprite([QuadBase] as never)).toThrow('defineSprite: takes {base, features}, got [');
+      expect(() => defineSprite({features: [position, flat]} as never)).toThrow(
+        'defineSprite: the base is no sprite base, got undefined — QuadBase, gridBase() or a base of your own',
+      );
+      expect(() => defineSprite({base: {name: 'bare'}, features: [position, flat]} as never)).toThrow(
+        'defineSprite: the base is no sprite base, got {name: "bare"} — QuadBase, gridBase() or a base of your own',
+      );
+      expect(() => defineSprite({base: QuadBase, features: 5} as never)).toThrow(
+        'defineSprite: features is a list of features, got 5',
+      );
+      expect(() => defineSprite({base: QuadBase} as never)).toThrow(
+        'defineSprite: features is a list of features, got undefined',
+      );
+      expect(() => defineSprite(null as never)).toThrow(TypeError);
     });
 
     test('a base that breaks the contract', () => {
@@ -398,6 +447,34 @@ describe('defineSprite()', () => {
     const kind = defineSprite({base: QuadBase, features});
 
     expect(kind.features).toHaveLength(2);
+  });
+
+  test('freezes its description all the way down', () => {
+    const kind = defineSprite({base: QuadBase, features: [position, flat, tint]});
+    const color = kind.description.attributes['color'] as {components: string[]};
+
+    expect(Object.isFrozen(kind.description)).toBe(true);
+    expect(Object.isFrozen(kind.description.attributes)).toBe(true);
+    expect(Object.isFrozen(kind.description.methods)).toBe(true);
+    expect(Object.isFrozen(color)).toBe(true);
+    expect(Object.isFrozen(color.components)).toBe(true);
+    expect(() => {
+      color.components.push('x');
+    }).toThrow(TypeError);
+    expect(() => {
+      (kind.description.attributes as Record<string, unknown>)['extra'] = {size: 1};
+    }).toThrow(TypeError);
+  });
+
+  test('leaves a feature that never passed through defineFeature() as its author wrote it', () => {
+    const rawFeature: SpriteFeature = {name: 'raw', attributes: {weight: {size: 1}}};
+    const kind = defineSprite({base: QuadBase, features: [position, flat, rawFeature]});
+
+    expect(Object.isFrozen(rawFeature)).toBe(false);
+    expect(Object.isFrozen(rawFeature.attributes)).toBe(false);
+    expect(Object.isFrozen(rawFeature.attributes!['weight'])).toBe(false);
+    expect(kind.description.attributes['weight']).not.toBe(rawFeature.attributes!['weight']);
+    expect(kind.description.attributes['weight']).toEqual({size: 1});
   });
 
   describe('checkKind', () => {
@@ -466,6 +543,41 @@ describe('defineSprite()', () => {
       expect(() => defineSprite({base: QuadBase, features: [position, flat, throwing(Object.create(null))]})).toThrow(
         'defineSprite: feature "picky": {}',
       );
+    });
+  });
+
+  describe('checkSpriteKind()', () => {
+    test('takes every kind out of defineSprite()', () => {
+      const kind = defineSprite({base: QuadBase, features: [position, flat]});
+
+      expect(() => checkSpriteKind(kind, 'Mine')).not.toThrow();
+      expect(() => checkSpriteKind(TexturedSpriteKind, 'Mine')).not.toThrow();
+    });
+
+    test.each([
+      ['undefined', undefined, 'undefined'],
+      ['a number', 5, '5'],
+      ['an empty object', {}, '{}'],
+    ])('refuses %s in the words of its caller', (_, value, quoted) => {
+      expect(() => checkSpriteKind(value, 'Mine')).toThrow(
+        new TypeError(`Mine: the kind must be a sprite kind from defineSprite(), got ${quoted}`),
+      );
+    });
+
+    test('refuses a copy of a kind and an object built on one, which ran none of the checks', () => {
+      const kind = defineSprite({base: QuadBase, features: [position, flat]});
+      const prefix = 'Mine: the kind must be a sprite kind from defineSprite(), got ';
+
+      for (const copy of [{...kind}, Object.create(kind)]) {
+        let thrown: unknown;
+        try {
+          checkSpriteKind(copy, 'Mine');
+        } catch (error) {
+          thrown = error;
+        }
+        expect(thrown).toBeInstanceOf(TypeError);
+        expect((thrown as TypeError).message.startsWith(prefix)).toBe(true);
+      }
     });
   });
 });

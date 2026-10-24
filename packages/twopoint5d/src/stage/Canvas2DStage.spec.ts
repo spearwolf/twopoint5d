@@ -1,6 +1,6 @@
 import {emit, on} from '@spearwolf/eventize';
 import {createSandbox} from 'sinon';
-import type {PassNode, WebGPURenderer} from 'three/webgpu';
+import {type PassNode, SpriteMaterial, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
 import {
@@ -30,6 +30,50 @@ function makeRenderer() {
 // constructor would call document.createElement()
 function makeCanvas(width = 32, height = 16) {
   return {width, height} as unknown as HTMLCanvasElement;
+}
+
+// a canvas as the DOM builds it: a width or a height it is given ends up a whole number, rounded down
+function makeRoundingCanvas(width: number, height: number) {
+  let w = width;
+  let h = height;
+  return {
+    get width() {
+      return w;
+    },
+    set width(value: number) {
+      w = Math.trunc(value);
+    },
+    get height() {
+      return h;
+    },
+    set height(value: number) {
+      h = Math.trunc(value);
+    },
+  } as unknown as HTMLCanvasElement;
+}
+
+// a rounding canvas that counts the writes to its width and its height: each of them clears a
+// canvas of the DOM
+function makeCountingCanvas(width: number, height: number) {
+  const canvas = makeRoundingCanvas(width, height);
+  const writes = {count: 0};
+  const counted = {
+    get width() {
+      return canvas.width;
+    },
+    set width(value: number) {
+      writes.count += 1;
+      canvas.width = value;
+    },
+    get height() {
+      return canvas.height;
+    },
+    set height(value: number) {
+      writes.count += 1;
+      canvas.height = value;
+    },
+  } as unknown as HTMLCanvasElement;
+  return {canvas: counted, writes};
 }
 
 // without a setContainerSize() the Stage2D has no camera and renderTo() falls through inside it, so
@@ -187,6 +231,41 @@ describe('Canvas2DStage', () => {
     expect(resized).not.toHaveBeenCalled();
   });
 
+  test('the constructor refuses a fit it does not know with a TypeError, before anything is built', () => {
+    const renderer = makeRenderer();
+
+    for (const fit of ['fill', 5]) {
+      const got = fit === 'fill' ? '"fill"' : '5';
+      const failure = new TypeError(`new Canvas2DStage(): fit must be "contain" or "cover", got ${got}`);
+
+      // the number arm throws before document.createElement(), which this suite has not got
+      expect(() => new Canvas2DStage(renderer, 32, 16, fit as never)).toThrow(failure);
+      expect(() => new Canvas2DStage(renderer, makeCanvas(), fit as never)).toThrow(failure);
+    }
+
+    expect(new Canvas2DStage(renderer, makeCanvas(), undefined as never).fit, 'undefined stands for the default').toBe('contain');
+  });
+
+  test('a write to fit refuses a value it does not know with a TypeError and keeps the fit it has, also after dispose()', () => {
+    const stage = makeStage();
+    stage.fit = 'cover';
+    const failure = new TypeError('Canvas2DStage: fit must be "contain" or "cover", got "fill"');
+
+    expect(() => {
+      stage.fit = 'fill' as never;
+    }).toThrow(failure);
+    expect(stage.fit).toBe('cover');
+    expect(stage.projection.viewSpecs.fit).toBe('cover');
+
+    stage.dispose();
+
+    expect(() => {
+      stage.fit = 'fill' as never;
+    }).toThrow(failure);
+    expect(stage.fit).toBe('cover');
+    expect(stage.projection.viewSpecs.fit).toBe('cover');
+  });
+
   test('uploads a change of the same size into the texture it has', () => {
     const stage = makeStage();
 
@@ -258,6 +337,193 @@ describe('Canvas2DStage', () => {
     }).toThrow(TypeError);
   });
 
+  describe('a canvas resized in place', () => {
+    test('brings sprite and view to the new size before OnCanvas2DStageResize goes out', () => {
+      const canvas = makeCanvas(64, 64);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+      stage.render();
+      const scaleAtResize: number[] = [];
+      on(stage, OnCanvas2DStageResize, () => {
+        scaleAtResize.push(stage.sprite.scale.x);
+      });
+
+      canvas.width = 48;
+      canvas.height = 32;
+      stage.render();
+
+      expect(stage.sprite.scale.toArray()).toEqual([48, 32, 1]);
+      expect(stage.projection.viewSpecs).toMatchObject({width: 48, height: 32});
+      expect(scaleAtResize, 'a listener reads the new size already').toEqual([48]);
+    });
+
+    test('a canvas a listener of OnCanvas2DStageRender resizes is drawn in its new size in that frame, and the next render() sends OnCanvas2DStageResize', () => {
+      const canvas = makeCanvas(64, 64);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+      stage.render();
+      const seen: {scale: number[]; view: unknown}[] = [];
+      sandbox.stub(stage.stageRenderer, 'renderTo').callsFake(() => {
+        seen.push({scale: stage.sprite.scale.toArray(), view: {...stage.projection.viewSpecs}});
+      });
+      const resized = vi.fn();
+      on(stage, OnCanvas2DStageResize, resized);
+      on(stage, OnCanvas2DStageRender, () => {
+        canvas.width = 48;
+        canvas.height = 32;
+      });
+
+      stage.render();
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]!.scale, 'the sprite follows before the frame is drawn').toEqual([48, 32, 1]);
+      expect(seen[0]!.view).toMatchObject({width: 48, height: 32});
+      expect(resized, 'no event in the frame of the change').not.toHaveBeenCalled();
+
+      stage.render();
+
+      expect(resized).toHaveBeenCalledTimes(1);
+    });
+
+    test('uploads no canvas without area, and keeps needsUpdate for the first render() with one', () => {
+      const canvas = makeCanvas(32, 16);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+
+      canvas.width = 0;
+      stage.render();
+
+      expect(stage.texture, 'no texture without area').toBeUndefined();
+      expect(stage.needsUpdate).toBe(true);
+
+      canvas.width = 32;
+      stage.render();
+
+      expect(stage.texture).toBeDefined();
+      expect(stage.needsUpdate).toBe(false);
+    });
+  });
+
+  describe('sizes', () => {
+    test('the constructor refuses a width or a height that is no finite number of 1 or more', () => {
+      expect(() => new Canvas2DStage(makeRenderer(), 0, 10)).toThrow(
+        new RangeError('new Canvas2DStage(): width must be a finite number of 1 or more, got 0'),
+      );
+      expect(() => new Canvas2DStage(makeRenderer(), NaN, 10)).toThrow(
+        new RangeError('new Canvas2DStage(): width must be a finite number of 1 or more, got NaN'),
+      );
+      expect(() => new Canvas2DStage(makeRenderer(), 10, -1)).toThrow(
+        new RangeError('new Canvas2DStage(): height must be a finite number of 1 or more, got -1'),
+      );
+    });
+
+    test('setCanvasSize() refuses a width that is no finite number of 1 or more, also after dispose()', () => {
+      const stage = makeStage();
+      const failure = new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number of 1 or more, got NaN');
+
+      expect(() => stage.setCanvasSize(NaN, 10)).toThrow(failure);
+      expect([stage.width, stage.height], 'the canvas keeps its size').toEqual([32, 16]);
+
+      stage.dispose();
+
+      expect(() => stage.setCanvasSize(NaN, 10)).toThrow(failure);
+    });
+
+    test('the constructor and setCanvasSize() refuse a width or a height below 1, which would leave a canvas without area', () => {
+      expect(() => new Canvas2DStage(makeRenderer(), 0.5, 10)).toThrow(
+        new RangeError('new Canvas2DStage(): width must be a finite number of 1 or more, got 0.5'),
+      );
+      expect(() => new Canvas2DStage(makeRenderer(), 10, 0.999)).toThrow(
+        new RangeError('new Canvas2DStage(): height must be a finite number of 1 or more, got 0.999'),
+      );
+
+      const stage = makeStage();
+
+      expect(() => stage.setCanvasSize(0.5, 10)).toThrow(
+        new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number of 1 or more, got 0.5'),
+      );
+      expect(() => stage.setCanvasSize(10, 0.999)).toThrow(
+        new RangeError('Canvas2DStage#setCanvasSize(): height must be a finite number of 1 or more, got 0.999'),
+      );
+      expect([stage.width, stage.height], 'the canvas keeps its size').toEqual([32, 16]);
+
+      stage.dispose();
+
+      expect(() => stage.setCanvasSize(0.5, 10)).toThrow(
+        new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number of 1 or more, got 0.5'),
+      );
+    });
+
+    test('takes a width of 1, and a fraction above it as the canvas rounds it down', () => {
+      vi.stubGlobal('document', {createElement: () => makeRoundingCanvas(0, 0)});
+      try {
+        const built = new Canvas2DStage(makeRenderer(), 1.5, 1);
+
+        expect([built.width, built.height]).toEqual([1, 1]);
+        expect(built.sprite.scale.toArray()).toEqual([1, 1, 1]);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+
+      const stage = new Canvas2DStage(makeRenderer(), makeRoundingCanvas(32, 16));
+      stage.setCanvasSize(1, 1.5);
+
+      expect([stage.width, stage.height]).toEqual([1, 1]);
+      expect(stage.projection.viewSpecs).toMatchObject({width: 1, height: 1});
+    });
+
+    test('setCanvasSize() leaves a canvas of the size it is given, rounded down, as it is', () => {
+      const {canvas, writes} = makeCountingCanvas(10, 8);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+
+      stage.setCanvasSize(10.5, 8.9);
+
+      expect(writes.count, 'a write would clear the canvas').toBe(0);
+      expect([stage.width, stage.height]).toEqual([10, 8]);
+
+      stage.setCanvasSize(12, 8);
+
+      expect(writes.count).toBeGreaterThan(0);
+      expect([stage.width, stage.height]).toEqual([12, 8]);
+      expect(stage.sprite.scale.toArray()).toEqual([12, 8, 1]);
+      expect(stage.projection.viewSpecs).toMatchObject({width: 12, height: 8});
+    });
+
+    test('setContainerSize() refuses a width or a height that is no finite number in its own name, also after dispose()', () => {
+      const stage = makeStage();
+      stage.setContainerSize(320, 240);
+      const resize = sandbox.spy(stage.stageRenderer, 'resize');
+
+      expect(() => stage.setContainerSize(NaN, 240)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): width must be a finite number, got NaN'),
+      );
+      expect(() => stage.setContainerSize(320, Infinity)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): height must be a finite number, got Infinity'),
+      );
+      expect(resize.called, 'the size does not reach the stage renderer').toBe(false);
+      expect([stage.stageRenderer.width, stage.stageRenderer.height], 'the renderer keeps its size').toEqual([320, 240]);
+
+      stage.dispose();
+
+      expect(() => stage.setContainerSize(NaN, 240)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): width must be a finite number, got NaN'),
+      );
+      expect(() => stage.setContainerSize(320, Infinity)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): height must be a finite number, got Infinity'),
+      );
+    });
+
+    test('setContainerSize() hands a size of 0 and a negative one on to the stage renderer as they are', () => {
+      const stage = makeStage();
+      const resize = sandbox.stub(stage.stageRenderer, 'resize');
+
+      stage.setContainerSize(0, 0);
+      stage.setContainerSize(-320, 240);
+
+      expect(resize.args).toEqual([
+        [0, 0],
+        [-320, 240],
+      ]);
+    });
+  });
+
   describe('render()', () => {
     test('render(now, deltaTime, frameNo) hands the frame to the stage renderer before it draws', () => {
       const stage = makeStage();
@@ -294,6 +560,56 @@ describe('Canvas2DStage', () => {
       stage.render();
 
       expect(updateFrame.thirdCall.args[2], 'the second call without values counts 2').toBe(2);
+    });
+
+    test('a listener of OnCanvas2DStageResize that throws: every listener hears it, the frame is drawn, the error comes out afterwards, and the next render() sends no second OnCanvas2DStageResize', () => {
+      const stage = makeStage();
+      const renderTo = sandbox.spy(stage.stageRenderer, 'renderTo');
+      const boom = new Error('boom');
+      const thrower = vi.fn(() => {
+        throw boom;
+      });
+      const second = vi.fn();
+      const rendered = vi.fn();
+      on(stage, OnCanvas2DStageResize, thrower);
+      on(stage, OnCanvas2DStageResize, second);
+      on(stage, OnCanvas2DStageRender, rendered);
+
+      expect(() => stage.render()).toThrow(boom);
+
+      expect(second, 'the listener behind the one that throws').toHaveBeenCalledTimes(1);
+      expect(rendered, 'the frame goes on').toHaveBeenCalledTimes(1);
+      expect(renderTo.calledOnce, 'and is drawn').toBe(true);
+      expect(stage.texture, 'the canvas is uploaded').toBeDefined();
+
+      expect(() => stage.render()).not.toThrow();
+
+      expect(thrower, 'no second resize for the same size').toHaveBeenCalledTimes(1);
+      expect(second).toHaveBeenCalledTimes(1);
+      expect(rendered).toHaveBeenCalledTimes(2);
+    });
+
+    test('a listener of OnCanvas2DStageResize and one of OnCanvas2DStageRender that throw come out together as an AggregateError', () => {
+      const stage = makeStage();
+      const resizeError = new Error('resize');
+      const renderError = new Error('render');
+      on(stage, OnCanvas2DStageResize, () => {
+        throw resizeError;
+      });
+      on(stage, OnCanvas2DStageRender, () => {
+        throw renderError;
+      });
+
+      let caught: unknown;
+      try {
+        stage.render();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).message).toMatch(/^Canvas2DStage#render\(\)/);
+      expect((caught as AggregateError).errors).toEqual([resizeError, renderError]);
     });
 
     test('the Stage2D gets OnStageUpdateFrame once the container has a size', () => {
@@ -348,6 +664,26 @@ describe('Canvas2DStage', () => {
       expect(canvas.width, 'the canvas keeps its size').toBe(64);
       expect(canvas.height).toBe(48);
       expect(geometryDispose.called, 'THREE.Sprite shares one geometry across every sprite').toBe(false);
+    });
+
+    // (b) a material set into the slot of the sprite belongs to the caller
+    test('releases the sprite material it built, and leaves one set into the slot to the caller', () => {
+      const stage = makeStage();
+      const own = stage.sprite.material;
+      const replacement = new SpriteMaterial();
+      stage.sprite.material = replacement;
+      const ownDispose = sandbox.spy(own, 'dispose');
+      const replacementDispose = sandbox.spy(replacement, 'dispose');
+
+      stage.render();
+
+      expect(own.map, 'the canvas texture goes into the material of the stage').toBe(stage.texture);
+      expect(replacement.map, 'and not into the one set into the slot').toBe(null);
+
+      stage.dispose();
+
+      expect(ownDispose.calledOnce, 'the material the stage built').toBe(true);
+      expect(replacementDispose.called, 'the material of the caller').toBe(false);
     });
 
     // (c) every public member behaves after dispose() as its TSDoc says

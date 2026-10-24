@@ -1,5 +1,6 @@
 import type {LineBasicMaterial, Object3D} from 'three/webgpu';
 import {Box3, Box3Helper, Color} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 import {HelpersManager} from './HelpersManager.js';
 import type {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
 import type {IMap2DVisibilitorHelpers} from './types.js';
@@ -7,7 +8,8 @@ import type {IMap2DVisibilitorHelpers} from './types.js';
 export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelpers {
   visibilityArea: RectangularVisibilityArea;
 
-  viewRectHelperHeight = 20;
+  // read by `update()` through the field, not through the accessor
+  #viewRectHelperHeight = 20;
   viewRectHelperColor = new Color(0xffffff);
 
   #viewRect?: Box3 = undefined;
@@ -23,6 +25,25 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
 
   constructor(visibilityArea: RectangularVisibilityArea) {
     this.visibilityArea = visibilityArea;
+  }
+
+  /**
+   * The height of the box that shows the visible rectangular area, in world units.
+   *
+   * A finite number of 0 or more; any other value throws a `RangeError` and the field keeps what
+   * it held. Taken and checked after {@link dispose} as well.
+   */
+  get viewRectHelperHeight(): number {
+    return this.#viewRectHelperHeight;
+  }
+
+  set viewRectHelperHeight(value: number) {
+    if (!(Number.isFinite(value) && value >= 0)) {
+      throw new RangeError(
+        `RectangularVisibilityAreaHelpers: viewRectHelperHeight must be a finite number of 0 or more, got ${describeValue(value)}`,
+      );
+    }
+    this.#viewRectHelperHeight = value;
   }
 
   /** `true` once {@link dispose} has run. */
@@ -49,7 +70,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
       this.update();
     } else {
       this.#helpers.remove();
-      this.releaseNode();
+      this.#releaseNode();
     }
   }
 
@@ -58,7 +79,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
    * manager to take down, and the manager disposes what it takes down — a helper that
    * kept the reference would write into a released geometry on the next update.
    */
-  private releaseNode(): void {
+  #releaseNode(): void {
     this.#viewRectHelper = undefined;
   }
 
@@ -72,7 +93,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
     if (this.#disposed) return;
     if (this.#helpers.scene === scene) return;
     this.#helpers.scene = scene;
-    this.releaseNode();
+    this.#releaseNode();
   }
 
   /**
@@ -90,7 +111,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
     if (this.#disposed) return;
     if (this.#helpers.scene !== scene) return;
     this.#helpers.remove();
-    this.releaseNode();
+    this.#releaseNode();
   }
 
   /**
@@ -109,7 +130,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
 
     const halfWidth = this.visibilityArea.width / 2;
     const halfHeight = this.visibilityArea.height / 2;
-    const viewRectHelperHalfHeight = this.viewRectHelperHeight / 2;
+    const viewRectHelperHalfHeight = this.#viewRectHelperHeight / 2;
 
     // written in place: the node built from this box reads it again on every frame
     const viewRect = (this.#viewRect ??= new Box3());
@@ -144,7 +165,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
     this.#show = false;
     // the manager takes the node out of the scene and disposes it
     this.#helpers.scene = undefined;
-    this.releaseNode();
+    this.#releaseNode();
     this.#viewRect = undefined;
   }
 }

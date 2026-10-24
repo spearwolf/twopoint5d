@@ -5,14 +5,14 @@ export type DisplayStateName = 'new' | 'running' | 'paused';
 export interface DisplayStateMachine extends EventizedObject {}
 
 export class DisplayStateMachine {
-  static NEW: DisplayStateName = 'new';
-  static RUNNING: DisplayStateName = 'running';
-  static PAUSED: DisplayStateName = 'paused';
+  static readonly NEW: DisplayStateName = 'new';
+  static readonly RUNNING: DisplayStateName = 'running';
+  static readonly PAUSED: DisplayStateName = 'paused';
 
-  static Init = 'init';
-  static Start = 'start';
-  static Pause = 'pause';
-  static Restart = 'restart';
+  static readonly Init = 'init';
+  static readonly Start = 'start';
+  static readonly Pause = 'pause';
+  static readonly Restart = 'restart';
 
   #state: DisplayStateName = DisplayStateMachine.NEW;
 
@@ -161,7 +161,7 @@ export class DisplayStateMachine {
           // neither error goes missing: the one of the start, and the one of the pause after it
           throw new AggregateError(
             [startError, pauseError],
-            'start(): a listener of start threw, and a listener of pause threw in the pause that followed',
+            'Display: a listener of start threw, and a listener of pause threw in the pause that followed',
             {cause: pauseError},
           );
         }

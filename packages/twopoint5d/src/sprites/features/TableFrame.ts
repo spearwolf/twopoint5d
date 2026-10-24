@@ -2,13 +2,14 @@ import {abs, add, atan, clamp, div, float, int, max, mul, round, step, sub} from
 import type {Node} from 'three/webgpu';
 import {roundHalfUp} from '../../texture/roundHalfUp.js';
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
 import {cameraPositionLocal} from '../cameraNodes.js';
 import {texCoordsFromIndex} from '../node-utils.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 
 export interface TableFrameOptions {
   /**
-   * How many views of each frame the table holds — a whole number of 2 or more. The shader reads the view
+   * How many views of each frame the table holds — a whole number from 2 to 64. The shader reads the view
    * the camera sees the sprite from out of the block of the frame, entry
    * `floor(frameIndex + 0.5) · views + view`; the kind needs `Yaw` for the facing of the sprite.
    */
@@ -34,6 +35,10 @@ const features = new Map<number, SpriteFeature<TableFrameApi>>();
 
 // the texels of one frame in the table: tex coords, measures and diagonal flip, trim margins
 const TEXELS_PER_FRAME = 3;
+
+// one feature per number of views stays for the life of the page: the bound keeps a caller who derives
+// views from data from filling the cache, and no directional sheet has more views
+const MAX_VIEWS = 64;
 
 /**
  * The view the camera sees the sprite from, `0` to `views − 1`: the angle of the camera about +y of the
@@ -77,13 +82,16 @@ const viewOf = (
  * the xz plane of the mesh: right for `axisBillboardPlacement()`, `BillboardPlacement` and
  * `flatPlacement({orientation: 'yaw'})`.
  *
- * @throws a `TypeError` for `views` that is no whole number of 2 or more
+ * @throws a `TypeError` for options that are no object, and for `views` that is no whole number from 2 to 64
  */
 export function tableFrame(options?: TableFrameOptions): SpriteFeature<TableFrameApi> {
+  if (options !== undefined && !isObject(options as unknown)) {
+    throw new TypeError(`tableFrame: the options must be an object, {views?}, got ${describeValue(options)}`);
+  }
   const views = options?.views;
-  if (views !== undefined && !(typeof views === 'number' && Number.isInteger(views) && views >= 2)) {
+  if (views !== undefined && !(typeof views === 'number' && Number.isInteger(views) && views >= 2 && views <= MAX_VIEWS)) {
     throw new TypeError(
-      `tableFrame: views must be a whole number of 2 or more, got ${describeValue(views)} — leave views out for frames without views`,
+      `tableFrame: views must be a whole number from 2 to ${MAX_VIEWS}, got ${describeValue(views)} — leave views out for frames without views`,
     );
   }
   const key = views ?? 0;

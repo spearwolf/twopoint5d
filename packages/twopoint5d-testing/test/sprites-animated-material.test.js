@@ -9,7 +9,16 @@ import {
   TextureCoords,
 } from '@spearwolf/twopoint5d';
 import {DataTexture, FloatType, OrthographicCamera, RenderTarget, RGBAFormat, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeColorTexture,
+  makeContainer,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
@@ -21,9 +30,6 @@ const GREEN = [0, 255, 0, 255];
 const BLUE = [0, 0, 255, 255];
 
 describe('sprites — AnimatedSpriteKind draws the frame the time points at', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -39,6 +45,7 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -74,7 +81,7 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const colorMap = makeColorTexture(texels);
+    const colorMap = keep(makeColorTexture(texels));
 
     let animId = 0;
     if (animsMap == null) {
@@ -91,10 +98,12 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
       animsMap = anims.bakeDataTexture(bakeOptions);
       animId = anims.animId(draw ?? animations[0].name);
     }
+    keep(animsMap);
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 1);
-    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}});
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
+    // the mesh gives geometry and material up; both, like the two textures, are the caller's
+    const geometry = keep(new FeatureSpritesGeometry(AnimatedSpriteKind, 1));
+    const material = keep(new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap}, uniforms: {time}}));
+    const sprites = keep(new FeatureSprites(AnimatedSpriteKind, {geometry, material}));
     sprites.frustumCulled = false;
 
     const sprite = geometry.instancedPool.createVO();
@@ -108,13 +117,6 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
     sprites.update();
 
     const pixels = await renderToPixels(display.renderer, scene, camera, target);
-
-    // the mesh gives geometry and material up; both, like the two textures, are the caller's
-    sprites.dispose();
-    geometry.dispose();
-    material.dispose();
-    colorMap.dispose();
-    animsMap.dispose();
 
     return rgbAt(pixels, TARGET_SIZE, CENTER, CENTER);
   }
@@ -187,7 +189,7 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
     camera.position.z = 10;
 
     const texels = [RED, GREEN, BLUE];
-    const colorMap = makeColorTexture(texels);
+    const colorMap = keep(makeColorTexture(texels));
     const frames = new TextureCoords(0, 0, texels.length, 1);
     const frameOf = (i) => new TextureCoords(frames, i, 0, 1, 1);
 
@@ -195,16 +197,16 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
     // animation of six frames makes that bake wider
     const redAnims = new FrameBasedAnimations();
     redAnims.add('red', 1, [frameOf(0)]);
-    const redBake = redAnims.bakeDataTexture();
+    const redBake = keep(redAnims.bakeDataTexture());
 
     const greenAnims = new FrameBasedAnimations();
     greenAnims.add('green', 1, [frameOf(1)]);
     greenAnims.add('padding', 1, [0, 1, 2, 0, 1, 2].map(frameOf));
-    const greenBake = greenAnims.bakeDataTexture();
+    const greenBake = keep(greenAnims.bakeDataTexture());
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, 1);
-    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap: redBake}});
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
+    const geometry = keep(new FeatureSpritesGeometry(AnimatedSpriteKind, 1));
+    const material = keep(new FeatureSpritesMaterial(AnimatedSpriteKind, {textures: {colorMap, animsMap: redBake}}));
+    const sprites = keep(new FeatureSprites(AnimatedSpriteKind, {geometry, material}));
 
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
@@ -225,13 +227,6 @@ describe('sprites — AnimatedSpriteKind draws the frame the time points at', fu
     // the swap reached the gpu through the texture nodes and the size uniform alone
     const rebuilt = material.positionNode !== positionNode || material.colorNode !== colorNode || material.version !== version;
     const widths = [redBake.image.width, greenBake.image.width];
-
-    sprites.dispose();
-    geometry.dispose();
-    material.dispose();
-    colorMap.dispose();
-    redBake.dispose();
-    greenBake.dispose();
 
     expect(widths[1], 'the width of the second bake').to.not.equal(widths[0]);
     expect(before, 'the red of the first bake').to.satisfy((c) => isNearColor(c, [255, 0, 0]));

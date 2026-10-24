@@ -15,8 +15,9 @@ A **sprite kind** is a base and a list of features, put together once with `defi
 - uniforms and textures, which the material holds
 - at most one shader stage per pipeline slot (see "The pipeline")
 
-`defineFeature()` checks a feature on its own; `defineSprite()` checks it against the others of a
-kind. A kind is immutable: a sprite with one more feature is a sprite of another kind.
+`defineFeature()` checks a feature on its own; `defineSprite()` checks every feature on its own as
+well, and against the others of a kind. A kind is immutable: a sprite with one more feature is a
+sprite of another kind.
 
 The **base** is the geometry every sprite of a kind is drawn from. `QuadBase` is the quad of
 four vertices the built-in kinds use: the unit quad `[-0.5, 0.5]²` on the XY plane, centred on the
@@ -175,8 +176,10 @@ flags.dispose();
   slot, the uv stages' result `ctx.uv` aside.
 - **One base per grid.** `gridBase({columns: 3, rows: 3})` answers the same frozen base every time,
   named `grid 3x3`, with its `columns` and `rows`: a feature that needs a grid recognizes it by
-  identity in its `checkKind`. Columns and rows are whole numbers from 1 to 1024, and a grid holds
-  at most 4096 cells (`columns · rows`); anything else is refused with a `TypeError`.
+  identity in its `checkKind`. Every grid built stays for the life of the page, so `gridBase()` is
+  meant for a few fixed grids, not for sizes derived from data. Columns and rows are whole numbers
+  from 1 to 1024, and a grid holds at most 4096 cells (`columns · rows`); anything else is refused
+  with a `TypeError`.
 - **Everything else works on it unchanged**: the pool, every placement and pass, the trim shift —
   it moves every vertex by where it lies on the sprite — `AtlasFrame`, `AnimatedFrames` and
   `TextureColor`. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws.
@@ -239,9 +242,24 @@ and `setColor(color)` writes them; `setColorValues()` writes its numbers as they
 A frame is three values: `texCoords` (`s, t, u, v`), `texFlipDiagonal` — a TexturePacker frame
 turned by 90°, read with the two lookup components swapped — and `texTrim`, the margins a
 packer cut off, as fractions of the untrimmed sprite. `setFrame(frame)` writes all three for a
-frame of any atlas; the margins come from TexturePacker data and are zero for every other.
+frame of any atlas; the margins come from TexturePacker data, and are zero for every other and
+for a frame whose `spriteSourceSize` does not lie within its `sourceSize`.
+`frameTrimMargins(data, target?)` works them out by the same rule, for a feature or a material of
+your own; with a `target` of its own the call allocates nothing.
+
+```ts check
+import {frameTrimMargins, type FrameTrimMargins, type TextureAtlasFrame} from '@spearwolf/twopoint5d';
+
+declare const frame: TextureAtlasFrame<unknown>;
+
+const margins: FrameTrimMargins = frameTrimMargins(frame.data);
+```
+
 `TexturePackerJson` reads the "JSON Hash" and "JSON Array" exports of TexturePacker and of
-free-tex-packer alike, rotated and trimmed frames included.
+free-tex-packer alike, rotated and trimmed frames included. It refuses a frame that is no object
+or has no `frame`, a number of `frame` that is no finite number of 0 or more (a `RangeError`), and
+— without `parentCoords` — a `meta.size` without an area above 0, each naming the frame or the
+field, before the first frame goes into the atlas: a refused json leaves the `target` as it was.
 
 The quad of the sprite stands for the **untrimmed** sprite: size a sprite that shows trimmed
 frames by the `sourceSize` of its frames, not by the measures of their `coords`.
@@ -346,12 +364,19 @@ with one animation per frame tag:
 | `pingpong_reverse` | `to` … `from` | `'pingpong'` |
 
 The frames keep their durations — as one `duration` when they are all alike, as `durations` when
-they differ. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its frames
-played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1 is a
-one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code instead.
-It reads its own keys only — an inherited one such as `constructor` names no tag —, and a value
-that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the first
-frame goes into the atlas: a refused sheet leaves `options.target` as it was.
+they differ. Every frame carries its duration, and Aseprite writes one above 0 for each; a frame
+without it, in a tag or not, is refused with a `RangeError` naming it, before the first frame goes
+into the atlas. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its
+frames played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1
+is a one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code
+instead. It reads its own keys only — an inherited one such as `constructor` names no tag —, and a
+value that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the
+first frame goes into the atlas: a refused sheet leaves `options.target` as it was.
+
+A json that Aseprite does not write that way — without `frames` or `meta`, a frame of the layout
+"Array" without a `filename`, a tag or a slice without a `name`, slice keys, `bounds`, `center` or
+`pivot` the parser cannot read, two slices of one name — is refused before the first frame goes into
+the atlas, and the error names what is wrong.
 
 ```ts check
 import {AnimatedSpriteKind, AsepriteJson, type AsepriteJsonData, FeatureSprites} from '@spearwolf/twopoint5d';
@@ -414,9 +439,10 @@ until `store.renderer` is set. A `getAsync()` after a subtype its resource never
 animation data and whose adapter reads none — rejects instead of waiting.
 
 An item that names an adapter the store does not know builds no resource and is reported as an
-`error` of the store. An adapter reads the envelope the three packers share — `frames`,
-`meta.size`, `meta.image` — since the resource reads the image out of the json before any adapter
-runs; a packer of another format is converted to that envelope first.
+`error` of the store; a field the type of an item does not read — an `imageUrl` beside an `atlasUrl`
+— is left out and reported the same way. An adapter reads the envelope the three packers share —
+`frames`, `meta.size`, `meta.image` — since the resource reads the image out of the json before any
+adapter runs; a packer of another format is converted to that envelope first.
 
 ### Atlases built at run time: `DynamicAtlas`
 
@@ -619,10 +645,10 @@ export function frame(time: number) {
 }
 ```
 
-- **The views of a frame** are `n` consecutive entries of the table, view 0 first. `frameIndex`
-  counts frames as it does without views, and the shader reads entry
-  `floor(frameIndex + 0.5) · n + view`; a `frameIndex` past the last frame shows the matching view
-  of the last frame, one before the first that of the first.
+- **The views of a frame** — `n` is a whole number from 2 to 64 — are `n` consecutive entries of
+  the table, view 0 first. `frameIndex` counts frames as it does without views, and the shader
+  reads entry `floor(frameIndex + 0.5) · n + view`; a `frameIndex` past the last frame shows the
+  matching view of the last frame, one before the first that of the first.
 - **View `k`** is the camera `k · 360° / n` counter-clockwise, seen from above, from the front of
   the sprite: view 0 its front, for eight views view 2 its left side and view 6 its right. The front
   is where `Yaw` turns it, `(sin yaw, 0, cos yaw)` in the local space of the mesh —
@@ -1047,13 +1073,20 @@ for `instancePosition`, `texCoords` for the three frame attributes — and throw
 kind does not know. A geometry built with `attributeUsage` shares its prototype with no other.
 `baseArgs` hands `make()` of the base other arguments: `[halfWidth, halfHeight, xOffset,
 yOffset]` for `QuadBase`. The trim margins still move the corners by the measure of the unit quad.
+The geometry takes only a kind out of `defineSprite()`, its parameters as a number or an object,
+`baseArgs` as a list and `attributeUsage` as an object of name lists; anything else throws a
+`TypeError` before anything is built.
 
 ## The material: textures, uniforms and rebuilds
 
 `FeatureSpritesMaterial` folds the pipeline of a kind into `positionNode` and `colorNode`. It takes
 the kind and, besides every three.js material parameter, its own options: `name`, `textures` and
 `uniforms` to start with, and `resources` — the uniforms and textures of a `SpriteResources`
-shared with other materials, which then stay the caller's.
+shared with other materials, which then stay the caller's. It takes only a kind out of
+`defineSprite()`, its options as an object, `resources` as a `SpriteResources` and `textures` and
+`uniforms` as objects by name, each start value of the type of its uniform — a finite number for a
+`float`, 2 to 4 finite numbers for a `vec2` to `vec4`; anything else throws a `TypeError`. A start
+value of `undefined` or `null` keeps the one the feature declares.
 
 ```ts check
 import {
@@ -1143,12 +1176,13 @@ material.placement = FlatPlacement;
 material.dispose();
 ```
 
-Another placement takes the place of the current one only when it contributes a placement stage
-and nothing else — no attributes, methods, uniforms or textures, because the sprites and the
-material were built without them — and the kind holds every feature it `requires`. It may bring a
-`checkKind` of its own, which is shown the kind with it in place of the kind's placement. Anything
-else throws a `TypeError` naming both features, a refusal of its `checkKind` an `Error` naming it.
-The placement of the kind always comes back, whatever it brings. A write of the placement the material holds builds nothing.
+Another placement takes the place of the current one only when it contributes a placement stage and
+nothing else — no attributes, methods, uniforms or textures, because the sprites and the material
+were built without them — and the kind holds every feature it `requires`. It may bring a `checkKind`
+of its own, which is shown the kind with it in place of the kind's placement. Anything else throws a
+`TypeError` naming both features, a refusal of its `checkKind` an `Error` naming it. The placement
+of the kind always comes back, whatever it brings. A write of the placement the material holds
+builds nothing.
 
 A change rebuilds the position graph and sets `needsUpdate`; three serves a shader source it has
 built before from its caches, so the second swap back and forth is cheap. Do not swap every frame.
@@ -1175,7 +1209,8 @@ placed = instancePosition + turn · plane · local
 feature, which the placement swap needs. `FlatPlacement` is `flatPlacement()`, `GroundPlacement` is
 `flatPlacement({plane: 'xz'})`. The six forms are named `flatPlacement`, `groundPlacement`,
 `flatPlacement+yaw`, `groundPlacement+yaw`, `flatPlacement+quaternion` and
-`groundPlacement+quaternion`; a plane or an orientation it does not know throws a `TypeError`.
+`groundPlacement+quaternion`; a plane or an orientation it does not know, and options that are no
+object, throw a `TypeError`.
 
 ```ts check
 import {
@@ -1353,7 +1388,8 @@ markers.dispose();
   within a sine of 0.1 of the normal. A sprite seen exactly along its axis is a line either way.
 - `axisBillboardPlacement()` returns one frozen feature per axis; `AxisBillboardPlacement` is
   `axisBillboardPlacement()`. The two forms are named `axisBillboardPlacement` and
-  `axisBillboardPlacement+z`; an axis other than `'y'` and `'z'` throws a `TypeError`.
+  `axisBillboardPlacement+z`; an axis other than `'y'` and `'z'`, and options that are no object,
+  throw a `TypeError`.
 - It brings nothing but its placement stage, so it stands in for `FlatPlacement`, every
   `flatPlacement()` and `BillboardPlacement` on a live material, and they for it. A kind with `Yaw`
   or `Orientation` keeps the attribute under it and ignores it.
@@ -1459,8 +1495,8 @@ export function frame() {
   `segmentPlacement+camera` — bring nothing but their placement stage and their check, so they stand
   in for each other on a live material. A flat placement or a billboard may stand in for one too,
   and draws the quad of `QuadSize` at the start of each segment — rarely what a rope wants.
-  `segmentPlacement()` refuses a facing or a plane it does not know, and a `plane` next to
-  `facing: 'camera'`, with a `TypeError`.
+  `segmentPlacement()` refuses a facing or a plane it does not know, a `plane` next to
+  `facing: 'camera'` and options that are no object with a `TypeError`.
 - **The texture along the segment.** `TextureColor` stretches the frame from end to end.
   `RepeatingTextureColor` repeats it, its texels kept square: `(length / thickness) / aspect` times,
   with `length` the segment and its caps, `thickness` the `height` and `aspect` the width over the
@@ -1639,17 +1675,26 @@ to draw with the uniforms and textures of the sprites is built on them before th
 `new FeatureSpritesMaterial(kind, {resources: sprites.material.resources})` — as `SpritePicker`
 builds its pick material.
 
-**Refusals.** A `TypeError` instead of a mismatch: a `geometry` or a `material` built for another
-sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a `geometry`; any
-material parameter next to a `material`. A material that cannot be built (a `placement` that cannot
-stand in, a texture name no feature declares) throws as well, and the geometry the constructor built
-for it is disposed first, so a refused constructor leaves nothing behind.
+**Refusals.** A `TypeError` instead of a mismatch: a kind that did not come from `defineSprite()`;
+options that are no object, `passes` that are no list, a `grow` that is neither `true` nor `false`;
+a `geometry` or a `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, or one
+built for another sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a
+`geometry`; any material parameter next to a `material`. The geometry and the material the
+constructor builds throw their own refusals in their own name — `baseArgs` that are no list —, and
+the uniforms and textures in the name of the class that builds them: `FeatureSpritesMaterial`
+without passes, `FeatureSprites` with them — `textures` that are no object. A material that cannot
+be built (a `placement` that cannot stand in, a texture name no feature declares) throws as well,
+and the geometry the constructor built for it is disposed first, so a refused constructor leaves
+nothing behind.
 
 **After `dispose()`.** The mesh leaves the scene graph and fires the `dispose` event of three.
 `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer `undefined`;
 `createSprite()` and `getTexture()` answer `undefined`; `freeSprite()`, `setUniform()`,
-`setTexture()`, `touchTexture()`, `update()` and the `placement` setter do nothing; `sortBy()` and
-`sortByViewDepth()` answer `false`; `passes` is empty. A second `dispose()` does nothing.
+`setTexture()`, `touchTexture()` and `update()` do nothing; `sortBy()` and `sortByViewDepth()`
+answer `false`; `passes` is empty. `bindUniform()` binds nothing and the `placement` setter changes
+nothing, and both go on refusing what they refuse otherwise: `bindUniform()` something that is no
+source, the setter a malformed feature and one that cannot stand in for the placement of the kind.
+A second `dispose()` does nothing.
 
 ## Draw order: sorting the sprites
 
@@ -1810,7 +1855,9 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   are taken as they are at the call. The picker builds a pick mesh and a pick material per mesh on
   the geometry, the uniforms and the textures of that mesh — a `setUniform()` or `setTexture()`
   reaches the pick as it reaches the sprites —, follows a swapped placement, releases them when the
-  mesh is disposed, and builds them anew after a growth or a geometry put into the slot. `dispose()`
+  mesh is disposed, and builds them anew after a growth or a geometry put into the slot. Until then
+  the picker holds the mesh, listed again or not: a mesh taken out of the scene and never disposed
+  lives as long as the picker — dispose it, or the picker. `dispose()`
   releases the target and every pick material and rejects every pick still in flight; a `pick()`
   after it answers `undefined`. A camera, a pointer or a list of the wrong shape is refused with a
   `TypeError` that names the fix.
@@ -1904,12 +1951,12 @@ which three does without an event — takes `touchTexture('animsMap')` once the 
 
 ## Writing a feature
 
-A feature is a plain object handed to `defineFeature()`, which checks it on its own and freezes
-it. This one turns a sprite grey — a statue of stone, a frozen enemy, a locked item: an attribute
-of one value per sprite, `dynamic` because it may change from frame to frame, a property
-`grayscale` on the handle, a start value of 0, and a color stage that mixes the color towards its
-luminance. The stage runs at `ColorOrder.Tint - 25`, in the gap between the palette swap and the
-tint, so a tint colors the grey — a statue in blue.
+A feature is a plain object handed to `defineFeature()`, which checks every field of it and
+freezes it, the records and lists inside included. This one turns a sprite grey — a statue of
+stone, a frozen enemy, a locked item: an attribute of one value per sprite, `dynamic` because it
+may change from frame to frame, a property `grayscale` on the handle, a start value of 0, and a
+color stage that mixes the color towards its luminance. The stage runs at `ColorOrder.Tint - 25`,
+in the gap between the palette swap and the tint, so a tint colors the grey — a statue in blue.
 
 ```ts check
 import {
@@ -1966,9 +2013,9 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 
 - **`name`** — required, unique within a kind; every error about the feature names it, and
   `requires` of other features refers to it.
-- **`attributes`** — instance attributes in the form of a vertex object description (see
-  [vertex objects](../src/vertex-objects/README.md)). They are merged into the one description of the kind, so an
-  attribute name is unique across the features and must not be one of the base (`position`,
+- **`attributes`** — instance attributes in the form of a vertex object description (see [vertex
+  objects](../src/vertex-objects/README.md)). They are merged into the one description of the kind,
+  so an attribute name is unique across the features and must not be one of the base (`position`,
   `uv`); the merged layout has to fit into one sprite. An attribute is `static` unless it says
   otherwise: give one that changes every frame `usage: 'dynamic'`.
 - **`usageAliases`** — words a caller of `attributeUsage` may use for attributes of this feature,
@@ -1986,12 +2033,12 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`initialize()`** — writes the neutral values into a slot `createSprite()` hands out: a freed
   slot comes back with the values of its last sprite, and without `initialize()` a new sprite
   keeps them. It runs for every sprite created, so it allocates nothing.
-- **`uniforms`** — start values by name: a number for a `float`, 2 to 4 numbers for a `vec2` to
-  `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0, shared:
-  true}`: the features that declare a name shared, with the same type and start value, hold one
-  uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`, so
-  a wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name, or
-  two shared ones of another type or start value, are refused, naming the fix. Every stage of the
+- **`uniforms`** — start values by name: a finite number for a `float`, 2 to 4 finite numbers for a
+  `vec2` to `vec4`. A name is unique across the kind — unless it is declared shared, `{value: 0,
+  shared: true}`: the features that declare a name shared, with the same type and start value, hold
+  one uniform, and one `setUniform()` writes it for all of them. `AnimatedFrames` shares its `time`,
+  so a wave, a bob or a particle reads the same clock. A shared and a plain declaration of one name,
+  or two shared ones of another type or start value, are refused, naming the fix. Every stage of the
   kind reads every uniform, through `uniform(name)` of its context.
 - **`textures`** — the textures the feature samples, by name, `{needsImage: true}` for one that
   counts as set only once its image has measures. A name is unique across the kind. The textures
@@ -2033,6 +2080,11 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
   `wave` — `defineSprite()` asks the `checkKind` of the first before every other check, so that it
   can say why a kind takes one; a check that lets it pass leaves the plain refusal, `two features
   are named "wave"`.
+
+A field of the wrong type — a stage without a `transform`, a method that is no function, a texture
+declared with anything but `{}` or `{needsImage: true}` — is refused with a `TypeError` naming the
+feature and the field and quoting the value. `defineSprite()`, `definePass()` and the placement swap
+hold a feature that never passed through `defineFeature()` to the same rules.
 
 A stage reads through its context: `attribute(name)` for an attribute of the kind or the base,
 `uniform(name)` for a uniform any feature of the kind declares, `sample(name, uv)` for a texture
@@ -2181,6 +2233,10 @@ colorMap.dispose();
 
 The rules:
 
+- **The shape.** `definePass()` refuses with a `TypeError` a pass that is no object, `features` that
+  are no list, a `without` that is no list of names, and `uniformNames` or `material` that are no
+  objects; a `renderOrder` that is no finite number throws a `RangeError`. The sprites check the
+  same for a pass that never went through `definePass()`, in their own name.
 - **No data.** A pass draws the data of the sprites. `definePass()` refuses a feature that brings
   attributes, methods, `initialize()` or usage aliases, and two features of one name. Everything a
   pass reads comes from a feature of the kind; a `requires` of a pass feature is met by the kind or
@@ -2384,8 +2440,10 @@ per frame, for every pass that has one, and the answer decides whether the pass 
 `uniform(name)` answers the uniform the features of the pass read under `name`, through
 `uniformNames`: the hook of a renamed copy judges the renamed uniforms. The lookup reaches every
 uniform of the sprites, not only those of the pass — the `time` of an animated kind resolves —
-and throws from `update()` for a name that is no uniform of the sprites at all. The hook runs every
-frame and must allocate nothing, so it reads the `value` of a node and does not build a vector.
+and throws from `update()` for a name that is no uniform of the sprites at all. A hook that throws
+stops neither the other passes nor the upload: `update()` throws once it is done, naming the pass,
+and the pass keeps the visibility of its last judgement. The hook runs every frame and must
+allocate nothing, so it reads the `value` of a node and does not build a vector.
 `definePass()` refuses a `visible` that is no function.
 
 `ShadowPass` carries `shadowFallsOnPlane`. The sprites stand on the side of `groundPlane` its
@@ -2515,6 +2573,11 @@ nothing for it.
 An `AmbientLight` or a `HemisphereLight` is taken as any node; its position means nothing, and
 neither does the shadow it throws.
 
+Both check what they are handed when they are called: `lightOf()` refuses a node that is no
+`Object3D`, `planeOf()` a target that is neither an `Object3D` nor a `Plane`, options that are no
+object and an `options.plane` that is no `Plane`, each with a `TypeError`, and a plane whose normal
+or constant is no finite number with a `RangeError`.
+
 The rules of `bindUniform()` and `unbindUniform()`:
 
 - **Checks.** `bindUniform()` throws a `TypeError` for a name no feature of the sprites or their
@@ -2528,8 +2591,9 @@ The rules of `bindUniform()` and `unbindUniform()`:
 - **Every pass.** The uniforms are shared, so a bound uniform reaches the sprites and every pass
   that reads it, a renamed one of a copy of `ShadowPass` included.
 - **Ownership.** The nodes and the `Plane` a source reads stay the caller's. `dispose()` drops
-  every binding, so the sprites hold no node after it; afterwards `bindUniform()` and
-  `unbindUniform()` do nothing, as `setUniform()` does.
+  every binding, so the sprites hold no node after it; afterwards `bindUniform()` binds nothing and
+  still throws a `TypeError` for something that is no source, and `unbindUniform()` does nothing, as
+  `setUniform()` does.
 - **A material handed in.** Bindings write into the uniforms of the material of the sprites, so they
   work with a `material` handed in as well — for the uniforms that material holds —, and never into
   a material put into the `material` slot later. A material shared by several
@@ -2541,7 +2605,8 @@ sprites and their parents and inverts it, then lets every source write its unifo
 of the bindings, then judges the `visible` hook of every pass, and uploads the geometry last.
 The hooks therefore judge the values the bindings wrote in the same call: a light bound below the
 ground leaves the shadow out in that very frame. Without bindings and hooks `update()` is the
-upload alone.
+upload alone. A source or a hook that throws stops neither the others nor the upload; `update()`
+throws what they threw at its end, naming the uniform or the pass.
 
 `update()` refreshes the world matrices it reads itself, because the renderer runs
 `scene.updateMatrixWorld()` only inside `render()`, after `update()`. A node moved after

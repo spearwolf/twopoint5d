@@ -7,6 +7,7 @@ import {
   FloatType,
   type Node,
   NoToneMapping,
+  OrthographicCamera,
   PerspectiveCamera,
   RenderTarget,
   Scene,
@@ -15,7 +16,16 @@ import {
   type ToneMapping,
 } from 'three/webgpu';
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
-import {type IStageDispose, OnAddToParent, OnRemoveFromParent, OnStageAdded, OnStageDispose, OnStageRemoved} from '../events.js';
+import {
+  type IStageDispose,
+  OnAddToParent,
+  OnRemoveFromParent,
+  OnStageAdded,
+  OnStageAfterCameraChanged,
+  OnStageAfterSceneChanged,
+  OnStageDispose,
+  OnStageRemoved,
+} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
@@ -134,10 +144,12 @@ describe('StageRenderer', () => {
 
   // failures: onResize and onRenderFrame make the host throw that error before it takes a
   // handler; unsubscribeResize and unsubscribeFrame make the unsubscribe of that event
-  // count the call and throw, and the host keeps its handler
+  // count the call and throw, and the host keeps its handler. isDisposed starts out false
+  // and is written by the test that needs a disposed host
   function makeHost(
     failures: {onResize?: Error; onRenderFrame?: Error; unsubscribeResize?: Error; unsubscribeFrame?: Error} = {},
   ): IStageRendererHost & {
+    isDisposed: boolean;
     _emitResize: (w: number, h: number) => void;
     _emitFrame: (now: number, dt: number, frame: number) => void;
     _unsubs: number;
@@ -155,6 +167,7 @@ describe('StageRenderer', () => {
       };
     };
     return {
+      isDisposed: false,
       onResize: (h) => {
         if (failures.onResize) throw failures.onResize;
         resizeHandler = h;
@@ -1561,6 +1574,132 @@ describe('StageRenderer', () => {
     });
   });
 
+  describe('a renderer holds no renderer that holds it', () => {
+    it('add() refuses the renderer itself and leaves everything as it was', () => {
+      const host = makeHost();
+      const root = new StageRenderer(host);
+      const added = vi.fn();
+      on(root, OnStageAdded, added);
+
+      expect(() => root.add(root)).toThrow(
+        'StageRenderer#add() cannot take the stage "StageRenderer": that stage is this renderer',
+      );
+
+      expect(root.stages).toEqual([]);
+      expect(root.parent).toBe(host);
+      expect(host._unsubs, 'the renderer stays on its host').toBe(0);
+      expect(added).not.toHaveBeenCalled();
+    });
+
+    it('add() refuses the renderer that holds it, and a resize() afterwards comes to an end', () => {
+      const a = new StageRenderer();
+      a.name = 'a';
+      const b = new StageRenderer();
+      b.name = 'b';
+      a.add(b);
+      const parentOfA = a.parent;
+
+      expect(() => b.add(a)).toThrow('StageRenderer#add() cannot take the stage "a": that stage holds this renderer');
+
+      expect(a.parent).toBe(parentOfA);
+      expect(b.parent).toBe(a);
+      expect(b.stages).toEqual([]);
+      expect(() => a.resize(10, 10)).not.toThrow();
+      expect([b.width, b.height]).toEqual([10, 10]);
+    });
+
+    it('add() and parent refuse a renderer that holds it two levels up', () => {
+      const host = makeHost();
+      const a = new StageRenderer(host);
+      a.name = 'a';
+      const b = new StageRenderer();
+      const c = new StageRenderer();
+      a.add(b);
+      b.add(c);
+
+      expect(() => c.add(a)).toThrow('StageRenderer#add() cannot take the stage "a": that stage holds this renderer');
+      expect(() => {
+        a.parent = c;
+      }).toThrow('StageRenderer#add() cannot take the stage "a": that stage holds this renderer');
+
+      expect(a.parent).toBe(host);
+      expect(host._unsubs).toBe(0);
+      expect(c.stages).toEqual([]);
+    });
+  });
+
+  describe('a disposed holder', () => {
+    it('parent refuses a disposed renderer and leaves this renderer with its host', () => {
+      const host = makeHost();
+      const child = new StageRenderer(host);
+      const other = new StageRenderer();
+      other.dispose();
+      const left = vi.fn();
+      on(child, OnRemoveFromParent, left);
+
+      expect(() => {
+        child.parent = other;
+      }).toThrow('StageRenderer#parent cannot take the renderer "StageRenderer": that renderer has been disposed');
+
+      expect(child.parent).toBe(host);
+      expect(host._unsubs).toBe(0);
+      expect(left).not.toHaveBeenCalled();
+    });
+
+    it('the constructor refuses a host that has been disposed and subscribes to nothing there', () => {
+      const host = makeHost();
+      host.isDisposed = true;
+      const onResize = vi.spyOn(host, 'onResize');
+      const onRenderFrame = vi.spyOn(host, 'onRenderFrame');
+
+      expect(() => new StageRenderer(host)).toThrow('StageRenderer#parent cannot take the host: that host has been disposed');
+
+      expect(onResize).not.toHaveBeenCalled();
+      expect(onRenderFrame).not.toHaveBeenCalled();
+    });
+
+    it('attach() refuses a host that has been disposed and keeps the host it had', () => {
+      const alive = makeHost();
+      const sr = new StageRenderer(alive);
+      const dead = makeHost();
+      dead.isDisposed = true;
+
+      expect(() => sr.attach(dead)).toThrow('StageRenderer#parent cannot take the host: that host has been disposed');
+
+      expect(sr.parent).toBe(alive);
+      expect(alive._unsubs).toBe(0);
+    });
+  });
+
+  describe('resize() takes finite sizes only', () => {
+    it('refuses NaN and Infinity before anything changes', () => {
+      const sr = new StageRenderer();
+      const stage = fakeStage('s');
+      sr.add(stage);
+      sr.resize(20, 10);
+      stage.resize.mockClear();
+
+      expect(() => sr.resize(NaN, 10)).toThrow(new RangeError('StageRenderer#resize(): width must be a finite number, got NaN'));
+      expect(() => sr.resize(10, Infinity)).toThrow(
+        new RangeError('StageRenderer#resize(): height must be a finite number, got Infinity'),
+      );
+
+      expect([sr.width, sr.height]).toEqual([20, 10]);
+      expect(stage.resize).not.toHaveBeenCalled();
+    });
+
+    it('gives a render target at least one pixel for a width written past resize()', () => {
+      const sr = new StageRenderer();
+      sr.resize(10, 10);
+      sr.width = NaN;
+
+      const passTarget = (sr.asPassNode(renderer as any) as any).value.renderTarget;
+
+      expect(passTarget.width).toBe(1);
+      expect(passTarget.height).toBe(10);
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Pipeline integration — see "Post-processing" in ./README.md
   // ---------------------------------------------------------------------------
@@ -2386,6 +2525,58 @@ describe('StageRenderer', () => {
       expect(secondPass.scene).toBe(stage.scene);
     });
 
+    // the listener sits ahead of the one the renderer places in add(), and throws for every change
+    function makeComposedSetupBehindAThrowingListener(
+      eventName: typeof OnStageAfterCameraChanged | typeof OnStageAfterSceneChanged,
+    ) {
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      stage.resize(100, 100);
+      const failure = new Error('the listener failed');
+      on(stage, eventName, () => {
+        throw failure;
+      });
+      sr.add(stage);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      sr.buildOutputNode = buildOutputNode;
+      const pipeline = {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
+      sr.pipeline = pipeline as any;
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      return {sr, stage, buildOutputNode, failure};
+    }
+
+    it('rebuilds the output node for a camera change behind a listener of OnStageAfterCameraChanged that throws', () => {
+      const {sr, stage, buildOutputNode, failure} = makeComposedSetupBehindAThrowingListener(OnStageAfterCameraChanged);
+      const camera = new OrthographicCamera();
+
+      expect(
+        thrownBy(() => {
+          stage.camera = camera;
+        }),
+      ).toBe(failure);
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      expect(buildOutputNode.mock.calls[1]![0][0].camera).toBe(camera);
+    });
+
+    it('rebuilds the output node for a scene change behind a listener of OnStageAfterSceneChanged that throws', () => {
+      const {sr, stage, buildOutputNode, failure} = makeComposedSetupBehindAThrowingListener(OnStageAfterSceneChanged);
+      const scene = new Scene();
+
+      expect(
+        thrownBy(() => {
+          stage.scene = scene;
+        }),
+      ).toBe(failure);
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      expect(buildOutputNode.mock.calls[1]![0][0].scene).toBe(scene);
+    });
+
     it('remove() stops listening to the camera and the scene of a stage', () => {
       const sr = new StageRenderer();
       const stage = new Stage2D(new ParallaxProjection('xy|bottom-left'));
@@ -2721,9 +2912,10 @@ describe('StageRenderer', () => {
           on(sr, OnStageAdded, announced);
           const bare = fakeStage('bare');
 
-          expect(() => sr.add(bare), label).toThrow(TypeError);
           expect(() => sr.add(bare), label).toThrow(
-            /StageRenderer#add\(\) cannot take the stage "bare": that stage has no asPassNode\(\)/,
+            new TypeError(
+              'StageRenderer#add() cannot take the stage "bare": that stage has no asPassNode(), and a pipeline with buildOutputNode or a RootRenderPipeline composes the pass node of every stage',
+            ),
           );
 
           expect(bare.resize, label).not.toHaveBeenCalled();

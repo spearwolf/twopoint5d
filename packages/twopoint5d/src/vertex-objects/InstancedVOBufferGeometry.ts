@@ -12,6 +12,16 @@ import {attributeNamesOf} from './attributeNamesOf.js';
 import {initializeAttributes, initializeInstancedAttributes} from './initializeAttributes.js';
 import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './types.js';
 
+// three frees the gpu buffer of an attribute by its identity and the size it booked when it
+// built the buffer, and reads no array to do so: an attribute that is only lent back for the
+// dispose event can let go of the typed array of its pool
+function giveUpArray(attr: BufferAttribute | InterleavedBufferAttribute): void {
+  const holder = 'isInterleavedBufferAttribute' in attr ? attr.data : attr;
+  holder.array = new (holder.array.constructor as new (length: number) => typeof holder.array)(0);
+  // `count` is read-only in the types of an InterleavedBuffer, a plain field at run time
+  (holder as {count: number}).count = 0;
+}
+
 /** Selects buffers of an instanced geometry by usage type, one half of the geometry at a time. */
 export type TouchInstancedBuffersType = {
   base?: TouchBuffersType;
@@ -91,8 +101,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * Only slots that stay empty are collected — one that falls back to the claim underneath is
    * filled and belongs to the route it fell back to. A vacated name is never filled again, so
    * there is at most one entry per name and it lives until `dispose()`: a geometry that gives up
-   * many routes with different attribute names holds one attribute, and its typed array, per
-   * name until then.
+   * many routes with different attribute names holds one attribute per name until then, and each
+   * of them holds an empty array: it gave up the typed array of its pool as its route was detached.
    */
   readonly #vacatedSlots: Map<string, BufferAttribute | InterleavedBufferAttribute> = new Map();
 
@@ -103,9 +113,13 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * constructor returns, no attribute of this geometry has reached the renderer, so one that is
    * displaced here holds no gpu buffer — which is exactly what makes it safe to displace it.
    *
+   * Built from a `BufferGeometry`, the geometry copies its attributes, its index and its draw
+   * range; `update()` leaves that draw range as it is.
+   *
    * @throws when the instanced pool or the base pool handed in has been disposed and holds no
    *   buffers to build attributes on. The message names the class, which of the two it is about
-   *   and the state, and no geometry comes into being.
+   *   and the state, and no geometry comes into being. Whatever the constructor throws, a pool it
+   *   built from a descriptor or description is disposed, and a pool handed in is left as it was.
    */
   constructor(
     ...args:
@@ -133,45 +147,62 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
     super();
 
-    const [instancedSource, instancedCapacity] = args;
-    this.instancedPool =
-      instancedSource instanceof VOBufferPool ? instancedSource : new VOBufferPool(instancedSource, instancedCapacity);
-    if (!(instancedSource instanceof VOBufferPool)) {
-      this.declareOwnedPool(this.instancedPool);
-    }
-
-    if (args[2] instanceof BufferGeometry) {
-      this.copy(asInstancedCopySource(args[2]));
-      // copy() cloned those attributes, so they are this geometry's own and no pool feeds them;
-      // they are claimed before any route initializes, so a route that takes such a slot gives
-      // it back when it is released
-      this.#slots.claimExisting(this);
-    } else {
-      const baseSource = args[2];
-      const baseCapacity = args[3] ?? 1;
-      const basePool = baseSource instanceof VOBufferPool ? baseSource : new VOBufferPool(baseSource, baseCapacity);
-      this.basePool = basePool;
-      if (!(baseSource instanceof VOBufferPool)) {
-        this.declareOwnedPool(basePool);
+    // held apart from the field, which the catch below may not read before it is assigned
+    let instancedPool: VOBufferPool | undefined;
+    try {
+      const [instancedSource, instancedCapacity] = args;
+      instancedPool =
+        instancedSource instanceof VOBufferPool ? instancedSource : new VOBufferPool(instancedSource, instancedCapacity);
+      this.instancedPool = instancedPool;
+      if (!(instancedSource instanceof VOBufferPool)) {
+        this.declareOwnedPool(this.instancedPool);
       }
-      const baseBuffers = new Map<string, BufferLike>();
-      this.#baseBuffers = baseBuffers;
-      this.#attachments.attach(basePool);
-      initializeAttributes(this, basePool, baseBuffers, this.#baseBufferSerials, this.#slots);
-      this.#routes.add({pool: basePool, buffers: baseBuffers, bufferSerials: this.#baseBufferSerials, group: 'base'});
+
+      if (args[2] instanceof BufferGeometry) {
+        this.copy(asInstancedCopySource(args[2]));
+        // copy() cloned those attributes, so they are this geometry's own and no pool feeds them;
+        // they are claimed before any route initializes, so a route that takes such a slot gives
+        // it back when it is released
+        this.#slots.claimExisting(this);
+      } else {
+        const baseSource = args[2];
+        const baseCapacity = args[3] ?? 1;
+        const basePool = baseSource instanceof VOBufferPool ? baseSource : new VOBufferPool(baseSource, baseCapacity);
+        this.basePool = basePool;
+        if (!(baseSource instanceof VOBufferPool)) {
+          this.declareOwnedPool(basePool);
+        }
+        const baseBuffers = new Map<string, BufferLike>();
+        this.#baseBuffers = baseBuffers;
+        this.#attachments.attach(basePool);
+        initializeAttributes(this, basePool, baseBuffers, this.#baseBufferSerials, this.#slots);
+        this.#routes.add({pool: basePool, buffers: baseBuffers, bufferSerials: this.#baseBufferSerials, group: 'base'});
+      }
+
+      // after the copy(): BufferGeometry#copy() takes the name of its source, which is usually the empty string
+      this.name = 'InstancedVOBufferGeometry';
+
+      this.#attachments.attach(this.instancedPool);
+      initializeInstancedAttributes(this, this.instancedPool, this.#instancedBuffers, this.#instancedBufferSerials, this.#slots);
+      this.#routes.add({
+        pool: this.instancedPool,
+        buffers: this.#instancedBuffers,
+        bufferSerials: this.#instancedBufferSerials,
+        group: 'instanced',
+      });
+    } catch (error) {
+      // a constructor that throws leaves nothing behind: the pools it built go, and a pool handed
+      // in is no longer counted as attached
+      this.#attachments.detachAll();
+      // the throw may come before either pool is assigned
+      if (instancedPool != null && this.#attachments.owns(instancedPool)) {
+        instancedPool.dispose();
+      }
+      if (this.basePool != null && this.#attachments.owns(this.basePool)) {
+        this.basePool.dispose();
+      }
+      throw error;
     }
-
-    // after the copy(): BufferGeometry#copy() takes the name of its source, which is usually the empty string
-    this.name = 'InstancedVOBufferGeometry';
-
-    this.#attachments.attach(this.instancedPool);
-    initializeInstancedAttributes(this, this.instancedPool, this.#instancedBuffers, this.#instancedBufferSerials, this.#slots);
-    this.#routes.add({
-      pool: this.instancedPool,
-      buffers: this.#instancedBuffers,
-      bufferSerials: this.#instancedBufferSerials,
-      group: 'instanced',
-    });
   }
 
   /**
@@ -226,7 +257,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *   for releasing them.
    * @throws when an attribute of `pool` would take an attribute slot that this geometry has
    *   already had an attribute in. The message names the call and every slot it is about, and
-   *   the geometry is left exactly as it was.
+   *   the geometry is left exactly as it was; a pool built here from a descriptor is disposed.
+   * @throws whatever the attributes of `pool` throw as they are built. The geometry is left as it
+   *   was — the route that holds `name` keeps every attribute it has, and a pool built here from a
+   *   descriptor is disposed — and the error reaches the caller as it was thrown.
    * @throws when `pool` has been disposed and holds no buffers to build attributes on. The route
    *   that holds `name` at the time keeps every attribute it has.
    * @throws when this geometry has been disposed. The declared return type promises a pool, and
@@ -278,6 +312,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     const taken = this.#slots.everHeld(attributeNamesOf(extraPool));
     if (taken.length > 0) {
       const slots = taken.map((attrName) => `"${attrName}"`).join(', ');
+      // the pool was built for this call alone, and a refused call leaves nothing behind
+      if (ownsPool) extraPool.dispose();
       throw new Error(
         `InstancedVOBufferGeometry#attachInstancedPool("${name}"): this geometry has already had an attribute in the slot ${slots}. ` +
           'An attribute slot belongs to one route for the life of the geometry — give this pool attribute names of its own, ' +
@@ -285,21 +321,30 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
       );
     }
 
-    // only once the guard above has let the pool through: a throw must leave nothing behind that
-    // dispose() would release later
+    const buffers = new Map<string, BufferLike>();
+    const bufferSerials = new Map<string, number>();
+
+    this.#attachments.attach(extraPool);
+
+    try {
+      initializeInstancedAttributes(this, extraPool, buffers, bufferSerials, this.#slots);
+    } catch (error) {
+      // nothing of this attempt has reached the renderer: its slots, its attachment and a pool
+      // built for it go, and the route that holds the name has not been touched yet
+      this.#slots.withdrawRoute(this, buffers);
+      this.#attachments.detach(extraPool);
+      if (ownsPool) extraPool.dispose();
+      throw error;
+    }
+
+    // only once the attributes stand: a pool that is refused or fails is not one of this geometry's own
     if (ownsPool) {
       this.declareOwnedPool(extraPool);
     }
 
-    // taking over a name that is already in use releases whatever was attached under it
+    // the route that held the name goes only now that its successor stands — the guard above
+    // keeps their slots apart
     this.#detachRoute(name);
-
-    this.#attachments.attach(extraPool);
-
-    const buffers = new Map<string, BufferLike>();
-    const bufferSerials = new Map<string, number>();
-
-    initializeInstancedAttributes(this, extraPool, buffers, bufferSerials, this.#slots);
 
     // `autoDispose` carries only what the caller said out loud: whether the geometry built the
     // pool is answered by the attachments, and that answer belongs to the pool rather than to
@@ -358,6 +403,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     if (route != null) {
       for (const {attrName, vacated} of this.#slots.releaseRoute(this, route.buffers)) {
         if (vacated != null) {
+          giveUpArray(vacated);
           this.#vacatedSlots.set(attrName, vacated);
         }
       }
@@ -407,8 +453,12 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * What stays behind belongs to the attributes that are still there: their serials from the
    * last `update()`. `update()` is a no-op from here on and `attachInstancedPool()` throws — see
    * both.
+   *
+   * A second call does nothing. A listener of the dispose event that throws holds up none of
+   * this: its error reaches the caller once the geometry is down.
    */
   override dispose(): void {
+    if (this.#disposed) return;
     this.#disposed = true;
 
     // the renderer reads the attributes of this geometry once more while it handles the
@@ -431,46 +481,49 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
         this.deleteAttribute(attrName);
       }
       this.#vacatedSlots.clear();
-    }
 
-    // the geometry is gone either way, so every pool it held gives up its attachment
-    this.#attachments.detachAll();
+      // a listener of the dispose event that throws holds up none of the teardown: its error
+      // reaches the caller once the geometry is down, and a second dispose() has nothing left
+      // to do.
+      // The geometry is gone either way, so every pool it held gives up its attachment
+      this.#attachments.detachAll();
 
-    // an attribute left behind would still read from the pool arrays, and a geometry put back
-    // into a scene after dispose() would have the renderer build fresh gpu buffers from them
-    if (this.#baseBuffers != null) {
-      this.#slots.releaseRoute(this, this.#baseBuffers);
-    }
-    this.#slots.releaseRoute(this, this.#instancedBuffers);
-    // through the routes rather than through the read-only view, whose type is a ReadonlyMap while
-    // releaseRoute() asks for the writable map a route was built with. A named route is one of the
-    // attached ones
-    for (const route of this.#routes) {
-      if (route.name != null) {
-        this.#slots.releaseRoute(this, route.buffers);
+      // an attribute left behind would still read from the pool arrays, and a geometry put back
+      // into a scene after dispose() would have the renderer build fresh gpu buffers from them
+      if (this.#baseBuffers != null) {
+        this.#slots.releaseRoute(this, this.#baseBuffers);
       }
-    }
-    this.setIndex(null);
-
-    if (this.#attachments.owns(this.instancedPool)) {
-      this.instancedPool.dispose();
-    }
-    if (this.basePool != null && this.#attachments.owns(this.basePool)) {
-      this.basePool.dispose();
-    }
-    for (const route of this.#routes) {
-      if (route.name != null && this.#releasesRoute(route)) {
-        route.pool.dispose();
+      this.#slots.releaseRoute(this, this.#instancedBuffers);
+      // through the routes rather than through the read-only view, whose type is a ReadonlyMap while
+      // releaseRoute() asks for the writable map a route was built with. A named route is one of the
+      // attached ones
+      for (const route of this.#routes) {
+        if (route.name != null) {
+          this.#slots.releaseRoute(this, route.buffers);
+        }
       }
-    }
+      this.setIndex(null);
 
-    this.#baseBuffers?.clear();
-    this.#baseBufferSerials.clear();
-    this.#instancedBuffers.clear();
-    this.#instancedBufferSerials.clear();
-    // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
-    this.#routes.clear();
-    this.#attachments.clear();
+      if (this.#attachments.owns(this.instancedPool)) {
+        this.instancedPool.dispose();
+      }
+      if (this.basePool != null && this.#attachments.owns(this.basePool)) {
+        this.basePool.dispose();
+      }
+      for (const route of this.#routes) {
+        if (route.name != null && this.#releasesRoute(route)) {
+          route.pool.dispose();
+        }
+      }
+
+      this.#baseBuffers?.clear();
+      this.#baseBufferSerials.clear();
+      this.#instancedBuffers.clear();
+      this.#instancedBufferSerials.clear();
+      // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
+      this.#routes.clear();
+      this.#attachments.clear();
+    }
   }
 
   /**
@@ -480,9 +533,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    */
   touchAttributes(...attrNames: string[]): void;
   touchAttributes(): void {
-    // read through `arguments` rather than the rest parameter of the signature: once the method of
-    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
-    // argument, measured on Node 24), while `arguments` stayed free in every order
+    // read through `arguments` rather than the rest parameter of the signature:
+    // docs/architecture.md, `vertex-objects/`
     // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
       // biome-ignore lint/complexity/noArguments: see the comment above the loop
@@ -518,9 +570,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    */
   touch(...args: Array<string | TouchBuffersType | TouchInstancedBuffersType>): void;
   touch(): void {
-    // read through `arguments` rather than the rest parameter of the signature: once the method of
-    // a second geometry class had run, V8 built the rest array on every call (56 B with a single
-    // argument, measured on Node 24), while `arguments` stayed free in every order
+    // read through `arguments` rather than the rest parameter of the signature:
+    // docs/architecture.md, `vertex-objects/`
     // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
       // biome-ignore lint/complexity/noArguments: see the comment above the loop
@@ -537,8 +588,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   }
 
   /**
-   * Sets `instanceCount` and the draw range from the pools, uploads the buffers that need it and
-   * syncs the attribute arrays to the pools' own.
+   * Sets `instanceCount` from the instanced pool and, on a geometry with a base pool, the draw
+   * range from that pool, uploads the buffers that need it and syncs the attribute arrays to the
+   * pools' own. A geometry built from a `BufferGeometry` keeps the draw range it copied from it,
+   * and one set on it since.
    *
    * A no-op after `dispose()`: the geometry has no attribute left to draw or upload, and an
    * `instanceCount` or draw range taken from a pool that is still alive would name instances or
@@ -558,6 +611,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   }
 
   #updateDrawRange() {
+    // without a base pool the draw range is the one copied from the BufferGeometry handed in, or
+    // whatever the caller set since
     if (this.basePool) {
       this.setDrawRange(
         0,
@@ -565,8 +620,6 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
           ? this.basePool.usedCount * this.basePool.descriptor.indices.length
           : this.basePool.usedCount * this.basePool.descriptor.vertexCount,
       );
-    } else {
-      this.setDrawRange(0, Infinity);
     }
   }
 

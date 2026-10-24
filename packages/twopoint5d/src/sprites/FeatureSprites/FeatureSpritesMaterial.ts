@@ -10,7 +10,10 @@ import {
 } from '@spearwolf/signalize';
 import {add, attribute, float, mul, sub, texture, textureSize as textureSizeOf, vec2, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
-import type {SpriteKind} from '../defineSprite.js';
+import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
+import {checkFeature} from '../checkFeature.js';
+import {checkSpriteKind, type SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
 import {passFeatures} from '../passes/passFeatures.js';
 import {runCheckKind} from '../runCheckKind.js';
@@ -34,7 +37,10 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
   name?: string;
   /** The textures to start with, by the names the features declare. They stay the caller's. */
   textures?: Readonly<Record<string, Texture | undefined>>;
-  /** Start values of uniforms, by the names the features declare. */
+  /**
+   * Start values of uniforms, by the names the features declare, each of the type of its uniform —
+   * see `SpriteResourcesOptions`.
+   */
   uniforms?: Readonly<Record<string, SpriteUniformValue | undefined>>;
   /** Another placement to start with — see {@link FeatureSpritesMaterial.placement}. */
   placement?: SpriteFeature;
@@ -47,7 +53,8 @@ export interface FeatureSpritesMaterialParameters extends Omit<NodeMaterialParam
   /**
    * Builds the material for this pass over the kind: from the features of the kind without the
    * stages of those `without` names, plus the features of the pass. The material parameters of the
-   * pass come first, so a parameter handed in here wins over one of the pass.
+   * pass come first, so a parameter handed in here wins over one of the pass; one handed in as
+   * `undefined` counts as not handed in.
    */
   pass?: SpritePass;
 }
@@ -62,6 +69,57 @@ const WHERE = 'FeatureSpritesMaterial';
 
 // the fields a placement may carry to stand in for another on a live material
 const PLACEMENT_ONLY: ReadonlySet<string> = new Set(['name', 'requires', 'checkKind', 'placement']);
+
+/**
+ * Checks that `feature`, a feature that is well formed, can stand in for the placement of `kind`:
+ * it contributes a placement stage and, unless it is `start`, nothing else, the kind holds every
+ * feature it requires, and its `checkKind`, if any, takes the kind with it in place of the
+ * placement of the kind. `start` is the placement the position graph begins with, which the rules
+ * leave out; `current` is the one `feature` would replace, the one the messages name. The rules
+ * hang on the kind alone, so the sprites run them after a `dispose()` as well.
+ *
+ * @internal
+ *
+ * @throws a `TypeError` naming both features for a placement that cannot stand in, an `Error` naming
+ *   the feature for one whose `checkKind` refuses the kind
+ */
+export function checkPlacementStandIn(
+  kind: SpriteKind,
+  start: SpriteFeature,
+  current: SpriteFeature,
+  feature: SpriteFeature,
+  where: string,
+): void {
+  if (feature.placement == null) {
+    throw new TypeError(
+      `${where}: feature "${feature.name}" contributes no placement stage and cannot stand in for "${current.name}"`,
+    );
+  }
+  if (feature === start) return;
+  const extra = Object.keys(feature).filter(
+    (key) => !PLACEMENT_ONLY.has(key) && (feature as unknown as Record<string, unknown>)[key] != null,
+  );
+  if (extra.length > 0) {
+    throw new TypeError(
+      `${where}: feature "${feature.name}" brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for "${current.name}"`,
+    );
+  }
+  // the sprites are built from the kind alone, so the kind's features are the yardstick, not the ones a material folds
+  const held = new Set(kind.features.map(({name}) => name));
+  for (const required of feature.requires ?? []) {
+    if (!held.has(required)) {
+      throw new TypeError(
+        `${where}: feature "${feature.name}" requires feature "${required}", which the sprite kind does not hold`,
+      );
+    }
+  }
+  const kindPlacement = kind.pipeline.placement;
+  runCheckKind(
+    feature,
+    {base: kind.base, features: kind.features.map((held) => (held === kindPlacement ? feature : held))},
+    `${where}: feature "${feature.name}"`,
+  );
+}
 
 const defaultFrame = (): SpriteFrameNodes => ({texCoords: vec4(0, 0, 1, 1)});
 
@@ -82,9 +140,16 @@ const trimShift = (position: Node<'vec3'>, uv: Node<'vec2'>, trim: Node<'vec4'>)
  * frame falls back to its defaults, the color source to flat grey.
  */
 export class FeatureSpritesMaterial<Api extends object = object> extends NodeMaterial {
+  /** Marks a `FeatureSpritesMaterial`, as the `is…` flags of three do. */
   readonly isFeatureSpritesMaterial = true;
 
+  /** The sprite kind the material draws. */
   readonly kind: SpriteKind<Api>;
+
+  /**
+   * The uniforms and textures the material reads: the `resources` handed in, which stay the
+   * caller's, or its own from `textures` and `uniforms`, which {@link dispose} releases.
+   */
   readonly resources: SpriteResources;
   /** The pass this material draws, `undefined` for the material of the sprites themselves. */
   readonly pass: SpritePass | undefined;
@@ -106,15 +171,35 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   /**
    * @param options every one of them is optional, so another three.js `Material` or a `Texture`
    *   would pass for them; the `isMaterial` and the `isTexture` they carry keep them out.
+   * @throws a `TypeError` for a kind that did not come from `defineSprite()`, for options that are
+   *   no object, for `resources` that are no `SpriteResources`, for `resources` next to `textures`
+   *   or `uniforms`, for `resources` that have been disposed or lack what a feature declares, for
+   *   a `placement` that is malformed or cannot stand in for the placement of the kind, and for a
+   *   pass that is malformed — a `RangeError` for a `renderOrder` that is no finite number —; an
+   *   `Error` for a pass the kind cannot draw and for a placement whose `checkKind` refuses the
+   *   kind; and what `new SpriteResources()` refuses of `textures` and `uniforms`, in the name of
+   *   this class. A constructor that throws leaves nothing behind it built.
    */
   constructor(kind: SpriteKind<Api>, options?: FeatureSpritesMaterialParameters & {isMaterial?: never; isTexture?: never}) {
+    // the kind and the form of the options before anything is built; null is refused, only
+    // undefined counts as no options
+    checkSpriteKind(kind, WHERE);
+    if (options !== undefined && (!isObject(options as unknown) || Array.isArray(options))) {
+      throw new TypeError(`${WHERE}: the options must be an object, got ${describeValue(options)}`);
+    }
+
     super();
 
     // the options of this material stay out of setValues(): Material.setValues() warns about every
     // key whose current value is undefined
     const {name, textures, uniforms, placement, resources, pass, ...ownParameters} = options ?? {};
-    // the parameters of the pass first, so that a parameter handed in wins
-    const materialParameters = {...pass?.material, ...ownParameters};
+    // the parameters of the pass first, so that a parameter handed in wins; one handed in as
+    // undefined counts as not handed in, as FeatureSprites counts it, and setValues() never sees it
+    const materialParameters = {
+      ...pass?.material,
+      // a filter that only takes entries out leaves the type of the others as it is
+      ...(Object.fromEntries(Object.entries(ownParameters).filter(([, value]) => value !== undefined)) as typeof ownParameters),
+    };
 
     this.kind = kind;
     this.name = name ?? 'twopoint5d.FeatureSpritesMaterial';
@@ -127,6 +212,9 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
       ...Object.keys(kind.base.description.attributes),
     ]);
 
+    if (resources != null && !(resources instanceof SpriteResources)) {
+      throw new TypeError(`${WHERE}: resources must be a SpriteResources, got ${describeValue(resources)}`);
+    }
     if (resources != null && (textures != null || uniforms != null)) {
       throw new TypeError(`${WHERE}: textures and uniforms belong to the resources handed in`);
     }
@@ -389,45 +477,17 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
    * rebuilds the position graph; three serves a source it has built before from its caches.
    * Keeps its last value once disposed, and a write there reaches nothing that renders.
    *
-   * @throws a `TypeError` naming both features for a placement that cannot stand in, an `Error`
-   *   naming it for one whose `checkKind` refuses the kind
+   * @throws a `TypeError` naming both features for a placement that cannot stand in, a `TypeError`
+   *   for a feature that is malformed — see `defineFeature()` —, an `Error` naming it for one whose
+   *   `checkKind` refuses the kind
    */
   get placement(): SpriteFeature {
     return this.#placement.value;
   }
 
   set placement(feature: SpriteFeature) {
-    const current = this.#placement.value;
-    if (feature.placement == null) {
-      throw new TypeError(
-        `${WHERE}: feature "${feature.name}" contributes no placement stage and cannot stand in for "${current.name}"`,
-      );
-    }
-    if (feature !== this.#pipeline.placement) {
-      const extra = Object.keys(feature).filter(
-        (key) => !PLACEMENT_ONLY.has(key) && (feature as unknown as Record<string, unknown>)[key] != null,
-      );
-      if (extra.length > 0) {
-        throw new TypeError(
-          `${WHERE}: feature "${feature.name}" brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for "${current.name}"`,
-        );
-      }
-      // the sprites are built from the kind alone, so the kind's features are the yardstick, not the ones this material folds
-      const held = new Set(this.kind.features.map(({name}) => name));
-      for (const required of feature.requires ?? []) {
-        if (!held.has(required)) {
-          throw new TypeError(
-            `${WHERE}: feature "${feature.name}" requires feature "${required}", which the sprite kind does not hold`,
-          );
-        }
-      }
-      const kindPlacement = this.kind.pipeline.placement;
-      runCheckKind(
-        feature,
-        {base: this.kind.base, features: this.kind.features.map((held) => (held === kindPlacement ? feature : held))},
-        `${WHERE}: feature "${feature.name}"`,
-      );
-    }
+    checkFeature(feature, WHERE);
+    checkPlacementStandIn(this.kind, this.#pipeline.placement!, this.#placement.value, feature, WHERE);
     this.#placement.set(feature);
   }
 

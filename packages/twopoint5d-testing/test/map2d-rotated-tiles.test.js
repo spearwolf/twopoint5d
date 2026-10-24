@@ -12,7 +12,16 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeContainer, makeSheetWithTurnedCopy, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeContainer,
+  makeSheetWithTurnedCopy,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
@@ -56,9 +65,6 @@ function allDifferent(colors) {
 }
 
 describe('map2d — TileSprites draws a turned tile upright', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -74,6 +80,7 @@ describe('map2d — TileSprites draws a turned tile upright', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -86,6 +93,7 @@ describe('map2d — TileSprites draws a turned tile upright', function () {
 
   it('draws the tile of a frame with FLIP_DIAGONAL | FLIP_VERTICAL as the upright tile', async function () {
     const {texture, json} = makeSheetWithTurnedCopy(IMAGE, TILE_SIZE, TILE_SIZE);
+    keep(texture);
 
     // tile 1 is the upright image, tile 2 the turned copy, which its frame turns back
     const tileSet = new TileSet(new TextureCoords(0, 0, json.meta.size.w, json.meta.size.h), {
@@ -94,8 +102,9 @@ describe('map2d — TileSprites draws a turned tile upright', function () {
     });
     tileSet.atlas.get(tileSet.frameId(2)).coords.flip = TextureCoords.FLIP_DIAGONAL | TextureCoords.FLIP_VERTICAL;
 
-    const geometry = new TileSpritesGeometry(2);
-    const material = new TileSpritesMaterial({colorMap: texture});
+    // a TileSprites owns neither its geometry nor its material; both, like the texture, are the caller's
+    const geometry = keep(new TileSpritesGeometry(2));
+    const material = keep(new TileSpritesMaterial({colorMap: texture}));
     const tileSprites = new TileSprites(geometry, material);
     tileSprites.frustumCulled = false;
 
@@ -117,12 +126,6 @@ describe('map2d — TileSprites draws a turned tile upright', function () {
 
     const pixels = await renderToPixels(display.renderer, scene, camera, target);
 
-    // a TileSprites owns neither its geometry nor its material; both, like the texture, are the caller's
-    scene.remove(tileSprites);
-    geometry.dispose();
-    material.dispose();
-    texture.dispose();
-
     const upright = cellColors(pixels, UPRIGHT_X);
     const turned = cellColors(pixels, TURNED_X);
 
@@ -135,17 +138,19 @@ describe('map2d — TileSprites draws a turned tile upright', function () {
   });
 
   it('draws the tiles out of a color map swapped for one of the same kind from the next frame on', async function () {
-    const {texture} = makeSheetWithTurnedCopy(IMAGE, TILE_SIZE, TILE_SIZE);
-    const white = makeSheetWithTurnedCopy(
-      IMAGE.map(() => [255, 255, 255, 255]),
-      TILE_SIZE,
-      TILE_SIZE,
-    ).texture;
+    const texture = keep(makeSheetWithTurnedCopy(IMAGE, TILE_SIZE, TILE_SIZE).texture);
+    const white = keep(
+      makeSheetWithTurnedCopy(
+        IMAGE.map(() => [255, 255, 255, 255]),
+        TILE_SIZE,
+        TILE_SIZE,
+      ).texture,
+    );
 
     const tileSet = new TileSet(new TextureCoords(0, 0, 2 * TILE_SIZE, TILE_SIZE), {tileWidth: TILE_SIZE, tileHeight: TILE_SIZE});
 
-    const geometry = new TileSpritesGeometry(1);
-    const material = new TileSpritesMaterial({colorMap: texture});
+    const geometry = keep(new TileSpritesGeometry(1));
+    const material = keep(new TileSpritesMaterial({colorMap: texture}));
     const tileSprites = new TileSprites(geometry, material);
     tileSprites.frustumCulled = false;
 
@@ -172,12 +177,6 @@ describe('map2d — TileSprites draws a turned tile upright', function () {
 
     // the swap reached the gpu through the texture node alone, without a new color graph
     const rebuilt = material.colorNode !== colorNode || material.version !== version;
-
-    scene.remove(tileSprites);
-    geometry.dispose();
-    material.dispose();
-    texture.dispose();
-    white.dispose();
 
     expect(before, 'the four cells of the tile before the swap, all different').to.satisfy(allDifferent);
     expect(rebuilt, 'the color graph was built anew').to.equal(false);

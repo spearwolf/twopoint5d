@@ -4,9 +4,6 @@ import {Scene} from 'three/webgpu';
 import {makeContainer, disposeDisplay, bufferOf, makeCamera, makeMap} from './helpers/fixtures.js';
 
 describe('map2d — tile attribute upload', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -118,5 +115,25 @@ describe('map2d — tile attribute upload', function () {
     expect(bufferOf(instancePosition).version, 'buffer version after a moved view').to.equal(version);
     expect(tileSprites.geometry.instancedPool.usedCount, 'tiles still on screen').to.equal(usedCount);
     expect(tileRenderer.node.position.x, 'the renderer node follows the view').to.equal(nodeX - 10);
+  });
+
+  it('taking the visibilitor away draws no tile from the next frame on', async function () {
+    const {map2d, tileSprites} = makeMap(new RectangularVisibilityArea(1024, 1024));
+    scene.add(map2d);
+
+    map2d.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    expect(tileSprites.geometry.instanceCount, 'tiles drawn in the first frame').to.be.greaterThan(0);
+
+    map2d.visibilitor = undefined;
+
+    map2d.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    expect(tileSprites.geometry.instanceCount, 'instances drawn after the visibilitor went').to.equal(0);
+    expect(tileSprites.geometry.instancedPool.usedCount, 'tiles held after the visibilitor went').to.equal(0);
   });
 });

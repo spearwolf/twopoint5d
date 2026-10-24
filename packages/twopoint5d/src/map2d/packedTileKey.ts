@@ -17,10 +17,10 @@ export function packTileCoords(x: number, y: number): number {
 }
 
 /**
- * Writes {@link packTileCoords} of `(x, y)` into `target.id`. The packed key is never a small
- * integer, and a call the compiler does not inline boxes the double it answers; written into the
- * field of an object, it is not.
+ * Writes {@link packTileCoords} of `(x, y)` into `target.packedKey`. The packed key is never a
+ * small integer, and a call the compiler does not inline boxes the double it answers; written into
+ * the field of an object, it is not.
  */
-export function writePackedTileCoords(target: {id: number}, x: number, y: number): void {
-  target.id = (y + TILE_KEY_BIAS) * TILE_KEY_SPAN + (x + TILE_KEY_BIAS);
+export function writePackedTileCoords(target: {packedKey: number}, x: number, y: number): void {
+  target.packedKey = (y + TILE_KEY_BIAS) * TILE_KEY_SPAN + (x + TILE_KEY_BIAS);
 }

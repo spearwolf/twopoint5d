@@ -1,19 +1,28 @@
 import {type Camera, Matrix4, Mesh, type Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
 import type {VO, VOSortKey, VOSortKeyName, VOSortOptions} from '../../vertex-objects/types.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
+import {describeThreeValue} from '../../utils/describeThreeValue.js';
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
+import {throwCollected} from '../../utils/throwCollected.js';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
-import type {SpriteKind} from '../defineSprite.js';
+import {checkFeature} from '../checkFeature.js';
+import {checkSpriteKind, type SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
-import {checkPassFeatures, passFeatures, placementOfPass} from '../passes/passFeatures.js';
+import {checkPass, checkPassFeatures, passFeatures, placementOfPass} from '../passes/passFeatures.js';
 import {resolvedUniformName, stageFeaturesOf} from '../passes/passUniformNames.js';
+import {thrownMessage} from '../runCheckKind.js';
 import type {SpriteFeature} from '../SpriteFeature.js';
 import {FeatureSpritesGeometry, type FeatureSpritesGeometryParameters} from './FeatureSpritesGeometry.js';
-import {FeatureSpritesMaterial, type FeatureSpritesMaterialParameters} from './FeatureSpritesMaterial.js';
+import {checkPlacementStandIn, FeatureSpritesMaterial, type FeatureSpritesMaterialParameters} from './FeatureSpritesMaterial.js';
 import {SpriteResources, type SpriteUniformNode} from './SpriteResources.js';
 
 // the mesh draws the sprites themselves; a pass material is built next to it, never as its material
+/**
+ * The options of {@link FeatureSprites}: those of the geometry and of the material side by side,
+ * and `geometry`, `material`, `grow` and `passes`. Every field is optional.
+ */
 export interface FeatureSpritesOptions<Api extends object = object>
   extends FeatureSpritesGeometryParameters,
     Omit<FeatureSpritesMaterialParameters, 'resources' | 'pass'> {
@@ -37,6 +46,13 @@ export interface FeatureSpritesOptions<Api extends object = object>
   passes?: readonly SpritePass[];
 }
 
+// what code of the caller threw, as an Error in the words of `where`; a refusal that names `where`
+// already — uniform() of a pass hook asked for a name no feature declares — goes on as it is
+const callerError = (where: string, error: unknown): unknown =>
+  error instanceof Error && error.message.startsWith(`${where} `)
+    ? error
+    : new Error(`${where} threw: ${thrownMessage(error)}`, {cause: error});
+
 /**
  * The mesh of one pass of a {@link FeatureSprites}: its child, over the geometry of the sprites — it
  * follows a geometry put into their `geometry` slot — with a material of its own built for the pass.
@@ -44,14 +60,22 @@ export interface FeatureSpritesOptions<Api extends object = object>
  * build and release it.
  */
 export class FeatureSpritesPass<Api extends object = object> extends Mesh {
+  /** The material built for {@link pass}; the sprites build and release it. */
   declare material: FeatureSpritesMaterial<Api>;
+
+  /** The pass this mesh draws. */
   readonly pass: SpritePass;
 
   #enabled = true;
   #hookAgrees = true;
   // built once: the hook runs every frame and must not allocate
   readonly #uniform: (name: string) => SpriteUniformNode;
+  readonly #where: string;
 
+  /**
+   * The sprites build one per pass, over their geometry and with the material built for the pass;
+   * it is not built on its own.
+   */
   constructor(geometry: FeatureSpritesGeometry<Api>, material: FeatureSpritesMaterial<Api>, pass: SpritePass) {
     super(geometry, material);
     this.pass = pass;
@@ -59,6 +83,7 @@ export class FeatureSpritesPass<Api extends object = object> extends Mesh {
     this.frustumCulled = false;
     this.renderOrder = pass.renderOrder ?? 0;
     const where = `FeatureSprites: the visible of pass "${pass.name}"`;
+    this.#where = where;
     this.#uniform = (name) => material.resources.uniform(resolvedUniformName(pass, name), where);
   }
 
@@ -77,8 +102,15 @@ export class FeatureSpritesPass<Api extends object = object> extends Mesh {
 
   /** Asks the `visible` hook of the pass for this frame; the sprites call it for passes that have one. @internal */
   judgeVisibility(): void {
-    this.#hookAgrees = this.pass.visible!(this.#uniform);
-    this.visible = this.#enabled && this.#hookAgrees;
+    let agrees: boolean;
+    try {
+      agrees = this.pass.visible!(this.#uniform);
+    } catch (error) {
+      // the pass keeps the visibility of its last judgement
+      throw callerError(this.#where, error);
+    }
+    this.#hookAgrees = agrees;
+    this.visible = this.#enabled && agrees;
   }
 }
 
@@ -103,6 +135,22 @@ const typeOfUniform = (node: SpriteUniformNode): string =>
         ? 'vec2'
         : 'float';
 
+// one binding: the source and the vector of the uniform it writes, of one type, so that update()
+// hands each source its vector without a cast, walking the list by index
+type UniformBinding =
+  | {
+      readonly type: 'vec3';
+      readonly name: string;
+      readonly source: Extract<SpriteUniformSource, {type: 'vec3'}>;
+      readonly vector: Vector3;
+    }
+  | {
+      readonly type: 'vec4';
+      readonly name: string;
+      readonly source: Extract<SpriteUniformSource, {type: 'vec4'}>;
+      readonly vector: Vector4;
+    };
+
 const definedKeys = (record: object): string[] =>
   Object.entries(record)
     .filter(([, value]) => value !== undefined)
@@ -121,12 +169,27 @@ interface ResolvedParts<Api extends object> {
 // leaves nothing behind: every check runs before anything is built, and when the shared resources
 // or the material cannot be built, what was built for them goes first
 function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api>): ResolvedParts<Api> {
+  // the kind is the first argument, so it is checked first
+  checkSpriteKind(kind, WHERE);
+  // the default of the constructor holds for `undefined` alone
+  if (!isObject(options as unknown) || Array.isArray(options)) {
+    throw new TypeError(`${WHERE}: the options must be an object, got ${describeValue(options)}`);
+  }
   const {geometry, material, passes = [], capacity, attributeUsage, baseArgs, grow, ...materialParameters} = options;
+  // an array and not any iterable: `passes.length` and `passes.flatMap()` read it
+  if (!Array.isArray(passes)) {
+    throw new TypeError(`${WHERE}: passes is a list of passes, got ${describeValue(passes)}`);
+  }
 
   if (grow !== undefined && typeof grow !== 'boolean') {
     throw new TypeError(`${WHERE}: grow is true or false, got ${describeValue(grow)}`);
   }
   if (geometry != null) {
+    if (!(geometry instanceof FeatureSpritesGeometry)) {
+      throw new TypeError(
+        `${WHERE}: the geometry handed in is no FeatureSpritesGeometry, got ${describeThreeValue(geometry, 'isBufferGeometry')}`,
+      );
+    }
     if (geometry.kind !== kind) throw new TypeError(`${WHERE}: the geometry handed in was built for another sprite kind`);
     if (grow === true) {
       throw new TypeError(
@@ -138,6 +201,11 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
     }
   }
   if (material != null) {
+    if (!(material instanceof FeatureSpritesMaterial)) {
+      throw new TypeError(
+        `${WHERE}: the material handed in is no FeatureSpritesMaterial, got ${describeThreeValue(material, 'isMaterial')}`,
+      );
+    }
     if (material.kind !== kind) throw new TypeError(`${WHERE}: the material handed in was built for another sprite kind`);
     const given = definedKeys(materialParameters);
     if (given.length > 0) throw new TypeError(`${WHERE}: ${given.join(', ')} build a material, and a material was handed in`);
@@ -147,8 +215,11 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
       );
     }
   }
+  // the placement is checked against every pass before the material sees it, so it is checked for its form first
+  if (materialParameters.placement != null) checkFeature(materialParameters.placement, WHERE);
   const passNames = new Set<string>();
   for (const pass of passes) {
+    checkPass(pass, WHERE);
     if (passNames.has(pass.name)) throw new TypeError(`${WHERE}: two passes are named "${pass.name}"`);
     passNames.add(pass.name);
     passFeatures(kind, pass, WHERE);
@@ -227,6 +298,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    */
   declare material: FeatureSpritesMaterial<Api> | undefined;
 
+  /** The sprite kind the mesh draws, handed to the constructor. */
   readonly kind: SpriteKind<Api>;
 
   // the geometry this mesh built, `undefined` for one handed in: the one dispose() and a growth release,
@@ -242,10 +314,8 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   #resources: SpriteResources | undefined;
   #passes: Record<string, FeatureSpritesPass<Api>> = Object.freeze(passRecord<Api>());
   #judgedPasses: readonly FeatureSpritesPass<Api>[] = [];
-  // the bindings in parallel arrays, so that update() walks them by index without an iterator
-  readonly #boundNames: string[] = [];
-  readonly #boundSources: SpriteUniformSource[] = [];
-  readonly #boundVectors: (Vector3 | Vector4)[] = [];
+  // walked by index, so that update() needs no iterator
+  readonly #bindings: UniformBinding[] = [];
   readonly #worldToSprites = new Matrix4();
   #disposed = false;
   // createSprite() says once that the pool is full, or — under grow — that it grew
@@ -257,10 +327,17 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   /**
    * @param options every field is optional, so another three.js `Material` or a `Texture` would
    *   pass for them; the `isMaterial` and the `isTexture` they carry keep them out.
-   * @throws a `TypeError` for a geometry or material of another kind, for parameters that would
-   *   build a geometry or a material next to one handed in, for passes next to a material handed in
-   *   and for two passes of one name; an `Error` for a pass the kind cannot draw, with the placement
-   *   the sprites start with. A constructor that throws leaves nothing behind it built.
+   * @throws a `TypeError` for a kind that did not come from `defineSprite()`, for a `geometry` or a
+   *   `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, for a geometry or
+   *   material of another kind, for parameters that would build a geometry or a material next to
+   *   one handed in, for passes next to a material handed in and for two passes of one name, for
+   *   options that are no object, for `passes` that are no list and for a `grow` that is neither
+   *   `true` nor `false`; an `Error` for a pass the kind cannot draw, with the placement the
+   *   sprites start with; what `new FeatureSpritesGeometry()` and `new FeatureSpritesMaterial()`
+   *   refuse of the options, in their name; and what `new SpriteResources()` refuses of `textures`
+   *   and `uniforms`, in the name of the class that builds the resources — `FeatureSpritesMaterial`
+   *   without passes, `FeatureSprites` with them. A constructor that throws leaves nothing behind
+   *   it built.
    */
   constructor(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api> & {isMaterial?: never; isTexture?: never} = {}) {
     const {geometry, material, ownsGeometry, grows, resources} = resolveParts(kind, options);
@@ -496,12 +573,22 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   /**
    * Swaps the placement of the material and of every pass material that draws with the placement
    * of the sprites — a pass that brings its own keeps it; see {@link FeatureSpritesMaterial.placement}.
-   * Does nothing once disposed.
+   * Once disposed it turns away what it turns away otherwise — a feature that is malformed, one
+   * that cannot stand in for the placement of the kind — and changes nothing.
    *
-   * @throws an `Error` for a placement a pass cannot draw next to, and what the material throws for a
-   *   placement it refuses; every material keeps its placement then
+   * @throws a `TypeError` for a feature that is malformed — see `defineFeature()` —, a `TypeError`
+   *   naming both features for a placement that cannot stand in, an `Error` for a placement whose
+   *   `checkKind` refuses the kind or that a pass cannot draw next to — the rules of
+   *   {@link FeatureSpritesMaterial.placement} —, and what the material throws for a placement it
+   *   refuses; every material keeps its placement then
    */
   set placement(feature: SpriteFeature) {
+    checkFeature(feature, WHERE);
+    // the rules of a stand-in hang on the kind alone, which dispose() leaves standing, so the setter
+    // turns a placement away after it as well; the material checks once more below, since it is a
+    // public class with a setter of its own
+    const kindPlacement = this.kind.pipeline.placement!;
+    checkPlacementStandIn(this.kind, kindPlacement, this.#material?.placement ?? kindPlacement, feature, WHERE);
     if (this.#material == null) return;
     // every pass checks the placement against its features before any material takes it; then the
     // material checks it, and the pass materials take what the material took
@@ -529,41 +616,45 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * Binds the uniform `name` to `source`: every {@link update} writes it, in the local space of the
    * sprites, for the sprites and every pass. A binding of the same name is replaced and keeps its
    * place; bindings run in the order they were made. A `setUniform()` on a bound name holds until
-   * the next `update()`. The nodes a source reads stay the caller's. Does nothing once disposed.
+   * the next `update()`. The nodes a source reads stay the caller's. Once disposed it turns away
+   * something that is no source and binds nothing.
    *
    * @throws a `TypeError` for a name no feature of the sprites or their passes declares, for a
    *   source of another type than the uniform, and for something that is no source; nothing is
    *   bound then
    */
   bindUniform(name: string, source: SpriteUniformSource): void {
-    const material = this.#material;
-    if (material == null) return;
     if (source == null || typeof source.write !== 'function' || (source.type !== 'vec3' && source.type !== 'vec4')) {
-      throw new TypeError(`${WHERE}: bindUniform("${name}") takes a source with a type of vec3 or vec4 and a write()`);
+      throw new TypeError(
+        `${WHERE}: bindUniform("${name}") takes a source with a type of vec3 or vec4 and a write(), got ${describeValue(source)}`,
+      );
     }
+    const material = this.#material;
+    // name and type of the uniform are not judged once disposed: the uniforms went with the material
+    if (material == null) return;
     // an own entry only: a name such as "constructor" is no uniform
     const node = Object.hasOwn(material.uniforms, name) ? material.uniforms[name] : undefined;
     if (node == null) {
       throw new TypeError(`${WHERE}: no feature of these sprites or their passes declares the uniform "${name}"`);
     }
-    const type = typeOfUniform(node);
-    if (type !== source.type) {
-      throw new TypeError(`${WHERE}: the uniform "${name}" is a ${type}, and the source bound to it writes a ${source.type}`);
-    }
-    const at = this.#boundNames.indexOf(name);
-    const index = at === -1 ? this.#boundNames.length : at;
-    this.#boundNames[index] = name;
-    this.#boundSources[index] = source;
-    this.#boundVectors[index] = node.value as Vector3 | Vector4;
+    const {value} = node;
+    let binding: UniformBinding;
+    if (source.type === 'vec3' && value instanceof Vector3) binding = {type: 'vec3', name, source, vector: value};
+    else if (source.type === 'vec4' && value instanceof Vector4) binding = {type: 'vec4', name, source, vector: value};
+    else
+      throw new TypeError(
+        `${WHERE}: the uniform "${name}" is a ${typeOfUniform(node)}, and the source bound to it writes a ${source.type}`,
+      );
+    const at = this.#bindings.findIndex((bound) => bound.name === name);
+    if (at === -1) this.#bindings.push(binding);
+    else this.#bindings[at] = binding;
   }
 
   /** Ends the binding of `name`; the uniform keeps the value written last. Does nothing without one. */
   unbindUniform(name: string): void {
-    const at = this.#boundNames.indexOf(name);
+    const at = this.#bindings.findIndex((bound) => bound.name === name);
     if (at === -1) return;
-    this.#boundNames.splice(at, 1);
-    this.#boundSources.splice(at, 1);
-    this.#boundVectors.splice(at, 1);
+    this.#bindings.splice(at, 1);
   }
 
   /** The texture `name` — `undefined` while it is unset, and once disposed. */
@@ -593,23 +684,41 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * that has one, then uploads what the pools have marked — see {@link VertexObjects.update}. Call
    * it once per frame, after the changes and before rendering: it refreshes the world matrices it
    * reads, so a node moved after it shows up a frame late. Allocates nothing.
+   *
+   * A source or a hook that throws stops neither the others nor the upload: once the upload is done,
+   * `update()` throws what it threw as an `Error` that names the uniform of the source or the pass of
+   * the hook — `FeatureSprites: the visible of pass "shadow" threw: …` —, and several as an
+   * `AggregateError`. A pass whose hook threw keeps the visibility of its last judgement.
    */
   override update(): void {
-    const sources = this.#boundSources;
-    if (sources.length > 0 && this.#material != null) {
+    let errors: unknown[] | undefined;
+    const bindings = this.#bindings;
+    if (bindings.length > 0 && this.#material != null) {
       // the renderer refreshes the world matrices only inside render(), after this call
       this.updateWorldMatrix(true, false);
       const worldToSprites = this.#worldToSprites.copy(this.matrixWorld).invert();
-      const vectors = this.#boundVectors;
-      for (let i = 0; i < sources.length; i++) {
-        const source = sources[i]!;
-        // the type was checked against the uniform when it was bound
-        source.write(vectors[i] as Vector3 & Vector4, worldToSprites);
+      for (let i = 0; i < bindings.length; i++) {
+        const binding = bindings[i]!;
+        try {
+          if (binding.type === 'vec3') binding.source.write(binding.vector, worldToSprites);
+          else binding.source.write(binding.vector, worldToSprites);
+        } catch (error) {
+          (errors ??= []).push(callerError(`${WHERE}: the source bound to the uniform "${binding.name}"`, error));
+        }
       }
     }
     const judged = this.#judgedPasses;
-    for (let i = 0; i < judged.length; i++) judged[i]!.judgeVisibility();
+    for (let i = 0; i < judged.length; i++) {
+      try {
+        judged[i]!.judgeVisibility();
+      } catch (error) {
+        (errors ??= []).push(error);
+      }
+    }
+    // the upload reads neither the bindings nor the hooks: what threw above keeps no sprite of this
+    // frame from the gpu
     super.update();
+    if (errors !== undefined) throwCollected(errors, `${WHERE}#update(): more than one bound source or visible hook threw`);
   }
 
   /**
@@ -620,9 +729,10 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    * renderer drops what it built for it; every pass mesh leaves this mesh and fires the event as
    * well. Afterwards `geometry`, `material`, `spritePool`, `placement` and `uniforms` answer
    * `undefined`, and so do `createSprite()` and `getTexture()`; `passes` is empty; `freeSprite()`,
-   * `setUniform()`, `bindUniform()`, `unbindUniform()`, `setTexture()`, `touchTexture()`, `update()`
-   * and the `placement` setter do nothing, `sortBy()` and `sortByViewDepth()` answer `false`. A
-   * second call does nothing.
+   * `setUniform()`, `unbindUniform()`, `setTexture()`, `touchTexture()` and `update()` do nothing,
+   * `sortBy()` and `sortByViewDepth()` answer `false`. `bindUniform()` binds nothing and still turns
+   * away something that is no source, and the `placement` setter changes nothing and still turns
+   * away a feature that is malformed or cannot stand in. A second call does nothing.
    */
   override dispose(): void {
     if (this.#disposed) return;
@@ -644,9 +754,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     }
     this.#passes = Object.freeze(passRecord<Api>());
     this.#judgedPasses = [];
-    this.#boundNames.length = 0;
-    this.#boundSources.length = 0;
-    this.#boundVectors.length = 0;
+    this.#bindings.length = 0;
 
     // what was built here goes, whatever stands in its slot; what stands in a slot without being built
     // here is let go of, not disposed

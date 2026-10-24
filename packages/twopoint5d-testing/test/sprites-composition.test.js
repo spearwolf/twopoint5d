@@ -19,6 +19,8 @@ import {
   compareWithModel,
   diffPixels,
   disposeDisplay,
+  disposeKept,
+  keep,
   makeColorTexture,
   makeContainer,
   readsTopDown,
@@ -99,9 +101,6 @@ function colorAt(frameColor, x, y) {
 }
 
 describe('sprites — a sprite composed of size, shear and rotation on a trimmed frame', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -117,6 +116,7 @@ describe('sprites — a sprite composed of size, shear and rotation on a trimmed
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -135,8 +135,9 @@ describe('sprites — a sprite composed of size, shear and rotation on a trimmed
   /** Renders one sprite of 5 × 4 units, sheared and turned, showing `frameName`, once per placement. */
   async function render(frameName) {
     const {texture, json} = makeTrimmedSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
-    const sprites = new FeatureSprites(ShearedSprite, {capacity: 1, textures: {colorMap: texture}});
+    const sprites = keep(new FeatureSprites(ShearedSprite, {capacity: 1, textures: {colorMap: texture}}));
     const sprite = sprites.createSprite();
     sprite.setSize(WIDTH, HEIGHT);
     sprite.setShear(SHEAR_X, 0);
@@ -152,9 +153,6 @@ describe('sprites — a sprite composed of size, shear and rotation on a trimmed
     sprites.placement = BillboardPlacement;
     const billboard = await renderToPixels(display.renderer, scene, makeCamera(), target);
 
-    // the mesh releases the material it built around the texture; the texture stays the caller's
-    sprites.dispose();
-    texture.dispose();
     return {flat, billboard};
   }
 

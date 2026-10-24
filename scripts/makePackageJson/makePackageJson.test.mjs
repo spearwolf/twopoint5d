@@ -51,6 +51,13 @@ describe('makePackageJson.mjs', () => {
     assert.match(stderr, /peerDependencies\.three is "catalog:nope"/);
   });
 
+  it('refuses a * nothing resolves: exit code 1, no manifest written', () => {
+    const {status, stderr, manifestPath} = run({'@scope/probe-missing': '*'});
+    assert.equal(status, 1, stderr);
+    assert.equal(fs.existsSync(manifestPath), false);
+    assert.match(stderr, /peerDependencies\.@scope\/probe-missing is "\*", which lets in any version/);
+  });
+
   it('writes the manifest when every specifier is a version range', () => {
     const {status, stderr, manifestPath} = run({three: '^0.185.0'});
     assert.equal(status, 0, stderr);

@@ -1,12 +1,12 @@
 import assert from 'node:assert';
-import {beforeEach, describe, it} from 'vitest';
+import {beforeEach, describe, expect, it} from 'vitest';
 
 import {AABB2} from '../AABB2.js';
 import {ChunkQuadTreeNode} from './ChunkQuadTreeNode.js';
 import type {IDataChunk2D} from './IDataChunk2D.js';
 import {StringDataChunk2D} from './StringDataChunk2D.js';
 
-const chunksAsStrings = (chunks: IDataChunk2D[]) => chunks.map((chunk) => chunk.toString()).sort();
+const chunksAsStrings = (chunks: readonly IDataChunk2D[]) => chunks.map((chunk) => chunk.toString()).sort();
 
 describe('ChunkQuadTreeNode', () => {
   describe('create without children', () => {
@@ -15,6 +15,42 @@ describe('ChunkQuadTreeNode', () => {
     it('is instance of ChunkQuadTreeNode', () => assert(node instanceof ChunkQuadTreeNode));
     it('is a leaf', () => assert.equal(node.isLeaf, true));
     it('has no chunk nodes', () => assert.equal(node.chunks.length, 0));
+  });
+
+  describe('the tuning factors and the state', () => {
+    it('cannot be written (a type-level check)', () => {
+      // the @ts-expect-error lines carry the claim: `pnpm typecheck` fails as soon as one of them
+      // can be written; Vitest checks nothing here. The function is never called.
+      const write = (node: ChunkQuadTreeNode<StringDataChunk2D>) => {
+        // @ts-expect-error isLeaf is read-only
+        node.isLeaf = false;
+        // @ts-expect-error chunks is read-only
+        node.chunks = [];
+        // @ts-expect-error originX is read-only
+        node.originX = 1;
+        // @ts-expect-error the children are set by the node alone
+        node.nodes.northEast = null;
+        // @ts-expect-error the factor is the same for every tree
+        ChunkQuadTreeNode.IntersectDistanceFactor = 1;
+      };
+      void write;
+    });
+
+    it('throws for a write to isLeaf, chunks or originX', () => {
+      const node = new ChunkQuadTreeNode();
+
+      expect(() => {
+        (node as unknown as {isLeaf: boolean}).isLeaf = false;
+      }, 'isLeaf').toThrow(TypeError);
+      expect(() => {
+        (node as unknown as {chunks: unknown[]}).chunks = [];
+      }, 'chunks').toThrow(TypeError);
+      expect(() => {
+        (node as unknown as {originX: number}).originX = 1;
+      }, 'originX').toThrow(TypeError);
+      expect(node.isLeaf).toBe(true);
+      expect(node.originX).toBeNull();
+    });
   });
 
   describe('create with irregular chunks', () => {

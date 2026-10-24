@@ -1,4 +1,6 @@
 import {Group} from 'three/webgpu';
+import {assertFinite} from '../utils/assertFinite.js';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
 import type {IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 
@@ -105,41 +107,59 @@ export class Map2D extends Group {
    * - `RectangularVisibilityArea`: the map point the visible rectangle is laid out around — its
    *   center. The rectangle appears at the origin of the map node, so `(centerX, centerY)` is the
    *   map point shown there.
+   *
+   * Takes a finite number; anything else throws a `RangeError` and leaves the view center as it
+   * was.
    */
   get centerX(): number {
     return this.#tileStreamer.centerX;
   }
 
+  // The six setters of the grid and the view center check here as well as in the streamer, so the
+  // message names the class the caller holds in its hands.
   set centerX(x: number) {
+    assertFinite(x, 'Map2D', 'centerX');
     this.#tileStreamer.centerX = x;
   }
 
   /**
    * The view center on the map plane, along the same axis as the rows of the tile grid. See
    * {@link centerX} for what the value means under each visibilitor — it always describes one
-   * point `(centerX, centerY)` together with it.
+   * point `(centerX, centerY)` together with it. Takes a finite number; anything else throws a
+   * `RangeError` and leaves the view center as it was.
    */
   get centerY(): number {
     return this.#tileStreamer.centerY;
   }
 
   set centerY(y: number) {
+    assertFinite(y, 'Map2D', 'centerY');
     this.#tileStreamer.centerY = y;
   }
 
+  /**
+   * The width of a cell of the grid, in the units of the map: a finite number above 0, or a
+   * `RangeError` is thrown and the grid stays as it was. Another value has the tiles built again.
+   */
   get tileWidth(): number {
     return this.#tileStreamer.tileWidth;
   }
 
   set tileWidth(width: number) {
+    assertPositiveFinite(width, 'Map2D', 'tileWidth');
     this.#tileStreamer.tileWidth = width;
   }
 
+  /**
+   * The height of a cell of the grid, in the units of the map: a finite number above 0, or a
+   * `RangeError` is thrown and the grid stays as it was. Another value has the tiles built again.
+   */
   get tileHeight(): number {
     return this.#tileStreamer.tileHeight;
   }
 
   set tileHeight(height: number) {
+    assertPositiveFinite(height, 'Map2D', 'tileHeight');
     this.#tileStreamer.tileHeight = height;
   }
 
@@ -149,13 +169,15 @@ export class Map2D extends Group {
    * `[c · tileWidth + xOffset, (c + 1) · tileWidth + xOffset)` on X. The tile quad starts at that
    * corner — it is **not** centered on its coordinates — so a tile at `(0, 0)` spans
    * `[xOffset, xOffset + tileWidth)`, and the `xOffset` that centers the grid on the map-plane
-   * origin is `-tileWidth / 2`. Defaults to `0`, and changing it has the tiles built again.
+   * origin is `-tileWidth / 2`. Defaults to `0`, and changing it has the tiles built again. A
+   * finite number; writing anything else throws a `RangeError` and leaves the offset as it was.
    */
   get xOffset(): number {
     return this.#tileStreamer.xOffset;
   }
 
   set xOffset(offset: number) {
+    assertFinite(offset, 'Map2D', 'xOffset');
     this.#tileStreamer.xOffset = offset;
   }
 
@@ -163,13 +185,15 @@ export class Map2D extends Group {
    * Where the tile grid starts on the axis of the rows in map-plane coordinates, before the
    * visibilitor's translation and the map node's world transform. A tile `(c, r)` covers
    * `[r · tileHeight + yOffset, (r + 1) · tileHeight + yOffset)` there — corner-anchored like
-   * {@link xOffset}, not centered. Defaults to `0`, and changing it has the tiles built again.
+   * {@link xOffset}, not centered. Defaults to `0`, and changing it has the tiles built again. A
+   * finite number; writing anything else throws a `RangeError` and leaves the offset as it was.
    */
   get yOffset(): number {
     return this.#tileStreamer.yOffset;
   }
 
   set yOffset(offset: number) {
+    assertFinite(offset, 'Map2D', 'yOffset');
     this.#tileStreamer.yOffset = offset;
   }
 

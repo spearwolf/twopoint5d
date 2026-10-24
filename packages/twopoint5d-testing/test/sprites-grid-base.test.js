@@ -18,6 +18,8 @@ import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   diffPixels,
   disposeDisplay,
+  disposeKept,
+  keep,
   makeCameraAboveGround,
   makeColorTexture,
   makeContainer,
@@ -79,9 +81,6 @@ const KINDS = {
 };
 
 describe('sprites — gridBase() draws what QuadBase draws', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -97,6 +96,7 @@ describe('sprites — gridBase() draws what QuadBase draws', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -121,8 +121,9 @@ describe('sprites — gridBase() draws what QuadBase draws', function () {
    */
   async function renderFrames(kind) {
     const {texture, json} = makeSheet();
+    keep(texture);
     const [atlas] = TexturePackerJson.parse(json);
-    const sprites = new FeatureSprites(kind, {capacity: 3, textures: {colorMap: texture}});
+    const sprites = keep(new FeatureSprites(kind, {capacity: 3, textures: {colorMap: texture}}));
     const place = (name, x, width, height) => {
       const sprite = sprites.createSprite();
       sprite.setSize(width, height);
@@ -136,10 +137,7 @@ describe('sprites — gridBase() draws what QuadBase draws', function () {
     scene.add(sprites);
     sprites.update();
 
-    const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
-    sprites.dispose();
-    texture.dispose();
-    return pixels;
+    return renderToPixels(display.renderer, scene, makeCamera(), target);
   }
 
   it('an upright, a turned and a trimmed atlas frame on a 1 × 1 and a 4 × 2 grid, pixel for pixel', async function () {
@@ -155,9 +153,9 @@ describe('sprites — gridBase() draws what QuadBase draws', function () {
 
   it('the shadow of ShadowPass under a sprite on a grid is the shadow under the quad, but for its edges', async function () {
     const render = async (base) => {
-      const colorMap = makeColorTexture([W], 1, 1);
+      const colorMap = keep(makeColorTexture([W], 1, 1));
       const kind = defineSprite({base, features: [InstancePosition, GroundPlacement, QuadSize, TextureColor]});
-      const sprites = new FeatureSprites(kind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]});
+      const sprites = keep(new FeatureSprites(kind, {capacity: 1, textures: {colorMap}, passes: [ShadowPass]}));
       sprites.setUniform('shadowColor', 0, 0, 1, 1);
       const sprite = sprites.createSprite();
       sprite.setSize(1.5, 1);
@@ -165,10 +163,7 @@ describe('sprites — gridBase() draws what QuadBase draws', function () {
       const scene = new Scene();
       scene.add(sprites);
       sprites.update();
-      const pixels = await renderToPixels(display.renderer, scene, makeCameraAboveGround(TARGET_SIZE, 16), target);
-      sprites.dispose();
-      colorMap.dispose();
-      return pixels;
+      return renderToPixels(display.renderer, scene, makeCameraAboveGround(TARGET_SIZE, 16), target);
     };
 
     const quad = await render(QuadBase);

@@ -4,6 +4,13 @@ import type {Node, Texture} from 'three/webgpu';
 import {cameraPositionLocal, cameraUpLocal} from './cameraNodes.js';
 import {frameUv} from './frameUv.js';
 
+/**
+ * Builds the position of a vertex at its instance position: the vertex position — the attribute
+ * `position` by default —, multiplied axis by axis by `scale` where one is given, plus the instance
+ * position — the attribute `instancePosition` by default. The result lies in the local space of the
+ * mesh, which is what a `positionNode` expects; the quad does not turn to the camera, which
+ * {@link billboardVertexByInstancePosition} does.
+ */
 export const vertexByInstancePosition = (params?: {
   vertexPosition?: Node<'vec3'>;
   instancePosition?: Node<'vec3'>;
@@ -71,17 +78,16 @@ export const colorFromTextureByTexCoords = (
   return texture(colorMap, frameUv(texCoords, uv, params?.flipDiagonal));
 };
 
-// The column is worked out in int, from the row: a float modulo divides by the width in f32, and
-// neither WGSL nor GLSL ES rounds that division exactly — at a width that is no power of 2 the
-// quotient tips over to the next whole number, and the column reads the texel of its neighbour.
+/**
+ * The uv of the center of texel `ndx` of a texture of `mapSize` texels, the texels counted row by row
+ * from texel 0 at the start of the first row.
+ */
 export const texCoordsFromIndex = (mapSize: Node<'vec2'>, ndx: Node<'int'>) => {
-  // vec2 texCoordsFromIndex(in vec2 mapSize, in int ndx) {
-  //   int width = int(mapSize[0]);
-  //   int row = ndx / width;
-  //   int column = ndx - row * width;
+  // The column is worked out in int, from the row: a float modulo divides by the width in f32, and
+  // neither WGSL nor GLSL ES rounds that division exactly — at a width that is no power of 2 the
+  // quotient tips over to the next whole number, and the column reads the texel of its neighbour.
   const width = mapSize.x.toInt();
   const row = div(ndx, width).toInt();
   const column = sub(ndx, mul(row, width)).toInt();
-  //   return (vec2(column, row) + 0.5) / vec2(mapSize[0], mapSize[1]);
   return div(add(vec2(column, row), float(0.5)), vec2(mapSize.x, mapSize.y));
 };

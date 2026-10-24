@@ -1,10 +1,10 @@
 import {uniformArray} from 'three/tsl';
 import {type Node, type UniformArrayNode, Vector4} from 'three/webgpu';
 
-import {type FrameTrimMargins, frameTrimMargins} from './frameTrimMargins.js';
+import {writeTableEntryTexels} from './frameTexels.js';
 import {selectAtlasFrames} from './selectAtlasFrames.js';
 import type {TextureAtlas, TextureAtlasFrame, TextureAtlasFrameName} from './TextureAtlas.js';
-import {TextureCoords} from './TextureCoords.js';
+import type {TextureCoords} from './TextureCoords.js';
 
 /** A frame of an {@link AtlasFrameTable}: a frame of an atlas, or bare `TextureCoords`, which are untrimmed. */
 export type AtlasFrameTableEntry = TextureAtlasFrame<unknown> | TextureCoords;
@@ -16,9 +16,9 @@ export type AtlasFrameTableEntry = TextureAtlasFrame<unknown> | TextureCoords;
  */
 export type AtlasFrameTableSelection = readonly TextureAtlasFrameName[] | RegExp;
 
-// update() reads the tex coords and the trim margins through these, so a call allocates nothing
-const texCoordsScratch: [s: number, t: number, u: number, v: number] = [0, 0, 0, 0];
-const trimScratch: FrameTrimMargins = [0, 0, 0, 0];
+// update() writes the texels of a frame through this, so a call allocates nothing; Float64, so that
+// the values reach the vectors as exactly as the frame works them out
+const frameScratch = new Float64Array(12);
 
 /**
  * The frames of an atlas as a uniform array, for a `NodeMaterial` that samples them by index — with
@@ -103,13 +103,10 @@ export class AtlasFrameTable {
     const entries = this.#entries;
     const values = this.#values;
     for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i]!;
-      const coords = entry instanceof TextureCoords ? entry : entry.coords;
-      coords.getTexCoords(texCoordsScratch);
-      values[i * 3]!.fromArray(texCoordsScratch);
-      values[i * 3 + 1]!.set(coords.width, coords.height, coords.flipD ? 1 : 0, 0);
-      frameTrimMargins(entry instanceof TextureCoords ? undefined : entry.data, trimScratch);
-      values[i * 3 + 2]!.fromArray(trimScratch);
+      writeTableEntryTexels(frameScratch, 0, entries[i]!);
+      values[i * 3]!.fromArray(frameScratch, 0);
+      values[i * 3 + 1]!.fromArray(frameScratch, 4);
+      values[i * 3 + 2]!.fromArray(frameScratch, 8);
     }
   }
 

@@ -202,9 +202,34 @@ describe('Map2D', () => {
       const map = new Map2D();
       const write = () => (map.tileWidth = 0);
 
-      expect(write).toThrow(RangeError);
-      // the tile grid is the one of map.tileStreamer, whose setter refuses the value and names itself
-      expect(write).toThrow('Map2DTileStreamer: tileWidth must be a finite number above 0, got 0');
+      expect(write).toThrow(new RangeError('Map2D: tileWidth must be a finite number above 0, got 0'));
+    });
+
+    test.each([
+      ['tileWidth', 0, 'a finite number above 0'],
+      ['tileHeight', -1, 'a finite number above 0'],
+      ['xOffset', NaN, 'a finite number'],
+      ['yOffset', Infinity, 'a finite number'],
+      ['centerX', NaN, 'a finite number'],
+      ['centerY', -Infinity, 'a finite number'],
+    ] as const)('the %s setter refuses %p in its own name and leaves the streamer as it was', (name, value, rule) => {
+      const streamer = new Map2DTileStreamer(10, 20, 3, 4);
+      streamer.centerX = 5;
+      streamer.centerY = 6;
+      const map = new Map2D(streamer);
+      const before = streamer[name];
+      const write = () => {
+        map[name] = value;
+      };
+
+      expect(write).toThrow(new RangeError(`Map2D: ${name} must be ${rule}, got ${value}`));
+      expect(streamer[name], `${name} of the streamer`).toBe(before);
+    });
+
+    test('names the view center it refuses', () => {
+      const map = new Map2D();
+
+      expect(() => (map.centerY = NaN)).toThrow('Map2D: centerY must be a finite number, got NaN');
     });
   });
 

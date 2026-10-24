@@ -7,11 +7,11 @@ import os from 'node:os';
 import path from 'node:path';
 import {chromium} from 'playwright';
 import {
-  CHROMIUM_GPU_ARGS,
   EVENT_GENERATE_PREVIEW,
   PREVIEW_HEIGHT,
   PREVIEW_QUALITY,
   PREVIEW_WIDTH,
+  chromiumGpuArgs,
   parsePreviewArgs,
   recordPreviewEvent,
   refuseScreenshot,
@@ -142,7 +142,7 @@ async function main() {
     server = options.url ? undefined : await startPreviewServer();
     const baseUrl = options.url ?? /** @type {{baseUrl: string}} */ (server).baseUrl;
 
-    browser = await chromium.launch({headless: !options.headed, args: CHROMIUM_GPU_ARGS});
+    browser = await chromium.launch({headless: !options.headed, args: chromiumGpuArgs()});
     const context = await browser.newContext({
       viewport: {width: PREVIEW_WIDTH, height: PREVIEW_HEIGHT},
       deviceScaleFactor: 1,

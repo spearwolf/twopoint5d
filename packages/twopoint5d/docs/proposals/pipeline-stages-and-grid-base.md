@@ -176,7 +176,9 @@ export function gridBase(options: GridBaseOptions): GridBase;
 - **One frozen base per option set**, memoized by `columns × rows` as `flatPlacement()` memoizes
   its features: `gridBase({columns: 3, rows: 3}) === gridBase({columns: 3, rows: 3})`, so a
   feature recognizes its base by identity (§6) and every geometry of the kind shares one
-  descriptor. Name: `grid 3x3`.
+  descriptor; every grid built stays for the life of the page, so `gridBase()` is meant for a few
+  fixed grids, not for sizes derived from data. Frozen all the way down, its description and the
+  prototype of its base vertex included. Name: `grid 3x3`.
 - **Layout** — as `QuadBase` lays out four, on more vertices: `(columns + 1) × (rows + 1)`
   vertices, row by row from the top, left to right; vertex `k = j · (columns + 1) + i` for the
   column line `i ∈ 0 … columns` and the row line `j ∈ 0 … rows`:
@@ -195,14 +197,14 @@ export function gridBase(options: GridBaseOptions): GridBase;
 - **The grid line of a vertex** is exact in its uv: `round(uv.x · columns)` is `i`, `round(uv.y ·
   rows)` is `j` — `i / columns` is stored as the `float32` nearest to it, and the rounding takes
   it back for every `columns ≤ 1024`. A stage reads the base uv through `ctx.attribute('uv')`.
-- **Refusals** (`TypeError`, before anything is built): options that are no object
-  (`gridBase: takes {columns, rows} — gridBase({columns: 3, rows: 3})`); a `columns` or `rows`
-  that is no whole number from 1 to 1024 (`gridBase: columns is 2.5 — columns and rows are whole
-  numbers from 1 to 1024`); a grid of more than 4096 cells (`gridBase: a grid of 1000 × 1000 is
-  1000000 cells — a grid holds at most 4096`). Neither is a limit of the GPU: 1024 per axis keeps
-  the grid line of every vertex exact in its uv, and 4096 cells keep a typo (`columns: 1000, rows:
-  1000`) from building a base of a million vertices for every sprite, whose indices the cache of
-  bases would hold for the life of the page.
+- **Refusals** (`TypeError`, before anything is built): options that are no object (`gridBase: takes
+  {columns, rows}, got undefined — gridBase({columns: 3, rows: 3})`); a `columns` or `rows` that is
+  no whole number from 1 to 1024 (`gridBase: columns is 2.5 — columns and rows are whole numbers
+  from 1 to 1024`); a grid of more than 4096 cells (`gridBase: a grid of 1000 × 1000 is 1000000
+  cells — a grid holds at most 4096`). Neither is a limit of the GPU: 1024 per axis keeps the grid
+  line of every vertex exact in its uv, and 4096 cells keep a typo (`columns: 1000, rows: 1000`)
+  from building a base of a million vertices for every sprite, whose indices the cache of bases
+  would hold for the life of the page.
 - `QuadBase` is unchanged. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws, with
   another vertex order.
 
@@ -267,7 +269,7 @@ The messages keep their head and add the reason and the fix (`where` is `defineS
 
 A declaration that is neither a uniform value nor `{value, shared?}` with a valid value, a
 boolean or absent `shared` and no other key is refused: `feature "x" starts the uniform "time"
-with {value: 0, share: true}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`.
+with {value: 0, share: true}; a uniform takes a finite number, 2 to 4 finite numbers, or {value, shared}`.
 
 ### 5.3 Where the merge reaches
 
@@ -312,7 +314,7 @@ readonly checkKind?: (kind: SpriteKindShape) => void;
 - A placement may carry `checkKind` and still stand in for another on a live material: the swap
   calls it with the features of the kind, the new placement in place of the kind's.
 - `defineFeature()` refuses a `checkKind` that is no function (`defineFeature: the checkKind of
-  feature "x" is no function`).
+  feature "x" is no function, got "grid"`).
 - Phase D uses it twice (§7): `NineSlice` refuses a base other than `gridBase({columns: 3, rows:
   3})`, and `segmentPlacement()` refuses `Rotation` and `Shear` next to it.
 

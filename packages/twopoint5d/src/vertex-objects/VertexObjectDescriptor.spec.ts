@@ -351,24 +351,27 @@ describe('VertexObjectDescriptor', () => {
     });
 
     test('an attribute of more than four values', () => {
-      expect(build({attributes: {a: {size: 5}}})).toThrow(RangeError);
       expect(build({attributes: {a: {components: ['a', 'b', 'c', 'd', 'e']}}})).toThrow(RangeError);
       expect(build({attributes: {a: {size: 5}}})).toThrow(
-        'VertexObjectDescriptor: attribute "a" in buffer "static_float32" has a size of 5, and a WebGPU vertex format holds at most 4 values',
+        new RangeError(
+          'VertexObjectDescriptor: attribute "a" in buffer "static_float32" has a size of 5, and a WebGPU vertex format holds at most 4 values',
+        ),
       );
     });
 
     test('an attribute of type float64', () => {
-      expect(build({attributes: {a: {size: 2, type: 'float64'}}})).toThrow(TypeError);
       expect(build({attributes: {a: {size: 2, type: 'float64'}}})).toThrow(
-        'VertexObjectDescriptor: attribute "a" in buffer "static_float64" is of type float64, for which WebGPU has no vertex format',
+        new TypeError(
+          'VertexObjectDescriptor: attribute "a" in buffer "static_float64" is of type float64, for which WebGPU has no vertex format',
+        ),
       );
     });
 
     test('an attribute of type uint8clamped', () => {
-      expect(build({attributes: {a: {size: 4, type: 'uint8clamped'}}})).toThrow(TypeError);
       expect(build({attributes: {a: {size: 4, type: 'uint8clamped'}}})).toThrow(
-        /attribute "a" in buffer "static_uint8clamped" is of type uint8clamped/,
+        new TypeError(
+          'VertexObjectDescriptor: attribute "a" in buffer "static_uint8clamped" is of type uint8clamped, for which WebGPU has no vertex format',
+        ),
       );
     });
 
@@ -404,9 +407,10 @@ describe('VertexObjectDescriptor', () => {
     });
 
     test('a float16 attribute of one value', () => {
-      expect(build({attributes: {a: {size: 1, type: 'float16'}}})).toThrow(TypeError);
       expect(build({attributes: {a: {size: 1, type: 'float16'}}})).toThrow(
-        /attribute "a" in buffer "static_float16" is of type float16 with a size of 1/,
+        new TypeError(
+          'VertexObjectDescriptor: attribute "a" in buffer "static_float16" is of type float16 with a size of 1; three builds no float16 vertex format of one value, so it needs a size of 2 to 4',
+        ),
       );
     });
 
@@ -414,17 +418,21 @@ describe('VertexObjectDescriptor', () => {
       const run = build({
         attributes: {a: {size: 2, type: 'float32', bufferName: 'shared'}, b: {size: 4, type: 'uint8', bufferName: 'shared'}},
       });
-      expect(run).toThrow(TypeError);
-      expect(run).toThrow(/buffer "shared" holds attribute "a" \(float32, static\) and attribute "b" \(uint8, static\)/);
+      expect(run).toThrow(
+        new TypeError(
+          'VertexObjectDescriptor: buffer "shared" holds attribute "a" (float32, static) and attribute "b" (uint8, static); every attribute of a buffer has to agree on type, normalized and usage',
+        ),
+      );
     });
 
     test('an integer of one value laid out as 32 bits and one of its declared type in one buffer', () => {
       const run = build({
         attributes: {a: {size: 1, type: 'int16', bufferName: 'shared'}, b: {size: 2, type: 'int16', bufferName: 'shared'}},
       });
-      expect(run).toThrow(TypeError);
       expect(run).toThrow(
-        /buffer "shared" holds attribute "a" \(int16 laid out as int32, static\) and attribute "b" \(int16, static\)/,
+        new TypeError(
+          'VertexObjectDescriptor: buffer "shared" holds attribute "a" (int16 laid out as int32, static) and attribute "b" (int16, static); every attribute of a buffer has to agree on type, normalized and usage',
+        ),
       );
     });
 
@@ -446,8 +454,11 @@ describe('VertexObjectDescriptor', () => {
           b: {size: 4, type: 'uint8', bufferName: 'shared'},
         },
       });
-      expect(run).toThrow(TypeError);
-      expect(run).toThrow(/\(uint8 normalized, static\) and attribute "b" \(uint8, static\)/);
+      expect(run).toThrow(
+        new TypeError(
+          'VertexObjectDescriptor: buffer "shared" holds attribute "a" (uint8 normalized, static) and attribute "b" (uint8, static); every attribute of a buffer has to agree on type, normalized and usage',
+        ),
+      );
     });
 
     test('but takes an accessor named like a property of Object.prototype', () => {

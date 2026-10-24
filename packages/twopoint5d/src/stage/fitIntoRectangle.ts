@@ -38,6 +38,11 @@ export type AnchorPosition =
   | 'bottom center'
   | 'bottom right';
 
+/**
+ * How a view fits into a container. `anchorPosition` is read by `calculateAnchorOffset()` alone:
+ * `fitIntoRectangle()` works out the size of the view and leaves its place to the caller. The
+ * projections take {@link ProjectionFitSpecs}, which has no `anchorPosition`.
+ */
 export type FitIntoRectangleSpecs =
   | {
       fit?: 'fill';
@@ -92,6 +97,17 @@ export type FitIntoRectangleSpecs =
       maxPixelZoom?: number;
       anchorPosition?: AnchorPosition;
     };
+
+/**
+ * The arms of {@link FitIntoRectangleSpecs} without `anchorPosition`: how `OrthographicProjection`
+ * and `ParallaxProjection` fit their view into the container. A projection centers its view on the
+ * projection plane and places no anchor.
+ */
+export type ProjectionFitSpecs = FitIntoRectangleSpecs extends infer Specs
+  ? Specs extends unknown
+    ? Omit<Specs, 'anchorPosition'>
+    : never
+  : never;
 
 /**
  * Parses an anchor position string into separate X and Y components.

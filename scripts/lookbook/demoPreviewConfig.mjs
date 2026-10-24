@@ -14,14 +14,20 @@ export const PREVIEW_QUALITY = 85;
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
-// without these, the headless shell of Playwright's Chromium finds no WebGPU adapter on Linux
-// and three.js falls back to WebGL 2 on SwiftShader; with them it gets the hardware adapter
-export const CHROMIUM_GPU_ARGS = [
-  '--enable-unsafe-webgpu',
-  '--ignore-gpu-blocklist',
-  '--enable-features=Vulkan',
-  '--use-angle=vulkan',
-];
+/**
+ * The launch arguments that give Playwright's Chromium a WebGPU adapter. On Linux the headless
+ * shell finds one only through Vulkan, and falls back to WebGL 2 on SwiftShader without it.
+ * macOS and Windows have no Vulkan backend: Chromium picks Metal or D3D there by itself, and a
+ * forced Vulkan ends in software rendering, with another look.
+ *
+ * @param {string} [platform] a value of `process.platform`
+ * @returns {string[]}
+ */
+export function chromiumGpuArgs(platform = process.platform) {
+  const args = ['--enable-unsafe-webgpu', '--ignore-gpu-blocklist'];
+  if (platform === 'linux') args.push('--enable-features=Vulkan', '--use-angle=vulkan');
+  return args;
+}
 
 /** @typedef {{id: string, ok: boolean, trigger?: string, seconds: number, kilobytes?: number, problems: string[]}} DemoResult */
 

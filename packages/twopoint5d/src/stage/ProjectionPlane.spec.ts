@@ -1,6 +1,7 @@
 import {PerspectiveCamera, Plane as THREE_Plane, Vector3} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
+import {OrthographicProjection} from './OrthographicProjection.js';
 import {ProjectionPlane} from './ProjectionPlane.js';
 
 describe('ProjectionPlane', () => {
@@ -10,6 +11,31 @@ describe('ProjectionPlane', () => {
 
   it('has predefined "xz" plane', () => {
     expect(ProjectionPlane.get('xz|top-left')).toBeInstanceOf(ProjectionPlane);
+  });
+
+  describe('constructor', () => {
+    const message =
+      'ProjectionPlane: unknown plane description "xy|bottom_left", expected "xy|bottom-left", "xy|top-left", "xz|bottom-left", "xz|top-left" or a THREE.Plane';
+
+    it('refuses a description it does not know with a TypeError that quotes it', () => {
+      expect(() => new ProjectionPlane('xy|bottom_left' as any)).toThrow(new TypeError(message));
+    });
+
+    it('refuses an object that is no THREE.Plane', () => {
+      expect(() => new ProjectionPlane({} as any)).toThrow(TypeError);
+      expect(() => new ProjectionPlane(new ProjectionPlane('xy|bottom-left') as any)).toThrow(TypeError);
+    });
+
+    it('refuses the description of a projection the same way', () => {
+      expect(() => new OrthographicProjection('xy|bottom_left' as any)).toThrow(new TypeError(message));
+    });
+
+    it('takes a THREE.Plane with an up vector', () => {
+      const plane = new ProjectionPlane(new THREE_Plane(new Vector3(1, 0, 0), -2), new Vector3(0, 1, 0));
+      expect(plane.plane.normal.toArray()).toEqual([1, 0, 0]);
+      expect(plane.plane.constant).toBe(-2);
+      expect(plane.up.toArray()).toEqual([0, 1, 0]);
+    });
   });
 
   describe('getPointByDistance()', () => {

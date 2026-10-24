@@ -18,7 +18,9 @@ import {Euler, Group, OrthographicCamera, Quaternion, RenderTarget, Scene, Vecto
 import {
   diffPixels,
   disposeDisplay,
+  disposeKept,
   isNearColor,
+  keep,
   makeColorTexture,
   makeContainer,
   readsTopDown,
@@ -84,9 +86,6 @@ function cameraAt(position, up = [0, 1, 0]) {
 }
 
 describe('sprites — the plane of a flat sprite, its yaw and its quaternion', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -105,6 +104,7 @@ describe('sprites — the plane of a flat sprite, its yaw and its quaternion', f
   });
 
   afterEach(() => {
+    disposeKept();
     colorMap?.dispose();
     colorMap = undefined;
     target?.dispose();
@@ -127,7 +127,7 @@ describe('sprites — the plane of a flat sprite, its yaw and its quaternion', f
    * @param {{parent?: Group}} [options]
    */
   async function render(kind, camera, setup, {parent} = {}) {
-    const sprites = new FeatureSprites(kind, {capacity: 1, textures: {colorMap}});
+    const sprites = keep(new FeatureSprites(kind, {capacity: 1, textures: {colorMap}}));
     sprites.frustumCulled = false;
     const sprite = sprites.createSprite();
     sprite.setSize(4, 4);
@@ -140,9 +140,7 @@ describe('sprites — the plane of a flat sprite, its yaw and its quaternion', f
       scene.add(sprites);
     }
     sprites.update();
-    const pixels = await renderToPixels(display.renderer, scene, camera, target);
-    sprites.dispose();
-    return pixels;
+    return renderToPixels(display.renderer, scene, camera, target);
   }
 
   /** The colors at the middle of the four quarters of the picture, top left, top right, bottom left, bottom right. */

@@ -17,7 +17,9 @@ import {
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   disposeDisplay,
+  disposeKept,
   isNearColor,
+  keep,
   makeColorTexture,
   makeContainer,
   readsTopDown,
@@ -43,9 +45,6 @@ const AnimatedScrollerKind = defineSprite({
 });
 
 describe('sprites — wave() sways and scrolls', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -61,6 +60,7 @@ describe('sprites — wave() sways and scrolls', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -111,15 +111,13 @@ describe('sprites — wave() sways and scrolls', function () {
     const PPU = 4;
 
     async function renderSway(base) {
-      const colorMap = makeColorTexture([WHITE], 1, 1);
-      const sprites = new FeatureSprites(swayingOn(base), {capacity: 1, textures: {colorMap}});
+      const colorMap = keep(makeColorTexture([WHITE], 1, 1));
+      const sprites = keep(new FeatureSprites(swayingOn(base), {capacity: 1, textures: {colorMap}}));
       // at the origin, a time of -0.25 makes the sine 1: phase 2π · (0 + 0.25)
       sprites.setUniform('waveAmplitude', 4);
       sprites.setUniform('time', -0.25);
       sprites.createSprite().setSize(2, 12);
       const picture = await render(sprites, PPU);
-      sprites.dispose();
-      colorMap.dispose();
       return picture;
     }
 
@@ -152,21 +150,21 @@ describe('sprites — wave() sways and scrolls', function () {
     const XS = [-8, -4, 0, 4, 8];
 
     it('moves each glyph of a row up or down by the sine of its x, whole', async function () {
-      const colorMap = makeColorTexture([WHITE], 1, 1);
-      const sprites = new FeatureSprites(ScrollerKind, {
-        capacity: XS.length,
-        textures: {colorMap},
-        // one wave per 16 units, standing still
-        uniforms: {waveAmplitude: 4, waveFrequency: 1 / 16, waveSpeed: 0},
-      });
+      const colorMap = keep(makeColorTexture([WHITE], 1, 1));
+      const sprites = keep(
+        new FeatureSprites(ScrollerKind, {
+          capacity: XS.length,
+          textures: {colorMap},
+          // one wave per 16 units, standing still
+          uniforms: {waveAmplitude: 4, waveFrequency: 1 / 16, waveSpeed: 0},
+        }),
+      );
       for (const x of XS) {
         const glyph = sprites.createSprite();
         glyph.setSize(2, 2);
         glyph.setPosition(x, 0, 0);
       }
       const picture = await render(sprites, PPU);
-      sprites.dispose();
-      colorMap.dispose();
 
       for (const x of XS) {
         const offset = 4 * Math.sin((2 * Math.PI * x) / 16);
@@ -178,15 +176,17 @@ describe('sprites — wave() sways and scrolls', function () {
     });
 
     it('moves with the time it shares with AnimatedFrames', async function () {
-      const colorMap = makeColorTexture([WHITE], 1, 1);
+      const colorMap = keep(makeColorTexture([WHITE], 1, 1));
       const anims = new FrameBasedAnimations();
       anims.add('still', 1, [new TextureCoords(0, 0, 1, 1)]);
-      const animsMap = anims.bakeDataTexture();
-      const sprites = new FeatureSprites(AnimatedScrollerKind, {
-        capacity: 1,
-        textures: {colorMap, animsMap},
-        uniforms: {waveAmplitude: 3},
-      });
+      const animsMap = keep(anims.bakeDataTexture());
+      const sprites = keep(
+        new FeatureSprites(AnimatedScrollerKind, {
+          capacity: 1,
+          textures: {colorMap, animsMap},
+          uniforms: {waveAmplitude: 3},
+        }),
+      );
       sprites.createSprite().setSize(2, 2);
 
       sprites.setUniform('time', 0);
@@ -194,9 +194,6 @@ describe('sprites — wave() sways and scrolls', function () {
       // a quarter wave later the sine is −1
       sprites.setUniform('time', 0.25);
       const moved = litRows(await render(sprites, 4), TARGET_SIZE / 2);
-      sprites.dispose();
-      colorMap.dispose();
-      animsMap.dispose();
 
       expect(still).to.have.lengthOf(8);
       expect(moved).to.have.lengthOf(8);

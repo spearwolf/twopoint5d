@@ -1,4 +1,4 @@
-import {emit, type EventizedObject, eventize, off, on, type UnsubscribeFunc} from '@spearwolf/eventize';
+import {emit, emitStrict, type EventizedObject, eventize, off, on, type UnsubscribeFunc} from '@spearwolf/eventize';
 
 import {Stylesheets} from '../display/Stylesheets.js';
 import {
@@ -147,6 +147,8 @@ export interface PanControl2DOptions {
    * as well; its `keyup` still lets go of a key held before. When the window loses focus or the
    * page is hidden, the control lets go of every key held down.
    *
+   * The control works on a copy of the array.
+   *
    * @see https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code
    */
   keys?: [string, string, string, string];
@@ -164,6 +166,8 @@ export interface PanControl2DOptions {
    * keyboard layout. As long as `keyCodes` holds anything other than `[87, 83, 65, 68]` and
    * `keys` holds its default, the control compares `event.keyCode` with `keyCodes` instead of
    * `event.code` with `keys`.
+   *
+   * The control works on a copy of the array.
    */
   keyCodes?: [number, number, number, number];
 
@@ -319,8 +323,11 @@ export class PanControl2D extends InputControlBase {
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
 
     this.mouseButton = readOption(options, 'mouseButton', 1);
-    this.keys = readOption(options, 'keys', [...DEFAULT_KEYS] as [string, string, string, string]);
-    this.keyCodes = readOption(options, 'keyCodes', [...DEFAULT_KEY_CODES] as [number, number, number, number]);
+    // Copies, because keys and keyCodes are public and writable, and `keyCodes[0] = 38` rebinds in
+    // place: a rebinding on this control changes neither the options nor another control built
+    // from them
+    this.keys = [...(options?.keys ?? DEFAULT_KEYS)] as [string, string, string, string];
+    this.keyCodes = [...(options?.keyCodes ?? DEFAULT_KEY_CODES)] as [number, number, number, number];
 
     // before pointerDisabled below: the setter hangs the pointerdown listener on this target
     this.#pointerTarget = readOption(options, 'pointerTarget', document);
@@ -449,6 +456,12 @@ export class PanControl2D extends InputControlBase {
     }
   }
 
+  /**
+   * `true` while the pointer does not pan this control. Setting it to `true` takes the pointer
+   * listeners off and drops a pan in progress; a hidden cursor comes back, every listener of
+   * `OnPanControl2DRestoreCursor` hears it — also behind one that throws — and the setter then
+   * throws that error.
+   */
   get pointerDisabled(): boolean {
     return this.#pointerDisabled;
   }
@@ -485,6 +498,9 @@ export class PanControl2D extends InputControlBase {
    * nobody is pressing. A speed field a caller wrote by hand is not touched: on a control
    * that is not disposed, {@link update} moves the view by those whether an input source
    * reaches this control or not.
+   *
+   * A hidden cursor comes back with `OnPanControl2DRestoreCursor`: every listener hears it, also
+   * behind one that throws, and the call then throws that error.
    */
   override unsubscribe(): void {
     // first: with the listeners off their targets, no event can refill what the lines below
@@ -681,7 +697,11 @@ export class PanControl2D extends InputControlBase {
     if (this.#cursorPanClass && this.#cursorStylesTarget) {
       this.#cursorStylesTarget.classList.remove(this.#cursorPanClass);
     }
-    emit(this, OnPanControl2DRestoreCursor, this);
+    // every listener hears the restore, even behind one that throws; the call that gave the
+    // cursor back throws the error afterwards — one as it is, several as an AggregateError. The
+    // state above is reset by now, and the callers (unsubscribe(), the pointerDisabled setter)
+    // run it as their last statement
+    emitStrict(this, OnPanControl2DRestoreCursor, this);
   }
 
   #onPointerMove = (event: PointerEvent): void => {
@@ -796,26 +816,36 @@ export class PanControl2D extends InputControlBase {
    * A control that was hiding the cursor emits one last `OnPanControl2DRestoreCursor`
    * while its subscribers can still hear it; after that every listener on this control
    * goes with it, and a further `dispose()` does nothing.
+   *
+   * A listener of `OnPanControl2DRestoreCursor` that throws does not hold the teardown up: every
+   * listener hears the event, the cursor rule goes back, the listeners go with the control, and
+   * `dispose()` then throws the error — an `AggregateError` when more than one listener throws.
+   * The control is disposed either way.
    */
   override dispose(): void {
     if (this.isDisposed) return;
 
-    // super.dispose() takes the listeners off and, through unsubscribe(), hands back what the
-    // input sources were holding — while the listeners of this control are still attached, so
-    // the restoreCursor that goes out on the way still reaches them
-    super.dispose();
+    try {
+      // super.dispose() takes the listeners off and, through unsubscribe(), hands back what the
+      // input sources were holding — while the listeners of this control are still attached, so
+      // the restoreCursor that goes out on the way still reaches them
+      super.dispose();
+    } finally {
+      // runs also behind a restoreCursor listener that threw: the error leaves dispose() after
+      // the teardown is through
 
-    // after super.dispose(): the cursor class is off the target by then (unsubscribe() restores
-    // the cursor), so no element points at a rule that may leave the sheet here. unsubscribe()
-    // keeps the rule, because a control that subscribes again still needs it
-    if (this.#cursorPanRuleName != null && this.#cursorPanRuleRoot != null) {
-      Stylesheets.releaseRule(this.#cursorPanRuleName, this.#cursorPanRuleRoot);
-      this.#cursorPanRuleName = undefined;
-      this.#cursorPanRuleRoot = undefined;
+      // after super.dispose(): the cursor class is off the target by then (unsubscribe() restores
+      // the cursor), so no element points at a rule that may leave the sheet here. unsubscribe()
+      // keeps the rule, because a control that subscribes again still needs it
+      if (this.#cursorPanRuleName != null && this.#cursorPanRuleRoot != null) {
+        Stylesheets.releaseRule(this.#cursorPanRuleName, this.#cursorPanRuleRoot);
+        this.#cursorPanRuleName = undefined;
+        this.#cursorPanRuleRoot = undefined;
+      }
+
+      // last: the restoreCursor above still has to reach the listeners that act on it
+      off(this);
     }
-
-    // last: the restoreCursor above still has to reach the listeners that act on it
-    off(this);
   }
 
   /**
@@ -842,7 +872,8 @@ export class PanControl2D extends InputControlBase {
   /**
    * Subscribes `listener` to `OnPanControl2DRestoreCursor`: a cursor this control hid
    * came back. Returns the function that takes the listener off again. {@link dispose} of
-   * a control that is hiding the cursor emits it one last time.
+   * a control that is hiding the cursor emits it one last time. Every listener hears the event,
+   * also behind one that throws; the call that gave the cursor back then throws the error.
    *
    * On a disposed control this does nothing: the listener is never called, and the
    * returned function has nothing to take back.

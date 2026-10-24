@@ -13,7 +13,16 @@ import {
   Tint,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeColorTexture,
+  makeContainer,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
@@ -40,9 +49,6 @@ const SPRITES = [
 const rgbAtX = (pixels, x) => rgbAt(pixels, TARGET_SIZE, Math.floor(CENTER + x * PIXELS_PER_UNIT), CENTER);
 
 describe('sprites — another geometry under the mesh: growth and the geometry slot', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
@@ -59,6 +65,7 @@ describe('sprites — another geometry under the mesh: growth and the geometry s
   });
 
   afterEach(() => {
+    disposeKept();
     console.info = info;
     target?.dispose();
     target = undefined;
@@ -71,14 +78,16 @@ describe('sprites — another geometry under the mesh: growth and the geometry s
   // A mesh of two sprites with grow and a reflection pass is drawn once, then grows twice to hold
   // five: the render objects built for the first geometry follow the mesh and its pass to the third.
   it('sprites created past the first capacity are drawn, and their pass draws them as well', async function () {
-    const colorMap = makeColorTexture([WHITE]);
-    const sprites = new FeatureSprites(TintedKind, {
-      capacity: 2,
-      grow: true,
-      textures: {colorMap},
-      uniforms: {mirrorPlane: [1, 0, 0, 0], reflectionColor: [1, 1, 1, 1]},
-      passes: [ReflectionPass],
-    });
+    const colorMap = keep(makeColorTexture([WHITE]));
+    const sprites = keep(
+      new FeatureSprites(TintedKind, {
+        capacity: 2,
+        grow: true,
+        textures: {colorMap},
+        uniforms: {mirrorPlane: [1, 0, 0, 0], reflectionColor: [1, 1, 1, 1]},
+        passes: [ReflectionPass],
+      }),
+    );
     const create = ({x, rgb}) => {
       const sprite = sprites.createSprite();
       sprite.setSize(0.5, 0.5);
@@ -106,8 +115,6 @@ describe('sprites — another geometry under the mesh: growth and the geometry s
     const geometryChanged = sprites.geometry !== firstGeometry;
     const passGeometry = sprites.passes['reflection'].geometry === sprites.geometry;
     const handlesKept = first.every((sprite, i) => sprites.spritePool.getVO(i) === sprite);
-    sprites.dispose();
-    colorMap.dispose();
 
     expect(capacity, 'two growths, from 2 to 8').to.equal(8);
     expect(geometryChanged, 'the mesh draws a new geometry').to.be.true;
@@ -133,13 +140,17 @@ describe('sprites — another geometry under the mesh: growth and the geometry s
   // The sprites of the geometry in the slot are the sprites of the mesh and of its pass: the render
   // objects built for the first geometry follow both to the one put there, and the first one is drawn by neither.
   it('a geometry put into the slot is drawn by the mesh and by its pass, and the geometry it took the place of by neither', async function () {
-    const colorMap = makeColorTexture([WHITE]);
-    const sprites = new FeatureSprites(TintedKind, {
-      capacity: 2,
-      textures: {colorMap},
-      uniforms: {mirrorPlane: [1, 0, 0, 0], reflectionColor: [1, 1, 1, 1]},
-      passes: [ReflectionPass],
-    });
+    const colorMap = keep(makeColorTexture([WHITE]));
+    // kept before the sprites that draw it, so that the sprites let go first
+    const other = keep(new FeatureSpritesGeometry(TintedKind, 4));
+    const sprites = keep(
+      new FeatureSprites(TintedKind, {
+        capacity: 2,
+        textures: {colorMap},
+        uniforms: {mirrorPlane: [1, 0, 0, 0], reflectionColor: [1, 1, 1, 1]},
+        passes: [ReflectionPass],
+      }),
+    );
     const create = ({x, rgb}) => {
       const sprite = sprites.createSprite();
       sprite.setSize(0.5, 0.5);
@@ -158,15 +169,10 @@ describe('sprites — another geometry under the mesh: growth and the geometry s
     sprites.update();
     const before = await renderToPixels(display.renderer, scene, camera, target);
 
-    const other = new FeatureSpritesGeometry(TintedKind, 4);
     sprites.geometry = other;
     SPRITES.slice(2).map(create);
     sprites.update();
     const after = await renderToPixels(display.renderer, scene, camera, target);
-
-    sprites.dispose();
-    other.dispose();
-    colorMap.dispose();
 
     for (const {x, rgb} of SPRITES.slice(0, 2)) {
       expect(isNearColor(rgbAtX(before, x), rgb), `before, at ${x}: ${rgbAtX(before, x)}`).to.be.true;

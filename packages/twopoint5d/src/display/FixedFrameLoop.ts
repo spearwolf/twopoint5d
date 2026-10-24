@@ -1,5 +1,6 @@
-import {emit, type EventizedObject, eventize, off, on, once, type UnsubscribeFunc} from '@spearwolf/eventize';
+import {emit, emitStrict, type EventizedObject, eventize, off, on, once, type UnsubscribeFunc} from '@spearwolf/eventize';
 import {OnDisplayDispose, OnDisplayRenderFrame} from '../events.js';
+import {throwCollected} from '../utils/throwCollected.js';
 import type {Display} from './Display.js';
 import type {DisplayEventProps} from './types.js';
 
@@ -11,6 +12,10 @@ const OnRender = Symbol.for('twopoint5d:FixedFrameLoop.OnRender');
 const BUILT_IN_FPS = 60;
 const BUILT_IN_MAX_STEPS_PER_FRAME = 5;
 
+/**
+ * The props of every `OnTick`: a new object per tick, which a listener may keep — the loop
+ * never writes to it again.
+ */
 export interface FixedFrameLoopTickProps {
   /** Fixed time step in seconds (`1 / fps`). */
   fixedDelta: number;
@@ -20,6 +25,10 @@ export interface FixedFrameLoopTickProps {
   tickNo: number;
 }
 
+/**
+ * The props of every `OnRender`: the `DisplayEventProps` of the render frame and the state of
+ * the interpolation after the ticks of that frame, in a new object per frame.
+ */
 export interface FixedFrameLoopRenderProps extends DisplayEventProps {
   /**
    * Interpolation factor in `[0, 1)`. Use it to compute the visual state
@@ -89,12 +98,24 @@ export interface FixedFrameLoop extends EventizedObject {}
  * render-budget problem — scene optimisation, `pixelZoom`, lower
  * `pixelRatio` or capping `Display`'s `maxFps` are the right tools.
  *
+ * Every listener of `OnTick` hears every tick, also behind one that throws. The tick counts
+ * all the same — `tickNo` and `tickTime` go on, and the next frame does not bring it again —,
+ * and the frame goes on with its remaining ticks and `OnRender`. The error reaches the one who
+ * sent the frame afterwards (`Display#renderFrame()` and its caller): a single one unchanged,
+ * several as an `AggregateError` in the order they were thrown. The error of one dispatch is the
+ * one `emitStrict()` throws for it — several listeners of the same tick already as an
+ * `AggregateError` of their own. `OnRender` goes out through `emit()`: a listener that throws ends
+ * the dispatch for the listeners behind it.
+ *
  * The loop pauses automatically when `Display` pauses (no `OnDisplayRenderFrame`
  * events fire) and disposes when `Display` disposes (via `OnDisplayDispose`).
  */
 export class FixedFrameLoop {
-  static OnTick = OnTick;
-  static OnRender = OnRender;
+  /** The event of every simulation step; {@link onTick} subscribes to it. */
+  static readonly OnTick = OnTick;
+
+  /** The event of every render frame; {@link onRender} subscribes to it. */
+  static readonly OnRender = OnRender;
 
   /**
    * The rate a loop starts at when its options name none, or one it refuses. Read each time a
@@ -110,6 +131,10 @@ export class FixedFrameLoop {
    */
   static DefaultMaxStepsPerFrame = BUILT_IN_MAX_STEPS_PER_FRAME;
 
+  /**
+   * The display the loop ticks on, handed to the constructor. It stays the caller's, see
+   * {@link dispose}.
+   */
   readonly display: Display;
 
   #fps: number;
@@ -184,6 +209,10 @@ export class FixedFrameLoop {
     return this.#alpha;
   }
 
+  /**
+   * `true` once {@link dispose} has run — also through the `dispose()` of the display, which
+   * takes the loop with it.
+   */
   get isDisposed(): boolean {
     return this.#disposed;
   }
@@ -220,6 +249,13 @@ export class FixedFrameLoop {
     this.#unsubscribeFromDisplayDispose = once(display, OnDisplayDispose, () => this.dispose());
   }
 
+  /**
+   * Takes every render frame of the display: runs the ticks the frame has room for and sends
+   * `OnRender`.
+   *
+   * @throws what the listeners of `OnTick` and `OnRender` threw, once the frame is through —
+   *   see the class documentation on listeners that throw.
+   */
   [OnDisplayRenderFrame](props: DisplayEventProps): void {
     if (this.#disposed) return;
 
@@ -228,15 +264,24 @@ export class FixedFrameLoop {
     const delta = Number.isFinite(props.rawDeltaTime) ? props.rawDeltaTime : props.deltaTime;
     this.#accumulator += delta;
 
+    let errors: unknown[] | undefined;
     let steps = 0;
     while (this.#accumulator >= this.#fixedDelta && steps < this.#maxStepsPerFrame) {
-      // a new object per tick on purpose: a listener may keep the props, and an object used
-      // again would change under it
-      emit(this, OnTick, {
-        fixedDelta: this.#fixedDelta,
-        tickTime: this.#tickTime,
-        tickNo: this.#tickNo,
-      });
+      try {
+        // every listener hears the tick, also behind one that throws: a listener left out would
+        // fall a step behind the others and behind tickNo.
+        // A new object per tick on purpose: a listener may keep the props, and an object used
+        // again would change under it
+        emitStrict(this, OnTick, {
+          fixedDelta: this.#fixedDelta,
+          tickTime: this.#tickTime,
+          tickNo: this.#tickNo,
+        });
+      } catch (error) {
+        (errors ??= []).push(error);
+      }
+      // the tick counts whatever its listeners throw, or the next frame would bring the same
+      // tick (the same tickNo) again
       this.#accumulator -= this.#fixedDelta;
       this.#tickTime += this.#fixedDelta;
       this.#tickNo += 1;
@@ -250,13 +295,22 @@ export class FixedFrameLoop {
 
     this.#alpha = this.#accumulator / this.#fixedDelta;
 
-    // a new object per frame on purpose, for the same reason as the tick props above
-    emit(this, OnRender, {
-      ...props,
-      alpha: this.#alpha,
-      tickTime: this.#tickTime,
-      tickNo: this.#tickNo,
-    });
+    try {
+      // a new object per frame on purpose, for the same reason as the tick props above
+      emit(this, OnRender, {
+        ...props,
+        alpha: this.#alpha,
+        tickTime: this.#tickTime,
+        tickNo: this.#tickNo,
+      });
+    } catch (error) {
+      if (!errors) throw error;
+      errors.push(error);
+    }
+
+    if (errors) {
+      throwCollected(errors, 'FixedFrameLoop: listeners threw in more than one OnTick or OnRender of the frame');
+    }
   }
 
   /**

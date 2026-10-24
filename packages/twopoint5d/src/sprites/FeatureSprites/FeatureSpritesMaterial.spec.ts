@@ -2,7 +2,7 @@ import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {add, modelViewMatrix, vec3, vec4} from 'three/tsl';
 import type {MeshBasicMaterial, Node, VaryingNode} from 'three/webgpu';
-import {AdditiveBlending, NearestFilter, NoColorSpace, SRGBColorSpace, Texture} from 'three/webgpu';
+import {AdditiveBlending, DoubleSide, NearestFilter, NoColorSpace, SRGBColorSpace, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
 import {attributeNamesOf, nodesOf, operatorOf, samplesTexture, textureNodesOf} from '../../testing/spriteGraph.js';
@@ -172,6 +172,48 @@ describe('FeatureSpritesMaterial', () => {
 
       expect(() => new FeatureSpritesMaterial(TexturedKind, {resources})).toThrow(
         new TypeError('FeatureSpritesMaterial: the resources handed in have been disposed'),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+  });
+
+  describe('refuses', () => {
+    test.each([
+      ['undefined', undefined, 'undefined'],
+      ['a number', 5, '5'],
+      ['an empty object', {}, '{}'],
+    ])('a kind that is %s and builds nothing', (_label, value, quoted) => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(value as never)).toThrow(
+        new TypeError(`FeatureSpritesMaterial: the kind must be a sprite kind from defineSprite(), got ${quoted}`),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('a copy of a kind, which ran none of the checks of defineSprite(), and builds nothing', () => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial({...TexturedKind})).toThrow(
+        /^FeatureSpritesMaterial: the kind must be a sprite kind from defineSprite\(\), got \{/,
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test.each([
+      ['options that are null', null, 'the options must be an object, got null'],
+      ['options that are a number', 5, 'the options must be an object, got 5'],
+      ['options that are a string', 'x', 'the options must be an object, got "x"'],
+      ['options that are an array', [], 'the options must be an object, got []'],
+      ['resources that are a number', {resources: 5}, 'resources must be a SpriteResources, got 5'],
+      ['resources that are a plain object', {resources: {}}, 'resources must be a SpriteResources, got {}'],
+      ['textures that are a number', {textures: 5}, 'textures must be an object of textures by name, got 5'],
+      ['uniforms that are a string', {uniforms: 'ab'}, 'uniforms must be an object of values by name, got "ab"'],
+    ])('%s and builds nothing', (_label, options, message) => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(TexturedKind, options as never)).toThrow(
+        new TypeError(`FeatureSpritesMaterial: ${message}`),
       );
       expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
     });
@@ -378,6 +420,16 @@ describe('FeatureSpritesMaterial', () => {
       }).toThrow(
         'FeatureSpritesMaterial: feature "heavy" brings attributes besides its placement stage; the sprites were built without them, so it cannot stand in for "flatPlacement"',
       );
+      material.dispose();
+    });
+
+    test('refuses a malformed feature as defineFeature() would, and keeps its placement', () => {
+      const material = new FeatureSpritesMaterial(TexturedKind);
+
+      expect(() => {
+        material.placement = {name: 'odd', placement: 5} as never;
+      }).toThrow(new TypeError('FeatureSpritesMaterial: the placement of feature "odd" is no function, got 5'));
+      expect(material.placement).toBe(FlatPlacement);
       material.dispose();
     });
 
@@ -676,6 +728,17 @@ describe('FeatureSpritesMaterial', () => {
       expect(material.version).toBe(version);
       material.dispose();
     });
+
+    test('refuses a start value that is no finite number in the words of the material', () => {
+      const timed = defineFeature({name: 'timed', uniforms: {time: 0}});
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, timed]});
+
+      expect(() => new FeatureSpritesMaterial(kind, {uniforms: {time: Number.NaN}})).toThrow(
+        new TypeError(
+          'FeatureSpritesMaterial: the uniform "time" is a float and takes a finite number as its start value, got NaN',
+        ),
+      );
+    });
   });
 
   describe('dispose()', () => {
@@ -811,6 +874,17 @@ describe('FeatureSpritesMaterial', () => {
       expect(material.alphaTest).toBe(0.25);
       expect(material.alphaTestNode).toBeNull();
       material.dispose();
+    });
+
+    test('a parameter handed in as undefined leaves the one of the pass, and nothing is said on the console', () => {
+      const warn = sandbox.stub(console, 'warn');
+      const material = new FeatureSpritesMaterial(TexturedKind, {pass: ShadowPass, side: undefined});
+      const sprites = new FeatureSprites(TexturedKind, {side: undefined});
+
+      expect(material.side).toBe(DoubleSide);
+      expect(warn.called).toBe(false);
+      material.dispose();
+      sprites.dispose();
     });
 
     test('takes a pass feature whose requires the kind or the pass meets', () => {

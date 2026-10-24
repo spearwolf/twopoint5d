@@ -1,5 +1,6 @@
 import {describe, expect, expectTypeOf, test} from 'vitest';
 
+import {sharedVertexObjectDescriptor} from '../../vertex-objects/sharedVertexObjectDescriptor.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {defineSprite} from '../defineSprite.js';
 import {AtlasFrame} from '../features/AtlasFrame.js';
@@ -115,6 +116,68 @@ describe('FeatureSpritesGeometry', () => {
     expect(() => new FeatureSpritesGeometry(kind, {capacity: 1, attributeUsage: {dynamic: ['positon']}})).toThrow(
       'FeatureSpritesGeometry: attributeUsage names "positon", which is neither an attribute nor a usage word of the sprite kind; it knows instancePosition, quadSize, rotation, texCoords, texFlipDiagonal, texTrim, color, position, size',
     );
+  });
+
+  describe('refuses', () => {
+    test.each([
+      ['undefined', undefined, 'undefined'],
+      ['a number', 5, '5'],
+      ['an empty object', {}, '{}'],
+    ])('a kind that is %s', (_label, value, quoted) => {
+      expect(() => new FeatureSpritesGeometry(value as never)).toThrow(
+        new TypeError(`FeatureSpritesGeometry: the kind must be a sprite kind from defineSprite(), got ${quoted}`),
+      );
+    });
+
+    test('a copy of a kind, which ran none of the checks of defineSprite()', () => {
+      expect(() => new FeatureSpritesGeometry({...kind})).toThrow(
+        /^FeatureSpritesGeometry: the kind must be a sprite kind from defineSprite\(\), got \{/,
+      );
+    });
+
+    test.each([
+      ['parameters that are null', null, 'the parameters must be a number or an object, got null'],
+      ['parameters that are a string', 'x', 'the parameters must be a number or an object, got "x"'],
+      ['parameters that are an array', [], 'the parameters must be a number or an object, got []'],
+      ['parameters that are a boolean', true, 'the parameters must be a number or an object, got true'],
+      ['baseArgs that are a number', {baseArgs: 5}, 'baseArgs is a list of arguments, got 5'],
+      ['baseArgs that are a string', {baseArgs: 'ab'}, 'baseArgs is a list of arguments, got "ab"'],
+      ['baseArgs that are an object', {baseArgs: {}}, 'baseArgs is a list of arguments, got {}'],
+      ['an attributeUsage that is a number', {attributeUsage: 5}, 'attributeUsage must be an object, got 5'],
+      ['an attributeUsage that is an array', {attributeUsage: []}, 'attributeUsage must be an object, got []'],
+      [
+        'an attributeUsage.dynamic that is a string',
+        {attributeUsage: {dynamic: 'position'}},
+        'attributeUsage.dynamic is a list of names, got "position"',
+      ],
+      [
+        'an attributeUsage.stream that holds a number',
+        {attributeUsage: {stream: [5]}},
+        'attributeUsage.stream is a list of names, got [5]',
+      ],
+      [
+        'an attributeUsage.static that is an object',
+        {attributeUsage: {static: {}}},
+        'attributeUsage.static is a list of names, got {}',
+      ],
+    ])('%s', (_label, parameters, message) => {
+      expect(() => new FeatureSpritesGeometry(kind, parameters as never)).toThrow(
+        new TypeError(`FeatureSpritesGeometry: ${message}`),
+      );
+    });
+  });
+
+  test('takes a baseArgs and an attributeUsage of null as not handed in', () => {
+    const plain = new FeatureSpritesGeometry(kind, 1);
+    const nulled = new FeatureSpritesGeometry(kind, {capacity: 1, baseArgs: null as never, attributeUsage: null as never});
+
+    expect([...nulled.basePool.buffer.buffers.values()].map(({typedArray}) => [...typedArray!])).toEqual(
+      [...plain.basePool.buffer.buffers.values()].map(({typedArray}) => [...typedArray!]),
+    );
+    expect(nulled.instancedPool.descriptor).toBe(plain.instancedPool.descriptor);
+    expect(nulled.instancedPool.descriptor).toBe(sharedVertexObjectDescriptor(kind.description));
+    plain.dispose();
+    nulled.dispose();
   });
 
   test('declares its pools read-only and typed by the kind (a type-level check)', () => {

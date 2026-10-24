@@ -1,6 +1,7 @@
 import {add, cos, cross, mul, sin, sub, vec3} from 'three/tsl';
 import type {Node} from 'three/webgpu';
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject} from '../../utils/isObject.js';
 import {vertexByInstancePosition} from '../node-utils.js';
 import {defineFeature, type SpriteFeature} from '../SpriteFeature.js';
 
@@ -49,9 +50,12 @@ const placements = new Map<string, SpriteFeature>();
  * local`. Returns one frozen feature per set of options, so equal options give the same feature;
  * `flatPlacement()` is {@link FlatPlacement}, `flatPlacement({plane: 'xz'})` is {@link GroundPlacement}.
  *
- * @throws a `TypeError` for a plane or an orientation it does not know
+ * @throws a `TypeError` for options that are no object, and for a plane or an orientation it does not know
  */
 export function flatPlacement(options?: FlatPlacementOptions): SpriteFeature {
+  if (options !== undefined && !isObject(options as unknown)) {
+    throw new TypeError(`flatPlacement: the options must be an object, {plane?, orientation?}, got ${describeValue(options)}`);
+  }
   const plane = options?.plane ?? 'xy';
   const orientation = options?.orientation;
   if (plane !== 'xy' && plane !== 'xz') {

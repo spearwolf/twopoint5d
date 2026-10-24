@@ -230,7 +230,7 @@ export class TextureFactory {
    * A name that is no texture option class is skipped; `TextureStore#parse()` reports such a
    * name when a catalog carries it.
    */
-  getOptions(classNames: Array<TextureOptionClasses>): Partial<TextureOptions> {
+  getOptions(classNames: readonly TextureOptionClasses[]): Partial<TextureOptions> {
     const options = this.#mergeOptions(classNames);
     // one raw value, two counts: `anisotropy` is what update() gives the texture, and the
     // deprecated `anisotrophy` counts from 0, where 0 is none
@@ -241,7 +241,7 @@ export class TextureFactory {
   }
 
   // the defaults of this factory with the given classes on top, the anisotropy still raw
-  #mergeOptions(classNames: Array<TextureOptionClasses>): Partial<TextureOptions> {
+  #mergeOptions(classNames: readonly TextureOptionClasses[]): Partial<TextureOptions> {
     return Object.assign(
       {},
       this.#defaultOptions,

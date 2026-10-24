@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {findUnpublishableSpecifiers} from './findUnpublishableSpecifiers.mjs';
+import {describeUnpublishable, findUnpublishableSpecifiers} from './findUnpublishableSpecifiers.mjs';
 
 describe('findUnpublishableSpecifiers', () => {
   it('names every catalog: and workspace: specifier left in a dependency section', () => {
@@ -16,11 +16,12 @@ describe('findUnpublishableSpecifiers', () => {
       {section: 'peerDependencies', name: 'c', specifier: 'workspace:*'},
       {section: 'optionalDependencies', name: 'd', specifier: 'catalog:x'},
       {section: 'devDependencies', name: 'e', specifier: 'workspace:^'},
+      {section: 'devDependencies', name: 'f', specifier: '*'},
     ]);
   });
 
   it('passes a manifest whose specifiers are all version ranges', () => {
-    const manifest = {dependencies: {a: '^1.0.0', b: '*'}, peerDependencies: {c: '~0.185.1'}};
+    const manifest = {dependencies: {a: '^1.0.0', b: '>=1.0.0'}, peerDependencies: {c: '~0.185.1'}};
 
     assert.deepEqual(findUnpublishableSpecifiers(manifest), []);
     assert.deepEqual(findUnpublishableSpecifiers({}), []);
@@ -55,5 +56,28 @@ describe('findUnpublishableSpecifiers', () => {
       {section: 'peerDependencies', name: 'b', specifier: 'file:../b.tgz'},
       {section: 'optionalDependencies', name: 'c', specifier: 'portal:../c'},
     ]);
+  });
+
+  it('names a bare `*`, which the resolution left standing', () => {
+    const manifest = {dependencies: {a: '*', b: '>=1.0.0', c: '1.x'}};
+
+    assert.deepEqual(findUnpublishableSpecifiers(manifest), [{section: 'dependencies', name: 'a', specifier: '*'}]);
+  });
+});
+
+describe('describeUnpublishable', () => {
+  it('words a bare `*` and a protocol or non-string value each its own way', () => {
+    assert.equal(
+      describeUnpublishable({section: 'peerDependencies', name: 'a', specifier: '*'}),
+      'peerDependencies.a is "*", which lets in any version: the build replaces it by the version of a package under packages/ or in the root package.json and found neither',
+    );
+    assert.equal(
+      describeUnpublishable({section: 'dependencies', name: 'b', specifier: 'catalog:'}),
+      'dependencies.b is "catalog:", which resolves to no version range',
+    );
+    assert.equal(
+      describeUnpublishable({section: 'dependencies', name: 'c', specifier: null}),
+      'dependencies.c is null, which resolves to no version range',
+    );
   });
 });

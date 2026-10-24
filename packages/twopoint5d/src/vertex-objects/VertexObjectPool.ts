@@ -331,9 +331,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       return;
     }
 
-    // the names are read through `arguments` rather than the rest parameter of the signature, as in
-    // the touch() of the geometries: V8 does not keep a rest array off the heap in every state of
-    // the optimizer, `arguments` it did
+    // the names are read through `arguments` rather than the rest parameter of the signature:
+    // docs/architecture.md, `vertex-objects/`
     // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 1; i < arguments.length; i++) {
       // biome-ignore lint/complexity/noArguments: see the comment above the loop

@@ -368,8 +368,7 @@ describe('layoutText()', () => {
     });
 
     test('a text that is no string', () => {
-      expect(() => layoutText(font, 42 as never)).toThrow(TypeError);
-      expect(() => layoutText(font, 42 as never)).toThrow('layoutText: the text must be a string, got 42');
+      expect(() => layoutText(font, 42 as never)).toThrow(new TypeError('layoutText: the text must be a string, got 42'));
     });
   });
 });

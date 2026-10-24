@@ -5,7 +5,7 @@ import type {IDataChunk2D} from './IDataChunk2D.js';
 import {ChunkQuadTreeNode, Quadrant} from './ChunkQuadTreeNode.js';
 import {StringDataChunk2D} from './StringDataChunk2D.js';
 
-const sortedNames = (chunks: StringDataChunk2D[]) => chunks.map((c) => c.toString()).sort();
+const sortedNames = (chunks: readonly StringDataChunk2D[]) => chunks.map((c) => c.toString()).sort();
 
 const subtreeOf = <T extends IDataChunk2D>(node: ChunkQuadTreeNode<T>): T[] => [
   ...node.chunks,
@@ -579,7 +579,7 @@ describe('ChunkQuadTreeNode (extended)', () => {
       expect(n.findChunks(new AABB2(1000, 1000, 5, 5))).toEqual([]);
     });
 
-    it('appends into a caller-supplied output array (no allocation in hot path)', () => {
+    it('fills a caller-supplied output array (no allocation in hot path)', () => {
       const chunks = grid4x4();
       const n = new ChunkQuadTreeNode<StringDataChunk2D>(Object.values(chunks));
       n.subdivide();
@@ -590,14 +590,14 @@ describe('ChunkQuadTreeNode (extended)', () => {
       expect(sortedNames(out)).toEqual(['K', 'L', 'O', 'P'].sort());
     });
 
-    it('preserves pre-existing entries in the output array (caller controls reset)', () => {
+    it('empties a caller-supplied output array before it fills it, as the spatial hash grid does', () => {
       const chunks = grid4x4();
       const n = new ChunkQuadTreeNode<StringDataChunk2D>(Object.values(chunks));
       n.subdivide();
       const sentinel = new StringDataChunk2D({x: 999, y: 999, width: 1, height: 1, data: 'Z'});
       const out: StringDataChunk2D[] = [sentinel];
       n.findChunks(new AABB2(2, 4, 6, 4), out);
-      expect(sortedNames(out)).toEqual(['K', 'L', 'O', 'P', 'Z'].sort());
+      expect(sortedNames(out)).toEqual(['K', 'L', 'O', 'P'].sort());
     });
   });
 
@@ -704,7 +704,7 @@ describe('ChunkQuadTreeNode (extended)', () => {
       return n;
     };
 
-    test('findChunksAt(x, y, out) appends to out and returns it', () => {
+    test('findChunksAt(x, y, out) empties out, fills it and returns it', () => {
       const n = build();
       const sentinel = new StringDataChunk2D({x: 999, y: 999, width: 1, height: 1, data: 'Z'});
       const out: StringDataChunk2D[] = [sentinel];
@@ -712,8 +712,8 @@ describe('ChunkQuadTreeNode (extended)', () => {
       const ret = n.findChunksAt(2, 2, out);
 
       expect(ret).toBe(out);
-      expect(out[0], 'the entry out held before').toBe(sentinel);
-      expect(sortedNames(out)).toEqual(['S', 'T', 'Z']);
+      expect(out, 'the entry out held before').not.toContain(sentinel);
+      expect(sortedNames(out)).toEqual(['S', 'T']);
     });
 
     test('findChunksAt() answers the chunks from the root down', () => {

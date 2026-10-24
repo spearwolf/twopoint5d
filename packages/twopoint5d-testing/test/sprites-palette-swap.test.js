@@ -16,6 +16,8 @@ import {
 import {NearestFilter, OrthographicCamera, RenderTarget, Scene, SRGBColorSpace, TextureLoader} from 'three/webgpu';
 import {
   disposeDisplay,
+  disposeKept,
+  keep,
   isNearColor,
   makeColorTexture,
   makeContainer,
@@ -89,12 +91,8 @@ function swapOnCpu(palette, source, row, {first = 0, count = 0, shift = 0} = {})
 }
 
 describe('sprites — PaletteSwap', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(30000);
-
   let display;
   let host;
-  const disposables = [];
 
   beforeEach(async () => {
     host = makeContainer();
@@ -103,17 +101,12 @@ describe('sprites — PaletteSwap', function () {
   });
 
   afterEach(() => {
-    for (const item of disposables.splice(0)) item.dispose();
+    disposeKept();
     disposeDisplay(display);
     display = undefined;
     host?.parentNode?.removeChild(host);
     host = undefined;
   });
-
-  const keep = (item) => {
-    disposables.push(item);
-    return item;
-  };
 
   /**
    * Renders `sprites` seen straight on, `size` pixels square at one pixel a unit, and answers the colour

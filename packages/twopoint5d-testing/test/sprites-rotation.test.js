@@ -1,16 +1,13 @@
 import {expect} from '@esm-bundle/chai';
 import {BillboardPlacement, Display, FeatureSprites, FlatPlacement, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {coveredBox, makeContainer, disposeDisplay, renderToPixels} from './helpers/fixtures.js';
+import {coveredBox, makeContainer, disposeDisplay, disposeKept, keep, renderToPixels} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
 const PIXELS_PER_UNIT = 8;
 
 describe('sprites — rotation of a sprite that is not square', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -26,6 +23,7 @@ describe('sprites — rotation of a sprite that is not square', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -42,10 +40,12 @@ describe('sprites — rotation of a sprite that is not square', function () {
     const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
     camera.position.z = 10;
 
-    const sprites = new FeatureSprites(TexturedSpriteKind, {
-      capacity: 1,
-      placement: renderAsBillboards ? BillboardPlacement : FlatPlacement,
-    });
+    const sprites = keep(
+      new FeatureSprites(TexturedSpriteKind, {
+        capacity: 1,
+        placement: renderAsBillboards ? BillboardPlacement : FlatPlacement,
+      }),
+    );
     sprites.frustumCulled = false;
     const sprite = sprites.createSprite();
     sprite.setSize(4, 1);
@@ -57,8 +57,6 @@ describe('sprites — rotation of a sprite that is not square', function () {
     sprites.update();
 
     const pixels = await renderToPixels(display.renderer, scene, camera, target);
-
-    sprites.dispose();
 
     return coveredBox(pixels, TARGET_SIZE);
   }

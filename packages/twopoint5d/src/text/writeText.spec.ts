@@ -149,9 +149,10 @@ describe('writeText()', () => {
     test('sprites whose kind lacks a feature it writes, naming every one missing', () => {
       const Bare = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, TextureColor]});
       const sprites = spritesOf(Bare, {capacity: 4});
-      expect(() => writeText(sprites as never, font, 'A')).toThrow(TypeError);
       expect(() => writeText(sprites as never, font, 'A')).toThrow(
-        'writeText: the sprites lack the features QuadSize, AtlasFrame — writeText() writes the position, the size and the frame of every glyph; build the kind with InstancePosition, QuadSize and AtlasFrame, as TexturedSpriteKind does',
+        new TypeError(
+          'writeText: the sprites lack the features QuadSize, AtlasFrame — writeText() writes the position, the size and the frame of every glyph; build the kind with InstancePosition, QuadSize and AtlasFrame, as TexturedSpriteKind does',
+        ),
       );
       expect(sprites.spritePool?.usedCount).toBe(0);
     });
@@ -166,9 +167,10 @@ describe('writeText()', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const sprites = spritesOf(TexturedSpriteKind, {capacity: 3});
       const other = sprites.createSprite()!;
-      expect(() => writeText(sprites, font, 'AV AV')).toThrow(RangeError);
       expect(() => writeText(sprites, font, 'AV AV')).toThrow(
-        'writeText: "AV AV" needs 4 sprites, and the pool ran full after 2 — give the sprites a larger capacity; no sprite was written',
+        new RangeError(
+          'writeText: "AV AV" needs 4 sprites, and the pool ran full after 2 — give the sprites a larger capacity; no sprite was written',
+        ),
       );
       expect(sprites.spritePool?.usedCount).toBe(1);
       expect(sprites.spritePool?.containsVO(other)).toBe(true);

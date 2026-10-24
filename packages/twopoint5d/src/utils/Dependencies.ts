@@ -1,3 +1,4 @@
+/** The name of a watched value. */
 export type DependencyKey = string;
 
 /**
@@ -8,15 +9,25 @@ export type DependencyKey = string;
  * against.
  */
 export interface DependencyCallbacks<T = unknown> {
+  /** Whether two present values are the same state. It is not asked for two identical values. */
   equals(a: T, b: T): boolean;
+  /**
+   * A copy of `source` that the state keeps as its own. Used with `copy`; without either, the state
+   * keeps the value itself.
+   */
   clone?(source: T): T;
+  /** Writes `source` into `target`, the clone the state holds, in place. Used with `clone`. */
   copy?(source: T, target: T): void;
 }
 
-// derived from the methods above, so that a callback in a pair is compared in both
+// the three are derived from the methods above, so that a callback in a pair is compared in both
 // directions too
+
+/** The `equals` of a key: whether two present values are the same state. */
 export type EqualityCallback<T = unknown> = DependencyCallbacks<T>['equals'];
+/** The `clone` of a key: a copy of a value that the state keeps as its own. */
 export type CloneCallback<T> = NonNullable<DependencyCallbacks<T>['clone']>;
+/** The `copy` of a key: writes a value into the clone the state holds, in place. */
 export type CopyCallback<T> = NonNullable<DependencyCallbacks<T>['copy']>;
 
 /**
@@ -53,6 +64,12 @@ export type DependencyDeclaration<Shape> =
       [K in keyof Shape & DependencyKey]: [name: DependencyKey, callbacks: Required<DependencyCallbacks<Shape[K]>>];
     }[keyof Shape & DependencyKey];
 
+/**
+ * Remembers the values something was last worked out from and tells whether new ones differ — the
+ * guard of a recalculation: `if (dependencies.changed({a, b})) recalculate()`. A key is compared by
+ * identity, or by its `equals` callback where it has one; `clone` and `copy` let the state hold a
+ * private copy of a value that is written in place.
+ */
 export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, unknown>> {
   /**
    * Declares a dependency on a value that compares, clones and copies itself — every three.js
@@ -205,6 +222,12 @@ export class Dependencies<Shape extends DependencyShape = Record<DependencyKey, 
     return changed;
   }
 
+  /**
+   * Empties the state: afterwards {@link value} answers `undefined` for every key, and the next
+   * {@link equals} or {@link changed} compares with a state in which every key is absent — equal to
+   * values that are all absent, different from any that is present. A key with `clone` and `copy`
+   * gets a new clone with the next {@link update}.
+   */
   clear(): void {
     this.#state.clear();
   }

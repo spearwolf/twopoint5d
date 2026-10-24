@@ -100,4 +100,23 @@ describe('Canvas2DStage — canvas on screen', () => {
     expect(isNearColor(await centerPixel(), [0, 0, 255])).to.be.true;
     expect(stage.texture).to.not.equal(texture);
   });
+
+  it('follows a canvas resized in place with sprite and view', async () => {
+    const stage = await setup();
+    stage.render();
+
+    stage.canvas.width = 128;
+    stage.canvas.height = 32;
+    fill(stage.canvas, '#0000ff');
+    stage.needsUpdate = true;
+    stage.render();
+
+    // 128 x 32 contained in the 64 x 64 container is a view of 128 x 128: the canvas lies across
+    // the middle as a band 16 pixels high, and above and below it stays the red of the first
+    // frame, since nothing clears the target
+    const pixels = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    expect(isNearColor(rgbAt(pixels, 64, 32, 32), [0, 0, 255]), 'the middle of the band').to.be.true;
+    expect(isNearColor(rgbAt(pixels, 64, 32, 2), [0, 0, 255]), 'a row near one edge').to.be.false;
+    expect(isNearColor(rgbAt(pixels, 64, 32, 61), [0, 0, 255]), 'a row near the other edge').to.be.false;
+  });
 });

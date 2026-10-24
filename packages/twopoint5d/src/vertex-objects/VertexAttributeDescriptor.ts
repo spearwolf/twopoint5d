@@ -7,9 +7,11 @@ import type {
   VertexAttributeUsageType,
 } from './types.js';
 
-// three 0.186.1 builds no vertex format of one value for an 8- or 16-bit integer: its table for one
-// value knows the 32-bit types alone (`WebGPUAttributeUtils.js:32–36`, `:518–520`). Such an attribute
-// is laid out in 32 bits from the start, so the gpu reads the array of the pool as it is
+// three builds no vertex format of one value for an 8- or 16-bit integer: its table for one value
+// knows the 32-bit types alone (the table `typeArraysToVertexFormatPrefixForItemSize1` that
+// `WebGPUAttributeUtils#_getVertexFormat()` reads for one value — `threeVertexLayout.spec.ts` holds
+// it). Such an attribute is laid out in 32 bits from the start, so the gpu reads the array of the
+// pool as it is
 const LAYOUT_OF_ONE_VALUE: Partial<Record<VertexAttributeDataType, VertexAttributeDataType>> = {
   int8: 'int32',
   int16: 'int32',
@@ -35,13 +37,13 @@ export class VertexAttributeDescriptor {
    * answer both forms in a single expression — a union of the two halves can't
    * express that, so the stored field is the partial intersection of both.
    */
-  private readonly description: VADescriptionFields;
+  readonly #description: VADescriptionFields;
 
   readonly name: string;
 
   constructor(name: string, description: VertexAttributeDescription | FrozenVertexAttributeDescription) {
     this.name = name;
-    this.description = description;
+    this.#description = description;
   }
 
   /**
@@ -52,17 +54,17 @@ export class VertexAttributeDescriptor {
    * answers take this type.
    */
   get dataType(): VertexAttributeDataType {
-    const declared = this.description.type ?? 'float32';
+    const declared = this.#description.type ?? 'float32';
     if (this.size !== 1 || this.normalizedData) return declared;
     return LAYOUT_OF_ONE_VALUE[declared] ?? declared;
   }
 
   get normalizedData(): boolean {
-    return Boolean(this.description.normalized);
+    return Boolean(this.#description.normalized);
   }
 
   get usageType(): VertexAttributeUsageType {
-    return this.description.usage ?? 'static';
+    return this.#description.usage ?? 'static';
   }
 
   /**
@@ -70,7 +72,7 @@ export class VertexAttributeDescriptor {
    * See `VADescription#autoTouch` for what this controls.
    */
   get autoTouch(): boolean {
-    return this.description.autoTouch ?? this.usageType !== 'static';
+    return this.#description.autoTouch ?? this.usageType !== 'static';
   }
 
   /**
@@ -79,34 +81,34 @@ export class VertexAttributeDescriptor {
    * without going through one, answers `1` for such an attribute instead.
    */
   get size(): number {
-    return this.description.size ?? this.description.components?.length ?? 1;
+    return this.#description.size ?? this.#description.components?.length ?? 1;
   }
 
   get hasComponents(): boolean {
-    return (this.description.components?.length ?? 0) > 0;
+    return (this.#description.components?.length ?? 0) > 0;
   }
 
   get components(): readonly string[] {
-    return this.description.components ?? [];
+    return this.#description.components ?? [];
   }
 
   get bufferName(): string {
-    return this.description.bufferName ?? `${this.usageType}_${this.dataType}${this.normalizedData ? 'N' : ''}`;
+    return this.#description.bufferName ?? `${this.usageType}_${this.dataType}${this.normalizedData ? 'N' : ''}`;
   }
 
   get getterName(): string | undefined {
-    if ('getter' in this.description && !this.description.getter) {
+    if ('getter' in this.#description && !this.#description.getter) {
       return undefined;
     }
-    if (typeof this.description.getter === 'string') return this.description.getter;
+    if (typeof this.#description.getter === 'string') return this.#description.getter;
     return `get${toPascalCase(this.name)}`;
   }
 
   get setterName(): string | undefined {
-    if ('setter' in this.description && !this.description.setter) {
+    if ('setter' in this.#description && !this.#description.setter) {
       return undefined;
     }
-    if (typeof this.description.setter === 'string') return this.description.setter;
+    if (typeof this.#description.setter === 'string') return this.#description.setter;
     return `set${toPascalCase(this.name)}`;
   }
 }

@@ -1,16 +1,18 @@
 import {getSubscriptionCount, on} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {ImageLoader, NearestFilter, Texture, type WebGPURenderer} from 'three/webgpu';
+import {ImageLoader, LinearFilter, NearestFilter, Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import type {TextureOptionClasses} from './TextureFactory.js';
 import {atlasAdapterPicker, loadFailureFor} from './internals.js';
 import {
   type AnyTextureResource,
   AtlasTextureResource,
   ImageTextureResource,
   TextureResource,
+  type TextureResourceErrorEvent,
   TileSetTextureResource,
 } from './TextureResource.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
@@ -655,6 +657,38 @@ describe('TextureResource', () => {
       resource.dispose();
     });
 
+    test('an animation entry with a duration and a frameRate is skipped and reported, and the other entries are registered', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16}, undefined, {
+        // json may carry both timing fields, which the type forbids
+        walk: {duration: 1, frameRate: 12, tileIds: [1, 2]},
+        idle: {duration: 1, tileIds: [3, 4]},
+      } as unknown as FrameBasedAnimationsDataMap);
+      resource.activate();
+
+      const errors: Array<{source: string; id: string; animation: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id: string; animation: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'frameBasedAnimations', id: 'tiles', animation: 'walk'});
+      expect(errors[0]!.error.message).toBe(
+        'FrameBasedAnimations: add() got a duration and a frameRate for the animation "walk" — give one of duration, frameRate and durations',
+      );
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
+      expect(resource.frameBasedAnimations!.animId('idle')).toBe(0);
+
+      resource.dispose();
+    });
+
     test('an animation entry with a frameRate of 0 is skipped and reported', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
@@ -1285,14 +1319,14 @@ describe('TextureResource', () => {
         fetchMock.mockRestore();
       });
 
-      test('a json without an image reports an override that is cleared again', async () => {
+      test('a json without an image takes the image, the texture, the atlas and the json back when the override is cleared again, and reports it', async () => {
         const fetchMock = vi
           .spyOn(globalThis, 'fetch')
           .mockResolvedValue(new Response(JSON.stringify({frames: atlasJson.frames, meta: {size: atlasJson.meta.size}})));
         const loadAsyncSpy = vi
           .spyOn(ImageLoader.prototype, 'loadAsync')
-          .mockImplementation(async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement);
-        const {factory} = makeTextureFactory();
+          .mockImplementation(async (url: string) => ({width: 16, height: 16, tag: url}) as unknown as HTMLImageElement);
+        const {factory, textures} = makeTextureFactory();
 
         const resource = TextureResource.fromAtlas('sprites', 'atlas.json', 'override.png');
         const errors: Array<{source: string; url?: string}> = [];
@@ -1307,15 +1341,30 @@ describe('TextureResource', () => {
 
         expect(errors).toHaveLength(0);
         expect(resource.imageUrl).toBe('override.png');
+        expect(resource.atlas).toBeDefined();
+        expect(textures).toHaveLength(1);
 
         resource.overrideImageUrl = undefined;
         await flushMicrotasks();
         await flushMicrotasks();
 
+        expect(errors).toMatchObject([{source: 'atlas', url: 'atlas.json'}]);
+        expect(resource.imageUrl).toBeUndefined();
+        expect(resource.imageCoords).toBeUndefined();
+        expect(resource.texture).toBeUndefined();
+        expect(resource.atlas).toBeUndefined();
+        expect(resource.frameBasedAnimations).toBeUndefined();
+        expect(resource.atlasJson).toBeUndefined();
+        expect(textures[0]!.disposed).toBe(true);
+
+        resource.overrideImageUrl = 'other.png';
+        await flushMicrotasks();
+        await flushMicrotasks();
+
+        expect(resource.imageUrl).toBe('other.png');
+        expect(resource.atlas).toBeDefined();
+        expect(resource.atlasJson?.meta.image).toBe('other.png');
         expect(errors).toHaveLength(1);
-        expect(errors[0]!.source).toBe('atlas');
-        expect(errors[0]!.url).toBe('atlas.json');
-        expect(resource.imageUrl).toBe('override.png');
 
         resource.dispose();
         loadAsyncSpy.mockRestore();
@@ -1517,6 +1566,35 @@ describe('TextureResource', () => {
       expect(errors[0]!.source).toBe('image');
       expect(errors[0]!.url).toBe('hero.png');
       expect(errors[0]!.error).toBe(loadError);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+    });
+
+    test('the error events of an image that fails to load are TextureResourceErrorEvents, narrowed by their source', async () => {
+      const loadError = new Error('boom');
+      const loadAsyncSpy = vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(() => Promise.reject(loadError));
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      const errors: TextureResourceErrorEvent[] = [];
+      on(resource, 'error', (event: TextureResourceErrorEvent) => {
+        errors.push(event);
+      });
+
+      resource.activate();
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      const [event] = errors;
+      expect(event!.source).toBe('image');
+      if (event!.source === 'image') expect(event!.url).toBe('hero.png');
+      expect(event!.error).toBe(loadError);
+
+      // @ts-expect-error — an image failure names its url
+      const missing: TextureResourceErrorEvent = {source: 'image', error: new Error('x')};
+      expect(missing.source).toBe('image');
 
       resource.dispose();
       loadAsyncSpy.mockRestore();
@@ -1773,6 +1851,53 @@ describe('TextureResource', () => {
     });
   });
 
+  describe('textureClasses are kept as a frozen copy', () => {
+    // the factory asks a renderer for its anisotropy maximum, and for nothing else
+    const rendererStub = () => ({getMaxAnisotropy: () => 16}) as unknown as WebGPURenderer;
+
+    test('an array of textureClasses changed and written again builds the texture with the new classes', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 16, tag: 'hero'}) as unknown as HTMLImageElement,
+      );
+      const classes: TextureOptionClasses[] = ['nearest'];
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      resource.textureClasses = classes;
+      resource.renderer = rendererStub();
+      resource.activate();
+      await flushMicrotasks();
+      const first = resource.texture!;
+      expect(first.magFilter).toBe(NearestFilter);
+      let firstDisposed = false;
+      first.addEventListener('dispose', () => {
+        firstDisposed = true;
+      });
+
+      classes.push('linear');
+      resource.textureClasses = classes;
+      await flushMicrotasks();
+
+      expect(resource.texture).not.toBe(first);
+      expect(resource.texture!.magFilter).toBe(LinearFilter);
+      expect(firstDisposed).toBe(true);
+
+      resource.dispose();
+    });
+
+    test('keeps a frozen copy of the textureClasses written to it', () => {
+      const written: TextureOptionClasses[] = ['nearest', 'flipy'];
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+
+      resource.textureClasses = written;
+      written.push('linear');
+
+      expect(resource.textureClasses).not.toBe(written);
+      expect(Object.isFrozen(resource.textureClasses)).toBe(true);
+      expect(resource.textureClasses).toEqual(['nearest', 'flipy']);
+
+      resource.dispose();
+    });
+  });
+
   // TypeScript refuses each of these writes; the browser tests and every other caller in JavaScript
   // reach the setters on the prototype of the shape, which throw
   describe('setters on the wrong shape', () => {
@@ -1784,8 +1909,7 @@ describe('TextureResource', () => {
         resource.tileSetOptions = {tileWidth: 16};
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow('TextureResource "hero" is an "image" resource and has no "tileSetOptions"');
+      expect(write).toThrow(new TypeError('TextureResource "hero" is an "image" resource and has no "tileSetOptions"'));
       // @ts-expect-error an image resource has no tileSetOptions
       expect(resource.tileSetOptions).toBeUndefined();
       expect(Object.hasOwn(resource, 'tileSetOptions')).toBe(false);
@@ -1801,8 +1925,7 @@ describe('TextureResource', () => {
         resource.frameBasedAnimationsData = {x: {duration: 1, tileIds: [1]}};
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow('TextureResource "hero" is an "image" resource and has no "frameBasedAnimationsData"');
+      expect(write).toThrow(new TypeError('TextureResource "hero" is an "image" resource and has no "frameBasedAnimationsData"'));
       // @ts-expect-error an image resource has no frameBasedAnimationsData
       expect(resource.frameBasedAnimationsData).toBeUndefined();
       expect(Object.hasOwn(resource, 'frameBasedAnimationsData')).toBe(false);
@@ -1818,8 +1941,7 @@ describe('TextureResource', () => {
         resource.atlasUrl = 'x.json';
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow('TextureResource "tiles" is a "tileset" resource and has no "atlasUrl"');
+      expect(write).toThrow(new TypeError('TextureResource "tiles" is a "tileset" resource and has no "atlasUrl"'));
       // @ts-expect-error a tile set resource has no atlasUrl
       expect(resource.atlasUrl).toBeUndefined();
       expect(Object.hasOwn(resource, 'atlasUrl')).toBe(false);
@@ -1849,8 +1971,11 @@ describe('TextureResource', () => {
         resource.imageUrl = 'other.png';
       };
 
-      expect(write).toThrow(TypeError);
-      expect(write).toThrow(/takes its "imageUrl" from the atlas json/);
+      expect(write).toThrow(
+        new TypeError(
+          'TextureResource "deco" is an "atlas" resource and takes its "imageUrl" from the atlas json — write "overrideImageUrl" instead',
+        ),
+      );
       expect(resource.imageUrl).toBeUndefined();
       expect(Object.hasOwn(resource, 'imageUrl')).toBe(false);
 
@@ -1931,10 +2056,11 @@ describe('TextureResource', () => {
       // so the cast stands in for a caller in JavaScript
       const Base = TextureResource as unknown as new (id: string, type: string) => TextureResource;
 
-      expect(() => new Base('sprites', 'atlas')).toThrow(TypeError);
       expect(() => new Base('sprites', 'atlas')).toThrow(
-        'new TextureResource(): TextureResource is the base of the three shapes of resource — build an ImageTextureResource, ' +
-          'a TileSetTextureResource or an AtlasTextureResource, or call TextureResource.fromImage(), fromTileSet() or fromAtlas()',
+        new TypeError(
+          'new TextureResource(): TextureResource is the base of the three shapes of resource — build an ImageTextureResource, ' +
+            'a TileSetTextureResource or an AtlasTextureResource, or call TextureResource.fromImage(), fromTileSet() or fromAtlas()',
+        ),
       );
     });
 
@@ -2029,8 +2155,7 @@ describe('TextureResource', () => {
       };
 
       for (const [property, write] of Object.entries(writes)) {
-        expect(write).toThrow(TypeError);
-        expect(write).toThrow(`TextureResource "hero" is an "image" resource and has no "${property}"`);
+        expect(write).toThrow(new TypeError(`TextureResource "hero" is an "image" resource and has no "${property}"`));
         // reading it answers undefined, and nothing was left on the resource
         expect((resource as unknown as Record<string, unknown>)[property]).toBeUndefined();
         expect(Object.hasOwn(resource, property)).toBe(false);
@@ -2340,6 +2465,54 @@ describe('TextureResource', () => {
 
       expect(resource.textureFactory).not.toBe(first);
       expect(resource.textureFactory!.getOptions(['anisotropy']).anisotropy).toBe(16);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+    });
+
+    test('a renderer that is cleared takes back the factory the resource built for it, and the texture of the image stays', async () => {
+      const loadAsyncSpy = stubImage();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+      const renderer = makeRendererStub(16);
+
+      resource.renderer = renderer;
+      resource.activate();
+      await flushMicrotasks();
+      const first = resource.textureFactory;
+      const texture = resource.texture;
+      expect(first).toBeDefined();
+      expect(texture).toBeInstanceOf(Texture);
+
+      resource.renderer = undefined;
+      await flushMicrotasks();
+
+      expect(resource.textureFactory).toBeUndefined();
+      expect(resource.texture).toBe(texture);
+
+      resource.renderer = renderer;
+      await flushMicrotasks();
+
+      expect(resource.textureFactory).toBeDefined();
+      expect(resource.textureFactory).not.toBe(first);
+
+      resource.dispose();
+      loadAsyncSpy.mockRestore();
+    });
+
+    test('a renderer that is cleared leaves a factory written from outside standing', async () => {
+      const loadAsyncSpy = stubImage();
+      const {factory} = makeTextureFactory();
+      const resource = TextureResource.fromImage('hero', 'hero.png');
+
+      resource.activate();
+      resource.textureFactory = factory;
+      resource.renderer = makeRendererStub(16);
+      await flushMicrotasks();
+
+      resource.renderer = undefined;
+      await flushMicrotasks();
+
+      expect(resource.textureFactory).toBe(factory);
 
       resource.dispose();
       loadAsyncSpy.mockRestore();

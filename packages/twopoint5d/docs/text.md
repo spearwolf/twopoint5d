@@ -50,14 +50,16 @@ answers its amount and `font.info.size` keeps the value as written.
 onto one page, in BMFont with a larger texture size. `BitmapFont.parse(source, {parentCoords})`
 reads a page that was packed into a larger image, at the coords given.
 
-**Refusals.** Each names what is wrong and where: a source in none of the three spellings, JSON that
-does not parse, font data that is no object, a font without a `common` block or with a `lineHeight`,
-`base`, `scaleW` or `scaleH` that is no number — `lineHeight`, `scaleW` and `scaleH` above 0 —, no
-`chars`, more than one page, a char with an id that is no whole number from 0 to 0x10FFFF, a field
-that is no number, a negative position or size, a glyph that reaches beyond the page, two chars of
-one id, a kerning pair whose chars are no code points or whose `amount` is no number. A numeric
-entity in the XML that is no code point stays as it is written, like an entity the reader does not
-know.
+**Refusals.** Each names what is wrong and where. A number of the font is refused with a
+`RangeError`: a `lineHeight`, `base`, `scaleW` or `scaleH` of the `common` block that is no finite
+number — `lineHeight`, `scaleW` and `scaleH` above 0 —, a field of a char that is no finite number,
+a negative position or size of a char, and a kerning pair whose `amount` is no finite number.
+Everything else is refused with an `Error`: a source in none of the three spellings, JSON that does
+not parse, font data that is no object, a font without a `common` block, without `chars` or with
+more than one page, a char with an id that is no whole number from 0 to 0x10FFFF, a glyph that
+reaches beyond the page, two chars of one id, and a kerning pair whose chars are no code points. A
+numeric entity in the XML that is no code point stays as it is written, like an entity the reader
+does not know.
 
 A font and its atlas are plain data: nothing to dispose. The page texture is the caller's.
 
@@ -170,15 +172,18 @@ them in draw order with those sprites — a label may end up behind the sprite i
 objects through a sort, still in reading order.
 
 **Refusals.** A kind without `InstancePosition`, `QuadSize` or `AtlasFrame` — `AnimatedSpriteKind`,
-whose frame comes out of an `animsMap` — is refused before a sprite is created, naming every feature
-missing. A pool that runs full is refused naming how many sprites the text needs; the sprites
-created so far are freed again, so nothing of the text is left behind. An error of `createSprite()`
-— under `grow`, a pool that cannot grow — goes on to the caller after the same freeing. A `scale`,
-`lineHeight` or `maxWidth` that is no number above 0, an `align` it does not know and a `fallback`
-the font lacks are refused naming the option. `rewriteText()` refuses a glyph that is no sprite of
-the sprites handed in, naming its index, before anything changes; on a pool that runs full the
-glyphs keep the text they had. Sprites that are disposed write nothing: `writeText()` answers an
-empty array, `rewriteText()` empties `glyphs`.
+whose frame comes out of an `animsMap` — is refused with a `TypeError` before a sprite is created,
+naming every feature missing. A pool that runs full is refused with a `RangeError` naming how many
+sprites the text needs; the sprites created so far are freed again, so nothing of the text is left
+behind. An error of `createSprite()` — under `grow`, a pool that cannot grow — goes on to the caller
+unchanged, after the same freeing. A `scale`, `lineHeight` or `maxWidth` that is no finite number
+above 0, and an `x`, `y`, `z` or `letterSpacing` that is no finite number, are refused with a
+`RangeError`; an `align` it does not know and a `fallback` that is no single char or no glyph of the
+font with an `Error` — each naming the option. A text that is no string is refused with a
+`TypeError`. `rewriteText()` refuses a glyph that is no sprite of the sprites handed in with a
+`TypeError` naming its index, before anything changes; on a pool that runs full the glyphs keep the
+text they had. Sprites that are disposed write nothing: `writeText()` answers an empty array,
+`rewriteText()` empties `glyphs`.
 
 ## Measuring: `layoutText()`
 
@@ -196,6 +201,9 @@ const {width, height, lineCount, glyphs} = layoutText(font, 'INVENTORY FULL', {s
 // glyphs[i]: {glyph, line, x, y, width, height} — the box of a glyph, y up, its top edge at y
 export const panelSize = {width: width + 8, height: height + 8, lineCount, firstGlyph: glyphs[0]};
 ```
+
+`layoutText()` refuses the options it shares with `writeText()` — all but `z` — and a text that is
+no string as `writeText()` does, with the same error classes.
 
 ## A sine scroller
 

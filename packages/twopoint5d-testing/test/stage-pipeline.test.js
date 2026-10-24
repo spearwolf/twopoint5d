@@ -10,7 +10,7 @@ import {
   StageRenderTargetPool,
 } from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget, Scene} from 'three/webgpu';
-import {makeContainer, disposeDisplay, isNearColor, rgbAt} from './helpers/fixtures.js';
+import {makeContainer, disposeDisplay, disposeKept, isNearColor, keep, rgbAt} from './helpers/fixtures.js';
 
 /** @import {PassNode} from 'three/webgpu' */
 
@@ -21,6 +21,7 @@ describe('StageRenderer — pipeline integration', () => {
   let host;
 
   afterEach(() => {
+    disposeKept();
     disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
@@ -164,6 +165,10 @@ describe('StageRenderer — pipeline integration', () => {
     const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(first).add(second);
     const pipeline = new RenderPipeline(display.renderer);
     sr.pipeline = pipeline;
+    // the pipeline and the stages belong to this test: the renderer lets go first
+    keep(pipeline);
+    keep(first);
+    keep(sr);
 
     /** @type {PassNode[][]} */
     const calls = [];
@@ -188,11 +193,6 @@ describe('StageRenderer — pipeline integration', () => {
     expect(calls, 'the output node is composed again').to.have.length(2);
     expect(calls[1], 'from the stage that is left').to.have.length(1);
     expect(calls[1][0], 'the pass node of the first stage').to.equal(first.asPassNode(display.renderer));
-
-    // the pipeline and the stages belong to this test: the renderer lets go first
-    sr.dispose();
-    first.dispose();
-    pipeline.dispose();
   });
 
   it('Mode D: a rebuild without a camera change keeps the pass node and its render target', async () => {
@@ -236,7 +236,8 @@ describe('StageRenderer — pipeline integration', () => {
     stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#08f')})));
 
     const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
-    const pipeline = new RenderPipeline(display.renderer);
+    // the pipeline was handed to the renderer and belongs to this test
+    const pipeline = keep(new RenderPipeline(display.renderer));
     sr.pipeline = pipeline;
     sr.buildOutputNode = (passes) => passes[0];
 
@@ -260,9 +261,6 @@ describe('StageRenderer — pipeline integration', () => {
 
     expect(disposeCalls, 'the stage gives up the render target it allocated').to.equal(2);
     expect(() => stage.asPassNode(display.renderer), 'and builds no further pass node').to.throw();
-
-    // the pipeline was handed to the renderer and belongs to this test
-    pipeline.dispose();
   });
 
   it('Mode C: a replaced pipeline takes over the output', async () => {
@@ -272,14 +270,16 @@ describe('StageRenderer — pipeline integration', () => {
     stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#0f0')})));
 
     const sr = new StageRenderer(display).setClearColor(new Color('#102030'), 1).add(stage);
-    const first = new RenderPipeline(display.renderer);
+    const first = keep(new RenderPipeline(display.renderer));
     sr.pipeline = first;
 
     await display.start();
     await display.nextFrame();
     await display.nextFrame();
 
-    const next = new RenderPipeline(display.renderer);
+    const next = keep(new RenderPipeline(display.renderer));
+    // both pipelines belong to this test: the renderer lets go first
+    keep(sr);
     // a fresh pipeline carries a placeholder output of its own
     const placeholder = next.outputNode;
     let runs = 0;
@@ -295,11 +295,6 @@ describe('StageRenderer — pipeline integration', () => {
     expect(next.outputNode).to.exist;
     expect(next.outputNode, 'the replaced pipeline carries the output node of the renderer').to.not.equal(placeholder);
     expect(runs).to.be.greaterThan(0);
-
-    // both pipelines belong to this test: the renderer lets go first, then they are released
-    sr.dispose();
-    first.dispose();
-    next.dispose();
   });
 
   it('dispose() drops the pipeline reference and leaves the pipeline itself to its owner', async () => {
@@ -335,11 +330,11 @@ describe('StageRenderer — pipeline integration', () => {
     await display.start();
 
     // 64 pixels wide: rgbAt() reads the rows at that length
-    const target = new RenderTarget(64, 64);
+    const target = keep(new RenderTarget(64, 64));
     // no specs: 64 x 64 units on 64 x 64 pixels, the camera centred on the origin
-    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
-    const geometry = new PlaneGeometry(16, 16);
-    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+    const geometry = keep(new PlaneGeometry(16, 16));
+    const material = keep(new MeshBasicMaterial({color: new Color('#0f0')}));
     const mesh = new Mesh(geometry, material);
     mesh.position.x = -16;
     stage.scene.add(mesh);
@@ -347,7 +342,10 @@ describe('StageRenderer — pipeline integration', () => {
     // driven by hand, no host: the child keeps clear = false and has no pipeline of its own
     const child = new StageRenderer().add(stage);
     const root = new StageRenderer().add(child);
-    const pipeline = new RootRenderPipeline(display.renderer);
+    const pipeline = keep(new RootRenderPipeline(display.renderer));
+    // the renderers let go first
+    keep(child);
+    keep(root);
     root.pipeline = pipeline;
     root.outputRenderTarget = target;
     root.resize(64, 64);
@@ -363,15 +361,6 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgbAt(first, 64, 16, 32), [0, 255, 0]), 'the content in the first frame').to.be.true;
     expect(isNearColor(rgbAt(second, 64, 16, 32), [0, 0, 0]), 'where the content stood a frame before').to.be.true;
     expect(isNearColor(rgbAt(second, 64, 48, 32), [0, 255, 0]), 'the content in the second frame').to.be.true;
-
-    // the pipeline and the target belong to this test: the renderers let go first
-    root.dispose();
-    child.dispose();
-    stage.dispose();
-    pipeline.dispose();
-    target.dispose();
-    geometry.dispose();
-    material.dispose();
   });
 
   it('Mode D: a RootRenderPipeline without stages shows the clear color of its renderer, and composes the first stage that joins it', async () => {
@@ -380,9 +369,9 @@ describe('StageRenderer — pipeline integration', () => {
     await display.start();
 
     // 64 pixels wide: rgbAt() reads the rows at that length
-    const target = new RenderTarget(64, 64);
+    const target = keep(new RenderTarget(64, 64));
     const root = new StageRenderer().setClearColor(new Color('#f00'), 1);
-    const pipeline = new RootRenderPipeline(display.renderer);
+    const pipeline = keep(new RootRenderPipeline(display.renderer));
     root.pipeline = pipeline;
     root.outputRenderTarget = target;
     root.resize(64, 64);
@@ -393,23 +382,17 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgbAt(empty, 64, 32, 32), [255, 0, 0]), 'the clear color without a stage').to.be.true;
 
     // no specs: 64 x 64 units on 64 x 64 pixels, the camera centred on the origin
-    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
-    const geometry = new PlaneGeometry(16, 16);
-    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const geometry = keep(new PlaneGeometry(16, 16));
+    const material = keep(new MeshBasicMaterial({color: new Color('#0f0')}));
+    const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+    // the renderer lets go first: it holds the stage that joined
+    keep(root);
     stage.scene.add(new Mesh(geometry, material));
     root.add(stage);
 
     root.renderTo(display.renderer);
     const joined = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
     expect(isNearColor(rgbAt(joined, 64, 32, 32), [0, 255, 0]), 'the first stage that joined').to.be.true;
-
-    // the pipeline and the target belong to this test: the renderer and the stage let go first
-    root.dispose();
-    stage.dispose();
-    pipeline.dispose();
-    target.dispose();
-    geometry.dispose();
-    material.dispose();
   });
 
   /**
@@ -542,24 +525,28 @@ describe('StageRenderer — pipeline integration', () => {
    * @param {StageRenderTargetPool} [pool] set as `internalTargetPool` on the child and the root
    */
   async function grayThroughNestedPipeline(makeRootPipeline, childComposes, pool) {
+    if (pool) keep(pool);
     host = makeContainer({width: 64, height: 64});
     display = new Display(host);
     await display.start();
     const renderer = display.renderer;
 
-    const target = new RenderTarget(64, 64);
-    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
-    const geometry = new PlaneGeometry(32, 32);
-    const material = new MeshBasicMaterial({color: new Color('#808080')});
+    const target = keep(new RenderTarget(64, 64));
+    const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+    const geometry = keep(new PlaneGeometry(32, 32));
+    const material = keep(new MeshBasicMaterial({color: new Color('#808080')}));
     stage.scene.add(new Mesh(geometry, material));
 
     const child = new StageRenderer().add(stage);
-    const childPipeline = new RenderPipeline(renderer);
+    const childPipeline = keep(new RenderPipeline(renderer));
     child.pipeline = childPipeline;
     if (childComposes) child.buildOutputNode = ([p]) => p;
 
     const root = new StageRenderer().add(child);
-    const rootPipeline = makeRootPipeline(renderer);
+    const rootPipeline = keep(makeRootPipeline(renderer));
+    // the renderers let go first
+    keep(child);
+    keep(root);
     root.pipeline = rootPipeline;
     root.outputRenderTarget = target;
     root.resize(64, 64);
@@ -570,16 +557,6 @@ describe('StageRenderer — pipeline integration', () => {
 
     root.renderTo(renderer);
     const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
-
-    root.dispose();
-    child.dispose();
-    pool?.dispose();
-    stage.dispose();
-    rootPipeline.dispose();
-    childPipeline.dispose();
-    target.dispose();
-    geometry.dispose();
-    material.dispose();
 
     return rgbAt(pixels, 64, 32, 32);
   }
@@ -605,9 +582,10 @@ describe('StageRenderer — pipeline integration', () => {
     await display.start();
     const renderer = display.renderer;
 
-    const geometry = new PlaneGeometry(16, 16);
-    const material = new MeshBasicMaterial({color: new Color('#0f0')});
-    const pool = new StageRenderTargetPool();
+    // what is kept first is released last: the renderers let go before the pool and the shared parts
+    const geometry = keep(new PlaneGeometry(16, 16));
+    const material = keep(new MeshBasicMaterial({color: new Color('#0f0')}));
+    const pool = keep(new StageRenderTargetPool());
 
     /**
      * A renderer with a pipeline of its own and a green square at `x`, and the targets its stages
@@ -616,7 +594,7 @@ describe('StageRenderer — pipeline integration', () => {
      * @param {number} x
      */
     const makeRenderer = (x) => {
-      const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+      const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
       const mesh = new Mesh(geometry, material);
       mesh.position.x = x;
       stage.scene.add(mesh);
@@ -633,14 +611,14 @@ describe('StageRenderer — pipeline integration', () => {
         },
       };
 
-      const target = new RenderTarget(64, 64);
-      const pipeline = new RenderPipeline(renderer);
-      const sr = new StageRenderer().add(stage).add(capture);
+      const target = keep(new RenderTarget(64, 64));
+      const pipeline = keep(new RenderPipeline(renderer));
+      const sr = keep(new StageRenderer().add(stage).add(capture));
       sr.pipeline = pipeline;
       sr.outputRenderTarget = target;
       sr.internalTargetPool = pool;
       sr.resize(64, 64);
-      return {sr, stage, pipeline, target, seen};
+      return {sr, target, seen};
     };
 
     const a = makeRenderer(-16);
@@ -672,18 +650,6 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgbAt(pixelsA, 64, 48, 32), [0, 0, 0]), 'nothing of b in a').to.be.true;
     expect(isNearColor(rgbAt(pixelsB, 64, 16, 32), [0, 0, 0]), 'nothing of a in b').to.be.true;
     expect(isNearColor(rgbAt(pixelsB, 64, 48, 32), [0, 255, 0]), 'the square of b in b').to.be.true;
-
-    // the renderers let go first, then the pool and what else belongs to this test
-    a.sr.dispose();
-    b.sr.dispose();
-    pool.dispose();
-    for (const {stage, pipeline, target} of [a, b]) {
-      stage.dispose();
-      pipeline.dispose();
-      target.dispose();
-    }
-    geometry.dispose();
-    material.dispose();
   });
 
   it('Mode C without clear leaves no tint of the renderer clear color in its internal target', async () => {
@@ -695,16 +661,18 @@ describe('StageRenderer — pipeline integration', () => {
     const renderer = display.renderer;
     renderer.setClearColor(new Color('#f00'), 1);
 
-    const target = new RenderTarget(64, 64);
-    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
-    const geometry = new PlaneGeometry(16, 16);
-    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const target = keep(new RenderTarget(64, 64));
+    const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+    const geometry = keep(new PlaneGeometry(16, 16));
+    const material = keep(new MeshBasicMaterial({color: new Color('#0f0')}));
     const mesh = new Mesh(geometry, material);
     mesh.position.x = -16;
     stage.scene.add(mesh);
 
     const root = new StageRenderer().add(stage);
-    const pipeline = new RenderPipeline(renderer);
+    const pipeline = keep(new RenderPipeline(renderer));
+    // the renderer lets go first
+    keep(root);
     // without the output transform the pipeline hands the RGB of the internal target through as
     // it is, whatever its alpha
     pipeline.outputColorTransform = false;
@@ -717,13 +685,6 @@ describe('StageRenderer — pipeline integration', () => {
 
     const rgb = rgbAt(pixels, 64, 48, 32);
     expect(isNearColor(rgb, [0, 0, 0]), `where no stage draws, got ${rgb}`).to.be.true;
-
-    root.dispose();
-    stage.dispose();
-    pipeline.dispose();
-    target.dispose();
-    geometry.dispose();
-    material.dispose();
   });
 
   it('Mode C with a clear that leaves out the color buffer shows only the content of the current frame', async () => {
@@ -732,17 +693,19 @@ describe('StageRenderer — pipeline integration', () => {
     await display.start();
     const renderer = display.renderer;
 
-    const target = new RenderTarget(64, 64);
-    const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
-    const geometry = new PlaneGeometry(16, 16);
-    const material = new MeshBasicMaterial({color: new Color('#0f0')});
+    const target = keep(new RenderTarget(64, 64));
+    const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+    const geometry = keep(new PlaneGeometry(16, 16));
+    const material = keep(new MeshBasicMaterial({color: new Color('#0f0')}));
     const mesh = new Mesh(geometry, material);
     mesh.position.x = -16;
     stage.scene.add(mesh);
 
     const root = new StageRenderer().setClearColor(new Color('#000'), 1).add(stage);
     root.clearColorBuffer = false;
-    const pipeline = new RenderPipeline(renderer);
+    const pipeline = keep(new RenderPipeline(renderer));
+    // the renderer lets go first
+    keep(root);
     root.pipeline = pipeline;
     root.outputRenderTarget = target;
     root.resize(64, 64);
@@ -758,13 +721,6 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgbAt(first, 64, 16, 32), [0, 255, 0]), 'the content in the first frame').to.be.true;
     expect(isNearColor(rgbAt(second, 64, 16, 32), [0, 0, 0]), 'where the content stood a frame before').to.be.true;
     expect(isNearColor(rgbAt(second, 64, 48, 32), [0, 255, 0]), 'the content in the second frame').to.be.true;
-
-    root.dispose();
-    stage.dispose();
-    pipeline.dispose();
-    target.dispose();
-    geometry.dispose();
-    material.dispose();
   });
 
   it('the internal targets have the output buffer type and the samples of the renderer', async () => {
@@ -786,7 +742,9 @@ describe('StageRenderer — pipeline integration', () => {
     };
 
     const sr = new StageRenderer().add(stage);
-    const pipeline = new RenderPipeline(renderer);
+    const pipeline = keep(new RenderPipeline(renderer));
+    // the renderer lets go first
+    keep(sr);
     sr.pipeline = pipeline;
     sr.resize(64, 64);
     sr.renderTo(renderer);
@@ -799,8 +757,5 @@ describe('StageRenderer — pipeline integration', () => {
     const passRT = /** @type {any} */ (sr.asPassNode(renderer)).value.renderTarget;
     expect(passRT.samples, 'pass target samples').to.equal(renderer.samples);
     expect(passRT.texture.type, 'pass target type').to.equal(renderer.getOutputBufferType());
-
-    sr.dispose();
-    pipeline.dispose();
   });
 });

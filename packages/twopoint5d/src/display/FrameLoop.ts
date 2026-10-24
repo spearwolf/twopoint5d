@@ -1,4 +1,6 @@
 import {emit, type EventizedObject, eventize, off, on, type UnsubscribeFunc} from '@spearwolf/eventize';
+import {describeValue} from '../utils/describeValue.js';
+import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 
 interface ISetAnimationLoop {
   // `null` is how three.js stops the loop again, and `stop()` below uses it. three's
@@ -16,6 +18,13 @@ const MEASURE_FPS_AFTER_NTH_FRAME = 30;
 // undefined, and that one is reported as well
 const NO_LOOP_ERROR = Symbol('no loop error');
 const MEASURE_COLLECTION_SIZE = 10;
+
+function checkMaxFps(maxFps: unknown, subject: string): number {
+  if (!isFiniteNumber(maxFps) || maxFps < 0) {
+    throw new RangeError(`${subject}: maxFps must be a finite number of 0 or more, got ${describeValue(maxFps)}`);
+  }
+  return maxFps;
+}
 
 // `let`, because a WeakMap cannot be emptied — only replaced. See FrameLoop.resetRAF().
 let rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
@@ -62,7 +71,10 @@ class RAF {
   // the null of stop() included; one failure is reported once
   #reportedLoopError: unknown = NO_LOOP_ERROR;
 
-  constructor(private readonly renderer?: ISetAnimationLoop) {
+  readonly #renderer?: ISetAnimationLoop;
+
+  constructor(renderer?: ISetAnimationLoop) {
+    this.#renderer = renderer;
     eventize(this);
   }
 
@@ -87,7 +99,7 @@ class RAF {
   }
 
   #onAnimationFrame = (now: number) => {
-    if (this.renderer == null) {
+    if (this.#renderer == null) {
       this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
     }
 
@@ -105,8 +117,8 @@ class RAF {
 
   start() {
     if (this.#rafID !== 0) return;
-    if (this.renderer) {
-      this.#handleLoopResult(this.renderer.setAnimationLoop(this.#onAnimationFrame));
+    if (this.#renderer) {
+      this.#handleLoopResult(this.#renderer.setAnimationLoop(this.#onAnimationFrame));
       this.#rafID = 1; // Using 1 to indicate that the renderer is set
     } else {
       this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
@@ -118,8 +130,8 @@ class RAF {
     // global that a bare node process does not have
     if (this.#rafID === 0) return;
 
-    if (this.renderer) {
-      this.#handleLoopResult(this.renderer.setAnimationLoop(null));
+    if (this.#renderer) {
+      this.#handleLoopResult(this.#renderer.setAnimationLoop(null));
     } else {
       cancelAnimationFrame(this.#rafID);
     }
@@ -178,8 +190,21 @@ class RAF {
 
 export interface FrameLoop extends EventizedObject {}
 
+/**
+ * Sends {@link FrameLoop.OnFrame} to every target on it, once per animation frame — out of the
+ * animation loop of the renderer handed in, or out of `requestAnimationFrame` without one —, at
+ * most `maxFps` times per second. The payload carries `now`, `lastNow` and `deltaTime` in
+ * seconds, `frameNo` and `measuredFps`.
+ *
+ * The loops share one driver per renderer and one without; a driver runs as long as a loop on it
+ * has a target. A `Display` builds one for itself.
+ */
 export class FrameLoop {
-  static OnFrame = OnFrame;
+  /**
+   * The name of the event every frame goes out under; a target handed to {@link start} receives
+   * it through its method of this name.
+   */
+  static readonly OnFrame = OnFrame;
 
   /**
    * Drops the rAF drivers that every `FrameLoop` of this module shares, so the next
@@ -275,21 +300,41 @@ export class FrameLoop {
     return this.#measuredFps;
   }
 
-  get subscriptionCount() {
+  /**
+   * The number of targets on the loop: {@link start} adds a target that is not on it yet,
+   * {@link stop} and {@link clear} take them off. Above 0 the loop takes frames from its driver.
+   */
+  get subscriptionCount(): number {
     return this.#subscribers.size;
   }
 
-  private readonly raf: RAF;
+  readonly #raf: RAF;
 
+  /**
+   * Builds a loop on the animation loop of `renderer`, or on `requestAnimationFrame` without one,
+   * that emits at most `maxFps` frames per second — every animation frame with `0`, the default.
+   *
+   * @throws {RangeError} for a `maxFps` that is no finite number of 0 or more, before the loop
+   *   takes a driver.
+   */
   // the shape is written out, so the published signature names nothing the package keeps inside
   constructor(maxFps = 0, renderer?: {setAnimationLoop(callback: ((now: number) => unknown) | null): unknown}) {
+    checkMaxFps(maxFps, 'new FrameLoop()');
     eventize(this);
-    this.raf = RAF.get(renderer);
+    this.#raf = RAF.get(renderer);
     this.setFps(maxFps);
   }
 
-  setFps(maxFps: number) {
-    this.#maxFps = Number.isFinite(maxFps) ? Math.abs(maxFps) : 0;
+  /**
+   * Limits the frames this loop emits to `maxFps` per second; with `0` it emits on every animation
+   * frame. The schedule starts anew with the next frame.
+   *
+   * @throws {RangeError} for a `maxFps` that is no finite number of 0 or more — the loop keeps the
+   *   limit it has.
+   */
+  setFps(maxFps: number): void {
+    checkMaxFps(maxFps, 'FrameLoop#setFps()');
+    this.#maxFps = maxFps;
     this.#nextEmitAt = 0;
     this.#emitTolerance = this.#maxFps > 0 ? (1000 / this.#maxFps) * 0.02 : 0;
   }
@@ -306,10 +351,12 @@ export class FrameLoop {
       this.#subscribers.add(target);
 
       if (this.subscriptionCount === 1) {
-        this.raf.attach(this, this.#onRAF);
+        this.#raf.attach(this, this.#onRAF);
       }
 
-      on(this as FrameLoop, FrameLoop.OnFrame, target);
+      // the module constant, not the static: a write over FrameLoop.OnFrame from JavaScript cannot
+      // pull on() here, emit() in #onRAF and off() in stop() apart
+      on(this as FrameLoop, OnFrame, target);
     }
 
     return () => {
@@ -317,15 +364,20 @@ export class FrameLoop {
     };
   }
 
-  stop(target: object) {
+  /**
+   * Takes `target` off the loop; a target that is not on it, `null` and `undefined` change
+   * nothing. With the last target the loop lets go of its driver, and the first frame after the
+   * next {@link start} has a `deltaTime` of 0 and begins the `maxFps` schedule anew.
+   */
+  stop(target: object): void {
     if (target == null) return;
     if (this.#subscribers.has(target)) {
       this.#subscribers.delete(target);
 
-      off(this, FrameLoop.OnFrame, target);
+      off(this, OnFrame, target);
 
       if (this.subscriptionCount === 0) {
-        this.raf.detach(this);
+        this.#raf.detach(this);
         // the first frame after the loop runs again would measure the whole span in which nobody
         // asked for a frame, and the maxFps grid would still stand where it stood before it —
         // the driver starts its fps window anew for the same reason
@@ -373,7 +425,7 @@ export class FrameLoop {
 
     // call FrameLoop subscribers. A new object per frame on purpose: a listener may keep the
     // props, and an object used again would change under it
-    emit(this, FrameLoop.OnFrame, {
+    emit(this, OnFrame, {
       now: now / 1000,
       lastNow: (prevNow ?? now) / 1000,
       frameNo: this.#frameNo,
@@ -382,7 +434,8 @@ export class FrameLoop {
     });
   };
 
-  clear() {
+  /** Takes every target off the loop, as {@link stop} does one after the other. */
+  clear(): void {
     for (const target of Array.from(this.#subscribers)) {
       this.stop(target);
     }

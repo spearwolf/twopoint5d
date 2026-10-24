@@ -26,8 +26,10 @@ import {OrthographicCamera, RenderTarget, Scene, Texture} from 'three/webgpu';
 import {
   cellColors as cellColorsOf,
   disposeDisplay,
+  disposeKept,
   expectSameCells,
   isNearColor,
+  keep,
   makeColorTexture,
   makeContainer,
   makeSheetWithTurnedCopy,
@@ -229,9 +231,6 @@ const cellColors = (pixels, pixelsPerUnit, topDown, x, y, columns, rows) =>
   cellColorsOf(pixels, TARGET_SIZE, pixelsPerUnit, topDown, x, y, columns, rows);
 
 describe('sprites — the pipeline stages carry flip and nine-slice', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -247,6 +246,7 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -282,8 +282,9 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
 
     it('mirrors an upright and a turned atlas frame along x, along y and along both', async function () {
       const {texture, json} = makeSheetWithTurnedCopy(IMAGE, 3, 2);
+      keep(texture);
       const [atlas] = TexturePackerJson.parse(json);
-      const sprites = new FeatureSprites(FlipKind, {capacity: 8, textures: {colorMap: texture}});
+      const sprites = keep(new FeatureSprites(FlipKind, {capacity: 8, textures: {colorMap: texture}}));
       const flips = [
         [0, 0],
         [1, 0],
@@ -303,8 +304,6 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
 
       const pixels = await render(sprites, PPU);
       const topDown = await readsTopDown(display.renderer, target);
-      sprites.dispose();
-      texture.dispose();
 
       for (const [j, name] of ['upright', 'turned'].entries()) {
         const y = j === 0 ? 3 : -3;
@@ -317,8 +316,9 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
 
     it('keeps a trimmed frame, also one the packer turned, where the flipped untrimmed sprite has it', async function () {
       const {texture, json} = makeTrimmedSheet();
+      keep(texture);
       const [atlas] = TexturePackerJson.parse(json);
-      const sprites = new FeatureSprites(FlipKind, {capacity: 4, textures: {colorMap: texture}});
+      const sprites = keep(new FeatureSprites(FlipKind, {capacity: 4, textures: {colorMap: texture}}));
       const place = (name, x, y, flipX) => {
         const sprite = sprites.createSprite();
         sprite.setSize(5, 4);
@@ -333,8 +333,6 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
 
       const pixels = await render(sprites, PPU);
       const topDown = await readsTopDown(display.renderer, target);
-      sprites.dispose();
-      texture.dispose();
 
       const reference = cellColors(pixels, PPU, topDown, -4, 4, 5, 4);
       const flipped = cellColors(pixels, PPU, topDown, 4, 4, 5, 4);
@@ -345,12 +343,13 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
 
     it('mirrors every frame AnimatedFrames picks, a turned one among them', async function () {
       const {texture, json} = makeSheetWithTurnedCopy(IMAGE, 3, 2);
+      keep(texture);
       const [atlas] = TexturePackerJson.parse(json);
       const anims = new FrameBasedAnimations();
       anims.add('upright', 1, [atlas.frame('upright').coords]);
       anims.add('turned', 1, [atlas.frame('turned').coords]);
-      const animsMap = anims.bakeDataTexture();
-      const sprites = new FeatureSprites(AnimatedFlipKind, {capacity: 3, textures: {colorMap: texture, animsMap}});
+      const animsMap = keep(anims.bakeDataTexture());
+      const sprites = keep(new FeatureSprites(AnimatedFlipKind, {capacity: 3, textures: {colorMap: texture, animsMap}}));
       const place = (name, x, flipX) => {
         const sprite = sprites.createSprite();
         sprite.setSize(3, 2);
@@ -364,9 +363,6 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
 
       const pixels = await render(sprites, PPU);
       const topDown = await readsTopDown(display.renderer, target);
-      sprites.dispose();
-      texture.dispose();
-      animsMap.dispose();
 
       const mirrored = mirroredX(cellColors(pixels, PPU, topDown, -5, 0, 3, 2));
       expectSameCells(cellColors(pixels, PPU, topDown, 0, 0, 3, 2), mirrored, 'the animated upright frame flipped');
@@ -407,16 +403,14 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
 
     /** @param {[left: number, top: number, right: number, bottom: number]} insets */
     async function renderPanel(width, height, insets) {
-      const colorMap = makeBlocks();
-      const sprites = new FeatureSprites(NineSliceKind, {capacity: 1, textures: {colorMap}});
+      const colorMap = keep(makeBlocks());
+      const sprites = keep(new FeatureSprites(NineSliceKind, {capacity: 1, textures: {colorMap}}));
       const sprite = sprites.createSprite();
       sprite.setSize(width, height);
       sprite.setTexCoords(0, 0, 1, 1);
       sprite.setSliceInsets(...insets);
       const pixels = await render(sprites, PPU);
       const topDown = await readsTopDown(display.renderer, target);
-      sprites.dispose();
-      colorMap.dispose();
       return {pixels, topDown};
     }
 
@@ -470,8 +464,8 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
   describe('a shared time', () => {
     it('moves a sprite whose bob shares the time of AnimatedFrames, by one setUniform()', async function () {
       const PPU = 4;
-      const colorMap = makeColorTexture([[255, 255, 255, 255]], 1, 1);
-      const sprites = new FeatureSprites(BobKind, {capacity: 1, textures: {colorMap}});
+      const colorMap = keep(makeColorTexture([[255, 255, 255, 255]], 1, 1));
+      const sprites = keep(new FeatureSprites(BobKind, {capacity: 1, textures: {colorMap}}));
       const sprite = sprites.createSprite();
       sprite.setSize(2, 2);
 
@@ -486,8 +480,6 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
       const still = rowsLit(await render(sprites, PPU));
       sprites.setUniform('time', 3);
       const moved = rowsLit(await render(sprites, PPU));
-      sprites.dispose();
-      colorMap.dispose();
 
       expect(still).to.have.lengthOf(8);
       expect(moved).to.have.lengthOf(8);
@@ -518,19 +510,18 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
     it('follows an image that arrives after setTexture(), and a texture swapped in', async function () {
       const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor, SizeColor]});
       const late = imageArrivesLater();
-      const sprites = new FeatureSprites(kind, {capacity: 1, textures: {colorMap: late.texture}});
+      const other = imageArrivesLater();
+      keep(late.texture);
+      keep(other.texture);
+      const sprites = keep(new FeatureSprites(kind, {capacity: 1, textures: {colorMap: late.texture}}));
       sprites.createSprite().setSize(4, 4);
 
       await render(sprites, PPU);
       late.arrive(7, 3);
       const arrived = centerColor(await render(sprites, PPU));
-      const other = imageArrivesLater();
       other.arrive(5, 9);
       sprites.setTexture('colorMap', other.texture);
       const swapped = centerColor(await render(sprites, PPU));
-      sprites.dispose();
-      late.texture.dispose();
-      other.texture.dispose();
 
       expect(arrived, 'the measures of the image that arrived').to.satisfy((c) => isNearColor(c, [7, 3, 0], 0));
       expect(swapped, 'the measures of the texture swapped in').to.satisfy((c) => isNearColor(c, [5, 9, 0], 0));
@@ -539,19 +530,20 @@ describe('sprites — the pipeline stages carry flip and nine-slice', function (
     it('follows an image that arrives later in the material of a pass', async function () {
       const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor]});
       const late = imageArrivesLater();
-      const sprites = new FeatureSprites(kind, {
-        capacity: 1,
-        textures: {colorMap: late.texture},
-        passes: [definePass({name: 'size', features: [SizeColor]})],
-      });
+      keep(late.texture);
+      const sprites = keep(
+        new FeatureSprites(kind, {
+          capacity: 1,
+          textures: {colorMap: late.texture},
+          passes: [definePass({name: 'size', features: [SizeColor]})],
+        }),
+      );
       sprites.material.visible = false;
       sprites.createSprite().setSize(4, 4);
 
       await render(sprites, PPU);
       late.arrive(6, 2);
       const arrived = centerColor(await render(sprites, PPU));
-      sprites.dispose();
-      late.texture.dispose();
 
       expect(arrived).to.satisfy((c) => isNearColor(c, [6, 2, 0], 0));
     });

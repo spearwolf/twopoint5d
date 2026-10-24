@@ -32,7 +32,9 @@ import {
   countColor,
   diffPixels,
   disposeDisplay,
+  disposeKept,
   isNearColor,
+  keep,
   makeCameraAboveGround,
   makeColorTexture,
   makeContainer,
@@ -103,7 +105,6 @@ function columnsOf(pixels, rgb) {
 }
 
 describe('sprites — a shadow pass', function () {
-  this.timeout(20000);
   let display;
   let host;
   let target;
@@ -116,6 +117,7 @@ describe('sprites — a shadow pass', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -138,8 +140,8 @@ describe('sprites — a shadow pass', function () {
   }
 
   it('draws the shadow of a sprite where the light projects it, in the shadow color, flat and as a billboard', async function () {
-    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    const colorMap = keep(makeColorTexture([RED, RED, RED, RED], 2, 2));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]}));
     aimTheShadow(sprites);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -153,13 +155,33 @@ describe('sprites — a shadow pass', function () {
     sprites.placement = BillboardPlacement;
     const billboard = await renderToPixels(display.renderer, scene, makeCamera(), target);
 
-    sprites.dispose();
-    colorMap.dispose();
-
     for (const pixels of [flat, billboard]) {
       expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
       expect(columnsOf(pixels, BLUE), 'its shadow at x ∈ [0, 2]').to.deep.equal({from: CENTER + 8, to: CENTER + 23});
     }
+  });
+
+  it('draws the sprites of a frame in which the visible hook of a pass throws', async function () {
+    const brokenShadow = definePass({
+      ...ShadowPass,
+      name: 'brokenShadow',
+      visible() {
+        throw new Error('the hook broke');
+      },
+    });
+    const colorMap = keep(makeColorTexture([RED, RED, RED, RED], 2, 2));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [brokenShadow]}));
+    const sprite = sprites.createSprite();
+    sprite.setSize(2, 2);
+    sprite.setPosition(-1, 0, 4);
+    sprite.setTexCoords(0, 0, 1, 1);
+    const scene = new Scene();
+    scene.add(sprites);
+
+    expect(() => sprites.update()).to.throw('FeatureSprites: the visible of pass "brokenShadow" threw: the hook broke');
+    const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
+
+    expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
   });
 
   /**
@@ -169,8 +191,8 @@ describe('sprites — a shadow pass', function () {
    */
   async function renderOnTheGround(ground) {
     const topDown = await readsTopDown(display.renderer, target);
-    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    const colorMap = keep(makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]}));
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -181,8 +203,8 @@ describe('sprites — a shadow pass', function () {
     let groundMesh;
     if (ground != null) {
       groundMesh = new Mesh(
-        new PlaneGeometry(4, 4),
-        new MeshBasicNodeMaterial({color: new Color(...ground.slice(0, 3).map((c) => c / 255))}),
+        keep(new PlaneGeometry(4, 4)),
+        keep(new MeshBasicNodeMaterial({color: new Color(...ground.slice(0, 3).map((c) => c / 255))})),
       );
       groundMesh.rotation.x = -Math.PI / 2;
       scene.add(groundMesh);
@@ -195,11 +217,6 @@ describe('sprites — a shadow pass', function () {
       makeCameraAboveGround(TARGET_SIZE, GROUND_PIXELS_PER_UNIT),
       target,
     );
-
-    sprites.dispose();
-    colorMap.dispose();
-    groundMesh?.geometry.dispose();
-    groundMesh?.material.dispose();
 
     return {
       pixels,
@@ -239,7 +256,7 @@ describe('sprites — a shadow pass', function () {
   it('shows the shadow of the frame the animated sprite shows at the same time', async function () {
     // frame 0 is opaque red, frame 1 transparent: the shadow is there at the start and gone three quarters in
     const texels = [RED, CLEAR];
-    const colorMap = makeColorTexture(texels);
+    const colorMap = keep(makeColorTexture(texels));
     const frames = new TextureCoords(0, 0, texels.length, 1);
     const anims = new FrameBasedAnimations();
     anims.add(
@@ -247,13 +264,15 @@ describe('sprites — a shadow pass', function () {
       1,
       [0, 1].map((i) => new TextureCoords(frames, i, 0, 1, 1)),
     );
-    const animsMap = anims.bakeDataTexture();
+    const animsMap = keep(anims.bakeDataTexture());
 
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {
-      capacity: 1,
-      textures: {colorMap, animsMap},
-      passes: [PlanarShadowPass],
-    });
+    const sprites = keep(
+      new FeatureSprites(AnimatedSpriteKind, {
+        capacity: 1,
+        textures: {colorMap, animsMap},
+        passes: [PlanarShadowPass],
+      }),
+    );
     aimTheShadow(sprites);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -268,17 +287,13 @@ describe('sprites — a shadow pass', function () {
     sprites.setUniform('time', 0.75);
     const later = await renderToPixels(display.renderer, scene, makeCamera(), target);
 
-    sprites.dispose();
-    colorMap.dispose();
-    animsMap.dispose();
-
     expect(columnsOf(atStart, BLUE).from, 'a shadow of the opaque frame').to.equal(CENTER + 8);
     expect(columnsOf(later, BLUE).from, 'no shadow of the transparent frame').to.equal(-1);
   });
 
   it('draws the shadow on a plane bound from a moved and turned node, for sprites moved in the world', async function () {
-    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    const colorMap = keep(makeColorTexture([RED, RED, RED, RED], 2, 2));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]}));
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     sprites.setUniform('shadowLight', -0.5, 0, 1, 0);
     // the sprites stand at (-1, 0, 1) in the world, so the sprite at local (0, 0, 3) is at world
@@ -302,17 +317,14 @@ describe('sprites — a shadow pass', function () {
 
     const pixels = await renderToPixels(display.renderer, scene, makeCamera(), target);
 
-    sprites.dispose();
-    colorMap.dispose();
-
     // the light travels along (0.5, 0, -1): from z = 4 down to the wall at z = -1 is 5 units, 2.5 to the right
     expect(columnsOf(pixels, [255, 0, 0]), 'the sprite at x ∈ [-2, 0]').to.deep.equal({from: CENTER - 8, to: CENTER + 7});
     expect(columnsOf(pixels, BLUE), 'its shadow at x ∈ [0.5, 2.5]').to.deep.equal({from: CENTER + 12, to: CENTER + 27});
   });
 
   it('spreads the shadow of a point light and draws none for a light behind the plane', async function () {
-    const colorMap = makeColorTexture([RED, RED, RED, RED], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]});
+    const colorMap = keep(makeColorTexture([RED, RED, RED, RED], 2, 2));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [PlanarShadowPass]}));
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     sprites.bindUniform('groundPlane', planeOf(new Plane(new Vector3(0, 0, 1), 0)));
     // a point 8 in front of the plane, at the left edge of the sprite: the sprite 4 in front of the
@@ -332,9 +344,6 @@ describe('sprites — a shadow pass', function () {
     lamp.position.set(-2, 0, -3);
     sprites.update();
     const behind = await renderToPixels(display.renderer, scene, makeCamera(), target);
-
-    sprites.dispose();
-    colorMap.dispose();
 
     // from (-2, 0, 8) through the sprite at z = 4 down to z = 0 doubles it: x ∈ [-2, 2], y ∈ [-2, 2].
     // The sprite (x ∈ [-2, 0], y ∈ [-1, 1]) covers part of it; above and below the sprite the left
@@ -361,8 +370,8 @@ describe('sprites — a shadow pass', function () {
    * }} options
    */
   async function renderTheShadowOf(pass, {light, placement, drawSprite = true, plane}) {
-    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]});
+    const colorMap = keep(makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]}));
     sprites.setUniform('shadowColor', 0, 0, 1, 1);
     sprites.setUniform('shadowLight', ...light);
     if (plane != null) sprites.setUniform('groundPlane', ...plane);
@@ -383,8 +392,6 @@ describe('sprites — a shadow pass', function () {
       target,
     );
 
-    sprites.dispose();
-    colorMap.dispose();
     return pixels;
   }
 

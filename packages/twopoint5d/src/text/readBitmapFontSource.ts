@@ -22,6 +22,13 @@ const readValue = (key: string, raw: string, quoted: boolean): unknown => {
 
 type Entry = Record<string, unknown>;
 
+// defined, not assigned: an attribute "__proto__" would run into the __proto__ setter of
+// Object.prototype and set the prototype of the entry — JSON.parse() makes such a key a field,
+// and so do the readers of the other two spellings
+const setField = (entry: Entry, key: string, value: unknown): void => {
+  Object.defineProperty(entry, key, {value, writable: true, enumerable: true, configurable: true});
+};
+
 interface Block {
   readonly tag: string;
   readonly entry: Entry;
@@ -63,25 +70,32 @@ const readText = (source: string): BitmapFontData => {
     const tag = trimmed.split(/\s/, 1)[0]!;
     const entry: Entry = {};
     for (const [, key, quoted, plain] of trimmed.matchAll(/(\w+)=(?:"([^"]*)"|(\S*))/g)) {
-      entry[key!] = quoted !== undefined ? readValue(key!, quoted, true) : readValue(key!, plain!, false);
+      setField(entry, key!, quoted !== undefined ? readValue(key!, quoted, true) : readValue(key!, plain!, false));
     }
     blocks.push({tag, entry});
   }
   return assemble(blocks);
 };
 
-const ENTITIES: Readonly<Record<string, string>> = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"};
+const ENTITIES: ReadonlyMap<string, string> = new Map([
+  ['amp', '&'],
+  ['lt', '<'],
+  ['gt', '>'],
+  ['quot', '"'],
+  ['apos', "'"],
+]);
 
-// A numeric entity that is no char — beyond U+10FFFF, a surrogate, or too large for a number — stays as
-// it is written, like a named entity it does not know. An entity stands only in a text attribute (`face`,
-// `charset`, `file`); in a number field `BitmapFont` refuses the string anyway, naming the field
+// A numeric entity that is no char — beyond U+10FFFF, a surrogate, or too large for a number —
+// and a named entity outside the five of XML — `&constructor;` as well — stay as they are
+// written. An entity stands only in a text attribute (`face`, `charset`, `file`); in a number
+// field `BitmapFont` refuses the string anyway, naming the field
 const decodeEntities = (value: string): string =>
   value.replace(/&(#x[0-9a-fA-F]+|#\d+|\w+);/g, (match, name: string) => {
     if (name.startsWith('#')) {
       const code = name.startsWith('#x') ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
       return isScalarValue(code) ? String.fromCodePoint(code) : match;
     }
-    return ENTITIES[name] ?? match;
+    return ENTITIES.get(name) ?? match;
   });
 
 // the elements of BMFont's XML and their attributes, by a tokenizer: no DOMParser, so it runs in Node
@@ -93,7 +107,7 @@ const readXml = (source: string): BitmapFontData => {
     const entry: Entry = {};
     for (const [, key, double, single] of attributes!.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
       // one of the two quotes matched
-      entry[key!] = readValue(key!, decodeEntities((double ?? single)!), true);
+      setField(entry, key!, readValue(key!, decodeEntities((double ?? single)!), true));
     }
     blocks.push({tag: tag!, entry});
   }

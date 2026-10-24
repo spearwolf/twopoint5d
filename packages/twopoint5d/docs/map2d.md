@@ -23,6 +23,8 @@ The usual map: the ground under a perspective camera that looks down at it. A ti
 the data provider, the frame of that id from the tile set, and the id `0` is a hole — no sprite.
 `RepeatingTilesProvider` takes ids that are whole numbers from 0 to 4294967295 — the range of the
 `Uint32Array` that `getTileIdsWithin()` writes — and refuses a pattern with any other value.
+`getTileIdAt()` and `getTileIdsWithin()` take their coordinates and counts as whole numbers —
+the width and the height 0 or more — and throw a `RangeError` for anything else.
 
 ```ts check
 import {
@@ -114,6 +116,9 @@ map2d.update();
 ```
 
 A width or a height of `0` switches the area off and takes its tiles down on the next `update()`.
+A rectangle that covers more than `maxVisibleTiles` tiles of the grid, 10 000 unless set, throws a
+`RangeError` on the next `update()` before it builds a tile: make the area smaller or the tiles
+larger, or raise the limit.
 
 ## Defaults and how they play together
 
@@ -127,9 +132,10 @@ Every default works on its own; a few of them have to fit one another.
 | `CameraBasedVisibility#frustumBoxScale` | `1.1` | how much larger than its tile the box is that the frustum is tested against: a margin before a tile that leaves the view is dropped. At least `1` |
 | `CameraBasedVisibility#lookAtCenter` | `false` | with `false`, `centerX`/`centerY` shift the map under the camera: leave them at `0` for a map fixed in the world under a moving camera. With `true` they name the map point where the camera looks |
 | `Map2D#tileWidth`, `#tileHeight` | `1` | the size of a cell of the grid, in the units of the map |
-| `Map2D#xOffset`, `#yOffset` | `0` | where the grid starts. The grid is anchored at the corner of a tile: tile `(0, 0)` spans `[xOffset, xOffset + tileWidth)`, and `-tileWidth / 2` centres the grid on the origin |
+| `Map2D#xOffset`, `#yOffset` | `0` | where the grid starts, a finite number. The grid is anchored at the corner of a tile: tile `(0, 0)` spans `[xOffset, xOffset + tileWidth)`, and `-tileWidth / 2` centres the grid on the origin |
 | camera `far` | the camera's own | bounds how far out the ground is searched; tilted towards the horizon, the ground in view grows with `far²` |
 | `RectangularVisibilityArea` | `320 × 240` | the size of the rectangle, in world units |
+| `RectangularVisibilityArea#maxVisibleTiles` | `10 000` | the most tiles the rectangle may cover on the grid; a larger one throws a `RangeError` on the next `update()`. 320 × 240 on the default grid of 1 covers 76 800 — set the tile size or the area |
 
 What `centerX`/`centerY` mean depends on the visibilitor; the TSDoc of `Map2D#centerX` lists each.
 
@@ -141,8 +147,8 @@ unless it says so.
 - **The grid.** A new `tileWidth`, `tileHeight`, `xOffset` or `yOffset` clears the tiles, and the
   next `update()` lays out the whole set in the new grid.
 - **The visibilitor.** Another visibilitor clears the tiles as well, and so does `undefined`: the
-  next `update()` empties every tile renderer and, with a visibilitor in place, lays out the set it
-  finds.
+  next `update()` empties every tile renderer — its tiles leave the screen with that update — and,
+  with a visibilitor in place, lays out the set it finds.
 - **The tile set and the data provider.** Another `tileSet` or another `tileDataProvider` on the
   `TileSpritesFactory` has its renderers build every tile again on the next `update()`, the holes
   of the provider before included.

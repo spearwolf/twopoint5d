@@ -67,7 +67,7 @@ describe('SpriteResources', () => {
 
     expect(() => resources.setUniform('time', 1, 2)).toThrow('SpriteResources: the uniform "time" is a float and takes 1 value');
     expect(() => new SpriteResources([anim], {uniforms: {time: [1, 2]}})).toThrow(
-      'SpriteResources: the uniform "time" is a float and takes 1 value',
+      new TypeError('SpriteResources: the uniform "time" is a float and takes a finite number as its start value, got [1, 2]'),
     );
     resources.dispose();
   });
@@ -92,8 +92,36 @@ describe('SpriteResources', () => {
 
   test('refuses a uniform start value of the wrong shape', () => {
     expect(() => new SpriteResources([anim], {uniforms: {light: [1, 2]}})).toThrow(
-      'SpriteResources: the uniform "light" is a vec3 and takes 3 values',
+      new TypeError('SpriteResources: the uniform "light" is a vec3 and takes 3 finite numbers as its start value, got [1, 2]'),
     );
+  });
+
+  test.each([
+    ['ab', 'offset', 'ab', 'vec2 and takes 2 finite numbers', '"ab"'],
+    ['[NaN, 0]', 'offset', [Number.NaN, 0], 'vec2 and takes 2 finite numbers', '[NaN, 0]'],
+    ["[1, 'x']", 'offset', [1, 'x'], 'vec2 and takes 2 finite numbers', '[1, "x"]'],
+    ['NaN', 'time', Number.NaN, 'float and takes a finite number', 'NaN'],
+    ['Infinity', 'time', Number.POSITIVE_INFINITY, 'float and takes a finite number', 'Infinity'],
+    ["'1'", 'time', '1', 'float and takes a finite number', '"1"'],
+    ['a Float32Array', 'light', new Float32Array([1, 2, 3]), 'vec3 and takes 3 finite numbers', 'Float32Array [1, 2, 3]'],
+    ['{x: 1}', 'tint', {x: 1}, 'vec4 and takes 4 finite numbers', '{x: 1}'],
+  ])('refuses the start value %s of the uniform %s, quoting it, and builds nothing', (_, name, value, takes, quoted) => {
+    const shaped = defineFeature({name: 'shaped', uniforms: {offset: [1, 2], tint: [1, 1, 1, 1]}});
+    const signals = getSignalsCount();
+    const effects = getEffectsCount();
+
+    expect(() => new SpriteResources([shaped, anim], {uniforms: {[name as string]: value as never}})).toThrow(
+      new TypeError(`SpriteResources: the uniform "${name}" is a ${takes} as its start value, got ${quoted}`),
+    );
+    expect(getSignalsCount()).toBe(signals);
+    expect(getEffectsCount()).toBe(effects);
+  });
+
+  test('a start value of null keeps the declared one', () => {
+    const resources = new SpriteResources([anim], {uniforms: {time: null as never}});
+
+    expect(resources.uniforms['time']!.value).toBe(0);
+    resources.dispose();
   });
 
   test('shapeOf() answers the shape of a texture, and undefined while none is set', () => {
@@ -187,6 +215,36 @@ describe('SpriteResources', () => {
 
     expect(getSignalsCount()).toBe(signals);
     expect(getEffectsCount()).toBe(effects);
+  });
+
+  describe('refuses', () => {
+    test.each([
+      ['features that are a number', 5, undefined, 'features is a list of features, got 5'],
+      ['features that are undefined', undefined, undefined, 'features is a list of features, got undefined'],
+      [
+        'a feature with uniforms that are no record',
+        [{name: 'odd', uniforms: 5}],
+        undefined,
+        'the uniforms of feature "odd" are no record of uniform declarations, got 5',
+      ],
+      ['options that are null', [anim], null, 'the options must be an object, got null'],
+      ['options that are a number', [anim], 5, 'the options must be an object, got 5'],
+      ['textures that are a number', [anim], {textures: 5}, 'textures must be an object of textures by name, got 5'],
+      ['uniforms that are an array', [anim], {uniforms: []}, 'uniforms must be an object of values by name, got []'],
+    ])('%s and builds nothing', (_label, features, options, message) => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new SpriteResources(features as never, options as never)).toThrow(
+        new TypeError(`SpriteResources: ${message}`),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('in the words of the caller it is handed', () => {
+      expect(() => new SpriteResources(5 as never, {}, 'Mine')).toThrow(
+        new TypeError('Mine: features is a list of features, got 5'),
+      );
+    });
   });
 
   describe('dispose()', () => {

@@ -12,8 +12,11 @@ export type FrameTrimMargins = [left: number, top: number, right: number, bottom
  *
  * They come from `spriteSourceSize` (`x`, `y`, `w`, `h`) and `sourceSize` (`w`, `h`) of the frame data,
  * as TexturePacker writes them for every frame; `trimmed` is not read, the two rectangles already say
- * it. A frame without both rectangles, with a value in them that is no finite number, or with a
- * `sourceSize` whose width or height is not above 0 gets four zeros.
+ * it. A frame without both rectangles, with a value in them that is no finite number, with a
+ * `sourceSize` whose width or height is not above 0, or with a `spriteSourceSize` that does not lie
+ * within the `sourceSize` — a `w` or `h` not above 0, an `x` or `y` below 0, `x + w` beyond the width
+ * or `y + h` beyond the height — gets four zeros: the margins of a frame always leave a trimmed area
+ * above 0.
  *
  * The margins hold for the upright sprite, the way TexturePacker writes `spriteSourceSize`: the flip bits
  * of a frame the packer turned only turn it back, and a flip set on the `TextureCoords` by hand mirrors
@@ -45,7 +48,15 @@ export function frameTrimMargins(data: unknown, target: FrameTrimMargins = [0, 0
     isFiniteNumber(W) &&
     isFiniteNumber(H) &&
     W > 0 &&
-    H > 0
+    H > 0 &&
+    // a trimmed area outside the sprite would leave margins that add up to 1 or more, and the shader
+    // divides by what is left of the sprite between them
+    w > 0 &&
+    h > 0 &&
+    x >= 0 &&
+    y >= 0 &&
+    x + w <= W &&
+    y + h <= H
   ) {
     target[0] = x / W;
     target[1] = y / H;

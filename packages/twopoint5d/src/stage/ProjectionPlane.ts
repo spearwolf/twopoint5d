@@ -1,5 +1,6 @@
 import type {Object3D} from 'three/webgpu';
 import {Matrix4, Quaternion, Plane as THREE_Plane, Vector3} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 
 export type ProjectionPlaneDescription = 'xy|bottom-left' | 'xy|top-left' | 'xz|bottom-left' | 'xz|top-left';
 
@@ -13,6 +14,11 @@ export class ProjectionPlane {
   plane: THREE_Plane;
   up: Vector3;
 
+  /**
+   * @param planeDescription - One of the four descriptions, or a `THREE.Plane` of your own.
+   * @param up - The up vector on the plane; mandatory for a `THREE.Plane`.
+   * @throws {TypeError} for a description that is neither one of the four nor a `THREE.Plane`.
+   */
   constructor(planeDescription: ProjectionPlaneDescription | THREE_Plane, up?: Vector3) {
     if (planeDescription === 'xy|bottom-left') {
       this.plane = new THREE_Plane(new Vector3(0, 0, 1));
@@ -26,13 +32,17 @@ export class ProjectionPlane {
     } else if (planeDescription === 'xz|bottom-left') {
       this.plane = new THREE_Plane(new Vector3(0, -1, 0));
       this.up = up?.clone() ?? new Vector3(0, 0, 1);
-    } else {
+    } else if ((planeDescription as Partial<THREE_Plane> | null | undefined)?.isPlane === true) {
       // custom projection plane
       this.plane = planeDescription.clone();
       if (up == null) {
         throw new Error('ProjectionPlane: up is mandatory for a custom projection plane');
       }
       this.up = up.clone();
+    } else {
+      throw new TypeError(
+        `ProjectionPlane: unknown plane description ${describeValue(planeDescription)}, expected "xy|bottom-left", "xy|top-left", "xz|bottom-left", "xz|top-left" or a THREE.Plane`,
+      );
     }
   }
 

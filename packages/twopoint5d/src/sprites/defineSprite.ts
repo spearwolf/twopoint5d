@@ -1,3 +1,7 @@
+import {deepFreeze} from '../utils/deepFreeze.js';
+import {describeValue} from '../utils/describeValue.js';
+import {isObject} from '../utils/isObject.js';
+import {cloneVertexObjectDescription} from '../vertex-objects/cloneVertexObjectDescription.js';
 import {voInitialize} from '../vertex-objects/constants.js';
 import {sharedVertexObjectDescriptor} from '../vertex-objects/sharedVertexObjectDescriptor.js';
 import type {
@@ -10,13 +14,19 @@ import type {
 import {VertexAttributeDescriptor} from '../vertex-objects/VertexAttributeDescriptor.js';
 import {VertexObjectDescriptor} from '../vertex-objects/VertexObjectDescriptor.js';
 import {vertexObjectPropertyNames} from '../vertex-objects/vertexObjectPropertyNames.js';
+import {checkFeature} from './checkFeature.js';
 import type {SpriteBase} from './SpriteBase.js';
 import {collectSpriteDeclarations} from './spriteDeclarations.js';
 import {runCheckKind} from './runCheckKind.js';
 import type {SpriteFeature} from './SpriteFeature.js';
 import {buildSpritePipeline, type SpritePipeline} from './spritePipeline.js';
 
-/** A base and the features of a sprite, merged and checked once by {@link defineSprite}. Immutable. */
+/**
+ * A base and the features of a sprite, merged and checked once by {@link defineSprite}. Frozen all
+ * the way down — the kind, its feature list, its pipeline and its description with every attribute
+ * description in it —; the base and the features stay as their authors left them, and every feature
+ * out of `defineFeature()` is frozen as deep.
+ */
 export interface SpriteKind<Api extends object = object> {
   readonly base: SpriteBase;
   readonly features: readonly SpriteFeature[];
@@ -54,6 +64,21 @@ export type SpriteOf<K> = K extends SpriteKind<infer Api> ? Api & VO : never;
 export type SpriteKindApiOf<K> = K extends SpriteKind<infer Api> ? Api : never;
 
 const WHERE = 'defineSprite';
+
+// every kind defineSprite() hands out. A kind is checked once, there: a copy, or an object of the
+// same shape, ran none of those checks
+const spriteKinds = new WeakSet<object>();
+
+/**
+ * Checks, in the words of `where`, that `kind` came from {@link defineSprite}. @internal
+ *
+ * @throws a `TypeError` that quotes the value
+ */
+export function checkSpriteKind(kind: unknown, where: string): asserts kind is SpriteKind {
+  if (!spriteKinds.has(kind as object)) {
+    throw new TypeError(`${where}: the kind must be a sprite kind from defineSprite(), got ${describeValue(kind)}`);
+  }
+}
 
 const sizeOf = (attribute: VertexAttributeDescription | undefined): number =>
   attribute == null
@@ -213,18 +238,32 @@ function checkLayout(
 
 /**
  * Merges a base and features into a sprite kind. Checks, in this order, and throws naming the
- * features involved: the base contract, unique feature names — where two share one, the `checkKind`
- * of the first is asked first, so that the forms of one factory can say why a kind takes one —,
- * `requires`, one placement and at most one frame and color source, a placement without textures,
- * unique uniforms, textures, attributes, sprite-handle properties and usage aliases, and the layout of
- * the merged attributes — and last the `checkKind` of every feature, in the order of the list.
+ * features involved: the options — an object with a base and an iterable of features —, every
+ * feature on its own as `defineFeature()` checks it, the base contract, unique feature names —
+ * where two share one, the `checkKind` of the first is asked first, so that the forms of one
+ * factory can say why a kind takes one —, `requires`, one placement and at most one frame and
+ * color source, a placement without textures, unique uniforms, textures, attributes,
+ * sprite-handle properties and usage aliases, and the layout of the merged attributes — and last
+ * the `checkKind` of every feature, in the order of the list.
  */
 export function defineSprite<const F extends readonly SpriteFeature[]>(options: {
   readonly base: SpriteBase;
   readonly features: F;
 }): SpriteKind<SpriteApiOf<F>> {
+  if (!isObject(options) || Array.isArray(options)) {
+    throw new TypeError(`${WHERE}: takes {base, features}, got ${describeValue(options)}`);
+  }
   const {base} = options;
+  if (!isObject(base) || !isObject(base.description)) {
+    throw new TypeError(
+      `${WHERE}: the base is no sprite base, got ${describeValue(base)} — QuadBase, gridBase() or a base of your own`,
+    );
+  }
+  if (options.features == null || typeof (options.features as Partial<Iterable<unknown>>)[Symbol.iterator] !== 'function') {
+    throw new TypeError(`${WHERE}: features is a list of features, got ${describeValue(options.features)}`);
+  }
   const features: readonly SpriteFeature[] = Object.freeze([...options.features]);
+  for (const feature of features) checkFeature(feature, WHERE);
 
   assertSpriteBase(base);
   assertFeatureNames(base, features);
@@ -247,10 +286,16 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
   const usageAliases = mergeUsageAliases(features, attributeOwners);
   const methods = Object.assign({}, ...features.map((feature) => feature.methods ?? {})) as Record<string, unknown>;
 
-  const description: VertexObjectDescription = {attributes, methods, basePrototype: initializerPrototype(features)};
+  // a copy of its own, frozen down to the components of every attribute: the attribute descriptions
+  // a feature brings stay that feature's, and nothing written to them afterwards reaches the kind
+  const description = deepFreeze(
+    cloneVertexObjectDescription({attributes, methods, basePrototype: initializerPrototype(features)}),
+  );
   checkLayout(description, features, attributeOwners);
 
   for (const feature of features) runCheckKind(feature, {base, features}, `${WHERE}: feature "${feature.name}"`);
 
-  return Object.freeze({base, features, description, usageAliases, pipeline});
+  const kind = Object.freeze({base, features, description, usageAliases, pipeline});
+  spriteKinds.add(kind);
+  return kind;
 }

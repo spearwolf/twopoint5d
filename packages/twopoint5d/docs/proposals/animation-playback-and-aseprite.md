@@ -108,7 +108,7 @@ New refusals of `add()`, each an `Error` that names the animation:
 | case | message (after `FrameBasedAnimations: add() got`) |
 | --- | --- |
 | `playback` not one of the three | `` a playback of X for the animation "a" — a playback is 'loop', 'once' or 'pingpong' `` |
-| `durations` beside `duration` or `frameRate` | `` durations and a duration (or frameRate) for the animation "a" — give one of duration, frameRate and durations `` |
+| more than one of `durations`, `duration` and `frameRate` | `` a duration and a frameRate for the animation "a" — give one of duration, frameRate and durations `` |
 | `durations` no array | `` durations of X for the animation "a" — durations is an array of seconds, one per frame `` |
 | wrong count | `` 3 durations for the 4 frames of the animation "a" — give one duration per frame `` |
 | a value not finite or not above 0 | `` a duration of X at index 2 for the animation "a" — a frame duration is a finite number of seconds above zero `` |
@@ -116,8 +116,9 @@ New refusals of `add()`, each an `Error` that names the animation:
 | a frame name of the list not in the atlas | `` the frame name "x" at index 1 for the animation "a", which the atlas does not carry `` |
 | a list entry no string | `` a frame name of X at index 1 for the animation "a" — a frame name is a string `` |
 
-Where a json catalog gives both `frameRate` and `duration` (the types forbid it), `frameRate` wins;
-refusing the pair would break such a catalog.
+A json catalog that gives more than one of them has that entry refused like any other timing the
+types forbid: the `TextureResource` reports it as an `error` with `source: 'frameBasedAnimations'`
+and registers the other entries of the map.
 
 ### 3.3 Reading an animation back
 
@@ -294,18 +295,28 @@ entry; the guide says to export without them.
   tags are: idle, walk, kick`), and so is a value that is none of `'loop'`, `'once'` and
   `'pingpong'`, naming the tag, before the first frame is added (`AsepriteJson: parse() got a
   playback of "bounce" for the tag "walk" — a playback is 'loop', 'once' or 'pingpong'`).
-- Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside
-  `0 … frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown
-  `direction` (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name
-  (`… — rename one of them in Aseprite`), a frame of a tag without a `duration` above 0
-  (`AsepriteJson: the frame "x" carries a duration of 0 — Aseprite writes one in ms above zero for every frame`),
-  and a tag whose `repeat` plays more than `FrameBasedAnimations.MaxFramesWithDurations` (8191)
-  frames of differing durations (`AsepriteJson: the tag "x" plays 9000 frames with their own
-  durations — … at most 8191 frames; lower its repeat`). A tag of even durations has no such
-  limit of its own: a bake refuses what does not fit.
+- Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside `0 …
+  frames − 1`, `from > to` (`… — export the sheet again from Aseprite`), an unknown `direction`
+  (naming the four), a `repeat` that is no whole number `≥ 0`, two tags of one name (`… — rename one
+  of them in Aseprite`), and a tag whose `repeat` plays more than
+  `FrameBasedAnimations.MaxFramesWithDurations` (8191) frames of differing durations (`AsepriteJson:
+  the tag "x" plays 9000 frames with their own durations — … at most 8191 frames; lower its
+  repeat`). A tag of even durations has no such limit of its own: a bake refuses what does not fit.
+- A frame without a `duration` above 0, in a tag or outside every tag, is refused with a
+  `RangeError` naming it (`AsepriteJson: the duration of the frame "x" must be a finite number above
+  0, got 0`); `meta.frameTags` that is no list, and a tag that is no object, with a `TypeError`.
 - A frame name twice in the layout "Array" — Aseprite writes it when the filename format holds no
   `{frame}` — is refused (`AsepriteJson: the frame name "x" appears twice — export with a filename
   format that contains {frame}`); in "Hash" a second key is gone by the time `JSON.parse()` is done.
+- A json, `frames` or `meta` that is no object, a frame of the layout "Array" without a string
+  `filename` and a tag without a string `name` are refused with a `TypeError`. The slices of
+  `meta.slices` are held to the checks the tags have: `meta.slices` that is no list, a slice that is
+  no object or has no string `name`, keys that are no list (absent or `null` is no keys), a key that
+  is no object, and a `bounds` (required), `center` or `pivot` (absent or `null` is missing) that is
+  no object, are a `TypeError`; a `frame` of a key that is no whole number `≥ 0` and an `x`, `y`,
+  `w` or `h` that is no finite number, or a `w` or `h` below 0, are a `RangeError`; two slices of
+  one name are an `Error` (`… — rename one of them in Aseprite`). A `frame` past the last frame is
+  fine: the key then holds at no frame, and a `pivot` may lie outside the `bounds`.
 - Every check runs before the first frame is added, the animations are planned there as well:
   a refused sheet leaves `options.target` as it was, and no `add()` that follows throws.
 
@@ -340,7 +351,7 @@ export interface AsepriteFrameData extends TexturePackerFrameData {
 A slice key holds from its `frame` up to the frame before the next key; frames before the first
 key carry no entry for that slice. `NineSlice` (phase D) reads `center` and `bounds`, `Anchor`
 (phase D) `pivot`; both convert to fractions of the frame themselves. `meta.slices` stays in
-`meta` unchanged.
+`meta` unchanged; the slices are checked before a frame is added (§5.2).
 
 ### 5.4 The signature
 
@@ -399,7 +410,7 @@ any adapter runs; a packer with another envelope is converted to it first.
   (`TextureStore: item "fighter" names the atlasAdapter "asprite", which this store does not
   know — known: texturepacker, aseprite; register it with registerAtlasAdapter() before parse()`);
   `atlasAdapter` that is no string is a field of the wrong type; on an item without `atlasUrl` it
-  is reported and ignored (`… atlasAdapter only reads an atlas — left out`).
+  is reported and ignored (`… builds a "tileset" resource, which reads no atlasAdapter — left out`).
 - An item that names none is read by the adapter whose `app` matches `meta.app` of its json —
   the latest registered first — and by `'texturepacker'` when none does or `meta.app` is no string.
 - A `TextureResource` on its own (no store) picks among the two built-ins the same way.

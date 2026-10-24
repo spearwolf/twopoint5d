@@ -42,6 +42,7 @@ Thumbs.db
 # nx
 .nx/cache
 .nx/workspace-data
+.nx/ci-gate.lock*
 
 playwright.browsers
 

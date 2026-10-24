@@ -25,6 +25,17 @@ function makeFrame(deltaTime: number, extra?: Partial<DisplayEventProps>): Displ
 }
 
 describe('FixedFrameLoop', () => {
+  it('OnTick and OnRender are read-only for TypeScript', () => {
+    // never called: the check is the one of the compiler
+    const write = () => {
+      // @ts-expect-error — onTick() subscribes under the name the loop emits under
+      FixedFrameLoop.OnTick = Symbol('other');
+      // @ts-expect-error — onRender() subscribes under the name the loop emits under
+      FixedFrameLoop.OnRender = Symbol('other');
+    };
+    expect(write).toBeTypeOf('function');
+  });
+
   let display: Display;
   let sim: FixedFrameLoop;
   let ticks: FixedFrameLoopTickProps[];
@@ -312,6 +323,121 @@ describe('FixedFrameLoop', () => {
       const optioned = new FixedFrameLoop(makeFakeDisplay(), {fps: 120, maxStepsPerFrame: 0});
       expect(optioned.fps).toBe(120);
       expect(optioned.maxStepsPerFrame).toBe(2);
+    });
+  });
+
+  describe('a listener that throws', () => {
+    let ownDisplay: Display;
+    let loop: FixedFrameLoop;
+    let heardTicks: number[];
+    let heardRenders: number[];
+
+    // the listener that throws is subscribed first, so that every recording listener stands
+    // behind it
+    const build = (onTick?: (props: FixedFrameLoopTickProps) => void, onRender?: () => void) => {
+      ownDisplay = makeFakeDisplay();
+      loop = new FixedFrameLoop(ownDisplay, {fps: 60});
+      heardTicks = [];
+      heardRenders = [];
+      if (onTick) loop.onTick(onTick);
+      if (onRender) loop.onRender(onRender);
+      loop.onTick(({tickNo}) => heardTicks.push(tickNo));
+      loop.onRender(({tickNo}) => heardRenders.push(tickNo));
+    };
+
+    const thrownBy = (run: () => void): unknown => {
+      try {
+        run();
+      } catch (error) {
+        return error;
+      }
+      return undefined;
+    };
+
+    it('every listener of OnTick hears the tick behind one that throws, the tick counts, OnRender goes out, and the error comes out afterwards', () => {
+      const tickError = new Error('tick');
+      let thrown = false;
+      build(() => {
+        if (thrown) return;
+        thrown = true;
+        throw tickError;
+      });
+
+      expect(() => emit(ownDisplay, OnDisplayRenderFrame, makeFrame(1 / 60))).toThrow(tickError);
+      expect(heardTicks).toEqual([0]);
+      expect(heardRenders).toEqual([1]);
+      expect(loop.tickNo).toBe(1);
+
+      emit(ownDisplay, OnDisplayRenderFrame, makeFrame(1 / 60));
+
+      // the next frame brings the next tick, not the one that threw again
+      expect(heardTicks).toEqual([0, 1]);
+    });
+
+    it('hands the error out as it was thrown', () => {
+      const tickError = new Error('tick');
+      build(() => {
+        throw tickError;
+      });
+
+      expect(thrownBy(() => emit(ownDisplay, OnDisplayRenderFrame, makeFrame(1 / 60)))).toBe(tickError);
+    });
+
+    it('a listener that throws in every tick of a frame: every tick runs, and the errors come out together as an AggregateError', () => {
+      const errors = [new Error('tick 0'), new Error('tick 1'), new Error('tick 2')];
+      build(({tickNo}) => {
+        throw errors[tickNo];
+      });
+
+      const thrown = thrownBy(() => emit(ownDisplay, OnDisplayRenderFrame, makeFrame(0.05)));
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual(errors);
+      expect((thrown as AggregateError).errors[0]).toBe(errors[0]);
+      expect((thrown as AggregateError).message).toBe(
+        'FixedFrameLoop: listeners threw in more than one OnTick or OnRender of the frame',
+      );
+      expect(heardTicks).toEqual([0, 1, 2]);
+      expect(heardRenders).toEqual([3]);
+      expect(loop.tickNo).toBe(3);
+    });
+
+    it('a tick listener and a render listener that throw come out together', () => {
+      const tickError = new Error('tick');
+      const renderError = new Error('render');
+      build(
+        () => {
+          throw tickError;
+        },
+        () => {
+          throw renderError;
+        },
+      );
+
+      const thrown = thrownBy(() => emit(ownDisplay, OnDisplayRenderFrame, makeFrame(1 / 60)));
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toStrictEqual([tickError, renderError]);
+      expect((thrown as AggregateError).errors[1]).toBe(renderError);
+    });
+
+    it('a render listener that throws ends the dispatch for the render listeners behind it, comes out unchanged, and the next frame runs as usual', () => {
+      const renderError = new Error('render');
+      let thrown = false;
+      build(undefined, () => {
+        if (thrown) return;
+        thrown = true;
+        throw renderError;
+      });
+
+      expect(thrownBy(() => emit(ownDisplay, OnDisplayRenderFrame, makeFrame(1 / 60)))).toBe(renderError);
+      expect(heardTicks).toEqual([0]);
+      expect(heardRenders).toEqual([]);
+
+      emit(ownDisplay, OnDisplayRenderFrame, makeFrame(1 / 60));
+
+      expect(heardTicks).toEqual([0, 1]);
+      expect(heardRenders).toEqual([2]);
     });
   });
 

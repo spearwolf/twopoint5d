@@ -24,6 +24,8 @@ import {
   compareWithModel,
   countMixed,
   disposeDisplay,
+  disposeKept,
+  keep,
   makeColorTexture,
   makeContainer,
   makeMipmappedChecker,
@@ -78,17 +80,12 @@ const either =
     models.map((model) => model(x, y)).find((color) => color !== BLACK) ?? BLACK;
 
 describe('sprites — segments lie along their ends', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
   let host;
   /** @type {RenderTarget | undefined} */
   let target;
-  /** @type {(() => void)[]} */
-  let disposals = [];
 
   beforeEach(async () => {
     host = makeContainer();
@@ -98,8 +95,7 @@ describe('sprites — segments lie along their ends', function () {
   });
 
   afterEach(() => {
-    for (const dispose of disposals) dispose();
-    disposals = [];
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -137,8 +133,8 @@ describe('sprites — segments lie along their ends', function () {
    * @param {{start: [number, number, number], end: [number, number, number], size: [number, number]}[]} segments
    */
   function makeSegments(placement, texels, segments) {
-    const colorMap = makeColorTexture(texels, 1, texels.length);
-    const sprites = new FeatureSprites(segmentsOf(placement), {capacity: segments.length, textures: {colorMap}});
+    const colorMap = keep(makeColorTexture(texels, 1, texels.length));
+    const sprites = keep(new FeatureSprites(segmentsOf(placement), {capacity: segments.length, textures: {colorMap}}));
     for (const {start, end, size} of segments) {
       const segment = sprites.createSprite();
       segment.setPosition(...start);
@@ -146,10 +142,6 @@ describe('sprites — segments lie along their ends', function () {
       segment.setSize(...size);
       segment.setTexCoords(0, 0, 1, 1);
     }
-    disposals.push(() => {
-      sprites.dispose();
-      colorMap.dispose();
-    });
     return sprites;
   }
 
@@ -208,16 +200,12 @@ describe('sprites — segments lie along their ends', function () {
     });
 
     it('with Anchor lays the line of the segment along the anchor of the image and splits the caps by it', async function () {
-      const colorMap = makeColorTexture([WHITE], 1, 1);
+      const colorMap = keep(makeColorTexture([WHITE], 1, 1));
       const kind = defineSprite({
         base: QuadBase,
         features: [InstancePosition, SegmentEnd, SegmentPlacement, Anchor, QuadSize, AtlasFrame, TextureColor],
       });
-      const sprites = new FeatureSprites(kind, {capacity: 1, textures: {colorMap}});
-      disposals.push(() => {
-        sprites.dispose();
-        colorMap.dispose();
-      });
+      const sprites = keep(new FeatureSprites(kind, {capacity: 1, textures: {colorMap}}));
       const segment = sprites.createSprite();
       segment.setPosition(-4, -2, 0);
       segment.setSegmentEnd(4, -2, 0);
@@ -286,22 +274,27 @@ describe('sprites — segments lie along their ends', function () {
       // above (−3, 0, −4) the camera from above sees the point at (−3, 4) of its view
       expectModel(await render(sprites, 'above'), segmentModel([-3, 4], [-3, 4], 4, 2, RED, GREEN));
     });
+
+    it('draws a segment of no length on a mesh scaled by 2 as its caps quad scaled by 2, the right of the camera along it', async function () {
+      const sprites = makeSegments(FACING, [RED, GREEN], [{start: [0, 0, 0], end: [0, 0, 0], size: [3, 2]}]);
+      sprites.scale.setScalar(2);
+
+      expectModel(await render(sprites, 'front'), segmentModel([0, 0], [0, 0], 6, 4, RED, GREEN));
+    });
   });
 
   describe('SegmentShadowPass', () => {
     it('throws the shadow of the whole segment where it lies, not of its caps at the start', async function () {
-      const colorMap = makeColorTexture([WHITE], 1, 1);
+      const colorMap = keep(makeColorTexture([WHITE], 1, 1));
       // a white shadow on the black clear color, the light straight from above, the ground y = 0
-      const sprites = new FeatureSprites(segmentsOf(segmentPlacement({plane: 'xz'})), {
-        capacity: 2,
-        textures: {colorMap},
-        passes: [SegmentShadowPass],
-        uniforms: {shadowColor: [1, 1, 1, 1], shadowLight: [0, 1, 0, 0], groundPlane: [0, 1, 0, 0]},
-      });
-      disposals.push(() => {
-        sprites.dispose();
-        colorMap.dispose();
-      });
+      const sprites = keep(
+        new FeatureSprites(segmentsOf(segmentPlacement({plane: 'xz'})), {
+          capacity: 2,
+          textures: {colorMap},
+          passes: [SegmentShadowPass],
+          uniforms: {shadowColor: [1, 1, 1, 1], shadowLight: [0, 1, 0, 0], groundPlane: [0, 1, 0, 0]},
+        }),
+      );
       // the segments themselves hang 2 above the ground and are not drawn: only their shadows show
       sprites.material.visible = false;
       /** @type {[[number, number, number], [number, number, number]][]} */
@@ -342,10 +335,12 @@ describe('sprites — segments lie along their ends', function () {
      * @param {{start: [number, number, number], end: [number, number, number], size: [number, number]}[]} segments
      */
     function makeRepeating(colorSource, colorMap, frame, segments) {
-      const sprites = new FeatureSprites(segmentsOf(SegmentPlacement, colorSource), {
-        capacity: segments.length,
-        textures: {colorMap},
-      });
+      const sprites = keep(
+        new FeatureSprites(segmentsOf(SegmentPlacement, colorSource), {
+          capacity: segments.length,
+          textures: {colorMap},
+        }),
+      );
       for (const {start, end, size} of segments) {
         const segment = sprites.createSprite();
         segment.setPosition(...start);
@@ -354,7 +349,6 @@ describe('sprites — segments lie along their ends', function () {
         if (Array.isArray(frame)) segment.setTexCoords(...frame);
         else segment.setFrame(frame);
       }
-      disposals.push(() => sprites.dispose());
       return sprites;
     }
 
@@ -371,8 +365,7 @@ describe('sprites — segments lie along their ends', function () {
         if (x < 32 || x >= 96 || y < 8 || y >= 24) return BLUE;
         return x < 64 ? RED : GREEN;
       });
-      const colorMap = makeColorTexture(texels, width, height);
-      disposals.push(() => colorMap.dispose());
+      const colorMap = keep(makeColorTexture(texels, width, height));
       const [atlas] = TexturePackerJson.parse({
         frames: {rope: {frame: {x: 32, y: 8, w: 64, h: 16}}},
         meta: {image: 'rope.png', size: {w: width, h: height}},
@@ -409,8 +402,7 @@ describe('sprites — segments lie along their ends', function () {
         base: QuadBase,
         features: [InstancePosition, SegmentEnd, SegmentPlacement, QuadSize, AtlasFrame, RepeatingTextureColor, Flip],
       });
-      const sprites = new FeatureSprites(kind, {capacity: 2, textures: {colorMap}});
-      disposals.push(() => sprites.dispose());
+      const sprites = keep(new FeatureSprites(kind, {capacity: 2, textures: {colorMap}}));
       // 7 long and 1 thick: the frame 1.75 times, ending on its red half
       for (const [y, flipX] of [
         [2, 0],
@@ -434,8 +426,7 @@ describe('sprites — segments lie along their ends', function () {
     });
 
     it('repeats a mipmapped frame without a seam at its wraps, where a bare fract() shows one', async function () {
-      const colorMap = makeMipmappedChecker();
-      disposals.push(() => colorMap.dispose());
+      const colorMap = keep(makeMipmappedChecker());
       // 12 long and 4 thick: the checker of 4 × 4 texels three times. The gpu works the derivatives out
       // over blocks of 2 × 2 pixels, and a seam shows only in a block a wrap runs through: a quarter of
       // a unit — one pixel — off the middle, the wraps lie on odd pixels and cut through blocks

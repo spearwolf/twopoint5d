@@ -49,6 +49,7 @@ const makeRound = (timestamps: boolean) => {
     resolutionScale: 1,
     pixelZoom: 0,
     isDisposed: false,
+    isRunning: true,
     frameLoop,
     pixelRatioAt: () => 1,
   }) as unknown as Display;

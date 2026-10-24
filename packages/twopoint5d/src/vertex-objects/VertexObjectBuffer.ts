@@ -237,9 +237,9 @@ export class VertexObjectBuffer {
         // every attribute takes a whole number of 4 bytes per vertex, so the next one starts on a
         // 4-byte boundary and the stride of the buffer is a multiple of 4 bytes: the vertex layout
         // WebGPU asks for. Without it three pads a buffer of one attribute anew on every update and
-        // copies the whole array to do so (`WebGPUAttributeUtils.js:202–222`), and a render pipeline
-        // over interleaved attributes on an odd offset is refused. No accessor reads or writes the
-        // padding
+        // copies the whole array to do so (`WebGPUAttributeUtils#updateAttribute()`;
+        // `threeVertexLayout.spec.ts` holds the padding), and a render pipeline over interleaved
+        // attributes on an odd offset is refused. No accessor reads or writes the padding
         if (buffer) {
           offset = buffer.itemSize;
           buffer.itemSize += alignedAttributeSize(attribute.size, buffer.dataType);

@@ -3,8 +3,11 @@ import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
 import {InstancedInterleavedBuffer} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
+import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
+import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import type {VO, VertexObjectDescription} from './types.js';
 
@@ -250,6 +253,65 @@ describe('InstancedVertexObjectGeometry', () => {
       expect(extraDispose.calledOnce).toBe(true);
     });
 
+    test('a second dispose() sends no second dispose event', () => {
+      const geometries = [
+        new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1),
+        new VertexObjectGeometry(baseDescriptor, 10),
+      ];
+
+      for (const geometry of geometries) {
+        let events = 0;
+        geometry.addEventListener('dispose', () => events++);
+
+        geometry.dispose();
+        geometry.dispose();
+
+        expect(events, geometry.name).toBe(1);
+      }
+    });
+
+    test('a dispose listener that throws holds up nothing, and its error comes out once the geometry is down', () => {
+      const handedIn = new VertexObjectPool<VO>(instancedDescriptor, 10);
+      const geometry = new InstancedVertexObjectGeometry(handedIn, 10, baseDescriptor, 1);
+      const extra = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+
+      let events = 0;
+      geometry.addEventListener('dispose', () => {
+        events++;
+        throw new Error('a listener of dispose');
+      });
+
+      expect(() => geometry.dispose()).toThrow('a listener of dispose');
+
+      expect(handedIn.isAttachedToGeometry).toBe(false);
+      expect(handedIn.isDisposed).toBe(false);
+      expect(geometry.basePool!.isDisposed).toBe(true);
+      expect(extra.isDisposed).toBe(true);
+      expect(Object.keys(geometry.attributes)).toEqual([]);
+      expect(geometry.index).toBeNull();
+      expect(geometry.extraInstancedPools.size).toBe(0);
+
+      expect(() => geometry.dispose()).not.toThrow();
+      expect(events).toBe(1);
+
+      const pool = new VertexObjectPool<VO>(baseDescriptor, 10);
+      const plain = new VertexObjectGeometry(pool, 10);
+      let plainEvents = 0;
+      plain.addEventListener('dispose', () => {
+        plainEvents++;
+        throw new Error('a listener of dispose');
+      });
+
+      expect(() => plain.dispose()).toThrow('a listener of dispose');
+
+      expect(pool.isAttachedToGeometry).toBe(false);
+      expect(pool.isDisposed).toBe(false);
+      expect(Object.keys(plain.attributes)).toEqual([]);
+
+      expect(() => plain.dispose()).not.toThrow();
+      expect(plainEvents).toBe(1);
+    });
+
     // (b) a resource handed in belongs to the caller and is not touched
     test('does NOT dispose an instanced pool that was handed in through the constructor', () => {
       const handedInPool = new VertexObjectPool<VO>(instancedDescriptor, 10);
@@ -289,6 +351,59 @@ describe('InstancedVertexObjectGeometry', () => {
     // slot it took back" — has no subject here: this geometry never calls createVO(). It
     // holds pools, not vertex objects: a pool it built itself is released, and one handed in
     // stays the caller's together with every slot the caller took from it.
+  });
+
+  describe('detachInstancedPool()', () => {
+    test('the attribute a detached route leaves behind holds an empty array of its type, and is lent back for the dispose event', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+      const attr = geometry.getAttribute('extra') as BufferAttribute;
+      const type = attr.array.constructor;
+
+      geometry.detachInstancedPool('extraPool');
+
+      expect(attr.array.length).toBe(0);
+      expect(attr.array.constructor).toBe(type);
+      expect(attr.count).toBe(0);
+
+      let lent: unknown;
+      geometry.addEventListener('dispose', () => {
+        lent = geometry.getAttribute('extra');
+      });
+      geometry.dispose();
+
+      expect(lent).toBe(attr);
+    });
+
+    test('the interleaved attributes a detached route leaves behind share one empty array of its type, and are lent back for the dispose event', () => {
+      const pairDescriptor = new VertexObjectDescriptor({
+        attributes: {
+          pairA: {size: 1, bufferName: 'pairBuffer'},
+          pairB: {size: 1, bufferName: 'pairBuffer'},
+        },
+      });
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      geometry.attachInstancedPool('pairs', pairDescriptor);
+      const attr = geometry.getAttribute('pairA') as InterleavedBufferAttribute;
+      const type = attr.data.array.constructor;
+
+      geometry.detachInstancedPool('pairs');
+
+      expect(attr.data.array.length).toBe(0);
+      expect(attr.data.array.constructor).toBe(type);
+      expect(attr.data.count).toBe(0);
+
+      let lentA: unknown;
+      let lentB: InterleavedBufferAttribute | undefined;
+      geometry.addEventListener('dispose', () => {
+        lentA = geometry.getAttribute('pairA');
+        lentB = geometry.getAttribute('pairB') as InterleavedBufferAttribute;
+      });
+      geometry.dispose();
+
+      expect(lentA).toBe(attr);
+      expect(lentB!.data).toBe(attr.data);
+    });
   });
 
   test('attaching a pool leaves the static buffers of the routes that were already there alone', () => {
@@ -458,6 +573,135 @@ describe('InstancedVertexObjectGeometry', () => {
       expect(geometry.getAttribute('extra')).toBeDefined();
       expect(livePool.isAttachedToGeometry, 'the route that holds the name still reads the pool').toBe(true);
       expect(livePool.isDisposed).toBe(false);
+    });
+  });
+
+  /** The pools built for `descriptor` that `dispose` saw a call on, each once. */
+  const disposedPoolsOf = (dispose: {thisValues: unknown[]}, descriptor: VertexObjectDescriptor) => [
+    ...new Set((dispose.thisValues as VOBufferPool[]).filter((pool) => pool.descriptor === descriptor)),
+  ];
+
+  describe('attachInstancedPool() that fails', () => {
+    // two attributes in buffers of their own, so an attach sets two slots one after the other
+    const twinDescriptor = new VertexObjectDescriptor({
+      attributes: {
+        twinA: {size: 1, bufferName: 'twinABuffer'},
+        twinB: {size: 1, bufferName: 'twinBBuffer'},
+      },
+    });
+
+    test('a refused descriptor leaves no pool behind: the one built for it is disposed', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      geometry.attachInstancedPool('first', extraInstancedDescriptor);
+
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+
+      expect(() => geometry.attachInstancedPool('second', extraInstancedDescriptor)).toThrow(/"extra"/);
+
+      expect(dispose.callCount).toBe(1);
+      const refused = dispose.thisValues[0] as VOBufferPool;
+      expect(refused.descriptor).toBe(extraInstancedDescriptor);
+      expect(refused).not.toBe(geometry.extraInstancedPools.get('first'));
+      expect(refused.isDisposed).toBe(true);
+    });
+
+    test('a throw while the attributes are built leaves the route under the name, its pool and the slots as they were', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const live = geometry.attachInstancedPool('extraPool', extraInstancedDescriptor);
+      const attributesBefore = Object.keys(geometry.attributes).sort();
+
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+      const setAttribute = sandbox.stub(geometry, 'setAttribute').callThrough();
+      setAttribute.onSecondCall().throws(new Error('setAttribute'));
+
+      expect(() => geometry.attachInstancedPool('extraPool', twinDescriptor)).toThrow('setAttribute');
+
+      expect(geometry.extraInstancedPools.get('extraPool')).toBe(live);
+      expect(live.isDisposed).toBe(false);
+      expect(live.isAttachedToGeometry).toBe(true);
+      expect(geometry.getAttribute('extra')).toBeDefined();
+      expect(Object.keys(geometry.attributes).sort()).toEqual(attributesBefore);
+
+      const built = disposedPoolsOf(dispose, twinDescriptor);
+      expect(built).toHaveLength(1);
+      expect(built[0]!.isDisposed).toBe(true);
+
+      setAttribute.restore();
+
+      geometry.attachInstancedPool('twins', twinDescriptor);
+      expect(geometry.getAttribute('twinA')).toBeDefined();
+      expect(geometry.getAttribute('twinB')).toBeDefined();
+    });
+
+    test('a throw while the attributes of a pool handed in are built leaves that pool unattached and alive', () => {
+      const geometry = new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, 1);
+      const twins = new VertexObjectPool<VO>(twinDescriptor, 10);
+
+      const setAttribute = sandbox.stub(geometry, 'setAttribute').callThrough();
+      setAttribute.onSecondCall().throws(new Error('setAttribute'));
+
+      expect(() => geometry.attachInstancedPool('twins', twins)).toThrow('setAttribute');
+
+      expect(twins.isAttachedToGeometry).toBe(false);
+      expect(twins.isDisposed).toBe(false);
+      expect(geometry.extraInstancedPools.size).toBe(0);
+      expect(geometry.getAttribute('twinA')).toBeUndefined();
+    });
+  });
+
+  describe('a constructor that throws', () => {
+    test('disposes the instanced pool it built when the base pool handed in has been disposed', () => {
+      const disposedBase = new VertexObjectPool<VO>(baseDescriptor, 1);
+      disposedBase.dispose();
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+
+      // built once, so that one pool is built for the call
+      expect(() => new InstancedVertexObjectGeometry(instancedDescriptor, 10, disposedBase)).toThrow(/base.*disposed/);
+
+      const built = disposedPoolsOf(dispose, instancedDescriptor);
+      expect(built).toHaveLength(1);
+      expect(built[0]!.isDisposed).toBe(true);
+    });
+
+    test('disposes the base pool it built when the instanced pool handed in has been disposed', () => {
+      const disposedInstanced = new VertexObjectPool<VO>(instancedDescriptor, 10);
+      disposedInstanced.dispose();
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+
+      expect(() => new InstancedVertexObjectGeometry(disposedInstanced, 10, baseDescriptor, 1)).toThrow(/disposed/);
+
+      const built = disposedPoolsOf(dispose, baseDescriptor);
+      expect(built).toHaveLength(1);
+      expect(built[0]!.isDisposed).toBe(true);
+    });
+
+    test('disposes the instanced pool it built when the base capacity is refused', () => {
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+
+      expect(() => new InstancedVertexObjectGeometry(instancedDescriptor, 10, baseDescriptor, -1)).toThrow(RangeError);
+
+      const built = disposedPoolsOf(dispose, instancedDescriptor);
+      expect(built).toHaveLength(1);
+      expect(built[0]!.isDisposed).toBe(true);
+    });
+
+    test('InstancedVOBufferGeometry disposes the instanced pool it built when the base capacity is refused', () => {
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+
+      expect(() => new InstancedVOBufferGeometry(instancedDescriptor, 10, baseDescriptor, 1.5)).toThrow(RangeError);
+
+      const built = disposedPoolsOf(dispose, instancedDescriptor);
+      expect(built).toHaveLength(1);
+      expect(built[0]!.isDisposed).toBe(true);
+    });
+
+    test('leaves an instanced pool handed in alive and unattached when the base capacity is refused', () => {
+      const handedIn = new VertexObjectPool<VO>(instancedDescriptor, 10);
+
+      expect(() => new InstancedVertexObjectGeometry(handedIn, 10, baseDescriptor, -1)).toThrow(RangeError);
+
+      expect(handedIn.isDisposed).toBe(false);
+      expect(handedIn.isAttachedToGeometry).toBe(false);
     });
   });
 });

@@ -26,6 +26,9 @@ export const texturePackerAtlasAdapter: AtlasAdapter = (json, parentCoords) => {
 
 /** `AsepriteJson.parse()` as an adapter: the frames, and the frame tags as animations. */
 export const asepriteAtlasAdapter: AtlasAdapter = (json, parentCoords) => {
+  // The cast claims a duration at every frame and `meta.frameTags` as a list of tags. parse() checks
+  // both before it adds a frame — the duration of each frame, the list and that each tag is an object —
+  // so a json that is no Aseprite sheet is refused there.
   const [atlas, , animations] = AsepriteJson.parse(json as AsepriteJsonData, {parentCoords});
   return {atlas, animations};
 };

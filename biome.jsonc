@@ -111,11 +111,12 @@
         "noUnusedVariables": "error",
         "noUnusedImports": "error"
       },
-      // a promise nobody awaits or catches loses its rejection, in a spec as much as in the
-      // library; both rules read the types Biome infers for the expressions. They hold
-      // packages/*/src only, an override below takes them off everywhere else. Biome runs
-      // its type inference only for a rule switched on up here, not for one an override
-      // switches on.
+      // a promise nobody awaits or catches loses its rejection, in a spec, a browser test or the
+      // library alike; both rules read the types Biome infers for the expressions — in the
+      // browser tests from the declarations of the built library they import. They hold
+      // packages/*/src and packages/twopoint5d-testing/test; an override below takes them off
+      // everywhere else. Biome runs its type inference only for a rule switched on up here, not
+      // for one an override switches on.
       "nursery": {
         "noFloatingPromises": "error",
         "noMisusedPromises": "error"
@@ -149,7 +150,7 @@
       }
     },
     {
-      "includes": ["**", "!packages/*/src/**"],
+      "includes": ["**", "!packages/*/src/**", "!packages/twopoint5d-testing/test/**"],
       "linter": {"rules": {"nursery": {"noFloatingPromises": "off", "noMisusedPromises": "off"}}}
     },
     {

@@ -3,9 +3,6 @@ import {Display} from '@spearwolf/twopoint5d';
 import {disposeDisplay} from './helpers/fixtures.js';
 
 describe('hello twopoint5d canvas', function () {
-  // a cold webgpu start — adapter plus device — happens inside the constructor, and it is slow
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
 

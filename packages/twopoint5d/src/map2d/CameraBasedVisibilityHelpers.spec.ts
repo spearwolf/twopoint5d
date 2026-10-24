@@ -4,6 +4,7 @@ import {describe, expect, test, vi} from 'vitest';
 
 import type {CameraBasedVisibility, TileBox} from './CameraBasedVisibility.js';
 import {CameraBasedVisibilityHelpers} from './CameraBasedVisibilityHelpers.js';
+import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 import {packTileCoords} from './tileKeys.js';
 
@@ -12,12 +13,16 @@ import {packTileCoords} from './tileKeys.js';
 // because the tile helpers are built from it.
 function makeTileBox(x: number, y: number, primary: boolean): TileBox {
   return {
-    id: packTileCoords(x, y),
+    packedKey: packTileCoords(x, y),
     x,
     y,
+    coords: createTilesWithinCoords(),
     primary,
     box: new Box3(new Vector3(x, 0, y), new Vector3(x + 1, 1, y + 1)),
     frustumBox: new Box3(new Vector3(x - 1, -1, y - 1), new Vector3(x + 2, 2, y + 2)),
+    centerWorld: new Vector3(x + 0.5, 0, y + 0.5),
+    distanceToCamera: 0,
+    map2dTile: undefined,
   };
 }
 
@@ -472,6 +477,77 @@ describe('CameraBasedVisibilityHelpers', () => {
         expect(node.geometry!).toHaveBeenCalledTimes(1);
         expect(node.material!).toHaveBeenCalledTimes(1);
       }
+    });
+  });
+
+  describe('the number fields', () => {
+    const subject = 'CameraBasedVisibilityHelpers';
+
+    test.each([Number.NaN, -1, 2.5])('maxDebugHelpers refuses %p and keeps its value', (value) => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+      const set = () => {
+        helpers.maxDebugHelpers = value;
+      };
+
+      expect(set).toThrow(
+        new RangeError(`${subject}: maxDebugHelpers must be a whole number of 0 or more, or Infinity, got ${String(value)}`),
+      );
+      expect(helpers.maxDebugHelpers).toBe(9);
+    });
+
+    test('maxDebugHelpers takes 0, a whole number and Infinity', () => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      for (const value of [0, 3, Number.POSITIVE_INFINITY]) {
+        helpers.maxDebugHelpers = value;
+        expect(helpers.maxDebugHelpers).toBe(value);
+      }
+    });
+
+    test.each([
+      ['tileBoxHelperExpand', -0.01],
+      ['frustumBoxHelperExpand', 0],
+    ] as const)('%s refuses NaN and Infinity and keeps its value', (name, start) => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+        const set = () => {
+          helpers[name] = value;
+        };
+        expect(set).toThrow(new RangeError(`${subject}: ${name} must be a finite number, got ${String(value)}`));
+        expect(helpers[name]).toBe(start);
+      }
+    });
+
+    test.each(['tileBoxHelperExpand', 'frustumBoxHelperExpand'] as const)('%s takes any sign', (name) => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+
+      helpers[name] = -0.5;
+      expect(helpers[name]).toBe(-0.5);
+      helpers[name] = 0.5;
+      expect(helpers[name]).toBe(0.5);
+    });
+
+    test('they refuse and keep taking values after dispose()', () => {
+      const helpers = new CameraBasedVisibilityHelpers(makeVisibility());
+      helpers.dispose();
+
+      expect(() => {
+        helpers.maxDebugHelpers = 2.5;
+      }).toThrow(RangeError);
+      expect(() => {
+        helpers.tileBoxHelperExpand = Number.NaN;
+      }).toThrow(RangeError);
+      expect(() => {
+        helpers.frustumBoxHelperExpand = Number.NaN;
+      }).toThrow(RangeError);
+
+      helpers.maxDebugHelpers = Number.POSITIVE_INFINITY;
+      helpers.tileBoxHelperExpand = 0.25;
+      helpers.frustumBoxHelperExpand = 0.5;
+      expect(helpers.maxDebugHelpers).toBe(Number.POSITIVE_INFINITY);
+      expect(helpers.tileBoxHelperExpand).toBe(0.25);
+      expect(helpers.frustumBoxHelperExpand).toBe(0.5);
     });
   });
 });

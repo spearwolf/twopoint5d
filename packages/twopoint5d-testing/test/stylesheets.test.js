@@ -309,13 +309,6 @@ describe('Stylesheets', function () {
     expect(iframeDocument.defaultView.getComputedStyle(div).cursor, 'the cursor in the shadow root').to.equal('pointer');
   });
 
-  it('getGlobalSheet() answers the sheet getSheet() answers for the same root', () => {
-    const shadowRoot = makeShadowRoot();
-
-    expect(Stylesheets.getGlobalSheet(), 'the document').to.equal(Stylesheets.getSheet());
-    expect(Stylesheets.getGlobalSheet(shadowRoot), 'a shadow root').to.equal(Stylesheets.getSheet(shadowRoot));
-  });
-
   it('refuses a root in a document without a window, on every call, with a message that says so', () => {
     const doc = document.implementation.createHTMLDocument('');
     const el = doc.createElement('div');

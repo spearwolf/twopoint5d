@@ -7,9 +7,6 @@ import {makeContainer, disposeDisplay, readBack, quadDescription} from './helper
 /** @typedef {VO & {setPosition: VOAttrSetter}} QuadVO */
 
 describe('vertex-objects — buffers data', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */

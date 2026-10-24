@@ -52,6 +52,22 @@ describe('checkNameableTypes.mjs', () => {
     assert.match(stdout, /0 not nameable/);
   });
 
+  it('stops on declarations that do not compile: exit code 2, the diagnostic named, no stack trace', () => {
+    const {status, stderr} = run({
+      'index.d.ts': [
+        "import type { Gone } from './gone.js';",
+        'export declare function f(): Gone;',
+        'export declare function g(): Missing;',
+        '',
+      ].join('\n'),
+    });
+
+    assert.equal(status, 2, stderr);
+    assert.match(stderr, /checkNameableTypes: the declarations do not compile/);
+    assert.match(stderr, /Cannot find name 'Missing'/);
+    assert.doesNotMatch(stderr, /^\s+at /m);
+  });
+
   it('stops with a message on an entry that does not exist: exit code 2, no stack trace', () => {
     const {status, stderr} = run({});
 

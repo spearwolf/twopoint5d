@@ -1,3 +1,4 @@
+import {getSubscriptionCount} from '@spearwolf/eventize';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {FrameLoop} from './FrameLoop.js';
 
@@ -212,6 +213,86 @@ describe('FrameLoop', () => {
     renderer.tick(49); //  emit (>= 48.0)
 
     expect(events).toHaveLength(4);
+  });
+
+  it.each([NaN, Infinity, -Infinity, -1, '30'])('setFps() refuses %o with a RangeError and keeps the limit it had', (maxFps) => {
+    const renderer = makeFakeRenderer();
+    const loop = new FrameLoop(0, renderer);
+    const {events} = subscribe(loop);
+    loop.setFps(30);
+
+    expect(() => loop.setFps(maxFps as number)).toThrow(RangeError);
+
+    renderer.tick(0); //  emit, nextEmitAt = 33.33
+    renderer.tick(16); //  held back at 30 frames per second
+    renderer.tick(33); //  emit (>= 32.67)
+
+    expect(events).toHaveLength(2);
+  });
+
+  it('setFps() names itself and the value it refuses', () => {
+    const loop = new FrameLoop(0, makeFakeRenderer());
+
+    expect(() => loop.setFps(NaN)).toThrow(
+      new RangeError('FrameLoop#setFps(): maxFps must be a finite number of 0 or more, got NaN'),
+    );
+    expect(() => loop.setFps(-1)).toThrow(
+      new RangeError('FrameLoop#setFps(): maxFps must be a finite number of 0 or more, got -1'),
+    );
+  });
+
+  it.each([
+    [NaN, 'NaN'],
+    [Infinity, 'Infinity'],
+    [-Infinity, '-Infinity'],
+    [-1, '-1'],
+    ['30', '"30"'],
+  ])('new FrameLoop() refuses %o in its own name', (maxFps, written) => {
+    expect(() => new FrameLoop(maxFps as number, makeFakeRenderer())).toThrow(
+      new RangeError(`new FrameLoop(): maxFps must be a finite number of 0 or more, got ${written}`),
+    );
+  });
+
+  it('takes a maxFps of 0 and of -0 as no limit', () => {
+    for (const maxFps of [0, -0]) {
+      const renderer = makeFakeRenderer();
+      const {events} = subscribe(new FrameLoop(maxFps, renderer));
+
+      renderer.tick(0);
+      renderer.tick(1);
+      renderer.tick(2);
+
+      expect(events).toHaveLength(3);
+    }
+  });
+
+  it('keeps emitting to a target subscribed under FrameLoop.OnFrame when JavaScript writes over the static', () => {
+    const renderer = makeFakeRenderer();
+    const loop = new FrameLoop(0, renderer);
+    const {events, target} = subscribe(loop);
+    const statics = FrameLoop as unknown as {OnFrame: symbol};
+    const onFrame = statics.OnFrame;
+
+    try {
+      statics.OnFrame = Symbol('other');
+
+      renderer.tick(1000);
+      expect(events, 'the frame reaches the target').toHaveLength(1);
+
+      loop.stop(target);
+      expect(getSubscriptionCount(loop), 'and stop() takes it off the loop again').toBe(0);
+    } finally {
+      statics.OnFrame = onFrame;
+    }
+  });
+
+  it('FrameLoop.OnFrame is read-only for TypeScript', () => {
+    // never called: the check is the one of the compiler
+    const write = () => {
+      // @ts-expect-error — the event name the loop emits under is not the caller's to change
+      FrameLoop.OnFrame = Symbol('other');
+    };
+    expect(write).toBeTypeOf('function');
   });
 
   it('subscriptionCount tracks start()/stop() idempotently', () => {

@@ -3,7 +3,7 @@ import {type Node, Texture, type TextureNode, Vector2} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {evaluateNode, nodesOf, operatorOf} from '../testing/spriteGraph.js';
-import {type FrameToSample, sampleFrameAt} from './sampleFrameAt.js';
+import {type FrameSampleOptions, type FrameToSample, sampleFrameAt} from './sampleFrameAt.js';
 
 const vec4Of = (...values: [number, number, number, number]) => vec4(...values) as unknown as Node<'vec4'>;
 
@@ -11,7 +11,6 @@ const vec4Of = (...values: [number, number, number, number]) => vec4(...values) 
 const frame = (flip: 0 | 1 = 0): FrameToSample => ({
   texCoords: vec4Of(2 / 16, 0, 8 / 16, 1),
   flipDiagonal: float(flip) as unknown as Node<'float'>,
-  margins: vec4Of(0.25, 0, 0.25, 0),
   drawnTexels: vec2(8, 4) as unknown as Node<'vec2'>,
 });
 
@@ -72,7 +71,12 @@ describe('sampleFrameAt()', () => {
   test('multiplies the sample by the covered part of the trimmed area for trim mask', () => {
     const {lookup} = recording();
 
-    const color = sampleFrameAt(lookup, frame(), at(0.5, 0.5), {wrap: ['clamp', 'clamp'], trim: 'mask', inset: 0});
+    const color = sampleFrameAt(lookup, frame(), at(0.5, 0.5), {
+      wrap: ['clamp', 'clamp'],
+      trim: 'mask',
+      margins: vec4Of(0.25, 0, 0.25, 0),
+      inset: 0,
+    });
 
     expect(operatorOf(color).op).toBe('*');
   });
@@ -80,9 +84,23 @@ describe('sampleFrameAt()', () => {
   test('maps the position into the trimmed area for trim mask', () => {
     const {calls, lookup} = recording();
 
-    sampleFrameAt(lookup, frame(), at(0.5, 0.5), {wrap: ['clamp', 'clamp'], trim: 'mask', inset: 0});
+    sampleFrameAt(lookup, frame(), at(0.5, 0.5), {
+      wrap: ['clamp', 'clamp'],
+      trim: 'mask',
+      margins: vec4Of(0.25, 0, 0.25, 0),
+      inset: 0,
+    });
 
     // the margins are a quarter left and right: the middle of the sprite is the middle of the frame
     expect(evaluateNode(calls[0]!.st)).toEqual([2 / 16 + 0.5 * (8 / 16), 0.5]);
+  });
+
+  test('types the margins as part of trim mask and the drawn texels as part of every frame', () => {
+    // @ts-expect-error trim 'mask' without the margins it masks by
+    const noMargins: FrameSampleOptions = {wrap: ['clamp', 'clamp'], inset: 0, trim: 'mask'};
+    // @ts-expect-error a frame without its drawn texels
+    const noDrawnTexels: FrameToSample = {texCoords: vec4Of(0, 0, 1, 1), flipDiagonal: float(0) as unknown as Node<'float'>};
+
+    expect([noMargins.trim, Object.hasOwn(noDrawnTexels, 'drawnTexels')]).toEqual(['mask', false]);
   });
 });

@@ -17,7 +17,9 @@ import {
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   disposeDisplay,
+  disposeKept,
   isNearColor,
+  keep,
   makeColorTexture,
   makeContainer,
   readsTopDown,
@@ -38,9 +40,6 @@ const AnchoredKind = defineSprite({
 });
 
 describe('sprites — Anchor', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
@@ -53,6 +52,7 @@ describe('sprites — Anchor', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -83,24 +83,23 @@ describe('sprites — Anchor', function () {
 
   async function renderStanding(rotation) {
     // red above green, the foot green
-    const colorMap = makeColorTexture(
-      [
-        [255, 0, 0, 255],
-        [0, 255, 0, 255],
-      ],
-      1,
-      2,
+    const colorMap = keep(
+      makeColorTexture(
+        [
+          [255, 0, 0, 255],
+          [0, 255, 0, 255],
+        ],
+        1,
+        2,
+      ),
     );
-    const sprites = new FeatureSprites(AnchoredKind, {capacity: 1, textures: {colorMap}});
+    const sprites = keep(new FeatureSprites(AnchoredKind, {capacity: 1, textures: {colorMap}}));
     const sprite = sprites.createSprite();
     sprite.setSize(4, 8);
     sprite.setTexCoords(0, 0, 1, 1);
     sprite.setAnchor(0.5, 1);
     sprite.rotation = rotation;
-    const colorAt = await render(sprites);
-    sprites.dispose();
-    colorMap.dispose();
-    return colorAt;
+    return render(sprites);
   }
 
   it('stands a sprite anchored at its foot on its position', async function () {
@@ -143,16 +142,18 @@ describe('sprites — Anchor', function () {
       },
     };
     const [atlas] = AsepriteJson.parse(json);
-    const colorMap = makeColorTexture(
-      [
-        [0, 255, 0, 255],
-        [255, 0, 0, 255],
-      ],
-      2,
-      1,
+    const colorMap = keep(
+      makeColorTexture(
+        [
+          [0, 255, 0, 255],
+          [255, 0, 0, 255],
+        ],
+        2,
+        1,
+      ),
     );
     const renderFigure = async (flipX) => {
-      const sprites = new FeatureSprites(AnchoredKind, {capacity: 1, textures: {colorMap}});
+      const sprites = keep(new FeatureSprites(AnchoredKind, {capacity: 1, textures: {colorMap}}));
       const sprite = sprites.createSprite();
       const frame = atlas.frame('figure 0.aseprite');
       sprite.setSize(8, 4);
@@ -160,14 +161,11 @@ describe('sprites — Anchor', function () {
       sprite.setAnchorFromPivot(frame);
       sprite.flipX = flipX;
       expect([sprite.anchorX, sprite.anchorY]).to.deep.equal([0.25, 1]);
-      const colorAt = await render(sprites);
-      sprites.dispose();
-      return colorAt;
+      return render(sprites);
     };
 
     const facingRight = await renderFigure(0);
     const facingLeft = await renderFigure(1);
-    colorMap.dispose();
 
     expectColor(facingRight, 0.5, 0.5, GREEN, 'the foot, facing right');
     expectColor(facingRight, 1.5, 0.5, RED, 'beside the foot, facing right');

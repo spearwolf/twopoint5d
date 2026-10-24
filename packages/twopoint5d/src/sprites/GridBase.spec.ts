@@ -44,6 +44,21 @@ describe('gridBase()', () => {
     expect(grid.defaultArgs).toEqual([0.5, 0.5]);
   });
 
+  test('answers a base frozen all the way down, its description and the prototype of its base vertex included', () => {
+    const grid = gridBase({columns: 3, rows: 3});
+    const {description} = grid;
+
+    expect(Object.isFrozen(description)).toBe(true);
+    expect(Object.isFrozen(description.attributes)).toBe(true);
+    expect(Object.isFrozen(description.attributes['position'])).toBe(true);
+    expect(Object.isFrozen(description.indices)).toBe(true);
+    expect(Object.isFrozen(description.basePrototype)).toBe(true);
+    expect(Object.isFrozen(grid.defaultArgs)).toBe(true);
+    expect(() => {
+      description.indices!.push(0);
+    }).toThrow(TypeError);
+  });
+
   test('is (columns + 1) × (rows + 1) vertices with a position of 3 and a uv of 2 values, no property per vertex', () => {
     const {description} = gridBase({columns: 4, rows: 2});
 
@@ -111,7 +126,10 @@ describe('gridBase()', () => {
     [{columns: 1025, rows: 1}, 'gridBase: columns is 1025 — columns and rows are whole numbers from 1 to 1024'],
     [{columns: '3', rows: 3}, 'gridBase: columns is "3" — columns and rows are whole numbers from 1 to 1024'],
     [{rows: 3}, 'gridBase: columns is undefined — columns and rows are whole numbers from 1 to 1024'],
-    [undefined, 'gridBase: takes {columns, rows} — gridBase({columns: 3, rows: 3})'],
+    [undefined, 'gridBase: takes {columns, rows}, got undefined — gridBase({columns: 3, rows: 3})'],
+    [null, 'gridBase: takes {columns, rows}, got null — gridBase({columns: 3, rows: 3})'],
+    [5, 'gridBase: takes {columns, rows}, got 5 — gridBase({columns: 3, rows: 3})'],
+    ['3 × 3', 'gridBase: takes {columns, rows}, got "3 × 3" — gridBase({columns: 3, rows: 3})'],
     [{columns: 1000, rows: 1000}, 'gridBase: a grid of 1000 × 1000 is 1000000 cells — a grid holds at most 4096'],
     [{columns: 1024, rows: 5}, 'gridBase: a grid of 1024 × 5 is 5120 cells — a grid holds at most 4096'],
   ])('refuses %j', (options, message) => {

@@ -198,4 +198,40 @@ describe('RectangularVisibilityAreaHelpers', () => {
       }
     });
   });
+
+  describe('viewRectHelperHeight', () => {
+    test.each([-1, Number.NaN, Number.POSITIVE_INFINITY])('refuses %p and keeps its value', (value) => {
+      const helpers = new RectangularVisibilityAreaHelpers(makeArea());
+      const set = () => {
+        helpers.viewRectHelperHeight = value;
+      };
+
+      expect(set).toThrow(
+        new RangeError(
+          `RectangularVisibilityAreaHelpers: viewRectHelperHeight must be a finite number of 0 or more, got ${String(value)}`,
+        ),
+      );
+      expect(helpers.viewRectHelperHeight).toBe(20);
+    });
+
+    test('takes 0 and a positive number', () => {
+      const helpers = new RectangularVisibilityAreaHelpers(makeArea());
+
+      helpers.viewRectHelperHeight = 0;
+      expect(helpers.viewRectHelperHeight).toBe(0);
+      helpers.viewRectHelperHeight = 7.5;
+      expect(helpers.viewRectHelperHeight).toBe(7.5);
+    });
+
+    test('refuses and keeps taking values after dispose()', () => {
+      const helpers = new RectangularVisibilityAreaHelpers(makeArea());
+      helpers.dispose();
+
+      expect(() => {
+        helpers.viewRectHelperHeight = -1;
+      }).toThrow(RangeError);
+      helpers.viewRectHelperHeight = 3;
+      expect(helpers.viewRectHelperHeight).toBe(3);
+    });
+  });
 });

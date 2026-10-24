@@ -120,14 +120,6 @@ export class Stylesheets {
   }
 
   /**
-   * @deprecated Use {@link Stylesheets.getSheet}: there is one sheet per document or shadow root,
-   *   not one global sheet. This name stays as an alias for one release.
-   */
-  static getGlobalSheet(root: HTMLElement | ShadowRoot = document.head): CSSStyleSheet {
-    return Stylesheets.getSheet(root);
-  }
-
-  /**
    * Install a className-based rule in the stylesheet of the root.
    *
    * A name carries exactly one rule within one root: a call with a different `css` rewrites that

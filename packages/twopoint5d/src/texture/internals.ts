@@ -2,6 +2,8 @@
 // that belong to the store and not to its callers. This module is not in `public-api.ts`, so
 // that nobody outside `src/texture/` can name them.
 
+import type {TextureResourceErrorEvent} from './TextureResource.js';
+
 /**
  * One image lent out by a {@link TextureImageSource}: the promise of the image, and the
  * way to give it back. `TextureResource` takes one per run of its image effect and gives it
@@ -22,16 +24,10 @@ export interface TextureImageSource {
 }
 
 /**
- * The payload of an `error` event of a `TextureResource` that keeps a value from arriving,
- * as the resource records it. `TextureStore#getAsync()` reads it through {@link loadFailureFor}.
+ * The part of the payloads of the `error` events of a `TextureResource` that keeps a value from
+ * arriving, as the resource records it. `TextureStore#getAsync()` reads it through {@link loadFailureFor}.
  */
-export interface TextureResourceLoadFailure {
-  source: 'image' | 'atlas' | 'texture';
-  url?: string;
-  id?: string;
-  status?: number;
-  error: unknown;
-}
+export type TextureResourceLoadFailure = Exclude<TextureResourceErrorEvent, {source: 'frameBasedAnimations'}>;
 
 /** The method of a `TextureResource` through which `TextureStore` changes its `refCount`. */
 export const changeRefCount: unique symbol = Symbol('TextureResource.changeRefCount');

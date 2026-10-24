@@ -44,8 +44,11 @@ the renderer, and the display leaves that context lost but restorable. Only a `D
 built on the canvas afterwards brings it back; a `WebGPURenderer` or a
 `getContext('webgl2')` of the caller's own on that canvas gets the lost context. A
 `Display` constructor that throws after it has built or taken over its renderer leaves
-nothing behind — it releases the renderer, gives a canvas handed in back and takes its
-own container out, as `dispose()` would.
+nothing behind — it releases the renderer, gives a canvas handed in back and takes its own
+container out, as `dispose()` would. The constructors of `InstancedVOBufferGeometry` and
+`InstancedVertexObjectGeometry` and `InstancedVOBufferGeometry#attachInstancedPool()` do
+the same for the pools they build from a descriptor or a description: one that throws
+disposes them and leaves a pool handed in as it was.
 
 Reference implementation —
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) marks what it built and
@@ -96,16 +99,21 @@ so read them from the mesh afresh. A `geometry` handed in is never replaced: `gr
 to one is refused. Where the caller replaces a resource by putting another into the
 `geometry` or `material` slot of the mesh, `FeatureSprites#dispose()` still releases the
 geometry and the material it built, and what the caller put there stays the caller's.
+[`Canvas2DStage#dispose()`](../src/stage/Canvas2DStage.ts) does the same for the
+`material` slot of its `sprite`: it releases the `SpriteMaterial` it built, and goes on
+writing the canvas texture into that one while another sits in the slot.
 
 **What an instance builds on a borrowed resource goes when that resource goes.**
 [`SpritePicker`](../src/sprites/SpritePicker.ts) owns its render target and, per mesh it
 has drawn, a pick mesh and a pick material built on the uniforms and textures of that
 mesh; the renderer, the camera and the meshes stay the caller's. It listens to three's
-`dispose` event of each mesh and of the geometry it draws, and releases the pick mesh
-and the pick material then — the event of the mesh comes before the mesh releases the
+`dispose` event of each mesh and of the geometry it draws, and releases the pick mesh and
+the pick material then — the event of the mesh comes before the mesh releases the
 resources the pick material reads, and the one of the geometry comes with a growth; the
-next pick builds them anew. Its `dispose()` releases the target and every pick material,
-stops listening, and rejects every pick still in flight (section 3).
+next pick builds them anew. Up to one of those events it holds each mesh it has drawn,
+whether a later pick lists it or not: a mesh its owner drops without `dispose()` lives as
+long as the picker. Its `dispose()` releases the target and every pick material, stops
+listening, and rejects every pick still in flight (section 3).
 
 ## 2. Idempotence
 
@@ -141,8 +149,9 @@ get isDisposed(): boolean {
 
 ## 3. After `dispose()`
 
-Every public member of a disposed instance behaves in one of exactly three ways, picked
-by its declared type. Its TSDoc says which.
+Every public member of a disposed instance behaves in one of three ways, picked by its
+declared type — or, for a member over plain values, keeps working (below). Its TSDoc
+says which.
 
 1. **Type admits absence → answer `undefined`.** `T | undefined` is a value the caller
    handles anyway.
@@ -160,9 +169,20 @@ by its declared type. Its TSDoc says which.
    [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts) keeps
    rejecting a mismatched capacity.
 
-This rules out the fourth reaction — a `TypeError` from deep inside the class because a
-field quietly became `undefined`, where the caller learns nothing and the stack points
-at the wrong line.
+**A member over plain values keeps working.** What it reads or writes is no resource the
+instance gives back — a uniform, the placement a graph was last built with —, so after
+`dispose()` it answers and takes values as before, and a write reaches only what still
+reads them: the other materials that share the resources, or nothing that renders.
+[`SpriteResources`](../src/sprites/FeatureSprites/SpriteResources.ts) keeps `uniforms`,
+`uniform()`, `setUniform()`, `textureSize()` and `declares()`;
+[`FeatureSpritesMaterial`](../src/sprites/FeatureSprites/FeatureSpritesMaterial.ts) keeps
+`uniforms`, `setUniform()` and the getter `placement` — the setter checks what it is
+handed and changes nothing that renders — and, with resources handed in, `getTexture()`,
+`setTexture()` and `touchTexture()`, which act on those resources, alive and the
+caller's. A new member keeps working only over state of this kind.
+
+This rules out a `TypeError` from deep inside the class because a field quietly became
+`undefined`, where the caller learns nothing and the stack points at the wrong line.
 
 A pending promise does not survive either — anything a caller is still awaiting when
 `dispose()` runs is rejected as part of it.
@@ -234,6 +254,8 @@ dispose(): void {
     errors.push(error);
   }
   this.frameLoop.stop(this);
+  this.#stopSizeWatch();
+  this.#stopVisibilityWatch();
   try {
     // the listeners are still attached here: this event is what tells them to let go,
     // and off(this) below is what makes it the last event this display ever emits.
@@ -271,6 +293,11 @@ dispose(): void {
 }
 ```
 
+What an instance has hung on the DOM, on the window or on an observer itself, its
+`dispose()` takes down directly — never through a listener of its own dispose event. An
+`off(instance)` of the caller, the obvious way to get rid of one's own listeners, would
+take that listener along, and the document would keep the instance alive.
+
 **Order rule:** release your own resources **before** tearing down the signal group. A
 resource reachable only through a signal is unreachable once that signal is destroyed,
 and releasing it afterwards works only as long as a destroyed signal still hands out its
@@ -288,13 +315,21 @@ the call goes out while every slot is still filled.
 
 ```ts
 override dispose(): void {
-  // the renderer reads the attributes of this geometry once more while it handles the
-  // dispose event, and reaches for the id of a slot before it checks that the slot is
-  // filled — so the event goes out while every slot is still there
-  super.dispose();
+  if (this.#disposed) return;
+  this.#disposed = true;
 
-  this.#attachments.detachAll();
-  // … release the attribute slots, the index and the owned pools
+  try {
+    // the renderer reads the attributes of this geometry once more while it handles the
+    // dispose event, and reaches for the id of a slot before it checks that the slot is
+    // filled — so the event goes out while every slot is still there
+    super.dispose();
+  } finally {
+    // a listener of the dispose event that throws holds up none of the teardown: its error
+    // reaches the caller once the geometry is down, and a second dispose() has nothing left
+    // to do
+    this.#attachments.detachAll();
+    // … release the attribute slots, the index and the owned pools
+  }
 }
 ```
 
@@ -339,7 +374,8 @@ of them, or accept the growth. `vertex-objects-heap.test.js` in
    from a pool or a factory, and touch nothing handed in — unless the place that accepts
    it promises the take-over in its own TSDoc (section 1).
 2. Make it idempotent — by flag, or by construction (section 2).
-3. Emit the dispose event, then `off(this)`.
+3. Emit the dispose event, then `off(this)`; take down what this instance hung on the DOM
+   directly, not through a listener of its own dispose event (section 4).
 4. `SignalGroup.delete(this)` after your own release; never `SignalGroup.destroy()`.
 5. Place `super.dispose()` first or last by the rule in section 5, with the reason as a
    comment at the call.

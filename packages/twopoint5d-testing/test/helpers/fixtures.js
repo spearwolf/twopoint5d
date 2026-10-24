@@ -78,7 +78,7 @@ export function makeIframeDocument({width, height} = {}) {
   return {iframe, doc: /** @type {Document} */ (iframe.contentDocument)};
 }
 
-// the errors display.dispose() threw in the teardown of the running test, for the hook below
+// the errors a dispose() threw in the teardown of the running test, for the hook below
 const teardownErrors = [];
 
 /**
@@ -106,15 +106,68 @@ afterEach(function () {
   const errors = teardownErrors.splice(0);
   if (this.currentTest?.state === 'failed') {
     // biome-ignore lint/suspicious/noConsole: the teardown error goes into the log beside the failure it must not mask
-    console.error(`display.dispose() threw in the teardown of "${this.currentTest.fullTitle()}":`, ...errors);
+    console.error(`dispose() threw in the teardown of "${this.currentTest.fullTitle()}":`, ...errors);
     return;
   }
   // the reporter prints the message alone, so it carries the errors as well
   throw new AggregateError(
     errors,
-    `display.dispose() threw in the teardown of "${this.currentTest?.fullTitle()}": ${errors.map(String).join('; ')}`,
+    `dispose() threw in the teardown of "${this.currentTest?.fullTitle()}": ${errors.map(String).join('; ')}`,
   );
 });
+
+// --- what a test builds itself ---
+
+/** @type {{dispose(): unknown}[]} */
+const kept = [];
+
+/**
+ * Hands `item` back and keeps it for {@link disposeKept}, which the `afterEach` of the suite
+ * calls: what a test builds itself — a render target, a pipeline, a geometry, a material,
+ * sprites — is released after the test, also when an assertion fails half way through it.
+ * Keep a part before what holds it, so that the holder lets go first. A test whose subject is the
+ * release of a kept item releases it through {@link release}.
+ *
+ * @template {{dispose(): unknown}} T
+ * @param {T} item
+ * @returns {T}
+ */
+export function keep(item) {
+  kept.push(item);
+  return item;
+}
+
+/**
+ * Releases `item` now, as the subject of a test, and takes it off the list of {@link keep}, so
+ * that {@link disposeKept} does not release it a second time. An item `keep()` does not hold is
+ * released all the same.
+ *
+ * @template {{dispose(): unknown}} T
+ * @param {T} item
+ * @returns {ReturnType<T['dispose']>}
+ */
+export function release(item) {
+  const at = kept.lastIndexOf(item);
+  if (at >= 0) kept.splice(at, 1);
+  return /** @type {ReturnType<T['dispose']>} */ (item.dispose());
+}
+
+/**
+ * Releases what {@link keep} kept, the last one kept first. Call it in `afterEach` before
+ * `disposeDisplay()`: the items were drawn with the renderer of that display. An error a
+ * `dispose()` throws is held for the hook above, like one of {@link disposeDisplay}, and the
+ * items after it are released all the same.
+ */
+export function disposeKept() {
+  while (kept.length > 0) {
+    const item = kept.pop();
+    try {
+      item.dispose();
+    } catch (error) {
+      teardownErrors.push(error);
+    }
+  }
+}
 
 /**
  * Resolves once renderer.dispose() has settled — the release of a display happens after its dispose() has returned.
@@ -170,6 +223,33 @@ export async function withSilencedInfo(body) {
   } finally {
     console.info = info;
   }
+}
+
+// --- unhandled rejections ---
+
+/**
+ * Settles once the browser has reported every rejection that went unhandled before the call. It
+ * leaves a rejection of its own unhandled one task later and waits for the browser to report it:
+ * the browser reports unhandled rejections in the order they occurred, so the control comes after
+ * all of them. The control goes through `twopoint5dExpectRejection()`, which an init script of
+ * web-test-runner.config.js puts into the page, and its report reaches neither the console nor the
+ * browser logs of the run nor a listener of the test. A browser that reported none would hold the
+ * test up until its timeout — red, not green.
+ *
+ * @returns {Promise<void>}
+ */
+export function whenRejectionsReported() {
+  const expectRejection = Reflect.get(globalThis, 'twopoint5dExpectRejection');
+  if (typeof expectRejection !== 'function') {
+    throw new Error('no twopoint5dExpectRejection() in this page — see web-test-runner.config.js');
+  }
+  const control = new Error('the control rejection of whenRejectionsReported()');
+  const reported = expectRejection(control);
+  setTimeout(() => {
+    // left unhandled on purpose: it is the control the hook waits for
+    void Promise.reject(control);
+  }, 0);
+  return reported;
 }
 
 // --- input for PanControl2D ---

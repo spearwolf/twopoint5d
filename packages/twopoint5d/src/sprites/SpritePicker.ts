@@ -17,6 +17,7 @@ import {
   Vector2,
   WebGLCoordinateSystem,
 } from 'three/webgpu';
+import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import type {VO} from '../vertex-objects/types.js';
 import type {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
@@ -134,7 +135,9 @@ function isShown(object: Object3D): boolean {
  * The renderer stays the caller's; the picker owns its render target, and a pick material and a pick
  * mesh per mesh it has drawn, which go when that mesh is disposed, when the geometry they draw is
  * disposed — a growth does that —, or with {@link dispose}; the next pick of the mesh builds them
- * anew.
+ * anew. Until then the picker holds the mesh, and with it its geometry, its pool and its textures,
+ * whether a later pick lists it or not: a mesh taken out of the scene and never disposed lives as
+ * long as the picker. Dispose a mesh that is done with, or the picker.
  */
 export class SpritePicker {
   /** The renderer it draws with; it stays the caller's. */
@@ -181,7 +184,8 @@ export class SpritePicker {
    * is left alone — under a reversed depth buffer the pick turns its projection over itself. Only
    * the sprites are drawn, not their passes. A mesh that is disposed, not visible (or under a parent
    * that is not), whose material is not visible, or that holds no sprite is left out; a mesh listed
-   * twice is drawn once, at its first place. A pointer outside the view answers `undefined` without
+   * twice is drawn once, at its first place. A mesh drawn once is held until it or the picker is
+   * disposed, also when no later pick lists it. A pointer outside the view answers `undefined` without
    * a draw. The state of the renderer the pick changes — render target, MRT, clear color, the
    * `autoClear` flags — is restored before it returns.
    *
@@ -470,7 +474,7 @@ export class SpritePicker {
 // the message and the pick see the same values
 function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly unknown[]): PickPointer {
   if ((camera as {isCamera?: unknown} | null)?.isCamera !== true) {
-    throw new TypeError(`${WHERE}: the camera is no three.js Camera`);
+    throw new TypeError(`${WHERE}: the camera is no three.js Camera, got ${describeThreeValue(camera, 'isObject3D')}`);
   }
   const x = pointer?.x;
   const y = pointer?.y;
@@ -482,11 +486,15 @@ function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly 
     throw new TypeError(`${WHERE}: the pointer is {x, y} in normalized device coordinates, -1 to 1 — got ${got}`);
   }
   if (!Array.isArray(sprites)) {
-    throw new TypeError(`${WHERE}: takes a list of FeatureSprites — pick(camera, pointer, [sprites])`);
+    throw new TypeError(
+      `${WHERE}: takes a list of FeatureSprites, got ${describeThreeValue(sprites, 'isObject3D')} — pick(camera, pointer, [sprites])`,
+    );
   }
   for (let k = 0; k < sprites.length; k++) {
     if (!(sprites[k] instanceof FeatureSprites)) {
-      throw new TypeError(`${WHERE}: the entry ${k} of the list is no FeatureSprites — the picker draws FeatureSprites alone`);
+      throw new TypeError(
+        `${WHERE}: the entry ${k} of the list is no FeatureSprites, got ${describeThreeValue(sprites[k], 'isObject3D')} — the picker draws FeatureSprites alone`,
+      );
     }
   }
   return {x, y};

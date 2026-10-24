@@ -68,7 +68,7 @@ export class Chronometer {
   /**
    * The time that has elapsed since the previous time and the current time.
    * Note that the pause times are subtracted here - so it is the time elapsed during the active
-   * phases.
+   * phases. `0` after an `update()` of the stopped chronometer.
    */
   get deltaTime(): number {
     return this.#deltaTime;
@@ -77,7 +77,8 @@ export class Chronometer {
   /**
    * The time that has elapsed between the previous time and the current time, as
    * {@link deltaTime}, with the pause times subtracted — but before {@link maxDeltaTime} cuts
-   * it. Equal to `deltaTime` as long as `maxDeltaTime` is `0` or not exceeded.
+   * it. Equal to `deltaTime` as long as `maxDeltaTime` is `0` or not exceeded. `0` after an
+   * `update()` of the stopped chronometer.
    */
   get rawDeltaTime(): number {
     return this.#rawDeltaTime;
@@ -119,7 +120,8 @@ export class Chronometer {
    *
    * While running, the elapsed delta is exposed as {@link deltaTime} (and
    * clamped against {@link maxDeltaTime} if set). While paused, the delta
-   * is accumulated into the lost time instead.
+   * is accumulated into the lost time instead, and {@link deltaTime} and
+   * {@link rawDeltaTime} are `0`: no active phase elapses in a pause.
    *
    * A `time` before the current one counts as no time passing: {@link deltaTime} is `0`, and
    * {@link time} stays where it is.
@@ -141,6 +143,9 @@ export class Chronometer {
       }
     } else {
       this.#recentlyLostTime += deltaTime;
+      // no active phase elapses in a pause
+      this.#deltaTime = 0;
+      this.#rawDeltaTime = 0;
     }
   }
 
@@ -154,6 +159,8 @@ export class Chronometer {
    *
    * A `time` before the latest one the chronometer has seen counts as that one: time does not
    * run backwards.
+   *
+   * {@link deltaTime} and {@link rawDeltaTime} keep their values until the next `update()`.
    *
    * No-op when already stopped.
    */

@@ -21,8 +21,7 @@ describe('TileSetLoader', () => {
     const promise = new TileSetLoader(textureFactory, imageLoader).loadAsync('tiles.png', {tileWidth: 0, tileHeight: 16});
     deliver();
 
-    await expect(promise).rejects.toThrow(RangeError);
-    await expect(promise).rejects.toThrow(/tileWidth/);
+    await expect(promise).rejects.toThrow(new RangeError('TileSet: tileWidth must be a finite number above 0, got 0'));
     expect(disposeSpy).toHaveBeenCalledOnce();
   });
 

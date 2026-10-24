@@ -3,12 +3,17 @@ import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
 import {isAnimationPlayback} from './animationPlayback.js';
+import {writeFrameTexels} from './frameTexels.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
 import {isTextureSize, readMaxTextureSize} from './readMaxTextureSize.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TileSet} from './TileSet.js';
 
+/**
+ * The name of an animation, a string or a symbol. An animation added without a name, or with the
+ * empty string, is given `anim_0`, `anim_1` and so on by {@link FrameBasedAnimations.add}.
+ */
 export type AnimName = string | symbol;
 
 /**
@@ -18,12 +23,20 @@ export type AnimName = string | symbol;
  */
 export type AnimationPlayback = 'loop' | 'once' | 'pingpong';
 
+/**
+ * The record a {@link FrameBasedAnimations} keeps for each registered animation. A caller reads an
+ * animation through {@link FrameBasedAnimations.animation}, which answers a {@link FrameBasedAnimationInfo}.
+ */
 export interface FrameBasedAnimDef {
+  /** The coords of the frames, in the order they are played. */
   frames: TextureCoords[];
   /** Seconds, the frames once through; the sum of `durations` where there are some. */
   duration: number;
+  /** The name of the animation. */
   name: AnimName;
+  /** The id `add()` answered for the animation: 0 for the first one registered, one more for each after it. */
   id: number;
+  /** What the animation does once its frames are through. */
   playback: AnimationPlayback;
   /** Seconds per frame, in the order of `frames`, or `undefined` for an animation of one duration. */
   durations: readonly number[] | undefined;
@@ -31,11 +44,18 @@ export interface FrameBasedAnimDef {
 
 /** What {@link FrameBasedAnimations.animation} answers about a registered animation. Frozen. */
 export interface FrameBasedAnimationInfo {
+  /**
+   * The id `add()` answered for the animation: 0 for the first one registered, one more for each after
+   * it. A sprite writes it as its `animId`, and `animation()` reads it back.
+   */
   readonly id: number;
+  /** The name of the animation. */
   readonly name: AnimName;
+  /** How many frames the animation runs through, once. */
   readonly frameCount: number;
   /** Seconds, the frames once through; the sum of `durations` where there are some. */
   readonly duration: number;
+  /** What the animation does once its frames are through. */
   readonly playback: AnimationPlayback;
   /** Seconds per frame, or `undefined` for an animation of one duration. */
   readonly durations: readonly number[] | undefined;
@@ -46,6 +66,7 @@ export interface FrameBasedAnimationInfo {
   readonly cycleDuration: number;
 }
 
+/** The options of {@link FrameBasedAnimations.bakeDataTexture}. */
 export interface BakeTextureOptions {
   /**
    * Gives every frame a second texel, `[width, height, flipDiagonal, endTime]`. A bake with a frame
@@ -81,6 +102,7 @@ export interface BakeTextureOptions {
  * Whichever way it is reached, the duration is a finite number at or above zero: a duration of
  * zero is a still image, a negative, infinite or `NaN` duration is refused by `add()`.
  * A `frameRate` that is not a number above zero — `NaN` among them — is refused by `add()` as well.
+ * Timing that gives more than one of them is refused by `add()`.
  *
  * `playback` says what happens once the frames are through — see {@link AnimationPlayback}; it
  * defaults to `'loop'`. A ping-pong runs at the same time per frame, so its cycle of
@@ -146,9 +168,9 @@ interface ResolvedTiming {
  * @param timing Either a duration number or AnimationTimingOptions object
  * @param frameCount Number of frames (required when using frameRate or durations)
  * @param name The name of the animation, for the error
- * @throws Error if neither duration, frameRate nor durations is provided, for durations beside one
- *   of the other two, for durations that do not give each frame a duration above zero, and for a
- *   playback that is none of the three
+ * @throws Error if neither duration, frameRate nor durations is provided, for timing that gives more
+ *   than one of `duration`, `frameRate` and `durations`, for durations that do not give each frame a
+ *   duration above zero, and for a playback that is none of the three
  */
 const resolveTiming = (
   timing: number | AnimationTimingOptions,
@@ -168,12 +190,21 @@ const resolveTiming = (
     );
   }
 
+  // the type allows one of the three, and a catalog is json: a second field would be dropped
+  // without a word — the frameRate branch comes first and would win — so it is refused
+  const given = [
+    'durations' in timing && timing.durations !== undefined ? 'durations' : undefined,
+    'duration' in timing && timing.duration !== undefined ? 'a duration' : undefined,
+    'frameRate' in timing && timing.frameRate !== undefined ? 'a frameRate' : undefined,
+  ].filter((field) => field !== undefined);
+  if (given.length > 1) {
+    const fields = given.length === 2 ? `${given[0]} and ${given[1]}` : `${given[0]}, ${given[1]} and ${given[2]}`;
+    throw new Error(
+      `FrameBasedAnimations: add() got ${fields} for the animation ${animNameInError(name)} — give one of duration, frameRate and durations`,
+    );
+  }
+
   if ('durations' in timing && timing.durations !== undefined) {
-    if (('duration' in timing && timing.duration !== undefined) || ('frameRate' in timing && timing.frameRate !== undefined)) {
-      throw new Error(
-        `FrameBasedAnimations: add() got durations and a duration (or frameRate) for the animation ${animNameInError(name)} — give one of duration, frameRate and durations`,
-      );
-    }
     const durations = resolveDurations(timing.durations, frameCount, name);
     return {duration: durations.reduce((sum, value) => sum + value, 0), durations, playback};
   }
@@ -287,14 +318,10 @@ const renderFloatsBuffer = (
 
     let endTime = 0;
     frames.forEach((coords, i) => {
-      floatsBuffer.set(coords.getTexCoords(), offset);
-      if (texelsPerFrame >= 2) {
-        // the end of the frame within the animation, for the walk of the shader over the frames of
-        // an animation with durations; 0 for every other
-        if (durations) endTime += durations[i]!;
-        floatsBuffer.set([coords.width, coords.height, coords.flipD ? 1 : 0, durations ? endTime : 0], offset + 4);
-      }
-      if (texelsPerFrame === 3) floatsBuffer.set(trims[i]!, offset + 8);
+      // the end of the frame within the animation, for the walk of the shader over the frames of an
+      // animation with durations; 0 for every other
+      if (durations) endTime += durations[i]!;
+      writeFrameTexels(floatsBuffer, offset, coords, texelsPerFrame, trims[i]!, durations ? endTime : 0);
       offset += texelsPerFrame * 4;
     });
 
@@ -305,6 +332,10 @@ const renderFloatsBuffer = (
   return floatsBuffer;
 };
 
+/**
+ * Registers animations over the frames of a {@link TextureAtlas}, of a {@link TileSet} or of a list of
+ * {@link TextureCoords}, and bakes them into a data texture that `AnimatedFrames` reads.
+ */
 export class FrameBasedAnimations {
   /**
    * The widest data texture a bake builds when it is told no limit: 8192 texels, the
@@ -312,8 +343,11 @@ export class FrameBasedAnimations {
    * that is handed its renderer, `bakeDataTexture({renderer})`, gets the limit of that device.
    *
    * It is also the upper bound of a `tileCount` in {@link FrameBasedAnimations.add}.
+   *
+   * Read-only: a bake takes a limit of its own through `maxTextureSize` or `renderer` of
+   * {@link BakeTextureOptions}, a `FrameTable` through the same options of its `bakeDataTexture()`.
    */
-  static MaxTextureSize = 8192;
+  static readonly MaxTextureSize: number = 8192;
 
   /**
    * The most frames an animation with per-frame `durations` holds: `AnimatedFrames` finds the frame
@@ -347,16 +381,17 @@ export class FrameBasedAnimations {
    * An animation carries at least one frame and a duration that is a finite number at or above
    * zero — zero being a still image. A set of frames that comes out empty, an atlas query that
    * matches nothing among them, and a duration that is negative, `NaN` or infinite are each
-   * refused with an error naming the case, as are a `frameRate` that is not a number above zero
-   * and timing that carries neither a `duration` nor a `frameRate`.
+   * refused with an error naming the case, as are a `frameRate` that is not a number above zero,
+   * timing that carries neither a `duration` nor a `frameRate`, and timing that gives more than one
+   * of `duration`, `frameRate` and `durations`.
    *
    * What picks the frames is refused as well when it cannot pick any: a tile id that is no whole
    * number, naming its index; a `firstTileId` that is no whole number; a `tileCount` that is no
-   * whole number from 1 to {@link FrameBasedAnimations.MaxTextureSize}, as read at the call —
-   * more frames fit into no data texture; and a `frameNameQuery` that is neither a string nor a
-   * `RegExp`. Tile ids and a `firstTileId` may be negative, the tile set wraps them. `firstTileId`
-   * and `tileCount` are checked only when they are passed: their defaults come from the tile set,
-   * which may hold more tiles than `MaxTextureSize`.
+   * whole number from 1 to {@link FrameBasedAnimations.MaxTextureSize} — more frames fit into no
+   * data texture; and a `frameNameQuery` that is neither a string nor a `RegExp`. Tile ids and a
+   * `firstTileId` may be negative, the tile set wraps them. `firstTileId` and `tileCount` are
+   * checked only when they are passed: their defaults come from the tile set, which may hold more
+   * tiles than `MaxTextureSize`.
    *
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,

@@ -100,50 +100,55 @@ describe('TileSet', () => {
     test('a baseCoords width that is not finite is refused', () => {
       const options = {tileWidth: 16, tileHeight: 16, tileCount: 4};
 
-      expect(() => new TileSet(new TextureCoords(0, 0, NaN, 64), options)).toThrow(RangeError);
-      expect(() => new TileSet(new TextureCoords(0, 0, NaN, 64), options)).toThrow(/baseCoords\.width/);
+      expect(() => new TileSet(new TextureCoords(0, 0, NaN, 64), options)).toThrow(
+        new RangeError('TileSet: baseCoords.width must be a finite number, got NaN'),
+      );
     });
 
     // without a tileCount the layout loop has nothing but the step to end it
     test('a tileWidth of 0 without a tileCount is refused', () => {
-      expect(() => new TileSet(base, {tileWidth: 0, tileHeight: 16})).toThrow(RangeError);
-      expect(() => new TileSet(base, {tileWidth: 0, tileHeight: 16})).toThrow(/tileWidth must be a finite number above 0, got 0/);
+      expect(() => new TileSet(base, {tileWidth: 0, tileHeight: 16})).toThrow(
+        new RangeError('TileSet: tileWidth must be a finite number above 0, got 0'),
+      );
     });
 
     test('a tileHeight of 0 without a tileCount is refused', () => {
-      expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 0})).toThrow(RangeError);
       expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 0})).toThrow(
-        /tileHeight must be a finite number above 0, got 0/,
+        new RangeError('TileSet: tileHeight must be a finite number above 0, got 0'),
       );
     });
 
     test('a baseCoords of 0 x 0 without options is refused', () => {
-      expect(() => new TileSet(new TextureCoords(0, 0, 0, 0))).toThrow(RangeError);
-      expect(() => new TileSet(new TextureCoords(0, 0, 0, 0))).toThrow(/tileWidth must be a finite number above 0, got 0/);
+      expect(() => new TileSet(new TextureCoords(0, 0, 0, 0))).toThrow(
+        new RangeError('TileSet: tileWidth must be a finite number above 0, got 0'),
+      );
     });
 
     test('a tile wider than the image is refused', () => {
-      expect(() => new TileSet(base, {tileWidth: 100, tileHeight: 16})).toThrow(RangeError);
       expect(() => new TileSet(base, {tileWidth: 100, tileHeight: 16})).toThrow(
-        'TileSet: the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 100, the baseCoords are 64 wide',
+        new RangeError(
+          'TileSet: the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 100, the baseCoords are 64 wide',
+        ),
       );
     });
 
     test('a first tile that does not fit inside the margin is refused', () => {
       const create = () => new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 256, tileHeight: 256, margin: 1});
 
-      expect(create).toThrow(RangeError);
       expect(create).toThrow(
-        'TileSet: the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 258, the baseCoords are 256 wide',
+        new RangeError(
+          'TileSet: the first tile does not fit into the width of the baseCoords: margin, padding and tileWidth take 258, the baseCoords are 256 wide',
+        ),
       );
     });
 
     test('a first tile taller than the baseCoords is refused', () => {
       const create = () => new TileSet(new TextureCoords(0, 0, 64, 32), {tileWidth: 32, tileHeight: 64});
 
-      expect(create).toThrow(RangeError);
       expect(create).toThrow(
-        'TileSet: the first tile does not fit into the height of the baseCoords: margin, padding and tileHeight take 64, the baseCoords are 32 high',
+        new RangeError(
+          'TileSet: the first tile does not fit into the height of the baseCoords: margin, padding and tileHeight take 64, the baseCoords are 32 high',
+        ),
       );
     });
 
@@ -151,9 +156,10 @@ describe('TileSet', () => {
       const atlas = new TextureAtlas();
       const create = () => new TileSet(atlas, new TextureCoords(0, 0, 64, 64), {tileWidth: 16, tileHeight: 16, tileCount: 17});
 
-      expect(create).toThrow(RangeError);
       expect(create).toThrow(
-        'TileSet: the tileCount of 17 does not fit into the baseCoords: 16 tiles of 16 × 16 fit into 64 × 64 with margin 0, padding 0 and spacing 0',
+        new RangeError(
+          'TileSet: the tileCount of 17 does not fit into the baseCoords: 16 tiles of 16 × 16 fit into 64 × 64 with margin 0, padding 0 and spacing 0',
+        ),
       );
       expect(atlas.size).toBe(0);
     });
@@ -171,6 +177,59 @@ describe('TileSet', () => {
 
       expect(tiles.tileCount).toBe(1);
       expect(tiles.frame(1).coords).toMatchObject({x: 0, y: 0});
+    });
+  });
+
+  describe('TileSet.MaxTiles', () => {
+    test('TileSet.MaxTiles is 2 ** 20', () => {
+      expect(TileSet.MaxTiles).toBe(2 ** 20);
+    });
+
+    test('refuses more than TileSet.MaxTiles tiles without a tileCount before it lays one, and leaves the atlas handed in empty', () => {
+      const atlas = new TextureAtlas();
+      const create = () => new TileSet(atlas, new TextureCoords(0, 0, 2048, 1024), {tileWidth: 1, tileHeight: 1});
+
+      expect(create).toThrow(
+        new RangeError(
+          'TileSet: 2097152 tiles of 1 × 1 fit into 2048 × 1024 with margin 0, padding 0 and spacing 0 — a tile set holds at most 1048576; give a tileCount, or larger tiles',
+        ),
+      );
+      expect(atlas.size).toBe(0);
+    });
+
+    test('names a count that is beyond counting as more than TileSet.MaxTiles tiles', () => {
+      const create = () => new TileSet(new TextureCoords(0, 0, 64, 64), {tileWidth: Number.MIN_VALUE, tileHeight: 16});
+
+      expect(create).toThrow(
+        new RangeError(
+          'TileSet: more than 1048576 tiles of 5e-324 × 16 fit into 64 × 64 with margin 0, padding 0 and spacing 0 — a tile set holds at most 1048576; give a tileCount, or larger tiles',
+        ),
+      );
+    });
+
+    test('refuses a tileCount above TileSet.MaxTiles', () => {
+      const create = () => new TileSet(new TextureCoords(0, 0, 2048, 1024), {tileWidth: 1, tileHeight: 1, tileCount: 1048577});
+
+      expect(create).toThrow(new RangeError('TileSet: tileCount must be a whole number from 1 to 1048576, got 1048577'));
+    });
+
+    test('refuses a tileWidth of 0.001 on a 64 × 64 image', () => {
+      const atlas = new TextureAtlas();
+      const create = () => new TileSet(atlas, new TextureCoords(0, 0, 64, 64), {tileWidth: 0.001, tileHeight: 0.001});
+
+      expect(create).toThrow(
+        new RangeError(
+          'TileSet: 4096000000 tiles of 0.001 × 0.001 fit into 64 × 64 with margin 0, padding 0 and spacing 0 — a tile set holds at most 1048576; give a tileCount, or larger tiles',
+        ),
+      );
+      expect(atlas.size).toBe(0);
+    });
+
+    test('takes a tileCount within MaxTiles from an image that holds far more', () => {
+      const tiles = new TileSet(new TextureCoords(0, 0, 8192, 8192), {tileWidth: 1, tileHeight: 1, tileCount: 16});
+
+      expect(tiles.tileCount).toBe(16);
+      expect(tiles.frame(tiles.lastId).coords).toMatchObject({x: 15, y: 0});
     });
   });
 

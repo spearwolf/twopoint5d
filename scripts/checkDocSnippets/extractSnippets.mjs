@@ -89,186 +89,283 @@ const VERSION_HEADING = /^## \[/;
 const UNRELEASED_HEADING = /^## \[Unreleased\]/;
 
 /**
+ * @typedef {object} OpenFence
+ * @property {boolean} marked
+ * @property {number} indent the column the fence starts at; CommonMark takes up to that many
+ *   columns off each code line
+ * @property {number} base the content column of the list item the fence sits in, 0 outside a list;
+ *   a line that is not blank and is indented less ends the item and the block
+ * @property {'`' | '~'} fence
+ * @property {number} size
+ * @property {number} line
+ * @property {string[]} code
+ * @property {number[]} offsets for each code line, the `offset` of `stripIndent()`
+ */
+
+/**
+ * What the scan of one document keeps from line to line.
+ *
+ * @typedef {object} ScanState
+ * @property {string} file
+ * @property {boolean} isChangelog
+ * @property {boolean} inScope outside a changelog every block counts; inside one only those under
+ *   `## [Unreleased]`
+ * @property {boolean} unreleasedSeen
+ * @property {OpenFence | null} open
+ * @property {number[]} listContent the content columns of the list items the next line may sit in,
+ *   innermost last
+ * @property {Array<{file: string, line: number, code: string, offsets: number[]}>} snippets
+ * @property {Array<{file: string, line: number, message: string}>} problems
+ */
+
+/**
  * @param {string} markdown
  * @param {string} file
  * @returns {{
- *   snippets: Array<{file: string, line: number, code: string, offsets: number[]}>,
- *   problems: Array<{file: string, line: number, message: string}>,
+ *   snippets: ScanState['snippets'],
+ *   problems: ScanState['problems'],
  * }}
  *   `offsets` holds for each line of `code` what a character index of that line needs added to
  *   point at the same character of the Markdown line.
  */
 export function extractSnippets(markdown, file) {
-  const snippets = [];
-  const problems = [];
-  const lines = markdown.split(/\r?\n/);
+  /** @type {ScanState} */
+  const state = {
+    file,
+    // a pure function: the name of the file tells a changelog, not the file system
+    isChangelog: file.split(/[\\/]/).pop() === CHANGELOG,
+    inScope: false,
+    unreleasedSeen: false,
+    open: null,
+    listContent: [],
+    snippets: [],
+    problems: [],
+  };
+  state.inScope = !state.isChangelog;
 
-  // a pure function: the name of the file tells a changelog, not the file system
-  const isChangelog = file.split(/[\\/]/).pop() === CHANGELOG;
-  // outside a changelog every block counts; inside one only those under `## [Unreleased]`
-  let inScope = !isChangelog;
-  let unreleasedSeen = false;
-
-  /**
-   * @typedef {object} OpenFence
-   * @property {boolean} marked
-   * @property {number} indent the column the fence starts at; CommonMark takes up to that many
-   *   columns off each code line
-   * @property {number} base the content column of the list item the fence sits in, 0 outside a list;
-   *   a line that is not blank and is indented less ends the item and the block
-   * @property {'`' | '~'} fence
-   * @property {number} size
-   * @property {number} line
-   * @property {string[]} code
-   * @property {number[]} offsets for each code line, the `offset` of `stripIndent()`
-   */
-  /** @type {OpenFence | null} */
-  let open = null;
-  // the content columns of the list items the next line may sit in, innermost last
-  /** @type {number[]} */
-  const listContent = [];
-
-  lines.forEach((text, index) => {
-    const lineNumber = index + 1;
-
-    if (open != null) {
-      // CommonMark: a line that is not blank and is indented less than the content of the list
-      // item the block sits in ends the item, and the block with it — code has no lazy
-      // continuation. The line is read again below, outside the block: it may open the next one
-      const whitespace = LEADING_WHITESPACE.exec(text)?.[0] ?? '';
-      if (text.trim() !== '' && columnsOf(whitespace) < open.base) {
-        if (open.marked) {
-          problems.push({
-            file,
-            line: open.line,
-            message: `code block marked \`ts check\` is never closed — its list item ends at line ${lineNumber}`,
-          });
-        }
-        open = null;
-      } else {
-        const closing = CLOSING_FENCE.exec(text);
-        // CommonMark: only a run of the same character, at least as long as the opening one, closes
-        const run = /** @type {string} */ (closing?.[2]);
-        if (
-          closing != null &&
-          columnsOf(/** @type {string} */ (closing[1])) - open.base <= MAX_FENCE_INDENT &&
-          run.charAt(0) === open.fence &&
-          run.length >= open.size
-        ) {
-          if (open.marked) {
-            snippets.push({file, line: open.line + 1, code: open.code.join('\n'), offsets: open.offsets});
-          }
-          open = null;
-          return;
-        }
-
-        if (open.marked) {
-          const {code, offset} = stripIndent(text, open.indent);
-          open.code.push(code);
-          open.offsets.push(offset);
-        }
-        return;
-      }
-    }
-
-    if (text.trim() === '') return;
-    const whitespace = LEADING_WHITESPACE.exec(text)?.[0] ?? '';
-    const indent = columnsOf(whitespace);
-    // a line indented less than the content of a list item is outside that item. Paragraphs are
-    // not tracked: a lazy continuation line of a paragraph ends the item here, and a list marker
-    // that may not interrupt a paragraph (an empty item, an ordered one that does not start at 1)
-    // starts one all the same, which CommonMark does neither; only a fence four or more columns
-    // deep that follows such a line is read differently
-    while (listContent.length > 0 && /** @type {number} */ (listContent.at(-1)) > indent) listContent.pop();
-    let base = listContent.at(-1) ?? 0;
-    // code of an indented block, or text that goes on a paragraph: it opens no fence and no
-    // list item
-    if (indent - base > MAX_FENCE_INDENT) return;
-
-    // a heading inside a code block is code, so the sections are tracked between fences only
-    if (isChangelog && VERSION_HEADING.test(text)) {
-      // the first `## [` heading after `## [Unreleased]` ends the section for good
-      inScope = !unreleasedSeen && UNRELEASED_HEADING.test(text);
-      if (inScope) unreleasedSeen = true;
-      return;
-    }
-
-    // the line is read from its first character on: a list marker hands the rest of the line on
-    // as the first line of its item, which may open a fence or start with another marker
-    let column = indent;
-    let rest = text.slice(whitespace.length);
-    for (;;) {
-      if (THEMATIC_BREAK.test(rest)) return;
-      const item = LIST_ITEM.exec(rest);
-      if (item == null) break;
-      const start = column + /** @type {string} */ (item[1]).length;
-      const end = columnsOf(/** @type {string} */ (item[2]), start);
-      rest = rest.slice(item[0].length);
-      // CommonMark: the content starts after 1 to 4 columns of spaces or tabs; on an otherwise
-      // empty line, or after 5 or more (the item starts with indented code), one column past the
-      // marker
-      const content = rest === '' || end - start > 4 ? start + 1 : end;
-      listContent.push(content);
-      // an empty first line, or one of indented code, opens no fence and holds no other marker
-      if (content !== end) return;
-      column = content;
-      base = content;
-    }
-
-    const match = OPENING_FENCE.exec(rest);
-    if (match == null) {
-      const quoted = inScope ? QUOTED_FENCE.exec(rest) : null;
-      if (quoted != null) {
-        // both groups of the pattern always take part in a match
-        const quotedFence = /** @type {string} */ (quoted[1]);
-        const quotedRest = /** @type {string} */ (quoted[2]);
-        // a quoted fence is never tracked as open: its code lines start with `>` themselves
-        if (!(quotedFence.startsWith('`') && quotedRest.includes('`'))) {
-          const info = quotedRest.trim();
-          if (info.split(/\s+/).includes('check')) {
-            problems.push({
-              file,
-              line: lineNumber,
-              message: `a code block marked \`${info}\` inside a blockquote is not checked — only a \`ts check\` block outside a quote is compiled`,
-            });
-          }
-        }
-      }
-      return;
-    }
-    // the groups of the pattern always take part in a match
-    const run = /** @type {string} */ (match[1]);
-    const info = /** @type {string} */ (match[2]);
-    const fence = /** @type {'`' | '~'} */ (run.charAt(0));
-    // CommonMark: the info string of a backtick fence holds no backtick, so a line such
-    // as "```inline``` prose" opens nothing; the info string of a tilde fence may
-    if (fence === '`' && info.includes('`')) return;
-
-    const marker = info.trim();
-    const words = marker.split(/\s+/).filter(Boolean);
-    const marked = inScope && words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
-
-    if (inScope && !marked && words.includes('check')) {
-      problems.push({file, line: lineNumber, message: `unknown marker \`${marker}\` — only \`ts check\` is checked`});
-    }
-
-    open = {
-      marked,
-      indent: column,
-      base,
-      fence,
-      size: run.length,
-      line: lineNumber,
-      code: [],
-      offsets: [],
-    };
-  });
-
-  // the callback above assigns `open`, which the compiler does not follow
-  const unclosed = /** @type {OpenFence | null} */ (open);
-  if (unclosed?.marked) {
-    problems.push({file, line: unclosed.line, message: 'code block marked `ts check` is never closed'});
+  for (const [index, text] of markdown.split(/\r?\n/).entries()) {
+    readLine(state, text, index + 1);
   }
 
-  return {snippets, problems};
+  if (state.open?.marked) {
+    state.problems.push({file, line: state.open.line, message: 'code block marked `ts check` is never closed'});
+  }
+
+  return {snippets: state.snippets, problems: state.problems};
+}
+
+/**
+ * Reads one line of the document into the state: the code of the open block, or whatever the
+ * line opens.
+ *
+ * @param {ScanState} state
+ * @param {string} text
+ * @param {number} lineNumber
+ */
+function readLine(state, text, lineNumber) {
+  if (state.open != null && continueOpenBlock(state, text, lineNumber)) return;
+
+  if (text.trim() === '') return;
+
+  // a heading inside a code block is code, so the sections are tracked between fences only
+  if (state.isChangelog && readChangelogHeading(state, text)) return;
+
+  const whitespace = LEADING_WHITESPACE.exec(text)?.[0] ?? '';
+  const markers = readListMarkers(state, text, whitespace, columnsOf(whitespace));
+  if (markers == null) return;
+  const {column, base, rest} = markers;
+
+  const match = OPENING_FENCE.exec(rest);
+  if (match == null) {
+    reportQuotedFence(state, rest, lineNumber);
+    return;
+  }
+  openFence(state, match, column, base, lineNumber);
+}
+
+/**
+ * Takes a line into the open block: it is code of the block, or the fence that closes it, or it
+ * ends the list item the block sits in and the block with it.
+ *
+ * @param {ScanState} state
+ * @param {string} text
+ * @param {number} lineNumber
+ * @returns {boolean} `true` if the line belonged to the block; `false` if it ended the list item
+ *   and the block, and has to be read again outside the block
+ */
+function continueOpenBlock(state, text, lineNumber) {
+  const open = /** @type {OpenFence} */ (state.open);
+  // CommonMark: a line that is not blank and is indented less than the content of the list
+  // item the block sits in ends the item, and the block with it — code has no lazy
+  // continuation. The line is read again outside the block: it may open the next one
+  const whitespace = LEADING_WHITESPACE.exec(text)?.[0] ?? '';
+  if (text.trim() !== '' && columnsOf(whitespace) < open.base) {
+    if (open.marked) {
+      state.problems.push({
+        file: state.file,
+        line: open.line,
+        message: `code block marked \`ts check\` is never closed — its list item ends at line ${lineNumber}`,
+      });
+    }
+    state.open = null;
+    return false;
+  }
+
+  const closing = CLOSING_FENCE.exec(text);
+  // CommonMark: only a run of the same character, at least as long as the opening one, closes
+  const run = /** @type {string} */ (closing?.[2]);
+  if (
+    closing != null &&
+    columnsOf(/** @type {string} */ (closing[1])) - open.base <= MAX_FENCE_INDENT &&
+    run.charAt(0) === open.fence &&
+    run.length >= open.size
+  ) {
+    if (open.marked) {
+      state.snippets.push({file: state.file, line: open.line + 1, code: open.code.join('\n'), offsets: open.offsets});
+    }
+    state.open = null;
+    return true;
+  }
+
+  if (open.marked) {
+    const {code, offset} = stripIndent(text, open.indent);
+    open.code.push(code);
+    open.offsets.push(offset);
+  }
+  return true;
+}
+
+/**
+ * Follows the `## [` headings of a changelog: the section of the state is `## [Unreleased]`, up to
+ * the next such heading.
+ *
+ * @param {ScanState} state
+ * @param {string} text
+ * @returns {boolean} `true` if the line was a `## [` heading
+ */
+function readChangelogHeading(state, text) {
+  if (!VERSION_HEADING.test(text)) return false;
+  // a heading starts at column 0, outside every list item
+  state.listContent.length = 0;
+  // the first `## [` heading after `## [Unreleased]` ends the section for good
+  state.inScope = !state.unreleasedSeen && UNRELEASED_HEADING.test(text);
+  if (state.inScope) state.unreleasedSeen = true;
+  return true;
+}
+
+/**
+ * Takes the list items off a line that start on it, and keeps the content columns of the items
+ * in the state; the rest of the line behind the markers is what may open a fence.
+ *
+ * @param {ScanState} state
+ * @param {string} text
+ * @param {string} whitespace the indentation of the line
+ * @param {number} indent the column the indentation ends at
+ * @returns {{column: number, base: number, rest: string} | null} the column and the list content
+ *   column the rest of the line starts at, and the rest; `null` if the line opens nothing: code of
+ *   an indented block, a thematic break, or an item with an empty or indented first line
+ */
+function readListMarkers(state, text, whitespace, indent) {
+  const {listContent} = state;
+  // a line indented less than the content of a list item is outside that item. Paragraphs are
+  // not tracked: a lazy continuation line of a paragraph ends the item here, and a list marker
+  // that may not interrupt a paragraph (an empty item, an ordered one that does not start at 1)
+  // starts one all the same, which CommonMark does neither; only a fence four or more columns
+  // deep that follows such a line is read differently
+  while (listContent.length > 0 && /** @type {number} */ (listContent.at(-1)) > indent) listContent.pop();
+  let base = listContent.at(-1) ?? 0;
+  // code of an indented block, or text that goes on a paragraph: it opens no fence and no
+  // list item
+  if (indent - base > MAX_FENCE_INDENT) return null;
+
+  // the line is read from its first character on: a list marker hands the rest of the line on
+  // as the first line of its item, which may open a fence or start with another marker
+  let column = indent;
+  let rest = text.slice(whitespace.length);
+  for (;;) {
+    if (THEMATIC_BREAK.test(rest)) return null;
+    const item = LIST_ITEM.exec(rest);
+    if (item == null) break;
+    const start = column + /** @type {string} */ (item[1]).length;
+    const end = columnsOf(/** @type {string} */ (item[2]), start);
+    rest = rest.slice(item[0].length);
+    // CommonMark: the content starts after 1 to 4 columns of spaces or tabs; on an otherwise
+    // empty line, or after 5 or more (the item starts with indented code), one column past the
+    // marker
+    const content = rest === '' || end - start > 4 ? start + 1 : end;
+    listContent.push(content);
+    // an empty first line, or one of indented code, opens no fence and holds no other marker
+    if (content !== end) return null;
+    column = content;
+    base = content;
+  }
+  return {column, base, rest};
+}
+
+/**
+ * Reports a block marked `check` inside a blockquote, which the check does not compile.
+ *
+ * @param {ScanState} state
+ * @param {string} rest the line behind its indentation and list markers
+ * @param {number} lineNumber
+ */
+function reportQuotedFence(state, rest, lineNumber) {
+  const quoted = state.inScope ? QUOTED_FENCE.exec(rest) : null;
+  if (quoted == null) return;
+  // both groups of the pattern always take part in a match
+  const quotedFence = /** @type {string} */ (quoted[1]);
+  const quotedRest = /** @type {string} */ (quoted[2]);
+  // a quoted fence is never tracked as open: its code lines start with `>` themselves
+  if (quotedFence.startsWith('`') && quotedRest.includes('`')) return;
+  const info = quotedRest.trim();
+  if (info.split(/\s+/).includes('check')) {
+    state.problems.push({
+      file: state.file,
+      line: lineNumber,
+      message: `a code block marked \`${info}\` inside a blockquote is not checked — only a \`ts check\` block outside a quote is compiled`,
+    });
+  }
+}
+
+/**
+ * Opens the block of a fence line: checks its marker, reports a marker that is nearly right, and
+ * sets `state.open`. A line that only looks like a fence opens nothing.
+ *
+ * @param {ScanState} state
+ * @param {RegExpExecArray} match the match of `OPENING_FENCE` on the rest of the line
+ * @param {number} column the column the fence starts at
+ * @param {number} base the content column of the list item the fence sits in, 0 outside a list
+ * @param {number} lineNumber
+ */
+function openFence(state, match, column, base, lineNumber) {
+  // the groups of the pattern always take part in a match
+  const run = /** @type {string} */ (match[1]);
+  const info = /** @type {string} */ (match[2]);
+  const fence = /** @type {'`' | '~'} */ (run.charAt(0));
+  // CommonMark: the info string of a backtick fence holds no backtick, so a line such
+  // as "```inline``` prose" opens nothing; the info string of a tilde fence may
+  if (fence === '`' && info.includes('`')) return;
+
+  const marker = info.trim();
+  const words = marker.split(/\s+/).filter(Boolean);
+  const marked = state.inScope && words.length === MARKER.length && MARKER.every((word, i) => words[i] === word);
+
+  if (state.inScope && !marked && words.includes('check')) {
+    state.problems.push({
+      file: state.file,
+      line: lineNumber,
+      message: `unknown marker \`${marker}\` — only \`ts check\` is checked`,
+    });
+  }
+
+  state.open = {
+    marked,
+    indent: column,
+    base,
+    fence,
+    size: run.length,
+    line: lineNumber,
+    code: [],
+    offsets: [],
+  };
 }

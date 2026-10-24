@@ -201,6 +201,13 @@ describe('BitmapFont', () => {
       expect(font.kerning('A', 'A')).toBe(1);
     });
 
+    test('leaves a named entity outside the five of XML as it is written, a name of Object.prototype as well', () => {
+      const [font] = BitmapFont.parse(
+        `<font><info face="A&constructor;B&toString;C&__proto__;D&amp;E"/><common lineHeight="4" base="3" scaleW="4" scaleH="4"/></font>`,
+      );
+      expect(font.face).toBe('A&constructor;B&toString;C&__proto__;D&E');
+    });
+
     test('keeps a numeric entity that is no code point as it is written', () => {
       const [font] = BitmapFont.parse(
         `<font><info face="A&#x110000;B&#xD800;C&#1114112;D&#99999999999999999999;"/><common lineHeight="4" base="3" scaleW="4" scaleH="4"/></font>`,
@@ -222,6 +229,38 @@ describe('BitmapFont', () => {
       expect(font.face).toBe('a&nbsp;b');
       expect(font.info.charset).toBe('');
       expect(font.page).toBe('p.png');
+    });
+
+    test('keeps an attribute named __proto__ as a field of its block in all three spellings, and sets no prototype', () => {
+      const text = [
+        'info face=tiny size=4 __proto__=1,2',
+        'common lineHeight=6 base=5 scaleW=16 scaleH=8 pages=1',
+        'page id=0 file="tiny.png"',
+        'char id=65 x=1 y=1 width=3 height=4 xoffset=0 yoffset=1 xadvance=4 page=0 chnl=15 __proto__=1,2',
+      ].join('\n');
+      const xml = `<font><info face="tiny" size="4" __proto__="1,2"/><common lineHeight="6" base="5" scaleW="16" scaleH="8" pages="1"/><page id="0" file="tiny.png"/></font>`;
+      const json = `{"info": {"face": "tiny", "size": 4, "__proto__": [1, 2]}, "common": {"lineHeight": 6, "base": 5, "scaleW": 16, "scaleH": 8, "pages": 1}, "pages": ["tiny.png"], "chars": []}`;
+      for (const source of [text, xml, json]) {
+        const [font] = BitmapFont.parse(source);
+        expect(Object.getPrototypeOf(font.info)).toBe(Object.prototype);
+        expect(Object.getOwnPropertyDescriptor(font.info, '__proto__')?.value).toEqual([1, 2]);
+        expect(font.info.face).toBe('tiny');
+      }
+      const [font] = BitmapFont.parse(text);
+      const data = font.glyph('A')?.frame.data as unknown as Record<string, unknown>;
+      expect(data).toMatchObject({
+        id: 65,
+        x: 1,
+        y: 1,
+        width: 3,
+        height: 4,
+        xoffset: 0,
+        yoffset: 1,
+        xadvance: 4,
+        page: 0,
+        chnl: 15,
+      });
+      expect(Object.getPrototypeOf(data)).toBe(Object.prototype);
     });
 
     test('a page without a file names an empty one', () => {
@@ -283,6 +322,14 @@ describe('BitmapFont', () => {
       expect(build).toThrow(`${start}a font is an object in the JSON layout, {pages, chars, common}`);
     });
 
+    test('a font of several hundred thousand chars, the last on page 1, is refused for its pages', () => {
+      const data = tinyFont();
+      const chars = Array.from({length: 500_000}, () => ({page: 0}));
+      chars.push({page: 1});
+      data.chars = chars as never;
+      expect(() => new BitmapFont(data)).toThrow('BitmapFont: the font "tiny" has 2 pages');
+    });
+
     test('no common block', () => {
       expect(() => new BitmapFont(without(tinyFont(), 'common'))).toThrow(
         'BitmapFont: the font has no common block — BMFont writes lineHeight, base, scaleW and scaleH there',
@@ -299,6 +346,7 @@ describe('BitmapFont', () => {
     ])('common.%s of %o', (key, value, message) => {
       const data = tinyFont();
       (data.common as unknown as Record<string, unknown>)[key] = value;
+      expect(() => new BitmapFont(data)).toThrow(RangeError);
       expect(() => new BitmapFont(data)).toThrow(message);
     });
 
@@ -324,21 +372,49 @@ describe('BitmapFont', () => {
       [
         'an id that is no whole number',
         {id: 6.5},
+        Error,
         'BitmapFont: a char has the id 6.5 — an id is a whole number from 0 to 0x10FFFF',
       ],
       [
         'an id above 0x10FFFF',
         {id: 0x110000},
+        Error,
         'BitmapFont: a char has the id 1114112 — an id is a whole number from 0 to 0x10FFFF',
       ],
-      ['a field that is no number', {xadvance: '4'}, 'BitmapFont: the char "A" (65) has an xadvance of "4" — a finite number'],
-      ['a negative width', {width: -1}, 'BitmapFont: the char "A" (65) has a width of -1 — 0 or more'],
-      ['a negative x', {x: -1}, 'BitmapFont: the char "A" (65) has an x of -1 — 0 or more'],
-      ['a char beyond the page', {x: 14}, 'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — x 14 + width 3'],
-      ['a char below the page', {y: 5}, 'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — y 5 + height 4'],
-    ])('%s', (_, change, message) => {
+      [
+        'a field that is no number',
+        {xadvance: '4'},
+        RangeError,
+        'BitmapFont: the xadvance of the char "A" (65) must be a finite number, got "4"',
+      ],
+      [
+        'a negative width',
+        {width: -1},
+        RangeError,
+        'BitmapFont: the width of the char "A" (65) must be a finite number of 0 or more, got -1',
+      ],
+      [
+        'a negative x',
+        {x: -1},
+        RangeError,
+        'BitmapFont: the x of the char "A" (65) must be a finite number of 0 or more, got -1',
+      ],
+      [
+        'a char beyond the page',
+        {x: 14},
+        Error,
+        'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — x 14 + width 3',
+      ],
+      [
+        'a char below the page',
+        {y: 5},
+        Error,
+        'BitmapFont: the char "A" (65) reaches beyond the page of 16 × 8 — y 5 + height 4',
+      ],
+    ])('%s', (_, change, errorClass, message) => {
       const data = tinyFont();
       Object.assign(data.chars[1]!, change);
+      expect(() => new BitmapFont(data)).toThrow(errorClass);
       expect(() => new BitmapFont(data)).toThrow(message);
     });
 
@@ -365,7 +441,9 @@ describe('BitmapFont', () => {
     test('a kerning pair whose amount is no number', () => {
       const data = tinyFont();
       data.kernings = [{first: 65, second: 86, amount: Number.NaN}];
-      expect(() => new BitmapFont(data)).toThrow('BitmapFont: kerning pair 0 has an amount of NaN — a finite number');
+      expect(() => new BitmapFont(data)).toThrow(
+        new RangeError('BitmapFont: the amount of kerning pair 0 must be a finite number, got NaN'),
+      );
     });
 
     test('a pair of chars the font lacks is kept and never met', () => {

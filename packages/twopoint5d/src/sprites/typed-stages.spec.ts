@@ -30,7 +30,7 @@ describe('asTextureNode()', () => {
     const lookup = texture(new Texture());
     expect(asTextureNode(lookup)).toBe(lookup);
     expect(() => asTextureNode(vec4(0, 0, 0, 1))).toThrow(
-      new TypeError('asTextureNode: the node is no TextureNode — sample() of a stage context answers one'),
+      new TypeError('asTextureNode: the node is no TextureNode, got VarNode — sample() of a stage context answers one'),
     );
   });
 });

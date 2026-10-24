@@ -8,7 +8,6 @@
     "start": "pnpm exec astro dev",
     "build": "pnpm exec astro build",
     "preview": "pnpm exec astro preview",
-    "update": "pnpm dlx npm-check --update",
     "postinstall": "pnpm exec astro telemetry disable",
     "typecheck": "pnpm run astro:check && pnpm run assets:check",
     "astro:check": "pnpm exec astro check",
@@ -21,7 +20,7 @@
     "@spearwolf/signalize": "catalog:",
     "@spearwolf/twopoint5d": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
-    "astro": "^7.3.5",
+    "astro": "^7.4.2",
     "lil-gui": "^0.21.0",
     "marked": "^18.0.14",
     "tailwindcss": "^4.3.3",
@@ -30,7 +29,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@types/node": "^24.19.2",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "typescript": "^6.0.3"
   }
 }

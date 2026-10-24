@@ -1,5 +1,7 @@
 import {TextureAtlas, type TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
+import {assertFinite} from '../utils/assertFinite.js';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {isObject} from '../utils/isObject.js';
@@ -101,8 +103,6 @@ const pairKey = (first: number, second: number) => first * 0x110000 + second;
 
 const codeOf = (char: string | number): number | undefined => (typeof char === 'number' ? char : char.codePointAt(0));
 
-const article = (field: string) => (/^[aeiox]/.test(field) ? 'an' : 'a');
-
 const CHAR_FIELDS = ['x', 'y', 'width', 'height', 'xoffset', 'yoffset', 'xadvance', 'page', 'chnl'] as const;
 const AT_LEAST_ZERO: ReadonlySet<string> = new Set(['x', 'y', 'width', 'height']);
 
@@ -126,8 +126,10 @@ export class BitmapFont {
    * its `data` is a frozen copy of the char. The frames are untrimmed: the offsets of a glyph place it in
    * its line, which `writeText()` does. A char of 0 × 0 — the space — has a frame of 0 × 0.
    *
+   * @throws {RangeError} for a metric of `common`, a field of a char or a kerning amount the constructor
+   *   refuses.
    * @throws {Error} for a source in none of the three spellings or in the binary one, JSON that does not
-   *   parse, and every refusal of the constructor.
+   *   parse, and every other refusal of the constructor.
    */
   static parse(
     source: string | BitmapFontData,
@@ -163,12 +165,15 @@ export class BitmapFont {
   /**
    * A font of `data` in the JSON layout; `BitmapFont.parse()` reads the other spellings into it.
    *
-   * @throws {Error} — each before the atlas holds a frame — for font data that is no object, a font
-   *   without a `common` block or with a `lineHeight`, `base`, `scaleW` or `scaleH` that is no finite
-   *   number (all but `base` above 0), without `chars`, with more than one page, with a char whose id is
-   *   no whole number from 0 to 0x10FFFF, whose fields are no finite numbers, whose `x`, `y`, `width` or
-   *   `height` are below 0, or which reaches beyond the page, with two chars of one id, and with a kerning
-   *   pair whose `first` or `second` is no code point or whose `amount` is no finite number.
+   * Each refusal throws before the atlas holds a frame.
+   *
+   * @throws {RangeError} for a `lineHeight`, `base`, `scaleW` or `scaleH` that is no finite number (all
+   *   but `base` above 0), a char whose fields are no finite numbers or whose `x`, `y`, `width` or
+   *   `height` are below 0, and a kerning pair whose `amount` is no finite number.
+   * @throws {Error} for font data that is no object, a font without a `common` block, without `chars` or
+   *   with more than one page, a char whose id is no whole number from 0 to 0x10FFFF or which reaches
+   *   beyond the page, two chars of one id, and a kerning pair whose `first` or `second` is no code
+   *   point.
    */
   constructor(data: BitmapFontData, options?: BitmapFontOptions) {
     if (!isObject(data)) {
@@ -181,12 +186,11 @@ export class BitmapFont {
       throw new Error(`${WHERE}: the font has no common block — BMFont writes lineHeight, base, scaleW and scaleH there`);
     }
     for (const key of ['lineHeight', 'base', 'scaleW', 'scaleH'] as const) {
-      const value: unknown = common[key];
-      const above0 = key !== 'base';
-      if (!isFiniteNumber(value) || (above0 && value <= 0)) {
-        throw new Error(
-          `${WHERE}: common.${key} must be a finite number${above0 ? ' above 0' : ''}, got ${describeValue(value)}`,
-        );
+      // the baseline may lie anywhere, the others are sizes a layout divides by or stacks lines with
+      if (key === 'base') {
+        assertFinite(common[key], WHERE, 'common.base');
+      } else {
+        assertPositiveFinite(common[key], WHERE, `common.${key}`);
       }
     }
     if (!Array.isArray(data.chars)) {
@@ -196,11 +200,11 @@ export class BitmapFont {
     const face = typeof info.face === 'string' ? info.face : '';
     const pages = Array.isArray(data.pages) ? data.pages : [];
 
-    const pageCount = Math.max(
-      pages.length,
-      isFiniteNumber(common.pages) ? common.pages : 0,
-      ...data.chars.map((char) => (isFiniteNumber(char?.page) ? char.page + 1 : 0)),
-    );
+    // a loop, no spread into Math.max(): a pan-Unicode font holds more chars than a call takes arguments
+    let pageCount = Math.max(pages.length, isFiniteNumber(common.pages) ? common.pages : 0);
+    for (const char of data.chars) {
+      if (isFiniteNumber(char?.page) && char.page + 1 > pageCount) pageCount = char.page + 1;
+    }
     if (pageCount > 1) {
       throw new Error(
         `${WHERE}: the font "${face}" has ${pageCount} pages — writeText() draws out of one texture; export the font onto one page (BMFont: a larger texture)`,
@@ -219,14 +223,11 @@ export class BitmapFont {
       // a converter that leaves out page and chnl writes a font of one page, all four channels
       const char: BitmapFontChar = {...raw, page: raw.page ?? 0, chnl: raw.chnl ?? 15};
       for (const field of CHAR_FIELDS) {
-        const value: unknown = char[field];
-        if (!isFiniteNumber(value)) {
-          throw new Error(
-            `${WHERE}: the char ${label} has ${article(field)} ${field} of ${describeValue(value)} — a finite number`,
-          );
-        }
+        const value = assertFinite(char[field], WHERE, `the ${field} of the char ${label}`);
         if (AT_LEAST_ZERO.has(field) && value < 0) {
-          throw new Error(`${WHERE}: the char ${label} has ${article(field)} ${field} of ${describeValue(value)} — 0 or more`);
+          throw new RangeError(
+            `${WHERE}: the ${field} of the char ${label} must be a finite number of 0 or more, got ${describeValue(value)}`,
+          );
         }
       }
       if (char.x + char.width > scaleW) {
@@ -252,14 +253,11 @@ export class BitmapFont {
         const value: unknown = pair?.[field];
         if (!isCodePoint(value)) {
           throw new Error(
-            `${WHERE}: kerning pair ${index} has ${article(field)} ${field} of ${describeValue(value)} — first and second are code points, whole numbers from 0 to 0x10FFFF`,
+            `${WHERE}: kerning pair ${index} has a ${field} of ${describeValue(value)} — first and second are code points, whole numbers from 0 to 0x10FFFF`,
           );
         }
       }
-      const amount: unknown = pair.amount;
-      if (!isFiniteNumber(amount)) {
-        throw new Error(`${WHERE}: kerning pair ${index} has an amount of ${describeValue(amount)} — a finite number`);
-      }
+      assertFinite(pair.amount, WHERE, `the amount of kerning pair ${index}`);
     });
 
     // every check has run: nothing below throws

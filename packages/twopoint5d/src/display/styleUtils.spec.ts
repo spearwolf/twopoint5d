@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {
+  contentAreaSide,
   getContentAreaSize,
   getHorizontalBorder,
   getHorizontalInnerMargin,
@@ -43,7 +44,7 @@ describe('styleUtils', () => {
     expect(getHorizontalInnerMargin(style)).toBe(204);
   });
 
-  it('subtracts the inner margin of each axis from the bounding box', () => {
+  it('subtracts the inner margin of each axis from the bounding box of an element without a layout size', () => {
     const fakeElement = {getBoundingClientRect: () => ({width: 1000, height: 500})} as unknown as Element;
 
     const area = getContentAreaSize(fakeElement, style);
@@ -51,5 +52,38 @@ describe('styleUtils', () => {
     expect(area.width).toBe(796);
     expect(area.height).toBe(449);
     expect(area.style).toBe(style);
+  });
+
+  it('takes the borders and the padding off in the scale a transform gives the element', () => {
+    const fakeElement = {
+      getBoundingClientRect: () => ({width: 2000, height: 1000}),
+      offsetWidth: 1000,
+      offsetHeight: 500,
+    } as unknown as Element;
+
+    const area = getContentAreaSize(fakeElement, style);
+
+    expect(area.width).toBe(2000 - 2 * 204);
+    expect(area.height).toBe(1000 - 2 * 51);
+  });
+
+  it('takes them off as the style gives them where the offset size lies within 1 of the client rect', () => {
+    const fakeElement = {
+      getBoundingClientRect: () => ({width: 1000.4, height: 500.3}),
+      offsetWidth: 1000,
+      offsetHeight: 500,
+    } as unknown as Element;
+
+    const area = getContentAreaSize(fakeElement, style);
+
+    expect(area.width).toBeCloseTo(796.4, 9);
+    expect(area.height).toBeCloseTo(449.3, 9);
+  });
+
+  it('contentAreaSide() takes the margin off unscaled where there is no layout size above 0', () => {
+    for (const layoutSide of [undefined, 0, NaN, -500, '500']) {
+      expect(contentAreaSide(2000, layoutSide, 204), String(layoutSide)).toBe(1796);
+    }
+    expect(contentAreaSide(2000, 1000, 204)).toBe(1592);
   });
 });

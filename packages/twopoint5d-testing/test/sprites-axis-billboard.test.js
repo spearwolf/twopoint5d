@@ -20,6 +20,8 @@ import {
   coveredBox,
   diffPixels,
   disposeDisplay,
+  disposeKept,
+  keep,
   makeCameraAboveGround,
   makeColorTexture,
   makeContainer,
@@ -66,9 +68,6 @@ function imageAt(x, up) {
 const uprightAt = (mirrored) => (x, y) => (y >= 0 || mirrored ? imageAt(x, Math.abs(y) / 0.6) : BLACK);
 
 describe('sprites — axis billboards', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
@@ -83,6 +82,7 @@ describe('sprites — axis billboards', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     colorMap?.dispose();
     colorMap = undefined;
     target?.dispose();
@@ -99,7 +99,7 @@ describe('sprites — axis billboards', function () {
    * @param {SpriteKind<InstancePositionApi & QuadSizeApi>} kind
    */
   async function render(kind, {camera, position = [0, SIZE / 2, 0], options = {}, hideSprite = false}) {
-    const sprites = new FeatureSprites(kind, {capacity: 1, textures: {colorMap}, ...options});
+    const sprites = keep(new FeatureSprites(kind, {capacity: 1, textures: {colorMap}, ...options}));
     sprites.frustumCulled = false;
     for (const pass of Object.values(sprites.passes)) pass.frustumCulled = false;
     if (hideSprite) sprites.material.visible = false;
@@ -110,9 +110,7 @@ describe('sprites — axis billboards', function () {
     const scene = new Scene();
     scene.add(sprites);
     sprites.update();
-    const pixels = await renderToPixels(display.renderer, scene, camera, target);
-    sprites.dispose();
-    return pixels;
+    return renderToPixels(display.renderer, scene, camera, target);
   }
 
   function expectModel(pixels, topDown, colorAt) {

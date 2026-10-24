@@ -99,7 +99,9 @@ or when the screenshot has another size. A failed demo keeps its old image, and 
 exits with 1. Console errors are listed under the demo and counted in the closing line;
 the image is written anyway, and `--strict` fails such a demo as well. The run prints whether
 Chromium found a WebGPU adapter; without one three.js renders with WebGL 2, which works
-but may look slightly different.
+but may look slightly different. On Linux the run asks Chromium for its Vulkan backend,
+which is how the headless shell finds an adapter there; on macOS and Windows Chromium
+picks its backend itself.
 
 The screenshot is taken when the page dispatches `lookbook.generatePreview` on the
 `document`; the event needs no `detail`, and when it has one the generator prints its

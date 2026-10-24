@@ -1,8 +1,18 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
 import {mul} from 'three/tsl';
-import type {MeshBasicMaterial, Vector3, Vector4} from 'three/webgpu';
-import {Mesh, Object3D, PerspectiveCamera, PlaneGeometry, PointLight, Scene, Texture} from 'three/webgpu';
+import type {Vector3, Vector4} from 'three/webgpu';
+import {
+  BufferGeometry,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  PerspectiveCamera,
+  PlaneGeometry,
+  PointLight,
+  Scene,
+  Texture,
+} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {nodesOf} from '../../testing/spriteGraph.js';
@@ -201,6 +211,17 @@ describe('FeatureSprites', () => {
     sprites.dispose();
   });
 
+  test('the placement setter refuses a malformed feature as defineFeature() would, and every material keeps its placement', () => {
+    const sprites = new FeatureSprites(kind, {passes: [definePass({name: 'plain', features: []})]});
+
+    expect(() => {
+      sprites.placement = {name: 'odd', placement: 5} as never;
+    }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'));
+    expect(sprites.placement).toBe(FlatPlacement);
+    expect(sprites.passes['plain']!.material.placement).toBe(FlatPlacement);
+    sprites.dispose();
+  });
+
   test('textures and uniforms pass through to the material', () => {
     const timedKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, TextureColor]});
     const sprites = new FeatureSprites(timedKind);
@@ -282,6 +303,33 @@ describe('FeatureSprites', () => {
     expect(() => sprites.touchTexture('colorMap')).not.toThrow();
     expect(() => sprites.setUniform('time', 1)).not.toThrow();
     expect(() => sprites.update()).not.toThrow();
+  });
+
+  describe('once the sprites are disposed', () => {
+    test('the placement setter turns away a feature that cannot stand in, and a malformed one', () => {
+      const sprites = new FeatureSprites(kind);
+      const start = kind.pipeline.placement!.name;
+      sprites.dispose();
+
+      expect(() => {
+        sprites.placement = Tint;
+      }).toThrow(
+        new TypeError(`FeatureSprites: feature "tint" contributes no placement stage and cannot stand in for "${start}"`),
+      );
+      expect(() => {
+        sprites.placement = {name: 'odd', placement: 5} as never;
+      }).toThrow(new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'));
+      expect(sprites.placement).toBeUndefined();
+    });
+
+    test('bindUniform() turns away what is no source', () => {
+      const sprites = new FeatureSprites(kind);
+      sprites.dispose();
+
+      expect(() => sprites.bindUniform('x', {} as never)).toThrow(
+        new TypeError('FeatureSprites: bindUniform("x") takes a source with a type of vec3 or vec4 and a write(), got {}'),
+      );
+    });
   });
 
   describe('dispose()', () => {
@@ -407,6 +455,123 @@ describe('FeatureSprites', () => {
       expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
     });
 
+    test('refuses a malformed placement option in its own name and leaves nothing built', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+      const odd = {name: 'odd', placement: 5} as never;
+
+      expect(() => new FeatureSprites(kind, {placement: odd})).toThrow(
+        new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'),
+      );
+      expect(() => new FeatureSprites(kind, {placement: odd, passes: [ShadowPass]})).toThrow(
+        new TypeError('FeatureSprites: the placement of feature "odd" is no function, got 5'),
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test.each([
+      ['options that are null', null, 'the options must be an object, got null'],
+      ['options that are a number', 5, 'the options must be an object, got 5'],
+      ['options that are an array', [], 'the options must be an object, got []'],
+      ['passes that are a number', {passes: 5}, 'passes is a list of passes, got 5'],
+      ['passes that are a string', {passes: 'ab'}, 'passes is a list of passes, got "ab"'],
+      ['passes that are null', {passes: null}, 'passes is a list of passes, got null'],
+      ['a pass that is null', {passes: [null]}, 'a pass is an object with a name and features, got null'],
+    ])('refuses %s and leaves nothing built', (_label, options, message) => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(kind, options as never)).toThrow(new TypeError(`FeatureSprites: ${message}`));
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test.each([
+      ['undefined', undefined, 'undefined'],
+      ['a number', 5, '5'],
+      ['an empty object', {}, '{}'],
+    ])('refuses a kind that is %s and leaves nothing built', (_label, value, quoted) => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(value as never)).toThrow(
+        new TypeError(`FeatureSprites: the kind must be a sprite kind from defineSprite(), got ${quoted}`),
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses a copy of a kind, which ran none of the checks of defineSprite(), and leaves nothing built', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites({...kind})).toThrow(
+        /^FeatureSprites: the kind must be a sprite kind from defineSprite\(\), got \{/,
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test.each([
+      [
+        'a BufferGeometry',
+        {geometry: new BufferGeometry()},
+        'the geometry handed in is no FeatureSpritesGeometry, got BufferGeometry',
+      ],
+      ['a number as geometry', {geometry: 5}, 'the geometry handed in is no FeatureSpritesGeometry, got 5'],
+      [
+        'a MeshBasicMaterial',
+        {material: new MeshBasicMaterial()},
+        'the material handed in is no FeatureSpritesMaterial, got MeshBasicMaterial',
+      ],
+    ])('refuses %s and leaves nothing built', (_label, options, message) => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(kind, options as never)).toThrow(new TypeError(`FeatureSprites: ${message}`));
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses baseArgs that are no list in the name of the geometry, and leaves nothing built', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+
+      expect(() => new FeatureSprites(kind, {baseArgs: 5 as never})).toThrow(
+        new TypeError('FeatureSpritesGeometry: baseArgs is a list of arguments, got 5'),
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses textures that are no object in the name of whoever builds the resources, and leaves nothing behind', () => {
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+
+      expect(() => new FeatureSprites(kind, {textures: 5 as never})).toThrow(
+        new TypeError('FeatureSpritesMaterial: textures must be an object of textures by name, got 5'),
+      );
+      // with passes the sprites build the resources every material shares
+      expect(() => new FeatureSprites(kind, {textures: 5 as never, passes: [ShadowPass]})).toThrow(
+        new TypeError('FeatureSprites: textures must be an object of textures by name, got 5'),
+      );
+
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
     test('leaves a geometry handed in alone when the material it builds is refused', () => {
       const geometry = new FeatureSpritesGeometry(kind, 1);
       const geometryDispose = sandbox.spy(geometry, 'dispose');
@@ -484,7 +649,7 @@ describe('FeatureSprites', () => {
       sprites.dispose();
     });
 
-    test('lets a placement the material of the sprites refuses reach no pass', () => {
+    test('lets a placement that cannot stand in reach no pass', () => {
       const sprites = new FeatureSprites(kind, {passes: [shadow]});
 
       expect(() => {
@@ -931,7 +1096,7 @@ describe('FeatureSprites', () => {
         'FeatureSprites: the uniform "groundPlane" is a vec4, and the source bound to it writes a vec3',
       );
       expect(() => sprites.bindUniform('groundPlane', {} as never)).toThrow(
-        'FeatureSprites: bindUniform("groundPlane") takes a source with a type of vec3 or vec4 and a write()',
+        'FeatureSprites: bindUniform("groundPlane") takes a source with a type of vec3 or vec4 and a write(), got {}',
       );
       sprites.setUniform('groundPlane', 0, 0, 1, 7);
       sprites.update();
@@ -989,6 +1154,132 @@ describe('FeatureSprites', () => {
       sprites.bindUniform('lift', lift);
       sprites.update();
       expect((sprites.uniforms!['lift']!.value as Vector3).toArray()).toEqual([2, 4, 8]);
+      sprites.dispose();
+    });
+  });
+
+  describe('update() behind code of the caller that throws', () => {
+    const thrown = (run: () => void): Error => {
+      try {
+        run();
+      } catch (error) {
+        return error as Error;
+      }
+      throw new Error('nothing was thrown');
+    };
+    const throwingSource = (message: string): SpriteUniformSource => ({
+      type: 'vec4',
+      write() {
+        throw new Error(message);
+      },
+    });
+    const below = () => {
+      const lamp = new Object3D();
+      lamp.position.set(0, -4, 0);
+      return lamp;
+    };
+
+    test('update() uploads what the pools marked when the visible hook of a pass throws, and names the pass', () => {
+      const cause = new Error('the hook broke');
+      const boom = definePass({
+        name: 'boom',
+        features: [],
+        visible: () => {
+          throw cause;
+        },
+      });
+      const sprites = new FeatureSprites(kind, {capacity: 4, passes: [boom]});
+      sprites.createSprite();
+      sprites.createSprite();
+      const upload = sandbox.spy(sprites.geometry!, 'update');
+
+      const error = thrown(() => sprites.update());
+
+      expect(error.message).toBe('FeatureSprites: the visible of pass "boom" threw: the hook broke');
+      expect(error.cause).toBe(cause);
+      expect(upload.callCount).toBe(1);
+      expect(sprites.geometry!.instanceCount).toBe(2);
+      sprites.dispose();
+    });
+
+    test('update() writes the other bindings and judges every pass behind a source that throws', () => {
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass]});
+      sprites.bindUniform('groundPlane', throwingSource('the source broke'));
+      sprites.bindUniform('shadowLight', lightOf(below()));
+      const upload = sandbox.spy(sprites.geometry!, 'update');
+
+      const error = thrown(() => sprites.update());
+
+      expect(error.message).toBe('FeatureSprites: the source bound to the uniform "groundPlane" threw: the source broke');
+      expect((sprites.uniforms!['shadowLight']!.value as Vector4).toArray()).toEqual([0, -4, 0, 1]);
+      expect(sprites.passes['shadow']!.visible).toBe(false);
+      expect(upload.callCount).toBe(1);
+      sprites.dispose();
+    });
+
+    test('update() throws an AggregateError when more than one source or hook threw', () => {
+      const boom = definePass({
+        name: 'boom',
+        features: [],
+        visible: () => {
+          throw 'the hook broke';
+        },
+      });
+      const sprites = new FeatureSprites(kind, {passes: [ShadowPass, boom]});
+      sprites.bindUniform('groundPlane', throwingSource('the source broke'));
+
+      const error = thrown(() => sprites.update());
+
+      expect(error).toBeInstanceOf(AggregateError);
+      expect(error.message).toBe('FeatureSprites#update(): more than one bound source or visible hook threw');
+      expect((error as AggregateError).errors.map(({message}: Error) => message)).toEqual([
+        'FeatureSprites: the source bound to the uniform "groundPlane" threw: the source broke',
+        'FeatureSprites: the visible of pass "boom" threw: the hook broke',
+      ]);
+      sprites.dispose();
+    });
+
+    test('a pass whose hook throws keeps the visibility of its last judgement', () => {
+      let verdict: boolean | 'throw' = false;
+      const moody = definePass({
+        name: 'moody',
+        features: [],
+        visible: () => {
+          if (verdict === 'throw') throw new Error('no verdict');
+          return verdict;
+        },
+      });
+      const sprites = new FeatureSprites(kind, {passes: [moody]});
+      const mesh = sprites.passes['moody']!;
+
+      sprites.update();
+      expect(mesh.visible).toBe(false);
+      verdict = 'throw';
+      expect(() => sprites.update()).toThrow('FeatureSprites: the visible of pass "moody" threw: no verdict');
+      expect(mesh.visible).toBe(false);
+      mesh.enabled = true;
+      expect(mesh.visible).toBe(false);
+
+      verdict = true;
+      sprites.update();
+      expect(mesh.visible).toBe(true);
+      verdict = 'throw';
+      expect(() => sprites.update()).toThrow();
+      expect(mesh.visible).toBe(true);
+      sprites.dispose();
+    });
+
+    test('a hook that asks uniform() for an undeclared name throws that refusal as it is', () => {
+      const peek = definePass({name: 'peek', features: [], visible: (uniform) => uniform('nothing') != null});
+      const sprites = new FeatureSprites(kind, {passes: [peek]});
+      const upload = sandbox.spy(sprites.geometry!, 'update');
+
+      const error = thrown(() => sprites.update());
+
+      expect(error.message).toBe(
+        'FeatureSprites: the visible of pass "peek" reads the uniform "nothing", which no feature of these sprites declares',
+      );
+      expect(upload.callCount).toBe(1);
       sprites.dispose();
     });
   });

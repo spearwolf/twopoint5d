@@ -19,6 +19,14 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
   declare readonly basePool?: VertexObjectPool<VOBaseType>;
   declare readonly instancedPool: VertexObjectPool<VOInstancedType>;
 
+  /**
+   * Builds the instanced pool and the base from a pool, a descriptor or a description each, or
+   * takes the base from a `BufferGeometry`, as {@link InstancedVOBufferGeometry} does.
+   *
+   * @throws what the constructor of {@link InstancedVOBufferGeometry} throws. Whatever this
+   *   constructor throws, a pool it built from a descriptor or description is disposed, and a
+   *   pool handed in is left as it was.
+   */
   constructor(
     ...args:
       | [VertexObjectPool<VOInstancedType> | VertexObjectDescriptor | VertexObjectDescription, number, BufferGeometry]
@@ -29,19 +37,32 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
           number?,
         ]
   ) {
-    super(
-      ...(args[2] instanceof BufferGeometry
-        ? [asPool<VOInstancedType>(args[0], args[1]), args[1], args[2]]
-        : [asPool<VOInstancedType>(args[0], args[1]), args[1], asPool<VOBaseType>(args[2], args[3] ?? 1), args[3]]),
-    );
+    const instancedPool = asPool<VOInstancedType>(args[0], args[1]);
+    const buildsInstanced = !(args[0] instanceof VertexObjectPool);
+    const buildsBase = !(args[2] instanceof BufferGeometry) && !(args[2] instanceof VertexObjectPool);
+    let basePool: VertexObjectPool<VOBaseType> | undefined;
+    try {
+      if (args[2] instanceof BufferGeometry) {
+        super(instancedPool, args[1], args[2]);
+      } else {
+        basePool = asPool<VOBaseType>(args[2], args[3] ?? 1);
+        super(instancedPool, args[1], basePool, args[3]);
+      }
+    } catch (error) {
+      // a constructor that throws leaves nothing behind: super() only ever sees pools and cannot
+      // tell which of them were built here, so the pools built above go here
+      if (buildsInstanced) instancedPool.dispose();
+      if (buildsBase) basePool?.dispose();
+      throw error;
+    }
 
     this.name = 'InstancedVertexObjectGeometry';
 
     // the pools built above belong to this geometry; super() only ever sees pools and cannot tell
-    if (!(args[0] instanceof VertexObjectPool)) {
+    if (buildsInstanced) {
       this.declareOwnedPool(this.instancedPool);
     }
-    if (!(args[2] instanceof BufferGeometry) && !(args[2] instanceof VertexObjectPool)) {
+    if (buildsBase) {
       this.declareOwnedPool(expectDefined(this.basePool, 'the base pool'));
     }
   }

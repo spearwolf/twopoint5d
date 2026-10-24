@@ -5,6 +5,8 @@ import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, RenderTarge
 import {
   makeContainer,
   disposeDisplay,
+  disposeKept,
+  keep,
   bufferOf,
   readBack,
   quadDescription,
@@ -145,9 +147,6 @@ function expectPoolArrays(geometry) {
 const TARGET_SIZE = 64;
 
 describe('vertex-objects — gpu upload', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -166,6 +165,7 @@ describe('vertex-objects — gpu upload', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     disposeDisplay(display);
     display = undefined;
     if (host && host.parentNode) {
@@ -418,15 +418,11 @@ describe('vertex-objects — gpu upload', function () {
     quad.setTint([0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0]);
     mesh.update();
 
-    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
-    try {
-      const pixels = await renderToPixels(display.renderer, scene, camera, target);
-      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+    const target = keep(new RenderTarget(TARGET_SIZE, TARGET_SIZE));
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
+    const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
 
-      expect(isNearColor(middle, [255, 255, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
-    } finally {
-      target.dispose();
-    }
+    expect(isNearColor(middle, [255, 255, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
 
     if (display.isWebGPUBackend) {
       // three pads a buffer attribute whose stride is no multiple of 4 bytes, and does it again on
@@ -460,15 +456,11 @@ describe('vertex-objects — gpu upload', function () {
     quad.setDy([-100, -100, -100, -100]);
     mesh.update();
 
-    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
-    try {
-      const pixels = await renderToPixels(display.renderer, scene, camera, target);
-      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+    const target = keep(new RenderTarget(TARGET_SIZE, TARGET_SIZE));
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
+    const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
 
-      expect(isNearColor(middle, [200, 100, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
-    } finally {
-      target.dispose();
-    }
+    expect(isNearColor(middle, [200, 100, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
     expectPoolArrays(geometry);
   });
 
@@ -485,15 +477,11 @@ describe('vertex-objects — gpu upload', function () {
     quad.setLevel([200, 200, 200, 200]);
     mesh.update();
 
-    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
-    try {
-      const pixels = await renderToPixels(display.renderer, scene, camera, target);
-      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+    const target = keep(new RenderTarget(TARGET_SIZE, TARGET_SIZE));
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
+    const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
 
-      expect(isNearColor(middle, [200, 0, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
-    } finally {
-      target.dispose();
-    }
+    expect(isNearColor(middle, [200, 0, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
     expectPoolArrays(geometry);
   });
 
@@ -512,15 +500,11 @@ describe('vertex-objects — gpu upload', function () {
     quad.setBytes([200, 1, 2, 100, 200, 1, 2, 100, 200, 1, 2, 100, 200, 1, 2, 100]);
     mesh.update();
 
-    const target = new RenderTarget(TARGET_SIZE, TARGET_SIZE);
-    try {
-      const pixels = await renderToPixels(display.renderer, scene, camera, target);
-      const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+    const target = keep(new RenderTarget(TARGET_SIZE, TARGET_SIZE));
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
+    const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
 
-      expect(isNearColor(middle, [200, 100, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
-    } finally {
-      target.dispose();
-    }
+    expect(isNearColor(middle, [200, 100, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
     expectPoolArrays(geometry);
   });
 

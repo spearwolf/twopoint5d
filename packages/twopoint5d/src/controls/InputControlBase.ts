@@ -144,10 +144,18 @@ export class InputControlBase {
    * ends it.
    *
    * On a disposed control this does nothing — there is no listener left to take off.
+   *
+   * An {@link unsubscribe} of a subclass that throws still leaves the list empty; the error
+   * leaves this call afterwards.
    */
   destroyAllListeners() {
-    this.unsubscribe();
-    this.#listeners.length = 0;
+    try {
+      this.unsubscribe();
+    } finally {
+      // a subclass can call listeners of its own events in unsubscribe(), and an error there
+      // still leaves the list empty
+      this.#listeners.length = 0;
+    }
   }
 
   /**

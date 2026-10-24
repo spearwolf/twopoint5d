@@ -23,6 +23,27 @@ const createEventMocks = () => ({
 });
 
 describe('DisplayStateMachine', () => {
+  it('its states and its event names are read-only for TypeScript', () => {
+    // never called: the check is the one of the compiler
+    const write = () => {
+      // @ts-expect-error — a state is a name the machine compares against
+      DisplayStateMachine.NEW = 'running';
+      // @ts-expect-error — a state is a name the machine compares against
+      DisplayStateMachine.RUNNING = 'paused';
+      // @ts-expect-error — a state is a name the machine compares against
+      DisplayStateMachine.PAUSED = 'new';
+      // @ts-expect-error — an event name is what the machine emits and Display subscribes to
+      DisplayStateMachine.Init = 'other';
+      // @ts-expect-error — an event name is what the machine emits and Display subscribes to
+      DisplayStateMachine.Start = 'other';
+      // @ts-expect-error — an event name is what the machine emits and Display subscribes to
+      DisplayStateMachine.Pause = 'other';
+      // @ts-expect-error — an event name is what the machine emits and Display subscribes to
+      DisplayStateMachine.Restart = 'other';
+    };
+    expect(write).toBeTypeOf('function');
+  });
+
   it('create', () => {
     const stateMachine = new DisplayStateMachine();
 
@@ -323,6 +344,7 @@ describe('DisplayStateMachine', () => {
     }
 
     expect(thrown).toBeInstanceOf(AggregateError);
+    expect((thrown as AggregateError).message).toMatch(/^Display: /);
     expect((thrown as AggregateError).errors).toEqual([startError, pauseError]);
     expect(pauses).toBe(1);
     expect(stateMachine.state).toBe(DisplayStateMachine.PAUSED);

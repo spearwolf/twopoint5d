@@ -15,9 +15,6 @@ const extraInstancedDescription = {
 };
 
 describe('vertex-objects — dispose', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   /** @type {Display | undefined} */
   let display;
   /** @type {HTMLElement | undefined} */
@@ -176,7 +173,9 @@ describe('vertex-objects — dispose', function () {
     const {geometry, material} = makeGeometryWithExtraRoute();
     await renderOnce(new VertexObjects(geometry, material));
 
+    const extraAttribute = geometry.getAttribute('extraOffset');
     geometry.detachInstancedPool('extra');
+    expect(extraAttribute.array.length, 'the attribute left behind lets go of the array of its pool').to.equal(0);
     geometry.dispose();
 
     expect(display.renderer.info.memory.attributes).to.equal(attributesBefore);

@@ -277,11 +277,18 @@ interface SpriteFeature<Api extends object = object> {
 declare function defineFeature<Api extends object = object>(feature: SpriteFeature<Api>): SpriteFeature<Api>;
 ```
 
-`defineFeature()` checks a feature on its own and freezes it: a name, a finite `order` for every
-ordered stage, a `checkKind` that is a function, `nearestTextures` that is a list of names, and no
-`requires` of its own name. What can only be checked against the other features of a kind,
-`defineSprite()` checks (§5.1). `frameStage`, `uv`, `checkKind` and the shared uniform declaration
-came with [`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md), `mirror` with
+`defineFeature()` checks a feature on its own — every field for its type, with a `TypeError` naming
+the feature, the field and the value: a name, a record of attribute descriptions for
+`attributes`, of lists of
+names for `usageAliases`, of functions for `methods` and of `{}` or `{needsImage: true}` for
+`textures`, a record for `uniforms`, functions for `initialize`, `frame`, `placement`,
+`colorSource` and `checkKind`, a finite `order` and a `transform` for every ordered stage, lists of
+names for `nearestTextures` and `requires`, and no `requires` of its own name — and freezes it, the
+records and lists inside included. `defineSprite()`, `definePass()` and the placement swap check a
+feature that never passed through `defineFeature()` the same way. What can only be checked against
+the other features of a kind, `defineSprite()` checks (§5.1). `frameStage`, `uv`, `checkKind` and
+the shared uniform declaration came with
+[`pipeline-stages-and-grid-base.md`](pipeline-stages-and-grid-base.md), `mirror` with
 [`flip-anchor-nine-slice.md`](flip-anchor-nine-slice.md), `nearestTextures` with
 [`table-frames-and-palette-swap.md`](table-frames-and-palette-swap.md).
 
@@ -561,26 +568,28 @@ declare function defineSprite<const F extends readonly SpriteFeature[]>(options:
 `SpriteApiOf<F>` is the intersection of the `__api` of the features. What `defineSprite()`
 checks, in this order, each refusal naming the features involved:
 
-1. The base contract: a `position` of 3 values, a `uv` of 2, a `make()` on the `basePrototype`.
-2. Unique feature names — where two features share one, the `checkKind` of the first is asked
+1. The options — an object with a base and an iterable of features —, and every feature on its
+   own as `defineFeature()` checks it, since a plain object passes for a feature.
+2. The base contract: a `position` of 3 values, a `uv` of 2, a `make()` on the `basePrototype`.
+3. Unique feature names — where two features share one, the `checkKind` of the first is asked
    first, so that the forms of one factory can say why a kind takes only one of them — and every
    `requires`.
-3. The pipeline: exactly one placement, at most one frame and one color source, and a placement
+4. The pipeline: exactly one placement, at most one frame and one color source, and a placement
    that declares no textures, since the placement runs always and cannot wait for one.
-4. Uniforms and textures: a name is declared by one feature — unless every feature that declares
+5. Uniforms and textures: a name is declared by one feature — unless every feature that declares
    it declares it shared, with the same type and start value — and a start value is a number or 2
    to 4 numbers (`collectSpriteDeclarations()`).
-5. Attributes and sprite-handle properties: an attribute name is unique across the features and
+6. Attributes and sprite-handle properties: an attribute name is unique across the features and
    none of the base, and every property the attributes generate or a method names is given by one
    feature, once. Then the usage aliases: a word names attributes of its own feature, is unique
    across the kind — but for a word named after an attribute whose feature declares it, which the
    other features may add attributes of their own to — and is never named after an attribute of a
    feature that does not declare it.
-6. The layout: the attributes of each feature on their own, then the merged description through
+7. The layout: the attributes of each feature on their own, then the merged description through
    `sharedVertexObjectDescriptor()` — the descriptor every pool of the kind takes over, built once
    from the very object the kind hands out. A failure names the attributes of the message with
    their features.
-7. Last, the `checkKind` of every feature, in the order of the list, shown `{base, features}`.
+8. Last, the `checkKind` of every feature, in the order of the list, shown `{base, features}`.
 
 The merged description carries the attributes, the methods of every feature and one
 `basePrototype` whose `[voInitialize]` calls every feature's `initialize` in feature-list order,
@@ -588,10 +597,15 @@ in an index loop that allocates nothing. `methods` cannot carry the hook:
 `createVertexObjectPrototype` copies `Object.entries(methods)`, which skips symbol keys. The
 prototype carries nothing else, so rule 9 of the descriptor has nothing to refuse.
 
-A sprite kind is frozen. Adding a feature means defining a new kind, which is cheap: it is a
-description and a sorted pipeline, not a GPU resource. Every kind brings a prototype of its own,
-so one loop over the sprites of more than four kinds is megamorphic — as is one over sprites of
-geometries built with `attributeUsage`, each of which shares its prototype with no other.
+A sprite kind is frozen all the way down: its feature list, its pipeline and its description — a
+copy of its own, every attribute description in it, so that nothing written to the attributes of a
+feature reaches the kind. The base and the features stay as their authors left them; every feature
+out of `defineFeature()` is frozen as deep, and so are `QuadBase` and every base of `gridBase()`,
+the prototype of their base vertex included. Adding a feature means defining a new kind, which is
+cheap: it is a description and a sorted pipeline, not a GPU resource. Every kind brings a prototype
+of its own, so one loop over the sprites of more than four kinds is megamorphic — as is one over
+sprites of geometries built with `attributeUsage`, each of which shares its prototype with no
+other.
 
 ### 5.2 Geometry, material and mesh
 
@@ -602,18 +616,30 @@ geometries built with `attributeUsage`, each of which shares its prototype with 
   `attributeUsage` it copies the description through `cloneVertexObjectDescription()`, the usage
   words of the kind as its aliases, and refuses a name that is neither an attribute nor a usage
   word of the kind, listing those it knows; such a geometry shares its prototype with no other.
+  Before anything is built it refuses with a `TypeError` a kind that did not come from
+  `defineSprite()` — a kind is told by where it came from, not by its shape, since a copy of a
+  kind ran none of the checks of `defineSprite()` —, parameters that are neither a number nor an
+  object, `baseArgs` that are no list and an `attributeUsage`
+  that is no object of name lists; a `baseArgs` or `attributeUsage` of `null` counts as not handed
+  in.
 - **`SpriteResources`** — the uniforms and textures a set of features declares, held once: one
   uniform node per declared uniform, at its start value or the one handed in, written by
   `setUniform(name, x, y?, z?, w?)`, which allocates nothing and keeps working after `dispose()`;
   per declared texture a signal, a memo of its shape over `textureShapeKey()` — `undefined` for a
-  texture declared with `needsImage` until its image has measures — and a size uniform kept
-  current. `setTexture()`, `getTexture()` and `touchTexture()` take the declared names; a texture
-  stays the caller's. `dispose()` destroys the size effects first, clears the textures while their
-  signals live and then deletes its signal group.
+  texture declared with `needsImage` until its image has measures — and a size uniform kept current.
+  `setTexture()`, `getTexture()` and `touchTexture()` take the declared names; a texture stays the
+  caller's. `dispose()` destroys the size effects first, clears the textures while their signals
+  live and then deletes its signal group. Before any signal exists it refuses, in the words of the
+  `where` it is handed, `features` that are no iterable, a feature as `defineFeature()` refuses it,
+  options that are no object, `textures` or `uniforms` that are no object by name and a start value
+  in `uniforms` that is not of the type of its uniform — a finite number or 2 to 4 of them, the rule
+  of the declared start values; `null` keeps the declared one, as `undefined` does.
 - **`FeatureSpritesMaterial`** — a `NodeMaterial` built from the kind,
   `new FeatureSpritesMaterial(kind, {name, textures, uniforms, placement, resources, pass, …})`,
   every other option a three.js material parameter for `setValues()`, without `positionNode` and
-  `colorNode`, behind the `isMaterial?: never; isTexture?: never` guard. It builds:
+  `colorNode`, behind the `isMaterial?: never; isTexture?: never` guard. It refuses with a
+  `TypeError`, before `super()`, a kind that did not come from `defineSprite()` and options that
+  are no object (`null` included), and `resources` that are no `SpriteResources`. It builds:
   - its `SpriteResources` from `textures` and `uniforms`, or takes `resources` handed in — which
     stay the caller's, are refused next to `textures` or `uniforms`, refused once disposed and
     refused when they lack what a feature declares
@@ -643,8 +669,14 @@ geometries built with `attributeUsage`, each of which shares its prototype with 
 - **`FeatureSprites`** — the `VertexObjects` mesh of a kind, `new FeatureSprites(kind, options)`,
   its options those of the geometry and of the material side by side, plus `geometry`, `material`
   and `passes` (§6). It builds the geometry and the material it is not handed and owns exactly
-  those; a geometry or a material of another kind, and parameters that would build one next to one
-  handed in, are refused with a `TypeError`, and a refused constructor leaves nothing behind.
+  those; a kind that did not come from `defineSprite()`, options that are no object, `passes` that
+  are no list, a `grow` that is no boolean, a `geometry` or `material` that is no
+  `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, one of another kind, and parameters that
+  would build one next to one handed in, are refused with a `TypeError`. What the geometry and the
+  material refuse of the options they refuse in their own name; what the uniforms and textures
+  refuse, in the name of the class that builds them — `FeatureSpritesMaterial` without passes,
+  `FeatureSprites` with them, which builds the resources every material shares. A refused
+  constructor leaves nothing behind.
   `createSprite()` answers a sprite at the values of an unused slot, or `undefined` once the pool
   is full — and says so once on the console —; `freeSprite()` gives one back, the last sprite
   moving into its slot; `spritePool` is the pool. `placement`, `uniforms`, `setUniform()` and the
@@ -746,12 +778,15 @@ interface SpritePass {
 declare function definePass(pass: SpritePass): SpritePass;
 ```
 
-`definePass()` checks what a pass can be checked for on its own and freezes it, with frozen
-copies of `features`, `without`, `material` and `uniformNames`: a name, a `visible` that is a
-function, features of distinct names, **no data** — a feature of a pass brings no attributes,
-methods, `initialize` or usage aliases, since the pool and the sprite handle are those of the
-kind —, at most one placement among the features, and a `without` that names no feature twice.
-The `visible` hook and the renames of `uniformNames` are
+`definePass()` checks what a pass can be checked for on its own and freezes it, with frozen copies
+of `features`, `without`, `material` and `uniformNames`: an object with a name, a `visible` that is
+a function, `features` as a list of features of distinct names, each checked as `defineFeature()`
+checks one, **no data** — a feature of a pass brings no attributes, methods, `initialize` or usage
+aliases, since the pool and the sprite handle are those of the kind —, at most one placement among
+the features, a `without` as a list of names that names none twice, `uniformNames` and `material` as
+objects, and a `renderOrder` that is a finite number (`TypeError`, each quoting the value it
+refuses, a `RangeError` for the `renderOrder`). The sprites run the same check for a pass that never
+went through `definePass()`. The `visible` hook and the renames of `uniformNames` are
 [`sprite-uniform-bindings.md`](sprite-uniform-bindings.md) §5 and §6.
 
 What only a kind can tell is checked where a material of the pass is built — by

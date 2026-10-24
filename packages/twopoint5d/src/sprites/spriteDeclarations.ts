@@ -12,7 +12,8 @@ export interface SpriteDeclarations {
 
 const VECTOR_TYPES = ['float', 'vec2', 'vec3', 'vec4'] as const;
 
-const isUniformValue = (value: unknown): value is SpriteUniformValue =>
+/** Whether `value` is a start value of a uniform: a finite number, or a list of 2 to 4 finite numbers. @internal */
+export const isUniformValue = (value: unknown): value is SpriteUniformValue =>
   (typeof value === 'number' && Number.isFinite(value)) ||
   (Array.isArray(value) &&
     value.length >= 2 &&
@@ -98,7 +99,7 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
       const declaration = declarationOf(declared);
       if (declaration == null) {
         throw new TypeError(
-          `${where}: feature "${feature.name}" starts the uniform "${name}" with ${describeValue(declared)}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`,
+          `${where}: feature "${feature.name}" starts the uniform "${name}" with ${describeValue(declared)}; a uniform takes a finite number, 2 to 4 finite numbers, or {value, shared}`,
         );
       }
       if (known != null) {

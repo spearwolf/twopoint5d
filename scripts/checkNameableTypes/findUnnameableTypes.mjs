@@ -41,10 +41,34 @@ const referencedName = (node) => {
  */
 export function findUnnameableTypes({entry, compilerOptions}) {
   const root = path.dirname(entry);
-  const program = ts.createProgram([entry], compilerOptions);
+  // `skipLibCheck` would suppress the diagnostics of the `.d.ts` files, which are the very
+  // ones the check below stops on
+  const program = ts.createProgram([entry], {...compilerOptions, skipLibCheck: false});
   const checker = program.getTypeChecker();
   const entryFile = program.getSourceFile(entry);
   if (entryFile == null) throw new Error(`no such entry declaration file: ${entry}`);
+
+  // A reference that does not resolve gives `getSymbolAtLocation` as `undefined` or as a
+  // symbol without a declaration, and the walk passes it over without a word. So a
+  // declaration that does not compile stops the check, instead of leaving a part of the
+  // surface unchecked.
+  const diagnostics = [
+    ...program.getOptionsDiagnostics(),
+    ...program.getGlobalDiagnostics(),
+    ...program
+      .getSourceFiles()
+      .filter((file) => !isLib(file.fileName))
+      .flatMap((file) => [...program.getSyntacticDiagnostics(file), ...program.getSemanticDiagnostics(file)]),
+  ];
+  if (diagnostics.length > 0) {
+    const lines = diagnostics.map((d) => {
+      const message = ts.flattenDiagnosticMessageText(d.messageText, ' ');
+      if (d.file == null || d.start == null) return `  ${message}`;
+      const {line} = d.file.getLineAndCharacterOfPosition(d.start);
+      return `  ${path.relative(root, d.file.fileName)}:${line + 1}  ${message}`;
+    });
+    throw new Error(`the declarations do not compile, and what they fail to resolve would go unchecked:\n${lines.join('\n')}`);
+  }
 
   const deref = (sym) => (sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym);
 
@@ -115,12 +139,28 @@ export function findUnnameableTypes({entry, compilerOptions}) {
  * @template {{name: string, file: string}} Row
  * @param {Row[]} rows
  * @param {ReadonlyMap<string, string>} accepted file and name to the reason it stays
- * @returns {{accepted: Row[], offenders: Row[]}}
+ * @returns {{accepted: Row[], offenders: Row[], stale: string[]}} the rows the map lists, the
+ *   rows it does not, and the keys of the map that no row matches, in the order of the map
  */
 export function partitionAccepted(rows, accepted) {
   const isAccepted = (row) => accepted.has(`${row.file}:${row.name}`);
+  const matched = new Set(rows.map((row) => `${row.file}:${row.name}`));
   return {
     accepted: rows.filter(isAccepted),
     offenders: rows.filter((row) => !isAccepted(row)),
+    stale: [...accepted.keys()].filter((key) => !matched.has(key)),
   };
+}
+
+/**
+ * The key of `entry` in ACCEPTED: its path relative to the workspace root, `/`-separated on
+ * every platform, so that one key serves Windows and POSIX alike.
+ *
+ * @param {string} entry
+ * @param {string} workspaceRoot
+ * @param {import('node:path').PlatformPath} [pathApi] `path.win32` or `path.posix`; the platform's by default
+ * @returns {string}
+ */
+export function entryKeyOf(entry, workspaceRoot, pathApi = path) {
+  return pathApi.relative(workspaceRoot, entry).split(pathApi.sep).join('/');
 }

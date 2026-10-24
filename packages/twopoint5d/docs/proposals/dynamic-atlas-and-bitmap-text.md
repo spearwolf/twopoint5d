@@ -410,7 +410,8 @@ or a char whose `page` is not 0 — is refused:
 ### 4.4 Refusals
 
 Each throws before the atlas holds a frame, naming the char by itself and its id where one is
-involved:
+involved. A number of the font — a metric of `common`, a field of a char, the `amount` of a kerning
+pair — is refused with a `RangeError`, every other refusal with an `Error`:
 
 - font data that is no object:
   `BitmapFont: the font data is null — a font is an object in the JSON layout, {pages, chars, common}`;
@@ -418,7 +419,7 @@ involved:
   `base` above 0 — a line height of 0 would stack every line onto the first);
 - no `chars` array;
 - a char whose `id` is no whole number from 0 to 0x10FFFF, or a field of §4.2 that is no finite
-  number; `width`, `height` below 0;
+  number; `x`, `y`, `width`, `height` below 0;
 - a char that lies outside the page:
   `BitmapFont: the char "A" (65) reaches beyond the page of 128 × 64 — x 120 + width 12`;
 - two chars of one id;
@@ -428,8 +429,11 @@ involved:
   answers 0 for a number that is no code point, so no number meets the pair of two others.
 
 A numeric entity in the XML that is no Unicode scalar value — beyond U+10FFFF, a surrogate — stays
-as it is written, as an entity the reader does not know does: entities stand only in text
-attributes (`face`, `charset`, `file`), and a number field holding one is refused by its name.
+as it is written, as does every named entity outside the five, `&constructor;` among them:
+entities stand only in text attributes (`face`, `charset`, `file`), and a number field holding one
+is refused by its name. The text and the XML reader define every attribute as a field of its
+block, as `JSON.parse()` makes a key a field, so an attribute named `__proto__` is a field like
+any other and sets no prototype.
 
 ## 5. `layoutText()` and `writeText()` (module `text/`)
 
@@ -588,9 +592,12 @@ it does not write; `rewriteText(sprites, glyphs, font, '')` frees them all and e
 - an error of `createSprite()` — under `grow`, a pool that cannot grow — goes on unchanged after
   the sprites created so far are freed again;
 - `scale`, `lineHeight` and `maxWidth` that are no finite number above 0, `x`, `y`, `z` and
-  `letterSpacing` that are no finite number, an `align` that is none of the three, a `fallback` that
-  is no single char or no glyph of the font — each naming the option and its value:
+  `letterSpacing` that are no finite number — a `RangeError` —, an `align` that is none of the
+  three, a `fallback` that is no single char or no glyph of the font — an `Error` —, each naming the
+  option and its value:
   `layoutText: lineHeight must be a finite number above 0, got 0`;
+- a text that is no string — a `TypeError`:
+  `layoutText: the text must be a string, got 5`;
 - for `rewriteText()`, a glyph that is no sprite of these sprites — a `TypeError` naming its index,
   before anything changes; on a pool that runs full or a throw of `createSprite()` the glyphs keep
   the text they had.

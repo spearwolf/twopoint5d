@@ -60,6 +60,20 @@ describe('paletteSwap()', () => {
     expect(paletteSwap({colors: 32}).name).toBe('paletteSwap+32');
   });
 
+  test.each([
+    [5, '5'],
+    ['x', '"x"'],
+    [null, 'null'],
+  ])('refuses options of %o that are no object', (options, shown) => {
+    expect(() => paletteSwap(options as never)).toThrow(
+      new TypeError(`paletteSwap: the options must be an object, {colors?}, got ${shown}`),
+    );
+  });
+
+  test('takes options that are undefined', () => {
+    expect(() => paletteSwap(undefined)).not.toThrow();
+  });
+
   test('declares paletteRow, the palette, the cycling uniforms and the colorMap it reads texel for texel', () => {
     expect(PaletteSwap.attributes).toEqual({paletteRow: {size: 1}});
     expect(PaletteSwap.textures).toEqual({palette: {}});
@@ -77,9 +91,8 @@ describe('paletteSwap()', () => {
     [Number.NaN, 'NaN'],
     [-Infinity, '-Infinity'],
   ])('refuses colors of %o', (colors, shown) => {
-    expect(() => paletteSwap({colors: colors as number})).toThrow(TypeError);
     expect(() => paletteSwap({colors: colors as number})).toThrow(
-      `paletteSwap: colors must be a whole number from 1 to 64, got ${shown}`,
+      new TypeError(`paletteSwap: colors must be a whole number from 1 to 64, got ${shown}`),
     );
   });
 

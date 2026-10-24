@@ -81,9 +81,10 @@ describe('RepeatingTilesProvider', () => {
           tiles.tileIds = pattern as number[][];
         };
 
-        expect(assign).toThrow(RangeError);
         expect(assign).toThrow(
-          `RepeatingTilesProvider: a tile id is a whole number from 0 to 4294967295, but row ${row}, column ${col} holds ${shown}`,
+          new RangeError(
+            `RepeatingTilesProvider: a tile id is a whole number from 0 to 4294967295, but row ${row}, column ${col} holds ${shown}`,
+          ),
         );
         expect(tiles.tileIds).toEqual([[1, 2]]);
         expect(tiles.getTileIdAt(0, 0)).toBe(1);
@@ -349,10 +350,71 @@ describe('RepeatingTilesProvider', () => {
         (name) => {
           const read = () => providers[name]().getTileIdsWithin(0, 0, 3, 2, new Uint32Array(5));
 
-          expect(read).toThrow(RangeError);
-          expect(read).toThrow('RepeatingTilesProvider: a target for 3x2 tile ids needs 6 cells, got 5');
+          expect(read).toThrow(
+            new RangeError('RepeatingTilesProvider#getTileIdsWithin(): a target for 3x2 tile ids needs 6 cells, got 5'),
+          );
         },
       );
+
+      const names = Object.keys(providers) as (keyof typeof providers)[];
+      const coordinateCases = names.flatMap((name) =>
+        (['left', 'top'] as const).flatMap((arg) => [0.5, NaN, Infinity].map((value) => [name, arg, value] as const)),
+      );
+      const countCases = names.flatMap((name) =>
+        (['width', 'height'] as const).flatMap((arg) => [-1, 1.5, NaN].map((value) => [name, arg, value] as const)),
+      );
+      const argsWith = (arg: 'left' | 'top' | 'width' | 'height', value: number): [number, number, number, number] => {
+        const args: Record<typeof arg, number> = {left: 0, top: 0, width: 2, height: 2};
+        args[arg] = value;
+        return [args.left, args.top, args.width, args.height];
+      };
+
+      test.each(coordinateCases)('%s: refuses a %s of %p and leaves the target alone', (name, arg, value) => {
+        const target = new Uint32Array(8).fill(666);
+        const read = () => providers[name]().getTileIdsWithin(...argsWith(arg, value), target);
+
+        expect(read).toThrow(
+          new RangeError(`RepeatingTilesProvider#getTileIdsWithin(): ${arg} must be a whole number, got ${value}`),
+        );
+        expect(Array.from(target), 'target').toEqual(new Array(8).fill(666));
+      });
+
+      test.each(countCases)('%s: refuses a %s of %p and leaves the target alone', (name, arg, value) => {
+        const target = new Uint32Array(8).fill(666);
+        const read = () => providers[name]().getTileIdsWithin(...argsWith(arg, value), target);
+
+        expect(read).toThrow(
+          new RangeError(`RepeatingTilesProvider#getTileIdsWithin(): ${arg} must be a whole number of 0 or more, got ${value}`),
+        );
+        expect(Array.from(target), 'target').toEqual(new Array(8).fill(666));
+      });
+
+      test('names the coordinate and the count it refuses', () => {
+        const provider = providers.none();
+
+        expect(() => provider.getTileIdsWithin(0.5, 0, 1, 1)).toThrow(
+          'RepeatingTilesProvider#getTileIdsWithin(): left must be a whole number, got 0.5',
+        );
+        expect(() => provider.getTileIdsWithin(0, 0, -1, 1)).toThrow(
+          'RepeatingTilesProvider#getTileIdsWithin(): width must be a whole number of 0 or more, got -1',
+        );
+      });
+
+      test.each(
+        names.flatMap((name) =>
+          (['col', 'row'] as const).flatMap((arg) => [0.5, NaN].map((value) => [name, arg, value] as const)),
+        ),
+      )('%s: getTileIdAt() refuses a %s of %p', (name, arg, value) => {
+        const read = () => (arg === 'col' ? providers[name]().getTileIdAt(value, 0) : providers[name]().getTileIdAt(0, value));
+
+        expect(read).toThrow(new RangeError(`RepeatingTilesProvider#getTileIdAt(): ${arg} must be a whole number, got ${value}`));
+      });
+
+      test('getTileIdAt() names the coordinate it refuses', () => {
+        expect(() => providers.none().getTileIdAt(NaN, 0)).toThrow(
+          'RepeatingTilesProvider#getTileIdAt(): col must be a whole number, got NaN',
+        );
+      });
     });
     describe('a limitToAxis outside the type', () => {
       const pattern = [

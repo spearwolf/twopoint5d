@@ -11,13 +11,15 @@ export interface DisplayEventProps {
   now: number;
   /**
    * The seconds since the previous frame, the pauses of the display not counted, at most
-   * {@link Display.maxDeltaTime} while that is above 0.
+   * {@link Display.maxDeltaTime} while that is above 0. `0` in a frame the display renders during
+   * its pause, see {@link Display.renderFrame}.
    */
   deltaTime: number;
   /**
    * The same as {@link DisplayEventProps.deltaTime}, before {@link Display.maxDeltaTime} cuts it:
    * the wall-clock time between the frames without the pauses of the display.
-   * `FixedFrameLoop` runs on it.
+   * `FixedFrameLoop` runs on it. `0` in a frame the display renders during its pause, see
+   * {@link Display.renderFrame}.
    */
   rawDeltaTime: number;
   frameNo: number;
@@ -48,7 +50,8 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * If the display supports fewer frames than specified here,
    * only as many frames as the display supports will be rendered.
    *
-   * If nothing or 0 is specified here, the maximum possible FPS are used.
+   * Without it, with 0, or with anything but a positive finite number, the display draws as many
+   * frames as the page gives it.
    */
   maxFps?: number;
 

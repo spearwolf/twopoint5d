@@ -161,22 +161,28 @@ kind of your own from features. From there:
 ## 📖 Documentation
 
 Some features have been around for a long time and are stable, others are in flux and
-highly experimental. as an independent solo developer, it is not possible for me to
-create detailed written documentation and keep it up to date. this is a living open
-source project and is subject to constant change. therefore, the developer is advised to
-do the following
+highly experimental. The written documentation:
 
-> _"Read the source, Luke!"_
+- the guides for users of the library — [sprites](packages/twopoint5d/docs/sprites.md),
+  [text](packages/twopoint5d/docs/text.md), [tile
+  maps](packages/twopoint5d/docs/map2d.md), [display: resolution and frame
+  rate](packages/twopoint5d/docs/display.md)
+- [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) and
+  [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md)
+- [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md)
+- [Library architecture](packages/twopoint5d/docs/architecture.md) and
+  [Monorepo architecture](docs/architecture.md) — Nx, the build, the publish pipeline and
+  the CI gate
+- [Proposals](packages/twopoint5d/docs/proposals/README.md) — for the developers of the
+  library
+- [CHANGELOG](packages/twopoint5d/CHANGELOG.md) — with a migration guide for every
+  breaking change
 
-To take this to the extreme, there is a LOOKBOOK app with lots of code examples, all of
-which can be used as a starting point for new projects or as documentation for one or
-the other feature.
+Beside them there is a LOOKBOOK app with lots of code examples, all of which can be used
+as a starting point for new projects or as documentation for one or the other feature.
 
 > :rocket: The LOOKBOOK app can easily be started locally using `pnpm lookbook`. See
 > next section [Development Setup](#development-setup) for details.
-
-And of course there are one or two READMEs in the `**/src/*` subdirectories that provide
-a high-level overview of the features. _Enjoy exploring!_
 
 
 ## Development Setup
@@ -196,12 +202,12 @@ Install the dependencies with:
 $ pnpm install
 ```
 
-The browser tests in `pnpm cbt` need Chromium and Firefox from Playwright.
+The browser tests in `pnpm cbt` need Chromium, Firefox and WebKit from Playwright.
 `pnpm install` does not download them, so fetch them once, and again after every
 Playwright bump (on Linux, add `--with-deps` if system libraries are missing):
 
 ```sh
-$ pnpm exec playwright install chromium firefox
+$ pnpm exec playwright install chromium firefox webkit
 ```
 
 ### 2. Build and test everything
@@ -223,6 +229,10 @@ $ pnpm lookbook
 
 Everyone is welcome to contribute to this project, no matter if it's just bug-fixes, new
 features, ideas or documentation or graphics!
+
+[AGENTS.md](AGENTS.md) holds the commands, the layout of the repository and the rules you
+cannot read off the code — written for coding agents, and just as useful to a human
+contributor.
 
 
 ## Copyright and License

@@ -12,6 +12,8 @@ import {
   compareWithModel,
   countColor,
   disposeDisplay,
+  disposeKept,
+  keep,
   makeCameraAboveGround,
   makeColorTexture,
   makeContainer,
@@ -40,8 +42,6 @@ function reflectionAt(x, y) {
 }
 
 describe('sprites — a reflection pass', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
   let display;
   let host;
   let target;
@@ -54,6 +54,7 @@ describe('sprites — a reflection pass', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -66,9 +67,9 @@ describe('sprites — a reflection pass', function () {
   // of the material alone
   it('draws the mirror image of a sprite standing on the XZ ground below it, the camera in front and above', async function () {
     const topDown = await readsTopDown(display.renderer, target);
-    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
+    const colorMap = keep(makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2));
     // mirrorPlane keeps its start value, the ground y = 0
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ReflectionPass]});
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [ReflectionPass]}));
     sprites.setUniform('reflectionColor', 0, 1, 0, 1);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -79,9 +80,6 @@ describe('sprites — a reflection pass', function () {
     sprites.update();
 
     const pixels = await renderToPixels(display.renderer, scene, makeCameraAboveGround(TARGET_SIZE, PIXELS_PER_UNIT), target);
-
-    sprites.dispose();
-    colorMap.dispose();
 
     const {lit, differing} = compareWithModel(pixels, {
       size: TARGET_SIZE,
@@ -103,8 +101,8 @@ describe('sprites — a reflection pass', function () {
     {name: 'BillboardReflectionPass', pass: BillboardReflectionPass},
   ]) {
     it(`draws no reflection for a mirrorPlane whose normal is (0, 0, 0), and the sprite as before: ${name}`, async function () {
-      const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
-      const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]});
+      const colorMap = keep(makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2));
+      const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap}, passes: [pass]}));
       sprites.setUniform('reflectionColor', 0, 1, 0, 1);
       sprites.setUniform('mirrorPlane', 0, 0, 0, 0);
       const sprite = sprites.createSprite();
@@ -117,9 +115,6 @@ describe('sprites — a reflection pass', function () {
 
       const pixels = await renderToPixels(display.renderer, scene, makeCameraAboveGround(TARGET_SIZE, PIXELS_PER_UNIT), target);
 
-      sprites.dispose();
-      colorMap.dispose();
-
       expect(countColor(pixels, GREEN), 'the pixels of a reflection').to.equal(0);
       // the sprite covers 2 × 1.2 units of the view, 614 pixels, as in the first test
       expect(countColor(pixels, WHITE), 'the pixels of the sprite').to.be.within(560, 670);
@@ -131,13 +126,15 @@ describe('sprites — a reflection pass', function () {
    * through makeCameraAboveGround(), and counts the pixels of the sprite and of its reflection.
    */
   async function countTheReflectionOf(pass) {
-    const colorMap = makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2);
-    const sprites = new FeatureSprites(TexturedSpriteKind, {
-      capacity: 1,
-      textures: {colorMap},
-      passes: [pass],
-      placement: BillboardPlacement,
-    });
+    const colorMap = keep(makeColorTexture([WHITE, WHITE, WHITE, WHITE], 2, 2));
+    const sprites = keep(
+      new FeatureSprites(TexturedSpriteKind, {
+        capacity: 1,
+        textures: {colorMap},
+        passes: [pass],
+        placement: BillboardPlacement,
+      }),
+    );
     sprites.setUniform('reflectionColor', 0, 1, 0, 1);
     const sprite = sprites.createSprite();
     sprite.setSize(2, 2);
@@ -149,8 +146,6 @@ describe('sprites — a reflection pass', function () {
 
     const pixels = await renderToPixels(display.renderer, scene, makeCameraAboveGround(TARGET_SIZE, PIXELS_PER_UNIT), target);
 
-    sprites.dispose();
-    colorMap.dispose();
     return {sprite: countColor(pixels, WHITE), reflection: countColor(pixels, GREEN)};
   }
 

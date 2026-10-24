@@ -12,7 +12,16 @@ import {
   Tint,
 } from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
-import {disposeDisplay, isNearColor, makeColorTexture, makeContainer, renderToPixels, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeColorTexture,
+  makeContainer,
+  renderToPixels,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels
 const TARGET_SIZE = 64;
@@ -29,9 +38,6 @@ const TintedKind = defineSprite({
 const rgbAtX = (pixels, x) => rgbAt(pixels, TARGET_SIZE, CENTER + x * PIXELS_PER_UNIT, CENTER);
 
 describe('sprites — the draw order', function () {
-  // a cold webgpu start — adapter plus device — happens in the hook, and hooks have their own budget
-  this.timeout(20000);
-
   let display;
   let host;
   let target;
@@ -44,6 +50,7 @@ describe('sprites — the draw order', function () {
   });
 
   afterEach(() => {
+    disposeKept();
     target?.dispose();
     target = undefined;
     disposeDisplay(display);
@@ -56,14 +63,16 @@ describe('sprites — the draw order', function () {
   // (z = 1), blue behind (z = 0), on black. The sprites write their depth, as a transparent material
   // does by default; the reflection pass mirrors both at the plane x = 0 and writes none.
   it('back to front blends the front sprite over the back one, front to back drops the back one, and the pass follows', async function () {
-    const colorMap = makeColorTexture([WHITE]);
-    const sprites = new FeatureSprites(TintedKind, {
-      capacity: 2,
-      textures: {colorMap},
-      transparent: true,
-      uniforms: {mirrorPlane: [1, 0, 0, 0], reflectionColor: [1, 1, 1, 1]},
-      passes: [ReflectionPass],
-    });
+    const colorMap = keep(makeColorTexture([WHITE]));
+    const sprites = keep(
+      new FeatureSprites(TintedKind, {
+        capacity: 2,
+        textures: {colorMap},
+        transparent: true,
+        uniforms: {mirrorPlane: [1, 0, 0, 0], reflectionColor: [1, 1, 1, 1]},
+        passes: [ReflectionPass],
+      }),
+    );
 
     // created front first: the slot order is front to back
     const red = sprites.createSprite();
@@ -88,9 +97,6 @@ describe('sprites — the draw order', function () {
     const frontToBackMoved = sprites.sortBy('z', {descending: true});
     sprites.update();
     const frontToBack = await renderToPixels(display.renderer, scene, camera, target);
-
-    sprites.dispose();
-    colorMap.dispose();
 
     expect(backToFrontMoved, 'sortByViewDepth() put the back sprite first').to.be.true;
     expect(frontToBackMoved, 'sortBy() put the front sprite first').to.be.true;

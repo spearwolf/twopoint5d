@@ -111,6 +111,13 @@ The source holds `c` and one `Matrix4` of its own. The orientation of the normal
 the front face of its `PlaneGeometry`; the ground of `animated-billboards` (`rotation.x = -π/2`)
 has its normal at +Y.
 
+- **Checks** at the call: a target that is neither an `Object3D` (`isObject3D`) nor a `Plane`
+  (`isPlane`), options that are no object and an `options.plane` that is no `Plane` are refused
+  with a `TypeError` (`planeOf: the target must be an Object3D or a Plane, got …`); a normal or a
+  constant that is no finite number with a `RangeError` through `assertFinite()` (`planeOf:
+  plane.normal.x must be a finite number, got NaN`). A normal of (0, 0, 0) passes; the passes draw
+  nothing for it.
+
 ### 2.2 `lightOf()`
 
 ```ts
@@ -127,6 +134,8 @@ The output is a homogeneous light, as `shadowLight` (§4) expects:
   point light. That covers `PointLight`, `SpotLight` (a point source; its cone is ignored) and any
   `Object3D` used as a lamp. An `AmbientLight` or a `HemisphereLight` has no position that means
   anything; `lightOf()` takes it like any node, and the docs say so.
+- **Checks** at the call: a node that is no `Object3D` is refused with a `TypeError` (`lightOf: the
+  node must be an Object3D — a light or a node that marks one —, got …`).
 
 ## 3. Binding on `FeatureSprites`
 
@@ -141,7 +150,7 @@ class FeatureSprites {
 
 - **Checks.** `bindUniform()` throws a `TypeError`, and binds nothing then:
   - for something that is no source — `FeatureSprites: bindUniform("…") takes a source with a type
-    of vec3 or vec4 and a write()`;
+    of vec3 or vec4 and a write(), got {}`;
   - for a name no feature of the sprites or their passes declares, looked up as an own key of the
     uniforms — `FeatureSprites: no feature of these sprites or their passes declares the uniform
     "…"`;
@@ -154,8 +163,9 @@ class FeatureSprites {
   does not throw — a caller who sets a start value before binding is not wrong — and the docs say
   that the binding wins.
 - **Lifecycle.** The nodes and the `Plane` stay the caller's. `dispose()` drops every binding, so
-  the sprites hold no node after it. After `dispose()`, `bindUniform()` and `unbindUniform()` do
-  nothing, as `setUniform()` does.
+  the sprites hold no node after it. After `dispose()`, `bindUniform()` binds nothing and still
+  throws a `TypeError` for something that is no source, and `unbindUniform()` does nothing, as
+  `setUniform()` does.
 - **A material handed in.** Bindings write into the uniforms of the material of the sprites — the
   one they were built with —, so they work with a material handed in as well, for the uniforms that
   material holds, and never reach a material put into the `material` slot later. A material shared
@@ -168,9 +178,15 @@ class FeatureSprites {
    `worldToSprites.copy(this.matrixWorld).invert()` into a `Matrix4` of the instance. For every
    binding `source.write(vector, worldToSprites)`, where `vector` is the `value` of the uniform
    node, looked up once in `bindUniform()` — the uniforms are shared, so every pass reads the value.
-   The bindings live in parallel arrays, walked by index.
+   Each binding is one entry that pairs the source with the vector of its uniform, by type; the
+   list is walked by index.
 2. For every pass with a `visible` hook: its visibility for this frame (§5).
 3. `super.update()`, the upload of the geometry.
+
+A source or a hook that throws stops neither the others nor the upload: once the upload is done,
+`update()` throws what it threw, naming the uniform of the source or the pass of the hook —
+`FeatureSprites: the visible of pass "shadow" threw: …` —, several as an `AggregateError`. A pass
+whose hook threw keeps the visibility of its last judgement.
 
 Without bindings and without a pass that has a hook, `update()` is the upload alone.
 
@@ -256,7 +272,7 @@ class FeatureSpritesPass {
   the sprites at all: `FeatureSprites: the visible of pass "…" reads the uniform "…", which no
   feature of these sprites declares`.
 - `definePass()` refuses a `visible` that is no function (`definePass: the visible of pass "…" is
-  no function`), and freezes the pass along with it.
+  no function, got …`), and freezes the pass along with it.
 - **`ShadowPass`** ships the hook `shadowFallsOnPlane` (`passPresets.ts`, exported), and
   `SegmentShadowPass`, a copy of it, carries it as well. With `groundPlane = (n, d)` and
   `shadowLight = (l, w)`, `h_L = dot(n, l) − w · d`:

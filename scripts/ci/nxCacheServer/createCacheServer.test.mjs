@@ -169,6 +169,71 @@ test('GET refreshes the mtime of the entry it serves', async () => {
   assert.ok(fs.statSync(file).mtimeMs >= Math.floor(testStart / 1000) * 1000);
 });
 
+test('a GET whose entry vanishes as the server refreshes its mtime serves the entry whole', async (t) => {
+  const file = path.join(dir, '123');
+  fs.writeFileSync(file, 'data');
+  const handle = await fs.promises.open(file, 'r');
+  const handlePrototype = Object.getPrototypeOf(handle);
+  await handle.close();
+
+  // a cleanup run removes the entry just as the server touches it, whichever way it does
+  const vanishing = (/** @type {(...args: any[]) => unknown} */ original) =>
+    /** @this {unknown} */
+    function (...args) {
+      fs.rmSync(file, {force: true});
+      return original.apply(this, args);
+    };
+  const onPath = t.mock.method(fs.promises, 'utimes', vanishing(fs.promises.utimes));
+  const onHandle = t.mock.method(handlePrototype, 'utimes', vanishing(handlePrototype.utimes));
+
+  const res = await get('123');
+  assert.equal(res.status, 200);
+  assert.equal(await res.text(), 'data');
+  assert.ok(onPath.mock.callCount() + onHandle.mock.callCount() > 0, 'the server never refreshed the mtime');
+});
+
+test('a GET whose entry cannot be read answers 500 and logs that reason, also when the handle fails to close', async (t) => {
+  const file = path.join(dir, '123');
+  fs.writeFileSync(file, 'data');
+  const handle = await fs.promises.open(file, 'r');
+  const handlePrototype = Object.getPrototypeOf(handle);
+  await handle.close();
+
+  t.mock.method(handlePrototype, 'stat', async () => {
+    throw new Error('stat failed');
+  });
+  // close() is a property of each handle, not of the prototype: the open() of the server hands out
+  // handles whose close() frees the descriptor, then reports its own failure
+  const open = fs.promises.open;
+  t.mock.method(fs.promises, 'open', async (/** @type {Parameters<typeof open>} */ ...args) => {
+    const opened = await open(...args);
+    const close = opened.close.bind(opened);
+    opened.close = async () => {
+      await close();
+      throw new Error('close failed');
+    };
+    return opened;
+  });
+  const logged = t.mock.method(console, 'error', () => {});
+
+  const res = await get('123');
+
+  assert.equal(res.status, 500);
+  assert.equal(logged.mock.callCount(), 1);
+  assert.match(String(logged.mock.calls[0]?.arguments[0]), /^nx cache server: GET \/v1\/cache\/123 failed: stat failed$/);
+});
+
+test('a PUT whose entry cannot be written answers 500 and logs the method, the path and the reason', async (t) => {
+  fs.rmSync(dir, {recursive: true});
+  const logged = t.mock.method(console, 'error', () => {});
+
+  const res = await put('123', 'data');
+
+  assert.equal(res.status, 500);
+  assert.equal(logged.mock.callCount(), 1);
+  assert.match(String(logged.mock.calls[0]?.arguments[0]), /^nx cache server: PUT \/v1\/cache\/123 failed: ENOENT/);
+});
+
 test('PUT without Content-Length answers 411', async () => {
   const status = await new Promise((resolve, reject) => {
     const req = http.request(`${baseUrl}/v1/cache/123`, {method: 'PUT', headers: auth()}, (res) => {
@@ -184,7 +249,8 @@ test('PUT without Content-Length answers 411', async () => {
   assert.deepEqual(fs.readdirSync(dir), []);
 });
 
-test('a PUT the client aborts halfway leaves neither the entry nor a partial file', async () => {
+test('a PUT the client aborts halfway leaves neither the entry nor a partial file', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
   const req = http.request(`${baseUrl}/v1/cache/123`, {
     method: 'PUT',
     headers: {...auth(), 'Content-Length': '1000'},
@@ -196,6 +262,8 @@ test('a PUT the client aborts halfway leaves neither the entry nor a partial fil
   req.destroy();
 
   assert.ok(await waitFor(() => fs.readdirSync(dir).length === 0, 1000), `left behind: ${fs.readdirSync(dir)}`);
+  // a client that went away is no failure of the server
+  assert.equal(logged.mock.callCount(), 0);
 });
 
 test('an unknown method answers 405 and an unknown path 404', async () => {

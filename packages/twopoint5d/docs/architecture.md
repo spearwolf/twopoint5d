@@ -17,13 +17,17 @@ of `public-api.ts` files _is_ the package's API contract:
 
 - Anything not re-exported through a `public-api.ts` is internal. Consumers get no deep
   imports, so internal files can be renamed and reshaped freely.
+- `display/`, `texture/`, `map2d/` (with `chunk-quad-tree/`) and `sprites/` name their
+  exports one by one, because their files export for their neighbours as well: a new
+  export of such a file stays internal until it is listed. A helper listed only because
+  an earlier release published it carries `@deprecated`.
 - A new public symbol is not published until it is added to its module's
   `public-api.ts`. `pnpm checkNameableTypes` fails the build when a published
   declaration references a type that consumers cannot name — usually the symptom of a
   type that was forgotten here.
 - Type-only exports go through `export type` — `export type * from './types.js'`, or a
-  named `export type {…}` list in a module that names its exports one by one, as
-  `display/` does — matching Biome's `useImportType` on the import side.
+  named `export type {…}` list in a module that names its exports one by one, as the
+  four modules above do — matching Biome's `useImportType` on the import side.
 
 ## 2. Layers
 
@@ -110,6 +114,18 @@ Accessors generated per descriptor with `new Function` would help only there, an
 would need `unsafe-eval` in the Content Security Policy of every application that turns
 them on, so the factories are shared on purpose.
 
+Methods on the hot path that take any number of values read them through `arguments`,
+never through a rest parameter: `touch()` and `touchAttributes()` of both geometries,
+`VertexObjectPool#touchVO()` and the generated `set…()` of an attribute of more than
+sixteen values. Once the method of a second geometry class has run, V8 builds the rest
+array on every call — 56 B with a single argument, measured on Node 24 —, while
+`arguments` stays off the heap as long as the method itself reads only its `length` and
+its elements; handing it to another function makes V8 build the object. Read with many
+separate values it costs as well (112 B with twelve values), which is why the generated
+setters of up to sixteen values declare their parameters one by one.
+`src/vertex-objects/hot-path-allocations.spec.ts` measures `touch()`, `touchVO()` and the
+setter of more than sixteen values.
+
 ### `texture/`
 
 `TextureAtlas` and `TileSet` describe where a frame lives inside an image;
@@ -148,7 +164,11 @@ pixels, and `AdaptiveResolution`, which sets the resolution scale by what every 
 — see [the display guide](display.md). The policy — the bounds of the ratio, the budget, the scale,
 the rounding to an eighth, the zoom in whole device pixels — is a pure function in
 `src/display/resolveDrawingBuffer.ts`, which the display measures with and `AdaptiveResolution`
-predicts its steps with.
+predicts its steps with. The handover of a canvas between two displays — waiting for the release
+of the one before, keeping its WebGL context lost but restorable, giving a canvas that was handed
+in back as the display found it — is an internal module, `src/display/canvasHandover.ts`, which
+`Display` enters at two places: `waitForCanvas()` before the init of its renderer and
+`releaseRenderer()` after `dispose()`.
 
 ### `stage/`
 
@@ -212,9 +232,12 @@ function over sprites, not a mesh of its own. The guide is [`docs/text.md`](./te
 Tiled-map integration on top of the sprite layer. `Map2D` holds a `Map2DTileStreamer`
 and its `Map2DTileRenderer`s. Visibility is pluggable: `CameraBasedVisibility` culls
 tiles against the camera frustum, nearest to the camera first and up to
-`maxVisibleTiles` of them, `RectangularVisibilityArea` uses a plain rectangle, and both
-have `*Helpers` classes that visualise what they decided. Once a frame loop has settled,
-neither visibility allocates anything in `computeVisibleTiles()` —
+`maxVisibleTiles` of them, `RectangularVisibilityArea` uses a plain rectangle of at most
+`maxVisibleTiles` tiles, and both have `*Helpers` classes that visualise what they
+decided. `CameraBasedVisibility` searches from the camera outwards over the two heaps of
+`tileDistanceHeaps.ts` and keeps the slot of every tile in a `TileSlotPool`, which hands
+the slot of a tile that leaves the view to one that enters it. Once a frame loop has
+settled, neither visibility allocates anything in `computeVisibleTiles()` —
 `src/map2d/hot-path-allocations.spec.ts` holds them to it —, and a tile that enters the
 view costs its `Map2DTileCoords`. Both name each recomputation with the `serial` of its
 result, and `Map2DTileStreamer` leaves a renderer out of `update()` while the result
@@ -223,7 +246,8 @@ carries the `serial` that renderer last laid out in a closed cycle and it report
 `Map2DTileCoordsUtil` and `tileKeys` define the coordinate and key scheme — every tile
 coordinate has exactly one key, and code that invents a second spelling reintroduces
 duplicate tiles. `chunk-quad-tree/` and `Map2DSpatialHashGrid` are the spatial indexes
-tile providers query. The guide is [`docs/map2d.md`](./map2d.md).
+tile providers query; both empty an `out` array before they fill it. The guide is
+[`docs/map2d.md`](./map2d.md).
 
 ## 3. Resource lifecycle
 
@@ -254,7 +278,7 @@ conditions and cleanup.
 - `*.spec.ts` next to the source, run by Vitest inside this package. Logic, coordinate
   math, buffer bookkeeping, descriptor parsing.
 - `*.test.js` in `packages/twopoint5d-testing/test/`, run by `@web/test-runner` in real
-  Chromium and Firefox. Anything that needs a GPU context: geometry uploads, shader
+  Chromium, Firefox and WebKit. Anything that needs a GPU context: geometry uploads, shader
   compilation, visual results.
 
 A change to rendering or GPU-buffer code needs both.

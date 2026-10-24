@@ -65,8 +65,8 @@ export class TileSlotTable<T extends TileSlotTableEntry<T>> {
    * of the same coordinate yet; `get()` would find only one of the two.
    */
   add(entry: T): void {
-    if (this.#size >= this.#buckets.length) this.grow();
-    this.link(entry);
+    if (this.#size >= this.#buckets.length) this.#grow();
+    this.#link(entry);
     this.#size += 1;
   }
 
@@ -95,7 +95,7 @@ export class TileSlotTable<T extends TileSlotTableEntry<T>> {
     }
   }
 
-  private link(entry: T): void {
+  #link(entry: T): void {
     const buckets = this.#buckets;
     const bucket = bucketOf(entry.x, entry.y, buckets.length - 1);
     entry.nextInBucket = buckets[bucket];
@@ -103,7 +103,7 @@ export class TileSlotTable<T extends TileSlotTableEntry<T>> {
   }
 
   /** Doubles the buckets and hangs every entry in again. */
-  private grow(): void {
+  #grow(): void {
     const previous = this.#buckets;
     this.#buckets = new Array<T | undefined>(previous.length * 2).fill(undefined);
     for (let i = 0; i < previous.length; ++i) {
@@ -111,7 +111,7 @@ export class TileSlotTable<T extends TileSlotTableEntry<T>> {
       let entry = previous[i];
       while (entry !== undefined) {
         const next = entry.nextInBucket;
-        this.link(entry);
+        this.#link(entry);
         entry = next;
       }
     }
