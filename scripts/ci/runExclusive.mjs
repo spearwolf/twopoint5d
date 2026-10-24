@@ -11,6 +11,7 @@
 // process holds <path>, when <command> cannot start, or when an argument is missing.
 
 import fs from 'node:fs';
+import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {parseArgs} from 'node:util';
 
@@ -79,6 +80,9 @@ function readOwner() {
 function acquire() {
   const owner = {pid: process.pid, startedAt: new Date().toISOString(), command: positionals.join(' ')};
   const draft = `${lockPath}.${process.pid}`;
+  // the lock runs before Nx, which creates .nx only on its first run: a fresh clone or a
+  // new worktree has no such directory yet
+  fs.mkdirSync(path.dirname(lockPath), {recursive: true});
   fs.writeFileSync(draft, `${JSON.stringify(owner)}\n`);
   try {
     for (let attempt = 0; attempt < 5; attempt++) {

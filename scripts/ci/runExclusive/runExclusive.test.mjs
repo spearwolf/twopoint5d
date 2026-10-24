@@ -47,6 +47,13 @@ describe('runExclusive.mjs', () => {
     assert.deepEqual(fs.readdirSync(dir), []);
   });
 
+  it('creates the directory of the lock when the checkout has none yet, as a fresh clone has no .nx', () => {
+    const nested = path.join(dir, '.nx', 'gate.lock');
+    const {status, stderr} = run('process.exit(0)', ['--lock', nested]);
+    assert.equal(status, 0, stderr);
+    assert.deepEqual(fs.readdirSync(path.dirname(nested)), []);
+  });
+
   it('refuses while a live process holds the lock, runs nothing and leaves the lock alone: exit code 1', () => {
     const owner = {pid: process.pid, startedAt: '2026-10-24T07:02:46.000Z', command: 'pnpm run ci:gate'};
     writeLock(owner);
