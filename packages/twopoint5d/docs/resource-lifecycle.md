@@ -107,7 +107,9 @@ mesh; the renderer, the camera and the meshes stay the caller's. It listens to t
 `dispose` event of each mesh and of the geometry it draws, and releases the pick mesh
 and the pick material then — the event of the mesh comes before the mesh releases the
 resources the pick material reads, and the one of the geometry comes with a growth; the
-next pick builds them anew. Its `dispose()` releases the target and every pick material,
+next pick builds them anew. Up to one of those events it holds each mesh it has drawn,
+whether a later pick lists it or not: a mesh its owner drops without `dispose()` lives as long
+as the picker. Its `dispose()` releases the target and every pick material,
 stops listening, and rejects every pick still in flight (section 3).
 
 ## 2. Idempotence

@@ -111,6 +111,13 @@ The source holds `c` and one `Matrix4` of its own. The orientation of the normal
 the front face of its `PlaneGeometry`; the ground of `animated-billboards` (`rotation.x = -π/2`)
 has its normal at +Y.
 
+- **Checks** at the call: a target that is neither an `Object3D` (`isObject3D`) nor a `Plane`
+  (`isPlane`), options that are no object and an `options.plane` that is no `Plane` are refused
+  with a `TypeError` (`planeOf: the target must be an Object3D or a Plane, got …`); a normal or a
+  constant that is no finite number with a `RangeError` through `assertFinite()` (`planeOf:
+  plane.normal.x must be a finite number, got NaN`). A normal of (0, 0, 0) passes; the passes draw
+  nothing for it.
+
 ### 2.2 `lightOf()`
 
 ```ts
@@ -127,6 +134,8 @@ The output is a homogeneous light, as `shadowLight` (§4) expects:
   point light. That covers `PointLight`, `SpotLight` (a point source; its cone is ignored) and any
   `Object3D` used as a lamp. An `AmbientLight` or a `HemisphereLight` has no position that means
   anything; `lightOf()` takes it like any node, and the docs say so.
+- **Checks** at the call: a node that is no `Object3D` is refused with a `TypeError` (`lightOf: the
+  node must be an Object3D — a light or a node that marks one —, got …`).
 
 ## 3. Binding on `FeatureSprites`
 

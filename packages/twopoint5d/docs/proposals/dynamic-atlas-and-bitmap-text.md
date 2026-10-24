@@ -429,8 +429,11 @@ pair — is refused with a `RangeError`, every other refusal with an `Error`:
   answers 0 for a number that is no code point, so no number meets the pair of two others.
 
 A numeric entity in the XML that is no Unicode scalar value — beyond U+10FFFF, a surrogate — stays
-as it is written, as an entity the reader does not know does: entities stand only in text
-attributes (`face`, `charset`, `file`), and a number field holding one is refused by its name.
+as it is written, as does every named entity outside the five, `&constructor;` among them:
+entities stand only in text attributes (`face`, `charset`, `file`), and a number field holding one
+is refused by its name. The text and the XML reader define every attribute as a field of its
+block, as `JSON.parse()` makes a key a field, so an attribute named `__proto__` is a field like
+any other and sets no prototype.
 
 ## 5. `layoutText()` and `writeText()` (module `text/`)
 

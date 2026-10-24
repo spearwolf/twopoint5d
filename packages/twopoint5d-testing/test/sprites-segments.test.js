@@ -274,6 +274,13 @@ describe('sprites — segments lie along their ends', function () {
       // above (−3, 0, −4) the camera from above sees the point at (−3, 4) of its view
       expectModel(await render(sprites, 'above'), segmentModel([-3, 4], [-3, 4], 4, 2, RED, GREEN));
     });
+
+    it('draws a segment of no length on a mesh scaled by 2 as its caps quad scaled by 2, the right of the camera along it', async function () {
+      const sprites = makeSegments(FACING, [RED, GREEN], [{start: [0, 0, 0], end: [0, 0, 0], size: [3, 2]}]);
+      sprites.scale.setScalar(2);
+
+      expectModel(await render(sprites, 'front'), segmentModel([0, 0], [0, 0], 6, 4, RED, GREEN));
+    });
   });
 
   describe('SegmentShadowPass', () => {

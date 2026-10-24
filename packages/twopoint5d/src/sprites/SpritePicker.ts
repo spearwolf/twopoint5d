@@ -134,7 +134,9 @@ function isShown(object: Object3D): boolean {
  * The renderer stays the caller's; the picker owns its render target, and a pick material and a pick
  * mesh per mesh it has drawn, which go when that mesh is disposed, when the geometry they draw is
  * disposed — a growth does that —, or with {@link dispose}; the next pick of the mesh builds them
- * anew.
+ * anew. Until then the picker holds the mesh, and with it its geometry, its pool and its textures,
+ * whether a later pick lists it or not: a mesh taken out of the scene and never disposed lives as
+ * long as the picker. Dispose a mesh that is done with, or the picker.
  */
 export class SpritePicker {
   /** The renderer it draws with; it stays the caller's. */
@@ -181,7 +183,8 @@ export class SpritePicker {
    * is left alone — under a reversed depth buffer the pick turns its projection over itself. Only
    * the sprites are drawn, not their passes. A mesh that is disposed, not visible (or under a parent
    * that is not), whose material is not visible, or that holds no sprite is left out; a mesh listed
-   * twice is drawn once, at its first place. A pointer outside the view answers `undefined` without
+   * twice is drawn once, at its first place. A mesh drawn once is held until it or the picker is
+   * disposed, also when no later pick lists it. A pointer outside the view answers `undefined` without
    * a draw. The state of the renderer the pick changes — render target, MRT, clear color, the
    * `autoClear` flags — is restored before it returns.
    *

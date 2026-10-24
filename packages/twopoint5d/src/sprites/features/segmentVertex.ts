@@ -37,7 +37,7 @@ export function segmentVertex(params: {
   end: Vec3;
   along: Node<'float'>;
   facing: SegmentFacing;
-  /** The camera in the local space of the mesh, for `facing: 'camera'`. */
+  /** The camera in the local space of the mesh, for `facing: 'camera'`: `right` and `up` are unit vectors. */
   camera?: {readonly position: Vec3; readonly right: Vec3; readonly up: Vec3};
 }): Vec3 {
   const {local, start, end, along, facing, camera} = params;

@@ -104,6 +104,45 @@ describe('planeOf()', () => {
 
     expectNear(normalized(written(source)), [0, 0, 1, 0]);
   });
+
+  test.each([
+    ['undefined', undefined, 'undefined'],
+    ['null', null, 'null'],
+    ['an empty object', {}, '{}'],
+    ['a number', 5, '5'],
+  ])('refuses a target that is neither an Object3D nor a Plane: %s', (_, target, quoted) => {
+    expect(() => planeOf(target as never)).toThrow(
+      new TypeError(`planeOf: the target must be an Object3D or a Plane, got ${quoted}`),
+    );
+  });
+
+  test.each([
+    ['a number', () => planeOf(new Object3D(), 5 as never), 'planeOf: the options must be an object, {plane?}, got 5'],
+    ['an empty object', () => planeOf(new Object3D(), {plane: {} as never}), 'planeOf: options.plane must be a Plane, got {}'],
+    [
+      'a Vector3',
+      () => planeOf(new Object3D(), {plane: new Vector3() as never}),
+      /^planeOf: options\.plane must be a Plane, got /,
+    ],
+  ])('refuses options that are no object and an options.plane that is no Plane: %s', (_, build, message) => {
+    expect(build).toThrow(typeof message === 'string' ? new TypeError(message) : message);
+  });
+
+  test.each([
+    ['a NaN in the normal', new Plane(new Vector3(Number.NaN, 0, 1), 0), 'normal.x', 'NaN'],
+    ['an infinite constant', new Plane(new Vector3(0, 0, 1), Number.POSITIVE_INFINITY), 'constant', 'Infinity'],
+  ])('refuses a plane whose normal or constant is no finite number, in either form: %s', (_, plane, field, quoted) => {
+    expect(() => planeOf(plane)).toThrow(new RangeError(`planeOf: plane.${field} must be a finite number, got ${quoted}`));
+    expect(() => planeOf(new Object3D(), {plane})).toThrow(
+      new RangeError(`planeOf: options.plane.${field} must be a finite number, got ${quoted}`),
+    );
+  });
+
+  test('takes a plane whose normal is (0, 0, 0)', () => {
+    const flat = new Plane(new Vector3(0, 0, 0), 1);
+    expect(() => planeOf(flat)).not.toThrow();
+    expect(() => planeOf(new Object3D(), {plane: flat})).not.toThrow();
+  });
 });
 
 describe('lightOf()', () => {
@@ -138,5 +177,22 @@ describe('lightOf()', () => {
 
     // 2 along world x is 2 along the sprites' z, after a quarter turn about y
     expectNear(written(lightOf(lamp), worldToSprites), [0, 0, 2, 1]);
+  });
+
+  test.each([
+    ['undefined', undefined, 'undefined'],
+    ['null', null, 'null'],
+    ['an empty object', {}, '{}'],
+  ])('refuses a node that is no Object3D with a TypeError that names lightOf and quotes it: %s', (_, node, quoted) => {
+    expect(() => lightOf(node as never)).toThrow(
+      new TypeError(`lightOf: the node must be an Object3D — a light or a node that marks one —, got ${quoted}`),
+    );
+  });
+
+  test.each([
+    ['a plain object that only claims to be a light', {isDirectionalLight: true}],
+    ['a Vector3', new Vector3()],
+  ])('refuses a node that is no Object3D: %s', (_, node) => {
+    expect(() => lightOf(node as never)).toThrow(/^lightOf: the node must be an Object3D/);
   });
 });

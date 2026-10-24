@@ -177,7 +177,7 @@ mesh applied to `cameraPosition`, as `BillboardPlacement` takes it):
 look   = normalize(c − p)                    towards the camera
 across = cross(a, look)                      level, its length the sine between a and look
 w      = max(1 − length(across) / 0.1, 0)    1 straight along the axis, 0 from a sine of 0.1 on
-r_c    = camera right less its part along a  (row x of the model-view rotation, levelled)
+r_c    = camera right less its part along a  (row x of the model-view rotation, normalized, then levelled)
 r_c'   = −r_c where dot(r_c, across) < 0, r_c otherwise
 right  = normalize(across + w · r_c')
 placed = p + right · local.x + a · local.y
@@ -201,7 +201,8 @@ placed = p + right · local.x + a · local.y
 - Cost: a normalize, a length, a select and a second normalize per vertex — about what
   `BillboardPlacement` costs. No data, no attribute.
 - `cameraRightLocal()` joins `cameraUpLocal()` and `cameraBackLocal()` in `cameraNodes.ts`
-  (internal).
+  (internal); all three normalize their row of the model-view rotation, which a mesh scaled
+  evenly by s scales by s.
 
 ### 3.3 Passes
 

@@ -187,6 +187,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CameraBasedVisibility` keeps the tiles nearest to the camera under `maxVisibleTiles` also on a map node that is tilted or stands upright: the margin by which the search goes on beyond the furthest kept tile is the diagonal of a tile in the plane of the map
 - `FeatureSprites#update()` uploads the sprites of the frame when a bound source or a `visible` hook throws, lets every other source and hook run, and throws afterwards, naming the uniform or the pass (several as an `AggregateError`); a pass whose hook threw keeps the visibility of its last judgement
 - a material parameter handed to `FeatureSpritesMaterial` or `FeatureSprites` as `undefined` leaves the one of the pass in place and is not passed to `setValues()`
+- `BitmapFont.parse()` keeps an attribute named `__proto__` of the text and the XML format as a field of its block, as `JSON.parse()` keeps such a key of the JSON format: no attribute sets the prototype of a block
+- `BitmapFont.parse()` leaves a named entity of the XML that is none of the five of XML — `&constructor;`, `&toString;`, `&__proto__;` — as it is written, as it leaves every entity it does not know
+- `new BitmapFont()` and `BitmapFont.parse()` read a font of any number of chars, a pan-Unicode font of several hundred thousand among them, and refuse one of several pages with the message of its pages
+- on a mesh scaled evenly, `segmentPlacement({facing: 'camera'})` draws the caps quad of a segment of no length at the scale of the mesh, and it, `axisBillboardPlacement()` and the placement of `ShadowPass` weigh the camera within their turnover at a sine of 0.1 as on a mesh of scale 1: the right, the up and the back of the camera they read are unit vectors in the local space of the mesh
+- `lightOf()` refuses a node that is no `Object3D`, and `planeOf()` a target that is neither an `Object3D` nor a `Plane`, options that are no object and an `options.plane` that is no `Plane`, each with a `TypeError` that names the function and quotes the value; `planeOf()` refuses a plane whose normal or constant is no finite number with a `RangeError` that names the field. Both refuse at the call, before the source reaches `bindUniform()`
 
 ### Migration Guide
 

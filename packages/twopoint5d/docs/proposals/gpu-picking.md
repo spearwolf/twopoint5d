@@ -103,7 +103,7 @@ canvas.addEventListener('pointerdown', async (event) => {
 
 ### 3.1 The pick material
 
-One per listed mesh, built at its first pick and kept until the mesh or the picker is disposed:
+One per listed mesh, built at its first pick and kept until the mesh or the picker is disposed — and the mesh with it, whether a later pick lists it or not:
 
 - a `FeatureSpritesMaterial` of the kind of the mesh, **on the `SpriteResources` of the mesh's
   material** — the same uniforms and textures, so a `setUniform()`, `setTexture()` or bound uniform

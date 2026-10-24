@@ -1831,7 +1831,9 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   are taken as they are at the call. The picker builds a pick mesh and a pick material per mesh on
   the geometry, the uniforms and the textures of that mesh — a `setUniform()` or `setTexture()`
   reaches the pick as it reaches the sprites —, follows a swapped placement, releases them when the
-  mesh is disposed, and builds them anew after a growth or a geometry put into the slot. `dispose()`
+  mesh is disposed, and builds them anew after a growth or a geometry put into the slot. Until then
+  the picker holds the mesh, listed again or not: a mesh taken out of the scene and never disposed
+  lives as long as the picker — dispose it, or the picker. `dispose()`
   releases the target and every pick material and rejects every pick still in flight; a `pick()`
   after it answers `undefined`. A camera, a pointer or a list of the wrong shape is refused with a
   `TypeError` that names the fix.
@@ -2542,6 +2544,11 @@ nothing for it.
 
 An `AmbientLight` or a `HemisphereLight` is taken as any node; its position means nothing, and
 neither does the shadow it throws.
+
+Both check what they are handed when they are called: `lightOf()` refuses a node that is no
+`Object3D`, `planeOf()` a target that is neither an `Object3D` nor a `Plane`, options that are no
+object and an `options.plane` that is no `Plane`, each with a `TypeError`, and a plane whose normal
+or constant is no finite number with a `RangeError`.
 
 The rules of `bindUniform()` and `unbindUniform()`:
 

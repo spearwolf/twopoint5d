@@ -200,11 +200,11 @@ export class BitmapFont {
     const face = typeof info.face === 'string' ? info.face : '';
     const pages = Array.isArray(data.pages) ? data.pages : [];
 
-    const pageCount = Math.max(
-      pages.length,
-      isFiniteNumber(common.pages) ? common.pages : 0,
-      ...data.chars.map((char) => (isFiniteNumber(char?.page) ? char.page + 1 : 0)),
-    );
+    // a loop, no spread into Math.max(): a pan-Unicode font holds more chars than a call takes arguments
+    let pageCount = Math.max(pages.length, isFiniteNumber(common.pages) ? common.pages : 0);
+    for (const char of data.chars) {
+      if (isFiniteNumber(char?.page) && char.page + 1 > pageCount) pageCount = char.page + 1;
+    }
     if (pageCount > 1) {
       throw new Error(
         `${WHERE}: the font "${face}" has ${pageCount} pages — writeText() draws out of one texture; export the font onto one page (BMFont: a larger texture)`,

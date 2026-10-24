@@ -1,5 +1,9 @@
 import type {DirectionalLight, Object3D, Vector4} from 'three/webgpu';
+import {describeValue} from '../../utils/describeValue.js';
 import type {SpriteUniformSource} from './SpriteUniformSource.js';
+
+const isObject3D = (value: unknown): value is Object3D =>
+  (value as {isObject3D?: unknown} | null | undefined)?.isObject3D === true;
 
 const isDirectionalLight = (node: Object3D): node is DirectionalLight => (node as DirectionalLight).isDirectionalLight === true;
 
@@ -13,8 +17,13 @@ const isDirectionalLight = (node: Object3D): node is DirectionalLight => (node a
  *   `w = 1` and its position, a point light.
  *
  * An `AmbientLight` or a `HemisphereLight` is taken as any node; its position means nothing.
+ *
+ * @throws {TypeError} for a node that is no `Object3D`.
  */
 export function lightOf(node: Object3D): SpriteUniformSource {
+  if (!isObject3D(node)) {
+    throw new TypeError(`lightOf: the node must be an Object3D — a light or a node that marks one —, got ${describeValue(node)}`);
+  }
   if (isDirectionalLight(node)) {
     return {
       type: 'vec4',

@@ -239,7 +239,7 @@ normal = dir × across
 | --- | --- | --- |
 | `'plane'`, `'xy'` | `(−D.y, D.x, 0)` normalized — the left of the direction, so a segment from left to right shows its image upright, facing +Z | `dir = +X`, `across = +Y`: the caps quad, in the plane |
 | `'plane'`, `'xz'` | `(D.z, 0, −D.x)` normalized — a segment along +X shows its top towards −Z and faces +Y, as `GroundPlacement` lays a sprite | `dir = +X`, `across = −Z` |
-| `'camera'` | `look × dir` normalized, `look` the unit vector from `point` to the camera position in the mesh — the quad turns about the segment until its face looks at the camera | `dir` = the right of the camera |
+| `'camera'` | `look × dir` normalized, `look` the unit vector from `point` to the camera position in the mesh — the quad turns about the segment until its face looks at the camera | `dir` = the right of the camera, a unit vector |
 
 - **The plane fallback across** applies on its own as well: a segment along the normal of its plane
   (along Z for `'xy'`) has no across in the plane and takes `+Y` (`'xy'`) or `−Z` (`'xz'`).

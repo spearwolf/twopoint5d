@@ -201,6 +201,13 @@ describe('BitmapFont', () => {
       expect(font.kerning('A', 'A')).toBe(1);
     });
 
+    test('leaves a named entity outside the five of XML as it is written, a name of Object.prototype as well', () => {
+      const [font] = BitmapFont.parse(
+        `<font><info face="A&constructor;B&toString;C&__proto__;D&amp;E"/><common lineHeight="4" base="3" scaleW="4" scaleH="4"/></font>`,
+      );
+      expect(font.face).toBe('A&constructor;B&toString;C&__proto__;D&E');
+    });
+
     test('keeps a numeric entity that is no code point as it is written', () => {
       const [font] = BitmapFont.parse(
         `<font><info face="A&#x110000;B&#xD800;C&#1114112;D&#99999999999999999999;"/><common lineHeight="4" base="3" scaleW="4" scaleH="4"/></font>`,
@@ -222,6 +229,38 @@ describe('BitmapFont', () => {
       expect(font.face).toBe('a&nbsp;b');
       expect(font.info.charset).toBe('');
       expect(font.page).toBe('p.png');
+    });
+
+    test('keeps an attribute named __proto__ as a field of its block in all three spellings, and sets no prototype', () => {
+      const text = [
+        'info face=tiny size=4 __proto__=1,2',
+        'common lineHeight=6 base=5 scaleW=16 scaleH=8 pages=1',
+        'page id=0 file="tiny.png"',
+        'char id=65 x=1 y=1 width=3 height=4 xoffset=0 yoffset=1 xadvance=4 page=0 chnl=15 __proto__=1,2',
+      ].join('\n');
+      const xml = `<font><info face="tiny" size="4" __proto__="1,2"/><common lineHeight="6" base="5" scaleW="16" scaleH="8" pages="1"/><page id="0" file="tiny.png"/></font>`;
+      const json = `{"info": {"face": "tiny", "size": 4, "__proto__": [1, 2]}, "common": {"lineHeight": 6, "base": 5, "scaleW": 16, "scaleH": 8, "pages": 1}, "pages": ["tiny.png"], "chars": []}`;
+      for (const source of [text, xml, json]) {
+        const [font] = BitmapFont.parse(source);
+        expect(Object.getPrototypeOf(font.info)).toBe(Object.prototype);
+        expect(Object.getOwnPropertyDescriptor(font.info, '__proto__')?.value).toEqual([1, 2]);
+        expect(font.info.face).toBe('tiny');
+      }
+      const [font] = BitmapFont.parse(text);
+      const data = font.glyph('A')?.frame.data as unknown as Record<string, unknown>;
+      expect(data).toMatchObject({
+        id: 65,
+        x: 1,
+        y: 1,
+        width: 3,
+        height: 4,
+        xoffset: 0,
+        yoffset: 1,
+        xadvance: 4,
+        page: 0,
+        chnl: 15,
+      });
+      expect(Object.getPrototypeOf(data)).toBe(Object.prototype);
     });
 
     test('a page without a file names an empty one', () => {
@@ -281,6 +320,14 @@ describe('BitmapFont', () => {
       ['42 to parse()', () => BitmapFont.parse(42 as never), 'BitmapFont: the font data is 42 — '],
     ])('font data that is no object: %s', (_, build, start) => {
       expect(build).toThrow(`${start}a font is an object in the JSON layout, {pages, chars, common}`);
+    });
+
+    test('a font of several hundred thousand chars, the last on page 1, is refused for its pages', () => {
+      const data = tinyFont();
+      const chars = Array.from({length: 500_000}, () => ({page: 0}));
+      chars.push({page: 1});
+      data.chars = chars as never;
+      expect(() => new BitmapFont(data)).toThrow('BitmapFont: the font "tiny" has 2 pages');
     });
 
     test('no common block', () => {
