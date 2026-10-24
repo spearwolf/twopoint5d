@@ -102,12 +102,12 @@ export class TexturePackerJson {
       parentCoords = new TextureCoords(0, 0, w, h);
     }
 
-    const isArray = Array.isArray(data.frames);
+    const isArray = Array.isArray(jsonFrames);
     // the entries are read as a catalog may hand them in: a frame that is no object is refused below, by name
     // or by index, and a filename is only read from an object
-    const entries: [name: unknown, frameData: unknown][] = Array.isArray(data.frames)
-      ? data.frames.map((frameData: unknown) => [isObject(frameData) ? frameData['filename'] : undefined, frameData])
-      : Object.entries(data.frames);
+    const entries: [name: unknown, frameData: unknown][] = Array.isArray(jsonFrames)
+      ? jsonFrames.map((frameData: unknown) => [isObject(frameData) ? frameData['filename'] : undefined, frameData])
+      : Object.entries(jsonFrames as Record<string, unknown>);
 
     // every frame is checked before the first add(), so a refused json leaves the target as it was
     const checked: [name: string, frameData: D][] = [];

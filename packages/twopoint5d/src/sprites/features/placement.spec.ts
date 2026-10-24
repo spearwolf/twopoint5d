@@ -182,9 +182,8 @@ describe('flatPlacement()', () => {
     ['x', '"x"'],
     [null, 'null'],
   ])('refuses options of %o that are no object', (options, shown) => {
-    expect(() => flatPlacement(options as never)).toThrow(TypeError);
     expect(() => flatPlacement(options as never)).toThrow(
-      `flatPlacement: the options must be an object, {plane?, orientation?}, got ${shown}`,
+      new TypeError(`flatPlacement: the options must be an object, {plane?, orientation?}, got ${shown}`),
     );
   });
 
@@ -395,9 +394,8 @@ describe('axisBillboardPlacement()', () => {
     ['x', '"x"'],
     [null, 'null'],
   ])('refuses options of %o that are no object', (options, shown) => {
-    expect(() => axisBillboardPlacement(options as never)).toThrow(TypeError);
     expect(() => axisBillboardPlacement(options as never)).toThrow(
-      `axisBillboardPlacement: the options must be an object, {axis?}, got ${shown}`,
+      new TypeError(`axisBillboardPlacement: the options must be an object, {axis?}, got ${shown}`),
     );
   });
 

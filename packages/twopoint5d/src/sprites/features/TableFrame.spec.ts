@@ -78,8 +78,9 @@ describe('tableFrame()', () => {
     ['x', '"x"'],
     [null, 'null'],
   ])('refuses options of %o that are no object', (options, shown) => {
-    expect(() => tableFrame(options as never)).toThrow(TypeError);
-    expect(() => tableFrame(options as never)).toThrow(`tableFrame: the options must be an object, {views?}, got ${shown}`);
+    expect(() => tableFrame(options as never)).toThrow(
+      new TypeError(`tableFrame: the options must be an object, {views?}, got ${shown}`),
+    );
   });
 
   test('takes options that are undefined', () => {

@@ -99,7 +99,7 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
       const declaration = declarationOf(declared);
       if (declaration == null) {
         throw new TypeError(
-          `${where}: feature "${feature.name}" starts the uniform "${name}" with ${describeValue(declared)}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`,
+          `${where}: feature "${feature.name}" starts the uniform "${name}" with ${describeValue(declared)}; a uniform takes a finite number, 2 to 4 finite numbers, or {value, shared}`,
         );
       }
       if (known != null) {

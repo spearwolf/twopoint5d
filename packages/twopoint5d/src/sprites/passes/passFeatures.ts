@@ -26,11 +26,11 @@ const isStringList = (value: unknown): value is readonly string[] =>
  * Checks what a pass can be checked for on its own, in the words of `where`: that it is an object
  * with a name, a `visible` that is a function, `features` that are a list of features of distinct
  * names, each checked as `defineFeature()` checks one, that bring no data and at most one placement
- * among them, a `without` that is a list of names and names no feature twice, `uniformNames` and
- * `material` that are objects, the renames among them sound, and a `renderOrder` that is a finite
- * number. A `without`, `uniformNames`, `material` or `renderOrder` of `null` is one the pass does
- * not bring. `definePass()` runs it, and so does every place that takes a pass, since a plain
- * object passes for one.
+ * among them, a `without` that is a list of names and names no feature twice, `uniformNames` that
+ * are an object whose renames are sound, a `material` that is an object, and a `renderOrder` that
+ * is a finite number. A `without`, `uniformNames`, `material` or `renderOrder` of `null` is one the
+ * pass does not bring. `definePass()` runs it, and so does every place that takes a pass, since a
+ * plain object passes for one.
  *
  * @internal
  *
@@ -83,12 +83,6 @@ export function checkPass(pass: unknown, where: string): asserts pass is SpriteP
       `${where}: the uniformNames of pass "${name}" are no record of uniform names, got ${describeValue(uniformNames)}`,
     );
   }
-  if (material != null && !isRecord(material)) {
-    throw new TypeError(
-      `${where}: the material of pass "${name}" is no record of material parameters, got ${describeValue(material)}`,
-    );
-  }
-  if (renderOrder != null) assertFinite(renderOrder, where, `the renderOrder of pass "${name}"`);
   // own keys only: a member of Object.prototype such as "toString" is no uniform of a feature
   const declares = (uniform: string) =>
     (features as readonly SpriteFeature[]).some(({uniforms}) => uniforms != null && Object.hasOwn(uniforms, uniform));
@@ -116,6 +110,12 @@ export function checkPass(pass: unknown, where: string): asserts pass is SpriteP
     }
     targets.set(target, uniform);
   }
+  if (material != null && !isRecord(material)) {
+    throw new TypeError(
+      `${where}: the material of pass "${name}" is no record of material parameters, got ${describeValue(material)}`,
+    );
+  }
+  if (renderOrder != null) assertFinite(renderOrder, where, `the renderOrder of pass "${name}"`);
 }
 
 // one copy per placement feature of a kind, so that every pass material sees the same object

@@ -77,10 +77,13 @@ export function createCacheServer({dir, token, maxEntryBytes = MAX_ENTRY_BYTES})
       // saves the cache
       const now = new Date();
       await handle.utimes(now, now);
-      stream = handle.createReadStream();
-    } finally {
       // the stream closes the handle itself, once it has taken it over
-      if (stream === undefined) await handle.close();
+      stream = handle.createReadStream();
+    } catch (err) {
+      // the reason the entry could not be served is err; a handle that fails to close as well
+      // adds nothing the log could act on
+      await handle.close().catch(() => {});
+      throw err;
     }
     res.writeHead(200, {'Content-Type': 'application/octet-stream', 'Content-Length': size});
     await pipeline(stream, res).catch((err) => {

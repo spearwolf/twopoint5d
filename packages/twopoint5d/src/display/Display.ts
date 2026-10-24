@@ -251,7 +251,9 @@ export interface Display extends EventizedObject {}
  * 3. Otherwise the content-area of {@link Display.resizeToElement} is
  *    measured via `getBoundingClientRect()` minus padding/border; on an
  *    element a CSS transform scales, padding and border come off in the
- *    scale of that transform, as in `getContentAreaSize()`.
+ *    scale of that transform, as in `getContentAreaSize()`. A rotated element
+ *    is measured by the bounding box `getBoundingClientRect()` gives it, its
+ *    padding and border in the ratio of that box to its layout size, as there.
  *
  * From the size of the source in CSS pixels, the pipeline goes on like this:
  * the canvas `box-sizing` decides whether its padding and border come off

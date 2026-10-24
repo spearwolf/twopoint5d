@@ -173,8 +173,9 @@ const framesOfTag = (tag: AsepriteFrameTag, playbackOverride: AnimationPlayback 
 // w and h are not below 0.
 const assertSliceRect = (value: unknown, field: string, where: string): void => {
   if (!isObject(value)) {
+    const verb = field === 'bounds' ? 'are' : 'is';
     throw new TypeError(
-      `AsepriteJson: the ${field} of ${where} is ${describeValue(value)} — a rectangle of a slice is an object {x, y, w, h}`,
+      `AsepriteJson: the ${field} of ${where} ${verb} ${describeValue(value)} — a rectangle of a slice is an object {x, y, w, h}`,
     );
   }
   for (const side of ['x', 'y'] as const) {

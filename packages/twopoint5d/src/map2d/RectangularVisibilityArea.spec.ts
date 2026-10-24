@@ -377,6 +377,50 @@ describe('RectangularVisibilityArea', () => {
       expect(views(result.tiles)).toEqual(views(fresh.tiles));
     });
 
+    test('a return to the grid of the last result after a refused grid change lays every tile out again', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const gridA = new Map2DTileCoordsUtil(100, 100);
+      const gridB = new Map2DTileCoordsUtil(50, 50);
+      area.maxVisibleTiles = 16;
+
+      const previousTiles = [...area.computeVisibleTiles([], [0, 0], gridA, matrixWorld)!.tiles];
+      expect(() => area.computeVisibleTiles(previousTiles, [0, 0], gridB, matrixWorld), 'the call on grid B').toThrow(RangeError);
+
+      // the area knows the grid of its last result only from the snapshot the refused call has
+      // overwritten, and takes the return for a change: no tile is reused by mistake
+      const result = area.computeVisibleTiles(previousTiles, [0, 0], gridA, matrixWorld)!;
+      const fresh = new RectangularVisibilityArea(320, 240);
+      fresh.maxVisibleTiles = 16;
+      const expected = fresh.computeVisibleTiles([], [0, 0], gridA, matrixWorld)!;
+
+      expect(result.reuseTiles).toHaveLength(0);
+      expect(ids(result.removeTiles)).toEqual(ids(previousTiles));
+      expect(result.changed).toBe(true);
+      expect(views(result.tiles)).toEqual(views(expected.tiles));
+    });
+
+    test('a grid change a refused call saw survives a switch-off', () => {
+      const area = new RectangularVisibilityArea(320, 240);
+      const gridA = new Map2DTileCoordsUtil(100, 100);
+      const gridB = new Map2DTileCoordsUtil(50, 50);
+      area.maxVisibleTiles = 16;
+
+      const previousTiles = [...area.computeVisibleTiles([], [0, 0], gridA, matrixWorld)!.tiles];
+      expect(() => area.computeVisibleTiles(previousTiles, [0, 0], gridB, matrixWorld), 'the call on grid B').toThrow(RangeError);
+
+      area.width = 0;
+      area.computeVisibleTiles(previousTiles, [0, 0], gridB, matrixWorld);
+      area.width = 320;
+      area.maxVisibleTiles = 100;
+
+      // the snapshot shows grid B; only the note of the refused call still says that the tiles come from grid A
+      const result = area.computeVisibleTiles(previousTiles, [0, 0], gridB, matrixWorld)!;
+
+      expect(result.reuseTiles).toHaveLength(0);
+      expect(ids(result.removeTiles)).toEqual(ids(previousTiles));
+      expect(result.changed).toBe(true);
+    });
+
     test.each([0, -1, 1.5, NaN, '5'])('the setter refuses %p and keeps the value it had', (value) => {
       const area = new RectangularVisibilityArea();
       area.maxVisibleTiles = 50;

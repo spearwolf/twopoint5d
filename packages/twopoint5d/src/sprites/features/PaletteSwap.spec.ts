@@ -65,8 +65,9 @@ describe('paletteSwap()', () => {
     ['x', '"x"'],
     [null, 'null'],
   ])('refuses options of %o that are no object', (options, shown) => {
-    expect(() => paletteSwap(options as never)).toThrow(TypeError);
-    expect(() => paletteSwap(options as never)).toThrow(`paletteSwap: the options must be an object, {colors?}, got ${shown}`);
+    expect(() => paletteSwap(options as never)).toThrow(
+      new TypeError(`paletteSwap: the options must be an object, {colors?}, got ${shown}`),
+    );
   });
 
   test('takes options that are undefined', () => {

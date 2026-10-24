@@ -150,7 +150,7 @@ class FeatureSprites {
 
 - **Checks.** `bindUniform()` throws a `TypeError`, and binds nothing then:
   - for something that is no source — `FeatureSprites: bindUniform("…") takes a source with a type
-    of vec3 or vec4 and a write()`;
+    of vec3 or vec4 and a write(), got {}`;
   - for a name no feature of the sprites or their passes declares, looked up as an own key of the
     uniforms — `FeatureSprites: no feature of these sprites or their passes declares the uniform
     "…"`;

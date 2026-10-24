@@ -138,6 +138,21 @@ describe('planeOf()', () => {
     );
   });
 
+  test.each([
+    [
+      'a plane as the target',
+      () => planeOf({isPlane: true, constant: 0} as never),
+      'planeOf: plane.normal must be a Vector3, got undefined',
+    ],
+    [
+      'a plane in the options',
+      () => planeOf(new Object3D(), {plane: {isPlane: true, constant: 0} as never}),
+      'planeOf: options.plane.normal must be a Vector3, got undefined',
+    ],
+  ])('refuses a plane without a normal: %s', (_, build, message) => {
+    expect(build).toThrow(new TypeError(message));
+  });
+
   test('takes a plane whose normal is (0, 0, 0)', () => {
     const flat = new Plane(new Vector3(0, 0, 0), 1);
     expect(() => planeOf(flat)).not.toThrow();
@@ -183,16 +198,13 @@ describe('lightOf()', () => {
     ['undefined', undefined, 'undefined'],
     ['null', null, 'null'],
     ['an empty object', {}, '{}'],
+    ['a plain object that only claims to be a light', {isDirectionalLight: true}, '{isDirectionalLight: true}'],
+    ['a Vector3', new Vector3(), /^lightOf: the node must be an Object3D/],
   ])('refuses a node that is no Object3D with a TypeError that names lightOf and quotes it: %s', (_, node, quoted) => {
     expect(() => lightOf(node as never)).toThrow(
-      new TypeError(`lightOf: the node must be an Object3D — a light or a node that marks one —, got ${quoted}`),
+      typeof quoted === 'string'
+        ? new TypeError(`lightOf: the node must be an Object3D — a light or a node that marks one —, got ${quoted}`)
+        : quoted,
     );
-  });
-
-  test.each([
-    ['a plain object that only claims to be a light', {isDirectionalLight: true}],
-    ['a Vector3', new Vector3()],
-  ])('refuses a node that is no Object3D: %s', (_, node) => {
-    expect(() => lightOf(node as never)).toThrow(/^lightOf: the node must be an Object3D/);
   });
 });

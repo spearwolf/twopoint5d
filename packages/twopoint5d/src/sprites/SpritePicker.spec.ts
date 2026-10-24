@@ -205,9 +205,14 @@ describe('SpritePicker', () => {
       const {renderer} = makeRenderer();
       const picker = new SpritePicker(renderer);
       await expect(picker.pick(null as unknown as Camera, center, [])).rejects.toThrow(
-        new TypeError('SpritePicker#pick(): the camera is no three.js Camera'),
+        new TypeError('SpritePicker#pick(): the camera is no three.js Camera, got null'),
       );
-      await expect(picker.pick({} as Camera, center, [])).rejects.toThrow(TypeError);
+      await expect(picker.pick({} as Camera, center, [])).rejects.toThrow(
+        new TypeError('SpritePicker#pick(): the camera is no three.js Camera, got {}'),
+      );
+      await expect(picker.pick(new Group() as unknown as Camera, center, [])).rejects.toThrow(
+        new TypeError('SpritePicker#pick(): the camera is no three.js Camera, got Group'),
+      );
     });
 
     test('a pointer that is no point of the view', async () => {
@@ -266,11 +271,19 @@ describe('SpritePicker', () => {
       const picker = new SpritePicker(renderer);
       const {sprites} = makeSprites(1);
       await expect(picker.pick(makeCamera(), center, sprites as unknown as FeatureSprites[])).rejects.toThrow(
-        new TypeError('SpritePicker#pick(): takes a list of FeatureSprites — pick(camera, pointer, [sprites])'),
+        new TypeError('SpritePicker#pick(): takes a list of FeatureSprites, got Mesh — pick(camera, pointer, [sprites])'),
+      );
+      await expect(picker.pick(makeCamera(), center, undefined as unknown as FeatureSprites[])).rejects.toThrow(
+        new TypeError('SpritePicker#pick(): takes a list of FeatureSprites, got undefined — pick(camera, pointer, [sprites])'),
       );
       await expect(picker.pick(makeCamera(), center, [sprites, new Group() as unknown as FeatureSprites])).rejects.toThrow(
         new TypeError(
-          'SpritePicker#pick(): the entry 1 of the list is no FeatureSprites — the picker draws FeatureSprites alone',
+          'SpritePicker#pick(): the entry 1 of the list is no FeatureSprites, got Group — the picker draws FeatureSprites alone',
+        ),
+      );
+      await expect(picker.pick(makeCamera(), center, [sprites, 5 as unknown as FeatureSprites])).rejects.toThrow(
+        new TypeError(
+          'SpritePicker#pick(): the entry 1 of the list is no FeatureSprites, got 5 — the picker draws FeatureSprites alone',
         ),
       );
       sprites.dispose();

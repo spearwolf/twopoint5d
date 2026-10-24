@@ -15,7 +15,7 @@
 // declarations do not compile.
 
 import path from 'node:path';
-import {findUnnameableTypes, partitionAccepted} from './checkNameableTypes/findUnnameableTypes.mjs';
+import {entryKeyOf, findUnnameableTypes, partitionAccepted} from './checkNameableTypes/findUnnameableTypes.mjs';
 import {readCompilerOptions} from './shared/readCompilerOptions.mjs';
 
 // A name that is reachable but not exported, and stays that way on purpose. Keyed by
@@ -39,7 +39,7 @@ const ACCEPTED = new Map([
 const workspaceRoot = path.resolve(import.meta.dirname, '..');
 const entry = path.resolve(process.argv[2] ?? 'dist/lib/index.d.ts');
 const tsconfigPath = path.join(workspaceRoot, 'tsconfig.json');
-const acceptedForEntry = ACCEPTED.get(path.relative(workspaceRoot, entry).split(path.sep).join('/')) ?? new Map();
+const acceptedForEntry = ACCEPTED.get(entryKeyOf(entry, workspaceRoot)) ?? new Map();
 
 /** @type {ReturnType<typeof findUnnameableTypes>} */
 let result;

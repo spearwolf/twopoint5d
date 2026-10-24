@@ -19,7 +19,15 @@ import {
   Tint,
 } from '@spearwolf/twopoint5d';
 import {Color, OrthographicCamera, PerspectiveCamera, Scene, Vector3} from 'three/webgpu';
-import {disposeDisplay, disposeKept, keep, makeColorTexture, makeContainer, withSilencedInfo} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  keep,
+  makeColorTexture,
+  makeContainer,
+  release,
+  withSilencedInfo,
+} from './helpers/fixtures.js';
 
 const WHITE = [255, 255, 255, 255];
 const CLEAR = [0, 0, 0, 0];
@@ -466,7 +474,7 @@ describe('sprites — picking', function () {
     expect(memory(), 'after 50 picks').to.deep.equal(afterFirst);
 
     // the pick mesh and its render object go with the mesh, the geometry of the sprites with them
-    sprites.dispose();
+    release(sprites);
     const {uniformBuffers, programs, geometries, attributes} = memory();
     expect({uniformBuffers, programs, geometries, attributes}, 'once the sprites are disposed').to.deep.equal({
       uniformBuffers: before.uniformBuffers,
@@ -476,10 +484,12 @@ describe('sprites — picking', function () {
     });
 
     picker.dispose();
+    // released here, not a second time by the afterEach
+    picker = undefined;
     expect(memory().renderTargets, 'once the picker is disposed').to.equal(before.renderTargets);
 
     // the color map is the caller's
-    colorMap.dispose();
+    release(colorMap);
     expect(memory().textures, 'once the color map is disposed').to.equal(before.textures);
   });
 });

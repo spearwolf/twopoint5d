@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {after, test} from 'node:test';
 import {readCompilerOptions} from '../shared/readCompilerOptions.mjs';
-import {findUnnameableTypes, partitionAccepted} from './findUnnameableTypes.mjs';
+import {entryKeyOf, findUnnameableTypes, partitionAccepted} from './findUnnameableTypes.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..');
 const compilerOptions = readCompilerOptions(path.join(repoRoot, 'tsconfig.json'));
@@ -153,5 +153,16 @@ test('declarations that do not compile throw, naming the file, the line and the 
       assert.match(err.message, /index\.d\.ts:3 {2}Cannot find name 'Missing'/);
       return true;
     },
+  );
+});
+
+test('entryKeyOf() writes the key of an entry with / on Windows and POSIX alike', () => {
+  assert.equal(
+    entryKeyOf('C:\\ws\\packages\\twopoint5d\\dist\\lib\\index.d.ts', 'C:\\ws', path.win32),
+    'packages/twopoint5d/dist/lib/index.d.ts',
+  );
+  assert.equal(
+    entryKeyOf('/ws/packages/twopoint5d/dist/lib/index.d.ts', '/ws', path.posix),
+    'packages/twopoint5d/dist/lib/index.d.ts',
   );
 });

@@ -165,8 +165,7 @@ describe('definePass()', () => {
     test.each(shapes)('refuses %s', (_label, pass, message, errorClass) => {
       const define = () => definePass(pass as never);
 
-      expect(define).toThrow(errorClass);
-      expect(define).toThrow(`definePass: ${message}`);
+      expect(define).toThrow(new errorClass(`definePass: ${message}`));
     });
 
     test('takes null for without, uniformNames, material and renderOrder as not brought', () => {
@@ -176,8 +175,10 @@ describe('definePass()', () => {
     });
 
     test('is checked by FeatureSprites for a pass that never went through definePass()', () => {
-      for (const [, pass, message] of shapes) {
-        expect(() => new FeatureSprites(kind, {passes: [pass as never]}), message).toThrow(`FeatureSprites: ${message}`);
+      for (const [, pass, message, errorClass] of shapes) {
+        expect(() => new FeatureSprites(kind, {passes: [pass as never]}), message).toThrow(
+          new errorClass(`FeatureSprites: ${message}`),
+        );
       }
     });
   });
@@ -190,6 +191,12 @@ describe('definePass()', () => {
       expect(pass.uniformNames).toEqual({groundPlane: 'moonGround'});
       expect(pass.uniformNames).not.toBe(names);
       expect(Object.isFrozen(pass.uniformNames)).toBe(true);
+    });
+
+    test('checks the renames before the material', () => {
+      expect(() => definePass({...ShadowPass, name: 'moon', uniformNames: {time: 'moonTime'}, material: 5 as never})).toThrow(
+        new TypeError('definePass: pass "moon" renames the uniform "time", which no feature of the pass declares'),
+      );
     });
 
     test('refuses a name no feature of the pass declares, an empty target, one that is no string and two names with one target', () => {

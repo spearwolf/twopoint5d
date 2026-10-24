@@ -17,6 +17,7 @@ import {
   Vector2,
   WebGLCoordinateSystem,
 } from 'three/webgpu';
+import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import type {VO} from '../vertex-objects/types.js';
 import type {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
@@ -473,7 +474,7 @@ export class SpritePicker {
 // the message and the pick see the same values
 function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly unknown[]): PickPointer {
   if ((camera as {isCamera?: unknown} | null)?.isCamera !== true) {
-    throw new TypeError(`${WHERE}: the camera is no three.js Camera`);
+    throw new TypeError(`${WHERE}: the camera is no three.js Camera, got ${describeThreeValue(camera, 'isObject3D')}`);
   }
   const x = pointer?.x;
   const y = pointer?.y;
@@ -485,11 +486,15 @@ function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly 
     throw new TypeError(`${WHERE}: the pointer is {x, y} in normalized device coordinates, -1 to 1 — got ${got}`);
   }
   if (!Array.isArray(sprites)) {
-    throw new TypeError(`${WHERE}: takes a list of FeatureSprites — pick(camera, pointer, [sprites])`);
+    throw new TypeError(
+      `${WHERE}: takes a list of FeatureSprites, got ${describeThreeValue(sprites, 'isObject3D')} — pick(camera, pointer, [sprites])`,
+    );
   }
   for (let k = 0; k < sprites.length; k++) {
     if (!(sprites[k] instanceof FeatureSprites)) {
-      throw new TypeError(`${WHERE}: the entry ${k} of the list is no FeatureSprites — the picker draws FeatureSprites alone`);
+      throw new TypeError(
+        `${WHERE}: the entry ${k} of the list is no FeatureSprites, got ${describeThreeValue(sprites[k], 'isObject3D')} — the picker draws FeatureSprites alone`,
+      );
     }
   }
   return {x, y};

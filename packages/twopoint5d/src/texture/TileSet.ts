@@ -327,7 +327,7 @@ export class TileSet<D = TextureAtlasFrameData> {
     assertFits(
       this.options.tileCount !== undefined || fitting <= TileSet.MaxTiles,
       () =>
-        `${fitting} tiles of ${this.tileWidth} × ${this.tileHeight} fit into ${baseWidth} × ${baseHeight} with margin ${margin}, padding ${padding} and spacing ${spacing} — a tile set holds at most ${TileSet.MaxTiles}; give a tileCount, or larger tiles`,
+        `${Number.isFinite(fitting) ? `${fitting} tiles` : `more than ${TileSet.MaxTiles} tiles`} of ${this.tileWidth} × ${this.tileHeight} fit into ${baseWidth} × ${baseHeight} with margin ${margin}, padding ${padding} and spacing ${spacing} — a tile set holds at most ${TileSet.MaxTiles}; give a tileCount, or larger tiles`,
     );
     assertFits(
       this.options.tileCount === undefined || tileCountLimit <= fitting,

@@ -198,9 +198,9 @@ export function gridBase(options: GridBaseOptions): GridBase;
   rows)` is `j` — `i / columns` is stored as the `float32` nearest to it, and the rounding takes
   it back for every `columns ≤ 1024`. A stage reads the base uv through `ctx.attribute('uv')`.
 - **Refusals** (`TypeError`, before anything is built): options that are no object
-  (`gridBase: takes {columns, rows} — gridBase({columns: 3, rows: 3})`); a `columns` or `rows`
-  that is no whole number from 1 to 1024 (`gridBase: columns is 2.5 — columns and rows are whole
-  numbers from 1 to 1024`); a grid of more than 4096 cells (`gridBase: a grid of 1000 × 1000 is
+  (`gridBase: takes {columns, rows}, got undefined — gridBase({columns: 3, rows: 3})`); a
+  `columns` or `rows` that is no whole number from 1 to 1024 (`gridBase: columns is 2.5 — columns
+  and rows are whole numbers from 1 to 1024`); a grid of more than 4096 cells (`gridBase: a grid of 1000 × 1000 is
   1000000 cells — a grid holds at most 4096`). Neither is a limit of the GPU: 1024 per axis keeps
   the grid line of every vertex exact in its uv, and 4096 cells keep a typo (`columns: 1000, rows:
   1000`) from building a base of a million vertices for every sprite, whose indices the cache of
@@ -269,7 +269,7 @@ The messages keep their head and add the reason and the fix (`where` is `defineS
 
 A declaration that is neither a uniform value nor `{value, shared?}` with a valid value, a
 boolean or absent `shared` and no other key is refused: `feature "x" starts the uniform "time"
-with {value: 0, share: true}; a uniform takes a number, 2 to 4 numbers, or {value, shared}`.
+with {value: 0, share: true}; a uniform takes a finite number, 2 to 4 finite numbers, or {value, shared}`.
 
 ### 5.3 Where the merge reaches
 

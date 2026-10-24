@@ -265,6 +265,33 @@ const leaseOn = <V>(value: V, resource: TextureResource): TextureStoreLease<V> =
   };
 };
 
+// The listeners one promise of #getOnce() installs, given back at once when it settles. A
+// listener booked after that is given back right away: on() can deliver a retained value
+// synchronously, before it has returned its unsubscribe function, and a subscription booked into
+// a settled promise would otherwise stay
+class Settlement {
+  #settled = false;
+  readonly #teardown: Array<() => void> = [];
+
+  get settled(): boolean {
+    return this.#settled;
+  }
+
+  track(unsubscribe: () => void): void {
+    if (this.#settled) unsubscribe();
+    else this.#teardown.push(unsubscribe);
+  }
+
+  // true for the call that settles, false for every one after it
+  settle(): boolean {
+    if (this.#settled) return false;
+    this.#settled = true;
+    for (const unsubscribe of this.#teardown) unsubscribe();
+    this.#teardown.length = 0;
+    return true;
+  }
+}
+
 export interface TextureStoreParseOptions {
   /**
    * Dispose and remove every resource that the parsed data no longer names and whose
@@ -442,6 +469,11 @@ export class TextureStore {
   // why the last parse() refused an item whose id carries no resource; getAsync() and
   // whenResource() say it when they give up on the id
   #refusedItems = new Map<string, ItemRefusal>();
+
+  // Set while ready goes out: what a listener of it books through #onReadyOnce() waits here. The
+  // retained ready value is written only after the last listener, so a once() booked meanwhile
+  // would hear neither this ready nor a replay
+  #readyLate: Array<() => void> | undefined;
 
   // the atlas adapters by name, in the order they were registered: the pick by `meta.app` asks the
   // latest first
@@ -638,6 +670,17 @@ export class TextureStore {
     return resource;
   }
 
+  // once(this, OnReady, …) that also hears the ready that is going out right now
+  #onReadyOnce(hear: () => void): () => void {
+    const late = this.#readyLate;
+    if (late === undefined) return once(this, OnReady, hear);
+    late.push(hear);
+    return () => {
+      const at = late.indexOf(hear);
+      if (at >= 0) late.splice(at, 1);
+    };
+  }
+
   #whenReady(what: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       if (this.#disposed) {
@@ -649,7 +692,7 @@ export class TextureStore {
       const unsubscribeDispose = once(this, OnDispose, () => {
         reject(disposedError(what));
       });
-      once(this, OnReady, () => {
+      this.#onReadyOnce(() => {
         unsubscribeDispose();
         resolve();
       });
@@ -878,10 +921,11 @@ export class TextureStore {
    * on and returns as usual. Nor does a subscriber of a resource — of {@link TextureStore.on} among
    * them — that throws while the values are written: every subscriber hears its value, the parse
    * runs to its end, and the throw goes out after `evictMissing` as an `error` event with `source:
-   * 'parse'` and no id. `parse()` throws only for data it refuses before anything is written or
-   * emitted. A resource that `evictMissing` disposes is removed even when a listener of its
-   * `dispose` event throws; that throw goes out as an `error` event with `source: 'parse'` and the
-   * id of the resource.
+   * 'parse'` and no id. `parse()` throws for data it refuses before anything is written or
+   * emitted — and for a throw of the loop that writes the items, which leaves the items before it
+   * written and emits nothing. A resource that `evictMissing` disposes is removed even when a
+   * listener of its `dispose` event throws; that throw goes out as an `error` event with `source:
+   * 'parse'` and the id of the resource.
    *
    * On a disposed store this does nothing: no resource is built, and none is updated.
    */
@@ -912,7 +956,23 @@ export class TextureStore {
     // parse goes on to its end — the ready value is retained, every resource is announced, and
     // evictMissing runs. A throw that reached the caller would tell loadAsync() the catalog had
     // failed to parse
-    emitSafe(this, OnReady, this);
+    const late: Array<() => void> = [];
+    this.#readyLate = late;
+    try {
+      emitSafe(this, OnReady, this);
+      // the subscriptions a listener of ready booked while it went out hear this ready now, as the
+      // ones that were there before it did. One of them may book or give back another, so the list
+      // is read until it is empty
+      while (late.length > 0) {
+        try {
+          late.shift()?.();
+        } catch (error) {
+          reportError(this, {source: 'parse', error});
+        }
+      }
+    } finally {
+      this.#readyLate = undefined;
+    }
 
     for (const resource of updatedResources) {
       emitSafe(this, `${OnResource}:${resource.id}`, resource);
@@ -1050,6 +1110,7 @@ export class TextureStore {
   ): {updatedResources: AnyTextureResource[]; publishError: {error: unknown} | undefined} {
     const updatedResources: AnyTextureResource[] = [];
     let publishError: {error: unknown} | undefined;
+    let written = false;
 
     try {
       batch(() => {
@@ -1073,8 +1134,12 @@ export class TextureStore {
             updatedResources.push(resource);
           }
         }
+        written = true;
       });
     } catch (error) {
+      // a throw of the loop is no throw of a subscriber: the items after it were never written,
+      // and ready and evictMissing must not go out as if they were
+      if (!written) throw error;
       // Safe to catch: the nested batch() calls of the items do not flush, so the throw comes out of
       // the flush of this outer one, after the loop has written every item. signalize isolates the
       // throw of each effect, runs all the others and throws one at the end, several as an
@@ -1239,7 +1304,7 @@ export class TextureStore {
 
     // the follower starts with the first ready: the values of a subscription come while ready goes
     // out, ahead of the resource:<id> events
-    const unsubscribeFromReady = once(this, OnReady, () => {
+    const unsubscribeFromReady = this.#onReadyOnce(() => {
       follower.follow((resource, hold) => this.#subscribeToResource(id, type, callback, warnOutOfReach, resource, hold));
     });
 
@@ -1434,52 +1499,29 @@ export class TextureStore {
         return;
       }
 
-      const teardown: Array<() => void> = [];
-      // set by settle() alone; track() and giveUp() read it, so that nothing lands on a settled promise
-      let settled = false;
-
-      const settle = () => {
-        if (settled) return;
-        settled = true;
-        signal?.removeEventListener('abort', onAbort);
-        for (const unsubscribe of teardown) unsubscribe();
-        teardown.length = 0;
-      };
-
-      // every listener this promise installs goes through here: on() can deliver a retained
-      // value synchronously, before it has even returned its unsubscribe function, so a
-      // subscription registered into an already settled promise is dropped instead of left
-      const track = (unsubscribe: () => void) => {
-        if (settled) {
-          unsubscribe();
-        } else {
-          teardown.push(unsubscribe);
-        }
-      };
+      const settlement = new Settlement();
 
       // the one way this promise rejects; once it has settled, this does nothing
       const giveUp = (error: Error) => {
-        if (settled) return;
-        settle();
-        reject(error);
+        if (settlement.settle()) reject(error);
       };
 
       const onAbort = () => giveUp(new DOMException(`TextureStore: ${what} aborted`, 'AbortError'));
 
-      track(
+      settlement.track(
         this.#subscribe(
           id,
           type,
           (value, resource) => {
             if (!asLease) {
-              settle();
+              settlement.settle();
               resolve(value as never);
               return;
             }
             // the hold goes on before settle() gives back the count of the subscription of this
             // promise, so the resource is held all the way through
             const lease = leaseOn(value, resource);
-            settle();
+            settlement.settle();
             resolve(lease as never);
           },
           false,
@@ -1492,15 +1534,15 @@ export class TextureStore {
       // follower before it starts
       const subTypes = (Array.isArray(type) ? type : [type]) as readonly TextureResourceSubType[];
       const follower = this.#followerOf(id);
-      track(() => follower.dispose());
+      settlement.track(() => follower.dispose());
       follower.follow((resource, hold) => this.#watchResource(what, id, subTypes, resource, hold, giveUp));
 
-      track(once(this, OnDispose, () => giveUp(disposedError(what))));
+      settlement.track(once(this, OnDispose, () => giveUp(disposedError(what))));
 
       // on() keeps waiting for a later parse(); getAsync() answers like whenResource() and gives
       // up once the first ready has gone by without the id showing up
-      track(
-        once(this, OnReady, () => {
+      settlement.track(
+        this.#onReadyOnce(() => {
           if (this.#resources.has(id)) return;
           giveUp(noResourceError(id, this.#refusedItems.get(id)));
         }),
@@ -1509,8 +1551,9 @@ export class TextureStore {
       // the promise may already have settled synchronously; a listener installed now would sit
       // on the caller's signal until that signal aborts — one per such getAsync() on a long-lived
       // AbortController
-      if (!settled) {
-        signal?.addEventListener('abort', onAbort, {once: true});
+      if (signal && !settlement.settled) {
+        signal.addEventListener('abort', onAbort, {once: true});
+        settlement.track(() => signal.removeEventListener('abort', onAbort));
       }
     });
   }

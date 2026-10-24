@@ -151,3 +151,16 @@ export function partitionAccepted(rows, accepted) {
     stale: [...accepted.keys()].filter((key) => !matched.has(key)),
   };
 }
+
+/**
+ * The key of `entry` in ACCEPTED: its path relative to the workspace root, `/`-separated on
+ * every platform, so that one key serves Windows and POSIX alike.
+ *
+ * @param {string} entry
+ * @param {string} workspaceRoot
+ * @param {import('node:path').PlatformPath} [pathApi] `path.win32` or `path.posix`; the platform's by default
+ * @returns {string}
+ */
+export function entryKeyOf(entry, workspaceRoot, pathApi = path) {
+  return pathApi.relative(workspaceRoot, entry).split(pathApi.sep).join('/');
+}

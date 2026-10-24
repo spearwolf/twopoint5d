@@ -1200,6 +1200,30 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
+    test('a throw while parse() writes its items reaches the caller: no ready, and evictMissing disposes nothing', async () => {
+      loadImages();
+      const store = new TextureStore();
+      store.parse({items: {a: {imageUrl: 'a.png'}, b: {imageUrl: 'b.png'}}});
+      const b = await store.whenResource('b');
+      const disposed = vi.fn();
+      once(b, TextureResourceEvents.Dispose, disposed);
+      const ready = vi.fn();
+      on(store, TextureStoreEvents.Ready, ready);
+      ready.mockClear();
+
+      vi.spyOn(TextureResource, 'fromImage').mockImplementationOnce(() => {
+        throw new Error('boom');
+      });
+
+      expect(() => store.parse({items: {c: {imageUrl: 'c.png'}, b: {imageUrl: 'b.png'}}}, {evictMissing: true})).toThrow(
+        new Error('boom'),
+      );
+      expect(ready).not.toHaveBeenCalled();
+      expect(disposed).not.toHaveBeenCalled();
+      expect(await store.whenResource('b')).toBe(b);
+      store.dispose();
+    });
+
     test('release() gives the hold back once, however often it is called', async () => {
       loadImages();
       const store = new TextureStore();
@@ -3278,6 +3302,61 @@ describe('TextureStore', () => {
       const b = await settleWithin(store.whenResource('b'));
       expect((b as Error).message).toBe('TextureStore: no resource with id "b" — check your TextureStoreData.items keys.');
       expect((b as Error).cause).toBeUndefined();
+      store.dispose();
+    });
+  });
+
+  describe('the reason an item built no resource', () => {
+    test('a refused item whose id still carries a resource keeps no reason: a later direct dispose answers without one', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+      store.parse({items: {a: {imageUrl: 5}}} as never);
+      const a = await store.whenResource('a');
+
+      a.dispose();
+
+      const refusal = await settleWithin(store.whenResource('a'));
+      expect(refusal).toEqual(new Error('TextureStore: no resource with id "a" — check your TextureStoreData.items keys.'));
+      store.dispose();
+    });
+
+    test('a listener of ready hears why an item was refused', async () => {
+      const store = new TextureStore();
+      let heard: Promise<unknown> | undefined;
+      let heardWhenResource: Promise<unknown> | undefined;
+      on(store, TextureStoreEvents.Ready, () => {
+        heard = settleWithin(store.getAsync('b', 'imageCoords'));
+        heardWhenResource = settleWithin(store.whenResource('b'));
+      });
+
+      store.parse({items: {b: {tileSet: 5}}} as never);
+
+      const afterwards = await settleWithin(store.getAsync('b', 'imageCoords'));
+      expect(afterwards).toBeInstanceOf(Error);
+      expect((afterwards as Error).message).toMatch(/^TextureStore: no resource with id "b" — its item /);
+      expect(heard).toBeDefined();
+      expect(((await heard) as Error).message).toBe((afterwards as Error).message);
+      expect(((await heardWhenResource) as Error).message).toBe((afterwards as Error).message);
+      store.dispose();
+    });
+
+    test('a listener of ready that asks getAsync() for an item that was built hears its value', async () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 4, height: 4}) as unknown as HTMLImageElement,
+      );
+      const store = new TextureStore();
+      let heard: Promise<unknown> | undefined;
+      on(store, TextureStoreEvents.Ready, () => {
+        heard = settleWithin(store.getAsync('a', 'imageCoords'), 1000);
+      });
+
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+
+      const coords = await store.getAsync('a', 'imageCoords');
+      expect(await heard).toBe(coords);
       store.dispose();
     });
   });

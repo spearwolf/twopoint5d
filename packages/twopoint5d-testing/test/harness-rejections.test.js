@@ -8,13 +8,25 @@ import {whenRejectionsReported} from './helpers/fixtures.js';
 // the init script of web-test-runner.config.js that takes the control off the page work together.
 
 describe('whenRejectionsReported()', function () {
+  // the four kinds the runner collects into its browser logs
+  const kinds = /** @type {const} */ (['log', 'debug', 'warn', 'error']);
+  /** @type {Map<(typeof kinds)[number], (...args: unknown[]) => void>} */
+  const originals = new Map();
+
+  const restoreConsole = () => {
+    for (const [kind, original] of originals) console[kind] = original;
+    originals.clear();
+  };
+
+  // a test the runner times out never reaches its finally, and every file after it would write
+  // into the stubs
+  afterEach(restoreConsole);
+
   it('writes nothing to the console', async () => {
     /** @type {Array<[string, unknown[]]>} */
     const written = [];
-    // the four kinds the runner collects into its browser logs
-    const kinds = /** @type {const} */ (['log', 'debug', 'warn', 'error']);
-    const originals = kinds.map((kind) => console[kind]);
     for (const kind of kinds) {
+      originals.set(kind, console[kind]);
       console[kind] = (...args) => {
         written.push([kind, args]);
       };
@@ -25,9 +37,7 @@ describe('whenRejectionsReported()', function () {
       // all of those have run before the next task
       await new Promise((resolve) => setTimeout(resolve, 0));
     } finally {
-      kinds.forEach((kind, i) => {
-        console[kind] = originals[i];
-      });
+      restoreConsole();
     }
 
     expect(written, 'what went to the console while whenRejectionsReported() ran').to.deep.equal([]);

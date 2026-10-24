@@ -1,9 +1,7 @@
 import type {DirectionalLight, Object3D, Vector4} from 'three/webgpu';
 import {describeValue} from '../../utils/describeValue.js';
+import {isObject3D} from '../../utils/isObject3D.js';
 import type {SpriteUniformSource} from './SpriteUniformSource.js';
-
-const isObject3D = (value: unknown): value is Object3D =>
-  (value as {isObject3D?: unknown} | null | undefined)?.isObject3D === true;
 
 const isDirectionalLight = (node: Object3D): node is DirectionalLight => (node as DirectionalLight).isDirectionalLight === true;
 

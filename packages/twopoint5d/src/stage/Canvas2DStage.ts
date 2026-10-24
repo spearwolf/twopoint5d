@@ -345,9 +345,10 @@ export class Canvas2DStage {
   /**
    * Draws one frame, in this order: sprite and view follow a new canvas size, and
    * `OnCanvas2DStageResize` goes out, if the canvas size changed since the last frame,
-   * `OnCanvas2DStageRender` — the moment to draw into the canvas and set
-   * `needsUpdate` —, the upload of the canvas, `stageRenderer.updateFrame()` and
-   * `stageRenderer.renderTo()`.
+   * `OnCanvas2DStageRender` — the moment to draw into the canvas and set `needsUpdate` —,
+   * sprite and view following a size a listener of it gave the canvas, whose
+   * `OnCanvas2DStageResize` goes out with the next `render()`, the upload of the canvas,
+   * `stageRenderer.updateFrame()` and `stageRenderer.renderTo()`.
    *
    * The values typically come from the `DisplayEventProps` of `OnDisplayRenderFrame`. Called
    * without them, the stage takes all three from a clock of its own: the first such call passes
@@ -394,6 +395,10 @@ export class Canvas2DStage {
     try {
       // a listener that throws here ends the frame: a canvas drawn halfway is not uploaded
       emit(this, OnCanvas2DStageRender, this);
+
+      // a listener may have resized the canvas in place: sprite and view follow before the upload,
+      // as they do for setCanvasSize(); its OnCanvas2DStageResize goes out with the next render()
+      this.#followCanvasSize();
 
       this.#updateTexture();
 

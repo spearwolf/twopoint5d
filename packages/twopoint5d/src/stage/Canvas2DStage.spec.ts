@@ -356,6 +356,33 @@ describe('Canvas2DStage', () => {
       expect(scaleAtResize, 'a listener reads the new size already').toEqual([48]);
     });
 
+    test('a canvas a listener of OnCanvas2DStageRender resizes is drawn in its new size in that frame, and the next render() sends OnCanvas2DStageResize', () => {
+      const canvas = makeCanvas(64, 64);
+      const stage = new Canvas2DStage(makeRenderer(), canvas);
+      stage.render();
+      const seen: {scale: number[]; view: unknown}[] = [];
+      sandbox.stub(stage.stageRenderer, 'renderTo').callsFake(() => {
+        seen.push({scale: stage.sprite.scale.toArray(), view: {...stage.projection.viewSpecs}});
+      });
+      const resized = vi.fn();
+      on(stage, OnCanvas2DStageResize, resized);
+      on(stage, OnCanvas2DStageRender, () => {
+        canvas.width = 48;
+        canvas.height = 32;
+      });
+
+      stage.render();
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]!.scale, 'the sprite follows before the frame is drawn').toEqual([48, 32, 1]);
+      expect(seen[0]!.view).toMatchObject({width: 48, height: 32});
+      expect(resized, 'no event in the frame of the change').not.toHaveBeenCalled();
+
+      stage.render();
+
+      expect(resized).toHaveBeenCalledTimes(1);
+    });
+
     test('uploads no canvas without area, and keeps needsUpdate for the first render() with one', () => {
       const canvas = makeCanvas(32, 16);
       const stage = new Canvas2DStage(makeRenderer(), canvas);
@@ -477,6 +504,9 @@ describe('Canvas2DStage', () => {
 
       expect(() => stage.setContainerSize(NaN, 240)).toThrow(
         new RangeError('Canvas2DStage#setContainerSize(): width must be a finite number, got NaN'),
+      );
+      expect(() => stage.setContainerSize(320, Infinity)).toThrow(
+        new RangeError('Canvas2DStage#setContainerSize(): height must be a finite number, got Infinity'),
       );
     });
 

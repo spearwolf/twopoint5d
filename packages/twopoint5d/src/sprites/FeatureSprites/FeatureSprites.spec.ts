@@ -327,7 +327,7 @@ describe('FeatureSprites', () => {
       sprites.dispose();
 
       expect(() => sprites.bindUniform('x', {} as never)).toThrow(
-        new TypeError('FeatureSprites: bindUniform("x") takes a source with a type of vec3 or vec4 and a write()'),
+        new TypeError('FeatureSprites: bindUniform("x") takes a source with a type of vec3 or vec4 and a write(), got {}'),
       );
     });
   });
@@ -1096,7 +1096,7 @@ describe('FeatureSprites', () => {
         'FeatureSprites: the uniform "groundPlane" is a vec4, and the source bound to it writes a vec3',
       );
       expect(() => sprites.bindUniform('groundPlane', {} as never)).toThrow(
-        'FeatureSprites: bindUniform("groundPlane") takes a source with a type of vec3 or vec4 and a write()',
+        'FeatureSprites: bindUniform("groundPlane") takes a source with a type of vec3 or vec4 and a write(), got {}',
       );
       sprites.setUniform('groundPlane', 0, 0, 1, 7);
       sprites.update();

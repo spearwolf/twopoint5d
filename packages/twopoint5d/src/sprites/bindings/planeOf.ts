@@ -2,18 +2,19 @@ import {Matrix4, type Object3D, Plane, Vector3, Vector4} from 'three/webgpu';
 import {assertFinite} from '../../utils/assertFinite.js';
 import {describeValue} from '../../utils/describeValue.js';
 import {isObject} from '../../utils/isObject.js';
+import {isObject3D} from '../../utils/isObject3D.js';
 import type {SpriteUniformSource} from './SpriteUniformSource.js';
 
 const isPlane = (value: unknown): value is Plane => (value as {isPlane?: unknown} | null | undefined)?.isPlane === true;
-
-const isObject3D = (value: unknown): value is Object3D =>
-  (value as {isObject3D?: unknown} | null | undefined)?.isObject3D === true;
 
 const WHERE = 'planeOf';
 
 // the normal and the constant of a plane handed in are calculated with: each one a finite number. A
 // normal of (0, 0, 0) is no refusal — the passes draw nothing for it
 function assertFinitePlane(plane: Plane, name: string): void {
+  if (!isObject(plane.normal)) {
+    throw new TypeError(`${WHERE}: ${name}.normal must be a Vector3, got ${describeValue(plane.normal)}`);
+  }
   assertFinite(plane.normal.x, WHERE, `${name}.normal.x`);
   assertFinite(plane.normal.y, WHERE, `${name}.normal.y`);
   assertFinite(plane.normal.z, WHERE, `${name}.normal.z`);
@@ -47,7 +48,7 @@ function writeTransformedPlane(out: Vector4, c: Vector4, m: Matrix4): void {
  * The normal is not normalized. The sprites stand on the side the normal points to.
  *
  * @throws {TypeError} for a target that is neither an `Object3D` nor a `Plane`, for options that are
- * no object and for an `options.plane` that is no `Plane`.
+ * no object, for an `options.plane` that is no `Plane`, and for a plane without a normal.
  * @throws {RangeError} for a plane whose normal or constant is no finite number.
  */
 export function planeOf(node: Object3D, options?: {plane?: Plane}): SpriteUniformSource;

@@ -1,7 +1,8 @@
-import {describe, expect, test} from 'vitest';
+import {describe, expect, test, vi} from 'vitest';
 import {AABB2} from './AABB2.js';
 import type {IMap2DRenderableArea} from './types.js';
 import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';
+import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
 
 describe('Map2DSpatialHashGrid', () => {
   test('construction', () => {
@@ -284,6 +285,19 @@ describe('Map2DSpatialHashGrid', () => {
       'a, once',
     ).toHaveLength(1);
     expect(new Set(out), 'a moved').toEqual(new Set([a, b, c]));
+  });
+
+  test('add() works out the cells of each renderable once', () => {
+    const grid = new Map2DSpatialHashGrid(10, 10);
+    const a: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 25, 5)};
+    const b: IMap2DRenderableArea = {aabb: new AABB2(30, 30, 5, 25)};
+    const computeTiles = vi.spyOn(Map2DTileCoordsUtil.prototype, 'computeTilesWithinArea');
+
+    grid.add(a, b);
+
+    expect(computeTiles).toHaveBeenCalledTimes(2);
+    expect(grid.getTile(2, 0)?.has(a)).toBe(true);
+    expect(grid.getTile(3, 5)?.has(b)).toBe(true);
   });
 
   describe('maxCellsPerRenderable', () => {

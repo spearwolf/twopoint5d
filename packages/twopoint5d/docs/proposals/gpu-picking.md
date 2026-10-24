@@ -255,14 +255,13 @@ resolves).
 ## 5. Refusals, ownership, disposal
 
 - `pick()` refuses, rejecting with a `TypeError` that names the fix: a `camera` that is no three
-  camera (`SpritePicker#pick(): the camera is no three.js Camera`); a `pointer` whose `x` or `y` is
-  no finite number
+  camera (`SpritePicker#pick(): the camera is no three.js Camera, got Mesh`); a `pointer` whose
+  `x` or `y` is no finite number
   (`… the pointer is {x, y} in normalized device coordinates, -1 to 1 — got {x: NaN, y: 0}`);
-  `sprites` that is no array
-  (`… takes a list of FeatureSprites — pick(camera, pointer, [sprites])`); an entry that is no
-  `FeatureSprites`
-  (`… the entry 1 of the list is no FeatureSprites — the picker draws FeatureSprites alone`). A
-  listed mesh of more than 2²⁴ sprites rejects the pick with a `RangeError` before anything is drawn
+  `sprites` that is no array (`… takes a list of FeatureSprites, got undefined — pick(camera,
+  pointer, [sprites])`); an entry that is no `FeatureSprites` (`… the entry 1 of the list is no
+  FeatureSprites, got Group — the picker draws FeatureSprites alone`). A listed mesh of more than 2²⁴ sprites rejects the pick with a `RangeError` before anything is
+  drawn
   (`… the entry 0 of the list holds 16777217 sprites, and the float target names a slot exactly up to 16777216 — split the sprites into meshes of at most 16777216`).
 - **Ownership**: the renderer, the camera and every mesh stay the caller's. The picker owns its
   target, its scene, its camera, its pick meshes and pick materials. A pick material borrows the

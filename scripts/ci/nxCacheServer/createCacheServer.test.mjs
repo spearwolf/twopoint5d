@@ -192,6 +192,37 @@ test('a GET whose entry vanishes as the server refreshes its mtime serves the en
   assert.ok(onPath.mock.callCount() + onHandle.mock.callCount() > 0, 'the server never refreshed the mtime');
 });
 
+test('a GET whose entry cannot be read answers 500 and logs that reason, also when the handle fails to close', async (t) => {
+  const file = path.join(dir, '123');
+  fs.writeFileSync(file, 'data');
+  const handle = await fs.promises.open(file, 'r');
+  const handlePrototype = Object.getPrototypeOf(handle);
+  await handle.close();
+
+  t.mock.method(handlePrototype, 'stat', async () => {
+    throw new Error('stat failed');
+  });
+  // close() is a property of each handle, not of the prototype: the open() of the server hands out
+  // handles whose close() frees the descriptor, then reports its own failure
+  const open = fs.promises.open;
+  t.mock.method(fs.promises, 'open', async (/** @type {Parameters<typeof open>} */ ...args) => {
+    const opened = await open(...args);
+    const close = opened.close.bind(opened);
+    opened.close = async () => {
+      await close();
+      throw new Error('close failed');
+    };
+    return opened;
+  });
+  const logged = t.mock.method(console, 'error', () => {});
+
+  const res = await get('123');
+
+  assert.equal(res.status, 500);
+  assert.equal(logged.mock.callCount(), 1);
+  assert.match(String(logged.mock.calls[0]?.arguments[0]), /^nx cache server: GET \/v1\/cache\/123 failed: stat failed$/);
+});
+
 test('a PUT whose entry cannot be written answers 500 and logs the method, the path and the reason', async (t) => {
   fs.rmSync(dir, {recursive: true});
   const logged = t.mock.method(console, 'error', () => {});

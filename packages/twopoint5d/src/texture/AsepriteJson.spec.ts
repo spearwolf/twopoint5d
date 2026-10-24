@@ -526,7 +526,7 @@ describe('AsepriteJson', () => {
           'bounds that are missing',
           slicesOf(slice({}, {bounds: undefined})),
           TypeError,
-          'the bounds of the key 0 of the slice "s" is undefined — a rectangle of a slice is an object {x, y, w, h}',
+          'the bounds of the key 0 of the slice "s" are undefined — a rectangle of a slice is an object {x, y, w, h}',
         ],
         [
           'a center that is no object',
@@ -572,8 +572,9 @@ describe('AsepriteJson', () => {
         ],
       ])('refuses %s', (_, data, errorClass, message) => {
         const t = new TextureAtlas<AsepriteFrameData>();
-        expect(() => AsepriteJson.parse(data as AsepriteJsonData, {target: t})).toThrow(errorClass);
-        expect(() => AsepriteJson.parse(data as AsepriteJsonData, {target: t})).toThrow(`AsepriteJson: ${message}`);
+        expect(() => AsepriteJson.parse(data as AsepriteJsonData, {target: t})).toThrow(
+          new errorClass(`AsepriteJson: ${message}`),
+        );
         expect(t.size).toBe(0);
       });
     });

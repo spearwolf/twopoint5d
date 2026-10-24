@@ -123,19 +123,26 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   add(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
     // every aabb is checked before the first renderable moves, so that an add() that throws leaves
     // the grid as it was — a renderable the grid holds stays in its cells as well
+    // the cells of each renderable, worked out once by the check and read again to place it
+    const spans: number[] = [];
     for (const renderable of renderables) {
       assertFiniteAABB(renderable.aabb, 'the aabb of a renderable');
-      const {columns, rows} = this.#cellsOf(renderable.aabb);
+      const {tileLeft, tileTop, columns, rows} = this.#cellsOf(renderable.aabb);
       if (columns * rows > this.#maxCellsPerRenderable) {
         throw new RangeError(
           `Map2DSpatialHashGrid: the aabb of a renderable reaches into ${columns * rows} cells, more than maxCellsPerRenderable (${this.#maxCellsPerRenderable}) — give the grid larger cells or raise maxCellsPerRenderable`,
         );
       }
+      spans.push(tileLeft, tileTop, columns, rows);
     }
-    for (const renderable of renderables) {
+    for (let i = 0; i < renderables.length; i++) {
+      const renderable = renderables[i]!;
       this.#takeOut(renderable);
 
-      const {tileLeft, tileTop, columns, rows} = this.#cellsOf(renderable.aabb);
+      const tileLeft = spans[4 * i]!;
+      const tileTop = spans[4 * i + 1]!;
+      const columns = spans[4 * i + 2]!;
+      const rows = spans[4 * i + 3]!;
       const cells: GridCell<Renderable>[] = [];
       for (let y = tileTop; y < tileTop + rows; y++) {
         for (let x = tileLeft; x < tileLeft + columns; x++) {

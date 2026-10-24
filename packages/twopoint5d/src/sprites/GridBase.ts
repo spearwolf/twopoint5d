@@ -97,7 +97,7 @@ const grids = new Map<string, GridBase>();
  */
 export function gridBase(options: GridBaseOptions): GridBase {
   if (options == null || typeof options !== 'object') {
-    throw new TypeError('gridBase: takes {columns, rows} — gridBase({columns: 3, rows: 3})');
+    throw new TypeError(`gridBase: takes {columns, rows}, got ${describeValue(options)} — gridBase({columns: 3, rows: 3})`);
   }
   const {columns, rows} = options;
   for (const [name, value] of [

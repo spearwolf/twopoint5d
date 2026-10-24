@@ -188,6 +188,13 @@ describe('TileSet', () => {
       expect(atlas.size).toBe(0);
     });
 
+    test('names a count that is beyond counting as more than TileSet.MaxTiles tiles', () => {
+      const create = () => new TileSet(new TextureCoords(0, 0, 64, 64), {tileWidth: Number.MIN_VALUE, tileHeight: 16});
+
+      expect(create).toThrow(RangeError);
+      expect(create).toThrow(/^TileSet: more than 1048576 tiles of 5e-324 × 16 fit into 64 × 64 /);
+    });
+
     test('refuses a tileCount above TileSet.MaxTiles', () => {
       const create = () => new TileSet(new TextureCoords(0, 0, 2048, 1024), {tileWidth: 1, tileHeight: 1, tileCount: 1048577});
 

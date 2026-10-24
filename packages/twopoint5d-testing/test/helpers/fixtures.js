@@ -125,7 +125,8 @@ const kept = [];
  * Hands `item` back and keeps it for {@link disposeKept}, which the `afterEach` of the suite
  * calls: what a test builds itself — a render target, a pipeline, a geometry, a material,
  * sprites — is released after the test, also when an assertion fails half way through it.
- * Keep a part before what holds it, so that the holder lets go first.
+ * Keep a part before what holds it, so that the holder lets go first. A test whose subject is the
+ * release of a kept item releases it through {@link release}.
  *
  * @template {{dispose(): unknown}} T
  * @param {T} item
@@ -134,6 +135,21 @@ const kept = [];
 export function keep(item) {
   kept.push(item);
   return item;
+}
+
+/**
+ * Releases `item` now, as the subject of a test, and takes it off the list of {@link keep}, so
+ * that {@link disposeKept} does not release it a second time. An item `keep()` does not hold is
+ * released all the same.
+ *
+ * @template {{dispose(): unknown}} T
+ * @param {T} item
+ * @returns {ReturnType<T['dispose']>}
+ */
+export function release(item) {
+  const at = kept.lastIndexOf(item);
+  if (at >= 0) kept.splice(at, 1);
+  return /** @type {ReturnType<T['dispose']>} */ (item.dispose());
 }
 
 /**

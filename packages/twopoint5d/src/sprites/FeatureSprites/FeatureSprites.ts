@@ -1,6 +1,7 @@
 import {type Camera, Matrix4, Mesh, type Texture, Vector2, Vector3, Vector4} from 'three/webgpu';
 import type {VO, VOSortKey, VOSortKeyName, VOSortOptions} from '../../vertex-objects/types.js';
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
+import {describeThreeValue} from '../../utils/describeThreeValue.js';
 import {describeValue} from '../../utils/describeValue.js';
 import {isObject} from '../../utils/isObject.js';
 import {throwCollected} from '../../utils/throwCollected.js';
@@ -150,10 +151,6 @@ type UniformBinding =
       readonly vector: Vector4;
     };
 
-// a three.js object is named by its type, anything else as describeValue() writes it
-const describePart = (value: unknown, flag: 'isBufferGeometry' | 'isMaterial'): string =>
-  isObject(value) && value[flag] === true && typeof value['type'] === 'string' ? value['type'] : describeValue(value);
-
 const definedKeys = (record: object): string[] =>
   Object.entries(record)
     .filter(([, value]) => value !== undefined)
@@ -190,7 +187,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
   if (geometry != null) {
     if (!(geometry instanceof FeatureSpritesGeometry)) {
       throw new TypeError(
-        `${WHERE}: the geometry handed in is no FeatureSpritesGeometry, got ${describePart(geometry, 'isBufferGeometry')}`,
+        `${WHERE}: the geometry handed in is no FeatureSpritesGeometry, got ${describeThreeValue(geometry, 'isBufferGeometry')}`,
       );
     }
     if (geometry.kind !== kind) throw new TypeError(`${WHERE}: the geometry handed in was built for another sprite kind`);
@@ -206,7 +203,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
   if (material != null) {
     if (!(material instanceof FeatureSpritesMaterial)) {
       throw new TypeError(
-        `${WHERE}: the material handed in is no FeatureSpritesMaterial, got ${describePart(material, 'isMaterial')}`,
+        `${WHERE}: the material handed in is no FeatureSpritesMaterial, got ${describeThreeValue(material, 'isMaterial')}`,
       );
     }
     if (material.kind !== kind) throw new TypeError(`${WHERE}: the material handed in was built for another sprite kind`);
@@ -628,7 +625,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    */
   bindUniform(name: string, source: SpriteUniformSource): void {
     if (source == null || typeof source.write !== 'function' || (source.type !== 'vec3' && source.type !== 'vec4')) {
-      throw new TypeError(`${WHERE}: bindUniform("${name}") takes a source with a type of vec3 or vec4 and a write()`);
+      throw new TypeError(
+        `${WHERE}: bindUniform("${name}") takes a source with a type of vec3 or vec4 and a write(), got ${describeValue(source)}`,
+      );
     }
     const material = this.#material;
     // name and type of the uniform are not judged once disposed: the uniforms went with the material

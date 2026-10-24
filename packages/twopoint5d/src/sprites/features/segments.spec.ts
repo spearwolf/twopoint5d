@@ -122,9 +122,8 @@ describe('segmentPlacement()', () => {
     ['x', '"x"'],
     [null, 'null'],
   ])('refuses options of %o that are no object', (options, shown) => {
-    expect(() => segmentPlacement(options as never)).toThrow(TypeError);
     expect(() => segmentPlacement(options as never)).toThrow(
-      `segmentPlacement: the options must be an object, {facing?, plane?}, got ${shown}`,
+      new TypeError(`segmentPlacement: the options must be an object, {facing?, plane?}, got ${shown}`),
     );
   });
 
