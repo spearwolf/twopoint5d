@@ -32,6 +32,26 @@ function makeCanvas(width = 32, height = 16) {
   return {width, height} as unknown as HTMLCanvasElement;
 }
 
+// a canvas as the DOM builds it: a width or a height it is given ends up a whole number, rounded down
+function makeRoundingCanvas(width: number, height: number) {
+  let w = width;
+  let h = height;
+  return {
+    get width() {
+      return w;
+    },
+    set width(value: number) {
+      w = Math.trunc(value);
+    },
+    get height() {
+      return h;
+    },
+    set height(value: number) {
+      h = Math.trunc(value);
+    },
+  } as unknown as HTMLCanvasElement;
+}
+
 // without a setContainerSize() the Stage2D has no camera and renderTo() falls through inside it, so
 // render() runs to the end under node without three.js ever drawing
 function makeStage() {
@@ -187,6 +207,41 @@ describe('Canvas2DStage', () => {
     expect(resized).not.toHaveBeenCalled();
   });
 
+  test('the constructor refuses a fit it does not know with a TypeError, before anything is built', () => {
+    const renderer = makeRenderer();
+
+    for (const fit of ['fill', 5]) {
+      const got = fit === 'fill' ? '"fill"' : '5';
+      const failure = new TypeError(`new Canvas2DStage(): fit must be "contain" or "cover", got ${got}`);
+
+      // the number arm throws before document.createElement(), which this suite has not got
+      expect(() => new Canvas2DStage(renderer, 32, 16, fit as never)).toThrow(failure);
+      expect(() => new Canvas2DStage(renderer, makeCanvas(), fit as never)).toThrow(failure);
+    }
+
+    expect(new Canvas2DStage(renderer, makeCanvas(), undefined as never).fit, 'undefined stands for the default').toBe('contain');
+  });
+
+  test('a write to fit refuses a value it does not know with a TypeError and keeps the fit it has, also after dispose()', () => {
+    const stage = makeStage();
+    stage.fit = 'cover';
+    const failure = new TypeError('Canvas2DStage: fit must be "contain" or "cover", got "fill"');
+
+    expect(() => {
+      stage.fit = 'fill' as never;
+    }).toThrow(failure);
+    expect(stage.fit).toBe('cover');
+    expect(stage.projection.viewSpecs.fit).toBe('cover');
+
+    stage.dispose();
+
+    expect(() => {
+      stage.fit = 'fill' as never;
+    }).toThrow(failure);
+    expect(stage.fit).toBe('cover');
+    expect(stage.projection.viewSpecs.fit).toBe('cover');
+  });
+
   test('uploads a change of the same size into the texture it has', () => {
     const stage = makeStage();
 
@@ -296,21 +351,21 @@ describe('Canvas2DStage', () => {
   });
 
   describe('sizes', () => {
-    test('the constructor refuses a width or a height that is not a finite number above 0', () => {
+    test('the constructor refuses a width or a height that is no finite number of 1 or more', () => {
       expect(() => new Canvas2DStage(makeRenderer(), 0, 10)).toThrow(
-        new RangeError('new Canvas2DStage(): width must be a finite number above 0, got 0'),
+        new RangeError('new Canvas2DStage(): width must be a finite number of 1 or more, got 0'),
       );
       expect(() => new Canvas2DStage(makeRenderer(), NaN, 10)).toThrow(
-        new RangeError('new Canvas2DStage(): width must be a finite number above 0, got NaN'),
+        new RangeError('new Canvas2DStage(): width must be a finite number of 1 or more, got NaN'),
       );
       expect(() => new Canvas2DStage(makeRenderer(), 10, -1)).toThrow(
-        new RangeError('new Canvas2DStage(): height must be a finite number above 0, got -1'),
+        new RangeError('new Canvas2DStage(): height must be a finite number of 1 or more, got -1'),
       );
     });
 
-    test('setCanvasSize() refuses a width that is not a finite number above 0, also after dispose()', () => {
+    test('setCanvasSize() refuses a width that is no finite number of 1 or more, also after dispose()', () => {
       const stage = makeStage();
-      const failure = new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number above 0, got NaN');
+      const failure = new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number of 1 or more, got NaN');
 
       expect(() => stage.setCanvasSize(NaN, 10)).toThrow(failure);
       expect([stage.width, stage.height], 'the canvas keeps its size').toEqual([32, 16]);
@@ -318,6 +373,49 @@ describe('Canvas2DStage', () => {
       stage.dispose();
 
       expect(() => stage.setCanvasSize(NaN, 10)).toThrow(failure);
+    });
+
+    test('the constructor and setCanvasSize() refuse a width or a height below 1, which would leave a canvas without area', () => {
+      expect(() => new Canvas2DStage(makeRenderer(), 0.5, 10)).toThrow(
+        new RangeError('new Canvas2DStage(): width must be a finite number of 1 or more, got 0.5'),
+      );
+      expect(() => new Canvas2DStage(makeRenderer(), 10, 0.999)).toThrow(
+        new RangeError('new Canvas2DStage(): height must be a finite number of 1 or more, got 0.999'),
+      );
+
+      const stage = makeStage();
+
+      expect(() => stage.setCanvasSize(0.5, 10)).toThrow(
+        new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number of 1 or more, got 0.5'),
+      );
+      expect(() => stage.setCanvasSize(10, 0.999)).toThrow(
+        new RangeError('Canvas2DStage#setCanvasSize(): height must be a finite number of 1 or more, got 0.999'),
+      );
+      expect([stage.width, stage.height], 'the canvas keeps its size').toEqual([32, 16]);
+
+      stage.dispose();
+
+      expect(() => stage.setCanvasSize(0.5, 10)).toThrow(
+        new RangeError('Canvas2DStage#setCanvasSize(): width must be a finite number of 1 or more, got 0.5'),
+      );
+    });
+
+    test('takes a width of 1, and a fraction above it as the canvas rounds it down', () => {
+      vi.stubGlobal('document', {createElement: () => makeRoundingCanvas(0, 0)});
+      try {
+        const built = new Canvas2DStage(makeRenderer(), 1.5, 1);
+
+        expect([built.width, built.height]).toEqual([1, 1]);
+        expect(built.sprite.scale.toArray()).toEqual([1, 1, 1]);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+
+      const stage = new Canvas2DStage(makeRenderer(), makeRoundingCanvas(32, 16));
+      stage.setCanvasSize(1, 1.5);
+
+      expect([stage.width, stage.height]).toEqual([1, 1]);
+      expect(stage.projection.viewSpecs).toMatchObject({width: 1, height: 1});
     });
 
     test('setContainerSize() refuses a width or a height that is no finite number in its own name, also after dispose()', () => {
@@ -391,6 +489,56 @@ describe('Canvas2DStage', () => {
       stage.render();
 
       expect(updateFrame.thirdCall.args[2], 'the second call without values counts 2').toBe(2);
+    });
+
+    test('a listener of OnCanvas2DStageResize that throws: every listener hears it, the frame is drawn, the error comes out afterwards, and the next render() sends no second OnCanvas2DStageResize', () => {
+      const stage = makeStage();
+      const renderTo = sandbox.spy(stage.stageRenderer, 'renderTo');
+      const boom = new Error('boom');
+      const thrower = vi.fn(() => {
+        throw boom;
+      });
+      const second = vi.fn();
+      const rendered = vi.fn();
+      on(stage, OnCanvas2DStageResize, thrower);
+      on(stage, OnCanvas2DStageResize, second);
+      on(stage, OnCanvas2DStageRender, rendered);
+
+      expect(() => stage.render()).toThrow(boom);
+
+      expect(second, 'the listener behind the one that throws').toHaveBeenCalledTimes(1);
+      expect(rendered, 'the frame goes on').toHaveBeenCalledTimes(1);
+      expect(renderTo.calledOnce, 'and is drawn').toBe(true);
+      expect(stage.texture, 'the canvas is uploaded').toBeDefined();
+
+      expect(() => stage.render()).not.toThrow();
+
+      expect(thrower, 'no second resize for the same size').toHaveBeenCalledTimes(1);
+      expect(second).toHaveBeenCalledTimes(1);
+      expect(rendered).toHaveBeenCalledTimes(2);
+    });
+
+    test('a listener of OnCanvas2DStageResize and one of OnCanvas2DStageRender that throw come out together as an AggregateError', () => {
+      const stage = makeStage();
+      const resizeError = new Error('resize');
+      const renderError = new Error('render');
+      on(stage, OnCanvas2DStageResize, () => {
+        throw resizeError;
+      });
+      on(stage, OnCanvas2DStageRender, () => {
+        throw renderError;
+      });
+
+      let caught: unknown;
+      try {
+        stage.render();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).message).toMatch(/^Canvas2DStage#render\(\)/);
+      expect((caught as AggregateError).errors).toEqual([resizeError, renderError]);
     });
 
     test('the Stage2D gets OnStageUpdateFrame once the container has a size', () => {

@@ -628,6 +628,13 @@ On `Canvas2DStage`:
   into the canvas here and set `needsUpdate`.
 - `OnCanvas2DStageDispose` — once, from `dispose()`, before the stage stops listening.
 
+A listener of `OnCanvas2DStageResize` that throws does not cut short the frame: every
+listener hears the event, the stage has taken the new size — the next `render()` sends no
+second event for it —, the frame is uploaded and drawn, and the error reaches the caller
+afterwards — one unchanged, several as an `AggregateError`. `OnCanvas2DStageRender` goes
+out through `emit()`: a listener that throws ends the frame, and the canvas is neither
+uploaded nor drawn.
+
 All event names are exported from `@spearwolf/twopoint5d`.
 
 ---

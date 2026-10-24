@@ -25,6 +25,17 @@ function makeFrame(deltaTime: number, extra?: Partial<DisplayEventProps>): Displ
 }
 
 describe('FixedFrameLoop', () => {
+  it('OnTick and OnRender are read-only for TypeScript', () => {
+    // never called: the check is the one of the compiler
+    const write = () => {
+      // @ts-expect-error — onTick() subscribes under the name the loop emits under
+      FixedFrameLoop.OnTick = Symbol('other');
+      // @ts-expect-error — onRender() subscribes under the name the loop emits under
+      FixedFrameLoop.OnRender = Symbol('other');
+    };
+    expect(write).toBeTypeOf('function');
+  });
+
   let display: Display;
   let sim: FixedFrameLoop;
   let ticks: FixedFrameLoopTickProps[];

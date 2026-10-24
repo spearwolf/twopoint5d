@@ -889,6 +889,22 @@ describe('Display', () => {
       expect(await renderFrames()).toBe(10);
     });
 
+    it('a maxFps that is no positive finite number gives the frame loop no limit', async () => {
+      const {display, frame} = makeDisplay({maxFps: -30});
+      await display.start();
+      let count = 0;
+      on(display, OnDisplayRenderFrame, () => {
+        count += 1;
+      });
+      for (let i = 0; i < 10; i++) {
+        frame(1000 + i * 16);
+      }
+
+      expect(count, 'every frame comes through').toBe(10);
+      expect(() => makeDisplay({maxFps: NaN}), 'NaN').not.toThrow();
+      expect(() => makeDisplay({maxFps: Infinity}), 'Infinity').not.toThrow();
+    });
+
     it('resizePollIntervalMs spaces out the measurements of the frames', async () => {
       const now = vi.spyOn(performance, 'now').mockReturnValue(5000);
       const {display, canvas, frame} = makeDisplay();
@@ -1525,6 +1541,21 @@ describe('Display', () => {
       frame(1016);
 
       expect(renderer.setDrawingBufferSize).toHaveBeenLastCalledWith(320, 200, 2);
+    });
+
+    it('measures a size source scaled by a CSS transform with its borders and padding in that scale', () => {
+      // the layout size is half the client rect: a scale(2) on the source or on one of its ancestors
+      const source = {getBoundingClientRect: () => ({width: 640, height: 400}), offsetWidth: 320, offsetHeight: 200};
+      getComputedStyleStub.mockImplementation((element: unknown) => ({
+        getPropertyValue: (name: string) => {
+          if (name === 'box-sizing') return 'border-box';
+          return element === source && name.startsWith('padding-') ? '10px' : '';
+        },
+      }));
+
+      const {display} = makeDisplay({resizeToElement: source as unknown as HTMLElement});
+
+      expect([display.width, display.height]).toEqual([600, 360]);
     });
 
     it('measures the window under resize-to="window" once the window reports a resize', async () => {

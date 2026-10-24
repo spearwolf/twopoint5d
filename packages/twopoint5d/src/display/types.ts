@@ -50,7 +50,8 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * If the display supports fewer frames than specified here,
    * only as many frames as the display supports will be rendered.
    *
-   * If nothing or 0 is specified here, the maximum possible FPS are used.
+   * Without it, with 0, or with anything but a positive finite number, the display draws as many
+   * frames as the page gives it.
    */
   maxFps?: number;
 

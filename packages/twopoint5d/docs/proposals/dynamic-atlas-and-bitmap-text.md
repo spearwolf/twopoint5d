@@ -419,7 +419,7 @@ pair — is refused with a `RangeError`, every other refusal with an `Error`:
   `base` above 0 — a line height of 0 would stack every line onto the first);
 - no `chars` array;
 - a char whose `id` is no whole number from 0 to 0x10FFFF, or a field of §4.2 that is no finite
-  number; `width`, `height` below 0;
+  number; `x`, `y`, `width`, `height` below 0;
 - a char that lies outside the page:
   `BitmapFont: the char "A" (65) reaches beyond the page of 128 × 64 — x 120 + width 12`;
 - two chars of one id;
@@ -592,9 +592,12 @@ it does not write; `rewriteText(sprites, glyphs, font, '')` frees them all and e
 - an error of `createSprite()` — under `grow`, a pool that cannot grow — goes on unchanged after
   the sprites created so far are freed again;
 - `scale`, `lineHeight` and `maxWidth` that are no finite number above 0, `x`, `y`, `z` and
-  `letterSpacing` that are no finite number, an `align` that is none of the three, a `fallback` that
-  is no single char or no glyph of the font — each naming the option and its value:
+  `letterSpacing` that are no finite number — a `RangeError` —, an `align` that is none of the
+  three, a `fallback` that is no single char or no glyph of the font — an `Error` —, each naming the
+  option and its value:
   `layoutText: lineHeight must be a finite number above 0, got 0`;
+- a text that is no string — a `TypeError`:
+  `layoutText: the text must be a string, got 5`;
 - for `rewriteText()`, a glyph that is no sprite of these sprites — a `TypeError` naming its index,
   before anything changes; on a pool that runs full or a throw of `createSprite()` the glyphs keep
   the text they had.

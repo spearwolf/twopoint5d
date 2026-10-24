@@ -172,15 +172,18 @@ them in draw order with those sprites — a label may end up behind the sprite i
 objects through a sort, still in reading order.
 
 **Refusals.** A kind without `InstancePosition`, `QuadSize` or `AtlasFrame` — `AnimatedSpriteKind`,
-whose frame comes out of an `animsMap` — is refused before a sprite is created, naming every feature
-missing. A pool that runs full is refused naming how many sprites the text needs; the sprites
-created so far are freed again, so nothing of the text is left behind. An error of `createSprite()`
-— under `grow`, a pool that cannot grow — goes on to the caller after the same freeing. A `scale`,
-`lineHeight` or `maxWidth` that is no number above 0, an `align` it does not know and a `fallback`
-the font lacks are refused naming the option. `rewriteText()` refuses a glyph that is no sprite of
-the sprites handed in, naming its index, before anything changes; on a pool that runs full the
-glyphs keep the text they had. Sprites that are disposed write nothing: `writeText()` answers an
-empty array, `rewriteText()` empties `glyphs`.
+whose frame comes out of an `animsMap` — is refused with a `TypeError` before a sprite is created,
+naming every feature missing. A pool that runs full is refused with a `RangeError` naming how many
+sprites the text needs; the sprites created so far are freed again, so nothing of the text is left
+behind. An error of `createSprite()` — under `grow`, a pool that cannot grow — goes on to the caller
+unchanged, after the same freeing. A `scale`, `lineHeight` or `maxWidth` that is no finite number
+above 0, and an `x`, `y`, `z` or `letterSpacing` that is no finite number, are refused with a
+`RangeError`; an `align` it does not know and a `fallback` that is no single char or no glyph of the
+font with an `Error` — each naming the option. A text that is no string is refused with a
+`TypeError`. `rewriteText()` refuses a glyph that is no sprite of the sprites handed in with a
+`TypeError` naming its index, before anything changes; on a pool that runs full the glyphs keep the
+text they had. Sprites that are disposed write nothing: `writeText()` answers an empty array,
+`rewriteText()` empties `glyphs`.
 
 ## Measuring: `layoutText()`
 
@@ -198,6 +201,9 @@ const {width, height, lineCount, glyphs} = layoutText(font, 'INVENTORY FULL', {s
 // glyphs[i]: {glyph, line, x, y, width, height} — the box of a glyph, y up, its top edge at y
 export const panelSize = {width: width + 8, height: height + 8, lineCount, firstGlyph: glyphs[0]};
 ```
+
+`layoutText()` refuses its options and a text that is no string as `writeText()` does, with the
+same error classes.
 
 ## A sine scroller
 

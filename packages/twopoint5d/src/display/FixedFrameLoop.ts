@@ -93,8 +93,11 @@ export interface FixedFrameLoop extends EventizedObject {}
  * events fire) and disposes when `Display` disposes (via `OnDisplayDispose`).
  */
 export class FixedFrameLoop {
-  static OnTick = OnTick;
-  static OnRender = OnRender;
+  /** The event of every simulation step; {@link onTick} subscribes to it. */
+  static readonly OnTick = OnTick;
+
+  /** The event of every render frame; {@link onRender} subscribes to it. */
+  static readonly OnRender = OnRender;
 
   /**
    * The rate a loop starts at when its options name none, or one it refuses. Read each time a

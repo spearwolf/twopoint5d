@@ -161,12 +161,18 @@ ci:checks = lint → build → typecheck → checkPkgTypes → checkNameableType
   publish pipeline's helpers and of `makePackageJson.mjs`,
   `checkPeerDependenciesOnly.mjs` and `checkNameableTypes.mjs` themselves (§4, §6), of
   the CI cache server and its entry script, of the helpers of the code block check and
-  of the Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`),
-  the check that the publish script and its helpers import nothing but Node's built-ins,
-  the check that every tracked Markdown file is an input of
-  `twopoint5d-testing:typecheck`, the check that every capitalised tag of the lookbook
-  demos names an export of the library, and the check that the lookbook serves the
-  script `RainbowLine` loads at runtime.
+  of the Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`), of
+  the helpers of the lookbook's preview generator
+  (`scripts/lookbook/demoPreviewConfig.mjs`, `previewServer.mjs`, `webpSize.mjs`), the
+  check that the publish script and its helpers import nothing but Node's built-ins, the
+  check that every tracked Markdown file is an input of `twopoint5d-testing:typecheck`,
+  the check that every file git tracks under
+  `packages/twopoint5d/src/` is an input of the library's `test`, `coverage` and
+  `allocations`, the check that every capitalised tag of the lookbook demos names an
+  export of the library, the check that the lookbook serves the script `RainbowLine`
+  loads at runtime, the check of the lookbook's preview images against its demos, their
+  ids and the size of the card, and the check of the view-transition names of the
+  lookbook's navbar against its two pages and the stylesheets.
 - `test:coverage` runs the library's Vitest project `specs` once, with coverage, against
   the thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the
   gate: it runs every spec without coverage. The thresholds sit two points under the level
@@ -508,18 +514,27 @@ submitted to it and, under WebGPU, the page has drawn two more animation frames 
 wait two seconds at most, the first one with a warning on the console when it runs out.
 Firefox 155 under WebGPU needs the frames to keep drawing for the tests that follow.
 
-The helpers of the publish pipeline, the CI cache server, the code block check and the
-Nameable-Types check run under `node --test` (`pnpm test:scripts`), and five more specs
-share that run. The Nx project `scripts` has no `test` target, so `pnpm test` leaves all
-of them out. The five are:
+The helpers of the publish pipeline, the CI cache server, the code block check, the
+Nameable-Types check and the preview generator of the lookbook run under `node --test`
+(`pnpm test:scripts`), and seven more specs share that run. The Nx project `scripts` has
+no `test` target, so `pnpm test` leaves all of them out. The seven are:
 
 - `scripts/lookbook/rainbowLineScript.test.mjs` holds `apps/lookbook/public/js/` to the
   script `@spearwolf/astro-rainbow-line` loads at runtime. Nothing in the repo
   references that file, so only a spec keeps it from being cleaned up.
 - `scripts/lookbook/demoMetadata.test.mjs` holds the demo metadata of the lookbook to
-  the library: every tag that starts with a capital letter names an export of
+  its pages and to the library: every demo page has a JSON file whose `url` is the route
+  of the page, and every tag that starts with a capital letter names an export of
   `packages/twopoint5d/src/index.ts`, read through the TypeScript compiler from the
   sources, so the spec needs no build.
+- `scripts/lookbook/demoPreviews.test.mjs` holds
+  `apps/lookbook/public/images/demo-preview/` (`previewDir` in
+  `scripts/lookbook/lookbookDemos.mjs`) to the demos: an `<id>.webp` for each demo,
+  nothing else, each in the size of the card, and no metadata file that names an image —
+  the card derives it from the id.
+- `scripts/lookbook/navViewTransitions.test.mjs` holds the `view-transition-name`s of
+  each of the two pages of the lookbook to the pairs of the design, and the stylesheets
+  to the names the pages declare; neither the build nor `astro check` sees any of it.
 - `scripts/checkDocSnippets/typecheckInputs.test.mjs` runs git and Nx itself: it holds
   the Markdown inputs of `twopoint5d-testing:typecheck` to the files git tracks.
 - `scripts/nxInputs/libraryVitestInputs.test.mjs` runs git and Nx as well: it holds the

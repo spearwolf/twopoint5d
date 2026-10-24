@@ -55,8 +55,8 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   which the nightly workflow `bench.yml` archives. Not part of `pnpm run ci` nor of the
   CI workflow: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
-  cache server, the docs' code block check and the Nameable-Types check
-  (`scripts/**/*.test.mjs`), plus specs that start `makePackageJson.mjs`,
+  cache server, the docs' code block check, the Nameable-Types check and the lookbook's
+  preview generator (`scripts/**/*.test.mjs`), plus specs that start `makePackageJson.mjs`,
   `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs` and `nxCacheServer.mjs` as
   child processes, one that checks the lookbook's vendored `rainbow-line` script, one
   that holds the tags and routes of the lookbook's demo metadata to the library's

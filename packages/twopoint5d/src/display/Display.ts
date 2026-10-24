@@ -38,7 +38,7 @@ import {
   readsBackWrittenSize,
   resolveDrawingBuffer,
 } from './resolveDrawingBuffer.js';
-import {getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
+import {contentAreaSide, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
 import type {CreateRendererParameters, DisplayEventProps, DisplayParameters, ResizeDisplayToFn} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
@@ -249,7 +249,9 @@ export interface Display extends EventizedObject {}
  *    as no size: the display takes the window under `resize-to="window"` or
  *    `"fullscreen"`, and 300 × 150 otherwise.
  * 3. Otherwise the content-area of {@link Display.resizeToElement} is
- *    measured via `getBoundingClientRect()` minus padding/border.
+ *    measured via `getBoundingClientRect()` minus padding/border; on an
+ *    element a CSS transform scales, padding and border come off in the
+ *    scale of that transform, as in `getContentAreaSize()`.
  *
  * From the size of the source in CSS pixels, the pipeline goes on like this:
  * the canvas `box-sizing` decides whether its padding and border come off
@@ -931,7 +933,9 @@ export class Display {
     const canvasTaken = waitForCanvas(renderer.domElement);
     this.#waitForRenderer = canvasTaken != null ? canvasTaken.then(() => renderer.init()) : renderer.init();
 
-    this.#frameLoop = new FrameLoop(maxFps ?? 0, this.#renderer);
+    // a maxFps that is no positive finite number is no limit — as adaptiveResolution reads it
+    // below —, and new FrameLoop() would refuse it only once the renderer is built
+    this.#frameLoop = new FrameLoop(isPositiveFinite(maxFps) ? maxFps : 0, this.#renderer);
 
     // From here on a throw takes down what the constructor has built, as dispose() does: it
     // releases the renderer, gives a canvas handed in back and takes its own container out.
@@ -1436,11 +1440,12 @@ export class Display {
     } else {
       const element = this.#sizeSourceElement;
       if (element != null) {
-        // the content area: the client rect minus padding and border
+        // the content area: the client rect minus padding and border, both in the scale the
+        // transforms give the element
         const rect = element.getBoundingClientRect();
         const style = this.#getSourceStyle(element, canvas);
-        this.#measuredWidth = rect.width - getHorizontalInnerMargin(style);
-        this.#measuredHeight = rect.height - getVerticalInnerMargin(style);
+        this.#measuredWidth = contentAreaSide(rect.width, (element as HTMLElement).offsetWidth, getHorizontalInnerMargin(style));
+        this.#measuredHeight = contentAreaSide(rect.height, (element as HTMLElement).offsetHeight, getVerticalInnerMargin(style));
         return;
       }
     }

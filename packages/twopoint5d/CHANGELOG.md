@@ -136,6 +136,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new TileSet()` works out how many tiles fit and refuses more than `TileSet.MaxTiles` of them without a `tileCount`, and a `tileCount` above it, with a `RangeError` before it lays a tile (**BREAKING**). See the Migration Guide
 - `FrameBasedAnimations#add()` refuses timing that gives more than one of `duration`, `frameRate` and `durations` with an error that names the animation and the fields; a `TextureResource` skips such an entry of its animation data and reports it with `source: 'frameBasedAnimations'` (**BREAKING** for JavaScript and catalog json). See the Migration Guide
 - `FrameBasedAnimations.MaxTextureSize` is `static readonly`: a bake takes a limit of its own through `maxTextureSize` or `renderer` (**BREAKING** for TypeScript). See the Migration Guide
+- `FrameLoop#setFps()` and `new FrameLoop()` throw a `RangeError` for a `maxFps` that is no finite number of 0 or more — `NaN`, an infinite value, a negative one —, and `setFps()` keeps the limit it has (**BREAKING**). A `maxFps` of `Display` that is no positive finite number gives the frame loop no limit, as `adaptiveResolution` reads it. See the Migration Guide
+- `FrameLoop.OnFrame`, `FixedFrameLoop.OnTick` and `FixedFrameLoop.OnRender` are `static readonly` (**BREAKING** for TypeScript), and a `FrameLoop` subscribes, emits and unsubscribes under the event name of its module, whatever stands at the static. See the Migration Guide
+- `new Canvas2DStage()` and a write to `fit` refuse a fit other than `'contain'` and `'cover'` with a `TypeError` that names the call — the constructor before anything is built, the write on a disposed stage as well, and the fit stays as it is (**BREAKING**). See the Migration Guide
 
 ### Deprecated
 
@@ -188,7 +191,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Canvas2DStage` brings sprite and view to the size of a canvas handed to its constructor and resized in place, on the next `render()` and before `OnCanvas2DStageResize` goes out, as `setCanvasSize()` does
 - `Canvas2DStage` writes the canvas texture into the `SpriteMaterial` it built and `dispose()` releases that one, also after the caller set another into the `material` slot of `sprite`, which stays the caller's
 - `Canvas2DStage` uploads no canvas of width or height 0 — WebGPU builds no texture without area —, and `needsUpdate` stays set for the first `render()` with one
-- `new Canvas2DStage(renderer, width, height)` and `setCanvasSize()` refuse a width or a height that is no finite number above 0 with a `RangeError` that names the call, before anything is built or written; `setCanvasSize()` refuses it on a disposed stage as well. `setContainerSize()` refuses a width or a height that is `NaN` or infinite with a `RangeError` that names it, before the size reaches `stageRenderer`, also on a disposed stage; 0 and negative values go on to `StageRenderer#resize()` as they are
+- `new Canvas2DStage(renderer, width, height)` and `setCanvasSize()` refuse a width or a height that is no finite number of 1 or more — a canvas rounds its width and its height down to whole numbers and would have no area below 1 — with a `RangeError` that names the call, before anything is built or written; `setCanvasSize()` refuses it on a disposed stage as well. `setContainerSize()` refuses a width or a height that is `NaN` or infinite with a `RangeError` that names it, before the size reaches `stageRenderer`, also on a disposed stage; 0 and negative values go on to `StageRenderer#resize()` as they are
+- every listener of `OnCanvas2DStageResize` hears the event from `Canvas2DStage#render()`, also behind one that throws: the stage has taken the new size — the next `render()` sends no second event for it —, the frame is uploaded and drawn, and the error reaches the caller afterwards — one unchanged, several as an `AggregateError`
+- `getContentAreaSize()` and the measurement of the size source of a `Display` take the borders and the padding of an element a CSS transform scales off in the scale of that transform: an element under `scale(2)` measures twice its content box
 - `new ProjectionPlane()`, and with it a projection, refuses a plane description that is neither one of the four nor a `THREE.Plane` with a `TypeError` that quotes it and names the four
 - `TextureStore#parse()` runs to its end behind a subscriber of a resource that throws while the values are written, a callback of `on()` among them: every item is written, `ready` and the `resource:<id>` events go out, `evictMissing` runs, and the throw goes out last as an `error` with `source: 'parse'`; `TextureStore#loadAsync()` resolves with the store
 - `TextureStore#registerAtlasAdapter()` registers nothing on a disposed store; it still refuses the arguments it refuses on a live one
@@ -931,6 +936,73 @@ import {FrameBasedAnimations} from '@spearwolf/twopoint5d';
 declare const animations: FrameBasedAnimations;
 
 const animsMap = animations.bakeDataTexture({maxTextureSize: 4096});
+```
+
+#### The frame rate of a FrameLoop
+
+`new FrameLoop()` and `setFps()` take a `maxFps` that is a finite number of 0 or more. A negative value is no limit of its own, and `0` is the one that sets none.
+
+**Before**
+
+```ts
+const loop = new FrameLoop(-30);
+loop.setFps(Number.POSITIVE_INFINITY);
+```
+
+**After**
+
+```ts check
+import {FrameLoop} from '@spearwolf/twopoint5d';
+
+const loop = new FrameLoop(30);
+loop.setFps(0); // no limit: a frame on every animation frame
+```
+
+#### Writing over the event names of the frame loops
+
+`FrameLoop.OnFrame`, `FixedFrameLoop.OnTick` and `FixedFrameLoop.OnRender` are `static readonly`, and a write to one of them does not compile. The event names are fixed: a target handed to `loop.start(target)` receives every frame through its method named `FrameLoop.OnFrame`, and `onTick()` and `onRender()` subscribe a handler to the ticks and the render frames of a `FixedFrameLoop`.
+
+**Before**
+
+```ts
+FrameLoop.OnFrame = Symbol('frame');
+loop.start({[FrameLoop.OnFrame]() {}});
+```
+
+**After**
+
+```ts check
+import {FixedFrameLoop, FrameLoop} from '@spearwolf/twopoint5d';
+
+declare const loop: FrameLoop;
+declare const sim: FixedFrameLoop;
+
+const stop = loop.start({[FrameLoop.OnFrame]() {}});
+sim.onTick(({fixedDelta}) => fixedDelta);
+sim.onRender(({alpha}) => alpha);
+```
+
+#### A Canvas2DStage given a fit or a size it cannot show
+
+The fit of a `Canvas2DStage` is `'contain'` or `'cover'`; another one, which only JavaScript can hand in, throws a `TypeError`. The width and the height of its canvas are finite numbers of 1 or more; a fraction above 1 is rounded down by the canvas.
+
+**Before**
+
+```js
+const stage = new Canvas2DStage(renderer, 0.5, 240, 'fill');
+stage.fit = 'fill';
+```
+
+**After**
+
+```ts check
+import {Canvas2DStage} from '@spearwolf/twopoint5d';
+import type {WebGPURenderer} from 'three/webgpu';
+
+declare const renderer: WebGPURenderer;
+
+const stage = new Canvas2DStage(renderer, 1, 240, 'contain');
+stage.fit = 'cover';
 ```
 
 ## [0.23.0] - 2026-10-18

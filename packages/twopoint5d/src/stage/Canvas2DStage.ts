@@ -5,7 +5,8 @@ import {Chronometer} from '../display/Chronometer.js';
 import {OnCanvas2DStageDispose, OnCanvas2DStageRender, OnCanvas2DStageResize} from '../events.js';
 import {TextureFactory} from '../texture/TextureFactory.js';
 import {assertFinite} from '../utils/assertFinite.js';
-import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
+import {describeValue} from '../utils/describeValue.js';
+import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
@@ -21,6 +22,24 @@ export type Canvas2DStageFitType = 'contain' | 'cover';
  */
 type Canvas2DViewSpecs = {fit: Canvas2DStageFitType; width: number; height: number};
 
+const FIT_TYPES: ReadonlySet<unknown> = new Set<Canvas2DStageFitType>(['contain', 'cover']);
+
+// a fit the projection does not know would land in the view specs as it is, and no view follows from it
+function checkFit(fit: unknown, subject: string): Canvas2DStageFitType {
+  if (!FIT_TYPES.has(fit)) {
+    throw new TypeError(`${subject}: fit must be "contain" or "cover", got ${describeValue(fit)}`);
+  }
+  return fit as Canvas2DStageFitType;
+}
+
+// a canvas takes its width and its height as whole numbers and rounds a fraction down: below 1 it has no area
+function assertCanvasSide(value: unknown, subject: string, name: string): number {
+  if (!isFiniteNumber(value) || value < 1) {
+    throw new RangeError(`${subject}: ${name} must be a finite number of 1 or more, got ${describeValue(value)}`);
+  }
+  return value;
+}
+
 export interface Canvas2DStage extends EventizedObject {}
 
 export class Canvas2DStage {
@@ -29,11 +48,18 @@ export class Canvas2DStage {
 
   #fit: Canvas2DStageFitType = 'contain';
 
+  /**
+   * How the view brings the canvas into the container: `'contain'`, the default, or `'cover'`. A
+   * write of any other value throws a `TypeError` and leaves the fit as it is — on a disposed
+   * stage as well, where a write of a valid value does nothing.
+   */
   get fit(): Canvas2DStageFitType {
     return this.#fit;
   }
 
   set fit(value: Canvas2DStageFitType) {
+    // ahead of the guard: an invalid value is turned away on a disposed stage as well
+    checkFit(value, 'Canvas2DStage');
     if (this.#disposed || this.#fit === value) return;
     this.#fit = value;
     this.#viewSpecs.fit = value;
@@ -110,6 +136,14 @@ export class Canvas2DStage {
 
   #viewSpecs: Canvas2DViewSpecs;
 
+  /**
+   * Builds a stage on a canvas of its own of `width` × `height`, or on the `canvas` handed in, and
+   * `fit` — `'contain'` without one — for the view.
+   *
+   * @throws {RangeError} for a width or a height that is no finite number of 1 or more, before
+   *   anything is built.
+   * @throws {TypeError} for a fit other than `'contain'` and `'cover'`, before anything is built.
+   */
   constructor(
     renderer: WebGPURenderer,
     ...args:
@@ -120,28 +154,32 @@ export class Canvas2DStage {
   ) {
     eventize(this);
 
+    // before anything is built: a canvas without area has nothing to show, and the sprite and
+    // the view would take its size; a fit the projection does not know gives no view at all
+    let fit: Canvas2DStageFitType;
     if (typeof args[0] === 'number') {
-      // before anything is built: a canvas without area has nothing to show, and the sprite and
-      // the view would take its size
-      assertPositiveFinite(args[0], 'new Canvas2DStage()', 'width');
-      assertPositiveFinite(args[1], 'new Canvas2DStage()', 'height');
+      assertCanvasSide(args[0], 'new Canvas2DStage()', 'width');
+      assertCanvasSide(args[1], 'new Canvas2DStage()', 'height');
+      fit = checkFit(args[2] ?? 'contain', 'new Canvas2DStage()');
+    } else {
+      fit = checkFit(args[1] ?? 'contain', 'new Canvas2DStage()');
     }
 
     this.renderer = renderer;
     this.stageRenderer = new StageRenderer();
 
     if (typeof args[0] === 'number') {
-      const [width, height, fit] = args as [width: number, height: number, fit: Canvas2DStageFitType];
+      const [width, height] = args as [width: number, height: number];
 
-      this.#fit = fit ?? this.#fit;
+      this.#fit = fit;
 
       this.canvas = document.createElement('canvas');
       this.canvas.width = width;
       this.canvas.height = height;
     } else {
-      const [canvas, fit] = args as [canvas: HTMLCanvasElement, fit: Canvas2DStageFitType];
+      const [canvas] = args as [canvas: HTMLCanvasElement];
 
-      this.#fit = fit ?? this.#fit;
+      this.#fit = fit;
 
       this.canvas = canvas;
     }
@@ -222,8 +260,8 @@ export class Canvas2DStage {
 
   setCanvasSize(width: number, height: number): void {
     // refused on a disposed stage as well: a size that is no size is wrong whatever the state
-    assertPositiveFinite(width, 'Canvas2DStage#setCanvasSize()', 'width');
-    assertPositiveFinite(height, 'Canvas2DStage#setCanvasSize()', 'height');
+    assertCanvasSide(width, 'Canvas2DStage#setCanvasSize()', 'width');
+    assertCanvasSide(height, 'Canvas2DStage#setCanvasSize()', 'height');
 
     // the canvas may have been handed in, and a disposed stage does not write to it
     if (this.#disposed) return;
@@ -268,45 +306,70 @@ export class Canvas2DStage {
    * Without `setContainerSize()` the {@link stage} has no camera and nothing is drawn; after 100
    * such frames the stage warns once. This method drives {@link stageRenderer} itself — hung on
    * a host such as a `Display`, it would update and draw twice per frame.
+   *
+   * Every listener of `OnCanvas2DStageResize` hears it, also behind one that throws. The stage has
+   * taken the new size by then — the next `render()` sends no second event for it —, the frame
+   * goes on with `OnCanvas2DStageRender`, the upload and the drawing, and the error reaches the
+   * caller afterwards, one unchanged, several as an `AggregateError`. `OnCanvas2DStageRender` goes
+   * out through `emit()`: a listener that throws ends the frame, and the canvas is neither
+   * uploaded nor drawn.
    */
   render(): void;
   render(now: number, deltaTime: number, frameNo: number): void;
   render(now?: number, deltaTime?: number, frameNo?: number): void {
     if (this.#disposed) return;
 
+    let resizeFailed = false;
+    let resizeError: unknown;
+
     if (this.width !== this.#lastWidth || this.height !== this.#lastHeight) {
       // ahead of the event: a listener reads sprite and view in the new size already
       this.#followCanvasSize();
 
-      this.#dispatchEvent(OnCanvas2DStageResize);
-
+      // ahead of the event as well: a listener that throws must not bring the same size back as a
+      // change in every frame after it
       this.#lastWidth = this.width;
       this.#lastHeight = this.height;
-    }
 
-    this.#dispatchEvent(OnCanvas2DStageRender);
-
-    this.#updateTexture();
-
-    if (now === undefined || deltaTime === undefined || frameNo === undefined) {
-      if (this.#clock) {
-        this.#clock.update();
-        now = this.#clock.time;
-        deltaTime = this.#clock.deltaTime;
-      } else {
-        this.#clock = new Chronometer();
-        now = 0;
-        deltaTime = 0;
+      try {
+        // every listener hears the resize, even behind one that throws; the frame is drawn all the same
+        emitStrict(this, OnCanvas2DStageResize, this);
+      } catch (error) {
+        resizeFailed = true;
+        resizeError = error;
       }
-      frameNo = ++this.#frameNo;
     }
 
-    this.stageRenderer.updateFrame(now, deltaTime, frameNo);
-    this.stageRenderer.renderTo(this.renderer);
-  }
+    try {
+      // a listener that throws here ends the frame: a canvas drawn halfway is not uploaded
+      emit(this, OnCanvas2DStageRender, this);
 
-  #dispatchEvent(eventName: typeof OnCanvas2DStageResize | typeof OnCanvas2DStageRender): void {
-    emit(this, eventName, this);
+      this.#updateTexture();
+
+      if (now === undefined || deltaTime === undefined || frameNo === undefined) {
+        if (this.#clock) {
+          this.#clock.update();
+          now = this.#clock.time;
+          deltaTime = this.#clock.deltaTime;
+        } else {
+          this.#clock = new Chronometer();
+          now = 0;
+          deltaTime = 0;
+        }
+        frameNo = ++this.#frameNo;
+      }
+
+      this.stageRenderer.updateFrame(now, deltaTime, frameNo);
+      this.stageRenderer.renderTo(this.renderer);
+    } catch (error) {
+      if (!resizeFailed) throw error;
+      throwCollected(
+        [resizeError, error],
+        'Canvas2DStage#render(): a listener of OnCanvas2DStageResize threw, and so did the frame after it',
+      );
+    }
+
+    if (resizeFailed) throw resizeError;
   }
 
   #disposed = false;
@@ -330,8 +393,9 @@ export class Canvas2DStage {
    *
    * Afterwards `isDisposed` is `true`, `texture` answers `undefined`, and `render()`,
    * `setCanvasSize()`, `setContainerSize()`, a write to `fit` and a further `dispose()` do nothing;
-   * `setCanvasSize()` still refuses a size that is no finite number above 0, and
-   * `setContainerSize()` one that is no finite number.
+   * `setCanvasSize()` still refuses a size that is no finite number of 1 or more,
+   * `setContainerSize()` one that is no finite number, and a write to `fit` one that is neither
+   * `'contain'` nor `'cover'`.
    * `canvas`, `renderer`, `projection`, `scene`, `sprite` and `needsUpdate` keep the values the
    * stage was left with. {@link width} and {@link height} read `canvas.width` and `canvas.height`,
    * so they keep answering with whatever stands at the canvas — including what the caller sets

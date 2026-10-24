@@ -1,5 +1,5 @@
 import {expect} from '@esm-bundle/chai';
-import {Display, OnDisplayResize} from '@spearwolf/twopoint5d';
+import {Display, getContentAreaSize, OnDisplayResize} from '@spearwolf/twopoint5d';
 import {on, off} from '@spearwolf/eventize';
 import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
 
@@ -42,6 +42,49 @@ function makeSizeRef(root, {id, width, height}) {
   root.appendChild(el);
   return el;
 }
+
+// a box of 200 × 100 CSS pixels inside 10 pixels of padding and a border of 5, laid out at the top
+// left of the page; `transform` goes onto it as it is
+function makeBorderedBox(transform) {
+  const el = document.createElement('div');
+  el.style.position = 'absolute';
+  el.style.left = '0';
+  el.style.top = '0';
+  el.style.width = '200px';
+  el.style.height = '100px';
+  el.style.padding = '10px';
+  el.style.border = '5px solid';
+  el.style.boxSizing = 'content-box';
+  el.style.transform = transform;
+  el.style.transformOrigin = '0 0';
+  document.body.appendChild(el);
+  return el;
+}
+
+describe('getContentAreaSize()', () => {
+  it('getContentAreaSize() of an element at scale(2) answers twice its content box', () => {
+    const el = makeBorderedBox('scale(2)');
+    try {
+      const {width, height} = getContentAreaSize(el);
+
+      expect(width).to.be.closeTo(400, 1e-6);
+      expect(height).to.be.closeTo(200, 1e-6);
+    } finally {
+      el.remove();
+    }
+  });
+
+  it('getContentAreaSize() of an untransformed element of a fractional width answers that width', () => {
+    const el = makeBorderedBox('none');
+    el.style.width = '200.5px';
+    el.style.border = '0';
+    try {
+      expect(getContentAreaSize(el).width).to.be.closeTo(200.5, 1e-6);
+    } finally {
+      el.remove();
+    }
+  });
+});
 
 describe('Display — resize behavior', () => {
   /** @type {Display | undefined} */
@@ -110,6 +153,23 @@ describe('Display — resize behavior', () => {
 
       expect(display.width).to.equal(256);
       expect(display.height).to.equal(128);
+    } finally {
+      sizeRef.remove();
+    }
+  });
+
+  it('a display measures a resizeToElement at scale(2) as twice its content box', async () => {
+    host = makeContainer({width: 800, height: 600});
+    const sizeRef = makeBorderedBox('scale(2)');
+
+    try {
+      display = new Display(host, {resizeToElement: sizeRef});
+
+      await display.start();
+      await nextFrame(display);
+
+      expect(display.width).to.equal(400);
+      expect(display.height).to.equal(200);
     } finally {
       sizeRef.remove();
     }
