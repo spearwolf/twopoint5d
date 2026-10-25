@@ -1,4 +1,4 @@
-import type {AnimationTimingOptions} from './FrameBasedAnimations.js';
+import type {AnimationPlayback, AnimationTimingOptions} from './FrameBasedAnimations.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import type {TileSetOptions} from './TileSet.js';
 
@@ -88,6 +88,16 @@ export interface TextureResourceData {
    * none.
    */
   frameBasedAnimations?: FrameBasedAnimationsDataMap;
+  /**
+   * The playback of an animation the atlas adapter reads out of the json, by its name — an Aseprite
+   * tag —, in place of the one the json gives it: `{kick: 'once'}` for a sheet exported without
+   * Aseprite's "Repeat". Read by an atlas alone, and handed to its adapter; the built-in `aseprite`
+   * adapter refuses a tag the sheet lacks, and `texturepacker`, which reads no animations, every one.
+   * The entries of `frameBasedAnimations` carry a playback of their own. `TextureStore#parse()`
+   * refuses an item whose `playback` is no object or names a value other than `'loop'`, `'once'` and
+   * `'pingpong'`.
+   */
+  playback?: Readonly<Record<string, AnimationPlayback>>;
 }
 
 export interface TextureStoreData {

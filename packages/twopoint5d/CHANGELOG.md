@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add the wrap classes of `TextureFactory`: `repeat`, `mirror` and `clamp` write `wrapS` and `wrapT`, their forms with `-s` and `-t` one axis alone (`TextureOptions` gains `wrapS` and `wrapT`); an axis class has the last word over one of both axes, and a texture without a wrap class keeps its wrap. A `TextureStore` catalog names them like any other class, so a tiling floor no longer sets `RepeatWrapping` by hand after the load. `docs/textures.md`, a new guide, lists every texture class
+- add `FrameBasedAnimationInfo#frames`, the frames an animation plays in their order: out of an atlas its own frame objects with `coords` and `data`, out of a `TileSet` the frame of each tile, out of a list of coords `{coords}`; frozen and the same array at every `animation()` call. A hit box or the key frame of a strike is read there instead of looked up by frame name
+- add `isAsepriteFrameData(data)`, a type guard for the data `AsepriteJson.parse()` gives a frame — `frame`, a `duration` above 0, a whole `index`, `slices` — that reads the slices of a frame out of a `TextureStore` atlas or `FrameBasedAnimationInfo#frames` without a cast to `AsepriteFrameData`
+- add `DynamicAtlas#textureFor(filter)` and `DynamicAtlas#filter`: a second `CanvasTexture` of the same canvas with the other filter, built at the first call and owned by the atlas, so smooth portraits and pixel labels come out of one atlas; every change marks both, `upload()` copies each changed cell into both, and `dispose()` releases both. The type `DynamicAtlasFilter` names the two filters
+- add `playback` to a `TextureStore` catalog item: the playback of an animation its atlas adapter reads, by name — `{kick: 'once'}` for an Aseprite sheet exported without "Repeat". The store hands it to the adapter as `options.playback` (`AtlasAdapter` takes an optional third argument, `AtlasAdapterOptions`; `AtlasTextureResource#playback` is the input behind it, compared by content); `asepriteAtlasAdapter` refuses a tag the sheet lacks and `texturePackerAtlasAdapter` any playback, as a failure of the atlas. `parse()` refuses an item whose `playback` is no object or names a value other than `'loop'`, `'once'` and `'pingpong'`; an image or a tile set item leaves it out and reports it
+
 ## [0.24.0] - 2026-10-25
 
 This release fills the sprite kinds of 0.23 with features — `Flip`, `Anchor`, `NineSlice`,

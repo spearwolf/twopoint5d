@@ -236,8 +236,8 @@ libraries.
   description declares and which accessors it generates
 - The guides of the library: [sprites](packages/twopoint5d/docs/sprites.md),
   [text](packages/twopoint5d/docs/text.md), [tile
-  maps](packages/twopoint5d/docs/map2d.md), [display](packages/twopoint5d/docs/display.md)
-  — written for the users of the library; they describe the code as it is, with no
+  maps](packages/twopoint5d/docs/map2d.md), [display](packages/twopoint5d/docs/display.md),
+  [textures](packages/twopoint5d/docs/textures.md) — written for the users of the library; they describe the code as it is, with no
   internals and no history, and a new or changed feature changes its guide section in the
   same commit
 - [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers

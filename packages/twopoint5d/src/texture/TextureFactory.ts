@@ -1,13 +1,17 @@
 import type {WebGPURenderer} from 'three/webgpu';
 import {
+  ClampToEdgeWrapping,
   LinearFilter,
   LinearSRGBColorSpace,
+  MirroredRepeatWrapping,
   NearestFilter,
+  RepeatWrapping,
   SRGBColorSpace,
   Texture,
   TextureLoader,
   type ColorSpace,
   type TextureFilter,
+  type Wrapping,
 } from 'three/webgpu';
 
 import type {TextureSource} from './types.js';
@@ -39,6 +43,13 @@ export interface TextureOptions {
   anisotrophy?: number;
   flipY: boolean;
   colorSpace: ColorSpace;
+  /**
+   * How the texture is read beyond its edges along its width. No class of the factory's seed writes
+   * it: a texture without a wrap class keeps the wrap it has, `ClampToEdgeWrapping` for a new one.
+   */
+  wrapS: Wrapping;
+  /** How the texture is read beyond its edges along its height; written by a wrap class alone, as `wrapS`. */
+  wrapT: Wrapping;
 }
 
 // The anisotropy classes write a raw value that `getOptions()` turns into both counts: 0 for
@@ -101,13 +112,46 @@ const TextureClasses = {
   'linear-srgb': {
     colorSpace: LinearSRGBColorSpace,
   },
+  repeat: {
+    wrapS: RepeatWrapping,
+    wrapT: RepeatWrapping,
+  },
+  'repeat-s': {
+    wrapS: RepeatWrapping,
+  },
+  'repeat-t': {
+    wrapT: RepeatWrapping,
+  },
+  mirror: {
+    wrapS: MirroredRepeatWrapping,
+    wrapT: MirroredRepeatWrapping,
+  },
+  'mirror-s': {
+    wrapS: MirroredRepeatWrapping,
+  },
+  'mirror-t': {
+    wrapT: MirroredRepeatWrapping,
+  },
+  clamp: {
+    wrapS: ClampToEdgeWrapping,
+    wrapT: ClampToEdgeWrapping,
+  },
+  'clamp-s': {
+    wrapS: ClampToEdgeWrapping,
+  },
+  'clamp-t': {
+    wrapT: ClampToEdgeWrapping,
+  },
 };
 
 /**
  * The names of the texture option classes a {@link TextureFactory} understands.
  *
+ * The wrap classes `repeat`, `mirror` and `clamp` write `wrapS` and `wrapT` both, their forms
+ * with `-s` or `-t` the one axis: `s` runs along the width of the image, `t` along its height.
+ *
  * When two classes write the same option, the narrower one has the last word: `mag-linear`
- * beats `linear`, whoever named them. Between two classes of the same breadth the order in
+ * beats `linear`, and `clamp-t` beats `repeat`, whoever named them. Between two classes of the same breadth the order in
  * which they were named decides, and the one named last wins.
  *
  * A {@link TextureStore} lines the classes of an item up behind its own defaults, so an item
@@ -155,6 +199,17 @@ const TextureClassPriority: Record<TextureOptionClasses, number> = {
 
   srgb: 500,
   'linear-srgb': 500,
+
+  repeat: 1000,
+  mirror: 1000,
+  clamp: 1000,
+
+  'repeat-s': 500,
+  'repeat-t': 500,
+  'mirror-s': 500,
+  'mirror-t': 500,
+  'clamp-s': 500,
+  'clamp-t': 500,
 };
 
 // a maximum that is not a finite, non-negative number is no maximum: 0 stands for

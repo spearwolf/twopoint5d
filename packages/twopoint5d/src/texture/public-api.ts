@@ -15,13 +15,21 @@ export {
   type AsepriteRect,
   type AsepriteSlice,
   type AsepriteSliceKey,
+  isAsepriteFrameData,
 } from './AsepriteJson.js';
-export {asepriteAtlasAdapter, type AtlasAdapter, type AtlasAdapterResult, texturePackerAtlasAdapter} from './atlasAdapters.js';
+export {
+  asepriteAtlasAdapter,
+  type AtlasAdapter,
+  type AtlasAdapterOptions,
+  type AtlasAdapterResult,
+  texturePackerAtlasAdapter,
+} from './atlasAdapters.js';
 export {AtlasFrameTable, atlasFrameTable, type AtlasFrameTableEntry, type AtlasFrameTableSelection} from './AtlasFrameTable.js';
 export {
   DynamicAtlas,
   type DynamicAtlasContext,
   type DynamicAtlasDraw,
+  type DynamicAtlasFilter,
   type DynamicAtlasImage,
   type DynamicAtlasOptions,
   type DynamicAtlasSize,

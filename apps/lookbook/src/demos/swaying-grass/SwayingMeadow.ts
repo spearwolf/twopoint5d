@@ -29,7 +29,6 @@ import {
   Group,
   Mesh,
   MeshBasicNodeMaterial,
-  RepeatWrapping,
   type BufferGeometry,
   type Texture,
 } from 'three/webgpu';
@@ -40,7 +39,7 @@ export interface MeadowAtlas {
   texture: Texture;
 }
 
-/** The images around the meadow: the night behind it and the soil of its rim. */
+/** The images around the meadow: the night behind it and the soil of its rim, both `repeat-s` in the catalog. */
 export interface MeadowScenery {
   back: Texture;
   ground: Texture;
@@ -242,11 +241,6 @@ export class SwayingMeadow extends Group {
 
   // the floor, the rim of soil around it, the rock beneath and the night behind
   #buildScenery(back: Texture, ground: Texture): Mesh[] {
-    for (const texture of [back, ground]) {
-      texture.wrapS = RepeatWrapping;
-      texture.needsUpdate = true;
-    }
-
     const floor = new Mesh(new CircleGeometry(ISLAND_RADIUS, 112), new MeshBasicNodeMaterial({color: new Color('#22423a')}));
     floor.rotation.x = -Math.PI / 2;
     floor.name = 'floor';

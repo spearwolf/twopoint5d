@@ -19,7 +19,7 @@ import {
 import type {Texture} from 'three/webgpu';
 import type {Sheet} from './assets';
 import type {Fighter} from './Fighter';
-import {type Box, emptyBox, frameBox, frontOf, heldFrameWindow, overlaps, placeBox} from './hitBoxes';
+import {asepriteData, type Box, emptyBox, frameBox, frontOf, heldFrame, overlaps, placeBox} from './hitBoxes';
 
 /**
  * The goblins: one sheet in olive, drawn in red, blue and green by `PaletteSwap` — each goblin
@@ -96,7 +96,7 @@ export class Goblins {
   #attackWindow: [number, number];
   #box = emptyBox();
   #fighterBox = emptyBox();
-  #walkFrame: TextureAtlasFrame;
+  #walkFrame: TextureAtlasFrame<unknown>;
 
   constructor(sheet: Sheet, palette: Texture, {count, minX, maxX, random}: GoblinsOptions) {
     this.#sheet = sheet;
@@ -114,14 +114,16 @@ export class Goblins {
       attributeUsage: {dynamic: ['flip']},
     });
 
-    const walk = sheet.frame('goblin 0.aseprite');
+    // the first frame of the walk
+    const walk = sheet.anim('walk').frames[0]!;
     this.#walkFrame = walk;
     this.#body = frameBox(walk);
-    // the held strike of the attack (frame 6): its front is what the club reaches
-    this.#club = frontOf(frameBox(sheet.frame('goblin 6.aseprite')));
-    this.#attackWindow = heldFrameWindow(sheet.anim('attack'));
+    // the held strike of the attack: its front is what the club reaches
+    const attack = heldFrame(sheet.anim('attack'));
+    this.#club = frontOf(frameBox(attack.frame));
+    this.#attackWindow = attack.window;
 
-    const {w, h} = walk.data!.sourceSize!;
+    const {w, h} = asepriteData(walk).sourceSize!;
     for (let i = 0; i < count; i++) {
       const sprite = this.sprites.createSprite()!;
       sprite.setSize(w, h);

@@ -177,7 +177,7 @@ interface CheckedCatalog {
 // other one an item names. `texture` is read by every type
 const FIELDS_READ_BY_TYPE: Record<TextureResourceType, ReadonlySet<keyof TextureResourceData>> = {
   tileset: new Set(['imageUrl', 'tileSet', 'texture', 'frameBasedAnimations']),
-  atlas: new Set(['atlasUrl', 'overrideImageUrl', 'atlasAdapter', 'texture', 'frameBasedAnimations']),
+  atlas: new Set(['atlasUrl', 'overrideImageUrl', 'atlasAdapter', 'texture', 'frameBasedAnimations', 'playback']),
   image: new Set(['imageUrl', 'texture']),
 };
 
@@ -189,6 +189,7 @@ const TYPE_SPECIFIC_FIELDS = [
   'atlasAdapter',
   'tileSet',
   'frameBasedAnimations',
+  'playback',
 ] as const;
 
 // one message for a missing id, shared by every method that gives up on one, so the two
@@ -885,9 +886,9 @@ export class TextureStore {
    *
    * A single item that cannot be read builds no resource and goes out as an `error` event
    * with `source: 'parse'` and its id: one that is no object, one with a field of the wrong
-   * type — a url that is no string, a `tileSet` or `frameBasedAnimations` that is no object,
-   * a `texture` that is no array; absent is `undefined`, a `null` is a field of the wrong
-   * type —, one that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`, and an atlas
+   * type — a url that is no string, a `tileSet`, `frameBasedAnimations` or `playback` that is no
+   * object, a `texture` that is no array, a `playback` with a value other than `'loop'`, `'once'`
+   * and `'pingpong'`; absent is `undefined`, a `null` is a field of the wrong type —, one that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`, and an atlas
    * item that names an `atlasAdapter` the store does not know (see
    * {@link TextureStore.registerAtlasAdapter}). A resource that already carries that id stays as it
    * is.
@@ -1197,6 +1198,7 @@ export class TextureStore {
           existing.overrideImageUrl = resolve(item.overrideImageUrl);
           existing.textureClasses = textureClasses;
           existing.frameBasedAnimationsData = item.frameBasedAnimations;
+          existing.playback = item.playback;
         });
         return existing;
       }
@@ -1208,6 +1210,7 @@ export class TextureStore {
         item.frameBasedAnimations,
       );
       created.atlasAdapter = this.#namedAtlasAdapter(item.atlasAdapter);
+      created.playback = item.playback;
       return created;
     }
     if (item.imageUrl) {

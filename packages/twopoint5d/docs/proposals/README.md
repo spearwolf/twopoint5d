@@ -7,7 +7,8 @@ tests that hold it.
 ## Proposals and guides
 
 The guides of the library are [`sprites.md`](../sprites.md), [`text.md`](../text.md),
-[`map2d.md`](../map2d.md) and [`display.md`](../display.md) in `packages/twopoint5d/docs/`.
+[`map2d.md`](../map2d.md), [`display.md`](../display.md) and [`textures.md`](../textures.md) in
+`packages/twopoint5d/docs/`.
 ([`architecture.md`](../architecture.md), [`resource-lifecycle.md`](../resource-lifecycle.md) and
 the READMEs under `src/*/` are not guides in this sense.)
 
@@ -110,5 +111,6 @@ scheduled, and each item would get a proposal of its own before it is built.
 | [`growing-capacity.md`](growing-capacity.md) | pools that grow instead of running out of slots |
 | [`gpu-picking.md`](gpu-picking.md) | GPU picking — which sprite is under the pointer |
 | [`pool-groups.md`](pool-groups.md) | instanced pools that move in lockstep |
+| [`texture-dx-gaps.md`](texture-dx-gaps.md) | wrap classes, the frames of an animation, `isAsepriteFrameData()`, a second filter of a `DynamicAtlas`, `playback` per tag in a catalog |
 
 A new proposal is a file of its own here, named after its subject, with a row in this table.

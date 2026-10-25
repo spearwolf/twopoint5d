@@ -4,6 +4,7 @@
 
 import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
+import {isAnimationPlayback} from './animationPlayback.js';
 import {isTextureOptionClass, type TextureOptionClasses} from './TextureFactory.js';
 import type {TextureStoreData} from './types.js';
 
@@ -43,8 +44,10 @@ export function assertTextureStoreData(data: unknown): asserts data is TextureSt
  * when it can read it. Absent is `undefined`: a `null` in an optional field is a field of the
  * wrong type.
  *
- * The values inside `tileSet` are checked by `TileSet`, the entries of `frameBasedAnimations`
- * by the animation effects of the resource — both report what they refuse.
+ * The values of `playback` are checked here, each a playback of `FrameBasedAnimations`; whether its
+ * names are tags of the sheet is the adapter's to say. The values inside `tileSet` are checked by
+ * `TileSet`, the entries of `frameBasedAnimations` by the animation effects of the resource — both
+ * report what they refuse.
  */
 export const textureResourceDataProblems = (item: unknown): string[] => {
   if (!isPlainObject(item)) return [`it is ${describeCatalogValue(item)}, not an object`];
@@ -56,7 +59,7 @@ export const textureResourceDataProblems = (item: unknown): string[] => {
       problems.push(`${key} is ${describeCatalogValue(value)}, not a string`);
     }
   }
-  const {tileSet, texture, frameBasedAnimations} = item;
+  const {tileSet, texture, frameBasedAnimations, playback} = item;
   if (tileSet !== undefined && !isPlainObject(tileSet)) {
     problems.push(`tileSet is ${describeCatalogValue(tileSet)}, not an object`);
   }
@@ -65,6 +68,17 @@ export const textureResourceDataProblems = (item: unknown): string[] => {
   }
   if (frameBasedAnimations !== undefined && !isPlainObject(frameBasedAnimations)) {
     problems.push(`frameBasedAnimations is ${describeCatalogValue(frameBasedAnimations)}, not an object`);
+  }
+  if (playback !== undefined) {
+    if (!isPlainObject(playback)) {
+      problems.push(`playback is ${describeCatalogValue(playback)}, not an object`);
+    } else {
+      for (const [name, value] of Object.entries(playback)) {
+        if (!isAnimationPlayback(value)) {
+          problems.push(`the playback of "${name}" is ${describeValue(value)}, not 'loop', 'once' or 'pingpong'`);
+        }
+      }
+    }
   }
   return problems;
 };

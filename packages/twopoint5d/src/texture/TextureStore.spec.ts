@@ -2,6 +2,7 @@ import {emit, getRetainedEventNames, getSubscriptionCount, on, once} from '@spea
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {ImageLoader, LinearFilter, NearestFilter, type Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
+import {asepriteAtlasAdapter} from './atlasAdapters.js';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
@@ -4167,6 +4168,148 @@ describe('TextureStore', () => {
       ],
     ])('registerAtlasAdapter() refuses what it cannot register: %#', (register, message) => {
       expect(register).toThrow(new TypeError(message));
+    });
+
+    test('an Aseprite item names the playback of a tag, and the adapter plays it so', async () => {
+      const {store} = storeWith(asepriteJson);
+      const seen: unknown[] = [];
+      store.registerAtlasAdapter(
+        'spy',
+        (json, parentCoords, options) => {
+          seen.push(options);
+          return asepriteAtlasAdapter(json, parentCoords, options);
+        },
+        {app: /aseprite/i},
+      );
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', playback: {blink: 'once'}}}});
+      useStubFactory(await store.whenResource('fighter'));
+
+      const animations = await store.getAsync('fighter', 'frameBasedAnimations');
+
+      expect(animations.animation('blink').playback).toBe('once');
+      expect(seen).toEqual([{playback: {blink: 'once'}}]);
+      store.dispose();
+    });
+
+    test('an item without playback hands its adapter options without one', async () => {
+      const {store} = storeWith(packerJson);
+      const seen: unknown[] = [];
+      store.registerAtlasAdapter('spy', (json, parentCoords, options) => {
+        seen.push(options);
+        return {atlas: TexturePackerJson.parse(json, parentCoords)[0]};
+      });
+      store.parse({items: {sheet: {atlasUrl: 'sheet.json', atlasAdapter: 'spy'}}});
+      useStubFactory(await store.whenResource('sheet'));
+
+      await store.getAsync('sheet', 'atlas');
+
+      expect(seen).toEqual([{}]);
+      store.dispose();
+    });
+
+    test('a playback for a tag the sheet lacks is the failure of the adapter: reported, and no atlas is built', async () => {
+      const {store} = storeWith(asepriteJson);
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', playback: {kick: 'once'}}}});
+      const resource = await store.whenResource('fighter');
+      useStubFactory(resource);
+      const failures: Array<{source: string; error: Error}> = [];
+      on(resource, TextureResourceEvents.Error, (event: {source: string; error: Error}) => {
+        failures.push(event);
+      });
+
+      const settled = await settleWithin(store.getAsync('fighter', 'atlas'));
+
+      expect(settled).toBeInstanceOf(Error);
+      expect(failures.map(({source, error}) => [source, error.message])).toEqual([
+        [
+          'texture',
+          'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: blink',
+        ],
+      ]);
+      expect(resource.atlas).toBeUndefined();
+      store.dispose();
+    });
+
+    test('the TexturePacker adapter reads no animations and refuses a playback that names one', async () => {
+      const {store} = storeWith(packerJson);
+      store.parse({items: {sheet: {atlasUrl: 'sheet.json', playback: {all: 'once'}}}});
+      const resource = await store.whenResource('sheet');
+      useStubFactory(resource);
+      const failures: Error[] = [];
+      on(resource, TextureResourceEvents.Error, ({error}: {error: Error}) => {
+        failures.push(error);
+      });
+
+      await settleWithin(store.getAsync('sheet', 'atlas'));
+
+      expect(failures.map(({message}) => message)).toEqual([
+        'texturePackerAtlasAdapter: got a playback for "all", but a TexturePacker json carries no animations — name the playback of an entry of frameBasedAnimations in that entry',
+      ]);
+      expect(resource.atlas).toBeUndefined();
+      store.dispose();
+    });
+
+    test('the same catalog parsed again keeps the atlas, and another playback reads the json again', async () => {
+      const {store} = storeWith(asepriteJson);
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', playback: {blink: 'once'}}}});
+      useStubFactory(await store.whenResource('fighter'));
+      const atlas = await store.getAsync('fighter', 'atlas');
+
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', playback: {blink: 'once'}}}});
+      expect(await store.getAsync('fighter', 'atlas')).toBe(atlas);
+
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', playback: {blink: 'loop'}}}});
+      const animations = await store.getAsync('fighter', 'frameBasedAnimations');
+      expect(animations.animation('blink').playback).toBe('loop');
+      expect(await store.getAsync('fighter', 'atlas')).not.toBe(atlas);
+      store.dispose();
+    });
+
+    test.each([
+      [{blink: 'onse'}, "the playback of \"blink\" is \"onse\", not 'loop', 'once' or 'pingpong'"],
+      [['once'], 'playback is an array, not an object'],
+      [null, 'playback is null, not an object'],
+    ])('an item with a playback of %j builds no resource and is reported', (playback, problem) => {
+      const {store, errors} = storeWith(asepriteJson);
+
+      store.parse({items: {fighter: {atlasUrl: 'fighter.json', playback: playback as never}}});
+
+      expect(errors.map(({source, id, error}) => [source, id, error.message])).toEqual([
+        ['parse', 'fighter', `TextureStore: item "fighter" builds no resource: ${problem}`],
+      ]);
+      store.dispose();
+    });
+
+    test('a playback on an image or a tile set item is reported and left out, the item is built', async () => {
+      const {store, errors} = storeWith(asepriteJson);
+
+      store.parse({
+        items: {
+          tiles: {imageUrl: 'tiles.png', playback: {blink: 'once'}},
+          map: {imageUrl: 'map.png', tileSet: {tileWidth: 8}, playback: {blink: 'once'}},
+        },
+      });
+
+      expect(errors.map(({id, error}) => [id, error.message])).toEqual([
+        ['tiles', 'TextureStore: item "tiles" builds an "image" resource, which reads no playback — left out'],
+        ['map', 'TextureStore: item "map" builds a "tileset" resource, which reads no playback — left out'],
+      ]);
+      expect((await store.whenResource('tiles')).type).toBe('image');
+      expect((await store.whenResource('map')).type).toBe('tileset');
+      store.dispose();
+    });
+
+    test('a wrap class of an item is a texture class the store lets through', async () => {
+      const {store, errors} = storeWith(asepriteJson);
+
+      store.parse({
+        defaultTextureClasses: ['nearest'],
+        items: {ground: {imageUrl: 'ground.png', texture: ['repeat-s', 'mirror-t']}},
+      });
+
+      expect(errors).toEqual([]);
+      expect((await store.whenResource('ground')).textureClasses).toEqual(['nearest', 'repeat-s', 'mirror-t']);
+      store.dispose();
     });
 
     test('the app handed in keeps its lastIndex', () => {

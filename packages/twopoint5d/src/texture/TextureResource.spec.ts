@@ -4,6 +4,7 @@ import {createSandbox} from 'sinon';
 import {ImageLoader, LinearFilter, NearestFilter, Texture, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
+import {asepriteAtlasAdapter} from './atlasAdapters.js';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import type {TextureOptionClasses} from './TextureFactory.js';
 import {atlasAdapterPicker, loadFailureFor} from './internals.js';
@@ -2148,6 +2149,10 @@ describe('TextureResource', () => {
           // @ts-expect-error an image resource has no atlasAdapter
           resource.atlasAdapter = undefined;
         },
+        playback: () => {
+          // @ts-expect-error an image resource has no playback
+          resource.playback = {kick: 'once'};
+        },
         frameBasedAnimationsData: () => {
           // @ts-expect-error an image resource has no frameBasedAnimationsData
           resource.frameBasedAnimationsData = undefined;
@@ -2183,6 +2188,10 @@ describe('TextureResource', () => {
         atlasAdapter: () => {
           // @ts-expect-error a tile set resource has no atlasAdapter
           resource.atlasAdapter = undefined;
+        },
+        playback: () => {
+          // @ts-expect-error a tile set resource has no playback
+          resource.playback = {kick: 'once'};
         },
       };
 
@@ -3232,6 +3241,66 @@ describe('TextureResource', () => {
       expect(resource.atlas).toBeUndefined();
       expect(errors.map(({error}) => error.message)).toEqual([`TextureResource: ${message}`]);
       resource.dispose();
+    });
+
+    test('the playback goes to the adapter, and plays the tag it names so', async () => {
+      const seen: unknown[] = [];
+      const {resource, errors} = await atlasResource(asepriteJson(), (r) => {
+        r.playback = {blink: 'once'};
+        r.atlasAdapter = (json, parentCoords, options) => {
+          seen.push(options);
+          return asepriteAtlasAdapter(json, parentCoords, options);
+        };
+      });
+
+      expect(errors).toEqual([]);
+      expect(seen).toEqual([{playback: {blink: 'once'}}]);
+      expect(resource.frameBasedAnimations!.animation('blink').playback).toBe('once');
+      resource.dispose();
+    });
+
+    test('another playback reads the json again, and equal playbacks keep the atlas', async () => {
+      const {resource} = await atlasResource(asepriteJson(), (r) => {
+        r.playback = {blink: 'once'};
+      });
+      const first = resource.atlas;
+
+      resource.playback = {blink: 'once'};
+      expect(resource.atlas).toBe(first);
+
+      resource.playback = {blink: 'pingpong'};
+      expect(resource.atlas).not.toBe(first);
+      expect(resource.frameBasedAnimations!.animation('blink').playback).toBe('pingpong');
+
+      resource.playback = undefined;
+      expect(resource.frameBasedAnimations!.animation('blink').playback).toBe('loop');
+      resource.dispose();
+    });
+
+    test('a playback the adapter refuses takes atlas and animations back and is reported', async () => {
+      const {resource, errors} = await atlasResource(asepriteJson(), (r) => {
+        r.playback = {kick: 'once'};
+      });
+
+      expect([resource.atlas, resource.frameBasedAnimations]).toEqual([undefined, undefined]);
+      expect(errors.map(({source, error}) => [source, error.message])).toEqual([
+        [
+          'texture',
+          'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: blink',
+        ],
+      ]);
+      resource.dispose();
+    });
+
+    test('playback answers undefined once the resource is disposed, and a write afterwards does nothing', () => {
+      const resource = new AtlasTextureResource('sheet');
+      resource.playback = {blink: 'once'};
+      expect(resource.playback).toEqual({blink: 'once'});
+
+      resource.dispose();
+      resource.playback = {blink: 'loop'};
+
+      expect(resource.playback).toBeUndefined();
     });
 
     test('atlasAdapter belongs to an atlas resource', () => {

@@ -5,7 +5,7 @@ import type {WebGPURenderer} from 'three/webgpu';
 import {ImageLoader, type Texture} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {throwCollected} from '../utils/throwCollected.js';
-import {FrameBasedAnimations} from './FrameBasedAnimations.js';
+import {type AnimationPlayback, FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {cmpAnimationsData} from './cmpAnimationsData.js';
 import {type AtlasJsonFetch, fetchAtlasJson} from './fetchAtlasJson.js';
 import {type AtlasAdapter, builtInAtlasAdapters, pickAtlasAdapter} from './atlasAdapters.js';
@@ -297,7 +297,7 @@ export interface TextureResource extends EventizedObject {}
  * - `renderer` — the renderer a resource on its own builds a factory for.
  *
  * The inputs that say what the resource is made of belong to the class of its shape: `imageUrl`,
- * `tileSetOptions`, `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter` and
+ * `tileSetOptions`, `atlasUrl`, `atlasJson`, `overrideImageUrl`, `atlasAdapter`, `playback` and
  * `frameBasedAnimationsData`.
  *
  * **Outputs** — read-only, produced by the effects {@link TextureResource.activate} registers. Each
@@ -1284,6 +1284,7 @@ export class TileSetTextureResource extends TextureResource {
  *   outside.
  * - `overrideImageUrl` names another image than the one the json names.
  * - `atlasAdapter` reads the json into the atlas and its animations.
+ * - `playback` names the playback of an animation the adapter reads, by its name.
  * - `frameBasedAnimationsData` names the animations over the frames of the atlas.
  *
  * `imageUrl` is an output here: the resource takes it from `overrideImageUrl ?? atlasJson.meta.image`.
@@ -1300,6 +1301,12 @@ export class AtlasTextureResource extends TextureResource {
   readonly #context = shapeContextOf(this);
 
   readonly #atlasAdapter = createSignal<AtlasAdapter | undefined>(undefined, {attach: this});
+  // compared by content: the same catalog parsed again writes a new object of the same playbacks,
+  // and keeps the atlas built with them
+  readonly #playback = createSignal<Readonly<Record<string, AnimationPlayback>> | undefined>(undefined, {
+    compare: cmpShallow,
+    attach: this,
+  });
   readonly #atlasUrl = createSignal<string | undefined>(undefined, {attach: this});
   readonly #atlasJson = createSignal<TexturePackerJsonData | undefined>(undefined, {attach: this});
   // the json as `atlasUrl` delivered it, with a relative `meta.image` resolved against that url,
@@ -1418,6 +1425,28 @@ export class AtlasTextureResource extends TextureResource {
   }
 
   /**
+   * The playback of an animation the atlas adapter reads out of the json, by its name — an Aseprite
+   * tag —, in place of the one the json gives it. Handed to the adapter as `options.playback`:
+   * `asepriteAtlasAdapter` refuses a tag the sheet lacks, `texturePackerAtlasAdapter` every one, and
+   * a refusal is reported as an `error` with `source: 'texture'`, the atlas not built.
+   *
+   * - It is compared by content: playbacks equal to the current ones — the same catalog parsed
+   *   again — keep the atlas, and no event goes out. A change reads the json again.
+   * - The object is kept as it was written: a change to it after the write reaches the resource only
+   *   with playbacks that differ from it.
+   *
+   * Answers `undefined` once {@link TextureResource.dispose} has run; a write afterwards does nothing.
+   */
+  get playback(): Readonly<Record<string, AnimationPlayback>> | undefined {
+    return this.#context.isDisposed() ? undefined : this.#playback.value;
+  }
+
+  set playback(value: Readonly<Record<string, AnimationPlayback>> | undefined) {
+    if (this.#context.isDisposed()) return;
+    this.#playback.set(value);
+  }
+
+  /**
    * The animations over the frames of the atlas, by name: each entry names its frames by
    * `frameNameQuery`. They are added to a copy of the animations the atlas adapter reads out of the
    * json.
@@ -1456,6 +1485,7 @@ export class AtlasTextureResource extends TextureResource {
     const fetchedAtlasJsonSignal = this.#fetchedAtlasJson;
     const overrideImageUrlSignal = this.#overrideImageUrl;
     const atlasAdapterSignal = this.#atlasAdapter;
+    const playbackSignal = this.#playback;
 
     createEffect(
       () => {
@@ -1584,7 +1614,8 @@ export class AtlasTextureResource extends TextureResource {
         let adapterAnimations: FrameBasedAnimations | undefined;
         try {
           const adapter = atlasAdapterSignal.value ?? (this[atlasAdapterPicker] ?? pickBuiltInAtlasAdapter)(atlasJson);
-          const result: unknown = adapter(atlasJson, imageCoords);
+          const playback = playbackSignal.value;
+          const result: unknown = adapter(atlasJson, imageCoords, playback === undefined ? {} : {playback});
           const answered = (typeof result === 'object' && result !== null ? result : {}) as Partial<AtlasAdapterResultShape>;
           if (!(answered.atlas instanceof TextureAtlas)) {
             throw new Error(
@@ -1613,7 +1644,7 @@ export class AtlasTextureResource extends TextureResource {
           context.atlas.set(built);
         });
       },
-      [atlasJsonSignal, atlasAdapterSignal, context.imageCoords, context.imageUrlOfCoords],
+      [atlasJsonSignal, atlasAdapterSignal, playbackSignal, context.imageCoords, context.imageUrlOfCoords],
       {attach: this, priority: DERIVED_FROM_IMAGE_PRIORITY},
     );
 
@@ -1669,9 +1700,10 @@ refuseInputsOfOtherShapes(ImageTextureResource, [
   'atlasJson',
   'overrideImageUrl',
   'atlasAdapter',
+  'playback',
   'frameBasedAnimationsData',
 ]);
-refuseInputsOfOtherShapes(TileSetTextureResource, ['atlasUrl', 'atlasJson', 'overrideImageUrl', 'atlasAdapter']);
+refuseInputsOfOtherShapes(TileSetTextureResource, ['atlasUrl', 'atlasJson', 'overrideImageUrl', 'atlasAdapter', 'playback']);
 refuseInputsOfOtherShapes(AtlasTextureResource, ['tileSetOptions']);
 
 // `imageUrl` of an atlas is read-only for TypeScript; the getter of the base alone would make a

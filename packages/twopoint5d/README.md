@@ -66,7 +66,7 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 - **Atlas frames on your own meshes.** A frame repeats across any surface, wrapped without
   seams.
 - **Pixel-crisp or smooth.** Every texture can be set up for sharp pixel art or for smooth,
-  anisotropic filtering.
+  anisotropic filtering, and to tile across a surface.
 
 ### 🔤 Text
 
@@ -130,6 +130,7 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
   repository, see the [project README](../../README.md)
 - the guides: [sprites](docs/sprites.md), [text](docs/text.md), [tile maps](docs/map2d.md),
   [stages](src/stage/README.md), [display: resolution and frame rate](docs/display.md),
+  [textures: texture classes](docs/textures.md),
   [resource lifecycle](docs/resource-lifecycle.md),
   [architecture](docs/architecture.md)
 

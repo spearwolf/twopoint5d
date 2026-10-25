@@ -1,7 +1,10 @@
 import {
+  ClampToEdgeWrapping,
   LinearFilter,
   LinearSRGBColorSpace,
+  MirroredRepeatWrapping,
   NearestFilter,
+  RepeatWrapping,
   SRGBColorSpace,
   Texture,
   TextureLoader,
@@ -237,6 +240,66 @@ describe('TextureFactory', () => {
     });
   });
 
+  describe('the wrap classes write wrapS and wrapT', () => {
+    test.each([
+      ['repeat', RepeatWrapping, RepeatWrapping],
+      ['repeat-s', RepeatWrapping, ClampToEdgeWrapping],
+      ['repeat-t', ClampToEdgeWrapping, RepeatWrapping],
+      ['mirror', MirroredRepeatWrapping, MirroredRepeatWrapping],
+      ['mirror-s', MirroredRepeatWrapping, ClampToEdgeWrapping],
+      ['mirror-t', ClampToEdgeWrapping, MirroredRepeatWrapping],
+    ] as Array<[TextureOptionClasses, number, number]>)('%s', (name, wrapS, wrapT) => {
+      const texture = new TextureFactory(16, []).update(new Texture(), name);
+
+      expect(texture.wrapS).toBe(wrapS);
+      expect(texture.wrapT).toBe(wrapT);
+    });
+
+    test.each([
+      ['clamp', ClampToEdgeWrapping, ClampToEdgeWrapping],
+      ['clamp-s', ClampToEdgeWrapping, RepeatWrapping],
+      ['clamp-t', RepeatWrapping, ClampToEdgeWrapping],
+    ] as Array<[TextureOptionClasses, number, number]>)('%s clamps a texture that repeats', (name, wrapS, wrapT) => {
+      const texture = new Texture();
+      texture.wrapS = RepeatWrapping;
+      texture.wrapT = RepeatWrapping;
+
+      new TextureFactory(16, []).update(texture, name);
+
+      expect(texture.wrapS).toBe(wrapS);
+      expect(texture.wrapT).toBe(wrapT);
+    });
+
+    test('a class of one axis has the last word over one of both, whoever named it', () => {
+      for (const classNames of [
+        ['repeat', 'clamp-t'],
+        ['clamp-t', 'repeat'],
+      ] as TextureOptionClasses[][]) {
+        const options = new TextureFactory(16, []).getOptions(classNames);
+        expect(options.wrapS).toBe(RepeatWrapping);
+        expect(options.wrapT).toBe(ClampToEdgeWrapping);
+      }
+    });
+
+    test('without a wrap class update() leaves the wrap of the texture as it is', () => {
+      const texture = new Texture();
+      texture.wrapS = MirroredRepeatWrapping;
+      texture.wrapT = RepeatWrapping;
+
+      new TextureFactory(16).update(texture, 'linear', 'srgb');
+
+      expect(texture.wrapS).toBe(MirroredRepeatWrapping);
+      expect(texture.wrapT).toBe(RepeatWrapping);
+    });
+
+    test('a default class of the factory repeats every texture it builds', () => {
+      const factory = new TextureFactory(16, ['nearest', 'repeat-s']);
+
+      expect(factory.update(new Texture()).wrapS).toBe(RepeatWrapping);
+      expect(factory.update(new Texture(), 'clamp').wrapS).toBe(ClampToEdgeWrapping);
+    });
+  });
+
   describe('isTextureOptionClass() tells class names from other values, and getOptions() skips the others', () => {
     const everyClassName = [
       'anisotropy',
@@ -257,6 +320,15 @@ describe('TextureFactory', () => {
       'no-flipy',
       'srgb',
       'linear-srgb',
+      'repeat',
+      'repeat-s',
+      'repeat-t',
+      'mirror',
+      'mirror-s',
+      'mirror-t',
+      'clamp',
+      'clamp-s',
+      'clamp-t',
     ] satisfies TextureOptionClasses[];
 
     test.each(everyClassName)('isTextureOptionClass(%j) answers true', (name) => {

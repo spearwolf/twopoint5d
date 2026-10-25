@@ -11,7 +11,7 @@
     },
     "boomerCeiling": {
       "imageUrl": "boomer-shooter-corridor/ceiling.png",
-      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy"]
+      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy", "repeat"]
     },
     "boomerDoor": {
       "imageUrl": "boomer-shooter-corridor/door.png",
@@ -19,7 +19,7 @@
     },
     "boomerFloor": {
       "imageUrl": "boomer-shooter-corridor/floor.png",
-      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy"]
+      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy", "repeat"]
     },
     "boomerSigns": {
       "atlasUrl": "boomer-shooter-corridor/signs.json",
@@ -31,7 +31,7 @@
     },
     "boomerWall": {
       "imageUrl": "boomer-shooter-corridor/wall.png",
-      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy"]
+      "texture": ["mag-nearest", "flipy", "srgb", "anisotropy", "repeat"]
     },
     "cardboardAtlas": {
       "atlasUrl": "cardboard/cardboard.json",
@@ -65,11 +65,11 @@
     },
     "meadowBack": {
       "imageUrl": "swaying-grass/meadow-back.png",
-      "texture": ["nearest", "flipy", "srgb"]
+      "texture": ["nearest", "flipy", "srgb", "repeat-s"]
     },
     "meadowGround": {
       "imageUrl": "swaying-grass/meadow-ground.png",
-      "texture": ["nearest", "flipy", "srgb"]
+      "texture": ["nearest", "flipy", "srgb", "repeat-s"]
     },
     "nightCityFacades": {
       "atlasUrl": "night-city/facades.json",

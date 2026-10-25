@@ -1,10 +1,11 @@
 import {readFileSync} from 'node:fs';
 import {describe, expect, expectTypeOf, test} from 'vitest';
 
-import {type AsepriteFrameData, AsepriteJson, type AsepriteJsonData} from './AsepriteJson.js';
+import {type AsepriteFrameData, AsepriteJson, type AsepriteJsonData, isAsepriteFrameData} from './AsepriteJson.js';
 import {asepriteAtlasAdapter} from './atlasAdapters.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
+import {TexturePackerJson} from './TexturePackerJson.js';
 
 const fixture = (name: string): AsepriteJsonData =>
   JSON.parse(readFileSync(new URL(`./fixtures/aseprite/${name}`, import.meta.url), 'utf8')) as AsepriteJsonData;
@@ -590,6 +591,56 @@ describe('AsepriteJson', () => {
         AsepriteJson.parse(sheet(2, {frameTags: [{name: 'a', from: 0, to: 9, direction: 'forward'}]}), {target: target as never}),
       ).toThrow();
       expect(target.size).toBe(0);
+    });
+  });
+
+  describe('isAsepriteFrameData()', () => {
+    test('every frame of a parsed sheet passes, and the guard narrows its data', () => {
+      const [atlas] = AsepriteJson.parse(fixture('fighter-hash.json'));
+      // the store hands its atlas out typed with TexturePacker data
+      const frames = (atlas as unknown as TextureAtlas).frameNames().map((name) => atlas.frame(name)!);
+
+      expect(frames.every(({data}) => isAsepriteFrameData(data))).toBe(true);
+
+      const data: unknown = frames[7]!.data;
+      if (!isAsepriteFrameData(data)) throw new Error('no Aseprite frame');
+      expectTypeOf(data).toEqualTypeOf<AsepriteFrameData>();
+      expect(data.slices['hitbox']!.pivot).toEqual({x: 4, y: 14});
+    });
+
+    test('the data of a TexturePacker frame fails, and so does none', () => {
+      const [atlas] = TexturePackerJson.parse({
+        frames: {a: {frame: {x: 0, y: 0, w: 4, h: 4}}},
+        meta: {image: 'a.png', size: {w: 4, h: 4}},
+      });
+
+      expect(isAsepriteFrameData(atlas.frame('a')!.data)).toBe(false);
+      expect(isAsepriteFrameData(undefined)).toBe(false);
+      expect(isAsepriteFrameData(null)).toBe(false);
+      expect(isAsepriteFrameData('f0')).toBe(false);
+    });
+
+    const valid = {frame: {x: 0, y: 0, w: 4, h: 4}, duration: 100, index: 0, slices: {}};
+
+    test.each([
+      ['no frame', {...valid, frame: undefined}],
+      ['a frame that is no object', {...valid, frame: 5}],
+      ['no duration', {...valid, duration: undefined}],
+      ['a duration of 0', {...valid, duration: 0}],
+      ['a duration of NaN', {...valid, duration: NaN}],
+      ['a duration that is a string', {...valid, duration: '100'}],
+      ['no index', {...valid, index: undefined}],
+      ['an index of -1', {...valid, index: -1}],
+      ['an index of 1.5', {...valid, index: 1.5}],
+      ['no slices', {...valid, slices: undefined}],
+      ['slices that are an array', {...valid, slices: []}],
+      ['slices of null', {...valid, slices: null}],
+    ])('fails for %s', (_, data) => {
+      expect(isAsepriteFrameData(data)).toBe(false);
+    });
+
+    test('passes for the fields alone', () => {
+      expect(isAsepriteFrameData(valid)).toBe(true);
     });
   });
 });

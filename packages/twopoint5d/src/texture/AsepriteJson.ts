@@ -106,6 +106,27 @@ export interface AsepriteFrameData extends AsepriteJsonFrameData {
   slices: Readonly<Record<string, AsepriteFrameSlice>>;
 }
 
+/**
+ * Whether `data` is the data `AsepriteJson.parse()` gives a frame: an object with a `frame` object, a
+ * `duration` that is a finite number above 0, an `index` that is a whole number of 0 or more, and
+ * `slices` that are an object and no array. Narrows the `data` of a frame out of a `TextureStore` or a
+ * `FrameBasedAnimationInfo`, whose type cannot tell which adapter read it.
+ */
+export const isAsepriteFrameData = (data: unknown): data is AsepriteFrameData => {
+  if (!isObject(data)) return false;
+  const {frame, duration, index, slices} = data;
+  return (
+    isObject(frame) &&
+    typeof duration === 'number' &&
+    Number.isFinite(duration) &&
+    duration > 0 &&
+    Number.isInteger(index) &&
+    (index as number) >= 0 &&
+    isObject(slices) &&
+    !Array.isArray(slices)
+  );
+};
+
 export interface AsepriteParseOptions {
   /** The coords the frames are laid out in; by default the whole of `meta.size`. */
   parentCoords?: TextureCoords;

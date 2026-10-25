@@ -2,7 +2,6 @@ import {
   type FrameBasedAnimationInfo,
   type FrameBasedAnimations,
   type TextureAtlas,
-  type TextureAtlasFrame,
   TextureStore,
   type TextureStoreData,
 } from '@spearwolf/twopoint5d';
@@ -39,10 +38,8 @@ export interface Sheet {
   animations: FrameBasedAnimations;
   /** The data texture `AnimatedFrames` reads the frames out of, baked from `animations`. */
   animsMap: DataTexture;
-  /** The animation of a tag, looked up once: id, playback, per-frame durations, `cycleDuration`. */
+  /** The animation of a tag, looked up once: id, playback, per-frame durations, frames, `cycleDuration`. */
   anim(name: string): FrameBasedAnimationInfo;
-  /** A frame by its Aseprite name, `"fighter 12.aseprite"`. */
-  frame(name: string): TextureAtlasFrame;
 }
 
 export interface PlatformerAssets {
@@ -71,11 +68,6 @@ async function loadSheet(store: TextureStore, id: string): Promise<Sheet> {
         infos.set(name, info);
       }
       return info;
-    },
-    frame(name) {
-      const frame = atlas.frame(name);
-      if (frame === undefined) throw new Error(`[platformer] the sheet "${id}" has no frame "${name}"`);
-      return frame;
     },
   };
 }

@@ -343,6 +343,14 @@ runs from 0 at that moment. With `'once'` that is the whole one-shot — set `an
 gives it another animation. `animation()` answers by name or by id; for a `'pingpong'`,
 `cycleDuration` is one turn.
 
+**The frames it shows.** `animation(id).frames` lists the frames in the order they are played, one
+per frame of `frameCount`: out of an atlas the frame objects of that atlas — `coords` and `data`,
+and a name listed twice stands there twice —, out of a `TileSet` the frame of each tile, out of a
+list of `TextureCoords` `{coords}` without `data`. Code that needs the frame on screen — a hit box,
+the key frame of a strike — reads it there instead of spelling out frame names. The array is frozen
+and the same at every call. Its `data` is typed `unknown`, since one `FrameBasedAnimations` holds the
+frames of any atlas; the data of an Aseprite frame is read through `isAsepriteFrameData()`, below.
+
 `time` is a uniform: set it with `setUniform('time', seconds)` or the `uniforms` option, a write
 builds nothing. The animsMap itself is a texture with `needsImage`: until it has an image the
 sprite shows the whole `colorMap`, untrimmed. A `TextureLoader` or a `DataTexture` filled later
@@ -408,29 +416,54 @@ adds `index` and `slices` — the key of each slice in force at that frame, `{bo
 pivot?}` in pixels of the untrimmed frame, `center` and `pivot` relative to `bounds` as Aseprite
 writes them.
 
+`isAsepriteFrameData(data)` tells that data from any other and narrows it to `AsepriteFrameData`:
+`true` for an object with a `frame` object, a `duration` above 0, a whole `index` of 0 or more and
+`slices` that are an object. It is the way to read the slices of a frame whose type does not say
+which packer wrote it — a frame of `FrameBasedAnimationInfo#frames`, or of the atlas a
+`TextureStore` hands out, which is typed with TexturePacker data whatever adapter read it:
+
+```ts check
+import {type FrameBasedAnimations, isAsepriteFrameData} from '@spearwolf/twopoint5d';
+
+declare const animations: FrameBasedAnimations; // the tags of fighter.json
+
+// the held key frame of the kick: the frame of the longest duration
+const kick = animations.animation('kick');
+const durations = kick.durations ?? kick.frames.map(() => kick.duration / kick.frameCount);
+const key = durations.indexOf(Math.max(...durations));
+
+const {data} = kick.frames[key]!;
+if (!isAsepriteFrameData(data)) throw new Error('fighter.json is no Aseprite sheet');
+
+export const hitbox = data.slices['hitbox']?.bounds;
+```
+
 **In a `TextureStore` catalog** an item with an `atlasUrl` is read by an atlas adapter: the one it
 names with `atlasAdapter`, else the one whose `app` matches `meta.app` of its json. An Aseprite
 json says `"app": "https://www.aseprite.org/"`, so its tags become the `frameBasedAnimations` of the
 item without a word of configuration; the item's own `frameBasedAnimations` entries are added
 beside them. TexturePacker and free-tex-packer jsons go to `'texturepacker'`, which reads frames and
-no animations. An adapter of one's own is a function `(json, parentCoords) => {atlas,
-animations?}`, registered before the catalog is parsed — here to make a one-shot of the kick:
+no animations. `playback` names the playback of a tag outright, as `parse(json, {playback})` does —
+here for a sheet exported without Aseprite's "Repeat", whose kick would loop:
 
 ```ts check
-import {AsepriteJson, type AsepriteJsonData, TextureStore} from '@spearwolf/twopoint5d';
+import {TextureStore} from '@spearwolf/twopoint5d';
 
 const store = new TextureStore();
-store.registerAtlasAdapter('fighter', (json, parentCoords) => {
-  const [atlas, , animations] = AsepriteJson.parse(json as AsepriteJsonData, {
-    parentCoords,
-    playback: {kick: 'once'},
-  });
-  return {atlas, animations};
-});
-store.parse({items: {fighter: {atlasUrl: 'fighter.json', atlasAdapter: 'fighter'}}});
+store.parse({items: {fighter: {atlasUrl: 'fighter.json', playback: {kick: 'once'}}}});
 
 export const animations = store.getAsync('fighter', 'frameBasedAnimations');
 ```
+
+The store hands the `playback` of an item to its adapter. `'aseprite'` refuses a tag the sheet does
+not carry, `'texturepacker'`, which reads no animations, refuses any; the refusal is an `error` of
+the resource with `source: 'texture'`, and the item builds no atlas. An entry of the item's own
+`frameBasedAnimations` carries a `playback` of its own and is not touched by it. `parse()` refuses
+an item whose `playback` is no object or names a value other than `'loop'`, `'once'` and
+`'pingpong'`; an image or a tile set item leaves `playback` out and reports it. An adapter of one's
+own is a function `(json, parentCoords, options?) => {atlas, animations?}` — `options.playback` is
+the `playback` of the item —, registered with `store.registerAtlasAdapter(name, adapter, {app})`
+before the catalog is parsed.
 
 The store above has no renderer, and the animations need none: without a renderer a `TextureStore`
 loads the images and builds coordinates, atlases, tile sets and animations; only `texture` waits
@@ -523,8 +556,30 @@ transform, a `globalAlpha`, a composite operation — and gives that state back 
 `font` set for `measureText()` stays. A draw callback starts from that neutral state.
 
 **The texture** is read upright (`flipY = false`, as every atlas of the library), in sRGB, with
-straight alpha and without mipmaps; `filter: 'nearest'` for pixel art, `'linear'` by default. The
-canvas is an `OffscreenCanvas` where there is one, a canvas element otherwise, or the `canvas`
+straight alpha and without mipmaps; `filter: 'nearest'` for pixel art, `'linear'` by default.
+`textureFor(filter)` answers the texture of the canvas with a filter: `texture` for the filter of
+the atlas, else a second texture of the same canvas, the same in every setting but its filters —
+smooth portraits beside pixel labels out of one atlas. A `FeatureSprites` reads one `colorMap`, so
+the sprites of the other filter go into a mesh of their own:
+
+```ts check
+import {DynamicAtlas, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
+
+declare const portrait: ImageBitmap; // painted, shown scaled
+
+const ui = new DynamicAtlas({width: 512, height: 512, filter: 'nearest', extrude: 1});
+const face = ui.add('portrait', portrait);
+
+const labels = new FeatureSprites(TexturedSpriteKind, {capacity: 64, textures: {colorMap: ui.texture}});
+const portraits = new FeatureSprites(TexturedSpriteKind, {capacity: 8, textures: {colorMap: ui.textureFor('linear')}});
+portraits.createSprite()?.setFrame(face);
+labels.createSprite();
+```
+
+The second texture is built at the first call and kept; every change reaches both, and `upload()`
+copies each changed cell into both. It is a GPU texture of its own: the memory of the canvas once
+more, and a whole upload goes up twice. Read linearly, a frame wants an `extrude`, so that the
+filter at its edge reads the frame and not the padding. The canvas is an `OffscreenCanvas` where there is one, a canvas element otherwise, or the `canvas`
 handed in, whose size the atlas takes; under Node there is neither, and the constructor says to
 hand one in.
 
@@ -536,9 +591,10 @@ from its first call on: a change waits for the next call, which copies each cell
 staging texture and `renderer.copyTextureToTexture()`. Where the cells would cover half the atlas or
 more, and at `clear()`, it marks the whole texture instead.
 
-**Ownership.** The atlas owns its texture, a canvas it built, and the staging canvas and texture of
-`upload()`; `dispose()` releases them. A canvas handed in stays the caller's. After `dispose()`,
-`texture`, `canvas`, `context`, `add()` and `redraw()` throw, `remove()` answers `false`, and
+**Ownership.** The atlas owns its textures — the second one of `textureFor()` among them —, a
+canvas it built, and the staging canvas and texture of `upload()`; `dispose()` releases them. A
+canvas handed in stays the caller's. After `dispose()`, `texture`, `textureFor()`, `canvas`,
+`context`, `add()` and `redraw()` throw, `remove()` answers `false`, and
 `clear()` and `upload()` do nothing.
 
 Text out of a bitmap font — one sprite per glyph, written into sprites of a kind such as

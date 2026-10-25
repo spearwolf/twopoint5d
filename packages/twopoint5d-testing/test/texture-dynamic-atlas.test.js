@@ -205,6 +205,75 @@ describe('texture — DynamicAtlas', function () {
     expect(isNearColor(colorAt(-3, 0), BLUE), `left: ${colorAt(-3, 0)}`).to.be.true;
   });
 
+  it('reads one canvas through a nearest and a linear texture, and a redraw after upload() reaches both', async () => {
+    const topDown = await readsTopDown(display.renderer, target);
+
+    // two texels side by side, red and blue; the extruded edge keeps the linear filter on the frame
+    atlas = new DynamicAtlas({width: 32, height: 16, filter: 'nearest', extrude: 1});
+    const pair = atlas.add(
+      'pair',
+      (ctx) => {
+        ctx.fillStyle = 'rgb(255,0,0)';
+        ctx.fillRect(0, 0, 1, 1);
+        ctx.fillStyle = 'rgb(0,0,255)';
+        ctx.fillRect(1, 0, 1, 1);
+      },
+      {width: 2, height: 1},
+    );
+    const smoothMap = atlas.textureFor('linear');
+    expect(smoothMap).to.not.equal(atlas.texture);
+
+    const crisp = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: atlas.texture}});
+    const smooth = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: smoothMap}});
+    for (const mesh of [crisp, smooth]) mesh.frustumCulled = false;
+    const place = (mesh, x) => {
+      const sprite = mesh.createSprite();
+      sprite.setSize(4, 4);
+      sprite.setPosition(x, 0, 0);
+      sprite.setFrame(pair);
+    };
+    place(crisp, -4);
+    place(smooth, 4);
+
+    const renderBoth = async () => {
+      const scene = new Scene();
+      scene.add(crisp, smooth);
+      crisp.update();
+      smooth.update();
+      const pixels = await renderToPixels(display.renderer, scene, camera(), target);
+      return (x, y) => {
+        const column = Math.floor(CENTER + x * PIXELS_PER_UNIT);
+        const fromTop = Math.floor(CENTER - y * PIXELS_PER_UNIT);
+        return rgbAt(pixels, TARGET_SIZE, column, topDown ? fromTop : TARGET_SIZE - 1 - fromTop);
+      };
+    };
+
+    try {
+      atlas.upload(display.renderer);
+      let colorAt = await renderBoth();
+
+      // nearest: the two texels side by side, sharp at the middle of the sprite
+      expect(isNearColor(colorAt(-4.1, 0), RED), `crisp, left of the middle: ${colorAt(-4.1, 0)}`).to.be.true;
+      expect(isNearColor(colorAt(-3.9, 0), BLUE), `crisp, right of the middle: ${colorAt(-3.9, 0)}`).to.be.true;
+      // linear: red and blue mixed at the middle
+      const [r, , b] = colorAt(3.9, 0);
+      expect(r, `smooth, red at the middle: ${colorAt(3.9, 0)}`).to.be.above(40);
+      expect(b, `smooth, blue at the middle: ${colorAt(3.9, 0)}`).to.be.above(40);
+
+      atlas.redraw('pair', (ctx, w, h) => {
+        ctx.fillStyle = 'rgb(0,255,0)';
+        ctx.fillRect(0, 0, w, h);
+      });
+      atlas.upload(display.renderer);
+      colorAt = await renderBoth();
+      expect(isNearColor(colorAt(-4.1, 0), GREEN), `crisp, redrawn: ${colorAt(-4.1, 0)}`).to.be.true;
+      expect(isNearColor(colorAt(3.9, 0), GREEN), `smooth, redrawn: ${colorAt(3.9, 0)}`).to.be.true;
+    } finally {
+      crisp.dispose();
+      smooth.dispose();
+    }
+  });
+
   it('keeps straight alpha: a half transparent red blends to half red over black', async () => {
     const topDown = await readsTopDown(display.renderer, target);
 

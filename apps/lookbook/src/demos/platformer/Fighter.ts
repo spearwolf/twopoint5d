@@ -15,7 +15,7 @@ import {
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Sheet} from './assets';
-import {type Box, emptyBox, frameBox, frontOf, heldFrameWindow, placeBox} from './hitBoxes';
+import {asepriteData, type Box, emptyBox, frameBox, frontOf, type HeldFrame, heldFrame, placeBox} from './hitBoxes';
 
 /**
  * The kung-fu fighter: the frames come out of the animsMap (`AnimatedFrames`), `Flip` turns him
@@ -67,7 +67,7 @@ export class Fighter {
   #actionEnds = 0;
   #hurtAt = Number.NEGATIVE_INFINITY;
   #flipped = false;
-  #idle: TextureAtlasFrame;
+  #idle: TextureAtlasFrame<unknown>;
 
   // the reach of each strike is the part of its held key frame in front of his feet: the pixels
   // of the extended leg, read from the sheet
@@ -86,20 +86,20 @@ export class Fighter {
     this.sprite = this.sprites.createSprite()!;
 
     // the quad stands for the untrimmed 64 × 64 canvas, the trim shift fits each frame into it
-    const idle = sheet.frame('fighter 0.aseprite');
+    // the first frame he idles in
+    const idle = sheet.anim('idle').frames[0]!;
     this.#idle = idle;
-    const {w, h} = idle.data!.sourceSize!;
+    const {w, h} = asepriteData(idle).sourceSize!;
     this.sprite.setSize(w, h);
     // the slice "pivot" marks the pixel under his feet: the anchor (0.5, 1) of the canvas
     this.sprite.setAnchorFromPivot(idle);
 
     this.#body = frameBox(idle);
+    // what the held key frame of a kick reaches, read out of the frames the animation plays
+    const strike = ({frame, window}: HeldFrame) => ({reach: frontOf(frameBox(frame)), window});
     this.#strikes = {
-      kick: {reach: frontOf(frameBox(sheet.frame('fighter 12.aseprite'))), window: heldFrameWindow(sheet.anim('kick'))},
-      'flying-kick': {
-        reach: frontOf(frameBox(sheet.frame('fighter 18.aseprite'))),
-        window: heldFrameWindow(sheet.anim('flying-kick')),
-      },
+      kick: strike(heldFrame(sheet.anim('kick'))),
+      'flying-kick': strike(heldFrame(sheet.anim('flying-kick'))),
     };
   }
 

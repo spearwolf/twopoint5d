@@ -174,6 +174,137 @@ describe('DynamicAtlas', () => {
     });
   });
 
+  describe('textureFor()', () => {
+    beforeEach(() => {
+      // the staging canvas
+      vi.stubGlobal('OffscreenCanvas', FakeCanvas);
+    });
+
+    test('answers the texture of the atlas for its own filter', () => {
+      const {atlas} = atlasOn(16, 16, {filter: 'nearest'});
+      expect(atlas.filter).toBe('nearest');
+      expect(atlas.textureFor('nearest')).toBe(atlas.texture);
+      expect(atlasOn(16, 16).atlas.filter).toBe('linear');
+    });
+
+    test('answers a second texture of the same canvas for the other filter, built once and kept', () => {
+      const {atlas, canvas} = atlasOn(16, 16, {filter: 'nearest'});
+
+      const smooth = atlas.textureFor('linear');
+
+      expect(smooth).not.toBe(atlas.texture);
+      expect(atlas.textureFor('linear')).toBe(smooth);
+      expect(smooth.image).toBe(canvas);
+      expect(smooth.magFilter).toBe(LinearFilter);
+      expect(smooth.minFilter).toBe(LinearFilter);
+      expect(smooth).toMatchObject({
+        flipY: false,
+        colorSpace: SRGBColorSpace,
+        premultiplyAlpha: false,
+        generateMipmaps: false,
+        name: 'twopoint5d.DynamicAtlas',
+      });
+      // the texture of the atlas keeps its own filter
+      expect(atlas.texture.magFilter).toBe(NearestFilter);
+      // marked from its construction on: its first render uploads the canvas as it is
+      expect(smooth.version).toBeGreaterThan(0);
+    });
+
+    test('refuses a filter it does not know', () => {
+      const {atlas} = atlasOn(16, 16);
+      expect(() => atlas.textureFor('cubic' as never)).toThrow(
+        new TypeError(`DynamicAtlas: the filter "cubic" is neither 'linear' nor 'nearest'`),
+      );
+    });
+
+    test('both textures are marked by every add(), redraw(), remove() and clear() before the first upload()', () => {
+      const {atlas} = atlasOn(32, 32);
+      const other = atlas.textureFor('nearest');
+      const versions = () => [atlas.texture.version, other.version];
+      let before = versions();
+      for (const change of [
+        () => atlas.add('a', noop, {width: 4, height: 4}),
+        () => atlas.redraw('a', noop),
+        () => atlas.remove('a'),
+        () => atlas.clear(),
+      ]) {
+        change();
+        const after = versions();
+        expect(after[0]).toBeGreaterThan(before[0]!);
+        expect(after[1]).toBeGreaterThan(before[1]!);
+        before = after;
+      }
+    });
+
+    test('upload() copies each changed cell into both textures, out of one staging texture', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      const other = atlas.textureFor('nearest');
+      atlas.upload(renderer);
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+
+      expect(copyTextureToTexture).toHaveBeenCalledTimes(2);
+      const [first, second] = copyTextureToTexture.mock.calls;
+      expect(first![1]).toBe(atlas.texture);
+      expect(second![1]).toBe(other);
+      expect(second![0]).toBe(first![0]);
+      expect(second![2]).toEqual(first![2]);
+      expect(second![3]).toEqual(first![3]);
+    });
+
+    test('a second texture asked for after the first upload() gets the copies from then on', () => {
+      const {atlas} = atlasOn(64, 32);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      atlas.upload(renderer);
+      const other = atlas.textureFor('nearest');
+      atlas.add('a', noop, {width: 10, height: 8});
+      atlas.upload(renderer);
+      expect(copyTextureToTexture.mock.calls.map(([, texture]) => texture)).toEqual([atlas.texture, other]);
+    });
+
+    test('a whole upload, clear() and an upload() that throws mark both textures', () => {
+      const {atlas} = atlasOn(16, 16);
+      const {renderer, copyTextureToTexture} = fakeRenderer();
+      const other = atlas.textureFor('nearest');
+      atlas.upload(renderer);
+
+      // four cells of 6 × 6: at least half of the atlas
+      for (const name of ['a', 'b', 'c', 'd']) atlas.add(name, noop, {width: 6, height: 6});
+      let version = other.version;
+      atlas.upload(renderer);
+      expect(other.version).toBeGreaterThan(version);
+      expect(copyTextureToTexture).not.toHaveBeenCalled();
+
+      version = other.version;
+      atlas.clear();
+      expect(other.version).toBeGreaterThan(version);
+
+      atlas.add('e', noop, {width: 2, height: 2});
+      copyTextureToTexture.mockImplementation(() => {
+        throw new Error('lost device');
+      });
+      version = other.version;
+      expect(() => atlas.upload(renderer)).toThrow('lost device');
+      expect(other.version).toBeGreaterThan(version);
+    });
+
+    test('dispose() releases both textures, and textureFor() throws afterwards', () => {
+      const {atlas} = atlasOn(16, 16);
+      const other = atlas.textureFor('nearest');
+      const disposeOwn = sandbox.spy(atlas.texture, 'dispose');
+      const disposeOther = sandbox.spy(other, 'dispose');
+
+      atlas.dispose();
+
+      expect(disposeOwn.calledOnce).toBe(true);
+      expect(disposeOther.calledOnce).toBe(true);
+      expect(() => atlas.textureFor('linear')).toThrow(
+        'DynamicAtlas#textureFor() is not available: this atlas has been disposed',
+      );
+    });
+  });
+
   describe('packing on shelves', () => {
     test('lays frames out left to right, padding apart and padding from the edges', () => {
       const {atlas} = atlasOn(64, 32);

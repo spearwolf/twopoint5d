@@ -46,9 +46,15 @@ export interface DynamicAtlasOptions {
    * reads the frame and not its neighbourhood — a whole number of 0 or more. Default 0.
    */
   extrude?: number;
-  /** The filter of the texture, for magnification and minification. Default `'linear'`. */
-  filter?: 'linear' | 'nearest';
+  /**
+   * The filter of {@link DynamicAtlas.texture}, for magnification and minification. Default
+   * `'linear'`; {@link DynamicAtlas.textureFor} answers a texture of the other one.
+   */
+  filter?: DynamicAtlasFilter;
 }
+
+/** The filters a {@link DynamicAtlas} reads its canvas with: for magnification and minification alike. */
+export type DynamicAtlasFilter = 'linear' | 'nearest';
 
 // a row of cells, as high as the cell that opened it; `x` is where its tail begins, `free` the cells given
 // back left of it, ascending, none touching another or the tail
@@ -86,6 +92,12 @@ const WHERE = 'DynamicAtlas';
 // where the copies of upload() would move half the atlas or more, one whole upload is cheaper: a single
 // transfer, and no submit for each cell
 const WHOLE_UPLOAD_SHARE = 0.5;
+
+function assertFilter(filter: unknown): asserts filter is DynamicAtlasFilter {
+  if (filter !== 'linear' && filter !== 'nearest') {
+    throw new TypeError(`${WHERE}: the filter ${describeValue(filter)} is neither 'linear' nor 'nearest'`);
+  }
+}
 
 const isWhole = (value: unknown, min: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= min;
@@ -126,7 +138,10 @@ const buildCanvas = (width: number, height: number): HTMLCanvasElement | Offscre
  * is called for the first time; from then on they leave it to the next `upload()`, which copies the
  * changed cells alone. `clear()` marks the whole canvas either way.
  *
- * The atlas owns its texture, a canvas it built itself and the staging canvas and texture of
+ * {@link textureFor} answers a second texture of the same canvas with the other filter — smooth
+ * portraits and pixel labels out of one atlas —, and every change reaches both.
+ *
+ * The atlas owns its textures, a canvas it built itself and the staging canvas and texture of
  * {@link upload}; {@link dispose} releases them. A canvas handed in stays the caller's.
  */
 export class DynamicAtlas {
@@ -138,11 +153,15 @@ export class DynamicAtlas {
   readonly padding: number;
   /** How many texels the edge of every frame is repeated outwards: the option, 0 without it. */
   readonly extrude: number;
+  /** The filter of {@link texture}: the option, `'linear'` without it. */
+  readonly filter: DynamicAtlasFilter;
 
   readonly #canvas: HTMLCanvasElement | OffscreenCanvas;
   readonly #ownsCanvas: boolean;
   readonly #context: DynamicAtlasContext;
   readonly #texture: CanvasTexture<HTMLCanvasElement | OffscreenCanvas>;
+  // the texture of the other filter, built by the first textureFor() that asks for it
+  #otherTexture: CanvasTexture<HTMLCanvasElement | OffscreenCanvas> | undefined;
   // the canvas as a whole: the parent of the coords of every frame
   readonly #root: TextureCoords;
 
@@ -188,9 +207,8 @@ export class DynamicAtlas {
     }
     this.padding = assertWhole(padding, 0, 'padding');
     this.extrude = assertWhole(extrude, 0, 'extrude');
-    if (filter !== 'linear' && filter !== 'nearest') {
-      throw new TypeError(`${WHERE}: the filter ${describeValue(filter)} is neither 'linear' nor 'nearest'`);
-    }
+    assertFilter(filter);
+    this.filter = filter;
     this.width = width;
     this.height = height;
     this.#root = new TextureCoords(0, 0, width, height);
@@ -206,6 +224,11 @@ export class DynamicAtlas {
     }
     this.#context = context;
 
+    this.#texture = this.#buildTexture(filter);
+  }
+
+  // a texture of the canvas with `filter`, in every other setting the same for each filter
+  #buildTexture(filter: DynamicAtlasFilter): CanvasTexture<HTMLCanvasElement | OffscreenCanvas> {
     const texture = new CanvasTexture(this.#canvas);
     texture.name = 'twopoint5d.DynamicAtlas';
     // the convention of every atlas of the library: v counts downwards, as TextureCoords do
@@ -217,7 +240,13 @@ export class DynamicAtlas {
     texture.generateMipmaps = false;
     texture.magFilter = filter === 'nearest' ? NearestFilter : LinearFilter;
     texture.minFilter = filter === 'nearest' ? NearestFilter : LinearFilter;
-    this.#texture = texture;
+    return texture;
+  }
+
+  // the textures of the canvas there are: the one of the atlas' filter, and the other one once it is asked for
+  #markTextures(): void {
+    this.#texture.needsUpdate = true;
+    if (this.#otherTexture !== undefined) this.#otherTexture.needsUpdate = true;
   }
 
   /**
@@ -229,13 +258,35 @@ export class DynamicAtlas {
   }
 
   /**
-   * The texture of the canvas, built once and never replaced; the atlas owns it.
+   * The texture of the canvas, read with {@link filter}; built once and never replaced, and the atlas
+   * owns it.
    *
    * @throws {Error} once the atlas is disposed.
    */
   get texture(): CanvasTexture<HTMLCanvasElement | OffscreenCanvas> {
     this.#assertAlive('texture');
     return this.#texture;
+  }
+
+  /**
+   * The texture of the canvas read with `filter`: {@link texture} for the filter of the atlas, else a
+   * second texture of the same canvas, built by the first call and answered by every call after it.
+   * It differs from `texture` in its filters alone, and the atlas owns it as it owns `texture`.
+   *
+   * Every change reaches both textures — `add()`, `redraw()` and `remove()` mark both until the first
+   * {@link upload}, which copies each changed cell into both from then on —, and each is a GPU
+   * texture of its own: the second costs the memory of the canvas once more, and a whole upload goes
+   * up twice.
+   *
+   * @throws {TypeError} for a filter that is neither `'linear'` nor `'nearest'`.
+   * @throws {Error} once the atlas is disposed.
+   */
+  textureFor(filter: DynamicAtlasFilter): CanvasTexture<HTMLCanvasElement | OffscreenCanvas> {
+    this.#assertAlive('textureFor()');
+    assertFilter(filter);
+    if (filter === this.filter) return this.#texture;
+    this.#otherTexture ??= this.#buildTexture(filter);
+    return this.#otherTexture;
   }
 
   /**
@@ -396,19 +447,20 @@ export class DynamicAtlas {
     this.#shelves = [];
     this.#atlas = new TextureAtlas();
     this.#cells = new Map();
-    this.#texture.needsUpdate = true;
+    this.#markTextures();
     this.#dirty.length = 0;
   }
 
   /**
-   * Copies the cells changed since the last call into the texture as `renderer` holds it, each from a
-   * staging texture through `renderer.copyTextureToTexture()`; call it once per frame, before the
-   * render. The first call copies nothing — every change before it has marked the whole texture — and
-   * from then on `add()`, `redraw()` and `remove()` leave the texture to the next call, so a change
-   * shows only after it. Where the copies would cover half the atlas or more, it marks the whole
-   * texture instead; `clear()` marks it either way. A call that throws — while it builds its staging
-   * canvas or in a copy — marks the whole texture, so no change is lost, and the error goes on to the
-   * caller.
+   * Copies the cells changed since the last call into the texture as `renderer` holds it — into both
+   * textures, with a second one of {@link textureFor} —, each from a staging texture through
+   * `renderer.copyTextureToTexture()`; call it once per frame, before the render. The first call
+   * copies nothing — every change before it has marked the whole texture — and from then on `add()`,
+   * `redraw()` and `remove()` leave the texture to the next call, so a change shows only after it.
+   * Where the copies would cover half the atlas or more, it marks the whole texture instead; `clear()`
+   * marks it either way. A call that throws — while it builds its staging canvas or in a copy — marks
+   * the whole texture, so no change is lost, and the error goes on to the caller. Whatever it marks,
+   * it marks in both textures.
    *
    * The renderer is the one that draws the texture, initialised: another renderer gets the canvas
    * as it is with its first render and none of the copies after. Without this call every change
@@ -434,7 +486,7 @@ export class DynamicAtlas {
     const stageW = Math.max(needW, this.#staging?.canvas.width ?? 0);
     const stageH = Math.max(needH, this.#staging?.canvas.height ?? 0);
     if (dirty.length * stageW * stageH >= WHOLE_UPLOAD_SHARE * this.width * this.height) {
-      this.#texture.needsUpdate = true;
+      this.#markTextures();
       dirty.length = 0;
       return;
     }
@@ -466,9 +518,12 @@ export class DynamicAtlas {
         this.#srcRegion.max.set(cw, ch);
         this.#dstPosition.set(cx, cy);
         renderer.copyTextureToTexture(staging.texture, this.#texture, this.#srcRegion, this.#dstPosition);
+        if (this.#otherTexture !== undefined) {
+          renderer.copyTextureToTexture(staging.texture, this.#otherTexture, this.#srcRegion, this.#dstPosition);
+        }
       }
     } catch (error) {
-      this.#texture.needsUpdate = true;
+      this.#markTextures();
       throw error;
     } finally {
       dirty.length = 0;
@@ -476,9 +531,10 @@ export class DynamicAtlas {
   }
 
   /**
-   * Disposes the texture and the staging texture of {@link upload}, and shrinks a canvas the atlas built
+   * Disposes the textures — the second one of {@link textureFor} among them — and the staging texture
+   * of {@link upload}, and shrinks a canvas the atlas built
    * itself and the staging canvas to 0 × 0; a canvas handed in is left alone. Afterwards `texture`,
-   * `canvas` and `context` throw, and so do `add()` and `redraw()`; `remove()` answers `false`, and
+   * `textureFor()`, `canvas` and `context` throw, and so do `add()` and `redraw()`; `remove()` answers `false`, and
    * `clear()` and `upload()` do nothing; `atlas` and the sizes answer what they held. A second call does
    * nothing.
    */
@@ -486,6 +542,7 @@ export class DynamicAtlas {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#texture.dispose();
+    this.#otherTexture?.dispose();
     if (this.#ownsCanvas) {
       this.#canvas.width = 0;
       this.#canvas.height = 0;
@@ -685,10 +742,10 @@ export class DynamicAtlas {
     }
   }
 
-  // the texture without upload() so far, the next upload() afterwards
+  // the textures without upload() so far, the next upload() afterwards
   #changed(rect: FrameRect): void {
     if (!this.#regionUploads) {
-      this.#texture.needsUpdate = true;
+      this.#markTextures();
     } else if (!this.#dirty.includes(rect)) {
       this.#dirty.push(rect);
     }

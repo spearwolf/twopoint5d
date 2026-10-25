@@ -6,11 +6,13 @@ import {
   OctahedronGeometry,
   PlaneGeometry,
   PointLight,
-  RepeatWrapping,
   type Texture,
 } from 'three/webgpu';
 
-/** The four images of the corridor out of the texture catalog, each loaded with `flipy` for a mesh. */
+/**
+ * The four images of the corridor out of the texture catalog, each loaded with `flipy` for a mesh;
+ * wall, floor and ceiling with `repeat` as well, so a plane tiles them.
+ */
 export interface CorridorTextures {
   wall: Texture;
   floor: Texture;
@@ -58,12 +60,6 @@ export class Corridor extends Group {
   constructor({wall, floor, ceiling, door}: CorridorTextures) {
     super();
     this.name = 'corridor';
-
-    for (const texture of [wall, floor, ceiling]) {
-      texture.wrapS = RepeatWrapping;
-      texture.wrapT = RepeatWrapping;
-      texture.needsUpdate = true;
-    }
 
     const wallMaterial = this.#material(wall);
     const doorMaterial = this.#material(door);

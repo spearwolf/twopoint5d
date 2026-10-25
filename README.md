@@ -166,7 +166,8 @@ highly experimental. The written documentation:
 - the guides for users of the library — [sprites](packages/twopoint5d/docs/sprites.md),
   [text](packages/twopoint5d/docs/text.md), [tile
   maps](packages/twopoint5d/docs/map2d.md), [display: resolution and frame
-  rate](packages/twopoint5d/docs/display.md)
+  rate](packages/twopoint5d/docs/display.md), [textures: texture
+  classes](packages/twopoint5d/docs/textures.md)
 - [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) and
   [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md)
 - [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md)

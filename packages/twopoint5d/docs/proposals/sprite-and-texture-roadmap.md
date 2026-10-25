@@ -690,11 +690,6 @@ the demo that ran into it, and each would get a proposal of its own before it is
 | `drawText()` — a `BitmapFont` drawn into a canvas, next to `layoutText()` | a label in a `DynamicAtlas` is drawn by a callback into a 2D context, and the demo draws the glyphs of the font there by hand | `ui-panels` |
 | a per-segment offset of `RepeatingTextureColor` | the repeat starts anew at every joint, so a rope of many links cannot read as one continuous strip | `rope-bridge` |
 | a projection fit that snaps to a whole-number `pixelZoom` | pixel art wants the largest whole zoom that fits the container, and each of these demos computes it on every resize | `rope-bridge`, `platformer`, `sine-scroller`, `ui-panels` |
-| a texture class for repeat wrapping in `TextureFactory` | a tiling ground texture out of a `TextureStore` catalog needs `RepeatWrapping` set by hand after the load | `swaying-grass` |
-| the atlas frames of an animation in `FrameBasedAnimationInfo` | it answers count, durations and playback, not which atlas frames an animation shows — code that needs the frame on screen, a hit box, looks them up by name | `platformer` |
-| Aseprite frame data typed through `TextureStore` | the atlas out of the store is typed with TexturePacker data, so reading the `slices` of an Aseprite frame needs a cast to `AsepriteFrameData` | `platformer` |
 | per-sprite visibility | a sprite is hidden by a size or an alpha of 0, which costs its values and still runs its vertices | `ui-panels` |
-| one filter per `DynamicAtlas` | one atlas texture has one filter, so smooth portraits and pixel labels need two atlases | `ui-panels` |
-| a `playback` per tag in a catalog item | a sheet exported without Aseprite's "Repeat" still needs an atlas adapter of one's own to name its one-shots | `platformer` |
 | the `Emissive` feature and a selective bloom (§4.13) — still later | the bloom goes by luminance, so a saturated red or pink glow needs a large factor and a glow cannot come from an emission map | `swaying-grass`, `sine-scroller` |
 | texture arrays, KTX2, `Ballistic` (§4.17) — the row "later" of §6 | each waits for a scene that needs it: mipmapped tiles, large painted atlases, a thousand sparks | — |

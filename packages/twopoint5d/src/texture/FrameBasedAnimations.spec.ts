@@ -1346,6 +1346,7 @@ describe('FrameBasedAnimations', () => {
         duration: 0.8,
         playback: 'once',
         durations: undefined,
+        frames: expect.any(Array),
         cycleDuration: 0.8,
       });
       expect(animations.animation(walk)).toEqual(animations.animation('walk'));
@@ -1379,6 +1380,64 @@ describe('FrameBasedAnimations', () => {
       animations.add('a', {durations: [0.1, 0.2, 0.3, 0.4], playback: 'pingpong'}, frames(4));
 
       expect(animations.animation('a').cycleDuration).toBeCloseTo(2 * 1 - 0.1 - 0.4, 10);
+    });
+
+    test('the frames out of a list of coords: each its coords, without data', () => {
+      const coords = frames(3);
+      const animations = new FrameBasedAnimations();
+      animations.add('a', 1, coords);
+
+      expect(animations.animation('a').frames).toEqual(coords.map((c) => ({coords: c})));
+      expect(animations.animation('a').frames[1]!.coords).toBe(coords[1]);
+    });
+
+    test('the frames out of an atlas: the frame objects of the atlas, in the order they are played', () => {
+      const [atlas] = TexturePackerJson.parse({
+        frames: {
+          'walk.10': {frame: {x: 0, y: 0, w: 4, h: 4}},
+          'walk.2': {frame: {x: 4, y: 0, w: 4, h: 4}},
+        },
+        meta: {image: 'sheet.png', size: {w: 8, h: 4}},
+      });
+      const animations = new FrameBasedAnimations();
+      animations.add('walk', 1, atlas, 'walk');
+      animations.add('kick', 1, atlas, ['walk.10', 'walk.2', 'walk.10']);
+
+      const walk = animations.animation('walk').frames;
+      expect(walk).toHaveLength(2);
+      expect(walk[0]).toBe(atlas.frame('walk.2'));
+      expect(walk[1]).toBe(atlas.frame('walk.10'));
+      expect(walk[0]!.data).toEqual({frame: {x: 4, y: 0, w: 4, h: 4}});
+
+      // a name listed twice stands there twice
+      expect(animations.animation('kick').frames).toEqual([
+        atlas.frame('walk.10'),
+        atlas.frame('walk.2'),
+        atlas.frame('walk.10'),
+      ]);
+    });
+
+    test('the frames out of a tile set: the frame of each tile, by tile ids and by a range', () => {
+      const tileSet = new TileSet(new TextureCoords(0, 0, 64, 16), {tileWidth: 16, tileHeight: 16});
+      const animations = new FrameBasedAnimations();
+      animations.add('ids', 1, tileSet, [3, 1]);
+      animations.add('range', 1, tileSet, 2, 2);
+
+      expect(animations.animation('ids').frames).toEqual([tileSet.frame(3), tileSet.frame(1)]);
+      expect(animations.animation('range').frames).toEqual([tileSet.frame(2), tileSet.frame(3)]);
+      expect(animations.animation('range').frames[0]).toBe(tileSet.frame(2));
+    });
+
+    test('the frames are frozen, the same array at every call, and shared by a clone', () => {
+      const animations = new FrameBasedAnimations();
+      animations.add('a', 1, frames(2));
+
+      const {frames: list} = animations.animation('a');
+
+      expect(Object.isFrozen(list)).toBe(true);
+      expect(animations.animation('a').frames).toBe(list);
+      expect(animations.animation(0).frames).toBe(list);
+      expect(animations.clone().animation('a').frames).toBe(list);
     });
 
     test('an animation that was never registered is an error, as for animId()', () => {

@@ -6,7 +6,7 @@ import {isAnimationPlayback} from './animationPlayback.js';
 import {writeFrameTexels} from './frameTexels.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
 import {isTextureSize, readMaxTextureSize} from './readMaxTextureSize.js';
-import {TextureAtlas} from './TextureAtlas.js';
+import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TileSet} from './TileSet.js';
 
@@ -59,6 +59,14 @@ export interface FrameBasedAnimationInfo {
   readonly playback: AnimationPlayback;
   /** Seconds per frame, or `undefined` for an animation of one duration. */
   readonly durations: readonly number[] | undefined;
+  /**
+   * The frames, in the order they are played, one per frame of `frameCount`: out of an atlas the
+   * frame objects of that atlas, `coords` and `data` — a name listed twice stands here twice —, out
+   * of a `TileSet` `tileSet.frame(tileId)`, out of a list of `TextureCoords` `{coords}` without
+   * `data`. Frozen, and the same array at every call. The `data` is typed `unknown`: read the data of
+   * an Aseprite frame through `isAsepriteFrameData()`.
+   */
+  readonly frames: readonly TextureAtlasFrame<unknown>[];
   /**
    * Seconds of one cycle: `duration` for `'loop'` and `'once'` — from then on a `'once'` holds its
    * last frame — and the way there and back for `'pingpong'`, which shows each end frame once.
@@ -265,8 +273,9 @@ const cycleDurationOf = ({playback, duration, durations, frames}: FrameBasedAnim
 
 const FRAME_NAME_ORDER = new Intl.Collator('en', {numeric: true});
 
-// the trim margins of the frames, in the order of `frames`, travel beside the definition
-type AnimEntry = FrameBasedAnimDef & {trims: FrameTrimMargins[]};
+// the trim margins of the frames and the frames as animation() hands them out, both in the order of
+// `frames`, travel beside the definition
+type AnimEntry = FrameBasedAnimDef & {trims: FrameTrimMargins[]; atlasFrames: readonly TextureAtlasFrame<unknown>[]};
 
 type AnimationsMap = Map<AnimName, AnimEntry>;
 
@@ -436,6 +445,7 @@ export class FrameBasedAnimations {
 
     let frames: TextureCoords[];
     let trims: FrameTrimMargins[] | undefined;
+    let atlasFrames: TextureAtlasFrame<unknown>[] | undefined;
 
     if (Array.isArray(args[2])) {
       // the caller keeps its array and may change it later; the checks below and the bake see what
@@ -446,7 +456,7 @@ export class FrameBasedAnimations {
       // of an Aseprite tag are a range of frames, not a pattern of names, and a reversed tag runs
       // the range backwards
       const atlas = args[2];
-      const atlasFrames = (args[3] as readonly unknown[]).map((frameName, index) => {
+      const picked = (args[3] as readonly unknown[]).map((frameName, index) => {
         if (typeof frameName !== 'string') {
           throw new Error(
             `FrameBasedAnimations: add() got a frame name of ${describeValue(frameName)} at index ${index} for the animation ${animNameInError(name)} — a frame name is a string`,
@@ -460,8 +470,9 @@ export class FrameBasedAnimations {
         }
         return frame;
       });
-      frames = atlasFrames.map(({coords}) => coords);
-      trims = atlasFrames.map(({data}) => frameTrimMargins(data));
+      frames = picked.map(({coords}) => coords);
+      trims = picked.map(({data}) => frameTrimMargins(data));
+      atlasFrames = picked;
     } else if (args[2] instanceof TextureAtlas) {
       const atlas = args[2];
       const query: unknown = args[3];
@@ -487,9 +498,10 @@ export class FrameBasedAnimations {
         .filter((frameName) => typeof frameName === 'string')
         .sort(FRAME_NAME_ORDER.compare);
       // every name here came out of `frameNames()` of this very atlas, so it is registered there
-      const atlasFrames = frameNames.map((frameName) => atlas.frame(frameName)!);
-      frames = atlasFrames.map(({coords}) => coords);
-      trims = atlasFrames.map(({data}) => frameTrimMargins(data));
+      const picked = frameNames.map((frameName) => atlas.frame(frameName)!);
+      frames = picked.map(({coords}) => coords);
+      trims = picked.map(({data}) => frameTrimMargins(data));
+      atlasFrames = picked;
     } else if (args[2] instanceof TileSet) {
       const tileSet = args[2];
       if (Array.isArray(args[3])) {
@@ -502,7 +514,8 @@ export class FrameBasedAnimations {
             );
           }
         });
-        frames = tileIds.map((tileId) => tileSet.frame(tileId).coords);
+        atlasFrames = tileIds.map((tileId) => tileSet.frame(tileId));
+        frames = atlasFrames.map(({coords}) => coords);
       } else {
         // only what was passed is checked: the defaults come from the tile set, which may hold
         // more tiles than a data texture can, and an add() that is never baked is legitimate
@@ -521,10 +534,11 @@ export class FrameBasedAnimations {
         }
         const firstTileId = (args[3] as number | undefined) ?? tileSet.firstId;
         const tileCount: number = args[4] ?? tileSet.tileCount;
-        frames = [];
+        atlasFrames = [];
         for (let tileId = firstTileId; tileId < firstTileId + tileCount; tileId++) {
-          frames.push(tileSet.frame(tileId).coords);
+          atlasFrames.push(tileSet.frame(tileId));
         }
+        frames = atlasFrames.map(({coords}) => coords);
       }
     } else {
       throw new Error(
@@ -534,6 +548,8 @@ export class FrameBasedAnimations {
 
     // only the frames of an atlas carry data to read margins from
     trims ??= frames.map((): FrameTrimMargins => [0, 0, 0, 0]);
+    // a list of coords names no frame of an atlas: each becomes a frame without data
+    atlasFrames ??= frames.map((coords) => ({coords}));
 
     const id = this.#names.length;
 
@@ -573,6 +589,7 @@ export class FrameBasedAnimations {
       playback,
       durations,
       trims,
+      atlasFrames: Object.freeze(atlasFrames),
     });
 
     return id;
@@ -608,9 +625,9 @@ export class FrameBasedAnimations {
   }
 
   /**
-   * What a registered animation is, by its name or its id: frames, duration, playback, per-frame
-   * durations and the length of one cycle — `cycleDuration` is when a `'once'` animation started
-   * at `animOffset = -now` reaches its last frame. A frozen object, built per call.
+   * What a registered animation is, by its name or its id: frame count, frames, duration, playback,
+   * per-frame durations and the length of one cycle — `cycleDuration` is when a `'once'` animation
+   * started at `animOffset = -now` reaches its last frame. A frozen object, built per call.
    *
    * Like {@link FrameBasedAnimations.animId}, an animation that was never registered is an error.
    */
@@ -631,6 +648,7 @@ export class FrameBasedAnimations {
       duration: anim.duration,
       playback: anim.playback,
       durations: anim.durations,
+      frames: anim.atlasFrames,
       cycleDuration: cycleDurationOf(anim),
     });
   }
