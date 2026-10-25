@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-10-24T07:24:32.149Z"
+    "generatedAt": "2026-10-25T10:05:42.958Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -329,18 +329,16 @@
       },
       "harness": {
         "executiveSummary": "Das Gerüst ist streng und gut begründet; der eine dringende Punkt liegt in den Dependencies: `vite@8.3.2`, `sharp` und `source-map-js` im Lookbook tragen Advisories mit Fix, und der Dev-Server lauscht auf allen Interfaces, während der CI-Audit-Schritt nur ins Log eines grünen Jobs schreibt. Die Nx-Inputs der Test-Targets hashen nur `.ts`, sodass eine geänderte Fixture (`.fnt`, `.json`, `.png`) ein altes grünes Ergebnis aus dem Cache liefert. Der Rest sind kleine Hygienepunkte in den Browser-Tests und den Prüfskripten.",
-        "score": 99,
-        "penalty": 0.5,
+        "score": 100,
+        "penalty": 0,
         "bySeverity": {
           "critical": 0,
           "high": 0,
           "medium": 0,
-          "low": 1,
-          "info": 1
+          "low": 0,
+          "info": 0
         },
-        "byCategory": {
-          "testing": 2
-        }
+        "byCategory": {}
       }
     },
     "packages": [
@@ -348,7 +346,7 @@
         "name": "@spearwolf/twopoint5d",
         "path": "packages/twopoint5d",
         "reviewedLoc": 37944,
-        "findings": 2,
+        "findings": 0,
         "score": 100
       },
       {
@@ -374,7 +372,7 @@
       }
     ],
     "previousDate": "2026-10-21",
-    "resolvedCount": 93,
+    "resolvedCount": 95,
     "deltaCause": "mixed",
     "deltaExplanation": "Der Vergleichswert 100 stammt aus dem Remediation-Lauf vom 2026-10-22, der sein Backlog abgearbeitet hat — gegen das letzte Audit (79 am 2026-10-21) liegt dieser Lauf 6 Punkte höher. Von den 68 neuen Defekten liegen 62 in Dateien, die der Vorlauf schon gelesen hatte, 6 in erstmals gelesenen (Uniform-Bindings, `FlatPlacement`, Atlas-Frame-Sampling); `git blame` datiert die Hauptfundstelle von 85 der 93 Findings vor das letzte Audit, sie lagen also schon da und hat erst dieser Lauf gefunden. Neu im Code sind nur 7, aus den Remediation-Commits vom 21./22. Oktober.",
     "scoreModel": 2,
@@ -396,21 +394,15 @@
       "critical": 0,
       "high": 0,
       "medium": 0,
-      "low": 1,
-      "info": 1
+      "low": 0,
+      "info": 0
     },
-    "byCategory": {
-      "testing": 2
-    },
-    "byComponent": {
-      "texture": 2
-    },
+    "byCategory": {},
+    "byComponent": {},
     "counts": {
-      "findings": 2,
+      "findings": 0,
       "improvements": 0,
-      "byStatus": {
-        "new": 2
-      }
+      "byStatus": {}
     },
     "deltaBreakdown": {
       "code": 62,
@@ -419,8 +411,8 @@
     },
     "lastRun": {
       "source": "remediation",
-      "date": "2026-10-24",
-      "ref": "2026-10-23"
+      "date": "2026-10-25",
+      "ref": "2026-10-25"
     }
   },
   "portrait": {
@@ -608,46 +600,7 @@
       ]
     }
   },
-  "findings": [
-    {
-      "id": "TEST-008",
-      "category": "testing",
-      "domain": "harness",
-      "package": "@spearwolf/twopoint5d",
-      "component": "texture",
-      "severity": "low",
-      "title": "Test zum früh gebuchten Abonnenten in `TextureStore#parse()` prüfen lassen, dass der Wurf wirklich geschah",
-      "location": "packages/twopoint5d/src/texture/TextureStore.spec.ts:3539",
-      "description": "Der Test »booked before the parse(), the same throw sends no error event either« prüft nur, dass kein Fehler-Event entsteht und nichts geworfen wird. Hörte das früh gebuchte `on()` das `ready` gar nicht, bliebe er ebenfalls grün; er sichert damit nicht, dass der Fehlerweg über `emitSafe()` überhaupt durchlaufen wird.",
-      "evidence": "Reviewer-Urteil zum Commit 3e41351e: prüft nicht, dass der Wurf geschah.",
-      "recommendation": "Zusätzlich festhalten, dass der werfende Callback lief, etwa `expect(TextureResource.prototype.activate).toHaveBeenCalled()` oder ein Zähler im Callback.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-10-23"
-      }
-    },
-    {
-      "id": "TEST-009",
-      "category": "testing",
-      "domain": "harness",
-      "package": "@spearwolf/twopoint5d",
-      "component": "texture",
-      "severity": "info",
-      "title": "`acquireAsync()` im Test zu `whenReady()` ohne die für `a` gedachte Wartefrist prüfen",
-      "location": "packages/twopoint5d/src/texture/TextureStore.spec.ts:3401",
-      "description": "Im Test »whenReady() resolves, and acquireAsync() holds the value of a built item and rejects for a refused one with the reason« bekommt auch `acquireAsync('b', …)` die 1000 ms von `settleWithin`, die nur für das Item `a` vorgesehen sind. Der Test bleibt korrekt, wartet aber im Fehlerfall länger als nötig und verwischt, welche Zusage die lange Frist braucht.",
-      "evidence": "Reviewer-Urteil zum Commit 3e41351e: harmlos.",
-      "recommendation": "Für `b` die Standardfrist von `settleWithin` (50 ms) verwenden.",
-      "effort": "S",
-      "status": "new",
-      "origin": {
-        "kind": "induced",
-        "run": "2026-10-23"
-      }
-    }
-  ],
+  "findings": [],
   "openQuestions": [
     "Ist ein `renderFrame()` aus eigener Hand bei pausiertem `Display` ein gewollter Anwendungsfall (Render-on-Demand)? Davon hängt ab, ob das stehengebliebene `deltaTime` ein Defekt ist oder nur dokumentiert werden muss — der Chronometer-Spec »c, u, u, stop, update« schreibt das heutige Verhalten fest.",
     "Soll `getContentAreaSize()` öffentliche API bleiben? Die Library nutzt sie selbst nicht, und kein Guide nennt sie; von der Antwort hängt ab, ob sie TSDoc bekommt oder `@deprecated`.",
@@ -665,7 +618,8 @@
       "Über Slices zusammengeführt wurden vier Muster: fehlende TSDoc an öffentlichen Exporten (vier Slices), Fehlermeldungen abseits der Projektregel (drei Slices), ungeprüfte Zahlen an öffentlichen Einstiegen (`stage`, `map2d`) und der Befund zu `MapTuple`, der im Querschnittsbefund zur öffentlichen Oberfläche aufging. Eine Notiz mit der unbekannten Kategorie »robustness« wurde als `performance` eingeordnet.",
       "Alle 10 Anhangpunkte gingen durch den Re-Check (ein Haiku-Prüfer) und treffen weiterhin zu; keiner wurde abgeräumt. Fünf Treffer zwischen neuen Findings und Anhangpunkten im `TextureStore` meinen jeweils einen anderen Befund und wurden nicht unterdrückt. Drei neue Findings bekamen neue IDs, weil ihre Nummer im Vorlauf vergeben war (IMPL-004, CONS-008, BUG-029).",
       "Die Fix-Bilanz ist heuristisch über `git blame` der Hauptfundstelle gegen den Zeitpunkt des Audit-Commits vom 2026-10-21: 85 Findings lagen schon vorher im Code, 7 gehen auf Remediation-Commits zurück. Das Dependency-Finding zu Vite und sharp ist herausgenommen — sein Blame trifft eine Zeile im Lockfile, die Ursache ist aber ein später veröffentlichtes Advisory.",
-      "Nachgeführt aus dem Remediation-Lauf vom 2026-10-23/24 auf `main`: 25 Commits (9b72e4bd..3e41351e), alle 93 Findings des Audits mit Reviewer-Urteil und Commit-Hash geschlossen, 34 Nebenbefunde im Lauf behoben, zwei kleine Testbefunde aus dem letzten Paket offen. Der Code wurde seit dem Audit nicht neu geprüft; der Score ist die Formel des Audits auf das veränderte Backlog."
+      "Nachgeführt aus dem Remediation-Lauf vom 2026-10-23/24 auf `main`: 25 Commits (9b72e4bd..3e41351e), alle 93 Findings des Audits mit Reviewer-Urteil und Commit-Hash geschlossen, 34 Nebenbefunde im Lauf behoben, zwei kleine Testbefunde aus dem letzten Paket offen. Der Code wurde seit dem Audit nicht neu geprüft; der Score ist die Formel des Audits auf das veränderte Backlog.",
+      "Nachgeführt am 2026-10-25: die beiden offenen Testbefunde zu `TextureStore.spec.ts` (Beleg für den Wurf des vorab gebuchten Abonnenten, Wartefrist für das abgelehnte Item) in einem Commit auf `main` geschlossen, mit Reviewer-Urteil; keine Folgen, keine Nebenbefunde. Der Code wurde seit dem Audit nicht neu geprüft."
     ]
   },
   "acknowledged": [
@@ -751,12 +705,6 @@
     }
   ],
   "scoreHistory": [
-    {
-      "date": "2026-09-20",
-      "score": 13.5,
-      "source": "remediation",
-      "scoreModel": 1
-    },
     {
       "date": "2026-09-20",
       "score": 20.5,
@@ -955,19 +903,20 @@
         "harness": 99
       },
       "coverage": 1
+    },
+    {
+      "date": "2026-10-25",
+      "score": 100,
+      "source": "remediation",
+      "scoreModel": 2,
+      "domains": {
+        "code": 100,
+        "harness": 100
+      },
+      "coverage": 1
     }
   ],
   "fixHistory": [
-    {
-      "date": "2026-09-24",
-      "source": "remediation",
-      "ref": "main",
-      "fixed": 2,
-      "inducedFixed": 0,
-      "inducedOpen": 1,
-      "discovered": 0,
-      "attribution": "reviewed"
-    },
     {
       "date": "2026-09-24",
       "source": "remediation",
@@ -1156,6 +1105,16 @@
       "inducedFixed": 22,
       "inducedOpen": 2,
       "discovered": 34,
+      "attribution": "reviewed"
+    },
+    {
+      "date": "2026-10-25",
+      "source": "remediation",
+      "ref": "2026-10-25",
+      "fixed": 2,
+      "inducedFixed": 0,
+      "inducedOpen": 0,
+      "discovered": 0,
       "attribution": "reviewed"
     }
   ]

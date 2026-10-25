@@ -3409,7 +3409,7 @@ describe('TextureStore', () => {
       once(store, TextureStoreEvents.Ready, () => {
         ready = settleWithin(store.whenReady());
         leaseA = settleWithin(store.acquireAsync('a', 'imageCoords'), 1000);
-        leaseB = settleWithin(store.acquireAsync('b', 'imageCoords'), 1000);
+        leaseB = settleWithin(store.acquireAsync('b', 'imageCoords'));
       });
 
       store.parse({items: {a: {imageUrl: 'a.png'}, b: {tileSet: 5}}} as never);
@@ -3537,7 +3537,7 @@ describe('TextureStore', () => {
     });
 
     test('booked before the parse(), the same throw sends no error event either', () => {
-      throwOnActivate();
+      const thrown = throwOnActivate();
       vi.spyOn(console, 'error').mockImplementation(() => {});
       const store = new TextureStore();
       const errors: TextureStoreErrorEvent[] = [];
@@ -3548,6 +3548,8 @@ describe('TextureStore', () => {
 
       expect(() => store.parse({items: {a: {imageUrl: 'a.png'}}})).not.toThrow();
 
+      // the subscription heard ready and threw: without that, no error event would be no proof
+      expect(vi.mocked(TextureResource.prototype.activate).mock.results).toEqual([{type: 'throw', value: thrown}]);
       expect(errors).toEqual([]);
       store.dispose();
     });
