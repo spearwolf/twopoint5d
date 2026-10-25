@@ -112,5 +112,6 @@ scheduled, and each item would get a proposal of its own before it is built.
 | [`gpu-picking.md`](gpu-picking.md) | GPU picking — which sprite is under the pointer |
 | [`pool-groups.md`](pool-groups.md) | instanced pools that move in lockstep |
 | [`texture-dx-gaps.md`](texture-dx-gaps.md) | wrap classes, the frames of an animation, `isAsepriteFrameData()`, a second filter of a `DynamicAtlas`, `playback` per tag in a catalog |
+| [`pixel-exact-projection-fit.md`](pixel-exact-projection-fit.md) | `pixelSnap` — a projection fit at a whole number of buffer pixels per unit, and a frustum aligned to whole units |
 
 A new proposal is a file of its own here, named after its subject, with a row in this table.
