@@ -286,7 +286,7 @@ And in a `TextureStore` catalog: an item with an `atlasUrl` whose JSON names Ase
 of configuration.
 
 **The other packers.** Rather than one parser per tool, `TextureStore` takes an atlas adapter:
-`(json, parentCoords) => {atlas, animations?}`, picked by `meta.app` or named in the item.
+`(json, parentCoords, options?) => {atlas, animations?}`, picked by `meta.app` or named in the item.
 TexturePacker, free-tex-packer (verify, §3.2) and Aseprite ship; rTexPacker and the rest are an
 adapter away, written by whoever needs them — a small, typed function an agent can write from the
 `TexturePackerJson` source.

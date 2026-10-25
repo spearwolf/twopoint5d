@@ -132,6 +132,8 @@ export interface FrameBasedAnimationInfo {
   readonly playback: AnimationPlayback;
   /** Seconds per frame, or `undefined` for an animation of one duration. */
   readonly durations: readonly number[] | undefined;
+  /** The frames in the order they are played, frozen — see texture-dx-gaps.md §3. */
+  readonly frames: readonly TextureAtlasFrame<unknown>[];
   /** Seconds of one cycle: `duration` for 'loop' and 'once' — from then on a 'once' holds its last frame — and the way there and back for 'pingpong'. */
   readonly cycleDuration: number;
 }
@@ -381,17 +383,26 @@ export interface AtlasAdapterResult {
   readonly animations?: FrameBasedAnimations;
 }
 
-/** Reads an atlas json of the TexturePacker envelope — `frames`, `meta.size`, `meta.image` — against the coords of its image. */
-export type AtlasAdapter = (json: TexturePackerJsonData, parentCoords: TextureCoords) => AtlasAdapterResult;
+/** The `playback` of the catalog item — see texture-dx-gaps.md §6. */
+export interface AtlasAdapterOptions {
+  readonly playback?: Readonly<Record<string, AnimationPlayback>>;
+}
 
-export const texturePackerAtlasAdapter: AtlasAdapter;   // TexturePackerJson.parse, no animations
-export const asepriteAtlasAdapter: AtlasAdapter;        // AsepriteJson.parse, the tags as animations
+/** Reads an atlas json of the TexturePacker envelope — `frames`, `meta.size`, `meta.image` — against the coords of its image. */
+export type AtlasAdapter = (
+  json: TexturePackerJsonData,
+  parentCoords: TextureCoords,
+  options?: AtlasAdapterOptions,
+) => AtlasAdapterResult;
+
+export const texturePackerAtlasAdapter: AtlasAdapter;   // TexturePackerJson.parse, no animations; refuses a playback
+export const asepriteAtlasAdapter: AtlasAdapter;        // AsepriteJson.parse, the tags as animations, options.playback passed on
 ```
 
 Two corrections of the roadmap's sketch `(json) => {atlas, meta, animations?}`:
 
 - the adapter takes the image's coords too — the resource lays the frames out on the image it
-  loaded, as it does for `TexturePackerJson.parse()`;
+  loaded, as it does for `TexturePackerJson.parse()` —, and the `options` of its item;
 - it answers no `meta`: the resource keeps none — its `atlasJson` is the json as read.
 
 An adapter reads the envelope TexturePacker, free-tex-packer and Aseprite share, because the
@@ -422,7 +433,8 @@ any adapter runs; a packer with another envelope is converted to it first.
 - New input of `AtlasTextureResource`: `atlasAdapter: AtlasAdapter | undefined` (the store writes
   the adapter an item names, `undefined` otherwise). The other shapes do not have it in their type,
   and a write from JavaScript throws the `TypeError` of `wrongShapeError()`. A change parses the
-  json again.
+  json again. Beside it `playback`, handed to the adapter as `options.playback`
+  ([`texture-dx-gaps.md`](texture-dx-gaps.md) §6).
 - The parse effect calls the adapter where it called `TexturePackerJson.parse()`. A throw, or an
   answer without a `TextureAtlas` as `atlas` (`TextureResource: the atlas adapter of resource "x"
   answered no atlas — an adapter answers {atlas, animations?}`), takes atlas and animations back and
@@ -442,14 +454,11 @@ animations effect then publishes:
 So an Aseprite item without `frameBasedAnimations` publishes its tags, an empty set for a sheet
 without tags; a catalog entry adds a `frameNameQuery` animation of its own beside them.
 
-A one-shot from code goes through an adapter of one's own:
+A one-shot of a sheet exported without Aseprite's "Repeat" is named in the item, and the store
+hands it to the adapter ([`texture-dx-gaps.md`](texture-dx-gaps.md) §6):
 
 ```ts
-store.registerAtlasAdapter('fighter', (json, parentCoords) => {
-  const [atlas, , animations] = AsepriteJson.parse(json as AsepriteJsonData, {parentCoords, playback: {kick: 'once'}});
-  return {atlas, animations};
-});
-// catalog: {"fighter": {"atlasUrl": "fighter.json", "atlasAdapter": "fighter"}}
+// catalog: {"fighter": {"atlasUrl": "fighter.json", "playback": {"kick": "once"}}}
 ```
 
 ## 7. Ownership and lifecycle

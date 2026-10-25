@@ -102,8 +102,10 @@ export interface DynamicAtlasOptions {
   /** How many texels the edge of every frame is repeated outwards — a whole number of 0 or more. Default 0. */
   extrude?: number;
   /** The filter of the texture, both ways. Default `'linear'`. */
-  filter?: 'linear' | 'nearest';
+  filter?: DynamicAtlasFilter;
 }
+
+export type DynamicAtlasFilter = 'linear' | 'nearest';
 
 export class DynamicAtlas {
   constructor(options: DynamicAtlasOptions);
@@ -112,11 +114,14 @@ export class DynamicAtlas {
   readonly height: number;
   readonly padding: number;
   readonly extrude: number;
+  readonly filter: DynamicAtlasFilter;
 
   /** The frames — an ordinary TextureAtlas; a new one after clear(). */
   get atlas(): TextureAtlas;
   /** The texture of the canvas; the atlas owns it. */
   get texture(): CanvasTexture<HTMLCanvasElement | OffscreenCanvas>;
+  /** `texture` for its own filter, else a second texture of the canvas — see texture-dx-gaps.md §5. */
+  textureFor(filter: DynamicAtlasFilter): CanvasTexture<HTMLCanvasElement | OffscreenCanvas>;
   get canvas(): HTMLCanvasElement | OffscreenCanvas;
   /** The 2D context of the canvas — to measure text before add(); draw through add() and redraw(). */
   get context(): DynamicAtlasContext;
@@ -161,6 +166,9 @@ one that already has a WebGL context — is refused naming that.
 | `premultiplyAlpha` | `false` | straight alpha, as every loaded image: the canvas keeps its texels premultiplied, and both upload paths hand them on unpremultiplied with this flag (WebGL's `UNPACK_PREMULTIPLY_ALPHA_WEBGL`, WebGPU's `premultipliedAlpha`) — a half transparent red blends to half red, not a quarter |
 | `generateMipmaps` | `false` | a change uploads the whole canvas or copies cells into it; building the mip chain each time costs, and the small levels of a packed atlas mix neighbouring frames anyway |
 | `minFilter`, `magFilter` | `LinearFilter`, or `NearestFilter` with `filter: 'nearest'` | no mipmap filter without mipmaps; `'nearest'` for pixel art |
+
+`textureFor()` builds a second texture of the canvas with these settings and the other filter
+([`texture-dx-gaps.md`](texture-dx-gaps.md) §5).
 
 Without `upload()`, every `add()`, `redraw()`, `remove()` and `clear()` sets
 `texture.needsUpdate = true`: the renderer uploads the canvas once with the next render that uses
