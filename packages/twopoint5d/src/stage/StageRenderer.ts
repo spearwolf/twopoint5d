@@ -77,6 +77,8 @@ export interface StageItem {
 
   width: number;
   height: number;
+  /** The pixel ratio the stage carries, handed to it with `width` and `height`. */
+  pixelRatio: number;
 }
 
 export interface StageRenderer extends EventizedObject {}
@@ -151,6 +153,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   width: number = 0;
   height: number = 0;
+  /**
+   * The pixels of the drawing buffer per unit of {@link width} and {@link height}, as the last
+   * {@link resize} handed it in — `Display#pixelRatio` from a host —, `1` until then.
+   */
+  pixelRatio: number = 1;
 
   /**
    * When `true`, the active render target is cleared before drawing the
@@ -391,8 +398,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #addToHost(host: IStageRendererHost, errors: unknown[]): boolean {
     try {
       this.#hostSubscriptions.push(
-        host.onResize(({width, height}) => {
-          this.resize(width, height);
+        host.onResize(({width, height, pixelRatio}) => {
+          this.resize(width, height, pixelRatio);
         }),
       );
       this.#hostSubscriptions.push(
@@ -458,13 +465,20 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * Width and height must be finite numbers: `NaN` and an infinite value are refused with a
    * `RangeError` that names the call, before anything changes.
    *
+   * `pixelRatio` is the pixels of the drawing buffer per unit of width and height —
+   * `Display#pixelRatio`, which a host hands in with its resize —, and reaches every stage with
+   * the size; a change of the ratio alone reaches them as well. One that is left out, or that is
+   * not a finite number above 0, counts as `1`.
+   *
    * The call goes through {@link stages} as they stood when it began: a stage that `add()` or
    * `remove()` brings in or takes out during the call is reached from the next call on, see
    * {@link orderedStages}.
    */
-  resize(width: number, height: number): void {
+  resize(width: number, height: number, pixelRatio = 1): void {
     assertFinite(width, 'StageRenderer#resize()', 'width');
     assertFinite(height, 'StageRenderer#resize()', 'height');
+
+    const ratio = isPositiveFinite(pixelRatio) ? pixelRatio : 1;
 
     // the stage items are the record of which size each stage carries: while one of them still
     // owes the size this renderer answers with, the call has work to do — a stage that took a
@@ -472,16 +486,19 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (
       this.width === width &&
       this.height === height &&
-      this.#stages.every((item) => item.width === width && item.height === height)
+      this.pixelRatio === ratio &&
+      this.#stages.every((item) => item.width === width && item.height === height && item.pixelRatio === ratio)
     ) {
       return;
     }
 
     const prevWidth = this.width;
     const prevHeight = this.height;
+    const prevPixelRatio = this.pixelRatio;
 
     this.width = width;
     this.height = height;
+    this.pixelRatio = ratio;
 
     const refusedByRenderTarget: unknown[] = [];
 
@@ -500,7 +517,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     for (const stage of stages) {
       try {
-        this.resizeStage(stage, width, height);
+        this.resizeStage(stage, width, height, ratio);
       } catch (error) {
         refusedByStages.push(error);
       }
@@ -514,6 +531,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       // would fall out of the size guard above and never reach the stage a second time
       this.width = prevWidth;
       this.height = prevHeight;
+      this.pixelRatio = prevPixelRatio;
 
       if (refused.length === 1) throw refused[0];
 
@@ -530,18 +548,19 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * Hands width and height to the stage of the item, unless the item carries them already, and
-   * writes them into the item as soon as the stage has taken them. {@link resize} calls it for
-   * every stage, {@link add} for the new stage before it is in {@link stages}. An override that
-   * throws counts as the stage refusing the size (see `resize()`).
+   * Hands width, height and pixel ratio to the stage of the item, unless the item carries them
+   * already, and writes them into the item as soon as the stage has taken them. {@link resize}
+   * calls it for every stage, {@link add} for the new stage before it is in {@link stages}. An
+   * override that throws counts as the stage refusing the size (see `resize()`).
    */
-  protected resizeStage(stageItem: StageItem, width: number, height: number): void {
-    if (stageItem.width !== width || stageItem.height !== height) {
+  protected resizeStage(stageItem: StageItem, width: number, height: number, pixelRatio: number): void {
+    if (stageItem.width !== width || stageItem.height !== height || stageItem.pixelRatio !== pixelRatio) {
       // the size a stage refuses is not the size it shows: the item keeps the one it had, so the
       // next resize() asks that stage again instead of taking it for done
-      stageItem.stage.resize(width, height);
+      stageItem.stage.resize(width, height, pixelRatio);
       stageItem.width = width;
       stageItem.height = height;
+      stageItem.pixelRatio = pixelRatio;
     }
   }
 
@@ -1349,11 +1368,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       throw new TypeError(`StageRenderer#add() cannot take the stage "${stage.name}": that stage ${NO_PASS_NODE}`);
     }
 
-    const item: StageItem = {stage, width: 0, height: 0};
+    const item: StageItem = {stage, width: 0, height: 0, pixelRatio: 1};
 
     // the size first: a stage that refuses it leaves with its error before anything here, on the
     // stage or at the previous holder of a child renderer has changed
-    this.resizeStage(item, this.width, this.height);
+    this.resizeStage(item, this.width, this.height, this.pixelRatio);
 
     const errors: unknown[] = [];
 

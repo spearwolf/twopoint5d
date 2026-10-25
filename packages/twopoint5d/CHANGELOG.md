@@ -14,6 +14,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `isAsepriteFrameData(data)`, a type guard for the data `AsepriteJson.parse()` gives a frame — `frame`, a `duration` above 0, a whole `index`, `slices` — that reads the slices of a frame out of a `TextureStore` atlas or `FrameBasedAnimationInfo#frames` without a cast to `AsepriteFrameData`
 - add `DynamicAtlas#textureFor(filter)` and `DynamicAtlas#filter`: a second `CanvasTexture` of the same canvas with the other filter, built at the first call and owned by the atlas, so smooth portraits and pixel labels come out of one atlas; every change marks both, `upload()` copies each changed cell into both, and `dispose()` releases both. The type `DynamicAtlasFilter` names the two filters
 - add `playback` to a `TextureStore` catalog item: the playback of an animation its atlas adapter reads, by name — `{kick: 'once'}` for an Aseprite sheet exported without "Repeat". The store hands it to the adapter as `options.playback` (`AtlasAdapter` takes an optional third argument, `AtlasAdapterOptions`; `AtlasTextureResource#playback` is the input behind it, compared by content); `asepriteAtlasAdapter` refuses a tag the sheet lacks and `texturePackerAtlasAdapter` any playback, as a failure of the atlas. `parse()` refuses an item whose `playback` is no object or names a value other than `'loop'`, `'once'` and `'pingpong'`; an image or a tile set item leaves it out and reports it
+- add `pixelSnap` to the fit of `OrthographicProjection` and `ParallaxProjection` (the `pixelZoom`, `contain` and `cover` arms of `FitIntoRectangleSpecs`): the zoom becomes a whole number of pixels of the drawing buffer per unit — rounded down for `pixelZoom` and `contain`, up for `cover`, at least 1, the buffer rounded down as `WebGPURenderer#setSize()` rounds it — and the left and the bottom edge of the frustum lie on a whole unit of the projection plane, through `left`/`bottom` of the orthographic camera and `setViewOffset()` of the perspective one, so pixel art stays crisp at a fractional `devicePixelRatio` and does not shimmer as it scrolls. `fitIntoRectangle()` takes the pixel ratio as a fourth argument, read by `pixelSnap` alone. `docs/display.md` has it under "Pixel art through a projection: `pixelSnap`"
+
+### Changed
+
+- change `StageRenderer#resize()`, `Stage2D#resize()`, `IStage#resize()` and `IProjection#updateViewRect()` to take the pixel ratio as an optional third argument, `1` where it is left out or not a finite number above 0: a `StageRenderer` hands the `pixelRatio` of its host on to every stage, nested renderers included, and a change of the ratio alone reaches them as well. `StageRenderer#pixelRatio`, `StageItem#pixelRatio` and `Stage2D#containerPixelRatio` read the ratio a renderer, an item and a stage carry
+- change `ProjectionViewRect` to carry `offsetX` and `offsetY`, how far the middle of the view lies right of and above the point the camera looks at: `0`, or in `[0, 1)` under `pixelSnap`
+
+### Migration Guide
+
+#### `IProjection#getViewRect()` answers `offsetX` and `offsetY`
+
+A projection of your own adds both fields to the view it answers; without a frustum of its own to align, both are `0`.
+
+**Before**
+
+```ts
+getViewRect(): ProjectionViewRect {
+  return {width, height, pixelRatioX, pixelRatioY};
+}
+```
+
+**After**
+
+```ts
+getViewRect(): ProjectionViewRect {
+  return {width, height, pixelRatioX, pixelRatioY, offsetX: 0, offsetY: 0};
+}
+```
+
+#### `StageRenderer#resizeStage()` takes the pixel ratio
+
+A subclass that overrides the protected `resizeStage()` takes the fourth argument and hands it on; a `StageItem` built by hand carries `pixelRatio`.
+
+**Before**
+
+```ts
+protected resizeStage(item: StageItem, width: number, height: number): void {
+  super.resizeStage(item, width, height);
+}
+```
+
+**After**
+
+```ts
+protected resizeStage(item: StageItem, width: number, height: number, pixelRatio: number): void {
+  super.resizeStage(item, width, height, pixelRatio);
+}
+```
 
 ## [0.24.0] - 2026-10-25
 

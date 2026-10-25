@@ -1,6 +1,7 @@
 import {Vector2} from 'three/webgpu';
 
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
+import {ceilWholePixels, floorWholePixels} from '../utils/wholePixels.js';
 
 /**
  * Represents the horizontal alignment of the view within the container.
@@ -42,11 +43,16 @@ export type AnchorPosition =
  * How a view fits into a container. `anchorPosition` is read by `calculateAnchorOffset()` alone:
  * `fitIntoRectangle()` works out the size of the view and leaves its place to the caller. The
  * projections take {@link ProjectionFitSpecs}, which has no `anchorPosition`.
+ *
+ * `pixelSnap` rounds the zoom of the `pixelZoom`, `contain` and `cover` arms to a whole number of
+ * pixels of the drawing buffer per unit of the view, as `fitIntoRectangle()` describes; `fill` has
+ * no zoom to round.
  */
 export type FitIntoRectangleSpecs =
   | {
       fit?: 'fill';
       pixelZoom: number;
+      pixelSnap?: boolean;
       anchorPosition?: AnchorPosition;
     }
   | {
@@ -58,6 +64,7 @@ export type FitIntoRectangleSpecs =
       width: number;
       minPixelZoom?: number;
       maxPixelZoom?: number;
+      pixelSnap?: boolean;
       anchorPosition?: AnchorPosition;
     }
   | {
@@ -65,6 +72,7 @@ export type FitIntoRectangleSpecs =
       height: number;
       minPixelZoom?: number;
       maxPixelZoom?: number;
+      pixelSnap?: boolean;
       anchorPosition?: AnchorPosition;
     }
   | {
@@ -73,6 +81,7 @@ export type FitIntoRectangleSpecs =
       width: number;
       minPixelZoom?: number;
       maxPixelZoom?: number;
+      pixelSnap?: boolean;
       anchorPosition?: AnchorPosition;
     }
   | {
@@ -80,6 +89,7 @@ export type FitIntoRectangleSpecs =
       width: number;
       minPixelZoom?: number;
       maxPixelZoom?: number;
+      pixelSnap?: boolean;
       anchorPosition?: AnchorPosition;
     }
   | {
@@ -87,6 +97,7 @@ export type FitIntoRectangleSpecs =
       height: number;
       minPixelZoom?: number;
       maxPixelZoom?: number;
+      pixelSnap?: boolean;
       anchorPosition?: AnchorPosition;
     }
   | {
@@ -95,6 +106,7 @@ export type FitIntoRectangleSpecs =
       width: number;
       minPixelZoom?: number;
       maxPixelZoom?: number;
+      pixelSnap?: boolean;
       anchorPosition?: AnchorPosition;
     };
 
@@ -205,20 +217,44 @@ export function calculateAnchorOffset(
  * 1 — the view is the container, as with a `Display#pixelZoom` of 0 —, and a `minPixelZoom` or
  * `maxPixelZoom` that is not a finite number above 0 does not apply.
  *
+ * With `pixelSnap`, the zoom — container units per unit of the view, after `minPixelZoom` and
+ * `maxPixelZoom` — is multiplied by `pixelRatio` and rounded to whole pixels of the drawing buffer:
+ * down for `pixelZoom` and `contain`, so that at least the asked-for view stays visible, up for
+ * `cover`, so that the view still covers the container; at least 1. The view is then the drawing
+ * buffer divided by that whole zoom, the buffer rounded down as `WebGPURenderer#setSize()` rounds
+ * it: `Math.floor(rect.width × pixelRatio) / zoom`. The zoom in container units is in general not a
+ * whole number then — 3 buffer pixels at a `pixelRatio` of 1.25 are 2.4 —, and it can lie beyond
+ * `minPixelZoom` or `maxPixelZoom` by less than one pixel of the buffer. Where no shape matches, or
+ * the container has no area, there is nothing to round. Without `pixelSnap`, `pixelRatio` is not
+ * read.
+ *
  * @param rect - The container dimensions as a Vector2
  * @param specs - The fit specifications
  * @param target - Optional target Vector2 to store the result
+ * @param pixelRatio - The pixels of the drawing buffer per unit of `rect`, read by `pixelSnap`
+ * alone: `Display#pixelRatio`, which is `1` under a `Display#pixelZoom`, where `rect` counts pixels
+ * of the buffer already. A value that is not a finite number above 0 counts as `1`.
  * @returns The calculated view dimensions as a Vector2
  */
-export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleSpecs>, target: Vector2 = new Vector2()): Vector2 {
+export function fitIntoRectangle(
+  rect: Vector2,
+  specs: Partial<FitIntoRectangleSpecs>,
+  target: Vector2 = new Vector2(),
+  pixelRatio = 1,
+): Vector2 {
   const pixelZoom = 'pixelZoom' in specs && specs.pixelZoom != null ? specs.pixelZoom : undefined;
+
+  // the zoom a shape gave, in container units per unit of the view; 0 where no shape matched
+  let zoom = 0;
+  let roundUp = false;
 
   if (pixelZoom != null) {
     // ---------------------------------------------------------------
     // pixelZoom
     // ---------------------------------------------------------------
     // a pixelZoom that is not a finite number above 0 zooms by 1, as a Display#pixelZoom of 0 does
-    target.copy(rect).divideScalar(isPositiveFinite(pixelZoom) ? pixelZoom : 1);
+    zoom = isPositiveFinite(pixelZoom) ? pixelZoom : 1;
+    target.copy(rect).divideScalar(zoom);
   } else if (specs.fit === 'fill') {
     // ---------------------------------------------------------------
     // fill
@@ -237,6 +273,8 @@ export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleS
     // a side that is missing, or not a finite number above 0, is a side the caller does not constrain
     const width = 'width' in specs && isPositiveFinite(specs.width) ? specs.width : 0;
     const height = 'height' in specs && isPositiveFinite(specs.height) ? specs.height : 0;
+
+    let fitted = true;
 
     if (width !== 0 && height === 0) {
       // --- we have a width and no height
@@ -260,13 +298,32 @@ export function fitIntoRectangle(rect: Vector2, specs: Partial<FitIntoRectangleS
       } else {
         target.set(width, height);
       }
+    } else {
+      fitted = false;
     }
 
     if (isPositiveFinite(specs.minPixelZoom) && rect.width / target.width < specs.minPixelZoom) {
       target.copy(rect).divideScalar(specs.minPixelZoom);
+      fitted = true;
     } else if (isPositiveFinite(specs.maxPixelZoom) && rect.width / target.width > specs.maxPixelZoom) {
       target.copy(rect).divideScalar(specs.maxPixelZoom);
+      fitted = true;
+    }
+
+    if (fitted) {
+      zoom = rect.width / target.width;
+      roundUp = specs.fit === 'cover';
     }
   }
+
+  // `fill` has no pixelSnap, so the union is narrowed to the arms that do
+  if ('pixelSnap' in specs && specs.pixelSnap === true && isPositiveFinite(zoom)) {
+    const ratio = isPositiveFinite(pixelRatio) ? pixelRatio : 1;
+    const wholeZoom = Math.max(1, roundUp ? ceilWholePixels(zoom * ratio) : floorWholePixels(zoom * ratio));
+    // the buffer the renderer really draws into: a view worked out from the fraction before its
+    // rounding would spread its pixels over one pixel more or less, and a seam would wander
+    target.set(Math.floor(rect.width * ratio) / wholeZoom, Math.floor(rect.height * ratio) / wholeZoom);
+  }
+
   return target;
 }

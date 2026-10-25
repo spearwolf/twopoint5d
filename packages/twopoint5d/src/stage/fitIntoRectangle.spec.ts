@@ -1,7 +1,7 @@
 import {Vector2} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
-import {calculateAnchorOffset, fitIntoRectangle, parseAnchorPosition} from './fitIntoRectangle.js';
+import {calculateAnchorOffset, type FitIntoRectangleSpecs, fitIntoRectangle, parseAnchorPosition} from './fitIntoRectangle.js';
 
 describe('fitIntoRectangle', () => {
   it('pixelZoom', () => {
@@ -310,4 +310,101 @@ it.each([0, -2, NaN, Infinity, -Infinity])('a maxPixelZoom of %s does not apply'
 it.each([0, -2, NaN, Infinity])('a minPixelZoom of %s does not apply', (minPixelZoom) => {
   const target = fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', width: 100, minPixelZoom}, new Vector2());
   expect([target.width, target.height]).toEqual([100, 62.5]);
+});
+
+describe('pixelSnap', () => {
+  // the view as [width, height], each to 9 decimal places: a buffer divided by a whole zoom is a
+  // fraction more often than not
+  const fit = (rect: [number, number], specs: Partial<FitIntoRectangleSpecs>, pixelRatio?: number) => {
+    const target = fitIntoRectangle(new Vector2(...rect), specs, new Vector2(), pixelRatio);
+    return [Number(target.width.toFixed(9)), Number(target.height.toFixed(9))];
+  };
+
+  // contain zooms by 2.5 here, as the container has the aspect ratio of the specs
+  it.each([
+    [1, [500, 300]],
+    [1.25, [1250 / 3, 250]],
+    [1.5, [500, 300]],
+    [2, [400, 240]],
+    [2.625, [437.5, 262.5]],
+  ])('contain rounds the zoom down to whole buffer pixels at a pixel ratio of %s', (pixelRatio, view) => {
+    expect(fit([1000, 600], {fit: 'contain', width: 400, height: 240, pixelSnap: true}, pixelRatio)).toEqual(
+      view.map((v) => Number(v.toFixed(9))),
+    );
+  });
+
+  // 1000 × 500 against 400 × 240: contain zooms by 2.083…, cover by 2.5
+  it.each([
+    [1, [1000 / 3, 500 / 3]],
+    [1.25, [312.5, 156.25]],
+    [1.5, [375, 187.5]],
+    [2, [400, 200]],
+    [2.625, [2625 / 7, 1312 / 7]],
+  ])('cover rounds the zoom up to whole buffer pixels at a pixel ratio of %s', (pixelRatio, view) => {
+    expect(fit([1000, 500], {fit: 'cover', width: 400, height: 240, pixelSnap: true}, pixelRatio)).toEqual(
+      view.map((v) => Number(v.toFixed(9))),
+    );
+  });
+
+  it('a pixelZoom is rounded down to whole buffer pixels, as Display#pixelZoom rounds it', () => {
+    // 2 × 1.25 = 2.5 buffer pixels, rounded down to 2
+    expect(fit([640, 400], {pixelZoom: 2, pixelSnap: true}, 1.25)).toEqual([400, 250]);
+    // 2 × 2.625 = 5.25, rounded down to 5, of a buffer of 1050 × 787
+    expect(fit([400, 300], {pixelZoom: 2, pixelSnap: true}, 2.625)).toEqual([210, 157.4]);
+  });
+
+  it('counts whole pixels with a leeway for floating point', () => {
+    // 5 / 2.625 × 2.625 is 4.999… in floating point, and still 5 whole pixels
+    expect(fit([400, 300], {pixelZoom: 5 / 2.625, pixelSnap: true}, 2.625)).toEqual([210, 157.4]);
+    // a cover zoom of exactly 3 stays 3 instead of rounding up to 4
+    expect(fit([1200, 720], {fit: 'cover', width: 400, pixelSnap: true}, 1)).toEqual([400, 240]);
+  });
+
+  it('divides the drawing buffer the renderer has, rounded down as WebGPURenderer#setSize() rounds it', () => {
+    // 1001 × 1.5 = 1501.5 and 601 × 1.5 = 901.5: the renderer draws into 1501 × 901 pixels
+    expect(fit([1001, 601], {pixelZoom: 1, pixelSnap: true}, 1.5)).toEqual([1501, 901]);
+  });
+
+  it('never zooms below one buffer pixel per unit', () => {
+    // 1000 / 4000 × 2 = 0.5 buffer pixels per unit
+    expect(fit([1000, 600], {fit: 'contain', width: 4000, pixelSnap: true}, 2)).toEqual([2000, 1200]);
+    expect(fit([1000, 600], {pixelZoom: 0.25, pixelSnap: true}, 2)).toEqual([2000, 1200]);
+  });
+
+  it('rounds after minPixelZoom and maxPixelZoom', () => {
+    // the zoom 1.6 is held to 2, which is 2.5 buffer pixels at a ratio of 1.25, rounded down to 2:
+    // 1.6 CSS pixels per unit, below the minPixelZoom by less than one buffer pixel
+    expect(fit([640, 400], {fit: 'contain', width: 400, minPixelZoom: 2, pixelSnap: true}, 1.25)).toEqual([400, 250]);
+    // the zoom 6.4 is held to 3, which is 3 buffer pixels at a ratio of 1
+    expect(fit([640, 400], {fit: 'contain', width: 100, maxPixelZoom: 3, pixelSnap: true}, 1)).toEqual(
+      [640 / 3, 400 / 3].map((v) => Number(v.toFixed(9))),
+    );
+  });
+
+  it('leaves the pixel ratio unread without pixelSnap', () => {
+    expect(fit([640, 400], {fit: 'contain', width: 400}, 2)).toEqual([400, 250]);
+    expect(fit([640, 400], {pixelZoom: 2}, 1.25)).toEqual([320, 200]);
+  });
+
+  it.each([0, -1, NaN, Infinity])('a pixel ratio of %s counts as 1', (pixelRatio) => {
+    expect(fit([1000, 600], {fit: 'contain', width: 400, height: 240, pixelSnap: true}, pixelRatio)).toEqual([500, 300]);
+  });
+
+  it('takes a pixel ratio of 1 where none is given', () => {
+    expect(fit([1000, 600], {fit: 'contain', width: 400, height: 240, pixelSnap: true})).toEqual([500, 300]);
+  });
+
+  it('does not snap fill, which has no zoom', () => {
+    expect(fit([1001, 601], {fit: 'fill', pixelSnap: true} as Partial<FitIntoRectangleSpecs>, 1.5)).toEqual([1001, 601]);
+  });
+
+  it('leaves the target untouched where no shape matches', () => {
+    const target = new Vector2(11, 22);
+    fitIntoRectangle(new Vector2(640, 400), {fit: 'contain', pixelSnap: true}, target, 2);
+    expect([target.width, target.height]).toEqual([11, 22]);
+  });
+
+  it('gives a 0×0 view for a rect without area', () => {
+    expect(fit([0, 600], {fit: 'contain', width: 400, pixelSnap: true}, 2)).toEqual([0, 0]);
+  });
 });

@@ -1,8 +1,22 @@
 # Proposal: a pixel-exact projection fit — `pixelSnap`
 
-Status: **specified.** Carried on from §8 of
+Status: **implemented** — see [`docs/display.md`](../display.md), "Pixel art through a projection:
+`pixelSnap`"; specs `fitIntoRectangle.spec.ts`, `OrthographicProjection.spec.ts`,
+`ParallaxProjection.spec.ts`, `Stage2D.spec.ts`, `StageRenderer.spec.ts`; browser test
+`stage-pixel-snap.test.js`; demos `rope-bridge` and `platformer`. Carried on from §8 of
 [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md), the row "a projection fit that
-snaps to a whole-number `pixelZoom`". Nothing here is built.
+snaps to a whole-number `pixelZoom`". Deviations:
+
+- `Canvas2DStage` and `ClearStage` stay as they are: `ClearStage#resize()` leaves out a parameter it
+  does not read, and the projection of a `Canvas2DStage` follows its own `fit`, which has no
+  `pixelSnap` (§4);
+- the ratio a renderer, an item and a stage carry is public: `StageRenderer#pixelRatio`,
+  `StageItem#pixelRatio`, `Stage2D#containerPixelRatio` (§4);
+- the frustum is aligned whenever `pixelSnap` is set, read with `'pixelSnap' in specs`, because the
+  `fill` arms of the union carry no such field (§5);
+- the browser test renders into a target of the buffer size at the ratios `1` and `2` instead of a
+  page of a `deviceScaleFactor` of `1.25`: the runner shares one browser context between the test
+  files, and the buffer is what the projection holds to whole pixels (§9).
 
 Pixel art drawn through a projection zoom stays crisp only where every pixel of the art covers the
 same whole number of pixels of the drawing buffer, and where the edges of its texels fall on the
@@ -95,7 +109,10 @@ optional third parameter, `1` where it is left out:
 - `Stage2D#resize()` keeps it beside the container size, compares it in its guard and hands it to
   the projection; `updateProjection()` hands on the kept one;
 - `IProjection#updateViewRect(width, height, pixelRatio?)` hands it to `fitIntoRectangle()`;
-- `Canvas2DStage` and `ClearStage` take it and leave it unread.
+- `StageRenderer#pixelRatio` and `Stage2D#containerPixelRatio` read the ratio the renderer and
+  the stage carry, `1` until the first `resize()`; `Canvas2DStage` and `ClearStage` stay as they
+  are — `ClearStage#resize()` declares no parameter it does not read, and the projection of a
+  `Canvas2DStage` follows its own `fit`, which takes no `pixelSnap`.
 
 A window dragged onto a screen of another `devicePixelRatio` keeps its CSS size and changes the
 ratio: the guard has to let that through, or the view would stay snapped to the old screen.
@@ -201,10 +218,12 @@ const y = (canvas.clientHeight / 2 - event.offsetY) / view.pixelRatioY + view.of
   option, the projection's own cleared when the option goes off.
 - `Stage2D.spec.ts`, `StageRenderer.spec.ts`: the ratio handed on from the host through a nested
   renderer to the projection, and a change of the ratio alone that snaps the view anew.
-- Browser, `packages/twopoint5d-testing`: a checkerboard texture with `nearest` filtering, one
-  texel per unit, through each projection with `pixelSnap` at a `deviceScaleFactor` of `1.25`,
-  under WebGPU and WebGL 2; every texel covers a block of whole, equally wide pixels of the read-back
-  image.
+- Browser, `packages/twopoint5d-testing/test/stage-pixel-snap.test.js`: a checkerboard texture
+  with `nearest` filtering, one texel per unit, through a `Stage2D` with each projection and
+  `pixelSnap`, into a target of 64 × 63 pixels — the odd height puts a centred frustum half a pixel
+  off — at the ratios `1` and `2`, under WebGPU and WebGL 2; every run of one colour inside a row or
+  a column of the read-back image is exactly the whole zoom long. Without `pixelSnap` the same
+  scene draws runs of uneven length.
 
 ## 10. Left out
 

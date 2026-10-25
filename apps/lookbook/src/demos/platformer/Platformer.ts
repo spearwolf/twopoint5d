@@ -1,3 +1,4 @@
+import {OrthographicProjection} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, Scene} from 'three/webgpu';
 import type {PlatformerAssets} from './assets';
 import {Backdrop} from './Backdrop';
@@ -56,7 +57,16 @@ export class Platformer {
   #input: FighterInput = {move: 0, kick: false, flyingKick: false};
   #cameraX = 0;
   #viewWidth = 0;
-  #pixelScale = 1;
+  // the smallest whole number of device pixels per art pixel at which at most VIEW_HEIGHT art
+  // pixels fill the height, with a frustum whose edges lie on whole art pixels
+  readonly #projection = new OrthographicProjection('xy|bottom-left', {
+    fit: 'cover',
+    height: VIEW_HEIGHT,
+    pixelSnap: true,
+    distanceToProjectionPlane: 100,
+    near: 1,
+    far: 200,
+  });
   #hits = 0;
   // the autoplay pauses between its moves, as a fighter on guard does
   #autoplayWaitUntil = 0;
@@ -80,9 +90,6 @@ export class Platformer {
     this.fighter.sprites.position.z = 1;
     this.scene.add(this.fighter.sprites);
 
-    this.camera.position.z = 100;
-    this.camera.near = 1;
-    this.camera.far = 200;
     this.#cameraX = this.fighter.x;
   }
 
@@ -102,32 +109,21 @@ export class Platformer {
     if (key !== undefined) this.#keys.delete(key);
   };
 
-  /** A whole number of device pixels per art pixel, chosen so that about VIEW_HEIGHT art pixels fill the height. */
+  /** Fits the view to a display of `width` × `height` CSS pixels drawn at `pixelRatio`. */
   resize(width: number, height: number, pixelRatio: number): void {
-    const deviceWidth = Math.round(width * pixelRatio);
-    const deviceHeight = Math.round(height * pixelRatio);
-    this.#pixelScale = Math.max(1, Math.ceil(deviceHeight / VIEW_HEIGHT));
-    const viewWidth = deviceWidth / this.#pixelScale;
-    const viewHeight = deviceHeight / this.#pixelScale;
-    this.#viewWidth = viewWidth;
-
-    // the frustum starts on a whole art pixel, so every texel covers whole device pixels
-    const camera = this.camera;
-    camera.left = -Math.floor(viewWidth / 2);
-    camera.right = camera.left + viewWidth;
-    camera.bottom = -BELOW_FLOOR;
-    camera.top = camera.bottom + viewHeight;
-    camera.updateProjectionMatrix();
+    this.#projection.updateViewRect(width, height, pixelRatio);
+    this.#projection.updateCamera(this.camera);
+    const view = this.#projection.getViewRect();
+    this.#viewWidth = view.width;
+    // the bottom edge of the frustum lies Math.floor(height / 2) art pixels below the camera: a
+    // camera that many pixels above it puts the floor BELOW_FLOOR art pixels above that edge
+    this.camera.position.y = Math.floor(view.height / 2) - BELOW_FLOOR;
   }
 
   /** Both kinds stand on the pivot of their sheets, or — to see what `Anchor` does — on their middles. */
   set anchorAtPivot(on: boolean) {
     this.fighter.anchorAtPivot = on;
     this.goblins.anchorAtPivot = on;
-  }
-
-  get pixelScale(): number {
-    return this.#pixelScale;
   }
 
   update(now: number, dt: number): void {

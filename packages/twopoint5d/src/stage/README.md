@@ -105,8 +105,9 @@ const display = new Display(canvas);
 const stage = new Stage2D(new ParallaxProjection('xy|bottom-left'));
 const sr = new StageRenderer().setClearColor(new Color('#000')).add(stage); // no parent → manual
 
-on(display, OnDisplayRenderFrame, ({renderer, width, height, now, deltaTime, frameNo}) => {
-  sr.resize(width, height);
+on(display, OnDisplayRenderFrame, ({renderer, width, height, pixelRatio, now, deltaTime, frameNo}) => {
+  // the pixel ratio reaches the projections, which read it for pixelSnap
+  sr.resize(width, height, pixelRatio);
   // … your per-frame logic here …
   sr.updateFrame(now, deltaTime, frameNo);
   sr.renderTo(renderer);

@@ -1,4 +1,4 @@
-import {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
+import {type Camera, OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {OrthographicProjection, type OrthographicProjectionSpecs} from './OrthographicProjection.js';
@@ -36,7 +36,7 @@ describe('OrthographicProjection', () => {
       const projection = new OrthographicProjection();
       expect(projection.viewSpecs).toEqual({fit: 'fill'});
       projection.updateViewRect(800, 600);
-      expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
+      expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1, offsetX: 0, offsetY: 0});
 
       const withPlane = new OrthographicProjection('xy|bottom-left');
       withPlane.updateViewRect(800, 600);
@@ -52,7 +52,14 @@ describe('OrthographicProjection', () => {
       width: 640,
     });
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
+    expect(projection.getViewRect()).toEqual({
+      width: 640,
+      height: 480,
+      pixelRatioX: 1.25,
+      pixelRatioY: 1.25,
+      offsetX: 0,
+      offsetY: 0,
+    });
   });
 
   it('getViewRect() hands out a new object on every call', () => {
@@ -93,7 +100,14 @@ describe('OrthographicProjection', () => {
     const projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640});
     projection.updateViewRect(800, 600);
     const camera = projection.createCamera();
-    expect(projection.getViewRect()).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
+    expect(projection.getViewRect()).toEqual({
+      width: 640,
+      height: 480,
+      pixelRatioX: 1.25,
+      pixelRatioY: 1.25,
+      offsetX: 0,
+      offsetY: 0,
+    });
 
     const noArea: [number, number][] = [
       [0, 600],
@@ -105,7 +119,14 @@ describe('OrthographicProjection', () => {
     ];
     for (const [w, h] of noArea) {
       projection.updateViewRect(w, h);
-      expect(projection.getViewRect(), `${w}×${h}`).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
+      expect(projection.getViewRect(), `${w}×${h}`).toEqual({
+        width: 640,
+        height: 480,
+        pixelRatioX: 1.25,
+        pixelRatioY: 1.25,
+        offsetX: 0,
+        offsetY: 0,
+      });
 
       projection.updateCamera(camera);
       expect([camera.left, camera.right, camera.top, camera.bottom], `${w}×${h}`).toEqual([-320, 320, 240, -240]);
@@ -223,10 +244,10 @@ describe('OrthographicProjection', () => {
   it('has no view before a container with area', () => {
     const projection = new OrthographicProjection('xy|bottom-left');
     projection.updateViewRect(0, 600);
-    expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0});
+    expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0, offsetX: 0, offsetY: 0});
 
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
+    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1, offsetX: 0, offsetY: 0});
   });
 
   it.each([{}, {fit: 'contain'}, {fit: 'contain', width: -640}] as const satisfies Partial<OrthographicProjectionSpecs>[])(
@@ -234,14 +255,14 @@ describe('OrthographicProjection', () => {
     (specs) => {
       const projection = new OrthographicProjection('xy|bottom-left', specs);
       projection.updateViewRect(800, 600);
-      expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0});
+      expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0, offsetX: 0, offsetY: 0});
     },
   );
 
   it('takes a pixelZoom of 0 as the container', () => {
     const projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 0});
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
+    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1, offsetX: 0, offsetY: 0});
   });
 
   describe('camera values from the specs', () => {
@@ -301,6 +322,87 @@ describe('OrthographicProjection', () => {
       projection.updateCamera(camera);
 
       expect([camera.near, camera.far]).toEqual([0.1, 100000]);
+    });
+  });
+
+  // the column and the row of the drawing buffer a point of the world lands on, through the
+  // matrices the camera really has
+  const toBufferPixel = (camera: Camera, x: number, y: number, bufferWidth: number, bufferHeight: number): [number, number] => {
+    camera.updateMatrixWorld();
+    const ndc = new Vector3(x, y, 0).project(camera);
+    return [((ndc.x + 1) / 2) * bufferWidth, ((ndc.y + 1) / 2) * bufferHeight];
+  };
+
+  const isWhole = (value: number) => Math.abs(value - Math.round(value)) < 1e-6;
+
+  describe('pixelSnap', () => {
+    it('lays the frustum edges on whole units of an odd view, and reports the shift of its middle', () => {
+      const projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 1, pixelSnap: true});
+      projection.updateViewRect(801, 601);
+      const camera = projection.createCamera();
+      expect([camera.left, camera.right, camera.bottom, camera.top]).toEqual([-400, 401, -300, 301]);
+      expect(projection.getViewRect()).toEqual({
+        width: 801,
+        height: 601,
+        pixelRatioX: 1,
+        pixelRatioY: 1,
+        offsetX: 0.5,
+        offsetY: 0.5,
+      });
+    });
+
+    it('keeps an even view in the middle', () => {
+      const projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 1, pixelSnap: true});
+      projection.updateViewRect(800, 600);
+      const camera = projection.createCamera();
+      expect([camera.left, camera.right, camera.bottom, camera.top]).toEqual([-400, 400, -300, 300]);
+      expect(projection.getViewRect()).toMatchObject({offsetX: 0, offsetY: 0});
+    });
+
+    it('fits with the pixel ratio it is handed: whole units land on whole pixels of the buffer', () => {
+      // contain zooms by 2.5 CSS pixels, 3.125 buffer pixels at a ratio of 1.25, rounded down to 3:
+      // the buffer of 1250 × 750 pixels shows 416.67 × 250 units
+      const projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 400, height: 240, pixelSnap: true});
+      projection.updateViewRect(1000, 600, 1.25);
+      const view = projection.getViewRect();
+      expect(view.width).toBeCloseTo(1250 / 3);
+      expect(view.height).toBe(250);
+      expect(view.pixelRatioX).toBeCloseTo(2.4);
+      expect(view.offsetX).toBeCloseTo(1 / 3);
+      expect(view.offsetY).toBe(0);
+
+      const camera = projection.createCamera();
+      expect(camera.left).toBe(-208);
+      for (const [x, y] of [
+        [0, 0],
+        [1, 1],
+        [-7, 3],
+        [100, -50],
+        [207, 124],
+      ] as [number, number][]) {
+        const [column, row] = toBufferPixel(camera, x, y, 1250, 750);
+        expect(isWhole(column) && isWhole(row), `${x}, ${y} lands on ${column}, ${row}`).toBe(true);
+      }
+    });
+
+    it('centres the frustum without pixelSnap, an odd view included', () => {
+      const projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 1});
+      projection.updateViewRect(801, 601, 2);
+      const camera = projection.createCamera();
+      expect([camera.left, camera.right, camera.bottom, camera.top]).toEqual([-400.5, 400.5, -300.5, 300.5]);
+      expect(projection.getViewRect()).toMatchObject({offsetX: 0, offsetY: 0});
+    });
+
+    it('centres the frustum of a camera it updates again once pixelSnap goes off', () => {
+      const specs: Partial<OrthographicProjectionSpecs> = {pixelZoom: 1, pixelSnap: true};
+      const projection = new OrthographicProjection('xy|bottom-left', specs);
+      projection.updateViewRect(801, 601);
+      const camera = projection.createCamera();
+      specs.pixelSnap = false;
+      projection.updateViewRect(801, 601);
+      projection.updateCamera(camera);
+      expect([camera.left, camera.right]).toEqual([-400.5, 400.5]);
+      expect(projection.getViewRect()).toMatchObject({offsetX: 0, offsetY: 0});
     });
   });
 });

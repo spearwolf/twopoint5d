@@ -1,4 +1,4 @@
-import {OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
+import {type Camera, OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
 import {ParallaxProjection, type ParallaxProjectionSpecs} from './ParallaxProjection.js';
@@ -36,7 +36,7 @@ describe('ParallaxProjection', () => {
       const projection = new ParallaxProjection();
       expect(projection.viewSpecs).toEqual({fit: 'fill'});
       projection.updateViewRect(800, 600);
-      expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
+      expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1, offsetX: 0, offsetY: 0});
 
       const withPlane = new ParallaxProjection('xy|bottom-left');
       withPlane.updateViewRect(800, 600);
@@ -52,7 +52,14 @@ describe('ParallaxProjection', () => {
       width: 640,
     });
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
+    expect(projection.getViewRect()).toEqual({
+      width: 640,
+      height: 480,
+      pixelRatioX: 1.25,
+      pixelRatioY: 1.25,
+      offsetX: 0,
+      offsetY: 0,
+    });
   });
 
   it('getViewRect() hands out a new object on every call', () => {
@@ -113,7 +120,14 @@ describe('ParallaxProjection', () => {
     const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
     projection.updateViewRect(800, 600);
     const camera = projection.createCamera();
-    expect(projection.getViewRect()).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
+    expect(projection.getViewRect()).toEqual({
+      width: 640,
+      height: 480,
+      pixelRatioX: 1.25,
+      pixelRatioY: 1.25,
+      offsetX: 0,
+      offsetY: 0,
+    });
     const fov = camera.fov;
     const noArea: [number, number][] = [
       [0, 600],
@@ -125,7 +139,14 @@ describe('ParallaxProjection', () => {
     ];
     for (const [w, h] of noArea) {
       projection.updateViewRect(w, h);
-      expect(projection.getViewRect(), `${w}×${h}`).toEqual({width: 640, height: 480, pixelRatioX: 1.25, pixelRatioY: 1.25});
+      expect(projection.getViewRect(), `${w}×${h}`).toEqual({
+        width: 640,
+        height: 480,
+        pixelRatioX: 1.25,
+        pixelRatioY: 1.25,
+        offsetX: 0,
+        offsetY: 0,
+      });
 
       projection.updateCamera(camera);
       expect(camera.aspect, `${w}×${h}`).toBeCloseTo(640 / 480);
@@ -264,10 +285,10 @@ describe('ParallaxProjection', () => {
   it('has no view before a container with area', () => {
     const projection = new ParallaxProjection('xy|bottom-left');
     projection.updateViewRect(0, 600);
-    expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0});
+    expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0, offsetX: 0, offsetY: 0});
 
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
+    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1, offsetX: 0, offsetY: 0});
   });
 
   it.each([{}, {fit: 'contain'}, {fit: 'contain', width: -640}] as const satisfies Partial<ParallaxProjectionSpecs>[])(
@@ -275,14 +296,14 @@ describe('ParallaxProjection', () => {
     (specs) => {
       const projection = new ParallaxProjection('xy|bottom-left', specs);
       projection.updateViewRect(800, 600);
-      expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0});
+      expect(projection.getViewRect()).toEqual({width: 0, height: 0, pixelRatioX: 0, pixelRatioY: 0, offsetX: 0, offsetY: 0});
     },
   );
 
   it('takes a pixelZoom of 0 as the container', () => {
     const projection = new ParallaxProjection('xy|bottom-left', {pixelZoom: 0});
     projection.updateViewRect(800, 600);
-    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1});
+    expect(projection.getViewRect()).toEqual({width: 800, height: 600, pixelRatioX: 1, pixelRatioY: 1, offsetX: 0, offsetY: 0});
   });
 
   describe('camera values from the specs', () => {
@@ -350,6 +371,100 @@ describe('ParallaxProjection', () => {
       projection.updateCamera(camera);
 
       expect(camera.fov).toBe(fov);
+    });
+  });
+
+  // the column and the row of the drawing buffer a point of the world lands on, through the
+  // matrices the camera really has
+  const toBufferPixel = (camera: Camera, x: number, y: number, bufferWidth: number, bufferHeight: number): [number, number] => {
+    camera.updateMatrixWorld();
+    const ndc = new Vector3(x, y, 0).project(camera);
+    return [((ndc.x + 1) / 2) * bufferWidth, ((ndc.y + 1) / 2) * bufferHeight];
+  };
+
+  const isWhole = (value: number) => Math.abs(value - Math.round(value)) < 1e-6;
+
+  describe('pixelSnap', () => {
+    it('shifts the window of the camera so that whole units of the projection plane land on whole buffer pixels', () => {
+      // 3 buffer pixels per unit of a buffer of 1250 × 750 pixels: 416.67 × 250 units
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 400, height: 240, pixelSnap: true});
+      projection.updateViewRect(1000, 600, 1.25);
+      const view = projection.getViewRect();
+      expect(view.offsetX).toBeCloseTo(1 / 3);
+      expect(view.offsetY).toBe(0);
+
+      const camera = projection.createCamera();
+      expect(camera.view).toMatchObject({
+        enabled: true,
+        fullWidth: view.width,
+        fullHeight: view.height,
+        width: view.width,
+        height: view.height,
+      });
+      expect(camera.view!.offsetX).toBeCloseTo(1 / 3);
+      expect(camera.view!.offsetY).toBeCloseTo(0);
+
+      for (const [x, y] of [
+        [0, 0],
+        [1, 1],
+        [-7, 3],
+        [100, -50],
+        [207, 124],
+      ] as [number, number][]) {
+        const [column, row] = toBufferPixel(camera, x, y, 1250, 750);
+        expect(isWhole(column) && isWhole(row), `${x}, ${y} lands on ${column}, ${row}`).toBe(true);
+      }
+    });
+
+    it('moves the window up by the share of a unit an odd height leaves', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {pixelZoom: 1, pixelSnap: true});
+      projection.updateViewRect(801, 601);
+      expect(projection.getViewRect()).toMatchObject({offsetX: 0.5, offsetY: 0.5});
+      const camera = projection.createCamera();
+      expect(camera.view).toMatchObject({offsetX: 0.5, offsetY: -0.5});
+      for (const [x, y] of [
+        [0, 0],
+        [3, -2],
+        [-400, 300],
+      ] as [number, number][]) {
+        const [column, row] = toBufferPixel(camera, x, y, 801, 601);
+        expect(isWhole(column) && isWhole(row), `${x}, ${y} lands on ${column}, ${row}`).toBe(true);
+      }
+    });
+
+    it('keeps the camera where it is and the field of view and the parallax factor as they are', () => {
+      const snapped = new ParallaxProjection('xy|bottom-left', {pixelZoom: 1, pixelSnap: true});
+      const centred = new ParallaxProjection('xy|bottom-left', {pixelZoom: 1});
+      snapped.updateViewRect(801, 601);
+      centred.updateViewRect(801, 601);
+      const a = snapped.createCamera();
+      const b = centred.createCamera();
+      expect(a.position.toArray()).toEqual(b.position.toArray());
+      expect([a.fov, a.aspect]).toEqual([b.fov, b.aspect]);
+      expect(snapped.getParallaxFactor(150)).toBe(centred.getParallaxFactor(150));
+    });
+
+    it('leaves a view offset of the caller alone without pixelSnap', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {pixelZoom: 1});
+      projection.updateViewRect(800, 600);
+      const camera = new PerspectiveCamera();
+      camera.setViewOffset(1600, 600, 800, 0, 800, 600);
+      projection.updateCamera(camera);
+      expect(camera.view).toMatchObject({enabled: true, fullWidth: 1600, offsetX: 800});
+    });
+
+    it('clears the view offset it wrote once pixelSnap goes off', () => {
+      const specs: Partial<ParallaxProjectionSpecs> = {pixelZoom: 1, pixelSnap: true};
+      const projection = new ParallaxProjection('xy|bottom-left', specs);
+      projection.updateViewRect(801, 601);
+      const camera = projection.createCamera();
+      expect(camera.view?.enabled).toBe(true);
+
+      specs.pixelSnap = false;
+      projection.updateViewRect(801, 601);
+      projection.updateCamera(camera);
+      expect(camera.view?.enabled ?? false).toBe(false);
+      expect(projection.getViewRect()).toMatchObject({offsetX: 0, offsetY: 0});
     });
   });
 });

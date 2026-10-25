@@ -33,6 +33,49 @@ describe('Stage2D', () => {
     expect(stage.camera).toBeDefined();
   });
 
+  describe('the pixel ratio', () => {
+    // contain zooms by 2.5 CSS pixels in a container of 1000 × 600
+    const snapping = () =>
+      new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 400, height: 240, pixelSnap: true});
+
+    it('hands the pixel ratio of resize() to the projection', () => {
+      const stage = new Stage2D(snapping());
+      stage.resize(1000, 600, 1.25);
+      expect(stage.containerPixelRatio).toBe(1.25);
+      expect(stage.width).toBeCloseTo(1250 / 3);
+      expect(stage.height).toBe(250);
+    });
+
+    it('takes a pixel ratio of 1 where none is given, and counts one that is no finite number above 0 as 1', () => {
+      const stage = new Stage2D(snapping());
+      stage.resize(1000, 600);
+      expect([stage.containerPixelRatio, stage.width, stage.height]).toEqual([1, 500, 300]);
+      stage.resize(1000, 600, Number.NaN);
+      expect([stage.containerPixelRatio, stage.width, stage.height]).toEqual([1, 500, 300]);
+    });
+
+    it('snaps the view anew on a change of the pixel ratio alone, and announces it', () => {
+      const stage = new Stage2D(snapping());
+      stage.resize(1000, 600, 1);
+      const resized = vi.fn();
+      on(stage, OnStageResize, resized);
+      stage.resize(1000, 600, 2);
+      expect([stage.width, stage.height]).toEqual([400, 240]);
+      expect(resized).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the pixel ratio for updateProjection()', () => {
+      const projection = snapping();
+      const stage = new Stage2D(projection);
+      stage.resize(1000, 600, 2);
+      stage.updateProjection(true);
+      expect([stage.width, stage.height]).toEqual([400, 240]);
+      // a new projection takes the view at the kept ratio as well
+      stage.projection = snapping();
+      expect([stage.width, stage.height]).toEqual([400, 240]);
+    });
+  });
+
   it('creates no camera before the first resize() with an area', () => {
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
     expect(stage.camera, 'after construction').toBeUndefined();
@@ -224,7 +267,7 @@ describe('Stage2D', () => {
       stage.updateProjection();
 
       expect(updateViewRect).toHaveBeenCalledTimes(1);
-      expect(updateViewRect).toHaveBeenCalledWith(800, 600);
+      expect(updateViewRect).toHaveBeenCalledWith(800, 600, 1);
       expect(stage.needsUpdate).toBe(false);
     });
 

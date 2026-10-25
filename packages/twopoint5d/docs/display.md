@@ -107,7 +107,77 @@ What follows from the zoom:
 
 The zoom of a projection — `OrthographicProjection` with `{pixelZoom: 2}` on a display without a
 zoom — draws the art as large, but in a drawing buffer at the full pixel ratio: four times the
-pixels of a display zoom of 2, at the same look.
+pixels of a display zoom of 2, at the same look. The next section keeps that crisp.
+
+## Pixel art through a projection: `pixelSnap`
+
+A projection zoom stays crisp only where every pixel of the art covers the same whole number of
+pixels of the drawing buffer, and where the edges of its texels fall on the edges of those pixels.
+A zoom of 2 CSS pixels is 2.5 pixels of the buffer at a pixel ratio of 1.25 — texels 2 and 3
+pixels wide by turns —, and a view centred on an odd number of pixels puts every texel edge half a
+pixel off. `pixelSnap: true` beside the fit of an `OrthographicProjection` or a
+`ParallaxProjection` takes care of both:
+
+- **The zoom counts pixels of the buffer.** A `StageRenderer` hands the `pixelRatio` of its display
+  on to its stages with their size, and the projection rounds the zoom times that ratio to a whole
+  number — down for `pixelZoom` and `contain`, so at least the asked-for view stays visible; up for
+  `cover`, so the view still covers the canvas; never below 1. The zoom in CSS pixels is then in
+  general no whole number: 3 pixels of the buffer at a ratio of 1.25 are 2.4 CSS pixels.
+- **The edges of the frustum lie on whole units.** The left and the bottom edge of the view sit at
+  `-Math.floor(width / 2)` and `-Math.floor(height / 2)` units from the point the camera looks at,
+  so the middle of the view lies up to a unit right of and above that point.
+  `getViewRect()` reports that shift in `offsetX` and `offsetY` — `0` without `pixelSnap`.
+
+```ts check
+import {Display, OrthographicProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const canvas = document.querySelector('canvas')!;
+const display = new Display(canvas);
+
+// the largest whole zoom at which at least 480 × 288 pixels of the art fit
+const projection = new OrthographicProjection('xy|bottom-left', {
+  fit: 'contain',
+  width: 480,
+  height: 288,
+  pixelSnap: true,
+});
+const stage = new Stage2D(projection);
+new StageRenderer(display).add(stage);
+
+// a pointer position in units of the view, measured from the point the camera looks at
+canvas.addEventListener('pointermove', (event) => {
+  const view = projection.getViewRect();
+  const x = (event.offsetX - canvas.clientWidth / 2) / view.pixelRatioX + view.offsetX;
+  const y = (canvas.clientHeight / 2 - event.offsetY) / view.pixelRatioY + view.offsetY;
+});
+
+export {display, stage};
+```
+
+What follows from it:
+
+- Sprites and the camera keep the texels whole as long as they sit on whole units — the strict
+  look of a retro game — or on multiples of `1 / zoom` units, one pixel of the buffer.
+- A `ParallaxProjection` shifts the window of its camera with `setViewOffset()` and leaves the
+  camera, its field of view and `getParallaxFactor()` as they are. Only the projection plane is
+  pixel-exact: a layer in front of or behind it is drawn `getScaleFactor()` times as large. Under
+  `pixelSnap` the projection owns the view offset of the cameras it places; without it, it clears
+  only an offset it wrote itself.
+- Under a display `pixelZoom` the buffer already holds the art, the ratio is `1`, and `pixelSnap`
+  makes every unit a whole number of pixels of the buffer on top of it — the cheapest pixel-exact
+  setup.
+- The buffer has to reach the screen one to one for the pixels to stay even there. A
+  `maxPixelRatio` below the `devicePixelRatio` scales the buffer up — a ratio of 2 on a screen of
+  3 by 1.5 —, and so does a `resolutionScale` below `1`.
+- `adaptiveResolution` does not go together with `pixelSnap`: every step of the scale changes the
+  pixel ratio, the whole zoom follows it, and the visible part of the world grows or shrinks
+  mid-game. Pixel art that has to save pixels takes a display `pixelZoom`, under which the
+  controller holds still.
+- A stage driven without a `StageRenderer` gets the ratio as the third argument of
+  `stage.resize(width, height, pixelRatio)`, a projection of its own as that of
+  `updateViewRect(width, height, pixelRatio)`; without it, the ratio is `1`.
+- `minPixelZoom` and `maxPixelZoom` hold the zoom before it is rounded, so the rounded zoom can
+  lie beyond one of them by less than one pixel of the buffer.
 
 ## A budget of pixels
 

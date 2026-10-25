@@ -40,6 +40,7 @@ import {description, title} from './_rope-bridge.json';
   import {
     createBloomOutputNodeBuilder,
     Display,
+    OnStageResize,
     OnStageUpdateFrame,
     OrthographicProjection,
     Stage2D,
@@ -61,9 +62,15 @@ import {description, title} from './_rope-bridge.json';
   const canvas = getFullscreenCanvas();
   const display = new Display(canvas);
 
-  // one unit is one pixel of the art, drawn `pixelZoom` screen pixels large: always a whole number,
-  // so the pixel art stays crisp. The view is about as high as the cave, and as wide as the window
-  const projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 2});
+  // one unit is one pixel of the art, drawn a whole number of device pixels large and on whole
+  // pixels, so the pixel art stays crisp: the largest such zoom at which the bridge and the cave
+  // height still fit. The view is at least as high as the cave, and as wide as the window
+  const projection = new OrthographicProjection('xy|bottom-left', {
+    fit: 'contain',
+    width: MIN_VIEW_WIDTH,
+    height: CAVE_HEIGHT,
+    pixelSnap: true,
+  });
   const stage = new Stage2D(projection);
   stage.scene.background = new Color('#070a12');
 
@@ -74,16 +81,9 @@ import {description, title} from './_rope-bridge.json';
   stageRenderer.pipeline = pipeline;
   stageRenderer.buildOutputNode = withGlow;
 
-  let pixelZoom = 2;
   let bridge: RopeBridge | undefined;
 
-  display.onResize(({width, height}) => {
-    pixelZoom = Math.max(1, Math.min(Math.round(height / CAVE_HEIGHT), Math.floor(width / MIN_VIEW_WIDTH)));
-    projection.viewSpecs = {pixelZoom};
-    stage.updateProjection(true);
-    const view = projection.getViewRect();
-    bridge?.resizeView(view.width, view.height);
-  });
+  on(stage, OnStageResize, ({width, height}) => bridge?.resizeView(width, height));
 
   display.onInit(async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
@@ -111,12 +111,13 @@ import {description, title} from './_rope-bridge.json';
 
     on(stage, OnStageUpdateFrame, ({deltaTime}: StageUpdateFrameProps) => bridge?.update(deltaTime));
 
-    // the pointer, in view units from the middle of the canvas
+    // the pointer, in view units from the point the camera looks at
     const toView = (event: PointerEvent): [number, number] => {
       const rect = canvas.getBoundingClientRect();
+      const view = projection.getViewRect();
       return [
-        (event.clientX - rect.left - rect.width / 2) / pixelZoom,
-        (rect.height / 2 - (event.clientY - rect.top)) / pixelZoom,
+        (event.clientX - rect.left - rect.width / 2) / view.pixelRatioX + view.offsetX,
+        (rect.height / 2 - (event.clientY - rect.top)) / view.pixelRatioY + view.offsetY,
       ];
     };
     canvas.addEventListener('pointerdown', (event) => {

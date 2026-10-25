@@ -150,7 +150,7 @@ describe('StageRenderer', () => {
     failures: {onResize?: Error; onRenderFrame?: Error; unsubscribeResize?: Error; unsubscribeFrame?: Error} = {},
   ): IStageRendererHost & {
     isDisposed: boolean;
-    _emitResize: (w: number, h: number) => void;
+    _emitResize: (w: number, h: number, pixelRatio?: number) => void;
     _emitFrame: (now: number, dt: number, frame: number) => void;
     _unsubs: number;
   } {
@@ -182,8 +182,8 @@ describe('StageRenderer', () => {
           frameHandler = undefined;
         }, failures.unsubscribeFrame);
       },
-      _emitResize(w, h) {
-        resizeHandler?.({width: w, height: h, renderer, now: 0, deltaTime: 0, frameNo: 1});
+      _emitResize(w, h, pixelRatio = 1) {
+        resizeHandler?.({width: w, height: h, pixelRatio, renderer, now: 0, deltaTime: 0, frameNo: 1});
       },
       _emitFrame(now, dt, frameNo) {
         frameHandler?.({renderer, now, deltaTime: dt, frameNo});
@@ -584,12 +584,76 @@ describe('StageRenderer', () => {
       warn.mockRestore();
     });
 
+    describe('the pixel ratio', () => {
+      it('hands the pixel ratio of the host on to its stages', () => {
+        const host = makeHost();
+        const sr = new StageRenderer(host);
+        const stage = fakeStage('s');
+        sr.add(stage);
+        host._emitResize(100, 50, 1.5);
+        expect(sr.pixelRatio).toBe(1.5);
+        expect(stage.resize).toHaveBeenLastCalledWith(100, 50, 1.5);
+        expect(sr.stages[0]).toMatchObject({width: 100, height: 50, pixelRatio: 1.5});
+      });
+
+      it('hands a change of the pixel ratio alone on to its stages', () => {
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        sr.add(stage);
+        sr.resize(320, 240, 1);
+        sr.resize(320, 240, 2);
+        expect(stage.resize).toHaveBeenLastCalledWith(320, 240, 2);
+        sr.resize(320, 240, 2);
+        expect(stage.resize).toHaveBeenCalledTimes(2);
+      });
+
+      it.each([0, -1, NaN, Infinity])('counts a pixel ratio of %s as 1', (pixelRatio) => {
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        sr.add(stage);
+        sr.resize(320, 240, pixelRatio);
+        expect(sr.pixelRatio).toBe(1);
+        expect(stage.resize).toHaveBeenLastCalledWith(320, 240, 1);
+      });
+
+      it('hands its pixel ratio to a stage it adds', () => {
+        const sr = new StageRenderer();
+        sr.resize(320, 240, 2);
+        const stage = fakeStage('s');
+        sr.add(stage);
+        expect(stage.resize).toHaveBeenLastCalledWith(320, 240, 2);
+      });
+
+      it('hands the pixel ratio on through a nested renderer', () => {
+        const parent = new StageRenderer();
+        const child = new StageRenderer(parent);
+        const inner = fakeStage('inner');
+        child.add(inner);
+        parent.resize(100, 80, 2.625);
+        expect(child.pixelRatio).toBe(2.625);
+        expect(inner.resize).toHaveBeenLastCalledWith(100, 80, 2.625);
+      });
+
+      it('keeps the pixel ratio it had while a stage refuses the new one', () => {
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        sr.add(stage);
+        sr.resize(320, 240, 1);
+        stage.resize.mockImplementation(() => {
+          throw new Error('stage refused the size');
+        });
+        expect(() => sr.resize(320, 240, 2)).toThrow('stage refused the size');
+        expect(sr.pixelRatio).toBe(1);
+        expect(sr.stages[0]!.pixelRatio).toBe(1);
+      });
+    });
+
     it('propagates resize() to stages', () => {
       const sr = new StageRenderer();
       const stage = fakeStage('x');
       sr.add(stage);
       sr.resize(320, 240);
-      expect(stage.resize).toHaveBeenLastCalledWith(320, 240);
+      expect(stage.resize).toHaveBeenLastCalledWith(320, 240, 1);
     });
 
     it('leaves the renderer the size it had when a stage refuses it', () => {
@@ -609,7 +673,7 @@ describe('StageRenderer', () => {
       stage2.resize.mockImplementation(() => {});
       sr.resize(320, 240);
 
-      expect(stage2.resize).toHaveBeenLastCalledWith(320, 240);
+      expect(stage2.resize).toHaveBeenLastCalledWith(320, 240, 1);
       expect(sr.width).toBe(320);
       expect(sr.height).toBe(240);
     });
@@ -626,8 +690,8 @@ describe('StageRenderer', () => {
 
       expect(() => sr.resize(320, 240)).toThrow('stage refused the size');
 
-      expect(stage1.resize).toHaveBeenLastCalledWith(320, 240);
-      expect(stage3.resize).toHaveBeenLastCalledWith(320, 240);
+      expect(stage1.resize).toHaveBeenLastCalledWith(320, 240, 1);
+      expect(stage3.resize).toHaveBeenLastCalledWith(320, 240, 1);
     });
 
     it('asks a stage for the size the renderer fell back to', () => {
@@ -640,11 +704,11 @@ describe('StageRenderer', () => {
       sr.add(stage1).add(stage2);
 
       expect(() => sr.resize(320, 240)).toThrow('stage refused the size');
-      expect(stage1.resize, 'the first stage took the size').toHaveBeenLastCalledWith(320, 240);
+      expect(stage1.resize, 'the first stage took the size').toHaveBeenLastCalledWith(320, 240, 1);
 
       sr.resize(0, 0);
 
-      expect(stage1.resize, 'and gives it up for the size the renderer carries').toHaveBeenLastCalledWith(0, 0);
+      expect(stage1.resize, 'and gives it up for the size the renderer carries').toHaveBeenLastCalledWith(0, 0, 1);
       expect(sr.width).toBe(0);
       expect(sr.height).toBe(0);
     });
@@ -679,8 +743,8 @@ describe('StageRenderer', () => {
       for (const stage of [a, b, c]) stage.resize.mockReset();
       sr.resize(320, 240);
 
-      expect(a.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
-      expect(c.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
+      expect(a.resize).toHaveBeenCalledExactlyOnceWith(320, 240, 1);
+      expect(c.resize).toHaveBeenCalledExactlyOnceWith(320, 240, 1);
       expect(b.resize, 'b took the size in the first call').not.toHaveBeenCalled();
     });
 
@@ -855,9 +919,9 @@ describe('StageRenderer', () => {
 
           sr.resize(320, 240);
 
-          expect(a.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
-          expect(b.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
-          expect(c.resize).toHaveBeenCalledExactlyOnceWith(320, 240);
+          expect(a.resize).toHaveBeenCalledExactlyOnceWith(320, 240, 1);
+          expect(b.resize).toHaveBeenCalledExactlyOnceWith(320, 240, 1);
+          expect(c.resize).toHaveBeenCalledExactlyOnceWith(320, 240, 1);
         });
       });
     }
@@ -1153,7 +1217,7 @@ describe('StageRenderer', () => {
       sr.add(stage);
       host._emitResize(100, 50);
       expect(sr.width).toBe(100);
-      expect(stage.resize).toHaveBeenCalledWith(100, 50);
+      expect(stage.resize).toHaveBeenCalledWith(100, 50, 1);
       host._emitFrame(1, 0.016, 1);
       expect(stage.updateFrame).toHaveBeenCalledWith(1, 0.016, 1);
       expect(stage.renderTo).toHaveBeenCalledTimes(1);

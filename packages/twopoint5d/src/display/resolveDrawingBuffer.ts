@@ -1,8 +1,5 @@
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
-
-// A zoom of 5 / 2.625 CSS pixels, times 2.625, is 4.999… device pixels in floating point: the
-// whole device pixels of a zoom are counted with this much leeway before rounding down
-const DEVICE_PIXEL_ZOOM_EPSILON = 1e-6;
+import {ceilWholePixels, floorWholePixels} from '../utils/wholePixels.js';
 
 // A pixel ratio that a budget of pixels or a resolution scale has made is rounded down to a step
 // of an eighth: the size of the drawing buffer, and of every render target that follows it,
@@ -149,10 +146,10 @@ export function resolveDrawingBuffer(params: DrawingBufferParams, out: DrawingBu
     // of the buffer that fit into the device pixels of the source, and a canvas of just their
     // size — a fraction of a CSS pixel at times, always whole in device pixels
     const ratio = devicePixelRatio;
-    devicePixelZoom = Math.max(1, Math.floor(pixelZoom * ratio + DEVICE_PIXEL_ZOOM_EPSILON));
+    devicePixelZoom = Math.max(1, floorWholePixels(pixelZoom * ratio));
     if (isPositiveFinite(maxPixels)) {
       // the smallest whole zoom at which the buffer stays within the budget
-      const budgetZoom = Math.ceil(Math.sqrt((wPx * ratio * hPx * ratio) / maxPixels) - DEVICE_PIXEL_ZOOM_EPSILON);
+      const budgetZoom = ceilWholePixels(Math.sqrt((wPx * ratio * hPx * ratio) / maxPixels));
       if (budgetZoom > devicePixelZoom) devicePixelZoom = budgetZoom;
     }
     width = Math.floor((wPx * ratio + DEVICE_PIXEL_SIZE_TOLERANCE) / devicePixelZoom);

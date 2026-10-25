@@ -92,6 +92,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   #containerWidth = 0;
   #containerHeight = 0;
+  #containerPixelRatio = 1;
 
   get containerWidth(): number {
     return this.#containerWidth;
@@ -99,6 +100,15 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   get containerHeight(): number {
     return this.#containerHeight;
+  }
+
+  /**
+   * The pixels of the drawing buffer per unit of the container, as the last `resize()` handed it
+   * in — `Display#pixelRatio` through a `StageRenderer` —, `1` until then. The projection reads it
+   * for `pixelSnap`.
+   */
+  get containerPixelRatio(): number {
+    return this.#containerPixelRatio;
   }
 
   #width = 0;
@@ -148,7 +158,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       // projection; one that disposes the stage, or takes the projection away, does
       if (this.projection != null && !this.#disposed) {
         try {
-          this.#updateProjection(this.#containerWidth, this.#containerHeight, errors);
+          this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
         } catch (error) {
           errors.push(error);
         }
@@ -198,7 +208,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     // without an override the projection's camera takes over, created now if there is none yet
     if (this.camera == null && this.projection != null && !this.#disposed) {
       try {
-        this.#updateProjection(this.#containerWidth, this.#containerHeight, errors);
+        this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
       } catch (error) {
         errors.push(error);
       }
@@ -238,26 +248,40 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
   }
 
-  resize(containerWidth: number, containerHeight: number): void {
+  /**
+   * Takes the size of the container and the pixels of the drawing buffer per unit of it, and
+   * computes view and camera anew where either changed. A `pixelRatio` that is left out, or that
+   * is not a finite number above 0, counts as `1`; the projection reads it for `pixelSnap`.
+   */
+  resize(containerWidth: number, containerHeight: number, pixelRatio = 1): void {
     if (this.#disposed) return;
 
-    if (containerWidth !== this.#containerWidth || containerHeight !== this.#containerHeight) {
+    const containerPixelRatio = isPositiveFinite(pixelRatio) ? pixelRatio : 1;
+
+    if (
+      containerWidth !== this.#containerWidth ||
+      containerHeight !== this.#containerHeight ||
+      containerPixelRatio !== this.#containerPixelRatio
+    ) {
       const prevContainerWidth = this.#containerWidth;
       const prevContainerHeight = this.#containerHeight;
+      const prevContainerPixelRatio = this.#containerPixelRatio;
 
       this.#containerWidth = containerWidth;
       this.#containerHeight = containerHeight;
+      this.#containerPixelRatio = containerPixelRatio;
 
       if (this.projection) {
         const errors: unknown[] = [];
         try {
-          this.#updateProjection(containerWidth, containerHeight, errors);
+          this.#updateProjection(containerWidth, containerHeight, containerPixelRatio, errors);
         } catch (error) {
           // the container of a resize the projection refuses is not the container this stage
           // shows: it keeps the one it had, and the very same size is worth another attempt as
           // soon as the camera fits — written through, it would fall out of the guard above
           this.#containerWidth = prevContainerWidth;
           this.#containerHeight = prevContainerHeight;
+          this.#containerPixelRatio = prevContainerPixelRatio;
           throw error;
         }
         // a listener that throws finds the container, the view and the camera taken
@@ -272,7 +296,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     if ((forceUpdate || this.needsUpdate) && this.projection) {
       // inside the branch: updateFrame() calls this method in every frame
       const errors: unknown[] = [];
-      this.#updateProjection(this.#containerWidth, this.#containerHeight, errors);
+      this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
       throwCollected(
         errors,
         'Stage2D#updateProjection(): more than one listener of OnStageAfterCameraChanged and OnStageResize threw',
@@ -282,7 +306,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   // what the projection throws leaves this call with the state it found; what a listener throws
   // goes into `errors`, after the state stands
-  #updateProjection = (width: number, height: number, errors: unknown[]): void => {
+  #updateProjection = (width: number, height: number, pixelRatio: number, errors: unknown[]): void => {
     // a container whose width or height is not a finite number above 0 has no aspect ratio to fit
     // a view into: the stage keeps the camera and the size it has, and creates neither before the
     // first resize() with an area
@@ -291,7 +315,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     const prevNeedsUpdate = this.needsUpdate;
     this.needsUpdate = false;
 
-    this.projection!.updateViewRect(width, height);
+    this.projection!.updateViewRect(width, height, pixelRatio);
     const {width: w, height: h} = this.projection!.getViewRect();
 
     // specs that give no view with an area leave the projection without one: there is nothing to
