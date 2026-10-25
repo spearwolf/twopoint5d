@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-25
+
+This release fills the sprite kinds of 0.23 with features — `Flip`, `Anchor`, `NineSlice`,
+`Fade`, `Flash`, `wave()`, `paletteSwap()`, `tableFrame()`, the axis billboard and segment
+sprites —, sorts, grows and picks sprites on the GPU, brings bitmap text in the new module
+`text/`, Aseprite and run-time atlases to the texture side, and a `Display` that bounds its
+pixel ratio and holds its frame rate. `TextureResource` splits into one class per shape, the
+`@spearwolf/eventize` peer dependency moves to `^6.3.0`, and many calls refuse input they
+took silently before; the Migration Guide at the end of this section walks a project through
+every break.
+
 ### Added
 
 - add the built-in features `Fade` and `Flash`, the first in the bands `ColorOrder.Fade` and `ColorOrder.Flash`: `Fade` multiplies the alpha by the dynamic `fade` (a new sprite starts at 1), `Flash` mixes the rgb towards the flash color of the dynamic `flash` attribute by `flashAmount`, alpha kept (`flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)`; a new sprite starts white at an amount of 0). The guide's example under "Writing a feature" is now `Grayscale`, a feature the library does not ship
