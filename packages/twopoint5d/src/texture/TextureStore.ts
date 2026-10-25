@@ -1064,7 +1064,9 @@ export class TextureStore {
         ),
       );
     }
-    // a catalog has no way to hand the url in later, so a getAsync() of its image would wait for good
+    // a getAsync() of its image waits until a later parse() names one or an imageUrl is written to the
+    // resource: reported, as a forgotten url would leave that wait unexplained, and built all the same,
+    // as a placeholder filled in later
     if (type === 'tileset' && !item.imageUrl) {
       notes.push(
         new Error(

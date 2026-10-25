@@ -3278,6 +3278,25 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
+    test('a tile set item without an imageUrl is a placeholder: an imageUrl written to its resource builds its tile set', async () => {
+      const loadSpy = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async () => ({width: 32, height: 16}) as unknown as HTMLImageElement);
+      const store = new TextureStore();
+      collectErrors(store);
+
+      store.parse({items: {t: {tileSet: {tileWidth: 8, tileHeight: 8}}}});
+
+      const tileSet = store.getAsync('t', 'tileSet');
+      expect(await settleWithin(tileSet)).toBe('pending');
+
+      ofShape(await store.whenResource('t'), 'tileset').imageUrl = 'tiles.png';
+
+      expect((await tileSet).tileCount).toBe(8);
+      expect(loadSpy).toHaveBeenCalledExactlyOnceWith('tiles.png');
+      store.dispose();
+    });
+
     test('getAsync() and whenResource() say why the item of an id built no resource, with the error of its parse error as the cause', async () => {
       const store = new TextureStore();
       const errors = collectErrors(store);

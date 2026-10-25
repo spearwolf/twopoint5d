@@ -11,7 +11,7 @@
     "generator": "js-ts-project-audit",
     "lang": "de",
     "templateVersion": "2.2.0",
-    "generatedAt": "2026-10-25T10:05:42.958Z"
+    "generatedAt": "2026-10-25T10:14:13.688Z"
   },
   "summary": {
     "project": "twopoint5d",
@@ -601,16 +601,7 @@
     }
   },
   "findings": [],
-  "openQuestions": [
-    "Ist ein `renderFrame()` aus eigener Hand bei pausiertem `Display` ein gewollter Anwendungsfall (Render-on-Demand)? Davon hängt ab, ob das stehengebliebene `deltaTime` ein Defekt ist oder nur dokumentiert werden muss — der Chronometer-Spec »c, u, u, stop, update« schreibt das heutige Verhalten fest.",
-    "Soll `getContentAreaSize()` öffentliche API bleiben? Die Library nutzt sie selbst nicht, und kein Guide nennt sie; von der Antwort hängt ab, ob sie TSDoc bekommt oder `@deprecated`.",
-    "Ist `anchorPosition` in den Projektions-Specs ein offenes Feature oder ein Erbe von `FitIntoRectangleSpecs`, das dort nie gelten sollte? Danach richtet sich, ob es umgesetzt oder aus dem Typ genommen wird.",
-    "Ist das direkte Ändern von `canvas.width`/`canvas.height` eines an `Canvas2DStage` übergebenen Canvas ein unterstützter Pfad, oder ist `setCanvasSize()` der einzige Weg? Im zweiten Fall reicht ein Satz in der TSDoc statt des Nachziehens von Sprite und Projektion.",
-    "Ist `emit()` statt `emitStrict()` für die Kamera-, Szenen- und Frame-Events von `Stage2D` eine bewusste Hot-Path-Entscheidung? Für Kamera- und Szenenwechsel, auf die der `StageRenderer` angewiesen ist, empfiehlt der Report `emitStrict()`.",
-    "Ein Atlas mit gefetchtem JSON ohne `meta.image`, dessen `overrideImageUrl` wieder geleert wird: Gilt die Klassen-TSDoc von `TextureResource` (Textur und Koordinaten werden zurückgenommen) oder der Spec in `TextureResource.spec.ts:1288` (`imageUrl` bleibt beim alten Override)?",
-    "Ist ein Tile-Set-Item ohne `imageUrl` im Katalog als Platzhalter gedacht, der programmatisch befüllt wird? Dann wäre eine Meldung falsch und nur die Doku zu ergänzen.",
-    "Ist ein Map-Node mit gekippter oder senkrechter Matrix ein unterstützter Fall von `CameraBasedVisibility`? Davon hängt das Gewicht des Befunds zur Footprint-Diagonale ab."
-  ],
+  "openQuestions": [],
   "methodology": {
     "text": "Gemessen wurde der Produktcode per `git ls-files` mit den Ausschlüssen des Vorlaufs: 270 Dateien, 39 984 Zeilen — die Library unter `packages/twopoint5d/src` (ohne Specs) und die Node-Skripte unter `scripts/`. Alle 270 Dateien wurden vollständig gelesen, in zehn Code-Slices entlang der Features (Texturen und Sprites je zweigeteilt, Text, Controls, `utils/` und `src/testing/` gemeinsam); jeder Slice lief als eigener Agent, die drei mit der höchsten Dichte an Timern, Listenern und Promises (`display`, Texturressourcen, `stage`) mit dem stärksten Modell.\n\nEin elfter Slice las das Harness ohne Zählung im Umfang: Root- und Paketmanifeste, `pnpm-workspace.yaml`, `nx.json`, die tsconfigs, `biome.jsonc`, die drei Workflows, die Config des Browser-Testpakets und eine Stichprobe von vier Vitest-Specs und drei Browser-Tests samt `helpers/fixtures.js`. Die übrigen Specs, die Browser-Tests darüber hinaus, das Lookbook und die Docs wurden nicht gelesen.\n\nDer Querschnitt prüfte die Importrichtung zwischen den Modulen per Grep (keine Zyklen), die Laufzeit-Exporte des gebauten Pakets (196 Symbole) und `pnpm config`. Ausgeführt wurden `pnpm outdated -r` (nur Patch- und Minor-Stände im Tooling, dazu nx 24 und `@types/node` 26, die Dependabot bewusst zurückhält) und `pnpm audit --prod` (10 Advisories, alle im Lookbook). `pnpm run ci` lief nicht.",
     "notes": [
@@ -619,7 +610,8 @@
       "Alle 10 Anhangpunkte gingen durch den Re-Check (ein Haiku-Prüfer) und treffen weiterhin zu; keiner wurde abgeräumt. Fünf Treffer zwischen neuen Findings und Anhangpunkten im `TextureStore` meinen jeweils einen anderen Befund und wurden nicht unterdrückt. Drei neue Findings bekamen neue IDs, weil ihre Nummer im Vorlauf vergeben war (IMPL-004, CONS-008, BUG-029).",
       "Die Fix-Bilanz ist heuristisch über `git blame` der Hauptfundstelle gegen den Zeitpunkt des Audit-Commits vom 2026-10-21: 85 Findings lagen schon vorher im Code, 7 gehen auf Remediation-Commits zurück. Das Dependency-Finding zu Vite und sharp ist herausgenommen — sein Blame trifft eine Zeile im Lockfile, die Ursache ist aber ein später veröffentlichtes Advisory.",
       "Nachgeführt aus dem Remediation-Lauf vom 2026-10-23/24 auf `main`: 25 Commits (9b72e4bd..3e41351e), alle 93 Findings des Audits mit Reviewer-Urteil und Commit-Hash geschlossen, 34 Nebenbefunde im Lauf behoben, zwei kleine Testbefunde aus dem letzten Paket offen. Der Code wurde seit dem Audit nicht neu geprüft; der Score ist die Formel des Audits auf das veränderte Backlog.",
-      "Nachgeführt am 2026-10-25: die beiden offenen Testbefunde zu `TextureStore.spec.ts` (Beleg für den Wurf des vorab gebuchten Abonnenten, Wartefrist für das abgelehnte Item) in einem Commit auf `main` geschlossen, mit Reviewer-Urteil; keine Folgen, keine Nebenbefunde. Der Code wurde seit dem Audit nicht neu geprüft."
+      "Nachgeführt am 2026-10-25: die beiden offenen Testbefunde zu `TextureStore.spec.ts` (Beleg für den Wurf des vorab gebuchten Abonnenten, Wartefrist für das abgelehnte Item) in einem Commit auf `main` geschlossen, mit Reviewer-Urteil; keine Folgen, keine Nebenbefunde. Der Code wurde seit dem Audit nicht neu geprüft.",
+      "Nachgeführt am 2026-10-25: die acht offenen Fragen mit dem Autor entschieden. Sieben sind im Code bereits beantwortet und stehen jetzt begründet unter »Bewusst akzeptiert«; die Frage zum Tile-Set-Item ohne `imageUrl` wurde zugunsten des Platzhalters entschieden — Kommentar in `TextureStore.ts`, ein Absatz in `docs/sprites.md` und ein Test für das nachträglich geschriebene `imageUrl`."
     ]
   },
   "acknowledged": [
@@ -702,6 +694,69 @@
       "reason": "Vom Autor als bekannt akzeptiert — wont fix, wird nicht weiter verfolgt und nicht mehr gemeldet.",
       "acknowledgedDate": "2026-09-19",
       "id": "IMPL-003"
+    },
+    {
+      "title": "`renderFrame()` bei pausiertem `Display` liefert `deltaTime` 0",
+      "category": "api",
+      "domain": "code",
+      "component": "display",
+      "location": "packages/twopoint5d/src/display/Display.ts:1653",
+      "reason": "Vom Autor bestätigt: Render-on-Demand bei Pause ist gewollt und in der TSDoc von `renderFrame()` und in `docs/display.md` beschrieben. Ein künstliches Delta würde `FixedFrameLoop` und `frame-pacing` verfälschen.",
+      "acknowledgedDate": "2026-10-25"
+    },
+    {
+      "title": "`getContentAreaSize()` wird von der Library selbst nicht genutzt",
+      "category": "api",
+      "domain": "code",
+      "component": "display",
+      "location": "packages/twopoint5d/src/display/styleUtils.ts:58",
+      "reason": "Vom Autor bestätigt: bleibt öffentliche API — exportiert, mit TSDoc, getestet und im CHANGELOG zugesagt; kein `@deprecated`.",
+      "acknowledgedDate": "2026-10-25"
+    },
+    {
+      "title": "`anchorPosition` gilt nicht in den Projektions-Specs",
+      "category": "api",
+      "domain": "code",
+      "component": "stage",
+      "location": "packages/twopoint5d/src/stage/fitIntoRectangle.ts:44",
+      "reason": "Vom Autor bestätigt: `anchorPosition` gehört zu `fitIntoRectangle()` und `calculateAnchorOffset()`; die Projektionen nehmen `ProjectionFitSpecs` ohne das Feld. Ein Anker in den Projektionen ist nicht geplant.",
+      "acknowledgedDate": "2026-10-25"
+    },
+    {
+      "title": "`canvas.width`/`canvas.height` eines an `Canvas2DStage` übergebenen Canvas direkt ändern",
+      "category": "api",
+      "domain": "code",
+      "component": "stage",
+      "location": "packages/twopoint5d/src/stage/Canvas2DStage.ts:96",
+      "reason": "Vom Autor bestätigt: unterstützter Weg neben `setCanvasSize()` — das nächste `render()` zieht Sprite, Projektion und Textur nach; dokumentiert und getestet.",
+      "acknowledgedDate": "2026-10-25"
+    },
+    {
+      "title": "`OnStageUpdateFrame` von `Stage2D` geht über `emit()` statt `emitStrict()`",
+      "category": "consistency",
+      "domain": "code",
+      "component": "stage",
+      "location": "packages/twopoint5d/src/stage/Stage2D.ts:409",
+      "reason": "Vom Autor bestätigt: bewusste Hot-Path-Entscheidung für das Event jedes Frames; Kamera-, Szenen-, Resize-, First-Frame- und Dispose-Events gehen über `emitStrict()`. Begründet in der TSDoc und in `stage/README.md`.",
+      "acknowledgedDate": "2026-10-25"
+    },
+    {
+      "title": "Atlas ohne `meta.image`, dessen `overrideImageUrl` wieder geleert wird",
+      "category": "correctness",
+      "domain": "code",
+      "component": "texture",
+      "location": "packages/twopoint5d/src/texture/TextureResource.ts:323",
+      "reason": "Vom Autor bestätigt: Textur, Koordinaten, Atlas und das gefetchte Json werden zurückgenommen, ein `error`-Event geht raus; TSDoc, Spec, Code und CHANGELOG sagen dasselbe.",
+      "acknowledgedDate": "2026-10-25"
+    },
+    {
+      "title": "`CameraBasedVisibility` mit gekippter oder senkrechter Matrix des Map-Nodes",
+      "category": "correctness",
+      "domain": "code",
+      "component": "map2d",
+      "location": "packages/twopoint5d/src/map2d/CameraBasedVisibility.ts:167",
+      "reason": "Vom Autor bestätigt: gekippte, senkrechte und umgedrehte Kartenebenen sind unterstützt und getestet. Drehungen, die keine Vierteldrehung um eine Weltachse sind, und Scherung bleiben die in der TSDoc von `#searchCanStop` beschriebenen Grenzen; sie wirken nur bei erreichtem `maxVisibleTiles`.",
+      "acknowledgedDate": "2026-10-25"
     }
   ],
   "scoreHistory": [
