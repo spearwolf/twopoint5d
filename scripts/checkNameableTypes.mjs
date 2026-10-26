@@ -32,6 +32,11 @@ const ACCEPTED = new Map([
         'a lookup table, not a type: `TextureOptionClasses` is the exported `keyof typeof` over it, ' +
           'and that union is everything a caller ever passes',
       ],
+      [
+        'display/DisplayFullscreen.d.ts:DisplayFullscreenHost',
+        'the seam between a Display and the DisplayFullscreen it builds: only the display constructs ' +
+          'the controller, and a caller reaches it through `display.fullscreen`, never through `new`',
+      ],
     ]),
   ],
 ]);

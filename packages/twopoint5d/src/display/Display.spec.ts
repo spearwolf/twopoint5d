@@ -4,6 +4,7 @@ import {afterEach, beforeEach, describe, expect, it, type Mock, vi} from 'vitest
 import {
   OnDisplayDispose,
   OnDisplayError,
+  OnDisplayFullscreenChange,
   OnDisplayInit,
   OnDisplayPause,
   OnDisplayRenderFrame,
@@ -13,13 +14,19 @@ import {
 } from '../events.js';
 import {AdaptiveResolution} from './AdaptiveResolution.js';
 import {Display} from './Display.js';
+import {DisplayFullscreen} from './DisplayFullscreen.js';
 import {FixedFrameLoop} from './FixedFrameLoop.js';
 import {FrameLoop} from './FrameLoop.js';
-import type {DisplayEventProps, DisplayParameters} from './types.js';
+import type {DisplayEventProps, DisplayFullscreenChangeProps, DisplayParameters} from './types.js';
 
 // Stylesheets writes into a real CSSStyleSheet, and there is no document here to hold one
 vi.mock('./Stylesheets.js', () => ({
-  Stylesheets: {addRule: vi.fn(() => 'twopoint5d-canvas'), installRule: vi.fn(() => 'twopoint5d-canvas--fullscreen')},
+  Stylesheets: {
+    addRule: vi.fn(() => 'twopoint5d-canvas'),
+    installRule: vi.fn(() => 'twopoint5d-canvas--fullscreen'),
+    retainRule: vi.fn((name: string) => name),
+    releaseRule: vi.fn(),
+  },
 }));
 
 const LIFECYCLE_EVENTS = [OnDisplayInit, OnDisplayStart, OnDisplayPause, OnDisplayRestart];
@@ -28,6 +35,9 @@ type DocumentListenerStub = Mock<(type: string, listener: () => void, capture?: 
 
 interface DocumentStub {
   hidden: boolean;
+  fullscreenEnabled?: boolean;
+  fullscreenElement?: unknown;
+  exitFullscreen?: () => Promise<void>;
   head: object;
   addEventListener: DocumentListenerStub;
   removeEventListener: DocumentListenerStub;
@@ -108,6 +118,20 @@ function makeDisplayOn({renderer, canvas, frame}: ReturnType<typeof makeRenderer
   }
 
   return {display, renderer, canvas, events, frame};
+}
+
+// the listener the display or its fullscreen controller added last to the document stub for `type`
+function documentListener(type: string): (() => void) | undefined {
+  return doc.addEventListener.mock.calls.filter(([t]) => t === type).at(-1)?.[1];
+}
+
+// as the browser does it: `element` becomes the fullscreen element of the document, and the
+// document hears fullscreenchange — every listener for it, the display's and the controller's
+function fireFullscreenChange(element: unknown) {
+  doc.fullscreenElement = element;
+  for (const [type, listener] of doc.addEventListener.mock.calls) {
+    if (type === 'fullscreenchange') listener();
+  }
 }
 
 // lets every reaction to an already settled promise run, the ones they queue in turn included
@@ -2419,6 +2443,118 @@ describe('Display', () => {
 
         expect(() => makeDisplay({pauseOutsideViewport: true})).not.toThrow();
       });
+    });
+  });
+  describe('fullscreen', () => {
+    // a canvas stub that sits in the document stub, below `parent`
+    function inDocument(canvas: object, parent?: object) {
+      Object.assign(canvas, {getRootNode: () => doc, parentElement: parent});
+    }
+
+    it('builds a DisplayFullscreen with the fullscreen option and answers it from fullscreen', () => {
+      const {display} = makeDisplay({fullscreen: {navigationUI: 'show'}});
+
+      expect(display.fullscreen).toBeInstanceOf(DisplayFullscreen);
+      expect(display.fullscreen.navigationUI).toBe('show');
+      expect(display.fullscreen.display).toBe(display);
+    });
+
+    it('does not hand the fullscreen option on to the renderer', () => {
+      // a canvas of a window of its own, so it passes as an HTMLElement of that window
+      class StubElement {}
+      const canvas = Object.assign(new StubElement(), makeCanvas(), {
+        tagName: 'CANVAS',
+        // read before the renderer is built, so the canvas can be handed back as it was
+        style: {getPropertyValue: () => '', getPropertyPriority: () => ''},
+        ownerDocument: {...doc, defaultView: {HTMLElement: StubElement, devicePixelRatio: 1, performance}},
+      });
+      const createRenderer = vi.fn((_params: object) => makeRenderer().renderer as unknown as WebGPURenderer);
+      try {
+        displays.push(
+          new Display(canvas as unknown as HTMLElement, {
+            fullscreen: {navigationUI: 'show'},
+            createRenderer: createRenderer as unknown as DisplayParameters['createRenderer'],
+          }),
+        );
+      } catch {
+        // the stub may not carry all the canvas path reads after the renderer; the call is what counts
+      }
+      expect(createRenderer).toHaveBeenCalled();
+      expect(createRenderer.mock.calls[0]?.[0]).not.toHaveProperty('fullscreen');
+    });
+
+    it('fullscreen throws after dispose()', () => {
+      const {display} = makeDisplay();
+      display.dispose();
+      expect(() => display.fullscreen).toThrow(/disposed/);
+    });
+
+    it('OnDisplayFullscreenChange goes out on the display and is retained', () => {
+      doc.fullscreenEnabled = true;
+      const {display, canvas} = makeDisplay();
+      const parent = {getRootNode: () => doc};
+      inDocument(canvas, parent);
+
+      fireFullscreenChange(parent);
+
+      const heard: DisplayFullscreenChangeProps[] = [];
+      display.onFullscreenChange((props) => {
+        heard.push(props);
+      });
+      expect(heard).toHaveLength(1);
+      expect(heard[0]).toMatchObject({display, isActive: true, mode: 'native', element: parent});
+
+      const named: unknown[] = [];
+      on(display, OnDisplayFullscreenChange, (props: unknown) => {
+        named.push(props);
+      });
+      expect(named).toHaveLength(1);
+    });
+
+    it('the default target is the parent of the canvas, else the canvas', () => {
+      const {display, canvas} = makeDisplay();
+      expect(display.fullscreen.element).toBe(canvas);
+
+      const parent = {getRootNode: () => doc};
+      inDocument(canvas, parent);
+      expect(display.fullscreen.element).toBe(parent);
+    });
+
+    it('dispose() disposes the controller: its fullscreenchange listener leaves the document', () => {
+      const {display} = makeDisplay();
+      const listener = documentListener('fullscreenchange');
+      expect(listener).toBeTypeOf('function');
+
+      display.dispose();
+
+      const removed = doc.removeEventListener.mock.calls.filter(([type]) => type === 'fullscreenchange').map(([, l]) => l);
+      expect(removed).toContain(listener);
+    });
+
+    it('dispose() leaves a fullscreen the controller entered before it releases the renderer', async () => {
+      doc.fullscreenEnabled = true;
+      const order: string[] = [];
+      doc.exitFullscreen = vi.fn(() => {
+        order.push('exitFullscreen');
+        return Promise.resolve();
+      });
+      const {display, canvas, renderer} = makeDisplay();
+      renderer.dispose.mockImplementation(() => {
+        order.push('renderer.dispose');
+      });
+      const parent = {
+        getRootNode: () => doc,
+        requestFullscreen: vi.fn(() => {
+          fireFullscreenChange(parent);
+          return Promise.resolve();
+        }),
+      };
+      inDocument(canvas, parent);
+      await display.fullscreen.request();
+
+      display.dispose();
+
+      expect(order[0]).toBe('exitFullscreen');
     });
   });
 });

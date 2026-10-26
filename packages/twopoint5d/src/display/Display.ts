@@ -14,6 +14,7 @@ import {WebGPURenderer} from 'three/webgpu';
 import {
   OnDisplayDispose,
   OnDisplayError,
+  OnDisplayFullscreenChange,
   OnDisplayInit,
   OnDisplayPause,
   OnDisplayRenderFrame,
@@ -24,6 +25,7 @@ import {
 import {AdaptiveResolution, adaptiveResolutionOf} from './AdaptiveResolution.js';
 import {Chronometer} from './Chronometer.js';
 import {type CanvasState, readCanvasState, releaseRenderer, restoreCanvasState, waitForCanvas} from './canvasHandover.js';
+import {DisplayFullscreen} from './DisplayFullscreen.js';
 import {DisplayStateMachine} from './DisplayStateMachine.js';
 import {FrameLoop} from './FrameLoop.js';
 import {isWebGLRenderer} from './isWebGLRenderer.js';
@@ -39,7 +41,13 @@ import {
   resolveDrawingBuffer,
 } from './resolveDrawingBuffer.js';
 import {contentAreaSide, getHorizontalInnerMargin, getIsContentBox, getVerticalInnerMargin} from './styleUtils.js';
-import type {CreateRendererParameters, DisplayEventProps, DisplayParameters, ResizeDisplayToFn} from './types.js';
+import type {
+  CreateRendererParameters,
+  DisplayEventProps,
+  DisplayFullscreenChangeProps,
+  DisplayParameters,
+  ResizeDisplayToFn,
+} from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
 
@@ -726,6 +734,22 @@ export class Display {
 
   #renderer?: WebGPURenderer;
 
+  #fullscreen?: DisplayFullscreen;
+
+  /**
+   * The fullscreen of this display: {@link DisplayFullscreen.request}, `exit()` and `toggle()`
+   * of the browser's native fullscreen, fullscreen on landscape, a pseudo fullscreen as opt-in
+   * fallback. Built by the constructor from {@link DisplayParameters.fullscreen}.
+   *
+   * Throws after {@link Display.dispose}.
+   */
+  get fullscreen(): DisplayFullscreen {
+    if (this.#disposed || this.#fullscreen == null) {
+      throw disposedError('fullscreen');
+    }
+    return this.#fullscreen;
+  }
+
   /**
    * The `WebGPURenderer` this display draws with — the one it built, or the one handed to the
    * constructor. The display owns it and releases it in {@link Display.dispose}; afterwards this
@@ -829,7 +853,7 @@ export class Display {
    */
   constructor(domElementOrRenderer: HTMLElement | WebGPURenderer, options?: DisplayParameters) {
     eventize(this);
-    retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize, OnDisplayError]);
+    retain(this, [OnDisplayInit, OnDisplayStart, OnDisplayResize, OnDisplayError, OnDisplayFullscreenChange]);
 
     this.#chronometer.stop();
 
@@ -845,6 +869,7 @@ export class Display {
       resizeToElement,
       resizeToAttributeEl,
       styleSheetRoot,
+      fullscreen,
       createRenderer,
       ...rendererOptions
     } = options ?? {};
@@ -1025,6 +1050,21 @@ export class Display {
       this.#onDocVisibilityChange = onDocVisibilityChange;
 
       onDocVisibilityChange();
+
+      this.#fullscreen = new DisplayFullscreen(
+        this,
+        {
+          doc,
+          view: this.#view,
+          // the element around the canvas: the host of a container this display built, else the
+          // parent of the canvas as it is now
+          defaultElement: () => this.#ownContainer?.parentElement ?? this.canvas.parentElement ?? this.canvas,
+          emit: (props) => emit(this, OnDisplayFullscreenChange, props),
+          pseudoTargetChanged: () => {},
+          styleSheetRoot: () => this.#styleSheetRoot,
+        },
+        fullscreen,
+      );
 
       if (pauseOutsideViewport && typeof IntersectionObserver !== 'undefined') {
         const observer = new IntersectionObserver((entries) => {
@@ -1823,6 +1863,9 @@ export class Display {
     this.frameLoop.stop(this);
     this.#stopSizeWatch();
     this.#stopVisibilityWatch();
+    // while the canvas is still there to name the default target, and before the release lets go
+    // of the renderer: a fullscreen this display entered is left first
+    this.#fullscreen?.dispose();
     try {
       // the listeners are still attached here: this event is what tells them to let go,
       // and off(this) below is what makes it the last event this display ever emits. Every
@@ -1982,6 +2025,15 @@ export class Display {
    */
   readonly onError = (listener: (error: unknown, display: Display) => unknown): UnsubscribeFunc =>
     on(this, OnDisplayError, listener);
+
+  /**
+   * Subscribes `listener` to `OnDisplayFullscreenChange`: the target of {@link Display.fullscreen}
+   * entered or left fullscreen, or `onLandscape` armed or disarmed.
+   *
+   * The event is retained, so a listener attached later hears the state it has to show.
+   */
+  readonly onFullscreenChange = (listener: DisplayEventListener<DisplayFullscreenChangeProps>): UnsubscribeFunc =>
+    on(this, OnDisplayFullscreenChange, listener);
 
   readonly onInit = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayInit, listener);
   readonly onStart = (listener: DisplayEventListener): UnsubscribeFunc => on(this, OnDisplayStart, listener);

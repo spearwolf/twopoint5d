@@ -7,6 +7,7 @@ describe('display public API', () => {
       'AdaptiveResolution',
       'Chronometer',
       'Display',
+      'DisplayFullscreen',
       'FixedFrameLoop',
       'FrameLoop',
       'Stylesheets',
