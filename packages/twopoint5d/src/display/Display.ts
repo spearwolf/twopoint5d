@@ -779,6 +779,7 @@ export class Display {
     if (this.#disposed || root === this.#styleSheetRoot) return;
     this.#styleSheetRoot = root;
     this.#installRules(root);
+    this.#fullscreen?.installRules(root);
   }
 
   #renderer?: WebGPURenderer;

@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
 import type {Display} from './Display.js';
 import {DisplayFullscreen, type DisplayFullscreenHost, resetFullscreenWarnings} from './DisplayFullscreen.js';
+import {Stylesheets} from './Stylesheets.js';
 import type {DisplayFullscreenChangeProps, DisplayFullscreenOptions} from './types.js';
 
 // Stylesheets writes into a real CSSStyleSheet, and there is no document here to hold one
@@ -48,6 +49,7 @@ interface DocStub extends EventTargetStub {
   fullscreenElement: unknown;
   exitFullscreen: Mock<() => Promise<void>>;
   head: object;
+  documentElement: {classList: {add: Mock; remove: Mock}};
 }
 
 interface TargetStub extends EventTargetStub {
@@ -79,6 +81,7 @@ function makeDoc(): DocStub {
   stub.fullscreenEnabled = true;
   stub.fullscreenElement = null;
   stub.head = {};
+  stub.documentElement = {classList: {add: vi.fn(), remove: vi.fn()}};
   stub.exitFullscreen = vi.fn(() => {
     fireFullscreenChange(null);
     return Promise.resolve();
@@ -713,6 +716,179 @@ describe('DisplayFullscreen', () => {
       fs.dispose();
 
       expect(landscapeQuery.listenerCount('change')).toBe(0);
+    });
+  });
+  describe('pseudo fullscreen', () => {
+    const PSEUDO_CSS =
+      'position:fixed;inset:0;width:auto;height:auto;max-width:none;max-height:none;margin:0;box-sizing:border-box;transform:none;z-index:2147483647;';
+
+    const pressEscape = () => doc.dispatch('keydown', {key: 'Escape'});
+
+    beforeEach(() => {
+      doc.fullscreenEnabled = false;
+      vi.mocked(Stylesheets.retainRule).mockClear();
+      vi.mocked(Stylesheets.releaseRule).mockClear();
+    });
+
+    it('fallback "pseudo" makes isAvailable true where isSupported is false', () => {
+      const fs = make({fallback: 'pseudo'});
+      expect(fs.fallback).toBe('pseudo');
+      expect(fs.isSupported).toBe(false);
+      expect(fs.isAvailable).toBe(true);
+    });
+
+    it('request() enters the pseudo mode', async () => {
+      const fs = make({fallback: 'pseudo'});
+
+      await expect(fs.request()).resolves.toBe(true);
+
+      expect(fs.isActive).toBe(true);
+      expect(fs.mode).toBe('pseudo');
+      expect(Stylesheets.retainRule).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudo, PSEUDO_CSS, doc.head);
+      expect(Stylesheets.retainRule).toHaveBeenCalledWith(
+        DisplayFullscreen.CssRulesPrefixPseudoRoot,
+        'overflow:hidden;',
+        doc.documentElement,
+      );
+      expect(defaultTarget.classList.add).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudo);
+      expect(doc.documentElement.classList.add).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudoRoot);
+      expect(host.pseudoTargetChanged).toHaveBeenLastCalledWith(defaultTarget);
+      expect(emitted.at(-1)).toMatchObject({isActive: true, mode: 'pseudo', element: defaultTarget});
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('a browser with native support never uses the pseudo mode, also when it refuses', async () => {
+      doc.fullscreenEnabled = true;
+      defaultTarget.requestFullscreen.mockImplementation(() => Promise.reject(new TypeError('no gesture')));
+      const fs = make({fallback: 'pseudo'});
+
+      await expect(fs.request()).resolves.toBe(false);
+
+      expect(fs.mode).toBeUndefined();
+      expect(Stylesheets.retainRule).not.toHaveBeenCalled();
+    });
+
+    it('exit() leaves the pseudo mode and releases both rules', async () => {
+      const fs = make({fallback: 'pseudo'});
+      await fs.request();
+
+      await expect(fs.exit()).resolves.toBe(false);
+
+      expect(fs.isActive).toBe(false);
+      expect(defaultTarget.classList.remove).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudo);
+      expect(doc.documentElement.classList.remove).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudoRoot);
+      expect(Stylesheets.releaseRule).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudo, doc.head);
+      expect(Stylesheets.releaseRule).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudoRoot, doc.documentElement);
+      expect(host.pseudoTargetChanged).toHaveBeenLastCalledWith(undefined);
+      expect(emitted.at(-1)).toMatchObject({isActive: false, mode: undefined});
+    });
+
+    it('toggle() enters and leaves the pseudo mode', async () => {
+      const fs = make({fallback: 'pseudo'});
+      await expect(fs.toggle()).resolves.toBe(true);
+      await expect(fs.toggle()).resolves.toBe(false);
+    });
+
+    it('Escape leaves the pseudo mode, and is listened for only while it holds', async () => {
+      const fs = make({fallback: 'pseudo'});
+      expect(doc.listenerCount('keydown')).toBe(0);
+
+      await fs.request();
+      expect(doc.listenerCount('keydown')).toBe(1);
+
+      doc.dispatch('keydown', {key: 'a'});
+      expect(fs.isActive).toBe(true);
+
+      pressEscape();
+      expect(fs.isActive).toBe(false);
+      expect(doc.listenerCount('keydown')).toBe(0);
+    });
+
+    it('dispose() leaves the pseudo mode it entered and takes the Escape listener off', async () => {
+      const fs = make({fallback: 'pseudo'});
+      await fs.request();
+
+      fs.dispose();
+
+      expect(defaultTarget.classList.remove).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudo);
+      expect(Stylesheets.releaseRule).toHaveBeenCalledTimes(2);
+      expect(doc.listenerCount('keydown')).toBe(0);
+    });
+
+    it('installRules() moves the rules of an active pseudo mode to the new root', async () => {
+      const fs = make({fallback: 'pseudo'});
+      await fs.request();
+      // an identity of its own: an empty object would deep-equal the head stub
+      const shadowRoot = {name: 'shadow-root'} as unknown as ShadowRoot;
+
+      fs.installRules(shadowRoot);
+
+      expect(Stylesheets.retainRule).toHaveBeenLastCalledWith(DisplayFullscreen.CssRulesPrefixPseudo, PSEUDO_CSS, shadowRoot);
+      expect(Stylesheets.releaseRule).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudo, doc.head);
+
+      await fs.exit();
+      expect(Stylesheets.releaseRule).toHaveBeenLastCalledWith(DisplayFullscreen.CssRulesPrefixPseudoRoot, doc.documentElement);
+      expect(Stylesheets.releaseRule).toHaveBeenCalledWith(DisplayFullscreen.CssRulesPrefixPseudo, shadowRoot);
+    });
+
+    it('installRules() without the pseudo mode installs nothing', () => {
+      const fs = make({fallback: 'pseudo'});
+      fs.installRules({name: 'shadow-root'} as unknown as ShadowRoot);
+      expect(Stylesheets.retainRule).not.toHaveBeenCalled();
+    });
+
+    describe('with onLandscape', () => {
+      let orientation: EventTargetStub & {type: string};
+
+      const turn = (type: string) => {
+        orientation.type = type;
+        orientation.dispatch('change');
+      };
+
+      beforeEach(() => {
+        orientation = Object.assign(makeEventTarget(), {type: 'portrait-primary'});
+        view.screen = {orientation};
+        view.matchMedia = vi.fn(() => ({matches: true}));
+      });
+
+      it('a turn to landscape enters the pseudo mode at once and never arms', () => {
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+
+        turn('landscape-primary');
+
+        expect(fs.mode).toBe('pseudo');
+        expect(fs.isArmed).toBe(false);
+      });
+
+      it('a page that loads in landscape enters the pseudo mode at once', () => {
+        orientation.type = 'landscape-primary';
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+
+        expect(fs.mode).toBe('pseudo');
+        expect(fs.isArmed).toBe(false);
+      });
+
+      it('the turn back leaves it', () => {
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+        turn('landscape-primary');
+
+        turn('portrait-primary');
+
+        expect(fs.isActive).toBe(false);
+      });
+
+      it('Escape in landscape holds off re-entering until portrait and back', () => {
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+        turn('landscape-primary');
+
+        pressEscape();
+        turn('landscape-primary');
+        expect(fs.isActive).toBe(false);
+
+        turn('portrait-primary');
+        turn('landscape-primary');
+        expect(fs.mode).toBe('pseudo');
+      });
     });
   });
 });

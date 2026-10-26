@@ -1,4 +1,5 @@
 import type {Display} from './Display.js';
+import {Stylesheets} from './Stylesheets.js';
 import type {DisplayFullscreenChangeProps, DisplayFullscreenOptions, DisplayOrientationLock, FullscreenMode} from './types.js';
 
 // the warnings to the developer go out once per page, as the one about Display.MaxResolution
@@ -49,6 +50,13 @@ function warnPortraitLock(type: DisplayOrientationLock): void {
   );
 }
 
+// The box a browser gives an element in native fullscreen, without !important: the pseudo mode
+// covers the viewport with it
+const PSEUDO_CSS =
+  'position:fixed;inset:0;width:auto;height:auto;max-width:none;max-height:none;margin:0;box-sizing:border-box;transform:none;z-index:2147483647;';
+// on the root element of the document, so the page behind the target does not scroll
+const PSEUDO_ROOT_CSS = 'overflow:hidden;';
+
 // a device whose primary input is a finger: desktops stay out of onLandscape, tablets come in
 const COARSE_POINTER_QUERY = '(pointer: coarse) and (hover: none)';
 // where screen.orientation does not exist
@@ -68,6 +76,16 @@ interface LockableOrientation {
 
 /** Who entered the fullscreen this controller holds. */
 type EnteredBy = 'request' | 'landscape';
+
+// the pseudo mode as it was entered: what to take off again, and where its rules live
+interface PseudoState {
+  element: HTMLElement;
+  className: string;
+  root: HTMLElement | ShadowRoot;
+  documentElement?: HTMLElement;
+  rootClassName?: string;
+  by: EnteredBy;
+}
 
 /**
  * What a {@link DisplayFullscreen} reads of its display and of the page. The display fills it;
@@ -100,7 +118,19 @@ export interface DisplayFullscreenHost {
  * API — is told to the developer once per page on the console.
  */
 export class DisplayFullscreen {
+  /** The base of the class name of the pseudo target. */
+  static CssRulesPrefixPseudo = 'twopoint5d-fullscreen--pseudo';
+  /** The base of the class name the root element of the document carries while the pseudo mode holds. */
+  static CssRulesPrefixPseudoRoot = 'twopoint5d-fullscreen--pseudo-root';
+
   readonly display: Display;
+
+  /**
+   * `'pseudo'` covers the viewport with the target through CSS where native fullscreen is not
+   * available — an iPhone, an iframe without `allow="fullscreen"`. It cannot hide the bars of the
+   * browser. A browser with native fullscreen always gets the native one. Default `false`.
+   */
+  fallback: 'pseudo' | false;
 
   /** Passed to `requestFullscreen()`. Default `'hide'`. */
   navigationUI: 'auto' | 'hide' | 'show';
@@ -142,6 +172,11 @@ export class DisplayFullscreen {
     this.#turned();
   };
 
+  readonly #onPseudoKey = (event: Event): void => {
+    // the key a browser leaves its native fullscreen with
+    if ((event as KeyboardEvent).key === 'Escape') this.#leavePseudo();
+  };
+
   readonly #onArmedTap = (event: Event): void => {
     // a mouse grants a gesture with its pointerdown, not with its pointerup; its click follows
     if (event.type === 'pointerup' && (event as PointerEvent).pointerType === 'mouse') return;
@@ -149,6 +184,9 @@ export class DisplayFullscreen {
     // synchronously in the handler of the tap: the gesture reaches the browser
     void this.#request('landscape');
   };
+
+  // the pseudo mode of this controller; no other display sees it
+  #pseudo?: PseudoState;
 
   #disposed = false;
 
@@ -161,6 +199,7 @@ export class DisplayFullscreen {
     this.#host = host;
     this.#element = options?.element;
     this.navigationUI = options?.navigationUI ?? 'hide';
+    this.fallback = options?.fallback ?? false;
     this.#orientationLock = options?.orientationLock;
     this.#exitOnPortrait = options?.exitOnPortrait;
 
@@ -199,8 +238,12 @@ export class DisplayFullscreen {
     this.#onLandscape = on;
     if (on) {
       this.#watchOrientation();
-      // no turn has happened, and nothing grants an exemption: a page in landscape arms
-      if (this.#isLandscape() && this.#gateIsOpen() && !this.isActive) this.#arm();
+      // no turn has happened, and nothing grants an exemption: a page in landscape arms — or, where
+      // only the pseudo mode is there, which needs no gesture, enters it
+      if (this.#isLandscape() && this.#gateIsOpen() && !this.isActive) {
+        if (this.isSupported) this.#arm();
+        else if (this.fallback === 'pseudo') this.#enterPseudo('landscape');
+      }
     } else {
       this.#unwatchOrientation();
       this.#disarm();
@@ -244,16 +287,17 @@ export class DisplayFullscreen {
 
   /** A {@link DisplayFullscreen.request} can succeed. What a fullscreen button shows itself by. */
   get isAvailable(): boolean {
-    return this.isSupported;
+    return this.isSupported || this.fallback === 'pseudo';
   }
 
-  /** The target is in fullscreen right now — by this controller or by anyone. */
+  /** The target is in fullscreen right now — native by this controller or by anyone, or pseudo. */
   get isActive(): boolean {
-    return this.#nativeElement() != null;
+    return this.#pseudo != null || this.#nativeElement() != null;
   }
 
-  /** How the target is in fullscreen: `'native'`, or `undefined` while not active. */
+  /** How the target is in fullscreen: `'native'`, `'pseudo'`, or `undefined` while not active. */
   get mode(): FullscreenMode | undefined {
+    if (this.#pseudo != null) return 'pseudo';
     return this.#nativeElement() != null ? 'native' : undefined;
   }
 
@@ -275,6 +319,11 @@ export class DisplayFullscreen {
   exit(): Promise<boolean> {
     if (this.#disposed) return Promise.resolve(false);
 
+    if (this.#pseudo != null) {
+      this.#leavePseudo();
+      return Promise.resolve(this.isActive);
+    }
+
     // a fullscreen another element has stacked on top of the target is not the target's to leave
     if (this.#nativeElement() == null) return Promise.resolve(this.isActive);
 
@@ -294,9 +343,22 @@ export class DisplayFullscreen {
     return this.isActive ? this.exit() : this.request();
   }
 
+  /** @internal called by the `styleSheetRoot` setter of the display: an active pseudo mode takes its rule along */
+  installRules(root: HTMLElement | ShadowRoot): void {
+    const pseudo = this.#pseudo;
+    if (pseudo == null || this.#disposed || root === pseudo.root) return;
+    // the class name does not depend on the root, so the target keeps its class
+    Stylesheets.retainRule(DisplayFullscreen.CssRulesPrefixPseudo, PSEUDO_CSS, root);
+    Stylesheets.releaseRule(DisplayFullscreen.CssRulesPrefixPseudo, pseudo.root);
+    pseudo.root = root;
+  }
+
   /** @internal called by `Display#dispose()` */
   dispose(): void {
     if (this.#disposed) return;
+
+    // the pseudo mode is always this controller's own
+    this.#leavePseudo();
 
     // only a fullscreen this controller entered: the app's own stays
     if (this.#entered != null && this.#nativeElement() != null) {
@@ -330,6 +392,10 @@ export class DisplayFullscreen {
     if (this.isActive) return Promise.resolve(true);
 
     if (!this.isSupported) {
+      if (this.fallback === 'pseudo') {
+        this.#enterPseudo(by);
+        return Promise.resolve(true);
+      }
       warnUnavailable();
       return Promise.resolve(false);
     }
@@ -463,16 +529,69 @@ export class DisplayFullscreen {
     if (!this.#isLandscape()) {
       this.#declined = false;
       this.#disarm();
-      if (this.#entered === 'landscape' && this.exitOnPortrait) void this.exit();
+      if (this.#enteredBy() === 'landscape' && this.exitOnPortrait) void this.exit();
       return;
     }
 
-    if (this.isActive || this.#declined || !this.#gateIsOpen() || !this.isSupported) return;
+    if (this.isActive || this.#declined || !this.#gateIsOpen()) return;
+
+    if (!this.isSupported) {
+      // the pseudo mode needs no gesture: the turn enters it, and nothing arms
+      if (this.fallback === 'pseudo') this.#enterPseudo('landscape');
+      return;
+    }
 
     // at once: a browser may let the turn count as a gesture
     void this.#request('landscape', false).then((active) => {
       if (!active && this.#onLandscape && this.#isLandscape() && !this.isActive && !this.#declined) this.#arm();
     });
+  }
+
+  #enteredBy(): EnteredBy | undefined {
+    return this.#pseudo?.by ?? this.#entered;
+  }
+
+  #enterPseudo(by: EnteredBy): void {
+    const element = this.element;
+    const root = this.#host.styleSheetRoot();
+    const documentElement = (element.ownerDocument ?? this.#host.doc).documentElement;
+
+    const className = Stylesheets.retainRule(DisplayFullscreen.CssRulesPrefixPseudo, PSEUDO_CSS, root);
+    element.classList.add(className);
+    const pseudo: PseudoState = {element, className, root, by};
+
+    // the root element sits in the document: its rule goes into the sheet of the document, whatever
+    // shadow root the target's rule goes into
+    if (documentElement != null) {
+      pseudo.documentElement = documentElement;
+      pseudo.rootClassName = Stylesheets.retainRule(DisplayFullscreen.CssRulesPrefixPseudoRoot, PSEUDO_ROOT_CSS, documentElement);
+      documentElement.classList.add(pseudo.rootClassName);
+    }
+
+    this.#pseudo = pseudo;
+    this.#host.doc.addEventListener('keydown', this.#onPseudoKey);
+    this.#host.pseudoTargetChanged(element);
+    this.#emitIfChanged();
+  }
+
+  #leavePseudo(): void {
+    const pseudo = this.#pseudo;
+    if (pseudo == null) return;
+
+    // as for the native mode: the user who leaves in landscape is not thrown back in
+    if (pseudo.by === 'landscape' && this.#onLandscape && this.#isLandscape()) this.#declined = true;
+
+    pseudo.element.classList.remove(pseudo.className);
+    Stylesheets.releaseRule(DisplayFullscreen.CssRulesPrefixPseudo, pseudo.root);
+    if (pseudo.documentElement != null && pseudo.rootClassName != null) {
+      pseudo.documentElement.classList.remove(pseudo.rootClassName);
+      Stylesheets.releaseRule(DisplayFullscreen.CssRulesPrefixPseudoRoot, pseudo.documentElement);
+    }
+
+    this.#pseudo = undefined;
+    this.#host.doc.removeEventListener('keydown', this.#onPseudoKey);
+    this.#host.pseudoTargetChanged(undefined);
+    this.#emitIfChanged();
   }
 
   #arm(): void {

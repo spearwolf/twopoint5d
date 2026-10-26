@@ -15,6 +15,7 @@ import {
 import {AdaptiveResolution} from './AdaptiveResolution.js';
 import {Display} from './Display.js';
 import {DisplayFullscreen} from './DisplayFullscreen.js';
+import {Stylesheets} from './Stylesheets.js';
 import {FixedFrameLoop} from './FixedFrameLoop.js';
 import {FrameLoop} from './FrameLoop.js';
 import type {DisplayEventProps, DisplayFullscreenChangeProps, DisplayParameters} from './types.js';
@@ -2561,6 +2562,37 @@ describe('Display', () => {
         display.resize();
 
         expect(display.width).toBe(640);
+      });
+
+      it('a pseudo target of the controller counts as the containing fullscreen element', async () => {
+        const {display, canvas} = makeDisplay({fullscreen: {fallback: 'pseudo'}});
+        const parent = {...box(800, 600), classList: {add: vi.fn(), remove: vi.fn()}};
+        inDocument(canvas, parent);
+
+        await display.fullscreen.request();
+        display.resize();
+        expect(display.fullscreen.mode).toBe('pseudo');
+        expect(display.width).toBe(800);
+
+        await display.fullscreen.exit();
+        display.resize();
+        expect(display.width).toBe(320);
+      });
+
+      it('a new styleSheetRoot takes the rule of an active pseudo mode along', async () => {
+        const {display, canvas} = makeDisplay({fullscreen: {fallback: 'pseudo'}});
+        inDocument(canvas, {...box(800, 600), classList: {add: vi.fn(), remove: vi.fn()}});
+        await display.fullscreen.request();
+        // an identity of its own: an empty object would deep-equal the head stub
+        const shadowRoot = {name: 'shadow-root'} as unknown as ShadowRoot;
+
+        display.styleSheetRoot = shadowRoot;
+
+        expect(Stylesheets.retainRule).toHaveBeenLastCalledWith(
+          DisplayFullscreen.CssRulesPrefixPseudo,
+          expect.any(String),
+          shadowRoot,
+        );
       });
 
       it('stubs without getRootNode or parentElement do not throw', () => {
