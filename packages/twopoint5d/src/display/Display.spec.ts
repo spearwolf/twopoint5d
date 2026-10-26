@@ -2629,6 +2629,33 @@ describe('Display', () => {
         );
       });
 
+      it('follows a request that resolves before the browser fires fullscreenchange', async () => {
+        doc.fullscreenEnabled = true;
+        const {display, canvas} = makeDisplay();
+        // as the spec orders it: the fullscreen element is set and the promise resolves, the event
+        // follows in the next rendering update
+        const parent = {
+          ...box(800, 600),
+          requestFullscreen: vi.fn(() => {
+            doc.fullscreenElement = parent;
+            return Promise.resolve();
+          }),
+        };
+        doc.exitFullscreen = vi.fn(() => {
+          doc.fullscreenElement = null;
+          return Promise.resolve();
+        });
+        inDocument(canvas, parent);
+
+        await display.fullscreen.request();
+        display.resize();
+        expect(display.width, 'after the request').toBe(800);
+
+        await display.fullscreen.exit();
+        display.resize();
+        expect(display.width, 'after the exit').toBe(320);
+      });
+
       it('stubs without getRootNode or parentElement do not throw', () => {
         const {display} = makeDisplay();
 

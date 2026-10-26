@@ -1133,7 +1133,13 @@ export class Display {
           // the element around the canvas: the host of a container this display built, else the
           // parent of the canvas as it is now
           defaultElement: () => this.#ownContainer?.parentElement ?? this.canvas.parentElement ?? this.canvas,
-          emit: (props) => emit(this, OnDisplayFullscreenChange, props),
+          emit: (props) => {
+            // a request or an exit resolves before the browser fires fullscreenchange, and the
+            // controller reports the state it read when its promise settled: the size source
+            // follows it then, before a listener of the event measures
+            this.#updateContainingFullscreen();
+            emit(this, OnDisplayFullscreenChange, props);
+          },
           pseudoTargetChanged: (target) => {
             this.#pseudoTarget = target;
             this.#updateContainingFullscreen();
