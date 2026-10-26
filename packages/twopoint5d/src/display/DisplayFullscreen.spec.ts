@@ -275,6 +275,27 @@ describe('DisplayFullscreen', () => {
       expect(emitted[1]).toMatchObject({isActive: false, mode: undefined});
     });
 
+    it('a new element while a request is pending: isActive follows the element requested', async () => {
+      let grant: () => void = () => {};
+      defaultTarget.requestFullscreen.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            grant = () => {
+              fireFullscreenChange(defaultTarget);
+              resolve();
+            };
+          }),
+      );
+      const fs = make();
+      const requested = fs.request();
+      fs.element = asElement(makeTarget('next'));
+
+      grant();
+
+      await expect(requested).resolves.toBe(true);
+      expect(fs.isActive).toBe(true);
+    });
+
     it('a new element takes effect with the next request; isActive stays on the element it entered with', async () => {
       const fs = make();
       await fs.request();
@@ -569,6 +590,67 @@ describe('DisplayFullscreen', () => {
       expect(fs.isActive).toBe(true);
     });
 
+    it('the user leaving in landscape holds off a half turn to the other landscape', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      // Escape, the back gesture: the browser leaves, the controller did not ask
+      fireFullscreenChange(null);
+      turn('landscape-secondary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('the user leaving a fullscreen the armed tap entered holds off as well', async () => {
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      tap();
+      await flush();
+      expect(fs.isActive).toBe(true);
+
+      fireFullscreenChange(null);
+      turn('landscape-secondary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('a toggle() while the request of the armed tap is pending returns that request', async () => {
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+      let grant: () => void = () => {};
+      defaultTarget.requestFullscreen.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            grant = () => {
+              fireFullscreenChange(defaultTarget);
+              resolve();
+            };
+          }),
+      );
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      // the tap on a button inside the target: the armed listener first, the button's click after
+      tap();
+      const toggled = fs.toggle();
+      grant();
+
+      await expect(toggled).resolves.toBe(true);
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+
+      // entered by onLandscape: the turn back leaves it
+      turn('portrait-primary');
+      await flush();
+      expect(fs.isActive).toBe(false);
+    });
+
     it('the user leaving in landscape holds off arming until portrait and back', async () => {
       const fs = make({onLandscape: true});
       turn('landscape-primary');
@@ -649,24 +731,43 @@ describe('DisplayFullscreen', () => {
       expect(fs.isArmed).toBe(true);
     });
 
-    it('a landscape lock turns the default exitOnPortrait off without a warning', async () => {
+    it('a landscape lock that holds turns the default exitOnPortrait off without a warning', async () => {
       const fs = make({onLandscape: true, orientationLock: 'landscape'});
-
-      expect(fs.exitOnPortrait).toBe(false);
-      expect(warn).not.toHaveBeenCalled();
+      expect(fs.exitOnPortrait, 'before any lock').toBe(true);
 
       turn('landscape-primary');
       await flush();
+      expect(orientation.lock).toHaveBeenCalledWith('landscape');
+      expect(fs.exitOnPortrait, 'while the lock holds').toBe(false);
+      expect(warn).not.toHaveBeenCalled();
+
       turn('portrait-primary');
       await flush();
 
       expect(doc.exitFullscreen).not.toHaveBeenCalled();
     });
 
-    it('an explicit exitOnPortrait true beside a landscape lock warns once and stays out of effect', () => {
+    it('a landscape lock the browser refuses leaves exitOnPortrait on: the turn back leaves', async () => {
+      orientation.lock.mockImplementation(() => Promise.reject(new DOMException('no', 'NotSupportedError')));
+      const fs = make({onLandscape: true, orientationLock: 'landscape'});
+
+      turn('landscape-primary');
+      await flush();
+      expect(fs.exitOnPortrait).toBe(true);
+
+      turn('portrait-primary');
+      await flush();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(false);
+    });
+
+    it('an explicit exitOnPortrait true beside a landscape lock warns once and stays out of effect while the lock holds', async () => {
       const fs = make({onLandscape: true, orientationLock: 'landscape-primary', exitOnPortrait: true});
       make({onLandscape: true, orientationLock: 'landscape-primary', exitOnPortrait: true});
 
+      turn('landscape-primary');
+      await flush();
       expect(fs.exitOnPortrait).toBe(false);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0]?.[0])).toContain('exitOnPortrait has no effect');
@@ -720,7 +821,7 @@ describe('DisplayFullscreen', () => {
   });
   describe('pseudo fullscreen', () => {
     const PSEUDO_CSS =
-      'position:fixed;inset:0;width:auto;height:auto;max-width:none;max-height:none;margin:0;box-sizing:border-box;transform:none;z-index:2147483647;';
+      'position:fixed!important;inset:0!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;box-sizing:border-box!important;transform:none!important;z-index:2147483647!important;object-fit:contain;';
 
     const pressEscape = () => doc.dispatch('keydown', {key: 'Escape'});
 

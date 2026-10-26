@@ -507,7 +507,7 @@ A game that only plays sideways locks the screen:
 ```ts check
 import {Display} from '@spearwolf/twopoint5d';
 
-// once in fullscreen, the screen stays sideways; turning back cannot leave it, so exitOnPortrait is off
+// once in fullscreen, the screen stays sideways where the browser grants the lock
 const display = new Display(document.querySelector('#game')!, {
   fullscreen: {onLandscape: true, orientationLock: 'landscape'},
 });
@@ -516,7 +516,9 @@ export {display};
 ```
 
 The lock is a wish: browsers grant it in fullscreen only, and many — on the iPhone, on a desktop —
-not at all. A refused lock changes nothing else. A portrait lock does not go with `onLandscape`:
+not at all. While it holds, the phone cannot turn upright, and `exitOnPortrait` is `false`. Where
+the browser refuses it, and in the pseudo fallback, which never locks, turning the phone upright
+leaves the fullscreen as it does without a lock. A portrait lock does not go with `onLandscape`:
 the display warns once and does not lock.
 
 ### Without native fullscreen: the pseudo fallback
@@ -613,7 +615,7 @@ The options go into `fullscreen: {…}` of the constructor; each is a property o
 | `element` | the element around the canvas | the target; a new one takes effect with the next request |
 | `navigationUI` | `'hide'` | passed to the browser; `'show'` keeps the navigation bar of Android |
 | `onLandscape` | `false` | turning a phone sideways enters fullscreen, or arms the next tap |
-| `exitOnPortrait` | `true`, `false` under a landscape lock | turning back leaves what `onLandscape` entered |
+| `exitOnPortrait` | `true`, `false` while a landscape lock holds | turning back leaves what `onLandscape` entered |
 | `orientationLock` | none | locks the screen in native fullscreen, where the browser grants it |
 | `fallback` | `false` | `'pseudo'` covers the viewport through CSS where native fullscreen is not there |
 

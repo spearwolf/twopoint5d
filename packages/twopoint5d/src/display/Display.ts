@@ -470,11 +470,18 @@ export class Display {
   // mode, not in every frame. While it is set, a size source outside it gives way to it
   #containingFullscreen?: Element;
   #pseudoTarget?: HTMLElement;
-  // A canvas that measures itself and gives way to a fullscreen parent measures that parent, and
-  // the display writes the parent's size into the canvas. What the inline style and the zoom
-  // bookkeeping held before is kept here and written back when the fullscreen is left, or the
-  // canvas would read back the size of the screen and keep it
-  #selfSizeBeforeFullscreen?: {width: string; height: string; zoomedWidth: number; zoomedHeight: number};
+  // A canvas that measures itself writes the size of the screen into its inline style while it
+  // is in fullscreen — the size of a parent it gives way to, or its own as the fullscreen element.
+  // What the inline style and the zoom bookkeeping held before is kept here and written back when
+  // the fullscreen is left, or the canvas would read back the size of the screen and keep it
+  #selfSizeBeforeFullscreen?: {
+    width: string;
+    height: string;
+    baseWidth: number;
+    baseHeight: number;
+    zoomedWidth: number;
+    zoomedHeight: number;
+  };
 
   readonly #onFullscreenChange = (): void => {
     this.#updateContainingFullscreen();
@@ -1544,36 +1551,42 @@ export class Display {
 
   // While an element that contains the canvas is in fullscreen, a size source outside it — or the
   // canvas itself, while the fullscreen element is not the canvas — gives way to the fullscreen
-  // element. The window and a resizeToCallback stay what they are
+  // element. The window and a resizeToCallback stay what they are, and the callback keeps the
+  // inline size it makes
   #followFullscreen(canvas: HTMLCanvasElement): void {
     const fullscreen = this.#containingFullscreen;
     const source = this.#sizeSourceElement ?? canvas;
-    const givesWay =
-      fullscreen != null &&
-      !this.#sizeSourceIsWindow &&
-      (source === canvas ? fullscreen !== canvas : !containsAcrossShadow(fullscreen, source));
+    const follows = fullscreen != null && !this.#sizeSourceIsWindow && this.resizeToCallback == null;
+    const givesWay = follows && (source === canvas ? fullscreen !== canvas : !containsAcrossShadow(fullscreen, source));
+    // a canvas that measures itself writes the size of the screen into its inline style in
+    // fullscreen — the one of a parent it gives way to, or its own, which the browser stretches
+    // to the screen when the canvas is the fullscreen element
+    const keepsSelfSize = follows && source === canvas;
 
-    if (givesWay) {
-      if (source === canvas && this.#selfSizeBeforeFullscreen == null) {
-        this.#selfSizeBeforeFullscreen = {
-          width: canvas.style.width,
-          height: canvas.style.height,
-          zoomedWidth: this.#selfSizeZoomedWidth,
-          zoomedHeight: this.#selfSizeZoomedHeight,
-        };
-      }
-      this.#sizeSourceElement = fullscreen;
-    } else if (this.#selfSizeBeforeFullscreen != null) {
+    if (keepsSelfSize && this.#selfSizeBeforeFullscreen == null) {
+      this.#selfSizeBeforeFullscreen = {
+        width: canvas.style.width,
+        height: canvas.style.height,
+        baseWidth: this.#selfSizeBaseWidth,
+        baseHeight: this.#selfSizeBaseHeight,
+        zoomedWidth: this.#selfSizeZoomedWidth,
+        zoomedHeight: this.#selfSizeZoomedHeight,
+      };
+    } else if (!keepsSelfSize && this.#selfSizeBeforeFullscreen != null) {
       const before = this.#selfSizeBeforeFullscreen;
       this.#selfSizeBeforeFullscreen = undefined;
       if (source === canvas) {
         canvas.style.width = before.width;
         canvas.style.height = before.height;
+        this.#selfSizeBaseWidth = before.baseWidth;
+        this.#selfSizeBaseHeight = before.baseHeight;
         this.#selfSizeZoomedWidth = before.zoomedWidth;
         this.#selfSizeZoomedHeight = before.zoomedHeight;
         this.#sizeDirty = true;
       }
     }
+
+    if (givesWay) this.#sizeSourceElement = fullscreen;
   }
 
   #applyFullscreenClass(canvas: HTMLCanvasElement, wantsFullscreen: boolean): void {

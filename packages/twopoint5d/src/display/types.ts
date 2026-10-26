@@ -58,7 +58,8 @@ export interface DisplayFullscreenOptions {
   onLandscape?: boolean;
   /**
    * Leave a fullscreen that `onLandscape` entered when the screen turns back to portrait.
-   * Default `true`, or `false` while `orientationLock` is a landscape type.
+   * Default `true`, or `false` while a landscape `orientationLock` holds; where the browser
+   * refuses the lock, and in the pseudo mode, the turn back leaves.
    */
   exitOnPortrait?: boolean;
 }

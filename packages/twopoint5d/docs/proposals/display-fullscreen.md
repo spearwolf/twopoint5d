@@ -4,7 +4,8 @@ Status: **phase A, B and the deprecation of phase C implemented** — see
 [`docs/display.md`](../display.md), "Fullscreen" and the cheat sheet "The fullscreen"; the Vitest
 specs `src/display/DisplayFullscreen.spec.ts` and `src/display/Display.spec.ts` ("fullscreen"), the
 browser test `packages/twopoint5d-testing/test/display-fullscreen.test.js`. Open: the device checks
-of §2.3, §7 and §10, the viewport measurement of §10, and the lookbook of §11 (phase D). From the
+of §2.3, §7 and §10, and the viewport measurement of §10. The lookbook of §11 (phase D) is built:
+`DemoNavBar` and `apps/lookbook/src/demos/utils/fullscreenButton.ts`. From the
 Trello card "Resize-Verhalten modernisieren (Fullscreen)" of the board list `display`. Deviations of
 the build from the first draft of this spec, which the sections below now state as built:
 
@@ -19,7 +20,16 @@ the build from the first draft of this spec, which the sections below now state 
   button of the page included (§6.3);
 - with only the pseudo mode there, a page that loads in landscape enters it at once (§6.2);
 - the `overflow:hidden` of the root element lives in the sheet of the document, not in
-  `styleSheetRoot` (§7).
+  `styleSheetRoot` (§7);
+- the box of the pseudo mode carries `!important` and a size of `100%`, as the browser's own does,
+  so an inline size does not keep the target in its corner (§7);
+- `exitOnPortrait` is off by default only while a landscape lock holds, not whenever one is set: a
+  refused lock and the pseudo mode, which never locks, leave on the turn back (§6.4);
+- a native request still pending answers a second request and a `toggle()` (§3.2);
+- a canvas that measures itself gets back its inline size also when it was the fullscreen element
+  itself, and a `resizeToCallback` keeps out of the rule of §5 altogether (§5);
+- the lookbook hands a display to the navbar through `bindFullscreenButton(display)`, not through
+  a registry (§11).
 
 A display can follow the size of the window today (`resize-to="window"`), but it cannot put
 anything on the whole screen: `resize-to="fullscreen"` only means "as large as the window, at
@@ -102,7 +112,7 @@ export interface DisplayFullscreenOptions {
   onLandscape?: boolean;
   /**
    * Leave a fullscreen that `onLandscape` entered when the screen turns back to portrait, §6.3.
-   * Default `true`, or `false` while `orientationLock` is a landscape type, §6.4.
+   * Default `true`, or `false` while a landscape `orientationLock` holds, §6.4.
    */
   exitOnPortrait?: boolean;
 }
@@ -333,8 +343,11 @@ grant a lock in fullscreen only.
 A locked screen does not turn back, so two combinations cannot work as written:
 
 - **A landscape lock with `onLandscape`** — the setup of a game that only plays in landscape. Left
-  at its default, `exitOnPortrait` is `false` while a landscape lock is set, and nothing warns. An
+  at its default, `exitOnPortrait` is `false` while a landscape lock holds, and nothing warns. An
   explicit `exitOnPortrait: true` beside it warns once and stays out of effect while the lock holds.
+  Where the browser refuses the lock, and in the pseudo mode, which never locks, the screen does
+  turn back, and the turn leaves as without a lock: a default that followed the option instead of
+  the lock would keep a phone upright under a fullscreen nobody can leave.
 - **A portrait lock with `onLandscape`.** Locking would turn the screen to portrait, the turn would
   leave the fullscreen and undo the lock, and the next turn would start it over. The controller
   warns once and does not lock while `onLandscape` is `true`; `onLandscape` keeps working.
@@ -350,8 +363,11 @@ Entering:
 
 - the target gets a class from `Stylesheets.retainRule()` under the prefix
   `DisplayFullscreen.CssRulesPrefixPseudo` (`'twopoint5d-fullscreen--pseudo'`) in `styleSheetRoot`:
-  `position:fixed;inset:0;width:auto;height:auto;max-width:none;max-height:none;margin:0;box-sizing:border-box;transform:none;z-index:2147483647;`
-  — the same box the UA stylesheet gives a native fullscreen element (§2.4), without `!important`;
+  `position:fixed!important;inset:0!important;width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;box-sizing:border-box!important;transform:none!important;z-index:2147483647!important;object-fit:contain;`
+  — the box the UA stylesheet gives a native fullscreen element (§2.4), with its `!important`: an
+  inline size — the one the display writes into a canvas target, the one of a host element in the
+  markup — would win over it otherwise. A size of `100%`, not `auto`: a canvas is a replaced
+  element, and `auto` would give it the size of its drawing buffer;
 - the root element of the target's document gets a class under the prefix
   `DisplayFullscreen.CssRulesPrefixPseudoRoot` with `overflow:hidden`, so the page behind does not
   scroll while the target covers it; its rule goes into the sheet of that document, whatever shadow
@@ -427,8 +443,9 @@ not. Phase C measures before it changes anything:
 ## 11. The lookbook
 
 - `DemoNavBar` gets a fullscreen button, shown while `isAvailable`, its state from
-  `OnDisplayFullscreenChange`. A demo hands its display to the navbar through a small registry in
-  `apps/lookbook/src/demos/utils/`; a demo without a display shows no button.
+  `OnDisplayFullscreenChange`. A demo hands its display to the navbar with
+  `bindFullscreenButton(display)` from `apps/lookbook/src/demos/utils/fullscreenButton.ts`; a demo
+  that does not call it shows no button.
 - `platformer` and `boomer-shooter-corridor` pass `fullscreen: {onLandscape: true, fallback: 'pseudo'}`
   and show "tap for fullscreen" while `isArmed`.
 

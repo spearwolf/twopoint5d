@@ -109,6 +109,27 @@ describe('Display#fullscreen', () => {
       expect(display.height).to.equal(100);
     });
 
+    it('a canvas that measures itself as the target follows the screen, and returns to its size after exit()', async () => {
+      const container = makeContainer();
+      const canvas = document.createElement('canvas');
+      canvas.style.width = '160px';
+      canvas.style.height = '100px';
+      container.appendChild(canvas);
+      elements.push(container);
+      display = new Display(canvas, {fullscreen: {element: canvas}});
+
+      expect(await requestWithClick(display)).to.equal(true);
+      display.resize();
+      expect(document.fullscreenElement).to.equal(canvas);
+      expect(display.width).to.be.above(160);
+
+      expect(await display.fullscreen.exit()).to.equal(false);
+      display.resize();
+
+      expect(display.width).to.equal(160);
+      expect(display.height).to.equal(100);
+    });
+
     it('exit() leaves and emits', async () => {
       const host = makeContainer();
       elements.push(host);
@@ -155,6 +176,38 @@ describe('Display#fullscreen', () => {
       display.resize();
 
       expect(display.fullscreen.mode).to.equal('pseudo');
+      expect(display.width).to.equal(iframeWindow.innerWidth);
+      expect(display.height).to.equal(iframeWindow.innerHeight);
+
+      expect(await display.fullscreen.exit()).to.equal(false);
+      display.resize();
+
+      expect(display.width).to.equal(100);
+    });
+
+    it('the pseudo mode covers the viewport with a target whose size is written inline', async () => {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('allow', "fullscreen 'none'");
+      iframe.style.border = '0';
+      iframe.style.width = '300px';
+      iframe.style.height = '200px';
+      document.body.appendChild(iframe);
+      elements.push(iframe);
+      const iframeDocument = /** @type {Document} */ (iframe.contentDocument);
+      const iframeWindow = /** @type {Window} */ (iframeDocument.defaultView);
+      const canvas = iframeDocument.createElement('canvas');
+      canvas.style.width = '100px';
+      canvas.style.height = '50px';
+      iframeDocument.body.appendChild(canvas);
+
+      // the canvas as target: the display writes its inline size on every measurement
+      display = new Display(canvas, {fullscreen: {element: canvas, fallback: 'pseudo'}});
+
+      expect(await display.fullscreen.request()).to.equal(true);
+      display.resize();
+
+      const rect = canvas.getBoundingClientRect();
+      expect(rect.width, 'the box of the canvas').to.equal(iframeWindow.innerWidth);
       expect(display.width).to.equal(iframeWindow.innerWidth);
       expect(display.height).to.equal(iframeWindow.innerHeight);
 

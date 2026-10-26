@@ -2656,6 +2656,59 @@ describe('Display', () => {
         expect(display.width, 'after the exit').toBe(320);
       });
 
+      it('a canvas that measures itself and is the fullscreen element returns to its size after leaving it', () => {
+        const {display, canvas} = makeDisplay();
+        inDocument(canvas, box(800, 600));
+        // the canvas reads back its inline style, and the browser forces it to the screen in fullscreen
+        const style = canvas.style as {width?: string; height?: string};
+        canvas.getBoundingClientRect.mockImplementation(() =>
+          doc.fullscreenElement === canvas
+            ? {width: 1920, height: 1080}
+            : {width: Number.parseFloat(style.width ?? '320') || 320, height: Number.parseFloat(style.height ?? '200') || 200},
+        );
+        display.resize();
+        expect(display.width).toBe(320);
+
+        fireFullscreenChange(canvas);
+        display.resize();
+        expect(display.width).toBe(1920);
+
+        fireFullscreenChange(null);
+        display.resize();
+
+        expect(display.width).toBe(320);
+        expect(display.height).toBe(200);
+      });
+
+      it('a resizeToCallback keeps the inline size it made across a fullscreen', () => {
+        let size: [number, number] = [300, 200];
+        const {display, canvas} = makeDisplay({resizeTo: () => size});
+        const parent = box(800, 600);
+        inDocument(canvas, parent);
+        display.resize();
+
+        fireFullscreenChange(parent);
+        size = [1920, 1080];
+        display.resize();
+        fireFullscreenChange(null);
+        display.resize();
+
+        expect(display.width).toBe(1920);
+        expect((canvas.style as {width?: string}).width).toBe('1920px');
+      });
+
+      it('a fullscreen held past the dispose of its display: toggle() resolves false and the getters answer', async () => {
+        const {display, canvas} = makeDisplay();
+        inDocument(canvas, box(800, 600));
+        const fs = display.fullscreen;
+
+        display.dispose();
+
+        expect(() => fs.isActive).not.toThrow();
+        expect(fs.isActive).toBe(false);
+        await expect(fs.toggle()).resolves.toBe(false);
+      });
+
       it('stubs without getRootNode or parentElement do not throw', () => {
         const {display} = makeDisplay();
 
