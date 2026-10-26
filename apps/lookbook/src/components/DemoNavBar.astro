@@ -4,6 +4,8 @@ import RainbowLine from '@spearwolf/astro-rainbow-line';
 import {RAINBOW_COLORS} from './rainbowColors';
 import twopoint5d from '../images/twopoint5d-logo.svg?url';
 import CloseDialogIcon from './icons/CloseDialogIcon.astro';
+import EnterFullscreenIcon from './icons/EnterFullscreenIcon.astro';
+import ExitFullscreenIcon from './icons/ExitFullscreenIcon.astro';
 import GitHubInvertocatIcon from './icons/GitHubInvertocatIcon.astro';
 import NavArrowLeftIcon from './icons/NavArrowLeftIcon.astro';
 import OpenNewWindowIcon from './icons/OpenNewWindowIcon.astro';
@@ -48,6 +50,19 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
     </figure>
 
     <div class="demo-nav-title min-w-0 flex-1 truncate font-bold text-white">{title}</div>
+
+    <!-- hidden until a demo hands its display over, see bindFullscreenButton() -->
+    <span class="demo-fullscreen-hint shrink-0 text-xs text-slate-200" hidden>tap for fullscreen</span>
+    <button
+      class="interactive-action demo-fullscreen-action shrink-0 text-slate-200 hover:text-white"
+      type="button"
+      aria-label="fullscreen"
+      aria-pressed="false"
+      hidden
+    >
+      <EnterFullscreenIcon class="demo-fullscreen-enter size-7" />
+      <ExitFullscreenIcon class="demo-fullscreen-exit size-7" />
+    </button>
   </header>
 </div>
 
@@ -195,8 +210,14 @@ const githubUrl = `https://github.com/spearwolf/twopoint5d/blob/main/apps/lookbo
   .lookbook-demo-header img {
     filter: drop-shadow(0 1px 2px rgba(0 0 0 / 70%));
   }
-  .open-show-source-dialog-action {
+  .open-show-source-dialog-action,
+  .demo-fullscreen-action {
     pointer-events: auto;
+  }
+  /* the icons are elements of their own components, so the scope of this one does not reach them */
+  .demo-fullscreen-action[aria-pressed='true'] :global(.demo-fullscreen-enter),
+  .demo-fullscreen-action:not([aria-pressed='true']) :global(.demo-fullscreen-exit) {
+    display: none;
   }
 
   /* the partner of the explorer's header in the view transition: no height and no paint of its

@@ -60,6 +60,7 @@ import {description, title} from './_boomer-shooter-corridor.json';
   import {NeonSigns} from '~demos/boomer-shooter-corridor/NeonSigns';
   import {Stalkers} from '~demos/boomer-shooter-corridor/Stalkers';
   import {deferPreview} from '~demos/utils/demoPreview';
+  import {bindFullscreenButton} from '~demos/utils/fullscreenButton';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
@@ -71,7 +72,8 @@ import {description, title} from './_boomer-shooter-corridor.json';
   const preview = deferPreview();
 
   const canvas = getFullscreenCanvas();
-  const display = new Display(canvas);
+  const display = new Display(canvas, {fullscreen: {onLandscape: true, fallback: 'pseudo'}});
+  bindFullscreenButton(display);
 
   // a stage without a projection takes the camera it is handed: a first-person perspective camera
   const camera = new PerspectiveCamera(72, 1, 0.05, 80);

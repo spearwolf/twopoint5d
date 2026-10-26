@@ -1,0 +1,14 @@
+---
+const {class: classes} = Astro.props;
+---
+
+<span class:list={['inline-block shrink-0 [&>svg]:size-full', classes]} aria-hidden="true">
+  <svg width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M9 4V9H4M20 9H15V4M15 20V15H20M4 15H9V20"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    ></path>
+  </svg>
+</span>

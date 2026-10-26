@@ -47,12 +47,14 @@ import {description, title} from './_platformer.json';
   import {loadPlatformerAssets} from '~demos/platformer/assets';
   import {Platformer} from '~demos/platformer/Platformer';
   import {deferPreview} from '~demos/utils/demoPreview';
+  import {bindFullscreenButton} from '~demos/utils/fullscreenButton';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
   // the preview image waits for the first kick that lands, the goblin flashing white
   const preview = deferPreview();
 
-  const display = new Display(getFullscreenCanvas());
+  const display = new Display(getFullscreenCanvas(), {fullscreen: {onLandscape: true, fallback: 'pseudo'}});
+  bindFullscreenButton(display);
 
   display.onInit(async ({renderer}) => {
     const assets = await loadPlatformerAssets(renderer);
