@@ -3,8 +3,10 @@
 Status: **phase A, B and the deprecation of phase C implemented** — see
 [`docs/display.md`](../display.md), "Fullscreen" and the cheat sheet "The fullscreen"; the Vitest
 specs `src/display/DisplayFullscreen.spec.ts` and `src/display/Display.spec.ts` ("fullscreen"), the
-browser test `packages/twopoint5d-testing/test/display-fullscreen.test.js`. Open: the device checks
-of §2.3, §7 and §10, and the viewport measurement of §10. The lookbook of §11 (phase D) is built:
+browser test `packages/twopoint5d-testing/test/display-fullscreen.test.js`. Checked on devices:
+macOS Safari and the iPhone in the iOS simulator (§2.3, §6.4, §7); open: Android Chrome (§2.2, the
+armed tap of §6.2), the bars of Safari expanding again over the pseudo mode (§7), and the rest of
+the viewport measurement of §10. The lookbook of §11 (phase D) is built:
 `DemoNavBar` and `apps/lookbook/src/demos/utils/fullscreenButton.ts`. From the
 Trello card "Resize-Verhalten modernisieren (Fullscreen)" of the board list `display`. Deviations of
 the build from the first draft of this spec, which the sections below now state as built:
@@ -64,14 +66,13 @@ Six facts shape everything below.
    special-case `requestFullscreen()` from a `screen.orientation` `change` handler. Whether that still
    holds in current Chrome, and whether any other browser does it, is not settled. §6.2 is built so
    that it works either way: it tries at once and falls back to the next tap.
-3. **The iPhone has no element fullscreen, as far as is known.** Safari on the iPhone has long
-   offered fullscreen for `<video>` only; a beta of Safari 17.2 had the Fullscreen API on the iPhone
-   and lost it again. A claim that iOS 26 brings "true fullscreen for games" comes from a secondary
-   source. `isSupported` is feature detection and nothing else — no sniffing of the user agent: what
-   `fullscreenEnabled` and `requestFullscreen` report is what the controller believes. Phase A
-   checks on the iOS simulator what an iPhone reports and whether a request then works; the guide
-   states the result, the code does not depend on it. An iPhone without the API gets §7. iPadOS and
-   macOS Safari have the unprefixed API since 16.4.
+3. **The iPhone has no element fullscreen.** Safari on an iPhone 17 under iOS 27.0 (simulator)
+   has neither `document.fullscreenEnabled` nor `Element#requestFullscreen`, and neither of them
+   with the `webkit` prefix; it keeps fullscreen for `<video>`. `isSupported` is feature detection
+   and nothing else — no sniffing of the user agent: what `fullscreenEnabled` and
+   `requestFullscreen` report is what the controller believes, so an iPhone that gains the API
+   gets the native mode without a change here. An iPhone without it gets §7. iPadOS and macOS
+   Safari have the unprefixed API since 16.4; on macOS Safari a request from a click enters it.
 4. **The browser restyles the fullscreen element.** The UA stylesheet gives an element in fullscreen
    (other than the root) `position: fixed`, `inset: 0`, `width` and `height` of `100%`,
    `object-fit: contain` and `transform: none`, all `!important`. A UA declaration with
@@ -336,8 +337,9 @@ construction.
 
 With `orientationLock`, the controller calls `screen.orientation.lock(orientationLock)` once native
 fullscreen is entered, and `screen.orientation.unlock()` once it is left — only where it locked. A
-lock the browser refuses (iOS, a desktop, a browser that wants fullscreen first) is caught and
-dropped without a word: the lock is a wish, not a contract. The pseudo mode never locks; browsers
+lock the browser refuses (a desktop, a browser that wants fullscreen first) is caught and
+dropped without a word, and where `screen.orientation.lock` does not exist — Safari on the iPhone
+has none — nothing is called: the lock is a wish, not a contract. The pseudo mode never locks; browsers
 grant a lock in fullscreen only.
 
 A locked screen does not turn back, so two combinations cannot work as written:
@@ -386,8 +388,16 @@ context. A target that sits directly in `<body>` meets none of these. A page tha
 gone on an iPhone is installed to the home screen with `display: fullscreen` or `standalone` in its
 web app manifest — the guide gives the recipe, the library has no part in it.
 
-Whether `inset: 0` follows the toolbar of Safari as it collapses and expands, or whether the box
-needs `height: 100dvh`, is checked on a device in phase A, before the rule is final.
+On the iPhone (iOS 27.0, simulator, iPhone 17) the box takes the viewport the page has at the
+moment it enters: 402 × 714 upright; in landscape 874 × 292 while the address bar and the tab bar
+of Safari stand, 874 × 402 once a swipe has collapsed them. `inset: 0` and `100%` follow the
+viewport; `100dvh` would add nothing. A swipe on the box does not collapse the bars: iOS does not
+scroll the document under a fixed element that covers the viewport, with or without the
+`overflow:hidden` of the root. Bars that stand when the pseudo mode begins stay while it holds —
+and `onLandscape` begins it at the turn, before anyone swipes, so on an iPhone it covers the
+viewport below the bars. The library has no way to collapse them; only a gesture does. The home
+screen with a manifest, above, is the way to the whole screen. Whether the box follows the bars
+when they expand again while it holds is unchecked.
 
 ## 8. `resize-to="fullscreen"`
 
@@ -429,7 +439,10 @@ The CHANGELOG lists the attribute value and the static under "Deprecated", one l
 The window size under `resize-to="window"` is `innerWidth × innerHeight`. Whether that is right on a
 phone — the URL bar that collapses, the on-screen keyboard, pinch zoom — is unchecked; in native
 fullscreen most of it is moot, in the pseudo mode and in a page that never goes fullscreen it is
-not. Phase C measures before it changes anything:
+not. Phase C measures before it changes anything. Measured so far, on an iPhone 17 under iOS 27.0
+in the simulator: `innerWidth × innerHeight` equals `visualViewport` in every state below, without
+zoom — 402 × 714 upright; 874 × 292 in landscape with the address bar and the tab bar standing,
+874 × 402 with both collapsed by a swipe. Still to measure:
 
 - on Android Chrome and iOS Safari, a page with `resize-to="window"` logs `innerWidth`,
   `innerHeight`, `visualViewport.width` and `.height`, and the box of a probe of `100dvh` — at load,

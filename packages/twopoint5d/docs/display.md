@@ -524,9 +524,9 @@ the display warns once and does not lock.
 ### Without native fullscreen: the pseudo fallback
 
 `isSupported` says whether the browser offers fullscreen for elements here. It does not in an
-iframe without `allow="fullscreen"`, and not where the browser keeps fullscreen for videos — as
-Safari on the iPhone long has. There, `fallback: 'pseudo'` lets the target cover the viewport
-through CSS:
+iframe without `allow="fullscreen"`, and not on the iPhone: Safari there keeps fullscreen for
+videos and offers neither `requestFullscreen` nor `fullscreenEnabled` (iOS 27). There,
+`fallback: 'pseudo'` lets the target cover the viewport through CSS:
 
 ```ts check
 import {Display} from '@spearwolf/twopoint5d';
@@ -550,9 +550,13 @@ covers the viewport only where no ancestor of the target has a `transform`, `fil
 or `contain` — any of them makes that ancestor the box a fixed element covers — and it stays below
 an ancestor's stacking context. A target directly in `<body>` meets none of these.
 
-On an iPhone the bars go away when the page runs from the home screen: a web app manifest with
-`"display": "fullscreen"` or `"standalone"`, linked from the page, and the page added through
-*Share → Add to Home Screen*.
+On an iPhone that matters most in landscape. The address bar and the tab bar of Safari take about a
+quarter of the height there — on an iPhone 17 the pseudo mode covers 874 × 292 of 874 × 402
+points. A swipe on the page collapses the bars, but a swipe on the pseudo box does not: bars that
+stand when the pseudo mode begins stay while it holds. `onLandscape` begins it at the turn, so the
+bars stand. A page that wants the whole screen runs from the home screen instead: a web app
+manifest with `"display": "fullscreen"` or `"standalone"`, linked from the page, and the page added
+through *Share → Add to Home Screen*.
 
 ### Which element goes fullscreen
 
