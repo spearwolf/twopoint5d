@@ -30,6 +30,7 @@ export {Shear, type ShearApi} from './features/Shear.js';
 export {TableFrame, tableFrame, type TableFrameApi, type TableFrameOptions} from './features/TableFrame.js';
 export {TextureColor} from './features/TextureColor.js';
 export {Tint, type TintApi} from './features/Tint.js';
+export {Visible, type VisibleApi} from './features/Visible.js';
 export {wave, type WaveOptions} from './features/Wave.js';
 export {Yaw, type YawApi} from './features/Yaw.js';
 export {

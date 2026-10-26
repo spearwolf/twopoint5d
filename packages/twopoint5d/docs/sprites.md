@@ -45,19 +45,21 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `Anchor`, `NineSlice`, `QuadSize`, `Shear`, `Rotation` |
 | `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()`, `SegmentPlacement`, `segmentPlacement()` |
-| `mesh` | any, by `order` | `wave()`; `PlanarShadow`, `MirrorAtPlane` (passes) |
+| `mesh` | any, by `order` | `wave()`, `Visible`; `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | `NineSlice` |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor`, `RepeatingTextureColor` |
 | `color` | any, by `order` | `PaletteSwap`, `paletteSwap()`, `Tint`, `Fade`, `Flash`, `ShadowMask`, `Darken` (passes) |
 
 The order bands `FrameOrder` (`Flip 100`), `LocalOrder`
 (`Anchor 100, Flip 150, Slice 175, Scale 200, Shear 300, Rotate 400`), `MeshOrder`
-(`Offset 100, Project 200, Mirror 300`), `UvOrder` (`Slice 100`) and `ColorOrder`
+(`Offset 100, Project 200, Mirror 300, Hide 1000`), `UvOrder` (`Slice 100`) and `ColorOrder`
 (`Palette 50, Tint 100, Mask 150, Fade 200, Flash 300, Pass 1000`) leave room for stages of your
 own. Two stages of one order run in the order of the feature list. No built-in feature sits in
 `ColorOrder.Mask`. `ColorOrder.Pass` is the band of
 the color stages a pass brings to recolor the sprite as a whole — `ShadowMask`, `Darken` — after
-every color stage of the kind.
+every color stage of the kind. `MeshOrder.Hide` is the last word on the position: `Visible` moves
+every vertex of a hidden sprite onto one point there, so a mesh stage of your own after it has to
+map one point to one point, or it spreads a hidden sprite apart again.
 
 A **frame stage** changes the frame after the frame slot has answered it, and everything that
 reads the frame — the trim shift, every stage, the color source — reads the changed one: a mirror
@@ -217,6 +219,7 @@ flags.dispose();
 | `Tint` | `color` (static) | `r`, `g`, `b`, `a`, `setColorValues()`, `setColor(color, a?)`, `getColor(target?)` | color, `Tint` | white, alpha 1 |
 | `Fade` | `fade` (dynamic) | `fade` | color, `Fade` | 1 |
 | `Flash` | `flash` (dynamic) | `flashR`, `flashG`, `flashB`, `flashAmount`, `setFlash(r, g, b, amount)` | color, `Flash` | white, amount 0 |
+| `Visible` | `visible` (static) | `visible` | mesh, `Hide` | shown, 1 |
 
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
@@ -1049,6 +1052,61 @@ enemies.dispose();
 - The passes leave both alone where they should: `ShadowMask` and `Darken` run after them, in
   `ColorOrder.Pass`, so a fading sprite throws a fading shadow, a flashing one a plain shadow, and
   its reflection flashes darkened.
+
+### Showing and hiding sprites
+
+A window of a game's UI closes, an inventory slot empties, a cursor leaves the screen, and a moment
+later they are back. `Visible` hides a sprite and shows it again without freeing it and without
+touching any other value of it: no size to zero and to remember, no alpha to restore.
+
+```ts check
+import {
+  AtlasFrame,
+  defineSprite,
+  FeatureSprites,
+  FlatPlacement,
+  InstancePosition,
+  QuadBase,
+  QuadSize,
+  TextureColor,
+  Visible,
+} from '@spearwolf/twopoint5d';
+
+const Window = defineSprite({
+  base: QuadBase,
+  features: [InstancePosition, FlatPlacement, QuadSize, AtlasFrame, TextureColor, Visible],
+});
+
+const windows = new FeatureSprites(Window, {capacity: 16});
+const quest = windows.createSprite();
+if (quest != null) {
+  quest.setSize(120, 80);
+
+  quest.visible = 0; // hidden: the size stays 120 × 80
+  windows.spritePool?.touchVO(quest, 'visible');
+
+  quest.visible = 1; // shown again, as it was
+  windows.spritePool?.touchVO(quest, 'visible');
+}
+windows.update();
+windows.dispose();
+```
+
+- `visible` is a number: 1, what every new sprite starts with, draws the sprite, 0 hides it; 0.5
+  and above counts as 1.
+- It is a **static** attribute: a change reaches the gpu once it is marked with `touchVO(sprite,
+  'visible')`. A kind that shows and hides many sprites every frame takes `attributeUsage: {dynamic:
+  ['visible']}` instead, and every `update()` uploads it.
+- A hidden sprite is hidden **everywhere**: its shadow and its reflection go with it, and
+  `SpritePicker` never picks it — a click lands on what lies behind. A pass of your own that should
+  draw hidden sprites anyway leaves the stage out with `without: ['visible']`.
+- It draws **no fragment at all**: unlike an alpha of 0, it writes no depth under any alpha test
+  and blends nothing. It works for every placement — flat, billboard, segment — and every base,
+  nine-slice panels included.
+- Its vertices still run through the vertex shader. A sprite that stays hidden for good is freed
+  instead.
+- The presets `TexturedSpriteKind` and `AnimatedSpriteKind` do not hold it; add it to a kind of
+  your own.
 
 ### Palette swap and colour cycling
 
@@ -1884,7 +1942,7 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
 - **Pixel-perfect for free.** The colour of every sprite runs through its own colour source and
   colour stages — `Tint`, `Fade` and the rest — and the alpha test of its material drops the same
   texels it drops on the screen: a click into the transparent corner of a frame picks what lies
-  behind it, and a sprite faded to 0 is not hit. The id is written after all of it (three's
+  behind it, a sprite faded to 0 is not hit, and neither is one hidden by `Visible`. The id is written after all of it (three's
   `outputNode`), so no colour stage can change it.
 - **The nearest sprite wins**, by the depth test, whatever the sprites blend or write. At one depth
   — a 2D scene on one plane — the sprite drawn later wins, as on the screen: the later slot of a
@@ -2120,7 +2178,8 @@ The fields, and the rules `defineFeature()` and `defineSprite()` hold them to:
 - **`local`**, **`mesh`**, **`uv`**, **`color`** — a stage `{order, transform}` in its slot;
   `order` is a finite number, lower runs first, and a tie keeps the order of the feature list.
   `FrameOrder`, `LocalOrder`, `MeshOrder`, `UvOrder` and `ColorOrder` name the bands. A `uv` stage
-  transforms the `vec2` the color source samples at.
+  transforms the `vec2` the color source samples at. A `mesh` stage runs before `MeshOrder.Hide`, or
+  maps one point to one point after it: `Visible` collapses a hidden sprite there.
 - **`placement`** — maps the local vertex into the local space of the mesh: exactly one feature of
   a kind, and it declares no textures, since the placement runs always. A pass may bring one in
   place of the kind's — see "Passes: shadows and reflections".
@@ -2892,6 +2951,8 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
   of them; it allocates its promise, a copy of the pointer and of the list, and three's read back
   per call — a tool for clicks and hover, not for every sprite every frame (see "Picking: which
   sprite is under the pointer").
+- A sprite hidden by `Visible` costs no fragment, but its vertices still run through the vertex
+  shader; a sprite hidden for good is freed (see "Showing and hiding sprites").
 - Keep a hot loop to the sprites of one kind (see "Defining a kind").
 - Call `update()` once per frame, after all writes and before rendering. It allocates nothing,
   with bindings and `visible` hooks as well; the allocation spec holds a plane and a light

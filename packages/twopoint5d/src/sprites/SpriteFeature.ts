@@ -221,8 +221,12 @@ export const FrameOrder = Object.freeze({Flip: 100} as const);
 /** The order bands of the uv stages. `Slice` moves the inner grid lines of a nine-slice. */
 export const UvOrder = Object.freeze({Slice: 100} as const);
 
-/** The order bands of the mesh stages. */
-export const MeshOrder = Object.freeze({Offset: 100, Project: 200, Mirror: 300} as const);
+/**
+ * The order bands of the mesh stages. `Hide` is the last word on the position — `Visible` collapses a
+ * hidden sprite there —, so a stage of one's own after it maps one point to one point and never spreads
+ * the vertices apart again.
+ */
+export const MeshOrder = Object.freeze({Offset: 100, Project: 200, Mirror: 300, Hide: 1000} as const);
 
 /**
  * The order bands of the color stages. `Palette` swaps the colours of the color source before every

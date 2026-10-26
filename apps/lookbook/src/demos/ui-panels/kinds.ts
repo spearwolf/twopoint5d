@@ -11,27 +11,29 @@ import {
   QuadSize,
   type SpriteOf,
   TextureColor,
+  Visible,
 } from '@spearwolf/twopoint5d';
 
 /**
  * Every panel, slot, bar and button of the screen: a frame of the UI kit whose border keeps its
  * size in pixels while `setSize()` stretches the middle. `NineSlice` needs the 3 × 3 grid — the
- * inner grid lines are what it moves — and `Anchor` places a panel by any of its corners.
+ * inner grid lines are what it moves —, `Anchor` places a panel by any of its corners, and
+ * `Visible` hides a closed window without losing its size.
  */
 export const PanelKind = defineSprite({
   base: gridBase({columns: 3, rows: 3}),
-  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, NineSlice, AtlasFrame, TextureColor],
+  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, NineSlice, AtlasFrame, TextureColor, Visible],
 });
 
 export type Panel = SpriteOf<typeof PanelKind>;
 
 /**
  * The portraits and the labels out of the `DynamicAtlas`: plain quads placed by their top left
- * corner, and a portrait flashes when its hero takes a hit.
+ * corner; a portrait flashes when its hero takes a hit, and hides while nobody speaks.
  */
 export const PictureKind = defineSprite({
   base: QuadBase,
-  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, AtlasFrame, TextureColor, Flash],
+  features: [InstancePosition, FlatPlacement, QuadSize, Anchor, AtlasFrame, TextureColor, Flash, Visible],
 });
 
 export type Picture = SpriteOf<typeof PictureKind>;

@@ -690,6 +690,6 @@ the demo that ran into it, and each would get a proposal of its own before it is
 | `drawText()` — a `BitmapFont` drawn into a canvas, next to `layoutText()` | a label in a `DynamicAtlas` is drawn by a callback into a 2D context, and the demo draws the glyphs of the font there by hand | `ui-panels` |
 | a per-segment offset of `RepeatingTextureColor` | the repeat starts anew at every joint, so a rope of many links cannot read as one continuous strip | `rope-bridge` |
 | a projection fit that snaps to a whole-number `pixelZoom` — *built:* `pixelSnap`, [`pixel-exact-projection-fit.md`](pixel-exact-projection-fit.md) | pixel art wants the largest whole zoom that fits the container, and each of these demos computes it on every resize | `rope-bridge`, `platformer`, `sine-scroller`, `ui-panels` |
-| per-sprite visibility | a sprite is hidden by a size or an alpha of 0, which costs its values and still runs its vertices | `ui-panels` |
+| per-sprite visibility — *built:* `Visible`, [`sprite-visibility.md`](sprite-visibility.md) | a sprite is hidden by a size or an alpha of 0, which costs its values and still runs its vertices | `ui-panels` |
 | the `Emissive` feature and a selective bloom (§4.13) — still later | the bloom goes by luminance, so a saturated red or pink glow needs a large factor and a glow cannot come from an emission map | `swaying-grass`, `sine-scroller` |
 | texture arrays, KTX2, `Ballistic` (§4.17) — the row "later" of §6 | each waits for a scene that needs it: mipmapped tiles, large painted atlases, a thousand sparks | — |

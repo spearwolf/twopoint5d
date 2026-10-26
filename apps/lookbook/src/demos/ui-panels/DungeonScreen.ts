@@ -498,6 +498,7 @@ export class DungeonScreen extends Group {
     panel.setSize(w * s, h * s);
     // a pixel of the border takes `s` units of the stage, whatever size the panel is stretched to
     panel.sliceScale = s;
+    panel.visible = 1;
     mesh.spritePool?.touchVO(panel);
   }
 
@@ -510,13 +511,22 @@ export class DungeonScreen extends Group {
     const s = this.#scale;
     picture.setPosition(this.#left + x * s, this.#top - y * s);
     picture.setSize(frame.coords.width * texel, frame.coords.height * texel);
+    picture.visible = 1;
     this.#pictures.spritePool?.touchVO(picture);
   }
 
-  #hide(mesh: PanelSprites | TextSprites | FeatureSpritesOf<typeof PictureKind>, sprite: Panel | TexturedSprite | Picture): void {
-    if (sprite.width === 0) return;
-    sprite.setSize(0, 0);
-    mesh.spritePool?.touchVO(sprite, 'quadSize');
+  /** Hides a panel or a picture; it keeps its size, and the next place shows it again. */
+  #hide(mesh: PanelSprites | FeatureSpritesOf<typeof PictureKind>, sprite: Panel | Picture): void {
+    if (sprite.visible === 0) return;
+    sprite.visible = 0;
+    mesh.spritePool?.touchVO(sprite, 'visible');
+  }
+
+  // an icon is a sprite of the preset, which holds no Visible: it hides by a size of 0
+  #hideIcon(icon: TexturedSprite): void {
+    if (icon.width === 0) return;
+    icon.setSize(0, 0);
+    this.#icons.spritePool?.touchVO(icon, 'quadSize');
   }
 
   #layout(): void {
@@ -695,7 +705,7 @@ export class DungeonScreen extends Group {
         }
       } else {
         this.#hide(this.#back, slot);
-        if (icon != null) this.#hide(this.#icons, icon);
+        if (icon != null) this.#hideIcon(icon);
       }
     });
 
