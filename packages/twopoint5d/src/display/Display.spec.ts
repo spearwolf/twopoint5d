@@ -1540,6 +1540,18 @@ describe('Display', () => {
       expect(canvas.getBoundingClientRect.mock.calls.length).toBe(measured + 1);
     });
 
+    it('lets a fullscreenchange make the next frame measure', async () => {
+      const {display, canvas, frame} = makeDisplay();
+      await display.start();
+      frame(1000);
+      const measured = canvas.getBoundingClientRect.mock.calls.length;
+
+      fireFullscreenChange(null);
+      frame(1016);
+
+      expect(canvas.getBoundingClientRect.mock.calls.length, 'the frame after fullscreenchange').toBe(measured + 1);
+    });
+
     it('lets a report of the ResizeObserver make the next frame measure once', async () => {
       const {display, canvas, frame} = makeDisplay();
       await display.start();
@@ -2450,6 +2462,126 @@ describe('Display', () => {
     function inDocument(canvas: object, parent?: object) {
       Object.assign(canvas, {getRootNode: () => doc, parentElement: parent});
     }
+
+    describe('the size source', () => {
+      // an element stub of the document stub with a client rect of its own
+      function box(width: number, height: number, parent?: object) {
+        return {
+          getRootNode: () => doc,
+          parentElement: parent,
+          getBoundingClientRect: () => ({width, height}),
+        };
+      }
+
+      it('a canvas in fullscreen with its parent as size source measures the canvas', () => {
+        const parent = box(800, 600);
+        const {display, canvas} = makeDisplay({resizeToElement: parent as unknown as HTMLElement});
+        inDocument(canvas, parent);
+        // the browser forces a canvas in fullscreen to the size of the screen
+        canvas.getBoundingClientRect.mockReturnValue({width: 1920, height: 1080});
+        display.resize();
+        expect(display.width).toBe(800);
+
+        fireFullscreenChange(canvas);
+        display.resize();
+
+        expect(display.width).toBe(1920);
+        expect(display.height).toBe(1080);
+      });
+
+      it('a canvas that measures itself measures a fullscreen parent', () => {
+        const {display, canvas} = makeDisplay();
+        const parent = box(800, 600);
+        inDocument(canvas, parent);
+        expect(display.width).toBe(320);
+
+        fireFullscreenChange(parent);
+        display.resize();
+
+        expect(display.width).toBe(800);
+        expect(display.height).toBe(600);
+      });
+
+      it('a canvas that measures itself returns to its size before the fullscreen after leaving it', () => {
+        const {display, canvas} = makeDisplay();
+        // the canvas reads back what the display wrote into its inline style, as in the browser
+        const style = canvas.style as {width?: string; height?: string};
+        canvas.getBoundingClientRect.mockImplementation(() => ({
+          width: Number.parseFloat(style.width ?? '320') || 320,
+          height: Number.parseFloat(style.height ?? '200') || 200,
+        }));
+        const parent = box(800, 600);
+        inDocument(canvas, parent);
+        display.resize();
+        expect(display.width).toBe(320);
+
+        fireFullscreenChange(parent);
+        display.resize();
+        expect(display.width).toBe(800);
+
+        fireFullscreenChange(null);
+        display.resize();
+
+        expect(display.width).toBe(320);
+        expect(display.height).toBe(200);
+      });
+
+      it('a size source inside the fullscreen element stays the size source', () => {
+        const fullscreenElement = box(1920, 1080);
+        const inner = box(500, 400, fullscreenElement);
+        const {display, canvas} = makeDisplay({resizeToElement: inner as unknown as HTMLElement});
+        inDocument(canvas, inner);
+
+        fireFullscreenChange(fullscreenElement);
+        display.resize();
+
+        expect(display.width).toBe(500);
+      });
+
+      it('resize-to="window" stays on the window in fullscreen', () => {
+        vi.stubGlobal('window', {devicePixelRatio: 1, performance, innerWidth: 1024, innerHeight: 768});
+        const {display, canvas} = makeDisplayOnCanvas({
+          getAttribute: (name: string) => (name === 'resize-to' ? 'window' : null),
+        });
+        const parent = box(800, 600);
+        inDocument(canvas, parent);
+
+        fireFullscreenChange(parent);
+        display.resize();
+
+        expect(display.width).toBe(1024);
+      });
+
+      it('resizeToCallback still wins in fullscreen', () => {
+        const {display, canvas} = makeDisplay({resizeTo: () => [640, 480]});
+        const parent = box(800, 600);
+        inDocument(canvas, parent);
+
+        fireFullscreenChange(parent);
+        display.resize();
+
+        expect(display.width).toBe(640);
+      });
+
+      it('stubs without getRootNode or parentElement do not throw', () => {
+        const {display} = makeDisplay();
+
+        expect(() => fireFullscreenChange({})).not.toThrow();
+        expect(() => display.resize()).not.toThrow();
+        expect(display.width).toBe(320);
+      });
+
+      it('dispose() takes every fullscreenchange listener off the document', () => {
+        const {display} = makeDisplay();
+        const added = doc.addEventListener.mock.calls.filter(([type]) => type === 'fullscreenchange').map(([, l]) => l);
+        expect(added.length).toBeGreaterThanOrEqual(2);
+
+        display.dispose();
+
+        const removed = doc.removeEventListener.mock.calls.filter(([type]) => type === 'fullscreenchange').map(([, l]) => l);
+        for (const listener of added) expect(removed).toContain(listener);
+      });
+    });
 
     it('builds a DisplayFullscreen with the fullscreen option and answers it from fullscreen', () => {
       const {display} = makeDisplay({fullscreen: {navigationUI: 'show'}});

@@ -80,6 +80,31 @@ function isApart(element: Element): boolean {
   return element.isConnected === false;
 }
 
+// The parent of an element, through the host where it is the top of a shadow root
+function parentAcrossShadow(node: Element): Element | undefined {
+  if (node.parentElement != null) return node.parentElement;
+  return (node.getRootNode?.() as Partial<ShadowRoot> | undefined)?.host ?? undefined;
+}
+
+// The nearest element from `node` up, through shadow hosts, that is in fullscreen: the
+// fullscreenElement of its own root node — a shadow root names its element, where the document
+// would name the host — or the pseudo target of the display. Read with optional calls, so a stub
+// without getRootNode or parentElement ends the walk instead of throwing
+function containingFullscreenOf(node: Element, pseudoTarget: Element | undefined): Element | undefined {
+  for (let current: Element | undefined = node; current != null; current = parentAcrossShadow(current)) {
+    if (current === pseudoTarget) return current;
+    if ((current.getRootNode?.() as Partial<DocumentOrShadowRoot> | undefined)?.fullscreenElement === current) return current;
+  }
+  return undefined;
+}
+
+function containsAcrossShadow(ancestor: Element, node: Element): boolean {
+  for (let current: Element | undefined = node; current != null; current = parentAcrossShadow(current)) {
+    if (current === ancestor) return true;
+  }
+  return false;
+}
+
 // one message for every member that refuses to answer once the display is gone, so the class
 // and the state are always in the text a caller reads out of a foreign stack
 function disposedError(member: string): Error {
@@ -271,6 +296,15 @@ export interface Display extends EventizedObject {}
  *    scale of that transform, as in `getContentAreaSize()`. A rotated element
  *    is measured by the bounding box `getBoundingClientRect()` gives it, its
  *    padding and border in the ratio of that box to its layout size, as there.
+ * 4. While an element that contains the canvas is in fullscreen — native, by
+ *    anyone, or the pseudo fullscreen of {@link Display.fullscreen} — a size
+ *    source element outside it gives way to it and the fullscreen element is
+ *    measured instead; so does the canvas as its own size source, while the
+ *    fullscreen element is not the canvas. `"window"` and a
+ *    {@link Display.resizeToCallback} stay as they are. A canvas that measured
+ *    a fullscreen parent gets back the inline size it had before, once the
+ *    fullscreen is left. A `fullscreenchange` of the document marks the size
+ *    dirty, so the next frame measures.
  *
  * From the size of the source in CSS pixels, the pipeline goes on like this:
  * the canvas `box-sizing` decides whether its padding and border come off
@@ -410,6 +444,21 @@ export class Display {
   // NaN while the last measurement wrote no zoomed size into a canvas that measures itself
   #selfSizeZoomedWidth = Number.NaN;
   #selfSizeZoomedHeight = Number.NaN;
+
+  // The element in fullscreen that contains the canvas — native, by anyone, or the pseudo target of
+  // this display's fullscreen — worked out on every fullscreenchange and every change of the pseudo
+  // mode, not in every frame. While it is set, a size source outside it gives way to it
+  #containingFullscreen?: Element;
+  #pseudoTarget?: HTMLElement;
+  // A canvas that measures itself and gives way to a fullscreen parent measures that parent, and
+  // the display writes the parent's size into the canvas. What the inline style and the zoom
+  // bookkeeping held before is kept here and written back when the fullscreen is left, or the
+  // canvas would read back the size of the screen and keep it
+  #selfSizeBeforeFullscreen?: {width: string; height: string; zoomedWidth: number; zoomedHeight: number};
+
+  readonly #onFullscreenChange = (): void => {
+    this.#updateContainingFullscreen();
+  };
 
   // A computed style declaration is live and follows its element, so one per element is enough.
   // The canvas of a display never changes; the source is fetched again once it is another element
@@ -1051,6 +1100,10 @@ export class Display {
 
       onDocVisibilityChange();
 
+      // the size source follows a fullscreen the app enters on its own as well
+      doc.addEventListener('fullscreenchange', this.#onFullscreenChange);
+      this.#updateContainingFullscreen();
+
       this.#fullscreen = new DisplayFullscreen(
         this,
         {
@@ -1060,7 +1113,10 @@ export class Display {
           // parent of the canvas as it is now
           defaultElement: () => this.#ownContainer?.parentElement ?? this.canvas.parentElement ?? this.canvas,
           emit: (props) => emit(this, OnDisplayFullscreenChange, props),
-          pseudoTargetChanged: () => {},
+          pseudoTargetChanged: (target) => {
+            this.#pseudoTarget = target;
+            this.#updateContainingFullscreen();
+          },
           styleSheetRoot: () => this.#styleSheetRoot,
         },
         fullscreen,
@@ -1297,6 +1353,7 @@ export class Display {
     this.#applyImageRendering(canvas);
 
     this.#resolveSizeSource(canvas);
+    this.#followFullscreen(canvas);
     this.#applyFullscreenClass(canvas, this.#sizeSourceIsWindow);
     this.#observeSizeSource();
 
@@ -1412,6 +1469,7 @@ export class Display {
     if (this.#onDocVisibilityChange != null) {
       this.#doc.removeEventListener('visibilitychange', this.#onDocVisibilityChange, false);
     }
+    this.#doc.removeEventListener('fullscreenchange', this.#onFullscreenChange);
     this.#viewportObserver?.disconnect();
 
     this.#onDocVisibilityChange = undefined;
@@ -1445,6 +1503,47 @@ export class Display {
     } else {
       this.#sizeSourceIsWindow = false;
       this.#sizeSourceElement = this.#resolveResizeToSelector(resizeTo) ?? this.resizeToElement ?? canvas;
+    }
+  }
+
+  #updateContainingFullscreen(): void {
+    const canvas = this.renderer?.domElement;
+    if (canvas == null) return;
+    this.#containingFullscreen = containingFullscreenOf(canvas, this.#pseudoTarget);
+    this.#sizeDirty = true;
+  }
+
+  // While an element that contains the canvas is in fullscreen, a size source outside it — or the
+  // canvas itself, while the fullscreen element is not the canvas — gives way to the fullscreen
+  // element. The window and a resizeToCallback stay what they are
+  #followFullscreen(canvas: HTMLCanvasElement): void {
+    const fullscreen = this.#containingFullscreen;
+    const source = this.#sizeSourceElement ?? canvas;
+    const givesWay =
+      fullscreen != null &&
+      !this.#sizeSourceIsWindow &&
+      (source === canvas ? fullscreen !== canvas : !containsAcrossShadow(fullscreen, source));
+
+    if (givesWay) {
+      if (source === canvas && this.#selfSizeBeforeFullscreen == null) {
+        this.#selfSizeBeforeFullscreen = {
+          width: canvas.style.width,
+          height: canvas.style.height,
+          zoomedWidth: this.#selfSizeZoomedWidth,
+          zoomedHeight: this.#selfSizeZoomedHeight,
+        };
+      }
+      this.#sizeSourceElement = fullscreen;
+    } else if (this.#selfSizeBeforeFullscreen != null) {
+      const before = this.#selfSizeBeforeFullscreen;
+      this.#selfSizeBeforeFullscreen = undefined;
+      if (source === canvas) {
+        canvas.style.width = before.width;
+        canvas.style.height = before.height;
+        this.#selfSizeZoomedWidth = before.zoomedWidth;
+        this.#selfSizeZoomedHeight = before.zoomedHeight;
+        this.#sizeDirty = true;
+      }
     }
   }
 
