@@ -114,5 +114,6 @@ scheduled, and each item would get a proposal of its own before it is built.
 | [`texture-dx-gaps.md`](texture-dx-gaps.md) | wrap classes, the frames of an animation, `isAsepriteFrameData()`, a second filter of a `DynamicAtlas`, `playback` per tag in a catalog |
 | [`pixel-exact-projection-fit.md`](pixel-exact-projection-fit.md) | `pixelSnap` — a projection fit at a whole number of buffer pixels per unit, and a frustum aligned to whole units |
 | [`sprite-visibility.md`](sprite-visibility.md) | `Visible` — a flag per sprite that collapses its vertices in the last mesh stage |
+| [`display-fullscreen.md`](display-fullscreen.md) | `display.fullscreen` — native fullscreen, fullscreen on landscape, a pseudo fullscreen as opt-in fallback |
 
 A new proposal is a file of its own here, named after its subject, with a row in this table.
