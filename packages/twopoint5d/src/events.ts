@@ -1,7 +1,7 @@
 import type {Camera, Scene} from 'three/webgpu';
 import type {PanControl2D} from './controls/PanControl2D.js';
 import type {Display} from './display/Display.js';
-import type {DisplayEventProps} from './display/types.js';
+import type {DisplayEventProps, DisplayFullscreenChangeProps} from './display/types.js';
 import type {Canvas2DStage} from './stage/Canvas2DStage.js';
 import type {IStage} from './stage/IStage.js';
 import type {StageRenderer} from './stage/StageRenderer.js';
@@ -17,6 +17,7 @@ export const OnDisplayRestart = 'restart';
 export const OnDisplayPause = 'pause';
 export const OnDisplayDispose = 'dispose';
 export const OnDisplayError = 'error';
+export const OnDisplayFullscreenChange = 'fullscreenChange';
 
 export interface IOnDisplayResize {
   [OnDisplayResize](props: DisplayEventProps): void;
@@ -48,6 +49,10 @@ export interface IOnDisplayDispose {
 
 export interface IOnDisplayError {
   [OnDisplayError](error: unknown, display: Display): void;
+}
+
+export interface IOnDisplayFullscreenChange {
+  [OnDisplayFullscreenChange](props: DisplayFullscreenChangeProps): void;
 }
 
 // ------------------------------------------------------------

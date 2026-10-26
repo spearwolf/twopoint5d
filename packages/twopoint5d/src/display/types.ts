@@ -1,6 +1,7 @@
 import type {WebGPURenderer} from 'three/webgpu';
 import type {AdaptiveResolutionOptions} from './AdaptiveResolution.js';
 import type {Display} from './Display.js';
+import type {DisplayFullscreen} from './DisplayFullscreen.js';
 
 export interface DisplayEventProps {
   display: Display;
@@ -23,6 +24,54 @@ export interface DisplayEventProps {
    */
   rawDeltaTime: number;
   frameNo: number;
+}
+
+/** How a {@link DisplayFullscreen} is in fullscreen: the browser's own, or a box of CSS over the page. */
+export type FullscreenMode = 'native' | 'pseudo';
+
+// the values of `screen.orientation.lock()`, spelled out here: the DOM lib of TypeScript carries
+// neither `lock()` nor its type
+export type DisplayOrientationLock =
+  | 'any'
+  | 'natural'
+  | 'landscape'
+  | 'portrait'
+  | 'portrait-primary'
+  | 'portrait-secondary'
+  | 'landscape-primary'
+  | 'landscape-secondary';
+
+export interface DisplayFullscreenOptions {
+  /**
+   * The element that goes fullscreen. Without it: the host element of a display that built its
+   * own container, else the parent element of the canvas at the time of the request, else the
+   * canvas.
+   */
+  element?: HTMLElement;
+  /** Passed to `requestFullscreen()`. Default `'hide'`: a game wants the navigation bar gone. */
+  navigationUI?: 'auto' | 'hide' | 'show';
+  /** Locks the screen once native fullscreen is entered. Default: no lock. */
+  orientationLock?: DisplayOrientationLock;
+  /** `'pseudo'` covers the viewport through CSS where native fullscreen is not available. Default `false`. */
+  fallback?: 'pseudo' | false;
+  /** Enter fullscreen when the screen turns to landscape. Default `false`. */
+  onLandscape?: boolean;
+  /**
+   * Leave a fullscreen that `onLandscape` entered when the screen turns back to portrait.
+   * Default `true`, or `false` while `orientationLock` is a landscape type.
+   */
+  exitOnPortrait?: boolean;
+}
+
+/** The props of `OnDisplayFullscreenChange`. */
+export interface DisplayFullscreenChangeProps {
+  display: Display;
+  isActive: boolean;
+  mode: FullscreenMode | undefined;
+  /** `onLandscape` waits for a tap to enter fullscreen. */
+  isArmed: boolean;
+  /** The element in fullscreen, or the target of the next request while not active. */
+  element: HTMLElement;
 }
 
 /**
@@ -148,6 +197,13 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * {@link Display.styleSheetRoot} changes the root later.
    */
   styleSheetRoot?: HTMLElement | ShadowRoot;
+
+  /**
+   * The options of {@link Display.fullscreen}: the target, fullscreen on landscape, the lock of
+   * the orientation, the pseudo fallback. Read once, by the constructor; the controller takes
+   * changes afterwards.
+   */
+  fullscreen?: DisplayFullscreenOptions;
 
   /**
    * By default, a `THREE.WebGPURenderer` is created for you.

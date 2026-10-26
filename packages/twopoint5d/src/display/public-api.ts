@@ -12,7 +12,11 @@ export {getContentAreaSize} from './styleUtils.js';
 export type {
   CreateRendererParameters,
   DisplayEventProps,
+  DisplayFullscreenChangeProps,
+  DisplayFullscreenOptions,
+  DisplayOrientationLock,
   DisplayParameters,
   DisplayRendererParameters,
+  FullscreenMode,
   ResizeDisplayToFn,
 } from './types.js';
