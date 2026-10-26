@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="400" viewBox="0 0 760 400" role="img" aria-labelledby="title">
+<title id="title">How the Display works out its pixel ratio</title>
+<style>
+  .bg { fill: #ffffff; }
+  .ink { fill: #1f2328; }
+  .muted { fill: #59636e; }
+  .line { stroke: #1f2328; }
+  .grid { stroke: #d0d7de; }
+  .panel { fill: #f6f8fa; stroke: #d0d7de; }
+  .blue { fill: #0969da; } .s-blue { stroke: #0969da; }
+  .amber { fill: #9a6700; } .s-amber { stroke: #9a6700; }
+  .green { fill: #1a7f37; } .s-green { stroke: #1a7f37; }
+  .purple { fill: #8250df; } .s-purple { stroke: #8250df; }
+  .purple2 { fill: #d8b9ff; }
+  .red { fill: #cf222e; } .s-red { stroke: #cf222e; }
+  .t { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 13px; }
+  .small { font-size: 11.5px; }
+  .b { font-weight: 600; }
+  .h { font-size: 15px; font-weight: 600; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .ink { fill: #e6edf3; }
+    .muted { fill: #9198a1; }
+    .line { stroke: #e6edf3; }
+    .grid { stroke: #3d444d; }
+    .panel { fill: #151b23; stroke: #3d444d; }
+    .blue { fill: #4493f8; } .s-blue { stroke: #4493f8; }
+    .amber { fill: #d29922; } .s-amber { stroke: #d29922; }
+    .green { fill: #3fb950; } .s-green { stroke: #3fb950; }
+    .purple { fill: #ab7df8; } .s-purple { stroke: #ab7df8; }
+    .purple2 { fill: #4c2889; }
+    .red { fill: #f85149; } .s-red { stroke: #f85149; }
+  }
+</style>
+<rect class="bg" width="760" height="400" rx="8"/>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="muted"/></marker></defs>
+<text x="20" y="30" class="t ink h" text-anchor="start">How the Display works out its pixel ratio</text>
+<text x="20" y="50" class="t muted small" text-anchor="start">device pixels per CSS pixel of the drawing buffer, without a pixelZoom; each bound applies only where it is set</text>
+<rect class="panel" x="20" y="70" width="108" height="70" rx="8"/>
+<text x="74" y="92" class="t ink b small" text-anchor="middle">start</text>
+<text x="74" y="111" class="t muted small" text-anchor="middle">devicePixelRatio</text>
+<text x="74" y="127" class="t muted small" text-anchor="middle">of the screen</text>
+<line x1="129" y1="105" x2="140" y2="105" class="line" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<rect class="panel" x="141" y="70" width="108" height="70" rx="8"/>
+<text x="195" y="92" class="t ink b small" text-anchor="middle">≤ maxPixelRatio</text>
+<text x="195" y="111" class="t muted small" text-anchor="middle">default 2</text>
+<text x="195" y="127" class="t muted small" text-anchor="middle">0: no bound</text>
+<line x1="250" y1="105" x2="261" y2="105" class="line" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<rect class="panel" x="262" y="70" width="108" height="70" rx="8"/>
+<text x="316" y="92" class="t ink b small" text-anchor="middle">≤ the budget</text>
+<text x="316" y="111" class="t muted small" text-anchor="middle">√(maxPixels ÷ area)</text>
+<text x="316" y="127" class="t muted small" text-anchor="middle">area in CSS px</text>
+<line x1="371" y1="105" x2="382" y2="105" class="line" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<rect class="panel" x="383" y="70" width="108" height="70" rx="8"/>
+<text x="437" y="92" class="t ink b small" text-anchor="middle">× resolutionScale</text>
+<text x="437" y="111" class="t muted small" text-anchor="middle">default 1</text>
+<text x="437" y="127" class="t muted small" text-anchor="middle">adaptive moves it</text>
+<line x1="492" y1="105" x2="503" y2="105" class="line" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<rect class="panel" x="504" y="70" width="108" height="70" rx="8"/>
+<text x="558" y="92" class="t ink b small" text-anchor="middle">≤ the budget</text>
+<text x="558" y="111" class="t muted small" text-anchor="middle">once more</text>
+<text x="558" y="127" class="t muted small" text-anchor="middle">caps supersampling</text>
+<line x1="613" y1="105" x2="624" y2="105" class="line" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<rect class="panel" x="625" y="70" width="108" height="70" rx="8"/>
+<text x="679" y="92" class="t ink b small" text-anchor="middle">↓ to an eighth</text>
+<text x="679" y="111" class="t muted small" text-anchor="middle">where budget or</text>
+<text x="679" y="127" class="t muted small" text-anchor="middle">scale made it</text>
+<text x="20" y="170" class="t blue b small" text-anchor="start">premium laptop 1440 × 900 @2</text>
+<text x="240" y="170" class="t muted small" text-anchor="start">maxPixelRatio 0, resolutionScale 1.5, maxPixels 8 M</text>
+<text x="74" y="192" class="t ink code" text-anchor="middle">2</text>
+<text x="195" y="192" class="t ink code" text-anchor="middle">2</text>
+<text x="316" y="192" class="t ink code" text-anchor="middle">2</text>
+<text x="437" y="192" class="t ink code" text-anchor="middle">3</text>
+<text x="558" y="192" class="t ink code" text-anchor="middle">2.48</text>
+<text x="679" y="192" class="t ink code" text-anchor="middle">2.375</text>
+<text x="740" y="170" class="t ink small" text-anchor="end">buffer 3420 × 2137</text>
+<line class="grid" x1="20" y1="204" x2="740" y2="204"/>
+<text x="20" y="226" class="t green b small" text-anchor="start">phone 412 × 915 @2.625</text>
+<text x="240" y="226" class="t muted small" text-anchor="start">adaptiveResolution at scale 0.75</text>
+<text x="74" y="248" class="t ink code" text-anchor="middle">2.625</text>
+<text x="195" y="248" class="t ink code" text-anchor="middle">2</text>
+<text x="316" y="248" class="t ink code" text-anchor="middle">—</text>
+<text x="437" y="248" class="t ink code" text-anchor="middle">1.5</text>
+<text x="558" y="248" class="t ink code" text-anchor="middle">—</text>
+<text x="679" y="248" class="t ink code" text-anchor="middle">1.5</text>
+<text x="740" y="226" class="t ink small" text-anchor="end">buffer 618 × 1372</text>
+<line class="grid" x1="20" y1="260" x2="740" y2="260"/>
+<text x="20" y="282" class="t amber b small" text-anchor="start">4K screen 3840 × 2160 @1</text>
+<text x="240" y="282" class="t muted small" text-anchor="start">maxPixels 3 M</text>
+<text x="74" y="304" class="t ink code" text-anchor="middle">1</text>
+<text x="195" y="304" class="t ink code" text-anchor="middle">1</text>
+<text x="316" y="304" class="t ink code" text-anchor="middle">0.60</text>
+<text x="437" y="304" class="t ink code" text-anchor="middle">0.60</text>
+<text x="558" y="304" class="t ink code" text-anchor="middle">0.60</text>
+<text x="679" y="304" class="t ink code" text-anchor="middle">0.5</text>
+<text x="740" y="282" class="t ink small" text-anchor="end">buffer 1920 × 1080</text>
+<line class="grid" x1="20" y1="316" x2="740" y2="316"/>
+<rect class="panel s-purple" x="20" y="330" width="720" height="58" rx="8" stroke-width="1.5"/>
+<text x="32" y="350" class="t purple b small" text-anchor="start">pixelZoom above 0 replaces all of it:</text>
+<text x="32" y="368" class="t ink small" text-anchor="start">pixelRatio = 1 · devicePixelZoom = ⌊pixelZoom × devicePixelRatio⌋, at least 1, raised where maxPixels needs it</text>
+<text x="32" y="382" class="t muted small" text-anchor="start">maxPixelRatio, resolutionScale and adaptiveResolution do not apply · Display.MaxResolution (8192) bounds each axis in every case</text>
+
+</svg>

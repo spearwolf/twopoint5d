@@ -2,59 +2,105 @@
 
 What a frame costs the GPU is, above all, its pixels: every pass of a frame — the scene, the
 shadows, every step of a bloom, the copy onto the canvas — shades each pixel of a render target
-that follows the size of the drawing buffer. A phone of 1080 × 2400 device pixels at its full
-pixel ratio shades 2.6 million of them a pass, more than a desktop screen of 1920 × 1080. The
-`Display` decides how many there are. This guide walks through its knobs, from the defaults to a
-display that holds its frame rate by itself.
+that follows the size of the drawing buffer. The `Display` decides how many there are. The same
+phone screen can cost 2.6 million pixels a pass or a tenth of a million, depending on four or five
+settings:
 
-| knob | what it does | default |
+![One phone screen of 412 × 915 CSS pixels at a devicePixelRatio of 2.625, drawn four ways: at
+every device pixel (2.6 M pixels a pass), with the defaults (1.5 M), with adaptive resolution at a
+scale of 0.75 (0.85 M) and as pixel art at a zoom of 2 (0.1 M)](images/display/display-setups-on-a-phone.svg)
+
+This guide starts from what you want to draw — pixel art, a display that holds its frame rate, or
+a display as sharp as the screen allows — and gives each a recipe to copy. A cheat sheet of every
+setting follows, then the reference: how each setting works and how they play together.
+
+- [Which setup?](#which-setup)
+- [Pixel art](#pixel-art)
+- [A fast display: adaptive resolution](#a-fast-display-adaptive-resolution)
+- [A premium display: every device pixel](#a-premium-display-every-device-pixel)
+- [Cheat sheet](#cheat-sheet)
+- [Reference](#reference)
+
+## Which setup?
+
+![A decision tree: pixel art that lives entirely on the grid of the art takes a display pixelZoom;
+pixel art beside smooth layers takes pixelSnap on the projection; smooth images and 3D take
+adaptiveResolution where the detail may give way, and maxPixelRatio 0 where the frame rate
+may](images/display/display-choose-a-setup.svg)
+
+| you want | the one setting | what you get |
 | --- | --- | --- |
-| `antialias` (option) | four samples per pixel in the renderer and in the scene pass of a `RenderPipeline` | `false` |
-| `maxPixelRatio` | the device pixels per CSS pixel at most | `2` |
-| `pixelZoom` | the drawing buffer at the resolution of the art, a whole number of device pixels per pixel | `0`, off |
-| `maxPixels` | a budget of pixels for the drawing buffer | `0`, off |
-| `resolutionScale` | a factor on the pixel ratio | `1` |
-| `adaptiveResolution` (option) | a controller that sets `resolutionScale` by the cost of every frame | off |
+| pixel art, as cheap as it gets | `display.pixelZoom` | a drawing buffer at the resolution of the art, scaled up `pixelated` by the browser |
+| pixel art beside smooth content | `pixelSnap: true` in the fit of the projection | pixel art at whole pixels of a full-resolution buffer |
+| a steady frame rate | `adaptiveResolution: true` | a controller that lowers the resolution when frames get expensive, and raises it again |
+| the sharpest image | `maxPixelRatio: 0` | one pixel of the buffer per device pixel |
 
-## The defaults
+There is no preset object to pass: each setup is a handful of settings, and the recipes below are
+the presets. Every recipe is a complete program — a `Display`, a `Stage2D` and a `StageRenderer`
+that draws the stage into the display, as in [the stage cheat-sheet](../src/stage/README.md).
 
-A `Display` that is told nothing draws at most at **2 device pixels per CSS pixel**
-(`Display.DefaultMaxPixelRatio`) and builds its renderer **without multisampling**. Beyond a ratio
-of 2 a phone screen shows hardly more detail, but a ratio of 3 shades 2.25 times as many pixels.
+## Pixel art
 
-Multisampling smooths the edges of geometry only: the polygons of a mesh, lines, a turned quad
-whose texture is opaque up to its border. It does nothing for pixel art, whose edges lie on its
-pixel grid, nothing for sprites cut out by the alpha test — grass, leaves — and little for sprites
-blended over a transparent border, which texture filtering smooths already. Under a
-`RenderPipeline` it is expensive: the scene pass renders four samples per pixel into half floats
-and resolves them before the bloom even starts. A scene of geometry asks for it:
+### Pixel art in three settings
 
 ```ts check
-import {Display} from '@spearwolf/twopoint5d';
+import {Display, OrthographicProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 
-const display = new Display(document.querySelector('canvas')!, {antialias: true, maxPixelRatio: 0});
+// <canvas resize-to="window"></canvas>: the canvas fills the window
+const display = new Display(document.querySelector('canvas')!);
 
-export {display};
+// every pixel of the art 3 CSS pixels large
+display.pixelZoom = 3;
+
+// one unit of the stage is one pixel of the art, with the edges of the view on whole units
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {pixelZoom: 1, pixelSnap: true}));
+new StageRenderer(display).add(stage);
+
+display.start();
+
+export {display, stage};
 ```
 
-`maxPixelRatio: 0` lifts the bound, and the display draws at the full `devicePixelRatio` again.
+Three settings do the work:
 
-## Pixel art at its own resolution
+- **`display.pixelZoom`** puts the art into the drawing buffer at its own resolution — one pixel of
+  the buffer is one pixel of the art — and the browser scales the canvas up, `pixelated`. It is
+  the cheapest setup there is: a phone of 1080 × 2400 device pixels with the art drawn 5 device
+  pixels large shades 216 × 480 pixels a frame, and every pass after the scene works on that small
+  image too.
+- **`{pixelZoom: 1}`** on the projection makes one unit of the stage one pixel of the buffer, so
+  the positions and the sizes of sprites count pixels of the art.
+- **`pixelSnap: true`** puts the edges of the view on whole units. Without it, a buffer of an odd
+  width centres the view on half a pixel, and every texel sits half a pixel off the grid.
 
-With `pixelZoom` above `0` the drawing buffer holds the art at its own resolution — one pixel of
-the buffer is one pixel of the art — and the browser scales the canvas up, `pixelated`. A phone of
-1080 × 2400 device pixels with the art drawn 2 device pixels large shades 540 × 1200 pixels a frame,
-and every pass after the scene works on that small image too.
+Textures of pixel art want `nearest` filtering, which is what a `TextureFactory` applies when it is
+told nothing else — see [textures](textures.md).
 
-`pixelZoom` counts CSS pixels per pixel of the art, and the display rounds it **down to whole device
-pixels**: a zoom of 2 is 4 device pixels at a ratio of 2 and 5 at a ratio of 2.625, where 5.25 would
-draw the pixels 5 and 6 device pixels wide by turns. `devicePixelZoom` reads what the rounding made
-of it. Rounded down, a pixel is never larger than asked for, so a zoom at which a view fits exactly
-is the largest whole zoom at which at least that much of the art fits — whatever the ratio of the
-screen:
+### How large: picking the zoom
+
+`pixelZoom` counts CSS pixels per pixel of the art, and the display rounds it **down to whole
+device pixels**: a zoom of 2 is 4 device pixels at a ratio of 2 and 5 at a ratio of 2.625, where
+5.25 would draw the pixels 5 and 6 device pixels wide by turns. `devicePixelZoom` reads what the
+rounding made of it.
+
+![A strip of 26 device pixels at a devicePixelRatio of 2.625: at 5.25 device pixels per pixel of
+the art the widths come out 5, 5, 5, 6, 5; rounded down to 5, every pixel is 5 device pixels wide
+and the strip ends one device pixel short](images/display/display-pixel-zoom-rounding.svg)
+
+Rounded down, a pixel is never larger than asked for. So a zoom worked out from the size of the
+screen and the view you need is the largest whole zoom at which at least that view fits, whatever
+the ratio of the screen:
+
+| you want | write | on a 1920 × 1080 window at a ratio of 1 |
+| --- | --- | --- |
+| every pixel of the art the same size, the view grows with the window | `display.pixelZoom = 3` | 640 × 360 pixels of the art |
+| at least 400 × 240 pixels of the art, as large as fits | `display.pixelZoom = Math.min(innerWidth / 400, innerHeight / 240)` | zoom 4.5 → 4: 480 × 270 |
+| at least 180 lines, any width | `display.pixelZoom = innerHeight / 180` | zoom 6: 320 × 180 |
+
+The zoom that follows the window is set again with every resize:
 
 ```ts check
-import {Display, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
+import {Display, OrthographicProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
 
 // <canvas resize-to="window">: the window is the size source, and the zoom is worked out from it
 const display = new Display(document.querySelector<HTMLCanvasElement>('canvas[resize-to="window"]')!);
@@ -67,21 +113,28 @@ fit();
 // a new zoom takes effect with the next measurement, which emits the resize again
 display.onResize(fit);
 
-// one unit of the view is one pixel of the buffer, and so one pixel of the art
-const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {pixelZoom: 1}));
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {pixelZoom: 1, pixelSnap: true}));
+new StageRenderer(display).add(stage);
+
+// how much of the art the screen shows: display.width × display.height pixels of the art
+display.onResize(({width, height}) => console.log(`${width} × ${height}`));
+
+display.start();
 
 export {display, stage};
 ```
 
 What follows from the zoom:
 
-- `width` and `height` count pixels of the buffer, as many whole ones as fit into the size source.
-  The canvas takes just their size, up to one pixel of the art short of the size source on its
-  right and bottom edge — stretched to the full size, the pixels would be uneven again. A canvas
-  that is its own size source keeps the size it had without the zoom as that source, through
-  every change of the zoom.
-- `pixelRatio` is `1`; `maxPixelRatio` and `resolutionScale` do not apply. `maxPixels` raises the
-  zoom instead, to the smallest whole zoom at which the buffer stays within the budget.
+- `width` and `height` count pixels of the buffer — of the art —, as many whole ones as fit into
+  the size source. The canvas takes just their size, up to one pixel of the art short of the size
+  source on its right and bottom edge: stretched to the full size, the pixels would be uneven
+  again. Give the page behind the canvas the clear colour of the stage, and the strip goes unseen.
+  A canvas that is its own size source keeps the size it had without the zoom as that source,
+  through every change of the zoom.
+- `pixelRatio` is `1`; `maxPixelRatio`, `resolutionScale` and `adaptiveResolution` do not apply.
+  `maxPixels` raises the zoom instead, to the smallest whole zoom at which the buffer stays within
+  the budget.
 - A pixel of the art is `devicePixelZoom / devicePixelRatio` CSS pixels large. A pointer position
   divides by that, not by `pixelZoom`:
 
@@ -105,18 +158,20 @@ What follows from the zoom:
 - A `pixelZoom` that is not a positive finite number — `NaN`, `Infinity`, a negative one — counts
   as `0`.
 
-The zoom of a projection — `OrthographicProjection` with `{pixelZoom: 2}` on a display without a
-zoom — draws the art as large, but in a drawing buffer at the full pixel ratio: four times the
-pixels of a display zoom of 2, at the same look. The next section keeps that crisp.
+### Pixel art through a projection: `pixelSnap`
 
-## Pixel art through a projection: `pixelSnap`
+A display zoom draws everything at the resolution of the art: a turned sprite turns in pixels of
+the art, a text of a smooth font comes out as blocky as the sprites, a scroll moves in whole
+pixels of the art. Where that is too coarse, the art goes into a drawing buffer at the full pixel
+ratio, and the projection zooms it. That costs as many pixels as any smooth scene, and it stays
+crisp only where every pixel of the art covers the same whole number of pixels of the buffer, and
+where the edges of its texels fall on the edges of those pixels. `pixelSnap: true` beside the fit
+of an `OrthographicProjection` or a `ParallaxProjection` takes care of both:
 
-A projection zoom stays crisp only where every pixel of the art covers the same whole number of
-pixels of the drawing buffer, and where the edges of its texels fall on the edges of those pixels.
-A zoom of 2 CSS pixels is 2.5 pixels of the buffer at a pixel ratio of 1.25 — texels 2 and 3
-pixels wide by turns —, and a view centred on an odd number of pixels puts every texel edge half a
-pixel off. `pixelSnap: true` beside the fit of an `OrthographicProjection` or a
-`ParallaxProjection` takes care of both:
+![Three strips of pixels of the drawing buffer. A zoom of 2.5 buffer pixels samples texels 2 and
+3 pixels wide by turns; pixelSnap rounds it to 2. A view 7 units wide centred on the camera puts
+texel edges through every third pixel centre at a zoom of 3; pixelSnap moves the left edge to −3
+and the texel edges onto the pixel edges](images/display/display-pixel-snap.svg)
 
 - **The zoom counts pixels of the buffer.** A `StageRenderer` hands the `pixelRatio` of its display
   on to its stages with their size, and the projection rounds the zoom times that ratio to a whole
@@ -154,6 +209,10 @@ canvas.addEventListener('pointermove', (event) => {
 export {display, stage};
 ```
 
+`contain` shows at least the view it names, and more where the screen has another shape; `cover`
+with a `height` alone — `{fit: 'cover', height: 180, pixelSnap: true}` — fills the canvas with at
+most 180 lines of the art, as the platformer of the lookbook does.
+
 What follows from it:
 
 - Sprites and the camera keep the texels whole as long as they sit on whole units — the strict
@@ -165,10 +224,11 @@ What follows from it:
   only an offset it wrote itself.
 - Under a display `pixelZoom` the buffer already holds the art, the ratio is `1`, and `pixelSnap`
   makes every unit a whole number of pixels of the buffer on top of it — the cheapest pixel-exact
-  setup.
+  setup, the one of [pixel art in three settings](#pixel-art-in-three-settings).
 - The buffer has to reach the screen one to one for the pixels to stay even there. A
   `maxPixelRatio` below the `devicePixelRatio` scales the buffer up — a ratio of 2 on a screen of
-  3 by 1.5 —, and so does a `resolutionScale` below `1`.
+  3 by 1.5 —, and so does a `resolutionScale` below `1`. A display for `pixelSnap` on a screen
+  above a ratio of 2 takes `maxPixelRatio: 0`.
 - `adaptiveResolution` does not go together with `pixelSnap`: every step of the scale changes the
   pixel ratio, the whole zoom follows it, and the visible part of the world grows or shrinks
   mid-game. Pixel art that has to save pixels takes a display `pixelZoom`, under which the
@@ -179,7 +239,299 @@ What follows from it:
 - `minPixelZoom` and `maxPixelZoom` hold the zoom before it is rounded, so the rounded zoom can
   lie beyond one of them by less than one pixel of the buffer.
 
-## A budget of pixels
+The zoom of a projection **without** `pixelSnap` — `OrthographicProjection` with `{pixelZoom: 2}`
+on a display without a zoom — draws the art as large, but its texels come out uneven wherever the
+pixel ratio is no whole number, and it shades four times the pixels of a display zoom of 2, at the
+same look.
+
+### A display zoom or `pixelSnap`?
+
+| | display `pixelZoom` | `pixelSnap` on the projection |
+| --- | --- | --- |
+| drawing buffer | the resolution of the art | the full pixel ratio |
+| cost | the lowest of all setups | that of a smooth scene |
+| a turned or scaled sprite | turns in pixels of the art | turns in pixels of the screen |
+| text of a smooth font, gradients, 3D | blocky, at the resolution of the art | sharp |
+| the smallest step of a scroll | one pixel of the art | one pixel of the buffer |
+| `adaptiveResolution` | holds still | does not go together with it |
+| `maxPixelRatio` | does not apply | `0`, so the buffer reaches the screen one to one |
+
+### Pixel-art presets
+
+| preset | display | projection | shows |
+| --- | --- | --- | --- |
+| retro, fixed zoom | `pixelZoom = 3` | `{pixelZoom: 1, pixelSnap: true}` | more of the world on a larger window |
+| at least a view | `pixelZoom = Math.min(innerWidth / 400, innerHeight / 240)`, again on every resize | `{pixelZoom: 1, pixelSnap: true}` | at least 400 × 240, as large as fits |
+| fixed number of lines | `pixelZoom = innerHeight / 180`, again on every resize | `{pixelZoom: 1, pixelSnap: true}` | at least 180 lines |
+| full resolution, at least a view | `{maxPixelRatio: 0}` | `{fit: 'contain', width: 480, height: 288, pixelSnap: true}` | at least 480 × 288 |
+| full resolution, the screen covered | `{maxPixelRatio: 0}` | `{fit: 'cover', height: 180, pixelSnap: true}` | at most 180 lines |
+
+### Where the art comes from
+
+Everything the library reads for sprites, tiles and text works with pixel art; the guides of each
+show how.
+
+| source | read by | guide |
+| --- | --- | --- |
+| a plain image — PNG, WebP, any format the browser decodes | `TextureFactory`, `TextureStore`, `nearest` unless told otherwise | [textures](textures.md) |
+| Aseprite "Export Sprite Sheet", json "Hash" or "Array", tags become animations | `AsepriteJson.parse()`, the `'aseprite'` adapter of a `TextureStore` | [sprites: Aseprite sheets](sprites.md#aseprite-sheets) |
+| TexturePacker and free-tex-packer, json "Hash" or "Array" | `TexturePackerJson`, the `'texturepacker'` adapter | [sprites: frames out of an atlas](sprites.md#frames-out-of-an-atlas) |
+| a tile set cut out of a plain image | `TileSet` | [tile maps](map2d.md) |
+| a set of frames picked by number — tiles, digits, poses | `FrameTable`, `tableFrame()` | [sprites: frames out of a table](sprites.md#frames-out-of-a-table-tableframe) |
+| a bitmap font, AngelCode BMFont as text, XML or json | `BitmapFont.parse()` | [text](text.md#bitmap-fonts) |
+| images drawn or packed at run time | `DynamicAtlas` | [sprites: atlases built at run time](sprites.md#atlases-built-at-run-time-dynamicatlas) |
+
+### What keeps pixel art crisp
+
+- A whole number of pixels per pixel of the art: a display `pixelZoom` rounds to whole device
+  pixels by itself, a projection zoom needs `pixelSnap`.
+- Sprites and the camera on whole units, or on multiples of `1 / zoom` units under `pixelSnap`.
+- `nearest` filtering for every texture of the art.
+- `antialias` off, which it is by default: it smooths edges of geometry and does nothing for pixel
+  art but cost.
+- Under `pixelSnap`, a buffer that reaches the screen one to one: no `maxPixelRatio` below the
+  `devicePixelRatio`, no `resolutionScale` below `1`, no `adaptiveResolution`.
+
+## A fast display: adaptive resolution
+
+### A steady frame rate in one option
+
+```ts check
+import {Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!, {adaptiveResolution: true});
+
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 800, height: 600}));
+new StageRenderer(display).add(stage);
+
+display.start();
+
+export {display, stage};
+```
+
+`adaptiveResolution: true` builds a controller that holds **60 frames per second** — or the
+`maxFps` of the display where that is lower — by `resolutionScale`, a factor on the pixel ratio:
+down a step of an eighth where a frame costs more than the target allows, up a step where there is
+room for the pixels of it, between `0.5` and `1`. Stages, cameras and layout notice nothing but a
+smaller drawing buffer, which the browser scales up smoothly: the image gets softer, the frame rate
+holds.
+
+![A schematic of the controller under gpu-time: a scene of 42 ms a frame takes the scale from 1 to
+0.75 and on to 0.5 in two windows, the frames drop below the budget of 13.3 ms; when the scene gets
+lighter, the scale goes up a step after three windows with room, and holds at 0.75 where 0.875
+would not fit](images/display/display-adaptive-resolution.svg)
+
+### The settings, simply
+
+| setting | turn it when | for example |
+| --- | --- | --- |
+| `targetFps` | 60 is too much to ask — a heavy scene, a phone that is to last | `{adaptiveResolution: {targetFps: 30}}` |
+| `minScale` | the image may get softer still — or must not, because there is text to read | `0.25` lets it go down to a sixteenth of the pixels; `0.75` keeps more than half |
+| `maxScale` | there is room left: above `1` the controller supersamples while frames are cheap | `{maxScale: 1.5}`, bounded by `maxPixels` |
+| `maxFps` | the frame rate itself is to be capped — the target follows it | `{maxFps: 30, adaptiveResolution: true}` holds 30 |
+| `maxPixelRatio` | the scale is to start from a cheaper ratio — the default bound is `2` | `{maxPixelRatio: 1.5}` |
+| `maxPixels` | a hard ceiling of pixels, whatever the screen: a 4K monitor costs no more than a laptop | `{maxPixels: 2_000_000}` |
+| `pauseOutsideViewport` | a canvas that scrolls out of view is to draw nothing at all | `{pauseOutsideViewport: true}` |
+
+`antialias` stays off: under a `RenderPipeline` it renders four samples per pixel before the bloom
+even starts, the most expensive way there is to smooth an edge.
+
+### Watching it work
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!, {adaptiveResolution: true});
+
+const adaptive = display.adaptiveResolution!;
+adaptive.method; //   'gpu-time' or 'frame-pacing', undefined before the first frame
+adaptive.scale; //    the resolutionScale it has set
+adaptive.gpuTime; //  the median GPU time of the frames it judged last, in ms
+adaptive.enabled = false; // hold it still, and give back the scale it found
+
+// every step it takes is a resize of the display
+display.onResize(({pixelRatio}) => console.log(`drawing at ${pixelRatio} device pixels per CSS pixel`));
+
+export {display};
+```
+
+The swaying grass of the lookbook shows the drawing buffer, the scale, the method and the GPU time
+in its `output` folder.
+
+### Fast presets
+
+| preset | options |
+| --- | --- |
+| hold 60, the defaults | `{adaptiveResolution: true}` |
+| battery saver | `{maxFps: 30, adaptiveResolution: true}` |
+| heavy scene, large screens | `{maxPixels: 3_000_000, adaptiveResolution: {minScale: 0.25}}` |
+| text that must stay readable | `{adaptiveResolution: {minScale: 0.75}}` |
+| a quality menu instead of a controller | `display.resolutionScale = 0.5`, `0.75` or `1` by hand |
+
+## A premium display: every device pixel
+
+### Every device pixel in one option
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+// one pixel of the buffer per device pixel; four samples per pixel for the edges of geometry
+const display = new Display(document.querySelector('canvas')!, {maxPixelRatio: 0, antialias: true});
+
+export {display};
+```
+
+`maxPixelRatio: 0` lifts the bound of 2 device pixels per CSS pixel, and the display draws at the
+full `devicePixelRatio`: one pixel of the buffer per device pixel, nothing scaled by the browser.
+On a phone of a ratio of 3 that shades 2.25 times the pixels of the default.
+
+`antialias: true` is for geometry alone: the polygons of a mesh, lines, a turned quad whose texture
+is opaque up to its border. It does nothing for pixel art, nothing for sprites cut out by the alpha
+test — grass, leaves — and little for sprites blended over a transparent border, which texture
+filtering smooths already. It is read once, by the constructor: it is an option of the renderer.
+
+### Sharper than the screen: supersampling
+
+A `resolutionScale` above `1` draws beyond `maxPixelRatio`: a scale of 1.5 shades 2.25 times the
+pixels, and the browser scales the canvas down. It smooths what multisampling does not reach — the
+inside of textures, thin lines of a shader. `maxPixels` keeps it from running away on a large
+screen, and `Display.MaxResolution` (8192) bounds each axis in any case:
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!, {maxPixelRatio: 0, maxPixels: 8_000_000});
+display.resolutionScale = 1.5;
+
+export {display};
+```
+
+A laptop of 1440 × 900 CSS pixels at a ratio of 2 asks for a ratio of 3; the budget holds it to
+2.48, rounded down to 2.375 — a buffer of 3420 × 2137.
+
+### Premium with a safety net
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+// every device pixel, more while frames are cheap, never below three quarters of the ratio
+const display = new Display(document.querySelector('canvas')!, {
+  maxPixelRatio: 0,
+  maxPixels: 8_000_000,
+  adaptiveResolution: {minScale: 0.75, maxScale: 1.5},
+});
+
+export {display};
+```
+
+The controller starts at a scale of 1, goes up toward 1.5 where the GPU has room and down to 0.75
+where it has none: a sharp image on a fast machine, a steady frame rate on a slow one.
+
+### Premium presets
+
+| preset | options |
+| --- | --- |
+| every device pixel | `{maxPixelRatio: 0}` |
+| smooth geometry | `{maxPixelRatio: 0, antialias: true}` |
+| supersampled stills, a product view | `{maxPixelRatio: 0, maxPixels: 8_000_000}` and `resolutionScale = 1.5` |
+| premium with a safety net | `{maxPixelRatio: 0, maxPixels: 8_000_000, adaptiveResolution: {minScale: 0.75, maxScale: 1.5}}` |
+
+## Cheat sheet
+
+### The settings of the display
+
+An *option* goes to the constructor, a *property* may be written at any time and takes effect with
+the next measurement — at the start of the next frame, or right away with a `resize()` of your own.
+
+| setting | kind | default | what it does | pixel art | fast | premium |
+| --- | --- | --- | --- | --- | --- | --- |
+| `pixelZoom` | property | `0`, off | the buffer at the resolution of the art, a whole number of device pixels per pixel | the key | `0` | `0` |
+| `maxPixelRatio` | option, property | `2` | the device pixels per CSS pixel at most; `0` is no bound | does not apply; `0` under `pixelSnap` | `2` or `1.5` | `0` |
+| `maxPixels` | option, property | `0`, off | a budget of pixels for the buffer | raises the zoom | `2`–`3` million | a guard, `8` million |
+| `resolutionScale` | property | `1` | a factor on the pixel ratio; above `1` supersampling | does not apply | set by the controller | `1`–`1.5` |
+| `adaptiveResolution` | option | off | a controller that sets `resolutionScale` by the cost of every frame | holds still; not with `pixelSnap` | `true` | `{minScale: 0.75, maxScale: 1.5}` |
+| `antialias` | option | `false` | four samples per pixel in the renderer and the scene pass of a `RenderPipeline` | off | off | on for geometry |
+| `maxFps` | option | none | the frames per second at most, and the target of the controller below 60 | — | `30` saves power | — |
+| `pauseOutsideViewport` | option | `false` | no frames while the canvas is out of view | — | `true` | — |
+| `styleImageRendering` | property | follows `pixelZoom` | pins `image-rendering` to `'pixelated'` or `'auto'` | — | — | — |
+| `Display.MaxResolution` | static | `8192` | the buffer per axis at most | — | — | raise before the first display, if the GPU allows |
+| `Display.DefaultMaxPixelRatio` | static | `2` | the `maxPixelRatio` of the displays built afterwards | — | — | — |
+
+### The fit of a projection
+
+`OrthographicProjection` and `ParallaxProjection` take the same fit:
+
+| spec | the view |
+| --- | --- |
+| `{fit: 'fill'}`, the default | one unit per CSS pixel — per pixel of the art under a display `pixelZoom` |
+| `{pixelZoom: z}` | `z` CSS pixels per unit |
+| `{fit: 'contain', width, height}` | at least `width` × `height` units, the rest of the canvas shows more |
+| `{fit: 'cover', width, height}` | the canvas covered, at most `width` × `height` units visible |
+| `minPixelZoom`, `maxPixelZoom` | bounds of the zoom of `contain` and `cover` |
+| `pixelSnap: true` | the zoom a whole number of pixels of the buffer, the edges of the view on whole units |
+
+### What to read
+
+| read | answers |
+| --- | --- |
+| `display.width`, `display.height` | the size in CSS pixels — in pixels of the art under a `pixelZoom` |
+| `display.pixelRatio` | the device pixels per CSS pixel the display draws at; `1` under a `pixelZoom` |
+| `display.devicePixelRatio` | the ratio of the screen |
+| `display.devicePixelZoom` | the whole device pixels per pixel of the art; `0` without a zoom |
+| `display.adaptiveResolution` | the controller: `scale`, `method`, `gpuTime`, `enabled` |
+| `projection.getViewRect()` | the view in units, its pixels per unit, and the shift of `pixelSnap` |
+| `display.onResize(listener)` | every change of size, ratio or zoom — a step of the controller as well |
+
+### What goes together
+
+| combination | result |
+| --- | --- |
+| `pixelZoom` + `pixelSnap` | the cheapest pixel-exact setup |
+| `pixelZoom` + `adaptiveResolution` | the controller holds still: pixel art keeps its size |
+| `pixelZoom` + `maxPixels` | the budget raises the zoom, the pixels of the art get larger |
+| `pixelSnap` + `adaptiveResolution` | **no**: every step changes the zoom, the view grows and shrinks mid-game |
+| `pixelSnap` + `maxPixelRatio` below the screen | **no**: the browser scales the buffer, the pixels come out uneven |
+| projection `pixelZoom` without `pixelSnap` | uneven texels at a fractional ratio, and the pixels of a full buffer |
+| `resolutionScale` above `1` + `maxPixels` | supersampling up to the budget |
+| `antialias` + pixel art | cost without effect |
+
+### The pixel ratio, put together
+
+![The pixel ratio as a chain: the devicePixelRatio, bounded by maxPixelRatio and by the budget of
+maxPixels, times resolutionScale, bounded by the budget once more and rounded down to an eighth
+where the budget or the scale made it; with three worked examples, and a pixelZoom that replaces
+the chain](images/display/display-pixel-ratio.svg)
+
+Without a `pixelZoom`, the display draws at
+
+```text
+min(min(devicePixelRatio, maxPixelRatio, sqrt(maxPixels / cssArea)) × resolutionScale, sqrt(maxPixels / cssArea))
+```
+
+device pixels per CSS pixel, each bound only where it is set. The budget comes in twice: before the
+scale and after it, so a scale above `1` draws beyond `maxPixelRatio` but never beyond `maxPixels`.
+For a scale up to `1` the second bound changes nothing. Where the budget or the scale has made the
+ratio, it is rounded **down to a step of an eighth**, at least an eighth: three builds every render
+target of a pipeline anew with every new size, and in steps the sizes change less often and come
+back to the same values. Where neither has, the ratio stays exact — `devicePixelRatio` itself, or
+`maxPixelRatio` — so a canvas at the ratio of its screen maps one pixel of the buffer onto one
+device pixel. `Display.MaxResolution` (8192) bounds the buffer per axis in the end.
+
+A change of any of these settings takes effect with the next measurement — at the start of the
+next frame, or right away with a `resize()` of your own — and emits `OnDisplayResize`. `width` and
+`height` stay in CSS pixels: stages, cameras and layout notice nothing but a smaller buffer.
+
+## Reference
+
+### The defaults
+
+A `Display` that is told nothing draws at most at **2 device pixels per CSS pixel**
+(`Display.DefaultMaxPixelRatio`) and builds its renderer **without multisampling**. Beyond a ratio
+of 2 a phone screen shows hardly more detail, but a ratio of 3 shades 2.25 times as many pixels.
+Multisampling under a `RenderPipeline` is expensive: the scene pass renders four samples per pixel
+into half floats and resolves them before the bloom even starts.
+
+### A budget of pixels
 
 `maxPixelRatio` bounds the density, not the cost: a 4K screen at a ratio of 1 has 8.3 million
 pixels, and no ratio bound touches it. `maxPixels` bounds the pixels themselves — the display draws
@@ -199,7 +551,7 @@ pixels — and draws a 4K screen at a ratio of 0.5, rounded down from 0.6. Where
 not for pixel art, which takes a `pixelZoom` instead. The budget holds after a `resolutionScale`
 above `1` as well: the 4K screen stays at 0.5 at a scale of 2.
 
-## Resolution scale
+### Resolution scale
 
 `resolutionScale` multiplies the pixel ratio the bounds leave: `0.75` shades 56 % of the pixels.
 It is what `adaptiveResolution` moves, and it may be set by hand — a quality setting, say. It does
@@ -209,46 +561,9 @@ Above `1` it is supersampling: the display draws beyond `maxPixelRatio` — a sc
 times the pixels — but within `maxPixels`. A `maxScale` above `1` lets `adaptiveResolution` go
 there.
 
-## The pixel ratio, put together
+### Adaptive resolution in detail
 
-Without a `pixelZoom`, the display draws at
-
-```text
-min(min(devicePixelRatio, maxPixelRatio, sqrt(maxPixels / cssArea)) × resolutionScale, sqrt(maxPixels / cssArea))
-```
-
-device pixels per CSS pixel, each bound only where it is set. The budget comes in twice: before the
-scale and after it, so a scale above `1` draws beyond `maxPixelRatio` but never beyond `maxPixels`.
-For a scale up to `1` the second bound changes nothing. Where the budget or the scale has
-made the ratio, it is rounded **down to a step of an eighth**, at least an eighth: three builds
-every render target of a pipeline anew with every new size, and in steps the sizes change less often
-and come back to the same values. Where neither has, the ratio stays exact — `devicePixelRatio`
-itself, or `maxPixelRatio` — so a canvas at the ratio of its screen maps one pixel of the buffer
-onto one device pixel. `Display.MaxResolution` (8192) bounds the buffer per axis in the end.
-
-A change of any of these knobs takes effect with the next measurement — at the start of the next
-frame, or right away with a `resize()` of your own — and emits `OnDisplayResize`. `width` and
-`height` stay in CSS pixels: stages, cameras and layout notice nothing but a smaller buffer.
-
-## Adaptive resolution
-
-```ts check
-import {Display} from '@spearwolf/twopoint5d';
-
-const display = new Display(document.querySelector('canvas')!, {adaptiveResolution: true});
-
-const adaptive = display.adaptiveResolution!;
-adaptive.method; //   'gpu-time' or 'frame-pacing', undefined before the first frame
-adaptive.scale; //    the resolutionScale it has set
-adaptive.gpuTime; //  the median GPU time of the frames it judged last, in ms
-
-export {display};
-```
-
-The display builds an `AdaptiveResolution`, which holds **60 frames per second** — or the `maxFps`
-of the display where that is lower — by `resolutionScale`: down a step of an eighth where a frame
-costs more than the target allows, up a step where there is room for the pixels of it, between
-`0.5` and `1`. Options of its own instead of `true`:
+Options of its own instead of `true`:
 
 ```ts check
 import {Display} from '@spearwolf/twopoint5d';
@@ -343,15 +658,15 @@ display.adaptiveResolution; // adaptive: the controller that holds the display
 export {adaptive};
 ```
 
-## Pipelines
+### Pipelines
 
 Every render target of a `RenderPipeline` — the scene pass, the half and smaller targets of a
-bloom — follows the size of the drawing buffer, so every knob above counts for all of them. The
+bloom — follows the size of the drawing buffer, so every setting above counts for all of them. The
 `StageRenderer` leaves its own clear of the target a pipeline draws into to three where
 `renderer.autoClear` covers it: on the canvas that clear would cost a full-screen draw of its own.
 See [the stage cheat-sheet](../src/stage/README.md).
 
-## Measured
+### Measured
 
 The swaying grass of the lookbook — sprites cut out by the alpha test, their shadows and a bloom —
 on an AMD Radeon 610M under WebGL 2, the CSS size of a Pixel 7, 412 × 915 at a ratio of 2.625:
@@ -369,10 +684,10 @@ At 4K and a ratio of 2 the same meadow takes 42 ms a frame; `adaptiveResolution`
 below the budget of 13.3 ms. With the timer extension taken away, `frame-pacing` gets there in four
 steps of about two seconds each.
 
-## Trying it on a phone
+### Trying it on a phone
 
 WebGPU needs a secure context: a page from `http://192.168.…` of the lookbook's dev server runs
 under WebGL 2. `localhost` counts as secure, so the phone reaches WebGPU through
 `adb reverse tcp:4321 tcp:4321` and `http://localhost:4321/lookbook/`. The swaying grass shows
 the drawing buffer, the scale, the method and the GPU time in its `output` folder; the sine
-scroller fits its pixel art with the zoom above.
+scroller fits its pixel art with a display zoom, the platformer with `pixelSnap`.

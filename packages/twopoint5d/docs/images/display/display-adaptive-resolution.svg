@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="400" viewBox="0 0 760 400" role="img" aria-labelledby="title">
+<title id="title">adaptiveResolution at work, schematic</title>
+<style>
+  .bg { fill: #ffffff; }
+  .ink { fill: #1f2328; }
+  .muted { fill: #59636e; }
+  .line { stroke: #1f2328; }
+  .grid { stroke: #d0d7de; }
+  .panel { fill: #f6f8fa; stroke: #d0d7de; }
+  .blue { fill: #0969da; } .s-blue { stroke: #0969da; }
+  .amber { fill: #9a6700; } .s-amber { stroke: #9a6700; }
+  .green { fill: #1a7f37; } .s-green { stroke: #1a7f37; }
+  .purple { fill: #8250df; } .s-purple { stroke: #8250df; }
+  .purple2 { fill: #d8b9ff; }
+  .red { fill: #cf222e; } .s-red { stroke: #cf222e; }
+  .t { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 13px; }
+  .small { font-size: 11.5px; }
+  .b { font-weight: 600; }
+  .h { font-size: 15px; font-weight: 600; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .ink { fill: #e6edf3; }
+    .muted { fill: #9198a1; }
+    .line { stroke: #e6edf3; }
+    .grid { stroke: #3d444d; }
+    .panel { fill: #151b23; stroke: #3d444d; }
+    .blue { fill: #4493f8; } .s-blue { stroke: #4493f8; }
+    .amber { fill: #d29922; } .s-amber { stroke: #d29922; }
+    .green { fill: #3fb950; } .s-green { stroke: #3fb950; }
+    .purple { fill: #ab7df8; } .s-purple { stroke: #ab7df8; }
+    .purple2 { fill: #4c2889; }
+    .red { fill: #f85149; } .s-red { stroke: #f85149; }
+  }
+</style>
+<rect class="bg" width="760" height="400" rx="8"/>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="muted"/></marker></defs>
+<text x="20" y="30" class="t ink h" text-anchor="start">adaptiveResolution at work (gpu-time, schematic)</text>
+<text x="20" y="50" class="t muted small" text-anchor="start">one bar per window of 12 measured frames; after every step, 30 frames settle before the next window counts</text>
+<line class="grid" x1="70" y1="228.0" x2="730" y2="228.0" stroke-width="0.6"/>
+<text x="62" y="232" class="t muted small" text-anchor="end">0</text>
+<line class="grid" x1="70" y1="196.9" x2="730" y2="196.9" stroke-width="0.6"/>
+<text x="62" y="200.889" class="t muted small" text-anchor="end">10</text>
+<line class="grid" x1="70" y1="165.8" x2="730" y2="165.8" stroke-width="0.6"/>
+<text x="62" y="169.778" class="t muted small" text-anchor="end">20</text>
+<line class="grid" x1="70" y1="134.7" x2="730" y2="134.7" stroke-width="0.6"/>
+<text x="62" y="138.667" class="t muted small" text-anchor="end">30</text>
+<line class="grid" x1="70" y1="103.6" x2="730" y2="103.6" stroke-width="0.6"/>
+<text x="62" y="107.556" class="t muted small" text-anchor="end">40</text>
+<text x="20" y="82" class="t muted small" text-anchor="start">GPU ms</text>
+<rect class="red" x="79.0" y="97.3" width="29.2" height="130.7" rx="2" fill-opacity="0.85"/>
+<rect class="red" x="126.1" y="154.6" width="29.2" height="73.4" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="173.2" y="192.5" width="29.2" height="35.5" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="220.4" y="193.8" width="29.2" height="34.2" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="267.5" y="193.2" width="29.2" height="34.8" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="314.7" y="212.4" width="29.2" height="15.6" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="361.8" y="212.1" width="29.2" height="15.9" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="409.0" y="212.8" width="29.2" height="15.2" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="456.1" y="203.7" width="29.2" height="24.3" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="503.2" y="204.0" width="29.2" height="24.0" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="550.4" y="203.4" width="29.2" height="24.6" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="597.5" y="193.2" width="29.2" height="34.8" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="644.7" y="192.8" width="29.2" height="35.2" rx="2" fill-opacity="0.85"/>
+<rect class="green" x="691.8" y="193.5" width="29.2" height="34.5" rx="2" fill-opacity="0.85"/>
+<line class="s-amber" x1="70" y1="186.6" x2="730" y2="186.6" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="730" y="180.622" class="t amber small b" text-anchor="end">budget 13.3 ms: 80 % of 1/60 s</text>
+<line class="s-red" x1="70" y1="165.8" x2="730" y2="165.8" stroke-width="1" stroke-dasharray="2 3"/>
+<text x="730" y="159.778" class="t red small" text-anchor="end">1.5 × budget: two steps down at once</text>
+<text x="376.429" y="200" class="t muted small" text-anchor="middle">the scene gets lighter</text>
+<line class="grid" x1="70" y1="352.0" x2="730" y2="352.0" stroke-width="0.6"/>
+<text x="62" y="356" class="t muted small" text-anchor="end">0.5</text>
+<line class="grid" x1="70" y1="331.5" x2="730" y2="331.5" stroke-width="0.6"/>
+<text x="62" y="335.5" class="t muted small" text-anchor="end">0.625</text>
+<line class="grid" x1="70" y1="311.0" x2="730" y2="311.0" stroke-width="0.6"/>
+<text x="62" y="315" class="t muted small" text-anchor="end">0.75</text>
+<line class="grid" x1="70" y1="290.5" x2="730" y2="290.5" stroke-width="0.6"/>
+<text x="62" y="294.5" class="t muted small" text-anchor="end">0.875</text>
+<line class="grid" x1="70" y1="270.0" x2="730" y2="270.0" stroke-width="0.6"/>
+<text x="62" y="274" class="t muted small" text-anchor="end">1</text>
+<text x="20" y="258" class="t muted small" text-anchor="start">resolutionScale</text>
+<polyline class="s-blue" fill="none" stroke-width="2.5" points="70.0,270.0 117.1,270.0 117.1,311.0 164.3,311.0 164.3,352.0 211.4,352.0 211.4,352.0 258.6,352.0 258.6,352.0 305.7,352.0 305.7,352.0 352.9,352.0 352.9,352.0 400.0,352.0 400.0,352.0 447.1,352.0 447.1,331.5 494.3,331.5 494.3,331.5 541.4,331.5 541.4,331.5 588.6,331.5 588.6,311.0 635.7,311.0 635.7,311.0 682.9,311.0 682.9,311.0 730.0,311.0"/>
+<text x="123.143" y="290.5" class="t muted small" text-anchor="start">−2 steps</text>
+<text x="170.286" y="321.25" class="t muted small" text-anchor="start">−2 more, held at minScale</text>
+<text x="441.143" y="341.75" class="t muted small" text-anchor="end">+1 after 3 windows below 90 %</text>
+<text x="582.571" y="321.25" class="t muted small" text-anchor="end">+1</text>
+<text x="659.286" y="301" class="t muted small" text-anchor="middle">0.875 would not fit: holds</text>
+
+</svg>

@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="372" viewBox="0 0 760 372" role="img" aria-labelledby="title">
+<title id="title">Which setup of the Display fits</title>
+<style>
+  .bg { fill: #ffffff; }
+  .ink { fill: #1f2328; }
+  .muted { fill: #59636e; }
+  .line { stroke: #1f2328; }
+  .grid { stroke: #d0d7de; }
+  .panel { fill: #f6f8fa; stroke: #d0d7de; }
+  .blue { fill: #0969da; } .s-blue { stroke: #0969da; }
+  .amber { fill: #9a6700; } .s-amber { stroke: #9a6700; }
+  .green { fill: #1a7f37; } .s-green { stroke: #1a7f37; }
+  .purple { fill: #8250df; } .s-purple { stroke: #8250df; }
+  .purple2 { fill: #d8b9ff; }
+  .red { fill: #cf222e; } .s-red { stroke: #cf222e; }
+  .t { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 13px; }
+  .small { font-size: 11.5px; }
+  .b { font-weight: 600; }
+  .h { font-size: 15px; font-weight: 600; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .ink { fill: #e6edf3; }
+    .muted { fill: #9198a1; }
+    .line { stroke: #e6edf3; }
+    .grid { stroke: #3d444d; }
+    .panel { fill: #151b23; stroke: #3d444d; }
+    .blue { fill: #4493f8; } .s-blue { stroke: #4493f8; }
+    .amber { fill: #d29922; } .s-amber { stroke: #d29922; }
+    .green { fill: #3fb950; } .s-green { stroke: #3fb950; }
+    .purple { fill: #ab7df8; } .s-purple { stroke: #ab7df8; }
+    .purple2 { fill: #4c2889; }
+    .red { fill: #f85149; } .s-red { stroke: #f85149; }
+  }
+</style>
+<rect class="bg" width="760" height="372" rx="8"/>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="muted"/></marker></defs>
+<text x="20" y="30" class="t ink h" text-anchor="start">Which setup?</text>
+<rect class="panel " x="20" y="158" width="150" height="56" rx="8"/>
+<text x="32" y="180" class="t ink b" text-anchor="start">What do you draw?</text>
+<path d="M170,176 C200,176 200,96 228,96" class="line" fill="none" stroke-width="1.2" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<text x="204" y="110" class="t muted small" text-anchor="end">pixel art</text>
+<rect class="panel " x="230" y="64" width="220" height="64" rx="8"/>
+<text x="242" y="86" class="t ink b" text-anchor="start">Does the whole picture</text>
+<text x="242" y="104" class="t ink b" text-anchor="start">live on the grid of the art?</text>
+<path d="M450,84 C474,84 474,52 498,52" class="line" fill="none" stroke-width="1.2" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<text x="456" y="58" class="t muted small" text-anchor="start">yes</text>
+<rect class="panel s-purple" x="500" y="14" width="240" height="78" rx="8" stroke-width="2"/>
+<text x="512" y="36" class="t purple b" text-anchor="start">Pixel art, cheapest</text>
+<text x="512" y="54" class="t code ink" text-anchor="start">display.pixelZoom</text>
+<text x="512" y="72" class="t muted small" text-anchor="start">→ “Pixel art in three settings”</text>
+<path d="M450,112 C474,112 474,142 498,142" class="line" fill="none" stroke-width="1.2" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<text x="482" y="124" class="t muted small" text-anchor="start">no</text>
+<rect class="panel s-purple" x="500" y="104" width="240" height="94" rx="8" stroke-width="2"/>
+<text x="512" y="126" class="t purple b" text-anchor="start">Pixel art at full resolution</text>
+<text x="512" y="144" class="t code ink" text-anchor="start">pixelSnap: true</text>
+<text x="512" y="162" class="t muted small" text-anchor="start">smooth layers, parallax depth or</text>
+<text x="512" y="180" class="t muted small" text-anchor="start">sharp text beside the art</text>
+<path d="M170,196 C200,196 200,280 228,280" class="line" fill="none" stroke-width="1.2" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<text x="92" y="240" class="t muted small" text-anchor="start">smooth images, 3D</text>
+<rect class="panel " x="230" y="248" width="220" height="64" rx="8"/>
+<text x="242" y="270" class="t ink b" text-anchor="start">What gives way when</text>
+<text x="242" y="288" class="t ink b" text-anchor="start">the GPU runs out of time?</text>
+<path d="M450,268 C474,268 474,246 498,246" class="line" fill="none" stroke-width="1.2" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<text x="446" y="246" class="t muted small" text-anchor="start">detail</text>
+<rect class="panel s-green" x="500" y="212" width="240" height="72" rx="8" stroke-width="2"/>
+<text x="512" y="234" class="t green b" text-anchor="start">A fast display</text>
+<text x="512" y="252" class="t code ink" text-anchor="start">adaptiveResolution: true</text>
+<text x="512" y="270" class="t muted small" text-anchor="start">holds 60 fps by the resolution</text>
+<path d="M450,294 C474,294 474,328 498,328" class="line" fill="none" stroke-width="1.2" stroke-opacity="0.55" marker-end="url(#arr)"/>
+<text x="420" y="336" class="t muted small" text-anchor="start">frame rate</text>
+<rect class="panel s-blue" x="500" y="296" width="240" height="72" rx="8" stroke-width="2"/>
+<text x="512" y="318" class="t blue b" text-anchor="start">A premium display</text>
+<text x="512" y="336" class="t code ink" text-anchor="start">maxPixelRatio: 0</text>
+<text x="512" y="354" class="t muted small" text-anchor="start">every device pixel, sharp as it gets</text>
+
+</svg>

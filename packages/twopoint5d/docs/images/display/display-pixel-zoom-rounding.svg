@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="244" viewBox="0 0 760 244" role="img" aria-labelledby="title">
+<title id="title">A display pixelZoom rounds to whole device pixels</title>
+<style>
+  .bg { fill: #ffffff; }
+  .ink { fill: #1f2328; }
+  .muted { fill: #59636e; }
+  .line { stroke: #1f2328; }
+  .grid { stroke: #d0d7de; }
+  .panel { fill: #f6f8fa; stroke: #d0d7de; }
+  .blue { fill: #0969da; } .s-blue { stroke: #0969da; }
+  .amber { fill: #9a6700; } .s-amber { stroke: #9a6700; }
+  .green { fill: #1a7f37; } .s-green { stroke: #1a7f37; }
+  .purple { fill: #8250df; } .s-purple { stroke: #8250df; }
+  .purple2 { fill: #d8b9ff; }
+  .red { fill: #cf222e; } .s-red { stroke: #cf222e; }
+  .t { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 13px; }
+  .small { font-size: 11.5px; }
+  .b { font-weight: 600; }
+  .h { font-size: 15px; font-weight: 600; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .ink { fill: #e6edf3; }
+    .muted { fill: #9198a1; }
+    .line { stroke: #e6edf3; }
+    .grid { stroke: #3d444d; }
+    .panel { fill: #151b23; stroke: #3d444d; }
+    .blue { fill: #4493f8; } .s-blue { stroke: #4493f8; }
+    .amber { fill: #d29922; } .s-amber { stroke: #d29922; }
+    .green { fill: #3fb950; } .s-green { stroke: #3fb950; }
+    .purple { fill: #ab7df8; } .s-purple { stroke: #ab7df8; }
+    .purple2 { fill: #4c2889; }
+    .red { fill: #f85149; } .s-red { stroke: #f85149; }
+  }
+</style>
+<rect class="bg" width="760" height="244" rx="8"/>
+<text x="20" y="30" class="t ink h" text-anchor="start">pixelZoom 2 on a screen of devicePixelRatio 2.625</text>
+<text x="20" y="50" class="t muted small" text-anchor="start">one strip of 26 device pixels; each coloured run is one pixel of the art, the number its width in device pixels</text>
+<text x="40" y="82" class="t ink small" text-anchor="start">unrounded: 2 × 2.625 = 5.25 device pixels per pixel — uneven widths</text>
+<rect class="purple" x="40.00" y="90" width="130.00" height="36.40"/>
+<text x="105" y="142.4" class="t muted" text-anchor="middle">5</text>
+<rect class="purple2" x="170.00" y="90" width="130.00" height="36.40"/>
+<text x="235" y="142.4" class="t muted" text-anchor="middle">5</text>
+<rect class="purple" x="300.00" y="90" width="130.00" height="36.40"/>
+<text x="365" y="142.4" class="t muted" text-anchor="middle">5</text>
+<rect class="purple2" x="430.00" y="90" width="156.00" height="36.40"/>
+<text x="508" y="142.4" class="t red b" text-anchor="middle">6</text>
+<rect class="purple" x="586.00" y="90" width="130.00" height="36.40"/>
+<text x="651" y="142.4" class="t muted" text-anchor="middle">5</text>
+<line class="line" x1="40" y1="90" x2="40" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="66" y1="90" x2="66" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="92" y1="90" x2="92" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="118" y1="90" x2="118" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="144" y1="90" x2="144" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="170" y1="90" x2="170" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="196" y1="90" x2="196" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="222" y1="90" x2="222" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="248" y1="90" x2="248" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="274" y1="90" x2="274" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="300" y1="90" x2="300" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="326" y1="90" x2="326" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="352" y1="90" x2="352" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="378" y1="90" x2="378" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="404" y1="90" x2="404" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="430" y1="90" x2="430" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="456" y1="90" x2="456" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="482" y1="90" x2="482" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="508" y1="90" x2="508" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="534" y1="90" x2="534" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="560" y1="90" x2="560" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="586" y1="90" x2="586" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="612" y1="90" x2="612" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="638" y1="90" x2="638" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="664" y1="90" x2="664" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="690" y1="90" x2="690" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="716" y1="90" x2="716" y2="126.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<rect x="40" y="90" width="676" height="36.40" fill="none" class="line" stroke-width="0.8" stroke-opacity="0.5"/>
+<text x="40" y="172" class="t ink small" text-anchor="start">the Display: devicePixelZoom = ⌊5.25⌋ = 5 — every pixel 5 device pixels wide</text>
+<rect class="purple" x="40.00" y="180" width="130.00" height="36.40"/>
+<text x="105" y="232.4" class="t muted" text-anchor="middle">5</text>
+<rect class="purple2" x="170.00" y="180" width="130.00" height="36.40"/>
+<text x="235" y="232.4" class="t muted" text-anchor="middle">5</text>
+<rect class="purple" x="300.00" y="180" width="130.00" height="36.40"/>
+<text x="365" y="232.4" class="t muted" text-anchor="middle">5</text>
+<rect class="purple2" x="430.00" y="180" width="130.00" height="36.40"/>
+<text x="495" y="232.4" class="t muted" text-anchor="middle">5</text>
+<rect class="purple" x="560.00" y="180" width="130.00" height="36.40"/>
+<text x="625" y="232.4" class="t muted" text-anchor="middle">5</text>
+<line class="line" x1="40" y1="180" x2="40" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="66" y1="180" x2="66" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="92" y1="180" x2="92" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="118" y1="180" x2="118" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="144" y1="180" x2="144" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="170" y1="180" x2="170" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="196" y1="180" x2="196" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="222" y1="180" x2="222" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="248" y1="180" x2="248" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="274" y1="180" x2="274" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="300" y1="180" x2="300" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="326" y1="180" x2="326" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="352" y1="180" x2="352" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="378" y1="180" x2="378" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="404" y1="180" x2="404" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="430" y1="180" x2="430" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="456" y1="180" x2="456" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="482" y1="180" x2="482" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="508" y1="180" x2="508" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="534" y1="180" x2="534" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="560" y1="180" x2="560" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="586" y1="180" x2="586" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="612" y1="180" x2="612" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="638" y1="180" x2="638" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="664" y1="180" x2="664" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="690" y1="180" x2="690" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="716" y1="180" x2="716" y2="216.4" stroke-width="0.6" stroke-opacity="0.35"/>
+<rect x="40" y="180" width="676" height="36.40" fill="none" class="line" stroke-width="0.8" stroke-opacity="0.5"/>
+<text x="703" y="236" class="t muted small" text-anchor="middle">1 px short</text>
+
+</svg>

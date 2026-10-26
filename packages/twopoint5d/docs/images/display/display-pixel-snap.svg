@@ -1,0 +1,218 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="430" viewBox="0 0 760 430" role="img" aria-labelledby="title">
+<title id="title">What pixelSnap fixes: the zoom and the edge of the view</title>
+<style>
+  .bg { fill: #ffffff; }
+  .ink { fill: #1f2328; }
+  .muted { fill: #59636e; }
+  .line { stroke: #1f2328; }
+  .grid { stroke: #d0d7de; }
+  .panel { fill: #f6f8fa; stroke: #d0d7de; }
+  .blue { fill: #0969da; } .s-blue { stroke: #0969da; }
+  .amber { fill: #9a6700; } .s-amber { stroke: #9a6700; }
+  .green { fill: #1a7f37; } .s-green { stroke: #1a7f37; }
+  .purple { fill: #8250df; } .s-purple { stroke: #8250df; }
+  .purple2 { fill: #d8b9ff; }
+  .red { fill: #cf222e; } .s-red { stroke: #cf222e; }
+  .t { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 13px; }
+  .small { font-size: 11.5px; }
+  .b { font-weight: 600; }
+  .h { font-size: 15px; font-weight: 600; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .ink { fill: #e6edf3; }
+    .muted { fill: #9198a1; }
+    .line { stroke: #e6edf3; }
+    .grid { stroke: #3d444d; }
+    .panel { fill: #151b23; stroke: #3d444d; }
+    .blue { fill: #4493f8; } .s-blue { stroke: #4493f8; }
+    .amber { fill: #d29922; } .s-amber { stroke: #d29922; }
+    .green { fill: #3fb950; } .s-green { stroke: #3fb950; }
+    .purple { fill: #ab7df8; } .s-purple { stroke: #ab7df8; }
+    .purple2 { fill: #4c2889; }
+    .red { fill: #f85149; } .s-red { stroke: #f85149; }
+  }
+</style>
+<rect class="bg" width="760" height="430" rx="8"/>
+<text x="20" y="30" class="t ink h" text-anchor="start">What pixelSnap fixes</text>
+<text x="20" y="50" class="t muted small" text-anchor="start">a strip of pixels of the drawing buffer; each coloured run is one texel of the art as the GPU samples it</text>
+<text x="40" y="82" class="t ink small" text-anchor="start">1 · the zoom: 2 CSS pixels at a pixel ratio of 1.25 are 2.5 buffer pixels — texels 2 and 3 wide by turns</text>
+<rect class="purple" x="40.00" y="90" width="60.00" height="42.00"/>
+<text x="70" y="148" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="100.00" y="90" width="90.00" height="42.00"/>
+<text x="145" y="148" class="t red b" text-anchor="middle">3</text>
+<rect class="purple" x="190.00" y="90" width="60.00" height="42.00"/>
+<text x="220" y="148" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="250.00" y="90" width="90.00" height="42.00"/>
+<text x="295" y="148" class="t red b" text-anchor="middle">3</text>
+<rect class="purple" x="340.00" y="90" width="60.00" height="42.00"/>
+<text x="370" y="148" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="400.00" y="90" width="90.00" height="42.00"/>
+<text x="445" y="148" class="t red b" text-anchor="middle">3</text>
+<rect class="purple" x="490.00" y="90" width="60.00" height="42.00"/>
+<text x="520" y="148" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="550.00" y="90" width="90.00" height="42.00"/>
+<text x="595" y="148" class="t red b" text-anchor="middle">3</text>
+<rect class="purple" x="640.00" y="90" width="60.00" height="42.00"/>
+<text x="670" y="148" class="t muted" text-anchor="middle">2</text>
+<line class="line" x1="40" y1="90" x2="40" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="70" y1="90" x2="70" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="100" y1="90" x2="100" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="130" y1="90" x2="130" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="160" y1="90" x2="160" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="190" y1="90" x2="190" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="220" y1="90" x2="220" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="250" y1="90" x2="250" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="280" y1="90" x2="280" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="310" y1="90" x2="310" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="340" y1="90" x2="340" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="370" y1="90" x2="370" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="400" y1="90" x2="400" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="430" y1="90" x2="430" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="460" y1="90" x2="460" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="490" y1="90" x2="490" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="520" y1="90" x2="520" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="550" y1="90" x2="550" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="580" y1="90" x2="580" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="610" y1="90" x2="610" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="640" y1="90" x2="640" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="670" y1="90" x2="670" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="700" y1="90" x2="700" y2="132.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<rect x="40" y="90" width="660" height="42.00" fill="none" class="line" stroke-width="0.8" stroke-opacity="0.5"/>
+<text x="40" y="176" class="t ink small" text-anchor="start">pixelSnap: the zoom rounded down to ⌊2.5⌋ = 2 buffer pixels — every texel alike</text>
+<rect class="purple" x="40.00" y="184" width="60.00" height="42.00"/>
+<text x="70" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="100.00" y="184" width="60.00" height="42.00"/>
+<text x="130" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple" x="160.00" y="184" width="60.00" height="42.00"/>
+<text x="190" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="220.00" y="184" width="60.00" height="42.00"/>
+<text x="250" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple" x="280.00" y="184" width="60.00" height="42.00"/>
+<text x="310" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="340.00" y="184" width="60.00" height="42.00"/>
+<text x="370" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple" x="400.00" y="184" width="60.00" height="42.00"/>
+<text x="430" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="460.00" y="184" width="60.00" height="42.00"/>
+<text x="490" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple" x="520.00" y="184" width="60.00" height="42.00"/>
+<text x="550" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple2" x="580.00" y="184" width="60.00" height="42.00"/>
+<text x="610" y="242" class="t muted" text-anchor="middle">2</text>
+<rect class="purple" x="640.00" y="184" width="60.00" height="42.00"/>
+<text x="670" y="242" class="t muted" text-anchor="middle">2</text>
+<line class="line" x1="40" y1="184" x2="40" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="70" y1="184" x2="70" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="100" y1="184" x2="100" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="130" y1="184" x2="130" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="160" y1="184" x2="160" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="190" y1="184" x2="190" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="220" y1="184" x2="220" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="250" y1="184" x2="250" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="280" y1="184" x2="280" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="310" y1="184" x2="310" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="340" y1="184" x2="340" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="370" y1="184" x2="370" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="400" y1="184" x2="400" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="430" y1="184" x2="430" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="460" y1="184" x2="460" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="490" y1="184" x2="490" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="520" y1="184" x2="520" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="550" y1="184" x2="550" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="580" y1="184" x2="580" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="610" y1="184" x2="610" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="640" y1="184" x2="640" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="670" y1="184" x2="670" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="700" y1="184" x2="700" y2="226.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<rect x="40" y="184" width="660" height="42.00" fill="none" class="line" stroke-width="0.8" stroke-opacity="0.5"/>
+<text x="40" y="272" class="t ink small" text-anchor="start">2 · the edge: a view 7 units wide, centred, starts at −3.5 — at a zoom of 3 the texels sit 1.5 pixels off the grid</text>
+<rect class="purple2" x="40.00" y="280" width="45.00" height="42.00"/>
+<rect class="purple" x="85.00" y="280" width="90.00" height="42.00"/>
+<rect class="purple2" x="175.00" y="280" width="90.00" height="42.00"/>
+<rect class="purple" x="265.00" y="280" width="90.00" height="42.00"/>
+<rect class="purple2" x="355.00" y="280" width="90.00" height="42.00"/>
+<rect class="purple" x="445.00" y="280" width="90.00" height="42.00"/>
+<rect class="purple2" x="535.00" y="280" width="90.00" height="42.00"/>
+<rect class="purple" x="625.00" y="280" width="75.00" height="42.00"/>
+<line class="line" x1="40" y1="280" x2="40" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="70" y1="280" x2="70" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="100" y1="280" x2="100" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="130" y1="280" x2="130" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="160" y1="280" x2="160" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="190" y1="280" x2="190" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="220" y1="280" x2="220" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="250" y1="280" x2="250" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="280" y1="280" x2="280" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="310" y1="280" x2="310" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="340" y1="280" x2="340" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="370" y1="280" x2="370" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="400" y1="280" x2="400" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="430" y1="280" x2="430" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="460" y1="280" x2="460" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="490" y1="280" x2="490" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="520" y1="280" x2="520" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="550" y1="280" x2="550" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="580" y1="280" x2="580" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="610" y1="280" x2="610" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="640" y1="280" x2="640" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="670" y1="280" x2="670" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="700" y1="280" x2="700" y2="322.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<circle class="ink" cx="55.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="red" cx="85.0" cy="301.0" r="4" fill-opacity="1"/>
+<circle class="ink" cx="115.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="ink" cx="145.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="red" cx="175.0" cy="301.0" r="4" fill-opacity="1"/>
+<circle class="ink" cx="205.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="ink" cx="235.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="red" cx="265.0" cy="301.0" r="4" fill-opacity="1"/>
+<circle class="ink" cx="295.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="ink" cx="325.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="red" cx="355.0" cy="301.0" r="4" fill-opacity="1"/>
+<circle class="ink" cx="385.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="ink" cx="415.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="red" cx="445.0" cy="301.0" r="4" fill-opacity="1"/>
+<circle class="ink" cx="475.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="ink" cx="505.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="red" cx="535.0" cy="301.0" r="4" fill-opacity="1"/>
+<circle class="ink" cx="565.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="ink" cx="595.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="red" cx="625.0" cy="301.0" r="4" fill-opacity="1"/>
+<circle class="ink" cx="655.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<circle class="ink" cx="685.0" cy="301.0" r="2" fill-opacity="0.45"/>
+<text x="40" y="340" class="t red small" text-anchor="start">every third pixel centre (red) falls on a texel edge: rounding decides its texel, and the art shimmers as the camera moves</text>
+<text x="40" y="372" class="t ink small" text-anchor="start">pixelSnap: the left edge at −⌊7 / 2⌋ = −3 — texel edges on pixel edges, the centre of the view one unit right of the camera</text>
+<rect class="purple" x="40.00" y="380" width="90.00" height="42.00"/>
+<rect class="purple2" x="130.00" y="380" width="90.00" height="42.00"/>
+<rect class="purple" x="220.00" y="380" width="90.00" height="42.00"/>
+<rect class="purple2" x="310.00" y="380" width="90.00" height="42.00"/>
+<rect class="purple" x="400.00" y="380" width="90.00" height="42.00"/>
+<rect class="purple2" x="490.00" y="380" width="90.00" height="42.00"/>
+<rect class="purple" x="580.00" y="380" width="90.00" height="42.00"/>
+<rect class="purple2" x="670.00" y="380" width="30.00" height="42.00"/>
+<line class="line" x1="40" y1="380" x2="40" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="70" y1="380" x2="70" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="100" y1="380" x2="100" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="130" y1="380" x2="130" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="160" y1="380" x2="160" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="190" y1="380" x2="190" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="220" y1="380" x2="220" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="250" y1="380" x2="250" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="280" y1="380" x2="280" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="310" y1="380" x2="310" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="340" y1="380" x2="340" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="370" y1="380" x2="370" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="400" y1="380" x2="400" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="430" y1="380" x2="430" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="460" y1="380" x2="460" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="490" y1="380" x2="490" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="520" y1="380" x2="520" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="550" y1="380" x2="550" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="580" y1="380" x2="580" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="610" y1="380" x2="610" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="640" y1="380" x2="640" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="670" y1="380" x2="670" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<line class="line" x1="700" y1="380" x2="700" y2="422.0" stroke-width="0.6" stroke-opacity="0.35"/>
+<rect x="40" y="380" width="660" height="42.00" fill="none" class="line" stroke-width="0.8" stroke-opacity="0.5"/>
+
+</svg>
