@@ -59,6 +59,8 @@ interface TargetStub extends EventTargetStub {
 
 let doc: DocStub;
 let host: DisplayFullscreenHost;
+// the window of the host; a test gives it a screen and a matchMedia where it needs them
+let view: {screen?: unknown; matchMedia?: unknown};
 let defaultTarget: TargetStub;
 let emitted: DisplayFullscreenChangeProps[];
 let warn: Mock;
@@ -111,9 +113,10 @@ describe('DisplayFullscreen', () => {
     doc = makeDoc();
     defaultTarget = makeTarget('default');
     emitted = [];
+    view = {};
     host = {
       doc: doc as unknown as Document,
-      view: {} as Window & typeof globalThis,
+      view: view as unknown as Window & typeof globalThis,
       defaultElement: () => asElement(defaultTarget),
       emit: (props) => {
         emitted.push(props);
@@ -339,6 +342,86 @@ describe('DisplayFullscreen', () => {
 
       await expect(fs.request()).resolves.toBe(false);
       expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+    });
+  });
+  describe('orientationLock', () => {
+    interface OrientationStub extends EventTargetStub {
+      type: string;
+      lock: Mock<(type: string) => Promise<void>>;
+      unlock: Mock<() => void>;
+    }
+
+    let orientation: OrientationStub;
+
+    beforeEach(() => {
+      orientation = makeEventTarget() as OrientationStub;
+      orientation.type = 'portrait-primary';
+      orientation.lock = vi.fn(() => Promise.resolve());
+      orientation.unlock = vi.fn();
+      view.screen = {orientation};
+    });
+
+    it('locks the screen after native fullscreen is entered', async () => {
+      const fs = make({orientationLock: 'landscape'});
+      expect(fs.orientationLock).toBe('landscape');
+
+      await fs.request();
+
+      expect(orientation.lock).toHaveBeenCalledWith('landscape');
+    });
+
+    it('does not lock without orientationLock', async () => {
+      const fs = make();
+      await fs.request();
+      expect(orientation.lock).not.toHaveBeenCalled();
+    });
+
+    it('unlocks after leaving', async () => {
+      const fs = make({orientationLock: 'landscape'});
+      await fs.request();
+      await Promise.resolve();
+
+      await fs.exit();
+
+      expect(orientation.unlock).toHaveBeenCalledTimes(1);
+    });
+
+    it('unlocks only where it locked', async () => {
+      orientation.lock.mockImplementation(() => Promise.reject(new DOMException('no', 'NotSupportedError')));
+      const fs = make({orientationLock: 'landscape'});
+      await fs.request();
+      await Promise.resolve();
+
+      await fs.exit();
+
+      expect(orientation.unlock).not.toHaveBeenCalled();
+    });
+
+    it('swallows a refused lock without a warning', async () => {
+      orientation.lock.mockImplementation(() => Promise.reject(new DOMException('no', 'NotSupportedError')));
+      const fs = make({orientationLock: 'landscape'});
+
+      await expect(fs.request()).resolves.toBe(true);
+      await Promise.resolve();
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('a window without screen.orientation.lock enters fullscreen all the same', async () => {
+      view.screen = {orientation: {type: 'portrait-primary'}};
+      const fs = make({orientationLock: 'landscape'});
+
+      await expect(fs.request()).resolves.toBe(true);
+    });
+
+    it('dispose() undoes a lock it set', async () => {
+      const fs = make({orientationLock: 'landscape'});
+      await fs.request();
+      await Promise.resolve();
+
+      fs.dispose();
+
+      expect(orientation.unlock).toHaveBeenCalledTimes(1);
     });
   });
 });

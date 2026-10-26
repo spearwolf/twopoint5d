@@ -1,5 +1,5 @@
 import type {Display} from './Display.js';
-import type {DisplayFullscreenChangeProps, DisplayFullscreenOptions, FullscreenMode} from './types.js';
+import type {DisplayFullscreenChangeProps, DisplayFullscreenOptions, DisplayOrientationLock, FullscreenMode} from './types.js';
 
 // the warnings to the developer go out once per page, as the one about Display.MaxResolution
 let refusedWarningWasShown = false;
@@ -33,6 +33,12 @@ function warnUnavailable(): void {
 // where the document would name the shadow host
 function fullscreenElementOfRoot(element: HTMLElement): Element | null | undefined {
   return (element.getRootNode?.() as Partial<DocumentOrShadowRoot> | undefined)?.fullscreenElement;
+}
+
+// lock() and unlock() of `screen.orientation`, which the DOM lib of TypeScript does not carry
+interface LockableOrientation {
+  lock?(orientation: DisplayOrientationLock): Promise<void>;
+  unlock?(): void;
 }
 
 /** Who entered the fullscreen this controller holds. */
@@ -74,6 +80,13 @@ export class DisplayFullscreen {
   /** Passed to `requestFullscreen()`. Default `'hide'`. */
   navigationUI: 'auto' | 'hide' | 'show';
 
+  /**
+   * Locks the screen through `screen.orientation.lock()` once native fullscreen is entered, and
+   * unlocks it once that is left. A lock the browser refuses is dropped without a word: the lock
+   * is a wish, not a contract.
+   */
+  orientationLock: DisplayOrientationLock | undefined;
+
   readonly #host: DisplayFullscreenHost;
 
   #element?: HTMLElement;
@@ -91,6 +104,9 @@ export class DisplayFullscreen {
   #emittedMode: FullscreenMode | undefined;
   #emittedArmed = false;
 
+  // the screen is locked by this controller
+  #locked = false;
+
   #disposed = false;
 
   readonly #onFullscreenChange = (): void => {
@@ -102,6 +118,7 @@ export class DisplayFullscreen {
     this.#host = host;
     this.#element = options?.element;
     this.navigationUI = options?.navigationUI ?? 'hide';
+    this.orientationLock = options?.orientationLock;
 
     host.doc.addEventListener('fullscreenchange', this.#onFullscreenChange);
   }
@@ -189,6 +206,7 @@ export class DisplayFullscreen {
       }
     }
 
+    this.#unlock();
     this.#host.doc.removeEventListener('fullscreenchange', this.#onFullscreenChange);
     this.#activeElement = undefined;
     this.#entered = undefined;
@@ -227,6 +245,7 @@ export class DisplayFullscreen {
     return pending.then(
       () => {
         this.#syncState();
+        if (this.#nativeElement() != null) this.#lock();
         return this.isActive;
       },
       () => {
@@ -250,9 +269,47 @@ export class DisplayFullscreen {
     } else if (this.#activeElement != null) {
       this.#activeElement = undefined;
       this.#entered = undefined;
+      this.#unlock();
     }
 
     this.#emitIfChanged();
+  }
+
+  #orientation(): LockableOrientation | undefined {
+    return this.#host.view.screen?.orientation as LockableOrientation | undefined;
+  }
+
+  #lock(): void {
+    const type = this.orientationLock;
+    const lock = this.#orientation()?.lock;
+    if (type == null || typeof lock !== 'function') return;
+    try {
+      lock.call(this.#orientation(), type).then(
+        () => {
+          // a fullscreen that was left while the lock was pending gets no lock left behind
+          if (this.#disposed || this.#nativeElement() == null) {
+            this.#orientation()?.unlock?.();
+          } else {
+            this.#locked = true;
+          }
+        },
+        () => {
+          // iOS, a desktop, a browser that wants something else first: the lock is a wish
+        },
+      );
+    } catch {
+      // the same, refused at once
+    }
+  }
+
+  #unlock(): void {
+    if (!this.#locked) return;
+    this.#locked = false;
+    try {
+      this.#orientation()?.unlock?.();
+    } catch {
+      // nothing is locked that could stay locked
+    }
   }
 
   #emitIfChanged(): void {
