@@ -2464,6 +2464,40 @@ describe('Display', () => {
       Object.assign(canvas, {getRootNode: () => doc, parentElement: parent});
     }
 
+    describe('resize-to="fullscreen"', () => {
+      const onAttribute = (value: string) => ({getAttribute: (name: string) => (name === 'resize-to' ? value : null)});
+
+      function deprecationWarnings(warn: Mock) {
+        return warn.mock.calls.filter(([message]) => String(message).includes('resize-to="fullscreen" is deprecated'));
+      }
+
+      beforeEach(() => {
+        vi.stubGlobal('window', {devicePixelRatio: 1, performance, innerWidth: 1024, innerHeight: 768});
+      });
+
+      // before the test that warns: the warning goes out once per page, and after it this one
+      // could not tell
+      it('resize-to="window" warns nothing', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {}) as unknown as Mock;
+        makeDisplayOnCanvas(onAttribute('window'));
+        expect(deprecationWarnings(warn)).toHaveLength(0);
+      });
+
+      it('"fullscreen" and ":fullscreen" warn once per page and size like "window"', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {}) as unknown as Mock;
+
+        const {display} = makeDisplayOnCanvas(onAttribute('fullscreen'));
+        display.resize();
+        makeDisplayOnCanvas(onAttribute(':fullscreen'));
+
+        expect(display.width).toBe(1024);
+        expect(display.height).toBe(768);
+        const warnings = deprecationWarnings(warn);
+        expect(warnings).toHaveLength(1);
+        expect(String(warnings[0]?.[0])).toContain('display.fullscreen');
+      });
+    });
+
     describe('the size source', () => {
       // an element stub of the document stub with a client rect of its own
       function box(width: number, height: number, parent?: object) {

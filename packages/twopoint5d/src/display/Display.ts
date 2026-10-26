@@ -50,6 +50,17 @@ import type {
 } from './types.js';
 
 let canvasMaxResolutionWarningWasShown = false;
+let resizeToFullscreenWarningWasShown = false;
+
+function showResizeToFullscreenWarning() {
+  if (!resizeToFullscreenWarningWasShown) {
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+    console.warn(
+      'Display: resize-to="fullscreen" is deprecated and means "window" — use resize-to="window", and display.fullscreen for the fullscreen of the browser.',
+    );
+    resizeToFullscreenWarningWasShown = true;
+  }
+}
 
 function showCanvasMaxResolutionWarning(w: number, h: number) {
   if (!canvasMaxResolutionWarningWasShown) {
@@ -264,11 +275,12 @@ export interface Display extends EventizedObject {}
  *
  * 1. If {@link Display.resizeToAttributeEl} carries a `resize-to` attribute,
  *    its value selects the source:
- *    - `"window"` / `"fullscreen"` (with optional leading colon) →
- *      `innerWidth × innerHeight` of the window of the canvas. Adds the
- *      `twopoint5d-canvas--fullscreen` CSS class to the canvas
- *      (`position:fixed; top:0; left:0`). The class is removed when the
- *      attribute changes back to anything else.
+ *    - `"window"` (with optional leading colon) → `innerWidth × innerHeight`
+ *      of the window of the canvas. Adds the `twopoint5d-canvas--fullscreen`
+ *      CSS class to the canvas (`position:fixed; top:0; left:0`). The class is
+ *      removed when the attribute changes back to anything else.
+ *      `"fullscreen"` is a deprecated alias of `"window"`, warned about once
+ *      per page; the fullscreen of the browser is {@link Display.fullscreen}.
  *    - `"self"` → measures {@link Display.resizeToElement} — by default the
  *      canvas, or the host element when the display built its own
  *      container — just as without the attribute; with `resizeToElement`
@@ -356,6 +368,14 @@ export class Display {
 
   static CssRulesPrefixContainer = 'twopoint5d-container';
   static CssRulesPrefixDisplay = 'twopoint5d-canvas';
+  /**
+   * The base of the class name the canvas carries under `resize-to="window"`.
+   *
+   * @deprecated The name stems from `resize-to="fullscreen"`, which means the window and not the
+   * fullscreen of the browser ({@link Display.fullscreen}). It is renamed to `CssRulesPrefixWindow`,
+   * and the class to `twopoint5d-canvas--window`, together with the removal of
+   * `resize-to="fullscreen"`.
+   */
   static CssRulesPrefixFullscreen = 'twopoint5d-canvas--fullscreen';
 
   /**
@@ -1496,6 +1516,8 @@ export class Display {
       this.#sizeSourceIsWindow = false;
       this.#sizeSourceElement = this.resizeToElement;
     } else if (RESIZE_TO_WINDOW.test(resizeTo)) {
+      // the suffix only after the match: the attribute is resolved in every frame
+      if (resizeTo.endsWith('fullscreen')) showResizeToFullscreenWarning();
       this.#sizeSourceIsWindow = true;
       this.#sizeSourceElement = undefined;
     } else if (resizeTo === 'self') {

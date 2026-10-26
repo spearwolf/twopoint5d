@@ -176,13 +176,14 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * In every frame and with every {@link Display.resize}, this HTML element is queried for a
    * `resize-to` attribute and read out. If nothing is specified, then this is the canvas element.
    *
-   * The `resize-to` attribute can contain either `"fullscreen"` or `"window"` as a value,
-   * or alternatively `"self"`. With `"self"`, the display measures its `resizeToElement` — by
-   * default the canvas, or the host element when the display built its own container — just
-   * as it does without the attribute; with `resizeToElement` cleared, it measures the canvas.
-   * With `"fullscreen"` or `"window"`, the display element is synchronized with the size of the
-   * window of the canvas accordingly. Any other value is a CSS selector, looked up in the
-   * document or in the shadow root this element sits in.
+   * The `resize-to` attribute can contain `"window"` as a value, or alternatively `"self"`.
+   * With `"self"`, the display measures its `resizeToElement` — by default the canvas, or the
+   * host element when the display built its own container — just as it does without the
+   * attribute; with `resizeToElement` cleared, it measures the canvas. With `"window"`, the
+   * display element is synchronized with the size of the window of the canvas accordingly. Any
+   * other value is a CSS selector, looked up in the document or in the shadow root this element
+   * sits in. `"fullscreen"` is a deprecated alias of `"window"` and warns once per page; the
+   * fullscreen of the browser is {@link Display.fullscreen}.
    */
   resizeToAttributeEl?: HTMLElement;
 
