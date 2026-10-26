@@ -43,7 +43,7 @@ fast and need the canonical idioms.
 
 | Class | Role |
 |---|---|
-| `Display` | Owns the `WebGPURenderer` and its canvas (a canvas handed to the constructor stays the caller's), drives the frame loop, emits resize/render events. Source of truth for size + time. |
+| `Display` | Owns the `WebGPURenderer` and its canvas (a canvas handed to the constructor stays the caller's), drives the frame loop, emits resize/render events, and enters the browser's fullscreen (`display.fullscreen`). Source of truth for size + time. |
 | `Stage2D` | Holds a `THREE.Scene` and a camera derived from an `IProjection`. Implements `IStage + IRenderable + IPassProvider`. |
 | `StageRenderer` | Container for stages. Implements `IStage + IRenderable + IPassProvider` so it can be nested. Optional clearing policy and `RenderPipeline` post-processing. |
 | `Canvas2DStage` | Wraps an `HTMLCanvasElement` 2D-context drawing as a textured sprite inside a `Stage2D`. Call `render(now, deltaTime, frameNo)` from your own frame loop; the stage has a camera as soon as `setContainerSize()` has given it a size. What its `dispose()` releases is in [Resource lifecycle](#resource-lifecycle). |

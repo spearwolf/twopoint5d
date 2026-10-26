@@ -18,6 +18,7 @@ setting follows, then the reference: how each setting works and how they play to
 - [Pixel art](#pixel-art)
 - [A fast display: adaptive resolution](#a-fast-display-adaptive-resolution)
 - [A premium display: every device pixel](#a-premium-display-every-device-pixel)
+- [Fullscreen](#fullscreen)
 - [Cheat sheet](#cheat-sheet)
 - [Reference](#reference)
 
@@ -436,6 +437,151 @@ where it has none: a sharp image on a fast machine, a steady frame rate on a slo
 | supersampled stills, a product view | `{maxPixelRatio: 0, maxPixels: 8_000_000}` and `resolutionScale = 1.5` |
 | premium with a safety net | `{maxPixelRatio: 0, maxPixels: 8_000_000, adaptiveResolution: {minScale: 0.75, maxScale: 1.5}}` |
 
+## Fullscreen
+
+### A fullscreen button
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('#game')!);
+const button = document.querySelector<HTMLButtonElement>('#fullscreen')!;
+
+// shown where a fullscreen can succeed at all
+button.hidden = !display.fullscreen.isAvailable;
+
+// synchronously in the click handler: the browser grants fullscreen only to a user gesture
+button.addEventListener('click', () => {
+  void display.fullscreen.toggle();
+});
+
+// Escape and the back gesture of a phone end the fullscreen as well; the event tells the button
+display.onFullscreenChange(({isActive}) => {
+  button.setAttribute('aria-pressed', String(isActive));
+});
+
+export {display};
+```
+
+`display.fullscreen` asks the browser for its own fullscreen, the one that hides the address bar
+and, on Android, the navigation bar. `request()`, `exit()` and `toggle()` never reject: each
+resolves with `isActive` afterwards, `false` where the browser refused. A refusal is told once per
+page on the console — almost always a call that did not come straight from a click, a key or a
+tap. Anything awaited before the call — a fetch, a timeout, the renderer — loses the gesture.
+
+The event `OnDisplayFullscreenChange` is retained: a button attached later hears the state it has
+to show.
+
+### Fullscreen when the phone turns sideways
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('#game')!, {
+  fullscreen: {onLandscape: true},
+});
+
+// where the browser wants a tap first, the display waits for it: a hint helps
+const hint = document.querySelector<HTMLElement>('#tap-for-fullscreen')!;
+display.onFullscreenChange(({isArmed}) => {
+  hint.hidden = !isArmed;
+});
+
+export {display};
+```
+
+With `onLandscape`, turning the phone sideways enters fullscreen, and turning it back leaves it.
+Some browsers let the turn itself count as a gesture; the others refuse, and then the next tap on
+the target enters fullscreen — `isArmed` is `true` while the display waits for it, and the tap
+still reaches the game. It only acts on devices whose primary input is a finger
+(`(pointer: coarse) and (hover: none)`): a desktop window that is wider than tall does nothing, a
+tablet does the same as a phone.
+
+Whoever leaves the fullscreen while the phone is still sideways — Escape, the back gesture, a button
+of the page — stays out of it until the phone has turned upright and back. A fullscreen the page
+entered with `request()` stays when the phone turns upright; `exitOnPortrait: false` keeps the one
+of `onLandscape` as well.
+
+A game that only plays sideways locks the screen:
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+// once in fullscreen, the screen stays sideways; turning back cannot leave it, so exitOnPortrait is off
+const display = new Display(document.querySelector('#game')!, {
+  fullscreen: {onLandscape: true, orientationLock: 'landscape'},
+});
+
+export {display};
+```
+
+The lock is a wish: browsers grant it in fullscreen only, and many — on the iPhone, on a desktop —
+not at all. A refused lock changes nothing else. A portrait lock does not go with `onLandscape`:
+the display warns once and does not lock.
+
+### Without native fullscreen: the pseudo fallback
+
+`isSupported` says whether the browser offers fullscreen for elements here. It does not in an
+iframe without `allow="fullscreen"`, and not where the browser keeps fullscreen for videos — as
+Safari on the iPhone long has. There, `fallback: 'pseudo'` lets the target cover the viewport
+through CSS:
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('#game')!, {
+  fullscreen: {onLandscape: true, fallback: 'pseudo'},
+});
+
+// 'native' or 'pseudo' while active
+display.onFullscreenChange(({mode}) => {
+  document.body.dataset['fullscreen'] = mode ?? '';
+});
+
+export {display};
+```
+
+A browser with native fullscreen always gets the native one. The pseudo mode needs no gesture:
+`request()` enters it at once, and so does the turn of `onLandscape`. Escape leaves it, the page
+behind it does not scroll, and `mode` is `'pseudo'`. It cannot hide the bars of the browser. It
+covers the viewport only where no ancestor of the target has a `transform`, `filter`, `perspective`
+or `contain` — any of them makes that ancestor the box a fixed element covers — and it stays below
+an ancestor's stacking context. A target directly in `<body>` meets none of these.
+
+On an iPhone the bars go away when the page runs from the home screen: a web app manifest with
+`"display": "fullscreen"` or `"standalone"`, linked from the page, and the page added through
+*Share → Add to Home Screen*.
+
+### Which element goes fullscreen
+
+By default the element around the canvas: the element a display was built in, or the parent of a
+canvas handed in. HTML beside the canvas — a HUD, a menu — stays on the screen with it, and the
+display measures the fullscreen element, so the drawing buffer takes the size of the screen.
+`fullscreen: {element}` names another target; a new `display.fullscreen.element` takes effect with
+the next request.
+
+The canvas itself is a poor target. The browser stretches an element in fullscreen to the screen
+with `object-fit: contain` and over every size the page gives it: under a `pixelZoom` the pixels of
+the art lose their whole size, and HTML beside the canvas leaves the screen.
+
+A canvas that measures itself and shares its parent with other elements gets the size of the
+parent in fullscreen, not its position: elements in front of it push it partly off the screen.
+`resize-to="window"` on the canvas, or a display built in a host element of its own, avoids that.
+Leaving the fullscreen gives the canvas back the size it had.
+
+`resize-to="fullscreen"` is an old name of `resize-to="window"`: it means the window and has
+nothing to do with the fullscreen of the browser. It still works and warns once per page; write
+`"window"`.
+
+### Fullscreen presets
+
+| preset | `fullscreen` option |
+| --- | --- |
+| a button, nothing automatic | none — `display.fullscreen.toggle()` in the click handler |
+| a phone game | `{onLandscape: true, fallback: 'pseudo'}` |
+| sideways only | `{onLandscape: true, orientationLock: 'landscape', fallback: 'pseudo'}` |
+| keep the navigation bar of Android | `{navigationUI: 'show'}` |
+
 ## Cheat sheet
 
 ### The settings of the display
@@ -456,6 +602,29 @@ the next measurement — at the start of the next frame, or right away with a `r
 | `styleImageRendering` | property | follows `pixelZoom` | pins `image-rendering` to `'pixelated'` or `'auto'` | — | — | — |
 | `Display.MaxResolution` | static | `8192` | the buffer per axis at most | — | — | raise before the first display, if the GPU allows |
 | `Display.DefaultMaxPixelRatio` | static | `2` | the `maxPixelRatio` of the displays built afterwards | — | — | — |
+
+### The fullscreen
+
+The options go into `fullscreen: {…}` of the constructor; each is a property of
+`display.fullscreen` as well and may be written at any time.
+
+| setting | default | what it does |
+| --- | --- | --- |
+| `element` | the element around the canvas | the target; a new one takes effect with the next request |
+| `navigationUI` | `'hide'` | passed to the browser; `'show'` keeps the navigation bar of Android |
+| `onLandscape` | `false` | turning a phone sideways enters fullscreen, or arms the next tap |
+| `exitOnPortrait` | `true`, `false` under a landscape lock | turning back leaves what `onLandscape` entered |
+| `orientationLock` | none | locks the screen in native fullscreen, where the browser grants it |
+| `fallback` | `false` | `'pseudo'` covers the viewport through CSS where native fullscreen is not there |
+
+| read or call | answers |
+| --- | --- |
+| `request()`, `exit()`, `toggle()` | enter, leave, switch; each resolves with `isActive` and never rejects |
+| `isSupported` | the browser offers fullscreen for elements here |
+| `isAvailable` | a request can succeed: `isSupported`, or the pseudo fallback |
+| `isActive`, `mode` | in fullscreen right now, `'native'` or `'pseudo'` |
+| `isArmed` | `onLandscape` waits for a tap |
+| `display.onFullscreenChange(listener)` | every change of `isActive`, `mode` and `isArmed`; retained |
 
 ### The fit of a projection
 

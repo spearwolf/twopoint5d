@@ -16,11 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `playback` to a `TextureStore` catalog item: the playback of an animation its atlas adapter reads, by name — `{kick: 'once'}` for an Aseprite sheet exported without "Repeat". The store hands it to the adapter as `options.playback` (`AtlasAdapter` takes an optional third argument, `AtlasAdapterOptions`; `AtlasTextureResource#playback` is the input behind it, compared by content); `asepriteAtlasAdapter` refuses a tag the sheet lacks and `texturePackerAtlasAdapter` any playback, as a failure of the atlas. `parse()` refuses an item whose `playback` is no object or names a value other than `'loop'`, `'once'` and `'pingpong'`; an image or a tile set item leaves it out and reports it
 - add `pixelSnap` to the fit of `OrthographicProjection` and `ParallaxProjection` (the `pixelZoom`, `contain` and `cover` arms of `FitIntoRectangleSpecs`): the zoom becomes a whole number of pixels of the drawing buffer per unit — rounded down for `pixelZoom` and `contain`, up for `cover`, at least 1, the buffer rounded down as `WebGPURenderer#setSize()` rounds it — and the left and the bottom edge of the frustum lie on a whole unit of the projection plane, through `left`/`bottom` of the orthographic camera and `setViewOffset()` of the perspective one, so pixel art stays crisp at a fractional `devicePixelRatio` and does not shimmer as it scrolls. `fitIntoRectangle()` takes the pixel ratio as a fourth argument, read by `pixelSnap` alone. `docs/display.md` has it under "Pixel art through a projection: `pixelSnap`"
 - add the sprite feature `Visible`: a static `visible` per sprite, 1 to draw it and 0 to hide it, that keeps every other value of the sprite; a hidden sprite moves its vertices onto one point in the new last mesh band `MeshOrder.Hide` (1000), so it draws no fragment, casts no shadow, shows no reflection and is never picked by `SpritePicker`. `docs/sprites.md` has it under "Showing and hiding sprites"
+- add `display.fullscreen`, a `DisplayFullscreen` the display builds from the new option `fullscreen` (`DisplayFullscreenOptions`): `request()`, `exit()` and `toggle()` of the browser's native fullscreen, each resolving with `isActive` and never rejecting — a refusal is told once per page on the console; `isSupported`, `isAvailable`, `isActive`, `mode`; the default target is the element around the canvas, `element` names another; `navigationUI` (default `'hide'`) and `orientationLock`, a lock of the screen while in native fullscreen. `docs/display.md` has it under "Fullscreen"
+- add `onLandscape` to `DisplayFullscreenOptions`: on a device whose primary input is a finger, turning the screen sideways enters fullscreen — at once where the browser lets the turn count as a gesture, else with the next tap on the target (`isArmed`) — and turning it back leaves it (`exitOnPortrait`, off by default under a landscape lock); the user who leaves in landscape is not thrown back in until the screen has turned upright and back
+- add `fallback: 'pseudo'` to `DisplayFullscreenOptions`: where native fullscreen is not available — an iframe without `allow="fullscreen"`, a browser that keeps fullscreen for videos — the target covers the viewport through CSS, with the same calls and `mode: 'pseudo'`; Escape leaves it
+- add the event `OnDisplayFullscreenChange` with `DisplayFullscreenChangeProps` (`isActive`, `mode`, `isArmed`, `element`), retained, and `Display#onFullscreenChange()`; the types `FullscreenMode` and `DisplayOrientationLock`
 
 ### Changed
 
 - change `StageRenderer#resize()`, `Stage2D#resize()`, `IStage#resize()` and `IProjection#updateViewRect()` to take the pixel ratio as an optional third argument, `1` where it is left out or not a finite number above 0: a `StageRenderer` hands the `pixelRatio` of its host on to every stage, nested renderers included, and a change of the ratio alone reaches them as well. `StageRenderer#pixelRatio`, `StageItem#pixelRatio` and `Stage2D#containerPixelRatio` read the ratio a renderer, an item and a stage carry
 - change `ProjectionViewRect` to carry `offsetX` and `offsetY`, how far the middle of the view lies right of and above the point the camera looks at: `0`, or in `[0, 1)` under `pixelSnap`
+- change the size source of a `Display` while an element that contains its canvas is in fullscreen — native, by anyone, or the pseudo fullscreen: a size source element outside it, or the canvas as its own size source while the fullscreen element is not the canvas, gives way to the fullscreen element, so the drawing buffer takes the size of the screen; `resize-to="window"` and a `resizeTo` callback stay as they are, and a canvas that measured a fullscreen parent gets back its inline size once the fullscreen is left
+
+### Deprecated
+
+- deprecate `resize-to="fullscreen"` (and `":fullscreen"`): an alias of `"window"` that means the window, not the fullscreen of the browser; it keeps working and warns once per page
+- deprecate `Display.CssRulesPrefixFullscreen`: it names the class of the canvas under `resize-to="window"`, and it is renamed to `CssRulesPrefixWindow`, the class to `twopoint5d-canvas--window`, together with the removal of `resize-to="fullscreen"`
 
 ### Migration Guide
 
@@ -62,6 +72,22 @@ protected resizeStage(item: StageItem, width: number, height: number): void {
 protected resizeStage(item: StageItem, width: number, height: number, pixelRatio: number): void {
   super.resizeStage(item, width, height, pixelRatio);
 }
+```
+
+#### `resize-to="fullscreen"` warns
+
+The attribute value warns once per page; it sizes the canvas like `"window"`, which is what to write. The fullscreen of the browser is `display.fullscreen`.
+
+**Before**
+
+```html
+<canvas resize-to="fullscreen"></canvas>
+```
+
+**After**
+
+```html
+<canvas resize-to="window"></canvas>
 ```
 
 ## [0.24.0] - 2026-10-25

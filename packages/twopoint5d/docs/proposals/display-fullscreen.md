@@ -1,7 +1,25 @@
 # Proposal: native fullscreen for a display — `display.fullscreen`
 
-Status: **proposed** — from the Trello card "Resize-Verhalten modernisieren (Fullscreen)" of the
-board list `display`. Phases A to D (§12); nothing is built.
+Status: **phase A, B and the deprecation of phase C implemented** — see
+[`docs/display.md`](../display.md), "Fullscreen" and the cheat sheet "The fullscreen"; the Vitest
+specs `src/display/DisplayFullscreen.spec.ts` and `src/display/Display.spec.ts` ("fullscreen"), the
+browser test `packages/twopoint5d-testing/test/display-fullscreen.test.js`. Open: the device checks
+of §2.3, §7 and §10, the viewport measurement of §10, and the lookbook of §11 (phase D). From the
+Trello card "Resize-Verhalten modernisieren (Fullscreen)" of the board list `display`. Deviations of
+the build from the first draft of this spec, which the sections below now state as built:
+
+- the prefixes of the pseudo classes are statics of `DisplayFullscreen`, not of `Display`, so the
+  controller does not import the display at runtime (§7);
+- `Display#onFullscreenChange()` beside the event, as for every other event of the display (§3.2);
+- the size source also follows the state the controller reports, because the promise of a request
+  or an exit resolves before `fullscreenchange` (§5);
+- a canvas that measured a fullscreen parent gets back its inline size when the fullscreen is left
+  (§5);
+- every leave in landscape of a fullscreen `onLandscape` entered holds off the arming, an exit
+  button of the page included (§6.3);
+- with only the pseudo mode there, a page that loads in landscape enters it at once (§6.2);
+- the `overflow:hidden` of the root element lives in the sheet of the document, not in
+  `styleSheetRoot` (§7).
 
 A display can follow the size of the window today (`resize-to="window"`), but it cannot put
 anything on the whole screen: `resize-to="fullscreen"` only means "as large as the window, at
@@ -137,6 +155,8 @@ export class DisplayFullscreen {
 class Display {
   /** The fullscreen of this display. Throws after `dispose()`, as the other members do. */
   get fullscreen(): DisplayFullscreen;
+  /** Subscribes to `OnDisplayFullscreenChange`. */
+  readonly onFullscreenChange: (listener: (props: DisplayFullscreenChangeProps) => unknown) => UnsubscribeFunc;
 }
 ```
 
@@ -239,8 +259,16 @@ What the rule leaves alone:
 - `resize-to="window"`: in native fullscreen the window is the screen;
 - `resizeToCallback`: what it answers still wins, as it does over every element.
 
+A canvas that measured a fullscreen parent gets back the inline size — and the zoom bookkeeping of a
+canvas that measures itself under a `pixelZoom` — it had before, once the fullscreen is left; else it
+would read back the size of the screen and keep it.
+
 The containing fullscreen element is worked out on every `fullscreenchange` of the document of the
-canvas, and on every enter and exit of the pseudo mode — not in every frame. Each of these marks the
+canvas, on every enter and exit of the pseudo mode, and on every change of state the controller
+reports — not in every frame. The last one is needed: the promise of `requestFullscreen()` and of
+`exitFullscreen()` resolves before the browser fires `fullscreenchange` (Firefox and WebKit on
+entering, Chromium on leaving), and a `resize()` right after the promise would measure the old
+state. Each of these marks the
 size dirty, so the next frame measures; the observer then watches the fullscreen element as it
 watches any size source. The display listens to `fullscreenchange` from its constructor on, whether
 or not anyone uses `display.fullscreen`: the rule holds for a fullscreen the app enters on its own.
@@ -274,10 +302,11 @@ Every turn to landscape, with the gate of §6.1 open and the target not active:
    request succeeds or not.
 
 A page that loads in landscape arms at construction and does not try at once: no turn has
-happened, and nothing grants an exemption.
+happened, and nothing grants an exemption. `onLandscape` set to `true` later does the same.
 
 Where native fullscreen is not available and `fallback` is `'pseudo'`, the pseudo mode needs no
-gesture: the turn enters it at once and never arms.
+gesture: the turn enters it at once and never arms, and a page that loads in landscape enters it at
+construction.
 
 ### 6.3 Leaving
 
@@ -285,7 +314,8 @@ gesture: the turn enters it at once and never arms.
   a fullscreen that `onLandscape` entered. A fullscreen the app entered through `request()` — a
   button pressed while in portrait — stays.
 - **The user leaves.** Where the user leaves a fullscreen that `onLandscape` entered — Escape, the
-  back gesture, the browser's own control — while the screen is still landscape, the controller does
+  back gesture, the browser's own control, an exit button of the page — while the screen is still
+  landscape, the controller does
   not arm again until the screen has turned to portrait and back. A page that throws the user back
   into fullscreen at the next tap after they left it is a trap; this rule is the reason the feature
   can be on by default in a game.
@@ -319,11 +349,13 @@ fullscreen always gets the native one, also when it refuses a request.
 Entering:
 
 - the target gets a class from `Stylesheets.retainRule()` under the prefix
-  `Display.CssRulesPrefixPseudoFullscreen` (`'twopoint5d-fullscreen--pseudo'`):
+  `DisplayFullscreen.CssRulesPrefixPseudo` (`'twopoint5d-fullscreen--pseudo'`) in `styleSheetRoot`:
   `position:fixed;inset:0;width:auto;height:auto;max-width:none;max-height:none;margin:0;box-sizing:border-box;transform:none;z-index:2147483647;`
   — the same box the UA stylesheet gives a native fullscreen element (§2.4), without `!important`;
-- the root element of the target's document gets a class with `overflow:hidden`, so the page behind
-  does not scroll while the target covers it;
+- the root element of the target's document gets a class under the prefix
+  `DisplayFullscreen.CssRulesPrefixPseudoRoot` with `overflow:hidden`, so the page behind does not
+  scroll while the target covers it; its rule goes into the sheet of that document, whatever shadow
+  root the target's rule goes into — a rule in a shadow root never reaches `<html>`;
 - `isActive` turns `true`, `mode` is `'pseudo'`, the event goes out, and the size source rule of §5
   takes the target as the containing fullscreen element.
 
