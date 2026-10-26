@@ -424,4 +424,295 @@ describe('DisplayFullscreen', () => {
       expect(orientation.unlock).toHaveBeenCalledTimes(1);
     });
   });
+  describe('onLandscape', () => {
+    interface OrientationStub extends EventTargetStub {
+      type: string;
+      lock: Mock<(type: string) => Promise<void>>;
+      unlock: Mock<() => void>;
+    }
+    interface QueryStub extends EventTargetStub {
+      matches: boolean;
+    }
+
+    let orientation: OrientationStub;
+    let coarse: QueryStub;
+    let landscapeQuery: QueryStub;
+
+    function makeQuery(matches: boolean): QueryStub {
+      const query = makeEventTarget() as QueryStub;
+      query.matches = matches;
+      return query;
+    }
+
+    // the screen turns, and screen.orientation reports it
+    function turn(type: string) {
+      orientation.type = type;
+      orientation.dispatch('change');
+    }
+
+    // lets the reactions to the settled request of a turn run
+    const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    const tap = (pointerType = 'touch') => defaultTarget.dispatch('pointerup', {type: 'pointerup', pointerType});
+
+    beforeEach(() => {
+      orientation = makeEventTarget() as OrientationStub;
+      orientation.type = 'portrait-primary';
+      orientation.lock = vi.fn(() => Promise.resolve());
+      orientation.unlock = vi.fn();
+      coarse = makeQuery(true);
+      landscapeQuery = makeQuery(false);
+      view.screen = {orientation};
+      view.matchMedia = vi.fn((query: string) => (query === '(orientation: landscape)' ? landscapeQuery : coarse));
+    });
+
+    it('a turn to landscape requests fullscreen at once', async () => {
+      const fs = make({onLandscape: true});
+
+      turn('landscape-primary');
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      await flush();
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('a refused turn arms; the next pointerup of a touch on the target requests and disarms', async () => {
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+      const fs = make({onLandscape: true});
+
+      turn('landscape-primary');
+      await flush();
+
+      expect(fs.isArmed).toBe(true);
+      expect(emitted.at(-1)).toMatchObject({isActive: false, isArmed: true});
+
+      tap('mouse');
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+
+      tap('touch');
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isArmed).toBe(false);
+      await flush();
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('a click on the target requests as well while armed', async () => {
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+      make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      defaultTarget.dispatch('click', {type: 'click'});
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+    });
+
+    it('the armed listeners are capture, passive, and do not prevent the default', async () => {
+      orientation.type = 'landscape-primary';
+      make({onLandscape: true});
+
+      const options = defaultTarget.addEventListener.mock.calls.filter(([type]) => type === 'pointerup').map(([, , o]) => o);
+      expect(options).toEqual([{capture: true, passive: true}]);
+
+      const preventDefault = vi.fn();
+      defaultTarget.dispatch('pointerup', {type: 'pointerup', pointerType: 'touch', preventDefault});
+      expect(preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('a turn to portrait disarms', async () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+      expect(fs.isArmed).toBe(true);
+
+      turn('portrait-primary');
+
+      expect(fs.isArmed).toBe(false);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+    });
+
+    it('a turn to portrait leaves a fullscreen that onLandscape entered', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      turn('portrait-primary');
+      await flush();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(false);
+    });
+
+    it('a turn to portrait leaves a fullscreen that request() entered alone', async () => {
+      const fs = make({onLandscape: true});
+      await fs.request();
+
+      turn('landscape-primary');
+      turn('portrait-primary');
+      await flush();
+
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('exitOnPortrait false keeps the fullscreen on the turn back', async () => {
+      const fs = make({onLandscape: true, exitOnPortrait: false});
+      turn('landscape-primary');
+      await flush();
+
+      turn('portrait-primary');
+      await flush();
+
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('the user leaving in landscape holds off arming until portrait and back', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      // Escape, the back gesture: the browser leaves, the controller did not ask
+      fireFullscreenChange(null);
+      tap();
+
+      expect(fs.isArmed).toBe(false);
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+
+      turn('portrait-primary');
+      turn('landscape-primary');
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+    });
+
+    it('a fine pointer keeps onLandscape out', async () => {
+      coarse.matches = false;
+      const fs = make({onLandscape: true});
+
+      turn('landscape-primary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('a page that loads in landscape arms and does not request', () => {
+      orientation.type = 'landscape-secondary';
+      const fs = make({onLandscape: true});
+
+      expect(fs.isArmed).toBe(true);
+      expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+    });
+
+    it('without screen.orientation the media query decides', () => {
+      view.screen = {};
+      make({onLandscape: true});
+
+      landscapeQuery.matches = true;
+      landscapeQuery.dispatch('change');
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    it('onLandscape = false disarms and takes the listeners down', () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+      expect(orientation.listenerCount('change')).toBe(1);
+
+      fs.onLandscape = false;
+
+      expect(fs.isArmed).toBe(false);
+      expect(orientation.listenerCount('change')).toBe(0);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+      expect(defaultTarget.listenerCount('click')).toBe(0);
+    });
+
+    it('onLandscape = false leaves a fullscreen in progress alone', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      fs.onLandscape = false;
+
+      expect(fs.isActive).toBe(true);
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+    });
+
+    it('onLandscape = true at runtime arms a page that is in landscape', () => {
+      orientation.type = 'landscape-primary';
+      const fs = make();
+
+      fs.onLandscape = true;
+
+      expect(fs.isArmed).toBe(true);
+    });
+
+    it('a landscape lock turns the default exitOnPortrait off without a warning', async () => {
+      const fs = make({onLandscape: true, orientationLock: 'landscape'});
+
+      expect(fs.exitOnPortrait).toBe(false);
+      expect(warn).not.toHaveBeenCalled();
+
+      turn('landscape-primary');
+      await flush();
+      turn('portrait-primary');
+      await flush();
+
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+    });
+
+    it('an explicit exitOnPortrait true beside a landscape lock warns once and stays out of effect', () => {
+      const fs = make({onLandscape: true, orientationLock: 'landscape-primary', exitOnPortrait: true});
+      make({onLandscape: true, orientationLock: 'landscape-primary', exitOnPortrait: true});
+
+      expect(fs.exitOnPortrait).toBe(false);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain('exitOnPortrait has no effect');
+    });
+
+    it('a portrait lock beside onLandscape warns once and does not lock', async () => {
+      const fs = make({onLandscape: true, orientationLock: 'portrait'});
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain("orientationLock 'portrait' and onLandscape cannot work together");
+
+      await fs.request();
+      await flush();
+
+      expect(orientation.lock).not.toHaveBeenCalled();
+    });
+
+    it('a refused try at once warns nothing; a refused armed tap warns', async () => {
+      defaultTarget.requestFullscreen.mockImplementation(() => Promise.reject(new TypeError('no gesture')));
+      make({onLandscape: true});
+
+      turn('landscape-primary');
+      await flush();
+      expect(warn).not.toHaveBeenCalled();
+
+      tap();
+      await flush();
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('dispose() takes down the orientation, query and tap listeners', () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+
+      fs.dispose();
+
+      expect(orientation.listenerCount('change')).toBe(0);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+      expect(defaultTarget.listenerCount('click')).toBe(0);
+    });
+
+    it('dispose() takes down the media query listener where there is no screen.orientation', () => {
+      view.screen = {};
+      const fs = make({onLandscape: true});
+      expect(landscapeQuery.listenerCount('change')).toBe(1);
+
+      fs.dispose();
+
+      expect(landscapeQuery.listenerCount('change')).toBe(0);
+    });
+  });
 });
