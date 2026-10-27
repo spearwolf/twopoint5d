@@ -153,7 +153,9 @@ a factory:
 - the values can be followed: a new renderer, other texture classes, another image or a catalog
   parsed again reach a subscriber as fresh values;
 - the store works without a renderer — it loads images and builds coordinates, atlases, tile sets
-  and animations, and only the textures wait for one.
+  and animations, and only the textures wait for one;
+- a resource loads on demand: loading the catalog fetches no image and no atlas json, the first
+  `getAsync()`, `acquireAsync()` or `on()` of an id does — see [preloading](#preloading).
 
 ### The catalog
 
@@ -288,8 +290,22 @@ export const ground = store.getAsync('ground', 'texture');
 ```
 
 `store.defaultTextureClasses` is the same list as a property. A catalog that names
-`defaultTextureClasses` replaces it as it is parsed; an assignment of your own reaches an item with
-the next `parse()` that names it.
+`defaultTextureClasses` replaces it as it is parsed — but only while a known class is left in the
+list: `"defaultTextureClasses": []`, or a list of nothing but typos, keeps the defaults of the
+`parse()` before. A catalog cannot take the defaults away; to drop them, assign
+`store.defaultTextureClasses = []` before the `parse()` or `loadAsync()` that should build without
+them. An assignment of your own reaches an item with the next `parse()` that names it, and a
+resource no later `parse()` names keeps the classes it was built with.
+
+```ts check
+import type {TextureStore, TextureStoreData} from '@spearwolf/twopoint5d';
+
+declare const store: TextureStore;
+declare const catalog: TextureStoreData; // names no defaults, or an empty list
+
+store.defaultTextureClasses = []; // the defaults of the catalog before do not carry over
+store.parse(catalog);
+```
 
 ### Loading a catalog
 
@@ -340,21 +356,40 @@ calls. Once the parse has begun the load is done, and an abort changes nothing.
 
 `new TextureStore(renderer)` or `store.renderer = renderer` gives the store the renderer it builds
 its textures for. Without one, the store loads its images and builds everything but the textures;
-a `getAsync(id, 'texture')` waits until a renderer is set. That makes it easy to start loading
-before the renderer is up:
+a `getAsync(id, 'texture')` waits until a renderer is set.
+
+### Preloading
+
+Loading the catalog and loading the resources are two steps. `loadAsync()` and `parse()` read the
+catalog and set the resources up, but a resource fetches nothing until it is asked for: the first
+`getAsync()`, `acquireAsync()` or `on()` of its id starts its image — and for an atlas item its
+json —, and the resource keeps loading and following its inputs from then on. Assigning the renderer
+starts nothing either.
+
+To have the images on their way while the renderer is still being set up, ask for a subtype that
+needs no renderer — `imageCoords`, or the `atlas` of an atlas item:
 
 ```ts check
 import {TextureStore} from '@spearwolf/twopoint5d';
 import {WebGPURenderer} from 'three/webgpu';
 
-const loading = TextureStore.loadAsync('/assets/textures.json');
+const store = await TextureStore.loadAsync('/assets/textures.json');
+
+// starts every image and atlas json now, before there is a renderer
+const preloading = Promise.all(['hero', 'tiles', 'floor'].map((id) => store.getAsync(id, 'imageCoords')));
 
 const renderer = new WebGPURenderer();
 await renderer.init();
 
-const store = await loading;
 store.renderer = renderer;
+await preloading;
+
+// the images are there; what is left is building the textures
+export const floor = await store.getAsync('floor', 'texture');
 ```
+
+A `whenResource(id)` hands out the resource without starting it; `resource.activate()` starts it
+by hand.
 
 A new renderer makes every resource build its texture anew and release the old one. The renderer
 stays yours: the store never disposes it.
@@ -537,9 +572,19 @@ A store reports what goes wrong as an `error` event, with a `TextureStoreErrorEv
 | `'fetch'` | `url`, `status?`, `error` | the catalog could not be fetched, or the server answered with a status |
 | `'parse'` | `url?`, `id?`, `error` | the body is no json; the data cannot be read; an item builds nothing; a field the type of an item does not read; a texture class no factory knows; a tile set item without an `imageUrl`; a subscriber that throws |
 
-An event with an `id` belongs to that item, one without to the catalog as a whole. None of them
-stops the parse: an item that cannot be read builds nothing — a resource that already carries its
-id stays as it was —, an unknown class or field is left out, and the rest of the catalog is built.
+An event with an `id` belongs to that item, one without to the catalog as a whole.
+
+Two kinds of failure are to be told apart:
+
+- **The catalog is not read.** A failed fetch, a status, a body that is no json — and data
+  `parse()` refuses whole: no object, an `items` that is no object, a `defaultTextureClasses` that
+  is no array, an item whose type differs from the resource that already carries its id. Nothing is
+  written then. `loadAsync()` rejects, besides the event, and `parse()` throws a `TypeError` and
+  emits nothing: these still need a `catch`.
+- **An item is read in part, or not at all.** An item that cannot be read builds nothing — a
+  resource that already carries its id stays as it was —, an unknown class or field is left out, a
+  subscriber that throws is reported. These are events only: the rest of the catalog is built, and
+  the instance `loadAsync()` resolves. The static `TextureStore.loadAsync()` rejects on them as well.
 
 ```ts check
 import {on} from '@spearwolf/eventize';
@@ -646,9 +691,14 @@ on(resource, 'texture', (texture: Texture) => {
   // the first texture, and every one after it
 });
 
-// the resource owns its texture, and releases it here
-resource.dispose();
+// once the texture is no longer drawn: the resource owns it, and releases it here
+export function disposePortrait() {
+  resource.dispose();
+}
 ```
+
+The texture arrives later, once the image has loaded; a `dispose()` before that cancels the load,
+and no texture is ever built.
 
 The events are retained: a listener that comes late still hears the current value. Without a store
 there is no image cache, no `getAsync()` and no `refCount` to hold it by — `dispose()` is up to you.
@@ -665,7 +715,13 @@ there is no image cache, no `getAsync()` and no `refCount` to hold it by — `di
 | `TextureImageLoader`, `TileSetLoader`, `TextureAtlasLoader`, `PowerOf2ImageLoader` | a `TextureStore` |
 | the classes `anisotrophy`, `anisotrophy-2`, `anisotrophy-4`, `no-anisotrophy` | `anisotropy`, `anisotropy-2`, `anisotropy-4`, `no-anisotropy` |
 
-The four callback loaders differ from the store in what they hand out: they pad an image whose sides
-are no powers of 2 onto a canvas whose sides are, start from the texture class `nearest`, and give
-the texture to the caller to dispose. Moving to the store means naming the classes in the catalog
-and leaving the disposal to the store.
+`TextureImageLoader`, `TileSetLoader` and `TextureAtlasLoader` differ from the store in what they
+hand out: they pad an image whose sides are no powers of 2 onto a canvas whose sides are, start from
+the texture class `nearest`, and give the texture to the caller to dispose. Moving to the store
+means naming the classes in the catalog — `nearest` among them, where the loader gave it — and
+leaving the disposal to the store.
+
+`PowerOf2ImageLoader` builds no texture at all: it hands out the padded image and its
+`TextureCoords`, `{imgEl, texCoords}`, and nothing of it needs disposing. In a store an image item
+takes its place, with `getAsync(id, 'imageCoords')` for the coordinates — of the image as it is,
+unpadded.
