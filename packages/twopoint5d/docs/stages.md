@@ -284,6 +284,7 @@ into it independently of CSS pixels, buffer pixels and zoom:
 
 ```ts check
 import {Display, OrthographicProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+import {Vector3} from 'three/webgpu';
 
 const canvas = document.querySelector('canvas')!;
 const display = new Display(canvas);
@@ -296,18 +297,20 @@ canvas.addEventListener('pointerdown', (event) => {
   // units of the view, measured from the point the camera looks at: x right, y up on the screen
   const x = (event.offsetX / canvas.clientWidth - 0.5) * view.width + view.offsetX;
   const y = (0.5 - event.offsetY / canvas.clientHeight) * view.height + view.offsetY;
+  // the point the camera looks at: its foot on the plane, wherever the camera was moved along it
+  const plane = projection.projectionPlane!;
+  const lookAt = plane.plane.projectPoint(stage.camera!.position, new Vector3());
   // the point in the world, on the projection plane
-  const point = projection.projectionPlane!.getPoint(x, y);
-  // a camera moved along the plane moves the point with it
-  point.add(stage.camera!.position).sub(projection.projectionPlane!.getPointByDistance(100));
+  const point = plane.getPoint(x, y).sub(plane.getOrigin()).add(lookAt);
 });
 
 display.start();
 ```
 
-`getPointByDistance(100)` is where the projection put the camera — `100` is the default
-distance of an `OrthographicProjection`. Under a `ParallaxProjection` the result is the point on
-the projection plane under the pointer; a layer in front of or behind it lies elsewhere.
+The point the camera looks at comes from the camera itself, so the recipe holds for any
+`distanceToProjectionPlane` and for a camera moved along the plane. It works the same under a
+`ParallaxProjection`, with one limit: the result is the point on the projection plane under the
+pointer, and a layer in front of or behind the plane lies elsewhere.
 
 ### A camera of your own
 
@@ -411,8 +414,19 @@ takes neither itself nor a renderer that holds it — `add()` and `parent` throw
 anything has moved.
 
 A `StageRenderer` hands its size and the pixel ratio of its host on to every stage, nested
-renderers included: `resize(width, height, pixelRatio)`. A stage that refuses the size — whose
-`resize()` throws — is not added, and the renderer and the stage stay as they were.
+renderers included: `resize(width, height, pixelRatio)`. A stage refuses the size when its
+`resize()` throws:
+
+- in `add()`, the size comes first: a stage that refuses it is not added, and neither the
+  renderer nor the previous holder of a child renderer has changed;
+- in `resize()`, every stage is asked, also behind one that refuses. The renderer keeps the size
+  it had, and so does its record of the refusing stage, so the next `resize()` with that size asks
+  that stage again; the stages that took the size keep it.
+
+What the stage itself keeps depends on where the throw comes from. A `Stage2D` whose projection
+throws keeps its previous container, view and camera. A `Stage2D` whose projection took the size
+and only a listener of `OnStageResize` or `OnStageAfterCameraChanged` threw keeps the new view and
+camera — refused as far as the renderer is concerned, and still showing the new size.
 
 ## Clearing
 
@@ -867,6 +881,13 @@ A listener that throws:
   that sent it runs to its end — the stage has its new camera, scene or size, the renderer its
   new stage or holder — and the error reaches the caller afterwards, one unchanged, several as an
   `AggregateError`.
+
+One exception to the second rule: a `Stage2D` applies a pending `needsUpdate` at the start of its
+`updateFrame()`, and a listener of `OnStageAfterCameraChanged` or `OnStageResize` that throws
+there ends the frame. The new camera and size stand and every listener has heard of them, but
+neither `OnStageFirstFrame` nor `OnStageUpdateFrame` goes out in that frame, and the error comes
+out of `updateFrame()`. A `StageRenderer` on a host then updates none of the stages behind it and
+draws nothing in that frame; the first frame comes with the next call.
 
 ## Who disposes what
 

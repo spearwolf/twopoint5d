@@ -744,10 +744,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Marks the output node for a rebuild after a write to {@link pipeline} or
-   * {@link buildOutputNode}. A write that has left the whole-picture mode releases the GPU memory of the internal
-   * target; one that has left the composed mode — for the plain mode or for the whole-picture mode — releases that
-   * of the pass target of every nested renderer and of the pass node of every `Stage2D` among the
-   * stages, which nothing samples any more.
+   * {@link buildOutputNode}. A write that has left the whole-picture mode releases the GPU memory of the
+   * internal target; one that has left the composed mode — for the plain mode or for the
+   * whole-picture mode — releases that of the pass target of every nested renderer and of the pass
+   * node of every `Stage2D` among the stages, which nothing samples any more.
    */
   #modeInputChanged(previousMode: StageRendererMode): void {
     this.#outputDirty = true;
@@ -781,7 +781,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
    * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their order
    * or names, the pipeline, `buildOutputNode` or the camera or the scene of a stage changed. Only
-   * the composed mode reads it; the whole-picture mode keeps its own node, see `#wireInternalOutputNode()`.
+   * the composed mode reads it; the whole-picture mode keeps its own node, see
+   * `#wireInternalOutputNode()`.
    */
   #outputDirty = true;
 
@@ -1007,11 +1008,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * The composed mode, nested renderers with pipelines of their own included: for each stage, get its pass node; pre-render nested
-   * `StageRenderer` children into their pass-targets first, with linear output (see
-   * `#beginLinearOutput()`). Then run the pipeline with `buildOutputNode(passes)` as `outputNode`;
-   * it applies the output transform of the caller. Without a stage it draws its own clear and
-   * neither builds an output node nor runs the pipeline.
+   * The composed mode, nested renderers with pipelines of their own included: for each stage, get
+   * its pass node; pre-render nested `StageRenderer` children into their pass-targets first, with
+   * linear output (see `#beginLinearOutput()`). Then run the pipeline with
+   * `buildOutputNode(passes)` as `outputNode`; it applies the output transform of the caller.
+   * Without a stage it draws its own clear and neither builds an output node nor runs the pipeline.
    */
   #renderPipelineComposed(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     if (!this.#canCompose(stages)) return;
@@ -1396,9 +1397,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (isEventized(stage)) {
       // a pass node keeps the scene and the camera it was built with: a stage that announces a
       // new one of either needs a new pass node, and with it a new output node — in the composed
-      // mode only, since the node of the whole-picture mode samples the internal target and holds neither scene
-      // nor camera, and so the flag is set here rather than through invalidateOutputNode(),
-      // which drops that node as well
+      // mode only, since the node of the whole-picture mode samples the internal target and holds
+      // neither scene nor camera, and so the flag is set here rather than through
+      // invalidateOutputNode(), which drops that node as well
       const unsubscribeChanges = on(stage, [OnStageAfterCameraChanged, OnStageAfterSceneChanged], () => {
         this.#outputDirty = true;
       });

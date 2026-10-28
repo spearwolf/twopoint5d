@@ -1,8 +1,8 @@
-// The two render targets of a `StageRenderer` — the internal target of the whole-picture mode and the pass target
-// a composing parent draws it into — and the pixel ratio that sizes both. The internal target is
-// either built here or, with a pool set, borrowed from that pool for the length of one draw; what
-// this module releases is only what it built itself. This module is not in `public-api.ts`: only
-// `StageRenderer` reaches it.
+// The two render targets of a `StageRenderer` — the internal target of the whole-picture mode and
+// the pass target a composing parent draws it into — and the pixel ratio that sizes both. The
+// internal target is either built here or, with a pool set, borrowed from that pool for the length
+// of one draw; what this module releases is only what it built itself. This module is not in
+// `public-api.ts`: only `StageRenderer` reaches it.
 
 import {RenderTarget, type WebGPURenderer} from 'three/webgpu';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
@@ -42,9 +42,9 @@ export class StageRendererTargets {
   }
 
   /**
-   * Answers the internal target for one whole-picture draw: borrowed from the pool if one is set, sized in
-   * device pixels, otherwise the own one, built or brought to the size `width`×`height` asks for.
-   * Every call is paired with one {@link returnInternalTarget} once the draw is over.
+   * Answers the internal target for one whole-picture draw: borrowed from the pool if one is set,
+   * sized in device pixels, otherwise the own one, built or brought to the size `width`×`height`
+   * asks for. Every call is paired with one {@link returnInternalTarget} once the draw is over.
    */
   acquireInternalTarget(renderer: WebGPURenderer, width: number, height: number): RenderTarget {
     const pool = this.#pool;
@@ -61,8 +61,8 @@ export class StageRendererTargets {
   }
 
   /**
-   * Ends the whole-picture draw {@link acquireInternalTarget} began: a borrowed target goes back to the
-   * pool it came from, even if another pool or none is set by now; an own target that was taken
+   * Ends the whole-picture draw {@link acquireInternalTarget} began: a borrowed target goes back to
+   * the pool it came from, even if another pool or none is set by now; an own target that was taken
    * away during the draw is released now that nothing draws into it any more.
    */
   returnInternalTarget(): void {
