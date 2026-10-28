@@ -6,9 +6,8 @@ modules. Day-to-day commands and repo rules are in the root `AGENTS.md`.
 
 Two companion docs carry the rules this one only points at:
 [**resource-lifecycle.md**](./resource-lifecycle.md) — binding for anything with a
-`dispose()`, see section 3 — and the [**stage layer
-cheat-sheet**](../src/stage/README.md) for `Display` + `Stage2D` + `StageRenderer`
-idioms.
+`dispose()`, see section 3 — and the [**stages guide**](./stages.md) for `Display` + `Stage2D` + `StageRenderer`,
+projections and post-processing.
 
 ## 1. The public surface
 
@@ -176,9 +175,8 @@ in back as the display found it — is an internal module, `src/display/canvasHa
 (`OrthographicProjection`, `ParallaxProjection`, with `ProjectionPlane` and
 `fitIntoRectangle` doing the geometry) decide how world units map to the viewport when
 the canvas resizes. `StageRenderer` composes several stages into one frame, and
-`RootRenderPipeline` / `IPassProvider` wire in post-processing passes. The layer's own
-cheat-sheet, including render-target ownership, is
-[`src/stage/README.md`](../src/stage/README.md).
+`RootRenderPipeline` / `IPassProvider` wire in post-processing passes. The guide of the
+layer, including render-target ownership, is [`docs/stages.md`](./stages.md).
 
 ### `sprites/`
 

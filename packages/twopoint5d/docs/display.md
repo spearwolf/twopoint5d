@@ -38,7 +38,7 @@ may](images/display/display-choose-a-setup.svg)
 
 There is no preset object to pass: each setup is a handful of settings, and the recipes below are
 the presets. Every recipe is a complete program — a `Display`, a `Stage2D` and a `StageRenderer`
-that draws the stage into the display, as in [the stage cheat-sheet](../src/stage/README.md).
+that draws the stage into the display, as in [stages](stages.md).
 
 ## Pixel art
 
@@ -839,7 +839,7 @@ Every render target of a `RenderPipeline` — the scene pass, the half and small
 bloom — follows the size of the drawing buffer, so every setting above counts for all of them. The
 `StageRenderer` leaves its own clear of the target a pipeline draws into to three where
 `renderer.autoClear` covers it: on the canvas that clear would cost a full-screen draw of its own.
-See [the stage cheat-sheet](../src/stage/README.md).
+See [stages: what a pipeline costs](stages.md#what-a-pipeline-costs).
 
 ### Measured
 

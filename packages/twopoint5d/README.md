@@ -129,7 +129,7 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 - the **LOOKBOOK**, a gallery of runnable demos: `pnpm lookbook` in a clone of this
   repository, see the [project README](../../README.md)
 - the guides: [sprites](docs/sprites.md), [text](docs/text.md), [tile maps](docs/map2d.md),
-  [stages](src/stage/README.md), [display: resolution and frame rate](docs/display.md),
+  [stages](docs/stages.md), [display: resolution and frame rate](docs/display.md),
   [textures: texture classes](docs/textures.md),
   [resource lifecycle](docs/resource-lifecycle.md),
   [architecture](docs/architecture.md)
