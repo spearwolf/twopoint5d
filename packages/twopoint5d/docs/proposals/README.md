@@ -116,5 +116,6 @@ scheduled, and each item would get a proposal of its own before it is built.
 | [`pixel-exact-projection-fit.md`](pixel-exact-projection-fit.md) | `pixelSnap` — a projection fit at a whole number of buffer pixels per unit, and a frustum aligned to whole units |
 | [`sprite-visibility.md`](sprite-visibility.md) | `Visible` — a flag per sprite that collapses its vertices in the last mesh stage |
 | [`display-fullscreen.md`](display-fullscreen.md) | `display.fullscreen` — native fullscreen, fullscreen on landscape, a pseudo fullscreen as opt-in fallback |
+| [`stage-transitions.md`](stage-transitions.md) | `StageDirector` — a stack of stage layers changed through transitions, and the transition effects in TSL |
 
 A new proposal is a file of its own here, named after its subject, with a row in this table.
