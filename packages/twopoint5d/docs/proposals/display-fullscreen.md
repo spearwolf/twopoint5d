@@ -528,7 +528,7 @@ named there as unchecked rather than holding the phase back.
   landscape, then the pseudo fallback with what it cannot do and the manifest recipe for the iPhone;
   rows in the cheat sheet; the deprecation of `resize-to="fullscreen"` where the guide explains
   `resize-to`. Each phase grows its part in its own commit.
-- `src/stage/README.md`: one line under the `Display` idioms.
+- `docs/stages.md`: one line under the `Display` idioms.
 - `CHANGELOG.md` of the library, under `## [Unreleased]`: `display.fullscreen`,
   `DisplayFullscreen`, `OnDisplayFullscreenChange` and the option under "Added"; the size source rule
   under "Changed"; `resize-to="fullscreen"` and `Display.CssRulesPrefixFullscreen` under

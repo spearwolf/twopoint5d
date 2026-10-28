@@ -49,7 +49,7 @@ const isStage2DWithoutCamera = (s: IStage): boolean =>
 
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
-type StageRendererMode = 'plain' | 'pipeline-only' | 'composed';
+type StageRendererMode = 'plain' | 'whole-picture' | 'composed';
 
 const NO_PASS_NODE =
   'has no asPassNode(), and a pipeline with buildOutputNode or a RootRenderPipeline composes the pass node of every stage';
@@ -60,7 +60,7 @@ function modeOf(
   buildOutputNode: StageRendererBuildOutputNode | undefined,
 ): StageRendererMode {
   if (pipeline == null) return 'plain';
-  return buildOutputNode != null || pipeline instanceof RootRenderPipeline ? 'composed' : 'pipeline-only';
+  return buildOutputNode != null || pipeline instanceof RootRenderPipeline ? 'composed' : 'whole-picture';
 }
 
 // one message for every member that refuses to answer once the renderer is gone, so the class
@@ -112,7 +112,7 @@ export interface StageRenderer extends EventizedObject {}
  * target, and frames accumulate unless something else clears it.
  *
  * With a {@link pipeline} that is not a `RootRenderPipeline` and without
- * {@link buildOutputNode} (Mode C), the stages draw into an internal target
+ * {@link buildOutputNode} (the whole-picture mode), the stages draw into an internal target
  * that the renderer clears to transparent black (color and depth) every frame,
  * whatever `clear` says; the own `clear` then applies on top, and one that
  * covers color and depth replaces the black clear.
@@ -583,8 +583,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
    * Optional `THREE.RenderPipeline` running between the stages and the
    * output. For a pipeline that is not a `RootRenderPipeline`, without
-   * `buildOutputNode` (Mode C), the stages render into an internal
-   * target whose texture is sampled by the pipeline. With
+   * `buildOutputNode` (the whole-picture mode), the stages render into an
+   * internal target whose texture is sampled by the pipeline. With
    * `buildOutputNode`, or as a `RootRenderPipeline`, the pipeline runs a TSL
    * graph composed from each stage's pass node — the user-defined one of
    * `buildOutputNode`, or the additive composition of the
@@ -600,7 +600,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * the {@link stages}, the write throws a `TypeError` that names the stage and the pipeline
    * stays the one it was.
    *
-   * In Mode C, the output node is rebuilt only for a new pipeline or after
+   * In the whole-picture mode, the output node is rebuilt only for a new pipeline or after
    * {@link invalidateOutputNode}; stages, their order and names, their scenes
    * and their cameras leave it standing. A write that leaves this mode
    * releases the GPU memory of the internal target this renderer built for
@@ -643,7 +643,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `pipeline.outputColorTransform` is `true` — just as on the canvas. A
    * renderer that a parent draws into a target of the parent's own pipeline
    * writes linear in both cases; the outermost pipeline applies the transform.
-   * Under a Mode C parent — a pipeline without `buildOutputNode` that is not a
+   * Under a parent in the whole-picture mode — a pipeline without `buildOutputNode` that is not a
    * `RootRenderPipeline` — a child writes linear into its own
    * `outputRenderTarget` as well: the parent switches to linear output for all
    * of its stage draws, whichever target they write to.
@@ -706,26 +706,26 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * Optional pool the internal target of Mode C — a {@link pipeline} without
+   * Optional pool the internal target of the whole-picture mode — a {@link pipeline} without
    * {@link buildOutputNode} that is not a `RootRenderPipeline` — is borrowed
    * from. Renderers of the same size on the same pool that draw one after
    * another draw through one target, see `StageRenderTargetPool`; without a
    * pool the renderer builds its internal target itself.
    *
-   * The target is borrowed at the start of the Mode C draw and given back once
+   * The target is borrowed at the start of the whole-picture draw and given back once
    * the pipeline has run, in the same call, also when a stage or the pipeline
    * throws — no pooled target is held between frames. In the plain mode and
    * the composing modes the pool is not used, and the pass-target a composing
    * parent samples through {@link asPassNode} never comes from it.
    *
    * Assigning a pool releases the internal target this renderer built for
-   * itself; clearing it again builds a new one on the next Mode C frame. A
-   * pool assigned during a Mode C draw of this renderer counts from the next
+   * itself; clearing it again builds a new one on the next whole-picture frame. A
+   * pool assigned during a whole-picture draw of this renderer counts from the next
    * draw on.
    *
    * The pool is handed in and stays the caller's: {@link dispose} leaves it
    * alone. A disposed pool is refused with an error naming the call and the
-   * state; a pool disposed while it is set makes the next Mode C frame throw
+   * state; a pool disposed while it is set makes the next whole-picture frame throw
    * the error of its `acquire()`. A disposed renderer answers `undefined` here
    * and takes no new pool: like `pipeline`, the write is a silent no-op.
    */
@@ -744,15 +744,15 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Marks the output node for a rebuild after a write to {@link pipeline} or
-   * {@link buildOutputNode}. A write that has left Mode C releases the GPU memory of the internal
-   * target; one that has left the composed mode — for the plain mode or for Mode C — releases that
-   * of the pass target of every nested renderer and of the pass node of every `Stage2D` among the
-   * stages, which nothing samples any more.
+   * {@link buildOutputNode}. A write that has left the whole-picture mode releases the GPU memory of the
+   * internal target; one that has left the composed mode — for the plain mode or for the
+   * whole-picture mode — releases that of the pass target of every nested renderer and of the pass
+   * node of every `Stage2D` among the stages, which nothing samples any more.
    */
   #modeInputChanged(previousMode: StageRendererMode): void {
     this.#outputDirty = true;
     const mode = this.#renderMode();
-    if (previousMode === 'pipeline-only' && mode !== 'pipeline-only') this.#targets.releaseInternalTarget();
+    if (previousMode === 'whole-picture' && mode !== 'whole-picture') this.#targets.releaseInternalTarget();
     if (previousMode === 'composed' && mode !== 'composed') {
       for (const {stage} of this.#stages) this.#releasePassMemoryOf(stage);
     }
@@ -775,13 +775,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /** The two render targets this renderer builds for itself. */
   readonly #targets = new StageRendererTargets();
-  /** The `texture()` node Mode C gives its pipeline as `outputNode`, and the texture it samples. */
+  /** The `texture()` node the whole-picture mode gives its pipeline as `outputNode`, and the texture it samples. */
   #internalOutputNode?: Node;
   #internalOutputTexture?: Texture;
   /**
    * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their order
    * or names, the pipeline, `buildOutputNode` or the camera or the scene of a stage changed. Only
-   * the composed mode reads it; Mode C keeps its own node, see `#wireInternalOutputNode()`.
+   * the composed mode reads it; the whole-picture mode keeps its own node, see
+   * `#wireInternalOutputNode()`.
    */
   #outputDirty = true;
 
@@ -831,7 +832,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       case 'composed':
         this.#renderPipelineComposed(renderer, stages);
         break;
-      case 'pipeline-only':
+      case 'whole-picture':
         this.#renderPipelineSimple(renderer, stages);
         break;
       case 'plain':
@@ -843,8 +844,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   /**
    * The one place that decides how this renderer draws: without a pipeline, the stages straight
    * into the target (plain); a pipeline with `buildOutputNode`, or a `RootRenderPipeline`,
-   * composes the pass nodes of the stages (Mode D, Mode E for nested renderers); any other
-   * pipeline samples the internal target (Mode C).
+   * composes the pass nodes of the stages (composed); any other pipeline samples the internal
+   * target the stages drew into (whole-picture).
    */
   #renderMode(): StageRendererMode {
     return modeOf(this.#pipeline, this.#buildOutputNode);
@@ -937,7 +938,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * Mode C: borrow the internal target — from {@link internalTargetPool} if
+   * The whole-picture mode: borrow the internal target — from {@link internalTargetPool} if
    * set, otherwise the renderer's own —, render the stages into it, run the
    * pipeline sampling that target as `texture()`, and give it back, also when
    * a stage or the pipeline throws. The internal target is cleared in full to
@@ -1007,11 +1008,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * Mode D, and Mode E for nested renderers: for each stage, get its pass node; pre-render nested
-   * `StageRenderer` children into their pass-targets first, with linear output (see
-   * `#beginLinearOutput()`). Then run the pipeline with `buildOutputNode(passes)` as `outputNode`;
-   * it applies the output transform of the caller. Without a stage it draws its own clear and
-   * neither builds an output node nor runs the pipeline.
+   * The composed mode, nested renderers with pipelines of their own included: for each stage, get
+   * its pass node; pre-render nested `StageRenderer` children into their pass-targets first, with
+   * linear output (see `#beginLinearOutput()`). Then run the pipeline with
+   * `buildOutputNode(passes)` as `outputNode`; it applies the output transform of the caller.
+   * Without a stage it draws its own clear and neither builds an output node nor runs the pipeline.
    */
   #renderPipelineComposed(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     if (!this.#canCompose(stages)) return;
@@ -1249,7 +1250,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /**
    * Draws the stage of the item into the current target of the renderer; called for every stage
-   * of the order in the plain mode and in Mode C. The composing modes, Mode D and Mode E, take
+   * of the order in the plain mode and in the whole-picture mode. The composed mode takes
    * the `asPassNode()` of every stage and call this hook for none of them — an override that
    * draws differently has no effect there.
    */
@@ -1396,9 +1397,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (isEventized(stage)) {
       // a pass node keeps the scene and the camera it was built with: a stage that announces a
       // new one of either needs a new pass node, and with it a new output node — in the composed
-      // mode only, since the node of Mode C samples the internal target and holds neither scene
-      // nor camera, and so the flag is set here rather than through invalidateOutputNode(),
-      // which drops that node as well
+      // mode only, since the node of the whole-picture mode samples the internal target and holds
+      // neither scene nor camera, and so the flag is set here rather than through
+      // invalidateOutputNode(), which drops that node as well
       const unsubscribeChanges = on(stage, [OnStageAfterCameraChanged, OnStageAfterSceneChanged], () => {
         this.#outputDirty = true;
       });

@@ -30,7 +30,7 @@ describe('StageRenderer — pipeline integration', () => {
     host = undefined;
   });
 
-  it('Mode C: pipeline samples internal RT; the pipeline runs once per frame', async () => {
+  it('whole-picture mode: pipeline samples internal RT; the pipeline runs once per frame', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
@@ -38,7 +38,7 @@ describe('StageRenderer — pipeline integration', () => {
 
     const sr = new StageRenderer(display).setClearColor(new Color('#102030'), 1).add(stage);
     sr.pipeline = new RenderPipeline(display.renderer);
-    // No buildOutputNode → Mode C (samples internal RT as texture)
+    // No buildOutputNode → whole-picture mode (samples internal RT as texture)
 
     // subscribed after the renderer, so it runs in the same emit right behind it
     let frames = 0;
@@ -62,7 +62,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(sr.pipeline.outputNode).to.exist;
   });
 
-  it('Mode D: buildOutputNode is invoked, pipeline.outputNode is the composed graph', async () => {
+  it('composed mode: buildOutputNode is invoked, pipeline.outputNode is the composed graph', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
@@ -88,7 +88,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(lastPasses).to.have.length(1);
   });
 
-  it('Mode D: swapping the stage projection after the first frame rebuilds the output node through the new camera', async () => {
+  it('composed mode: swapping the stage projection after the first frame rebuilds the output node through the new camera', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
@@ -119,7 +119,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(lastPasses[0].camera, 'the pass node renders through the camera of the new projection').to.equal(stage.camera);
   });
 
-  it('Mode D: swapping the stage scene after the first frame rebuilds the output node for the new scene', async () => {
+  it('composed mode: swapping the stage scene after the first frame rebuilds the output node for the new scene', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
@@ -152,7 +152,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(lastPasses[0].scene, 'the pass node renders the new scene').to.equal(stage.scene);
   });
 
-  it('Mode D: a stage disposed while the renderer holds it leaves the renderer, and the next frame composes the stages that are left', async () => {
+  it('composed mode: a stage disposed while the renderer holds it leaves the renderer, and the next frame composes the stages that are left', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
     const first = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
@@ -195,7 +195,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(calls[1][0], 'the pass node of the first stage').to.equal(first.asPassNode(display.renderer));
   });
 
-  it('Mode D: a rebuild without a camera change keeps the pass node and its render target', async () => {
+  it('composed mode: a rebuild without a camera change keeps the pass node and its render target', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
@@ -263,7 +263,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(() => stage.asPassNode(display.renderer), 'and builds no further pass node').to.throw();
   });
 
-  it('Mode C: a replaced pipeline takes over the output', async () => {
+  it('whole-picture mode: a replaced pipeline takes over the output', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
     const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
@@ -363,7 +363,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgbAt(second, 64, 48, 32), [0, 255, 0]), 'the content in the second frame').to.be.true;
   });
 
-  it('Mode D: a RootRenderPipeline without stages shows the clear color of its renderer, and composes the first stage that joins it', async () => {
+  it('composed mode: a RootRenderPipeline without stages shows the clear color of its renderer, and composes the first stage that joins it', async () => {
     host = makeContainer({width: 64, height: 64});
     display = new Display(host);
     await display.start();
@@ -472,7 +472,7 @@ describe('StageRenderer — pipeline integration', () => {
     return pixels;
   }
 
-  it('Mode D: createBloomOutputNodeBuilder() keeps the stage and lays a glow around what is bright', async () => {
+  it('composed mode: createBloomOutputNodeBuilder() keeps the stage and lays a glow around what is bright', async () => {
     const withBloom = await readSquare(() => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0}));
     const control = await readSquare(
       () =>
@@ -491,7 +491,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(controlProbe, [0, 0, 0]), 'the same point without the builder').to.be.true;
   });
 
-  it('Mode D: createBloomOutputNodeBuilder() draws what stays below its threshold as the stage draws it', async () => {
+  it('composed mode: createBloomOutputNodeBuilder() draws what stays below its threshold as the stage draws it', async () => {
     const pixels = await readSquare(() => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0.9}), '#808080');
 
     // linear 0.216 is far below the threshold, so no glow is added and the composition alone stands
@@ -500,7 +500,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgbAt(pixels, 64, 46, 32), [0, 0, 0]), 'six pixels outside its edge').to.be.true;
   });
 
-  it('Mode D: a rebuild through createBloomOutputNodeBuilder() leaves the texture count of the renderer where the first build left it', async () => {
+  it('composed mode: a rebuild through createBloomOutputNodeBuilder() leaves the texture count of the renderer where the first build left it', async () => {
     await withSquare(
       () => createBloomOutputNodeBuilder({strength: 1, radius: 0, threshold: 0}),
       async ({sr, renderer}) => {
@@ -561,22 +561,22 @@ describe('StageRenderer — pipeline integration', () => {
     return rgbAt(pixels, 64, 32, 32);
   }
 
-  it('Mode E: a nested pipeline under a composing root applies the output transform once', async () => {
+  it('nested pipelines: a nested pipeline under a composing root applies the output transform once', async () => {
     const rgb = await grayThroughNestedPipeline((renderer) => new RootRenderPipeline(renderer), true);
     expect(isNearColor(rgb, [128, 128, 128], 3), `mid-gray encoded once, got ${rgb}`).to.be.true;
   });
 
-  it('Mode C: a nested pipeline under a pipeline-only root applies the output transform once', async () => {
+  it('whole-picture mode: a nested pipeline under a whole-picture root applies the output transform once', async () => {
     const rgb = await grayThroughNestedPipeline((renderer) => new RenderPipeline(renderer), false);
     expect(isNearColor(rgb, [128, 128, 128], 3), `mid-gray encoded once, got ${rgb}`).to.be.true;
   });
 
-  it('Mode C: a nested pipeline under a pipeline-only root, both on one StageRenderTargetPool, applies the output transform once', async () => {
+  it('whole-picture mode: a nested pipeline under a whole-picture root, both on one StageRenderTargetPool, applies the output transform once', async () => {
     const rgb = await grayThroughNestedPipeline((renderer) => new RenderPipeline(renderer), false, new StageRenderTargetPool());
     expect(isNearColor(rgb, [128, 128, 128], 3), `mid-gray encoded once, got ${rgb}`).to.be.true;
   });
 
-  it('Mode C: two renderers of the same size on one StageRenderTargetPool draw through one internal target, each only its own stages', async () => {
+  it('whole-picture mode: two renderers of the same size on one StageRenderTargetPool draw through one internal target, each only its own stages', async () => {
     host = makeContainer({width: 64, height: 64});
     display = new Display(host);
     await display.start();
@@ -652,7 +652,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgbAt(pixelsB, 64, 48, 32), [0, 255, 0]), 'the square of b in b').to.be.true;
   });
 
-  it('Mode C without clear leaves no tint of the renderer clear color in its internal target', async () => {
+  it('whole-picture mode without clear leaves no tint of the renderer clear color in its internal target', async () => {
     host = makeContainer({width: 64, height: 64});
     // a WebGPU clear premultiplies its color only for a renderer with alpha: without it, a clear
     // at alpha 0 keeps the RGB of the clear color. The WebGL2 backend premultiplies always.
@@ -687,7 +687,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(isNearColor(rgb, [0, 0, 0]), `where no stage draws, got ${rgb}`).to.be.true;
   });
 
-  it('Mode C with a clear that leaves out the color buffer shows only the content of the current frame', async () => {
+  it('whole-picture mode with a clear that leaves out the color buffer shows only the content of the current frame', async () => {
     host = makeContainer({width: 64, height: 64});
     display = new Display(host);
     await display.start();

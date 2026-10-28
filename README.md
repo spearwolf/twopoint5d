@@ -151,8 +151,8 @@ repository, `pnpm lookbook` serves it at
 sprite presets; [Sprites](packages/twopoint5d/docs/sprites.md) shows how to compose a
 kind of your own from features. From there:
 
-- [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) — projections,
-  several stages in one frame, post-processing
+- [Stages](packages/twopoint5d/docs/stages.md) — projections, several stages in one
+  frame, post-processing
 - [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a vertex
   object description declares, for sprites of your own
 - [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md) — what
@@ -167,9 +167,9 @@ highly experimental. The written documentation:
   [text](packages/twopoint5d/docs/text.md), [tile
   maps](packages/twopoint5d/docs/map2d.md), [display: resolution and frame
   rate](packages/twopoint5d/docs/display.md), [textures: texture
-  classes](packages/twopoint5d/docs/textures.md)
-- [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) and
-  [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md)
+  classes](packages/twopoint5d/docs/textures.md), [stages: projections, layers and
+  post-processing](packages/twopoint5d/docs/stages.md)
+- [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md)
 - [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md)
 - [Library architecture](packages/twopoint5d/docs/architecture.md) and
   [Monorepo architecture](docs/architecture.md) — Nx, the build, the publish pipeline and

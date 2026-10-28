@@ -331,7 +331,7 @@ describe('StageRenderer', () => {
   });
 
   describe('ClearStage', () => {
-    it('a ClearStage draws its clear in the plain mode and in Mode C', () => {
+    it('a ClearStage draws its clear in the plain mode and in the whole-picture mode', () => {
       // the clears of the stage: depth alone, as the defaults say
       const clearsOfStage = () =>
         renderer.clear.mock.calls.filter((args) => args[0] === false && args[1] === true && args[2] === false);
@@ -1788,7 +1788,7 @@ describe('StageRenderer', () => {
     });
   });
 
-  describe('Mode C: a pipeline that samples the internal target', () => {
+  describe('the whole-picture mode: a pipeline that samples the internal target', () => {
     function makePipelineMock() {
       return {
         outputNode: undefined as unknown,
@@ -1828,7 +1828,7 @@ describe('StageRenderer', () => {
       expect(pipeline.outputNode).toBeDefined();
     });
 
-    it('keeps the output node of Mode C through changes of stages, order, names, scenes and cameras', () => {
+    it('keeps the output node of the whole-picture mode through changes of stages, order, names, scenes and cameras', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
@@ -1858,7 +1858,7 @@ describe('StageRenderer', () => {
       }
     });
 
-    it('clears the internal target of Mode C without clear to transparent black, color and depth', () => {
+    it('clears the internal target of the whole-picture mode without clear to transparent black, color and depth', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
@@ -1879,7 +1879,7 @@ describe('StageRenderer', () => {
       expect(renderer.__clearAlpha, 'clear alpha restored').toBe(0.5);
     });
 
-    it('clears the internal target of Mode C in full before its own clear leaves out the color buffer', () => {
+    it('clears the internal target of the whole-picture mode in full before its own clear leaves out the color buffer', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
@@ -1898,7 +1898,7 @@ describe('StageRenderer', () => {
       ]);
     });
 
-    it('clears the internal target of Mode C once when its own clear covers color and depth', () => {
+    it('clears the internal target of the whole-picture mode once when its own clear covers color and depth', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
@@ -1956,7 +1956,7 @@ describe('StageRenderer', () => {
       expect(afterStages()).toEqual([{kind: 'pipeline', target: null}]);
     });
 
-    it('lets the stages of Mode C draw linear, and its own pipeline apply the output transform of the caller', () => {
+    it('lets the stages of the whole-picture mode draw linear, and its own pipeline apply the output transform of the caller', () => {
       const sr = new StageRenderer();
       sr.resize(100, 100);
       const stage = fakeStage('s');
@@ -1982,7 +1982,7 @@ describe('StageRenderer', () => {
       ]);
     });
 
-    it('lets a nested renderer with a pipeline under Mode C write linear', () => {
+    it('lets a nested renderer with a pipeline under the whole-picture mode write linear', () => {
       const parent = new StageRenderer();
       parent.resize(100, 100);
       parent.add(fakeStage('s'));
@@ -2219,7 +2219,7 @@ describe('StageRenderer', () => {
     });
   });
 
-  describe('Mode C with an internalTargetPool', () => {
+  describe('the whole-picture mode with an internalTargetPool', () => {
     const sandbox = createSandbox();
 
     afterEach(() => {
@@ -2296,11 +2296,11 @@ describe('StageRenderer', () => {
       expect((rt as any)?.isRenderTarget).toBe(true);
       expect(a.targets, 'a in both frames').toEqual([rt, rt]);
       expect(b.targets, 'b in both frames').toEqual([rt, rt]);
-      expect(a.pipeline.needsUpdate, 'the Mode C node of a stays').toBe(false);
-      expect(b.pipeline.needsUpdate, 'the Mode C node of b stays').toBe(false);
+      expect(a.pipeline.needsUpdate, 'the whole-picture node of a stays').toBe(false);
+      expect(b.pipeline.needsUpdate, 'the whole-picture node of b stays').toBe(false);
     });
 
-    it('gives a nested Mode C renderer under a Mode C parent on the same pool a target of its own', () => {
+    it('gives a nested whole-picture renderer under a whole-picture parent on the same pool a target of its own', () => {
       const pool = new StageRenderTargetPool();
       const parent = makeModeC(pool);
       const child = makeModeC(pool);
@@ -2382,7 +2382,7 @@ describe('StageRenderer', () => {
       expect(targets.at(-1)).toBe(acquire.firstCall.returnValue);
     });
 
-    it('uses the pool in Mode C only', () => {
+    it('uses the pool in the whole-picture mode only', () => {
       const pool = new StageRenderTargetPool();
       const acquire = sandbox.spy(pool, 'acquire');
 
@@ -2403,7 +2403,7 @@ describe('StageRenderer', () => {
       composed.renderTo(renderer as any);
       expect(acquire.called, 'composed mode').toBe(false);
 
-      // a child in Mode C under a composing parent: its internal target is borrowed, the
+      // a child in the whole-picture mode under a composing parent: its internal target is borrowed, the
       // pass-target the parent samples is its own
       const child = makeModeC(pool);
       const parent = new StageRenderer();
@@ -2432,7 +2432,7 @@ describe('StageRenderer', () => {
       expect(sr.internalTargetPool).toBe(pool);
     });
 
-    it('throws the error of acquire() on the next Mode C frame when its pool has been disposed', () => {
+    it('throws the error of acquire() on the next whole-picture frame when its pool has been disposed', () => {
       const pool = new StageRenderTargetPool();
       const {sr} = makeModeC(pool);
       sr.renderTo(renderer as any);
@@ -2461,7 +2461,7 @@ describe('StageRenderer', () => {
     });
   });
 
-  describe('Mode D and E: composing the pass nodes of the stages', () => {
+  describe('the composed mode: composing the pass nodes of the stages', () => {
     const sandbox = createSandbox();
 
     afterEach(() => {
@@ -3207,7 +3207,7 @@ describe('StageRenderer', () => {
       sandbox.restore();
     });
 
-    // a Mode C renderer after its first frame, and the internal target its stage drew into
+    // a whole-picture renderer after its first frame, and the internal target its stage drew into
     function makeModeC() {
       const sr = new StageRenderer();
       sr.resize(50, 50);
@@ -3228,7 +3228,7 @@ describe('StageRenderer', () => {
     ];
 
     for (const [leave, apply] of leavingModeC) {
-      it(`releases the internal target of Mode C once on leaving it through ${leave}, and draws into it on return`, () => {
+      it(`releases the internal target of the whole-picture mode once on leaving it through ${leave}, and draws into it on return`, () => {
         const {sr, targets, internalRT} = makeModeC();
         const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
 
@@ -3246,7 +3246,7 @@ describe('StageRenderer', () => {
       });
     }
 
-    it('releases nothing on a change between two Mode C pipelines', () => {
+    it('releases nothing on a change between two whole-picture pipelines', () => {
       const {sr} = makeModeC();
       const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
 
@@ -3427,7 +3427,7 @@ describe('StageRenderer', () => {
 
     const sizeOf = (rt: RenderTarget) => [rt.width, rt.height];
 
-    it('the own internal target of Mode C follows the ratio in the next frame, the same object', () => {
+    it('the own internal target of the whole-picture mode follows the ratio in the next frame, the same object', () => {
       const {sr, targets} = makeModeC();
       sr.renderTo(renderer as any);
       const first = targets[0]!;
@@ -3440,7 +3440,7 @@ describe('StageRenderer', () => {
       expect(sizeOf(first)).toEqual([75, 75]);
     });
 
-    it('a target borrowed from the pool follows the ratio in the next frame as the same object, and Mode C keeps its texture node and its pipeline', () => {
+    it('a target borrowed from the pool follows the ratio in the next frame as the same object, and the whole-picture mode keeps its texture node and its pipeline', () => {
       const {sr, targets} = makeModeC();
       const pipeline = sr.pipeline as unknown as ReturnType<typeof makePipelineMock>;
       const pool = new StageRenderTargetPool();
@@ -3956,7 +3956,7 @@ describe('StageRenderer', () => {
     // (e) has no subject here: this renderer creates neither signals nor effects.
 
     // (f) has no subject here: a target borrowed from an internalTargetPool goes back before
-    // renderTo() returns, so dispose() finds none to give back — 'Mode C with an
+    // renderTo() returns, so dispose() finds none to give back — 'the whole-picture mode with an
     // internalTargetPool' covers the return. The renderer takes no tile from a factory. The
     // stages arrive through add() and stay the caller's; the render targets it builds are its
     // own, and case (a) covers them.

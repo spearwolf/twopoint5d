@@ -19,12 +19,12 @@ export interface ClearStageOptions {
  * root.add(world).add(new ClearStage({depth: true})).add(ui);
  * ```
  *
- * It works without a pipeline and in Mode C (a pipeline without `buildOutputNode` that is not a
- * `RootRenderPipeline`), where all stages draw into one target. Under a composing pipeline every
- * stage draws into a target with a depth buffer of its own (the `pass()` node of a `Stage2D`, the
- * pass target of a nested renderer) and the composition lays them over each other: there is
- * nothing to clear between them. `StageRenderer#add()` refuses a `ClearStage` there, and so do the
- * `pipeline` and the `buildOutputNode` setter while one is among the stages.
+ * It works without a pipeline and in the whole-picture mode (a pipeline without `buildOutputNode`
+ * that is not a `RootRenderPipeline`), where all stages draw into one target. Under a composing
+ * pipeline every stage draws into a target with a depth buffer of its own (the `pass()` node of a
+ * `Stage2D`, the pass target of a nested renderer) and the composition lays them over each other:
+ * there is nothing to clear between them. `StageRenderer#add()` refuses a `ClearStage` there, and
+ * so do the `pipeline` and the `buildOutputNode` setter while one is among the stages.
  */
 export class ClearStage implements IStage, IRenderable {
   name: string;

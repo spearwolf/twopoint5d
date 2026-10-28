@@ -230,14 +230,13 @@ libraries.
   vertex-object core, what each module owns
 - [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md) — `dispose()` and
   ownership
-- [Stage layer cheat-sheet](packages/twopoint5d/src/stage/README.md) — `Display` +
-  `Stage2D` + `StageRenderer` idioms
 - [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a
   description declares and which accessors it generates
 - The guides of the library: [sprites](packages/twopoint5d/docs/sprites.md),
   [text](packages/twopoint5d/docs/text.md), [tile
   maps](packages/twopoint5d/docs/map2d.md), [display](packages/twopoint5d/docs/display.md),
-  [textures](packages/twopoint5d/docs/textures.md) — written for the users of the library; they describe the code as it is, with no
+  [textures](packages/twopoint5d/docs/textures.md),
+  [stages](packages/twopoint5d/docs/stages.md) — written for the users of the library; they describe the code as it is, with no
   internals and no history, and a new or changed feature changes its guide section in the
   same commit
 - [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers
