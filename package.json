@@ -18,7 +18,7 @@
     "test:ci": "pnpm nx run-many -t test --projects=tag:ci",
     "test:coverage": "pnpm nx run-many -t coverage",
     "test:allocations": "pnpm nx run-many -t allocations",
-    "test:browser": "pnpm nx run-many -t test --projects=tag:browser",
+    "test:browser": "pnpm nx run-many -t test --projects=tag:browser --output-style=stream",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "test:twopoint5d": "pnpm nx run-many -t test --projects=tag:twopoint5d",
     "test:affected": "pnpm nx affected -t test",

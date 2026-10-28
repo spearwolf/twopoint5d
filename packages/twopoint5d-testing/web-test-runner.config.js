@@ -73,12 +73,23 @@ function takeExpectedRejections() {
   });
 }
 
+/**
+ * What three writes once per renderer under every WebGL2 launcher, where the fallback is the
+ * point of the run — some two thousand identical lines per run, which bury every other log.
+ * renderer-backend.test.js checks the backend itself.
+ */
+const WEBGL2_FALLBACK_WARNING = 'THREE.WebGPURenderer: WebGPU is not available, running under WebGL2 backend.';
+
 export default {
   nodeResolve: true,
   // in a monorepo you need to set set the root dir to resolve modules
   rootDir: '../../',
   files: 'test/**/*.test.js',
-  reporters: [defaultReporter({reportTestResults: true, reportTestProgress: false})],
+  // The progress report is the only sign of life in a run of two minutes and more: under Nx the
+  // runner has no terminal of its own and prints it as a static block every 10 seconds. On CI
+  // (`CI` is set by GitHub Actions) those blocks would only lengthen the log.
+  reporters: [defaultReporter({reportTestResults: true, reportTestProgress: !process.env.CI})],
+  filterBrowserLogs: ({type, args}) => !(type === 'warn' && args[0] === WEBGL2_FALLBACK_WARNING),
   plugins: [esbuildPlugin({target: 'auto'})],
   // Every test file runs under both backends of three's WebGPURenderer. Which one a browser
   // would pick on its own depends on the machine — headless Chromium has no WebGPU without a
