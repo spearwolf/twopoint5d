@@ -6,15 +6,15 @@ interface StageRenderTargetPoolEntry {
 }
 
 /**
- * A pool of `RenderTarget`s that `StageRenderer`s share for the internal target of Mode C — a
- * `pipeline` without `buildOutputNode` that is not a `RootRenderPipeline`. Build one, set it as
+ * A pool of `RenderTarget`s that `StageRenderer`s share for the internal target of the whole-picture mode —
+ * a `pipeline` without `buildOutputNode` that is not a `RootRenderPipeline`. Build one, set it as
  * `internalTargetPool` on each renderer that shall share, and dispose it when the renderers are
  * done with it.
  *
- * A renderer borrows a target at the start of its Mode C draw and gives it back once its pipeline
+ * A renderer borrows a target at the start of its whole-picture draw and gives it back once its pipeline
  * has run, in the same call — also when a stage or the pipeline throws. Renderers that draw one
  * after another therefore draw through the same target; a renderer that draws during the draw of
- * another — a child with a pipeline of its own under a Mode C renderer — gets a target of its own.
+ * another — a child with a pipeline of its own under a renderer in the whole-picture mode — gets a target of its own.
  * Each renderer clears the borrowed target in full before its stages draw, as it does its own, so
  * nothing of the previous borrower stays in it.
  *
@@ -24,16 +24,16 @@ interface StageRenderTargetPoolEntry {
  *
  * A target is lent in exactly the width and height asked for, with the `type` and `samples` it was
  * built with. When no free target has the size, the oldest free one of that type and those
- * samples is resized to it — the same object, so the `texture()` node of Mode C and the pipeline
+ * samples is resized to it — the same object, so the `texture()` node of the whole-picture mode and the pipeline
  * on it stay across a change of the pixel ratio — and every other free target is released; with
  * no such target all free ones are released and a new one is built. A pool that renderers of
  * different sizes share resizes its target on every switch between them, and allocates new GPU
  * memory each time — give each size a pool of its own. A renderer that borrows while another
- * one draws — a Mode C child under a Mode C parent — finds its old target released after a change
+ * one draws — a child and its parent, both in the whole-picture mode — finds its old target released after a change
  * of size and gets a new one: the borrow that changed the size released the other free targets.
  *
  * Renderers that draw in the same order every frame borrow the same target every frame, so the
- * `texture()` node of Mode C and the pipeline built on it stay.
+ * `texture()` node of the whole-picture mode and the pipeline built on it stay.
  *
  * Ownership: the pool belongs to whoever built it. `StageRenderer#dispose()` leaves it alone.
  */
@@ -73,7 +73,7 @@ export class StageRenderTargetPool {
     }
 
     // no free target has the size: the oldest free one of the type and the samples takes it. It stays
-    // the same object, so the texture() node of Mode C and the pipeline on it stay, and three.js
+    // the same object, so the texture() node of the whole-picture mode and the pipeline on it stay, and three.js
     // releases the GPU memory of the old size in setSize()
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;

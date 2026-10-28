@@ -1,4 +1,4 @@
-// The two render targets of a `StageRenderer` — the internal target of Mode C and the pass target
+// The two render targets of a `StageRenderer` — the internal target of the whole-picture mode and the pass target
 // a composing parent draws it into — and the pixel ratio that sizes both. The internal target is
 // either built here or, with a pool set, borrowed from that pool for the length of one draw; what
 // this module releases is only what it built itself. This module is not in `public-api.ts`: only
@@ -17,16 +17,16 @@ export class StageRendererTargets {
   #pixelRatio = 1;
 
   /**
-   * The internal target of Mode C (a pipeline without buildOutputNode that is not a
-   * RootRenderPipeline), built here. Without a pool only; with one, Mode C borrows its target.
+   * The internal target of the whole-picture mode (a pipeline without buildOutputNode that is not a
+   * RootRenderPipeline), built here. Without a pool only; with one, that mode borrows its target.
    */
   #internal?: RenderTarget;
   /** The pass target a composing parent draws this renderer into and samples through `asPassNode()`. */
   #pass?: RenderTarget;
 
-  /** The pool the internal target of Mode C is borrowed from; `undefined` for a target of its own. */
+  /** The pool the internal target of the whole-picture mode is borrowed from; `undefined` for a target of its own. */
   #pool?: StageRenderTargetPool;
-  /** The target of the Mode C draw that is running — the own one or a borrowed one — until it is returned. */
+  /** The target of the whole-picture draw that is running — the own one or a borrowed one — until it is returned. */
   #lent?: RenderTarget;
   /** The pool `#lent` came from; `undefined` while `#lent` is the own target. */
   #lentFrom?: StageRenderTargetPool;
@@ -35,14 +35,14 @@ export class StageRendererTargets {
     return this.#pool;
   }
 
-  /** Stores the pool; with a pool, the internal target built here is released — Mode C borrows from then on. */
+  /** Stores the pool; with a pool, the internal target built here is released — the whole-picture mode borrows from then on. */
   set pool(pool: StageRenderTargetPool | undefined) {
     this.#pool = pool;
     if (pool) this.#dropOwnInternalTarget();
   }
 
   /**
-   * Answers the internal target for one Mode C draw: borrowed from the pool if one is set, sized in
+   * Answers the internal target for one whole-picture draw: borrowed from the pool if one is set, sized in
    * device pixels, otherwise the own one, built or brought to the size `width`×`height` asks for.
    * Every call is paired with one {@link returnInternalTarget} once the draw is over.
    */
@@ -61,7 +61,7 @@ export class StageRendererTargets {
   }
 
   /**
-   * Ends the Mode C draw {@link acquireInternalTarget} began: a borrowed target goes back to the
+   * Ends the whole-picture draw {@link acquireInternalTarget} began: a borrowed target goes back to the
    * pool it came from, even if another pool or none is set by now; an own target that was taken
    * away during the draw is released now that nothing draws into it any more.
    */

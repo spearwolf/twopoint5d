@@ -436,7 +436,7 @@ and alpha right after its clear.
 
 The targets a renderer builds for itself start every frame empty: the internal target of
 [a pipeline on the whole picture](#a-pipeline-on-the-whole-picture) and the target of a
-[nested renderer](#nested-renderers-each-with-its-own-effect) its parent composes are cleared to
+[nested renderer](#nested-pipelines-an-effect-per-layer) its parent composes are cleared to
 transparent black, color and depth; an own `clear = true` then applies on top of that.
 
 ## Off-screen: `outputRenderTarget`
@@ -472,12 +472,13 @@ on depends on what else is set:
 | `pipeline` | `buildOutputNode` | what happens |
 | --- | --- | --- |
 | none | — | the stages draw straight into the canvas or `outputRenderTarget` |
-| a `RenderPipeline` | none | **Mode C** — the stages draw into one internal target, the pipeline shows its texture |
-| a `RenderPipeline` | a callback | **Mode D** — every stage is a pass node, the callback composes them into a TSL graph |
-| a `RootRenderPipeline` | none, or a callback | Mode D, with the passes added up as the default composition |
+| a `RenderPipeline` | none | **whole picture** — the stages draw into one internal target, and the pipeline works on that one picture |
+| a `RenderPipeline` | a callback | **composed** — every stage is a pass node of its own, and the callback composes them into a TSL graph |
+| a `RootRenderPipeline` | none, or a callback | **composed**, with the passes added up as the default composition |
 
-Nesting renderers with a pipeline each is **Mode E**. Mode D and Mode E are the *composing*
-modes: there every stage has to provide a pass node.
+Renderers with a pipeline each, nested under a composing parent, are **nested pipelines**: an
+effect per layer, composed once at the top. Under a composing pipeline — the composed mode and
+nested pipelines — every stage has to provide a pass node.
 
 Two notes on the types in the examples. `Display.renderer` is `WebGPURenderer | undefined` —
 `dispose()` takes it away — so a display that is up asserts it with `!`. And `buildOutputNode`
@@ -487,7 +488,7 @@ your own casts for both.
 
 ### A pipeline on the whole picture
 
-Mode C needs no TSL at all: the stages draw into an internal target, and the renderer sets
+The whole-picture mode needs no TSL at all: the stages draw into an internal target, and the renderer sets
 `pipeline.outputNode` to a `texture()` node of it.
 
 ```ts
@@ -505,7 +506,7 @@ next frame.
 
 #### Sharing the internal target: `StageRenderTargetPool`
 
-Each renderer in Mode C holds an internal target of its own. Several of them of the same size —
+Each renderer in the whole-picture mode holds an internal target of its own. Several of them of the same size —
 children with a pipeline each under a composing root, say — can share one through a
 `StageRenderTargetPool` set as `internalTargetPool`:
 
@@ -534,12 +535,13 @@ for (const name of ['back', 'front']) {
 
 A renderer borrows the target for its draw and gives it back once its pipeline has run — also
 when a stage or the pipeline throws. Renderers that draw one after another share one target; a
-renderer that draws while another one holds the target, such as a child inside a parent in Mode
-C, gets a second one from the pool. The pool lends targets of exactly the size asked for: give
-renderers of different sizes a pool each, or the pool resizes its target at every switch between
+renderer that draws while another one holds the target, such as a child inside a parent that is
+in the whole-picture mode as well, gets a second one from the pool. The pool lends targets of
+exactly the size asked for: give renderers of different sizes a pool each, or the pool resizes its
+target at every switch between
 them and allocates new GPU memory each time. Without a pool nothing changes.
 
-### Composing passes: `buildOutputNode`
+### Composed: one pass per stage, `buildOutputNode`
 
 For a real effect, `buildOutputNode(stagePasses)` receives the pass node of every stage, in the
 render order, and returns the output node of the pipeline. The bloom over everything comes ready
@@ -623,9 +625,9 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 A `buildOutputNode` you set still wins over the additive default; the composition itself is
 `RootRenderPipeline.buildOutputNode(passes)`, for a callback of your own to build on.
 
-### Nested renderers, each with its own effect
+### Nested pipelines: an effect per layer
 
-Mode E puts the pieces together: a child renderer with a pipeline of its own renders its layer
+Nested pipelines put the pieces together: a child renderer with a pipeline of its own renders its layer
 with its effect into a texture, and the parent composes that texture with the other layers in its
 own pipeline.
 
@@ -648,7 +650,7 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 The child's pipeline writes linear: while the root draws its children, `renderer.toneMapping` is
 `NoToneMapping` and `renderer.outputColorSpace` the working color space, restored before its own
 pipeline runs. Tone mapping and the output encoding apply once, in the outermost pipeline. The
-same holds for a child with a pipeline under a renderer in Mode C. The lookbook demo *stage nested
+same holds for a child with a pipeline under a renderer in the whole-picture mode. The lookbook demo *stage nested
 pipelines* runs this setup.
 
 ### One writer per canvas
@@ -658,8 +660,8 @@ A `RenderPipeline` expects to make the last draw to its target. A `pipeline.rend
 two is lost, under WebGPU and under WebGL 2 alike. Two patterns are stable:
 
 1. **One pipeline at the top.** Post-processing beside plain stages on one canvas: the outermost
-   renderer gets the pipeline and composes every child — Mode D or Mode E. The outer pipeline makes
-   the one draw to the canvas.
+   renderer gets the pipeline and composes every child — the composed mode, or nested pipelines.
+   The outer pipeline makes the one draw to the canvas.
 2. **No mixed writers.** A root without a pipeline whose children write to the canvas, some through
    a pipeline and some plain, is not supported.
 
@@ -898,7 +900,7 @@ pipeline.dispose();
   to `pipeline`, `buildOutputNode` or `internalTargetPool` is ignored; another renderer refuses it
   as a child or a parent. A disposed `Stage2D` ignores `resize()`, `updateFrame()`, `renderTo()` and
   writes to `projection` and `camera`, and `asPassNode()` throws.
-- A renderer that leaves a composing mode, or a stage that leaves a renderer, releases the GPU
+- A renderer that leaves the composed mode, or a stage that leaves a renderer, releases the GPU
   memory of the targets behind the pass nodes, but keeps the nodes: three.js allocates the memory
   again on the next draw that needs it.
 
@@ -917,7 +919,7 @@ pipeline.dispose();
 - **Shared names in `renderOrder`.** Stages that share a listed name draw together at its
   position, and the renderer warns. Give them names of their own.
 - **`ClearStage` under a composing pipeline.** Refused with a `TypeError`; it belongs to layers
-  without a pipeline and to Mode C.
+  without a pipeline and to the whole-picture mode.
 - **Mixed writers on the canvas.** One pipeline at the top composes everything — see
   [one writer per canvas](#one-writer-per-canvas).
 - **Disposing a stage a renderer still holds.** A stage of your own without `OnStageDispose` goes
@@ -942,7 +944,7 @@ pipeline.dispose();
 | `ClearStage` | clears depth (by default), color or stencil between two stages |
 | `Canvas2DStage` | a 2D canvas on a sprite in a stage of its own |
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |
-| `StageRenderTargetPool` | one internal target for several renderers in Mode C |
+| `StageRenderTargetPool` | one internal target for several renderers in the whole-picture mode |
 | `createBloomOutputNodeBuilder()` | a ready-made `buildOutputNode`: the sum of the passes with a bloom on top |
 | `fitIntoRectangle()` | the arithmetic of the fit, for a layout of your own; `calculateAnchorOffset()` places the result in a container |
 
@@ -961,9 +963,9 @@ pipeline.dispose();
 | mode | set up as | the picture |
 | --- | --- | --- |
 | layers | no `pipeline` | every stage straight into the target, one over the other |
-| Mode C | `pipeline` = a `RenderPipeline`, no `buildOutputNode` | all stages into one internal target, the pipeline on its texture |
-| Mode D | `pipeline` + `buildOutputNode`, or a `RootRenderPipeline` | one pass per stage, composed in TSL |
-| Mode E | nested renderers with a pipeline each, under a composing parent | an effect per layer, composed once at the top |
+| whole picture | `pipeline` = a `RenderPipeline`, no `buildOutputNode` | all stages into one internal target, the pipeline on its texture |
+| composed | `pipeline` + `buildOutputNode`, or a `RootRenderPipeline` | one pass per stage, composed in TSL |
+| nested pipelines | nested renderers with a pipeline each, under a composing parent | an effect per layer, composed once at the top |
 
 ### The defaults
 
