@@ -14,7 +14,10 @@ export * from './RootRenderPipeline.js';
 export * from './Stage2D.js';
 export type {
   StageDirectorLayer,
+  StageDirectorShape,
+  StageDirectorShapeSlot,
   StageLayerMode,
+  StagePrecompileOptions,
   StagePushOptions,
   StageShowOptions,
   StageTransitionOptions,

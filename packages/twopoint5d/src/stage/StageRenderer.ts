@@ -811,20 +811,23 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       const prev = renderer.getRenderTarget();
       renderer.setRenderTarget(this.outputRenderTarget);
       try {
-        this.#renderToCurrentTarget(renderer);
+        this.renderToCurrentTarget(renderer);
       } finally {
         renderer.setRenderTarget(prev);
       }
     } else {
-      this.#renderToCurrentTarget(renderer);
+      this.renderToCurrentTarget(renderer);
     }
   }
 
   /**
    * Render contribution into the renderer's CURRENT target, ignoring
-   * `outputRenderTarget`, in the mode `#renderMode()` picks.
+   * `outputRenderTarget`, in the mode `#renderMode()` picks. Both ways a renderer is drawn go
+   * through here — its own `renderTo()`, and a parent that composes it into its pass target —, so
+   * a subclass that prepares its draw overrides this, not `renderTo()`. A `StageDirector` picks the
+   * shape of its stack here.
    */
-  #renderToCurrentTarget(renderer: WebGPURenderer): void {
+  protected renderToCurrentTarget(renderer: WebGPURenderer): void {
     // read once: a stage that add() or remove() brings in or takes out while the stages draw is
     // reached from the next call on, and every step of this call sees the same stages
     const stages = this.orderedStages;
@@ -1073,7 +1076,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       // would stay underneath. A child whose own clear covers color and depth and reaches
       // the target in this frame overwrites it itself.
       if (!child.#clearsWholeTarget()) this.#clearToTransparentBlack(renderer);
-      child.#renderToCurrentTarget(renderer);
+      child.renderToCurrentTarget(renderer);
     } finally {
       renderer.setRenderTarget(prev);
     }

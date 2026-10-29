@@ -757,6 +757,65 @@ With `manual: true` the director does not advance the transition: the caller wri
 clamped to `[0, 1]`, and ends it with `complete()` or `cancel()`. `duration` and `easing` do not
 apply.
 
+### No hitch on the first transition
+
+The first time the stack takes a shape — the title dissolving into the level, the pause menu
+fading in over it — the director builds a shader for it, in the frame the player pressed Start.
+Name the shapes ahead and they compile at start, while the title runs:
+
+```ts
+const dissolveIn = dissolve({scale: 4});
+const fadeIn = fade();
+
+await director.precompile(
+  display.renderer!,
+  [
+    ['layer', 'layer'], // the stars below the title
+    ['layer', dissolveIn], // the stars below the title dissolving into the level
+    ['layer', 'layer', fadeIn], // the pause menu fading in over the frozen level
+  ],
+  // drawn once off screen: their sprites and the bloom of the level build now
+  {layers: [level, pauseMenu]},
+);
+```
+
+A shape lists the slots of the stack bottom to top: `'layer'` for a slot that shows a layer, the
+effect for a slot in a transition — the same effect object the transition will take, since the
+director tells shapes apart by their effect objects. A shape drawn or compiled before is skipped.
+
+The shapes cover the composition of the director. A layer builds its own materials and pipelines
+on its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
+their first frame in the stack builds nothing. A stage that is not in the stack yet takes the size
+of the director for that draw, so call `precompile()` once the display runs, and outside of a
+frame.
+
+### One scene into another, as a whole
+
+A transition changes one slot. To fade the whole picture of one scene — stars, level and HUD —
+into the whole picture of another, give each scene a director of its own and let an outer
+director change between them:
+
+```ts
+const game = new StageDirector().setStack([stars, level, hud]);
+const gameOver = new StageDirector().setStack([backdrop, scoreBoard]);
+
+const screen = new StageDirector(display).setStack([game]);
+const sceneChange = dissolve();
+screen.replace(game, gameOver, {effect: sceneChange, duration: 1.2});
+```
+
+The outer director sees each inner one as one layer with one picture, so the effect runs over the
+composed scene, not slot by slot.
+
+An inner director draws into a target of the outer one, not onto the canvas, and its
+`precompile()` compiles for that place once it is a layer. For a scene that waits for its turn,
+say so ahead:
+
+```ts
+await gameOver.precompile(display.renderer!, [['layer', 'layer']], {nested: true});
+await screen.precompile(display.renderer!, [[sceneChange]], {layers: [gameOver]});
+```
+
 ### The stack and its slots
 
 The stack is a list of **slots**, bottom to top. A slot shows one layer, or a transition between
@@ -921,6 +980,10 @@ Every layer in the stack has a target the size of the drawing buffer, as a neste
 (see [what a pipeline costs](#what-a-pipeline-costs)). A frozen layer keeps its target and draws
 nothing. A transition costs its two sources — both draw while it runs, unless one is frozen — and
 no draw of its own: it is a part of the one quad of the director's pipeline.
+
+A shape the stack has not had before builds a shader on its first frame; every later visit to it
+swaps textures and builds nothing. [`precompile()`](#no-hitch-on-the-first-transition) moves that
+build to the start.
 
 ## A 2D canvas as a stage: `Canvas2DStage`
 
@@ -1188,8 +1251,9 @@ pipeline.dispose();
 - **A layer that hides the stack below.** An effect that writes an alpha of 1 everywhere — the
   `bloom()` of three.js does — makes its layer opaque in a `StageDirector`. Keep the alpha of the
   layer and add the glow to its color: `vec4(composed.rgb.add(glow.rgb), composed.a)`.
-- **A new effect object per transition.** Each one builds a shader on its first use. Make the
-  effects once and reuse them.
+- **A new effect object per transition.** Each one builds a shader on its first use, and a shape
+  compiled with one effect object does not match a transition with another. Make the effects once
+  and reuse them — in `precompile()` and in the transitions.
 
 ## Cheat sheet
 
@@ -1208,7 +1272,7 @@ pipeline.dispose();
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |
 | `StageRenderTargetPool` | one internal target for several renderers in the whole-picture mode |
 | `createBloomOutputNodeBuilder()` | a ready-made `buildOutputNode`: the sum of the passes with a bloom on top |
-| `StageDirector` | a stack of layers, changed through transitions — `show`, `hide`, `replace`, `push`, `pop` |
+| `StageDirector` | a stack of layers, changed through transitions — `show`, `hide`, `replace`, `push`, `pop`; `precompile()` builds the shaders of its shapes and draws layers once ahead |
 | `StageTransition` | one change of the stack: `state`, `progress`, `finished`, `complete()`, `cancel()`, `reverse()` |
 | `crossfade()`, `fade()`, `dipToColor()`, `wipe()`, `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()` | the transition effects |
 | `createTransitionNode()` | the node of an effect, for a `buildOutputNode` of your own |

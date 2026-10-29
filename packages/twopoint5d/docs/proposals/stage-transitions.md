@@ -1,12 +1,12 @@
 # Proposal: stage transitions — `StageDirector` and transition effects
 
-Status: **phase A and B implemented** — see [`docs/stages.md`](../stages.md), "Stage transitions",
+Status: **phases A, B and C implemented** — see [`docs/stages.md`](../stages.md), "Stage transitions",
 and its cheat sheet; the Vitest specs `src/stage/StageDirector.spec.ts`,
 `src/stage/transitionEffects.spec.ts` and `src/stage/hot-path-allocations.director.spec.ts`, the
 browser test `packages/twopoint5d-testing/test/stage-transitions.test.js`, and the lookbook demos
-`stage-transitions-game-menu` and `stage-transitions-gallery` (§11). Open: phase C — `precompile()`
-and the questions of §12. Deviations of the build from the first draft of this spec, which the
-sections below now state as built:
+`stage-transitions-game-menu` and `stage-transitions-gallery` (§11). Open: nothing (§12).
+Deviations of the build from the first draft of this spec, which the sections below now state as
+built:
 
 - a change without an `effect`, a `duration` above 0 or `manual` lands in the call itself, not in
   the next frame, and emits both events there; `duration` defaults to 0 without an effect (§3.2,
@@ -21,7 +21,16 @@ sections below now state as built:
 - the named easings are worked out in place, not through a call, so that their frame allocates
   nothing (§5.2);
 - `push()` with `below: 'freeze'` finishes a transition that runs in the slot below first (§4.3);
-- an effect's `dispose(node)` runs in the director's `dispose()`, where its graphs go (§6.1, §8).
+- an effect's `dispose(node)` runs in the director's `dispose()`, where its graphs go (§6.1, §8);
+- `precompile()` takes the renderer along with the shapes, and a shape is a list of `'layer'` and
+  effect objects (§7.1);
+- every texture node of a shape samples a placeholder of its own while it has no pass, not one
+  empty texture shared by all (§7.1);
+- `precompile()` also draws the stages of its `layers` option once, off screen, and compiles a
+  director inside a renderer that composes for its pass target there (§7.1);
+- a fourth seam in `StageRenderer`: the draw of a renderer is the protected
+  `renderToCurrentTarget()`, which a parent that composes calls as well, and the director prepares
+  its shape there instead of in `renderTo()` (§9).
 
 A game is rarely one stage. It opens on a title menu, cuts to a loading screen, plays a level,
 lays a pause menu over the frozen level and goes back to the title. Today a `StageRenderer` can
@@ -424,19 +433,55 @@ director therefore keeps the structure of its graph apart from what fills it:
 - **The graph of a shape** has a `TextureNode` per source and a progress uniform per transition
   slot, and a `RootRenderPipeline` of its own whose output node it is. The director keeps both
   per shape it has drawn, and fills a graph by pointing the `value` of its texture nodes at the
-  pass textures of the layers and at the empty texture, a 1×1 target of the output buffer type
-  cleared to transparent black. All pass targets of a director have the size and the type of its
-  own, so a swapped texture changes a binding, not the shader — three.js compares the `value` of
-  a texture node with the texture of its binding on every draw, and its flip of a render target
-  is a uniform.
+  pass textures of the layers. A texture node without a pass — the side of a transition that
+  shows nothing — samples a placeholder of its own, a 1×1 target of the output buffer type cleared
+  to transparent black; the director keeps one per texture node of its largest shape. No two
+  texture nodes of a graph ever sample the same texture: three.js shares one uniform among the
+  uniform nodes of a graph that hash alike, and a texture node hashes by the uuid of its texture —
+  two nodes on one texture while the graph builds would sample one binding for good. All pass
+  targets of a director have the size and the type of its own, so a swapped texture changes a
+  binding, not the shader — three.js compares the `value` of a texture node with the texture of
+  its binding on every draw, and its flip of a render target is a uniform.
 - A change of the stack that keeps the shape — the second `replace()` of the menu, every
   `crossfade()` between any two layers in the same slot — swaps textures. A change that makes a new
   shape builds its graph and its pipeline once; every later visit to that shape switches to its
   pipeline, whose material is built already, and runs no `NodeBuilder`.
 
-A first visit to a shape still builds a shader. `director.precompile(shapes)`, which would build
-and compile graphs ahead of time through `renderer.compileAsync()` for a game that knows its
-transitions, is phase C and not built — see §12.2.
+A first visit to a shape builds a shader, unless the game names the shape ahead:
+
+```ts
+await director.precompile(renderer, [
+  ['layer', 'layer'], // stars below the title
+  ['layer', dissolveIn], // the title dissolving into the level
+  ['layer', 'layer', fadeIn], // the pause menu fading in over the frozen level
+]);
+```
+
+A shape lists its slots bottom to top, `'layer'` for a layer and the effect object for a
+transition — the object the transition will take, since shapes are told apart by their effect
+objects. `precompile()` builds the graph and the pipeline of every shape it has not seen and
+compiles it through `RenderPipeline#render()` itself, with the one draw of the pipeline turned into
+a `renderer.compileAsync()` of its quad: the pipeline sets the renderer up as for a frame — linear
+output, no XR — and its quad puts on the vertex node it draws with, so the node build sees what
+a frame would see and the first frame of the shape finds its material built. The target is the
+director's `outputRenderTarget`, or else the renderer's current one, the canvas outside of a frame.
+The shapes compile one after the other and the frames between them go on; a shape drawn or
+compiled before is skipped, and a disposed director resolves at once.
+
+The shapes cover the composition of the director. The materials and pipelines of a layer build on
+its first draw, and a bloom of a layer builds its passes only in a draw — a compile never reaches
+the nodes that render before the quad. `precompile(renderer, shapes, {layers})` therefore draws
+each of `layers` once, off screen, as the director draws a layer: into a target of the type and the
+samples of its pass targets, on linear output. three.js keys its builds by format, type and samples
+of the target and by the output transform, not by its size, so the first frame of the layer in the
+stack finds every build in place. A stage that is no layer of the director yet takes the size of
+the director first.
+
+A director that is a layer of another one — or of any `StageRenderer` that composes — draws into a
+pass target of its parent on linear output, and its pipeline applies no output transform. Its
+`precompile()` compiles for that place when a renderer that composes holds it; `nested: true` says
+so ahead, for a director whose parent comes later — a scene that waits for its turn as a layer of
+an outer director (§15).
 
 ### 7.2 What a frame costs
 
@@ -470,7 +515,7 @@ transition that had it as a source ends as `cancelled` with the other source in 
 
 ## 9. The seams in `StageRenderer`
 
-The director is a subclass and needs three changes in `src/stage/StageRenderer.ts`, none of which
+The director is a subclass and needs four changes in `src/stage/StageRenderer.ts`, none of which
 a user of `StageRenderer` sees:
 
 1. **`orderedStages` from the subclass.** The director overrides the getter with its stack order;
@@ -485,6 +530,10 @@ a user of `StageRenderer` sees:
    The director's composer answers the cached graph of a shape, and an unchanged shape costs no
    shader build. A `buildOutputNode` of one's own that answers the same node after changing the
    graph behind it sets `pipeline.needsUpdate` itself.
+4. **One draw for both ways in.** `renderTo()` and a parent that composes a renderer into its pass
+   target both call the protected `renderToCurrentTarget()`. The director picks the shape of its
+   stack and fills its uniforms there, so a director that is a layer of another one draws its own
+   transitions.
 
 ## 10. Tests
 
@@ -502,6 +551,12 @@ a user of `StageRenderer` sees:
   memory, a wrapper built and disposed, a stage disposed in the stack;
 - the shape cache of §7.1: the same shape answers the same output node, so the pipeline gets
   `needsUpdate` once per new shape (with the stub renderer of the existing `StageRenderer.spec.ts`);
+- `precompile()`: one compile per new shape, into the target of the director, the renderer given
+  back as it was; the stages of `layers` drawn once into a target of the pass type on linear
+  output, a stage that is no layer resized to the director first; the compile for a pass target on
+  linear output inside a renderer that composes and with `nested: true`, for the director's own
+  target with `nested: false`; the first frame of a compiled shape builds no context; a
+  shape drawn before and a disposed director compile nothing; every refusal with its message;
 - events: order, props, a throwing listener; `dispose()` cancelling transitions;
 - the effects build with every option and keep their names; `createTransitionNode()` with a
   `TextureNode`, a `PassNode` and `null`;
@@ -522,7 +577,18 @@ Under WebGPU and under WebGL 2, with two layers of flat known colors:
 - a layer with a bloom pipeline of its own under the director keeps its bloom, and the output
   transform applies once;
 - the texture swap of §7.1: a second `replace()` with the same effect into a third layer shows
-  that layer, under both backends.
+  that layer, under both backends;
+- `precompile()`: the first frame of a compiled shape creates no node builder and shows the right
+  mix;
+- the placeholders of §7.1: a shape first built while two of its sources show nothing shows each
+  source of its own once both have layers;
+- a material with `premultipliedAlpha: true` in a layer composes as the default blending does;
+- a director as a layer of another one: a crossfade between two such directors mixes their
+  composed pictures;
+- `precompile()` with `layers`: the first frame of a layer drawn off screen creates no node
+  builder in the stack;
+- `precompile()` of a director inside another one: the first frame of a transition inside it
+  shows the right mix and creates no node builder.
 
 ## 11. The lookbook
 
@@ -544,6 +610,10 @@ The demo of the feature: a game menu that goes into a game and back.
   `replace(level, title, {effect: dipToColor()})`.
 - **The `<demo-ui>`.** A select of every built-in effect, a duration slider, an easing select, a
   checkbox "freeze the outgoing layer".
+- **`precompile()`.** At start the demo compiles every shape of its flow — the title, each effect
+  of the select into the level, the pause menu over the level and the dip back to the title —
+  and draws the level and the pause menu once off screen, while the title runs. The flow of start,
+  pause, resume and quit builds no shader after that.
 - The assets come from `apps/lookbook/public/assets/` as they are (`skinball-256.png`, the
   spearwolf logo, the bitmap font of the text demos); the demo needs no new generated asset.
 
@@ -562,28 +632,12 @@ Every effect, side by side with its options — the visual test of the effect li
   files for them.
 - The custom effect of §6.3 is in the list as "wobble (custom)", to show that an effect of one's own
   plugs in the same way.
+- At start the gallery compiles the shape of every effect under the label.
 
 ## 12. Open questions
 
-1. **The name.** `StageDirector` follows the director of scene-based game engines and says that
-   it decides what is on stage. `StageStack` says what it holds, `StageSwitcher` what it does in
-   the simplest case. The proposal uses `StageDirector`; the event and option names follow it.
-2. **The shader build on a first shape.** How long the `NodeBuilder` and the compile of a graph
-   with one transition slot take under WebGPU and under WebGL 2 is not measured yet. If a first
-   transition hitches visibly on a mid-range phone, `precompile()` (§7.1) becomes part of the
-   first phase and the demos call it at start; if not, it stays in the last one.
-3. **A second transition on a busy slot.** Finishing the running one (§5.2) is simple and
-   predictable, but a visible jump when the first was far from its end. The alternative freezes
-   the current picture of the slot into a target of its own and starts from that picture — one
-   more target and a copy, for a smoother cut. Which one the menus of a real game need is open.
-4. **Transitions of the whole stack.** A transition from one whole stack into another — every
-   layer at once, through one effect — is a director nested as a layer in another director, with
-   one stack per scene. Whether that is enough or whether `director.transitionStack(stages, opts)`
-   earns a place of its own is open.
-5. **Materials that are premultiplied already.** A material with `premultipliedAlpha: true` drawn
-   into a transparent target gives a different alpha than the default blending does. The browser
-   test of §10.2 holds the default; whether such materials need a note in the guide or a flag on
-   the layer is open.
+None. A second transition on a busy slot finishes the running one (§5.2); a material with
+`premultipliedAlpha: true` composes as the default blending does (§10.2).
 
 ## 13. Phases
 
@@ -591,7 +645,7 @@ Every effect, side by side with its options — the visual test of the effect li
 | --- | --- |
 | A — built | the seams of §9; `StageDirector` with the stack, the methods of §3.2, run and freeze, timing, events, disposal; `crossfade()`, `fade()`, `dipToColor()`, `wipe()`; the shape cache; the tests of §10 for these; the demo of §11.1 with these four effects |
 | B — built | `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()`; `createTransitionNode()`; manual progress; the demo of §11.2; the effect select of §11.1 with every effect |
-| C — open | `precompile()`, per §12.2; whatever §12.3 and §12.4 decide |
+| C — built | `precompile()` of §7.1 with shapes, layers and the nested place, its tests, the calls in both demos (§11); the placeholders of §7.1; the fourth seam of §9 |
 
 ## 14. Docs and CHANGELOG
 
@@ -612,5 +666,9 @@ Every effect, side by side with its options — the visual test of the effect li
 - **Transitions in the plain and the whole-picture mode.** A transition needs both sources as
   textures at once; the director composes, always.
 - **Sound.** A transition has events and a promise; a game starts its sound from them.
+- **A transition of the whole stack in one method.** A director that is a layer of another one is
+  a stack of its own, and a transition of that layer runs one effect over the whole picture of
+  the stack: one director per scene, an outer director that changes between them — a recipe in
+  [`docs/stages.md`](../stages.md), not a method.
 - **Effects in 3D.** A page curl or a cube turn is an effect of one's own (§6.3) that distorts
   the uv; the library ships none.

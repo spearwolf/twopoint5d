@@ -1,5 +1,5 @@
 import {on} from '@spearwolf/eventize';
-import {ACESFilmicToneMapping, Color, FloatType, SRGBColorSpace} from 'three/webgpu';
+import {ACESFilmicToneMapping, Color, FloatType, NoToneMapping, RenderPipeline, RenderTarget, SRGBColorSpace} from 'three/webgpu';
 import {beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
 import {OnStageTransitionEnd, OnStageTransitionStart, type StageTransitionProps} from '../events.js';
 import {ClearStage} from './ClearStage.js';
@@ -33,6 +33,9 @@ function createRendererMock() {
     toneMapping: ACESFilmicToneMapping,
     outputColorSpace: SRGBColorSpace,
     xr: {enabled: false},
+    initialized: true,
+    init: vi.fn(async () => {}),
+    compileAsync: vi.fn(async (_scene: unknown, _camera: unknown) => {}),
   };
   m.setRenderTarget.mockImplementation((rt) => {
     m.__renderTarget = rt;
@@ -417,6 +420,146 @@ describe('StageDirector', () => {
       draw();
       expect(renderer.clear).toHaveBeenCalled();
       expect(renderer.render).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('precompile()', () => {
+    it('builds and compiles each shape once, on linear output into the target of the director', async () => {
+      const target = new RenderTarget(64, 64);
+      director.outputRenderTarget = target;
+      const seen: unknown[] = [];
+      renderer.compileAsync.mockImplementation(async () => {
+        seen.push([renderer.__renderTarget, renderer.toneMapping, renderer.xr.enabled]);
+      });
+      const effect = crossfade();
+      const render = renderer.render;
+      await director.precompile(renderer as any, [['layer'], ['layer', effect], ['layer', effect]]);
+
+      expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+      expect(seen).toEqual([
+        [target, NoToneMapping, false],
+        [target, NoToneMapping, false],
+      ]);
+      // the renderer is given back as it was
+      expect(renderer.__renderTarget).toBe(null);
+      expect(renderer.toneMapping).toBe(ACESFilmicToneMapping);
+      expect(renderer.outputColorSpace).toBe(SRGBColorSpace);
+      expect(renderer.render).toBe(render);
+      expect(render).not.toHaveBeenCalled();
+      target.dispose();
+    });
+
+    it('leaves the first frame of a compiled shape nothing to build', async () => {
+      const updateContext = vi.spyOn(RenderPipeline.prototype as any, '_updateContext');
+      try {
+        const effect = crossfade();
+        await director.precompile(renderer as any, [['layer'], [effect]]);
+        expect(updateContext).toHaveBeenCalledTimes(2);
+
+        director.setStack([a]);
+        draw();
+        director.replace(a, b, {effect, duration: 1});
+        draw();
+        expect(updateContext).toHaveBeenCalledTimes(2);
+        expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+      } finally {
+        updateContext.mockRestore();
+      }
+    });
+
+    it('skips a shape it has drawn already, and a disposed director compiles nothing', async () => {
+      director.setStack([a]);
+      draw();
+      await director.precompile(renderer as any, [['layer']]);
+      expect(renderer.compileAsync).not.toHaveBeenCalled();
+
+      director.dispose();
+      await director.precompile(renderer as any, [[crossfade()]]);
+      expect(renderer.compileAsync).not.toHaveBeenCalled();
+    });
+
+    it('draws the stages of layers once, off screen, as it draws a layer', async () => {
+      director.resize(64, 32, 2);
+      director.setStack([a]);
+      const seen: unknown[] = [];
+      for (const stage of [a, b]) {
+        stage.renderTo.mockImplementation(() => {
+          const target = renderer.__renderTarget as RenderTarget;
+          seen.push([stage.name, target.width, target.height, target.texture.type, renderer.toneMapping]);
+        });
+      }
+      a.resize.mockClear();
+      await director.precompile(renderer as any, [], {layers: [a, b]});
+
+      expect(seen).toEqual([
+        ['a', 128, 64, FloatType, NoToneMapping],
+        ['b', 128, 64, FloatType, NoToneMapping],
+      ]);
+      // a stage that is no layer yet takes the size of the director; a layer has it already
+      expect(b.resize).toHaveBeenCalledWith(64, 32, 2);
+      expect(a.resize).not.toHaveBeenCalled();
+      expect(renderer.__renderTarget).toBe(null);
+      expect(renderer.toneMapping).toBe(ACESFilmicToneMapping);
+      expect(renderer.compileAsync).not.toHaveBeenCalled();
+    });
+
+    it('compiles for a pass target on linear output inside a renderer that composes, or when told so', async () => {
+      // the tone mapping each pipeline builds its output transform for
+      const updateContext = vi.spyOn(RenderPipeline.prototype as any, '_updateContext');
+      const targets: unknown[] = [];
+      renderer.compileAsync.mockImplementation(async () => {
+        targets.push(renderer.__renderTarget);
+      });
+      try {
+        await director.precompile(renderer as any, [['layer']]);
+        await director.precompile(renderer as any, [['layer', 'layer']], {nested: true});
+        const outer = new StageDirector();
+        outer.setStack([director]);
+        await director.precompile(renderer as any, [[crossfade()]]);
+        await director.precompile(renderer as any, [[crossfade()]], {nested: false});
+        outer.dispose();
+        expect(updateContext.mock.contexts.map((pipeline) => (pipeline as {_toneMapping: unknown})._toneMapping)).toEqual([
+          ACESFilmicToneMapping,
+          NoToneMapping,
+          NoToneMapping,
+          ACESFilmicToneMapping,
+        ]);
+      } finally {
+        updateContext.mockRestore();
+      }
+      expect(targets[0]).toBe(null);
+      expect((targets[1] as RenderTarget).isRenderTarget).toBe(true);
+      expect((targets[2] as RenderTarget).texture.type).toBe(FloatType);
+      expect(targets[3]).toBe(null);
+    });
+
+    it('refuses shapes it cannot take', async () => {
+      const subject = 'StageDirector#precompile()';
+      await expect(director.precompile(renderer as any, 'layer' as any)).rejects.toThrow(
+        `${subject}: shapes must be an array of shapes, got "layer"`,
+      );
+      await expect(director.precompile(renderer as any, [[]])).rejects.toThrow(
+        `${subject}: shapes[0] must be a non-empty array of 'layer' and StageTransitionEffect`,
+      );
+      await expect(director.precompile(renderer as any, [['layer', 'fade' as any]])).rejects.toThrow(
+        `${subject}: shapes[0][1] must be 'layer' or a StageTransitionEffect, got "fade"`,
+      );
+      await expect(director.precompile(renderer as any, [], 'layers' as any)).rejects.toThrow(
+        `${subject}: the options must be an object, got "layers"`,
+      );
+      await expect(director.precompile(renderer as any, [], {layers: a as any})).rejects.toThrow(
+        `${subject}: layers must be an array of stages`,
+      );
+      await expect(director.precompile(renderer as any, [], {layers: [{} as any]})).rejects.toThrow(
+        `${subject}: layers[0] must be a stage with renderTo()`,
+      );
+      await expect(director.precompile(renderer as any, [], {layers: [director]})).rejects.toThrow(
+        `${subject}: layers[0] is this director`,
+      );
+      await expect(director.precompile(renderer as any, [], {nested: 1 as any})).rejects.toThrow(
+        `${subject}: nested must be a boolean, got 1`,
+      );
+      expect(renderer.compileAsync).not.toHaveBeenCalled();
     });
   });
 

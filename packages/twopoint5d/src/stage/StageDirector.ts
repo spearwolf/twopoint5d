@@ -2,9 +2,12 @@ import {emitStrict, isEventized, on} from '@spearwolf/eventize';
 import {float, texture, uniform, uv} from 'three/tsl';
 import {
   Color,
+  ColorManagement,
   type Node,
+  NoToneMapping,
   RenderTarget,
   type RenderPipeline,
+  type Texture,
   type TextureNode,
   type UniformNode,
   Vector2,
@@ -67,6 +70,30 @@ export interface StagePushOptions extends StageShowOptions {
   below?: StageLayerMode;
 }
 
+/**
+ * A slot of a shape for `StageDirector#precompile()`: a layer, or a transition through this
+ * effect — the same effect object the transition will take.
+ */
+export type StageDirectorShapeSlot = 'layer' | StageTransitionEffect;
+
+/** A shape of the stack for `StageDirector#precompile()`: its slots, from the bottom up. */
+export type StageDirectorShape = readonly StageDirectorShapeSlot[];
+
+/** The options of `StageDirector#precompile()`. */
+export interface StagePrecompileOptions {
+  /**
+   * Stages to draw once, off screen, into a target of the kind the director draws its layers into:
+   * their materials and pipelines build there, not on their first frame in the stack. Default none.
+   */
+  layers?: readonly StageDirectorLayer[];
+  /**
+   * Compile the shapes for a place of the director inside another renderer — into a target of
+   * the kind a composing parent draws its layers into, on linear output. Default: whether a
+   * `StageRenderer` that composes holds the director, a `StageDirector` above all.
+   */
+  nested?: boolean;
+}
+
 interface Layer {
   /** The stage the caller handed in. */
   readonly stage: StageDirectorLayer;
@@ -107,6 +134,9 @@ interface Shape {
   readonly pipeline: RootRenderPipeline;
   readonly slots: readonly ShapeSlot[];
   readonly outputNode: Node;
+  /** Every texture node of the shape, and the placeholder each one samples while it has no pass. */
+  readonly textureNodes: readonly TextureNode[];
+  readonly placeholders: readonly Texture[];
 }
 
 /** Which slot and which of its sources an entry of `orderedStages` is. */
@@ -127,6 +157,61 @@ function effectId(effect: StageTransitionEffect): number {
     effectIds.set(effect, id);
   }
   return id;
+}
+
+/** What a slot of a shape holds: a layer (`undefined`) or a transition through an effect. */
+type ShapeKind = StageTransitionEffect | undefined;
+
+function shapeKey(kinds: readonly ShapeKind[]): string {
+  return kinds.map((effect) => (effect ? `t${effectId(effect)}` : 'l')).join(',');
+}
+
+function parseShapes(subject: string, shapes: unknown): ShapeKind[][] {
+  if (!Array.isArray(shapes)) {
+    throw new TypeError(`${subject}: shapes must be an array of shapes, got ${describeValue(shapes)}`);
+  }
+  return shapes.map((shape: unknown, i) => {
+    if (!Array.isArray(shape) || shape.length === 0) {
+      throw new TypeError(
+        `${subject}: shapes[${i}] must be a non-empty array of 'layer' and StageTransitionEffect, got ${describeValue(shape)}`,
+      );
+    }
+    return shape.map((slot: unknown, j): ShapeKind => {
+      if (slot === 'layer') return undefined;
+      if (typeof (slot as Partial<StageTransitionEffect>)?.build === 'function') return slot as StageTransitionEffect;
+      throw new TypeError(
+        `${subject}: shapes[${i}][${j}] must be 'layer' or a StageTransitionEffect, got ${describeValue(slot)}`,
+      );
+    });
+  });
+}
+
+function parsePrecompileOptions(
+  subject: string,
+  director: StageDirector,
+  options: unknown,
+): {layers: readonly StageDirectorLayer[]; nested: boolean | undefined} {
+  if (options === undefined) return {layers: [], nested: undefined};
+  if (options === null || typeof options !== 'object') {
+    throw new TypeError(`${subject}: the options must be an object, got ${describeValue(options)}`);
+  }
+  const {layers = [], nested} = options as StagePrecompileOptions;
+  if (!Array.isArray(layers)) {
+    throw new TypeError(`${subject}: layers must be an array of stages, got ${describeValue(layers)}`);
+  }
+  layers.forEach((stage: unknown, i) => {
+    if (typeof (stage as Partial<IRenderable>)?.renderTo !== 'function') {
+      throw new TypeError(`${subject}: layers[${i}] must be a stage with renderTo(), got ${describeValue(stage)}`);
+    }
+    if (stage === director) throw new Error(`${subject}: layers[${i}] is this director`);
+    if ((stage as {isDisposed?: unknown}).isDisposed === true) {
+      throw new Error(`${subject}: layers[${i}] "${(stage as IStage).name}" has been disposed`);
+    }
+  });
+  if (nested !== undefined && typeof nested !== 'boolean') {
+    throw new TypeError(`${subject}: nested must be a boolean, got ${describeValue(nested)}`);
+  }
+  return {layers, nested};
 }
 
 /** `top` over `bottom`, both premultiplied. */
@@ -224,7 +309,10 @@ export class StageDirector extends StageRenderer {
   #shapeKey?: string;
   #shape?: Shape;
 
-  #empty?: RenderTarget;
+  // 1×1 transparent black targets, one per texture node of the largest shape: three.js shares one
+  // uniform among the texture nodes of a graph that sample the same texture, so no two texture
+  // nodes of a shape ever stand on the same placeholder while it builds
+  readonly #placeholders: RenderTarget[] = [];
   readonly #clearUniform = uniform(new Vector4(0, 0, 0, 0));
   readonly #resolution = uniform(new Vector2(1, 1));
   readonly #clearColorOfRenderer = new Color();
@@ -593,12 +681,11 @@ export class StageDirector extends StageRenderer {
     }
   }
 
-  override renderTo(renderer: WebGPURenderer): void {
-    if (this.isDisposed) return;
-    if (isWebGLRenderer(renderer)) {
-      throw new TypeError('StageDirector#renderTo(): a WebGLRenderer is not supported — render with a WebGPURenderer');
-    }
-    this.#ensureEmpty(renderer);
+  /**
+   * Picks the shape of the stack and fills its uniforms before the base draws: from `renderTo()` of
+   * a director at the top, and from a parent that composes a director as one of its layers.
+   */
+  protected override renderToCurrentTarget(renderer: WebGPURenderer): void {
     const shape = this.#currentShape(renderer);
     if (super.pipeline !== shape.pipeline) super.pipeline = shape.pipeline;
 
@@ -608,7 +695,72 @@ export class StageDirector extends StageRenderer {
       if (progress && run) progress.value = run.transition.progress;
     }
     this.#updateClearUniform(renderer);
-    super.renderTo(renderer);
+    super.renderToCurrentTarget(renderer);
+  }
+
+  /**
+   * Builds and compiles the shaders of `shapes` ahead of time, so that the first transition of each
+   * shape starts without the hitch of a shader build. A shape lists the slots of the stack from the
+   * bottom up: `'layer'` for a slot that shows a layer, the effect for a slot with a transition —
+   * the same effect object the transition takes, since the director tells shapes apart by their
+   * effect objects. `replace(title, level, {effect: dissolveIn})` on the stack `[stars, title]` is
+   * the shape `['layer', dissolveIn]`.
+   *
+   * The shapes build the composition of the director. The stages of `options.layers` draw once, off
+   * screen, as the director draws a layer — into a target of the type and the samples of its pass
+   * targets, on linear output —, so that their own materials and pipelines, a bloom of a level, are
+   * built before their first frame in the stack. A stage that is no layer of the director yet takes
+   * the size of the director first.
+   *
+   * The shapes are compiled for the target the director draws into: its `outputRenderTarget`, or
+   * else the renderer's current target — the canvas, called outside of a frame. A director inside
+   * a renderer that composes — another director — draws into a pass target of its parent on linear
+   * output, and compiles for that; `options.nested` says so for a director that has no parent yet.
+   * A shape the director has already drawn or compiled is skipped; the shapes compile one after the
+   * other, and the frames between them go on. A disposed director resolves at once.
+   */
+  async precompile(
+    renderer: WebGPURenderer,
+    shapes: readonly StageDirectorShape[],
+    options?: StagePrecompileOptions,
+  ): Promise<void> {
+    const subject = 'StageDirector#precompile()';
+    if (isWebGLRenderer(renderer)) {
+      throw new TypeError(`${subject}: a WebGLRenderer is not supported — compile with a WebGPURenderer`);
+    }
+    const parsed = parseShapes(subject, shapes);
+    const {layers, nested} = parsePrecompileOptions(subject, this, options);
+    if (this.isDisposed) return;
+    // the node build runs in the synchronous part of compileAsync(), inside the borrowed draw of the
+    // pipeline; an init() on its way would move it out of there
+    if (!renderer.initialized) await renderer.init();
+
+    const asLayer = nested ?? this.#isNested();
+    // a target of the kind the pass targets are — three.js keys its builds by format, type and
+    // samples of the target, not by its size —, of the size of the director for the layers
+    let passTarget: RenderTarget | undefined;
+    const target = (): RenderTarget =>
+      (passTarget ??= new RenderTarget(
+        Math.max(1, Math.floor(this.width * this.pixelRatio)),
+        Math.max(1, Math.floor(this.height * this.pixelRatio)),
+        {type: renderer.getOutputBufferType(), samples: renderer.samples},
+      ));
+    try {
+      for (const stage of layers) {
+        if (this.isDisposed) return;
+        this.#drawOffScreen(renderer, stage, target());
+      }
+      for (const kinds of parsed) {
+        if (this.isDisposed) return;
+        const key = shapeKey(kinds);
+        if (this.#shapes.has(key)) continue;
+        const shape = this.#buildShape(renderer, kinds);
+        this.#shapes.set(key, shape);
+        await this.#compileShape(renderer, shape, asLayer ? (this.outputRenderTarget ?? target()) : undefined);
+      }
+    } finally {
+      passTarget?.dispose();
+    }
   }
 
   protected override shouldRenderPass(child: StageRenderer): boolean {
@@ -647,8 +799,8 @@ export class StageDirector extends StageRenderer {
     }
     this.#shapes.clear();
     this.#shape = undefined;
-    this.#empty?.dispose();
-    this.#empty = undefined;
+    for (const placeholder of this.#placeholders) placeholder.dispose();
+    this.#placeholders.length = 0;
     throwCollected(
       errors,
       'StageDirector#dispose(): more than one listener of OnStageTransitionEnd, OnStageRemoved, OnRemoveFromParent and OnStageDispose threw',
@@ -948,30 +1100,33 @@ export class StageDirector extends StageRenderer {
     this.#orderDirty = false;
   }
 
-  /** The 1×1 transparent black target that stands in for nothing. */
-  #ensureEmpty(renderer: WebGPURenderer): void {
-    if (this.#empty) return;
-    const empty = new RenderTarget(1, 1, {type: renderer.getOutputBufferType()});
-    const prev = renderer.getRenderTarget();
-    const prevAlpha = renderer.getClearAlpha();
-    renderer.getClearColor(this.#clearColorOfRenderer);
-    renderer.setRenderTarget(empty);
-    try {
-      renderer.setClearColor(new Color(0x000000), 0);
-      renderer.clear(true, true, false);
-    } finally {
-      renderer.setClearColor(this.#clearColorOfRenderer, prevAlpha);
-      renderer.setRenderTarget(prev);
+  /** The `index`th 1×1 transparent black target, which stands in for nothing. */
+  #placeholder(renderer: WebGPURenderer, index: number): Texture {
+    while (this.#placeholders.length <= index) {
+      const placeholder = new RenderTarget(1, 1, {type: renderer.getOutputBufferType()});
+      const prev = renderer.getRenderTarget();
+      const prevAlpha = renderer.getClearAlpha();
+      renderer.getClearColor(this.#clearColorOfRenderer);
+      renderer.setRenderTarget(placeholder);
+      try {
+        renderer.setClearColor(new Color(0x000000), 0);
+        renderer.clear(true, true, false);
+      } finally {
+        renderer.setClearColor(this.#clearColorOfRenderer, prevAlpha);
+        renderer.setRenderTarget(prev);
+      }
+      this.#placeholders.push(placeholder);
     }
-    this.#empty = empty;
+    return this.#placeholders[index]!.texture;
   }
 
   #currentShape(renderer: WebGPURenderer): Shape {
     if (this.#shapeKey === undefined || this.#shape === undefined) {
-      const key = this.#slots.map((slot) => (slot.run ? `t${effectId(slot.run.transition.effect)}` : 'l')).join(',');
+      const kinds = this.#slots.map((slot) => slot.run?.transition.effect);
+      const key = shapeKey(kinds);
       let shape = this.#shapes.get(key);
       if (!shape) {
-        shape = this.#buildShape(renderer);
+        shape = this.#buildShape(renderer, kinds);
         this.#shapes.set(key, shape);
       }
       this.#shapeKey = key;
@@ -980,17 +1135,24 @@ export class StageDirector extends StageRenderer {
     return this.#shape;
   }
 
-  #buildShape(renderer: WebGPURenderer): Shape {
-    const empty = this.#empty!.texture;
+  #buildShape(renderer: WebGPURenderer, kinds: readonly ShapeKind[]): Shape {
     const at = uv();
     const slots: ShapeSlot[] = [];
+    const textureNodes: TextureNode[] = [];
+    const placeholders: Texture[] = [];
+    const textureNode = (): TextureNode => {
+      const placeholder = this.#placeholder(renderer, textureNodes.length);
+      const node = texture(placeholder) as unknown as TextureNode;
+      textureNodes.push(node);
+      placeholders.push(placeholder);
+      return node;
+    };
     let out = this.#clearUniform as unknown as Node<'vec4'>;
-    for (const slot of this.#slots) {
-      if (slot.run) {
-        const from = texture(empty) as unknown as TextureNode;
-        const to = texture(empty) as unknown as TextureNode;
+    for (const effect of kinds) {
+      if (effect) {
+        const from = textureNode();
+        const to = textureNode();
         const progress = uniform(0) as unknown as UniformNode<'float', number>;
-        const effect = slot.run.transition.effect;
         const effectNode = effect.build({
           from: textureSource(from),
           to: textureSource(to),
@@ -1001,24 +1163,88 @@ export class StageDirector extends StageRenderer {
         slots.push({from, to, progress, effect, effectNode});
         out = over(effectNode, out);
       } else {
-        const layer = texture(empty) as unknown as TextureNode;
+        const layer = textureNode();
         slots.push({layer});
         out = over(layer as unknown as Node<'vec4'>, out);
       }
     }
-    return {pipeline: new RootRenderPipeline(renderer), slots, outputNode: out};
+    return {pipeline: new RootRenderPipeline(renderer), slots, outputNode: out, textureNodes, placeholders};
+  }
+
+  /** Whether a renderer that composes holds this director: it draws into a pass target, on linear output. */
+  #isNested(): boolean {
+    for (let holder = this.parent; holder instanceof StageRenderer; holder = holder.parent) {
+      // a director composes always, also before its first frame gives it a pipeline
+      if (holder instanceof StageDirector || holder.pipeline !== undefined) return true;
+    }
+    return false;
+  }
+
+  /** Draws `stage` once into `target` on linear output, as the director draws a layer into its pass target. */
+  #drawOffScreen(renderer: WebGPURenderer, stage: StageDirectorLayer, target: RenderTarget): void {
+    if (!this.#layers.has(stage) && this.width > 0 && this.height > 0) {
+      stage.resize(this.width, this.height, this.pixelRatio);
+    }
+    this.#withTarget(renderer, target, true, () => stage.renderTo(renderer));
+  }
+
+  /**
+   * Compiles the material of `shape` through `RenderPipeline#render()` itself, with the one draw it
+   * makes turned into a `compileAsync()`: the pipeline sets up the renderer and its quad as for a
+   * frame — the output transform, no XR, the vertex node of the quad —, and the node build of the
+   * compile sees what the draw of a frame would see. `nestedTarget` stands for the pass target of a
+   * parent, which the director draws into on linear output; without it the director's own target
+   * applies. Every texture node of the shape samples a placeholder of its own; the pass textures
+   * that take their places later have their type, so they change a binding and no shader. The
+   * pipeline keeps the output node, and the first frame of the shape finds it in place and builds
+   * nothing.
+   */
+  async #compileShape(renderer: WebGPURenderer, shape: Shape, nestedTarget: RenderTarget | undefined): Promise<void> {
+    const pipeline = shape.pipeline;
+    pipeline.outputNode = shape.outputNode;
+    pipeline.needsUpdate = true;
+
+    let compiled: Promise<void> | undefined;
+    const ownRender = Object.hasOwn(renderer, 'render');
+    const render = renderer.render;
+    renderer.render = ((scene, camera) => {
+      compiled = renderer.compileAsync(scene, camera);
+    }) as WebGPURenderer['render'];
+    try {
+      const target = nestedTarget ?? this.outputRenderTarget ?? renderer.getRenderTarget();
+      this.#withTarget(renderer, target, nestedTarget !== undefined, () => pipeline.render());
+    } finally {
+      if (ownRender) renderer.render = render;
+      else delete (renderer as Partial<WebGPURenderer>).render;
+    }
+    await compiled;
+  }
+
+  /** Runs `draw` with `target` set — and linear output, if asked —, and gives the renderer back as it was. */
+  #withTarget(renderer: WebGPURenderer, target: RenderTarget | null, linear: boolean, draw: () => void): void {
+    const prevTarget = renderer.getRenderTarget();
+    const toneMapping = renderer.toneMapping;
+    const outputColorSpace = renderer.outputColorSpace;
+    renderer.setRenderTarget(target);
+    if (linear) {
+      renderer.toneMapping = NoToneMapping;
+      renderer.outputColorSpace = ColorManagement.workingColorSpace;
+    }
+    try {
+      draw();
+    } finally {
+      renderer.toneMapping = toneMapping;
+      renderer.outputColorSpace = outputColorSpace;
+      renderer.setRenderTarget(prevTarget);
+    }
   }
 
   /** Points the texture nodes of the current shape at the pass textures of the layers. */
   #fillShape(passes: Node[]): Node {
     const shape = this.#shape;
     if (!shape) throw new Error('StageDirector: the shape of the stack is built before the composition');
-    const empty = this.#empty!.texture;
-    for (const slot of shape.slots) {
-      if (slot.layer) slot.layer.value = empty;
-      if (slot.from) slot.from.value = empty;
-      if (slot.to) slot.to.value = empty;
-    }
+    const {textureNodes, placeholders} = shape;
+    for (let i = 0; i < textureNodes.length; i++) textureNodes[i]!.value = placeholders[i]!;
     const refs = this.#orderRefs;
     for (let i = 0; i < refs.length; i++) {
       const ref = refs[i]!;

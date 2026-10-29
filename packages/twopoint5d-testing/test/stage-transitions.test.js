@@ -42,6 +42,26 @@ describe('StageDirector — transitions on the GPU', () => {
     return {stage, material};
   }
 
+  /** Counts the node builders the backend creates — one per shader build of a render object — until `stop()`. */
+  function countNodeBuilds() {
+    // createNodeBuilder() is left out of the public types of three.js
+    const backend = /** @type {{createNodeBuilder: (...args: unknown[]) => unknown}} */ (
+      /** @type {unknown} */ (display.renderer.backend)
+    );
+    const createNodeBuilder = backend.createNodeBuilder;
+    const counter = {
+      count: 0,
+      stop: () => {
+        backend.createNodeBuilder = createNodeBuilder;
+      },
+    };
+    backend.createNodeBuilder = function (...args) {
+      counter.count++;
+      return createNodeBuilder.apply(this, args);
+    };
+    return counter;
+  }
+
   async function draw() {
     director.updateFrame(0, 0, 0);
     director.renderTo(display.renderer);
@@ -196,6 +216,125 @@ describe('StageDirector — transitions on the GPU', () => {
     second.progress = 1;
     expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [0, 0, 255]), 'to is the new layer').to.be.true;
     expect(director.pipeline, 'the shape keeps its pipeline').to.equal(pipeline);
+  });
+
+  it('precompile() builds the shader of a shape ahead, and its first frame builds none', async () => {
+    const red = layer('red', '#f00');
+    const green = layer('green', '#0f0');
+    // the meshes of both layers are built before the count starts
+    director.setStack([green.stage]);
+    await draw();
+    director.setStack([red.stage]);
+    await draw();
+
+    const effect = crossfade();
+    await director.precompile(display.renderer, [[effect]]);
+    expect(Object.hasOwn(display.renderer, 'render'), 'the renderer draws as before').to.be.false;
+
+    const builds = countNodeBuilds();
+    try {
+      const t = director.replace(red.stage, green.stage, {effect, manual: true});
+      t.progress = 0.5;
+      const half = srgb(0.5);
+      expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [half, half, 0], 3), 'progress 0.5').to.be.true;
+      expect(builds.count, 'node builds in the first frame of the shape').to.equal(0);
+    } finally {
+      builds.stop();
+    }
+  });
+
+  it('precompile() draws the layers it is given once, and their first frame in the stack builds nothing', async () => {
+    const red = layer('red', '#f00');
+    const green = layer('green', '#0f0');
+    director.setStack([red.stage]);
+    await draw();
+
+    const effect = crossfade();
+    await director.precompile(display.renderer, [[effect]], {layers: [green.stage]});
+    const builds = countNodeBuilds();
+    try {
+      const t = director.replace(red.stage, green.stage, {effect, manual: true});
+      t.progress = 1;
+      expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [0, 255, 0]), 'the new layer').to.be.true;
+      expect(builds.count, 'node builds in the first frame of the new layer').to.equal(0);
+    } finally {
+      builds.stop();
+    }
+  });
+
+  it('precompile() of a director inside another one compiles for its place there', async () => {
+    const red = layer('red', '#f00');
+    const green = layer('green', '#0f0');
+    const inner = keep(new StageDirector().setStack([red.stage]));
+    director.setStack([inner]);
+    await draw();
+
+    const effect = crossfade();
+    await inner.precompile(display.renderer, [[effect]], {layers: [green.stage]});
+    const builds = countNodeBuilds();
+    try {
+      const t = inner.replace(red.stage, green.stage, {effect, manual: true});
+      t.progress = 0.5;
+      const half = srgb(0.5);
+      expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [half, half, 0], 3), 'progress 0.5').to.be.true;
+      expect(builds.count, 'node builds in the first frame of the shape').to.equal(0);
+    } finally {
+      builds.stop();
+    }
+  });
+
+  it('a shape first built with two sources of nothing shows each source of its own later', async () => {
+    const blue = layer('blue', '#00f');
+    const red = layer('red', '#f00');
+    const green = layer('green', '#0f0');
+    const effect = fade();
+    // both transitions come from nothing: the shape is built while both their from sample nothing
+    const first = director.show(red.stage, {effect, manual: true});
+    const second = director.show(green.stage, {effect, manual: true});
+    first.progress = 1;
+    second.progress = 1;
+    await draw();
+    first.cancel();
+    second.cancel();
+
+    // the same shape: the lower slot fades from blue to red, the upper one from nothing to green
+    director.setStack([blue.stage]);
+    const lower = director.replace(blue.stage, red.stage, {effect, manual: true});
+    const upper = director.show(green.stage, {effect, manual: true});
+    // a shared uniform would show the one from in both slots, whichever of the two it kept
+    lower.progress = 0;
+    upper.progress = 0;
+    expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [0, 0, 255]), 'blue, with nothing above it').to.be.true;
+    lower.progress = 1;
+    expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [255, 0, 0]), 'red, with nothing above it').to.be.true;
+  });
+
+  it('a director as a layer of another one changes its whole picture through one effect', async () => {
+    const red = layer('red', '#f00');
+    const blue = layer('blue', '#00f', 0.5);
+    const green = layer('green', '#0f0');
+    // a scene of two slots, a half blue over red, and a scene of one
+    const first = keep(new StageDirector().setStack([red.stage, blue.stage]));
+    const second = keep(new StageDirector().setStack([green.stage]));
+    director.setStack([first]);
+    const half = srgb(0.5);
+    expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [half, 0, half], 3), 'the first scene, composed').to.be.true;
+
+    const t = director.replace(first, second, {effect: crossfade(), manual: true});
+    t.progress = 1;
+    expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [0, 255, 0]), 'the second scene').to.be.true;
+    t.progress = 0.5;
+    const quarter = srgb(0.25);
+    expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [quarter, half, quarter], 3), 'the two pictures mixed').to.be.true;
+  });
+
+  it('a material with premultipliedAlpha composes as the default blending does', async () => {
+    const blue = layer('blue', '#00f');
+    const halfRed = layer('half red', '#f00', 0.5);
+    halfRed.material.premultipliedAlpha = true;
+    director.setStack([blue.stage, halfRed.stage]);
+    const half = srgb(0.5);
+    expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [half, 0, half], 3), 'half red over blue').to.be.true;
   });
 
   it('a layer with a pipeline of its own keeps it, and the output transform applies once', async () => {
