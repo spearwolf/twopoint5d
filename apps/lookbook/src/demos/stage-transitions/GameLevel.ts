@@ -181,7 +181,7 @@ export class GameLevel {
     const halfWidth = (this.hud.width || VIEW_WIDTH) / 2;
     const halfHeight = (this.hud.height || VIEW_HEIGHT) / 2;
     const unit = this.#unit;
-    this.#helpGlyphs = rewriteText(this.#text, this.#helpGlyphs, this.#assets.pixelFont, 'ARROWS MOVE   ESC PAUSE', {
+    this.#helpGlyphs = rewriteText(this.#text, this.#helpGlyphs, this.#assets.pixelFont, 'ARROWS MOVE   ESC PAUSE   Q QUIT', {
       x: halfWidth - 16 * unit,
       // clear of the toolbar of the lookbook
       y: -halfHeight + 56 * unit,

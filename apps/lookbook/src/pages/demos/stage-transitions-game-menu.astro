@@ -100,11 +100,12 @@ import {description, title} from './_stage-transitions-game-menu.json';
       else pauseGame();
     };
 
+    // from the game and from the pause menu: the menu fades out above the dip, if it is there
     const quit = () => {
-      if (screen !== 'paused') return;
+      if (screen === 'title') return;
       screen = 'title';
       stars.targetWarp = 1;
-      director.hide(pause.stage, {effect: effects.get('crossfade')!, duration: 0.3});
+      if (director.has(pause.stage)) director.hide(pause.stage, {effect: effects.get('crossfade')!, duration: 0.3});
       director.replace(level.renderer, title.stage, {...options(), effect: effects.get('dip to black')!, duration: 1.2});
     };
 
