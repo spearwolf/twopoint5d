@@ -21,6 +21,7 @@ import {description, title} from './_stage-transitions-gallery.json';
     rewriteText,
     Stage2D,
     StageDirector,
+    type StageDirectorShape,
     type StageTransition,
     type StageTransitionEasing,
     type TexturedSprite,
@@ -90,6 +91,12 @@ import {description, title} from './_stage-transitions-gallery.json';
     };
 
     director.setStack([a.stage, label]);
+    // a transition in the lower slot under the label, for every effect: the gallery shows each one
+    // without the hitch of its first shader build
+    const precompiled = director.precompile(renderer, [
+      ['layer', 'layer'],
+      ...[...effects.values()].map((effect): StageDirectorShape => [effect, 'layer']),
+    ]);
     let shown = a;
     let hold = HOLD;
     let running: StageTransition | undefined;
@@ -188,6 +195,7 @@ import {description, title} from './_stage-transitions-gallery.json';
       store.dispose();
     });
 
+    await precompiled;
     preview.ready(display);
   });
 

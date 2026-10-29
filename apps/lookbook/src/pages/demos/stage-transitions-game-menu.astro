@@ -14,7 +14,7 @@ import {description, title} from './_stage-transitions-game-menu.json';
 </style>
 
 <script>
-  import {Display, StageDirector, type StageTransitionEasing} from '@spearwolf/twopoint5d';
+  import {Display, StageDirector, type StageDirectorShape, type StageTransitionEasing} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
   import {loadStageTransitionAssets} from '~demos/stage-transitions/assets';
@@ -135,14 +135,26 @@ import {description, title} from './_stage-transitions-game-menu.json';
     });
     getFullscreenCanvas().addEventListener('click', start);
 
+    const menuEffects = [...effects.keys()].filter((name) => !name.startsWith('luma'));
+
+    // every shape the stack takes on its way, built before the first transition needs it: the stars
+    // below the title, below the level and below the level frozen under the pause menu
+    const crossfade = effects.get('crossfade')!;
+    const dip = effects.get('dip to black')!;
+    const shapes: StageDirectorShape[] = [
+      ['layer', 'layer'],
+      ...menuEffects.map((name): StageDirectorShape => ['layer', effects.get(name)!]),
+      ['layer', 'layer', crossfade],
+      ['layer', 'layer', 'layer'],
+      ['layer', dip, crossfade],
+      ['layer', dip],
+    ];
+    // the title runs while the shapes compile, one after the other; the level and the pause menu
+    // draw once off screen, so their sprites and the bloom of the level are built before the start
+    const precompiled = director.precompile(renderer, shapes, {layers: [level.renderer, pause.stage]});
+
     const gui = new GUI({container: getDemoUi(), title: 'transition'});
-    gui
-      .add(
-        settings,
-        'effect',
-        [...effects.keys()].filter((name) => !name.startsWith('luma')),
-      )
-      .onChange(showInfo);
+    gui.add(settings, 'effect', menuEffects).onChange(showInfo);
     gui.add(settings, 'duration', 0.1, 3, 0.1).onChange(showInfo);
     gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']).onChange(showInfo);
     gui.add(settings, 'freezeOutgoing').name('freeze outgoing');
@@ -162,6 +174,7 @@ import {description, title} from './_stage-transitions-game-menu.json';
       store.dispose();
     });
 
+    await precompiled;
     preview.ready(display);
   });
 
