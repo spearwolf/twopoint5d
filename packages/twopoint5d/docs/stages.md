@@ -44,6 +44,7 @@ Contents:
 - [Clearing](#clearing)
 - [Off-screen: `outputRenderTarget`](#off-screen-outputrendertarget)
 - [Post-processing](#post-processing)
+- [Stage transitions](#stage-transitions)
 - [A 2D canvas as a stage: `Canvas2DStage`](#a-2d-canvas-as-a-stage-canvas2dstage)
 - [Stages of your own](#stages-of-your-own)
 - [Driving the frame loop yourself](#driving-the-frame-loop-yourself)
@@ -687,6 +688,240 @@ has the size of the drawing buffer, so the resolution of the display counts for 
 where the draw of the pipeline covers it anyway, since on the canvas that clear would cost a
 full-screen draw of its own.
 
+## Stage transitions
+
+A game is rarely one stage: a title menu turns into a level, a pause menu lies over the frozen
+level, the level goes back to the title through black. A `StageDirector` holds a **stack of
+layers** and changes it through **transitions** — each with an effect, a duration and an easing.
+
+### From the menu into the game
+
+```ts check
+import {Display, OrthographicProjection, Stage2D, StageDirector, StageRenderer, dissolve} from '@spearwolf/twopoint5d';
+import {Color} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const view = {width: 640, height: 360, fit: 'contain'} as const;
+
+const stars = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const title = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+// a level of two stages, the world and its HUD — one layer for the director
+const level = new StageRenderer()
+  .add(new Stage2D(new OrthographicProjection('xy|bottom-left', view)))
+  .add(new Stage2D(new OrthographicProjection('xy|bottom-left', view)));
+
+// the director is the renderer of the display: it composes the stack in one pipeline
+const director = new StageDirector(display).setClearColor(new Color('#05060d'));
+director.setStack([stars, title]); // bottom to top
+
+// made once and reused: the director keeps one graph per effect
+const effect = dissolve({scale: 4});
+
+window.addEventListener('keydown', async (event) => {
+  if (event.code !== 'Enter' || !director.has(title)) return;
+  // only the slot of the title changes: the stars below stay as they are
+  const transition = director.replace(title, level, {effect, duration: 0.8, easing: 'ease-in-out'});
+  await transition.finished; // the stack is [stars, level]
+});
+
+display.start();
+```
+
+The stars sit in the bottom slot from the first frame to the last; every transition runs above
+them. The level is a `StageRenderer` of its own, so it may carry a pipeline of its own — a bloom
+of the world alone, a palette effect —, and the director composes its output like any other layer.
+
+### A pause menu over the frozen game
+
+```ts
+// the level keeps its last picture under the menu: neither updated nor drawn
+director.push(pauseMenu, {effect: fade(), duration: 0.2, below: 'freeze'});
+
+// back to the game, which runs on from the frame it stopped at
+director.pop({effect: fade(), duration: 0.2});
+
+// or back to the title, through black
+director.hide(pauseMenu);
+director.replace(level, title, {effect: dipToColor({color: new Color('#000')}), duration: 1});
+```
+
+### A loading screen that follows the loader
+
+```ts
+const transition = director.replace(loadingScreen, level, {effect: lumaMask({mask}), manual: true});
+loader.onProgress = (fraction) => (transition.progress = fraction);
+loader.onDone = () => transition.complete();
+```
+
+With `manual: true` the director does not advance the transition: the caller writes `progress`,
+clamped to `[0, 1]`, and ends it with `complete()` or `cancel()`. `duration` and `easing` do not
+apply.
+
+### The stack and its slots
+
+The stack is a list of **slots**, bottom to top. A slot shows one layer, or a transition between
+two sources — a layer and a layer, a layer and nothing, nothing and a layer. The director composes
+the slots bottom to top with premultiplied alpha, over its own clear color: a layer that clears
+itself to an opaque color hides everything below it, a layer that clears nothing lets the slots
+below show through wherever it draws nothing.
+
+| method | the stack before → after | what transitions |
+| --- | --- | --- |
+| `show(stage, opts?)` | `[a]` → `[a, stage]`, or at `opts.at` | `stage` from nothing |
+| `hide(stage, opts?)` | `[a, stage]` → `[a]` | `stage` into nothing |
+| `replace(from, to, opts?)` | `[a, from]` → `[a, to]` | `from` into `to`, in the slot of `from` |
+| `push(stage, opts?)` | `[a]` → `[a, stage]` | as `show()`; `opts.below` decides what `a` does under it |
+| `pop(opts?)` | `[a, b]` → `[a]` | the top layer into nothing; the layer below runs again |
+| `setStack(stages)` | anything → `stages` | nothing: an instant cut; running transitions end as cancelled |
+
+- Without an `effect`, a `duration` above 0 or `manual`, a change lands at once — the stack
+  changes in the call, and the next frame draws it.
+- `director.stack` is the stack as it stands once every running transition has ended;
+  `director.transitions` lists the transitions that run, `director.has(stage)` asks for one stage.
+- `add(stage)` shows a stage on top at once — `new StageRenderer(director)` and
+  `child.parent = director` do the same —, `remove(stage)` takes it out at once, wherever it is.
+- A method refuses, with an error that names the call and the stage and before anything has
+  changed: `show()` or `push()` of a stage in the stack, `hide()` or `replace()` of a stage that is
+  not in it, `replace()` to a stage in the stack, `pop()` of an empty stack, a disposed stage, a
+  `ClearStage`, the director itself or a renderer that holds it, and options it cannot take — a
+  negative `duration` or `delay`, an easing it does not know, an `at` outside the stack.
+- A change of a slot that is in a transition finishes that transition first: its end state lands
+  and its events go out. So does a transition that takes a stage out of the stack, when `show()`,
+  `push()` or `replace()` brings that stage back.
+- `pipeline`, `buildOutputNode` and `renderOrder` are the director's own; a write to any of them
+  throws. The director draws only its clear while the stack is empty.
+
+### Layers
+
+A layer is any stage. A `StageRenderer` is the layer itself: its stages, its clear, its order and
+its pipeline apply as under every composing parent, and it may be a `StageDirector` too. Any other
+stage — a `Stage2D`, a stage of your own — goes into a `StageRenderer` the director builds for it
+and disposes when the stage leaves the stack. Every layer draws into a target of its own that the
+director clears to transparent black every frame.
+
+A layer leaves the director's stages as it leaves the stack and joins them again, at the size of
+the director, when it comes back; a layer that leaves releases the GPU memory of its target.
+
+### Run and freeze
+
+Every layer in a slot updates and draws every frame, unless it is **frozen**: then it is neither
+updated nor drawn, and the composition samples the last picture it drew. Freezing costs nothing —
+no draw, no copy. A frozen layer whose size changes draws once at the new size, without an update.
+
+| where | option | `'run'` | `'freeze'` |
+| --- | --- | --- | --- |
+| under a `push()` | `below` | the default: the layer below plays on | it stops until `pop()` |
+| the layer a transition leaves | `outgoing` | the default | its last picture goes |
+| the layer a transition brings | `incoming` | the default | its first picture comes; it runs from the end on |
+
+`director.freeze(stage)` and `director.run(stage)` set it by hand; `director.isFrozen(stage)` asks.
+
+### The transition
+
+Every method but `setStack()` answers a `StageTransition`, the instant ones included:
+
+| member | |
+| --- | --- |
+| `from`, `to` | the stages, `undefined` for nothing |
+| `effect`, `duration`, `delay`, `manual` | as handed in |
+| `state` | `'pending'` until its first frame, `'running'`, then `'finished'` or `'cancelled'` |
+| `elapsed`, `progress` | seconds since its start; the eased progress, `0`…`1` — writable while `manual` |
+| `finished` | resolves with the transition once it ended, also when it was cancelled; it never rejects |
+| `complete()` | ends it now, with `to` in the slot |
+| `cancel(jumpTo?)` | ends it now as cancelled: `'start'`, the default, leaves `from`, `'end'` leaves `to` |
+| `reverse()` | runs it back from where it is; back at the start it ends as cancelled |
+
+The options of every change:
+
+| option | default | |
+| --- | --- | --- |
+| `effect` | `crossfade()` | |
+| `duration` | `0.5` with an `effect`, `0` without | seconds |
+| `easing` | `'ease-in-out'` | `'linear'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'` — cubic — or a function of your own |
+| `delay` | `0` | seconds before it starts |
+| `manual` | `false` | |
+| `outgoing`, `incoming` | `'run'` | see [run and freeze](#run-and-freeze) |
+| `at` | the top | `show()` and `push()`: the position in the stack |
+| `below` | `'run'` | `push()` |
+
+**Time.** A transition runs on the `updateFrame()` of the director, by its `deltaTime`: a paused
+display pauses it, a slowed one slows it. The frame after the call is its first one, at progress
+0 — a transition started in a click handler has drawn its first picture in the frame after the
+click —, and the frame in which `elapsed` reaches `duration` shows `to` alone. A named easing costs
+no allocation per frame; a function of your own is called once per frame.
+
+**Events.** `OnStageTransitionStart` goes out on the director in the first frame of a transition,
+after its delay; `OnStageTransitionEnd` in the frame or the call that ends it. Both carry
+`{director, transition}`; a change without a transition emits both at once. A listener that throws
+keeps neither the other listeners, the layers nor the change of the stack from happening; its
+error comes out of the call afterwards.
+
+### Effects
+
+| effect | options | what it does |
+| --- | --- | --- |
+| `crossfade()` | — | a mix of the two |
+| `fade()` | — | `crossfade()` under the name that reads right for a layer that comes from or goes into nothing |
+| `dipToColor({color})` | black | `from` into the color, the color into `to` |
+| `wipe({direction, softness})` | `'left'`, `0.02` | a moving edge with `to` behind it; `'left'` starts at the right side; an angle in radians, counter-clockwise from the right, for any other |
+| `slide({direction, mode})` | `'left'`, `'push'` | `'push'`: both move; `'cover'`: `to` moves in over `from`; `'reveal'`: `from` moves off `to` |
+| `iris({center, softness})` | the middle, `0.02` | a circle opens on `to`; `center` in uv from the top left |
+| `dissolve({scale, softness})` | `1`, `0.05` | a noise per cell of `scale` pixels decides when it switches; at `1` a pixel dissolve |
+| `lumaMask({mask, softness, invert})` | —, `0.05`, `false` | the luminance of a gray texture says when each pixel switches, dark ones first; the mask covers the picture as a texture covers a mesh and stays yours |
+| `pixelate({maxBlockSize})` | `32` | both sampled at blocks that grow to the middle and shrink again |
+
+Every effect works in both directions and with nothing on either side: `fade()` from nothing is an
+opacity fade, `wipe()` from nothing a reveal. An effect is a description — its options are read
+when you make it —, so one effect serves every director and every transition at once. Make it once
+and reuse it: the director keeps one graph per shape of its stack, and a second transition with
+the same effect object in the same slot swaps textures instead of building a shader. A new effect
+object, even with the same options, builds a shader on its first use.
+
+### An effect of your own
+
+An effect is one function from two sources and a progress to a premultiplied color, in TSL. It
+answers `from` at progress 0 and `to` at progress 1, and anything between:
+
+```ts check
+import type {StageTransitionEffect} from '@spearwolf/twopoint5d';
+import {float, mix, sin, vec2} from 'three/tsl';
+
+export const wobble = (amplitude = 0.03): StageTransitionEffect => ({
+  name: 'wobble',
+  build: ({from, to, progress, uv}) => {
+    const strength = sin(progress.mul(Math.PI)).mul(amplitude);
+    const shifted = uv.add(vec2(sin(uv.y.mul(40)).mul(strength), float(0)));
+    return mix(from.sample(shifted), to.sample(shifted), progress);
+  },
+});
+```
+
+`build({from, to, progress, uv, resolution})` gets the sources as `sample(uv)` — transparent black
+outside `[0, 1]` —, the eased progress as a float node, the uv of the pixel with its origin at the
+top left of the picture, and the size of the picture in pixels of the drawing buffer. An effect
+whose nodes own GPU memory releases it in an optional `dispose(node)`, which the director calls
+in its own `dispose()`.
+
+### Without a director
+
+`createTransitionNode(effect, from, to, progress?)` builds the node of an effect for a
+`buildOutputNode` of your own. A source is a `TextureNode` — what a nested `StageRenderer` hands
+in —, the `PassNode` of a `Stage2D`, or `null` for nothing. Without a `progress` node it makes a
+float uniform at 0 and answers it with the node:
+
+```ts
+const {node, progress} = createTransitionNode(crossfade(), null, null);
+sr.buildOutputNode = ([a, b]) => createTransitionNode(crossfade(), a, b, progress).node;
+// the caller drives progress.value
+```
+
+### What a transition costs
+
+Every layer in the stack has a target the size of the drawing buffer, as a nested renderer does
+(see [what a pipeline costs](#what-a-pipeline-costs)). A frozen layer keeps its target and draws
+nothing. A transition costs its two sources — both draw while it runs, unless one is frozen — and
+no draw of its own: it is a part of the one quad of the director's pipeline.
+
 ## A 2D canvas as a stage: `Canvas2DStage`
 
 A `Canvas2DStage` shows a 2D canvas on a sprite, fitted into the container — debug overlays,
@@ -901,6 +1136,7 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 | `Canvas2DStage` | the sprite material and textures it built, its `StageRenderer` and its `Stage2D` | the `WebGPURenderer`, a canvas handed in, a material you set on the sprite |
 | `StageRenderTargetPool` | every target back in the pool, every lent one as it comes back | — |
 | a builder of `createBloomOutputNodeBuilder()` | the bloom node it built last | the pass nodes, which belong to the stages |
+| `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()` |
 | `Display` | its `WebGPURenderer` | a canvas handed in |
 
 The order of a teardown: the renderer first, then what it used.
@@ -949,6 +1185,11 @@ pipeline.dispose();
   and a nested `StageRenderer` take care of this themselves.
 - **One builder for two renderers.** Each rebuild of one releases the bloom of the other. One
   builder per renderer.
+- **A layer that hides the stack below.** An effect that writes an alpha of 1 everywhere — the
+  `bloom()` of three.js does — makes its layer opaque in a `StageDirector`. Keep the alpha of the
+  layer and add the glow to its color: `vec4(composed.rgb.add(glow.rgb), composed.a)`.
+- **A new effect object per transition.** Each one builds a shader on its first use. Make the
+  effects once and reuse them.
 
 ## Cheat sheet
 
@@ -967,6 +1208,10 @@ pipeline.dispose();
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |
 | `StageRenderTargetPool` | one internal target for several renderers in the whole-picture mode |
 | `createBloomOutputNodeBuilder()` | a ready-made `buildOutputNode`: the sum of the passes with a bloom on top |
+| `StageDirector` | a stack of layers, changed through transitions — `show`, `hide`, `replace`, `push`, `pop` |
+| `StageTransition` | one change of the stack: `state`, `progress`, `finished`, `complete()`, `cancel()`, `reverse()` |
+| `crossfade()`, `fade()`, `dipToColor()`, `wipe()`, `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()` | the transition effects |
+| `createTransitionNode()` | the node of an effect, for a `buildOutputNode` of your own |
 | `fitIntoRectangle()` | the arithmetic of the fit, for a layout of your own; `calculateAnchorOffset()` places the result in a container |
 
 ### The interfaces
@@ -987,6 +1232,7 @@ pipeline.dispose();
 | whole picture | `pipeline` = a `RenderPipeline`, no `buildOutputNode` | all stages into one internal target, the pipeline on its texture |
 | composed | `pipeline` + `buildOutputNode`, or a `RootRenderPipeline` | one pass per stage, composed in TSL |
 | nested pipelines | nested renderers with a pipeline each, under a composing parent | an effect per layer, composed once at the top |
+| a stack of layers | a `StageDirector` | every layer into a target of its own, the slots composed bottom to top with their transitions |
 
 ### The defaults
 
@@ -1002,3 +1248,5 @@ pipeline.dispose();
 | `ClearStage` | `{depth: true}`, name `'clear'` |
 | `Canvas2DStage` fit | `'contain'` |
 | `createBloomOutputNodeBuilder()` | `strength: 1`, `radius: 0`, `threshold: 0` |
+| a transition of `StageDirector` | `crossfade()`, `0.5` s with an effect and `0` without, `'ease-in-out'`, no delay |
+| `outgoing`, `incoming`, `below` | `'run'` |

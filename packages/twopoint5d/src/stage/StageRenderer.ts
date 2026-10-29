@@ -1046,12 +1046,15 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (!clearedByPipeline) this.#applyClear(renderer);
   }
 
-  /** Renders every nested `StageRenderer` among the stages into its pass target, with linear output. */
+  /**
+   * Renders every nested `StageRenderer` among the stages into its pass target, with linear output —
+   * every one for which {@link shouldRenderPass} answers `true`.
+   */
   #prerenderNestedRenderers(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     this.#beginLinearOutput(renderer);
     try {
       for (const {stage} of stages) {
-        if (stage instanceof StageRenderer) this.#prerenderChild(renderer, stage);
+        if (stage instanceof StageRenderer && this.shouldRenderPass(stage)) this.#prerenderChild(renderer, stage);
       }
     } finally {
       this.#endLinearOutput(renderer);
@@ -1076,13 +1079,32 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
   }
 
-  /** Builds `pipeline.outputNode` anew from the pass node of every stage. */
+  /**
+   * Builds `pipeline.outputNode` anew from the pass node of every stage. A composition that answers
+   * the node the pipeline has already leaves the pipeline as it is: three.js builds its shader again
+   * for every `needsUpdate`, and a composer that keeps its graph — a `StageDirector` does — costs no
+   * shader build where nothing in the graph changed.
+   */
   #rebuildComposedOutputNode(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     const passes = stages.map((s) => this.#getStagePass(s, renderer));
     const compose = this.buildOutputNode ?? RootRenderPipeline.buildOutputNode;
-    this.pipeline!.outputNode = compose(passes);
-    this.pipeline!.needsUpdate = true;
+    const pipeline = this.pipeline!;
+    const outputNode = compose(passes);
+    if (pipeline.outputNode !== outputNode) {
+      pipeline.outputNode = outputNode;
+      pipeline.needsUpdate = true;
+    }
     this.#outputDirty = false;
+  }
+
+  /**
+   * Asks, in the composed mode, whether the nested renderer `child` among the stages is drawn into
+   * its pass target in this frame. Answers `true` by default; a subclass that answers `false` keeps
+   * the picture the target holds from an earlier frame — neither cleared nor drawn —, and the
+   * composition samples that picture. A `StageDirector` freezes a layer this way.
+   */
+  protected shouldRenderPass(_child: StageRenderer): boolean {
+    return true;
   }
 
   /**

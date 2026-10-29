@@ -4,7 +4,9 @@ import type {Display} from './display/Display.js';
 import type {DisplayEventProps, DisplayFullscreenChangeProps} from './display/types.js';
 import type {Canvas2DStage} from './stage/Canvas2DStage.js';
 import type {IStage} from './stage/IStage.js';
+import type {StageDirector} from './stage/StageDirector.js';
 import type {StageRenderer} from './stage/StageRenderer.js';
+import type {StageTransition} from './stage/StageTransition.js';
 
 // ------------------------------------------------------------
 
@@ -161,6 +163,34 @@ export interface IAddToParent {
 
 export interface IRemoveFromParent {
   [OnRemoveFromParent](): void;
+}
+
+// ------------------------------------------------------------
+
+/**
+ * Emitted by a `StageDirector` in the first `updateFrame()` of a transition — the first one after
+ * its `delay` —, and right away for a change without a transition.
+ */
+export const OnStageTransitionStart = 'stageTransitionStart';
+
+/**
+ * Emitted by a `StageDirector` when a transition ends: in the `updateFrame()` that ends it, or in
+ * the call that ends it — `complete()`, `cancel()`, a change of its slot, `dispose()`.
+ * `transition.state` says how it ended, `'finished'` or `'cancelled'`.
+ */
+export const OnStageTransitionEnd = 'stageTransitionEnd';
+
+export interface StageTransitionProps {
+  director: StageDirector;
+  transition: StageTransition;
+}
+
+export interface IStageTransitionStart {
+  [OnStageTransitionStart](props: StageTransitionProps): void;
+}
+
+export interface IStageTransitionEnd {
+  [OnStageTransitionEnd](props: StageTransitionProps): void;
 }
 
 // ------------------------------------------------------------

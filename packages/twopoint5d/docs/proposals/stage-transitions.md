@@ -1,8 +1,27 @@
 # Proposal: stage transitions — `StageDirector` and transition effects
 
-Status: **proposed** — nothing is built. The design builds on the composed mode and the nested
-pipelines of `StageRenderer` ([`docs/stages.md`](../stages.md), "Post-processing") and needs three
-small seams in `src/stage/StageRenderer.ts` (§9). The lookbook demos of §11 are part of the build.
+Status: **phase A and B implemented** — see [`docs/stages.md`](../stages.md), "Stage transitions",
+and its cheat sheet; the Vitest specs `src/stage/StageDirector.spec.ts`,
+`src/stage/transitionEffects.spec.ts` and `src/stage/hot-path-allocations.director.spec.ts`, the
+browser test `packages/twopoint5d-testing/test/stage-transitions.test.js`, and the lookbook demos
+`stage-transitions-game-menu` and `stage-transitions-gallery` (§11). Open: phase C — `precompile()`
+and the questions of §12. Deviations of the build from the first draft of this spec, which the
+sections below now state as built:
+
+- a change without an `effect`, a `duration` above 0 or `manual` lands in the call itself, not in
+  the next frame, and emits both events there; `duration` defaults to 0 without an effect (§3.2,
+  §5.1, §5.2);
+- `pipeline` is the director's own as well: it builds one `RootRenderPipeline` per shape of its
+  stack, and a write to `pipeline`, `buildOutputNode` or `renderOrder` throws (§3.1, §7.1);
+- the uv of an effect has its origin at the top left of the picture under both backends; the
+  directions of `wipe()` and `slide()` and the angle of `wipe()` are screen directions on it, and
+  `lumaMask()` samples its mask as a mesh samples a texture, its top on top (§6.1, §6.2);
+- `has(stage)` and `isFrozen(stage)` on the director, `isOver` on the transition (§3.2, §5.1);
+- `add()` shows a stage on top at once, `remove()` takes it out at once, wherever it is (§3.1);
+- the named easings are worked out in place, not through a call, so that their frame allocates
+  nothing (§5.2);
+- `push()` with `below: 'freeze'` finishes a transition that runs in the slot below first (§4.3);
+- an effect's `dispose(node)` runs in the director's `dispose()`, where its graphs go (§6.1, §8).
 
 A game is rarely one stage. It opens on a title menu, cuts to a loading screen, plays a level,
 lays a pause menu over the frozen level and goes back to the title. Today a `StageRenderer` can
@@ -72,19 +91,22 @@ display.start();
 ```
 
 `new StageDirector(parent?)` takes a host or a parent `StageRenderer` like every `StageRenderer`.
-It builds a `RenderPipeline` of its own on its first frame — the director composes, always — and
-disposes it in its `dispose()`. A `pipeline` assigned by the caller replaces the director's own
-and stays the caller's; `buildOutputNode` and `renderOrder` belong to the director, and a write
-to either throws (`StageDirector#buildOutputNode is the director's own: …`).
+It builds a `RootRenderPipeline` per shape of its stack (§7.1) — the director composes, always —
+and disposes them in its `dispose()`. `pipeline`, `buildOutputNode` and `renderOrder` belong to the
+director, and a write to any of them throws (`StageDirector#pipeline is the director's own: …`).
 
-`add()` and `remove()` stay as `StageRenderer` has them, but a director calls them itself: a layer
-is a stage of the director while it is in the stack or in a transition, and only then (§4.4). A
-`ClearStage` is refused, as under every composing pipeline.
+A layer is a stage of the director while it is in the stack or in a transition, and only then
+(§4.4); the director calls `add()` and `remove()` of its base itself. Called by the caller, `add()`
+shows a stage on top at once — `new StageRenderer(director)` and `child.parent = director` with
+it —, and `remove()` takes a stage out at once, wherever it is: a transition that has it as a
+source ends as cancelled, with the other source in its slot. A `ClearStage` is refused, as under
+every composing pipeline.
 
 ### 3.2 Changing the stack
 
 Every method takes the stage the caller holds — a `Stage2D` or a `StageRenderer` — and an
-optional transition (§5). Without one the change is instant and lands on the next frame.
+optional transition (§5). Without an `effect`, a `duration` above 0 or `manual` the change is
+instant: the stack changes in the call, both events go out there, and the next frame draws it.
 
 | method | the stack before → after | what transitions |
 | --- | --- | --- |
@@ -98,7 +120,8 @@ optional transition (§5). Without one the change is instant and lands on the ne
 Each of them except `setStack()` answers a `StageTransition` (§5.1), the instant ones included,
 so a caller awaits `finished` the same way either way. `director.stack` is the stack as it will be
 when every running transition has ended, a read-only array of the stages the caller handed in;
-`director.transitions` the transitions that run.
+`director.transitions` the transitions that run, `director.has(stage)` whether a stage is in the
+stack and `director.isFrozen(stage)` whether its layer is frozen.
 
 A method refuses, with an error that names the call and the stage and before anything changes:
 
@@ -106,6 +129,8 @@ A method refuses, with an error that names the call and the stage and before any
 - `show()` and `push()` of a stage that is in the stack already;
 - `hide()`, `replace()` with a `from` that is not in the stack, and `pop()` of an empty stack;
 - `replace()` with a `to` that is in the stack already;
+- options it cannot take: a negative `duration` or `delay`, an easing it does not know, an `at`
+  outside the stack;
 - a `StageDirector` that has been disposed answers every method with a transition in the state
   `cancelled`, as a disposed `StageRenderer` makes `add()` do nothing.
 
@@ -252,14 +277,19 @@ stack of this frame.
 - The `updateFrame()` in which `elapsed` reaches `duration` ends it: the slot shows `to` alone —
   for every effect that keeps the contract of §6.1 the same picture as `progress` 1 —,
   `OnStageTransitionEnd` goes out, and `finished` resolves.
-- A transition with `duration: 0` ends in the first `updateFrame()` after the call.
+- A change without a transition (§3.2) never reaches `updateFrame()`: it has ended in the call.
+- A transition that takes a stage out of the stack is finished the same way when `show()`,
+  `push()` or `replace()` brings that stage back.
 - A second transition on a slot that is in a transition finishes the running one first — its end
   state lands, its events go out — and starts from there. `reverse()` is the way to go back from
   the middle of one.
 
 `easing` turns `elapsed / duration` into `progress` on the CPU; the graph only reads a float
-uniform per slot. Nothing in the advance of a transition allocates: `pnpm test:allocations`
-holds `StageDirector#updateFrame()` during a running transition to zero bytes (§10.1).
+uniform per slot. The named easings are cubic and worked out in place, as products: a double
+handed to a call that V8 does not inline is boxed, and so is one that `**` hands to the runtime.
+Nothing in the advance of a transition with a named easing allocates: `pnpm test:allocations`
+holds `StageDirector#updateFrame()` during a running transition to zero bytes (§10.1). A function
+of the caller is called once per frame.
 
 ### 5.3 Manual progress
 
@@ -300,7 +330,7 @@ interface StageTransitionInput {
   from: StageTransitionSource;
   to: StageTransitionSource;
   progress: Node<'float'>;   // eased, 0…1
-  uv: Node<'vec2'>;          // the screen uv of the pixel, 0…1
+  uv: Node<'vec2'>;          // the uv of the pixel, 0…1, its origin at the top left of the picture
   resolution: Node<'vec2'>;  // in pixels of the drawing buffer
 }
 
@@ -319,7 +349,12 @@ An effect is a description: its options are read when it is built, and `build()`
 nodes on every call. One effect object can therefore serve every director, every slot and every
 transition at once — unlike an `OutputNodeBuilder`, which belongs to one renderer. An effect
 whose nodes own GPU memory releases it through an optional `dispose(node)` that the director calls
-for the node it built once nothing samples it any more; the built-in effects own none. A texture
+for every node it built, in its own `dispose()`, where the graphs of its shapes go; the built-in
+effects own none.
+
+The uv is the one the pipeline quad samples its textures at: under WebGPU and under WebGL 2 alike
+its origin is the top left of the picture, which the browser test of §10.2 holds with a `wipe()`
+`'up'` and a read-back whose row order it asks the backend for. A texture
 an effect samples — the mask of `lumaMask()` — is handed in and stays the caller's.
 
 ### 6.2 The built-in effects
@@ -329,12 +364,12 @@ an effect samples — the mask of `lumaMask()` — is handed in and stays the ca
 | `crossfade()` | — | `mix(from, to, p)` |
 | `fade()` | — | an alias of `crossfade()` under the name that reads right for `show()`, `hide()`, `push()`, `pop()` |
 | `dipToColor({color})` | `color`, default black | `from` into the color in the first half, the color into `to` in the second |
-| `wipe({direction, softness})` | `'left' \| 'right' \| 'up' \| 'down'` or an angle in radians; softness in uv, default 0.02 | a moving edge, `to` behind it |
-| `slide({direction, mode})` | `mode`: `'push'` (both move), `'cover'` (`to` moves over `from`), `'reveal'` (`from` moves off `to`) | samples the sources at shifted uvs |
-| `iris({center, softness})` | `center` in uv, default the middle | a circle opens on `to`; reversed, it closes on `from` |
+| `wipe({direction, softness})` | `'left' \| 'right' \| 'up' \| 'down'` — where the edge travels, `'left'` starts at the right side — or an angle in radians, counter-clockwise on the screen from the right; softness in uv, default 0.02 | a moving edge, `to` behind it |
+| `slide({direction, mode})` | `direction`: where the pictures travel, the four names only; `mode`: `'push'` (both move), `'cover'` (`to` moves over `from`), `'reveal'` (`from` moves off `to`) | samples the sources at shifted uvs |
+| `iris({center, softness})` | `center` in uv from the top left, default the middle; softness as a share of the largest radius | a circle opens on `to`; reversed, it closes on `from` |
 | `dissolve({scale, softness})` | the size of the noise cells in pixels, default 1 | a hash noise per cell against `progress`; at scale 1 a pixel dissolve |
-| `lumaMask({mask, softness, invert})` | a `Texture` whose luminance says when each pixel switches | the classic gradient-mask transition of 2D games |
-| `pixelate({maxBlockSize, mix})` | blocks in buffer pixels at the middle, default 32 | both sources sampled at a block grid that grows to the middle and shrinks again, crossed at the middle |
+| `lumaMask({mask, softness, invert})` | a `Texture` whose luminance says when each pixel switches, dark ones first; it covers the picture as a texture covers a mesh, its top on top | the classic gradient-mask transition of 2D games |
+| `pixelate({maxBlockSize})` | blocks in buffer pixels at the middle, default 32 | both sources sampled at a block grid that grows to the middle and shrinks again, crossed at the middle |
 
 `fade()` with a layer and nothing is a plain opacity fade; `wipe()` from nothing is a reveal. Every
 effect of the table works in both directions and with "nothing" on either side, because it only
@@ -387,17 +422,21 @@ director therefore keeps the structure of its graph apart from what fills it:
 - **The shape** of the stack is the list of its slot kinds, bottom to top: a layer, or a
   transition with a given effect object. `[layer, crossfade, layer]` is a shape.
 - **The graph of a shape** has a `TextureNode` per source and a progress uniform per transition
-  slot. The director keeps one graph per shape it has drawn, and fills a graph by pointing the
-  `value` of its texture nodes at the pass textures of the layers and at the empty texture. All
-  pass targets of a director have the size and the type of its own, so a swapped texture changes
-  a binding, not the shader.
+  slot, and a `RootRenderPipeline` of its own whose output node it is. The director keeps both
+  per shape it has drawn, and fills a graph by pointing the `value` of its texture nodes at the
+  pass textures of the layers and at the empty texture, a 1×1 target of the output buffer type
+  cleared to transparent black. All pass targets of a director have the size and the type of its
+  own, so a swapped texture changes a binding, not the shader — three.js compares the `value` of
+  a texture node with the texture of its binding on every draw, and its flip of a render target
+  is a uniform.
 - A change of the stack that keeps the shape — the second `replace()` of the menu, every
   `crossfade()` between any two layers in the same slot — swaps textures. A change that makes a new
-  shape builds its graph once; every later visit to that shape finds it.
+  shape builds its graph and its pipeline once; every later visit to that shape switches to its
+  pipeline, whose material is built already, and runs no `NodeBuilder`.
 
-A first visit to a shape still builds a shader. `director.precompile(shapes)` builds and compiles
-graphs ahead of time through `renderer.compileAsync()`, for a game that knows its transitions —
-see §12 for what remains to be measured there.
+A first visit to a shape still builds a shader. `director.precompile(shapes)`, which would build
+and compile graphs ahead of time through `renderer.compileAsync()` for a game that knows its
+transitions, is phase C and not built — see §12.2.
 
 ### 7.2 What a frame costs
 
@@ -418,11 +457,10 @@ Following [the resource lifecycle rules](../resource-lifecycle.md):
 
 | what | whose | disposed by |
 | --- | --- | --- |
-| the `RenderPipeline` the director built | the director | `StageDirector#dispose()` |
-| a `pipeline` the caller assigned | the caller | the caller |
+| the `RootRenderPipeline` of every shape | the director | `StageDirector#dispose()` |
 | the wrapper `StageRenderer` of a `Stage2D` | the director | the director, when its stage leaves the stack and in `dispose()` |
 | a stage handed in | the caller | the caller; the director only lets go |
-| the empty texture, the graphs, their uniforms and texture nodes | the director | `dispose()` |
+| the empty target, the graphs, their uniforms and texture nodes | the director | `dispose()`, which calls `dispose(node)` of every effect that has one for the node it built |
 | an effect object and a mask texture | the caller | the caller |
 
 `dispose()` cancels every running transition — their `finished` resolve as `cancelled`, their
@@ -445,7 +483,8 @@ a user of `StageRenderer` sees:
    `pipeline.outputNode` and `needsUpdate` only when the composer answers a node other than the
    one the pipeline has, as `#wireInternalOutputNode()` already does for the whole-picture mode.
    The director's composer answers the cached graph of a shape, and an unchanged shape costs no
-   shader build.
+   shader build. A `buildOutputNode` of one's own that answers the same node after changing the
+   graph behind it sets `pipeline.needsUpdate` itself.
 
 ## 10. Tests
 
@@ -550,13 +589,13 @@ Every effect, side by side with its options — the visual test of the effect li
 
 | phase | content |
 | --- | --- |
-| A | the seams of §9; `StageDirector` with the stack, the methods of §3.2, run and freeze, timing, events, disposal; `crossfade()`, `fade()`, `dipToColor()`, `wipe()`; the shape cache; the tests of §10 for these; the demo of §11.1 with these four effects |
-| B | `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()`; `createTransitionNode()`; manual progress; the demo of §11.2; the effect select of §11.1 with every effect |
-| C | `precompile()`, or earlier per §12.2; whatever §12.3 and §12.4 decide |
+| A — built | the seams of §9; `StageDirector` with the stack, the methods of §3.2, run and freeze, timing, events, disposal; `crossfade()`, `fade()`, `dipToColor()`, `wipe()`; the shape cache; the tests of §10 for these; the demo of §11.1 with these four effects |
+| B — built | `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()`; `createTransitionNode()`; manual progress; the demo of §11.2; the effect select of §11.1 with every effect |
+| C — open | `precompile()`, per §12.2; whatever §12.3 and §12.4 decide |
 
 ## 14. Docs and CHANGELOG
 
-- [`docs/stages.md`](../stages.md) gets a section "Transitions" after "Post-processing": the
+- [`docs/stages.md`](../stages.md) has a section "Stage transitions" after "Post-processing": the
   director, the stack and its methods, run and freeze, the options, the handle, the events, an
   effect of one's own, `createTransitionNode()`; and the classes, the effects and the defaults in
   its cheat sheet. Its "Who disposes what" gets the rows of §8.
