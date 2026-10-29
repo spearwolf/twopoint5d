@@ -1,0 +1,25 @@
+{
+  "title": "stage transitions: game menu",
+  "shortDescription": "A title menu that turns into a game through a transition of your choice, a pause menu over the frozen level, and back to the title through black",
+  "description": "One `StageDirector` is the renderer of the `Display`. It holds a **stack of layers** and composes it in one pipeline, bottom to top, with premultiplied alpha. The bottom slot holds a starfield from start to end; above it the **title** — a `Stage2D` with the chrome font and a ship — turns into the **level** through `director.replace(title, level, {effect, duration, easing})`: only that slot runs the transition, the stars stay. The level is a `StageRenderer` of two stages, the world and the HUD, with a **bloom of its own** that the director composes like any other layer; the builder of the demo keeps the alpha of the layer, so the stars shine through. *Escape* runs `director.push(pause, {below: 'freeze'})`: the level keeps its last picture under the menu, neither updated nor drawn, and `pop()` lets it run on from there. *Q* quits to the title through `dipToColor()`. Pick the effect, the duration and the easing in the panel; *freeze outgoing* holds the last picture of the layer that goes. See [Stage transitions](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#stage-transitions).",
+  "url": "/demos/stage-transitions-game-menu",
+  "tags": [
+    "StageDirector",
+    "StageRenderer",
+    "Stage2D",
+    "OrthographicProjection",
+    "crossfade",
+    "dipToColor",
+    "dissolve",
+    "wipe",
+    "slide",
+    "iris",
+    "pixelate",
+    "transitions",
+    "post-processing",
+    "FeatureSprites",
+    "BitmapFont",
+    "writeText",
+    "vanilla"
+  ]
+}

@@ -1,0 +1,171 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-transitions-game-menu.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #05060d;
+  }
+</style>
+
+<script>
+  import {Display, StageDirector, type StageTransitionEasing} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {loadStageTransitionAssets} from '~demos/stage-transitions/assets';
+  import {makeEffects} from '~demos/stage-transitions/effects';
+  import {GameLevel, type LevelInput} from '~demos/stage-transitions/GameLevel';
+  import {PauseMenu} from '~demos/stage-transitions/PauseMenu';
+  import {Starfield} from '~demos/stage-transitions/Starfield';
+  import {TitleMenu} from '~demos/stage-transitions/TitleMenu';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  const preview = deferPreview();
+
+  const display = new Display(getFullscreenCanvas());
+
+  // the director is the one renderer of the display: it draws every layer into a target of its own
+  // and composes the stack in one pipeline, bottom to top, over its clear color
+  const director = new StageDirector(display).setClearColor(new Color('#05060d'), 1);
+
+  const effects = makeEffects();
+  const settings = {
+    effect: 'dissolve',
+    duration: 0.9,
+    easing: 'ease-in-out' as StageTransitionEasing,
+    freezeOutgoing: false,
+  };
+
+  const input: LevelInput = {left: false, right: false, up: false, down: false};
+
+  display.onInit(async ({renderer}) => {
+    const {store, assets} = await loadStageTransitionAssets(renderer);
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
+
+    const stars = new Starfield(assets.dot);
+    const title = new TitleMenu(assets);
+    const level = new GameLevel(renderer, assets, input);
+    const pause = new PauseMenu(assets);
+
+    // the stars stay in the bottom slot from the start to the end: every transition runs above them
+    director.setStack([stars.stage, title.stage]);
+
+    type Screen = 'title' | 'game' | 'paused';
+    let screen: Screen = 'title';
+
+    const options = () => ({
+      effect: effects.get(settings.effect)!,
+      duration: settings.duration,
+      easing: settings.easing,
+      outgoing: settings.freezeOutgoing ? ('freeze' as const) : ('run' as const),
+    });
+
+    const showInfo = () =>
+      title.setInfo(`effect: ${settings.effect}  -  ${settings.duration.toFixed(1)} s  -  ${settings.easing}`);
+    showInfo();
+
+    const start = () => {
+      if (screen !== 'title') return;
+      screen = 'game';
+      level.reset();
+      stars.targetWarp = 4;
+      director.replace(title.stage, level.renderer, options());
+    };
+
+    const pauseGame = () => {
+      if (screen !== 'game') return;
+      screen = 'paused';
+      // the level keeps its last picture under the menu, and runs on from there after pop()
+      director.push(pause.stage, {effect: effects.get('crossfade')!, duration: 0.25, below: 'freeze'});
+    };
+
+    const resume = () => {
+      if (screen !== 'paused') return;
+      screen = 'game';
+      director.pop({effect: effects.get('crossfade')!, duration: 0.2});
+    };
+
+    const togglePause = () => {
+      if (screen === 'paused') resume();
+      else pauseGame();
+    };
+
+    const quit = () => {
+      if (screen !== 'paused') return;
+      screen = 'title';
+      stars.targetWarp = 1;
+      director.hide(pause.stage, {effect: effects.get('crossfade')!, duration: 0.3});
+      director.replace(level.renderer, title.stage, {...options(), effect: effects.get('dip to black')!, duration: 1.2});
+    };
+
+    const keys: Record<string, keyof LevelInput> = {
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      KeyA: 'left',
+      KeyD: 'right',
+      KeyW: 'up',
+      KeyS: 'down',
+    };
+    window.addEventListener('keydown', (event) => {
+      const key = keys[event.code];
+      if (key) {
+        input[key] = true;
+        event.preventDefault();
+      }
+      if (event.repeat) return;
+      if (event.code === 'Enter' || event.code === 'Space') start();
+      else if (event.code === 'Escape') togglePause();
+      else if (event.code === 'KeyQ') quit();
+    });
+    window.addEventListener('keyup', (event) => {
+      const key = keys[event.code];
+      if (key) input[key] = false;
+    });
+    getFullscreenCanvas().addEventListener('click', start);
+
+    const gui = new GUI({container: getDemoUi(), title: 'transition'});
+    gui
+      .add(
+        settings,
+        'effect',
+        [...effects.keys()].filter((name) => !name.startsWith('luma')),
+      )
+      .onChange(showInfo);
+    gui.add(settings, 'duration', 0.1, 3, 0.1).onChange(showInfo);
+    gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']).onChange(showInfo);
+    gui.add(settings, 'freezeOutgoing').name('freeze outgoing');
+    gui.add({start}, 'start').name('start (enter)');
+    gui.add({pause: togglePause}, 'pause').name('pause / resume (esc)');
+    gui.add({quit}, 'quit').name('quit to title (q)');
+
+    display.onDispose(() => {
+      gui.destroy();
+      // the director lets go of the layers first, then each layer goes
+      director.dispose();
+      stars.dispose();
+      title.dispose();
+      level.dispose();
+      pause.dispose();
+      assets.dot.dispose();
+      store.dispose();
+    });
+
+    preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

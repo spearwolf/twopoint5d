@@ -122,6 +122,23 @@
       ]
     },
     {
+      "name": "Stage transitions",
+      "tagId": "stage-transitions",
+      "includeTags": [
+        "StageDirector",
+        "StageTransition",
+        "crossfade",
+        "dipToColor",
+        "dissolve",
+        "iris",
+        "lumaMask",
+        "pixelate",
+        "slide",
+        "wipe",
+        "transitions"
+      ]
+    },
+    {
       "name": "Vertex Objects",
       "tagId": "vertex-objects",
       "includeTags": [

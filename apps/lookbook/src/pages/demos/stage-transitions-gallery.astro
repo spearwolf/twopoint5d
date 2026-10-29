@@ -1,0 +1,197 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-transitions-gallery.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {
+    Display,
+    FeatureSprites,
+    OrthographicProjection,
+    rewriteText,
+    Stage2D,
+    StageDirector,
+    type StageTransition,
+    type StageTransitionEasing,
+    type TexturedSprite,
+    TexturedSpriteKind,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {loadStageTransitionAssets, VIEW_HEIGHT, VIEW_WIDTH} from '~demos/stage-transitions/assets';
+  import {makeEffects, makeMasks} from '~demos/stage-transitions/effects';
+  import {COLD, GalleryScene, WARM} from '~demos/stage-transitions/GalleryScene';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the gallery shows a picture between two transitions, in seconds
+  const HOLD = 0.8;
+
+  const preview = deferPreview();
+  const display = new Display(getFullscreenCanvas());
+  const director = new StageDirector(display).setClearColor(new Color('#000'), 1);
+
+  const masks = makeMasks();
+  const effects = makeEffects(masks);
+  const names = [...effects.keys()];
+
+  const settings = {
+    effect: names[0]!,
+    cycle: true,
+    duration: 1.2,
+    easing: 'ease-in-out' as StageTransitionEasing,
+    scrub: false,
+    progress: 0.5,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const {store, assets} = await loadStageTransitionAssets(renderer);
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
+
+    const a = new GalleryScene(assets, WARM);
+    const b = new GalleryScene(assets, COLD);
+
+    // the label: a third layer on top that no transition touches
+    const label = new Stage2D(
+      new OrthographicProjection('xy|bottom-left', {width: VIEW_WIDTH, height: VIEW_HEIGHT, fit: 'contain'}),
+    );
+    label.name = 'label';
+    const text = new FeatureSprites(TexturedSpriteKind, {
+      capacity: 64,
+      textures: {colorMap: assets.pixelPage},
+      transparent: true,
+    });
+    label.scene.add(text);
+    let glyphs: TexturedSprite[] = [];
+    const writeLabel = (line: string) => {
+      glyphs = rewriteText(text, glyphs, assets.pixelFont, line, {
+        x: 0,
+        y: -VIEW_HEIGHT / 2 + 40,
+        z: 1,
+        align: 'center',
+        scale: 2,
+      });
+      for (const glyph of glyphs) glyph.setColor(new Color('#ffffff'));
+      text.update();
+    };
+
+    director.setStack([a.stage, label]);
+    let shown = a;
+    let hold = HOLD;
+    let running: StageTransition | undefined;
+
+    const other = () => (shown === a ? b : a);
+
+    const begin = (manual: boolean): StageTransition => {
+      const next = other();
+      writeLabel(settings.effect);
+      const transition = director.replace(shown.stage, next.stage, {
+        effect: effects.get(settings.effect)!,
+        duration: settings.duration,
+        easing: settings.easing,
+        manual,
+      });
+      if (manual) transition.progress = settings.progress;
+      running = transition;
+      transition.finished.then((t) => {
+        if (running === t) running = undefined;
+        // a transition that finished leaves the other picture in front; a cancelled one leaves this one
+        if (t.state === 'finished') shown = next;
+        hold = HOLD;
+      });
+      return transition;
+    };
+
+    const nextEffect = (t: StageTransition) => {
+      // a transition cancelled by the scrub mode keeps its effect for the scrub
+      if (!settings.cycle || settings.scrub || t.state !== 'finished') return;
+      settings.effect = names[(names.indexOf(settings.effect) + 1) % names.length]!;
+      effectController.updateDisplay();
+    };
+
+    display.onRenderFrame(({deltaTime}) => {
+      if (settings.scrub || running) return;
+      hold -= deltaTime;
+      if (hold > 0) return;
+      // the name stays on screen with its transition; the next one is picked for the round after
+      begin(false).finished.then(nextEffect);
+    });
+
+    const restartScrub = () => {
+      running?.cancel();
+      running = undefined;
+      if (settings.scrub) begin(true);
+    };
+
+    const gui = new GUI({container: getDemoUi(), title: 'transitions'});
+    const effectController = gui
+      .add(settings, 'effect', names)
+      .onChange(() => {
+        writeLabel(settings.effect);
+        if (settings.scrub) restartScrub();
+      })
+      .listen();
+    gui.add(settings, 'cycle').name('cycle through all');
+    gui.add(settings, 'duration', 0.2, 4, 0.1);
+    gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']);
+    gui
+      .add(settings, 'scrub')
+      .name('scrub by hand')
+      .onChange(() => {
+        if (!settings.scrub) {
+          running?.cancel();
+          running = undefined;
+          hold = HOLD;
+        } else {
+          restartScrub();
+        }
+      });
+    gui
+      .add(settings, 'progress', 0, 1, 0.001)
+      .name('progress')
+      .onChange(() => {
+        if (running?.manual) running.progress = settings.progress;
+      });
+
+    writeLabel(settings.effect);
+
+    // the card of the lookbook shows one effect, held in its middle
+    if (new URLSearchParams(location.search).get('preview') === '1') {
+      settings.effect = 'luma mask: spiral';
+      settings.scrub = true;
+      restartScrub();
+    }
+
+    display.onDispose(() => {
+      gui.destroy();
+      director.dispose();
+      a.dispose();
+      b.dispose();
+      text.dispose();
+      label.dispose();
+      for (const mask of Object.values(masks)) mask.dispose();
+      assets.dot.dispose();
+      store.dispose();
+    });
+
+    preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>
