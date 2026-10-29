@@ -116,6 +116,10 @@ function softnessOf(subject: string, softness: unknown, fallback: number): numbe
  * every `at` in `[0, 1]`, at progress 1 it is 1.
  */
 function switched(at: Node<'float'>, progress: Node<'float'>, softness: number): Node<'float'> {
+  // smoothstep() with both edges at one place is undefined in GLSL: a driver that compiles it
+  // without ANGLE in between, as Firefox and WebKit do on Linux, may answer anything at all. A hard
+  // edge is a step, and at progress 1 every pixel has switched, the brightest of a mask too.
+  if (softness === 0) return select(progress.greaterThanEqual(1), float(1), float(1).sub(step(progress, at)));
   const edge = progress.mul(1 + softness);
   return float(1).sub(smoothstep(edge.sub(softness), edge, at));
 }
