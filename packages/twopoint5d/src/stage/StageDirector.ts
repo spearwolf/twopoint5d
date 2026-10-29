@@ -487,14 +487,22 @@ export class StageDirector extends StageRenderer {
     const subject = 'StageDirector#push()';
     if (this.isDisposed) return this.#cancelledHandle(undefined, stage);
     const below = modeOption(subject, 'below', opts?.below);
-    const at = this.#slotIndexAt(subject, opts?.at);
-    const belowSlot = this.#slots[at - 1];
+    parseOptions(subject, opts);
+    if (this.#slotWithEnd(stage))
+      throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
+    this.#slotIndexAt(subject, opts?.at);
 
-    if (below === 'freeze' && belowSlot?.run) {
-      const errors: unknown[] = [];
+    // the runs end before the slot below is known: a run with the stage — the stage pushed back while
+    // a pop() still takes it out — and a run below that ends with nothing each take their slot out,
+    // and the slot below is the one that stays
+    const errors: unknown[] = [];
+    this.#finishRunsWith(stage, errors);
+    let belowSlot = this.#slots[this.#slotIndexAt(subject, opts?.at) - 1];
+    while (below === 'freeze' && belowSlot?.run) {
       this.#endRun(belowSlot, 'to', 'finished', errors);
-      throwCollected(errors, `${subject}: more than one listener of OnStageTransitionEnd threw`);
+      belowSlot = this.#slots[this.#slotIndexAt(subject, opts?.at) - 1];
     }
+    throwCollected(errors, `${subject}: more than one listener of OnStageTransitionEnd threw`);
     const belowLayer = belowSlot?.layer;
     const transition = this.show(stage, opts);
     if (below === 'freeze' && belowLayer && !belowLayer.frozen) {

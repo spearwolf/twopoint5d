@@ -873,6 +873,9 @@ no draw, no copy. A frozen layer whose size changes draws once at the new size, 
 | the layer a transition leaves | `outgoing` | the default | its last picture goes |
 | the layer a transition brings | `incoming` | the default | its first picture comes; it runs from the end on |
 
+`push()` with `below: 'freeze'` freezes the layer that stays below the new slot: a pause menu
+pushed back while its `pop()` still fades it out comes back over a frozen level.
+
 `director.freeze(stage)` and `director.run(stage)` set it by hand; `director.isFrozen(stage)` asks.
 
 ### The transition

@@ -350,6 +350,30 @@ describe('StageDirector', () => {
       expect(a.updateFrame).toHaveBeenCalledTimes(1);
     });
 
+    it('push() with below "freeze" while the same stage still leaves through a pop() freezes the layer below again', () => {
+      const effect = crossfade();
+      director.setStack([a]);
+      director.push(b, {below: 'freeze', effect, duration: 0.25});
+      director.transitions[0]!.complete();
+      director.pop({effect, duration: 0.25});
+      // b is on its way out, a runs again: pushed back at once, b comes back over a frozen a
+      director.push(b, {below: 'freeze', effect, duration: 0.25});
+      expect(names(director.stack)).toEqual(['a', 'b']);
+      expect(director.isFrozen(a)).toBe(true);
+      director.transitions[0]!.complete();
+      expect(director.isFrozen(a)).toBe(true);
+      director.pop();
+      expect(director.isFrozen(a)).toBe(false);
+    });
+
+    it('push() with below "freeze" freezes the layer under a slot below that ends with nothing', () => {
+      director.setStack([a, b]);
+      director.hide(b, {duration: 1});
+      director.push(c, {below: 'freeze'});
+      expect(names(director.stack)).toEqual(['a', 'c']);
+      expect(director.isFrozen(a)).toBe(true);
+    });
+
     it('outgoing "freeze" freezes the layer that goes; incoming "freeze" the one that comes, until the end', () => {
       director.setStack([a]);
       const t = director.replace(a, b, {duration: 1, outgoing: 'freeze', incoming: 'freeze'});

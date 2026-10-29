@@ -20,7 +20,8 @@ built:
 - `add()` shows a stage on top at once, `remove()` takes it out at once, wherever it is (§3.1);
 - the named easings are worked out in place, not through a call, so that their frame allocates
   nothing (§5.2);
-- `push()` with `below: 'freeze'` finishes a transition that runs in the slot below first (§4.3);
+- `push()` finishes a transition that still has the pushed stage first, and with `below: 'freeze'`
+  a transition that runs in the slot below; the slot below is the one that stays (§4.3);
 - an effect's `dispose(node)` runs in the director's `dispose()`, where its graphs go (§6.1, §8);
 - `precompile()` takes the renderer along with the shapes, and a shape is a list of `'layer'` and
   effect objects (§7.1);
@@ -218,6 +219,12 @@ pause menu continues on the very frame it was frozen at.
 | below a `push()` | `below` | default: the level keeps playing under the menu | the level stops; `pop()` lets it run again |
 | `from` of a `replace()` or `hide()` | `outgoing` | default: the menu keeps animating while it goes | the last picture goes |
 | `to` of a `replace()` or `show()` | `incoming` | default | the first picture comes, updated from the end of the transition on |
+
+`push()` with `below: 'freeze'` freezes the layer of the slot that stays below the new one. It
+first finishes a transition that still has the pushed stage — the pause menu pushed back while a
+`pop()` still fades it out — and a transition that runs in the slot below; a slot that such an end
+leaves without a layer goes, and the next one down is the slot below. A pause menu that a player
+opens and closes and opens again within the fade lies over a frozen level every time.
 
 `director.freeze(stage)` and `director.run(stage)` set it by hand, for a slot that no transition
 touches. A frozen layer whose size changes is drawn once at the new size, without an
@@ -546,7 +553,9 @@ a user of `StageRenderer` sees:
   directions; `finished` resolving with the state; the easing names and a function;
 - manual progress: clamping, `complete()`, `cancel()`, no advance by `updateFrame()`;
 - the run and freeze modes of §4.3: which layers get `updateFrame()`, which get
-  `shouldRenderPass()`, the one draw of a frozen layer after a resize;
+  `shouldRenderPass()`, the one draw of a frozen layer after a resize; `push()` with
+  `below: 'freeze'` while the pushed stage still leaves through a `pop()`, and over a slot that
+  ends with nothing;
 - the stages of the director as layers come and go (§4.4): `add()`/`remove()`, the release of pass
   memory, a wrapper built and disposed, a stage disposed in the stack;
 - the shape cache of §7.1: the same shape answers the same output node, so the pipeline gets
@@ -606,8 +615,10 @@ The demo of the feature: a game menu that goes into a game and back.
   pipeline of its own. `pause` — a dimmed full-screen panel with "paused" and two entries.
 - **Flow.** Enter or a click: `replace(title, level)` with the effect chosen in the `<demo-ui>`;
   the stars stay still under the transition. Escape: `push(pause, {below: 'freeze'})`, Escape
-  again `pop()`. "Quit to title" in the pause menu: `hide(pause)` and
-  `replace(level, title, {effect: dipToColor()})`.
+  again `pop()`. Q or "quit to title", from the game and from the pause menu: `hide(pause)` if the
+  menu is there, and `replace(level, title, {effect: dipToColor()})`. Every way — keys, the buttons
+  of the `<demo-ui>`, a click — and every quick sequence within a running transition ends in the
+  stack it names.
 - **The `<demo-ui>`.** A select of every built-in effect, a duration slider, an easing select, a
   checkbox "freeze the outgoing layer".
 - **`precompile()`.** At start the demo compiles every shape of its flow — the title, each effect
