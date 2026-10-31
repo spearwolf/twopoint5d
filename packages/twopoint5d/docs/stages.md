@@ -1095,7 +1095,9 @@ const display = new Display(document.querySelector('canvas')!);
 const view = {width: 640, height: 360, fit: 'contain'} as const;
 
 const world = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+// ... the first world goes into world.scene
 const rift = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+// ... the second world goes into rift.scene
 
 // the opening of the rift: a white disc on transparent black that grows
 const riftStage = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
@@ -1116,9 +1118,11 @@ director.setMask(rift, new StageMask(riftStage));
 display.start();
 ```
 
-The world is not hidden by anything: it runs under the rift as it ran before, and the rift runs
-inside the disc. With `invert: true` the mask turns around — the rift would show everywhere but
-inside the disc, and a hole of the world would look into whatever lies below the slot.
+The world is not hidden by anything: it runs under the rift, and the rift runs inside the disc.
+With `invert: true` on the mask of the rift the picture turns around: the rift shows everywhere but
+inside the disc, where the world below shows. To cut a hole into the world itself, for a layer
+below it to show through, put a second `StageMask` on the same stage with `invert: true` on the
+slot of the world.
 
 ### One mask on two slots
 
@@ -1255,8 +1259,8 @@ await director.precompile(
 ```
 
 The shader holds what a mask reads: its `source`, its `invert`, and which of the slots share a mask
-stage. Another `StageMask` with the same options on a stage in the same place finds the shape
-compiled — a mask, unlike an effect, goes by its options, not by its object.
+stage. Another `StageMask` finds the shape compiled when the same slots share a mask stage and the
+source and the `invert` are the same — a mask, unlike an effect, goes by its options, not by its object.
 
 ### What a mask costs
 
