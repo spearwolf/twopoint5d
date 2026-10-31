@@ -903,6 +903,78 @@ describe('StageDirector masks', () => {
       expect(ordered()).toEqual(['stars', 'third']);
     });
 
+    it("push() with below: 'freeze' refuses a mask driven by a run it does not end, before anything changes", () => {
+      const pushed = fakeStage('pushed');
+      director.setStack([stars, level]);
+      const driving = director.replace(stars, nextLevel, {effect: inkIn, duration: 1});
+      const below = director.replace(level, fakeStage('other'), {duration: 1});
+      const before = snapshot();
+      // push() ends the run directly below it, which ends in a layer: the driving run two slots below stays
+      expect(() => director.push(pushed, {below: 'freeze', effect: maskEffect('inkOver', [ink]), duration: 1})).toThrow(
+        'StageDirector#push(): the mask "ink" drives a transition already',
+      );
+      expect(snapshot()).toEqual(before);
+      expect(driving.state).toBe('pending');
+      expect(below.state).toBe('pending');
+      expect(director.transitions).toEqual([driving, below]);
+    });
+
+    it("push() with below: 'freeze' reuses the mask of a run it ends further down", () => {
+      const pushed = fakeStage('pushed');
+      director.setStack([stars, level]);
+      const driving = director.replace(stars, nextLevel, {effect: inkIn, duration: 1});
+      // a run that ends with nothing takes its slot out, and the run below it ends as well
+      const hidden = director.hide(level, {duration: 1});
+      const wrapper = rendererOf(inkStage)!;
+      const t = director.push(pushed, {below: 'freeze', effect: maskEffect('inkOver', [ink]), duration: 1});
+      expect(hidden.state).toBe('finished');
+      expect(driving.state).toBe('finished');
+      expect(t.state).toBe('pending');
+      // the mask stage stayed: not released and joined again
+      expect(rendererOf(inkStage)).toBe(wrapper);
+      expect(wrapper.isDisposed).toBe(false);
+      expect(ordered()).toEqual(['nextLevel', 'pushed', 'ink']);
+      expect(director.isFrozen(nextLevel)).toBe(true);
+    });
+
+    it('push() whose slot mask refuses to join gives back the uses of the effect masks', () => {
+      const broken = fakeStage('broken');
+      broken.resize.mockImplementation(() => {
+        throw new Error('broken: no size');
+      });
+      director.setStack([stars, level]);
+      const before = snapshot();
+      expect(() => director.push(nextLevel, {mask: new StageMask(broken), effect: inkIn, duration: 1})).toThrow(
+        'broken: no size',
+      );
+      expect(snapshot()).toEqual(before);
+      expect(director.stages).toHaveLength(2);
+      // the mask drives nothing and its stage left the director
+      expect(() => director.replace(level, nextLevel, {effect: inkIn, duration: 1})).not.toThrow();
+    });
+
+    it('setStack() and dispose() free the masks of the transitions they end', () => {
+      director.setStack([stars, level]);
+      const t = director.replace(level, nextLevel, {effect: inkIn, duration: 1});
+      const wrapper = rendererOf(inkStage)!;
+      director.setStack([stars]);
+      expect(t.state).toBe('cancelled');
+      expect(wrapper.isDisposed).toBe(true);
+      expect(ordered()).toEqual(['stars']);
+      // the mask drives nothing any more
+      const again = director.replace(stars, level, {effect: inkIn, duration: 1});
+      expect(ordered()).toEqual(['stars', 'level', 'ink']);
+
+      director.dispose();
+      expect(again.state).toBe('cancelled');
+      const second = new StageDirector();
+      second.resize(64, 64);
+      second.setStack([nextLevel]);
+      expect(() => second.replace(nextLevel, level, {effect: inkIn, duration: 1})).not.toThrow();
+      expect(second.orderedStages).toHaveLength(3);
+      second.dispose();
+    });
+
     it('show() of a stage whose run the call ends reuses the mask of that run', () => {
       director.setStack([stars, level]);
       const hidden = director.hide(level, {effect: inkIn, duration: 1});

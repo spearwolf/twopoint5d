@@ -574,17 +574,49 @@ export class StageDirector extends StageRenderer {
     this.#refuseMaskStageAsLayer(subject, stage);
     const mask = this.#checkMask(subject, opts?.mask, stage);
     const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => t.from === stage || t.to === stage);
+    this.#slotIndexAt(subject, opts?.at);
+    return this.#show(subject, stage, opts, options, mask, effectMasks, false);
+  }
+
+  /**
+   * The part of {@link show} after its refusals, which `push()` shares. `usesHeld` says that the
+   * caller has taken the uses of `effectMasks` already; a stage that refuses to join gives them back.
+   */
+  #show(
+    subject: string,
+    stage: StageDirectorLayer,
+    opts: StageShowOptions | undefined,
+    options: ParsedOptions,
+    mask: StageMask | undefined,
+    effectMasks: readonly StageMask[],
+    usesHeld: boolean,
+  ): StageTransition {
     const at = this.#slotIndexAt(subject, opts?.at);
 
     // the mask stages join first: a mask stage that refuses to join leaves every run as it was
     const errors: unknown[] = [];
     const slot: Slot = {};
-    if (mask) this.#maskSlot(subject, slot, mask, errors);
-    let usesMasks = false;
+    if (mask) {
+      try {
+        this.#maskSlot(subject, slot, mask, errors);
+      } catch (error) {
+        // the uses a caller took are given back
+        const collected = [error, ...errors];
+        if (usesHeld) this.#unuseMasks(effectMasks, collected);
+        if (collected.length === 1) throw error;
+        throw new AggregateError(
+          collected,
+          `${subject}: more than one error on the way back from a mask stage that refused to join`,
+        );
+      }
+    }
+    let usesMasks = usesHeld;
     let layer: Layer;
     try {
-      this.#useMasks(subject, effectMasks);
-      usesMasks = true;
+      if (!usesHeld) {
+        this.#useMasks(subject, effectMasks);
+        usesMasks = true;
+      }
       this.#finishRunsWith(stage, errors);
       layer = this.#join(subject, stage);
     } catch (error) {
@@ -665,37 +697,64 @@ export class StageDirector extends StageRenderer {
     if (this.#slotWithEnd(stage))
       throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
     this.#refuseMaskStageAsLayer(subject, stage);
-    this.#checkMask(subject, opts?.mask, stage);
-    const at = this.#slotIndexAt(subject, opts?.at);
-    // the runs this call may end: those with the stage, and with 'freeze' those below the new slot;
-    // show() checks again once they have ended
-    const slotsBelow = below === 'freeze' ? this.#slots.slice(0, at) : [];
-    this.#checkEffectMasks(
-      subject,
-      options,
-      stage,
-      (t) => t.from === stage || t.to === stage || slotsBelow.some((slot) => slot.run?.transition === t),
-    );
+    const mask = this.#checkMask(subject, opts?.mask, stage);
+    this.#slotIndexAt(subject, opts?.at);
+    const ended = this.#runsPushEnds(stage, opts?.at, below);
+    const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => ended.has(t));
 
+    // the mask stages join first, so a mask a run that ends here used stays and is not joined again;
     // the runs end before the slot below is known: a run with the stage — the stage pushed back while
     // a pop() still takes it out — and a run below that ends with nothing each take their slot out,
     // and the slot below is the one that stays
     const errors: unknown[] = [];
+    this.#useMasks(subject, effectMasks);
     this.#finishRunsWith(stage, errors);
     let belowSlot = this.#slots[this.#slotIndexAt(subject, opts?.at) - 1];
     while (below === 'freeze' && belowSlot?.run) {
       this.#endRun(belowSlot, 'to', 'finished', errors);
       belowSlot = this.#slots[this.#slotIndexAt(subject, opts?.at) - 1];
     }
+    if (errors.length > 0) this.#unuseMasks(effectMasks, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionEnd threw`);
     const belowLayer = belowSlot?.layer;
-    const transition = this.show(stage, opts);
+    const transition = this.#show(subject, stage, opts, options, mask, effectMasks, true);
     if (below === 'freeze' && belowLayer && !belowLayer.frozen) {
       const slot = this.#slotOfLayer(this.#layers.get(stage));
       belowLayer.frozen = true;
       if (slot) slot.frozeBelow = belowLayer;
     }
     return transition;
+  }
+
+  /**
+   * The transitions `push(stage, {at, below})` ends before it shows the stage, worked out without
+   * ending any: those with `stage` as a source, and with `'freeze'` the run of the slot below the
+   * new one — and further down for as long as such a run ends with nothing and takes its slot out.
+   * The stack stays as it is while they end: a run ends in its end state, and a slot that goes held
+   * no stage of the stack.
+   */
+  #runsPushEnds(stage: IStage, at: unknown, below: StageLayerMode): Set<StageTransition> {
+    const ended = new Set<StageTransition>();
+    const slots: Slot[] = [];
+    for (const slot of this.#slots) {
+      const run = slot.run;
+      if (run && (run.from?.stage === stage || run.to?.stage === stage)) {
+        ended.add(run.transition);
+        if (!run.to) continue;
+      }
+      slots.push(slot);
+    }
+    if (below !== 'freeze') return ended;
+    const target = at === undefined || at === this.stack.length ? undefined : this.#slotWithEnd(this.stack[at as number]!);
+    const indexBelow = () => (target ? slots.indexOf(target) : slots.length) - 1;
+    for (let i = indexBelow(); i >= 0; i = indexBelow()) {
+      const run = slots[i]!.run;
+      if (!run || ended.has(run.transition)) break;
+      ended.add(run.transition);
+      if (run.to) break;
+      slots.splice(i, 1);
+    }
+    return ended;
   }
 
   /** Takes the top layer out of the stack, as {@link hide} does; the layer below it runs again. */
@@ -916,7 +975,8 @@ export class StageDirector extends StageRenderer {
     for (let i = 0; i < shape.slots.length; i++) {
       const progress = shape.slots[i]!.progress;
       const run = this.#slots[i]?.run;
-      if (progress && run) progress.value = run.transition.progress;
+      // written only when it changed: a double stored again is boxed again, 16 bytes per draw
+      if (progress && run && progress.value !== run.transition.progress) progress.value = run.transition.progress;
     }
     this.#updateClearUniform(renderer);
     super.renderToCurrentTarget(renderer);
