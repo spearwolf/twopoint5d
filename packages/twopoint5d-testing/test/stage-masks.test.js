@@ -1,7 +1,17 @@
 import {expect} from '@esm-bundle/chai';
 import {on} from '@spearwolf/eventize';
-import {Display, OnStageUpdateFrame, StageDirector, StageMask, StageRenderer, createMaskNode, matte} from '@spearwolf/twopoint5d';
-import {Color, RenderPipeline, RenderTarget} from 'three/webgpu';
+import {
+  Display,
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageDirector,
+  StageMask,
+  StageRenderer,
+  createMaskNode,
+  matte,
+} from '@spearwolf/twopoint5d';
+import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget, Scene} from 'three/webgpu';
 import {mix} from 'three/tsl';
 import {
   disposeDisplay,
@@ -458,6 +468,130 @@ describe('StageDirector — masked slots on the GPU', () => {
       expect(isNearColor(left, TO), 'coverage 0: to').to.be.true;
       expect(isNearColor(middle, [srgb(0.5), srgb(0.5), 0], 3), 'coverage 0.5: half of both').to.be.true;
       expect(isNearColor(right, FROM), 'coverage 1: from').to.be.true;
+    });
+  });
+
+  describe('a mask in the world of a stage', () => {
+    const RED = [255, 0, 0];
+    const BLUE = [0, 0, 255];
+
+    /**
+     * The world: a `Stage2D` of a fill projection (one unit per pixel, the camera at the origin),
+     * sized by hand to the picture; and a scene of one white square of 16 units at the origin, which
+     * the mask draws through the camera of the world. Blue below, red above, the mask on red.
+     */
+    function maskedByASquareInTheWorld() {
+      const world = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+      world.name = 'world';
+      world.resize(SIZE, SIZE, 1);
+      const scene = new Scene();
+      const square = new Mesh(keep(new PlaneGeometry(16, 16)), keep(new MeshBasicMaterial({color: new Color('#fff')})));
+      scene.add(square);
+      const mask = StageMask.inWorldOf(world, scene, {source: 'alpha'});
+      const blue = makeFilledStage('blue', '#00f');
+      const red = makeFilledStage('red', '#f00');
+      director.setStack([blue.stage, red.stage]);
+      director.setMask(red.stage, mask);
+      return {world, mask, red};
+    }
+
+    it('follows a moved camera: the masked area moves with the world', async () => {
+      const {world} = maskedByASquareInTheWorld();
+
+      let pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, 32, 32), RED), 'the square in the middle: the slot shows').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, 16, 32), BLUE), 'beside it: the slot below').to.be.true;
+
+      // the camera moves 16 units to the right: the square, a thing of the world, moves 16 pixels to the left
+      world.camera.position.x += 16;
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, 32, 32), BLUE), 'the middle is the slot below now').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, 16, 32), RED), 'the slot shows where the square has moved to').to.be.true;
+    });
+
+    it('follows a new projection: the next frame draws through the new camera', async () => {
+      const {world} = maskedByASquareInTheWorld();
+      let pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, 20, 32), BLUE), 'one pixel per unit: the square is 16 pixels wide').to.be.true;
+
+      const oldCamera = world.camera;
+      // two pixels per unit: the same square covers 32 pixels
+      world.projection = new OrthographicProjection('xy|bottom-left', {pixelZoom: 2});
+      expect(world.camera, 'the projection built a camera of its own').not.to.equal(oldCamera);
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, 20, 32), RED), 'the square has grown over x = 20').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, 12, 32), BLUE), 'and stops where 32 pixels end').to.be.true;
+    });
+
+    it('a disposed mask leaves its slot: the whole slot shows again', async () => {
+      const {mask} = maskedByASquareInTheWorld();
+      let pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, 8, 32), BLUE), 'masked: the slot below at the left').to.be.true;
+
+      mask.dispose();
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, 8, 32), RED), 'the slot shows at the left').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, 32, 32), RED), 'and in the middle').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, 56, 32), RED), 'and at the right').to.be.true;
+    });
+  });
+
+  describe('a mask at a share of the resolution', () => {
+    // a white rectangle with hard edges at x = 16 and x = 48: on the grid of the half-size target too
+    const EDGES = [16, 48];
+    const RED = [255, 0, 0];
+    const BLUE = [0, 0, 255];
+
+    /** The picture of a red slot over a blue one, masked by `maskStage` at `scale`. */
+    async function maskedAt(maskStage, scale) {
+      const blue = makeFilledStage('blue', '#00f');
+      const red = makeFilledStage('red', '#f00');
+      director.setStack([blue.stage, red.stage]);
+      director.setMask(red.stage, new StageMask(maskStage, {scale}));
+      return draw();
+    }
+
+    const bar = (name) => makeFilledStage(name, '#fff', {rect: {x: 16, y: 0, width: 32, height: SIZE}});
+
+    /** Every pixel farther from an edge than the texel of the coarser grid (2 pixels), compared at the tolerance of a filtered fetch. */
+    function expectSameArea(half, full) {
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          if (EDGES.some((edge) => Math.abs(x - edge) <= 2)) continue;
+          expect(isNearColor(rgbAt(half, SIZE, x, y), rgbAt(full, SIZE, x, y), 3), `pixel ${x}, ${y}`).to.be.true;
+        }
+      }
+    }
+
+    it('masks the same area as a mask at scale 1, within one texel of the coarser grid', async () => {
+      const full = await maskedAt(bar('bar').stage, 1);
+      expect(isNearColor(rgbAt(full, SIZE, 8, 32), BLUE), 'scale 1: outside').to.be.true;
+      expect(isNearColor(rgbAt(full, SIZE, 32, 32), RED), 'scale 1: inside').to.be.true;
+
+      // a fresh stack for the second mask: one stage has one scale, and this is another stage
+      director.setStack([]);
+      const half = await maskedAt(bar('bar at half').stage, 0.5);
+      expectSameArea(half, full);
+    });
+
+    it('draws a line of one pixel at scale 1 and loses it at scale 0.5: the coarser grid is the one in use', async () => {
+      // 1 pixel wide and between the centers of two texels of the half-size target (32.0 and 34.0)
+      const line = (name) => makeFilledStage(name, '#fff', {rect: {x: 33.25, y: 0, width: 1, height: SIZE}});
+      const full = await maskedAt(line('line').stage, 1);
+      expect(isNearColor(rgbAt(full, SIZE, 33, 32), RED), 'scale 1: the line masks its pixel').to.be.true;
+
+      director.setStack([]);
+      const half = await maskedAt(line('line at half').stage, 0.5);
+      expect(isNearColor(rgbAt(half, SIZE, 33, 32), BLUE), 'scale 0.5: no texel center lies on the line').to.be.true;
+    });
+
+    it("masks the same area through a caller's StageRenderer as the mask stage", async () => {
+      const full = await maskedAt(bar('bar').stage, 1);
+
+      director.setStack([]);
+      const own = keep(new StageRenderer().setClearColor(new Color('#000'), 0).add(bar('bar of a renderer').stage));
+      const half = await maskedAt(own, 0.5);
+      expectSameArea(half, full);
     });
   });
 });
