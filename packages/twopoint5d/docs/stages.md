@@ -1298,16 +1298,16 @@ samples in `masks`, and `build()` gets their pictures through `input.mask()`:
 
 ```ts check
 import type {StageMask, StageTransitionEffect} from '@spearwolf/twopoint5d';
-import {float, mix} from 'three/tsl';
+import {float, mix, select} from 'three/tsl';
 
-/** `to` grows out of the lit spots of a mask: no light, no `to` before the very end. */
+/** `to` grows out of the lit spots of a mask; a pixel without light keeps `from` until the very end. */
 export const throughTheLight = (light: StageMask): StageTransitionEffect => ({
   name: 'through-the-light',
   masks: [light],
   build: ({from, to, progress, uv, mask}) => {
     const lit = mask(light).coverage(uv);
     // from at progress 0 and to at progress 1, whatever the mask draws
-    const share = mix(lit.mul(progress), float(1), progress.mul(progress));
+    const share = select(progress.greaterThanEqual(1), float(1), lit.mul(progress));
     return mix(from.sample(uv), to.sample(uv), share);
   },
 });
@@ -1325,8 +1325,7 @@ export const throughTheLight = (light: StageMask): StageTransitionEffect => ({
   the picture.
 - The contract stays: `from` at progress 0, `to` at progress 1. A mask that lives has to be held
   to the ends by the effect, as `matte()` does.
-- An effect with `masks` is still told apart by its object, as every effect is; the masks only add
-  texture nodes to the shape of the stack.
+- An effect with `masks` is compiled once per effect object, like any other.
 
 ### The mask
 
@@ -1427,6 +1426,8 @@ A mask that a transition uses carries the progress of that transition to its sta
   the call ends anyway have ended: `replace()` ends the run in its own slot first, so
   `director.replace(a, b, {effect: inkIn})` in the slot whose `inkIn` run is still going is allowed —
   the old run ends, and the mask starts again at progress 0, with the same mask and the same stage.
+- **Without a transition.** A change that happens at once, without an effect, drives no mask and
+  leaves `progress` as it was.
 - **The reverse.** `reverse()` runs the transition back, and the mask follows it back with it.
 
 ```ts
