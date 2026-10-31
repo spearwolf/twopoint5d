@@ -4,7 +4,9 @@ import {
   FeatureSprites,
   Map2D,
   Map2DTileRenderer,
+  OrthographicProjection,
   RepeatingTilesProvider,
+  Stage2D,
   TexturedSpriteKind,
   TextureCoords,
   TileSet,
@@ -13,7 +15,18 @@ import {
   TileSpritesGeometry,
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
-import {DataTexture, LinearMipmapLinearFilter, NearestFilter, OrthographicCamera, PerspectiveCamera, Scene} from 'three/webgpu';
+import {
+  Color,
+  DataTexture,
+  LinearMipmapLinearFilter,
+  Mesh,
+  MeshBasicMaterial,
+  NearestFilter,
+  OrthographicCamera,
+  PerspectiveCamera,
+  PlaneGeometry,
+  Scene,
+} from 'three/webgpu';
 
 // The fixtures the browser tests build their cases from. A helper that a second test file
 // needs moves here instead of being copied.
@@ -352,6 +365,40 @@ export function makeMap(visibilitor) {
   map2d.addTileRenderer(tileRenderer);
 
   return {map2d, tileSprites, tileRenderer};
+}
+
+// --- stages that fill a rect ---
+
+/**
+ * A stage that fills a rect of its picture with `color` at `opacity`, and draws nothing elsewhere:
+ * a mask stage clears nothing and draws its shapes onto transparent black. The picture is
+ * `size` × `size` units on as many pixels, `rect` is `{x, y, width, height}` in units from the
+ * bottom left corner of the picture (the projection puts its origin in the middle), and the whole picture without it. `fill()` adds a further rect, `material`
+ * is the one of the first. The meshes, the geometries and the materials go into {@link keep}, the
+ * stage as well — release them with {@link disposeKept}.
+ *
+ * @param {string} name
+ * @param {string} color
+ * @param {{opacity?: number, rect?: {x: number, y: number, width: number, height: number}, size?: number}} [options]
+ */
+export function makeFilledStage(name, color, {opacity = 1, rect, size = 64} = {}) {
+  const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+  stage.name = name;
+  /** @type {Mesh[]} */
+  const meshes = [];
+  /** @param {string} fillColor @param {number} fillOpacity @param {{x: number, y: number, width: number, height: number}} area */
+  const fill = (fillColor, fillOpacity, area) => {
+    const material = keep(
+      new MeshBasicMaterial({color: new Color(fillColor), transparent: fillOpacity < 1, opacity: fillOpacity}),
+    );
+    const mesh = new Mesh(keep(new PlaneGeometry(area.width, area.height)), material);
+    mesh.position.set(area.x + area.width / 2 - size / 2, area.y + area.height / 2 - size / 2, 0);
+    stage.scene.add(mesh);
+    meshes.push(mesh);
+    return mesh;
+  };
+  fill(color, opacity, rect ?? {x: 0, y: 0, width: size, height: size});
+  return {stage, fill, meshes, material: /** @type {MeshBasicMaterial} */ (meshes[0].material)};
 }
 
 // --- sprites and pixels ---
