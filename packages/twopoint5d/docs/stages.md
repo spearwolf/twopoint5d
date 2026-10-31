@@ -937,6 +937,7 @@ error comes out of the call afterwards.
 | `dissolve({scale, softness})` | `1`, `0.05` | a noise per cell of `scale` pixels decides when it switches; at `1` a pixel dissolve |
 | `lumaMask({mask, softness, invert})` | —, `0.05`, `false` | the luminance of a gray texture says when each pixel switches, dark ones first; the mask covers the picture as a texture covers a mesh and stays yours |
 | `pixelate({maxBlockSize})` | `32` | both sampled at blocks that grow to the middle and shrink again |
+| `matte({mask, mode, softness})` | —, `'coverage'`, `0.05` | a [stage that lives](#a-transition-through-a-living-matte) decides how much of `to` shows: its coverage is the share of `to`, or the point at which each pixel switches |
 
 Every effect works in both directions and with nothing on either side: `fade()` from nothing is an
 opacity fade, `wipe()` from nothing a reveal. An effect is a description — its options are read
@@ -1158,6 +1159,175 @@ once after the size of the director changes. A freeze does not outlive the mask 
 director: once nothing masks with the stage any more, it leaves, and a later `setMask()` finds it
 running.
 
+### A transition through a living matte
+
+`lumaMask()` switches by a still texture. When the matte itself should move — ink that spreads, a
+hand that wipes, flames that eat the picture — the matte is a stage, and `matte()` makes the
+transition of it. The stage draws the blots, and the transition shows `to` where it draws:
+
+```ts check
+import {on} from '@spearwolf/eventize';
+import {
+  Display,
+  matte,
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageDirector,
+  StageMask,
+} from '@spearwolf/twopoint5d';
+import {CircleGeometry, Mesh, MeshBasicMaterial} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const view = {width: 640, height: 360, fit: 'contain'} as const;
+
+const title = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+// ... the title screen goes into title.scene
+const level = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+// ... the level goes into level.scene
+
+// the ink: white discs on transparent black, each with a size of its own
+const inkStage = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const blots = Array.from({length: 24}, () => {
+  const mesh = new Mesh(new CircleGeometry(1, 32), new MeshBasicMaterial({transparent: true}));
+  mesh.position.set(Math.random() * 640, Math.random() * 360, 0);
+  inkStage.scene.add(mesh);
+  return {mesh, seed: 1 + Math.random() * 0.5};
+});
+
+const ink = new StageMask(inkStage);
+const inkIn = matte({mask: ink}); // made once and reused, as every effect
+
+// the blots grow with the transition, whatever its duration or its easing
+on(inkStage, OnStageUpdateFrame, () => {
+  for (const blot of blots) blot.mesh.scale.setScalar(blot.seed * ink.progress ** 2 * 800);
+});
+
+const director = new StageDirector(display);
+director.setStack([title]);
+director.replace(title, level, {effect: inkIn, duration: 1.2});
+
+display.start();
+```
+
+At progress 0 the title shows alone, with the blots at size 0; at 1 the level shows alone. Between
+them every pixel shows the share of the level that the ink covers there — a pixel inside a blot the
+level, outside it the title, the edge of a soft blot a mix of both. The mask stage is never in the
+stack: the director draws it while the transition runs and lets it go when the transition ends, so a
+matte costs nothing before and after.
+
+**Progress, not the clock.** A matte that grows with the clock of the display would end early under a
+slowed transition, late under a fast one and never under a `manual: true` one. `ink.progress` is the
+eased progress of the transition; the stage reads it in its `OnStageUpdateFrame`, and the blots
+follow the transition at any duration and easing, also when it is [driven by hand](#a-loading-screen-that-follows-the-loader).
+More in [the progress of a mask](#the-progress-of-a-mask).
+
+**`mode`.** The default is `'coverage'`: the stage is the transition, and its coverage is the
+share of `to`. With `'threshold'` the coverage says **when** a pixel switches — a pixel of
+coverage 0.3 switches at progress 0.3, as the luminance of a gray texture does in `lumaMask()`:
+what is dark switches first. That is `lumaMask()` with a
+mask that lives: a noise that boils while the progress sweeps through it.
+
+```ts check
+import {
+  Display,
+  matte,
+  OrthographicProjection,
+  Stage2D,
+  StageDirector,
+  StageMask,
+} from '@spearwolf/twopoint5d';
+import {DataTexture, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const view = {width: 640, height: 360, fit: 'contain'} as const;
+const title = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const level = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+
+// a gray noise of 64 × 36 texels over the whole picture, drawn again every tenth of a second
+const noise = new DataTexture(new Uint8Array(64 * 36 * 4), 64, 36, RGBAFormat);
+const boil = () => {
+  const texels = noise.image.data as Uint8Array;
+  for (let i = 0; i < texels.length; i += 4) {
+    texels[i] = texels[i + 1] = texels[i + 2] = Math.random() * 255;
+    texels[i + 3] = 255;
+  }
+  noise.needsUpdate = true;
+};
+boil();
+setInterval(boil, 100);
+
+const noiseStage = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const plane = new Mesh(new PlaneGeometry(640, 360), new MeshBasicMaterial({map: noise}));
+plane.position.set(320, 180, 0);
+noiseStage.scene.add(plane);
+
+const boiling = matte({
+  mask: new StageMask(noiseStage, {source: 'luminance'}),
+  mode: 'threshold',
+  softness: 0.1,
+});
+
+const director = new StageDirector(display);
+director.setStack([title]);
+director.replace(title, level, {effect: boiling, duration: 1.5});
+
+display.start();
+```
+
+`softness` belongs to `'threshold'` alone: how far a pixel blends around its switching point, in the
+range of the coverage (default `0.05`). Both ends hold by the switching function — at progress 0
+every pixel shows `from`, at progress 1 every pixel shows `to` — whatever the noise draws.
+
+**The ends.** An effect answers `from` at progress 0 and `to` at progress 1, but a living stage
+promises neither. In `'coverage'` mode `matte()` holds the ends itself: the share is 0 at progress 0
+and 1 at progress 1, whatever the stage drew. Between them it is the stage alone — and a mask stage
+that does not cover the picture by the end **jumps** there: in the last frame the transition shows
+`to` in full, also at the pixels the stage never reached. The blots of the recipe grow with the
+square of the progress to a size that covers the picture, so they have covered it before the jump. A stage
+whose picture is not 1 everywhere at progress 1 shows the jump as a flash of `to` over what was left of `from`.
+
+An effect with a mask holds a stage, so it is no description any more: it serves **one director** at
+a time, and a second transition with an effect that names a busy mask is refused — see
+[the progress of a mask](#the-progress-of-a-mask).
+
+### An effect that reads a mask
+
+`matte()` is one effect of the contract that is open to every effect. An effect names the masks it
+samples in `masks`, and `build()` gets their pictures through `input.mask()`:
+
+```ts check
+import type {StageMask, StageTransitionEffect} from '@spearwolf/twopoint5d';
+import {float, mix} from 'three/tsl';
+
+/** `to` grows out of the lit spots of a mask: no light, no `to` before the very end. */
+export const throughTheLight = (light: StageMask): StageTransitionEffect => ({
+  name: 'through-the-light',
+  masks: [light],
+  build: ({from, to, progress, uv, mask}) => {
+    const lit = mask(light).coverage(uv);
+    // from at progress 0 and to at progress 1, whatever the mask draws
+    const share = mix(lit.mul(progress), float(1), progress.mul(progress));
+    return mix(from.sample(uv), to.sample(uv), share);
+  },
+});
+```
+
+- `masks` is a list of `StageMask` objects, read when a transition with the effect begins. The
+  director draws their stages while the transition runs and lets them go afterwards. A list changed
+  later changes no transition that runs.
+- `input.mask(mask)` answers a `StageMaskSource` for one of the masks the effect named. It is the
+  `StageTransitionSource` of the stage, `sample(uv)` — the premultiplied picture, transparent black
+  outside `[0, 1]` — with one member more: `coverage(uv)`, the coverage by the `source` and the `invert` of
+  the mask, from 0 to 1 and 0 outside `[0, 1]`. A mask the effect did not name throws, also another `StageMask` on the same stage.
+- The mask is sampled at the `uv` of the effect, as the layers are: a mask stage is a picture of
+  the screen, not a texture of a mesh. A mask stage that draws into its top half is the top half of
+  the picture.
+- The contract stays: `from` at progress 0, `to` at progress 1. A mask that lives has to be held
+  to the ends by the effect, as `matte()` does.
+- An effect with `masks` is still told apart by its object, as every effect is; the masks only add
+  texture nodes to the shape of the stack.
+
 ### The mask
 
 ```ts
@@ -1236,6 +1406,38 @@ stage that is neither a layer nor a mask of this director is refused with "no la
 director". A frozen mask keeps its last picture and costs a texture fetch per pixel; `run()` sets it
 going again.
 
+### The progress of a mask
+
+A mask that a transition uses carries the progress of that transition to its stage:
+
+| member | |
+| --- | --- |
+| `mask.progress` | the eased progress of the transition, `0`…`1`, read-only |
+| `mask.progressNode` | a float uniform with the same value, for a mask stage whose materials animate on the GPU — a noise threshold in a sprite material, a dissolve of its own inside the mask |
+
+- **When it is written.** In `updateFrame()` of the director, after it advanced its transitions and
+  before it updates the mask stage: an `OnStageUpdateFrame` listener of the stage reads the value of
+  this very frame. A transition with `manual: true` may be set after `updateFrame()` and before the
+  draw; `progressNode` is written again in the draw, so the GPU never draws a stale value, while
+  `mask.progress` for the CPU side is the value of `updateFrame()`.
+- **Between transitions.** The mask holds the last value: 1 after a transition that finished, the value
+  of the cancel after one that was cancelled. A new transition starts it at 0.
+- **One transition at a time.** A mask drives one transition; a second one whose effect names a mask that
+  is busy is refused, with an error that names the mask stage. A mask is busy only after the runs that
+  the call ends anyway have ended: `replace()` ends the run in its own slot first, so
+  `director.replace(a, b, {effect: inkIn})` in the slot whose `inkIn` run is still going is allowed —
+  the old run ends, and the mask starts again at progress 0, with the same mask and the same stage.
+- **The reverse.** `reverse()` runs the transition back, and the mask follows it back with it.
+
+```ts
+// two slots, one ink: the second must wait for the first
+const first = director.replace(title, level, {effect: inkIn});
+director.replace(hud, minimap, {effect: inkIn}); // throws: the mask drives a transition already
+
+// the slot of a running matte may start again with it
+director.replace(level, nextLevel, {effect: inkIn}); // allowed: the run in this slot ends first
+```
+
 ### Orientation
 
 A mask is sampled at the same uv as the layers, the origin at the top left of the picture, under
@@ -1258,6 +1460,19 @@ await director.precompile(
 );
 ```
 
+An effect that names masks goes into the shape as any effect does, by its object — and the stages
+of its masks go into `layers`, so that they draw once ahead:
+
+```ts
+const inkIn = matte({mask: ink});
+
+await director.precompile(
+  display.renderer!,
+  [['layer', inkIn]], // the stars below the title taking the level in through the ink
+  {layers: [title, level, inkStage]},
+);
+```
+
 The shader holds what a mask reads: its `source`, its `invert`, and which of the slots share a mask
 stage. Another `StageMask` finds the shape compiled when the same slots share a mask stage and the
 source and the `invert` are the same — a mask, unlike an effect, goes by its options, not by its object.
@@ -1269,6 +1484,7 @@ source and the `invert` are the same — a mask, unlike an effect, goes by its o
 | a mask that runs | the draws of its stage | 1 pass target |
 | a frozen mask | none | 1 pass target, kept |
 | a masked slot | none of its own: one texture fetch and one multiplication in the quad | none of its own |
+| a transition through `matte()` | its two sources and the mask stage, for the length of the transition | 1 pass target, for the length of the transition |
 
 Against a nested pipeline that masks a layer in a pass of its own, a masked slot saves a pass
 target with its depth buffer — about 100 MB at 3840 × 2160 — and a full-screen quad per masked
@@ -1521,7 +1737,7 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 | `Canvas2DStage` | the sprite material and textures it built, its `StageRenderer` and its `Stage2D` | the `WebGPURenderer`, a canvas handed in, a material you set on the sprite |
 | `StageRenderTargetPool` | every target back in the pool, every lent one as it comes back | — |
 | a builder of `createBloomOutputNodeBuilder()` | the bloom node it built last | the pass nodes, which belong to the stages |
-| `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects and the texture nodes of its masks; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()`, the mask stages |
+| `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects and the texture nodes of its masks; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()`, the mask stages, the `StageMask` objects an effect names |
 | `StageMask` | lets go of its stage | the stage, which stays undisposed |
 | `Display` | its `WebGPURenderer` | a canvas handed in |
 
@@ -1600,9 +1816,9 @@ pipeline.dispose();
 | `createBloomOutputNodeBuilder()` | a ready-made `buildOutputNode`: the sum of the passes with a bloom on top |
 | `StageDirector` | a stack of layers, changed through transitions — `show`, `hide`, `replace`, `push`, `pop`; `setMask()` masks a slot by a stage; `precompile()` builds the shaders of its shapes and draws layers once ahead |
 | `StageTransition` | one change of the stack: `state`, `progress`, `finished`, `complete()`, `cancel()`, `reverse()` |
-| `crossfade()`, `fade()`, `dipToColor()`, `wipe()`, `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()` | the transition effects |
+| `crossfade()`, `fade()`, `dipToColor()`, `wipe()`, `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()`, `matte()` | the transition effects; `matte()` is the one through a stage that lives |
 | `createTransitionNode()` | the node of an effect, for a `buildOutputNode` of your own |
-| `StageMask` | a stage bound as a mask: its picture says how much of a slot shows — `source`, `invert`; `setMask()`, `maskOf()` and the `mask` option of a `StageDirector` |
+| `StageMask` | a stage bound as a mask: its picture says how much of a slot shows — `source`, `invert`; `setMask()`, `maskOf()` and the `mask` option of a `StageDirector`; `progress` and `progressNode` follow the transition whose effect names it (`masks`, `input.mask()`) |
 | `createMaskNode()` | the node of a picture times the coverage of a mask, for a `buildOutputNode` of your own |
 | `fitIntoRectangle()` | the arithmetic of the fit, for a layout of your own; `calculateAnchorOffset()` places the result in a container |
 
@@ -1641,5 +1857,6 @@ pipeline.dispose();
 | `Canvas2DStage` fit | `'contain'` |
 | `createBloomOutputNodeBuilder()` | `strength: 1`, `radius: 0`, `threshold: 0` |
 | `StageMask` | `source: 'alpha'`, `invert: false` |
+| `matte()` | `mode: 'coverage'`, `softness: 0.05` (`'threshold'` only) |
 | a transition of `StageDirector` | `crossfade()`, `0.5` s with an effect and `0` without, `'ease-in-out'`, no delay |
 | `outgoing`, `incoming`, `below` | `'run'` |
