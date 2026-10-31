@@ -22,8 +22,9 @@ generator and its output together. The output is the same, byte for byte, on eve
 same versions of Node, sharp and Blender.
 
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
-committed raw images and to resize, and for `boomer-shooter-corridor` Blender on the PATH (tested
-with 5.2 LTS, falls back to `/usr/bin/blender`), run headless with `-b --factory-startup`. No
+committed raw images and to resize, and for `boomer-shooter-corridor` and `stage-masks` (its
+`matte-3d`) Blender on the PATH (tested with 5.2 LTS, falls back to `/usr/bin/blender`), run
+headless with `-b --factory-startup`. No
 network, no ComfyUI: images painted with ComfyUI are curated sources committed under
 `<demo>/raw/` next to a `source.json` that records prompt, seed, workflow and settings.
 
@@ -582,3 +583,27 @@ laid over them.
 | `room-snow.webp` | 2400 × 1280, straight alpha | the room around the window: a wall of dark ashlar, bevelled and lit from below; a splayed reveal from the glass (half width 200, sill −165, springline 20, apex 250) to the face of the wall (half width 258, sill −207, apex 318); the front face of the sill slab; two lancets (middles at ±101, half width 91, apex 160) and a roundel at (0, 200) in stone tracery, rimmed with the cold light of the outside, lead cames across the lancets; a brass urn and a jar of dead roses on the sill; under it the cast-iron vent at (0, −246), half extents 110 × 15, glowing. The window's light is cold. The glass is alpha 0 but for frost feathering in from the edges of each pane and a faint reflection of the vent on the lower panes |
 | `room-ash.webp` | 2400 × 1280, straight alpha | the same room, lit red through the window, the glass rimmed with soot that runs down the panes in streaks |
 | `layout.json` | | `texelsPerUnit`; the frames `world` (the room images) and `outside` (the outside images); the window `glass`, `reveal` and `lancet` (`hw`, `sill`, `spring`, `apex`, the lancet with its middle `cx`), the `roundel` (`x`, `y`, `r`), the `vent` (`x`, `y`, `hw`, `hh`) and the `lamp` (`x`, `y`), in units |
+
+### matte-3d
+
+"Mirror, Mirror", the art of the demo `stage-masks-matte-3d`, from `stage-masks/matte-3d/matte-3d.mjs`
+and `blender_bathroom.py`. Not drawn but **rendered**: Blender builds a cramped antique bathroom
+from primitives and procedural materials and renders it with Cycles twice, from one camera, so the
+two pictures lie exactly over each other. The camera looks straight at the wall of the medicine
+cabinet and frames lower by a lens shift, not a tilt, so the glass of the mirror is an exact
+rectangle in the picture and the mirror shows the room behind the viewer by a real reflection.
+Cycles renders on a GPU when it finds one (OptiX, CUDA, HIP, oneAPI, Metal) and on the CPU
+otherwise, with a fixed seed and OpenImageDenoise. The picture is the same on every run, the bytes
+are not: a GPU schedules its samples a little differently each time, and two renders differ by a
+few levels in a few pixels (a mean of 0.004 of 255) — the one exception to the byte-for-byte rule
+above. The PNGs land in
+`stage-masks/matte-3d/.render-cache/` (ignored by git), and `--skip-render` reuses them. Units of
+the stage throughout: origin in the middle of the picture, y up, 2 texels per unit, both images
+loaded with the default `flipY`. The shards, the panes and the ouroboros of the mask are no
+asset: the demo builds them as meshes at run time.
+
+| file | size | what |
+| --- | --- | --- |
+| `bathroom.webp` | 2400 × 1280, opaque | 1200 × 640 units: the bathroom at night, lit by two frosted globe sconces in a dim sodium orange on brass arms left and right of the cabinet; cream subway tiles with grey grout, crazed and grimy towards the floor, up to a bull-nose rail, above it a gloss paint gone sick green and peeling to the plaster; the cabinet of chipped white enamel with a chrome bead round its glass, the silver of the mirror lost in dark blooms creeping in from the rim; a glass shelf with a tumbler of toothbrushes, an amber pill bottle and a razor; a porcelain basin with two cross-handle taps. The mirror shows the empty room behind the viewer: a door ajar on a dark hallway, a towel on a hook, the tiles |
+| `reflection.webp` | 2400 × 1280, opaque | the same room as the world inside the mirror: the sconces dying to a bruised red, a cold cyan light from below and from the hallway, the tiles wet and glossy, black water brimming in the basin and running down the tiles from under the cabinet, the shelf and the sink; in the mirror, in front of the lit door, right behind where the viewer stands, a tall woman in a grey nightgown with long black hair over her face, one eye showing, arms hanging too long — she stands behind the camera and is seen only in the reflection |
+| `layout.json` | | `glass` (the rectangle of the mirror glass: `left`, `bottom`, `right`, `top`), `sconces` (the middle of each shade), `figureEyes` (where her two eyes show in the mirror of `reflection.webp`; the demo cracks the glass from between them) and `units` (`width`, `height` of the picture in units, `texelsPerUnit`) |

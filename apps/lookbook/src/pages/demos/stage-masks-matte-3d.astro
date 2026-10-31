@@ -1,0 +1,282 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-matte-3d.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {
+    Display,
+    matte,
+    StageDirector,
+    type StageDirectorShape,
+    StageMask,
+    type StageTransition,
+    type StageTransitionEasing,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {disposeMirrorAssets, loadMirrorAssets, MirrorScene} from '~demos/stage-masks/MirrorBathroom';
+  import {type MirrorMaskScene, MirrorShatter} from '~demos/stage-masks/MirrorShatter';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long a scene holds before the mirror breaks again, while "cycle" is on, in seconds
+  const HOLD = 2.8;
+  // how long the card of the lookbook waits for the textures and the first frames, in ms
+  const PREVIEW_SETTLE = 1500;
+  const BLOOM_ON = 1.4;
+
+  type Reads = 'coverage (alpha)' | 'look (luminance)';
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  // the silhouettes of the mask's geometry are the edge of the transition: they get MSAA
+  const display = new Display(canvas, {antialias: true});
+  const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+
+  const settings = {
+    scene: 'shatter' as MirrorMaskScene,
+    bloom: true,
+    reads: 'coverage (alpha)' as Reads,
+    duration: 3.6,
+    easing: 'ease-in-out' as StageTransitionEasing,
+    cycle: true,
+    scrub: false,
+    progress: 0.42,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadMirrorAssets(renderer);
+    if (display.isDisposed) {
+      disposeMirrorAssets(assets);
+      return;
+    }
+
+    const bathroom = new MirrorScene(assets, 'bathroom');
+    const reflection = new MirrorScene(assets, 'reflection');
+
+    // the mask stage: a 3D scene under its own perspective camera, with a bloom in its own pipeline.
+    // It is never in the stack: the director draws it only while a transition through it runs
+    const shatter = new MirrorShatter(assets.layout);
+    shatter.attachPipeline(renderer);
+    // two masks on the one stage, read two ways: the alpha is the coverage of the geometry, the
+    // luminance is its look — the bloom included. Each makes its own matte, compiled once
+    const byCoverage = new StageMask(shatter.stage, {source: 'alpha'});
+    const byLook = new StageMask(shatter.stage, {source: 'luminance'});
+    const throughCoverage = matte({mask: byCoverage});
+    const throughLook = matte({mask: byLook});
+
+    director.setStack([bathroom.stage]);
+
+    let running: StageTransition | undefined;
+    let runningMask: StageMask = byCoverage;
+    let hold = HOLD;
+    const sceneName = (stage: unknown) => (stage === reflection.stage ? 'the reflection' : 'the bathroom');
+    const maskName = (scene: MirrorMaskScene) => (scene === 'shatter' ? 'the glass shatters' : 'the ouroboros');
+    const readout = {
+      slot: sceneName(bathroom.stage),
+      time: '—',
+      progress: '0.000',
+      mask: maskName(settings.scene),
+      reads: settings.reads,
+    };
+
+    // the readouts, looked at once per frame and written only when what they show changes: during
+    // a run the slot names both ends, and the mask scene and the source are those of the run
+    let shownFrom: unknown = bathroom.stage;
+    let shownTo: unknown;
+    let shownTime = -1;
+    let shownProgress = 0;
+    let shownMask: MirrorMaskScene = settings.scene;
+    let shownReads: Reads = settings.reads;
+    const describe = () => {
+      const from = running ? running.from : director.stack[0];
+      const to = running ? running.to : undefined;
+      if (from !== shownFrom || to !== shownTo) {
+        shownFrom = from;
+        shownTo = to;
+        readout.slot = to === undefined ? sceneName(from) : `${sceneName(from)} → ${sceneName(to)}`;
+      }
+      // -1 for no run, -2 for a run by hand, else the share of the duration in thousandths
+      const time = running ? (running.manual ? -2 : Math.round(Math.min(1, running.elapsed / running.duration) * 1000)) : -1;
+      if (time !== shownTime) {
+        shownTime = time;
+        readout.time = time === -1 ? '—' : time === -2 ? 'by hand' : (time / 1000).toFixed(3);
+      }
+      const progress = Math.round(runningMask.progress * 1000);
+      if (progress !== shownProgress) {
+        shownProgress = progress;
+        readout.progress = (progress / 1000).toFixed(3);
+      }
+      if (shatter.scene !== shownMask) {
+        shownMask = shatter.scene;
+        readout.mask = maskName(shownMask);
+      }
+      const reads: Reads = runningMask === byLook ? 'look (luminance)' : 'coverage (alpha)';
+      if (reads !== shownReads) {
+        shownReads = reads;
+        readout.reads = reads;
+      }
+    };
+
+    const begin = (manual: boolean): StageTransition => {
+      const from = director.stack[0] === reflection.stage ? reflection : bathroom;
+      const to = from === reflection ? bathroom : reflection;
+      // the mask scene and the source the UI picked take effect with a new run, never in the middle of one
+      shatter.setScene(settings.scene);
+      runningMask = settings.reads === 'look (luminance)' ? byLook : byCoverage;
+      shatter.follow(runningMask);
+      const transition = director.replace(from.stage, to.stage, {
+        effect: runningMask === byLook ? throughLook : throughCoverage,
+        duration: settings.duration,
+        easing: settings.easing,
+        manual,
+      });
+      if (manual) transition.progress = settings.progress;
+      running = transition;
+      transition.finished.then((t) => {
+        if (display.isDisposed) return;
+        if (running === t) running = undefined;
+        hold = HOLD;
+        describe();
+      });
+      return transition;
+    };
+
+    const play = () => {
+      // a run already going is the one on the screen: let it finish
+      if (running || settings.scrub) return;
+      begin(false);
+    };
+
+    const setScrub = () => {
+      if (settings.scrub) {
+        running?.cancel('end');
+        running = undefined;
+        begin(true);
+      } else if (running?.manual) {
+        // let go of the slider: the transition ends where it is nearer to
+        running.cancel(running.progress >= 0.5 ? 'end' : 'start');
+      }
+    };
+
+    // a change of the mask scene or of the source while scrubbing restarts the scrub with it, from
+    // where the slider stands; in a run it waits for the next one
+    const restartScrub = () => {
+      if (!settings.scrub || !running?.manual) return;
+      running.cancel('start');
+      running = undefined;
+      begin(true);
+    };
+
+    // one handler per frame: the cycle and the readouts; the poses of the mask follow its progress
+    display.onRenderFrame(({deltaTime}) => {
+      if (settings.cycle && !settings.scrub && !running) {
+        hold -= deltaTime;
+        if (hold <= 0) begin(false);
+      }
+      describe();
+    });
+
+    const gui = new GUI({container: getDemoUi(), title: 'Mirror, Mirror'});
+    gui
+      .add(settings, 'scene', {'the glass shatters': 'shatter', 'the ouroboros': 'ouroboros'})
+      .name('mask scene')
+      .onChange(restartScrub);
+    gui
+      .add(settings, 'bloom')
+      .name('bloom in the mask pipeline')
+      .onChange(() => {
+        shatter.bloomStrength.value = settings.bloom ? BLOOM_ON : 0;
+      });
+    gui.add(settings, 'reads', ['coverage (alpha)', 'look (luminance)']).name('the matte reads').onChange(restartScrub);
+    gui.add(settings, 'duration', 0.6, 10, 0.1).name('duration (s)');
+    gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']);
+    gui.add({play}, 'play').name('play (space)');
+    gui.add(settings, 'cycle').name('cycle by itself');
+    gui.add(settings, 'scrub').name('scrub by hand (s)').onChange(setScrub).listen();
+    gui
+      .add(settings, 'progress', 0, 1, 0.001)
+      .name('transition.progress')
+      .onChange(() => {
+        if (running?.manual) running.progress = settings.progress;
+      });
+    gui.add(readout, 'slot').name('in the slot').disable().listen();
+    gui.add(readout, 'time').name('time / duration').disable().listen();
+    gui.add(readout, 'progress').name('mask.progress').disable().listen();
+    gui.add(readout, 'mask').name('mask stage shows').disable().listen();
+    gui.add(readout, 'reads').name('this run reads').disable().listen();
+
+    // space plays, S scrubs by hand
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (event.code === 'Space' || event.code === 'Enter') {
+        event.preventDefault();
+        play();
+      } else if (event.code === 'KeyS') {
+        settings.scrub = !settings.scrub;
+        setScrub();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    // every shape the slot takes — a scene alone, and each of the two mattes between two — with both
+    // scenes and the mask stage drawn once ahead. The two mattes differ in their source, so each is
+    // a shader of its own; the mask stage shows every part of both its scenes for the draw ahead
+    const shapes: StageDirectorShape[] = [['layer'], [throughCoverage], [throughLook]];
+    shatter.showAllForPrecompile();
+    const precompiled = director
+      .precompile(renderer, shapes, {layers: [bathroom.stage, reflection.stage, shatter.stage]})
+      .catch((error: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+        console.error('stage-masks-matte-3d: precompile() failed, the shaders build on first use', error);
+      })
+      .finally(() => shatter.afterPrecompile());
+
+    // the card of the lookbook: the shards in flight, the first panes of the wall swinging shut
+    if (isPreview) {
+      settings.cycle = false;
+      settings.progress = 0.42;
+      settings.scrub = true;
+      setScrub();
+    }
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      gui.destroy();
+      // the director lets go of the layers and of the mask stage first, then each goes
+      director.dispose();
+      byCoverage.dispose();
+      byLook.dispose();
+      shatter.dispose();
+      bathroom.dispose();
+      reflection.dispose();
+      disposeMirrorAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

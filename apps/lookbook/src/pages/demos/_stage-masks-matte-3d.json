@@ -1,0 +1,17 @@
+{
+  "title": "stage masks: matte 3d",
+  "shortDescription": "Mirror, Mirror: the glass of a bathroom mirror shatters at the camera, and every shard is a window into the world behind it — matte() in 'coverage' mode whose mask stage is a real 3D scene with its own perspective camera and a bloom in its own pipeline that the matte does not see",
+  "description": "A `StageDirector` with one slot. **The bathroom**: an antique bathroom at night, two frosted sconces humming in sodium orange, the medicine cabinet reflecting the empty room behind you — a door ajar on the hallway, a towel on its hook. **The reflection**: the same room as the world inside the mirror. The sconces die to a bruised red, a cold light comes up from below, black water brims in the basin and runs down the tiles — and in the mirror, right behind where you stand, a woman with long black hair over her face. Both pictures were rendered by Blender from one camera, so they lie exactly over each other.\n\nThe change is `director.replace(bathroom, reflection, {effect, duration, easing})` with `effect = matte({mask})` in its default **`'coverage'` mode**, and the mask stage is **a real 3D scene**: meshes of shaded glass on transparent black, under a `PerspectiveCamera` of its own on a `Stage2D` without a projection. In *the glass shatters*, Voronoi shards cut from the glass crack outward from her face, turn over into the reflection one by one, come loose and tumble at the camera, growing in its perspective until they fly past it; the holes they leave show the reflection, and the panes of the wall swing shut in a wave until the whole picture is the other side. In *the ouroboros*, a sigil far behind the glass — a snake eating its tail inside a ring of spikes, an eye that opens — turns towards you and comes closer until the eye fills the screen. No uv is distorted anywhere: **the anti-aliased silhouette of the geometry is the edge** between `from` and `to` (the display runs with MSAA for it). Every pose is a function of `mask.progress`, laid out once from a seed, so *scrub by hand* (key S, `manual: true`) holds any frame and runs the same way back.\n\nThe mask stage is a `StageRenderer` with **a pipeline of its own**: the pass of the 3D scene and a bloom over it, added to the colour only. The meshes are opaque wherever they are — that is their **coverage**, the alpha — and shaded like glass in their colour, dimmer as a face turns away from the camera, with a glint as it swings through facing it — that is their **look**. *the matte reads* switches between two `StageMask`s on that one stage: with `source: 'alpha'` the matte reads the coverage, and *bloom in the mask pipeline* changes nothing on screen; with `source: 'luminance'` it reads the look — a tumbling shard turns half transparent, and the bloom, which brightens the glass, makes it solid again. The picture of a mask stage is premultiplied: what glows outside the silhouette, at alpha 0, is not part of it. See [Stage masks: a transition through a living matte](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#a-transition-through-a-living-matte).",
+  "url": "/demos/stage-masks-matte-3d",
+  "tags": [
+    "StageMask",
+    "matte",
+    "StageDirector",
+    "StageTransition",
+    "Stage2D",
+    "StageRenderer",
+    "masks",
+    "transitions",
+    "vanilla"
+  ]
+}
