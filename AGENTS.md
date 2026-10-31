@@ -153,6 +153,12 @@ explicit instruction.
   package bump changes the version in that path —
   `scripts/lookbook/rainbowLineScript.test.mjs` (`pnpm test:scripts`) fails otherwise.
   The `!apps/lookbook/public/js` entry in `biome.jsonc` exists for it and stays too.
+- **Creating assets.** Where the `asset-creation` skill is available in the local
+  environment, it is cleared for use at any time, without asking first, for the lookbook
+  demos, other demos and every asset the development of this project needs. An asset
+  that lands in the repo stays reproducible: its generator goes under
+  `apps/lookbook/assets-src/`, its output is documented in that directory's `README.md`,
+  and both are committed together, as `pnpm lookbook:assets` above describes.
 - **Publishing** happens from the generated `dist/`, never from `packages/twopoint5d/`.
   `scripts/` is the publish pipeline — changes there can break the published package.
   `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions: the Nx cache server
