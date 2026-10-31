@@ -1,0 +1,49 @@
+{
+  "texelsPerUnit": 2,
+  "world": {
+    "left": -600,
+    "right": 600,
+    "bottom": -320,
+    "top": 320
+  },
+  "outside": {
+    "left": -280,
+    "right": 280,
+    "bottom": -230,
+    "top": 300
+  },
+  "glass": {
+    "hw": 200,
+    "sill": -165,
+    "spring": 20,
+    "apex": 250
+  },
+  "reveal": {
+    "hw": 258,
+    "sill": -207,
+    "spring": 20,
+    "apex": 318
+  },
+  "lancet": {
+    "cx": 101,
+    "hw": 91,
+    "sill": -165,
+    "spring": 20,
+    "apex": 160
+  },
+  "roundel": {
+    "x": 0,
+    "y": 200,
+    "r": 30
+  },
+  "vent": {
+    "x": 0,
+    "y": -246,
+    "hw": 110,
+    "hh": 15
+  },
+  "lamp": {
+    "x": 104,
+    "y": 6
+  }
+}

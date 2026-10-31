@@ -1,0 +1,211 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-heat-haze.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {Display, StageDirector, type StageTransition, type StageTransitionEasing} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {
+    CrematoriumView,
+    disposeCrematoriumAssets,
+    HeatColumn,
+    loadCrematoriumAssets,
+  } from '~demos/stage-masks/CrematoriumWindow';
+  import {heatHaze} from '~demos/stage-masks/heatHaze';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long a picture holds before the heat rises again, while "cycle" is on, in seconds
+  const HOLD = 3;
+  // how long the card of the lookbook waits for the plumes to climb, in ms
+  const PREVIEW_SETTLE = 1800;
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+  const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+
+  const settings = {
+    strength: 1,
+    duration: 5,
+    easing: 'ease-in-out' as StageTransitionEasing,
+    cycle: true,
+    scrub: false,
+    progress: 0.5,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadCrematoriumAssets(renderer);
+    if (display.isDisposed) {
+      disposeCrematoriumAssets(assets);
+      return;
+    }
+
+    const snow = new CrematoriumView('snow', assets);
+    const ash = new CrematoriumView('ash', assets);
+
+    // the heat: a living mask stage, never in the stack. The effect names its mask, so the director
+    // draws the column only while a transition runs. Made once and reused, as every effect
+    const heat = new HeatColumn(assets.layout);
+    const haze = heatHaze({mask: heat.mask, strength: settings.strength});
+
+    director.setStack([snow.stage]);
+
+    let running: StageTransition | undefined;
+    let hold = HOLD;
+    const sceneName = (stage: unknown) => (stage === ash.stage ? 'ash' : 'snow');
+    const readout = {slot: 'snow', time: '—', progress: heat.mask.progress.toFixed(3), bend: '0.000'};
+
+    // the readouts, written once per frame: during a run they name both ends of the slot
+    const describe = () => {
+      if (running) {
+        readout.slot = `${sceneName(running.from)} → ${sceneName(running.to)}`;
+        readout.time = running.manual ? 'by hand' : Math.min(1, running.elapsed / running.duration).toFixed(3);
+        const p = heat.mask.progress;
+        readout.bend = (p > 0 && p < 1 ? Math.sin(p * Math.PI) * haze.strength.value : 0).toFixed(3);
+      } else {
+        readout.slot = sceneName(director.stack[0]);
+        readout.time = '—';
+        readout.bend = '0.000';
+      }
+      readout.progress = heat.mask.progress.toFixed(3);
+    };
+
+    const begin = (manual: boolean): StageTransition => {
+      const from = director.stack[0] === ash.stage ? ash : snow;
+      const to = from === ash ? snow : ash;
+      const transition = director.replace(from.stage, to.stage, {
+        effect: haze,
+        duration: settings.duration,
+        easing: settings.easing,
+        manual,
+      });
+      if (manual) transition.progress = settings.progress;
+      running = transition;
+      transition.finished.then((t) => {
+        if (display.isDisposed) return;
+        if (running === t) running = undefined;
+        hold = HOLD;
+        describe();
+      });
+      return transition;
+    };
+
+    const play = () => {
+      // a run already going is the one on the screen: let it finish
+      if (running || settings.scrub) return;
+      begin(false);
+    };
+
+    const setScrub = () => {
+      if (settings.scrub) {
+        running?.cancel('end');
+        running = undefined;
+        begin(true);
+      } else if (running?.manual) {
+        // let go of the slider: the transition ends where it is nearer to
+        running.cancel(running.progress >= 0.5 ? 'end' : 'start');
+      }
+    };
+
+    display.onRenderFrame(({deltaTime}) => {
+      describe();
+      if (!settings.cycle || settings.scrub || running) return;
+      hold -= deltaTime;
+      if (hold <= 0) begin(false);
+    });
+
+    const gui = new GUI({container: getDemoUi(), title: 'Crematorium Window'});
+    // the strength is a uniform of the effect: it changes mid-transition and needs no new shader
+    gui
+      .add(settings, 'strength', 0, 3, 0.01)
+      .name('haze strength')
+      .onChange(() => {
+        haze.strength.value = settings.strength;
+      });
+    gui.add(settings, 'duration', 1, 12, 0.1).name('duration (s)');
+    gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']);
+    gui.add({play}, 'play').name('play (space)');
+    gui.add(settings, 'cycle').name('cycle by itself');
+    gui.add(settings, 'scrub').name('scrub by hand (s)').onChange(setScrub).listen();
+    gui
+      .add(settings, 'progress', 0, 1, 0.001)
+      .name('transition.progress')
+      .onChange(() => {
+        if (running?.manual) running.progress = settings.progress;
+      });
+    gui.add(readout, 'slot').name('in the slot').disable().listen();
+    gui.add(readout, 'time').name('time / duration').disable().listen();
+    gui.add(readout, 'progress').name('heat.progress').disable().listen();
+    gui.add(readout, 'bend').name('bend (strength·sin πp)').disable().listen();
+
+    // space plays, S scrubs by hand
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (event.code === 'Space' || event.code === 'Enter') {
+        event.preventDefault();
+        play();
+      } else if (event.code === 'KeyS') {
+        settings.scrub = !settings.scrub;
+        setScrub();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    // every shape the slot takes: a picture alone, and the heat between the two. The strength is a
+    // uniform, so one shader serves every value of the slider; both pictures and the heat column are
+    // drawn once ahead
+    const precompiled = director
+      .precompile(renderer, [['layer'], [haze]], {layers: [snow.stage, ash.stage, heat.stage]})
+      .catch((error: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+        console.error('stage-masks-heat-haze: precompile() failed, the shaders build on first use', error);
+      });
+
+    // the card of the lookbook: held half way, the ash showing through the heat over the vent
+    if (isPreview) {
+      settings.cycle = false;
+      settings.progress = 0.42;
+      settings.scrub = true;
+      setScrub();
+    }
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      gui.destroy();
+      // the director lets go of the layers and of the mask stage first, then each goes
+      director.dispose();
+      heat.dispose();
+      snow.dispose();
+      ash.dispose();
+      disposeCrematoriumAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

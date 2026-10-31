@@ -1,0 +1,17 @@
+{
+  "title": "stage masks: heat haze",
+  "shortDescription": "Crematorium Window: a snowy cemetery at dusk, seen through a tall window, wavers in the heat of the furnace vent below — and through the shimmer the snow is ash, the firs are skeletons and figures stand among the graves. An effect of its own reads a living mask stage through input.mask() and bends both pictures by it",
+  "description": "A `StageDirector` with one slot. The view out of a crematorium window: a cemetery on a slope at dusk after snowfall — snow-capped headstones, an angel, firs laden with snow, a crescent moon, a sodium lamp pooling orange on the snow, flakes falling past the glass, frost in the corners of the panes. Under the sill the cast-iron vent of the furnace glows. The same view, the second time: the snow is ash, embers glow in the ground, the firs are burnt to their skeletons, the sky is smoke lit red from below, soot runs down the panes — and tall, thin figures stand among the graves, facing the window.\n\nThe change is `director.replace(snow, ash, {effect: haze, duration, easing})` with an **effect of the demo's own**, `heatHaze({mask, strength})` in `demos/stage-masks/heatHaze.ts`. It names its mask in `masks: [mask]`, and its `build()` reads the living stage through `input.mask(mask)` — a `StageMaskSource` — and uses its `coverage(uv)` twice. **As a bend**: the coverage is sampled at the four neighbouring pixels, and its slope pushes the uv of both pictures, strongest at the edges of the plumes where the density of the hot air changes fastest; a ripple whose phase is the coverage itself adds the fine shimmer and crawls as the plumes rise. **As the share of `to`**: where the heat is dense the ash shows through it, the thin air at its rim only shimmers. The ends hold whatever the mask draws: the bend is scaled by `sin(π·progress)` and is exactly 0 at both ends, the share is 0 at progress 0 and 1 at progress 1.\n\nThe mask stage is a `Stage2D` that is never in the stack: a column of soft blobs that rise from the vent and wobble on a clock of their own, read with the default `source: 'alpha'`. Its `OnStageUpdateFrame` reads `mask.progress`: thin at the start, the column widens and thickens with the progress until it fills the view, at any duration and easing. *haze strength* is a uniform of the effect — it changes mid-transition and compiles no new shader; `precompile()` builds the one shape ahead. *scrub by hand* (key S) holds the progress on a slider (`manual: true`) while the heat keeps rising; *bend* reads `strength · sin(π·progress)`. See [Stage masks: an effect that reads a mask](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#an-effect-that-reads-a-mask).",
+  "url": "/demos/stage-masks-heat-haze",
+  "tags": [
+    "StageMask",
+    "StageMaskSource",
+    "StageDirector",
+    "StageTransition",
+    "StageTransitionEffect",
+    "Stage2D",
+    "masks",
+    "transitions",
+    "vanilla"
+  ]
+}

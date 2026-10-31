@@ -3,6 +3,7 @@
 // regenerates all of them; README.md documents every output.
 import {generate as foundFootage} from './found-footage/footage.mjs';
 import {generate as frozen} from './frozen/frozen.mjs';
+import {generate as heatHaze} from './heat-haze/heat-haze.mjs';
 import {generate as matteInk} from './matte-ink/matte-ink.mjs';
 import {generate as matteThreshold} from './matte-threshold/matte-threshold.mjs';
 import {generate as rift} from './rift/rift.mjs';
@@ -20,4 +21,5 @@ export async function generate(out) {
   await frozen(out);
   await matteInk(out);
   await matteThreshold(out);
+  await heatHaze(out);
 }
