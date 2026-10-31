@@ -1471,8 +1471,9 @@ export const throughTheLight = (light: StageMask): StageTransitionEffect => ({
   later changes no transition that runs.
 - `input.mask(mask)` answers a `StageMaskSource` for one of the masks the effect named. It is the
   `StageTransitionSource` of the stage, `sample(uv)` — the premultiplied picture, transparent black
-  outside `[0, 1]` — with one member more: `coverage(uv)`, the coverage by the `source` and the `invert` of
-  the mask, from 0 to 1 and 0 outside `[0, 1]`. A mask the effect did not name throws, also another `StageMask` on the same stage.
+  outside `[0, 1]` — with one member more: `coverage(uv)`, the coverage by the `source` and the
+  `invert` of the mask, from 0 to 1 and 0 outside `[0, 1]`. A mask the effect did not name throws,
+  also another `StageMask` on the same stage.
 - The mask is sampled at the `uv` of the effect, as the layers are: a mask stage is a picture of
   the screen, not a texture of a mesh. A mask stage that draws into its top half is the top half of
   the picture.
@@ -1504,6 +1505,11 @@ clears nothing and draws its shapes onto transparent black. `'luminance'` suits 
 painting or a canvas, and is read in the linear working space. Every source reads the picture
 premultiplied: the luminance of a half-transparent gray is its luminance times its alpha, so the
 transparent black around the shapes of a mask stage covers 0 under every source.
+
+Light outside the drawn shape never reaches the coverage, not even with `'luminance'`: a glow or a
+bloom halo that spreads beyond a shape lies on pixels whose alpha is 0, and a picture that is
+premultiplied has taken its color away there. Where light should count, give the shape alpha
+there — a soft blob that reaches as far as the glow, not a hard shape with a halo around it.
 
 `mask.stage`, `mask.source`, `mask.invert` and `mask.scale` read back what you handed in. A
 `StageMask` holds its stage but does not own it: `mask.dispose()` lets go of it and leaves the
@@ -1626,7 +1632,10 @@ director.setMask(level, new StageMask(fogStage, {scale: 0.5})); // a quarter of 
 - **One stage has one scale.** The pass target belongs to the stage, so two masks on one stage
   that ask for different scales are refused, with an error that names the stage — in `setMask()`,
   `show()`, `push()`, `hide()` and `replace()`, before anything changes. That holds when one mask
-  replaces the other on a slot as well: take the old mask off first, then set the new one.
+  replaces the other on a slot as well: take the old mask off first, then set the new one. The
+  stage takes another scale only once nothing uses it any more: if another slot or a running
+  transition still uses a mask on that stage, taking the old mask off this slot frees nothing, and
+  the refusal stands until those uses have ended too.
 
   ```ts
   director.setMask(level, undefined);
@@ -1696,8 +1705,10 @@ on a small device.
 `createMaskNode(content, mask, options?)` builds the node of a masked picture for a
 `buildOutputNode` of your own: `content` times the coverage of `mask`, all four channels,
 premultiplied. A source is a `TextureNode` or the `PassNode` of a `Stage2D`, as for
-`createTransitionNode()`; the options are `source` and `invert` of the table above, not `scale`. The mask stage is one of the
-stages of the renderer and is drawn like every other stage.
+`createTransitionNode()`; the options are `source` and `invert` of the table above, not `scale`.
+The mask stage is one of the stages of the renderer and is drawn like every other stage.
+An effect that names masks, such as `matte()`, is refused by `createTransitionNode()`: its mask
+stages need a `StageDirector` to draw them.
 
 ```ts check
 import {
