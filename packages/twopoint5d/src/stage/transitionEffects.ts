@@ -342,9 +342,12 @@ export function pixelate(options?: PixelateOptions): StageTransitionEffect {
 /** What {@link createTransitionNode} takes as a source: a texture node, a pass node, or nothing. */
 export type StageTransitionSourceNode = Node | null | undefined;
 
-const isTextureNode = (node: unknown): node is TextureNode => (node as Partial<TextureNode> | null)?.isTextureNode === true;
+/** @internal */
+export const isTextureNode = (node: unknown): node is TextureNode =>
+  (node as Partial<TextureNode> | null)?.isTextureNode === true;
 
-const hasTextureNode = (node: unknown): node is {getTextureNode(): TextureNode} =>
+/** @internal */
+export const hasTextureNode = (node: unknown): node is {getTextureNode(): TextureNode} =>
   typeof (node as {getTextureNode?: unknown} | null)?.getTextureNode === 'function';
 
 /**

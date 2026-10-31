@@ -6,6 +6,8 @@ export type * from './IProjection.js';
 export type * from './IRenderable.js';
 export type * from './IStage.js';
 export type * from './IStageRendererHost.js';
+export type {MaskNodeOptions} from './maskNodes.js';
+export {createMaskNode} from './maskNodes.js';
 export * from './OrthographicProjection.js';
 export * from './outputNodeBuilders.js';
 export * from './ParallaxProjection.js';
@@ -23,6 +25,8 @@ export type {
   StageTransitionOptions,
 } from './StageDirector.js';
 export {StageDirector} from './StageDirector.js';
+export type {StageMaskCoverageSource, StageMaskOptions} from './StageMask.js';
+export {StageMask} from './StageMask.js';
 export * from './StageRenderer.js';
 export * from './StageRenderTargetPool.js';
 export type {StageTransitionEasing, StageTransitionState} from './StageTransition.js';

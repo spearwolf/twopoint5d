@@ -988,6 +988,74 @@ A shape the stack has not had before builds a shader on its first frame; every l
 swaps textures and builds nothing. [`precompile()`](#no-hitch-on-the-first-transition) moves that
 build to the start.
 
+## Stage masks
+
+A mask says how much of a picture shows: where it covers 1, the picture stays as it is, where it
+covers 0, nothing is left of it, and in between it fades. A `StageMask` makes a stage the mask. The
+stage draws as any stage does — sprites, meshes, a `Canvas2DStage` — and the coverage is read from
+its picture, so a fog of war is a stage that draws soft white blobs around the player and around
+every torch.
+
+```ts check
+import {OrthographicProjection, Stage2D, StageMask} from '@spearwolf/twopoint5d';
+
+// a stage that draws soft white blobs on transparent black
+const fogStage = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'fill'}));
+const fog = new StageMask(fogStage, {source: 'alpha'});
+```
+
+`new StageMask(stage, options?)` takes any stage a `StageDirector` takes as a layer: it has
+`renderTo()`, it is no `ClearStage`, and it is not disposed. Anything else is refused with an
+error that names the stage.
+
+| option | default | |
+| --- | --- | --- |
+| `source` | `'alpha'` | what of the picture is the coverage: `'alpha'`, `'luminance'`, `'red'`, `'green'`, `'blue'` |
+| `invert` | `false` | `1 - coverage`: the mask cuts out where its stage draws |
+
+The options are read once, when the mask is made. `'alpha'` is the default because a mask stage
+clears nothing and draws its shapes onto transparent black. `'luminance'` suits a gray picture, a
+painting or a canvas, and is read in the linear working space. Every source reads the picture
+premultiplied: the luminance of a half-transparent gray is its luminance times its alpha, so the
+transparent black around the shapes of a mask stage covers 0 under every source.
+
+`mask.stage`, `mask.source` and `mask.invert` read back what you handed in. A `StageMask` holds its
+stage but does not own it: `mask.dispose()` lets go of it and leaves the stage undisposed, which
+stays yours to dispose.
+
+### Without a director
+
+`createMaskNode(content, mask, options?)` builds the node of a masked picture for a
+`buildOutputNode` of your own: `content` times the coverage of `mask`, all four channels,
+premultiplied. A source is a `TextureNode` or the `PassNode` of a `Stage2D`, as for
+`createTransitionNode()`; the options are those of the table above. The mask stage is one of the
+stages of the renderer and is drawn like every other stage.
+
+```ts check
+import {
+  createMaskNode,
+  Display,
+  OrthographicProjection,
+  Stage2D,
+  StageRenderer,
+} from '@spearwolf/twopoint5d';
+import {RenderPipeline} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const sr = new StageRenderer(display);
+
+const projection = () => new OrthographicProjection('xy|bottom-left', {fit: 'fill'});
+const scene = new Stage2D(projection());
+scene.name = 'scene';
+const fog = new Stage2D(projection());
+fog.name = 'fog';
+sr.add(scene).add(fog);
+
+// the scene shows where the fog stage draws
+sr.pipeline = new RenderPipeline(display.renderer!);
+sr.buildOutputNode = ([sceneNode, fogNode]) => createMaskNode(sceneNode, fogNode, {source: 'alpha'});
+```
+
 ## A 2D canvas as a stage: `Canvas2DStage`
 
 A `Canvas2DStage` shows a 2D canvas on a sprite, fitted into the container — debug overlays,
