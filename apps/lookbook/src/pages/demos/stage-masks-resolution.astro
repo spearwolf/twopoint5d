@@ -1,0 +1,294 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-resolution.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style is:global>
+  body {
+    background: #050406;
+  }
+
+  /* the words on the brass plaques: laid over the canvas where the plaques are */
+  .seance-plaque {
+    position: fixed;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0 1.2em;
+    pointer-events: none;
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: #f2e2b6;
+    text-shadow:
+      0 -1px 0 rgb(0 0 0 / 70%),
+      0 0 6px rgb(0 0 0 / 60%);
+  }
+
+  .seance-plaque b {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+</style>
+
+<script>
+  import {Display, StageDirector, type StageDirectorShape, StageMask} from '@spearwolf/twopoint5d';
+  import GUI, {type Controller} from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {
+    bytesPerTexel,
+    DEPTH_BYTES_PER_TEXEL,
+    disposeSeanceAssets,
+    EctoplasmFog,
+    FogClock,
+    loadSeanceAssets,
+    maskTargetSize,
+    megabytes,
+    SEANCE_VIEW,
+    SeanceRoom,
+    SpiritPlate,
+  } from '~demos/stage-masks/SeancePhotographs';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the fog drifts before the card of the lookbook is taken, in ms
+  const PREVIEW_SETTLE = 1500;
+  // the scales a panel offers, and the presets for all three at once
+  const SCALES = [1, 0.75, 0.5, 0.25, 0.125];
+  const PRESETS: Record<string, [number, number, number]> = {
+    '1 · 0.5 · 0.25': [1, 0.5, 0.25],
+    '1 · 0.25 · 0.125': [1, 0.25, 0.125],
+    'all at 1': [1, 1, 1],
+    'all at 0.5': [0.5, 0.5, 0.5],
+    'all at 0.25': [0.25, 0.25, 0.25],
+  };
+  // the size the guide reckons with
+  const UHD = {width: 3840, height: 2160};
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+  const director = new StageDirector(display).setClearColor(new Color('#050406'), 1);
+
+  const settings = {
+    preset: '1 · 0.5 · 0.25',
+    scales: [1, 0.5, 0.25],
+    edges: 'soft' as 'soft' | 'hard',
+    drift: true,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadSeanceAssets(renderer);
+    if (display.isDisposed) {
+      disposeSeanceAssets(assets);
+      return;
+    }
+    const {layout} = assets;
+
+    const room = new SeanceRoom(assets);
+    const clock = new FogClock();
+    // one slot per frame, so one mask per frame — and three fog stages, not one: a pass target
+    // belongs to its stage, so one stage has one scale, and two masks on one stage that ask for
+    // different scales are refused. The three draw the same fog from the same clock
+    const plates = layout.panels.map((_, i) => new SpiritPlate(assets, i));
+    const fogs = layout.panels.map((_, i) => new EctoplasmFog(layout, i, clock));
+    const masks = fogs.map((fog, i) => new StageMask(fog.stage, {scale: settings.scales[i]}));
+    fogs.forEach((fog, i) => {
+      fog.scale = masks[i]!.scale;
+    });
+
+    director.setStack([room.stage, ...plates.map((plate) => plate.stage)]);
+    plates.forEach((plate, i) => director.setMask(plate.stage, masks[i]));
+
+    // the words on the plaques, and the same in the panel
+    const plaques = layout.panels.map(() => {
+      const el = document.createElement('div');
+      el.className = 'seance-plaque';
+      document.body.appendChild(el);
+      return el;
+    });
+    // the panels by name, for the read-outs: lil-gui reads a property of an object
+    const NAMES = ['left', 'middle', 'right'] as const;
+    const readout = {
+      buffer: '',
+      panels: {left: '', middle: '', right: ''},
+      uhd: {left: '', middle: '', right: ''},
+    };
+
+    const describe = () => {
+      const pixelRatio = renderer.getPixelRatio();
+      // the type of the director's pass targets, the same for every target of this renderer
+      const colorBytes = bytesPerTexel(renderer.getOutputBufferType());
+      const bufferW = maskTargetSize(display.width, pixelRatio, 1);
+      const bufferH = maskTargetSize(display.height, pixelRatio, 1);
+      readout.buffer = `${bufferW} × ${bufferH} px, ${colorBytes} B colour + ${DEPTH_BYTES_PER_TEXEL} B depth per px`;
+      for (let i = 0; i < masks.length; i++) {
+        const scale = masks[i]!.scale;
+        const w = maskTargetSize(display.width, pixelRatio, scale);
+        const h = maskTargetSize(display.height, pixelRatio, scale);
+        const color = w * h * colorBytes;
+        const depth = w * h * DEPTH_BYTES_PER_TEXEL;
+        const uw = maskTargetSize(UHD.width, 1, scale);
+        const uh = maskTargetSize(UHD.height, 1, scale);
+        readout.panels[NAMES[i]!] = `${w} × ${h} · ${megabytes(color + depth)} MB`;
+        readout.uhd[NAMES[i]!] = `${uw} × ${uh} · ${megabytes(uw * uh * (colorBytes + DEPTH_BYTES_PER_TEXEL))} MB`;
+        plaques[i]!.innerHTML =
+          `<span><b>scale ${scale}</b> · ${w} × ${h} px</span>` +
+          `<span>${megabytes(color)} MB colour + ${megabytes(depth)} MB depth</span>`;
+      }
+    };
+
+    // the plaques follow the wall: `fit: 'contain'` puts the 1200 × 640 units in the middle
+    const placePlaques = () => {
+      const rect = canvas.getBoundingClientRect();
+      const k = Math.min(rect.width / SEANCE_VIEW.width, rect.height / SEANCE_VIEW.height);
+      const {plaque} = layout;
+      for (let i = 0; i < plaques.length; i++) {
+        const panel = layout.panels[i]!;
+        const el = plaques[i]!;
+        const w = plaque.w * k;
+        const h = plaque.h * k;
+        el.style.left = `${rect.left + rect.width / 2 + panel.x * k - w / 2}px`;
+        el.style.top = `${rect.top + rect.height / 2 - (panel.y + plaque.dy) * k - h / 2}px`;
+        el.style.width = `${w}px`;
+        el.style.height = `${h}px`;
+        el.style.fontSize = `${Math.max(7, h * 0.3)}px`;
+      }
+    };
+
+    display.onResize(() => {
+      describe();
+      placePlaques();
+    });
+
+    // a new scale is a new mask: the options of a StageMask are read once. The stage keeps one
+    // scale while a mask on it is in the director, so the old mask comes off first
+    const setScale = (panel: number, scale: number) => {
+      const old = masks[panel]!;
+      if (old.scale === scale) return;
+      director.setMask(plates[panel]!.stage, undefined);
+      old.dispose();
+      const mask = new StageMask(fogs[panel]!.stage, {scale});
+      masks[panel] = mask;
+      fogs[panel]!.scale = scale;
+      director.setMask(plates[panel]!.stage, mask);
+      settings.scales[panel] = scale;
+      describe();
+    };
+
+    const scaleControllers: Controller[] = [];
+    const applyPreset = () => {
+      const preset = PRESETS[settings.preset];
+      if (!preset) return;
+      preset.forEach((scale, i) => setScale(i, scale));
+      for (const c of scaleControllers) c.updateDisplay();
+    };
+
+    const applyEdges = () => {
+      clock.hard.value = settings.edges === 'hard' ? 1 : 0;
+    };
+
+    let time = 0;
+    display.onRenderFrame(({deltaTime}) => {
+      if (!settings.drift) return;
+      // one clock for the three fogs, written outside every mask stage
+      time += Math.min(deltaTime, 0.1);
+      clock.time.value = time;
+    });
+
+    const gui = new GUI({container: getDemoUi(), title: 'Séance Photographs'});
+    gui.add(settings, 'preset', Object.keys(PRESETS)).name('scales (left → right)').onChange(applyPreset);
+    for (let i = 0; i < masks.length; i++) {
+      const proxy = {
+        get scale() {
+          return settings.scales[i]!;
+        },
+        set scale(value: number) {
+          setScale(i, Number(value));
+        },
+      };
+      scaleControllers.push(gui.add(proxy, 'scale', SCALES).name(NAMES[i]!));
+    }
+    gui.add(settings, 'edges', ['soft', 'hard']).name('mask edges (e)').onChange(applyEdges).listen();
+    gui.add(settings, 'drift').name('fog drifts (space)').listen();
+    const info = gui.addFolder('mask targets');
+    info.add(readout, 'buffer').name('drawing buffer').disable().listen();
+    for (let i = 0; i < masks.length; i++) {
+      info.add(readout.panels, NAMES[i]!).disable().listen();
+    }
+    const uhd = gui.addFolder('the same at 3840 × 2160');
+    for (let i = 0; i < masks.length; i++) {
+      uhd.add(readout.uhd, NAMES[i]!).disable().listen();
+    }
+
+    // E switches the edges, space holds the fog
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName)) return;
+      if (event.code === 'KeyE') {
+        settings.edges = settings.edges === 'soft' ? 'hard' : 'soft';
+        applyEdges();
+      } else if (event.code === 'Space') {
+        event.preventDefault();
+        settings.drift = !settings.drift;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    // the one shape of the stack: the room and three masked slots. A new scale is a new mask with
+    // the same source and invert, so it finds this shape compiled; the soft/hard switch is a
+    // uniform of the fog material. The fog stages draw once ahead with the layers
+    const shape: StageDirectorShape = ['layer', ...masks.map((mask) => ({mask}))];
+    const precompiled = director
+      .precompile(renderer, [shape], {layers: [room.stage, ...plates.map((p) => p.stage), ...fogs.map((f) => f.stage)]})
+      .catch((error: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+        console.error('stage-masks-resolution: precompile() failed, the shaders build on their first frame', error);
+      });
+
+    // the card of the lookbook: the hard edges, where the scales tell apart
+    if (isPreview) {
+      settings.edges = 'hard';
+      applyEdges();
+      time = 16;
+    }
+
+    describe();
+    placePlaques();
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      gui.destroy();
+      for (const el of plaques) el.remove();
+      // the director lets go of the layers and of the fog stages first, then each goes
+      director.dispose();
+      for (const mask of masks) mask.dispose();
+      for (const fog of fogs) fog.dispose();
+      for (const plate of plates) plate.dispose();
+      room.dispose();
+      disposeSeanceAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

@@ -9,6 +9,7 @@ import {generate as matte3d} from './matte-3d/matte-3d.mjs';
 import {generate as matteInk} from './matte-ink/matte-ink.mjs';
 import {generate as matteThreshold} from './matte-threshold/matte-threshold.mjs';
 import {generate as portal} from './portal/portal.mjs';
+import {generate as resolution} from './resolution/seance.mjs';
 import {generate as rift} from './rift/rift.mjs';
 import {generate as spotlight} from './spotlight/spotlight.mjs';
 import {generate as withoutDirector} from './without-director/wallpaper.mjs';
@@ -31,4 +32,5 @@ export async function generate(out, opts = {}) {
   await matte3d(out, opts);
   await flashlight(out);
   await portal(out);
+  await resolution(out);
 }
