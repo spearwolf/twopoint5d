@@ -27,6 +27,7 @@ import {
   type Texture,
   TextureLoader,
   type WebGPURenderer,
+  type Wrapping,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
@@ -80,11 +81,11 @@ const DIR = 'stage-masks/without-director';
 export async function loadWallpaperAssets(renderer: WebGPURenderer): Promise<WallpaperAssets> {
   const loader = new TextureLoader();
   const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string, wrapT = RepeatWrapping as number) => {
+  const load = async (name: string, wrapT: Wrapping = RepeatWrapping) => {
     const texture = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
     texture.colorSpace = SRGBColorSpace;
     texture.wrapS = RepeatWrapping;
-    texture.wrapT = wrapT as typeof RepeatWrapping;
+    texture.wrapT = wrapT;
     texture.magFilter = LinearFilter;
     texture.minFilter = LinearMipmapLinearFilter;
     texture.anisotropy = anisotropy;
@@ -122,17 +123,16 @@ function wallPlane(map: Texture, part: 'paper' | 'wainscot', renderOrder: number
   const [bottom, top, tile] = part === 'paper' ? [DADO, TOP, TILE] : [FLOOR, DADO, WAINSCOT_TILE];
   const height = top - bottom;
   // every texture of the demo lies on exactly one plane, so the plane sets its repeat
-  const texture = map;
   if (part === 'paper') {
-    texture.repeat.set(width / TILE, height / TILE);
+    map.repeat.set(width / TILE, height / TILE);
     // the top edge of the wall on a tile edge: the eyes of eyes.json are measured from there
-    texture.offset.set(0, Math.ceil(height / TILE) - height / TILE);
+    map.offset.set(0, Math.ceil(height / TILE) - height / TILE);
   } else {
-    texture.repeat.set(width / tile, 1);
+    map.repeat.set(width / tile, 1);
   }
   const mesh = new Mesh(
     new PlaneGeometry(width, height),
-    new MeshBasicMaterial({map: texture, transparent, depthTest: false, depthWrite: false}),
+    new MeshBasicMaterial({map, transparent, depthTest: false, depthWrite: false}),
   );
   mesh.position.set((LEFT + RIGHT) / 2, (bottom + top) / 2, 0);
   mesh.renderOrder = renderOrder;
@@ -381,7 +381,9 @@ export class WatchingWallpaper {
       // reveals, and with `invert` it lights the ordinary wall that only shows where it burns
       const light = (glow as unknown as Vec4).rgb.mul(LIGHT_GAIN).add(vec3(AMBIENT, AMBIENT * 0.95, AMBIENT * 1.08));
       const fromCentre = length(uv().sub(0.5).mul(vec2(1, 0.75)));
-      const vignette = mix(float(0.45), float(1), smoothstep(0.62, 0.2, fromCentre));
+      // full brightness out to 0.2 from the centre, down to 0.45 at 0.62; smoothstep's edges stay in
+      // ascending order, which GLSL and WGSL both require
+      const vignette = mix(float(1), float(0.45), smoothstep(0.2, 0.62, fromCentre));
       return vec4(composed.mul(light).mul(vignette), 1) as unknown as Node;
     };
   }

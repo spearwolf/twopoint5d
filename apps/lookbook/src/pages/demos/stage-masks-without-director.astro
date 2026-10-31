@@ -68,7 +68,10 @@ import {description, title} from './_stage-masks-without-director.json';
     gui.add(settings, 'source', ['alpha', 'luminance', 'red', 'green', 'blue']).onChange(rebuild);
     gui.add(settings, 'invert').onChange(rebuild);
 
+    const previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+
     display.onDispose(() => {
+      clearTimeout(previewTimeout);
       canvas.removeEventListener('pointermove', onPointer);
       canvas.removeEventListener('pointerdown', onPointer);
       gui.destroy();
@@ -77,8 +80,6 @@ import {description, title} from './_stage-masks-without-director.json';
       wall.dispose();
       disposeWallpaperAssets(assets);
     });
-
-    setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
   });
 
   await display.start();
