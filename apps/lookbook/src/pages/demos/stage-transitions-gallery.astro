@@ -32,6 +32,7 @@ import {description, title} from './_stage-transitions-gallery.json';
   import {loadStageTransitionAssets, VIEW_HEIGHT, VIEW_WIDTH} from '~demos/stage-transitions/assets';
   import {makeEffects, makeMasks} from '~demos/stage-transitions/effects';
   import {COLD, GalleryScene, WARM} from '~demos/stage-transitions/GalleryScene';
+  import {GalleryMattes} from '~demos/stage-transitions/matteMasks';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -45,6 +46,9 @@ import {description, title} from './_stage-transitions-gallery.json';
 
   const masks = makeMasks();
   const effects = makeEffects(masks);
+  // the living mattes: each effect and its mask stage made once; the mask stages are not in the stack
+  const mattes = new GalleryMattes();
+  for (const [name, effect] of mattes.effects) effects.set(name, effect);
   const names = [...effects.keys()];
 
   const settings = {
@@ -93,10 +97,12 @@ import {description, title} from './_stage-transitions-gallery.json';
     director.setStack([a.stage, label]);
     // a transition in the lower slot under the label, for every effect: the gallery shows each one
     // without the hitch of its first shader build
-    const precompiled = director.precompile(renderer, [
-      ['layer', 'layer'],
-      ...[...effects.values()].map((effect): StageDirectorShape => [effect, 'layer']),
-    ]);
+    const precompiled = director
+      .precompile(renderer, [['layer', 'layer'], ...[...effects.values()].map((effect): StageDirectorShape => [effect, 'layer'])])
+      .catch((error: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+        console.error('stage-transitions-gallery: precompile() failed, the shaders build on first use', error);
+      });
     let shown = a;
     let hold = HOLD;
     let running: StageTransition | undefined;
@@ -191,6 +197,7 @@ import {description, title} from './_stage-transitions-gallery.json';
       text.dispose();
       label.dispose();
       for (const mask of Object.values(masks)) mask.dispose();
+      mattes.dispose();
       assets.dot.dispose();
       store.dispose();
     });

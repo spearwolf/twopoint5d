@@ -1,7 +1,7 @@
 {
   "title": "stage transitions: gallery",
   "shortDescription": "Every transition effect of the library, one after another between two pictures, with a slider to hold any frame of one",
-  "description": "Two `Stage2D` layers, **A** and **B**, turn into each other through every effect the library ships — `crossfade()`, `dipToColor()`, `wipe()`, `slide()` in its three modes, `iris()`, `dissolve()`, `pixelate()` and `lumaMask()` with three masks drawn at run time on a 2D canvas — and through *wobble*, an effect of the demo's own: one function from two sources and a progress to a color, in TSL. The label on top is a third layer that no transition touches. *scrub by hand* starts the transition with `manual: true`, and the slider writes its `progress`: any frame of any effect holds still. Every effect object is made once and reused, so the `StageDirector` keeps one graph for it and the second round builds no shader. See [Stage transitions](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#stage-transitions).",
+  "description": "Two `Stage2D` layers, **A** and **B**, turn into each other through every effect the library ships — `crossfade()`, `dipToColor()`, `wipe()`, `slide()` in its three modes, `iris()`, `dissolve()`, `pixelate()` and `lumaMask()` with three masks drawn at run time on a 2D canvas — through `matte()` with a living mask stage of its own, ink blots that grow by the `progress` of the transition (`'coverage'`) and a noise that boils by its own time (`'threshold'`) — and through *wobble*, an effect of the demo's own: one function from two sources and a progress to a color, in TSL. The label on top is a third layer that no transition touches. *scrub by hand* starts the transition with `manual: true`, and the slider writes its `progress`: any frame of any effect holds still. Every effect object is made once and reused, so the `StageDirector` keeps one graph for it and the second round builds no shader. See [Stage transitions](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#stage-transitions).",
   "url": "/demos/stage-transitions-gallery",
   "tags": [
     "StageDirector",
@@ -15,6 +15,8 @@
     "dissolve",
     "pixelate",
     "lumaMask",
+    "matte",
+    "StageMask",
     "transitions",
     "FeatureSprites",
     "writeText",
