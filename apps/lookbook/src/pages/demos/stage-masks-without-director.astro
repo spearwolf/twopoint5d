@@ -1,0 +1,87 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-without-director.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {Display, type StageMaskCoverageSource, StageRenderer} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color, RenderPipeline} from 'three/webgpu';
+  import {disposeWallpaperAssets, loadWallpaperAssets, WatchingWallpaper} from '~demos/stage-masks/WatchingWallpaper';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the eyes get to find the light before the card of the lookbook is taken, in ms
+  const PREVIEW_SETTLE = 2500;
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  const settings = {
+    source: 'alpha' as StageMaskCoverageSource,
+    invert: false,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadWallpaperAssets(renderer);
+    if (display.isDisposed) {
+      disposeWallpaperAssets(assets);
+      return;
+    }
+
+    const wall = new WatchingWallpaper(assets);
+
+    // a plain composing StageRenderer, no director: three stages, one output node of our own.
+    // The mask stage clears to transparent black, so the clear alpha is 0
+    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 0);
+    sr.add(wall.room).add(wall.haunted).add(wall.glows);
+    const pipeline = new RenderPipeline(renderer);
+    sr.pipeline = pipeline;
+    sr.buildOutputNode = wall.createOutputNodeBuilder(() => settings);
+
+    // the pointer carries a candle: into units of the view, from its middle
+    const onPointer = (event: PointerEvent) => {
+      const view = wall.room.projection!.getViewRect();
+      wall.pointAt(
+        (event.offsetX / canvas.clientWidth - 0.5) * view.width + view.offsetX,
+        (0.5 - event.offsetY / canvas.clientHeight) * view.height + view.offsetY,
+      );
+    };
+    canvas.addEventListener('pointermove', onPointer);
+    canvas.addEventListener('pointerdown', onPointer);
+
+    // every switch builds the output node again: the source and invert are part of the shader
+    const rebuild = () => sr.invalidateOutputNode();
+    const gui = new GUI({container: getDemoUi(), title: 'mask'});
+    gui.add(settings, 'source', ['alpha', 'luminance', 'red', 'green', 'blue']).onChange(rebuild);
+    gui.add(settings, 'invert').onChange(rebuild);
+
+    display.onDispose(() => {
+      canvas.removeEventListener('pointermove', onPointer);
+      canvas.removeEventListener('pointerdown', onPointer);
+      gui.destroy();
+      sr.dispose();
+      pipeline.dispose();
+      wall.dispose();
+      disposeWallpaperAssets(assets);
+    });
+
+    setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display});
+</script>

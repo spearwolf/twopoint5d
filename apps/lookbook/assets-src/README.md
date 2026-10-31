@@ -43,6 +43,7 @@ the lookbook's `assets:check`), and `pnpm lint` formats and lints them like ever
 | `lib/bmfont.mjs` | builds a BMFont from a pixel font |
 | `shared/fonts/press-start-2p/` | the source font of every bitmap font, with its licence |
 | `<demo>/generate.mjs` | the generator of one demo |
+| `stage-masks/<demo>/` | the generators of the stage-masks demos, one directory each, run together by `stage-masks/generate.mjs` |
 
 ## Conventions for every demo
 
@@ -415,3 +416,27 @@ them glow.
 | `sign-exit` | 92 × 24 | red `#ff3a4a`, "EXIT" and an arrow |
 | `sign-danger` | 104 × 24 | amber `#ffb030` |
 | `sign-love` | 40 × 24 | pink `#ff6ab0`, "<3" |
+
+## stage-masks
+
+The art of the stage-masks demos, under `public/assets/stage-masks/<demo>/`. One build id,
+`--only=stage-masks`, regenerates every demo of the series; `stage-masks/generate.mjs` calls the
+generator of each. The series shares its look: a dark palette and one or two sickly accent colours
+per demo, horror and strange things, crisp art at native resolution.
+
+### without-director
+
+"The wallpaper is watching", from `stage-masks/without-director/wallpaper.mjs`. Everything is
+drawn from signed distance functions at the output resolution — analytic anti-aliasing, a bevel
+from the gradient of the distance, a cast shadow from a second look-up — and no image is
+painted by hand. The ordinary and the haunted versions share every shape, so the one lies exactly
+over the other.
+
+| file | size | what |
+| --- | --- | --- |
+| `wallpaper-plain.webp` | 1024 × 1024, opaque | one repeating tile of a flocked damask: bottle-green paper with a fine stripe and a tone-on-tone diaper, an ogee lattice of beaded double lines (half-drop), a palmette over an oval cartouche with volutes, acanthus and drooping leaves in cell 1, a rosette with sprigs in cell 2 at the corners; antique gold flock, lit from the top left, aged by brown stains. Tiles on both axes |
+| `wallpaper-haunted.webp` | 1024 × 1024, alpha | the same tile gone wrong: the paper bruised and veined in violet, the flock turned to bone and skin, lidded eyes with lashes in the cartouche and the volute knobs, every rosette a face with two eyes and a mouth of pointed teeth. **The eyes are holes** (alpha 0 inside the almond, anti-aliased rim): a sclera and an iris drawn beneath show through them |
+| `wainscot-plain.webp` | 1024 × 256, opaque | a mahogany wainscot, repeating along x: the moulded dado rail in rows 0–25, two raised and bevelled panels per tile between stiles, a skirting board in the last 22 rows |
+| `wainscot-haunted.webp` | 1024 × 256, opaque | the same with a mould seeping down from the rail and two sets of four claw marks cut into the panels |
+| `eye-parts.png` | 512 × 256, straight alpha | the sclera (0, 0, 256, 256) — an opaque, veined, lit ball that fills the square — and the iris (256, 0, 256, 256) — amber fibres, a green fleck ring, a dark limbus, a tall slit pupil and a highlight, clear outside the radius 0.96 of the half square |
+| `eyes.json` | | every eye of one tile: `x`, `y` (the centre, tile units 0–1 from the top left), `rx`, `ry` (the radii of the almond, tile units) and `kind` (`big`, `scroll`, `face`); the two face eyes sit at the bottom corners and repeat at the top ones; `eyeParts` names the two rectangles of `eye-parts.png` and the iris radius |

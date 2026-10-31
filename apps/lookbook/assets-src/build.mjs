@@ -22,6 +22,7 @@ const DEMOS = [
   'swaying-grass',
   'ui-panels',
   'boomer-shooter-corridor',
+  'stage-masks',
 ];
 
 function parseArgs() {

@@ -1,0 +1,16 @@
+{
+  "title": "stage masks: without a director",
+  "shortDescription": "The wallpaper is watching: candle glows in a mask stage reveal a second wallpaper whose ornament has become eyes and mouths",
+  "description": "A plain composing `StageRenderer`, no `StageDirector`: three `Stage2D` stages and a `buildOutputNode` of the demo's own. `room` is a Victorian wall, crisp flocked damask over a wainscot. `haunted` is the same wall painted again, shape for shape, where the ornament has become eyes and mouths. `glows` is the mask: three drifting candles, a violet will-o'-wisp and the candle your pointer carries, soft blobs drawn over transparent black. `createMaskNode(haunted, glows, {source, invert})` shows the haunted wall only where the glows are, laid premultiplied `over` the ordinary one; the glows then light the picture in their own colour. The eyes behind the holes of the haunted wall follow your candle.\n\n*source* picks what of the mask picture is the coverage: `alpha` reveals under every glow, `red` under the warm candles, `blue` mostly under the violet wisp, `luminance` and `green` somewhere between. *invert* turns it around: the wall looks ordinary only where you hold a light. Both are read when the output node is built, so every switch calls `invalidateOutputNode()` and the renderer builds its node again on the next frame. See [Stage masks: without a director](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#without-a-director-1).",
+  "url": "/demos/stage-masks-without-director",
+  "tags": [
+    "createMaskNode",
+    "StageRenderer",
+    "Stage2D",
+    "FeatureSprites",
+    "TexturedSpriteKind",
+    "masks",
+    "post-processing",
+    "vanilla"
+  ]
+}

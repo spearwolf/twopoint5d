@@ -139,6 +139,11 @@
       ]
     },
     {
+      "name": "Stage masks",
+      "tagId": "stage-masks",
+      "includeTags": ["StageMask", "createMaskNode", "masks"]
+    },
+    {
       "name": "Vertex Objects",
       "tagId": "vertex-objects",
       "includeTags": [
