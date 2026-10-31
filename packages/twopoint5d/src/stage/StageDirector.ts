@@ -427,6 +427,11 @@ export class StageDirector extends StageRenderer {
   #slots: Slot[] = [];
   readonly #layers = new Map<IStage, Layer>();
   readonly #byRenderer = new Map<IStage, Layer>();
+  /**
+   * Every `StageMask` a slot or a running transition holds, and the function that ends the watch
+   * on its dispose; kept in step with the slots by `#slotsChanged()`.
+   */
+  readonly #maskWatches = new Map<StageMask, () => void>();
 
   /** > 0 while the director calls `add()` or `remove()` of its base itself. */
   #internalCall = 0;
@@ -1444,7 +1449,53 @@ export class StageDirector extends StageRenderer {
     this.#transitions = undefined;
     this.#shapeKey = undefined;
     this.invalidateOutputNode();
+    this.#watchMasks();
   }
+
+  /**
+   * Watches the dispose of every mask a slot or a running transition holds, and of no other: a
+   * mask the director let go of keeps no reference to it. Runs with every change of the slots, never
+   * in a frame that changes none.
+   */
+  #watchMasks(): void {
+    const watches = this.#maskWatches;
+    const held = (mask: StageMask): boolean => {
+      for (const slot of this.#slots) {
+        if (slot.mask === mask || slot.run?.masks.includes(mask)) return true;
+      }
+      return false;
+    };
+    for (const [mask, unwatch] of watches) {
+      if (!held(mask)) {
+        watches.delete(mask);
+        unwatch();
+      }
+    }
+    const watch = (mask: StageMask): void => {
+      if (!watches.has(mask)) watches.set(mask, StageMaskInternals.onDispose(mask, this.#maskDisposed));
+    };
+    for (const slot of this.#slots) {
+      if (slot.mask) watch(slot.mask);
+      slot.run?.masks.forEach(watch);
+    }
+  }
+
+  /**
+   * A disposed mask leaves every slot it lies on, and every transition whose effect names it ends
+   * as cancelled, as for a disposed mask stage; its stage leaves the director when nothing else
+   * uses it. Another mask on the same stage stays where it is.
+   */
+  #maskDisposed = (mask: StageMask): void => {
+    const errors: unknown[] = [];
+    for (const slot of this.#slots) {
+      if (slot.mask === mask) this.#unmaskSlot(slot, errors);
+    }
+    for (const slot of this.#slots.slice()) {
+      if (slot.run?.masks.includes(mask)) this.#endRun(slot, 'from', 'cancelled', errors);
+    }
+    this.#slotsChanged();
+    throwCollected(errors, 'StageDirector: more than one listener of OnStageTransitionEnd threw while a disposed mask left');
+  };
 
   // ---------------------------------------------------------------------------
   // transitions

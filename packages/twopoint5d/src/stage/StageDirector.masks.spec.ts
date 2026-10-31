@@ -5,15 +5,18 @@ import {
   Color,
   FloatType,
   type Node,
+  PerspectiveCamera,
   RenderPipeline,
   type RenderTarget,
+  Scene,
   SRGBColorSpace,
   type TextureNode,
 } from 'three/webgpu';
 import {beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
-import {OnStageDispose, OnStageRemoved} from '../events.js';
+import {OnStageDispose, OnStageRemoved, OnStageTransitionEnd} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
+import {Stage2D} from './Stage2D.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
@@ -1345,6 +1348,215 @@ describe('StageDirector masks', () => {
         expect(fog.progress).toBe(0);
         expect(fog.progressNode.value).toBe(0);
       });
+    });
+  });
+
+  describe('a disposed StageMask', () => {
+    it('leaves its slot, and its stage stays undisposed and leaves the director when unused', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, fog);
+      const wrapper = rendererOf(fogStage)!;
+      expect(ordered()).toEqual(['stars', 'level', 'fog']);
+      fog.dispose();
+      expect(director.maskOf(level)).toBeUndefined();
+      expect(ordered()).toEqual(['stars', 'level']);
+      expect(wrapper.isDisposed).toBe(true);
+      // the stage is the caller's: the director lets go of it and disposes nothing
+      expect((fogStage as {isDisposed?: boolean}).isDisposed).toBeUndefined();
+      expect(names(director.stack)).toEqual(['stars', 'level']);
+    });
+
+    it('leaves only the slots it lies on: another mask on its stage stays', () => {
+      const cut = new StageMask(fogStage, {invert: true});
+      director.setStack([stars, level]);
+      director.setMask(stars, fog);
+      director.setMask(level, cut);
+      fog.dispose();
+      expect(director.maskOf(stars)).toBeUndefined();
+      expect(director.maskOf(level)).toBe(cut);
+      expect(ordered()).toEqual(['stars', 'level', 'fog']);
+      cut.dispose();
+      expect(director.maskOf(level)).toBeUndefined();
+      expect(ordered()).toEqual(['stars', 'level']);
+    });
+
+    it('ends the matte it drives as cancelled', () => {
+      director.setStack([stars, level]);
+      const t = director.replace(level, nextLevel, {effect: matte({mask: fog}), duration: 1});
+      frame(0);
+      frame(0.5);
+      fog.dispose();
+      expect(t.state).toBe('cancelled');
+      expect(names(director.stack)).toEqual(['stars', 'level']);
+      expect(director.transitions).toHaveLength(0);
+      expect(ordered()).toEqual(['stars', 'level']);
+    });
+
+    it('a listener of the end that throws reaches the caller of dispose(), after the teardown', () => {
+      director.setStack([stars, level]);
+      director.setMask(stars, fog);
+      const t = director.replace(level, nextLevel, {effect: matte({mask: fog}), duration: 1});
+      const boom = new Error('boom');
+      on(director, OnStageTransitionEnd, () => {
+        throw boom;
+      });
+      expect(() => fog.dispose()).toThrow(boom);
+      expect(fog.isDisposed).toBe(true);
+      expect(t.state).toBe('cancelled');
+      expect(director.maskOf(stars)).toBeUndefined();
+      expect(ordered()).toEqual(['stars', 'level']);
+    });
+
+    it('is refused by setMask(), show(), push() and a transition', () => {
+      director.setStack([stars, level]);
+      const effect = matte({mask: fog});
+      fog.dispose();
+      const before = snapshot();
+      const refusal = 'cannot take the mask on "fog": that mask has been disposed';
+      expect(() => director.setMask(level, fog)).toThrow(`StageDirector#setMask() ${refusal}`);
+      expect(() => director.show(nextLevel, {mask: fog})).toThrow(`StageDirector#show() ${refusal}`);
+      expect(() => director.push(nextLevel, {mask: fog})).toThrow(`StageDirector#push() ${refusal}`);
+      expect(() => director.replace(level, nextLevel, {effect, duration: 1})).toThrow(`StageDirector#replace() ${refusal}`);
+      expect(snapshot()).toEqual(before);
+    });
+
+    it('a director that let go of the mask hears nothing of its dispose()', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, fog);
+      director.setMask(level, undefined);
+      director.setMask(stars, fog);
+      director.setStack([stars, level]);
+      const before = snapshot();
+      expect(() => fog.dispose()).not.toThrow();
+      expect(snapshot()).toEqual(before);
+
+      const other = new StageMask(fakeStage('other'));
+      director.setMask(level, other);
+      director.dispose();
+      expect(() => other.dispose()).not.toThrow();
+    });
+  });
+
+  describe('a mask in the world of a stage', () => {
+    let world: Stage2D;
+    let worldScene: Scene;
+    let maskScene: Scene;
+    let camera: PerspectiveCamera;
+    let flashlight: StageMask;
+
+    /** The draws of the mask scene, with the camera of each. */
+    const maskDraws = () => renderer.render.mock.calls.filter(([scene]) => scene === maskScene).map(([, cam]) => cam);
+
+    beforeEach(() => {
+      worldScene = new Scene();
+      world = new Stage2D(undefined, worldScene);
+      world.name = 'world';
+      camera = new PerspectiveCamera();
+      world.camera = camera;
+      maskScene = new Scene();
+      flashlight = StageMask.inWorldOf(world, maskScene);
+    });
+
+    it('draws its scene through the current camera of the stage', () => {
+      director.setStack([world, level]);
+      director.setMask(level, flashlight);
+      expect(ordered()).toEqual(['world', 'level', 'mask in the world of world']);
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([camera]);
+      const next = new PerspectiveCamera();
+      world.camera = next;
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([camera, next]);
+    });
+
+    it('draws nothing while the stage has no camera', () => {
+      director.setStack([world, level]);
+      director.setMask(level, flashlight);
+      world.camera = undefined;
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([]);
+    });
+
+    it('the mask goes into a slot again after it left one, and into a second matte after the first ended', () => {
+      director.setStack([world, level]);
+      director.setMask(level, flashlight);
+      const wrapper = rendererOf(flashlight.stage)!;
+      director.setMask(level, undefined);
+      expect(wrapper.isDisposed).toBe(true);
+      expect((flashlight.stage as {isDisposed?: boolean}).isDisposed).toBe(false);
+      expect(ordered()).toEqual(['world', 'level']);
+
+      director.setMask(level, flashlight);
+      expect(director.maskOf(level)).toBe(flashlight);
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([camera]);
+      director.setMask(level, undefined);
+
+      const effect = matte({mask: flashlight});
+      const first = director.replace(level, nextLevel, {effect, duration: 1});
+      frame(0);
+      frame(1);
+      expect(first.state).toBe('finished');
+      expect(ordered()).toEqual(['world', 'nextLevel']);
+      const second = director.replace(nextLevel, level, {effect: matte({mask: flashlight}), duration: 1});
+      expect(ordered()).toEqual(['world', 'nextLevel', 'level', 'mask in the world of world']);
+      frame(0);
+      frame(1);
+      expect(second.state).toBe('finished');
+      expect(names(director.stack)).toEqual(['world', 'level']);
+      expect(flashlight.isDisposed).toBe(false);
+    });
+
+    it('dispose() takes the mask off its slot and disposes its stage, and leaves world and scene', () => {
+      const child = new PerspectiveCamera();
+      maskScene.add(child);
+      director.setStack([world, level]);
+      director.setMask(level, flashlight);
+      const t = director.replace(world, stars, {effect: matte({mask: flashlight}), duration: 1});
+      flashlight.dispose();
+      expect(t.state).toBe('cancelled');
+      expect(director.maskOf(level)).toBeUndefined();
+      expect((flashlight.stage as {isDisposed?: boolean}).isDisposed).toBe(true);
+      expect(ordered()).toEqual(['world', 'level']);
+      expect(world.isDisposed).toBe(false);
+      expect(maskScene.children).toEqual([child]);
+      expect(() => director.setMask(level, flashlight)).toThrow(
+        'StageDirector#setMask() cannot take the mask on "mask in the world of world": that mask has been disposed',
+      );
+    });
+
+    it('a disposed world leaves the mask drawing nothing', () => {
+      director.setStack([level]);
+      director.setMask(level, flashlight);
+      world.dispose();
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([]);
+      expect(director.maskOf(level)).toBe(flashlight);
+    });
+
+    it('a frozen mask in the world keeps its picture when the camera moves', () => {
+      director.setStack([world, level]);
+      director.setMask(level, flashlight);
+      director.freeze(flashlight.stage);
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([camera]);
+      // the documented behaviour: a frozen mask is drawn once and sampled ever after, whatever the
+      // camera of the world does
+      camera.position.set(10, 0, 0);
+      world.camera = new PerspectiveCamera();
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([camera]);
+      director.run(flashlight.stage);
+      frame();
+      draw();
+      expect(maskDraws()).toEqual([camera, world.camera]);
     });
   });
 });
