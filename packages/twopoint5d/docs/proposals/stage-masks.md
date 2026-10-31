@@ -84,12 +84,12 @@ it holds a stage, and a stage serves one director at a time as a mask. The refus
 **stage**, not by the `StageMask` object: a module-level registry maps every stage that a director
 draws as a mask to that director, and a second director refuses every mask on such a stage with an
 error that names the mask stage. A stage that is a layer in one director and a mask in another is
-refused as well. For a `StageRenderer` as the mask stage that follows from its one holder already. A `Stage2D` could be held twice — its pass node is shared by every renderer that
-composes it —, but not under two directors: a director wraps a `Stage2D` in a `StageRenderer` and
-draws it through `renderTo()`, not through its pass node, so two directors would draw it twice, and
-both would call its `updateFrame()`, so the mask would animate twice per frame. Within one
-director, one mask serves every slot it lies on (§3.2), and so do two `StageMask` objects on the
-same stage (§3.3).
+refused as well. For a `StageRenderer` as the mask stage that follows from its one holder already.
+A `Stage2D` could be held twice — its pass node is shared by every renderer that composes it —, but
+not under two directors: a director wraps a `Stage2D` in a `StageRenderer` and draws it through
+`renderTo()`, not through its pass node, so two directors would draw it twice, and both would call
+its `updateFrame()`, so the mask would animate twice per frame. Within one director, one mask serves
+every slot it lies on (§3.2), and so do two `StageMask` objects on the same stage (§3.3).
 
 `mask.stage`, `mask.source` and `mask.invert` read out what was given. `mask.progress` and
 `mask.progressNode` belong to transitions (§4.2).
@@ -171,10 +171,11 @@ more (§4.4 of the transitions proposal): the GPU memory of its pass target goes
 `director.freeze(fogStage)` and `director.run(fogStage)` work for mask stages as they work for
 layers; `freeze()` of a stage that is neither a layer nor a mask of this director is refused with
 the message "no layer or mask of this director", and a freeze does not survive the mask stage
-leaving the director, as it does not for a layer. A frozen mask draws once — and once again after a resize — and is sampled ever after: a
-mask that never changes costs a texture fetch per pixel and nothing else. A frozen mask stage is
-what `lumaMask()` does with a `Texture`, with the difference that the mask is drawn at the size of
-the director, by its projection, and stays upright under both backends (§3.5).
+leaving the director, as it does not for a layer. A frozen mask draws once — and once again after a
+resize — and is sampled ever after: a mask that never changes costs a texture fetch per pixel and
+nothing else. A frozen mask stage is what `lumaMask()` does with a `Texture`, with the difference
+that the mask is drawn at the size of the director, by its projection, and stays upright under both
+backends (§3.5).
 
 ### 3.5 Orientation
 
@@ -668,9 +669,27 @@ leaves the stack; a transition whose effect names it ends as cancelled.
 - `StageMask.inWorldOf()`: the camera read at the draw, a coverage of 0 without one, the mask in a
   slot again after it left one and in a second `matte()` after the first ended, its stage disposed
   by `mask.dispose()` alone, a disposed mask refused;
-- a second director refuses a mask the first holds, a `Stage2D` mask stage included;
+- a second director refuses a mask stage the first draws as a mask, a `Stage2D` mask stage and a
+  second `StageMask` object on the same stage included, and a stage that is a layer in one director
+  and a mask in another;
+- a stage is a layer or a mask, never both: `show()`, `push()`, `replace()`, `setStack()` and `add()`
+  refuse a mask stage of the director as a layer, `setMask()` refuses a layer as a mask, each before
+  anything changed;
+- `setStack()` drops every mask, including those of stages that stay; `hide()`, `pop()` and
+  `remove()` of a layer take the mask off its slot;
+- `remove()` of a mask stage and the dispose of a mask stage take the mask off every slot and end
+  every transition whose effect names it as cancelled; `remove()` of a stage that is neither layer
+  nor mask keeps its behavior;
+- the order of the stages in `orderedStages`: the mask stages stand after every layer, the slot masks
+  bottom-up, then those of running effects slot by slot, each by its first appearance;
+- `freeze()` of a mask stage that has not joined the director is refused with "no layer or mask";
 - the progress of §4.2: written before the mask stage's `updateFrame()`, the eased value, under
-  `manual: true`, a second transition on a busy mask refused;
+  `manual: true`, a second transition on a busy mask refused; `replace()` in the slot of a running
+  matte reuses its mask and starts it at progress 0; `progressNode` follows a manual progress set
+  between `updateFrame()` and the draw;
+- `scale` (§4.5): the pass target of a mask stage at the given share of the size of the drawing
+  buffer, the values outside `(0, 1]` and non-finite ones refused, a caller's renderer getting its
+  own scale back when the mask stage leaves;
 - `matte()`: both modes, both ends held whatever the mask draws;
 - `precompile()` with masked slots and mask stages;
 - `hot-path-allocations.director.spec.ts`: `updateFrame()` with a masked slot and a running matte
@@ -690,6 +709,7 @@ leaves the stack; a transition whose effect names it ends as cancelled.
 - a frozen mask keeps masking after its scene changed;
 - `matte()` in `'coverage'` mode at progress 0, 0.5 and 1 against a mask stage whose coverage follows
   `mask.progress`;
+- a mask at `scale` 0.5 masks the same area as one at `scale` 1, sampled up to the full size;
 - `StageMask.inWorldOf()` follows a moved camera and a new projection;
 - `precompile()`: the first frame of a masked shape creates no node builder;
 - `fogCoverage()` on a plane: an explored cell reads 0, an unexplored one 1, the edge between them
@@ -747,7 +767,7 @@ fog planes, a parchment below, the three states with a sight mask — and the si
 - **A mask in its own format.** A coverage needs one channel, the pass target has four in half
   float. An `R8` target would be an eighth of the memory, but three.js keys its builds by the format
   of the target, and a mask stage that draws sprites needs its materials built for that format too.
-  Measured in phase C, decided there.
+  Measured in phase C, decided there; the `scale` option of §4.5 is independent of this question.
 - **Single tiles in `map2d`.** §8.5 would leave out the tiles under the fog, if `map2d` could
   build single tiles again instead of all of them through `clearTiles()`. Is that seam worth it for
   the fill it saves, or does the fog stay on top of everything?
