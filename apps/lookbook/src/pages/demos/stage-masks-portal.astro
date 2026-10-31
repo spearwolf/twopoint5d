@@ -63,14 +63,12 @@ import {description, title} from './_stage-masks-portal.json';
     const portal = new PortalCanvas(hallway);
     // the canvas hangs at the portal depth; the hallway updates first, the mask stage draws after the layers
     portal.place(state.portalZ);
-    on(hallway.stage, OnStageUpdateFrame, () => portal.place(state.portalZ));
+    const unsubscribePlace = on(hallway.stage, OnStageUpdateFrame, () => portal.place(state.portalZ));
 
     // from the bottom up: the hallway, the moor inside the painting, the glaze in front of the canvas.
     // The portal is never in the stack: it is the mask of the moor's slot, in the world of the hallway
     director.setStack([hallway.stage, moor.stage, glaze.stage]);
     director.setMask(moor.stage, portal.mask);
-    // for the console: the state of the walk, the portal and the walker
-    Object.assign(window, {portalState: state});
 
     const settings = {
       autoWalk: state.autoWalk,
@@ -80,16 +78,16 @@ import {description, title} from './_stage-masks-portal.json';
     const readout = {camera: '', distance: '', size: '', maskOf: ''};
     readout.maskOf = director.maskOf(moor.stage) === portal.mask ? 'StageMask.inWorldOf(hallway, portal scene)' : 'undefined';
 
-    const setAutoWalk = (on: boolean) => {
-      state.autoWalk = on;
-      settings.autoWalk = on;
+    const setAutoWalk = (enabled: boolean) => {
+      state.autoWalk = enabled;
+      settings.autoWalk = enabled;
     };
 
     // the readouts show what is on the screen: the camera as it stands, the oval as large as it is drawn
     let lastCameraZ = Number.NaN;
     let lastPortalZ = Number.NaN;
     let lastHeight = Number.NaN;
-    on(glaze.stage, OnStageUpdateFrame, () => {
+    const unsubscribeReadouts = on(glaze.stage, OnStageUpdateFrame, () => {
       settings.cameraZ = Math.round(state.cameraZ);
       settings.autoWalk = state.autoWalk;
       settings.portalZ = state.portalZ;
@@ -174,7 +172,7 @@ import {description, title} from './_stage-masks-portal.json';
     gui
       .add(settings, 'autoWalk')
       .name('auto walk (space)')
-      .onChange((on: boolean) => setAutoWalk(on))
+      .onChange((enabled: boolean) => setAutoWalk(enabled))
       .listen();
     gui
       .add(settings, 'portalZ', -150, 250, 1)
@@ -216,6 +214,8 @@ import {description, title} from './_stage-masks-portal.json';
       canvas.removeEventListener('pointerleave', onPointerLeave);
       canvas.removeEventListener('pointercancel', onPointerLeave);
       canvas.removeEventListener('wheel', onWheel);
+      unsubscribePlace();
+      unsubscribeReadouts();
       gui.destroy();
       // the director lets go of the layers and the mask stage first, then each goes
       director.dispose();

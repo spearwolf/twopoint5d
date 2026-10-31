@@ -312,6 +312,8 @@ export class Moor {
   }
 
   #update(): void {
+    // the hallway lies below the moor in the stack, and the director updates its layers bottom-up:
+    // the state read here is the one the hallway moved this very frame
     const state = this.#state;
     // the camera of the hallway, moved by the place of the canvas: the moor lies behind the far wall
     const camera = this.stage.camera;
