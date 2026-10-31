@@ -440,3 +440,22 @@ over the other.
 | `wainscot-haunted.webp` | 1024 × 256, opaque | the same with a mould seeping down from the rail and two sets of four claw marks cut into the panels |
 | `eye-parts.png` | 512 × 256, straight alpha | the sclera (0, 0, 256, 256) — an opaque, veined, lit ball that fills the square — and the iris (256, 0, 256, 256) — amber fibres, a green fleck ring, a dark limbus, a tall slit pupil and a highlight, clear outside the radius 0.96 of the half square |
 | `eyes.json` | | every eye of one tile: `x`, `y` (the centre, tile units 0–1 from the top left), `rx`, `ry` (the radii of the almond, tile units) and `kind` (`big`, `scroll`, `face`); the two face eyes sit at the bottom corners and repeat at the top ones; `eyeParts` names the two rectangles of `eye-parts.png` and the iris radius |
+
+### spotlight
+
+"Ward C, 3:07 a.m.", from `stage-masks/spotlight/spotlight.mjs` with `svg.mjs` (the drawing kit),
+`ward-c.mjs`, `laundromat.mjs` and `sprites.mjs`. The scenes are written as SVG — paths,
+gradients, blurred shadows — and rasterised by sharp's librsvg at the output resolution; the
+floors under them are shaded pixel by pixel in JavaScript (tiles, grout, linoleum, grime, the
+depth of the water), and the north wall is mirrored into the water at its foot. No font is used:
+the few letters are strokes of a font in `svg.mjs`. Both levels share one frame — 1200 × 640
+units, origin in the middle, y up, 2 texels per unit —, the north wall from y = 175 to 275, the
+south wall below y = −250, and the lamps at the same places (wall lamps at (−290, 232) and
+(330, 232), a pendant at (70, −95)), so that the mask of the demo fits both.
+
+| file | size | what |
+| --- | --- | --- |
+| `ward-c.webp` | 2400 × 1280, opaque | the flooded corridor of an asylum, top down with the north wall face on: pale celadon tiles with a dark border band, missing tiles in clusters, cracks, rust, sunken patient records, spilled pills and grease-pencil tally marks under green-black water; the wall in plaster and bottle-green tiles with a tide line, peeling paint, a rusty pipe, cell doors C-04, C-09 and C-12 (C-07 stands open on the dark), two caged lamps (unlit — the demo lights them), more tally marks and "3:07" scrawled on the plaster; an overturned wheelchair, a gurney with undone straps and a sheet sliding off, a fallen drip stand, a knocked-over chair, a mop bucket, a collapsed ceiling with a broken tube, a rusted drain |
+| `laundromat.webp` | 2400 × 1280, opaque | an all-night laundromat in the same frame: checkered teal and cream linoleum with puddles, a row of dryers built into the north wall (clothes behind the glass, the one at x = −60 standing open with a sock over the rim), flyers above them, an island of ten top loaders (x −250…30, y −16…96), a folding table with towels and a tipped basket (x 230…370, y −70…−10), orange shell chairs, a wire cart, a "wet floor" sign, lint and coins, and fifteen socks that lead from the open dryer off into the dark, ever further apart |
+| `sprites.png` | 1024 × 1024, straight alpha | the sprites, TexturePacker hash in `sprites.json`, untrimmed, 6 px apart, drawn at 2 texels per unit: `player` (a child in a yellow raincoat with a torch, facing +x), `eyes-pale`, `eyes-ember`, `eyes-three` (glowing eyes with slit pupils and a halo), `hand` (a huge drowned hand, blurred), `cage-pendant` and `tube-pendant` (the pendant of each level seen from above), `neon-wash` and `wall-tube` (white, for an additive tint: the neon "WASH" with a dead H, a fluorescent tube), `paper-a`, `paper-b`, `pill-bottle`, `glove`, `doll-head`, `id-band`, `sock`, `dryer-sheet`, `lint` (what drifts), `ripple` (a white ring), `shadow` (a soft round shadow) |
+| `sprites.json` | | the frames of `sprites.png` |

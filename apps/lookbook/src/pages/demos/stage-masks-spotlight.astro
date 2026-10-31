@@ -1,0 +1,227 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-spotlight.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #010204;
+  }
+</style>
+
+<script>
+  import {
+    crossfade,
+    Display,
+    StageDirector,
+    type StageDirectorShape,
+    StageMask,
+    type StageMaskCoverageSource,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {
+    disposeWardAssets,
+    LAUNDROMAT,
+    loadWardAssets,
+    makeLightNodes,
+    WARD_C,
+    WardDeep,
+    WardFog,
+    WardLevel,
+    WardPlayer,
+  } from '~demos/stage-masks/WardC';
+  import {type RigInput, WardRig} from '~demos/stage-masks/WardRig';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the eyes get to find the rim of the light before the card of the lookbook is taken, in ms
+  const PREVIEW_SETTLE = 3000;
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  // the director composes three slots over its clear color: the deep, the level, the player
+  const director = new StageDirector(display).setClearColor(new Color('#010204'), 1);
+
+  const settings = {
+    source: 'alpha' as StageMaskCoverageSource,
+    invert: false,
+    mask: true,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadWardAssets(renderer);
+    if (display.isDisposed) {
+      disposeWardAssets(assets);
+      return;
+    }
+
+    const rig = new WardRig();
+    const nodes = makeLightNodes(rig);
+    const deep = new WardDeep(assets, rig);
+    const ward = new WardLevel(assets, rig, nodes, WARD_C);
+    const laundromat = new WardLevel(assets, rig, nodes, LAUNDROMAT);
+    const player = new WardPlayer(assets, rig);
+    const fog = new WardFog(rig);
+
+    let level = ward;
+    rig.obstacles = level.config.obstacles;
+
+    // the fog is never in the stack: it is the mask of the level's slot
+    director.setStack([deep.stage, ward.stage, player.stage]);
+    let mask = new StageMask(fog.stage, {source: settings.source, invert: settings.invert});
+    director.setMask(ward.stage, mask);
+
+    const readout = {level: level.config.name, maskOf: ''};
+    const describe = () => {
+      // the mask belongs to the slot: ask the stage that is in it now, whichever level that is
+      const m = director.maskOf(level.stage);
+      readout.maskOf = m ? `StageMask(fog, ${m.source}${m.invert ? ', invert' : ''})` : 'undefined';
+      readout.level = level.config.name;
+    };
+    describe();
+
+    // the options of a StageMask are read once, when it is made: a change makes a new mask
+    const remakeMask = () => {
+      const old = mask;
+      mask = new StageMask(fog.stage, {source: settings.source, invert: settings.invert});
+      if (settings.mask) director.setMask(level.stage, mask);
+      old.dispose();
+      rig.mask.source = settings.source;
+      rig.mask.invert = settings.invert;
+      describe();
+    };
+
+    const toggleMask = () => {
+      director.setMask(level.stage, settings.mask ? mask : undefined);
+      rig.mask.masked = settings.mask;
+      describe();
+    };
+
+    const effect = crossfade();
+    const nextLevel = () => {
+      const next = level === ward ? laundromat : ward;
+      // only the view behind the porthole changes: the mask stays on the slot
+      director.replace(level.stage, next.stage, {effect, duration: 1.6, easing: 'ease-in-out'});
+      level = next;
+      rig.obstacles = level.config.obstacles;
+      player.palette = level.config.palette;
+      player.wetness = level.config.wetness;
+      describe();
+    };
+
+    const keys: Record<string, keyof Omit<RigInput, 'target'>> = {
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      KeyA: 'left',
+      KeyD: 'right',
+      KeyW: 'up',
+      KeyS: 'down',
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = keys[event.code];
+      if (key) {
+        rig.input[key] = true;
+        event.preventDefault();
+      }
+      if (event.repeat) return;
+      if (event.code === 'KeyN') nextLevel();
+      else if (event.code === 'KeyM') {
+        settings.mask = !settings.mask;
+        toggleMask();
+      } else if (event.code === 'KeyI') {
+        settings.invert = !settings.invert;
+        remakeMask();
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const key = keys[event.code];
+      if (key) rig.input[key] = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+
+    // a pointer drag leads the player: into units of the view, from its middle
+    let dragging = false;
+    const toWorld = (event: PointerEvent) => {
+      const view = deep.stage.projection!.getViewRect();
+      return {
+        x: (event.offsetX / canvas.clientWidth - 0.5) * view.width + view.offsetX,
+        y: (0.5 - event.offsetY / canvas.clientHeight) * view.height + view.offsetY,
+      };
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      dragging = true;
+      canvas.setPointerCapture(event.pointerId);
+      rig.input.target = toWorld(event);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (dragging) rig.input.target = toWorld(event);
+    };
+    const onPointerUp = () => {
+      dragging = false;
+      rig.input.target = undefined;
+    };
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+
+    const gui = new GUI({container: getDemoUi(), title: 'Ward C, 3:07 a.m.'});
+    gui.add(settings, 'source', ['alpha', 'luminance', 'red', 'green', 'blue']).onChange(remakeMask);
+    gui.add(settings, 'invert').name('invert (i)').onChange(remakeMask).listen();
+    gui.add(settings, 'mask').name('mask on the slot (m)').onChange(toggleMask).listen();
+    gui.add({nextLevel}, 'nextLevel').name('next level (n)');
+    gui.add(readout, 'level').name('in the slot').disable().listen();
+    gui.add(readout, 'maskOf').name('maskOf(level)').disable().listen();
+
+    // every shape the stack takes, built before it is needed: the level under its mask, the crossfade
+    // inside the mask, and both without it
+    const shapes: StageDirectorShape[] = [
+      ['layer', {mask}, 'layer'],
+      ['layer', {effect, mask}, 'layer'],
+      ['layer', 'layer', 'layer'],
+      ['layer', effect, 'layer'],
+    ];
+    const precompiled = director.precompile(renderer, shapes, {layers: [laundromat.stage, fog.stage]});
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
+      gui.destroy();
+      // the director lets go of the layers and the mask stage first, then each goes
+      director.dispose();
+      mask.dispose();
+      deep.dispose();
+      ward.dispose();
+      laundromat.dispose();
+      player.dispose();
+      fog.dispose();
+      disposeWardAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>
