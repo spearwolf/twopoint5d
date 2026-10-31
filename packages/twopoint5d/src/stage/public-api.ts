@@ -39,6 +39,7 @@ export type {
   PixelateOptions,
   SlideMode,
   SlideOptions,
+  StageMaskSource,
   StageTransitionDirection,
   StageTransitionEffect,
   StageTransitionInput,

@@ -2,6 +2,7 @@ import {describeValue} from '../utils/describeValue.js';
 import {ClearStage} from './ClearStage.js';
 import type {IRenderable} from './IRenderable.js';
 import type {StageDirectorLayer} from './StageDirector.js';
+import type {StageTransition} from './StageTransition.js';
 
 /** What of the picture of a mask stage is the coverage. */
 export type StageMaskCoverageSource = 'alpha' | 'luminance' | 'red' | 'green' | 'blue';
@@ -40,6 +41,17 @@ export function readMaskOptions(subject: string, options: StageMaskOptions | und
 }
 
 /**
+ * The functions through which a `StageDirector` keeps the state of the masks its transitions use;
+ * they are not part of the public API.
+ * @internal
+ */
+export const StageMaskInternals = {} as {
+  /** The running transition whose effect names the mask, `undefined` while none does. */
+  drivenBy(mask: StageMask): StageTransition | undefined;
+  setDrivenBy(mask: StageMask, transition: StageTransition | undefined): void;
+};
+
+/**
  * A stage bound as the mask of a layer: the coverage of its picture says how much of the layer
  * shows. The options are read once, when the mask is made, as the options of a transition effect
  * are. A `StageMask` holds its stage, but does not own it: `dispose()` lets go of it and leaves it
@@ -51,6 +63,14 @@ export class StageMask {
   readonly invert: boolean;
 
   #isDisposed = false;
+  #drivenBy: StageTransition | undefined;
+
+  static {
+    StageMaskInternals.drivenBy = (mask) => mask.#drivenBy;
+    StageMaskInternals.setDrivenBy = (mask, transition) => {
+      mask.#drivenBy = transition;
+    };
+  }
 
   /**
    * @param stage Any stage a `StageDirector` takes as a layer: it has `renderTo()`, is no `ClearStage`

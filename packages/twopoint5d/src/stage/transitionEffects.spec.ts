@@ -16,6 +16,7 @@ import {
   textureSource,
   wipe,
 } from './transitionEffects.js';
+import {StageMask} from './StageMask.js';
 
 const tex = () => new DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
 
@@ -26,6 +27,9 @@ function input(): StageTransitionInput {
     progress: uniform(0) as unknown as Node<'float'>,
     uv: uv(),
     resolution: vec2(64, 64) as unknown as Node<'vec2'>,
+    mask: () => {
+      throw new Error('no masks in these tests');
+    },
   };
 }
 
@@ -87,6 +91,32 @@ describe('transition effects', () => {
       );
       expect(() => createTransitionNode({} as any, null, null)).toThrow(
         'createTransitionNode: effect must be a StageTransitionEffect',
+      );
+    });
+
+    it('refuses an effect with masks up front, and answers an input whose mask() throws', () => {
+      const a = texture(tex()) as unknown as TextureNode;
+      const mask = new StageMask({name: 'ink', resize() {}, updateFrame() {}, renderTo() {}});
+      let built = 0;
+      const withMasks: StageTransitionEffect = {
+        name: 'inkIn',
+        masks: [mask],
+        build: ({from}) => {
+          built++;
+          return from.sample(uv());
+        },
+      };
+      expect(() => createTransitionNode(withMasks, a, null)).toThrow(
+        'createTransitionNode: an effect with masks needs a StageDirector',
+      );
+      expect(built).toBe(0);
+
+      // an empty list of masks is no mask
+      expect(() => createTransitionNode({...crossfade(), masks: []}, a, null)).not.toThrow();
+
+      const sneaky: StageTransitionEffect = {name: 'sneaky', build: (input) => input.mask(mask).sample(uv())};
+      expect(() => createTransitionNode(sneaky, a, null)).toThrow(
+        'createTransitionNode: an effect with masks needs a StageDirector',
       );
     });
   });

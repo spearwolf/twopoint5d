@@ -1,7 +1,8 @@
-import {texture} from 'three/tsl';
+import {texture, uv} from 'three/tsl';
 import {DataTexture, type Node, type TextureNode} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
-import {createMaskNode, maskCoverage} from './maskNodes.js';
+import {createMaskNode, maskCoverage, maskSource} from './maskNodes.js';
+import {StageMask} from './StageMask.js';
 
 const tex = () => new DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
 const textureNode = () => texture(tex()) as unknown as TextureNode;
@@ -55,5 +56,22 @@ describe('maskCoverage()', () => {
     const nodes = (['alpha', 'red', 'green', 'blue', 'luminance'] as const).map((s) => maskCoverage(p, s, false));
     expect(new Set(nodes).size).toBe(5);
     expect(maskCoverage(p, 'red', true)).not.toBe(maskCoverage(p, 'red', false));
+  });
+});
+
+describe('maskSource()', () => {
+  const stage = {name: 'ink', resize() {}, updateFrame() {}, renderTo() {}};
+
+  it('samples the picture of the mask and reads its coverage by the source and invert of the mask', () => {
+    const node = textureNode();
+    const source = maskSource(node, new StageMask(stage, {source: 'red', invert: true}));
+    const at = uv();
+    const sampled = new Set<unknown>();
+    source.coverage(at).traverse((child) => {
+      if ((child as Partial<TextureNode>).isTextureNode) sampled.add((child as TextureNode).getBase());
+    });
+    expect([...sampled]).toEqual([node]);
+    expect(isNode(source.sample(at))).toBe(true);
+    expect(isNode(source.coverage(at))).toBe(true);
   });
 });

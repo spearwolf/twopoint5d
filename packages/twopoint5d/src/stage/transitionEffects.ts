@@ -25,6 +25,7 @@ import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
+import type {StageMask} from './StageMask.js';
 
 /**
  * One of the two pictures a transition blends: the layer it leaves, the layer it brings, or nothing.
@@ -44,6 +45,18 @@ export interface StageTransitionInput {
   uv: Node<'vec2'>;
   /** The size of the picture in pixels of the drawing buffer. */
   resolution: Node<'vec2'>;
+  /**
+   * The picture of one of the masks the effect names in {@link StageTransitionEffect.masks}, by the
+   * `StageMask` object itself. Throws for a mask the effect did not name — another `StageMask` on
+   * the same stage included.
+   */
+  mask(mask: StageMask): StageMaskSource;
+}
+
+/** The picture of a stage mask, as {@link StageTransitionInput.mask} answers it. */
+export interface StageMaskSource extends StageTransitionSource {
+  /** The coverage of the mask at `uv` by its `source` and `invert`, 0 to 1; 0 outside `[0, 1]`. */
+  coverage(uv: Node<'vec2'>): Node<'float'>;
 }
 
 /**
@@ -51,13 +64,21 @@ export interface StageTransitionInput {
  *
  * The effect answers `from` at progress 0 and `to` at progress 1, for every pixel, and anything
  * between: a `StageDirector` drops a transition at its end and shows `to` alone, which is the same
- * picture. An effect is a description — its options are read when it is made, and `build()` makes
- * new nodes on every call —, so one effect object serves every director, every slot and every
- * transition at once.
+ * picture. An effect without `masks` is a description — its options are read when it is made, and
+ * `build()` makes new nodes on every call —, so one effect object serves every director, every slot
+ * and every transition at once.
  */
 export interface StageTransitionEffect {
   /** A name for messages and for the lookbook; it does not have to be unique. */
   readonly name: string;
+
+  /**
+   * Stage masks the effect samples through {@link StageTransitionInput.mask}. A `StageDirector`
+   * draws their stages while a transition with the effect runs, and a mask drives one transition
+   * at a time. An effect with masks holds stages, so it is no description any more: it serves one
+   * director at a time.
+   */
+  readonly masks?: readonly StageMask[];
 
   build(input: StageTransitionInput): Node<'vec4'>;
 
@@ -376,6 +397,9 @@ function sourceOf(node: StageTransitionSourceNode, side: string): StageTransitio
   );
 }
 
+// a mask is a stage, and only a director draws a stage into a picture the effect can sample
+const NO_MASKS_WITHOUT_DIRECTOR = 'createTransitionNode: an effect with masks needs a StageDirector';
+
 export interface TransitionNode {
   /** The node of the effect: a premultiplied color. */
   node: Node<'vec4'>;
@@ -387,7 +411,8 @@ export interface TransitionNode {
  * Builds the node of `effect` between `from` and `to`, for a `buildOutputNode` of one's own. A
  * source is a `TextureNode` — what a nested `StageRenderer` hands in —, the `PassNode` of a
  * `Stage2D`, whose texture node it takes, or `null` for nothing. Without a `progress` node it makes
- * a float uniform at 0 and answers it with the node; the caller drives its `value`.
+ * a float uniform at 0 and answers it with the node; the caller drives its `value`. An effect with
+ * `masks` is refused: its mask stages need a `StageDirector` to draw them.
  */
 export function createTransitionNode(
   effect: StageTransitionEffect,
@@ -398,6 +423,7 @@ export function createTransitionNode(
   if (typeof (effect as Partial<StageTransitionEffect> | undefined)?.build !== 'function') {
     throw new TypeError(`createTransitionNode: effect must be a StageTransitionEffect, got ${describeValue(effect)}`);
   }
+  if (effect.masks?.length) throw new Error(NO_MASKS_WITHOUT_DIRECTOR);
   const p = progress ?? (uniform(0) as unknown as UniformNode<'float', number>);
   const node = effect.build({
     from: sourceOf(from, 'from'),
@@ -406,6 +432,9 @@ export function createTransitionNode(
     uv: uv(),
     // the drawing buffer as the fragment sees it; a director hands in a uniform of its own
     resolution: screenSize as unknown as Node<'vec2'>,
+    mask: () => {
+      throw new Error(NO_MASKS_WITHOUT_DIRECTOR);
+    },
   });
   return {node, progress: p as Node<'float'>};
 }

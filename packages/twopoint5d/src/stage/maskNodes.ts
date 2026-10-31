@@ -1,11 +1,12 @@
 import {clamp, float, luminance, uv} from 'three/tsl';
-import type {Node} from 'three/webgpu';
+import type {Node, TextureNode} from 'three/webgpu';
 import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
-import {readMaskOptions, type StageMaskCoverageSource, type StageMaskOptions} from './StageMask.js';
+import {readMaskOptions, type StageMask, type StageMaskCoverageSource, type StageMaskOptions} from './StageMask.js';
 import {
   hasTextureNode,
   isTextureNode,
+  type StageMaskSource,
   type StageTransitionSource,
   type StageTransitionSourceNode,
   textureSource,
@@ -29,6 +30,20 @@ export function maskCoverage(picture: Node<'vec4'>, source: StageMaskCoverageSou
             : picture.b;
   const coverage = clamp(raw, 0, 1);
   return invert ? float(1).sub(coverage) : coverage;
+}
+
+/**
+ * The source of `mask` whose picture `node` holds: the premultiplied picture, transparent black
+ * outside `[0, 1]`, and its coverage by the `source` and `invert` of the mask, 0 outside `[0, 1]`.
+ * @internal
+ */
+export function maskSource(node: TextureNode, mask: StageMask): StageMaskSource {
+  const picture = textureSource(node);
+  const {source, invert} = mask;
+  return {
+    sample: picture.sample,
+    coverage: (at) => maskCoverage(picture.sample(at), source, invert),
+  };
 }
 
 export interface MaskNodeOptions extends StageMaskOptions {}

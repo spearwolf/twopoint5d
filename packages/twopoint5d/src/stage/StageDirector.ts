@@ -23,8 +23,8 @@ import {ClearStage} from './ClearStage.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
-import {maskCoverage} from './maskNodes.js';
-import {StageMask, type StageMaskCoverageSource} from './StageMask.js';
+import {maskCoverage, maskSource} from './maskNodes.js';
+import {StageMask, type StageMaskCoverageSource, StageMaskInternals} from './StageMask.js';
 import {type StageItem, StageRenderer, type StageRendererBuildOutputNode, type StageRendererParentType} from './StageRenderer.js';
 import {
   easingOf,
@@ -106,7 +106,10 @@ interface Layer {
   readonly stage: StageDirectorLayer;
   /** A layer of the stack, or the stage of a mask; a stage is never both. */
   readonly role: 'layer' | 'mask';
-  /** How many masks of slots (and, later, of transitions) use a mask stage; 0 for a layer. */
+  /**
+   * How many slot masks and running transitions use a mask stage — a transition once per stage its
+   * effect names, however many of its masks lie on it; 0 for a layer.
+   */
   uses: number;
   /** The stage itself, or the renderer the director wrapped it in. */
   readonly renderer: StageRenderer;
@@ -122,6 +125,8 @@ interface Run {
   readonly from: Layer | undefined;
   readonly to: Layer | undefined;
   readonly fromWasFrozen: boolean;
+  /** The masks the effect names, as they stood when the transition began; each one is driven by it. */
+  readonly masks: readonly StageMask[];
 }
 
 interface Slot {
@@ -156,7 +161,8 @@ interface Shape {
 
 /**
  * Which slot and which of its sources an entry of `orderedStages` is — or, after every layer, which
- * of the distinct mask stages, counted by first appearance.
+ * of the distinct mask stages, counted by first appearance: the stages of the slot masks bottom-up,
+ * then those of the running effects slot by slot, as `distinctMasks()` counts them.
  */
 type OrderRef =
   | {readonly side: 'layer' | 'from' | 'to'; readonly slot: number}
@@ -173,6 +179,27 @@ const layerOwners = new WeakMap<IStage, Set<StageDirector>>();
 
 const NO_STAGES: ReadonlyArray<StageItem> = Object.freeze([]);
 
+const NO_MASKS: readonly StageMask[] = Object.freeze([]);
+
+/** The masks `effect` names, checked; a snapshot, so a list changed later changes no running transition. */
+function masksOf(subject: string, effect: StageTransitionEffect): readonly StageMask[] {
+  const masks: unknown = effect.masks;
+  if (masks === undefined) return NO_MASKS;
+  if (!Array.isArray(masks) || !masks.every((mask) => mask instanceof StageMask)) {
+    throw new TypeError(
+      `${subject}: the masks of the effect "${effect.name}" must be an array of StageMask, got ${describeValue(masks)}`,
+    );
+  }
+  return masks.length === 0 ? NO_MASKS : Object.freeze([...(masks as StageMask[])]);
+}
+
+/** Whether `masks[index]` is the first mask of the list on its stage: a stage counts once per transition. */
+function firstOnItsStage(masks: readonly StageMask[], index: number): boolean {
+  const stage = masks[index]!.stage;
+  for (let i = 0; i < index; i++) if (masks[i]!.stage === stage) return false;
+  return true;
+}
+
 const effectIds = new WeakMap<StageTransitionEffect, number>();
 let nextEffectId = 1;
 
@@ -187,14 +214,15 @@ function effectId(effect: StageTransitionEffect): number {
 
 /**
  * What a slot of a shape holds: a layer (no effect) or a transition through an effect, masked or
- * not. Of a mask only its stage, `source` and `invert` count.
+ * not, and the masks the effect names. Of a mask only its stage, `source` and `invert` count.
  */
 interface ShapeKind {
   readonly effect: StageTransitionEffect | undefined;
   readonly mask: StageMask | undefined;
+  readonly effectMasks: readonly StageMask[];
 }
 
-const LAYER_KIND: ShapeKind = Object.freeze({effect: undefined, mask: undefined});
+const LAYER_KIND: ShapeKind = Object.freeze({effect: undefined, mask: undefined, effectMasks: NO_MASKS});
 
 /** A distinct mask of a shape: the index of its stage among the distinct mask stages, and its options. */
 interface ShapeMask {
@@ -204,36 +232,60 @@ interface ShapeMask {
 }
 
 /**
- * Walks the masks of `kinds` bottom-up and calls `visit` per masked slot with the index of its
- * distinct mask — a stage with a source and an invert — and that mask, whose `stage` is the index
- * of its stage among the distinct mask stages; both count by first appearance, as the mask stages
- * stand in `orderedStages`. Answers the distinct masks.
+ * Walks the masks of `kinds` and calls `visit` per masked slot, bottom-up, then `visitEffect` per
+ * mask an effect names, slot by slot and each effect's masks in the order of its list, with its
+ * position in that list. Both get the index of the distinct mask — a stage with a source and an
+ * invert — and that mask, whose `stage` is the index of its stage among the distinct mask stages;
+ * both count by first appearance in this walk, as the mask stages stand in `orderedStages`.
+ * Answers the distinct masks.
  */
-function distinctMasks(kinds: readonly ShapeKind[], visit: (slot: number, index: number, mask: ShapeMask) => void): ShapeMask[] {
+function distinctMasks(
+  kinds: readonly ShapeKind[],
+  visit: (slot: number, index: number, mask: ShapeMask) => void,
+  visitEffect: (slot: number, position: number, index: number, mask: ShapeMask) => void,
+): ShapeMask[] {
   const stages: IStage[] = [];
   const masks: ShapeMask[] = [];
-  kinds.forEach(({mask}, slot) => {
-    if (!mask) return;
+  const indexOf = (mask: StageMask): number => {
     let stage = stages.indexOf(mask.stage);
     if (stage === -1) stage = stages.push(mask.stage) - 1;
-    let index = masks.findIndex((m) => m.stage === stage && m.source === mask.source && m.invert === mask.invert);
-    if (index === -1) index = masks.push({stage, source: mask.source, invert: mask.invert}) - 1;
+    const index = masks.findIndex((m) => m.stage === stage && m.source === mask.source && m.invert === mask.invert);
+    return index === -1 ? masks.push({stage, source: mask.source, invert: mask.invert}) - 1 : index;
+  };
+  kinds.forEach(({mask}, slot) => {
+    if (!mask) return;
+    const index = indexOf(mask);
     visit(slot, index, masks[index]!);
+  });
+  kinds.forEach(({effectMasks}, slot) => {
+    effectMasks.forEach((mask, position) => {
+      const index = indexOf(mask);
+      visitEffect(slot, position, index, masks[index]!);
+    });
   });
   return masks;
 }
 
 /**
- * The key of a shape: per slot `l` or `t<effect id>`, with `m<mask index>` for a masked one, and
- * after a `|` per distinct mask `<source><invert>@<stage index>`. The stage index tells one texture
- * node for two masks from two: a red and a green mask on one stage and on two stages differ in it
- * alone.
+ * The key of a shape: per slot `l` or `t<effect id>`, with `m<mask index>` for a masked one and
+ * `e<mask index>.<mask index>…` for the masks its effect names, and after a `|` per distinct mask
+ * `<source><invert>@<stage index>`. The stage index tells one texture node for two masks from two:
+ * a red and a green mask on one stage and on two stages differ in it alone. The indices of the
+ * effect's masks tell which texture node the graph of the effect samples: two slot masks that swap
+ * their stages leave the list of distinct masks as it was, but not the place of the effect's mask
+ * in it.
  */
 function shapeKey(kinds: readonly ShapeKind[]): string {
   const slots = kinds.map(({effect}) => (effect ? `t${effectId(effect)}` : 'l'));
-  const masks = distinctMasks(kinds, (slot, index) => {
-    slots[slot] += `m${index}`;
-  });
+  const masks = distinctMasks(
+    kinds,
+    (slot, index) => {
+      slots[slot] += `m${index}`;
+    },
+    (slot, position, index) => {
+      slots[slot] += `${position === 0 ? 'e' : '.'}${index}`;
+    },
+  );
   if (masks.length === 0) return slots.join(',');
   return `${slots.join(',')}|${masks.map((m) => `${m.source}${m.invert ? 1 : 0}@${m.stage}`).join(',')}`;
 }
@@ -253,7 +305,7 @@ function parseShapes(subject: string, shapes: unknown): ShapeKind[][] {
     }
     return shape.map((slot: unknown, j): ShapeKind => {
       if (slot === 'layer') return LAYER_KIND;
-      if (isEffect(slot)) return {effect: slot, mask: undefined};
+      if (isEffect(slot)) return {effect: slot, mask: undefined, effectMasks: masksOf(subject, slot)};
       if (slot !== null && typeof slot === 'object' && !Array.isArray(slot) && 'mask' in slot) {
         const {effect, mask} = slot as {effect?: unknown; mask?: unknown};
         if (!(mask instanceof StageMask)) {
@@ -264,7 +316,7 @@ function parseShapes(subject: string, shapes: unknown): ShapeKind[][] {
             `${subject}: shapes[${i}][${j}].effect must be a StageTransitionEffect, got ${describeValue(effect)}`,
           );
         }
-        return {effect, mask};
+        return {effect, mask, effectMasks: effect ? masksOf(subject, effect) : NO_MASKS};
       }
       throw new TypeError(
         `${subject}: shapes[${i}][${j}] must be 'layer', a StageTransitionEffect or {effect?, mask}, got ${describeValue(slot)}`,
@@ -521,25 +573,30 @@ export class StageDirector extends StageRenderer {
       throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
     this.#refuseMaskStageAsLayer(subject, stage);
     const mask = this.#checkMask(subject, opts?.mask, stage);
+    const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => t.from === stage || t.to === stage);
     const at = this.#slotIndexAt(subject, opts?.at);
 
-    // the mask stage joins first: a mask stage that refuses to join leaves every run as it was
+    // the mask stages join first: a mask stage that refuses to join leaves every run as it was
     const errors: unknown[] = [];
     const slot: Slot = {};
     if (mask) this.#maskSlot(subject, slot, mask, errors);
+    let usesMasks = false;
     let layer: Layer;
     try {
+      this.#useMasks(subject, effectMasks);
+      usesMasks = true;
       this.#finishRunsWith(stage, errors);
       layer = this.#join(subject, stage);
     } catch (error) {
       // the original error stays the first of what is thrown: the listeners that threw on the way back are not lost
       const collected = [error, ...errors];
       this.#unmaskSlot(slot, collected);
+      if (usesMasks) this.#unuseMasks(effectMasks, collected);
       if (collected.length === 1) throw error;
       throw new AggregateError(collected, `${subject}: more than one error on the way back from a stage that refused to join`);
     }
     this.#slots.splice(Math.min(at, this.#slots.length), 0, slot);
-    const transition = this.#begin(slot, undefined, layer, options, errors);
+    const transition = this.#begin(slot, undefined, layer, options, effectMasks, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionStart and OnStageTransitionEnd threw`);
     return transition;
   }
@@ -551,10 +608,13 @@ export class StageDirector extends StageRenderer {
     const options = parseOptions(subject, opts);
     const slot = this.#slotWithEnd(stage);
     if (!slot) throw new Error(`${subject} cannot hide the stage "${stage.name}": that stage is not in the stack`);
+    const running = slot.run?.transition;
+    const effectMasks = this.#checkEffectMasks(subject, options, undefined, (t) => t === running);
 
     const errors: unknown[] = [];
+    this.#useMasks(subject, effectMasks);
     if (slot.run) this.#endRun(slot, 'to', 'finished', errors);
-    const transition = this.#begin(slot, slot.layer, undefined, options, errors);
+    const transition = this.#begin(slot, slot.layer, undefined, options, effectMasks, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionStart and OnStageTransitionEnd threw`);
     return transition;
   }
@@ -570,12 +630,25 @@ export class StageDirector extends StageRenderer {
       throw new Error(`${subject} cannot take the stage "${to.name}": that stage is in the stack already`);
     }
     this.#refuseMaskStageAsLayer(subject, to);
+    // a mask is busy only after the runs this call ends anyway: the run of the slot and those with `to`
+    const running = slot.run?.transition;
+    const effectMasks = this.#checkEffectMasks(subject, options, to, (t) => t === running || t.from === to || t.to === to);
 
+    // the mask stages join first, so a mask the ending run used stays and is not joined again
     const errors: unknown[] = [];
-    if (slot.run) this.#endRun(slot, 'to', 'finished', errors);
-    this.#finishRunsWith(to, errors);
-    const toLayer = this.#join(subject, to);
-    const transition = this.#begin(slot, slot.layer, toLayer, options, errors);
+    this.#useMasks(subject, effectMasks);
+    let toLayer: Layer;
+    try {
+      if (slot.run) this.#endRun(slot, 'to', 'finished', errors);
+      this.#finishRunsWith(to, errors);
+      toLayer = this.#join(subject, to);
+    } catch (error) {
+      const collected = [error, ...errors];
+      this.#unuseMasks(effectMasks, collected);
+      if (collected.length === 1) throw error;
+      throw new AggregateError(collected, `${subject}: more than one error on the way back from a stage that refused to join`);
+    }
+    const transition = this.#begin(slot, slot.layer, toLayer, options, effectMasks, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionStart and OnStageTransitionEnd threw`);
     return transition;
   }
@@ -588,12 +661,21 @@ export class StageDirector extends StageRenderer {
     const subject = 'StageDirector#push()';
     if (this.isDisposed) return this.#cancelledHandle(undefined, stage);
     const below = modeOption(subject, 'below', opts?.below);
-    parseOptions(subject, opts);
+    const options = parseOptions(subject, opts);
     if (this.#slotWithEnd(stage))
       throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
     this.#refuseMaskStageAsLayer(subject, stage);
     this.#checkMask(subject, opts?.mask, stage);
-    this.#slotIndexAt(subject, opts?.at);
+    const at = this.#slotIndexAt(subject, opts?.at);
+    // the runs this call may end: those with the stage, and with 'freeze' those below the new slot;
+    // show() checks again once they have ended
+    const slotsBelow = below === 'freeze' ? this.#slots.slice(0, at) : [];
+    this.#checkEffectMasks(
+      subject,
+      options,
+      stage,
+      (t) => t.from === stage || t.to === stage || slotsBelow.some((slot) => slot.run?.transition === t),
+    );
 
     // the runs end before the slot below is known: a run with the stage — the stage pushed back while
     // a pop() still takes it out — and a run below that ends with nothing each take their slot out,
@@ -849,6 +931,8 @@ export class StageDirector extends StageRenderer {
    * the shape `['layer', dissolveIn]`. A masked slot is `{mask}`, or `{effect, mask}` for a
    * transition inside the mask; a mask counts by its stage, its `source` and its `invert`, so
    * another `StageMask` with the same options on a stage in the same place finds the shape compiled.
+   * An effect with `masks` compiles with a texture node for each of their stages, and
+   * `options.layers` may list those stages to build their materials as well.
    *
    * The shapes build the composition of the director. The stages of `options.layers` draw once, off
    * screen, as the director draws a layer — into a target of the type and the samples of its pass
@@ -1027,6 +1111,58 @@ export class StageDirector extends StageRenderer {
   }
 
   /**
+   * Refuses the masks `options.effect` names before anything changes, as `#checkMask()` refuses the
+   * mask of a slot, and a mask that drives a transition already — unless that transition is one
+   * the call ends anyway, as `ends` tells. Answers the masks the transition will use: none for a
+   * change without a transition, which draws no effect.
+   */
+  #checkEffectMasks(
+    subject: string,
+    options: ParsedOptions,
+    layer: IStage | undefined,
+    ends: (transition: StageTransition) => boolean,
+  ): readonly StageMask[] {
+    const masks = masksOf(subject, options.effect);
+    for (const mask of masks) this.#checkMask(subject, mask, layer);
+    if (options.instant) return NO_MASKS;
+    for (const mask of masks) {
+      const driver = StageMaskInternals.drivenBy(mask);
+      if (driver !== undefined && !ends(driver)) {
+        throw new Error(`${subject}: the mask "${mask.stage.name}" drives a transition already`);
+      }
+    }
+    return masks;
+  }
+
+  /**
+   * One use for every stage among `masks`, each stage once: a stage that is no mask of the
+   * director yet joins. A stage that refuses to join gives back the uses taken before it.
+   */
+  #useMasks(subject: string, masks: readonly StageMask[]): void {
+    let i = 0;
+    try {
+      for (; i < masks.length; i++) {
+        if (firstOnItsStage(masks, i)) this.#join(subject, masks[i]!.stage, 'mask').uses++;
+      }
+    } catch (error) {
+      const errors: unknown[] = [];
+      this.#unuseMasks(masks.slice(0, i), errors);
+      if (errors.length === 0) throw error;
+      throw new AggregateError(
+        [error, ...errors],
+        `${subject}: more than one error on the way back from a mask stage that refused to join`,
+      );
+    }
+  }
+
+  /** Gives back the uses `#useMasks()` took for `masks`. */
+  #unuseMasks(masks: readonly StageMask[], errors: unknown[]): void {
+    for (let i = 0; i < masks.length; i++) {
+      if (firstOnItsStage(masks, i)) this.#unuseMask(masks[i]!, errors);
+    }
+  }
+
+  /**
    * Puts `mask` on `slot`: the stage of the new mask joins first, then the stage of the old one leaves
    * if nothing uses it any more.
    */
@@ -1189,13 +1325,20 @@ export class StageDirector extends StageRenderer {
     this.#slotsChanged();
   }
 
-  /** Takes the mask stage `layer` off every slot it masks, and out of the director. */
+  /**
+   * Takes the mask stage `layer` off every slot it masks, ends every transition whose effect names
+   * it as cancelled, and takes it out of the director.
+   */
   #dropMask(layer: Layer, errors: unknown[]): void {
     for (const slot of this.#slots) {
       if (slot.mask?.stage === layer.stage) {
         slot.mask = undefined;
         layer.uses--;
       }
+    }
+    // the end of each run gives its use back, and the last one lets the stage go
+    for (const slot of this.#slots.slice()) {
+      if (slot.run?.masks.some((mask) => mask.stage === layer.stage)) this.#endRun(slot, 'from', 'cancelled', errors);
     }
     try {
       this.#release(layer);
@@ -1228,8 +1371,19 @@ export class StageDirector extends StageRenderer {
   // transitions
   // ---------------------------------------------------------------------------
 
-  /** Starts the change of `slot` from `from` to `to`, or makes it at once. */
-  #begin(slot: Slot, from: Layer | undefined, to: Layer | undefined, options: ParsedOptions, errors: unknown[]): StageTransition {
+  /**
+   * Starts the change of `slot` from `from` to `to`, or makes it at once. `masks` are the masks of
+   * the effect, whose uses the caller has taken already: the transition drives them, and its end
+   * gives the uses back. A change at once takes none.
+   */
+  #begin(
+    slot: Slot,
+    from: Layer | undefined,
+    to: Layer | undefined,
+    options: ParsedOptions,
+    masks: readonly StageMask[],
+    errors: unknown[],
+  ): StageTransition {
     const transition = StageTransitionInternals.create(
       {
         from: from?.stage,
@@ -1256,7 +1410,8 @@ export class StageDirector extends StageRenderer {
     }
 
     slot.layer = undefined;
-    slot.run = {transition, from, to, fromWasFrozen: from?.frozen === true};
+    slot.run = {transition, from, to, fromWasFrozen: from?.frozen === true, masks};
+    for (const mask of masks) StageMaskInternals.setDrivenBy(mask, transition);
     if (from && options.outgoing === 'freeze') from.frozen = true;
     if (to) {
       to.frozen = options.incoming === 'freeze';
@@ -1271,6 +1426,9 @@ export class StageDirector extends StageRenderer {
     const run = slot.run;
     if (!run) return;
     slot.run = undefined;
+    for (const mask of run.masks) {
+      if (StageMaskInternals.drivenBy(mask) === run.transition) StageMaskInternals.setDrivenBy(mask, undefined);
+    }
 
     const kept = keep === 'to' ? run.to : run.from;
     const left = keep === 'to' ? run.from : run.to;
@@ -1286,6 +1444,7 @@ export class StageDirector extends StageRenderer {
         errors.push(error);
       }
     }
+    this.#unuseMasks(run.masks, errors);
     this.#slotsChanged();
 
     StageTransitionInternals.settle(run.transition, state);
@@ -1344,13 +1503,16 @@ export class StageDirector extends StageRenderer {
         }
       }
     });
-    // after every layer: the distinct mask stages of the slot masks, bottom-up, each by its first
-    // appearance — they update after the layers whose camera they may read
+    // after every layer: the distinct mask stages of the slot masks, bottom-up, then those of the
+    // running effects, slot by slot, each by its first appearance — they update after the layers
+    // whose camera they may read. distinctMasks() counts the texture nodes of a shape in this order
     const masks: Layer[] = [];
-    for (const slot of this.#slots) {
-      const layer = slot.mask ? this.#layers.get(slot.mask.stage) : undefined;
+    const addMask = (mask: StageMask): void => {
+      const layer = this.#layers.get(mask.stage);
       if (layer && !masks.includes(layer)) masks.push(layer);
-    }
+    };
+    for (const slot of this.#slots) if (slot.mask) addMask(slot.mask);
+    for (const slot of this.#slots) slot.run?.masks.forEach(addMask);
     masks.forEach((layer, maskStage) => {
       const item = itemOf(layer);
       if (item) {
@@ -1386,7 +1548,10 @@ export class StageDirector extends StageRenderer {
   #currentShape(renderer: WebGPURenderer): Shape {
     if (this.#shapeKey === undefined || this.#shape === undefined) {
       const kinds = this.#slots.map(
-        (slot): ShapeKind => (slot.run || slot.mask ? {effect: slot.run?.transition.effect, mask: slot.mask} : LAYER_KIND),
+        (slot): ShapeKind =>
+          slot.run || slot.mask
+            ? {effect: slot.run?.transition.effect, mask: slot.mask, effectMasks: slot.run?.masks ?? NO_MASKS}
+            : LAYER_KIND,
       );
       const key = shapeKey(kinds);
       let shape = this.#shapes.get(key);
@@ -1417,10 +1582,19 @@ export class StageDirector extends StageRenderer {
     const maskNodes: TextureNode[] = [];
     const coverages: Node<'float'>[] = [];
     const coverageOf: (Node<'float'> | undefined)[] = [];
-    distinctMasks(kinds, (slot, index, {stage, source, invert}) => {
-      const maskNode = (maskNodes[stage] ??= textureNode());
-      coverageOf[slot] = coverages[index] ??= maskCoverage(maskNode.sample(at) as unknown as Node<'vec4'>, source, invert);
-    });
+    // per slot, the index of the mask stage of each mask its effect names, by its place in the list
+    const effectMaskStages: number[][] = [];
+    distinctMasks(
+      kinds,
+      (slot, index, {stage, source, invert}) => {
+        const maskNode = (maskNodes[stage] ??= textureNode());
+        coverageOf[slot] = coverages[index] ??= maskCoverage(maskNode.sample(at) as unknown as Node<'vec4'>, source, invert);
+      },
+      (slot, position, _index, {stage}) => {
+        maskNodes[stage] ??= textureNode();
+        (effectMaskStages[slot] ??= [])[position] = stage;
+      },
+    );
     const masked = (slot: number, color: Node<'vec4'>): Node<'vec4'> => {
       const coverage = coverageOf[slot];
       return coverage ? (color.mul(coverage) as Node<'vec4'>) : color;
@@ -1428,17 +1602,26 @@ export class StageDirector extends StageRenderer {
 
     let out = this.#clearUniform as unknown as Node<'vec4'>;
     for (let index = 0; index < kinds.length; index++) {
-      const {effect} = kinds[index]!;
+      const {effect, effectMasks} = kinds[index]!;
       if (effect) {
         const from = textureNode();
         const to = textureNode();
         const progress = uniform(0) as unknown as UniformNode<'float', number>;
+        const stages = effectMaskStages[index];
         const effectNode = effect.build({
           from: textureSource(from),
           to: textureSource(to),
           progress: progress as unknown as Node<'float'>,
           uv: at,
           resolution: this.#resolution as unknown as Node<'vec2'>,
+          mask: (mask) => {
+            const position = effectMasks.indexOf(mask);
+            if (position === -1 || !stages) {
+              const named = mask instanceof StageMask ? `the mask on "${mask.stage.name}"` : describeValue(mask);
+              throw new Error(`StageTransitionInput#mask(): the effect "${effect.name}" did not name ${named} in its masks`);
+            }
+            return maskSource(maskNodes[stages[position]!]!, mask);
+          },
         });
         slots.push({from, to, progress, effect, effectNode});
         out = over(masked(index, effectNode), out);

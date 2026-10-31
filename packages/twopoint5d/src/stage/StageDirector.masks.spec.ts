@@ -1,5 +1,15 @@
 import {emit, eventize, on} from '@spearwolf/eventize';
-import {ACESFilmicToneMapping, Color, FloatType, type Node, RenderPipeline, SRGBColorSpace, type TextureNode} from 'three/webgpu';
+import {mix} from 'three/tsl';
+import {
+  ACESFilmicToneMapping,
+  Color,
+  FloatType,
+  type Node,
+  RenderPipeline,
+  type RenderTarget,
+  SRGBColorSpace,
+  type TextureNode,
+} from 'three/webgpu';
 import {beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
 import {OnStageDispose, OnStageRemoved} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
@@ -7,7 +17,7 @@ import type {IStage} from './IStage.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
-import {crossfade} from './transitionEffects.js';
+import {crossfade, type StageTransitionEffect, type StageTransitionInput} from './transitionEffects.js';
 
 // the parts of a WebGPURenderer the director and its pipelines touch, as StageDirector.spec.ts mocks them
 function createRendererMock() {
@@ -757,6 +767,350 @@ describe('StageDirector masks', () => {
         `${subject}: shapes[0][1] must be 'layer', a StageTransitionEffect or {effect?, mask}, got {effect: `,
       );
       expect(renderer.compileAsync).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('masks of a transition effect', () => {
+    let inkStage: FakeStage;
+    let ink: StageMask;
+    let inkIn: StageTransitionEffect;
+
+    /** An effect that names `masks` and samples each of them; `use` builds its node instead. */
+    const maskEffect = (
+      name: string,
+      masks: StageMask[],
+      use?: (input: StageTransitionInput) => Node<'vec4'>,
+    ): StageTransitionEffect => ({
+      name,
+      masks,
+      build: (input) => {
+        if (use) return use(input);
+        let share = input.progress;
+        for (const mask of masks) share = share.mul(input.mask(mask).coverage(input.uv));
+        return mix(input.from.sample(input.uv), input.to.sample(input.uv), share) as Node<'vec4'>;
+      },
+    });
+
+    beforeEach(() => {
+      inkStage = fakeStage('ink');
+      ink = new StageMask(inkStage, {source: 'luminance'});
+      inkIn = maskEffect('inkIn', [ink]);
+    });
+
+    it('the mask stages of an effect join when its transition begins and leave when it ends', () => {
+      director.setStack([stars, level]);
+      const t = director.replace(level, nextLevel, {effect: inkIn, duration: 1});
+      // after every layer, as the mask of a slot
+      expect(ordered()).toEqual(['stars', 'level', 'nextLevel', 'ink']);
+      frame();
+      draw();
+      expect(inkStage.updateFrame).toHaveBeenCalledTimes(1);
+      expect(inkStage.renderTo).toHaveBeenCalledTimes(1);
+      expect(inkStage.resize).toHaveBeenCalledWith(64, 64, 1);
+
+      const wrapper = rendererOf(inkStage)!;
+      t.complete();
+      expect(ordered()).toEqual(['stars', 'nextLevel']);
+      expect(wrapper.isDisposed).toBe(true);
+      frame();
+      expect(inkStage.updateFrame).toHaveBeenCalledTimes(1);
+      // the registry let go: another director takes the stage
+      const second = new StageDirector();
+      second.setStack([stars]);
+      expect(() => second.setMask(stars, ink)).not.toThrow();
+      second.dispose();
+
+      // a stage named twice by one effect joins once, and leaves with the transition
+      const twice = maskEffect('twice', [ink, new StageMask(inkStage, {invert: true})]);
+      const hidden = director.hide(nextLevel, {effect: twice, duration: 1});
+      expect(ordered()).toEqual(['stars', 'nextLevel', 'ink']);
+      expect(director.stages).toHaveLength(3);
+      hidden.cancel();
+      expect(ordered()).toEqual(['stars', 'nextLevel']);
+      expect(director.stages).toHaveLength(2);
+
+      // a change without a transition draws no mask
+      director.replace(nextLevel, level, {effect: inkIn, duration: 0});
+      expect(ordered()).toEqual(['stars', 'level']);
+    });
+
+    it('a mask stage shared by a slot and an effect stays while either uses it', () => {
+      const fogIn = maskEffect('fogIn', [new StageMask(fogStage, {source: 'red'})]);
+      director.setStack([stars, level]);
+      director.setMask(stars, fog);
+      const t = director.replace(level, nextLevel, {effect: fogIn, duration: 1});
+      expect(ordered()).toEqual(['stars', 'level', 'nextLevel', 'fog']);
+      expect(director.stages).toHaveLength(4);
+      // the slot lets go of the mask, the transition still uses its stage
+      director.setMask(stars, undefined);
+      expect(ordered()).toEqual(['stars', 'level', 'nextLevel', 'fog']);
+      t.complete();
+      expect(ordered()).toEqual(['stars', 'nextLevel']);
+    });
+
+    it('a second transition on a busy mask is refused', () => {
+      const other = fakeStage('other');
+      director.setStack([stars, level]);
+      const t = director.replace(level, nextLevel, {effect: inkIn, duration: 1});
+      const before = snapshot();
+
+      expect(() => director.replace(stars, other, {effect: inkIn, duration: 1})).toThrow(
+        'StageDirector#replace(): the mask "ink" drives a transition already',
+      );
+      // another effect that names the same mask
+      expect(() => director.hide(stars, {effect: maskEffect('inkOut', [ink]), duration: 1})).toThrow(
+        'StageDirector#hide(): the mask "ink" drives a transition already',
+      );
+      expect(() => director.show(other, {effect: inkIn, duration: 1})).toThrow(
+        'StageDirector#show(): the mask "ink" drives a transition already',
+      );
+      expect(() => director.push(other, {effect: inkIn, manual: true})).toThrow(
+        'StageDirector#push(): the mask "ink" drives a transition already',
+      );
+      expect(snapshot()).toEqual(before);
+      expect(t.state).toBe('pending');
+      expect(director.transitions).toEqual([t]);
+
+      // a change without a transition drives no mask
+      expect(() => director.replace(stars, other, {effect: inkIn, duration: 0})).not.toThrow();
+
+      // once the first transition is over, the mask is free
+      t.complete();
+      expect(() => director.replace(other, stars, {effect: inkIn, duration: 1})).not.toThrow();
+    });
+
+    it('replace() in the slot of a running matte reuses its mask', () => {
+      const third = fakeStage('third');
+      director.setStack([stars, level]);
+      const first = director.replace(level, nextLevel, {effect: inkIn, duration: 1});
+      frame();
+      const wrapper = rendererOf(inkStage)!;
+
+      // the run of its own slot ends first, so the mask is not busy
+      const second = director.replace(nextLevel, third, {effect: inkIn, duration: 1});
+      expect(first.state).toBe('finished');
+      expect(second.state).toBe('pending');
+      expect(rendererOf(inkStage)).toBe(wrapper);
+      expect(wrapper.isDisposed).toBe(false);
+      expect(ordered()).toEqual(['stars', 'nextLevel', 'third', 'ink']);
+
+      // the mask drives the second transition now
+      expect(() => director.replace(stars, level, {effect: inkIn, duration: 1})).toThrow(
+        'StageDirector#replace(): the mask "ink" drives a transition already',
+      );
+      second.complete();
+      expect(wrapper.isDisposed).toBe(true);
+      expect(ordered()).toEqual(['stars', 'third']);
+    });
+
+    it('show() of a stage whose run the call ends reuses the mask of that run', () => {
+      director.setStack([stars, level]);
+      const hidden = director.hide(level, {effect: inkIn, duration: 1});
+      // show() finishes the hide() of the stage first
+      const shown = director.show(level, {effect: inkIn, duration: 1});
+      expect(hidden.state).toBe('finished');
+      expect(shown.state).toBe('pending');
+      expect(ordered()).toEqual(['stars', 'level', 'ink']);
+    });
+
+    it('refuses the masks of an effect it cannot take, before anything changes', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, fog);
+      const before = snapshot();
+      const replaceWith = (effect: StageTransitionEffect) => () => director.replace(level, nextLevel, {effect, duration: 1});
+
+      const gone = new StageMask(fakeStage('gone'));
+      gone.dispose();
+      expect(replaceWith(maskEffect('goneIn', [gone]))).toThrow(
+        'StageDirector#replace() cannot take the mask on "gone": that mask has been disposed',
+      );
+      expect(replaceWith(maskEffect('starsIn', [new StageMask(stars)]))).toThrow(
+        'StageDirector#replace() cannot take the mask on "stars": that stage is a layer of this director',
+      );
+      expect(replaceWith(maskEffect('nextIn', [new StageMask(nextLevel)]))).toThrow(
+        'StageDirector#replace() cannot take the mask on "nextLevel": that stage is a layer of this director',
+      );
+      expect(replaceWith({name: 'odd', masks: [inkStage as any], build: crossfade().build})).toThrow(
+        'StageDirector#replace(): the masks of the effect "odd" must be an array of StageMask, got [',
+      );
+      expect(replaceWith({name: 'odd', masks: 'ink' as any, build: crossfade().build})).toThrow(
+        'StageDirector#replace(): the masks of the effect "odd" must be an array of StageMask, got "ink"',
+      );
+
+      const second = new StageDirector();
+      second.resize(64, 64);
+      second.setStack([nextLevel]);
+      second.setMask(nextLevel, ink);
+      expect(replaceWith(inkIn)).toThrow(
+        'StageDirector#replace() cannot take the mask on "ink": that stage is a mask of another director',
+      );
+      second.dispose();
+
+      expect(snapshot()).toEqual(before);
+      expect(director.transitions).toEqual([]);
+    });
+
+    it('a disposed mask stage ends the transition that names it as cancelled', () => {
+      director.setStack([stars, level]);
+
+      // a stage the director wrapped
+      const blobs = eventize(fakeStage('blobs'));
+      const t = director.replace(level, nextLevel, {effect: maskEffect('blobsIn', [new StageMask(blobs)]), duration: 1});
+      const wrapper = rendererOf(blobs)!;
+      emit(blobs, OnStageDispose, blobs);
+      expect(t.state).toBe('cancelled');
+      expect(names(director.stack)).toEqual(['stars', 'level']);
+      expect(wrapper.isDisposed).toBe(true);
+      expect(ordered()).toEqual(['stars', 'level']);
+
+      // a StageRenderer as the mask stage
+      const own = new StageRenderer();
+      own.name = 'own';
+      const t2 = director.replace(level, nextLevel, {effect: maskEffect('ownIn', [new StageMask(own)]), duration: 1});
+      own.dispose();
+      expect(t2.state).toBe('cancelled');
+      expect(names(director.stack)).toEqual(['stars', 'level']);
+      expect(ordered()).toEqual(['stars', 'level']);
+
+      // remove() of the mask stage, which a slot mask uses as well
+      director.setMask(stars, fog);
+      const t3 = director.replace(level, nextLevel, {effect: maskEffect('fogIn', [fog]), duration: 1});
+      director.remove(fogStage);
+      expect(t3.state).toBe('cancelled');
+      expect(director.maskOf(stars)).toBeUndefined();
+      expect(names(director.stack)).toEqual(['stars', 'level']);
+      expect(ordered()).toEqual(['stars', 'level']);
+      expect(director.stages).toHaveLength(2);
+    });
+
+    describe('the shape', () => {
+      const outputNode = () => director.pipeline!.outputNode as Node;
+      let pictureOf: Map<IStage, unknown>;
+      /** The stages whose pictures the texture nodes of `node` sample, sorted. */
+      const sampled = (node: Node) =>
+        [...textureNodesOf(node)]
+          .map((textureNode) => [...pictureOf].find(([, picture]) => picture === textureNode.value)?.[0].name ?? 'placeholder')
+          .sort();
+
+      let effectNode: Node | undefined;
+      /** An effect that names `masks`, samples the first of them and keeps the node it built. */
+      const capture = (masks: StageMask[]) =>
+        maskEffect('capture', masks, (input) => {
+          effectNode = mix(
+            input.from.sample(input.uv),
+            input.to.sample(input.uv),
+            input.mask(masks[0]!).coverage(input.uv),
+          ) as Node<'vec4'>;
+          return effectNode as Node<'vec4'>;
+        });
+
+      beforeEach(() => {
+        pictureOf = new Map();
+        effectNode = undefined;
+        for (const stage of [stars, level, nextLevel, fogStage, inkStage]) {
+          stage.renderTo.mockImplementation(() => pictureOf.set(stage, (renderer.__renderTarget as RenderTarget).texture));
+        }
+      });
+
+      it('the masks of an effect count among the distinct masks of the shape', () => {
+        // on different stages: a slot mask on the top slot, the mask of an effect in the slot below
+        director.setStack([stars, level]);
+        director.setMask(level, fog);
+        director.replace(stars, nextLevel, {effect: capture([ink]), duration: 1});
+        expect(ordered()).toEqual(['stars', 'nextLevel', 'level', 'fog', 'ink']);
+        draw();
+        expect(sampled(effectNode!)).toEqual(['ink', 'nextLevel', 'stars']);
+        expect(sampled(outputNode())).toEqual(['fog', 'ink', 'level', 'nextLevel', 'stars']);
+        director.transitions[0]!.complete();
+
+        // on the same stage: one texture node, shared by the slot mask and the mask of the effect
+        director.replace(nextLevel, stars, {effect: capture([new StageMask(fogStage, {source: 'red'})]), duration: 1});
+        expect(ordered()).toEqual(['nextLevel', 'stars', 'level', 'fog']);
+        draw();
+        expect(sampled(effectNode!)).toEqual(['fog', 'nextLevel', 'stars']);
+        expect(sampled(outputNode())).toEqual(['fog', 'level', 'nextLevel', 'stars']);
+      });
+
+      it('the key tells which distinct mask the mask of an effect samples', () => {
+        const vignetteStage = fakeStage('vignette');
+        vignetteStage.renderTo.mockImplementation(() =>
+          pictureOf.set(vignetteStage, (renderer.__renderTarget as RenderTarget).texture),
+        );
+        const vignette = new StageMask(vignetteStage);
+        const third = fakeStage('third');
+        const effect = capture([new StageMask(fogStage)]);
+
+        director.setStack([stars, level, nextLevel]);
+        director.setMask(stars, fog);
+        director.setMask(level, vignette);
+        director.replace(nextLevel, third, {effect, duration: 1});
+        draw();
+        expect(sampled(effectNode!)).toEqual(['fog', 'nextLevel', 'placeholder']);
+        const first = director.pipeline;
+        director.transitions[0]!.complete();
+
+        // the slot masks swap their stages: the same masks and options in the same places, but the
+        // mask of the effect samples the other distinct mask stage
+        director.setMask(stars, vignette);
+        director.setMask(level, fog);
+        effectNode = undefined;
+        director.replace(third, nextLevel, {effect, duration: 1});
+        draw();
+        expect(director.pipeline).not.toBe(first);
+        expect(sampled(effectNode!)).toEqual(['fog', 'nextLevel', 'placeholder']);
+      });
+
+      it('precompile() compiles a shape with the masks of an effect', async () => {
+        const updateContext = vi.spyOn(RenderPipeline.prototype as any, '_updateContext');
+        try {
+          await director.precompile(
+            renderer as any,
+            [
+              ['layer', inkIn],
+              ['layer', {effect: inkIn, mask: fog}],
+            ],
+            {layers: [level, inkStage]},
+          );
+          expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+          expect(inkStage.renderTo).toHaveBeenCalledTimes(1);
+
+          director.setStack([stars, level]);
+          director.replace(level, nextLevel, {effect: inkIn, duration: 1});
+          draw();
+          director.transitions[0]!.complete();
+          director.setMask(nextLevel, fog);
+          director.replace(nextLevel, level, {effect: inkIn, duration: 1});
+          draw();
+          expect(updateContext).toHaveBeenCalledTimes(2);
+          expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+        } finally {
+          updateContext.mockRestore();
+        }
+        await expect(
+          director.precompile(renderer as any, [[{name: 'odd', masks: [fogStage], build: crossfade().build} as any]]),
+        ).rejects.toThrow('StageDirector#precompile(): the masks of the effect "odd" must be an array of StageMask, got [');
+      });
+    });
+
+    it('input.mask() throws for a mask the effect did not name', () => {
+      director.setStack([stars, level]);
+      const sneaky = maskEffect('sneaky', [ink], (input) => input.mask(fog).sample(input.uv));
+      director.replace(level, nextLevel, {effect: sneaky, duration: 1});
+      expect(() => draw()).toThrow(
+        'StageTransitionInput#mask(): the effect "sneaky" did not name the mask on "fog" in its masks',
+      );
+      director.transitions[0]!.complete();
+
+      // another StageMask object on a named stage is not named
+      const twin = maskEffect('twin', [ink], (input) => input.mask(new StageMask(inkStage)).sample(input.uv));
+      director.replace(nextLevel, level, {effect: twin, duration: 1});
+      expect(() => draw()).toThrow('StageTransitionInput#mask(): the effect "twin" did not name the mask on "ink" in its masks');
+      director.transitions[0]!.complete();
+
+      // an effect without masks names none
+      const none: StageTransitionEffect = {name: 'none', build: (input) => input.mask(ink).sample(input.uv)};
+      director.replace(level, nextLevel, {effect: none, duration: 1});
+      expect(() => draw()).toThrow('StageTransitionInput#mask(): the effect "none" did not name the mask on "ink" in its masks');
     });
   });
 });
