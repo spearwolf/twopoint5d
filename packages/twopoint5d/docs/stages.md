@@ -1159,6 +1159,159 @@ once after the size of the director changes. A freeze does not outlive the mask 
 director: once nothing masks with the stage any more, it leaves, and a later `setMask()` finds it
 running.
 
+### Masks in the world
+
+A mask stage with a projection of its own masks in **screen space**: a vignette, ink that spreads
+from a corner, a fog of war whose blobs you move by hand with the camera of the level. The mask
+knows nothing of the world; it is a picture over the slot.
+
+A mask that lies *in* the world — the cone of a flashlight, a portal disc on a wall — is drawn
+through the camera of the stage it masks, wherever that camera moves and whatever projection it
+gets. `StageMask.inWorldOf(stage, scene, options?)` is that mask: you hand in the `Stage2D` of the
+world and a scene of the mask, and the mask draws the scene through the current camera of the
+stage.
+
+#### A flashlight in a level
+
+The level is a `Stage2D` whose camera follows the player. The flashlight is a white pie slice in
+a scene of its own, placed in the coordinates of the level; the level shows inside the cone, the
+dark clear color of the director around it.
+
+```ts check
+import {on} from '@spearwolf/eventize';
+import {
+  Display,
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageDirector,
+  StageMask,
+} from '@spearwolf/twopoint5d';
+import {CircleGeometry, Color, Mesh, MeshBasicMaterial, Scene} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+
+const level = new Stage2D(new OrthographicProjection('xy|bottom-left', {width: 640, height: 360, fit: 'contain'}));
+// ... the sprites and tiles of the level go into level.scene
+
+const player = {x: 0, y: 0, angle: 0};
+
+on(level, OnStageUpdateFrame, () => {
+  level.camera!.position.x = player.x;
+  level.camera!.position.y = player.y;
+});
+
+// the cone: a pie slice of 45 degrees and 240 units, white on transparent black
+const flashlightScene = new Scene();
+const cone = new Mesh(
+  new CircleGeometry(240, 32, -Math.PI / 8, Math.PI / 4),
+  new MeshBasicMaterial({color: new Color('#fff')}),
+);
+flashlightScene.add(cone);
+
+// the cone follows the player in the world: the camera of the level does the rest
+on(level, OnStageUpdateFrame, () => {
+  cone.position.set(player.x, player.y, 0);
+  cone.rotation.z = player.angle;
+});
+
+const flashlight = StageMask.inWorldOf(level, flashlightScene, {source: 'alpha'});
+
+const director = new StageDirector(display).setClearColor(new Color('#05060d'));
+director.setStack([level]);
+director.setMask(level, flashlight);
+
+display.start();
+```
+
+The mask reads `level.camera` when it draws, so it needs no wiring: a camera that follows the
+player, a new `projection` of the level or a `camera` of your own is the camera of the next frame.
+Here the cone and the camera both follow the player, so the light stays in the middle of the
+screen; a torch that stays where it is would be a mesh left in place in the scene of the mask, and
+the camera moves over it.
+
+#### A portal into a second world
+
+Two worlds through a portal are three lines: the stack `[world, other]`, a mask in the world of
+`world` on the slot of `other`, and a camera of `other` that you move with the portal. The disc of
+the portal is a thing of `world`: it stays where it is in the world while the camera moves, and
+the second world shows through it.
+
+```ts check
+import {on} from '@spearwolf/eventize';
+import {
+  Display,
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageDirector,
+  StageMask,
+} from '@spearwolf/twopoint5d';
+import {CircleGeometry, Color, Mesh, MeshBasicMaterial, Scene} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const view = {width: 640, height: 360, fit: 'contain'} as const;
+
+const world = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const other = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+// ... the two worlds go into world.scene and other.scene
+
+const player = {x: 0, y: 0};
+on(world, OnStageUpdateFrame, () => {
+  world.camera!.position.set(player.x, player.y, world.camera!.position.z);
+});
+
+// the other world is seen through the portal as if it lay behind it: its camera moves with the
+// camera of the world
+on(other, OnStageUpdateFrame, () => {
+  other.camera!.position.set(player.x, player.y, other.camera!.position.z);
+});
+
+// the portal: a white disc on a wall of the world, at (200, 80)
+const portalScene = new Scene();
+const disc = new Mesh(new CircleGeometry(60, 48), new MeshBasicMaterial({color: new Color('#fff')}));
+disc.position.set(200, 80, 0);
+portalScene.add(disc);
+
+const director = new StageDirector(display);
+director.setStack([world, other]);
+director.setMask(other, StageMask.inWorldOf(world, portalScene));
+
+display.start();
+```
+
+Move the camera and the disc moves with the world, with the other world in it. To let the other
+world move against the world — an inner room larger than the disc, seen through it like through a
+window — move its camera by another amount than the camera of the world.
+
+#### Reference
+
+- **Only a `Stage2D`.** The camera of a `StageRenderer` is not one camera. `inWorldOf()` refuses
+  anything else, a disposed stage, and a `scene` that is no three.js `Object3D`, each with an error
+  that names the call. It takes the options of `new StageMask()`, `scale` included.
+- **The camera is read at each draw.** There is no listener on the stage. While the stage has no
+  camera — before its first resize, or after its `dispose()` — the mask draws nothing, a coverage of
+  0: the masked slot is hidden entirely, and `invert: true` shows it entirely.
+- **The mask owns the stage it built.** `mask.dispose()` disposes it; the `scene` and the world
+  stage stay yours. A director treats the stage like every mask stage of a caller: the mask goes
+  back into a slot, or into a `matte()`, as often as you like until it is disposed. A frozen mask
+  in the world keeps its picture when the camera moves.
+- **`mask.dispose()`** takes the mask off its slots and ends the transitions naming it as
+  cancelled, like every mask.
+
+Two things decide whether the mask lines up with the world:
+
+- **The size of the world.** The mask is drawn at the size of the director, the camera has the
+  aspect of the container of the world. They match when the same director sizes the world — the
+  world is a layer of it — or when you size the world to the same size. A world sized elsewhere
+  has its camera for another aspect, and the mask is drawn stretched against it.
+- **A camera parented in the scene of the world.** The mask draws with `renderer.render()`, which
+  refreshes the `matrixWorld` of a camera that has no parent. A camera that is a child of a node of
+  the world scene — say, of the player — gets its `matrixWorld` refreshed only when the world
+  draws its own scene. With the world as a running layer of the director that is current at every
+  frame; with a frozen world, or one that is no layer of the frame, the mask sees the camera where
+  it stood at the last draw of the world.
+
 ### A transition through a living matte
 
 `lumaMask()` switches by a still texture. When the matte itself should move — ink that spreads, a
@@ -1343,16 +1496,25 @@ error that names the stage.
 | --- | --- | --- |
 | `source` | `'alpha'` | what of the picture is the coverage: `'alpha'`, `'luminance'`, `'red'`, `'green'`, `'blue'` |
 | `invert` | `false` | `1 - coverage`: the mask cuts out where its stage draws |
+| `scale` | `1` | the share of the size of the drawing buffer the mask stage is drawn at, a number above 0 and at most 1; `0.5` costs a quarter of the memory, see [a mask at a share of the resolution](#a-mask-at-a-share-of-the-resolution) |
 
-The options are read once, when the mask is made. `'alpha'` is the default because a mask stage
+The options are read once, when the mask is made. A `scale` that is not a finite number above 0
+and at most 1 is refused with a `RangeError`. `'alpha'` is the default because a mask stage
 clears nothing and draws its shapes onto transparent black. `'luminance'` suits a gray picture, a
 painting or a canvas, and is read in the linear working space. Every source reads the picture
 premultiplied: the luminance of a half-transparent gray is its luminance times its alpha, so the
 transparent black around the shapes of a mask stage covers 0 under every source.
 
-`mask.stage`, `mask.source` and `mask.invert` read back what you handed in. A `StageMask` holds its
-stage but does not own it: `mask.dispose()` lets go of it and leaves the stage undisposed, which
-stays yours to dispose.
+`mask.stage`, `mask.source`, `mask.invert` and `mask.scale` read back what you handed in. A
+`StageMask` holds its stage but does not own it: `mask.dispose()` lets go of it and leaves the
+stage undisposed, which stays yours to dispose. The one stage a mask owns is the one
+[`StageMask.inWorldOf()`](#masks-in-the-world) builds.
+
+**Disposing a mask.** `mask.dispose()` ends the mask for every director that holds it: the mask
+leaves every slot it lies on (the slot shows whole again) and every transition whose effect names
+it ends as cancelled. A disposed mask is refused wherever a mask is taken. A second call does
+nothing. If a listener of the end of a transition throws, the mask is torn down completely first
+and the error reaches the caller of `dispose()` afterwards.
 
 The mask stage is any stage a director takes as a layer: a `Stage2D`, a `StageRenderer` with stages
 and a pipeline of its own, a stage of your own. A stage serves **one director** at a time as a mask,
@@ -1382,7 +1544,8 @@ they are.
 - `setStack()` makes new slots and drops every mask, also those of the stages that stay in the
   stack. Set the masks again after the call.
 - `hide()`, `pop()` and `remove()` of a layer take the mask off the slot that goes with it.
-- `remove(maskStage)` and the `dispose()` of a mask stage take the mask off every slot it lies on.
+- `remove(maskStage)` and the `dispose()` of a mask stage take the mask off every slot it lies on,
+  and so does the `dispose()` of the mask itself.
   `remove()` of a stage that is neither a layer nor a mask does what it does without masks.
 - Every refusal comes before anything changes. `setMask()` refuses a `stage` that is not in the
   stack, a `mask` that is not a `StageMask`, a disposed mask or mask stage, a mask whose stage is a
@@ -1444,6 +1607,37 @@ director.replace(level, nextLevel, {effect: inkIn}); // allowed: the run in this
 A mask is sampled at the same uv as the layers, the origin at the top left of the picture, under
 WebGPU and under WebGL 2. A mask stage that draws into its top half masks the top half of the slot.
 
+### A mask at a share of the resolution
+
+A coverage needs no more resolution than its edge asks for, and the edge of a fog is a blur
+anyway. With `scale` the director draws the mask stage into a pass target of that share of the
+drawing buffer and samples it up to the full picture with the texture's own filtering:
+
+```ts
+director.setMask(level, new StageMask(fogStage, {scale: 0.5})); // a quarter of the memory
+```
+
+- **The stage keeps its logical size.** Its projection, its camera and the size its listeners read
+  do not change; only the pixels it draws into are fewer. The sizes round down, to at least one
+  pixel.
+- **Hard edges show the grid.** A mask stage with hard edges draws them at the coarser grid, up to
+  a texel of it (two pixels at `0.5`) off the edge at scale 1, and a line thinner than a texel may
+  fall through the grid. A fog, a vignette or a soft blob does not show it.
+- **One stage has one scale.** The pass target belongs to the stage, so two masks on one stage
+  that ask for different scales are refused, with an error that names the stage — in `setMask()`,
+  `show()`, `push()`, `hide()` and `replace()`, before anything changes. That holds when one mask
+  replaces the other on a slot as well: take the old mask off first, then set the new one.
+
+  ```ts
+  director.setMask(level, undefined);
+  director.setMask(level, new StageMask(fogStage, {scale: 1}));
+  ```
+
+- **A `StageRenderer` as the mask stage** is drawn at the scale as well. The director sets the
+  scale on it while it draws as a mask and gives it back to `1` once the mask has left.
+- **Not a node option.** `createMaskNode()` takes `source` and `invert` alone: it builds a node,
+  and the size of a pass target is the business of whoever draws the stage.
+
 ### No hitch: `precompile()` with masks
 
 A masked slot builds its shader on the first frame as any new shape of the stack does, and
@@ -1491,12 +1685,18 @@ Against a nested pipeline that masks a layer in a pass of its own, a masked slot
 target with its depth buffer — about 100 MB at 3840 × 2160 — and a full-screen quad per masked
 layer, and one mask serves several slots.
 
+The pass target of a mask is the one that costs. At 3840 × 2160 it holds a half-float color of
+66 MB and a depth buffer of 33 MB, about 100 MB at `scale: 1`; at `scale: 0.5` the target is
+1920 × 1080 and holds about 25 MB. A mask whose edge is soft loses nothing by it, and the
+[`scale`](#a-mask-at-a-share-of-the-resolution) of a fog or a vignette is the first thing to try
+on a small device.
+
 ### Without a director
 
 `createMaskNode(content, mask, options?)` builds the node of a masked picture for a
 `buildOutputNode` of your own: `content` times the coverage of `mask`, all four channels,
 premultiplied. A source is a `TextureNode` or the `PassNode` of a `Stage2D`, as for
-`createTransitionNode()`; the options are those of the table above. The mask stage is one of the
+`createTransitionNode()`; the options are `source` and `invert` of the table above, not `scale`. The mask stage is one of the
 stages of the renderer and is drawn like every other stage.
 
 ```ts check
@@ -1739,7 +1939,7 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 | `StageRenderTargetPool` | every target back in the pool, every lent one as it comes back | — |
 | a builder of `createBloomOutputNodeBuilder()` | the bloom node it built last | the pass nodes, which belong to the stages |
 | `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects and the texture nodes of its masks; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()`, the mask stages, the `StageMask` objects an effect names |
-| `StageMask` | lets go of its stage | the stage, which stays undisposed |
+| `StageMask` | lets go of its stage, leaves its slots and ends the transitions naming it as cancelled; the stage `StageMask.inWorldOf()` built | a stage handed in, which stays undisposed; the `scene` and the world stage of `inWorldOf()` |
 | `Display` | its `WebGPURenderer` | a canvas handed in |
 
 The order of a teardown: the renderer first, then what it used.
@@ -1793,6 +1993,9 @@ pipeline.dispose();
   layer and add the glow to its color: `vec4(composed.rgb.add(glow.rgb), composed.a)`.
 - **A stage that is a layer and a mask.** A director refuses it either way round, and so does a
   second director for a mask stage; give the mask its own stage.
+- **Two scales on one mask stage.** A stage has one pass target, so a second mask on it with
+  another `scale` is refused — also as the replacement of the first on a slot. Take the old mask off
+  with `setMask(stage, undefined)`, then set the new one.
 - **Masks after `setStack()`.** It makes new slots and drops every mask: set them again.
 - **A new effect object per transition.** Each one builds a shader on its first use, and a shape
   compiled with one effect object does not match a transition with another. Make the effects once
@@ -1819,7 +2022,7 @@ pipeline.dispose();
 | `StageTransition` | one change of the stack: `state`, `progress`, `finished`, `complete()`, `cancel()`, `reverse()` |
 | `crossfade()`, `fade()`, `dipToColor()`, `wipe()`, `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()`, `matte()` | the transition effects; `matte()` is the one through a stage that lives |
 | `createTransitionNode()` | the node of an effect, for a `buildOutputNode` of your own |
-| `StageMask` | a stage bound as a mask: its picture says how much of a slot shows — `source`, `invert`; `setMask()`, `maskOf()` and the `mask` option of a `StageDirector`; `progress` and `progressNode` follow the transition whose effect names it (`masks`, `input.mask()`) |
+| `StageMask` | a stage bound as a mask: its picture says how much of a slot shows — `source`, `invert`, `scale`; `StageMask.inWorldOf()` for a mask in the world of a `Stage2D`; `setMask()`, `maskOf()` and the `mask` option of a `StageDirector`; `progress` and `progressNode` follow the transition whose effect names it (`masks`, `input.mask()`) |
 | `createMaskNode()` | the node of a picture times the coverage of a mask, for a `buildOutputNode` of your own |
 | `fitIntoRectangle()` | the arithmetic of the fit, for a layout of your own; `calculateAnchorOffset()` places the result in a container |
 
