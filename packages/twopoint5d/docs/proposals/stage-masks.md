@@ -41,7 +41,7 @@ masks another stage?
 | --- | --- | --- |
 | a mask in a plain composing `StageRenderer` | both stages in one renderer, a `buildOutputNode` of one's own: `([scene, mask]) => scene.mul(mask.a)` | works; the caller writes the TSL and has to know that the passes are premultiplied |
 | a masked layer in a `StageDirector` | the layer is a `StageRenderer` of its own with a `RenderPipeline` and the `buildOutputNode` above; the director composes its output | works, and costs a pass target and a full-screen quad per masked layer on top of the targets of its two stages — at 3840 × 2160 an RGBA half-float target alone is 66 MB, its depth buffer 33 MB more |
-| one mask over two layers | — | does not work: a mask that is a stage of one nested renderer cannot be one of another, a renderer has one holder |
+| one mask over two layers | the mask stage in the nested renderer of each layer | a `StageRenderer` as the mask does not work: a renderer has one holder. A `Stage2D` does: `asPassNode()` hands every renderer that composes it the same pass node, drawn once per frame — but every one of those renderers calls its `updateFrame()`, so a mask that animates in `OnStageUpdateFrame` runs once per holder and frame, twice as fast under two |
 | a transition through a living mask | `lumaMask({mask: rt.texture})` with `rt` the `outputRenderTarget` of a `StageRenderer` hung on the display beside the director | a hack: the mask draws before the director only by the order in which both subscribed to the display; `lumaMask()` samples its mask as a mesh samples a texture (`1 - uv.y`), so a render-target texture, which the director samples at `uv`, comes out upside down; the mask stage runs on the clock of the display, not on the progress of the transition, so a `manual: true` transition never drives it; and it draws in every frame, also while no transition runs |
 | a mask through stencil | — | does not work across stages: see §6 |
 
@@ -76,8 +76,13 @@ painting or a `Canvas2DStage`-like stage, whose luminance is read in the linear 
 
 The mask stage is any stage a director takes as a layer: a `Stage2D`, a `StageRenderer` with stages
 and a pipeline of its own, a stage of one's own. Unlike an effect, a `StageMask` is no description:
-it holds a stage, and a stage has one holder. A mask serves one director at a time; a second
-director refuses it with an error that names the mask stage.
+it holds a stage, and a mask serves one director at a time; a second director refuses it with an
+error that names the mask stage. For a `StageRenderer` as the mask stage that follows from its one
+holder already. A `Stage2D` could be held twice — its pass node is shared by every renderer that
+composes it —, but not under two directors: a director wraps a `Stage2D` in a `StageRenderer` and
+draws it through `renderTo()`, not through its pass node, so two directors would draw it twice, and
+both would call its `updateFrame()`, so the mask would animate twice per frame. Within one
+director, one mask serves every slot it lies on (§3.2).
 
 `mask.stage`, `mask.source` and `mask.invert` read out what was given. `mask.progress` and
 `mask.progressNode` belong to transitions (§4.2).
@@ -248,16 +253,21 @@ The shape of §7.1 of the transitions proposal lists the slot kinds; a mask adds
 
 - per slot, whether it is masked and by which of the distinct masks of the shape, counted by first
   appearance from the bottom;
-- per distinct mask, its `source` and `invert`, which are in the shader.
+- per distinct mask, its `source` and `invert`, which are in the shader, and the index of its
+  **stage** among the distinct mask stages of the shape, counted the same way.
 
-Two different `StageMask` objects with the same options in the same places are one shape: the
-second swaps a texture and builds nothing — more forgiving than the effects, which go by object,
-and possible because a mask has no graph of its own. The masks an effect names count among the
-distinct masks of the shape.
+A shape has **one texture node per distinct mask stage**, shared by every mask on that stage, every
+slot and every effect that samples it. The rule of §7.1 of the transitions proposal that no two
+texture nodes of a graph sample one texture holds the other way round here: one stage, one node,
+one binding. The index of the stage is what keeps the cache honest: a red and a green mask on one
+stage and a red and a green mask on two stages have the same masks and options in the same places,
+and only the stage index tells the graph of one texture node from the graph of two — reused for the
+other pattern, the first would bind two pictures to one node.
 
-A shape has **one texture node per distinct mask stage**, shared by every slot and every effect
-that samples it. The rule of §7.1 that no two texture nodes of a graph sample one texture holds the
-other way round here: one mask, one node, one binding.
+Two different `StageMask` objects with the same options on stages in the same pattern are one
+shape: the second swaps a texture and builds nothing — more forgiving than the effects, which go by
+object, and possible because a mask has no graph of its own. The masks an effect names count among
+the distinct masks of the shape, their stages among its distinct stages.
 
 `precompile()` takes masked slots in its shapes and mask stages in its `layers`:
 
@@ -341,13 +351,23 @@ an optimisation, not a mechanism, and it belongs after measurements (§12, phase
   the texture mask on top of it.
 - **A scissor of the mask's bounds.** Cheaper still, and possible under a composing pipeline: a mask
   that knows its rectangle on the screen lets its slot's layer draw inside that rectangle alone.
-- **Stencil inside one stage.** A mask stage may use stencil itself to build its shape — portal
-  frames, clipped UI panels —, on a renderer with `rendererOptions: {stencil: true}` and in the
-  layers mode of its own renderer. That is a recipe of the guide, orthogonal to this proposal.
+- **Stencil inside one stage.** A mask stage could use stencil itself to build its shape — portal
+  frames, clipped UI panels — in the layers mode of its own renderer, but not with the targets as
+  they are. `rendererOptions: {stencil: true}` gives the canvas a stencil buffer, and only the
+  canvas: a renderer straight on the display stencils, a layer or a mask under a director does not.
+  The director, as every parent that composes, draws a child into the child's pass target — a
+  child in the layers mode too —, and `StageRendererTargets` builds that target without
+  `stencilBuffer`. A stencil inside a mask stage needs a pass target with one first: an option per
+  renderer, `passTargetStencil: true`, which `StageRendererTargets` hands to the `RenderTarget` it
+  builds and changes on the target it has. That seam comes with phase D (§12); until then stencil
+  inside a stage is a recipe for a renderer that draws to the canvas, orthogonal to this
+  proposal.
 
 The guide gains one sentence either way: the `stencil` of a `ClearStage` takes effect only on a
-display whose renderer has a stencil buffer, `rendererOptions: {stencil: true}`, and only in the
-modes that draw into one target.
+display whose renderer has a stencil buffer, `rendererOptions: {stencil: true}`, only in the modes
+that draw into one target, and only in a renderer that draws to the canvas or to an
+`outputRenderTarget` with a stencil buffer — not in the pass target a composing parent draws it
+into.
 
 ## 7. Masks in 3D
 
@@ -372,10 +392,24 @@ director.setMask(level, flashlight);
 ```
 
 `StageMask.inWorldOf(stage, scene, options?)` builds a mask stage of its own that draws `scene`
-through `stage.camera`, takes the size of the director as every mask does, and follows a new camera
-of `stage` through `OnStageAfterCameraChanged`. The stage built is the director's and goes with the
-mask's last use; `scene` stays the caller's. `stage` has to be a `Stage2D` — the camera of a
-`StageRenderer` is not one camera.
+through `stage.camera` and takes the size of the director as every mask does. `stage` has to be a
+`Stage2D` — the camera of a `StageRenderer` is not one camera.
+
+- **No subscription.** The mask stage reads `stage.camera` at every draw instead of following
+  `OnStageAfterCameraChanged`: a new camera of the world is the camera of the next frame, and a
+  mask that is never attached holds no listener that would need a cleanup. While `stage` has no
+  camera — before its first resize, after its `dispose()` — the mask draws nothing, a coverage of
+  0.
+- **The mask owns the stage it built.** It is no stage of the caller's that the director could let
+  go of, and none of the director's that it could dispose: the director treats it as every mask
+  stage of the caller — it wraps it, joins and releases it with its uses, disposes the wrapper and
+  releases its pass memory when the last use ends (§3.4), and never disposes the stage itself. The
+  mask goes back into a slot or a `matte()` as often as the caller likes.
+- **`mask.dispose()`** disposes the stage `inWorldOf()` built; for a mask on a stage of the
+  caller's it lets go of the stage and disposes nothing. A disposed mask is refused by
+  `setMask()`, `show()`, `push()` and every transition whose effect names it; disposed while a slot
+  uses it, it leaves that slot as a disposed mask stage does (§9).
+- `scene` stays the caller's.
 
 Under a `ParallaxProjection` the mask has the depth effect of the world: a portal disc at `z = 50`
 grows as the camera comes closer, and the second world shows through it at exactly the size of its
@@ -562,10 +596,10 @@ Following [the resource lifecycle rules](../resource-lifecycle.md):
 
 | what | whose | disposed by |
 | --- | --- | --- |
-| a `StageMask` and its uniform | the caller | nothing to dispose: a uniform owns no GPU memory |
+| a `StageMask` and its uniform | the caller | `StageMask#dispose()`, which disposes the stage of `inWorldOf()` and nothing else: a uniform owns no GPU memory, a stage handed in stays the caller's |
 | the stage of a mask handed in | the caller | the caller; the director only lets go |
 | the wrapper `StageRenderer` of a mask stage that is no renderer | the director | the director, when the mask has no use left, and in `dispose()` |
-| the stage of `StageMask.inWorldOf()` | the director that uses the mask | as a wrapper; the scene stays the caller's |
+| the stage of `StageMask.inWorldOf()` | the mask | `StageMask#dispose()`; a director wraps and releases it as any mask stage, and disposes it never; the scene stays the caller's |
 | the texture nodes of masks in the graphs | the director | `dispose()` |
 | a `RevealMap` and its texture | the caller | `RevealMap#dispose()` |
 
@@ -584,8 +618,13 @@ leaves the stack; a transition whose effect names it ends as cancelled.
 - the lifecycle of §3.4 and §4.1: a mask stage joins and leaves the stages of the director with its
   uses, its pass memory released, a wrapper built and disposed, a frozen mask drawn once and again
   after a resize, a mask stage disposed while in use;
-- the shape keys of §4.4: two masks with the same options in the same places answer the same output
-  node, one mask on two slots builds one texture node;
+- the shape keys of §4.4: two masks with the same options on stages in the same pattern answer
+  the same output node, one mask on two slots builds one texture node, two masks on one stage and
+  two masks on two stages with the same options are two shapes;
+- `StageMask.inWorldOf()`: the camera read at the draw, a coverage of 0 without one, the mask in a
+  slot again after it left one and in a second `matte()` after the first ended, its stage disposed
+  by `mask.dispose()` alone, a disposed mask refused;
+- a second director refuses a mask the first holds, a `Stage2D` mask stage included;
 - the progress of §4.2: written before the mask stage's `updateFrame()`, the eased value, under
   `manual: true`, a second transition on a busy mask refused;
 - `matte()`: both modes, both ends held whatever the mask draws;
@@ -632,7 +671,7 @@ leaves the stack; a transition whose effect names it ends as cancelled.
 | A | `createMaskNode()`; `StageMask` with `source`, `invert`; `setMask()`, `maskOf()`, the `mask` option, run and freeze of masks, the masks in the shape cache and in `precompile()`; the tests of §10 for these; the guide section; the demo `stage-masks` |
 | B | `masks` and `input.mask()` in the effect contract, `mask.progress` and `progressNode`, `matte()` in both modes; the gallery |
 | C | `StageMask.inWorldOf()` (§7.2); a mask target at a share of the resolution — a `scale` of `0.5` takes the RGBA half-float target of a mask at 3840 × 2160 from 66 MB to 17 MB — through a seam in `StageRendererTargets` for the size of a pass target |
-| D — idea, not scheduled | depth-aware masks (§7.3); the stencil pre-pass and the scissor of §6.2, each after a measurement of the fill cost it would save |
+| D — idea, not scheduled | depth-aware masks (§7.3); the stencil pre-pass and the scissor of §6.2, each after a measurement of the fill cost it would save; `passTargetStencil` for a stencil inside a layer or a mask stage (§6.2) |
 | E | `RevealMap` and `fogCoverage()` (§8.1, §8.2) with their tests, a section in [`docs/map2d.md`](../map2d.md) and the demo `fog-of-war-dungeon` with the fog planes; independent of A to C and the first to build for a fog. The variants of §8.3 and §8.4 follow A and C |
 
 ## 13. Open questions
