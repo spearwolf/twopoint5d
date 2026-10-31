@@ -112,7 +112,7 @@ the mesh with it, whether a later pick lists it or not:
   graph, the frame, the uv stages, the color source and every color stage are the sprite's own: the
   alpha that reaches the alpha test is the sprite's alpha, `Fade`, `Tint` and all.
 - **Then the id.** three's `outputNode` takes the place of the fragment's output after the color
-  node, the opacity and the alpha test have run (`NodeMaterial#setup()`, three 0.186.1): a fragment
+  node, the opacity and the alpha test have run (`NodeMaterial#setup()`, three 0.187.0): a fragment
   the alpha test drops is dropped here too, and what survives writes
   `vec4(instanceIndex + 1, meshNumber, 0, 1)`. Nothing after it — no color stage, no
   `ColorOrder.Pass` stage, no fog, no premultiplied alpha — can change the id. `instanceIndex`
@@ -182,7 +182,7 @@ A camera of the picker's own (a three `Camera`) draws one pixel:
   getter and sets it inside `render()`. Under a reversed depth buffer and a camera without reversed
   depth, the picker turns the projection over itself — three's reversed projection is the plain one
   with its depth row turned, `z' = w − z` from the 0 … 1 of WebGPU and `z' = (w − z)/2` from the
-  −1 … 1 of WebGL (three 0.186.1, `Matrix4#makePerspective()` and `#makeOrthographic()`); a camera
+  −1 … 1 of WebGL (three 0.187.0, `Matrix4#makePerspective()` and `#makeOrthographic()`); a camera
   three has drawn with is reversed already and taken as it is. The picker's camera takes the
   `coordinateSystem` of the renderer; under a reversed depth buffer the renderer marks it reversed
   and calls its `updateProjectionMatrix()`, which does nothing — the projection is the one handed
@@ -194,15 +194,18 @@ A camera of the picker's own (a three `Camera`) draws one pixel:
 ### 3.4 The target
 
 A `RenderTarget` of 1 × 1, `FloatType`, RGBA, with a depth buffer, built at the first pick. **Float,
-not integer**: three 0.186.1 renders into an integer target under WebGPU (`getOutputType()` answers
-`uvec4` for `UnsignedIntType`), but its WebGL 2 backend reads none back —
-`WebGLTextureUtils#_getBytesPerTexel()` knows `RGBA`, `RGB` and `ALPHA` and answers `undefined` for
-`RGBA_INTEGER`, so `readRenderTargetPixelsAsync()` sizes its buffer `NaN`. A float holds every whole
-number up to 2²⁴ exactly — sixteen million sprites per mesh and as many meshes in a list; a mesh of
-more sprites is refused before the draw (§5), since two of its slots would read back as one — and is
-read back as `Float32Array` under both backends (`EXT_color_buffer_float`, which three's WebGL 2
-backend enables). No blending, and a target is no output target: three applies neither tone mapping
-nor the output color space to it (`Renderer#currentToneMapping`, `#currentColorSpace`).
+not integer**: a float holds every whole number up to 2²⁴ exactly — sixteen million sprites per mesh
+and as many meshes in a list; a mesh of more sprites is refused before the draw (§5), since two of
+its slots would read back as one — and is read back as `Float32Array` under both backends
+(`EXT_color_buffer_float`, which three's WebGL 2 backend enables). three 0.187.0 reads an integer
+target back under both backends as well, under WebGL 2 as RGBA with 32-bit components alone:
+`WebGLTextureUtils#copyTextureToBuffer()` hands the format and the type of the texture on to
+`readPixels()`, and WebGL 2 guarantees an unsigned integer target no other combination. Such a
+target would raise the bound of §5 to 2³² − 1, and the id every pick material writes would become a
+`uvec4` (`NodeBuilder#getOutputType()` answers `uvec4` for an `UnsignedIntType` target). The picker
+keeps the float target, which reaches 2²⁴ under both backends as it is. No blending, and a target is
+no output target: three applies neither tone mapping nor the output color space to it
+(`Renderer#currentToneMapping`, `#currentColorSpace`).
 
 ### 3.5 One pick
 

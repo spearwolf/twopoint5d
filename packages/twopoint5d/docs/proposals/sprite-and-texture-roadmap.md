@@ -449,9 +449,9 @@ const hit = await picker.pick(camera, pointerNdc, [enemies, items]);
   sprite's own, and a last step *after* the color stages replaces the result with the id:
   `instanceIndex + 1` and an id of the mesh. Written there, no `Tint` or `Flash` can change it.
   Built like a pass, cached per mesh.
-- The target holds the id exactly: a float render target — WebGL 2 reads no integer target back — no
-  blending, no tone mapping, no output color space transform — any of them would turn an id into
-  another id.
+- The target holds the id exactly: a float render target (why float, not integer:
+  [`gpu-picking.md`](gpu-picking.md) §3.4), no blending, no tone mapping, no output color space
+  transform — any of them would turn an id into another id.
 - **Pixel-perfect for free**: the texels the alpha test drops are dropped here too, so a click
   into the transparent corner of a frame picks what lies behind it.
 - **Asynchronous**: `readRenderTargetPixelsAsync()`, one frame of latency. Fine for clicks;

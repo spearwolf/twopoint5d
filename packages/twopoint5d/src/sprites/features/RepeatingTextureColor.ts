@@ -59,10 +59,11 @@ export const RepeatingTextureColor = defineFeature({
     return sampleFrameAt(
       (st, gradX, gradY) => {
         const lookup = asTextureNode(sample('colorMap', st));
-        // three reads a texture whose filters are both NearestFilter with textureLoad and binds no
-        // sampler for it, and a grad() fails on WebGPU; that test is part of the shape of a texture,
-        // so a texture swapped in without a rebuild passes it alike. Every other texture takes the
-        // gradients — on one without mipmaps they sample what a plain lookup samples
+        // a texture whose filters are both NearestFilter reads level 0 alone, so gradients change
+        // nothing there: under WebGPU three reads it with textureLoad, and its grad() takes the same
+        // lookup (WGSLNodeBuilder#generateTextureGrad() of three 0.187.0). That test is part of the
+        // shape of a texture, so a texture swapped in without a rebuild passes it alike. Every other
+        // texture takes the gradients — on one without mipmaps they sample what a plain lookup samples
         const {minFilter, magFilter} = lookup.value;
         return minFilter === NearestFilter && magFilter === NearestFilter ? lookup : lookup.grad(gradX, gradY);
       },

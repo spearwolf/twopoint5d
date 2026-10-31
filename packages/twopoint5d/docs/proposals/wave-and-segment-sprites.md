@@ -413,8 +413,8 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
   `RepeatingTextureColor` cannot: a texture of the same kind swaps in without a rebuild
   (`textureShapeKey()`), and the key tells `LinearFilter` from `LinearMipmapLinearFilter` no more
   than three needs it to. It reads the one filter test the key holds — both filters `NearestFilter`,
-  which three reads with `textureLoad` and no sampler, where a `.grad()` fails on WebGPU — and takes
-  gradients for every other texture. Gradients on a texture without mipmaps sample what a plain
+  which read level 0 alone, so that gradients change nothing there — and takes gradients for every
+  other texture. Gradients on a texture without mipmaps sample what a plain
   sample samples. So a mipmapped frame repeats without a seam of the smallest mip level at its
   wraps, after any swap.
 - **The lookup** goes through `ctx.sample()`, so the material registers it and hands it a new

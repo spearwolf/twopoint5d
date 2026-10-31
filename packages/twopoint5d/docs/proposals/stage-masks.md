@@ -710,7 +710,7 @@ transition and the fog of the game are one look.
 | §8.3, a parchment below | 1 mask target | as above |
 | §8.4, three states | 3 mask targets, or 1 with the masks in three channels of one stage | as above, and the sight blobs |
 
-The texture goes up whole: `Texture#updateRanges` of three.js 0.186 is read by the classic
+The texture goes up whole: `Texture#updateRanges` of three.js 0.187 is read by the classic
 `WebGLRenderer` alone, and the `WebGPURenderer` uploads a texture whole under both of its backends. At
 1024 × 1024 cells that is 1 MB in every frame in which a cell fades — still cheap, but a reason to
 keep the cells as coarse as the look allows (§13).

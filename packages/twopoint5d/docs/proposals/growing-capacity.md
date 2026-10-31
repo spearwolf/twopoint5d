@@ -70,7 +70,7 @@ built with `grow: true`:
 3. **The meshes follow**: `this.geometry` and the geometry of every pass mesh become the new one.
    The materials, their uniforms, textures and bindings are untouched — they never held the
    geometry. three's render objects see a geometry of another id on the next frame and collect its
-   attributes anew (`RenderObject#needsGeometryUpdate`, three 0.186.1), so nothing in the scene
+   attributes anew (`RenderObject#needsGeometryUpdate`, three 0.187.0), so nothing in the scene
    graph has to be told.
 4. **The old geometry is disposed** — it was built by the mesh, so it is the mesh's to release
    (`docs/resource-lifecycle.md` §1). Its pool goes with it, empty: `adoptVOs()` took every handle,

@@ -7,10 +7,7 @@ collected in §9. Deviations of the build from the first draft of this spec, whi
 below now state as built:
 
 - the sample takes explicit gradients for a `minFilter` that reads mipmaps, under every wrap, and
-  for no other filter (§4.2): gradients matter nowhere else, and three (r186) reads a texture whose
-  filters are both `NearestFilter` with `textureLoad` and binds no sampler for it, while its WGSL
-  builder still names that sampler in the `textureSampleGrad` of a `grad()` — the shader fails on
-  WebGPU;
+  for no other filter (§4.2): gradients matter nowhere else;
 - `wrap` takes a pair `[u, v]` as well, one wrap per axis (§4.1): a frame repeated around a
   cylinder — the skyline of the lookbook demo `atlas-frames-on-meshes`, and of the game the issue
   came from — repeats in u and has to hold its top and bottom edges in v, where a `fract()` of 1 at
@@ -234,8 +231,7 @@ wrap — a visible seam. When the `minFilter` of `map` reads mipmaps
 `texture(…).grad(dx, dy)`, worked out from the derivatives of the uv *before* the wrap, scaled by
 the extent of the frame — of the trimmed area under `'mask'` — and swapped like the lookup. The
 filter is read when the graph is built; a filter changed afterwards takes a new graph. Without
-mipmaps the sample takes no gradients: none are needed, and three reads a texture whose filters
-are both `NearestFilter` with `textureLoad`, without the sampler a `grad()` names.
+mipmaps the sample takes no gradients: none are needed.
 
 That removes the seam. It does not stop the smaller mip levels of an atlas from mixing
 neighbouring frames; an atlas sampled with mipmaps needs padding or extruded edges from its
