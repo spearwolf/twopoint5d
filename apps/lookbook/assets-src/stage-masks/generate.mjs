@@ -4,6 +4,7 @@
 import {generate as foundFootage} from './found-footage/footage.mjs';
 import {generate as frozen} from './frozen/frozen.mjs';
 import {generate as matteInk} from './matte-ink/matte-ink.mjs';
+import {generate as matteThreshold} from './matte-threshold/matte-threshold.mjs';
 import {generate as rift} from './rift/rift.mjs';
 import {generate as spotlight} from './spotlight/spotlight.mjs';
 import {generate as withoutDirector} from './without-director/wallpaper.mjs';
@@ -18,4 +19,5 @@ export async function generate(out) {
   await foundFootage(out);
   await frozen(out);
   await matteInk(out);
+  await matteThreshold(out);
 }
