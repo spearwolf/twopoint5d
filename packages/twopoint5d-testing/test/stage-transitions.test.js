@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {
   Display,
   OrthographicProjection,
@@ -12,7 +12,16 @@ import {
   wipe,
 } from '@spearwolf/twopoint5d';
 import {CanvasTexture, Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget} from 'three/webgpu';
-import {disposeDisplay, disposeKept, isNearColor, keep, makeContainer, readsTopDown, rgbAt} from './helpers/fixtures.js';
+import {
+  countNodeBuilds,
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeContainer,
+  readsTopDown,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 // 64 pixels wide: rgbAt() reads the rows at that length
 const SIZE = 64;
@@ -40,26 +49,6 @@ describe('StageDirector — transitions on the GPU', () => {
     const material = keep(new MeshBasicMaterial({color: new Color(color), transparent: opacity < 1, opacity}));
     stage.scene.add(new Mesh(keep(new PlaneGeometry(SIZE, SIZE)), material));
     return {stage, material};
-  }
-
-  /** Counts the node builders the backend creates — one per shader build of a render object — until `stop()`. */
-  function countNodeBuilds() {
-    // createNodeBuilder() is left out of the public types of three.js
-    const backend = /** @type {{createNodeBuilder: (...args: unknown[]) => unknown}} */ (
-      /** @type {unknown} */ (display.renderer.backend)
-    );
-    const createNodeBuilder = backend.createNodeBuilder;
-    const counter = {
-      count: 0,
-      stop: () => {
-        backend.createNodeBuilder = createNodeBuilder;
-      },
-    };
-    backend.createNodeBuilder = function (...args) {
-      counter.count++;
-      return createNodeBuilder.apply(this, args);
-    };
-    return counter;
   }
 
   async function draw() {
@@ -231,7 +220,7 @@ describe('StageDirector — transitions on the GPU', () => {
     await director.precompile(display.renderer, [[effect]]);
     expect(Object.hasOwn(display.renderer, 'render'), 'the renderer draws as before').to.be.false;
 
-    const builds = countNodeBuilds();
+    const builds = await countNodeBuilds(display.renderer);
     try {
       const t = director.replace(red.stage, green.stage, {effect, manual: true});
       t.progress = 0.5;
@@ -251,7 +240,7 @@ describe('StageDirector — transitions on the GPU', () => {
 
     const effect = crossfade();
     await director.precompile(display.renderer, [[effect]], {layers: [green.stage]});
-    const builds = countNodeBuilds();
+    const builds = await countNodeBuilds(display.renderer);
     try {
       const t = director.replace(red.stage, green.stage, {effect, manual: true});
       t.progress = 1;
@@ -271,7 +260,7 @@ describe('StageDirector — transitions on the GPU', () => {
 
     const effect = crossfade();
     await inner.precompile(display.renderer, [[effect]], {layers: [green.stage]});
-    const builds = countNodeBuilds();
+    const builds = await countNodeBuilds(display.renderer);
     try {
       const t = inner.replace(red.stage, green.stage, {effect, manual: true});
       t.progress = 0.5;

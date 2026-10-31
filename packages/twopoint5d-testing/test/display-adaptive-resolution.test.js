@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display} from '@spearwolf/twopoint5d';
 import {Scene} from 'three/webgpu';
 import {disposeDisplay, makeCamera, makeContainer} from './helpers/fixtures.js';

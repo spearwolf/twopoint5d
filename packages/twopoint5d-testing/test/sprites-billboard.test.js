@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {BillboardPlacement, Display, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {Group, OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {coveredBox, disposeDisplay, disposeKept, keep, makeContainer, renderToPixels} from './helpers/fixtures.js';

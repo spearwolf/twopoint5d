@@ -1,5 +1,5 @@
 import {emit, on} from '@spearwolf/eventize';
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
 import {pointer, key, makeState} from './helpers/fixtures.js';
 

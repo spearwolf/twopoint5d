@@ -1,5 +1,5 @@
 /** @import {Texture} from 'three/webgpu' */
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {

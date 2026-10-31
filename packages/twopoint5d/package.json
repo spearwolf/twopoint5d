@@ -58,6 +58,18 @@
     "lintPkg": "pnpm exec publint dist && node ../../scripts/checkPeerDependenciesOnly.mjs dist",
     "publishNpmPkg": "pnpm run checkPkgTypes && pnpm run lintPkg && pnpm run checkNameableTypes && node ../../scripts/publishNpmPkg.mjs dist"
   },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@types/node": "catalog:",
+    "@types/sinon": "^22.0.2",
+    "@types/three": "catalog:",
+    "@vitest/coverage-v8": "^5.0.5",
+    "publint": "^0.3.25",
+    "rimraf": "catalog:",
+    "sinon": "^22.1.0",
+    "typescript": "catalog:",
+    "vitest": "^5.0.5"
+  },
   "peerDependencies": {
     "@spearwolf/eventize": "catalog:",
     "@spearwolf/signalize": "catalog:",

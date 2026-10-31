@@ -1,5 +1,5 @@
 import {on} from '@spearwolf/eventize';
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display, OnDisplayError} from '@spearwolf/twopoint5d';
 import {WebGPURenderer} from 'three/webgpu';
 import {disposeDisplay, makeContainer, makeIframeDocument} from './helpers/fixtures.js';

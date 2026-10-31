@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display} from '@spearwolf/twopoint5d';
 import {sendMouse} from '@web/test-runner-commands';
 import {disposeDisplay, makeContainer} from './helpers/fixtures.js';
@@ -43,9 +43,10 @@ describe('Display#fullscreen', () => {
   });
 
   describe('native', () => {
-    beforeEach(function () {
-      // a headless engine without the Fullscreen API has nothing to test here
-      if (!document.fullscreenEnabled) this.skip();
+    beforeEach(() => {
+      // every launcher of web-test-runner.config.js offers the Fullscreen API, and one that does
+      // not fails here instead of passing the native path by unseen
+      expect(document.fullscreenEnabled, 'document.fullscreenEnabled under this launcher').to.equal(true);
     });
 
     it('a click requests fullscreen on the default target, the host element', async () => {

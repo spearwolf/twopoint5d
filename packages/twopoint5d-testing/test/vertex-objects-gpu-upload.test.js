@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute, float, vec3} from 'three/tsl';
 import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, RenderTarget, Scene} from 'three/webgpu';

@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Canvas2DStage, Display} from '@spearwolf/twopoint5d';
 import {RenderTarget} from 'three/webgpu';
 import {makeContainer, disposeDisplay, isNearColor, rgbAt} from './helpers/fixtures.js';

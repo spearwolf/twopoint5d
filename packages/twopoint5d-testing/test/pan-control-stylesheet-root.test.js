@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
 
 // the rules of the cursor style `cursor` in the stylesheet of `root`: the class name

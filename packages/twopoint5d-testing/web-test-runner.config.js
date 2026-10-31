@@ -1,3 +1,4 @@
+import path from 'node:path';
 import {esbuildPlugin} from '@web/dev-server-esbuild';
 import {defaultReporter} from '@web/test-runner';
 import {playwrightLauncher} from '@web/test-runner-playwright';
@@ -80,70 +81,145 @@ function takeExpectedRejections() {
  */
 const WEBGL2_FALLBACK_WARNING = 'THREE.WebGPURenderer: WebGPU is not available, running under WebGL2 backend.';
 
+// A file belongs here when none of its tests renders, reads a pixel back or asserts anything about
+// the renderer or its backend. A `Display` it builds still initializes its renderer under the
+// backend of the launcher (the constructor calls `renderer.init()`), but serves the test as an
+// element with a size. Such a file runs once per engine: Chromium under WebGPU — the launcher that
+// leaves a page as a user's Chromium has it —, Firefox and WebKit.
+const RENDERER_FREE_FILES = [
+  'test/display-fullscreen.test.js',
+  'test/harness-rejections.test.js',
+  'test/pan-control-cursor.test.js',
+  'test/pan-control-dispose.test.js',
+  'test/pan-control-input.test.js',
+  'test/pan-control-keys.test.js',
+  'test/pan-control-pointer-target.test.js',
+  'test/pan-control-stylesheet-root.test.js',
+  'test/pan-control-switch-off.test.js',
+  'test/stylesheets.test.js',
+  'test/texture-store-on.test.js',
+];
+
+// The launchers are built once and shared by name: the runner starts a launcher once however many
+// groups list the same object.
+const chromiumWebGPU = backendLauncher('chromium', 'WebGPU', {
+  // the first two flags as for Chromium WebGL2 below, for the heap samples.
+  // --enable-unsafe-webgpu: headless Chromium offers no adapter without it.
+  // --use-webgpu-adapter=swiftshader: the software adapter Chromium ships, so a machine
+  // without a GPU — the CI runner — renders as a developer's machine does.
+  // --use-angle=swiftshader, --enable-features=Vulkan, --use-vulkan=swiftshader: the
+  // compositor has to run on SwiftShader as well, on Linux through Vulkan. Otherwise it
+  // cannot take the canvas texture of a SwiftShader device: the first getCurrentTexture()
+  // comes back invalid, and Dawn drops the instance — every device of the page is lost
+  // ("A valid external Instance reference no longer exists"). macOS needs the first of the
+  // three, Linux all of them.
+  // --disable-accelerated-2d-canvas: on macOS a 2D canvas still draws on the GPU, and
+  // copyExternalImageToTexture() cannot take its texture into a SwiftShader device — every
+  // upload of a CanvasTexture fails as "CopyTextureForBrowser from [Invalid Texture]" and the
+  // texture stays black. Drawn in software, the canvas copies on every platform.
+  args: [
+    '--enable-precise-memory-info',
+    '--js-flags=--expose-gc',
+    '--enable-unsafe-webgpu',
+    '--use-webgpu-adapter=swiftshader',
+    '--use-angle=swiftshader',
+    '--enable-features=Vulkan',
+    '--use-vulkan=swiftshader',
+    '--disable-accelerated-2d-canvas',
+  ],
+});
+
+const chromiumWebGL2 = backendLauncher('chromium', 'WebGL2', {
+  // --enable-precise-memory-info: without it, performance.memory.usedJSHeapSize is
+  // quantized to a fixed bucket and never moves. --js-flags=--expose-gc: without it,
+  // there is no way to force a GC before a heap sample, so samples aren't comparable.
+  args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'],
+});
+
+const firefoxWebGL2 = backendLauncher('firefox', 'WebGL2', {
+  headless: true,
+  firefoxUserPrefs: {
+    // Firefox probes the GL driver in a child process (glxtest) at startup and waits at most
+    // 4 seconds for it. On a loaded CI runner with cold caches, llvmpipe can miss that window;
+    // Firefox then treats GL as blocked for the whole session and every getContext('webgl2')
+    // returns null ("AllowWebgl2:false restricts context creation on this system").
+    // force-enabled skips that gate and creates the context through the driver directly.
+    'webgl.force-enabled': true,
+  },
+});
+
+// WebKit, the engine of Safari. Playwright 1.63.0 ships WebKit 26.6, whose pages have no
+// navigator.gpu (measured on macOS), so it renders under WebGL 2; it needs no flags.
+const webkitWebGL2 = backendLauncher('webkit', 'WebGL2', {});
+
+/**
+ * Lists every skipped test at the end of a run, by launcher — on CI as well, where the progress
+ * report and its count are off — so a test that skips where it ought to run shows in the log of a
+ * green run.
+ *
+ * @returns {import('@web/test-runner').Reporter}
+ */
+function skippedTestsReporter() {
+  /**
+   * @param {import('@web/test-runner').TestSuiteResult} suite
+   * @param {string[]} trail the file and the suites around `suite`
+   * @param {string[]} found
+   */
+  function collect(suite, trail, found) {
+    const here = suite.name ? [...trail, suite.name] : trail;
+    for (const test of suite.tests) {
+      if (test.skipped === true) found.push([...here, test.name].join(' › '));
+    }
+    for (const child of suite.suites) collect(child, here, found);
+  }
+
+  return {
+    stop({sessions}) {
+      /** @type {Map<string, string[]>} */
+      const byLauncher = new Map();
+      for (const session of sessions) {
+        const name = session.browser.name;
+        const skipped = byLauncher.get(name) ?? [];
+        byLauncher.set(name, skipped);
+        // undefined when the file did not load
+        if (session.testResults === undefined) continue;
+        const file = path.relative(process.cwd(), session.testFile);
+        const found = [];
+        collect(session.testResults, [file], found);
+        skipped.push(...found);
+      }
+      const lines = ['Skipped tests:'];
+      for (const [name, skipped] of [...byLauncher].sort(([a], [b]) => a.localeCompare(b))) {
+        lines.push(`  ${name}: ${skipped.length}`);
+        for (const test of skipped.sort()) lines.push(`    ${test}`);
+      }
+      // biome-ignore lint/suspicious/noConsole: a reporter writes to the log of the run
+      console.log(lines.join('\n'));
+    },
+  };
+}
+
 export default {
   nodeResolve: true,
   // in a monorepo you need to set set the root dir to resolve modules
   rootDir: '../../',
-  files: 'test/**/*.test.js',
+  files: ['test/**/*.test.js', ...RENDERER_FREE_FILES.map((file) => `!${file}`)],
   // The progress report is the only sign of life in a run of two minutes and more: under Nx the
   // runner has no terminal of its own and prints it as a static block every 10 seconds. On CI
   // (`CI` is set by GitHub Actions) those blocks would only lengthen the log.
-  reporters: [defaultReporter({reportTestResults: true, reportTestProgress: !process.env.CI})],
+  reporters: [defaultReporter({reportTestResults: true, reportTestProgress: !process.env.CI}), skippedTestsReporter()],
   filterBrowserLogs: ({type, args}) => !(type === 'warn' && args[0] === WEBGL2_FALLBACK_WARNING),
   plugins: [esbuildPlugin({target: 'auto'})],
-  // Every test file runs under both backends of three's WebGPURenderer. Which one a browser
-  // would pick on its own depends on the machine — headless Chromium has no WebGPU without a
-  // flag, headless Firefox has no adapter at all, and Playwright's WebKit offers no
-  // navigator.gpu — so WebKit runs under WebGL 2 alone, and each launcher pins its backend and
-  // renderer-backend.test.js fails when three ends up on another one.
-  browsers: [
-    backendLauncher('chromium', 'WebGPU', {
-      // the first two flags as for Chromium WebGL2 below, for the heap samples.
-      // --enable-unsafe-webgpu: headless Chromium offers no adapter without it.
-      // --use-webgpu-adapter=swiftshader: the software adapter Chromium ships, so a machine
-      // without a GPU — the CI runner — renders as a developer's machine does.
-      // --use-angle=swiftshader, --enable-features=Vulkan, --use-vulkan=swiftshader: the
-      // compositor has to run on SwiftShader as well, on Linux through Vulkan. Otherwise it
-      // cannot take the canvas texture of a SwiftShader device: the first getCurrentTexture()
-      // comes back invalid, and Dawn drops the instance — every device of the page is lost
-      // ("A valid external Instance reference no longer exists"). macOS needs the first of the
-      // three, Linux all of them.
-      // --disable-accelerated-2d-canvas: on macOS a 2D canvas still draws on the GPU, and
-      // copyExternalImageToTexture() cannot take its texture into a SwiftShader device — every
-      // upload of a CanvasTexture fails as "CopyTextureForBrowser from [Invalid Texture]" and the
-      // texture stays black. Drawn in software, the canvas copies on every platform.
-      args: [
-        '--enable-precise-memory-info',
-        '--js-flags=--expose-gc',
-        '--enable-unsafe-webgpu',
-        '--use-webgpu-adapter=swiftshader',
-        '--use-angle=swiftshader',
-        '--enable-features=Vulkan',
-        '--use-vulkan=swiftshader',
-        '--disable-accelerated-2d-canvas',
-      ],
-    }),
-    backendLauncher('chromium', 'WebGL2', {
-      // --enable-precise-memory-info: without it, performance.memory.usedJSHeapSize is
-      // quantized to a fixed bucket and never moves. --js-flags=--expose-gc: without it,
-      // there is no way to force a GC before a heap sample, so samples aren't comparable.
-      args: ['--enable-precise-memory-info', '--js-flags=--expose-gc'],
-    }),
-    backendLauncher('firefox', 'WebGL2', {
-      headless: true,
-      firefoxUserPrefs: {
-        // Firefox probes the GL driver in a child process (glxtest) at startup and waits at most
-        // 4 seconds for it. On a loaded CI runner with cold caches, llvmpipe can miss that window;
-        // Firefox then treats GL as blocked for the whole session and every getContext('webgl2')
-        // returns null ("AllowWebgl2:false restricts context creation on this system").
-        // force-enabled skips that gate and creates the context through the driver directly.
-        'webgl.force-enabled': true,
-      },
-    }),
-    // WebKit, the engine of Safari. Playwright 1.63.0 ships WebKit 26.6, whose pages have no
-    // navigator.gpu (measured on macOS), so it renders under WebGL 2; it needs no flags.
-    backendLauncher('webkit', 'WebGL2', {}),
-  ],
+  // Every test file that starts a renderer runs under all four launchers; the files of
+  // RENDERER_FREE_FILES run under three. Which backend a browser would pick on its own depends on
+  // the machine — headless Chromium has no WebGPU without a flag, headless Firefox has no adapter
+  // at all, and Playwright's WebKit offers no navigator.gpu — so WebKit runs under WebGL 2 alone,
+  // and each launcher pins its backend and renderer-backend.test.js fails when three ends up on
+  // another one.
+  browsers: [chromiumWebGPU, chromiumWebGL2, firefoxWebGL2, webkitWebGL2],
+  // the group of the files above runs on its own browsers, the same launcher objects: the runner
+  // starts each launcher once, whatever number of groups names it
+  groups: [{name: 'renderer-free', files: RENDERER_FREE_FILES, browsers: [chromiumWebGPU, firefoxWebGL2, webkitWebGL2]}],
   testFramework: {
     config: {
       ui: 'bdd',

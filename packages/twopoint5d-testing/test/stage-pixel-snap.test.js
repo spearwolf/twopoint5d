@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display, OrthographicProjection, ParallaxProjection, Stage2D} from '@spearwolf/twopoint5d';
 import {Mesh, MeshBasicNodeMaterial, PlaneGeometry, RenderTarget} from 'three/webgpu';
 import {disposeDisplay, makeColorTexture, makeContainer, renderToPixels} from './helpers/fixtures.js';

@@ -1,5 +1,5 @@
 /** @import {InstancePositionApi, QuadSizeApi, SpriteKind} from '@spearwolf/twopoint5d' */
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {
   AxisBillboardPlacement,
   axisBillboardPlacement,

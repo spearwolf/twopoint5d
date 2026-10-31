@@ -13,7 +13,7 @@ them.
 | Path | Role |
 | --- | --- |
 | `packages/twopoint5d` | the published library `@spearwolf/twopoint5d` — almost all work happens here |
-| `packages/twopoint5d-testing` | browser integration tests, each file under WebGPU and under WebGL 2, kept out of the library so it stays Vitest-only, and the type check of the docs' marked code blocks |
+| `packages/twopoint5d-testing` | browser integration tests, each file that renders under WebGPU and under WebGL 2, kept out of the library so it stays Vitest-only, and the type check of the docs' marked code blocks |
 | `apps/lookbook` | Astro showcase and de-facto live documentation |
 | `scripts` | the Node scripts — publish pipeline, CI cache server, the checks of the repo; as an Nx project only their type check |
 
@@ -136,12 +136,20 @@ explicit instruction.
   subject; the refusals a feature's `checkKind` throws get theirs from `defineSprite()`.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
-  Bump them there, never in an individual `package.json`. They are peer dependencies of
+  Bump them there, never in an individual `package.json`. The catalog also holds every
+  tool that more than one manifest names — `typescript` (7), `rimraf`, `@types/node`,
+  `playwright` —, likewise to be raised only there. The four are peer dependencies of
   the library; `@types/three` is an optional one (only a TypeScript consumer needs it).
   The catalog range lands verbatim in the published manifest, and a 0.x minor of `three`
   breaks, so `three` stays on the tilde — and every `three` bump is a release: until the
   library publishes, a consumer on the newer `three` meets a peer conflict. The steps of a
   bump are in [monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions).
+- **Each package declares what it uses.** A workspace package lists every tool its scripts
+  call and every package its code, specs, tests and configs import — type packages
+  included — in its own `package.json`. The root lists only what the root scripts,
+  `scripts/` and the workflows call at the root. pnpm resolves an undeclared package from
+  the root's `node_modules` as long as the root has it, so a missing entry shows only in a
+  filtered install like the deploy's.
 - **Two TypeScripts.** `tsc` is TypeScript 7 — it builds the library and runs every type
   check outside the lookbook. TypeScript 7 exports no compiler API under `typescript`, so
   a script that needs one imports the classic API from `@typescript/typescript6`, never
@@ -175,8 +183,9 @@ explicit instruction.
   rules](packages/twopoint5d/docs/resource-lifecycle.md). They are binding, not
   advisory.
 - **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and `*.test.js`
-  in `packages/twopoint5d-testing/test/` (real browsers, visual, every file under WebGPU
-  and under WebGL 2). A change to rendering or GPU-buffer code needs both.
+  in `packages/twopoint5d-testing/test/` (real browsers, visual, every file that renders under WebGPU
+  and under WebGL 2; a file none of whose tests renders runs once per engine and goes into
+  `RENDERER_FREE_FILES` in `web-test-runner.config.js`). A change to rendering or GPU-buffer code needs both.
   A `hot-path-allocations.spec.ts` measures the heap bytes of a hot-path call through
   `measureSettledBytes()` in `src/testing/`: it collects what earlier tests left behind
   before the round warms up and answers the lowest of three measurements of

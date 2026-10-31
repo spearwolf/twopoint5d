@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display, getContentAreaSize, OnDisplayResize} from '@spearwolf/twopoint5d';
 import {on, off} from '@spearwolf/eventize';
 import {makeContainer, disposeDisplay} from './helpers/fixtures.js';

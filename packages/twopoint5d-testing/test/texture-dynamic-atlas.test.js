@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display, DynamicAtlas, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {disposeDisplay, isNearColor, makeContainer, readsTopDown, renderToPixels, rgbAt} from './helpers/fixtures.js';

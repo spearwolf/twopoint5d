@@ -22,11 +22,15 @@
     "three": "catalog:"
   },
   "devDependencies": {
-    "@esm-bundle/chai": "4.3.4-fix.0",
+    "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
+    "@types/three": "catalog:",
     "@web/dev-server-esbuild": "^2.0.0",
     "@web/test-runner": "^1.0.0",
     "@web/test-runner-commands": "^1.0.1",
-    "@web/test-runner-playwright": "^1.0.0"
+    "@web/test-runner-playwright": "^1.0.0",
+    "chai": "^6.3.0",
+    "playwright": "catalog:",
+    "typescript": "catalog:"
   }
 }

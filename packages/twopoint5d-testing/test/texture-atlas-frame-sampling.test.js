@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {AtlasFrameTable, Display, sampleAtlasFrame, TexturePackerJson} from '@spearwolf/twopoint5d';
 import {float, fract, int, texture as sampleTexture, uv, vec2} from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, OrthographicCamera, PlaneGeometry, RenderTarget, Scene} from 'three/webgpu';

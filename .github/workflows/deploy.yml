@@ -95,8 +95,8 @@ jobs:
           cache: pnpm
 
       - name: Install the workspace root and the library
-        # the root holds the toolchain of the build and the checks; the lookbook, the
-        # browser tests, their dependencies and their install scripts stay out
+        # the root and the library hold the toolchain of the build and the checks; the
+        # lookbook, the browser tests, their dependencies and their install scripts stay out
         run: pnpm install --frozen-lockfile --filter twopoint5d-workspace --filter @spearwolf/twopoint5d
 
       - name: Audit the installed dependencies

@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Stylesheets} from '@spearwolf/twopoint5d';
 import {makeIframeDocument} from './helpers/fixtures.js';
 

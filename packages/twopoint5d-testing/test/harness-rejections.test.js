@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {whenRejectionsReported} from './helpers/fixtures.js';
 
 // The runner writes every unhandled rejection of a page into the browser logs of the run, as

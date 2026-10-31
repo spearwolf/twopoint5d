@@ -1,5 +1,6 @@
 /** @import {Display, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
-import {expect} from '@esm-bundle/chai';
+/** @import {WebGPURenderer} from 'three/webgpu' */
+import {expect} from 'chai';
 import {
   FeatureSprites,
   Map2D,
@@ -21,6 +22,7 @@ import {
   LinearMipmapLinearFilter,
   Mesh,
   MeshBasicMaterial,
+  MeshBasicNodeMaterial,
   NearestFilter,
   OrthographicCamera,
   PerspectiveCamera,
@@ -35,7 +37,7 @@ import {
 
 /**
  * The backend this run renders under. Each browser of web-test-runner.config.js pins one before
- * the page loads, and every test file runs once per backend.
+ * the page loads, and a test file that starts a renderer runs under every one of them.
  *
  * @returns {'WebGPU' | 'WebGL2'}
  */
@@ -236,6 +238,64 @@ export async function withSilencedInfo(body) {
   } finally {
     console.info = info;
   }
+}
+
+// --- node builds ---
+
+// makes the cache key of every calibration material one three has never seen
+let probesBuilt = 0;
+
+/**
+ * Counts the node builders three creates for `renderer` until `stop()` — one per shader build of a
+ * render object or a compute node — through `renderer.debug.onNodeBuilderCreated`, which three
+ * calls at each of them. Before it counts, it has three compile a material no render object has
+ * used yet and throws when that build goes uncounted: a count of 0 then says that a frame built
+ * nothing, not that the hook went quiet.
+ *
+ * @param {WebGPURenderer} renderer
+ * @returns {Promise<{count: number, stop: () => void}>}
+ */
+export async function countNodeBuilds(renderer) {
+  const previous = renderer.debug.onNodeBuilderCreated;
+  const counter = {
+    count: 0,
+    stop: () => {
+      renderer.debug.onNodeBuilderCreated = previous;
+    },
+  };
+  /** @type {NonNullable<typeof previous>} */
+  const countAndForward = (builder, object) => {
+    counter.count++;
+    previous?.(builder, object);
+  };
+
+  // a cache key nobody has used: three finds no NodeBuilderState for it and builds one
+  const material = new MeshBasicNodeMaterial();
+  material.customProgramCacheKey = () => `countNodeBuilds probe ${++probesBuilt}`;
+  const geometry = new PlaneGeometry(1, 1);
+  const scene = new Scene();
+  scene.add(new Mesh(geometry, material));
+  const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+  camera.position.z = 1;
+
+  renderer.debug.onNodeBuilderCreated = countAndForward;
+  try {
+    // compiles without drawing and leaves the state of the renderer as it was
+    await renderer.compileAsync(scene, camera);
+  } finally {
+    renderer.debug.onNodeBuilderCreated = previous;
+    geometry.dispose();
+    material.dispose();
+  }
+  if (counter.count === 0) {
+    throw new Error(
+      'countNodeBuilds(): three compiled a material it had never seen without a call of renderer.debug.onNodeBuilderCreated, so a count of 0 would prove nothing',
+    );
+  }
+
+  counter.count = 0;
+  renderer.debug.onNodeBuilderCreated = countAndForward;
+  return counter;
 }
 
 // --- unhandled rejections ---
@@ -573,10 +633,31 @@ export function countColor(pixels, rgb) {
   return count;
 }
 
+/** Whether the pixel at byte offset `i` is brighter than the black clear color in any channel, by more than 16. */
+function isLitAt(pixels, i) {
+  return pixels[i] > 16 || pixels[i + 1] > 16 || pixels[i + 2] > 16;
+}
+
+/**
+ * How many pixels of a read-back target are lit: brighter than the black clear color in any
+ * channel, by more than 16. Independent of the order in which a backend reads the rows back.
+ *
+ * @param {ArrayLike<number>} pixels
+ * @returns {number}
+ */
+export function countLit(pixels) {
+  let lit = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (isLitAt(pixels, i)) lit++;
+  }
+  return lit;
+}
+
 /**
  * Compares two read-back targets of the same size pixel by pixel: `lit` counts the pixels of `a`
  * brighter than the clear color, `differing` the pixels where any channel differs by more than
- * `tolerance`. Independent of the order in which a backend reads the rows back.
+ * `tolerance`. Independent of the order in which a backend reads the rows back. For a count of the
+ * lit pixels without a comparison, {@link countLit} does it.
  *
  * @param {ArrayLike<number>} a
  * @param {ArrayLike<number>} b
@@ -587,7 +668,7 @@ export function diffPixels(a, b, tolerance = 2) {
   let lit = 0;
   let differing = 0;
   for (let i = 0; i < a.length; i += 4) {
-    if (a[i] > 16 || a[i + 1] > 16 || a[i + 2] > 16) lit++;
+    if (isLitAt(a, i)) lit++;
     if (
       Math.abs(a[i] - b[i]) > tolerance ||
       Math.abs(a[i + 1] - b[i + 1]) > tolerance ||

@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display} from '@spearwolf/twopoint5d';
 import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
 import {disposeDisplay, whenPageAnimates, whenReleased} from './helpers/fixtures.js';

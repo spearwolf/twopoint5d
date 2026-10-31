@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {on} from '@spearwolf/eventize';
 import {
   Display,
@@ -15,6 +15,7 @@ import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTar
 import {mix} from 'three/tsl';
 import {
   disposeDisplay,
+  countNodeBuilds,
   disposeKept,
   isNearColor,
   keep,
@@ -48,25 +49,6 @@ describe('StageDirector — masked slots on the GPU', () => {
   let target;
   /** @type {StageDirector} */
   let director;
-
-  /** Counts the node builders the backend creates until `stop()`, as stage-transitions.test.js does. */
-  function countNodeBuilds() {
-    const backend = /** @type {{createNodeBuilder: (...args: unknown[]) => unknown}} */ (
-      /** @type {unknown} */ (display.renderer.backend)
-    );
-    const createNodeBuilder = backend.createNodeBuilder;
-    const counter = {
-      count: 0,
-      stop: () => {
-        backend.createNodeBuilder = createNodeBuilder;
-      },
-    };
-    backend.createNodeBuilder = function (...args) {
-      counter.count++;
-      return createNodeBuilder.apply(this, args);
-    };
-    return counter;
-  }
 
   async function draw() {
     director.updateFrame(0, 0, 0);
@@ -249,7 +231,7 @@ describe('StageDirector — masked slots on the GPU', () => {
         shapeMask.dispose();
       }
     }
-    const builds = countNodeBuilds();
+    const builds = await countNodeBuilds(display.renderer);
     try {
       director.setMask(red.stage, new StageMask(white.stage));
       expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), redOverBlue(0.5), 3), 'the masked shape').to.be.true;

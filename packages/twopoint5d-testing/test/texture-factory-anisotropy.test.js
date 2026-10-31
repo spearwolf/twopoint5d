@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {TextureFactory} from '@spearwolf/twopoint5d';
 import {Texture, WebGPURenderer} from 'three/webgpu';
 

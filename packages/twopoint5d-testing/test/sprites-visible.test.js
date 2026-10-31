@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {
   defineSprite,
   Display,
@@ -15,6 +15,7 @@ import {
 import {OrthographicCamera, RenderTarget, Scene, Vector3} from 'three/webgpu';
 import {
   countColor,
+  countLit,
   diffPixels,
   disposeDisplay,
   disposeKept,
@@ -24,6 +25,7 @@ import {
   makeContainer,
   renderToPixels,
   rgbAt,
+  withSilencedInfo,
 } from './helpers/fixtures.js';
 
 // 8 world units across 64 pixels: one unit is 8 pixels, a sprite of 2 × 2 units 256 pixels
@@ -129,6 +131,32 @@ describe('sprites — Visible', function () {
     expect(countColor(await render(scene), [255, 0, 0]), 'the sprite in its slot').to.equal(SPRITE_PIXELS);
   });
 
+  it('a sprite hidden before its pool grows stays hidden after the growth, and shown again it is drawn', async function () {
+    const {sprites, all, scene} = makeSprites([[-2, 0, 0]], {grow: true});
+    const [first] = all;
+    first.visible = 0;
+    sprites.spritePool.touchVO(first, 'visible');
+    sprites.update();
+    expect(countColor(await render(scene), [255, 0, 0]), 'the hidden sprite').to.equal(0);
+
+    // the pool is full: this createSprite() doubles it
+    const second = await withSilencedInfo(() => sprites.createSprite());
+    second.setSize(2, 2);
+    second.setPosition(2, 0, 0);
+    sprites.update();
+    expect(sprites.spritePool.capacity, 'the capacity after the growth').to.equal(2);
+    const grown = await render(scene);
+    expect(countColor(grown, [255, 0, 0]), 'the new sprite alone').to.equal(SPRITE_PIXELS);
+    const hiddenRgb = rgbAt(grown, TARGET_SIZE, CENTER - 2 * PIXELS_PER_UNIT, CENTER);
+    expect(isNearColor(hiddenRgb, [0, 0, 0]), `where the hidden sprite was: ${hiddenRgb}`).to.be.true;
+
+    first.visible = 1;
+    // the pool is a new object after the growth
+    sprites.spritePool.touchVO(first, 'visible');
+    sprites.update();
+    expect(countColor(await render(scene), [255, 0, 0]), 'both sprites').to.equal(2 * SPRITE_PIXELS);
+  });
+
   it('a hidden sprite casts no shadow', async function () {
     async function shadowOf(visible) {
       const {sprites, all, scene} = makeSprites([[0, 0, 1]], {
@@ -147,8 +175,8 @@ describe('sprites — Visible', function () {
     const shown = await shadowOf(1);
     const hidden = await shadowOf(0);
 
-    expect(diffPixels(shown, shown).lit, 'the shadow of the shown sprite').to.be.above(0);
-    expect(diffPixels(hidden, hidden).lit, 'the shadow of the hidden sprite').to.equal(0);
+    expect(countLit(shown), 'the shadow of the shown sprite').to.be.above(0);
+    expect(countLit(hidden), 'the shadow of the hidden sprite').to.equal(0);
   });
 
   it('a hidden sprite is not picked, and the one behind it is', async function () {

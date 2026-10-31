@@ -244,7 +244,7 @@ for 3. The timings are archived, not held to a limit: a shared runner's timings
 vary too much for a gate, and a regression shows only in the series over weeks. What can
 be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
 
-The browser suite runs every test file in four browsers, each pinned to one backend of
+The browser suite runs every test file that starts a renderer in four browsers, each pinned to one backend of
 three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2`, `Firefox WebGL2` and
 `Webkit WebGL2` (`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter
 names a launcher after the capitalized product and the backend). Left to themselves the
@@ -268,6 +268,22 @@ that fails then: it holds the backend three picked to the pinned one, read throu
 `expectedBackend()` from `test/helpers/fixtures.js`, and writes
 `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>` into the "Browser logs" of
 each launcher.
+
+A file none of whose tests renders, reads a pixel back or asserts anything about the
+renderer or its backend runs once per engine instead: the files in `RENDERER_FREE_FILES`
+of `web-test-runner.config.js` form a group of their own on Chromium WebGPU, Firefox and
+WebKit, and the default group leaves them out. Under the WebGL2 launcher of Chromium they
+would only repeat the run of the WebGPU launcher — the engine is the same, and the backend
+is the one thing that differs. The runner starts each launcher once, however many groups
+name it, because the groups share the launcher objects. A new test file that does not
+render belongs into the list.
+
+The last lines of a run are the block `Skipped tests:` of `skippedTestsReporter()`: per
+launcher the number of skipped tests and their names, on CI as well, where the progress
+report and its count are off. A test that skips where it ought to run shows in the log of
+a green run. The Native tests of `test/display-fullscreen.test.js` have to run in every
+launcher: their `beforeEach` asserts `document.fullscreenEnabled`, so a launcher without
+the Fullscreen API fails there instead of passing the native path by unseen.
 
 The runner puts a logger into every page that writes each unhandled rejection into the
 "Browser logs" as "An error was thrown in a Promise outside a test", with its stack,
@@ -445,15 +461,27 @@ anything.
 ## 5. Shared dependency versions
 
 `three`, `@types/three`, `@spearwolf/eventize` and `@spearwolf/signalize` are pinned in
-the `catalog:` block of `pnpm-workspace.yaml`. Individual `package.json` files reference
-them as `"catalog:"`, so a version bump happens in exactly one place and stays
-consistent across library, test harness and lookbook. In the library they are
-`peerDependencies`; `@types/three` is an optional peer (`peerDependenciesMeta`), because
-only a TypeScript consumer needs it.
+the `catalog:` block of `pnpm-workspace.yaml`, and so is every tool that more than one
+manifest names: `typescript` (7), `rimraf`, `@types/node` and `playwright`. Individual
+`package.json` files reference them as `"catalog:"`, so a version bump happens in exactly
+one place and stays consistent across library, test harness and lookbook. In the library
+the four first are `peerDependencies`; `@types/three` is an optional peer
+(`peerDependenciesMeta`), because only a TypeScript consumer needs it.
+
+Each package declares what it uses. A workspace package lists every tool its scripts call
+and every package its code, specs, tests and configs import — type packages included — in
+the `devDependencies` or `dependencies` of its own `package.json`; the root lists only
+what the root scripts, `scripts/` and the workflows call at the root. The root does not
+carry the tools of the packages: pnpm resolves an undeclared package from the root's
+`node_modules` as long as the root has it, so a missing entry would show only in a
+filtered install like the one of the deploy, and a package that no longer needs a tool
+would never lose it. A tool that two manifests name goes into the catalog, or their ranges
+drift apart.
 
 `.github/dependabot.yml` has Dependabot look at `npm` and `github-actions` once a week.
 The minor and patch updates of the toolchain arrive as one pull request, the group
-`toolchain`. The four catalog entries stay out of it: a jump of `three` moves the peer
+`toolchain`. The four peer entries of the catalog stay out of it (the tool entries belong to the
+group): a jump of `three` moves the peer
 range of the library and is a release of its own, because the catalog range lands verbatim
 in the published manifest. So each of them, and every major update but those of
 `typescript` and `@types/node`, which it ignores (see below), comes as a pull request by
@@ -491,8 +519,8 @@ update to a younger version would fail. `pnpm outdated -r` lists what is behind 
 project of the workspace, the catalog entries included; an update comes through Dependabot
 or by hand, a catalog entry in `pnpm-workspace.yaml`.
 
-The repo runs two TypeScripts. `typescript` in the root is 7.x, the native compiler: its
-`tsc` builds the library and runs every type check but the lookbook's. TypeScript 7
+The repo runs two TypeScripts. The catalog's `typescript` is 7.x, the native compiler —
+the root, the library and the browser tests reference it: its `tsc` builds the library and runs every type check but the lookbook's. TypeScript 7
 exports no compiler API under `typescript` (only `typescript/unstable/*`, whose shape
 may still change), so the scripts that need one —
 `scripts/checkNameableTypes/findUnnameableTypes.mjs`,
@@ -507,7 +535,7 @@ type-checks the `.ts` files and `.astro` pages of the lookbook through it. Movin
 lookbook's `typescript` to 7 breaks `pnpm typecheck` until `@astrojs/check` accepts 7,
 so `.github/dependabot.yml` ignores the major updates of `typescript`. Its one `npm`
 entry covers the whole workspace, which means the rule also holds back a major of the
-root's `typescript`; that step is taken by hand. The rule goes once `@astrojs/check`
+catalog's `typescript`; that step is taken by hand. The rule goes once `@astrojs/check`
 accepts 7.
 
 Node and pnpm versions come from `engines` in the root `package.json`: Node
@@ -523,10 +551,10 @@ narrower `24.16` would pin the minor line and cut the repo off from later 24.x r
 `@types/node` stays on the 24 line, the lowest `engines` allows and the one every workflow
 runs on: the types of a later line would let a script or a spec call an API Node 24 lacks,
 and only a run on 24 would notice. `.github/dependabot.yml` therefore ignores its major
-updates; they move with the `node-version` of the workflows. Two manifests name it: the
-root `package.json` for the scripts and specs, and `apps/lookbook/package.json`, where it
-keeps the peers of astro, vite and sharp from resolving `@types/node` to the newest line
-for the lookbook. Both move together when the Node line changes.
+updates; they move with the `node-version` of the workflows. The catalog holds it for the
+root (the scripts), the library (its specs) and the lookbook, where it keeps the peers of
+astro, vite and sharp from resolving `@types/node` to the newest line. All three move
+together when the Node line changes.
 
 ## 6. Test surfaces
 
@@ -536,8 +564,8 @@ Two runners, deliberately in separate packages:
   to the source. No browser dependencies in the library package.
 - `@web/test-runner` with Playwright Chromium, Firefox and WebKit in
   `packages/twopoint5d-testing` (tag `browser`) — `*.test.js` under `test/`, for anything
-  that needs a real GPU context, every file under WebGPU in Chromium and under WebGL 2 in
-  Chromium, Firefox and WebKit. `pnpm install` downloads no browsers; they come from `pnpm
+  that needs a real GPU context, every file that renders under WebGPU in Chromium and under
+  WebGL 2 in Chromium, Firefox and WebKit (the renderer-free files run once per engine, §3). `pnpm install` downloads no browsers; they come from `pnpm
   exec playwright install chromium firefox webkit`. The `*.test.js` files are type-checked
   with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from JSDoc —
   vertex object interfaces, descriptions. `strictNullChecks` stays off for the browser

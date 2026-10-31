@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {PanControl2D} from '@spearwolf/twopoint5d';
 import {makeState, pointer} from './helpers/fixtures.js';
 

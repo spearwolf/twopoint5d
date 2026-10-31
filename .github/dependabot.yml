@@ -1,8 +1,8 @@
 version: 2
 updates:
-  # the four catalog entries in pnpm-workspace.yaml are the peer dependencies of the
-  # library, and playwright moves the browsers the test suite runs on; each of their
-  # updates comes as a pull request of its own
+  # the catalog entries three, @types/three, @spearwolf/eventize and @spearwolf/signalize in
+  # pnpm-workspace.yaml are the peer dependencies of the library, and playwright moves the
+  # browsers the test suite runs on; each of their updates comes as a pull request of its own
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -25,14 +25,15 @@ updates:
         update-types: [minor, patch]
     # the lookbook holds typescript at 6.x for astro check, whose @astrojs/check peer
     # range ends at ^6.0.0; one entry covers the whole workspace, so this also holds back
-    # a major of the root's typescript. Drop it once @astrojs/check accepts 7
+    # a major of the catalog's typescript, which the root, the library and the browser tests
+    # use. Drop it once @astrojs/check accepts 7
     ignore:
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
       # @types/node follows the lowest Node line engines allows, the one every workflow
       # runs: the types of a later line would let a script call an API Node 24 lacks.
-      # Its major moves together with the node-version of the workflows, and in both
-      # manifests that name it: the root and apps/lookbook
+      # Its major moves together with the node-version of the workflows, and in its
+      # catalog entry in pnpm-workspace.yaml
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
       # 22.0.1 adds an index.d.mts that exports sinon as a default only, so the named

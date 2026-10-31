@@ -1,4 +1,4 @@
-import {expect} from '@esm-bundle/chai';
+import {expect} from 'chai';
 import {Display, VertexObjectGeometry, VertexObjectPool, VertexObjects} from '@spearwolf/twopoint5d';
 import {MeshBasicMaterial, PerspectiveCamera, Scene} from 'three/webgpu';
 import {makeContainer, disposeDisplay, readBack, quadDescription} from './helpers/fixtures.js';
