@@ -25,7 +25,7 @@ import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
-import type {StageMask} from './StageMask.js';
+import {StageMask} from './StageMask.js';
 
 /**
  * One of the two pictures a transition blends: the layer it leaves, the layer it brings, or nothing.
@@ -136,7 +136,8 @@ function softnessOf(subject: string, softness: unknown, fallback: number): numbe
  * the order of `at`, and `softness` blends over that width of it. At progress 0 the share is 0 for
  * every `at` in `[0, 1]`, at progress 1 it is 1.
  */
-function switched(at: Node<'float'>, progress: Node<'float'>, softness: number): Node<'float'> {
+/** @internal */
+export function switched(at: Node<'float'>, progress: Node<'float'>, softness: number): Node<'float'> {
   // smoothstep() with both edges at one place is undefined in GLSL: a driver that compiles it
   // without ANGLE in between, as Firefox and WebKit do on Linux, may answer anything at all. A hard
   // edge is a step, and at progress 1 every pixel has switched, the brightest of a mask too.
@@ -329,6 +330,56 @@ export function lumaMask(options: LumaMaskOptions): StageTransitionEffect {
       const luma = luminance(texture(mask as Texture, vec2(uv.x, float(1).sub(uv.y))).rgb);
       const at = invert ? float(1).sub(luma) : luma;
       return mix(from.sample(uv), to.sample(uv), switched(at, progress, softness));
+    },
+  };
+}
+
+export interface MatteOptions {
+  /** The mask: a stage whose picture is the matte of the transition. The effect names it in `masks`. */
+  mask: StageMask;
+  /**
+   * `'coverage'`: the coverage of the mask is the share of `to`; `'threshold'`: the coverage is the
+   * switching point of each pixel against the progress, as the luminance is in {@link lumaMask}.
+   * Default `'coverage'`.
+   */
+  mode?: 'coverage' | 'threshold';
+  /** `'threshold'` only: how far a pixel blends, in the range of the coverage. Default 0.05. */
+  softness?: number;
+}
+
+/**
+ * A transition through a living stage: the picture of `mask` decides how much of `to` shows.
+ *
+ * In `'coverage'` mode the stage is the transition — its coverage is the share of `to` — and the
+ * effect holds both ends itself: the share is 0 at progress 0 and 1 at progress 1, whatever the
+ * stage drew. In `'threshold'` mode the coverage says when a pixel switches, as in {@link lumaMask}.
+ * The effect holds a stage, so it serves one director at a time.
+ */
+export function matte(options: MatteOptions): StageTransitionEffect {
+  const opts = optionsOf('matte', options as MatteOptions | undefined, '{mask, mode?, softness?}');
+  const mask = opts.mask;
+  if (!(mask instanceof StageMask)) {
+    throw new TypeError(`matte: mask must be a StageMask, got ${describeValue(mask)}`);
+  }
+  if (mask.isDisposed) {
+    throw new Error(`matte: the mask on "${mask.stage.name}" has been disposed`);
+  }
+  const mode = opts.mode ?? 'coverage';
+  if (mode !== 'coverage' && mode !== 'threshold') {
+    throw new TypeError(`matte: mode must be 'coverage' or 'threshold', got ${describeValue(mode)}`);
+  }
+  const softness = softnessOf('matte', opts.softness, 0.05);
+  return {
+    name: 'matte',
+    masks: [mask],
+    build: ({from, to, progress, uv, mask: maskOf}) => {
+      // sampled at uv as it is: the mask stage is a picture of the screen, not a texture of a mesh
+      const coverage = maskOf(mask).coverage(uv);
+      const share =
+        mode === 'threshold'
+          ? switched(coverage, progress, softness)
+          : select(progress.lessThanEqual(0), float(0), select(progress.greaterThanEqual(1), float(1), coverage));
+      return mix(from.sample(uv), to.sample(uv), share);
     },
   };
 }

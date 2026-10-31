@@ -17,7 +17,7 @@ import type {IStage} from './IStage.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
-import {crossfade, type StageTransitionEffect, type StageTransitionInput} from './transitionEffects.js';
+import {crossfade, matte, type StageTransitionEffect, type StageTransitionInput} from './transitionEffects.js';
 
 // the parts of a WebGPURenderer the director and its pipelines touch, as StageDirector.spec.ts mocks them
 function createRendererMock() {
@@ -1279,6 +1279,59 @@ describe('StageDirector masks', () => {
         expect(ink.progress).toBe(0.25);
         frame();
         expect(ink.progress).toBe(0.75);
+      });
+
+      it('two masks on two slots, driving two transitions, each follow their own progress', () => {
+        const otherStage = fakeStage('other');
+        const other = new StageMask(otherStage);
+        const third = fakeStage('third');
+        const fourth = fakeStage('fourth');
+        director.setStack([stars, level]);
+        director.replace(stars, third, {effect: matte({mask: ink}), duration: 1, easing: 'linear'});
+        director.replace(level, fourth, {effect: matte({mask: other, mode: 'threshold'}), duration: 2, easing: 'ease-in'});
+        frame(0);
+        frame(0.5);
+        expect(ink.progress).toBe(0.5);
+        // ease-in is t³ of a quarter of the duration
+        expect(other.progress).toBe(0.015625);
+        frame(0.5);
+        expect(director.transitions).toHaveLength(1);
+        expect(ink.progress).toBe(1);
+        expect(other.progress).toBe(0.125);
+        expect(ink.progressNode.value).toBe(1);
+        expect(other.progressNode.value).toBe(0.125);
+      });
+
+      it('a slot mask and a matte on one stage: only the matte follows its transition', () => {
+        // the stage of `fog` masks a slot, and a second StageMask on that stage is the mask of the matte
+        const matteMask = new StageMask(fogStage, {source: 'luminance'});
+        director.setStack([stars, level]);
+        director.setMask(stars, fog);
+        director.replace(level, nextLevel, {effect: matte({mask: matteMask}), duration: 1, easing: 'linear'});
+        frame(0);
+        frame(0.5);
+        draw();
+        expect(matteMask.progress).toBe(0.5);
+        expect(matteMask.progressNode.value).toBe(0.5);
+        expect(fog.progress).toBe(0);
+        expect(fog.progressNode.value).toBe(0);
+        // the stage is one mask stage, drawn once
+        expect(ordered().filter((name) => name === 'fog')).toHaveLength(1);
+      });
+
+      it('a delayed transition keeps the progress of its mask at 0 until it starts', () => {
+        director.setStack([stars, level]);
+        director.replace(level, nextLevel, {effect: matte({mask: ink}), duration: 1, delay: 1, easing: 'linear'});
+        expect(ink.progress).toBe(0);
+        frame(0);
+        frame(0.5);
+        frame(0.25);
+        expect(ink.progress).toBe(0);
+        expect(ink.progressNode.value).toBe(0);
+        frame(0.25);
+        frame(0.5);
+        expect(ink.progress).toBe(0.5);
+        expect(ink.progressNode.value).toBe(0.5);
       });
 
       it('the mask of a slot carries no progress', () => {

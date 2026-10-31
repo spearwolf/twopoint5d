@@ -1477,6 +1477,7 @@ export class StageDirector extends StageRenderer {
     );
 
     if (options.instant) {
+      // an instant change drives no mask: the progress of a mask the effect names stays as it was
       slot.layer = to;
       if (!to) this.#removeSlot(slot, errors);
       if (from && !this.#isReferenced(from)) this.#release(from);
