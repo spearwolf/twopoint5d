@@ -39,8 +39,8 @@ back as the display found it: its classes, the inline `width`, `height` and
 `image-rendering`, the `touch-action` attribute and the `width` and `height` attributes
 of the drawing buffer return to what they were before the constructor ran, and so does
 the `data-engine` attribute three marks it with. One thing stays changed under the WebGL
-backend, the context: three gives up the one WebGL context of the canvas as it releases
-the renderer, and the display leaves that context lost but restorable. Only a `Display`
+backend, the context: the display gives up the one WebGL context of the canvas as it
+releases the renderer, and leaves that context lost but restorable. Only a `Display`
 built on the canvas afterwards brings it back; a `WebGPURenderer` or a
 `getContext('webgl2')` of the caller's own on that canvas gets the lost context. A
 `Display` constructor that throws after it has built or taken over its renderer leaves

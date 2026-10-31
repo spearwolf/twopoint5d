@@ -8,7 +8,7 @@ import {
   OnDisplayRestart,
   OnDisplayStart,
 } from '@spearwolf/twopoint5d';
-import {WebGPURenderer} from 'three/webgpu';
+import {PerspectiveCamera, Scene, WebGPURenderer} from 'three/webgpu';
 import {makeContainer, disposeDisplay} from './helpers/fixtures.js';
 
 async function animationFrames(count) {
@@ -128,6 +128,38 @@ describe('Display — lifecycle', function () {
     await animationFrames(5);
     expect(info.frame, 'no tick of three while paused').to.equal(pausedAt);
 
+    display.pause = false;
+    await display.nextFrame();
+    const runningAt = info.frame;
+    await animationFrames(10);
+    const ticks = info.frame - runningAt;
+    expect(ticks, 'three ticks again').to.be.greaterThan(0);
+    // one loop ticks once per frame of the page; a second one started on top would tick twice
+    expect(ticks, 'one loop of three, not two').to.be.below(15);
+  });
+
+  it('a paused display keeps the animation loop of three standing through a draw and through a callback set on the renderer', async () => {
+    host = makeContainer();
+    display = new Display(host);
+    await display.start();
+    await display.nextFrame();
+    // three counts the ticks of its own animation loop in info.frame, and nothing else writes it
+    const {renderer} = display;
+    const {info} = renderer;
+
+    display.pause = true;
+    const pausedAt = info.frame;
+
+    // three 0.187.0 starts its loop from render() and from setAnimationLoop() with a callback
+    renderer.render(new Scene(), new PerspectiveCamera());
+    let called = 0;
+    await renderer.setAnimationLoop(() => ++called);
+    await animationFrames(5);
+
+    expect(info.frame, 'no tick of three while paused').to.equal(pausedAt);
+    expect(called, 'no frame for a callback set while paused').to.equal(0);
+
+    await renderer.setAnimationLoop(null);
     display.pause = false;
     await display.nextFrame();
     const runningAt = info.frame;

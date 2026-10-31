@@ -116,7 +116,9 @@ describe('Display — the contract after dispose()', function () {
           expect(info.reason, 'the reason the device was lost').to.equal('destroyed');
         } else {
           expect(backend.isWebGLBackend, 'the backend is WebGL when it is not WebGPU').to.equal(true);
-          // WebGLBackend.dispose() releases the context through WEBGL_lose_context.loseContext()
+          // the release gives the context up through WEBGL_lose_context.loseContext() right after
+          // renderer.dispose() resolves, after this test resumes; a task later it has run
+          await new Promise((resolve) => setTimeout(resolve, 0));
           expect(backend.gl.isContextLost(), 'the context is lost').to.equal(true);
         }
       });

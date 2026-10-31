@@ -1,5 +1,5 @@
 // The places where the specs reach past the typed API of three.js, each checked against three
-// 0.186.1. Check them again with every bump of `three` in the catalog of `pnpm-workspace.yaml`;
+// 0.187.0. Check them again with every bump of `three` in the catalog of `pnpm-workspace.yaml`;
 // `threeInternals.spec.ts` fails when one has moved.
 
 import type {Camera, Node, UniformNode} from 'three/webgpu';
@@ -21,7 +21,7 @@ export function setReversedDepth(camera: Camera, reversedDepth: boolean): void {
  * What the output node of a pick material is built from. The pick writes
  * `vec4(instanceIndex + 1, meshNumber, 0, 1)` as its `outputNode`; the structure — `instanceIndex`
  * as an `IndexNode` of the instance scope in the graph, the mesh number as its only `UniformNode` —
- * is the one of three 0.186.1.
+ * is the one of three 0.187.0.
  */
 export function pickOutputOf(outputNode: Node): {readsInstanceIndex: boolean; meshNumber: {value: number} | undefined} {
   const nodes = [...nodesOf(outputNode)];

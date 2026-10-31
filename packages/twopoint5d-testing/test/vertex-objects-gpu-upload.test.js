@@ -25,34 +25,6 @@ import {
 /** @typedef {VO & {setPosition: VOAttrSetter, setLevel: VOAttrSetter}} LevelQuadVO */
 /** @typedef {VO & {setPosition: VOAttrSetter, setBytes: VOAttrSetter}} ByteQuadVO */
 
-/**
- * Reads an interleaved attribute back out of the gpu buffer it shares with its siblings.
- *
- * On the WebGL backend three 0.186.1 answers an empty buffer for it: in
- * `src/renderers/webgl-fallback/utils/WebGLAttributeUtils.js`, `createAttribute()` files the
- * record that carries `byteLength` under the attribute wrapper, while `getArrayBufferAsync()`
- * looks it up under the shared buffer, `attribute.data`. The gl buffer is read directly
- * instead; the WebGPU backend takes the usual path.
- *
- * "three still reads an interleaved attribute back as an empty buffer on the WebGL backend"
- * fails once a three release reads the whole buffer back — this helper and that test go then.
- */
-async function readBackInterleaved(display, attr) {
-  if (display.isWebGPUBackend) return readBack(display.renderer, attr);
-
-  const {gl} = display.renderer.backend;
-  const buffer = bufferOf(attr);
-  const out = new Float32Array(buffer.array.length);
-  const previous = gl.getParameter(gl.ARRAY_BUFFER_BINDING);
-  try {
-    gl.bindBuffer(gl.ARRAY_BUFFER, display.renderer.backend.get(buffer).bufferGPU);
-    gl.getBufferSubData(gl.ARRAY_BUFFER, 0, out);
-  } finally {
-    gl.bindBuffer(gl.ARRAY_BUFFER, previous);
-  }
-  return Array.from(out);
-}
-
 // static and therefore without autoTouch: what reaches the gpu here comes from the pool having
 // written something, which is the whole point of this test
 /** @type {VertexObjectDescription} */
@@ -390,7 +362,7 @@ describe('vertex-objects — gpu upload', function () {
     await display.nextFrame();
 
     // the attributes sit in alphabetical order inside the stride: color at offset 0, position at offset 3
-    expect((await readBackInterleaved(display, position)).slice(0, 24)).to.deep.equal([
+    expect((await readBack(display.renderer, position)).slice(0, 24)).to.deep.equal([
       2, 2, 2, 0, 0, 0, 3, 3, 3, 7, 7, 7, 4, 4, 4, 8, 8, 8, 5, 5, 5, 9, 9, 9,
     ]);
   });
@@ -506,34 +478,5 @@ describe('vertex-objects — gpu upload', function () {
 
     expect(isNearColor(middle, [200, 100, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
     expectPoolArrays(geometry);
-  });
-
-  it('three still reads an interleaved attribute back as an empty buffer on the WebGL backend', async function () {
-    if (!display.isWebGLBackend) this.skip();
-
-    /** @type {VertexObjectGeometry<ColoredQuadVO>} */
-    const geometry = new VertexObjectGeometry(interleavedQuadDescription, 8);
-    const material = new MeshBasicNodeMaterial();
-    // an attribute has to be read by a shader, otherwise three never builds a gpu buffer for it
-    material.positionNode = attribute('position', 'vec3');
-    material.colorNode = attribute('color', 'vec3');
-    const mesh = new VertexObjects(geometry, material);
-    scene.add(mesh);
-
-    const quad = geometry.pool.createVO();
-    quad.setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
-    quad.setColor([1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0]);
-
-    mesh.update();
-    display.renderer.render(scene, camera);
-    await display.nextFrame();
-
-    /** @type {any} */
-    const position = geometry.getAttribute('position');
-    const bytes = await display.renderer.getArrayBufferAsync(position);
-    expect(
-      bytes.byteLength,
-      'three reads an interleaved attribute back by itself now: readBackInterleaved() and this test can go',
-    ).to.equal(0);
   });
 });

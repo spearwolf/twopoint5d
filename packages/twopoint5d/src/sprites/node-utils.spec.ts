@@ -22,7 +22,8 @@ import {
   vertexByInstancePosition,
 } from './node-utils.js';
 
-// three wraps the result of each TSL operator in a VarNode that holds the OperatorNode as `node`
+// the OperatorNode behind a TSL operator: three 0.187.0 answers the OperatorNode itself, and a
+// VarNode — that of `toVar()`, say — gives the one it holds as `node`
 const operatorOf = (node: Node | null | undefined): OperatorNode => {
   const varNode = node as unknown as VarNode<unknown, OperatorNode>;
   return varNode.isVarNode ? varNode.node : (node as unknown as OperatorNode);

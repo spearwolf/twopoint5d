@@ -222,7 +222,7 @@ export class FrameLoop {
    *
    * The drivers bound to a renderer are not stopped here: they live in a `WeakMap`,
    * which cannot be walked. They also need no stopping, because `Renderer.dispose()`
-   * of three.js ends with `setAnimationLoop(null)`.
+   * of three.js stops the animation loop of the renderer and drops its callback.
    *
    * The call is safe in any environment, `requestAnimationFrame` or not: without it
    * no renderer-less driver can ever have been built.

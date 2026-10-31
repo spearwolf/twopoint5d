@@ -13,11 +13,11 @@ catalogs:
       specifier: ^1.0.0
       version: 1.0.0
     '@types/three':
-      specifier: ~0.186.0
-      version: 0.186.0
+      specifier: ~0.187.0
+      version: 0.187.0
     three:
-      specifier: ~0.186.1
-      version: 0.186.1
+      specifier: ~0.187.0
+      version: 0.187.0
 
 overrides:
   nx>undici: ^7.29.1
@@ -40,7 +40,7 @@ importers:
         version: 22.0.2
       '@types/three':
         specifier: 'catalog:'
-        version: 0.186.0
+        version: 0.187.0
       '@typescript/typescript6':
         specifier: ^6.0.2
         version: 6.0.2
@@ -109,7 +109,7 @@ importers:
         version: 4.3.3
       three:
         specifier: 'catalog:'
-        version: 0.186.1
+        version: 0.187.0
     devDependencies:
       '@astrojs/check':
         specifier: ^0.9.12
@@ -134,10 +134,10 @@ importers:
         version: 1.0.0(@spearwolf/eventize@6.3.0)
       '@types/three':
         specifier: 'catalog:'
-        version: 0.186.0
+        version: 0.187.0
       three:
         specifier: 'catalog:'
-        version: 0.186.1
+        version: 0.187.0
 
   packages/twopoint5d-testing:
     dependencies:
@@ -152,7 +152,7 @@ importers:
         version: link:../twopoint5d
       three:
         specifier: 'catalog:'
-        version: 0.186.1
+        version: 0.187.0
     devDependencies:
       '@esm-bundle/chai':
         specifier: 4.3.4-fix.0
@@ -1515,8 +1515,8 @@ packages:
   '@types/stats.js@0.17.4':
     resolution: {integrity: sha512-jIBvWWShCvlBqBNIZt0KAshWpvSjhkwkEu4ZUcASoAvhmrgAUI2t1dXrjSL4xXVLB4FznPrIsX3nKXFl/Dt4vA==}
 
-  '@types/three@0.186.0':
-    resolution: {integrity: sha512-mxYSBpDC+D0pLfSP6sW4WZTcT+nrtmZcimMqnVmy36Hte3XpeYSrvgg4TRdaM1GemGog1AWzI5qL2VoIfMXbJQ==}
+  '@types/three@0.187.0':
+    resolution: {integrity: sha512-v+vKNarUtk4n2QRZ4+CN5ygMM0ARUjXjIQl0R/unMUfmStFeVqGbgqarbrpoGTXRZoulSH16ePrVJVxPJEbMUA==}
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
@@ -3563,8 +3563,8 @@ packages:
   thenify@3.3.1:
     resolution: {integrity: sha512-RVZSIV5IG10Hk3enotrhvz0T9em6cyHBLkH/YAZuKqd8hRkKhSfCGIcP2KUY0EPxndzANBmNllzWPwak+bheSw==}
 
-  three@0.186.1:
-    resolution: {integrity: sha512-blFeqb49wRCSGUGj7gtpfnSGHy2lwDk94RhUmS1c/hTby70kvChbWpkJ4Pm1390LqzzvTmzgXKHPEafJwCb8jA==}
+  three@0.187.0:
+    resolution: {integrity: sha512-Qiu7R+Cmh8CstZsY1uJOSWnVlfo7ZtNLV7mF8Jltk3LB3AtDu9cRZlcnRKkAk8Y4z6KKw35z7Y7Urd7jWY8etA==}
 
   tiny-inflate@1.0.3:
     resolution: {integrity: sha512-pkY1fj1cKHb2seWDy0B16HeWyczlJA9/WW3u3c4z/NiWDsO3DOU5D7nhTLE9CF0yXv/QZFY7sEJmj24dK+Rrqw==}
@@ -5214,7 +5214,7 @@ snapshots:
 
   '@types/stats.js@0.17.4': {}
 
-  '@types/three@0.186.0':
+  '@types/three@0.187.0':
     dependencies:
       '@dimforge/rapier3d-compat': 0.12.0
       '@tweenjs/tween.js': 23.1.3
@@ -7495,7 +7495,7 @@ snapshots:
     dependencies:
       any-promise: 1.3.0
 
-  three@0.186.1: {}
+  three@0.187.0: {}
 
   tiny-inflate@1.0.3: {}
 

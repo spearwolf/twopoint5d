@@ -160,21 +160,41 @@ const canvasReleases = new WeakMap<HTMLCanvasElement, Promise<void>>();
 // would be exactly the kind of leftover a release must not leave behind
 const lostContexts = new WeakMap<HTMLCanvasElement, LostContext>();
 
-// A canvas keeps its one WebGL context for good and answers every later getContext('webgl2')
-// with it, and WebGLBackend.dispose() gives that context up with WEBGL_lose_context.loseContext().
-// A context whose loss has its default prevented can be restored later, so the release of a
-// canvas that goes back to its caller prevents it and hands the context on to the next display
-async function disposeKeepingContextRestorable(renderer: WebGPURenderer): Promise<LostContext | undefined> {
+// The WebGL context of a renderer under the WebGL backend, while it is live, and the extension
+// that gives it up — fetched before renderer.dispose(): a lost context answers getExtension() with
+// null. Without the extension there is no loss to cause, and nothing to restore
+function liveContextOf(renderer: WebGPURenderer): {gl: WebGL2RenderingContext; extension: WEBGL_lose_context} | undefined {
   // the three.js typings leave gl off the backend, and the WebGPU backend has none
   const backend = renderer.backend as {isWebGLBackend?: boolean; gl?: WebGL2RenderingContext | null} | undefined;
   const gl = backend?.isWebGLBackend ? backend.gl : undefined;
-  // fetched before renderer.dispose(): a lost context answers getExtension() with null. Without
-  // the extension three calls no loseContext(), and there is nothing to restore
   const extension = gl != null && !gl.isContextLost() ? gl.getExtension('WEBGL_lose_context') : null;
-  if (gl == null || extension == null) {
+  return gl != null && extension != null ? {gl, extension} : undefined;
+}
+
+// three 0.187.0 gives the WebGL context up in WebGLBackend.dispose() only for a canvas the
+// renderer has built itself. A display hands the renderer it builds a canvas, so the release
+// gives the context up after renderer.dispose() where it is still live — a renderer that has
+// built its own canvas has lost it in its dispose() already. A live context nobody draws to
+// counts against the few the browser keeps alive, and it drops the oldest one — possibly that of
+// a running display
+async function disposeLosingContext(renderer: WebGPURenderer): Promise<void> {
+  const context = liveContextOf(renderer);
+  await renderer.dispose();
+  if (context != null && !context.gl.isContextLost()) context.extension.loseContext();
+}
+
+// A canvas keeps its one WebGL context for good and answers every later getContext('webgl2')
+// with it, and the release gives that context up with WEBGL_lose_context.loseContext() — see
+// disposeLosingContext(). A context whose loss has its default prevented can be restored later, so
+// the release of a canvas that goes back to its caller prevents it and hands the context on to the
+// next display
+async function disposeKeepingContextRestorable(renderer: WebGPURenderer): Promise<LostContext | undefined> {
+  const context = liveContextOf(renderer);
+  if (context == null) {
     await renderer.dispose();
     return undefined;
   }
+  const {gl, extension} = context;
 
   const canvas = renderer.domElement;
   let markPrevented!: () => void;
@@ -186,16 +206,16 @@ async function disposeKeepingContextRestorable(renderer: WebGPURenderer): Promis
     event.preventDefault();
     markPrevented();
   };
-  // once: the listener is meant for the loss renderer.dispose() causes and for no later one
+  // once: the listener is meant for the loss the release causes and for no later one
   canvas.addEventListener('webglcontextlost', onContextLost, {once: true});
   try {
-    // awaited: WebGLBackend.dispose() calls loseContext() only after an await of its own, so the
-    // context is not lost yet when the call returns
     await renderer.dispose();
   } catch (error) {
     canvas.removeEventListener('webglcontextlost', onContextLost);
     throw error;
   }
+  // a renderer that has built its canvas itself has lost the context in its dispose() already
+  if (!gl.isContextLost()) extension.loseContext();
   if (!gl.isContextLost()) {
     // no loss, no event, and nothing to restore
     canvas.removeEventListener('webglcontextlost', onContextLost);
@@ -354,10 +374,9 @@ export function waitForCanvas(canvas: HTMLCanvasElement): Promise<void> | undefi
  * canvas in the same tick waits for this release.
  *
  * dispose() can fall in the middle of the init (a mount and unmount under React StrictMode).
- * three does not release a renderer whose init is still running: the init would run to its
- * end and keep the device, the context and the animation loop of three for good. So the
- * release waits for the init, then for the GPU, and under WebGPU for two animation frames of
- * the page — see waitForTwoAnimationFrames(). A canvas handed to the constructor goes back to
+ * The release waits for the init — a failed one leaves nothing to release but a listener, see
+ * below —, then for the GPU, and under WebGPU for two animation frames of the page — see
+ * waitForTwoAnimationFrames(). A canvas handed to the constructor goes back to
  * its caller at the end of it, with its WebGL context lost but restorable, so the next display
  * on it can bring the context back
  */
@@ -369,7 +388,7 @@ export function releaseRenderer(renderer: WebGPURenderer, {init, handBack}: {ini
         await drainSubmittedWork(renderer);
         await waitForTwoAnimationFrames(renderer);
         if (!handBack) {
-          await renderer.dispose();
+          await disposeLosingContext(renderer);
           return;
         }
         const lost = await disposeKeepingContextRestorable(renderer);
@@ -379,8 +398,9 @@ export function releaseRenderer(renderer: WebGPURenderer, {init, handBack}: {ini
       () => {
         // a failed init has built nothing that renderer.dispose() would release but the
         // webglcontextlost listener three put on the canvas before it failed, and that listener
-        // goes here. renderer.dispose() itself stays uncalled: its setAnimationLoop(null) would
-        // wait on the rejected init once more — a rejection that nobody could catch
+        // goes here. renderer.dispose() itself stays uncalled: three 0.187.0 has it wait on the
+        // rejected init once more, and it would reject with the error the caller has heard
+        // through start() and the error event already
         dropContextLostListener(renderer);
       },
     )

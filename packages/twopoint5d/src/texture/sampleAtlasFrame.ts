@@ -115,9 +115,7 @@ export function sampleAtlasFrame(
 
   // the uv in the convention of TextureCoords, v counted downwards; continuous, before the wrap
   const position = (origin === 'bottom-left' ? vec2(uv.x, sub(1, uv.y)) : uv) as unknown as Node<'vec2'>;
-  // gradients matter only where a mip level is picked. They are taken nowhere else: three (r186) reads a
-  // texture whose filters are both NearestFilter with textureLoad and binds no sampler for it, while its
-  // WGSL builder still names that sampler in the textureSampleGrad of a grad() — the shader fails on WebGPU
+  // gradients matter only where a mip level is picked, so they are taken nowhere else
   const mipmapped = MIPMAP_FILTERS.includes(map.minFilter);
 
   return sampleFrameAt(

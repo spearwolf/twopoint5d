@@ -66,7 +66,7 @@ const WHERE = 'SpritePicker#pick()';
 
 // three's projection for a reversed depth buffer is the plain one with its depth row turned over:
 // z' = w - z from the 0 … 1 of WebGPU, z' = (w - z) / 2 from the -1 … 1 of WebGL — the near plane
-// at 1, the far plane at 0 (three 0.186.1, Matrix4#makePerspective() and #makeOrthographic())
+// at 1, the far plane at 0 (three 0.187.0, Matrix4#makePerspective() and #makeOrthographic())
 // biome-ignore format: the matrix row by row
 const REVERSE_DEPTH_WEBGPU = new Matrix4().set(
   1, 0, 0, 0,
@@ -413,8 +413,9 @@ export class SpritePicker {
   /** Draws the scene of the pick into the target and asks for the pixel; the renderer as it was. */
   #draw(): Promise<TypedArray> {
     const {renderer} = this;
-    // float, not integer: three 0.186.1 reads no integer target back under WebGL 2, and a float holds
-    // every whole number up to 2^24 exactly
+    // a float target holds every whole number up to 2^24 exactly, which is MAX_SPRITES_PER_MESH, and
+    // reads back under both backends. Under WebGL 2 an integer target reads back only as RGBA with
+    // 32-bit components (readPixels); three 0.187.0 passes the format of the texture on
     const target = (this.#target ??= new RenderTarget(1, 1, {type: FloatType, depthBuffer: true}));
 
     const renderTarget = renderer.getRenderTarget();

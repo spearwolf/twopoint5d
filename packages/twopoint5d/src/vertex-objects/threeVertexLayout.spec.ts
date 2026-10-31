@@ -25,6 +25,11 @@ describe('the vertex layout three asks for', () => {
       }
       return data;
     },
+    // as Backend#getBufferAttribute() of three 0.187.0: the data of an interleaved attribute is
+    // filed under its InterleavedBuffer
+    getBufferAttribute(attribute: BufferAttribute | InterleavedBufferAttribute): object {
+      return attribute instanceof InterleavedBufferAttribute ? attribute.data : attribute;
+    },
     device: {createBuffer: ({size}: {size: number}) => ({getMappedRange: () => new ArrayBuffer(size), unmap() {}})},
   };
 

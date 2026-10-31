@@ -10,30 +10,26 @@ import {makeContainer, disposeDisplay, quadDescription, instancedDescription} fr
 
 // The absolute heap size of the test page depends on the V8 version and on what three loads; a
 // limit measured against the run's own first sample holds across versions. The samples grow
-// linearly, about 13.5 KB per round — 11.8 % of the first sample, measured on Chromium 153 with
-// three 0.185 and its WebGL2 backend. Heap snapshots show three retaining what grows, and JIT code
-// the page compiles meanwhile counts too. A plain three mesh with the same attributes grows 5.2 %
-// in the same rounds; the rest are objects of this library that three keeps along the same path:
+// linearly, about 11 KB per round — 7.9 % of the first sample under WebGL2 and 8.0 % under
+// WebGPU, measured on Chromium 156 with three 0.187.0. JIT code the page compiles meanwhile
+// counts too. A plain three mesh with the same attributes grows 4.5 % in the same rounds; the
+// rest are objects of this library that three 0.187.0 keeps along the same path:
 // - every mesh rendered with the shared material gets a `RenderObject`, held by its dispose
-//   listener on the material. It keeps the mesh, the disposed geometry and its own uniform group.
-//   `geometry.dispose()` leaves the listener in place; three releases the `RenderObject` on
-//   `material.dispose()`, on the `dispose()` of the mesh — from three 0.186 on, which this test
-//   does not call — or when its cache key changes. A material that is only garbage collected
-//   takes the `RenderObject` along; through three 0.185 the renderer's `info.memoryMap` kept its
-//   uniform group until `material.dispose()` or `renderer.dispose()`, from 0.186 on the map holds
-//   its keys weakly.
-// - that `RenderObject` also keeps the typed arrays of the geometry through `attributes`: three
-//   clears the field on the dispose event of the geometry, and its geometry bookkeeping fills it
-//   again while handling the same event, because the geometry still holds its attributes then.
-//   With the pool capacities of this test (1 quad, 8 instances) that is 144 bytes of vertex data
-//   per round; it grows with the capacity of the pools.
-// - the WebGL backend caches a vertex array object per attribute set in `vaoCache` and never
-//   deletes one; they go only when the renderer itself is garbage collected.
-// Disposing the material every 20 rounds leaves about 3 KB per round (2.2 % over 80 rounds);
-// the snapshots trace about 1.6 KB of it to the vertex-array cache and name no owner for the
-// rest. Runs repeat to within 0.01 points; the limit sits three points above them, so a shift in
-// three or V8 does not fail the test, while a leak on the scale of what three keeps here pushes
-// the growth past it.
+//   listener on the material. It keeps the mesh, the disposed geometry with its typed arrays and
+//   its own uniform group. `geometry.dispose()` leaves that listener in place; three releases the
+//   `RenderObject` on `material.dispose()`, on the `dispose()` of the mesh — from three 0.186 on,
+//   which this test does not call — or when its cache key changes. A material that is only
+//   garbage collected takes the `RenderObject` along: the renderer's `info.memoryMap` holds its
+//   keys weakly from three 0.186 on.
+// - on the dispose event of the geometry the `RenderObject` drops the attributes it built from
+//   nodes and its vertex array object, and clears its `attributes`. Under WebGL2 the backend
+//   shares a vertex array object between the render objects on the same gpu buffers and deletes
+//   it once the last of them lets go of it or one of its buffers is destroyed
+//   (`webgl-fallback/utils/WebGLVertexArrayUtils.js`), so none outlives its round.
+// Disposing the material every 20 rounds leaves about 2.5 KB per round (1.8 % over 100 rounds,
+// measured as above). Runs repeat to within 0.01 points. The limit sits about seven points above
+// them, so a shift in three or V8 does not fail the test, while a leak of some 10 KB per round
+// on top of what three keeps here pushes the growth past it.
 const MAX_HEAP_GROWTH = 0.15;
 
 // Chrome's non-standard heap counter; Firefox has none, which the `before()` hook checks for

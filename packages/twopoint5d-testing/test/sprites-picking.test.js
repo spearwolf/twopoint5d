@@ -131,7 +131,7 @@ describe('sprites — picking', function () {
       reversedPicker = new SpritePicker(reversed.renderer);
       const {renderer} = reversed;
       if (reversed.isWebGPUBackend) {
-        // WebGL 2 falls back to a plain depth buffer without EXT_clip_control (three 0.186.1, WebGLBackend.js)
+        // WebGL 2 falls back to a plain depth buffer without EXT_clip_control (three 0.187.0, WebGLBackend.js)
         expect(renderer.reversedDepthBuffer, 'WebGPU takes a reversed depth buffer').to.be.true;
       }
       const {sprites, all} = makeSprites(FlatKind, [

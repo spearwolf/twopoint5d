@@ -448,6 +448,26 @@ its updates brings the Chromium, Firefox and WebKit the browser suite runs on, s
 as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
 comment that names the advisory it answers and says when the entry can go.
 
+The catalog ranges of `three` and `@types/three` land verbatim as peer ranges in the
+published manifest. They stay a tilde on exactly one minor: a 0.x minor of `three` breaks,
+and the gate runs against that one minor alone — a range across two minors would vouch for
+one no gate has ever run against. So every bump of `three` is a release, and a consumer on
+the newer minor meets a peer conflict until that release is published. A bump takes these
+steps:
+
+1. raise both entries together in the `catalog:` block of `pnpm-workspace.yaml`;
+2. `pnpm install`;
+3. check `packages/twopoint5d/src/testing/threeInternals.ts` and every place that names a
+   version of `three` (`git grep -nE "three 0\.[0-9]+|r1[0-9]{2}|@types/three@" -- packages`)
+   against the sources of the new release;
+4. `pnpm run ci`;
+5. an entry under `### Changed` and a section "The `three` peer dependency range" in the
+   `### Migration Guide` of `packages/twopoint5d/CHANGELOG.md`.
+
+A new `version` in `packages/twopoint5d/package.json` on `main` triggers the release:
+`deploy.yml` publishes after the CI run once npm does not know the version and it does not
+end in `-dev` (§4).
+
 pnpm resolves no version younger than a day (`minimumReleaseAge: 1440` in
 `pnpm-workspace.yaml`): a compromised release is usually found and pulled within hours,
 and the day keeps it out of every fresh resolution. The packages under `@spearwolf/` are

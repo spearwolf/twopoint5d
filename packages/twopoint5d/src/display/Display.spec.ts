@@ -636,7 +636,8 @@ describe('Display', () => {
 
       await display.start();
 
-      // three has started its loop in init() already
+      // the display starts no loop it does not hold: three starts its own from setAnimationLoop()
+      // with the callback of the frame loop
       expect(animation.start, 'after start()').not.toHaveBeenCalled();
       expect(animation.stop, 'after start()').not.toHaveBeenCalled();
 
@@ -657,6 +658,46 @@ describe('Display', () => {
 
       expect(animation.start, 'a second pause = false').toHaveBeenCalledTimes(1);
       expect(animation.stop, 'a second pause = false').toHaveBeenCalledTimes(1);
+    });
+
+    it('holds the animation loop of three through a start of it in the pause, and hands start() back as it runs', async () => {
+      const {display, renderer} = makeDisplay();
+      const originalStart = vi.fn();
+      const animation = {start: originalStart, stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+      await display.start();
+
+      display.pause = true;
+
+      // as three calls it from render(), compute() and setAnimationLoop() with a callback
+      animation.start();
+      animation.start();
+
+      expect(originalStart, 'a start in the pause').not.toHaveBeenCalled();
+
+      display.pause = false;
+
+      expect(originalStart, 'running again').toHaveBeenCalledTimes(1);
+      expect(animation.start, 'running again').toBe(originalStart);
+
+      animation.start();
+
+      expect(originalStart, 'a start while running').toHaveBeenCalledTimes(2);
+    });
+
+    it('hands start() of the animation loop of three back without a call as a paused display is disposed', async () => {
+      const {display, renderer} = makeDisplay();
+      const originalStart = vi.fn();
+      const animation = {start: originalStart, stop: vi.fn()};
+      Object.assign(renderer, {_animation: animation});
+      await display.start();
+
+      display.pause = true;
+      animation.start();
+      display.dispose();
+
+      expect(animation.start, 'disposed').toBe(originalStart);
+      expect(originalStart, 'disposed').not.toHaveBeenCalled();
     });
 
     it('leaves the animation loop of three running while another frame loop runs on the renderer', async () => {
@@ -713,7 +754,7 @@ describe('Display', () => {
 
       display.stop();
 
-      // three builds its animation loop at the end of init() and starts it there
+      // three builds its animation loop in init()
       Object.assign(renderer, {_animation: animation});
       finishInit();
       await settle();
@@ -753,7 +794,9 @@ describe('Display', () => {
     });
 
     it('a stop() while the first start() waits stops the animation loop of three, and the next start() starts it again once', async () => {
-      const animation = {start: vi.fn(), stop: vi.fn()};
+      // held apart from the stub: while the display holds the loop still, start() is its cover
+      const start = vi.fn();
+      const animation = {start, stop: vi.fn()};
       let finishInit!: () => void;
       const {display, renderer} = makeDisplay(
         undefined,
@@ -772,7 +815,7 @@ describe('Display', () => {
       expect(display.isRunning).toBe(false);
       expect(display.pause).toBe(true);
       expect(animation.stop).toHaveBeenCalledTimes(1);
-      expect(animation.start).not.toHaveBeenCalled();
+      expect(start).not.toHaveBeenCalled();
 
       await display.start();
 

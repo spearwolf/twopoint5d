@@ -1961,11 +1961,11 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   sprite, a fragment only under the pointer — and that copy. List the meshes that can be hit, not
   the whole scene.
 - **The renderer** is left as the pick found it: render target, MRT, clear colour and the
-  `autoClear` flags. The picker draws into a 1 × 1 float target — three's WebGL 2 backend reads no
-  integer target back — with no blending, no tone mapping and no output colour space, so the id
-  arrives exactly, up to 2²⁴ sprites per mesh; a mesh of more is refused with a `RangeError` before
-  the draw rather than answered with the wrong sprite. A material's `side`, alpha test, opacity,
-  `maskNode`, `alphaHash` and `alphaToCoverage` reach its pick as they reach the screen.
+  `autoClear` flags. The picker draws into a 1 × 1 float target with no blending, no tone mapping
+  and no output colour space, so the id arrives exactly, up to 2²⁴ sprites per mesh; a mesh of more
+  is refused with a `RangeError` before the draw rather than answered with the wrong sprite. A
+  material's `side`, alpha test, opacity, `maskNode`, `alphaHash` and `alphaToCoverage` reach its
+  pick as they reach the screen.
 - **Ownership.** The renderer, the camera and the meshes stay the caller's. The camera takes the
   coordinate system of the renderer, as its next render would; its depth convention stays as it is —
   under a reversed depth buffer the pick turns its projection over itself. The pointer and the list

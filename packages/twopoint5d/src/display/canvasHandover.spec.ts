@@ -137,4 +137,52 @@ describe('canvasHandover', () => {
       expect(waitForCanvas(canvas)).toBeInstanceOf(Promise);
     });
   });
+
+  describe('a WebGL context that renderer.dispose() leaves alive', () => {
+    // as three 0.187.0 does for a canvas handed to its renderer: dispose() leaves the context be
+    const makeKeepingRenderer = () => {
+      const canvas = makeCanvas();
+      const state = {lost: false};
+      const loseContext = vi.fn(() => {
+        state.lost = true;
+        canvas.dispatchEvent(new Event('webglcontextlost', {cancelable: true}));
+      });
+      const restoreContext = vi.fn(() => {
+        state.lost = false;
+        canvas.dispatchEvent(new Event('webglcontextrestored'));
+      });
+      const gl = {
+        isContextLost: () => state.lost,
+        getExtension: (name: string) => (name === 'WEBGL_lose_context' ? {loseContext, restoreContext} : null),
+      };
+      const dispose = vi.fn(async () => {});
+      return {canvas, loseContext, restoreContext, renderer: makeRenderer(canvas, {isWebGLBackend: true, gl}, dispose)};
+    };
+
+    it('is lost by a release that hands the canvas back, kept restorable and brought back for the next display', async () => {
+      vi.useFakeTimers();
+      const {canvas, loseContext, restoreContext, renderer} = makeKeepingRenderer();
+      const lostEvents: Event[] = [];
+      canvas.addEventListener('webglcontextlost', (event) => lostEvents.push(event));
+
+      releaseRenderer(renderer, {init: Promise.resolve(), handBack: true});
+      const taken = waitForCanvas(canvas);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(loseContext).toHaveBeenCalledTimes(1);
+      expect(lostEvents[0]?.defaultPrevented).toBe(true);
+      expect(restoreContext).toHaveBeenCalledTimes(1);
+      expect(await stateOf(taken!)).toBe('settled');
+    });
+
+    it('is lost by a release that does not hand the canvas back', async () => {
+      const {canvas, loseContext, renderer} = makeKeepingRenderer();
+
+      releaseRenderer(renderer, {init: Promise.resolve(), handBack: false});
+      await settle();
+
+      expect(loseContext).toHaveBeenCalledTimes(1);
+      expect(waitForCanvas(canvas)).toBeUndefined();
+    });
+  });
 });

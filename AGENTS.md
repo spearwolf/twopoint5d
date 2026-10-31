@@ -137,7 +137,8 @@ explicit instruction.
   the library; `@types/three` is an optional one (only a TypeScript consumer needs it).
   The catalog range lands verbatim in the published manifest, and a 0.x minor of `three`
   breaks, so `three` stays on the tilde — and every `three` bump is a release: until the
-  library publishes, a consumer on the newer `three` meets a peer conflict.
+  library publishes, a consumer on the newer `three` meets a peer conflict. The steps of a
+  bump are in [monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions).
 - **Two TypeScripts.** `tsc` is TypeScript 7 — it builds the library and runs every type
   check outside the lookbook. TypeScript 7 exports no compiler API under `typescript`, so
   a script that needs one imports the classic API from `@typescript/typescript6`, never

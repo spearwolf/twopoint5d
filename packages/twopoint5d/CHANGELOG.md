@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- upgrade the `three` peer dependency to `~0.187.0` and `@types/three` to `~0.187.0`
 - change the composed mode of `StageRenderer` to leave `pipeline.outputNode` and `needsUpdate` alone when a rebuild answers the node the pipeline has already: three.js builds its shader again for every `needsUpdate`. A `buildOutputNode` that answers the same node after changing the graph behind it sets `pipeline.needsUpdate = true` itself
 - change the stage cheat-sheet `src/stage/README.md` into the guide `docs/stages.md`: projections (the projection plane, the fit, a camera that follows, depth under a `ParallaxProjection`, the pointer on the plane), several stages in one frame, clearing, post-processing, `Canvas2DStage`, stages and hosts of one's own, events and who disposes what; `src/stage/README.md` is gone. The post-processing setups of a `StageRenderer` go by names that say what they do — the whole-picture mode, the composed mode and nested pipelines — in the guide, the JSDoc and the lookbook
 - change `StageRenderer#resize()`, `Stage2D#resize()`, `IStage#resize()` and `IProjection#updateViewRect()` to take the pixel ratio as an optional third argument, `1` where it is left out or not a finite number above 0: a `StageRenderer` hands the `pixelRatio` of its host on to every stage, nested renderers included, and a change of the ratio alone reaches them as well. `StageRenderer#pixelRatio`, `StageItem#pixelRatio` and `Stage2D#containerPixelRatio` read the ratio a renderer, an item and a stage carry
@@ -105,6 +106,34 @@ The attribute value warns once per page; it sizes the canvas like `"window"`, wh
 
 ```html
 <canvas resize-to="window"></canvas>
+```
+
+#### The `three` peer dependency range
+
+**Before**
+
+```json
+{
+  "dependencies": {
+    "three": "~0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "~0.186.0"
+  }
+}
+```
+
+**After**
+
+```json
+{
+  "dependencies": {
+    "three": "~0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "~0.187.0"
+  }
+}
 ```
 
 ## [0.24.0] - 2026-10-25
