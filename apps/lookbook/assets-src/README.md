@@ -459,3 +459,27 @@ south wall below y = −250, and the lamps at the same places (wall lamps at (�
 | `laundromat.webp` | 2400 × 1280, opaque | an all-night laundromat in the same frame: checkered teal and cream linoleum with puddles, a row of dryers built into the north wall (clothes behind the glass, the one at x = −60 standing open with a sock over the rim), flyers above them, an island of ten top loaders (x −250…30, y −16…96), a folding table with towels and a tipped basket (x 230…370, y −70…−10), orange shell chairs, a wire cart, a "wet floor" sign, lint and coins, and fifteen socks that lead from the open dryer off into the dark, ever further apart |
 | `sprites.png` | 1024 × 1024, straight alpha | the sprites, TexturePacker hash in `sprites.json`, untrimmed, 6 px apart, drawn at 2 texels per unit: `player` (a child in a yellow raincoat with a torch, facing +x), `eyes-pale`, `eyes-ember`, `eyes-three` (glowing eyes with slit pupils and a halo), `hand` (a huge drowned hand, blurred), `cage-pendant` and `tube-pendant` (the pendant of each level seen from above), `neon-wash` and `wall-tube` (white, for an additive tint: the neon "WASH" with a dead H, a fluorescent tube), `paper-a`, `paper-b`, `pill-bottle`, `glove`, `doll-head`, `id-band`, `sock`, `dryer-sheet`, `lint` (what drifts), `ripple` (a white ring), `shadow` (a soft round shadow) |
 | `sprites.json` | | the frames of `sprites.png` |
+
+### rift
+
+"Deep Listening", from `stage-masks/rift/rift.mjs` with `kit.mjs` (the frame and the helpers; the
+generic SVG kit is the spotlight's `svg.mjs`), `room.mjs`, `backdrops.mjs` and `sprites.mjs`. Every
+scene is drawn as SVG in units of the stage — origin in the middle, y up, 2 texels per unit — and
+rasterised by sharp's librsvg. The two rooms are drawn in three passes: an albedo pass multiplied
+by a light map worked out per pixel in JavaScript (the desk lamp, the scopes, the dial and the
+moonlight through the window of the night; the jellyfish beyond the window, the scopes and the
+anemone of the deep, under a teal fog), an emissive pass laid over it unlit, and a glow pass added
+as light. No font is used. Both rooms share every shape and one frame — 1200 × 640 units — with the
+window opening at x 42…418, y −28…213 (mullions at x 167 and 293), the floor at y = −210, the desk
+top at y = −78, the three scope screens of 66 × 50 units at (−265, −14), (−165, −14), (−65, −14),
+the reels at (−522, 124) and (−398, 124), the desk lamp's bulb at (150, −14) and the dish (the
+jellyfish) at (262, 66), so that the demo's overlays fit both.
+
+| file | size | what |
+| --- | --- | --- |
+| `room-night.webp` | 2400 × 1280, alpha | the control room of a radio-telescope station at night, side on: two racks at the left (a reel-to-reel deck — the reels are sprites —, two lit VU meters, a receiver with a lit dial, a patch bay with cables, a chart recorder), a desk with three oscilloscopes (dark glass with a graticule; the demo draws the traces), a speaker, a mug of cold coffee, a stack of fanfold printout spilling to a heap on the floor, a green desk lamp, headphones; a swivel chair with a cardigan, a filing cabinet with a thermos and a radio, a corkboard of printouts (one peak circled in red), a clock at twenty to four, a framed photo of the dish, a fluorescent fixture that is off; warm amber light. **The panes of the window are see-through** (a faint reflection on the glass) |
+| `room-drowned.webp` | 2400 × 1280, alpha | the same room drowned: the colours turned to teal, algae hanging from the ceiling, barnacles on racks, scopes and desk, sand drifted over the floor with ripples and shells, the holdfasts of the kelp (the strands are sprites), violet coral and sponges on the chair, a starfish on the middle scope, an anemone in the mug, a fungus glowing in the lamp's shade, specks of light living on the walls, a fish skeleton; the window shattered, a few shards in the frame, see-through |
+| `sky.webp` | 840 × 570, opaque | behind the night window (x 20…440, y −50…235 in units): a clear sky with the Milky Way and a thin moon, low hills, a far dish, the big dish tilted up to the left with its feed horn at (224, 151) — the demo blinks a red light there —, a service hut with one lit window |
+| `deep.webp` | 840 × 570, opaque | behind the drowned window, the same rectangle: dark water lit from above with shafts of light, a glow where the jellyfish hangs, low rocks, the overgrown pedestal of the dish, marine snow, a murk that moves in clouds |
+| `sprites.png` | 2048 × 1332, straight alpha | the sprites, TexturePacker hash in `sprites.json`, untrimmed, 6 px apart, drawn at 2 texels per unit: `reel-night`, `reel-drowned` (84 units, a flange with three windows over a pack of tape; the second grown over), `jelly-bell` (the jellyfish's bell, translucent cyan, four glowing gonads, a rim of lights), `jelly-arms` (its frilled oral arms and long tentacles, hanging from the top edge), `leviathan` (650 × 230 units, swimming left: an eel's length of body under a ragged frill, needle teeth, one pale eye, two rows of lights), `kelp-a` … `kelp-d` (strands rooted at the bottom middle), `fish`, `bubble`, `glow` (a soft white radial glow for additive tints) |
+| `sprites.json` | | the frames of `sprites.png` |

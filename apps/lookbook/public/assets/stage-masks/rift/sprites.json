@@ -1,0 +1,253 @@
+{
+  "frames": {
+    "reel-night": {
+      "frame": {
+        "x": 6,
+        "y": 1158,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      }
+    },
+    "reel-drowned": {
+      "frame": {
+        "x": 1872,
+        "y": 692,
+        "w": 168,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 168,
+        "h": 168
+      }
+    },
+    "jelly-bell": {
+      "frame": {
+        "x": 1446,
+        "y": 692,
+        "w": 420,
+        "h": 300
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 420,
+        "h": 300
+      },
+      "sourceSize": {
+        "w": 420,
+        "h": 300
+      }
+    },
+    "jelly-arms": {
+      "frame": {
+        "x": 140,
+        "y": 6,
+        "w": 380,
+        "h": 600
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 380,
+        "h": 600
+      },
+      "sourceSize": {
+        "w": 380,
+        "h": 600
+      }
+    },
+    "leviathan": {
+      "frame": {
+        "x": 6,
+        "y": 692,
+        "w": 1300,
+        "h": 460
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1300,
+        "h": 460
+      },
+      "sourceSize": {
+        "w": 1300,
+        "h": 460
+      }
+    },
+    "kelp-a": {
+      "frame": {
+        "x": 6,
+        "y": 6,
+        "w": 128,
+        "h": 680
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 680
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 680
+      }
+    },
+    "kelp-b": {
+      "frame": {
+        "x": 660,
+        "y": 6,
+        "w": 128,
+        "h": 520
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 520
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 520
+      }
+    },
+    "kelp-c": {
+      "frame": {
+        "x": 526,
+        "y": 6,
+        "w": 128,
+        "h": 600
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 600
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 600
+      }
+    },
+    "kelp-d": {
+      "frame": {
+        "x": 1312,
+        "y": 692,
+        "w": 128,
+        "h": 440
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 440
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 440
+      }
+    },
+    "fish": {
+      "frame": {
+        "x": 250,
+        "y": 1158,
+        "w": 84,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 84,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 84,
+        "h": 32
+      }
+    },
+    "bubble": {
+      "frame": {
+        "x": 340,
+        "y": 1158,
+        "w": 24,
+        "h": 24
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 24
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 24
+      }
+    },
+    "glow": {
+      "frame": {
+        "x": 180,
+        "y": 1158,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    }
+  },
+  "meta": {
+    "image": "sprites.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 1332
+    },
+    "scale": "1"
+  }
+}

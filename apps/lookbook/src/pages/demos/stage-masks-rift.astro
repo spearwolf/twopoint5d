@@ -1,0 +1,231 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-rift.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #020406;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {
+    Display,
+    OnStageUpdateFrame,
+    StageDirector,
+    type StageDirectorShape,
+    StageMask,
+    type StageMaskCoverageSource,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {disposeDeepAssets, DrownedRoom, ListeningRoom, loadDeepAssets, TvSnow} from '~demos/stage-masks/DeepListening';
+  import {RiftMembrane, RiftRim, type RiftInput, RiftState} from '~demos/stage-masks/RiftMembrane';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the rift gets to tear open and the leviathan to reach the window before the card is taken, in ms
+  const PREVIEW_SETTLE = 3200;
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  const director = new StageDirector(display).setClearColor(new Color('#020406'), 1);
+
+  const settings = {
+    size: 170,
+    cut: false,
+    source: 'alpha' as StageMaskCoverageSource,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadDeepAssets(renderer);
+    if (display.isDisposed) {
+      disposeDeepAssets(assets);
+      return;
+    }
+
+    const rift = new RiftState();
+    rift.size = settings.size;
+    const membrane = new RiftMembrane(rift);
+    const snow = new TvSnow();
+    const world = new ListeningRoom(assets, rift);
+    const other = new DrownedRoom(assets, rift);
+    const rim = new RiftRim(rift);
+
+    // from the bottom up: the static, the world, the other world, the glowing rim of the rift. The
+    // membrane is never in the stack: it is the mask stage, drawn once a frame for both its masks
+    director.setStack([snow.stage, world.stage, other.stage, rim.stage]);
+
+    // the rift: where the membrane covers 1 the other world shows, where it covers 0 the world
+    let riftMask = new StageMask(membrane.stage, {source: settings.source});
+    // the cut: the same membrane, inverted, on the world's slot — the world is cut out where the rift
+    // is open, and wherever the drowned room's reception fades the static below shows instead of it
+    let cutMask = new StageMask(membrane.stage, {source: settings.source, invert: true});
+    director.setMask(other.stage, riftMask);
+
+    const describe = (mask: StageMask | undefined) =>
+      mask ? `StageMask(membrane, ${mask.source}${mask.invert ? ', invert' : ''})` : 'undefined';
+    const readout = {other: '', world: '', draws: ''};
+    const refresh = () => {
+      readout.other = describe(director.maskOf(other.stage));
+      readout.world = describe(director.maskOf(world.stage));
+    };
+
+    const applyCut = () => {
+      director.setMask(world.stage, settings.cut ? cutMask : undefined);
+      refresh();
+    };
+    applyCut();
+
+    // the options of a StageMask are read once, when it is made: a new source makes both masks anew
+    const remakeMasks = () => {
+      const oldRift = riftMask;
+      const oldCut = cutMask;
+      riftMask = new StageMask(membrane.stage, {source: settings.source});
+      cutMask = new StageMask(membrane.stage, {source: settings.source, invert: true});
+      director.setMask(other.stage, riftMask);
+      director.setMask(world.stage, settings.cut ? cutMask : undefined);
+      oldRift.dispose();
+      oldCut.dispose();
+      refresh();
+    };
+
+    // the membrane counts its draws; the rim, the top layer, is updated before the mask stage draws,
+    // so it reads the draws of the frame before: one, whether one mask or two lie on the membrane
+    let lastDraws = -1;
+    on(rim.stage, OnStageUpdateFrame, () => {
+      const draws = membrane.takeDraws();
+      if (draws !== lastDraws) {
+        lastDraws = draws;
+        readout.draws = `${draws} per frame`;
+      }
+    });
+
+    const keys: Record<string, keyof Omit<RiftInput, 'target'>> = {
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      KeyA: 'left',
+      KeyD: 'right',
+      KeyW: 'up',
+      KeyS: 'down',
+    };
+    // a shortcut of the browser or the system moves nothing
+    const withModifier = (event: KeyboardEvent) => event.ctrlKey || event.metaKey || event.altKey;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (withModifier(event)) return;
+      const key = keys[event.code];
+      if (key) {
+        rift.input[key] = true;
+        event.preventDefault();
+      }
+      if (event.repeat) return;
+      if (event.code === 'KeyI') {
+        settings.cut = !settings.cut;
+        applyCut();
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const key = keys[event.code];
+      if (key) rift.input[key] = false;
+    };
+    // a key released while the window is not focused never sends its keyup: stop on blur
+    const onBlur = () => {
+      rift.input.left = rift.input.right = rift.input.up = rift.input.down = false;
+      rift.input.target = undefined;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+
+    // a pointer drag leads the rift: into units of the view, from its middle
+    let dragging = false;
+    const toWorld = (event: PointerEvent) => {
+      const view = world.stage.projection!.getViewRect();
+      return {
+        x: (event.offsetX / canvas.clientWidth - 0.5) * view.width + view.offsetX,
+        y: (0.5 - event.offsetY / canvas.clientHeight) * view.height + view.offsetY,
+      };
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      dragging = true;
+      canvas.setPointerCapture(event.pointerId);
+      rift.input.target = toWorld(event);
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      if (dragging) rift.input.target = toWorld(event);
+    };
+    const onPointerUp = () => {
+      dragging = false;
+      rift.input.target = undefined;
+    };
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+
+    const gui = new GUI({container: getDemoUi(), title: 'Deep Listening'});
+    gui
+      .add(settings, 'size', 80, 320, 1)
+      .name('rift size')
+      .onChange((size: number) => {
+        rift.size = size;
+      });
+    gui.add(settings, 'cut').name('inverted second mask (i)').onChange(applyCut).listen();
+    gui.add(settings, 'source', ['alpha', 'luminance']).onChange(remakeMasks);
+    gui.add(readout, 'other').name('maskOf(other)').disable().listen();
+    gui.add(readout, 'world').name('maskOf(world)').disable().listen();
+    gui.add(readout, 'draws').name('membrane drawn').disable().listen();
+
+    // both shapes the toggle reaches: the rift alone, and the rift with the cut on the world below it.
+    // Only for the source the demo starts with: the source is part of the shader, and the first switch
+    // to 'luminance' builds its two shapes then
+    const shapes: StageDirectorShape[] = [
+      ['layer', 'layer', {mask: riftMask}, 'layer'],
+      ['layer', {mask: cutMask}, {mask: riftMask}, 'layer'],
+    ];
+    const precompiled = director.precompile(renderer, shapes, {layers: [membrane.stage]});
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
+      gui.destroy();
+      // the director lets go of the layers and the mask stage first, then each goes
+      director.dispose();
+      riftMask.dispose();
+      cutMask.dispose();
+      membrane.dispose();
+      snow.dispose();
+      world.dispose();
+      other.dispose();
+      rim.dispose();
+      disposeDeepAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>
