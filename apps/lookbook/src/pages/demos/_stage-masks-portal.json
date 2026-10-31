@@ -1,0 +1,16 @@
+{
+  "title": "stage masks: portal",
+  "shortDescription": "The Painting in the Hallway: a portrait at the end of a manor's hallway whose canvas is a portal into a moonlit moor, a mask in the world of a parallax stage",
+  "description": "A `StageDirector` with the stack `[world, other, glaze]`, all three `Stage2D` under the same `ParallaxProjection`. The world is the hallway of a manor at night, built as a box in the space of the stage — oak boards and a worn runner, flocked damask over walnut wainscot, a plaster ceiling, three doors, ten sconces lit per pixel — and at its end, on the far wall at the portal depth (`z = 50` to start), a portrait in a carved gilt frame under a brass picture lamp. Its canvas is the portal: a white oval in a scene of its own, placed on the far wall in the coordinates of the hallway, made a mask with `StageMask.inWorldOf(world, portalScene)` and put on the slot of `other` with `director.setMask(other, portal)`. The mask draws its scene through the camera of the world at every frame, so the oval stays on the wall wherever the camera walks, and grows as the camera comes closer.\n\nThe other world is the moor inside the painting: a night sky with the moon low over three ridges, heath and a pale path, a lone house with one lit window, a dead hawthorn, standing stones, banks of mist — and someone walking up the path towards you, very slowly. Its plane `z = 0` is the canvas, and its camera is the camera of the world moved by the place of the canvas, so the moor is seen as if it lay behind the wall: it fills the oval at exactly the size of its frame, and shifts in depth as you walk and lean — a window, not a picture. When the walker reaches the glass, the lamps of the hallway falter. The glaze on top, unmasked and in the world as well, carries the shadow the frame throws into the oval and the dust in the light of the sconces.\n\n*auto walk* walks to the painting and back by itself; WASD or the arrow keys walk and step aside by hand, the wheel walks, the pointer leans, space toggles the auto walk. *portal depth* moves the far wall with the portrait, *camera z* is the dolly. The readouts show the camera, its distance to the canvas, the size of the oval on the screen and `maskOf(other)`. See [Stage masks: a portal into a second world](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#a-portal-into-a-second-world) and [depth under a parallax projection](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#depth-under-a-parallax-projection).",
+  "url": "/demos/stage-masks-portal",
+  "tags": [
+    "StageMask",
+    "StageDirector",
+    "ParallaxProjection",
+    "Stage2D",
+    "FeatureSprites",
+    "TexturedSpriteKind",
+    "masks",
+    "vanilla"
+  ]
+}

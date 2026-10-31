@@ -1,0 +1,233 @@
+{
+  "frames": {
+    "sconce": {
+      "frame": {
+        "x": 1406,
+        "y": 6,
+        "w": 192,
+        "h": 256
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 256
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 256
+      }
+    },
+    "picture-lamp": {
+      "frame": {
+        "x": 6,
+        "y": 612,
+        "w": 650,
+        "h": 220
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 650,
+        "h": 220
+      },
+      "sourceSize": {
+        "w": 650,
+        "h": 220
+      }
+    },
+    "glow": {
+      "frame": {
+        "x": 1940,
+        "y": 612,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      }
+    },
+    "house": {
+      "frame": {
+        "x": 532,
+        "y": 6,
+        "w": 600,
+        "h": 468
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 600,
+        "h": 468
+      },
+      "sourceSize": {
+        "w": 600,
+        "h": 468
+      }
+    },
+    "walker": {
+      "frame": {
+        "x": 1138,
+        "y": 6,
+        "w": 136,
+        "h": 336
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 136,
+        "h": 336
+      },
+      "sourceSize": {
+        "w": 136,
+        "h": 336
+      }
+    },
+    "tree": {
+      "frame": {
+        "x": 6,
+        "y": 6,
+        "w": 520,
+        "h": 600
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 520,
+        "h": 600
+      },
+      "sourceSize": {
+        "w": 520,
+        "h": 600
+      }
+    },
+    "stone-a": {
+      "frame": {
+        "x": 1280,
+        "y": 6,
+        "w": 120,
+        "h": 276
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 120,
+        "h": 276
+      },
+      "sourceSize": {
+        "w": 120,
+        "h": 276
+      }
+    },
+    "stone-b": {
+      "frame": {
+        "x": 662,
+        "y": 612,
+        "w": 174,
+        "h": 186
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 174,
+        "h": 186
+      },
+      "sourceSize": {
+        "w": 174,
+        "h": 186
+      }
+    },
+    "heather-a": {
+      "frame": {
+        "x": 842,
+        "y": 612,
+        "w": 360,
+        "h": 144
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 144
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 144
+      }
+    },
+    "heather-b": {
+      "frame": {
+        "x": 1208,
+        "y": 612,
+        "w": 360,
+        "h": 144
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 144
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 144
+      }
+    },
+    "heather-c": {
+      "frame": {
+        "x": 1574,
+        "y": 612,
+        "w": 360,
+        "h": 144
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 360,
+        "h": 144
+      },
+      "sourceSize": {
+        "w": 360,
+        "h": 144
+      }
+    }
+  },
+  "meta": {
+    "image": "sprites.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 838
+    },
+    "scale": "1"
+  }
+}

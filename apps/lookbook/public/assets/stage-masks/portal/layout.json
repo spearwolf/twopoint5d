@@ -1,0 +1,95 @@
+{
+  "hall": {
+    "floor": -200,
+    "ceiling": 220,
+    "halfWidth": 180
+  },
+  "wall": {
+    "skirting": -186,
+    "rail": -66,
+    "paper": -56,
+    "cornice": 186,
+    "period": 128
+  },
+  "floor": {
+    "period": 256,
+    "runner": 98
+  },
+  "door": {
+    "w": 132,
+    "h": 300,
+    "frames": {
+      "door-13": {
+        "x": 0,
+        "y": 0,
+        "w": 528,
+        "h": 1200
+      },
+      "door-17": {
+        "x": 536,
+        "y": 0,
+        "w": 528,
+        "h": 1200
+      }
+    }
+  },
+  "frame": {
+    "hw": 118,
+    "hh": 148,
+    "moulding": 38,
+    "rx": 72,
+    "ry": 100
+  },
+  "texelsPerUnit": {
+    "wall": 4,
+    "floor": 4,
+    "door": 4,
+    "frame": 5
+  },
+  "sprites": {
+    "sconce": {
+      "w": 48,
+      "h": 64
+    },
+    "picture-lamp": {
+      "w": 130,
+      "h": 44
+    },
+    "glow": {
+      "w": 64,
+      "h": 64
+    },
+    "house": {
+      "w": 300,
+      "h": 234
+    },
+    "walker": {
+      "w": 34,
+      "h": 84
+    },
+    "tree": {
+      "w": 260,
+      "h": 300
+    },
+    "stone-a": {
+      "w": 40,
+      "h": 92
+    },
+    "stone-b": {
+      "w": 58,
+      "h": 62
+    },
+    "heather-a": {
+      "w": 90,
+      "h": 36
+    },
+    "heather-b": {
+      "w": 90,
+      "h": 36
+    },
+    "heather-c": {
+      "w": 90,
+      "h": 36
+    }
+  }
+}

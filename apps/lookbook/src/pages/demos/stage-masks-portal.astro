@@ -1,0 +1,237 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-portal.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #030305;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {Display, OnStageUpdateFrame, StageDirector, type StageDirectorShape} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color, type PerspectiveCamera} from 'three/webgpu';
+  import {Glaze, Moor, PortalCanvas} from '~demos/stage-masks/PaintedMoor';
+  import {
+    disposePortalAssets,
+    FRAME,
+    Hallway,
+    loadPortalAssets,
+    MAX_CAMERA_Z,
+    MIN_DISTANCE,
+    PortalState,
+  } from '~demos/stage-masks/PaintingHallway';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the first frames get to settle before the card is taken, in ms
+  const PREVIEW_SETTLE = 2500;
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  canvas.style.touchAction = 'none';
+  const display = new Display(canvas);
+
+  const director = new StageDirector(display).setClearColor(new Color('#030305'), 1);
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadPortalAssets(renderer);
+    if (display.isDisposed) {
+      disposePortalAssets(assets);
+      return;
+    }
+
+    const state = new PortalState();
+    if (isPreview) {
+      // the card: close enough that the moor fills much of the frame, the walker halfway up the path
+      state.autoWalk = false;
+      state.cameraZ = state.portalZ + 400;
+      state.walk = 0.62;
+    }
+    const hallway = new Hallway(assets, state);
+    const moor = new Moor(assets, state);
+    const glaze = new Glaze(assets, state);
+    const portal = new PortalCanvas(hallway);
+    // the canvas hangs at the portal depth; the hallway updates first, the mask stage draws after the layers
+    portal.place(state.portalZ);
+    on(hallway.stage, OnStageUpdateFrame, () => portal.place(state.portalZ));
+
+    // from the bottom up: the hallway, the moor inside the painting, the glaze in front of the canvas.
+    // The portal is never in the stack: it is the mask of the moor's slot, in the world of the hallway
+    director.setStack([hallway.stage, moor.stage, glaze.stage]);
+    director.setMask(moor.stage, portal.mask);
+    // for the console: the state of the walk, the portal and the walker
+    Object.assign(window, {portalState: state});
+
+    const settings = {
+      autoWalk: state.autoWalk,
+      portalZ: state.portalZ,
+      cameraZ: Math.round(state.cameraZ),
+    };
+    const readout = {camera: '', distance: '', size: '', maskOf: ''};
+    readout.maskOf = director.maskOf(moor.stage) === portal.mask ? 'StageMask.inWorldOf(hallway, portal scene)' : 'undefined';
+
+    const setAutoWalk = (on: boolean) => {
+      state.autoWalk = on;
+      settings.autoWalk = on;
+    };
+
+    // the readouts show what is on the screen: the camera as it stands, the oval as large as it is drawn
+    let lastCameraZ = Number.NaN;
+    let lastPortalZ = Number.NaN;
+    let lastHeight = Number.NaN;
+    on(glaze.stage, OnStageUpdateFrame, () => {
+      settings.cameraZ = Math.round(state.cameraZ);
+      settings.autoWalk = state.autoWalk;
+      settings.portalZ = state.portalZ;
+      const camera = hallway.stage.camera as PerspectiveCamera | undefined;
+      if (!camera) return;
+      const cameraZ = Math.round(camera.position.z);
+      // the strings are made only when a number on the screen changes
+      if (cameraZ === lastCameraZ && state.portalZ === lastPortalZ && canvas.clientHeight === lastHeight) return;
+      lastCameraZ = cameraZ;
+      lastPortalZ = state.portalZ;
+      lastHeight = canvas.clientHeight;
+      const distance = camera.position.z - state.portalZ;
+      const visible = 2 * distance * Math.tan((camera.fov * Math.PI) / 360);
+      const pxW = Math.round(((FRAME.rx * 2) / visible) * canvas.clientHeight);
+      const pxH = Math.round(((FRAME.ry * 2) / visible) * canvas.clientHeight);
+      readout.camera = `z ${cameraZ}`;
+      readout.distance = `${Math.round(distance)} units`;
+      readout.size = `${pxW} × ${pxH} px (${Math.round((pxH / canvas.clientHeight) * 100)} % of the height)`;
+    });
+
+    const keys: Record<string, 'forward' | 'back' | 'left' | 'right'> = {
+      ArrowUp: 'forward',
+      ArrowDown: 'back',
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      KeyW: 'forward',
+      KeyS: 'back',
+      KeyA: 'left',
+      KeyD: 'right',
+    };
+    // a shortcut of the browser or the system moves nothing, and neither does typing into the gui
+    const ignored = (event: KeyboardEvent) =>
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (ignored(event)) return;
+      const key = keys[event.code];
+      if (key) {
+        state.input[key] = true;
+        setAutoWalk(false);
+        event.preventDefault();
+      }
+      if (event.code === 'Space' && !event.repeat) {
+        setAutoWalk(!state.autoWalk);
+        event.preventDefault();
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const key = keys[event.code];
+      if (key) state.input[key] = false;
+    };
+    // a key released while the window is not focused never sends its keyup: stop on blur
+    const onBlur = () => {
+      state.input.forward = state.input.back = state.input.left = state.input.right = false;
+      state.input.leanX = state.input.leanY = 0;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+
+    // the pointer leans: the camera moves a little towards it, and the moor shifts in its frame
+    const onPointerMove = (event: PointerEvent) => {
+      state.input.leanX = (event.offsetX / canvas.clientWidth - 0.5) * 2;
+      state.input.leanY = (0.5 - event.offsetY / canvas.clientHeight) * 2;
+    };
+    const onPointerLeave = () => {
+      state.input.leanX = state.input.leanY = 0;
+    };
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      setAutoWalk(false);
+      state.cameraZ = Math.min(MAX_CAMERA_Z, Math.max(state.portalZ + MIN_DISTANCE, state.cameraZ + event.deltaY * 0.6));
+    };
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+    canvas.addEventListener('pointercancel', onPointerLeave);
+    canvas.addEventListener('wheel', onWheel, {passive: false});
+
+    const gui = new GUI({container: getDemoUi(), title: 'The Painting in the Hallway'});
+    gui
+      .add(settings, 'autoWalk')
+      .name('auto walk (space)')
+      .onChange((on: boolean) => setAutoWalk(on))
+      .listen();
+    gui
+      .add(settings, 'portalZ', -150, 250, 1)
+      .name('portal depth z')
+      .onChange((z: number) => {
+        state.portalZ = z;
+      })
+      .listen();
+    gui
+      .add(settings, 'cameraZ', 200, MAX_CAMERA_Z, 1)
+      .name('camera z (dolly)')
+      .onChange((z: number) => {
+        setAutoWalk(false);
+        state.cameraZ = Math.max(state.portalZ + MIN_DISTANCE, z);
+      })
+      .listen();
+    gui.add(readout, 'camera').name('camera').disable().listen();
+    gui.add(readout, 'distance').name('distance to canvas').disable().listen();
+    gui.add(readout, 'size').name('portal on screen').disable().listen();
+    gui.add(readout, 'maskOf').name('maskOf(other)').disable().listen();
+
+    // the one shape the demo reaches: the moor masked by the portal between two plain layers
+    const shapes: StageDirectorShape[] = [['layer', {mask: portal.mask}, 'layer']];
+    const precompiled = director
+      .precompile(renderer, shapes, {layers: [hallway.stage, moor.stage, glaze.stage, portal.mask.stage]})
+      .catch((error: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+        console.error('stage-masks-portal: precompile() failed, the first frame builds the shader instead', error);
+      });
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
+      canvas.removeEventListener('pointercancel', onPointerLeave);
+      canvas.removeEventListener('wheel', onWheel);
+      gui.destroy();
+      // the director lets go of the layers and the mask stage first, then each goes
+      director.dispose();
+      portal.dispose();
+      glaze.dispose();
+      moor.dispose();
+      hallway.dispose();
+      disposePortalAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>
