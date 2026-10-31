@@ -116,6 +116,8 @@ export async function loadDeepAssets(renderer: WebGPURenderer): Promise<DeepAsse
     load('sprites.png'),
     fetch(assetsUrl(`${DIR}/sprites.json`)).then((response) => response.json() as Promise<AtlasJson>),
   ]);
+  // an atlas of the library's sprites is read upright, t from the top
+  sprites.flipY = false;
   return {roomNight, roomDrowned, sky, deep, sprites, atlas};
 }
 
@@ -127,13 +129,13 @@ export function disposeDeepAssets(assets: DeepAssets): void {
   assets.sprites.dispose();
 }
 
-/** The rectangle of a frame of the atlas in uv, v from the bottom (the texture is flipped on upload). */
+/** The rectangle of a frame of the atlas in uv, t from the top: the atlas is uploaded upright. */
 function frameUv(atlas: AtlasJson, name: string) {
   const entry = atlas.frames[name];
   if (!entry) throw new Error(`DeepListening: the atlas has no frame "${name}"`);
   const {x, y, w, h} = entry.frame;
   const {w: aw, h: ah} = atlas.meta.size;
-  return {u: x / aw, v: (ah - y - h) / ah, uw: w / aw, vh: h / ah, w: w / TEXELS_PER_UNIT, h: h / TEXELS_PER_UNIT};
+  return {u: x / aw, v: y / ah, uw: w / aw, vh: h / ah, w: w / TEXELS_PER_UNIT, h: h / TEXELS_PER_UNIT};
 }
 
 /** Puts a frame of the atlas on a sprite at the size it was drawn, times `scale`. */
@@ -189,7 +191,8 @@ function swayingPlane(
   const h = opts.height;
   const geometry = new PlaneGeometry(w, h, 1, 24);
   const uvs = geometry.getAttribute('uv');
-  for (let i = 0; i < uvs.count; i++) uvs.setXY(i, f.u + uvs.getX(i) * f.uw, f.v + uvs.getY(i) * f.vh);
+  // the plane's v runs up from its bottom edge, the atlas' t down from the top of the frame
+  for (let i = 0; i < uvs.count; i++) uvs.setXY(i, f.u + uvs.getX(i) * f.uw, f.v + (1 - uvs.getY(i)) * f.vh);
   // 0 at the anchor, 1 at the free end
   const along = opts.anchor === 'bottom' ? positionLocal.y.div(h).add(0.5) : float(0.5).sub(positionLocal.y.div(h));
   const t = opts.time;
