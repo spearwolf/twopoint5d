@@ -117,5 +117,6 @@ scheduled, and each item would get a proposal of its own before it is built.
 | [`sprite-visibility.md`](sprite-visibility.md) | `Visible` — a flag per sprite that collapses its vertices in the last mesh stage |
 | [`display-fullscreen.md`](display-fullscreen.md) | `display.fullscreen` — native fullscreen, fullscreen on landscape, a pseudo fullscreen as opt-in fallback |
 | [`stage-transitions.md`](stage-transitions.md) | `StageDirector` — a stack of stage layers changed through transitions, and the transition effects in TSL |
+| [`stage-masks.md`](stage-masks.md) | `StageMask` — a stage whose picture masks a slot of a `StageDirector`, `matte()` transitions through a living stage, stencil and masks in 3D |
 
 A new proposal is a file of its own here, named after its subject, with a row in this table.
