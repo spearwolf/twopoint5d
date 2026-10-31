@@ -2,13 +2,13 @@
 
 Status: **phase A, B and C implemented** — see [`docs/stages.md`](../stages.md), "Stage masks"
 ([the mask](../stages.md#the-mask), [masks on a slot](../stages.md#masks-on-a-slot),
-[run and freeze](../stages.md#run-and-freeze), [the progress of a mask](../stages.md#the-progress-of-a-mask),
+[run and freeze a mask](../stages.md#run-and-freeze-a-mask), [the progress of a mask](../stages.md#the-progress-of-a-mask),
 [a transition through a living matte](../stages.md#a-transition-through-a-living-matte),
 [an effect that reads a mask](../stages.md#an-effect-that-reads-a-mask),
 [masks in the world](../stages.md#masks-in-the-world),
 [a mask at a share of the resolution](../stages.md#a-mask-at-a-share-of-the-resolution),
 [`precompile()` with masks](../stages.md#no-hitch-precompile-with-masks),
-[without a director](../stages.md#without-a-director)) and its cheat sheet; the Vitest specs
+[masks without a director](../stages.md#masks-without-a-director)) and its cheat sheet; the Vitest specs
 `src/stage/StageMask.spec.ts`, `src/stage/StageDirector.masks.spec.ts`, `src/stage/maskNodes.spec.ts`,
 `src/stage/matte.spec.ts`, `src/stage/StageRendererTargets.spec.ts` and
 `src/stage/hot-path-allocations.director.spec.ts`; the browser test

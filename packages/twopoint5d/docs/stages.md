@@ -965,9 +965,11 @@ export const wobble = (amplitude = 0.03): StageTransitionEffect => ({
 });
 ```
 
-`build({from, to, progress, uv, resolution})` gets the sources as `sample(uv)` — transparent black
-outside `[0, 1]` —, the eased progress as a float node, the uv of the pixel with its origin at the
-top left of the picture, and the size of the picture in pixels of the drawing buffer. An effect
+`build({from, to, progress, uv, resolution, mask})` gets the sources as `sample(uv)` — transparent
+black outside `[0, 1]` —, the eased progress as a float node, the uv of the pixel with its origin
+at the top left of the picture, the size of the picture in pixels of the drawing buffer, and
+`mask()`, which reads a mask the effect names — see [an effect that reads a
+mask](#an-effect-that-reads-a-mask). An effect
 whose nodes own GPU memory releases it in an optional `dispose(node)`, which the director calls
 in its own `dispose()`.
 
@@ -1563,7 +1565,7 @@ they are.
   bottom to top. A mask that follows something in the world of a layer reads the camera that moved
   in this frame.
 
-### Run and freeze
+### Run and freeze a mask
 
 A mask stage updates and draws every frame for as long as a slot references it, and leaves the
 stages of the director as a layer does when nothing references it any more: the GPU memory of its
@@ -1700,7 +1702,7 @@ The pass target of a mask is the one that costs. At 3840 × 2160 it holds a half
 [`scale`](#a-mask-at-a-share-of-the-resolution) of a fog or a vignette is the first thing to try
 on a small device.
 
-### Without a director
+### Masks without a director
 
 `createMaskNode(content, mask, options?)` builds the node of a masked picture for a
 `buildOutputNode` of your own: `content` times the coverage of `mask`, all four channels,
@@ -2071,7 +2073,7 @@ pipeline.dispose();
 | `ClearStage` | `{depth: true}`, name `'clear'` |
 | `Canvas2DStage` fit | `'contain'` |
 | `createBloomOutputNodeBuilder()` | `strength: 1`, `radius: 0`, `threshold: 0` |
-| `StageMask` | `source: 'alpha'`, `invert: false` |
+| `StageMask` | `source: 'alpha'`, `invert: false`, `scale: 1` |
 | `matte()` | `mode: 'coverage'`, `softness: 0.05` (`'threshold'` only) |
 | a transition of `StageDirector` | `crossfade()`, `0.5` s with an effect and `0` without, `'ease-in-out'`, no delay |
 | `outgoing`, `incoming`, `below` | `'run'` |
