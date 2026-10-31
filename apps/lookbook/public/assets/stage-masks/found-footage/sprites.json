@@ -1,0 +1,233 @@
+{
+  "frames": {
+    "birch-a": {
+      "frame": {
+        "x": 272,
+        "y": 6,
+        "w": 240,
+        "h": 1240
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 240,
+        "h": 1240
+      },
+      "sourceSize": {
+        "w": 240,
+        "h": 1240
+      }
+    },
+    "birch-b": {
+      "frame": {
+        "x": 764,
+        "y": 6,
+        "w": 220,
+        "h": 1240
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 220,
+        "h": 1240
+      },
+      "sourceSize": {
+        "w": 220,
+        "h": 1240
+      }
+    },
+    "birch-c": {
+      "frame": {
+        "x": 6,
+        "y": 6,
+        "w": 260,
+        "h": 1240
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 260,
+        "h": 1240
+      },
+      "sourceSize": {
+        "w": 260,
+        "h": 1240
+      }
+    },
+    "birch-d": {
+      "frame": {
+        "x": 990,
+        "y": 6,
+        "w": 200,
+        "h": 1240
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 200,
+        "h": 1240
+      },
+      "sourceSize": {
+        "w": 200,
+        "h": 1240
+      }
+    },
+    "birch-e": {
+      "frame": {
+        "x": 518,
+        "y": 6,
+        "w": 240,
+        "h": 1240
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 240,
+        "h": 1240
+      },
+      "sourceSize": {
+        "w": 240,
+        "h": 1240
+      }
+    },
+    "tent": {
+      "frame": {
+        "x": 1196,
+        "y": 6,
+        "w": 520,
+        "h": 300
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 520,
+        "h": 300
+      },
+      "sourceSize": {
+        "w": 520,
+        "h": 300
+      }
+    },
+    "figure": {
+      "frame": {
+        "x": 1344,
+        "y": 1252,
+        "w": 80,
+        "h": 240
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 80,
+        "h": 240
+      },
+      "sourceSize": {
+        "w": 80,
+        "h": 240
+      }
+    },
+    "eyeshine": {
+      "frame": {
+        "x": 1430,
+        "y": 1252,
+        "w": 40,
+        "h": 20
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 20
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 20
+      }
+    },
+    "bracken": {
+      "frame": {
+        "x": 6,
+        "y": 1252,
+        "w": 440,
+        "h": 300
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 440,
+        "h": 300
+      },
+      "sourceSize": {
+        "w": 440,
+        "h": 300
+      }
+    },
+    "bramble": {
+      "frame": {
+        "x": 452,
+        "y": 1252,
+        "w": 440,
+        "h": 300
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 440,
+        "h": 300
+      },
+      "sourceSize": {
+        "w": 440,
+        "h": 300
+      }
+    },
+    "grass": {
+      "frame": {
+        "x": 898,
+        "y": 1252,
+        "w": 440,
+        "h": 300
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 440,
+        "h": 300
+      },
+      "sourceSize": {
+        "w": 440,
+        "h": 300
+      }
+    }
+  },
+  "meta": {
+    "image": "sprites.webp",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 1558
+    },
+    "scale": "1"
+  }
+}

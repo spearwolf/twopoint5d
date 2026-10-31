@@ -483,3 +483,20 @@ jellyfish) at (262, 66), so that the demo's overlays fit both.
 | `deep.webp` | 840 × 570, opaque | behind the drowned window, the same rectangle: dark water lit from above with shafts of light, a glow where the jellyfish hangs, low rocks, the overgrown pedestal of the dish, marine snow, a murk that moves in clouds |
 | `sprites.png` | 2048 × 1332, straight alpha | the sprites, TexturePacker hash in `sprites.json`, untrimmed, 6 px apart, drawn at 2 texels per unit: `reel-night`, `reel-drowned` (84 units, a flange with three windows over a pack of tape; the second grown over), `jelly-bell` (the jellyfish's bell, translucent cyan, four glowing gonads, a rim of lights), `jelly-arms` (its frilled oral arms and long tentacles, hanging from the top edge), `leviathan` (650 × 230 units, swimming left: an eel's length of body under a ragged frill, needle teeth, one pale eye, two rows of lights), `kelp-a` … `kelp-d` (strands rooted at the bottom middle), `fish`, `bubble`, `glow` (a soft white radial glow for additive tints) |
 | `sprites.json` | | the frames of `sprites.png` |
+
+### found-footage
+
+"Found Footage", the art of the demo `stage-masks-shared`, from `stage-masks/found-footage/footage.mjs`
+with `birch.mjs`, `props.mjs` and `ground.mjs`. (The directory is not named after the demo: `shared/`
+is kept for art several demos use.) The birch trunks are shaded pixel by pixel in JavaScript — a
+cylinder lit from the camera, bark noise, lenticels, black patches, the chevrons where branches fell
+off, a fissured base with moss — over twigs drawn as SVG, and the carvings are SVG strokes turned
+into a cut with a lit and a dark lip. The props and the litter of the floor are SVG rasterised by
+sharp's librsvg. Everything is drawn at 2 texels per unit in neutral greys: the demo tints it to
+the green of a camcorder's night shot. No font is used.
+
+| file | size | what |
+| --- | --- | --- |
+| `sprites.webp` | 2048 × 1558, straight alpha | the sprites, TexturePacker hash in `sprites.json`, untrimmed, 6 px apart, loaded upright (`flipY = false`): `birch-a` … `birch-e` (1240 px tall — 620 units —, 200 to 260 px wide, the trunk standing on the bottom edge of the frame with its root flare; `birch-a` carries a carved spiral, `birch-b` nothing, `birch-c` an eye with rays, `birch-d` tally marks over a cross, `birch-e` a circle crossed by a stroke and three bars, each at 42 % of the height from the top), `tent` (260 × 150 units: a dome tent whose pole snapped, sagging to the right, the door unzipped on the black inside, three tears in its side, guy lines and a boot; standing on the bottom edge), `figure` (40 × 120 units: a thin pale figure with arms to its knees and a tilted head, standing on the bottom edge), `eyeshine` (20 × 10 units, two white points with a glow, for an additive tint), `bracken`, `bramble`, `grass` (220 × 150 units each, undergrowth rooted at the bottom middle) |
+| `sprites.json` | | the frames of `sprites.webp` |
+| `ground.webp` | 2048 × 400, straight alpha | the forest floor, 1024 × 200 units, repeating along x: far at the top, near at the bottom; dark loam, dry leaves and twigs that grow towards the bottom, a trodden path across the middle, a fringe of grass at the top that thins into transparency. Loaded with the default `flipY` and `RepeatWrapping` along x: the demo scrolls each row of it at the speed of its depth |

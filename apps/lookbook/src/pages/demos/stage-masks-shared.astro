@@ -1,0 +1,163 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-shared.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {Display, OnStageUpdateFrame, StageDirector, type StageDirectorShape, StageMask} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {CamcorderHud, VhsNoise} from '~demos/stage-masks/Camcorder';
+  import {disposeFootageAssets, FootageClock, ForestLevel, loadFootageAssets, RotLayer} from '~demos/stage-masks/FoundFootage';
+  import {InkVignette} from '~demos/stage-masks/InkVignette';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the ink gets to creep in before the card is taken, in ms
+  const PREVIEW_SETTLE = 3600;
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+
+  const settings = {
+    level: true,
+    hud: true,
+    strength: 0.35,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadFootageAssets(renderer);
+    if (display.isDisposed) {
+      disposeFootageAssets(assets);
+      return;
+    }
+
+    const clock = new FootageClock();
+    const rot = new RotLayer(clock);
+    const forest = new ForestLevel(assets, clock);
+    const vhs = new VhsNoise(clock);
+    const hud = new CamcorderHud(clock);
+    const ink = new InkVignette(clock);
+    ink.strength = settings.strength;
+
+    // the bottom layer is updated first in every frame: the clock moves there, before any stage reads it
+    on(rot.stage, OnStageUpdateFrame, ({deltaTime}) => clock.update(deltaTime));
+
+    // from the bottom up: the rot the ink leaves, the level, the tape's noise, the HUD. The ink is
+    // never in the stack: it is the mask stage, and one StageMask lies on two slots
+    const layers = [rot.stage, forest.stage, vhs.stage, hud.stage];
+    director.setStack(layers);
+    const inkMask = new StageMask(ink.stage, {invert: true});
+
+    const readout = {level: '', hud: '', drawn: '', sampled: ''};
+    const describe = (stage: (typeof layers)[number]) => (director.maskOf(stage) ? 'StageMask(ink, alpha, invert)' : 'undefined');
+    const refresh = () => {
+      readout.level = describe(forest.stage);
+      readout.hud = describe(hud.stage);
+      let sampled = 0;
+      for (const stage of layers) if (director.maskOf(stage) === inkMask) sampled++;
+      readout.sampled = `${sampled} of ${layers.length} slots`;
+    };
+    const apply = () => {
+      director.setMask(forest.stage, settings.level ? inkMask : undefined);
+      director.setMask(hud.stage, settings.hud ? inkMask : undefined);
+      refresh();
+    };
+    apply();
+
+    // the ink counts its draws; the HUD, the top layer, is updated before the mask stage draws, so it
+    // reads the draws of the frame before: one, whether one slot or two sample the ink — and none once
+    // no slot holds the mask, when the mask stage has left the director
+    let lastDraws = -1;
+    on(hud.stage, OnStageUpdateFrame, () => {
+      const draws = ink.takeDraws();
+      if (draws !== lastDraws) {
+        lastDraws = draws;
+        readout.drawn = `${draws} per frame`;
+      }
+    });
+
+    // L and H toggle the mask of the level and of the HUD
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (event.code === 'KeyL') settings.level = !settings.level;
+      else if (event.code === 'KeyH') settings.hud = !settings.hud;
+      else return;
+      apply();
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    const gui = new GUI({container: getDemoUi(), title: 'Found Footage'});
+    gui.add(settings, 'level').name('mask on the level (l)').onChange(apply).listen();
+    gui.add(settings, 'hud').name('mask on the HUD (h)').onChange(apply).listen();
+    gui
+      .add(settings, 'strength', 0, 1, 0.01)
+      .name('vignette strength')
+      .onChange((strength: number) => {
+        ink.strength = strength;
+      });
+    gui.add(readout, 'level').name('maskOf(level)').disable().listen();
+    gui.add(readout, 'hud').name('maskOf(hud)').disable().listen();
+    gui.add(readout, 'drawn').name('mask stage drawn').disable().listen();
+    gui.add(readout, 'sampled').name('sampled by').disable().listen();
+
+    // every shape the two toggles reach: both slots masked, one of them, none. One source and one
+    // invert throughout, so these four are all the shaders the demo needs
+    const shapes: StageDirectorShape[] = [
+      ['layer', {mask: inkMask}, 'layer', {mask: inkMask}],
+      ['layer', {mask: inkMask}, 'layer', 'layer'],
+      ['layer', 'layer', 'layer', {mask: inkMask}],
+      ['layer', 'layer', 'layer', 'layer'],
+    ];
+    const precompiled = director
+      .precompile(renderer, shapes, {layers: [ink.stage]})
+      .catch((error: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+        console.error('stage-masks-shared: precompile() failed, the shaders build on first use', error);
+      })
+      // precompile() draws the mask stage off screen: those draws are not the frame's
+      .finally(() => ink.takeDraws());
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      gui.destroy();
+      // the director lets go of the layers and the mask stage first, then each goes
+      director.dispose();
+      inkMask.dispose();
+      ink.dispose();
+      rot.dispose();
+      forest.dispose();
+      vhs.dispose();
+      hud.dispose();
+      disposeFootageAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>
