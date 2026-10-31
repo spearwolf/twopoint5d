@@ -11,9 +11,6 @@ import {description, title} from './_stage-masks-flashlight.json';
   body {
     background: #020203;
   }
-  canvas {
-    touch-action: none;
-  }
 </style>
 
 <script>
@@ -41,6 +38,8 @@ import {description, title} from './_stage-masks-flashlight.json';
 
   const preview = deferPreview();
   const canvas = getFullscreenCanvas();
+  // a drag on the canvas crawls and aims; the browser must not scroll or zoom the page for it
+  canvas.style.touchAction = 'none';
   const display = new Display(canvas);
 
   // two slots over the clear color: the dark with its eyes, and the level, masked by the flashlight
@@ -62,7 +61,6 @@ import {description, title} from './_stage-masks-flashlight.json';
     }
 
     const rig = new CrawlRig(assets.layout);
-    Object.assign(window, {rig});
     const nodes = makeLightNodes();
     const dark = new CrawlDark(assets, rig, settings.projection);
     const level = new CrawlLevel(assets, rig, nodes, settings.projection);

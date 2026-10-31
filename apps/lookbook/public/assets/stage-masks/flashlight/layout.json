@@ -68,7 +68,7 @@
   ],
   "near": [
     {
-      "name": "near-pier",
+      "name": "near-post",
       "x": -880,
       "y": -40,
       "z": 170
@@ -92,7 +92,7 @@
       "z": 170
     },
     {
-      "name": "near-pier",
+      "name": "near-post",
       "x": 1180,
       "y": -40,
       "z": 170
@@ -219,8 +219,8 @@
       "w": 24,
       "h": 10
     },
-    "near-pier": {
-      "w": 80,
+    "near-post": {
+      "w": 68,
       "h": 520
     },
     "near-cobweb": {

@@ -1,11 +1,11 @@
 // stage-masks/flashlight: the sprites of "The Crawlspace" in one atlas — the player crawling with a
 // flashlight (four frames), the three crayon drawings pinned to the post, the eyes in the dark, a
-// drop and its splash, and the near things in front of the plane (a brick pier, a cobweb, dangling
+// drop and its splash, and the near things in front of the plane (a timber post, a cobweb, dangling
 // wires, rubble, a tuft of insulation). Every frame is a small layer of its own, authored y-down
 // around its middle, at its own texels per unit; `layout.json` gives each frame its size in units.
 import {Rng} from '../../lib/image.mjs';
 import {pack} from '../../lib/pack.mjs';
-import {blurFilter, brick, el, Layer, n, poly} from './kit.mjs';
+import {blurFilter, el, Layer, n, poly, wood} from './kit.mjs';
 
 /**
  * @typedef {object} Sprite
@@ -385,13 +385,28 @@ function eyes(core, glow, count, gap) {
 
 // -------------------------------------------------------------------------------------- the near things
 
-/** a brick pier close to the camera, its edges falling off into shadow */
-function nearPierPaint(/** @type {number} */ u, /** @type {number} */ v) {
-  const hw = 40;
-  if (Math.abs(u) > hw || v > 250) return undefined;
-  const c = brick(u + 400, v + 300, 24, 9, 401);
-  const k = (0.35 + 0.5 * Math.cos((u / hw) * 1.35)) * (v > 236 ? 0.4 : 1);
-  return /** @type {[number, number, number, number]} */ ([c[0] * k, c[1] * k, c[2] * k, 1]);
+/**
+ * A timber post close to the camera — a dark, weathered 6 × 6 with a split down its face and the
+ * iron of a strap, so it reads as a thing in front of the scene, not as more of the brick behind
+ * it. Its sides fall off to black and its outline is soft, so no hard seam shows where the light
+ * meets its edge.
+ */
+function nearPostPaint(/** @type {number} */ u, /** @type {number} */ v) {
+  const hw = 34;
+  const d = Math.abs(u) / hw;
+  if (d > 1) return undefined;
+  let c = wood(v * 0.6, u * 1.6, 401);
+  // weathered grey timber, darker than every wood behind it
+  const grey = (c[0] + c[1] + c[2]) / 3;
+  c = [c[0] * 0.35 + grey * 0.25, c[1] * 0.35 + grey * 0.25, c[2] * 0.35 + grey * 0.27];
+  // the split down the face, and an iron strap across it
+  if (Math.abs(u - 6 - 2 * Math.sin(v * 0.04)) < 0.8) c = [0.02, 0.015, 0.012];
+  if (Math.abs(v + 120) < 7) c = [0.09, 0.08, 0.075];
+  if (Math.abs(v + 120) < 7 && Math.abs(Math.abs(u) - 18) < 2.2) c = [0.16, 0.14, 0.12];
+  // round towards the sides, black at the edge, the outline feathered over the last 3 units
+  const k = Math.cos(d * 1.45) ** 1.6;
+  const a = Math.min(1, (hw - Math.abs(u)) / 3);
+  return /** @type {[number, number, number, number]} */ ([c[0] * k, c[1] * k, c[2] * k, a]);
 }
 
 function nearCobweb() {
@@ -519,7 +534,7 @@ const SPRITES = [
       el('path', {d: 'M-9 3Q-6 -3 -4 2M-2 2Q0 -4 2 2M4 2Q6 -3 9 3', stroke: '#a9bcc2', 'stroke-width': 1, fill: 'none'}),
     ],
   },
-  {name: 'near-pier', ppu: 3, w: 80, h: 520, paint: nearPierPaint, body: () => []},
+  {name: 'near-post', ppu: 3, w: 68, h: 520, paint: nearPostPaint, body: () => []},
   {name: 'near-cobweb', ppu: 3, w: 260, h: 200, body: nearCobweb},
   {name: 'near-wires', ppu: 3, w: 140, h: 200, body: nearWires},
   {name: 'near-rubble', ppu: 3, w: 270, h: 90, body: nearRubble},
