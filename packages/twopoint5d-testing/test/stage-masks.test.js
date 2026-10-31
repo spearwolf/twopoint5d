@@ -1,6 +1,8 @@
 import {expect} from '@esm-bundle/chai';
-import {Display, StageDirector, StageMask, StageRenderer, createMaskNode} from '@spearwolf/twopoint5d';
+import {on} from '@spearwolf/eventize';
+import {Display, OnStageUpdateFrame, StageDirector, StageMask, StageRenderer, createMaskNode, matte} from '@spearwolf/twopoint5d';
 import {Color, RenderPipeline, RenderTarget} from 'three/webgpu';
+import {mix} from 'three/tsl';
 import {
   disposeDisplay,
   disposeKept,
@@ -272,5 +274,190 @@ describe('StageDirector — masked slots on the GPU', () => {
     expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), [0, 0, 0], 3), 'coverage 0').to.be.true;
     expect(isNearColor(rgbAt(pixels, SIZE, MIDDLE, 32), [128, 0, 0], 3), 'coverage 0.5').to.be.true;
     expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), [255, 0, 0], 3), 'coverage 1').to.be.true;
+  });
+
+  describe('matte() — a transition through a living stage', () => {
+    // from is red, to is green: a pixel tells which side of the transition it shows
+    const FROM = [255, 0, 0];
+    const TO = [0, 255, 0];
+
+    /** A mask stage with one white rectangle from the left edge that is `fraction()` of the picture wide, set in every update. */
+    function growingStage(name, fraction) {
+      const filled = makeFilledStage(name, undefined);
+      const mesh = filled.fill('#fff', 1, {x: 0, y: 0, width: SIZE, height: SIZE});
+      on(filled.stage, OnStageUpdateFrame, () => {
+        const width = Math.max(fraction(), 1e-4);
+        mesh.scale.x = width;
+        mesh.position.x = (width * SIZE - SIZE) / 2;
+      });
+      return filled.stage;
+    }
+
+    /** red `from` replaced by green `to` through `effect`, driven by hand; the stack is red alone below nothing. */
+    function transitionThrough(effect) {
+      const red = makeFilledStage('red', '#f00');
+      const green = makeFilledStage('green', '#0f0');
+      director.setStack([red.stage]);
+      return director.replace(red.stage, green.stage, {effect, manual: true});
+    }
+
+    /** The colors at the left, the middle and the right band of the picture. */
+    const bandsOf = (pixels) => [LEFT, MIDDLE, RIGHT].map((x) => rgbAt(pixels, SIZE, x, 32));
+
+    it('coverage mode at progress 0, 0.5 and 1 against a mask stage whose coverage follows mask.progress', async () => {
+      /** @type {StageMask} */
+      let ink;
+      ink = new StageMask(growingStage('ink', () => ink.progress));
+      const t = transitionThrough(matte({mask: ink}));
+
+      t.progress = 0;
+      let pixels = await draw();
+      expect(ink.progress, 'the mask follows the progress').to.equal(0);
+      expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), FROM), 'progress 0: from at the left').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), FROM), 'progress 0: from at the right').to.be.true;
+
+      t.progress = 0.5;
+      pixels = await draw();
+      expect(ink.progress, 'the mask follows the progress').to.equal(0.5);
+      expect(ink.progressNode.value, 'and so does its node').to.equal(0.5);
+      expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), TO), 'progress 0.5: the covered left half shows to').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), FROM), 'progress 0.5: the right half still shows from').to.be.true;
+
+      t.progress = 1;
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), TO), 'progress 1: to at the left').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), TO), 'progress 1: to at the right').to.be.true;
+
+      t.complete();
+      expect(ink.progress, 'a finished transition leaves 1 behind').to.equal(1);
+      expect(isNearColor(rgbAt(await draw(), SIZE, RIGHT, 32), TO), 'the end').to.be.true;
+    });
+
+    it('coverage mode holds both ends whatever the mask draws: nothing at 1, everything at 0', async () => {
+      const nothing = new StageMask(bandsStage('nothing', [undefined, undefined, undefined]));
+      const t = transitionThrough(matte({mask: nothing}));
+      t.progress = 0.5;
+      let pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, FROM), `nothing, 0.5, band ${i}: from`).to.be.true);
+      t.progress = 1;
+      pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, TO), `nothing, 1, band ${i}: to`).to.be.true);
+      t.cancel();
+
+      const everything = new StageMask(
+        bandsStage('everything', [
+          ['#fff', 1],
+          ['#fff', 1],
+          ['#fff', 1],
+        ]),
+      );
+      const u = transitionThrough(matte({mask: everything}));
+      u.progress = 0.5;
+      pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, TO), `everything, 0.5, band ${i}: to`).to.be.true);
+      u.progress = 0;
+      pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, FROM), `everything, 0, band ${i}: from`).to.be.true);
+    });
+
+    it('threshold mode: the coverage is the progress at which a pixel switches, the ends hold', async () => {
+      // switching points 0.25, 0.75 and 1 from the left; the alpha is the coverage
+      const gradient = new StageMask(
+        bandsStage('gradient', [
+          ['#fff', 0.25],
+          ['#fff', 0.75],
+          ['#fff', 1],
+        ]),
+      );
+      const t = transitionThrough(matte({mask: gradient, mode: 'threshold', softness: 0}));
+
+      t.progress = 0;
+      let pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, FROM), `progress 0, band ${i}: from`).to.be.true);
+
+      t.progress = 0.5;
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), TO), 'progress 0.5: the 0.25 band has switched').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, MIDDLE, 32), FROM), 'progress 0.5: the 0.75 band has not').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), FROM), 'progress 0.5: the 1 band has not').to.be.true;
+
+      t.progress = 0.9;
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, MIDDLE, 32), TO), 'progress 0.9: the 0.75 band has switched').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), FROM), 'progress 0.9: the 1 band has not').to.be.true;
+
+      t.progress = 1;
+      pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, TO), `progress 1, band ${i}: to`).to.be.true);
+    });
+
+    it('threshold mode: a mask that draws nothing switches first, and the ends hold', async () => {
+      const nothing = new StageMask(bandsStage('nothing', [undefined, undefined, undefined]));
+      const t = transitionThrough(matte({mask: nothing, mode: 'threshold', softness: 0}));
+      t.progress = 0;
+      let pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, FROM), `progress 0, band ${i}: from`).to.be.true);
+      t.progress = 0.5;
+      pixels = await draw();
+      bandsOf(pixels).forEach((rgb, i) => expect(isNearColor(rgb, TO), `progress 0.5, band ${i}: to`).to.be.true);
+    });
+
+    it('threshold mode blends a pixel near its switching point by softness', async () => {
+      const gradient = new StageMask(bandsStage('gradient', [undefined, ['#fff', 0.5], undefined]));
+      const t = transitionThrough(matte({mask: gradient, mode: 'threshold', softness: 0.5}));
+      t.progress = 0.5;
+      const [, mixed] = bandsOf(await draw());
+      expect(mixed[0], 'some of from is left').to.be.greaterThan(40);
+      expect(mixed[1], 'some of to has come').to.be.greaterThan(40);
+    });
+
+    it('a matte inside a masked slot runs under the mask of the slot', async () => {
+      const blue = makeFilledStage('blue', '#00f');
+      const red = makeFilledStage('red', '#f00');
+      const green = makeFilledStage('green', '#0f0');
+      const fog = new StageMask(bandsStage('fog', [undefined, ['#fff', 1], ['#fff', 1]]));
+      const everything = new StageMask(
+        bandsStage('everything', [
+          ['#fff', 1],
+          ['#fff', 1],
+          ['#fff', 1],
+        ]),
+      );
+      director.setStack([blue.stage, red.stage]);
+      director.setMask(red.stage, fog);
+      const t = director.replace(red.stage, green.stage, {effect: matte({mask: everything}), manual: true});
+
+      const BLUE = [0, 0, 255];
+      t.progress = 0;
+      let pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), BLUE), 'progress 0: the fog hides the slot at the left').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), FROM), 'progress 0: from where the fog covers').to.be.true;
+
+      t.progress = 0.5;
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), BLUE), 'progress 0.5: still hidden at the left').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, MIDDLE, 32), TO), 'progress 0.5: to inside the fog').to.be.true;
+
+      t.complete();
+      expect(director.maskOf(green.stage), 'the mask stays with the slot').to.equal(fog);
+      pixels = await draw();
+      expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), BLUE), 'the end: hidden at the left').to.be.true;
+      expect(isNearColor(rgbAt(pixels, SIZE, RIGHT, 32), TO), 'the end: to where the fog covers').to.be.true;
+    });
+
+    it("an effect of one's own reads input.mask(m).coverage(uv)", async () => {
+      const mask = new StageMask(bandsStage('mask', [undefined, ['#fff', 0.5], ['#fff', 1]]));
+      // reads the coverage alone, to tell the two sources apart by it: 1 shows from, 0 shows to
+      const own = {
+        name: 'own',
+        masks: [mask],
+        build: ({from, to, uv, mask: maskOf}) => mix(to.sample(uv), from.sample(uv), maskOf(mask).coverage(uv)),
+      };
+      transitionThrough(own);
+      const [left, middle, right] = bandsOf(await draw());
+      expect(isNearColor(left, TO), 'coverage 0: to').to.be.true;
+      expect(isNearColor(middle, [srgb(0.5), srgb(0.5), 0], 3), 'coverage 0.5: half of both').to.be.true;
+      expect(isNearColor(right, FROM), 'coverage 1: from').to.be.true;
+    });
   });
 });
