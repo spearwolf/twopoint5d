@@ -1,6 +1,6 @@
 # Proposal: stage masks — a stage that masks another one, and transitions through a living matte
 
-Status: **proposed**
+Status: **specified**
 
 A `StageDirector` lays layers over each other and changes them through transitions whose effects
 are TSL functions of two pictures and a progress. What it cannot do is let a *third* picture decide
@@ -73,16 +73,23 @@ The options are read once, as the options of an effect are: they go into the sha
 the default because a mask stage clears nothing and draws its shapes — every sprite, every mesh
 with its own alpha and blending — onto transparent black; `'luminance'` takes a gray picture, a
 painting or a `Canvas2DStage`-like stage, whose luminance is read in the linear working space.
+Every source reads the premultiplied picture of the mask stage, not an un-premultiplied one: the
+`'luminance'` of a half-transparent gray is its luminance times its alpha, so the transparent black
+around the shapes of a mask stage is coverage 0 under every source, and the four channels agree
+about where a shape ends.
 
 The mask stage is any stage a director takes as a layer: a `Stage2D`, a `StageRenderer` with stages
 and a pipeline of its own, a stage of one's own. Unlike an effect, a `StageMask` is no description:
-it holds a stage, and a mask serves one director at a time; a second director refuses it with an
-error that names the mask stage. For a `StageRenderer` as the mask stage that follows from its one
-holder already. A `Stage2D` could be held twice — its pass node is shared by every renderer that
+it holds a stage, and a stage serves one director at a time as a mask. The refusal goes by the
+**stage**, not by the `StageMask` object: a module-level registry maps every stage that a director
+draws as a mask to that director, and a second director refuses every mask on such a stage with an
+error that names the mask stage. A stage that is a layer in one director and a mask in another is
+refused as well. For a `StageRenderer` as the mask stage that follows from its one holder already. A `Stage2D` could be held twice — its pass node is shared by every renderer that
 composes it —, but not under two directors: a director wraps a `Stage2D` in a `StageRenderer` and
 draws it through `renderTo()`, not through its pass node, so two directors would draw it twice, and
 both would call its `updateFrame()`, so the mask would animate twice per frame. Within one
-director, one mask serves every slot it lies on (§3.2).
+director, one mask serves every slot it lies on (§3.2), and so do two `StageMask` objects on the
+same stage (§3.3).
 
 `mask.stage`, `mask.source` and `mask.invert` read out what was given. `mask.progress` and
 `mask.progressNode` belong to transitions (§4.2).
@@ -119,9 +126,25 @@ anti-aliased silhouettes and half-transparent blobs of the mask stage come throu
 - `director.maskOf(stage)` answers the mask of the slot that holds `stage`.
 - `setMask()` refuses, before anything changes: a `stage` that is not in the stack, a mask whose
   stage is a layer of the stack — a stage is a layer or a mask, never both —, a mask whose stage is
-  the director or holds it, a disposed stage, a mask held by another director.
+  the director or holds it, a disposed stage, a mask on a stage that another director draws as a
+  mask or as a layer (§3.1).
 - One mask may lie on several slots: its stage draws once per frame, and every masked slot samples
   the same picture.
+- The rule that a stage is a layer or a mask, never both, holds in both directions: `show()`,
+  `push()`, `replace()`, `setStack()` and `add()` refuse a stage that is a mask stage of this
+  director as a layer, as `setMask()` refuses a layer as a mask. The refusal comes before anything
+  changes.
+- `setStack()` drops every mask. A mask is a property of a slot, and `setStack()` makes new slots;
+  the masks of the stages that stay in the stack are not carried over, and a `setMask()` after the
+  call puts them back. `hide()`, `pop()` and `remove()` of a layer take the mask off the slot that
+  goes with it.
+- `remove(maskStage)` and the dispose of a mask stage take the mask off every slot it lies on, and
+  end every transition whose effect names it as cancelled (§9). `remove()` of a stage that is
+  neither a layer nor a mask does what it does without masks.
+- The mask stages stand in the update and draw order of the director after every layer: first the
+  distinct mask stages of the slot masks, bottom-up, then those of the running effects, slot by
+  slot, each by its first appearance. They update after the layers, so a mask that draws in the
+  world of another stage (§7.2) reads the camera that the world moved in this frame.
 
 ### 3.3 Two worlds through one mask
 
@@ -146,7 +169,9 @@ more (§4.4 of the transitions proposal): the GPU memory of its pass target goes
 `Stage2D` is disposed.
 
 `director.freeze(fogStage)` and `director.run(fogStage)` work for mask stages as they work for
-layers. A frozen mask draws once — and once again after a resize — and is sampled ever after: a
+layers; `freeze()` of a stage that is neither a layer nor a mask of this director is refused with
+the message "no layer or mask of this director", and a freeze does not survive the mask stage
+leaving the director, as it does not for a layer. A frozen mask draws once — and once again after a resize — and is sampled ever after: a
 mask that never changes costs a texture fetch per pixel and nothing else. A frozen mask stage is
 what `lumaMask()` does with a `Texture`, with the difference that the mask is drawn at the size of
 the director, by its projection, and stays upright under both backends (§3.5).
@@ -210,8 +235,16 @@ the display would end early under a slowed transition, late under a fast one, an
   mask.
 
 A mask drives one transition at a time; a second transition whose effect names a mask that is
-busy is refused (`StageDirector#replace(): the mask "ink" drives a transition already`). Between
-transitions `progress` holds the value of the last one; a new one starts it at 0.
+busy is refused (`StageDirector#replace(): the mask "ink" drives a transition already`). A mask is
+busy only after the runs that the call ends anyway have ended: `replace()` ends the run in its own
+slot first, so `replace(a, b, {effect: inkIn})` in the slot whose `inkIn` run is still going is
+allowed — the old run ends, and the mask starts again at progress 0. Between transitions `progress`
+holds the value of the last one; a new one starts it at 0.
+
+Under `manual: true` the progress may be set after `updateFrame()` and before the draw. The
+`progressNode` is written again in `renderToCurrentTarget()`, as the progress uniforms of the shape
+are, so the GPU never draws a stale value; `mask.progress` for the CPU side is the value of
+`updateFrame()`.
 
 ### 4.3 `matte()`
 
@@ -291,6 +324,17 @@ A slot of a shape is `'layer'`, an effect, or `{effect?, mask}` for a masked slo
 
 Against the nested pipeline of §2, a masked slot saves a pass target with its depth buffer — about
 100 MB at 3840 × 2160 — and a full-screen quad per masked layer, and one mask serves several slots.
+
+#### The size of a mask target
+
+A coverage needs no more resolution than its edge asks for, and a soft fog edge is a blur anyway.
+The `scale` option of `StageMask` is a number in `(0, 1]`, default `1`: the director draws the mask
+stage into a pass target of that share of the size of the drawing buffer, and the mask is sampled
+up to the full picture by the texture's own filtering. The director applies it to the pass target of
+the renderer it draws the mask stage with, through a seam of the stage module
+(`StageRendererTargets#scale`); the seam is internal, and `StageRenderer` has no public option for
+it. A mask stage with hard edges shows the coarser grid at `scale` below 1, a fog does not. §12
+gives the numbers.
 
 ## 5. Without a director
 
@@ -653,24 +697,42 @@ leaves the stack; a transition whose effect names it ends as cancelled.
 
 ## 11. The lookbook
 
-- **`stage-masks`** — a level with a spotlight of soft blobs around the player and the torches,
-  drawn into the alpha of a mask stage, and a rift into a second, colder world that opens where the
-  player stands. The `<demo-ui>` switches `source`, `invert` and freezes the mask.
-- **`fog-of-war-dungeon`** — a `Map2D` dungeon top-down under a `ParallaxProjection`, the tiles of
-  the existing map demos: the player walks, the fog rolls back in clouds and keeps boiling at its
-  edge. The `<demo-ui>` switches the three variants of §8.2 to §8.4 — fog planes, a parchment below,
-  the three states with a sight mask — and the size of the cells.
-- **`stage-transitions-gallery`** gains `matte()` with two mask stages: ink blots in `'coverage'`
-  mode and a boiling noise in `'threshold'` mode.
-- **`stage-transitions-game-menu`** may take the ink matte as one more effect of its select.
+Every scenario and every goal of phases A to C has a demo of its own in the lookbook, so that no
+demo has to carry two ideas. The demos use high-quality game art, with no pixel zoom above 2, and
+are themed as horror and strange things rather than classic fantasy. The scenario column cites the
+row of the goal table (§1) or of the scenario table (§2) it shows.
+
+| demo | phase | scenario / goal | what it shows | `<demo-ui>` |
+| --- | --- | --- | --- | --- |
+| `stage-masks-without-director` | A | §2 row 1, §5 | a plain composing `StageRenderer`: a sprite scene and a mask stage of drifting soft blobs, `createMaskNode()` in `buildOutputNode` | `source`, `invert` |
+| `stage-masks-spotlight` | A | §1 row 1, §3.1–3.2 | a level under a fog of war: soft blobs around the player and three torches in the alpha of a mask stage over a starfield; `replace(level, nextLevel)` keeps the porthole | `source`, `invert`, next level, mask on/off |
+| `stage-masks-rift` | A | §1 row 2, §3.3 | `[world, other]`, a mask on the slot of `other`: a rift into a colder world opens where the player stands; a second `invert: true` mask on the same stage cuts the world out of the bottom slot for a third layer | rift size, inverted second mask |
+| `stage-masks-shared` | A | §2 row 3, §3.2 last item | one ink vignette on two slots — a level and a HUD — the mask stage updated and drawn once per frame, shown by a counter | toggle the mask per slot |
+| `stage-masks-frozen` | A | §1 row 3, §3.4 | a keyhole of stained glass drawn once: the mask scene changes behind a frozen mask and nothing moves, a resize redraws it; draw counter | run / freeze, scramble the mask scene |
+| `stage-masks-matte-ink` | B | §1 row 4, §4.3 `'coverage'` | ink blots that grow by `ink.progress` turn a title into a level; a slider with `manual: true` holds any frame | duration, easing, scrub |
+| `stage-masks-matte-threshold` | B | §1 row 4, §4.3 `'threshold'` | a boiling noise and a turning gradient in a mask stage, swept by the progress | `softness`, mask kind, scrub |
+| `stage-masks-matte-3d` | B | §1 row 4, §7.4 | the silhouette of a real 3D scene as the matte: shards of glass that fly apart, a logo that turns until it fills the screen, the mask stage with a bloom in its own pipeline | mask scene, scrub |
+| `stage-masks-heat-haze` | B | §1 row 5, §4.1 | an effect of the demo's own that reads a living mask through `input.mask(m)` and displaces `from` and `to` by it | strength, scrub |
+| `stage-masks-flashlight` | C | §1 row 7, §7.2 | a level under a `ParallaxProjection`, the cone of a flashlight in the world of the level by `StageMask.inWorldOf()`; the camera follows the player, the projection can be swapped | projection, cone angle |
+| `stage-masks-portal` | C | §7.2 last paragraph | a portal disc at `z = 50` on a wall of `world`, a second world behind it that grows as the camera comes closer | portal depth, camera distance |
+| `stage-masks-resolution` | C | §12 phase C, §4.5 | one fog mask at `scale` 1, 0.5 and 0.25 side by side, with the bytes of each mask target | scale, soft/hard edges |
+
+`stage-transitions-gallery` additionally gains the two mattes of §4.3, ink blots in `'coverage'`
+mode and a boiling noise in `'threshold'` mode, as two more entries; the game-menu demo stays as it
+is.
+
+The demo of phase E, `fog-of-war-dungeon`, is a `Map2D` dungeon top-down under a
+`ParallaxProjection`, the tiles of the existing map demos: the player walks, the fog rolls back in
+clouds and keeps boiling at its edge. Its `<demo-ui>` switches the three variants of §8.2 to §8.4 —
+fog planes, a parchment below, the three states with a sight mask — and the size of the cells.
 
 ## 12. Phases
 
 | phase | content |
 | --- | --- |
-| A | `createMaskNode()`; `StageMask` with `source`, `invert`; `setMask()`, `maskOf()`, the `mask` option, run and freeze of masks, the masks in the shape cache and in `precompile()`; the tests of §10 for these; the guide section; the demo `stage-masks` |
-| B | `masks` and `input.mask()` in the effect contract, `mask.progress` and `progressNode`, `matte()` in both modes; the gallery |
-| C | `StageMask.inWorldOf()` (§7.2); a mask target at a share of the resolution — a `scale` of `0.5` takes the RGBA half-float target of a mask at 3840 × 2160 from 66 MB to 17 MB — through a seam in `StageRendererTargets` for the size of a pass target |
+| A | `createMaskNode()`; `StageMask` with `source`, `invert`; `setMask()`, `maskOf()`, the `mask` option, run and freeze of masks, the masks in the shape cache and in `precompile()`; the tests of §10 for these; the guide section; the demos of §11 for phase A |
+| B | `masks` and `input.mask()` in the effect contract, `mask.progress` and `progressNode`, `matte()` in both modes; the demos of §11 for phase B and the gallery |
+| C | `StageMask.inWorldOf()` (§7.2); the demos of §11 for phase C; a mask target at a share of the resolution — a `scale` of `0.5` takes the RGBA half-float target of a mask at 3840 × 2160 from 66 MB to 17 MB — through a seam in `StageRendererTargets` for the size of a pass target, offered as the `scale` option of `StageMask` (§4.5) |
 | D — idea, not scheduled | depth-aware masks (§7.3); the stencil pre-pass and the scissor of §6.2, each after a measurement of the fill cost it would save; `passTargetStencil` for a stencil inside a layer or a mask stage (§6.2) |
 | E | `RevealMap` and `fogCoverage()` (§8.1, §8.2) with their tests, a section in [`docs/map2d.md`](../map2d.md) and the demo `fog-of-war-dungeon` with the fog planes; independent of A to C and the first to build for a fog. The variants of §8.3 and §8.4 follow A and C |
 
