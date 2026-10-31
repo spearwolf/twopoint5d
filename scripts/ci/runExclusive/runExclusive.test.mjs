@@ -115,6 +115,66 @@ describe('runExclusive.mjs', () => {
     assert.equal(fs.existsSync(lock), false);
   });
 
+  it('hands Ctrl-C to its command once: the terminal signals the whole process group', async () => {
+    // the command counts its SIGINTs and ends with 10 + count half a second after the first,
+    // so a second one inside that time shows as 12
+    const wrapper = spawn(
+      process.execPath,
+      [
+        script,
+        '--lock',
+        lock,
+        '--',
+        process.execPath,
+        '-e',
+        `let count = 0;
+         process.on('SIGINT', () => { if (count++ === 0) setTimeout(() => process.exit(10 + count), 500); });
+         console.log('ready');
+         setTimeout(() => process.exit(9), 10_000);`,
+      ],
+      // a process group of its own, which the command joins: a gate in the foreground of a terminal
+      {stdio: ['ignore', 'pipe', 'pipe'], detached: true},
+    );
+    const exited = new Promise((resolve) => wrapper.on('exit', (code, signal) => resolve({code, signal})));
+    await Promise.race([new Promise((resolve) => wrapper.stdout.once('data', resolve)), exited]);
+    assert.ok(wrapper.pid);
+    process.kill(-wrapper.pid, 'SIGINT');
+    assert.deepEqual(await exited, {code: 11, signal: null});
+    assert.equal(fs.existsSync(lock), false);
+  });
+
+  it('leaves its command running on a SIGINT to its own pid alone and holds the lock until the command ends', async () => {
+    const wrapper = spawn(
+      process.execPath,
+      [
+        script,
+        '--lock',
+        lock,
+        '--',
+        process.execPath,
+        '-e',
+        `process.on('SIGINT', () => process.exit(8)); process.on('SIGTERM', () => process.exit(7)); console.log('ready'); setTimeout(() => process.exit(9), 10_000);`,
+      ],
+      {stdio: ['ignore', 'pipe', 'pipe']},
+    );
+    const exited = new Promise((resolve) => wrapper.on('exit', (code, signal) => resolve({code, signal})));
+    await Promise.race([new Promise((resolve) => wrapper.stdout.once('data', resolve)), exited]);
+    wrapper.kill('SIGINT');
+    const outcome = await Promise.race([exited, new Promise((resolve) => setTimeout(() => resolve('running'), 300))]);
+    assert.equal(outcome, 'running');
+    assert.equal(fs.existsSync(lock), true);
+    wrapper.kill('SIGTERM');
+    assert.deepEqual(await exited, {code: 7, signal: null});
+    assert.equal(fs.existsSync(lock), false);
+  });
+
+  it('dies of a SIGINT its command died of, and releases the lock', () => {
+    const {status, signal, stderr} = run(`process.kill(process.pid, 'SIGINT')`);
+    assert.equal(status, null, stderr);
+    assert.equal(signal, 'SIGINT');
+    assert.equal(fs.existsSync(lock), false);
+  });
+
   it('releases the lock and exits with 1 when the command cannot start', () => {
     const {status, stderr} = spawnSync(process.execPath, [script, '--lock', lock, '--', path.join(dir, 'no-such-command')], {
       encoding: 'utf8',

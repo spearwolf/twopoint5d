@@ -213,12 +213,21 @@ $ pnpm exec playwright install chromium firefox webkit
 
 ### 2. Build and test everything
 
+`pnpm run ci` is the gate every commit has to pass, the same one CI runs on every push;
+`pnpm cbt` — clean, build, test — is its short name.
+
 ```sh
 # clean, lint, build, type-check, check the package types and that every published
 # type can be named, lint the manifest, then the script tests, the Vitest suite with
 # coverage, the allocation specs and the browser tests
 $ pnpm cbt
 ```
+
+It takes several minutes and starts Chromium, Firefox and WebKit, so no Git hook runs it:
+run it yourself before you commit. A hook that only lints would let through commits the
+gate turns down. One gate runs at a time in a checkout — a second one refuses while the
+first holds `.nx/ci-gate.lock` —, and a `git worktree` has a lock of its own.
+[Monorepo architecture §3](docs/architecture.md#3-the-ci-gate) lists every step.
 
 ### 3. Run the local LOOKBOOK app
 

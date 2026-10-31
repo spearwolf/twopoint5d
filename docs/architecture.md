@@ -113,6 +113,10 @@ run beside a passing one of the same hash, which it reports as a flaky task. So 
 `pnpm run ci` refuses with exit code 1 while the process the lock names lives, and takes
 the lock over once that process is gone. A second gate goes into a `git worktree`, which
 has a `dist/` and a lock of its own. `ci:gate` called directly takes no lock.
+Ctrl-C reaches the gate once: the terminal sends SIGINT to the whole foreground process
+group, the command included, so the lock hands it on to nobody — Nx and pnpm take a second
+SIGINT for "stop at once". It hands on SIGTERM and SIGHUP; a run is stopped by its pid with
+SIGTERM, while a SIGINT to the pid of the lock alone stops nothing.
 
 - `lint` = `biome ci .`: Biome checks the formatting of every `.ts`, `.js`, `.mjs`,
   `.astro`, `.json`, `.jsonc` and `.css` file outside the ignores in `biome.jsonc`,
@@ -168,9 +172,11 @@ has a `dist/` and a lock of its own. `ci:gate` called directly takes no lock.
   that (see below).
 - `test:scripts` runs `node --test` over `scripts/**/*.test.mjs`, the specs of the publish
   pipeline's helpers and of `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs` and
-  `checkNameableTypes.mjs` themselves (§4, §6), of the CI cache server and its entry
-  script, of the lock of the gate, of the helpers of the code block check and of the
-  Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`), of the
+  `checkNameableTypes.mjs` themselves (§4, §6), of the decision whether to publish
+  (`scripts/publishNpmPkg/publishDecision.mjs`), of the CI cache server and its entry
+  script, of the lock of the gate, of the audit filter of the deploy (the filter itself
+  and the script that runs it), of the helpers of the code block check, of its list of
+  tracked Markdown files and of the Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`), of the
   helpers of the lookbook's preview generator (`scripts/lookbook/demoPreviewConfig.mjs`,
   `previewServer.mjs`, `webpSize.mjs`), the check that the publish script and its helpers
   import nothing but Node's built-ins, the check that every tracked Markdown file is an
@@ -225,13 +231,16 @@ declares peer dependencies only (`lintPkg` holds that), so whatever the audit fi
 in tooling, and Dependabot proposes the update that fixes it (§5). A hit, or an audit that
 gets no answer from the registry, puts a warning on the summary page of the run and the
 report into the job summary; an audit that times out leaves the job green. Dependabot also
-keeps the commit SHAs of the actions, and the version comment next to each, current.
+keeps the commit SHAs of the actions, and the version comment next to each, current. The
+build job of the deploy holds what it installs to the same level and stops on a hit (§4).
 
 The benchmarks run in a workflow of their own, `.github/workflows/bench.yml`: nightly on
 `main` and by hand (`workflow_dispatch`) on any branch. It installs the workspace root and
-the library only and runs `bench` through pnpm. The artifact `bench-<commit sha>` keeps
-`packages/twopoint5d/bench-results` for 90 days, the coverage report of the CI workflow
-is kept for 3. The timings are archived, not held to a limit: a shared runner's timings
+the library only and runs `bench` through pnpm. A nightly run skips a commit whose
+`bench-<commit sha>` is still kept; a run by hand always measures. The artifact
+`bench-<commit sha>` keeps `packages/twopoint5d/bench-results/results.json` for 90 days,
+and a run without a `results.json` fails; the coverage report of the CI workflow is kept
+for 3. The timings are archived, not held to a limit: a shared runner's timings
 vary too much for a gate, and a regression shows only in the series over weeks. What can
 be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
 
@@ -354,7 +363,9 @@ loses its `dist/` as well.
 
 The logic of both scripts lives in `scripts/makePackageJson/` and
 `scripts/publishNpmPkg/`, next to its `node --test` specs; the scripts themselves only
-wire it up. The refusal of those specifiers, `findUnpublishableSpecifiers`, lies in
+wire it up. Which of skip, publish and fail an answer of `npm show` means is
+`decidePublish()` in `scripts/publishNpmPkg/publishDecision.mjs`, whose spec goes through
+every answer; no spec starts the publish script itself. The refusal of those specifiers, `findUnpublishableSpecifiers`, lies in
 `scripts/publishNpmPkg/`, because the publish script holds it itself and imports nothing
 but Node's built-ins; `makePackageJson.mjs` imports it from there.
 
@@ -404,8 +415,10 @@ it — a version bump whose deploy waits behind another would never be published
   dependencies and their install scripts run. It installs the workspace root and the
   library alone, `pnpm install --frozen-lockfile --filter twopoint5d-workspace --filter
   @spearwolf/twopoint5d`, so the lookbook, the browser tests and their dependencies stay
-  out; it builds the library, runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes`
-  and hands `dist/` on as the artifact `package`.
+  out; it audits what it installed and stops on a high or critical advisory reached from
+  the workspace root or the library (`scripts/ci/auditInstalledDependencies.mjs`), and on
+  an audit without an answer; it builds the library, runs `checkPkgTypes`, `lintPkg` and
+  `checkNameableTypes` and hands `dist/` on as the artifact `package`.
 - `publish` is the only job with `id-token: write`. It installs nothing: it checks out
   the commit, takes `dist/` from the artifact and runs `node
   ../../scripts/publishNpmPkg.mjs dist` in `packages/twopoint5d`, so with the publish
@@ -425,8 +438,9 @@ it — a version bump whose deploy waits behind another would never be published
   no tag.
 
 Changes under `scripts/` are changes to the publish pipeline. Treat them accordingly.
-The exception is `scripts/ci/`: the cache server of the CI workflow and the lock of the
-local gate (§3), neither of which publishes anything.
+The exception is `scripts/ci/`: the cache server of the CI workflow, the lock of the
+local gate (§3) and the audit filter of the deploy's `build` job, none of which publishes
+anything.
 
 ## 5. Shared dependency versions
 
@@ -572,14 +586,16 @@ no `test` target, so `pnpm test` leaves all of them out. The seven are:
   helpers to imports of Node's built-ins and of each other, because the publish job of
   the deploy installs nothing (§4).
 
-Five specs start a script itself, as a child process: `makePackageJson.mjs` in a throwaway
+Six specs start a script itself, as a child process: `makePackageJson.mjs` in a throwaway
 project directory, `checkPeerDependenciesOnly.mjs` against a throwaway manifest,
 `checkNameableTypes.mjs` against throwaway declaration files,
-`scripts/ci/nxCacheServer.mjs` with a command line it refuses and
-`scripts/ci/runExclusive.mjs` around Node one-liners and a throwaway lock, because their
+`scripts/ci/nxCacheServer.mjs` with a command line it refuses,
+`scripts/ci/runExclusive.mjs` around Node one-liners and a throwaway lock and
+`scripts/ci/auditInstalledDependencies.mjs` against throwaway reports, because their
 exit codes, their messages and the manifest the first one does not write are wiring that
 no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon
-as its arguments fit, nor `checkDocSnippets.mjs`, which reads git and the file system.
+as its arguments fit; `decidePublish()` carries its decision and its spec covers it. No spec
+runs `checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 

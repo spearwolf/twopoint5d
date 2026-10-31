@@ -7,6 +7,10 @@
 //
 //   node scripts/ci/runExclusive.mjs --lock <path> -- <command> [args…]
 //
+// SIGTERM and SIGHUP go on to the command; SIGINT does not, because a terminal sends it to
+// the command as well. A SIGINT to the pid of this process alone therefore stops nothing —
+// stop a run by its pid with SIGTERM, which `kill` sends.
+//
 // Exit: the exit code of <command>, or the signal it died of, raised again; 1 when a live
 // process holds <path>, when <command> cannot start, or when an argument is missing.
 
@@ -16,7 +20,7 @@ import {spawn} from 'node:child_process';
 import {parseArgs} from 'node:util';
 
 const USAGE = 'usage: node scripts/ci/runExclusive.mjs --lock <path> -- <command> [args…]';
-const FORWARDED_SIGNALS = /** @type {const} */ (['SIGINT', 'SIGTERM', 'SIGHUP']);
+const FORWARDED_SIGNALS = /** @type {const} */ (['SIGTERM', 'SIGHUP']);
 
 let values;
 let positionals;
@@ -125,6 +129,11 @@ const child = spawn(command, args, {stdio: 'inherit'});
 // the lock is released once the command has ended, so a signal goes on to the command,
 // and this process waits for it
 for (const signal of FORWARDED_SIGNALS) process.on(signal, () => child.kill(signal));
+// Ctrl-C in a terminal sends SIGINT to the whole foreground process group, so the command has
+// it already, and Nx and pnpm read a second one as "stop at once". The listener only keeps the
+// default action of SIGINT from ending this process before the command, which would leave the
+// lock behind and the command without a parent that waits for it.
+process.on('SIGINT', () => {});
 
 child.on('error', (error) => {
   console.error(`runExclusive: cannot start ${command}: ${error.message}`);
@@ -134,7 +143,8 @@ child.on('error', (error) => {
 child.on('exit', (code, signal) => {
   release();
   if (signal !== null) {
-    for (const forwarded of FORWARDED_SIGNALS) process.removeAllListeners(forwarded);
+    // the listener of SIGINT included: a death by SIGINT would otherwise meet its no-op
+    for (const handled of ['SIGINT', ...FORWARDED_SIGNALS]) process.removeAllListeners(handled);
     process.kill(process.pid, signal);
     return;
   }

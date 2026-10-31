@@ -93,13 +93,15 @@ has no image, an image has no demo, or an image has another size.
 | `--headed` | show the browser window |
 | `--timeout=<ms>` | how long a demo may take to signal, 30000 by default |
 | `--strict` | a demo that logs a console error fails as well |
+| `--allow-webgl2` | write the previews even without a WebGPU adapter, rendered with WebGL 2 |
 
 A demo fails when it does not signal in time, when its page throws an unhandled exception,
 or when the screenshot has another size. A failed demo keeps its old image, and the run
 exits with 1. Console errors are listed under the demo and counted in the closing line;
 the image is written anyway, and `--strict` fails such a demo as well. The run prints whether
-Chromium found a WebGPU adapter; without one three.js renders with WebGL 2, which works
-but may look slightly different. On Linux the run asks Chromium for its Vulkan backend,
+Chromium found a WebGPU adapter. Without one three.js would render with WebGL 2, which looks
+different from the committed images, so the run writes nothing and exits with 2;
+`--allow-webgl2` writes them anyway. On Linux the run asks Chromium for its Vulkan backend,
 which is how the headless shell finds an adapter there; on macOS and Windows Chromium
 picks its backend itself.
 

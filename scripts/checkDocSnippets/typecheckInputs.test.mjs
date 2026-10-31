@@ -1,5 +1,6 @@
-// `checkDocSnippets.mjs` reads every tracked `*.md`, `project.json` names them by
-// directory, and this spec holds the two lists together: a tracked Markdown file that
+// `checkDocSnippets.mjs` reads every tracked `*.md` the working tree holds, `project.json`
+// names them by directory, and this spec takes the same list as the script and holds it
+// against the inputs: a tracked Markdown file that
 // falls outside those globs could turn its `ts check` block red without invalidating
 // the typecheck target's cache.
 
@@ -8,6 +9,7 @@ import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {it} from 'node:test';
+import {trackedMarkdownFiles} from './trackedMarkdownFiles.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 // resolves through the `./bin/*.js` export of nx to its CLI; started with this node, it
@@ -15,9 +17,7 @@ const repoRoot = path.resolve(import.meta.dirname, '../..');
 const nxBin = createRequire(path.join(repoRoot, 'package.json')).resolve('nx/bin/nx.js');
 
 it('every tracked Markdown file is an input of twopoint5d-testing:typecheck', () => {
-  const tracked = execFileSync('git', ['ls-files', '-z', '--', '*.md'], {cwd: repoRoot, encoding: 'utf8'})
-    .split('\0')
-    .filter(Boolean);
+  const tracked = trackedMarkdownFiles(repoRoot);
   const {files} = JSON.parse(
     execFileSync(process.execPath, [nxBin, 'show', 'target', 'inputs', 'twopoint5d-testing:typecheck', '--json'], {
       cwd: repoRoot,

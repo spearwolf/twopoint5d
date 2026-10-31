@@ -33,7 +33,7 @@ export function chromiumGpuArgs(platform = process.platform) {
 
 /**
  * @param {string[]} argv the arguments after the script name
- * @returns {{only: string[] | undefined, url: string | undefined, headed: boolean, timeoutMs: number, strict: boolean}}
+ * @returns {{only: string[] | undefined, url: string | undefined, headed: boolean, timeoutMs: number, strict: boolean, allowWebgl2: boolean}}
  */
 export function parsePreviewArgs(argv) {
   const {values} = parseArgs({
@@ -44,6 +44,7 @@ export function parsePreviewArgs(argv) {
       headed: {type: 'boolean', default: false},
       timeout: {type: 'string'},
       strict: {type: 'boolean', default: false},
+      'allow-webgl2': {type: 'boolean', default: false},
     },
     strict: true,
     allowPositionals: false,
@@ -63,6 +64,7 @@ export function parsePreviewArgs(argv) {
     headed: values.headed ?? false,
     timeoutMs,
     strict: values.strict ?? false,
+    allowWebgl2: values['allow-webgl2'] ?? false,
   };
 }
 
@@ -91,6 +93,19 @@ export function refuseScreenshot({pageErrors, consoleErrors}, strict) {
   if (pageErrors > 0) return `the page threw ${pageErrors} error(s)`;
   if (strict && consoleErrors > 0) return `the page logged ${consoleErrors} console error(s) under --strict`;
   return undefined;
+}
+
+/**
+ * Why the run writes no preview at all, or undefined when it goes ahead. Without a WebGPU
+ * adapter three.js renders with WebGL 2, whose images look different from the committed
+ * ones, so such a run writes them only under `--allow-webgl2`.
+ * @param {string | undefined} adapter what describeWebGpuAdapter() found
+ * @param {boolean} allowWebgl2 `--allow-webgl2`
+ * @returns {string | undefined}
+ */
+export function refuseAdapter(adapter, allowWebgl2) {
+  if (adapter !== undefined || allowWebgl2) return undefined;
+  return 'Chromium found no WebGPU adapter, so three.js would render every preview with WebGL 2, which looks different; nothing is written. --allow-webgl2 writes them anyway';
 }
 
 /**

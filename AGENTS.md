@@ -49,16 +49,19 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test:allocations` — the allocation specs (`src/**/hot-path-allocations*.spec.ts`)
   alone, without coverage: the Vitest project `allocations` in
   `packages/twopoint5d/vite.config.ts`, 30 s per test. `pnpm test` runs them along with
-  the rest
+  the rest. After an upgrade of Node — the one on your machine, or the line CI installs —
+  run them once as `pnpm test:allocations --skip-nx-cache`: the Nx hash of a task leaves
+  the Node version out, so the cache would replay a measurement taken under the old V8
 - `pnpm bench` — the library's hot-path benchmarks (`src/**/*.bench.ts`) through
   `vitest bench`; the timings land in `packages/twopoint5d/bench-results/results.json`,
   which the nightly workflow `bench.yml` archives. Not part of `pnpm run ci` nor of the
   CI workflow: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
-  cache server, the docs' code block check, the Nameable-Types check and the lookbook's
+  cache server, the audit filter of the deploy, the docs' code block check, the Nameable-Types check and the lookbook's
   preview generator (`scripts/**/*.test.mjs`), plus specs that start
   `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs`,
-  `nxCacheServer.mjs` and `runExclusive.mjs` as child processes, one that checks the
+  `nxCacheServer.mjs`, `runExclusive.mjs` and `auditInstalledDependencies.mjs` as child
+  processes, one that checks the
   lookbook's vendored `rainbow-line` script, one that holds the tags and routes of the
   lookbook's demo metadata to the library's exports, one that holds the preview images of
   the lookbook to its demos, ids and card size, one that holds the view-transition names
@@ -163,8 +166,8 @@ explicit instruction.
 - **Publishing** happens from the generated `dist/`, never from `packages/twopoint5d/`.
   `scripts/` is the publish pipeline — changes there can break the published package.
   `scripts/ci/` and `scripts/checkDocSnippets*` are the exceptions: the Nx cache server
-  of the CI workflow and the lock of the local gate, and the check of the docs' code
-  blocks, none of which publishes anything.
+  of the CI workflow, the lock of the local gate and the audit filter of the deploy's
+  build job, and the check of the docs' code blocks, none of which publishes anything.
   `scripts/publishNpmPkg.mjs` and `scripts/publishNpmPkg/` import nothing but Node's
   built-ins (`node:`) and each other, because the publish job of the deploy installs
   nothing; `builtinImportsOnly.test.mjs` fails on anything else.

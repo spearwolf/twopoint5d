@@ -10,16 +10,16 @@
 // `three`, `@spearwolf/eventize` and `@spearwolf/signalize`.
 //
 //   cd packages/twopoint5d-testing && node ../../scripts/checkDocSnippets.mjs [file.md …]
-//   (default: every tracked *.md of the repository)
+//   (default: every tracked *.md of the repository that the working tree holds)
 //
 // Exit 0: no errors. 1: a type error, or a marker that is not exactly `ts check`.
-// 2: git or the tsconfig is unreadable.
+// 2: git, the tsconfig or a file named on the command line is unreadable.
 
-import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {compileSnippets} from './checkDocSnippets/compileSnippets.mjs';
 import {extractSnippets} from './checkDocSnippets/extractSnippets.mjs';
+import {trackedMarkdownFiles} from './checkDocSnippets/trackedMarkdownFiles.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const anchorDir = process.cwd();
@@ -38,12 +38,7 @@ const problems = [];
 try {
   // tracked files only: untracked notes must not decide whether the gate passes
   files =
-    process.argv.length > 2
-      ? process.argv.slice(2)
-      : execFileSync('git', ['ls-files', '-z', '--', '*.md'], {cwd: repoRoot, encoding: 'utf8'})
-          .split('\0')
-          .filter(Boolean)
-          .map((file) => path.join(repoRoot, file));
+    process.argv.length > 2 ? process.argv.slice(2) : trackedMarkdownFiles(repoRoot).map((file) => path.join(repoRoot, file));
 
   for (const file of files) {
     const extracted = extractSnippets(fs.readFileSync(file, 'utf8'), file);

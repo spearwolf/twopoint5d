@@ -12,6 +12,7 @@ import {
   chromiumGpuArgs,
   parsePreviewArgs,
   recordPreviewEvent,
+  refuseAdapter,
   refuseScreenshot,
   selectDemos,
   summarizeRun,
@@ -60,10 +61,11 @@ describe('parsePreviewArgs()', () => {
       headed: false,
       timeoutMs: DEFAULT_TIMEOUT_MS,
       strict: false,
+      allowWebgl2: false,
     });
   });
 
-  it('reads --only as a comma separated list, --url without its trailing slash, --headed, --timeout and --strict', () => {
+  it('reads --only as a comma separated list, --url without its trailing slash, --headed, --timeout, --strict and --allow-webgl2', () => {
     assert.deepEqual(
       parsePreviewArgs([
         '--only=crosses, first-sprite,',
@@ -71,6 +73,7 @@ describe('parsePreviewArgs()', () => {
         '--headed',
         '--timeout=1000',
         '--strict',
+        '--allow-webgl2',
       ]),
       {
         only: ['crosses', 'first-sprite'],
@@ -78,6 +81,7 @@ describe('parsePreviewArgs()', () => {
         headed: true,
         timeoutMs: 1000,
         strict: true,
+        allowWebgl2: true,
       },
     );
   });
@@ -179,6 +183,23 @@ describe('refuseScreenshot()', () => {
 
   it('accepts a page that reported nothing', () => {
     assert.equal(refuseScreenshot({pageErrors: 0, consoleErrors: 0}, true), undefined);
+  });
+});
+
+describe('refuseAdapter()', () => {
+  it('lets a run with an adapter go ahead', () => {
+    assert.equal(refuseAdapter('nvidia ampere', false), undefined);
+  });
+
+  it('lets a run without an adapter go ahead under --allow-webgl2', () => {
+    assert.equal(refuseAdapter(undefined, true), undefined);
+  });
+
+  it('refuses a run without an adapter and names the flag that allows it', () => {
+    const refusal = refuseAdapter(undefined, false);
+    assert.equal(typeof refusal, 'string');
+    assert.match(refusal ?? '', /no WebGPU adapter/);
+    assert.match(refusal ?? '', /--allow-webgl2/);
   });
 });
 

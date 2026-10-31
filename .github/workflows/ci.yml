@@ -90,8 +90,9 @@ jobs:
         # finds sits in tooling, and Dependabot proposes the update that fixes it. A hit
         # puts a warning on the summary page of the run and the report into the job
         # summary, where it does not sit unread in the log of a green step;
-        # continue-on-error keeps an audit that times out from failing the job. The
-        # dependencies are the same under both Node lines, so one job audits them
+        # continue-on-error keeps an audit that times out from failing the job. The build
+        # job of the deploy holds what it installs to the same level and stops on a hit.
+        # The dependencies are the same under both Node lines, so one job audits them
         if: matrix.task == 'checks' && matrix.node == 24
         run: |
           status=0

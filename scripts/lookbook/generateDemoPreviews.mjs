@@ -2,6 +2,9 @@
 // waits for the demo's EVENT_GENERATE_PREVIEW and writes a screenshot of it as
 // apps/lookbook/public/images/demo-preview/<id>.webp. See the "Preview images" section of
 // apps/lookbook/README.md.
+//
+// Exit: 0 every preview written, 1 a demo failed, 2 no WebGPU adapter without
+// `--allow-webgl2`, or the run could not start.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +17,7 @@ import {
   chromiumGpuArgs,
   parsePreviewArgs,
   recordPreviewEvent,
+  refuseAdapter,
   refuseScreenshot,
   selectDemos,
   summarizeRun,
@@ -151,6 +155,11 @@ async function main() {
     const adapter = await describeWebGpuAdapter(context, baseUrl);
     console.log(`lookbook at ${baseUrl}`);
     console.log(`WebGPU adapter: ${adapter ?? 'none, three.js renders with WebGL 2'}`);
+    const refusal = refuseAdapter(adapter, options.allowWebgl2);
+    if (refusal) {
+      console.error(`generateDemoPreviews: ${refusal}`);
+      return 2;
+    }
     console.log(`${ids.length} demo(s) into ${path.relative(process.cwd(), previewDir)}\n`);
 
     /** @type {DemoResult[]} */
