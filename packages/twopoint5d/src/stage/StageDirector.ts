@@ -26,6 +26,7 @@ import {RootRenderPipeline} from './RootRenderPipeline.js';
 import {maskCoverage, maskSource} from './maskNodes.js';
 import {StageMask, type StageMaskCoverageSource, StageMaskInternals} from './StageMask.js';
 import {type StageItem, StageRenderer, type StageRendererBuildOutputNode, type StageRendererParentType} from './StageRenderer.js';
+import {StageRendererInternals} from './StageRendererTargets.js';
 import {
   easingOf,
   type StageTransition,
@@ -111,6 +112,11 @@ interface Layer {
    * effect names, however many of its masks lie on it; 0 for a layer.
    */
   uses: number;
+  /**
+   * The share of the full size the pass target of a mask stage has, from the `scale` of the masks
+   * on it — one stage, one target, one scale; `1` for a layer.
+   */
+  readonly scale: number;
   /** The stage itself, or the renderer the director wrapped it in. */
   readonly renderer: StageRenderer;
   readonly wrapped: boolean;
@@ -579,6 +585,7 @@ export class StageDirector extends StageRenderer {
     this.#refuseMaskStageAsLayer(subject, stage);
     const mask = this.#checkMask(subject, opts?.mask, stage);
     const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => t.from === stage || t.to === stage);
+    this.#checkScales(subject, [mask, ...effectMasks]);
     this.#slotIndexAt(subject, opts?.at);
     return this.#show(subject, stage, opts, options, mask, effectMasks, false);
   }
@@ -647,6 +654,7 @@ export class StageDirector extends StageRenderer {
     if (!slot) throw new Error(`${subject} cannot hide the stage "${stage.name}": that stage is not in the stack`);
     const running = slot.run?.transition;
     const effectMasks = this.#checkEffectMasks(subject, options, undefined, (t) => t === running);
+    this.#checkScales(subject, effectMasks);
 
     const errors: unknown[] = [];
     this.#useMasks(subject, effectMasks);
@@ -670,6 +678,7 @@ export class StageDirector extends StageRenderer {
     // a mask is busy only after the runs this call ends anyway: the run of the slot and those with `to`
     const running = slot.run?.transition;
     const effectMasks = this.#checkEffectMasks(subject, options, to, (t) => t === running || t.from === to || t.to === to);
+    this.#checkScales(subject, effectMasks);
 
     // the mask stages join first, so a mask the ending run used stays and is not joined again
     const errors: unknown[] = [];
@@ -706,6 +715,7 @@ export class StageDirector extends StageRenderer {
     this.#slotIndexAt(subject, opts?.at);
     const ended = this.#runsPushEnds(stage, opts?.at, below);
     const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => ended.has(t));
+    this.#checkScales(subject, [mask, ...effectMasks]);
 
     // the mask stages join first, so a mask a run that ends here used stays and is not joined again;
     // the runs end before the slot below is known: a run with the stage — the stage pushed back while
@@ -836,6 +846,7 @@ export class StageDirector extends StageRenderer {
     const slot = this.#slotWithEnd(stage);
     if (!slot) throw new Error(`${subject} cannot mask the stage "${stage.name}": that stage is not in the stack`);
     this.#checkMask(subject, mask);
+    this.#checkScales(subject, [mask]);
     const errors: unknown[] = [];
     this.#maskSlot(subject, slot, mask, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageRemoved threw`);
@@ -1219,6 +1230,31 @@ export class StageDirector extends StageRenderer {
   }
 
   /**
+   * Refuses, before anything changes, a mask of the call whose `scale` differs from that of its
+   * stage: a mask stage has one pass target, so every mask on it has the scale the stage is drawn at
+   * — the scale of the masks that use it now, or else of the first mask of this call on it. A stage
+   * takes another scale once it has left the director.
+   */
+  #checkScales(subject: string, masks: readonly (StageMask | undefined)[]): void {
+    for (let i = 0; i < masks.length; i++) {
+      const mask = masks[i];
+      if (!mask) continue;
+      const refusal = (reason: string) =>
+        new Error(`${subject} cannot take the mask on "${mask.stage.name}": ${reason}, and a stage has one target`);
+      const known = this.#layers.get(mask.stage);
+      if (known?.role === 'mask' && known.scale !== mask.scale) {
+        throw refusal(`that stage is drawn as a mask at a scale of ${known.scale} already`);
+      }
+      for (let j = 0; j < i; j++) {
+        const other = masks[j];
+        if (other && other.stage === mask.stage && other.scale !== mask.scale) {
+          throw refusal(`another mask of this call on that stage has a scale of ${other.scale}`);
+        }
+      }
+    }
+  }
+
+  /**
    * One use for every stage among `masks`, each stage once: a stage that is no mask of the
    * director yet joins. A stage that refuses to join gives back the uses taken before it.
    */
@@ -1226,7 +1262,7 @@ export class StageDirector extends StageRenderer {
     let i = 0;
     try {
       for (; i < masks.length; i++) {
-        if (firstOnItsStage(masks, i)) this.#join(subject, masks[i]!.stage, 'mask').uses++;
+        if (firstOnItsStage(masks, i)) this.#join(subject, masks[i]!.stage, 'mask', masks[i]!.scale).uses++;
       }
     } catch (error) {
       const errors: unknown[] = [];
@@ -1253,7 +1289,7 @@ export class StageDirector extends StageRenderer {
   #maskSlot(subject: string, slot: Slot, mask: StageMask | undefined, errors: unknown[]): void {
     const old = slot.mask;
     if (old === mask) return;
-    if (mask) this.#join(subject, mask.stage, 'mask').uses++;
+    if (mask) this.#join(subject, mask.stage, 'mask', mask.scale).uses++;
     slot.mask = mask;
     if (old) this.#unuseMask(old, errors);
     this.#slotsChanged();
@@ -1299,12 +1335,21 @@ export class StageDirector extends StageRenderer {
     }
   }
 
-  /** The layer of `stage` in `role`, made and added to the base if it is none yet. */
-  #join(subject: string, stage: StageDirectorLayer, role: Layer['role'] = 'layer'): Layer {
+  /**
+   * The layer of `stage` in `role`, made and added to the base if it is none yet. A mask stage
+   * draws into a pass target of the share `scale` of the full size; the callers have checked the
+   * scale against the stage with `#checkScales()`.
+   */
+  #join(subject: string, stage: StageDirectorLayer, role: Layer['role'] = 'layer', scale = 1): Layer {
     const known = this.#layers.get(stage);
     if (known) {
       if (known.role !== role) {
         throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is a ${known.role} of this director`);
+      }
+      if (known.scale !== scale) {
+        throw new Error(
+          `${subject} cannot take the mask on "${stage.name}": that stage is drawn as a mask at a scale of ${known.scale} already, and a stage has one target`,
+        );
       }
       return known;
     }
@@ -1348,7 +1393,9 @@ export class StageDirector extends StageRenderer {
       this.#internalCall--;
     }
 
-    const layer: Layer = {stage, role, uses: 0, renderer, wrapped, frozen: false, needsPicture: true};
+    const layer: Layer = {stage, role, uses: 0, scale, renderer, wrapped, frozen: false, needsPicture: true};
+    // the stage keeps its logical size — the director resizes it as any layer —, only its pass target shrinks
+    if (scale !== 1) StageRendererInternals.setPassTargetScale(renderer, scale);
     // a wrapped stage that is disposed leaves its wrapper; the director lets go of the layer with it
     if (wrapped && isEventized(stage)) {
       layer.unsubscribe = on(stage, OnStageDispose, () => {
@@ -1387,7 +1434,12 @@ export class StageDirector extends StageRenderer {
       super.remove(layer.renderer);
     } finally {
       this.#internalCall--;
-      if (layer.wrapped) layer.renderer.dispose();
+      if (layer.wrapped) {
+        layer.renderer.dispose();
+      } else if (layer.scale !== 1) {
+        // a StageRenderer of the caller leaves with the full size of its pass target it came with
+        StageRendererInternals.setPassTargetScale(layer.renderer, 1);
+      }
     }
   }
 

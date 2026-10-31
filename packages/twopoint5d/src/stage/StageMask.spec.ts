@@ -50,6 +50,27 @@ describe('StageMask', () => {
     expect(() => new StageMask(layer(), {invert: 1 as any})).toThrow('new StageMask(): invert must be a boolean, got 1');
   });
 
+  it('takes a scale in (0, 1], default 1', () => {
+    expect(new StageMask(layer()).scale).toBe(1);
+    expect(new StageMask(layer(), {scale: 0.5}).scale).toBe(0.5);
+    expect(new StageMask(layer(), {scale: 1}).scale).toBe(1);
+    expect(new StageMask(layer(), {scale: 0.01}).scale).toBe(0.01);
+  });
+
+  it('refuses a scale of 0, above 1 or not finite', () => {
+    expect(() => new StageMask(layer(), {scale: 2})).toThrow(
+      'new StageMask(): scale must be a finite number above 0 and at most 1, got 2',
+    );
+    expect(() => new StageMask(layer(), {scale: 0})).toThrow(
+      'new StageMask(): scale must be a finite number above 0 and at most 1, got 0',
+    );
+    expect(() => new StageMask(layer(), {scale: -0.5})).toThrow('got -0.5');
+    expect(() => new StageMask(layer(), {scale: NaN})).toThrow('got NaN');
+    expect(() => new StageMask(layer(), {scale: Infinity})).toThrow('got Infinity');
+    expect(() => new StageMask(layer(), {scale: '0.5' as any})).toThrow('got "0.5"');
+    expect(() => new StageMask(layer(), {scale: 2})).toThrow(RangeError);
+  });
+
   it('refuses a stage without renderTo()', () => {
     expect(() => new StageMask({name: 'x', resize() {}, updateFrame() {}} as any)).toThrow(
       'new StageMask() cannot take the stage',
@@ -161,6 +182,13 @@ describe('StageMask', () => {
     it('refuses its options with its own name', () => {
       expect(() => StageMask.inWorldOf(world(), new Scene(), {source: 'lum' as any})).toThrow(
         `StageMask.inWorldOf(): source must be 'alpha', 'luminance', 'red', 'green' or 'blue', got "lum"`,
+      );
+    });
+
+    it('takes a scale and refuses one out of range with its own name', () => {
+      expect(StageMask.inWorldOf(world(), new Scene(), {scale: 0.5}).scale).toBe(0.5);
+      expect(() => StageMask.inWorldOf(world(), new Scene(), {scale: 1.5})).toThrow(
+        'StageMask.inWorldOf(): scale must be a finite number above 0 and at most 1, got 1.5',
       );
     });
 

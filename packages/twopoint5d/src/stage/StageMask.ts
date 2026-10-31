@@ -2,6 +2,7 @@ import {uniform} from 'three/tsl';
 import type {Object3D, UniformNode} from 'three/webgpu';
 import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
+import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {ClearStage} from './ClearStage.js';
 import type {IRenderable} from './IRenderable.js';
@@ -21,17 +22,32 @@ export interface StageMaskOptions {
   source?: StageMaskCoverageSource;
   /** `1 - coverage`: the mask cuts out where its stage draws. Default `false`. */
   invert?: boolean;
+  /**
+   * The share of the size of the drawing buffer the mask stage is drawn at, in `(0, 1]`: the
+   * director draws it into a pass target of that share, and the masked layers sample it up through
+   * the texture's filtering. A fog or another soft edge loses nothing at `0.5` and takes a quarter
+   * of the memory; a hard edge shows the coarser grid. The mask stage keeps its full logical size.
+   * Two masks on one stage share its target and so its scale. Default `1`.
+   */
+  scale?: number;
 }
 
 const SOURCES: readonly StageMaskCoverageSource[] = ['alpha', 'luminance', 'red', 'green', 'blue'];
 
 /**
- * The options of a mask, checked and with their defaults; `subject` leads every message.
+ * The options of a mask, checked and with their defaults; `subject` leads every message. `scaled`
+ * reads the `scale` of a `StageMask` too; without it — for a mask node — the scale stays `1`.
  * @internal
  */
-export function readMaskOptions(subject: string, options: StageMaskOptions | undefined): Required<StageMaskOptions> {
+export function readMaskOptions(
+  subject: string,
+  options: StageMaskOptions | undefined,
+  scaled = false,
+): Required<StageMaskOptions> {
   if (options !== undefined && (options === null || typeof options !== 'object')) {
-    throw new TypeError(`${subject}: the options must be an object, {source?, invert?}, got ${describeValue(options)}`);
+    throw new TypeError(
+      `${subject}: the options must be an object, {source?, invert?${scaled ? ', scale?' : ''}}, got ${describeValue(options)}`,
+    );
   }
   const source = options?.source ?? 'alpha';
   if (!SOURCES.includes(source)) {
@@ -43,7 +59,11 @@ export function readMaskOptions(subject: string, options: StageMaskOptions | und
   if (typeof invert !== 'boolean') {
     throw new TypeError(`${subject}: invert must be a boolean, got ${describeValue(invert)}`);
   }
-  return {source, invert};
+  const scale = scaled ? (options?.scale ?? 1) : 1;
+  if (!isFiniteNumber(scale) || scale <= 0 || scale > 1) {
+    throw new RangeError(`${subject}: scale must be a finite number above 0 and at most 1, got ${describeValue(scale)}`);
+  }
+  return {source, invert, scale};
 }
 
 /** Whether `value` is a `Stage2D`; a value that throws on the test — a revoked `Proxy` — is none. */
@@ -108,11 +128,17 @@ export const StageMaskInternals = {} as {
  * shows. The options are read once, when the mask is made, as the options of a transition effect
  * are. A `StageMask` holds its stage, but does not own it: `dispose()` lets go of it and leaves it
  * undisposed — except the stage {@link StageMask.inWorldOf} builds, which the mask owns.
+ *
+ * The `scale` option draws the mask stage at a share of the resolution, `0.5` for a quarter of the
+ * memory of its target; the stage keeps its logical size, and every mask on one stage has the same
+ * scale (see {@link StageMaskOptions.scale}).
  */
 export class StageMask {
   readonly stage: StageDirectorLayer;
   readonly source: StageMaskCoverageSource;
   readonly invert: boolean;
+  /** The share of the size of the drawing buffer the mask stage is drawn at, `(0, 1]`; see {@link StageMaskOptions.scale}. */
+  readonly scale: number;
 
   /**
    * The eased progress of the transition whose effect names this mask, as a float uniform: for a
@@ -171,7 +197,7 @@ export class StageMask {
    */
   static inWorldOf(stage: Stage2D, scene: Object3D, options?: StageMaskOptions): StageMask {
     const subject = 'StageMask.inWorldOf()';
-    const checked = readMaskOptions(subject, options);
+    const checked = readMaskOptions(subject, options, true);
     if (!isStage2D(stage)) {
       throw new TypeError(`${subject}: stage must be a Stage2D, got ${describeStage(stage)}`);
     }
@@ -194,7 +220,7 @@ export class StageMask {
    */
   constructor(stage: StageDirectorLayer, options?: StageMaskOptions) {
     const subject = 'new StageMask()';
-    const {source, invert} = readMaskOptions(subject, options);
+    const {source, invert, scale} = readMaskOptions(subject, options, true);
     if ((stage as {isDisposed?: unknown} | undefined)?.isDisposed === true) {
       throw new Error(`${subject} cannot take the stage "${stage.name}": that stage has been disposed`);
     }
@@ -211,6 +237,7 @@ export class StageMask {
     this.stage = stage;
     this.source = source;
     this.invert = invert;
+    this.scale = scale;
   }
 
   /**

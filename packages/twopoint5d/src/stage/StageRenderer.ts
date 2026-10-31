@@ -32,7 +32,7 @@ import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRen
 import type {OutputNodeBuilder} from './outputNodeBuilders.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
 import type {Stage2D} from './Stage2D.js';
-import {StageRendererTargets} from './StageRendererTargets.js';
+import {StageRendererInternals, StageRendererTargets} from './StageRendererTargets.js';
 import type {StageRenderTargetPool} from './StageRenderTargetPool.js';
 import {StageRenderOrder} from './StageRenderOrder.js';
 
@@ -775,6 +775,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /** The two render targets this renderer builds for itself. */
   readonly #targets = new StageRendererTargets();
+
+  static {
+    StageRendererInternals.setPassTargetScale = (renderer, scale) => {
+      renderer.#targets.scale = scale;
+    };
+  }
   /** The `texture()` node the whole-picture mode gives its pipeline as `outputNode`, and the texture it samples. */
   #internalOutputNode?: Node;
   #internalOutputTexture?: Texture;

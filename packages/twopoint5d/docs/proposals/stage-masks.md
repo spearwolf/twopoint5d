@@ -765,9 +765,17 @@ fog planes, a parchment below, the three states with a sight mask — and the si
   own. Is a `setMask(stage, mask, {duration})` that crosses the coverage of the old and the new mask
   worth a uniform per masked slot?
 - **A mask in its own format.** A coverage needs one channel, the pass target has four in half
-  float. An `R8` target would be an eighth of the memory, but three.js keys its builds by the format
-  of the target, and a mask stage that draws sprites needs its materials built for that format too.
-  Measured in phase C, decided there; the `scale` option of §4.5 is independent of this question.
+  float. At 3840 × 2160 the color of that target is 8 bytes a pixel, 66.4 MB; an `R8` target is 1
+  byte a pixel, 8.3 MB. Every pass target also carries a depth buffer — `depthBuffer` is on by
+  default in three.js, and WebGPU gives it `depth24plus`, about 4 bytes a pixel, 33.2 MB —, and the
+  format of the color leaves it as it is: `R8` takes the whole target from 99.5 MB to 41.5 MB. The
+  `scale` option of §4.5 quarters color and depth together: at `0.5` the half-float target is
+  24.9 MB in all, an `R8` one 10.4 MB. So `scale` saves more than the format does, and independently
+  of it. The cost of `R8` stays: three.js keys its builds by the format of the target, and a mask
+  stage that draws sprites needs its materials built for that format too. No frame time of the two
+  formats is measured — that needs an `R8` build and a browser on a GPU; the software WebGPU of the
+  headless test browsers says nothing about fill rate. Open until a mask stage shows up whose fill,
+  not its memory, is what costs.
 - **Single tiles in `map2d`.** §8.5 would leave out the tiles under the fog, if `map2d` could
   build single tiles again instead of all of them through `clearTiles()`. Is that seam worth it for
   the fill it saves, or does the fog stay on top of everything?

@@ -46,7 +46,8 @@ export function maskSource(node: TextureNode, mask: StageMask): StageMaskSource 
   };
 }
 
-export interface MaskNodeOptions extends StageMaskOptions {}
+/** The coverage options of a `StageMask`; the `scale` of its target belongs to a director, not to a node. */
+export interface MaskNodeOptions extends Omit<StageMaskOptions, 'scale'> {}
 
 function sourceOf(node: StageTransitionSourceNode, role: string): StageTransitionSource {
   if (isTextureNode(node)) return textureSource(node);

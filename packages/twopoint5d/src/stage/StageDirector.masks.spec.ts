@@ -1581,4 +1581,121 @@ describe('StageDirector masks', () => {
       expect(maskDraws()).toEqual([camera, world.camera]);
     });
   });
+
+  describe('a mask target at a share of the resolution', () => {
+    /** Width and height of the pass target `stage` is drawn into, in device pixels. */
+    const passSize = (stage: StageRenderer) => {
+      const image = (stage.asPassNode(renderer as any) as TextureNode).value.image as {width: number; height: number};
+      return [image.width, image.height];
+    };
+
+    it('scale 0.5 halves the pass target of the mask stage, not the targets of the layers', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, new StageMask(fogStage, {scale: 0.5}));
+      frame();
+      draw();
+      expect(passSize(rendererOf(fogStage)!)).toEqual([32, 32]);
+      expect(passSize(rendererOf(level)!)).toEqual([64, 64]);
+      director.resize(128, 96);
+      expect(passSize(rendererOf(fogStage)!)).toEqual([64, 48]);
+    });
+
+    it('a mask of scale 1 draws at the full size', () => {
+      director.setStack([level]);
+      director.setMask(level, fog);
+      draw();
+      expect(passSize(rendererOf(fogStage)!)).toEqual([64, 64]);
+    });
+
+    it('the stage keeps its logical size under a scaled target', () => {
+      director.setStack([level]);
+      director.setMask(level, new StageMask(fogStage, {scale: 0.25}));
+      frame();
+      draw();
+      expect(fogStage.resize).toHaveBeenLastCalledWith(64, 64, 1);
+      const wrapper = rendererOf(fogStage)!;
+      expect([wrapper.width, wrapper.height]).toEqual([64, 64]);
+      expect(passSize(wrapper)).toEqual([16, 16]);
+    });
+
+    it("a caller's StageRenderer gets its scale back when the mask leaves", () => {
+      const maskRenderer = new StageRenderer();
+      maskRenderer.name = 'fog renderer';
+      maskRenderer.add(fogStage);
+      director.setStack([level]);
+      director.setMask(level, new StageMask(maskRenderer, {scale: 0.5}));
+      frame();
+      draw();
+      expect(rendererOf(maskRenderer)).toBe(maskRenderer);
+      expect(passSize(maskRenderer)).toEqual([32, 32]);
+      // the pass target stays the same object: the texture nodes on it stay valid
+      const texture = (maskRenderer.asPassNode(renderer as any) as TextureNode).value;
+      director.setMask(level, undefined);
+      expect(passSize(maskRenderer)).toEqual([64, 64]);
+      expect((maskRenderer.asPassNode(renderer as any) as TextureNode).value).toBe(texture);
+      expect(maskRenderer.isDisposed).toBe(false);
+    });
+
+    it("a caller's StageRenderer gets its scale back when the mask stage is removed", () => {
+      const maskRenderer = new StageRenderer();
+      maskRenderer.add(fogStage);
+      director.setStack([level]);
+      director.setMask(level, new StageMask(maskRenderer, {scale: 0.5}));
+      draw();
+      director.remove(maskRenderer);
+      expect(passSize(maskRenderer)).toEqual([64, 64]);
+    });
+
+    it('takes two StageMask objects of one scale on one stage', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, new StageMask(fogStage, {scale: 0.5}));
+      director.setMask(stars, new StageMask(fogStage, {scale: 0.5, invert: true}));
+      draw();
+      expect(passSize(rendererOf(fogStage)!)).toEqual([32, 32]);
+    });
+
+    it('refuses a second scale on a stage drawn as a mask: one stage, one target', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, new StageMask(fogStage, {scale: 0.5}));
+      const before = snapshot();
+      const full = new StageMask(fogStage);
+      expect(() => director.setMask(stars, full)).toThrow(
+        'StageDirector#setMask() cannot take the mask on "fog": that stage is drawn as a mask at a scale of 0.5 already, and a stage has one target',
+      );
+      expect(() => director.show(nextLevel, {mask: full})).toThrow(
+        'StageDirector#show() cannot take the mask on "fog": that stage is drawn as a mask at a scale of 0.5 already',
+      );
+      expect(() => director.push(nextLevel, {mask: full})).toThrow('StageDirector#push() cannot take the mask on "fog"');
+      expect(() => director.replace(level, nextLevel, {effect: matte({mask: full}), duration: 1})).toThrow(
+        'StageDirector#replace() cannot take the mask on "fog": that stage is drawn as a mask at a scale of 0.5 already',
+      );
+      expect(snapshot()).toEqual(before);
+      expect(director.transitions).toEqual([]);
+    });
+
+    it('refuses two scales on one stage within one call', () => {
+      director.setStack([level]);
+      const before = snapshot();
+      const half = new StageMask(fogStage, {scale: 0.5});
+      const full = new StageMask(fogStage);
+      expect(() => director.show(nextLevel, {mask: half, effect: matte({mask: full}), duration: 1})).toThrow(
+        'StageDirector#show() cannot take the mask on "fog": another mask of this call on that stage has a scale of 0.5, and a stage has one target',
+      );
+      const twoScales: StageTransitionEffect = {...crossfade(), masks: [half, full]};
+      expect(() => director.replace(level, nextLevel, {effect: twoScales, duration: 1})).toThrow(
+        'StageDirector#replace() cannot take the mask on "fog": another mask of this call on that stage has a scale of 0.5, and a stage has one target',
+      );
+      expect(snapshot()).toEqual(before);
+      expect(director.transitions).toEqual([]);
+    });
+
+    it('takes another scale once the stage has left', () => {
+      director.setStack([level]);
+      director.setMask(level, new StageMask(fogStage, {scale: 0.5}));
+      director.setMask(level, undefined);
+      director.setMask(level, new StageMask(fogStage, {scale: 0.25}));
+      draw();
+      expect(passSize(rendererOf(fogStage)!)).toEqual([16, 16]);
+    });
+  });
 });
