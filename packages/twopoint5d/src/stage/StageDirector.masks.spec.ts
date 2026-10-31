@@ -1,7 +1,7 @@
-import {emit, eventize} from '@spearwolf/eventize';
+import {emit, eventize, on} from '@spearwolf/eventize';
 import {ACESFilmicToneMapping, Color, FloatType, type Node, RenderPipeline, SRGBColorSpace, type TextureNode} from 'three/webgpu';
 import {beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
-import {OnStageDispose} from '../events.js';
+import {OnStageDispose, OnStageRemoved} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import {StageDirector} from './StageDirector.js';
@@ -391,6 +391,65 @@ describe('StageDirector masks', () => {
       expect(ordered()).toEqual(['stars', 'level']);
     });
 
+    it('show() whose layer refuses to join takes the mask stage off again', () => {
+      const broken = fakeStage('broken');
+      broken.resize.mockImplementation(() => {
+        throw new Error('broken: no size');
+      });
+      director.setStack([stars]);
+      const before = snapshot();
+      expect(() => director.show(broken, {mask: fog})).toThrow(new Error('broken: no size'));
+      expect(snapshot()).toEqual(before);
+      expect(director.stages).toHaveLength(1);
+      expect(director.maskOf(broken)).toBeUndefined();
+      // the registry let go of the mask stage, and its wrapper is gone
+      const second = new StageDirector();
+      second.setStack([stars]);
+      expect(() => second.setMask(stars, fog)).not.toThrow();
+      second.dispose();
+    });
+
+    it('show() whose layer refuses to join disposes the wrapper of the mask stage', () => {
+      const broken = fakeStage('broken');
+      broken.resize.mockImplementation(() => {
+        throw new Error('broken: no size');
+      });
+      let made: StageRenderer | undefined;
+      const original = StageRenderer.prototype.add;
+      const spy = vi.spyOn(StageRenderer.prototype, 'add').mockImplementation(function (this: StageRenderer, stage) {
+        if (stage === fogStage) made = this;
+        return original.call(this, stage);
+      });
+      try {
+        expect(() => director.show(broken, {mask: fog})).toThrow('broken: no size');
+      } finally {
+        spy.mockRestore();
+      }
+      expect(made).toBeDefined();
+      expect(made!.isDisposed).toBe(true);
+    });
+
+    it('show() whose layer refuses to join keeps the original error beside a listener that threw on the way back', () => {
+      const broken = fakeStage('broken');
+      const refusal = new Error('broken: no size');
+      const listener = new Error('listener: OnStageRemoved threw');
+      broken.resize.mockImplementation(() => {
+        throw refusal;
+      });
+      on(director, OnStageRemoved, () => {
+        throw listener;
+      });
+      let thrown: unknown;
+      try {
+        director.show(broken, {mask: fog});
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([refusal, listener]);
+      expect(ordered()).toEqual([]);
+    });
+
     it("a director's dispose() lets go of its mask stages for another director", () => {
       const second = new StageDirector();
       director.setStack([level]);
@@ -503,6 +562,77 @@ describe('StageDirector masks', () => {
       expect(director.maskOf(level)).toBeUndefined();
       expect(wrapper.isDisposed).toBe(true);
       expect(ordered()).toEqual(['stars', 'level']);
+    });
+  });
+
+  describe('run and freeze', () => {
+    it('freeze(maskStage) keeps its picture and run() lets it go on', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, fog);
+      expect(director.freeze(fogStage)).toBe(director);
+      expect(director.isFrozen(fogStage)).toBe(true);
+      expect(director.isFrozen(level)).toBe(false);
+      frame();
+      draw();
+      // the first draw gives the frozen mask its picture
+      expect(fogStage.updateFrame).not.toHaveBeenCalled();
+      expect(fogStage.renderTo).toHaveBeenCalledTimes(1);
+      frame();
+      draw();
+      draw();
+      expect(fogStage.updateFrame).not.toHaveBeenCalled();
+      expect(fogStage.renderTo).toHaveBeenCalledTimes(1);
+      // the layers go on
+      expect(level.updateFrame).toHaveBeenCalledTimes(2);
+      expect(level.renderTo).toHaveBeenCalledTimes(3);
+
+      expect(director.run(fogStage)).toBe(director);
+      expect(director.isFrozen(fogStage)).toBe(false);
+      frame();
+      draw();
+      expect(fogStage.updateFrame).toHaveBeenCalledTimes(1);
+      expect(fogStage.renderTo).toHaveBeenCalledTimes(2);
+    });
+
+    it('a frozen mask draws once and again after a resize', () => {
+      director.setStack([level]);
+      director.setMask(level, fog);
+      director.freeze(fogStage);
+      draw();
+      draw();
+      expect(fogStage.renderTo).toHaveBeenCalledTimes(1);
+      director.resize(128, 96);
+      draw();
+      draw();
+      expect(fogStage.renderTo).toHaveBeenCalledTimes(2);
+      expect(fogStage.resize).toHaveBeenLastCalledWith(128, 96, 1);
+      // the same size again keeps the picture
+      director.resize(128, 96);
+      draw();
+      expect(fogStage.renderTo).toHaveBeenCalledTimes(2);
+    });
+
+    it('freeze() of a mask stage that has not joined is refused', () => {
+      director.setStack([stars, level]);
+      expect(() => director.freeze(fogStage)).toThrow(
+        'StageDirector#freeze() cannot find the stage "fog": that stage is no layer or mask of this director',
+      );
+      expect(() => director.run(fogStage)).toThrow(
+        'StageDirector#run() cannot find the stage "fog": that stage is no layer or mask of this director',
+      );
+      expect(director.isFrozen(fogStage)).toBe(false);
+    });
+
+    it('a freeze does not survive the mask stage leaving', () => {
+      director.setStack([stars, level]);
+      director.setMask(level, fog);
+      director.freeze(fogStage);
+      director.setMask(level, undefined);
+      expect(director.isFrozen(fogStage)).toBe(false);
+      expect(() => director.freeze(fogStage)).toThrow('that stage is no layer or mask of this director');
+      director.setMask(level, fog);
+      frame();
+      expect(fogStage.updateFrame).toHaveBeenCalledTimes(1);
     });
   });
 

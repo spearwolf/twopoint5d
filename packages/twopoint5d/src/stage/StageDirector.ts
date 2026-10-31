@@ -532,8 +532,11 @@ export class StageDirector extends StageRenderer {
       this.#finishRunsWith(stage, errors);
       layer = this.#join(subject, stage);
     } catch (error) {
-      this.#unmaskSlot(slot, errors);
-      throw error;
+      // the original error stays the first of what is thrown: the listeners that threw on the way back are not lost
+      const collected = [error, ...errors];
+      this.#unmaskSlot(slot, collected);
+      if (collected.length === 1) throw error;
+      throw new AggregateError(collected, `${subject}: more than one error on the way back from a stage that refused to join`);
     }
     this.#slots.splice(Math.min(at, this.#slots.length), 0, slot);
     const transition = this.#begin(slot, undefined, layer, options, errors);
@@ -699,12 +702,12 @@ export class StageDirector extends StageRenderer {
     return this.#slotWithEnd(stage)?.mask;
   }
 
-  /** Freezes the layer of `stage`: it is neither updated nor drawn, and its last picture stays. */
+  /** Freezes the layer or mask stage `stage`: it is neither updated nor drawn, and its last picture stays. */
   freeze(stage: IStage): this {
     return this.#setFrozen('StageDirector#freeze()', stage, true);
   }
 
-  /** Lets the layer of `stage` run again. */
+  /** Lets the layer or mask stage `stage` run again. */
   run(stage: IStage): this {
     return this.#setFrozen('StageDirector#run()', stage, false);
   }
@@ -712,7 +715,9 @@ export class StageDirector extends StageRenderer {
   #setFrozen(subject: string, stage: IStage, frozen: boolean): this {
     if (this.isDisposed) return this;
     const layer = this.#layers.get(stage);
-    if (!layer) throw new Error(`${subject} cannot find the stage "${stage.name}": that stage is no layer of this director`);
+    if (!layer) {
+      throw new Error(`${subject} cannot find the stage "${stage.name}": that stage is no layer or mask of this director`);
+    }
     layer.frozen = frozen;
     return this;
   }

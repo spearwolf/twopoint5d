@@ -873,8 +873,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #canCompose(stages: ReadonlyArray<StageItem>): boolean {
     if (!isPositiveFinite(this.width) || !isPositiveFinite(this.height)) return false;
-    for (const {stage} of stages) {
-      if (isStage2DWithoutCamera(stage)) return false;
+    // indexed: an iterator over the frozen array of a StageDirector is allocated on every frame
+    for (let i = 0; i < stages.length; i++) {
+      if (isStage2DWithoutCamera(stages[i]!.stage)) return false;
     }
     return true;
   }
@@ -1056,7 +1057,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #prerenderNestedRenderers(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     this.#beginLinearOutput(renderer);
     try {
-      for (const {stage} of stages) {
+      // indexed, as in #canCompose()
+      for (let i = 0; i < stages.length; i++) {
+        const stage = stages[i]!.stage;
         if (stage instanceof StageRenderer && this.shouldRenderPass(stage)) this.#prerenderChild(renderer, stage);
       }
     } finally {
