@@ -449,6 +449,11 @@ The own clear of a renderer is its only clear. While it draws its stages, `rende
 is `false`, whatever you set; the renderer restores it afterwards, as it restores the clear color
 and alpha right after its clear.
 
+The `stencil` of a `ClearStage` takes effect only on a display whose renderer has a stencil buffer
+(`rendererOptions: {stencil: true}`), only in the modes that draw into one target, and only in a
+renderer that draws to the canvas or to an `outputRenderTarget` with a stencil buffer — not in the
+pass target a composing parent draws it into.
+
 The targets a renderer builds for itself start every frame empty: the internal target of
 [a pipeline on the whole picture](#a-pipeline-on-the-whole-picture) and the target of a
 [nested renderer](#nested-pipelines-an-effect-per-layer) its parent composes are cleared to
@@ -781,7 +786,8 @@ await director.precompile(
 
 A shape lists the slots of the stack bottom to top: `'layer'` for a slot that shows a layer, the
 effect for a slot in a transition — the same effect object the transition will take, since the
-director tells shapes apart by their effect objects. A shape drawn or compiled before is skipped.
+director tells shapes apart by their effect objects —, and `{effect?, mask}` for a slot with a
+[mask](#no-hitch-precompile-with-masks). A shape drawn or compiled before is skipped.
 
 The shapes cover the composition of the director. A layer builds its own materials and pipelines
 on its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
@@ -831,7 +837,7 @@ below show through wherever it draws nothing.
 | `replace(from, to, opts?)` | `[a, from]` → `[a, to]` | `from` into `to`, in the slot of `from` |
 | `push(stage, opts?)` | `[a]` → `[a, stage]` | as `show()`; `opts.below` decides what `a` does under it |
 | `pop(opts?)` | `[a, b]` → `[a]` | the top layer into nothing; the layer below runs again |
-| `setStack(stages)` | anything → `stages` | nothing: an instant cut; running transitions end as cancelled |
+| `setStack(stages)` | anything → `stages` | nothing: an instant cut; running transitions end as cancelled, and every [mask](#masks-on-a-slot) is dropped |
 
 - Without an `effect`, a `duration` above 0 or `manual`, a change lands at once — the stack
   changes in the call, and the next frame draws it.
@@ -996,11 +1002,163 @@ stage draws as any stage does — sprites, meshes, a `Canvas2DStage` — and the
 its picture, so a fog of war is a stage that draws soft white blobs around the player and around
 every torch.
 
-```ts check
-import {OrthographicProjection, Stage2D, StageMask} from '@spearwolf/twopoint5d';
+A `StageDirector` puts a mask on a **slot** of its stack: the slot shows its layer only where the
+mask stage draws. The mask costs a texture fetch and a multiplication in the one quad of the
+director, no pass target for the masked layer and no extra full-screen draw — and one mask serves
+as many slots as you like.
 
-// a stage that draws soft white blobs on transparent black
-const fogStage = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'fill'}));
+### A fog of war over a level
+
+The level is a layer. The fog is a second stage that draws a soft white blob around the player and
+around every torch, and nothing else. The level, masked by the fog, shows inside the blobs; outside
+of them the director's own clear color shows — the dark of the unexplored.
+
+```ts check
+import {on} from '@spearwolf/eventize';
+import {
+  Display,
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageDirector,
+  StageMask,
+} from '@spearwolf/twopoint5d';
+import {CanvasTexture, Color, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const view = {width: 640, height: 360, fit: 'contain'} as const;
+
+const level = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+// ... the sprites and tiles of the level go into level.scene
+
+// white in the middle, transparent at the rim: a soft blob of coverage
+const blobTexture = (() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(64, 64, 8, 64, 64, 64);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 128, 128);
+  return new CanvasTexture(canvas);
+})();
+
+const blob = (radius: number) =>
+  new Mesh(
+    new PlaneGeometry(radius * 2, radius * 2),
+    new MeshBasicMaterial({map: blobTexture, transparent: true}),
+  );
+
+// the fog stage clears nothing: it draws its blobs onto transparent black
+const fogStage = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const aroundPlayer = blob(90);
+fogStage.scene.add(aroundPlayer);
+
+const player = {x: 320, y: 180};
+on(fogStage, OnStageUpdateFrame, () => {
+  aroundPlayer.position.set(player.x, player.y, 0);
+});
+
+const director = new StageDirector(display).setClearColor(new Color('#05060d'));
+director.setStack([level]);
+director.setMask(level, new StageMask(fogStage, {source: 'alpha'}));
+
+display.start();
+```
+
+The fog stage is never in the stack: the director draws it as the mask and updates it after the
+layers, every frame. The coverage is the alpha of what the stage draws, so a mesh or a sprite with
+a soft edge gives a soft edge of the light. `director.setMask(level, undefined)` shows the whole
+level again, and a layer that comes below the level — `director.show(stars, {at: 0})` — shows
+through the dark where the fog covers 0 instead of the clear color.
+
+### A rift into a second world
+
+Two layers and one mask cross a world into another: the world lies in the bottom slot, the rift in
+the slot above it, and the mask belongs to the slot of the rift. Where the mask is 0 the world
+shows, where it is 1 the rift, between them a mix of both.
+
+```ts check
+import {on} from '@spearwolf/eventize';
+import {
+  Display,
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageDirector,
+  StageMask,
+} from '@spearwolf/twopoint5d';
+import {CircleGeometry, Mesh, MeshBasicMaterial} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const view = {width: 640, height: 360, fit: 'contain'} as const;
+
+const world = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const rift = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+
+// the opening of the rift: a white disc on transparent black that grows
+const riftStage = new Stage2D(new OrthographicProjection('xy|bottom-left', view));
+const opening = new Mesh(new CircleGeometry(1, 48), new MeshBasicMaterial({transparent: true}));
+opening.position.set(320, 180, 0);
+riftStage.scene.add(opening);
+
+let radius = 1;
+on(riftStage, OnStageUpdateFrame, ({deltaTime}) => {
+  radius = Math.min(radius + deltaTime * 120, 260);
+  opening.scale.setScalar(radius);
+});
+
+const director = new StageDirector(display);
+director.setStack([world, rift]);
+director.setMask(rift, new StageMask(riftStage));
+
+display.start();
+```
+
+The world is not hidden by anything: it runs under the rift as it ran before, and the rift runs
+inside the disc. With `invert: true` the mask turns around — the rift would show everywhere but
+inside the disc, and a hole of the world would look into whatever lies below the slot.
+
+### One mask on two slots
+
+A mask lies on as many slots as you like. Its stage draws once per frame, and every masked slot
+samples the same picture — a torch that lights the hills and the ruins at once:
+
+```ts
+const torchLight = new StageMask(torchStage);
+
+director.setStack([sky, hills, ruins]);
+director.setMask(hills, torchLight);
+director.setMask(ruins, torchLight); // no second draw of torchStage
+```
+
+The sky below stays unmasked and shows around the lit parts. Two `StageMask` objects on one stage
+count as one mask stage that draws once — a second one with `invert: true` cuts out where the first
+reveals.
+
+### A frozen mask
+
+A mask that never changes — a vignette, a porthole, the outline of a painted screen — need not
+draw again and again. Freeze its stage and the director samples the last picture:
+
+```ts
+director.setMask(level, new StageMask(vignetteStage));
+director.freeze(vignetteStage); // drawn once, then sampled: a texture fetch per pixel and nothing else
+
+director.run(vignetteStage); // alive again
+```
+
+`freeze()` and `run()` work for the stage of a mask as they work for a layer. A frozen mask redraws
+once after the size of the director changes. A freeze does not outlive the mask stage's stay in the
+director: once nothing masks with the stage any more, it leaves, and a later `setMask()` finds it
+running.
+
+### The mask
+
+```ts
+import {StageMask} from '@spearwolf/twopoint5d';
+
 const fog = new StageMask(fogStage, {source: 'alpha'});
 ```
 
@@ -1022,6 +1180,95 @@ transparent black around the shapes of a mask stage covers 0 under every source.
 `mask.stage`, `mask.source` and `mask.invert` read back what you handed in. A `StageMask` holds its
 stage but does not own it: `mask.dispose()` lets go of it and leaves the stage undisposed, which
 stays yours to dispose.
+
+The mask stage is any stage a director takes as a layer: a `Stage2D`, a `StageRenderer` with stages
+and a pipeline of its own, a stage of your own. A stage serves **one director** at a time as a mask,
+and it is a layer or a mask, never both: a second director refuses every mask on such a stage with
+an error that names the mask stage, and so does a director that has the stage as a layer. Within
+one director a stage may lie under several masks and several slots.
+
+### Masks on a slot
+
+The mask belongs to the **slot**, not to the layer: `replace(level, nextLevel)` keeps the mask and
+changes the view behind it, and a transition in that slot runs inside the mask.
+
+| call | |
+| --- | --- |
+| `director.setMask(stage, mask)` | masks the slot whose end state holds `stage`; lands at once, the next frame draws it |
+| `director.setMask(stage, undefined)` | takes the mask off |
+| `director.maskOf(stage)` | the mask of the slot that holds `stage`, or `undefined` |
+| `director.show(stage, {mask})`, `director.push(stage, {mask})` | the new slot is a masked one from its first frame |
+
+The composition gets one factor per masked slot: the premultiplied picture of the slot times the
+coverage, all four channels. Coverage 0 removes the slot, 1 keeps it, anything between scales it —
+soft edges, anti-aliased silhouettes and half-transparent blobs of the mask stage come through as
+they are.
+
+- A mask that comes and goes softly is the job of the mask stage itself: it is alive, after all —
+  let its shapes grow or fade. `setMask()` itself is an instant change.
+- `setStack()` makes new slots and drops every mask, also those of the stages that stay in the
+  stack. Set the masks again after the call.
+- `hide()`, `pop()` and `remove()` of a layer take the mask off the slot that goes with it.
+- `remove(maskStage)` and the `dispose()` of a mask stage take the mask off every slot it lies on.
+  `remove()` of a stage that is neither a layer nor a mask does what it does without masks.
+- Every refusal comes before anything changes. `setMask()` refuses a `stage` that is not in the
+  stack, a `mask` that is not a `StageMask`, a disposed mask or mask stage, a mask whose stage is a
+  layer of the stack, is the director or holds it, and a mask stage that another director draws
+  as a mask or as a layer. `show()` and `push()` refuse a `mask` the same way. The other way round,
+  `show()`, `push()`, `replace()`, `setStack()` and `add()` refuse a stage that is a mask stage of
+  the director as a layer.
+- The mask stages are updated and drawn after every layer, in the order of the slots they lie on,
+  bottom to top. A mask that follows something in the world of a layer reads the camera that moved
+  in this frame.
+
+### Run and freeze
+
+A mask stage updates and draws every frame for as long as a slot references it, and leaves the
+stages of the director as a layer does when nothing references it any more: the GPU memory of its
+pass target goes, and a `StageRenderer` the director built around a `Stage2D` is disposed.
+
+`freeze(stage)`, `run(stage)` and `isFrozen(stage)` take the stage of a mask as they take a layer; a
+stage that is neither a layer nor a mask of this director is refused with "no layer or mask of this
+director". A frozen mask keeps its last picture and costs a texture fetch per pixel; `run()` sets it
+going again.
+
+### Orientation
+
+A mask is sampled at the same uv as the layers, the origin at the top left of the picture, under
+WebGPU and under WebGL 2. A mask stage that draws into its top half masks the top half of the slot.
+
+### No hitch: `precompile()` with masks
+
+A masked slot builds its shader on the first frame as any new shape of the stack does, and
+`precompile()` moves that build to the start. A slot of a shape is `'layer'`, an effect, or
+`{effect?, mask}` for a masked slot:
+
+```ts
+await director.precompile(
+  display.renderer!,
+  [
+    ['layer', {mask: fog}], // the stars below the level under its fog
+    ['layer', {effect: dissolveIn, mask: fog}], // a dissolve inside the masked slot
+  ],
+  {layers: [level, fogStage]}, // the mask stages draw once ahead, as the layers do
+);
+```
+
+The shader holds what a mask reads: its `source`, its `invert`, and which of the slots share a mask
+stage. Another `StageMask` with the same options on a stage in the same place finds the shape
+compiled — a mask, unlike an effect, goes by its options, not by its object.
+
+### What a mask costs
+
+| | full-screen draws | targets of the size of the drawing buffer |
+| --- | --- | --- |
+| a mask that runs | the draws of its stage | 1 pass target |
+| a frozen mask | none | 1 pass target, kept |
+| a masked slot | none of its own: one texture fetch and one multiplication in the quad | none of its own |
+
+Against a nested pipeline that masks a layer in a pass of its own, a masked slot saves a pass
+target with its depth buffer — about 100 MB at 3840 × 2160 — and a full-screen quad per masked
+layer, and one mask serves several slots.
 
 ### Without a director
 
@@ -1270,7 +1517,8 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 | `Canvas2DStage` | the sprite material and textures it built, its `StageRenderer` and its `Stage2D` | the `WebGPURenderer`, a canvas handed in, a material you set on the sprite |
 | `StageRenderTargetPool` | every target back in the pool, every lent one as it comes back | — |
 | a builder of `createBloomOutputNodeBuilder()` | the bloom node it built last | the pass nodes, which belong to the stages |
-| `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()` |
+| `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects and the texture nodes of its masks; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()`, the mask stages |
+| `StageMask` | lets go of its stage | the stage, which stays undisposed |
 | `Display` | its `WebGPURenderer` | a canvas handed in |
 
 The order of a teardown: the renderer first, then what it used.
@@ -1322,6 +1570,9 @@ pipeline.dispose();
 - **A layer that hides the stack below.** An effect that writes an alpha of 1 everywhere — the
   `bloom()` of three.js does — makes its layer opaque in a `StageDirector`. Keep the alpha of the
   layer and add the glow to its color: `vec4(composed.rgb.add(glow.rgb), composed.a)`.
+- **A stage that is a layer and a mask.** A director refuses it either way round, and so does a
+  second director for a mask stage; give the mask its own stage.
+- **Masks after `setStack()`.** It makes new slots and drops every mask: set them again.
 - **A new effect object per transition.** Each one builds a shader on its first use, and a shape
   compiled with one effect object does not match a transition with another. Make the effects once
   and reuse them — in `precompile()` and in the transitions.
@@ -1343,10 +1594,12 @@ pipeline.dispose();
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |
 | `StageRenderTargetPool` | one internal target for several renderers in the whole-picture mode |
 | `createBloomOutputNodeBuilder()` | a ready-made `buildOutputNode`: the sum of the passes with a bloom on top |
-| `StageDirector` | a stack of layers, changed through transitions — `show`, `hide`, `replace`, `push`, `pop`; `precompile()` builds the shaders of its shapes and draws layers once ahead |
+| `StageDirector` | a stack of layers, changed through transitions — `show`, `hide`, `replace`, `push`, `pop`; `setMask()` masks a slot by a stage; `precompile()` builds the shaders of its shapes and draws layers once ahead |
 | `StageTransition` | one change of the stack: `state`, `progress`, `finished`, `complete()`, `cancel()`, `reverse()` |
 | `crossfade()`, `fade()`, `dipToColor()`, `wipe()`, `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()` | the transition effects |
 | `createTransitionNode()` | the node of an effect, for a `buildOutputNode` of your own |
+| `StageMask` | a stage bound as a mask: its picture says how much of a slot shows — `source`, `invert`; `setMask()`, `maskOf()` and the `mask` option of a `StageDirector` |
+| `createMaskNode()` | the node of a picture times the coverage of a mask, for a `buildOutputNode` of your own |
 | `fitIntoRectangle()` | the arithmetic of the fit, for a layout of your own; `calculateAnchorOffset()` places the result in a container |
 
 ### The interfaces
@@ -1383,5 +1636,6 @@ pipeline.dispose();
 | `ClearStage` | `{depth: true}`, name `'clear'` |
 | `Canvas2DStage` fit | `'contain'` |
 | `createBloomOutputNodeBuilder()` | `strength: 1`, `radius: 0`, `threshold: 0` |
+| `StageMask` | `source: 'alpha'`, `invert: false` |
 | a transition of `StageDirector` | `crossfade()`, `0.5` s with an effect and `0` without, `'ease-in-out'`, no delay |
 | `outgoing`, `incoming`, `below` | `'run'` |
