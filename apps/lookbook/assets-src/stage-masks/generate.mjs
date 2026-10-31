@@ -2,6 +2,7 @@
 // several use) under `public/assets/stage-masks/`. `pnpm lookbook:assets --only=stage-masks`
 // regenerates all of them; README.md documents every output.
 import {generate as foundFootage} from './found-footage/footage.mjs';
+import {generate as frozen} from './frozen/frozen.mjs';
 import {generate as rift} from './rift/rift.mjs';
 import {generate as spotlight} from './spotlight/spotlight.mjs';
 import {generate as withoutDirector} from './without-director/wallpaper.mjs';
@@ -14,4 +15,5 @@ export async function generate(out) {
   await spotlight(out);
   await rift(out);
   await foundFootage(out);
+  await frozen(out);
 }

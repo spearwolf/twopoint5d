@@ -500,3 +500,32 @@ the green of a camcorder's night shot. No font is used.
 | `sprites.webp` | 2048 × 1558, straight alpha | the sprites, TexturePacker hash in `sprites.json`, untrimmed, 6 px apart, loaded upright (`flipY = false`): `birch-a` … `birch-e` (1240 px tall — 620 units —, 200 to 260 px wide, the trunk standing on the bottom edge of the frame with its root flare; `birch-a` carries a carved spiral, `birch-b` nothing, `birch-c` an eye with rays, `birch-d` tally marks over a cross, `birch-e` a circle crossed by a stroke and three bars, each at 42 % of the height from the top), `tent` (260 × 150 units: a dome tent whose pole snapped, sagging to the right, the door unzipped on the black inside, three tears in its side, guy lines and a boot; standing on the bottom edge), `figure` (40 × 120 units: a thin pale figure with arms to its knees and a tilted head, standing on the bottom edge), `eyeshine` (20 × 10 units, two white points with a glow, for an additive tint), `bracken`, `bramble`, `grass` (220 × 150 units each, undergrowth rooted at the bottom middle) |
 | `sprites.json` | | the frames of `sprites.webp` |
 | `ground.webp` | 2048 × 400, straight alpha | the forest floor, 1024 × 200 units, repeating along x: far at the top, near at the bottom; dark loam, dry leaves and twigs that grow towards the bottom, a trodden path across the middle, a fringe of grass at the top that thins into transparency. Loaded with the default `flipY` and `RepeatWrapping` along x: the demo scrolls each row of it at the speed of its depth |
+
+### frozen
+
+"The Moth Chapel", the art of the demo `stage-masks-frozen`, from `stage-masks/frozen/frozen.mjs`
+with `rose.mjs` (the window), `room.mjs` (the séance), `sprites.mjs` (faces, planchette, moths) and
+`letters.mjs` (the capitals and digits of the talking board as strokes; no font is used). Units of
+the stage throughout: the middle of the rose is the origin, y up, 2 texels per unit, every image
+loaded upright (`flipY = false`, t from the top).
+
+The rose is one classifier — for every point the pane it lies in, or stone — worked out at 4
+points per unit: an eye in the middle (r < 92: a slit pupil, twelve iris wedges, two whites, six
+lids), a stone ring, eight petals (r 103 … 196, each a pointed arch with a moth pointing at the eye:
+body, forewings and their tips, eyespots, hindwings, four ground panes, two spandrels), a stone
+ring, sixteen lancets (r 206 … 296, two lights, a roundel with a small eye, a tip, two spandrels),
+stone from r 298. One exact distance transform of the borders between the regions gives the lead
+(1.9 units either side of a border), the edges of the glass and the bevels of the stone. The
+grisaille — iris fibres, lashes, wing veins, antennae, vines, trefoils — is SVG, rasterised and
+taken off the glass's alpha.
+
+| file | size | what |
+| --- | --- | --- |
+| `glass.webp` | 1280 × 1280, lossless, straight alpha | the glass of the rose over x, y in ±320 units: **red** how much amber it carries, **blue** how much violet, **alpha** how much light it lets through — the painter's matt darker towards the lead, streaks of its own in every pane, the grisaille, 0 under the lead and on the stone. Green is 0. Read as data (`NoColorSpace`) |
+| `panes.png` | 1280 × 1280, RGBA | the id of the pane under every texel, little-endian over red and green (`id = r + 256 g`), 0 for stone; sampled with `NearestFilter` and no mipmaps. The border between two ids runs in the middle of the lead, where the glass is clear of light |
+| `window.json` | | `texelsPerUnit`, `extent` (320), `stoneRadius` (393, where the wall of the demo takes over) and `panes`: the 253 panes (21 of the eye, 120 of the petals, 112 of the lancets), each with its `id`, `ring` (`eye`, `petal`, `lancet`), `sector`, `part`, the `kind` of its glass (`clear`, `quarry`, `mist`, `pale`, `amber`, `ruby`, `violet`, `dusk`), its box `x0`, `y0`, `x1`, `y1` reaching 2.9 units over the lead, its middle `cx`, `cy` and its `area` in square units |
+| `frame.webp` | 1600 × 1600, straight alpha | the stone and the lead over ±400 units, by moonlight from the top left and warmed by the glow of the glass: the tracery between the panes with chamfered edges, the mouldings from r 298 (a chamfer, a hollow, a roll, a fillet, a splay), 24 voussoirs to r 393 with chipped joints, grime running down, lichen on what faces up; rounded lead along every border between two panes. Clear on the glass and outside r 393.5 |
+| `room.webp` | 1280 × 1280, opaque | the séance over ±320 units, seen from the window high in the west wall: flagstones in perspective, the apse with a fresco of a saint with moth wings, a halo and scratched-out eyes over *VIGILATE*, the pale scar of a crucifix, a boarded window, two iron candle stands; the medium in her tall chair, the widower on the left, the sister on the right, the nephew with his back to the window, all without heads; a round table under a black velvet cloth with a gold fringe, a talking board, three candles without flames. Lit per pixel by the five flames |
+| `room.json` | | the layout the demo reads: `table`, `board` with its `marks` (the room position of every letter and digit, of `YES`, `NO` and `GOOD BYE`), `lens` (where the planchette's lens sits on its sprite), `candles` and `stands` (the foot of each flame and its size), `heads` (where each sphere goes, its radius, its face, its yaw and pitch at rest) and `lights` |
+| `sprites.webp` | 1080 × 612, straight alpha | the sprites, TexturePacker hash in `sprites.json`, untrimmed, 6 px apart: `face-medium`, `face-widower`, `face-sister`, `face-nephew` (528 × 256: an equirectangular map of a whole head, 512 texels for 360°, the face in the middle, the crown on the top row, the neck on the bottom one, with 8 texels of the far side of the seam on each side), `planchette` (84 × 68, a heart of dark wood pointing up with a brass-rimmed lens, its shadow baked in), `moth-pale`, `moth-dusk` (100 × 76, wings spread, the head up) |
+| `sprites.json` | | the frames of `sprites.webp`, and `faceMap` (`width` 512, `height` 256, `wrap` 8) |

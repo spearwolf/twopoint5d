@@ -1,0 +1,158 @@
+{
+  "frames": {
+    "face-medium": {
+      "frame": {
+        "x": 6,
+        "y": 6,
+        "w": 528,
+        "h": 256
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 528,
+        "h": 256
+      },
+      "sourceSize": {
+        "w": 528,
+        "h": 256
+      }
+    },
+    "face-widower": {
+      "frame": {
+        "x": 540,
+        "y": 268,
+        "w": 528,
+        "h": 256
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 528,
+        "h": 256
+      },
+      "sourceSize": {
+        "w": 528,
+        "h": 256
+      }
+    },
+    "face-sister": {
+      "frame": {
+        "x": 6,
+        "y": 268,
+        "w": 528,
+        "h": 256
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 528,
+        "h": 256
+      },
+      "sourceSize": {
+        "w": 528,
+        "h": 256
+      }
+    },
+    "face-nephew": {
+      "frame": {
+        "x": 540,
+        "y": 6,
+        "w": 528,
+        "h": 256
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 528,
+        "h": 256
+      },
+      "sourceSize": {
+        "w": 528,
+        "h": 256
+      }
+    },
+    "planchette": {
+      "frame": {
+        "x": 218,
+        "y": 530,
+        "w": 84,
+        "h": 68
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 84,
+        "h": 68
+      },
+      "sourceSize": {
+        "w": 84,
+        "h": 68
+      }
+    },
+    "moth-pale": {
+      "frame": {
+        "x": 112,
+        "y": 530,
+        "w": 100,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 100,
+        "h": 76
+      }
+    },
+    "moth-dusk": {
+      "frame": {
+        "x": 6,
+        "y": 530,
+        "w": 100,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 100,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 100,
+        "h": 76
+      }
+    }
+  },
+  "meta": {
+    "image": "sprites.webp",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1080,
+      "h": 612
+    },
+    "scale": "1"
+  },
+  "faceMap": {
+    "width": 512,
+    "height": 256,
+    "wrap": 8
+  }
+}

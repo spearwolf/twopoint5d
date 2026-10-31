@@ -1,0 +1,192 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-frozen.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {Display, OnStageUpdateFrame, StageDirector, type StageDirectorShape, StageMask} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {
+    ChapelVoid,
+    ChapelWall,
+    disposeChapelAssets,
+    GlassTint,
+    loadChapelAssets,
+    SeanceClock,
+    SeanceRoom,
+  } from '~demos/stage-masks/MothChapel';
+  import {RoseWindow} from '~demos/stage-masks/RoseWindow';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the heads get to turn to the window before the card is taken, in ms
+  const PREVIEW_SETTLE = 9000;
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadChapelAssets(renderer);
+    if (display.isDisposed) {
+      disposeChapelAssets(assets);
+      return;
+    }
+
+    const lamps = assets.layout.candles.length + assets.layout.stands.length;
+    const clock = new SeanceClock(assets.layout, lamps);
+    const dark = new ChapelVoid(clock);
+    const room = new SeanceRoom(assets, clock);
+    const amber = new GlassTint('amber glass', [0.7, 0.26, 0.025], 0.26, 3);
+    const violet = new GlassTint('violet glass', [0.09, 0.02, 0.2], 0.34, 9);
+    const wall = new ChapelWall(assets, clock);
+    const rose = new RoseWindow(assets, clock);
+
+    // the bottom layer is updated first in every frame, frozen mask or not: the clock moves there, and
+    // so do the panes of the rose — the mask scene lives on while its picture is frozen
+    on(dark.stage, OnStageUpdateFrame, ({deltaTime}) => {
+      clock.update(deltaTime);
+      rose.update(deltaTime);
+    });
+
+    // from the bottom up: the dark behind the glass, the séance, the amber and the violet light of the
+    // glass, the stone and the lead. The rose window is never in the stack: it is the mask stage, read
+    // through three masks, one per channel of its picture — and drawn once for all three
+    const layers = [dark.stage, room.stage, amber.stage, violet.stage, wall.stage];
+    director.setStack(layers);
+    const throughGlass = new StageMask(rose.stage, {source: 'alpha'});
+    const amberGlass = new StageMask(rose.stage, {source: 'red'});
+    const violetGlass = new StageMask(rose.stage, {source: 'blue'});
+    director.setMask(room.stage, throughGlass);
+    director.setMask(amber.stage, amberGlass);
+    director.setMask(violet.stage, violetGlass);
+
+    // a rose window does not change: draw it once, then sample that picture in every frame
+    director.freeze(rose.stage);
+
+    const settings = {mode: 'freeze' as 'freeze' | 'run'};
+    const readout = {scene: '', drawn: '0 times total', frame: '', last: 'not yet'};
+    let total = 0;
+    let frameNo = 0;
+    let wasRunning = false;
+    let frozenAtLastUpdate = true;
+    let lastDraw = 0;
+    let lastFrameDraws = -1;
+    const sceneAfloat = `${rose.panes.length} panes afloat`;
+    const sceneGoingHome = `${rose.panes.length} panes going home`;
+    const sceneAtRest = `${rose.panes.length} panes at rest`;
+
+    const apply = () => {
+      if (settings.mode === 'freeze') director.freeze(rose.stage);
+      else director.run(rose.stage);
+    };
+    const scramble = () => rose.scramble();
+    const mend = () => rose.mend();
+
+    // the wall, the top layer, is updated before the mask stage draws: it reads the draws of the frame
+    // before, the one on the screen now
+    on(wall.stage, OnStageUpdateFrame, () => {
+      frameNo++;
+      const draws = rose.takeDraws();
+      // the frame on the screen was drawn in the state of the last update: a key pressed since then
+      // speaks for the next frame, not for this one
+      const frozenThen = frozenAtLastUpdate;
+      frozenAtLastUpdate = director.isFrozen(rose.stage);
+      if (draws > 0) {
+        total += draws;
+        lastDraw = frameNo - 1;
+        // a counter that ticks: while the mask runs, this text changes in every frame
+        readout.drawn = `${total} ${total === 1 ? 'time' : 'times'} total`;
+        if (total === draws) readout.last = `frame ${lastDraw}, the first frame`;
+        else if (frozenThen) readout.last = `frame ${lastDraw}, after a resize: the target lost its picture`;
+        else if (!wasRunning) readout.last = 'in every frame, running';
+        wasRunning = !frozenThen;
+      } else if (wasRunning) {
+        // frozen again: the picture on the screen is the one of the last running frame
+        readout.last = `frame ${lastDraw}, the last frame it ran`;
+        wasRunning = false;
+      }
+      if (draws !== lastFrameDraws) {
+        lastFrameDraws = draws;
+        readout.frame = draws === 0 ? '0 / 1' : '1 / 1';
+      }
+      readout.scene = rose.isMoving ? (rose.isScattered ? sceneAfloat : sceneGoingHome) : sceneAtRest;
+    });
+
+    // F freezes and runs the mask stage, S scrambles the mask scene, M mends the glass
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (event.code === 'KeyF') {
+        settings.mode = settings.mode === 'freeze' ? 'run' : 'freeze';
+        apply();
+      } else if (event.code === 'KeyS') scramble();
+      else if (event.code === 'KeyM') mend();
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    const gui = new GUI({container: getDemoUi(), title: 'The Moth Chapel'});
+    gui.add(settings, 'mode', ['freeze', 'run']).name('mask stage (f)').onChange(apply).listen();
+    gui.add({scramble}, 'scramble').name('scramble the mask scene (s)');
+    gui.add({mend}, 'mend').name('mend the glass (m)');
+    gui.add(readout, 'scene').name('mask scene').disable().listen();
+    gui.add(readout, 'drawn').name('mask stage drawn').disable().listen();
+    gui.add(readout, 'frame').name('this frame').disable().listen();
+    gui.add(readout, 'last').name('last drawn').disable().listen();
+
+    // the one shape of the stack: run and freeze change no shape, and the masks never come off.
+    // Every stage draws once ahead, so its materials are built before the first frame
+    const shapes: StageDirectorShape[] = [['layer', {mask: throughGlass}, {mask: amberGlass}, {mask: violetGlass}, 'layer']];
+    const precompiled = director.precompile(renderer, shapes, {layers: [...layers, rose.stage]}).catch((error: unknown) => {
+      // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+      console.error('stage-masks-frozen: precompile() failed, the shaders build on first use', error);
+    });
+    // precompile() draws the stages off screen in its synchronous part, before its first await: those
+    // draws of the rose are not the frames', and the frozen mask still owes its first picture
+    rose.takeDraws();
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      gui.destroy();
+      // the director lets go of the layers and the mask stage first, then each goes
+      director.dispose();
+      throughGlass.dispose();
+      amberGlass.dispose();
+      violetGlass.dispose();
+      rose.dispose();
+      wall.dispose();
+      violet.dispose();
+      amber.dispose();
+      room.dispose();
+      dark.dispose();
+      disposeChapelAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>
