@@ -17,8 +17,14 @@ const stage = (name = 'ink') => ({name, resize() {}, updateFrame() {}, renderTo(
 /** An input whose mask() answers `coverage` and records the uv it is asked at. */
 function inputWith(mask: StageMask, coverage: Node<'float'>) {
   const at: Node<'vec2'>[] = [];
-  const from = textureSource(texture(tex()) as unknown as TextureNode);
-  const to = textureSource(texture(tex()) as unknown as TextureNode);
+  const fromNode = texture(tex()) as unknown as TextureNode;
+  const toNode = texture(tex()) as unknown as TextureNode;
+  const labels = new Map<Node, string>([
+    [fromNode.getBase(), 'from'],
+    [toNode.getBase(), 'to'],
+  ]);
+  const from = textureSource(fromNode);
+  const to = textureSource(toNode);
   const fromSample = vi.spyOn(from, 'sample');
   const toSample = vi.spyOn(to, 'sample');
   const maskSource: StageMaskSource = {
@@ -39,18 +45,22 @@ function inputWith(mask: StageMask, coverage: Node<'float'>) {
       return maskSource;
     },
   };
-  return {input, at, fromSample, toSample};
+  return {input, at, fromSample, toSample, labels};
 }
 
 /**
  * The shape of a graph as text: operators and constants by value, the leaves it was built from
  * (uniforms, texture nodes, the uv) by the order of their first appearance. Two graphs built from
- * the same leaves in the same way have the same shape. (The cache key of a node is no help here: it
+ * the same leaves in the same way have the same shape; `labels` names leaves that must stay apart. (The cache key of a node is no help here: it
  * holds the identity of every node, so two equal graphs differ.)
  */
-function keyOf(root: Node): string {
+function keyOf(root: Node, labels?: ReadonlyMap<Node, string>): string {
   const ids = new Map<Node, number>();
   const walk = (node: Node): string => {
+    // the textures of from and to keep their names: a swapped pair stays a swap
+    const base = (node as Partial<TextureNode>).getBase?.() ?? node;
+    const named = labels?.get(base) ?? labels?.get(node);
+    if (named !== undefined) return `${node.constructor.name}<${named}>`;
     const children = [...(node.getChildren() as Iterable<Node>)];
     const inner = node as unknown as {op?: string; scope?: string; method?: string; value?: unknown};
     if (children.length === 0) {
@@ -75,7 +85,7 @@ describe('matte()', () => {
   it('refuses a missing mask', () => {
     expect(() => matte({} as any)).toThrow('matte: mask must be a StageMask, got undefined');
     expect(() => matte({mask: tex() as any})).toThrow('matte: mask must be a StageMask, got ');
-    expect(() => matte(undefined as any)).not.toThrow('options');
+    expect(() => matte(undefined as any)).toThrow('matte: mask must be a StageMask, got undefined');
     expect(() => matte('ink' as any)).toThrow('matte: the options must be an object');
   });
 
@@ -103,10 +113,11 @@ describe('matte()', () => {
     const effect = matte(options);
     options.mode = 'threshold' as any;
     const coverage = float(0.5);
-    const {input} = inputWith(mask, coverage);
-    const same = matte({mask, mode: 'coverage'}).build(inputWith(mask, coverage).input);
+    const one = inputWith(mask, coverage);
+    const two = inputWith(mask, coverage);
+    const same = matte({mask, mode: 'coverage'}).build(two.input);
     // the same graph as an effect made with 'coverage' — the later change of the object is not seen
-    expect(keyOf(effect.build(input))).toBe(keyOf(same));
+    expect(keyOf(effect.build(one.input), one.labels)).toBe(keyOf(same, two.labels));
   });
 
   it('builds a new node on every call', () => {
@@ -120,7 +131,7 @@ describe('matte()', () => {
     it('holds both ends whatever the mask draws', () => {
       const mask = new StageMask(stage());
       const coverage = float(0.3);
-      const {input} = inputWith(mask, coverage);
+      const {input, labels} = inputWith(mask, coverage);
       const node = matte({mask}).build(input);
       // 0 at progress <= 0, 1 at progress >= 1, the coverage between — and nothing else
       const share = select(
@@ -128,15 +139,21 @@ describe('matte()', () => {
         float(0),
         select(input.progress.greaterThanEqual(1), float(1), coverage),
       );
-      expect(keyOf(node)).toBe(keyOf(mix(input.from.sample(input.uv), input.to.sample(input.uv), share)));
+      const expected = mix(input.from.sample(input.uv), input.to.sample(input.uv), share);
+      expect(keyOf(node, labels)).toBe(keyOf(expected, labels));
+      // the direction: `from` is the first sample, `to` the second — a swap is a different graph
+      const swapped = mix(input.to.sample(input.uv), input.from.sample(input.uv), share);
+      expect(keyOf(swapped, labels)).not.toBe(keyOf(expected, labels));
     });
 
     it('is the default mode', () => {
       const mask = new StageMask(stage());
       const coverage = float(0.3);
-      const a = matte({mask}).build(inputWith(mask, coverage).input);
-      const b = matte({mask, mode: 'coverage'}).build(inputWith(mask, coverage).input);
-      expect(keyOf(a)).toBe(keyOf(b));
+      const one = inputWith(mask, coverage);
+      const two = inputWith(mask, coverage);
+      const a = matte({mask}).build(one.input);
+      const b = matte({mask, mode: 'coverage'}).build(two.input);
+      expect(keyOf(a, one.labels)).toBe(keyOf(b, two.labels));
     });
   });
 
@@ -145,19 +162,24 @@ describe('matte()', () => {
       const mask = new StageMask(stage());
       const coverage = float(0.3);
       for (const softness of [undefined, 0, 0.2]) {
-        const {input} = inputWith(mask, coverage);
+        const {input, labels} = inputWith(mask, coverage);
         const node = matte({mask, mode: 'threshold', softness}).build(input);
         const share = switched(coverage, input.progress, softness ?? 0.05);
-        expect(keyOf(node)).toBe(keyOf(mix(input.from.sample(input.uv), input.to.sample(input.uv), share)));
+        const expected = mix(input.from.sample(input.uv), input.to.sample(input.uv), share);
+        expect(keyOf(node, labels)).toBe(keyOf(expected, labels));
+        const swapped = mix(input.to.sample(input.uv), input.from.sample(input.uv), share);
+        expect(keyOf(swapped, labels)).not.toBe(keyOf(expected, labels));
       }
     });
 
     it('differs from coverage mode', () => {
       const mask = new StageMask(stage());
       const coverage = float(0.3);
-      const a = matte({mask, mode: 'threshold'}).build(inputWith(mask, coverage).input);
-      const b = matte({mask}).build(inputWith(mask, coverage).input);
-      expect(keyOf(a)).not.toBe(keyOf(b));
+      const one = inputWith(mask, coverage);
+      const two = inputWith(mask, coverage);
+      const a = matte({mask, mode: 'threshold'}).build(one.input);
+      const b = matte({mask}).build(two.input);
+      expect(keyOf(a, one.labels)).not.toBe(keyOf(b, two.labels));
     });
   });
 

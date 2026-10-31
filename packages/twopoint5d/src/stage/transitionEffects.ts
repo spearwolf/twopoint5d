@@ -135,8 +135,8 @@ function softnessOf(subject: string, softness: unknown, fallback: number): numbe
  * The share of `to` at a pixel whose switching point is `at`, from 0 to 1: the pixels switch in
  * the order of `at`, and `softness` blends over that width of it. At progress 0 the share is 0 for
  * every `at` in `[0, 1]`, at progress 1 it is 1.
+ * @internal
  */
-/** @internal */
 export function switched(at: Node<'float'>, progress: Node<'float'>, softness: number): Node<'float'> {
   // smoothstep() with both edges at one place is undefined in GLSL: a driver that compiles it
   // without ANGLE in between, as Firefox and WebKit do on Linux, may answer anything at all. A hard
