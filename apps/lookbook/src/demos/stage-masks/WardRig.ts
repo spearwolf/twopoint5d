@@ -125,7 +125,9 @@ export class WardRig {
     this.#movePlayer(deltaTime);
 
     // the left lamp hums, almost steady
-    const [hum, pendant, dying] = this.lamps as [RigLight, RigLight, RigLight];
+    const hum = this.lamps[0]!;
+    const pendant = this.lamps[1]!;
+    const dying = this.lamps[2]!;
     hum.intensity = 0.9 + 0.05 * Math.sin(t * 8.7) + 0.03 * Math.sin(t * 23.1) + 0.02 * Math.sin(t * 2.3);
 
     // the pendant swings on its cord and browns out in slow waves
@@ -209,11 +211,10 @@ export class WardRig {
       const top = box.top + PLAYER_RADIUS;
       if (p.x <= left || p.x >= right || p.y <= bottom || p.y >= top) continue;
       // out along the shortest way
-      const pushes = [left - p.x, right - p.x, bottom - p.y, top - p.y];
-      let best = 0;
-      for (let i = 1; i < 4; i++) if (Math.abs(pushes[i]!) < Math.abs(pushes[best]!)) best = i;
-      if (best < 2) p.x += pushes[best]!;
-      else p.y += pushes[best]!;
+      const dx = p.x - left < right - p.x ? left - p.x : right - p.x;
+      const dy = p.y - bottom < top - p.y ? bottom - p.y : top - p.y;
+      if (Math.abs(dx) < Math.abs(dy)) p.x += dx;
+      else p.y += dy;
     }
   }
 

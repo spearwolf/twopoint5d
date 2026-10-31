@@ -21,6 +21,7 @@ import {description, title} from './_stage-masks-spotlight.json';
     type StageDirectorShape,
     StageMask,
     type StageMaskCoverageSource,
+    type StageTransition,
   } from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
@@ -71,8 +72,19 @@ import {description, title} from './_stage-masks-spotlight.json';
     const player = new WardPlayer(assets, rig);
     const fog = new WardFog(rig);
 
+    // `level` is the level of the slot's end state, the one setMask() and maskOf() take; `shown` is the
+    // level the player walks in, which changes only once a crossfade into the next one has ended
     let level = ward;
-    rig.obstacles = level.config.obstacles;
+    let shown = ward;
+    let running: StageTransition | undefined;
+    const levelOf = (stage: unknown) => (stage === laundromat.stage ? laundromat : ward);
+    const arrive = (next: WardLevel) => {
+      shown = next;
+      rig.obstacles = next.config.obstacles;
+      player.palette = next.config.palette;
+      player.wetness = next.config.wetness;
+    };
+    arrive(ward);
 
     // the fog is never in the stack: it is the mask of the level's slot
     director.setStack([deep.stage, ward.stage, player.stage]);
@@ -84,7 +96,7 @@ import {description, title} from './_stage-masks-spotlight.json';
       // the mask belongs to the slot: ask the stage that is in it now, whichever level that is
       const m = director.maskOf(level.stage);
       readout.maskOf = m ? `StageMask(fog, ${m.source}${m.invert ? ', invert' : ''})` : 'undefined';
-      readout.level = level.config.name;
+      readout.level = running ? `${shown.config.name} → ${level.config.name}` : shown.config.name;
     };
     describe();
 
@@ -109,12 +121,18 @@ import {description, title} from './_stage-masks-spotlight.json';
     const nextLevel = () => {
       const next = level === ward ? laundromat : ward;
       // only the view behind the porthole changes: the mask stays on the slot
-      director.replace(level.stage, next.stage, {effect, duration: 1.6, easing: 'ease-in-out'});
+      const transition = director.replace(level.stage, next.stage, {effect, duration: 1.6, easing: 'ease-in-out'});
       level = next;
-      rig.obstacles = level.config.obstacles;
-      player.palette = level.config.palette;
-      player.wetness = level.config.wetness;
+      running = transition;
       describe();
+      // the player walks in the old level until the new one has crossed in; a second click finishes
+      // this transition first, and the promises resolve in that order
+      transition.finished.then((t) => {
+        if (display.isDisposed) return;
+        arrive(levelOf(t.state === 'finished' ? t.to : t.from));
+        if (running === t) running = undefined;
+        describe();
+      });
     };
 
     const keys: Record<string, keyof Omit<RigInput, 'target'>> = {
@@ -127,7 +145,10 @@ import {description, title} from './_stage-masks-spotlight.json';
       KeyW: 'up',
       KeyS: 'down',
     };
+    // a shortcut of the browser or the system is not a step of the player
+    const withModifier = (event: KeyboardEvent) => event.ctrlKey || event.metaKey || event.altKey;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (withModifier(event)) return;
       const key = keys[event.code];
       if (key) {
         rig.input[key] = true;
@@ -147,8 +168,14 @@ import {description, title} from './_stage-masks-spotlight.json';
       const key = keys[event.code];
       if (key) rig.input[key] = false;
     };
+    // a key released while the window is not focused never sends its keyup: stop walking on blur
+    const onBlur = () => {
+      rig.input.left = rig.input.right = rig.input.up = rig.input.down = false;
+      rig.input.target = undefined;
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
 
     // a pointer drag leads the player: into units of the view, from its middle
     let dragging = false;
@@ -185,7 +212,9 @@ import {description, title} from './_stage-masks-spotlight.json';
     gui.add(readout, 'maskOf').name('maskOf(level)').disable().listen();
 
     // every shape the stack takes, built before it is needed: the level under its mask, the crossfade
-    // inside the mask, and both without it
+    // inside the mask, and both without it. Only for the mask the demo starts with: the source and the
+    // invert are part of the shader, so each other pair the GUI offers is a shader of its own, and the
+    // first switch to it builds that one (ten pairs times two shapes is more than a start should wait for)
     const shapes: StageDirectorShape[] = [
       ['layer', {mask}, 'layer'],
       ['layer', {effect, mask}, 'layer'],
@@ -200,6 +229,7 @@ import {description, title} from './_stage-masks-spotlight.json';
       clearTimeout(previewTimeout);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);

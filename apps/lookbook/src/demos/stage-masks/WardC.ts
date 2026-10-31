@@ -426,6 +426,7 @@ export class WardFog {
     this.#rig = rig;
     this.stage.scene.add(this.blobs.mesh);
     this.#blobOf = rig.lights.map((light) => this.blobs.add(light.x, light.y, light.radius, 1)!.setColor(light.color));
+    // uploads the pool now, for the reason given in the constructor of WardLevel
     this.#update();
     on(this.stage, OnStageUpdateFrame, () => this.#update());
   }
@@ -539,6 +540,7 @@ export class WardDeep {
       });
     });
 
+    // upload the pools now, for the reason given in the constructor of WardLevel
     this.#hand.update();
     this.#eyes.update();
     on(this.stage, OnStageUpdateFrame, ({deltaTime}: StageUpdateFrameProps) => this.#update(deltaTime));
@@ -618,6 +620,9 @@ interface Ring {
 
 const RING_LIFE = 1.3;
 
+/** the raincoat stays readable in the dark and does not burn out in a lamp */
+const litRaincoat = (c: number) => Math.min(1.15, 0.55 + c * 0.45);
+
 /**
  * The top slot, unmasked: the player in a yellow raincoat, its shadow and the rings it leaves on
  * the water. The player is not part of either level, so it stays put while the levels cross.
@@ -652,6 +657,7 @@ export class WardPlayer {
     }
     this.#player = this.#sprites.createSprite()!;
     setFrame(this.#player, assets.atlas, 'player', 0.85);
+    // uploads the pool now, for the reason given in the constructor of WardLevel
     this.#sprites.update();
     on(this.stage, OnStageUpdateFrame, ({deltaTime}: StageUpdateFrameProps) => this.#update(deltaTime));
   }
@@ -688,8 +694,7 @@ export class WardPlayer {
     this.#player.setPosition(player.x, player.y + bob, 0);
     this.#player.rotation = player.facing;
     rig.lightAt(player.x, player.y, this.palette.colors, this.palette.ambient, this.#tint);
-    const lit = (c: number) => Math.min(1.15, 0.55 + c * 0.45);
-    this.#player.setColorValues(lit(this.#tint.r), lit(this.#tint.g), lit(this.#tint.b), 1);
+    this.#player.setColorValues(litRaincoat(this.#tint.r), litRaincoat(this.#tint.g), litRaincoat(this.#tint.b), 1);
     this.#sprites.update();
   }
 
