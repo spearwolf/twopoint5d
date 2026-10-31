@@ -563,10 +563,10 @@ describe('StageDirector', () => {
         `${subject}: shapes must be an array of shapes, got "layer"`,
       );
       await expect(director.precompile(renderer as any, [[]])).rejects.toThrow(
-        `${subject}: shapes[0] must be a non-empty array of 'layer' and StageTransitionEffect`,
+        `${subject}: shapes[0] must be a non-empty array of 'layer', StageTransitionEffect and {effect?, mask}`,
       );
       await expect(director.precompile(renderer as any, [['layer', 'fade' as any]])).rejects.toThrow(
-        `${subject}: shapes[0][1] must be 'layer' or a StageTransitionEffect, got "fade"`,
+        `${subject}: shapes[0][1] must be 'layer', a StageTransitionEffect or {effect?, mask}, got "fade"`,
       );
       await expect(director.precompile(renderer as any, [], 'layers' as any)).rejects.toThrow(
         `${subject}: the options must be an object, got "layers"`,

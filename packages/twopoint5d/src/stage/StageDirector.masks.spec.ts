@@ -1,5 +1,5 @@
 import {emit, eventize} from '@spearwolf/eventize';
-import {ACESFilmicToneMapping, Color, FloatType, SRGBColorSpace} from 'three/webgpu';
+import {ACESFilmicToneMapping, Color, FloatType, type Node, RenderPipeline, SRGBColorSpace, type TextureNode} from 'three/webgpu';
 import {beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
 import {OnStageDispose} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
@@ -7,6 +7,7 @@ import type {IStage} from './IStage.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
+import {crossfade} from './transitionEffects.js';
 
 // the parts of a WebGPURenderer the director and its pipelines touch, as StageDirector.spec.ts mocks them
 function createRendererMock() {
@@ -59,6 +60,15 @@ function fakeStage(name: string): FakeStage {
 }
 
 const names = (stages: ReadonlyArray<IStage>) => stages.map((s) => s.name);
+
+/** The texture nodes a graph samples, each counted once: the base of every sample() of it. */
+function textureNodesOf(node: Node): Set<TextureNode> {
+  const found = new Set<TextureNode>();
+  node.traverse((child) => {
+    if ((child as Partial<TextureNode>).isTextureNode) found.add((child as TextureNode).getBase());
+  });
+  return found;
+}
 
 describe('StageDirector masks', () => {
   let renderer: ReturnType<typeof createRendererMock>;
@@ -351,6 +361,36 @@ describe('StageDirector masks', () => {
       second.dispose();
     });
 
+    it('a stage may be a layer of two directors, but a mask stage of one is no layer of another', () => {
+      const second = new StageDirector();
+      second.resize(64, 64);
+      director.setStack([level]);
+      second.setStack([level]);
+      expect(names(director.stack)).toEqual(['level']);
+      expect(names(second.stack)).toEqual(['level']);
+
+      director.setMask(level, fog);
+      expect(() => second.show(fogStage)).toThrow(
+        'StageDirector#show() cannot take the stage "fog": that stage is a mask of another director',
+      );
+      expect(names(second.stack)).toEqual(['level']);
+      second.dispose();
+    });
+
+    it('show() with a mask whose stage refuses to join changes nothing', () => {
+      const broken = fakeStage('broken');
+      broken.resize.mockImplementation(() => {
+        throw new Error('broken: no size');
+      });
+      director.setStack([stars, level]);
+      const t = director.hide(level, {duration: 1});
+      expect(() => director.show(level, {mask: new StageMask(broken)})).toThrow('broken: no size');
+      // the hide() still runs: the mask stage joins before any run ends
+      expect(t.state).toBe('pending');
+      expect(director.transitions).toEqual([t]);
+      expect(ordered()).toEqual(['stars', 'level']);
+    });
+
     it("a director's dispose() lets go of its mask stages for another director", () => {
       const second = new StageDirector();
       director.setStack([level]);
@@ -463,6 +503,130 @@ describe('StageDirector masks', () => {
       expect(director.maskOf(level)).toBeUndefined();
       expect(wrapper.isDisposed).toBe(true);
       expect(ordered()).toEqual(['stars', 'level']);
+    });
+  });
+
+  describe('the shape', () => {
+    const outputNode = () => director.pipeline!.outputNode as Node;
+    const texturesOf = () => [...textureNodesOf(outputNode())].map((node) => node.value);
+
+    it('two masks with the same options on stages in the same pattern answer the same output node', () => {
+      const blobsStage = fakeStage('blobs');
+      director.setStack([stars, level]);
+      director.setMask(level, fog);
+      draw();
+      const pipeline = director.pipeline;
+      const node = outputNode();
+      const before = texturesOf();
+      expect(before).toHaveLength(3);
+
+      director.setMask(level, new StageMask(blobsStage));
+      draw();
+      expect(director.pipeline).toBe(pipeline);
+      expect(outputNode()).toBe(node);
+      // the texture of the mask stage is swapped, nothing is built
+      const after = texturesOf();
+      expect(after).toHaveLength(3);
+      expect(after.filter((texture) => !before.includes(texture))).toHaveLength(1);
+    });
+
+    it('one mask on two slots builds one texture node', () => {
+      director.setStack([stars, level]);
+      director.setMask(stars, fog);
+      director.setMask(level, fog);
+      draw();
+      expect(textureNodesOf(outputNode()).size).toBe(3);
+      const shared = director.pipeline;
+
+      // a second StageMask object with the same options on the same stage is the same mask
+      director.setMask(level, new StageMask(fogStage));
+      draw();
+      expect(director.pipeline).toBe(shared);
+
+      // an inverted mask on the same stage samples the same texture node, in another shape
+      director.setMask(level, new StageMask(fogStage, {invert: true}));
+      draw();
+      expect(director.pipeline).not.toBe(shared);
+      expect(textureNodesOf(outputNode()).size).toBe(3);
+    });
+
+    it('a red and a green mask on one stage and on two stages are two shapes', () => {
+      const otherStage = fakeStage('other');
+      director.setStack([stars, level]);
+      director.setMask(stars, new StageMask(fogStage, {source: 'red'}));
+      director.setMask(level, new StageMask(fogStage, {source: 'green'}));
+      draw();
+      const oneStage = director.pipeline;
+      expect(textureNodesOf(outputNode()).size).toBe(3);
+
+      director.setMask(level, new StageMask(otherStage, {source: 'green'}));
+      draw();
+      expect(director.pipeline).not.toBe(oneStage);
+      expect(textureNodesOf(outputNode()).size).toBe(4);
+    });
+
+    it('a masked slot and an unmasked one are two shapes, and a transition runs inside the mask', () => {
+      director.setStack([stars, level]);
+      draw();
+      const plain = director.pipeline;
+      director.setMask(level, fog);
+      draw();
+      const masked = director.pipeline;
+      expect(masked).not.toBe(plain);
+
+      const effect = crossfade();
+      director.replace(level, nextLevel, {effect, duration: 1});
+      draw();
+      expect(director.pipeline).not.toBe(masked);
+      // stars, from, to and the mask
+      expect(textureNodesOf(outputNode()).size).toBe(4);
+      director.transitions[0]!.complete();
+      draw();
+      expect(director.pipeline).toBe(masked);
+    });
+
+    it('precompile() takes a masked slot and a mask stage in layers', async () => {
+      const updateContext = vi.spyOn(RenderPipeline.prototype as any, '_updateContext');
+      try {
+        const effect = crossfade();
+        await director.precompile(
+          renderer as any,
+          [
+            ['layer', {mask: fog}],
+            ['layer', {effect, mask: fog}],
+          ],
+          {layers: [level, fogStage]},
+        );
+        expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+        expect(updateContext).toHaveBeenCalledTimes(2);
+        expect(fogStage.renderTo).toHaveBeenCalledTimes(1);
+
+        // another StageMask object on another stage, with the same options: the shapes are compiled
+        const blobsStage = fakeStage('blobs');
+        director.setStack([stars, level]);
+        director.setMask(level, new StageMask(blobsStage));
+        draw();
+        director.replace(level, nextLevel, {effect, duration: 1});
+        draw();
+        expect(updateContext).toHaveBeenCalledTimes(2);
+        expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+      } finally {
+        updateContext.mockRestore();
+      }
+    });
+
+    it('parseShapes refuses {mask: 3}', async () => {
+      const subject = 'StageDirector#precompile()';
+      await expect(director.precompile(renderer as any, [['layer', {mask: 3} as any]])).rejects.toThrow(
+        `${subject}: shapes[0][1].mask must be a StageMask, got 3`,
+      );
+      await expect(director.precompile(renderer as any, [[{mask: fog, effect: 'fade'} as any]])).rejects.toThrow(
+        `${subject}: shapes[0][0].effect must be a StageTransitionEffect, got "fade"`,
+      );
+      await expect(director.precompile(renderer as any, [['layer', {effect: crossfade()} as any]])).rejects.toThrow(
+        `${subject}: shapes[0][1] must be 'layer', a StageTransitionEffect or {effect?, mask}, got {effect: `,
+      );
+      expect(renderer.compileAsync).not.toHaveBeenCalled();
     });
   });
 });
