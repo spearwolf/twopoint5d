@@ -28,6 +28,8 @@ and later against the depth of the scene.
 | an effect of one's own that reads a living stage — a heat haze, a displacement | `masks` on the effect and `input.mask(m)` in `build()` | 4.1 |
 | a renderer composed by hand | `createMaskNode(content, mask)` for a `buildOutputNode` of one's own | 5 |
 | a mask that lies in the world, not on the screen | `StageMask.inWorldOf(stage, scene)`: the mask scene drawn through the camera of the stage | 7.2 |
+| a world map or a dungeon under a living fog over what is not explored yet | `RevealMap` — the explored cells, kept on the CPU, saved with the game — and `fogCoverage()`, the living edge in TSL | 8 |
+| the three states of a fog of war: unexplored, remembered, in sight | masked slots of the stack, a sight mask that forgets and a `RevealMap` that remembers | 8.4 |
 
 ## 2. What the stage layer gives today, and where it ends
 
@@ -150,7 +152,7 @@ The director samples a mask at the uv it samples its layers at, the origin at th
 picture under WebGPU and under WebGL 2: the pass target of a mask stage is a render target as the
 pass target of every layer is, and three.js flips both alike. A mask stage that draws into its top
 half masks the top half of the slot. This is the trap of the `lumaMask()` hack of §2, and the browser
-test of §9.2 holds it.
+test of §10.2 holds it.
 
 ## 4. Masks in transitions
 
@@ -291,7 +293,7 @@ sr.buildOutputNode = ([scene, fog]) => createMaskNode(scene, fog, {source: 'alph
 `buildOutputNode` of one's own; a source is a `TextureNode` or the `PassNode` of a `Stage2D`, as for
 `createTransitionNode()`, and the options are those of §3.1. The mask stage is one of the stages of
 the renderer and is drawn as every stage is: no lifecycle, no progress, nothing but the TSL of §3.2.
-It is the smallest part of this proposal and the first one to build (§11).
+It is the smallest part of this proposal and the first one to build (§12).
 
 ## 6. Stencil
 
@@ -330,7 +332,7 @@ layer, for reasons in the code as it is:
 
 Stencil wins in one column: the fill cost of the masked stage. A portal that covers a tenth of the
 screen, behind which a whole second world draws, pays the full world under a texture mask. That is
-an optimisation, not a mechanism, and it belongs after measurements (§11, phase D):
+an optimisation, not a mechanism, and it belongs after measurements (§12, phase D):
 
 - **A stencil pre-pass of a mask in the layers mode.** One full-screen quad writes the stencil where
   the coverage of a frozen or running mask is above a threshold, and the masked stage draws with the
@@ -387,7 +389,7 @@ A mask in the world could also be compared with the depth of the scene: the insi
 cone only where its geometry is in front of the walls, an x-ray that shows through a wall only
 behind it. That needs the depth of both pictures in the quad — the `PassNode` of a `Stage2D` has
 a depth texture, the pass targets of the layers of a director have a depth buffer and no depth
-texture. A depth-aware mask is left for later (§11, phase D), with a depth texture on the pass
+texture. A depth-aware mask is left for later (§12, phase D), with a depth texture on the pass
 targets of the layers that ask for one, and `depthTest: 'in-front' | 'behind'` on the mask.
 
 ### 7.4 3D transitions through a matte
@@ -399,7 +401,162 @@ of meshes — the silhouette of a real 3D scene, anti-aliased by its own rendere
 between `from` and `to`. The mask stage may even carry a bloom in its own pipeline; the matte reads
 its coverage, not its look.
 
-## 8. Ownership and disposal
+## 8. A living fog over what is not explored yet
+
+A world map or a dungeon under a fog that covers every part the player has not reached yet, rolls
+back where the player walks and keeps moving at its edge. It is the use case that asks of a mask
+what none of §3 to §7 asks: a **memory**. What the player has seen stays seen — across every move
+of the camera, every resize, every save game.
+
+### 8.1 Where the explored state lives
+
+Not in a target of the screen. A pass target holds the picture of one frame in screen space: the
+director clears it every frame, a resize drops it, and a camera that moves would drag the explored
+area along with it. A target that accumulates the sight of the player in map space — drawn with
+`MaxEquation` blending and never cleared — would remember on the GPU, but it answers nothing to the
+game: neither the minimap, nor the AI that asks "has the player seen this room", nor the save game
+gets at it without a read-back.
+
+The explored state is game state, and it lives on the CPU, in the cells of the map. The GPU only
+shows it:
+
+```ts
+import {RevealMap} from '@spearwolf/twopoint5d';
+
+// the grid of the map: cells of 32 × 32 units — a tile, or a quarter of one for softer edges
+const reveal = new RevealMap({columns: 256, rows: 256, cellWidth: 32, cellHeight: 32, xOffset: 0, yOffset: 0, fadeIn: 0.8});
+
+// game logic, wherever the player or a unit stands: the cells within the radius are explored
+reveal.revealCircle(player.x, player.z, 6 * 32);
+
+// once per frame: the cells that fade in advance, and the texture goes up if anything changed
+reveal.update(deltaTime);
+
+reveal.isRevealed(col, row); // for the game: the minimap, the AI, the quest log
+const saved = reveal.save(); // a Uint8Array; reveal.restore(saved) after loading
+```
+
+- `RevealMap` is a finite grid of `columns × rows` cells on the plane of a `Map2D`, with the
+  `cellWidth`, `cellHeight`, `xOffset` and `yOffset` of the grid of `Map2DTileStreamer` — a cell may
+  be a tile or a part of one.
+- Each cell holds a value from 0, unexplored, to 255, explored. `reveal()`, `revealCircle()` and
+  `revealRect()` mark cells as explored; with `fadeIn` above 0 a cell rises to 255 over that many
+  seconds, so the fog rolls back instead of popping. The cells in their fade are an index list of
+  fixed capacity, and `update()` touches those alone: no allocation per frame, no pass over the
+  grid.
+- `reveal.texture` is a `DataTexture` of one byte per cell, in linear filtering: between the cells
+  the coverage is interpolated, and the grid of the map does not show in the fog.
+- The value of a cell is the coverage the fog reads. A time of the reveal per cell — so that the
+  shader alone would animate the fade — was weighed and dropped: a half-float time loses whole
+  seconds of precision after about an hour of play, and a float texture with linear filtering needs
+  the optional `float32-filterable` feature of WebGPU.
+
+### 8.2 The fog is a layer, not a mask
+
+The first answer to the use case needs no mask at all: the fog is a mesh over the map, in the scene
+of the world, drawn through the camera of the world. Where it is opaque, the world below is hidden;
+the stack of a director does not have to know of it.
+
+```ts
+import {fogCoverage} from '@spearwolf/twopoint5d';
+import {color, mix, positionWorld, time} from 'three/tsl';
+
+// the coverage of the fog at a point of the map: 1 where nothing is explored, 0 where all is
+const coverage = fogCoverage(reveal, {
+  position: positionWorld.xz, // the point of the map; positionLocal.xz for a fog plane inside the Map2D node
+  edge: 0.5, // where the fog ends between an unexplored and an explored cell
+  softness: 0.15,
+  noise: {scale: 1 / 96, amount: 0.35, drift: [0.02, 0.01]}, // in world units: the noise does not swim with the camera
+});
+
+fogMaterial.colorNode = mix(color('#1b1d2b'), color('#3a3f5c'), cloudNoise);
+fogMaterial.opacityNode = coverage;
+```
+
+`fogCoverage(reveal, options)` answers a float node: the interpolated value of the cells at
+`position`, turned into a coverage by `smoothstep()` around `edge`, and a noise of the world
+position moved by `time` laid over the edge before. The noise is what makes the fog live: the
+frontier boils and drifts, and a cell that fades in eats into the fog as a cloud, not as a square.
+The noise runs in world units, so it stays on the map when the camera moves.
+
+Under a `ParallaxProjection` the fog takes the depth of the 2.5D world for free: two or three fog
+planes at different heights above the map, each with a drift of its own, are a fog with volume —
+the planes nearer the camera move faster, as `getParallaxFactor()` says. Their cost is their fill:
+three transparent planes over the visible part of the map, no target, no pass.
+
+### 8.3 What lies under the fog: a mask
+
+A mask comes in where the unexplored part should not just be covered, but show **another picture**:
+the parchment of an undrawn map, the blueprint of a dungeon, a sketch that becomes the world where
+the player walks.
+
+```ts
+// the coverage of the explored part, drawn in the space of the world: a plane with 1 - fogCoverage(…)
+const explored = StageMask.inWorldOf(worldStage, exploredScene, {source: 'alpha'});
+
+director.setStack([parchment, world]);
+director.setMask(world, explored); // the world only where it is explored, the parchment elsewhere
+```
+
+The mask stage draws the same `fogCoverage()`, inverted, through the camera of the world (§7.2): its
+living edge is the edge between parchment and world. The fog of §8.2 and the mask of §8.3 can share
+one `RevealMap` and one noise, so the clouds lie exactly over the seam.
+
+### 8.4 Three states: unexplored, remembered, in sight
+
+The fog of war of a strategy game knows three states of a cell: never seen, seen but not in sight
+now — the terrain shows, dimmed, without the units —, and in sight. That is a stack of masked
+slots over each other:
+
+| slot, bottom to top | mask | it shows |
+| --- | --- | --- |
+| `parchment` | — | the undrawn map |
+| `terrain` | `explored` (§8.3) | the ground wherever it was ever seen |
+| `dim` | `remembered` | a translucent dark layer over what was seen and is not in sight |
+| `units` | `sight` | enemies and items only where they are seen now |
+
+- `sight` is a living mask in the world: a soft blob sprite around every unit of the player, its
+  radius the sight of the unit, in a mask stage of `StageMask.inWorldOf()`. It forgets by design:
+  it is the picture of this frame.
+- `remembered` is explored and not in sight. A mask stage is a stage and composes its coverage from
+  as many inputs as it likes: the plane of `explored`, then the blobs of `sight` drawn over it with
+  a blending that takes their alpha away (`ReverseSubtractEquation`).
+- The reveal follows the sight in the game logic: every step of a unit calls `revealCircle()` with
+  its sight, the `RevealMap` remembers, and its `fadeIn` rolls the fog back behind the blob.
+
+What the remembered part shows of buildings the player saw — the ghost of an enemy base — is a
+layer the game fills by its own memory; the library has no opinion on it.
+
+### 8.5 What does not have to be drawn
+
+Under a fog that covers half the map, the tiles below it are drawn for nothing. A tile data provider
+that answers the hole `0` for the cells the `RevealMap` has not explored would leave them out — but
+`map2d` sees a change within a provider only through `clearTiles()`, which lays out every tile
+again, and a walking player reveals cells on every step. A seam for the invalidation of single tiles
+in `map2d` would be needed first (§13). Until then the fog covers, and the fill below it is the
+price.
+
+### 8.6 Into the next level
+
+The fog is also the matte of the change from one dungeon level to the next: the mask stage of §8.3,
+driven by `mask.progress` instead of the `RevealMap`, rolls the fog in over the old level and out
+over the new one — `matte({mask: fogRoll})` in `'coverage'` mode (§4.3), with the same noise, so the
+transition and the fog of the game are one look.
+
+### 8.7 What it costs
+
+| variant | targets of the size of the drawing buffer | per frame on the CPU |
+| --- | --- | --- |
+| §8.2, the fog as planes | none | `reveal.update()`: the cells that fade, and the upload of the texture when one changed — 64 KB at 256 × 256 cells |
+| §8.3, a parchment below | 1 mask target | as above |
+| §8.4, three states | 3 mask targets, or 1 with the masks in three channels of one stage | as above, and the sight blobs |
+
+The texture goes up whole: `Texture#updateRanges` of three.js 0.186 is read by the classic
+`WebGLRenderer` alone, and the `WebGPURenderer` uploads a texture whole under both of its backends. At
+1024 × 1024 cells that is 1 MB in every frame in which a cell fades — still cheap, but a reason to
+keep the cells as coarse as the look allows (§13).
+
+## 9. Ownership and disposal
 
 Following [the resource lifecycle rules](../resource-lifecycle.md):
 
@@ -410,13 +567,14 @@ Following [the resource lifecycle rules](../resource-lifecycle.md):
 | the wrapper `StageRenderer` of a mask stage that is no renderer | the director | the director, when the mask has no use left, and in `dispose()` |
 | the stage of `StageMask.inWorldOf()` | the director that uses the mask | as a wrapper; the scene stays the caller's |
 | the texture nodes of masks in the graphs | the director | `dispose()` |
+| a `RevealMap` and its texture | the caller | `RevealMap#dispose()` |
 
 A mask stage that is disposed while a slot uses it takes the mask off that slot, as a disposed layer
 leaves the stack; a transition whose effect names it ends as cancelled.
 
-## 9. Tests
+## 10. Tests
 
-### 9.1 Vitest
+### 10.1 Vitest
 
 - `StageMask`: every option, its defaults and its refusals with their messages; `progress` and
   `progressNode` in step;
@@ -433,9 +591,14 @@ leaves the stack; a transition whose effect names it ends as cancelled.
 - `matte()`: both modes, both ends held whatever the mask draws;
 - `precompile()` with masked slots and mask stages;
 - `hot-path-allocations.director.spec.ts`: `updateFrame()` with a masked slot and a running matte
-  allocates nothing.
+  allocates nothing;
+- `RevealMap`: the grid and its refusals, `reveal()`, `revealCircle()` and `revealRect()` at the
+  borders of the grid, the fade by `fadeIn`, a full fade list, `save()` and `restore()` with a wrong
+  length refused, the texture flagged only when a cell changed; `fogCoverage()` with every option;
+- `src/map2d/hot-path-allocations.reveal.spec.ts`: `revealCircle()` and `update()` with cells in
+  their fade allocate nothing.
 
-### 9.2 Browser, under WebGPU and under WebGL 2
+### 10.2 Browser, under WebGPU and under WebGL 2
 
 - a masked slot over a slot below: coverage 0, 0.5 and 1 read the expected premultiplied colors;
 - the orientation of §3.5: a mask stage that draws its top half masks the top half;
@@ -445,27 +608,34 @@ leaves the stack; a transition whose effect names it ends as cancelled.
 - `matte()` in `'coverage'` mode at progress 0, 0.5 and 1 against a mask stage whose coverage follows
   `mask.progress`;
 - `StageMask.inWorldOf()` follows a moved camera and a new projection;
-- `precompile()`: the first frame of a masked shape creates no node builder.
+- `precompile()`: the first frame of a masked shape creates no node builder;
+- `fogCoverage()` on a plane: an explored cell reads 0, an unexplored one 1, the edge between them
+  lies at `edge`, and the noise moves with `time`, not with the camera.
 
-## 10. The lookbook
+## 11. The lookbook
 
-- **`stage-masks`** — a level under a fog of war: soft blobs around the player and the torches drawn
-  into the alpha of a mask stage, and a rift into a second, colder world that opens where the
-  player stands. The `<demo-ui>` switches `source`, `invert` and freezes the fog.
+- **`stage-masks`** — a level with a spotlight of soft blobs around the player and the torches,
+  drawn into the alpha of a mask stage, and a rift into a second, colder world that opens where the
+  player stands. The `<demo-ui>` switches `source`, `invert` and freezes the mask.
+- **`fog-of-war-dungeon`** — a `Map2D` dungeon top-down under a `ParallaxProjection`, the tiles of
+  the existing map demos: the player walks, the fog rolls back in clouds and keeps boiling at its
+  edge. The `<demo-ui>` switches the three variants of §8.2 to §8.4 — fog planes, a parchment below,
+  the three states with a sight mask — and the size of the cells.
 - **`stage-transitions-gallery`** gains `matte()` with two mask stages: ink blots in `'coverage'`
   mode and a boiling noise in `'threshold'` mode.
 - **`stage-transitions-game-menu`** may take the ink matte as one more effect of its select.
 
-## 11. Phases
+## 12. Phases
 
 | phase | content |
 | --- | --- |
-| A | `createMaskNode()`; `StageMask` with `source`, `invert`; `setMask()`, `maskOf()`, the `mask` option, run and freeze of masks, the masks in the shape cache and in `precompile()`; the tests of §9 for these; the guide section; the demo `stage-masks` |
+| A | `createMaskNode()`; `StageMask` with `source`, `invert`; `setMask()`, `maskOf()`, the `mask` option, run and freeze of masks, the masks in the shape cache and in `precompile()`; the tests of §10 for these; the guide section; the demo `stage-masks` |
 | B | `masks` and `input.mask()` in the effect contract, `mask.progress` and `progressNode`, `matte()` in both modes; the gallery |
 | C | `StageMask.inWorldOf()` (§7.2); a mask target at a share of the resolution — a `scale` of `0.5` takes the RGBA half-float target of a mask at 3840 × 2160 from 66 MB to 17 MB — through a seam in `StageRendererTargets` for the size of a pass target |
 | D — idea, not scheduled | depth-aware masks (§7.3); the stencil pre-pass and the scissor of §6.2, each after a measurement of the fill cost it would save |
+| E | `RevealMap` and `fogCoverage()` (§8.1, §8.2) with their tests, a section in [`docs/map2d.md`](../map2d.md) and the demo `fog-of-war-dungeon` with the fog planes; independent of A to C and the first to build for a fog. The variants of §8.3 and §8.4 follow A and C |
 
-## 12. Open questions
+## 13. Open questions
 
 - **A slot or a layer.** §3.2 hangs the mask on the slot, so that a `replace()` keeps the porthole.
   A mask that goes with its layer — the fog of one level, not of the next — is then a `setMask()`
@@ -477,17 +647,29 @@ leaves the stack; a transition whose effect names it ends as cancelled.
   float. An `R8` target would be an eighth of the memory, but three.js keys its builds by the format
   of the target, and a mask stage that draws sprites needs its materials built for that format too.
   Measured in phase C, decided there.
+- **Single tiles in `map2d`.** §8.5 would leave out the tiles under the fog, if `map2d` could
+  build single tiles again instead of all of them through `clearTiles()`. Is that seam worth it for
+  the fill it saves, or does the fog stay on top of everything?
+- **Endless maps.** A `RevealMap` is a finite grid; a `Map2D` is endless. A map that has no edge
+  would need reveal maps in chunks, streamed with the tiles. Left out until a game asks for it.
+- **Part uploads.** The texture of a `RevealMap` goes up whole (§8.7). Is a texture of chunks —
+  several small `DataTexture`s, only the changed ones uploaded — worth its extra samples, or is
+  a coarser grid the answer?
 
-## 13. Docs and CHANGELOG
+## 14. Docs and CHANGELOG
 
 - [`docs/stages.md`](../stages.md) gets a section "Stage masks" after "Stage transitions": the mask,
   a masked slot, two worlds through one mask, run and freeze, `matte()`, `createMaskNode()`, masks in
   the world; its cheat sheet the class, the effect and the defaults, its "Who disposes what" the rows
-  of §8, and the sentence on the `stencil` of a `ClearStage` (§6.2).
+  of §9, and the sentence on the `stencil` of a `ClearStage` (§6.2).
 - `packages/twopoint5d/CHANGELOG.md` gets an entry under `## [Unreleased]`, "Added", per phase.
-- `src/stage/public-api.ts` exports `StageMask`, `matte()`, `createMaskNode()` and their types.
+- [`docs/map2d.md`](../map2d.md) gets a section "A fog over what is not explored": `RevealMap`,
+  `fogCoverage()`, fog planes under a parallax projection, and a link to the masks of `stages.md` for
+  the parchment and the three states.
+- `src/stage/public-api.ts` exports `StageMask`, `matte()`, `createMaskNode()` and their types;
+  `src/map2d/public-api.ts` exports `RevealMap`, `fogCoverage()` and their types.
 
-## 14. Left out
+## 15. Left out
 
 - **Stencil as the mechanism of masks.** §6: binary, inside one target, a state of every material.
   It comes back as an optimisation of the fill cost, not as an API.
