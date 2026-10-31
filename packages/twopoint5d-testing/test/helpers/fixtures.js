@@ -370,15 +370,16 @@ export function makeMap(visibilitor) {
 // --- stages that fill a rect ---
 
 /**
- * A stage that fills a rect of its picture with `color` at `opacity`, and draws nothing elsewhere:
- * a mask stage clears nothing and draws its shapes onto transparent black. The picture is
- * `size` × `size` units on as many pixels, `rect` is `{x, y, width, height}` in units from the
- * bottom left corner of the picture (the projection puts its origin in the middle), and the whole picture without it. `fill()` adds a further rect, `material`
- * is the one of the first. The meshes, the geometries and the materials go into {@link keep}, the
- * stage as well — release them with {@link disposeKept}.
+ * A stage that fills rects of its picture and draws nothing elsewhere: a mask stage clears nothing
+ * and draws its shapes onto transparent black. The picture is `size` × `size` units on as many
+ * pixels. A `rect` is `{x, y, width, height}` in units from the bottom left corner of the picture
+ * (the projection puts its origin in the middle). With a `color` the stage fills `rect` with it at
+ * `opacity`, or the whole picture without a `rect`; without a `color` it starts empty. `fill()`
+ * adds a further rect, `material` is the one of the first. The meshes, the geometries and the
+ * materials go into {@link keep}, the stage as well — release them with {@link disposeKept}.
  *
  * @param {string} name
- * @param {string} color
+ * @param {string | undefined} color
  * @param {{opacity?: number, rect?: {x: number, y: number, width: number, height: number}, size?: number}} [options]
  */
 export function makeFilledStage(name, color, {opacity = 1, rect, size = 64} = {}) {
@@ -397,8 +398,8 @@ export function makeFilledStage(name, color, {opacity = 1, rect, size = 64} = {}
     meshes.push(mesh);
     return mesh;
   };
-  fill(color, opacity, rect ?? {x: 0, y: 0, width: size, height: size});
-  return {stage, fill, meshes, material: /** @type {MeshBasicMaterial} */ (meshes[0].material)};
+  if (color !== undefined) fill(color, opacity, rect ?? {x: 0, y: 0, width: size, height: size});
+  return {stage, fill, meshes, material: /** @type {MeshBasicMaterial} */ (meshes[0]?.material)};
 }
 
 // --- sprites and pixels ---

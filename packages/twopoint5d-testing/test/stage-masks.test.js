@@ -67,8 +67,7 @@ describe('StageDirector — masked slots on the GPU', () => {
    * three `[color, opacity]`, or `undefined` for a third that draws nothing.
    */
   function bandsStage(name, bands) {
-    const first = bands.find(Boolean);
-    const filled = makeFilledStage(name, first[0], {opacity: first[1], rect: {x: 0, y: 0, width: 0.001, height: 0.001}});
+    const filled = makeFilledStage(name, undefined);
     bands.forEach((band, i) => {
       if (band) filled.fill(band[0], band[1], {x: i * THIRD, y: 0, width: i === 2 ? SIZE - 2 * THIRD : THIRD, height: SIZE});
     });
@@ -140,17 +139,18 @@ describe('StageDirector — masked slots on the GPU', () => {
   });
 
   describe('invert and every source', () => {
-    // the bands of the mask stage are red, green and nothing; the coverage each source reads there
+    // the bands of the mask stage are red, green and blue; the coverage each source reads there
     // the luminance of the premultiplied rgb in the linear working space: Rec. 709 weights
     const LUMA_RED = 0.2126;
     const LUMA_GREEN = 0.7152;
+    const LUMA_BLUE = 0.0722;
     /** @type {{source: 'alpha' | 'luminance' | 'red' | 'green' | 'blue', coverage: number[]}[]} */
     const cases = [
-      {source: 'alpha', coverage: [1, 1, 0]},
+      {source: 'alpha', coverage: [1, 1, 1]},
       {source: 'red', coverage: [1, 0, 0]},
       {source: 'green', coverage: [0, 1, 0]},
-      {source: 'blue', coverage: [0, 0, 0]},
-      {source: 'luminance', coverage: [LUMA_RED, LUMA_GREEN, 0]},
+      {source: 'blue', coverage: [0, 0, 1]},
+      {source: 'luminance', coverage: [LUMA_RED, LUMA_GREEN, LUMA_BLUE]},
     ];
 
     for (const {source, coverage} of cases) {
@@ -158,7 +158,11 @@ describe('StageDirector — masked slots on the GPU', () => {
         it(`source "${source}"${invert ? ', inverted' : ''}`, async () => {
           const blue = makeFilledStage('blue', '#00f');
           const red = makeFilledStage('red', '#f00');
-          const mask = bandsStage('mask', [['#f00', 1], ['#0f0', 1], undefined]);
+          const mask = bandsStage('mask', [
+            ['#f00', 1],
+            ['#0f0', 1],
+            ['#00f', 1],
+          ]);
           director.setStack([blue.stage, red.stage]);
           director.setMask(red.stage, new StageMask(mask, {source, invert}));
 
@@ -216,23 +220,39 @@ describe('StageDirector — masked slots on the GPU', () => {
     expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [0, 0, 255]), 'running: the new scene masks').to.be.true;
   });
 
-  it('precompile(): the first frame of a masked shape creates no node builder', async () => {
+  /** Sets the masked shape of a stack of blue and red up, draws its first frame and answers the node builders it created. */
+  async function maskedFirstFrame(precompile) {
     const blue = makeFilledStage('blue', '#00f');
     const red = makeFilledStage('red', '#f00');
     const white = makeFilledStage('mask', '#fff', {opacity: 0.5});
     director.setStack([blue.stage, red.stage]);
     await draw();
 
-    // the mask in the shape is another StageMask of the same options on the same stage: the shape counts by those
-    await director.precompile(display.renderer, [['layer', {mask: new StageMask(white.stage)}]], {layers: [white.stage]});
+    if (precompile) {
+      // the mask in the shape is another StageMask of the same options on the same stage: the shape counts by those
+      const shapeMask = new StageMask(white.stage);
+      try {
+        await director.precompile(display.renderer, [['layer', {mask: shapeMask}]], {layers: [white.stage]});
+      } finally {
+        shapeMask.dispose();
+      }
+    }
     const builds = countNodeBuilds();
     try {
       director.setMask(red.stage, new StageMask(white.stage));
       expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), redOverBlue(0.5), 3), 'the masked shape').to.be.true;
-      expect(builds.count, 'node builds in the first frame of the shape').to.equal(0);
+      return builds.count;
     } finally {
       builds.stop();
     }
+  }
+
+  it('precompile(): the first frame of a masked shape creates no node builder', async () => {
+    expect(await maskedFirstFrame(true), 'node builds in the first frame of the shape').to.equal(0);
+  });
+
+  it('without precompile() the first frame of a masked shape builds nodes: the count of the test above counts', async () => {
+    expect(await maskedFirstFrame(false), 'node builds in the first frame of the shape').to.be.greaterThan(0);
   });
 
   it('createMaskNode() in a plain composing renderer masks one stage by another', async () => {
