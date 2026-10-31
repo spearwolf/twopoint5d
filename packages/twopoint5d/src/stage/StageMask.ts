@@ -1,3 +1,5 @@
+import {uniform} from 'three/tsl';
+import type {UniformNode} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {ClearStage} from './ClearStage.js';
 import type {IRenderable} from './IRenderable.js';
@@ -49,6 +51,16 @@ export const StageMaskInternals = {} as {
   /** The running transition whose effect names the mask, `undefined` while none does. */
   drivenBy(mask: StageMask): StageTransition | undefined;
   setDrivenBy(mask: StageMask, transition: StageTransition | undefined): void;
+  /** Writes `progress` and `progressNode` — the node only when its value changes. */
+  setProgress(mask: StageMask, progress: number): void;
+  /**
+   * Writes the progress of `transition` into `progress` and `progressNode`, as `setProgress()` does.
+   * It takes the transition, not its progress: a double handed to a call that V8 does not inline is
+   * boxed, and the frame of a running transition allocates nothing.
+   */
+  followProgress(mask: StageMask, transition: StageTransition): void;
+  /** Writes the progress of `transition` into `progressNode` alone: the draw of a progress set after the frame. */
+  followProgressNode(mask: StageMask, transition: StageTransition): void;
 };
 
 /**
@@ -62,13 +74,38 @@ export class StageMask {
   readonly source: StageMaskCoverageSource;
   readonly invert: boolean;
 
+  /**
+   * The eased progress of the transition whose effect names this mask, as a float uniform: for a
+   * mask stage whose materials animate on the GPU. The mask owns it; it holds no GPU memory of its
+   * own. Written by the director, read by the caller.
+   */
+  readonly progressNode: UniformNode<'float', number> = uniform(0) as unknown as UniformNode<'float', number>;
+
   #isDisposed = false;
   #drivenBy: StageTransition | undefined;
+  // the progress in a typed array: written in every frame of a running transition, and a number
+  // field of a mask boxed each fraction stored into it (measured, 16 bytes per frame); an element of
+  // a Float64Array takes the double in place
+  readonly #progress = new Float64Array(1);
 
   static {
     StageMaskInternals.drivenBy = (mask) => mask.#drivenBy;
     StageMaskInternals.setDrivenBy = (mask, transition) => {
       mask.#drivenBy = transition;
+    };
+    StageMaskInternals.setProgress = (mask, progress) => {
+      mask.#progress[0] = progress;
+      // written only when it changed: a double stored again in the uniform is boxed again, 16 bytes
+      if (mask.progressNode.value !== progress) mask.progressNode.value = progress;
+    };
+    StageMaskInternals.followProgress = (mask, transition) => {
+      const progress = transition.progress;
+      mask.#progress[0] = progress;
+      if (mask.progressNode.value !== progress) mask.progressNode.value = progress;
+    };
+    StageMaskInternals.followProgressNode = (mask, transition) => {
+      const progress = transition.progress;
+      if (mask.progressNode.value !== progress) mask.progressNode.value = progress;
     };
   }
 
@@ -95,6 +132,16 @@ export class StageMask {
     this.stage = stage;
     this.source = source;
     this.invert = invert;
+  }
+
+  /**
+   * The eased progress, 0 to 1, of the transition whose effect names this mask: written by the
+   * director in its `updateFrame()`, after it advanced its transitions and before it updates the mask
+   * stage. A new transition starts it at 0; between transitions it holds the value of the last one —
+   * 1 when it finished, the value at the cancel when it was cancelled. Read-only.
+   */
+  get progress(): number {
+    return this.#progress[0]!;
   }
 
   get isDisposed(): boolean {

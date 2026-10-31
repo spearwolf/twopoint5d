@@ -950,6 +950,16 @@ export class StageDirector extends StageRenderer {
       }
     }
 
+    // the masks of the running effects carry the progress their transitions reached in this frame
+    // to their stages, before those update; the slots as they stand now, after the ends of this frame
+    const current = this.#slots;
+    for (let i = 0; i < current.length; i++) {
+      const run = current[i]!.run;
+      if (!run) continue;
+      const masks = run.masks;
+      for (let j = 0; j < masks.length; j++) StageMaskInternals.followProgress(masks[j]!, run.transition);
+    }
+
     const stages = this.orderedStages;
     for (let i = 0; i < stages.length; i++) {
       const stage = stages[i]!.stage;
@@ -977,6 +987,15 @@ export class StageDirector extends StageRenderer {
       const run = this.#slots[i]?.run;
       // written only when it changed: a double stored again is boxed again, 16 bytes per draw
       if (progress && run && progress.value !== run.transition.progress) progress.value = run.transition.progress;
+    }
+    // again for the masks of the running effects: a manual progress set after updateFrame() reaches
+    // the GPU in this draw, while their `progress` keeps the value of the frame
+    const slots = this.#slots;
+    for (let i = 0; i < slots.length; i++) {
+      const run = slots[i]!.run;
+      if (!run) continue;
+      const masks = run.masks;
+      for (let j = 0; j < masks.length; j++) StageMaskInternals.followProgressNode(masks[j]!, run.transition);
     }
     this.#updateClearUniform(renderer);
     super.renderToCurrentTarget(renderer);
@@ -1471,7 +1490,11 @@ export class StageDirector extends StageRenderer {
 
     slot.layer = undefined;
     slot.run = {transition, from, to, fromWasFrozen: from?.frozen === true, masks};
-    for (const mask of masks) StageMaskInternals.setDrivenBy(mask, transition);
+    // a new transition starts its masks at 0, before its first frame
+    for (const mask of masks) {
+      StageMaskInternals.setDrivenBy(mask, transition);
+      StageMaskInternals.setProgress(mask, 0);
+    }
     if (from && options.outgoing === 'freeze') from.frozen = true;
     if (to) {
       to.frozen = options.incoming === 'freeze';
@@ -1486,8 +1509,13 @@ export class StageDirector extends StageRenderer {
     const run = slot.run;
     if (!run) return;
     slot.run = undefined;
+    // the masks hold the last progress of the transition: 1 when it finished, the value at the cancel
+    // when it was cancelled
+    const lastProgress = state === 'finished' ? 1 : run.transition.progress;
     for (const mask of run.masks) {
-      if (StageMaskInternals.drivenBy(mask) === run.transition) StageMaskInternals.setDrivenBy(mask, undefined);
+      if (StageMaskInternals.drivenBy(mask) !== run.transition) continue;
+      StageMaskInternals.setDrivenBy(mask, undefined);
+      StageMaskInternals.setProgress(mask, lastProgress);
     }
 
     const kept = keep === 'to' ? run.to : run.from;

@@ -63,6 +63,24 @@ describe('StageMask', () => {
     );
   });
 
+  it('starts at progress 0, with a float uniform of the same value', () => {
+    const mask = new StageMask(layer());
+    expect(mask.progress).toBe(0);
+    expect(mask.progressNode.isUniformNode).toBe(true);
+    expect(mask.progressNode.value).toBe(0);
+    // one uniform per mask, the same at every read
+    expect(mask.progressNode).toBe(mask.progressNode);
+    expect(new StageMask(layer()).progressNode).not.toBe(mask.progressNode);
+  });
+
+  it('progress is read-only for the caller', () => {
+    const mask = new StageMask(layer());
+    expect(() => {
+      (mask as {progress: number}).progress = 0.5;
+    }).toThrow(TypeError);
+    expect(mask.progress).toBe(0);
+  });
+
   it('dispose() leaves a stage handed in undisposed', () => {
     const stage = layer();
     const mask = new StageMask(stage);

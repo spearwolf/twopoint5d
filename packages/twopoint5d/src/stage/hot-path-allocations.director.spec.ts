@@ -120,4 +120,37 @@ describe('StageDirector on the hot path', () => {
     expect(director.transitions).toHaveLength(1);
     director.dispose();
   });
+
+  test('a running matte allocates nothing', async () => {
+    const director = new StageDirector();
+    director.resize(64, 64);
+    const from = stage('from');
+    // a mask stage that reads the progress of its mask in every frame, as a living matte does
+    let reads = 0;
+    const inkStage: IStage & IRenderable = {
+      ...stage('ink'),
+      updateFrame() {
+        if (ink.progress > 0) reads++;
+      },
+    };
+    const ink = new StageMask(inkStage, {source: 'luminance'});
+    const inkIn: StageTransitionEffect = {
+      name: 'inkIn',
+      masks: [ink],
+      build: ({from, to, uv, mask}) =>
+        mix(from.sample(uv), to.sample(uv), mask(ink).coverage(uv).mul(ink.progressNode)) as Node<'vec4'>,
+    };
+    director.setStack([stage('below'), from]);
+    // a fixed progress: a uniform written with a changing double boxes it, 16 B per write
+    const t = director.replace(from, stage('to'), {effect: inkIn, manual: true});
+    t.progress = 0.25;
+
+    const bytesPerCall = await bytesPerFrame(director);
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expect(ink.progress).toBe(0.25);
+    expect(ink.progressNode.value).toBe(0.25);
+    expect(reads).toBeGreaterThan(0);
+    director.dispose();
+  });
 });

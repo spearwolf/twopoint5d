@@ -1184,5 +1184,114 @@ describe('StageDirector masks', () => {
       director.replace(level, nextLevel, {effect: none, duration: 1});
       expect(() => draw()).toThrow('StageTransitionInput#mask(): the effect "none" did not name the mask on "ink" in its masks');
     });
+
+    describe('the progress of a mask', () => {
+      it("progress is written before the mask stage's updateFrame()", () => {
+        const seen: [number, number][] = [];
+        director.setStack([stars, level]);
+        const t = director.replace(level, nextLevel, {effect: inkIn, duration: 1, easing: 'ease-in-out'});
+        inkStage.updateFrame.mockImplementation(() => seen.push([ink.progress, t.progress]));
+        frame(0.25);
+        frame(0.25);
+        frame(0.25);
+        // the transition advanced first, then the mask carried its progress to the stage
+        expect(seen).toHaveLength(3);
+        for (const [maskProgress, transitionProgress] of seen) expect(maskProgress).toBe(transitionProgress);
+        // the first frame starts the transition at 0; ease-in-out is 4t³ below the middle
+        expect(seen.map(([p]) => p)).toEqual([0, 0.0625, 0.5]);
+      });
+
+      it('progress is the eased value', () => {
+        director.setStack([stars, level]);
+        const t = director.replace(level, nextLevel, {effect: inkIn, duration: 1, easing: 'ease-in'});
+        frame(0);
+        expect(ink.progress).toBe(0);
+        frame(0.5);
+        // ease-in is t³: the eased progress, not the linear 0.5
+        expect(ink.progress).toBe(0.125);
+        expect(ink.progress).toBe(t.progress);
+      });
+
+      it('progress and progressNode stay in step', () => {
+        director.setStack([stars, level]);
+        director.replace(level, nextLevel, {effect: inkIn, duration: 1, easing: 'linear'});
+        for (const deltaTime of [0, 0.25, 0.25, 0.125]) {
+          frame(deltaTime);
+          expect(ink.progressNode.value).toBe(ink.progress);
+          draw();
+          expect(ink.progressNode.value).toBe(ink.progress);
+        }
+        expect(ink.progress).toBe(0.625);
+      });
+
+      it('progress holds the last value between transitions and a new one starts at 0', () => {
+        const third = fakeStage('third');
+        director.setStack([stars, level]);
+        director.replace(level, nextLevel, {effect: inkIn, duration: 1, easing: 'linear'});
+        frame(0);
+        frame(0.75);
+        expect(ink.progress).toBe(0.75);
+        // the frame that reaches the end leaves the mask at 1
+        frame(0.5);
+        expect(director.transitions).toHaveLength(0);
+        expect(ink.progress).toBe(1);
+        expect(ink.progressNode.value).toBe(1);
+        frame();
+        draw();
+        expect(ink.progress).toBe(1);
+
+        // a new transition starts it at 0, before its first frame
+        const manual = director.replace(nextLevel, third, {effect: inkIn, manual: true});
+        expect(ink.progress).toBe(0);
+        expect(ink.progressNode.value).toBe(0);
+        manual.progress = 0.4;
+        frame();
+        expect(ink.progress).toBe(0.4);
+        // cancelled, it holds the value at the cancel
+        manual.progress = 0.6;
+        manual.cancel();
+        expect(ink.progress).toBe(0.6);
+        expect(ink.progressNode.value).toBe(0.6);
+        frame();
+        expect(ink.progress).toBe(0.6);
+
+        // complete() of a running transition leaves it at 1
+        const completed = director.replace(nextLevel, third, {effect: inkIn, duration: 1});
+        expect(ink.progress).toBe(0);
+        frame(0);
+        frame(0.25);
+        completed.complete();
+        expect(ink.progress).toBe(1);
+        expect(ink.progressNode.value).toBe(1);
+      });
+
+      it('progressNode follows a manual progress set before the draw', () => {
+        director.setStack([stars, level]);
+        const t = director.replace(level, nextLevel, {effect: inkIn, manual: true});
+        t.progress = 0.25;
+        frame();
+        draw();
+        expect(ink.progressNode.value).toBe(0.25);
+        // set between updateFrame() and the draw: the GPU draws the set value, the CPU side keeps the frame's
+        t.progress = 0.75;
+        draw();
+        expect(ink.progressNode.value).toBe(0.75);
+        expect(ink.progress).toBe(0.25);
+        frame();
+        expect(ink.progress).toBe(0.75);
+      });
+
+      it('the mask of a slot carries no progress', () => {
+        director.setStack([stars, level]);
+        director.setMask(stars, fog);
+        director.replace(level, nextLevel, {effect: inkIn, duration: 1, easing: 'linear'});
+        frame(0);
+        frame(0.5);
+        draw();
+        expect(ink.progress).toBe(0.5);
+        expect(fog.progress).toBe(0);
+        expect(fog.progressNode.value).toBe(0);
+      });
+    });
   });
 });
