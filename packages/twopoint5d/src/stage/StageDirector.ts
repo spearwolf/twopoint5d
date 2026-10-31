@@ -23,6 +23,7 @@ import {ClearStage} from './ClearStage.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
+import {StageMask} from './StageMask.js';
 import {type StageItem, StageRenderer, type StageRendererBuildOutputNode, type StageRendererParentType} from './StageRenderer.js';
 import {
   easingOf,
@@ -62,6 +63,8 @@ export interface StageTransitionOptions {
 export interface StageShowOptions extends StageTransitionOptions {
   /** The position in the stack, 0 the bottom. Default the top. */
   at?: number;
+  /** The mask of the new slot, from its first frame on. Default none. */
+  mask?: StageMask;
 }
 
 /** The options of `StageDirector#push()`. */
@@ -97,6 +100,10 @@ export interface StagePrecompileOptions {
 interface Layer {
   /** The stage the caller handed in. */
   readonly stage: StageDirectorLayer;
+  /** A layer of the stack, or the stage of a mask; a stage is never both. */
+  readonly role: 'layer' | 'mask';
+  /** How many masks of slots (and, later, of transitions) use a mask stage; 0 for a layer. */
+  uses: number;
   /** The stage itself, or the renderer the director wrapped it in. */
   readonly renderer: StageRenderer;
   readonly wrapped: boolean;
@@ -119,6 +126,8 @@ interface Slot {
   run?: Run;
   /** The layer a push() froze below this one, which runs again when this slot goes. */
   frozeBelow?: Layer;
+  /** The mask of the slot: it stays through replace() and goes with the slot. */
+  mask?: StageMask;
 }
 
 interface ShapeSlot {
@@ -139,11 +148,22 @@ interface Shape {
   readonly placeholders: readonly Texture[];
 }
 
-/** Which slot and which of its sources an entry of `orderedStages` is. */
-interface OrderRef {
-  readonly slot: number;
-  readonly side: 'layer' | 'from' | 'to';
-}
+/**
+ * Which slot and which of its sources an entry of `orderedStages` is — or, after every layer, which
+ * of the distinct mask stages, counted by first appearance.
+ */
+type OrderRef =
+  | {readonly side: 'layer' | 'from' | 'to'; readonly slot: number}
+  | {readonly side: 'mask'; readonly maskStage: number};
+
+/**
+ * Every stage a director draws as a mask, and that director: a stage is the mask stage of one
+ * director at a time, since that director draws and updates it.
+ */
+const maskOwners = new WeakMap<IStage, StageDirector>();
+
+/** Every stage a director holds as a layer, and the directors that hold it so. */
+const layerOwners = new WeakMap<IStage, Set<StageDirector>>();
 
 const NO_STAGES: ReadonlyArray<StageItem> = Object.freeze([]);
 
@@ -432,12 +452,22 @@ export class StageDirector extends StageRenderer {
     const options = parseOptions(subject, opts);
     if (this.#slotWithEnd(stage))
       throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
+    this.#refuseMaskStageAsLayer(subject, stage);
+    const mask = this.#checkMask(subject, opts?.mask, stage);
     const at = this.#slotIndexAt(subject, opts?.at);
 
     const errors: unknown[] = [];
     this.#finishRunsWith(stage, errors);
     const layer = this.#join(subject, stage);
     const slot: Slot = {};
+    if (mask) {
+      try {
+        this.#maskSlot(subject, slot, mask, errors);
+      } catch (error) {
+        if (!this.#isReferenced(layer)) this.#release(layer);
+        throw error;
+      }
+    }
     this.#slots.splice(Math.min(at, this.#slots.length), 0, slot);
     const transition = this.#begin(slot, undefined, layer, options, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionStart and OnStageTransitionEnd threw`);
@@ -469,6 +499,7 @@ export class StageDirector extends StageRenderer {
     if (from === to || this.#slotWithEnd(to)) {
       throw new Error(`${subject} cannot take the stage "${to.name}": that stage is in the stack already`);
     }
+    this.#refuseMaskStageAsLayer(subject, to);
 
     const errors: unknown[] = [];
     if (slot.run) this.#endRun(slot, 'to', 'finished', errors);
@@ -490,6 +521,8 @@ export class StageDirector extends StageRenderer {
     parseOptions(subject, opts);
     if (this.#slotWithEnd(stage))
       throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
+    this.#refuseMaskStageAsLayer(subject, stage);
+    this.#checkMask(subject, opts?.mask, stage);
     this.#slotIndexAt(subject, opts?.at);
 
     // the runs end before the slot below is known: a run with the stage — the stage pushed back while
@@ -539,6 +572,7 @@ export class StageDirector extends StageRenderer {
     const seen = new Set<IStage>();
     for (const stage of stages) {
       if (seen.has(stage)) throw new Error(`${subject} cannot take the stage "${stage.name}" twice`);
+      this.#refuseMaskStageAsLayer(subject, stage);
       seen.add(stage);
     }
 
@@ -562,13 +596,40 @@ export class StageDirector extends StageRenderer {
       if (slot.run) this.#endRun(slot, 'from', 'cancelled', errors);
     }
     for (const slot of this.#slots) if (slot.frozeBelow) slot.frozeBelow.frozen = false;
+    // new slots, without masks: the masks of the stages that stay are not carried over
+    const previous = this.#slots;
     this.#slots = layers.map((layer) => ({layer}));
+    for (const slot of previous) this.#unmaskSlot(slot, errors);
     for (const layer of [...this.#layers.values()]) {
-      if (!layers.includes(layer)) this.#release(layer);
+      if (layer.role === 'layer' && !layers.includes(layer)) this.#release(layer);
     }
     this.#slotsChanged();
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionEnd threw`);
     return this;
+  }
+
+  /**
+   * Masks by `mask` the slot whose end state holds `stage`, at once: the slot shows only where the
+   * stage of the mask draws. `undefined` takes the mask off. The mask
+   * belongs to the slot — `replace()` keeps it, and it goes with the slot. One mask stage serves
+   * every slot it masks, and is drawn once per frame, after every layer.
+   */
+  setMask(stage: IStage, mask: StageMask | undefined): this {
+    const subject = 'StageDirector#setMask()';
+    if (this.isDisposed) return this;
+    const slot = this.#slotWithEnd(stage);
+    if (!slot) throw new Error(`${subject} cannot mask the stage "${stage.name}": that stage is not in the stack`);
+    this.#checkMask(subject, mask);
+    const errors: unknown[] = [];
+    this.#maskSlot(subject, slot, mask, errors);
+    throwCollected(errors, `${subject}: more than one listener of OnStageRemoved threw`);
+    return this;
+  }
+
+  /** The mask of the slot that holds `stage` once every running transition has ended. */
+  maskOf(stage: IStage): StageMask | undefined {
+    if (this.isDisposed) return undefined;
+    return this.#slotWithEnd(stage)?.mask;
   }
 
   /** Freezes the layer of `stage`: it is neither updated nor drawn, and its last picture stays. */
@@ -605,14 +666,15 @@ export class StageDirector extends StageRenderer {
 
   /**
    * Takes `stage` out of the stack at once, wherever it is: a transition that has it as a source ends
-   * as cancelled, with the other source in its slot.
+   * as cancelled, with the other source in its slot. A mask stage comes off every slot it masks.
    */
   override remove(stage: IStage): this {
     if (this.#internalCall > 0) return super.remove(stage);
     const layer = this.#layers.get(stage) ?? this.#byRenderer.get(stage);
     if (!layer) return super.remove(stage);
     const errors: unknown[] = [];
-    this.#dropLayer(layer, errors);
+    if (layer.role === 'mask') this.#dropMask(layer, errors);
+    else this.#dropLayer(layer, errors);
     throwCollected(errors, 'StageDirector#remove(): more than one listener of OnStageTransitionEnd and OnStageRemoved threw');
     return this;
   }
@@ -844,7 +906,84 @@ export class StageDirector extends StageRenderer {
   }
 
   #isReferenced(layer: Layer): boolean {
-    return this.#slotOfLayer(layer) !== undefined;
+    return layer.role === 'mask' ? layer.uses > 0 : this.#slotOfLayer(layer) !== undefined;
+  }
+
+  /** Refuses `stage` as a layer when a director — this one or another — draws it as a mask. */
+  #refuseMaskStageAsLayer(subject: string, stage: IStage): void {
+    const owner = maskOwners.get(stage);
+    if (owner === undefined) return;
+    throw new Error(
+      `${subject} cannot take the stage "${stage.name}": that stage is a mask of ${owner === this ? 'this' : 'another'} director`,
+    );
+  }
+
+  /** Why `stage` cannot be drawn by this director — it is the director or holds it —, or `undefined`. */
+  #holdRefusal(stage: IStage): string | undefined {
+    if (!(stage instanceof StageRenderer)) return undefined;
+    for (let holder: StageRendererParentType | undefined = this; holder instanceof StageRenderer; holder = holder.parent) {
+      if (holder === stage) return holder === this ? 'that stage is this director' : 'that stage holds this director';
+    }
+    return undefined;
+  }
+
+  /**
+   * Refuses `mask` before anything changes; `layer` is the stage the call puts into the new slot.
+   * Answers the mask, `undefined` for none.
+   */
+  #checkMask(subject: string, mask: unknown, layer?: IStage): StageMask | undefined {
+    if (mask === undefined) return undefined;
+    if (!(mask instanceof StageMask)) {
+      throw new TypeError(`${subject}: mask must be a StageMask, got ${describeValue(mask)}`);
+    }
+    const stage = mask.stage;
+    const refusal = (reason: string) => new Error(`${subject} cannot take the mask on "${stage.name}": ${reason}`);
+    if (mask.isDisposed) throw refusal('that mask has been disposed');
+    if ((stage as {isDisposed?: unknown}).isDisposed === true) throw refusal('that stage has been disposed');
+    const hold = this.#holdRefusal(stage);
+    if (hold) throw refusal(hold);
+    if (stage === layer || this.#layers.get(stage)?.role === 'layer') {
+      throw refusal('that stage is a layer of this director');
+    }
+    const owner = maskOwners.get(stage);
+    if (owner !== undefined && owner !== this) throw refusal('that stage is a mask of another director');
+    // this director holds the stage as no layer, so every holder is another director
+    if (layerOwners.get(stage)?.size) throw refusal('that stage is a layer of another director');
+    return mask;
+  }
+
+  /**
+   * Puts `mask` on `slot`: the stage of the new mask joins first, then the stage of the old one leaves
+   * if nothing uses it any more.
+   */
+  #maskSlot(subject: string, slot: Slot, mask: StageMask | undefined, errors: unknown[]): void {
+    const old = slot.mask;
+    if (old === mask) return;
+    if (mask) this.#join(subject, mask.stage, 'mask').uses++;
+    slot.mask = mask;
+    if (old) this.#unuseMask(old, errors);
+    this.#slotsChanged();
+  }
+
+  /** Takes the mask off `slot`, a slot that goes or makes way for a new one. */
+  #unmaskSlot(slot: Slot, errors: unknown[]): void {
+    const mask = slot.mask;
+    if (!mask) return;
+    slot.mask = undefined;
+    this.#unuseMask(mask, errors);
+  }
+
+  /** One use of the stage of `mask` less; with the last one the stage leaves the director. */
+  #unuseMask(mask: StageMask, errors: unknown[]): void {
+    const layer = this.#layers.get(mask.stage);
+    if (layer?.role !== 'mask') return;
+    layer.uses--;
+    if (layer.uses > 0) return;
+    try {
+      this.#release(layer);
+    } catch (error) {
+      errors.push(error);
+    }
   }
 
   /** The index in #slots before which a stage shown at position `at` of the stack goes. */
@@ -866,10 +1005,16 @@ export class StageDirector extends StageRenderer {
     }
   }
 
-  /** The layer of `stage`, made and added to the base if it is none yet. */
-  #join(subject: string, stage: StageDirectorLayer): Layer {
+  /** The layer of `stage` in `role`, made and added to the base if it is none yet. */
+  #join(subject: string, stage: StageDirectorLayer, role: Layer['role'] = 'layer'): Layer {
     const known = this.#layers.get(stage);
-    if (known) return known;
+    if (known) {
+      if (known.role !== role) {
+        throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is a ${known.role} of this director`);
+      }
+      return known;
+    }
+    if (role === 'layer') this.#refuseMaskStageAsLayer(subject, stage);
 
     if ((stage as {isDisposed?: unknown}).isDisposed === true) {
       throw new Error(`${subject} cannot take the stage "${stage.name}": that stage has been disposed`);
@@ -884,17 +1029,8 @@ export class StageDirector extends StageRenderer {
         `${subject} cannot take the stage ${describeValue(stage)}: a layer needs resize(), updateFrame() and renderTo()`,
       );
     }
-    if (stage instanceof StageRenderer) {
-      for (let holder: StageRendererParentType | undefined = this; holder instanceof StageRenderer; holder = holder.parent) {
-        if (holder === stage) {
-          throw new Error(
-            holder === this
-              ? `${subject} cannot take the stage "${stage.name}": that stage is this director`
-              : `${subject} cannot take the stage "${stage.name}": that stage holds this director`,
-          );
-        }
-      }
-    }
+    const hold = this.#holdRefusal(stage);
+    if (hold) throw new Error(`${subject} cannot take the stage "${stage.name}": ${hold}`);
 
     const wrapped = !(stage instanceof StageRenderer);
     const renderer = wrapped ? new StageRenderer() : (stage as StageRenderer);
@@ -918,7 +1054,7 @@ export class StageDirector extends StageRenderer {
       this.#internalCall--;
     }
 
-    const layer: Layer = {stage, renderer, wrapped, frozen: false, needsPicture: true};
+    const layer: Layer = {stage, role, uses: 0, renderer, wrapped, frozen: false, needsPicture: true};
     // a wrapped stage that is disposed leaves its wrapper; the director lets go of the layer with it
     if (wrapped && isEventized(stage)) {
       layer.unsubscribe = on(stage, OnStageDispose, () => {
@@ -927,6 +1063,13 @@ export class StageDirector extends StageRenderer {
     }
     this.#layers.set(stage, layer);
     this.#byRenderer.set(renderer, layer);
+    if (role === 'mask') {
+      maskOwners.set(stage, this);
+    } else {
+      let owners = layerOwners.get(stage);
+      if (!owners) layerOwners.set(stage, (owners = new Set()));
+      owners.add(this);
+    }
     this.#orderDirty = true;
     return layer;
   }
@@ -936,6 +1079,13 @@ export class StageDirector extends StageRenderer {
     if (this.#layers.get(layer.stage) !== layer) return;
     this.#layers.delete(layer.stage);
     this.#byRenderer.delete(layer.renderer);
+    if (layer.role === 'mask') {
+      if (maskOwners.get(layer.stage) === this) maskOwners.delete(layer.stage);
+    } else {
+      const owners = layerOwners.get(layer.stage);
+      owners?.delete(this);
+      if (owners?.size === 0) layerOwners.delete(layer.stage);
+    }
     this.#orderDirty = true;
     layer.unsubscribe?.();
     this.#internalCall++;
@@ -954,7 +1104,7 @@ export class StageDirector extends StageRenderer {
       if (run && (run.from === layer || run.to === layer)) {
         this.#endRun(slot, run.from === layer ? 'to' : 'from', 'cancelled', errors);
       }
-      if (slot.layer === layer) this.#removeSlot(slot);
+      if (slot.layer === layer) this.#removeSlot(slot, errors);
       if (slot.frozeBelow === layer) slot.frozeBelow = undefined;
     }
     try {
@@ -965,13 +1115,30 @@ export class StageDirector extends StageRenderer {
     this.#slotsChanged();
   }
 
-  #removeSlot(slot: Slot): void {
+  /** Takes the mask stage `layer` off every slot it masks, and out of the director. */
+  #dropMask(layer: Layer, errors: unknown[]): void {
+    for (const slot of this.#slots) {
+      if (slot.mask?.stage === layer.stage) {
+        slot.mask = undefined;
+        layer.uses--;
+      }
+    }
+    try {
+      this.#release(layer);
+    } catch (error) {
+      errors.push(error);
+    }
+    this.#slotsChanged();
+  }
+
+  #removeSlot(slot: Slot, errors: unknown[]): void {
     const index = this.#slots.indexOf(slot);
     if (index !== -1) this.#slots.splice(index, 1);
     if (slot.frozeBelow) {
       slot.frozeBelow.frozen = false;
       slot.frozeBelow = undefined;
     }
+    this.#unmaskSlot(slot, errors);
     this.#slotsChanged();
   }
 
@@ -1004,7 +1171,7 @@ export class StageDirector extends StageRenderer {
 
     if (options.instant) {
       slot.layer = to;
-      if (!to) this.#removeSlot(slot);
+      if (!to) this.#removeSlot(slot, errors);
       if (from && !this.#isReferenced(from)) this.#release(from);
       this.#slotsChanged();
       StageTransitionInternals.advance(transition, 0);
@@ -1037,7 +1204,7 @@ export class StageDirector extends StageRenderer {
     if (kept === run.from && run.from) run.from.frozen = run.fromWasFrozen;
 
     slot.layer = kept;
-    if (!kept) this.#removeSlot(slot);
+    if (!kept) this.#removeSlot(slot, errors);
     if (left && !this.#isReferenced(left)) {
       try {
         this.#release(left);
@@ -1089,7 +1256,7 @@ export class StageDirector extends StageRenderer {
     const ordered: StageItem[] = [];
     const refs: OrderRef[] = [];
     this.#slots.forEach((slot, index) => {
-      const sources: [Layer | undefined, OrderRef['side']][] = slot.run
+      const sources: [Layer | undefined, 'layer' | 'from' | 'to'][] = slot.run
         ? [
             [slot.run.from, 'from'],
             [slot.run.to, 'to'],
@@ -1101,6 +1268,20 @@ export class StageDirector extends StageRenderer {
           ordered.push(item);
           refs.push({slot: index, side});
         }
+      }
+    });
+    // after every layer: the distinct mask stages of the slot masks, bottom-up, each by its first
+    // appearance — they update after the layers whose camera they may read
+    const masks: Layer[] = [];
+    for (const slot of this.#slots) {
+      const layer = slot.mask ? this.#layers.get(slot.mask.stage) : undefined;
+      if (layer && !masks.includes(layer)) masks.push(layer);
+    }
+    masks.forEach((layer, maskStage) => {
+      const item = itemOf(layer);
+      if (item) {
+        ordered.push(item);
+        refs.push({side: 'mask', maskStage});
       }
     });
     this.#ordered = Object.freeze(ordered);
@@ -1256,6 +1437,8 @@ export class StageDirector extends StageRenderer {
     const refs = this.#orderRefs;
     for (let i = 0; i < refs.length; i++) {
       const ref = refs[i]!;
+      // a mask stage draws into its pass target, but the shape samples no mask yet
+      if (ref.side === 'mask') continue;
       const pass = passes[i] as Partial<TextureNode> | undefined;
       const slot = shape.slots[ref.slot];
       const node = ref.side === 'layer' ? slot?.layer : ref.side === 'from' ? slot?.from : slot?.to;
