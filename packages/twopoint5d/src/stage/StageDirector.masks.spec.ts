@@ -882,6 +882,42 @@ describe('StageDirector masks', () => {
       expect(() => director.replace(other, stars, {effect: inkIn, duration: 1})).not.toThrow();
     });
 
+    it('pop() refuses a busy mask under its own name, before the layer below runs again', () => {
+      const other = fakeStage('other');
+      director.setStack([stars, level]);
+      director.push(nextLevel, {below: 'freeze'});
+      const t = director.replace(stars, other, {effect: inkIn, duration: 1});
+      const before = snapshot();
+
+      expect(() => director.pop({effect: maskEffect('inkOut', [ink]), duration: 1})).toThrow(
+        'StageDirector#pop(): the mask "ink" drives a transition already',
+      );
+      expect(() => director.pop({duration: -1})).toThrow('StageDirector#pop(): duration must be');
+      expect(snapshot()).toEqual(before);
+      expect(director.isFrozen(level)).toBe(true);
+      expect(director.transitions).toEqual([t]);
+
+      // the pop() that goes through lets the layer below run again
+      director.pop();
+      expect(names(director.stack)).toEqual(['other', 'level']);
+      expect(director.isFrozen(level)).toBe(false);
+    });
+
+    it('push() gives the uses of its effect masks back when a listener shrinks the stack below its `at`', () => {
+      const leaving = fakeStage('leaving');
+      director.setStack([stars, level, leaving]);
+      director.hide(leaving, {duration: 1});
+      on(director, OnStageTransitionEnd, () => director.remove(stars));
+
+      // the run of the hidden stage ends first, and its listener takes a slot out of the stack
+      expect(() => director.push(leaving, {at: 2, effect: inkIn, duration: 1})).toThrow(
+        'StageDirector#push(): at must be a whole number from 0 to 1, got 2',
+      );
+      expect(ordered()).not.toContain('ink');
+      // the mask stage is no mask of the director any more
+      expect(() => director.show(inkStage)).not.toThrow();
+    });
+
     it('replace() in the slot of a running matte reuses its mask', () => {
       const third = fakeStage('third');
       director.setStack([stars, level]);

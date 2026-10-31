@@ -569,8 +569,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * stood when the call began. On a disposed renderer the list is empty.
    */
   updateFrame(now: number, deltaTime: number, frameNo: number): void {
-    for (const {stage} of this.orderedStages) {
-      stage.updateFrame(now, deltaTime, frameNo);
+    // indexed, as every loop over the stages of a frame: an iterator is an allocation per call
+    const stages = this.orderedStages;
+    for (let i = 0; i < stages.length; i++) {
+      stages[i]!.stage.updateFrame(now, deltaTime, frameNo);
     }
   }
 
@@ -911,7 +913,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const wasPreviouslyAutoClear = renderer.autoClear;
     renderer.autoClear = false;
     try {
-      for (const stageItem of stages) this.renderStage(stageItem, renderer);
+      for (let i = 0; i < stages.length; i++) this.renderStage(stages[i]!, renderer);
     } finally {
       renderer.autoClear = wasPreviouslyAutoClear;
     }

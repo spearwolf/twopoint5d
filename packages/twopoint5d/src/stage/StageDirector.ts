@@ -603,7 +603,16 @@ export class StageDirector extends StageRenderer {
     effectMasks: readonly StageMask[],
     usesHeld: boolean,
   ): StageTransition {
-    const at = this.#slotIndexAt(subject, opts?.at);
+    let at: number;
+    try {
+      at = this.#slotIndexAt(subject, opts?.at);
+    } catch (error) {
+      // the uses a caller took are given back
+      const collected = [error];
+      if (usesHeld) this.#unuseMasks(effectMasks, collected);
+      if (collected.length === 1) throw error;
+      throw new AggregateError(collected, `${subject}: more than one error on the way back from a position that is gone`);
+    }
 
     // the mask stages join first: a mask stage that refuses to join leaves every run as it was
     const errors: unknown[] = [];
@@ -649,6 +658,15 @@ export class StageDirector extends StageRenderer {
   hide(stage: IStage, opts?: StageTransitionOptions): StageTransition {
     const subject = 'StageDirector#hide()';
     if (this.isDisposed) return this.#cancelledHandle(stage, undefined);
+    return this.#hide(subject, stage, opts, false);
+  }
+
+  /**
+   * {@link hide} under the name of its caller, which `pop()` shares. With `runBelow` the layer a
+   * push() froze below the slot runs again — only once every refusal is behind, so that a refused
+   * call leaves it frozen.
+   */
+  #hide(subject: string, stage: IStage, opts: StageTransitionOptions | undefined, runBelow: boolean): StageTransition {
     const options = parseOptions(subject, opts);
     const slot = this.#slotWithEnd(stage);
     if (!slot) throw new Error(`${subject} cannot hide the stage "${stage.name}": that stage is not in the stack`);
@@ -658,6 +676,10 @@ export class StageDirector extends StageRenderer {
 
     const errors: unknown[] = [];
     this.#useMasks(subject, effectMasks);
+    if (runBelow && slot.frozeBelow) {
+      slot.frozeBelow.frozen = false;
+      slot.frozeBelow = undefined;
+    }
     if (slot.run) this.#endRun(slot, 'to', 'finished', errors);
     const transition = this.#begin(slot, slot.layer, undefined, options, effectMasks, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionStart and OnStageTransitionEnd threw`);
@@ -723,11 +745,20 @@ export class StageDirector extends StageRenderer {
     // and the slot below is the one that stays
     const errors: unknown[] = [];
     this.#useMasks(subject, effectMasks);
-    this.#finishRunsWith(stage, errors);
-    let belowSlot = this.#slots[this.#slotIndexAt(subject, opts?.at) - 1];
-    while (below === 'freeze' && belowSlot?.run) {
-      this.#endRun(belowSlot, 'to', 'finished', errors);
+    let belowSlot: Slot | undefined;
+    try {
+      this.#finishRunsWith(stage, errors);
+      // a listener of an end may have shrunk the stack below `at`: the look-up throws then
       belowSlot = this.#slots[this.#slotIndexAt(subject, opts?.at) - 1];
+      while (below === 'freeze' && belowSlot?.run) {
+        this.#endRun(belowSlot, 'to', 'finished', errors);
+        belowSlot = this.#slots[this.#slotIndexAt(subject, opts?.at) - 1];
+      }
+    } catch (error) {
+      const collected = [error, ...errors];
+      this.#unuseMasks(effectMasks, collected);
+      if (collected.length === 1) throw error;
+      throw new AggregateError(collected, `${subject}: more than one error on the way back from a stack a listener changed`);
     }
     if (errors.length > 0) this.#unuseMasks(effectMasks, errors);
     throwCollected(errors, `${subject}: more than one listener of OnStageTransitionEnd threw`);
@@ -779,12 +810,7 @@ export class StageDirector extends StageRenderer {
     const stack = this.stack;
     const top = stack[stack.length - 1];
     if (top === undefined) throw new Error(`${subject} has nothing to pop: the stack is empty`);
-    const slot = this.#slotWithEnd(top)!;
-    if (slot.frozeBelow) {
-      slot.frozeBelow.frozen = false;
-      slot.frozeBelow = undefined;
-    }
-    return this.hide(top, opts);
+    return this.#hide(subject, top, opts, true);
   }
 
   /**
