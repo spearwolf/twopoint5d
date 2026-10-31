@@ -46,11 +46,31 @@ export function readMaskOptions(subject: string, options: StageMaskOptions | und
   return {source, invert};
 }
 
-/** A refused stage as a message quotes it: an instance of a class by the name of its class. */
+/** Whether `value` is a `Stage2D`; a value that throws on the test — a revoked `Proxy` — is none. */
+function isStage2D(value: unknown): value is Stage2D {
+  try {
+    return value instanceof Stage2D;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A refused stage as a message quotes it: an instance of a class by the name of its class, anything
+ * else as `describeValue()` writes it. It runs no code of the caller, as `describeValue()` does not:
+ * `constructor` and `name` count only as data properties, never through a getter, and a value that
+ * throws on the way — a revoked `Proxy` — falls back to `describeValue()`.
+ */
 function describeStage(value: unknown): string {
-  if (value !== null && typeof value === 'object') {
-    const name = (Object.getPrototypeOf(value) as {constructor?: {name?: unknown}} | null)?.constructor?.name;
-    if (typeof name === 'string' && name !== '' && name !== 'Object') return name;
+  try {
+    if (value !== null && typeof value === 'object') {
+      const proto: unknown = Object.getPrototypeOf(value);
+      const ctor = proto != null ? Object.getOwnPropertyDescriptor(proto, 'constructor')?.value : undefined;
+      const name = typeof ctor === 'function' ? Object.getOwnPropertyDescriptor(ctor, 'name')?.value : undefined;
+      if (typeof name === 'string' && name !== '' && name !== 'Object') return name;
+    }
+  } catch {
+    // the value refused to be read: describeValue() writes what can be written of it
   }
   return describeValue(value);
 }
@@ -152,7 +172,7 @@ export class StageMask {
   static inWorldOf(stage: Stage2D, scene: Object3D, options?: StageMaskOptions): StageMask {
     const subject = 'StageMask.inWorldOf()';
     const checked = readMaskOptions(subject, options);
-    if (!(stage instanceof Stage2D)) {
+    if (!isStage2D(stage)) {
       throw new TypeError(`${subject}: stage must be a Stage2D, got ${describeStage(stage)}`);
     }
     if (stage.isDisposed) {

@@ -13,7 +13,7 @@ import {
   type TextureNode,
 } from 'three/webgpu';
 import {beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
-import {OnStageDispose, OnStageRemoved, OnStageTransitionEnd} from '../events.js';
+import {OnStageAdded, OnStageDispose, OnStageRemoved, OnStageTransitionEnd} from '../events.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import {Stage2D} from './Stage2D.js';
@@ -1418,6 +1418,28 @@ describe('StageDirector masks', () => {
       expect(() => director.push(nextLevel, {mask: fog})).toThrow(`StageDirector#push() ${refusal}`);
       expect(() => director.replace(level, nextLevel, {effect, duration: 1})).toThrow(`StageDirector#replace() ${refusal}`);
       expect(snapshot()).toEqual(before);
+    });
+
+    it('disposed while its stage joins, it leaves the slot as soon as the change stands', () => {
+      director.setStack([stars, level]);
+      // a listener of the join of the mask stage disposes the mask, between the checks and the change
+      on(director, OnStageAdded, () => fog.dispose());
+      director.setMask(level, fog);
+      expect(director.maskOf(level)).toBeUndefined();
+      expect(ordered()).toEqual(['stars', 'level']);
+    });
+
+    it('disposed while its stage joins for a matte, it ends the matte as cancelled at once', () => {
+      director.setStack([stars, level]);
+      const effect = matte({mask: fog});
+      on(director, OnStageAdded, ({stage}: {stage: IStage}) => {
+        if ((stage as StageRenderer).stages?.[0]?.stage === fogStage) fog.dispose();
+      });
+      const t = director.replace(level, nextLevel, {effect, duration: 1});
+      expect(t.state).toBe('cancelled');
+      expect(names(director.stack)).toEqual(['stars', 'level']);
+      expect(director.transitions).toHaveLength(0);
+      expect(ordered()).toEqual(['stars', 'level']);
     });
 
     it('a director that let go of the mask hears nothing of its dispose()', () => {

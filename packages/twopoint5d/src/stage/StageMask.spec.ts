@@ -126,6 +126,21 @@ describe('StageMask', () => {
       expect(() => StageMask.inWorldOf(layer() as any, new Scene())).toThrow(TypeError);
     });
 
+    it('quotes a refused stage without running code of the caller', () => {
+      const getter = vi.fn(() => 'Sneaky');
+      class Shady {}
+      Object.defineProperty(Shady.prototype, 'constructor', {get: getter});
+      expect(() => StageMask.inWorldOf(new Shady() as any, new Scene())).toThrow(
+        'StageMask.inWorldOf(): stage must be a Stage2D, got [object Object]',
+      );
+      expect(getter).not.toHaveBeenCalled();
+      const {proxy, revoke} = Proxy.revocable({}, {});
+      revoke();
+      expect(() => StageMask.inWorldOf(proxy as any, new Scene())).toThrow(
+        'StageMask.inWorldOf(): stage must be a Stage2D, got [object]',
+      );
+    });
+
     it('refuses a disposed stage', () => {
       const stage = world();
       stage.dispose();

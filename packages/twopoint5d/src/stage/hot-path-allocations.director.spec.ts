@@ -1,12 +1,22 @@
 import {mix} from 'three/tsl';
-import {ACESFilmicToneMapping, Color, FloatType, type Node, RenderPipeline, SRGBColorSpace} from 'three/webgpu';
+import {
+  ACESFilmicToneMapping,
+  Color,
+  FloatType,
+  type Node,
+  PerspectiveCamera,
+  RenderPipeline,
+  SRGBColorSpace,
+  Scene,
+} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
+import {Stage2D} from './Stage2D.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
-import type {StageTransitionEffect} from './transitionEffects.js';
+import {matte, type StageTransitionEffect} from './transitionEffects.js';
 
 // a call that allocates anything costs 16 B at least; the allocation-free paths below
 // measure a small fraction of a byte per call, the noise of a round spread over its calls
@@ -151,6 +161,34 @@ describe('StageDirector on the hot path', () => {
     expect(ink.progress).toBe(0.25);
     expect(ink.progressNode.value).toBe(0.25);
     expect(reads).toBeGreaterThan(0);
+    director.dispose();
+  });
+
+  test('a mask in the world of a stage, on a slot and in a running matte, allocates nothing', async () => {
+    const director = new StageDirector();
+    director.resize(64, 64);
+    // the world is no layer here: what is measured is the mask, which reads the camera of the world at
+    // every draw. A Stage2D updated beside stages of other classes allocates in its own updateFrame()
+    // whether or not a mask is in play
+    const world = new Stage2D();
+    world.name = 'world';
+    world.camera = new PerspectiveCamera();
+    const from = stage('from');
+    const level = stage('level');
+    director.setStack([from, level]);
+    // the mask reads the camera of the world at every draw
+    director.setMask(level, StageMask.inWorldOf(world, new Scene()));
+    const flashlight = StageMask.inWorldOf(world, new Scene(), {source: 'luminance'});
+    // a fixed progress: a uniform written with a changing double boxes it, 16 B per write
+    const t = director.replace(from, stage('next'), {effect: matte({mask: flashlight}), manual: true});
+    t.progress = 0.25;
+
+    const bytesPerCall = await bytesPerFrame(director);
+
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    expect(director.transitions).toHaveLength(1);
+    expect(flashlight.progress).toBe(0.25);
+    expect(director.orderedStages).toHaveLength(5);
     director.dispose();
   });
 });

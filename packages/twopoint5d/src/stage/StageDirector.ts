@@ -1414,7 +1414,8 @@ export class StageDirector extends StageRenderer {
    * it as cancelled, and takes it out of the director.
    */
   #dropMask(layer: Layer, errors: unknown[]): void {
-    for (const slot of this.#slots) {
+    // over a copy, as every loop here that may hand control to a listener
+    for (const slot of this.#slots.slice()) {
       if (slot.mask?.stage === layer.stage) {
         slot.mask = undefined;
         layer.uses--;
@@ -1471,13 +1472,21 @@ export class StageDirector extends StageRenderer {
         unwatch();
       }
     }
+    // a mask disposed before the change that put it in place — by a listener between the checks of a
+    // call and its change — hears no dispose any more: it leaves as soon as the change stands
+    let disposed: StageMask | undefined;
     const watch = (mask: StageMask): void => {
-      if (!watches.has(mask)) watches.set(mask, StageMaskInternals.onDispose(mask, this.#maskDisposed));
+      if (watches.has(mask)) return;
+      if (mask.isDisposed) disposed ??= mask;
+      else watches.set(mask, StageMaskInternals.onDispose(mask, this.#maskDisposed));
     };
     for (const slot of this.#slots) {
       if (slot.mask) watch(slot.mask);
       slot.run?.masks.forEach(watch);
     }
+    // one at a time: the leave changes the slots and comes back here for the next one. An error of a
+    // listener of that leave reaches the caller of the call that made the change
+    if (disposed) this.#maskDisposed(disposed);
   }
 
   /**
@@ -1487,14 +1496,18 @@ export class StageDirector extends StageRenderer {
    */
   #maskDisposed = (mask: StageMask): void => {
     const errors: unknown[] = [];
-    for (const slot of this.#slots) {
+    // over a copy: a listener of OnStageRemoved, when the mask stage leaves, may change the slots
+    for (const slot of this.#slots.slice()) {
       if (slot.mask === mask) this.#unmaskSlot(slot, errors);
     }
     for (const slot of this.#slots.slice()) {
       if (slot.run?.masks.includes(mask)) this.#endRun(slot, 'from', 'cancelled', errors);
     }
     this.#slotsChanged();
-    throwCollected(errors, 'StageDirector: more than one listener of OnStageTransitionEnd threw while a disposed mask left');
+    throwCollected(
+      errors,
+      'StageDirector: more than one listener of OnStageTransitionEnd and OnStageRemoved threw while a disposed mask left',
+    );
   };
 
   // ---------------------------------------------------------------------------
