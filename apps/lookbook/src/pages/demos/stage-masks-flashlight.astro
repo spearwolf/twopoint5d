@@ -1,0 +1,231 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-flashlight.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #020203;
+  }
+  canvas {
+    touch-action: none;
+  }
+</style>
+
+<script>
+  import {on} from '@spearwolf/eventize';
+  import {Display, OnStageUpdateFrame, StageDirector, type StageDirectorShape, StageMask} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color, Vector2} from 'three/webgpu';
+  import {CrawlRig} from '~demos/stage-masks/CrawlRig';
+  import {
+    CrawlDark,
+    CrawlFlashlight,
+    CrawlLevel,
+    type CrawlProjection,
+    disposeCrawlAssets,
+    loadCrawlAssets,
+    makeLightNodes,
+    makeProjection,
+  } from '~demos/stage-masks/Crawlspace';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long the eyes get to open before the card of the lookbook is taken, in ms
+  const PREVIEW_SETTLE = 3500;
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  // two slots over the clear color: the dark with its eyes, and the level, masked by the flashlight
+  const director = new StageDirector(display).setClearColor(new Color('#020203'), 1);
+
+  const settings = {
+    projection: 'parallax' as CrawlProjection,
+    coneAngle: 48,
+    reach: 520,
+    mask: true,
+    flicker: true,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadCrawlAssets(renderer);
+    if (display.isDisposed) {
+      disposeCrawlAssets(assets);
+      return;
+    }
+
+    const rig = new CrawlRig(assets.layout);
+    Object.assign(window, {rig});
+    const nodes = makeLightNodes();
+    const dark = new CrawlDark(assets, rig, settings.projection);
+    const level = new CrawlLevel(assets, rig, nodes, settings.projection);
+    const flashlight = new CrawlFlashlight(rig, nodes);
+    // the cone follows the lens after the level moved the rig's camera and wrote the light
+    on(level.stage, OnStageUpdateFrame, () => flashlight.update());
+
+    // the mask lies in the world of the level: its scene is drawn through the level's camera,
+    // whatever projection the level has at the moment of the draw
+    const mask = StageMask.inWorldOf(level.stage, flashlight.scene);
+    director.setStack([dark.stage, level.stage]);
+    director.setMask(level.stage, mask);
+
+    const readout = {camera: '', maskOf: ''};
+    const describe = () => {
+      const c = level.stage.camera;
+      readout.camera = c ? `${c.position.x.toFixed(0)}, ${c.position.y.toFixed(0)}, ${c.position.z.toFixed(0)}` : '—';
+      readout.maskOf = director.maskOf(level.stage) ? 'StageMask.inWorldOf(level, flashlight)' : 'undefined';
+    };
+    describe();
+    // the read-outs a few times a second, not every frame: each one is a new string
+    const readoutInterval = setInterval(describe, 200);
+
+    const applyCone = () => {
+      rig.halfAngle = (settings.coneAngle / 2) * (Math.PI / 180);
+      rig.reach = settings.reach;
+    };
+    applyCone();
+
+    // a new projection for both stages: the mask needs no word of it, it reads the level's camera
+    const applyProjection = () => {
+      const distance = assets.layout.cameraDistance;
+      level.stage.projection = makeProjection(settings.projection, distance);
+      dark.stage.projection = makeProjection(settings.projection, distance);
+      rig.parallax = settings.projection === 'parallax' ? 1 : 0;
+      describe();
+    };
+
+    const toggleMask = () => {
+      director.setMask(level.stage, settings.mask ? mask : undefined);
+      describe();
+    };
+
+    const keys: Record<string, 'left' | 'right' | 'up' | 'down'> = {
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      ArrowDown: 'down',
+      KeyA: 'left',
+      KeyD: 'right',
+      KeyW: 'up',
+      KeyS: 'down',
+    };
+    const ignored = (event: KeyboardEvent) =>
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      (event.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName));
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (ignored(event)) return;
+      const key = keys[event.code];
+      if (key) {
+        rig.input[key] = true;
+        // the keyboard takes the aim back from the pointer
+        if (!rig.input.pressed) rig.input.pointer = undefined;
+        event.preventDefault();
+      }
+      if (event.repeat) return;
+      if (event.code === 'KeyP') {
+        settings.projection = settings.projection === 'parallax' ? 'orthographic' : 'parallax';
+        applyProjection();
+      } else if (event.code === 'KeyM') {
+        settings.mask = !settings.mask;
+        toggleMask();
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const key = keys[event.code];
+      if (key) rig.input[key] = false;
+    };
+    // a key released while the window is not focused never sends its keyup
+    const onBlur = () => {
+      rig.input.left = rig.input.right = rig.input.up = rig.input.down = false;
+      rig.input.pressed = false;
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+
+    // the pointer aims the light; held down, the player crawls towards it
+    const pointer = new Vector2();
+    const toView = (event: PointerEvent) => {
+      pointer.set(event.offsetX / canvas.clientWidth - 0.5, 0.5 - event.offsetY / canvas.clientHeight);
+      rig.input.pointer = pointer;
+    };
+    const onPointerMove = (event: PointerEvent) => toView(event);
+    const onPointerDown = (event: PointerEvent) => {
+      canvas.setPointerCapture(event.pointerId);
+      rig.input.pressed = true;
+      toView(event);
+    };
+    const onPointerUp = () => {
+      rig.input.pressed = false;
+    };
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+
+    const gui = new GUI({container: getDemoUi(), title: 'The Crawlspace'});
+    gui.add(settings, 'projection', ['parallax', 'orthographic']).name('projection (p)').onChange(applyProjection).listen();
+    gui.add(settings, 'coneAngle', 16, 100, 1).name('cone angle °').onChange(applyCone);
+    gui.add(settings, 'reach', 240, 800, 10).name('cone reach').onChange(applyCone);
+    gui.add(settings, 'mask').name('mask on the slot (m)').onChange(toggleMask).listen();
+    gui
+      .add(settings, 'flicker')
+      .name('tired battery')
+      .onChange((v: boolean) => {
+        rig.flicker = v;
+      });
+    gui.add(readout, 'camera').name('level.camera').disable().listen();
+    gui.add(readout, 'maskOf').name('maskOf(level)').disable().listen();
+
+    // both shapes the mask toggle reaches, built before they are needed; the mask stage draws once
+    // ahead with them. The mask has one source and one invert, so there is no other pair to build
+    const shapes: StageDirectorShape[] = [
+      ['layer', {mask}],
+      ['layer', 'layer'],
+    ];
+    const precompiled = director.precompile(renderer, shapes, {layers: [mask.stage]}).catch((error: unknown) => {
+      // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+      console.error('stage-masks-flashlight: precompile() failed, the shaders build on their first frame', error);
+    });
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      clearInterval(readoutInterval);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerUp);
+      gui.destroy();
+      // the director lets go of the layers and the mask stage first; the mask owns the stage it
+      // built, the scene stays the flashlight's
+      director.dispose();
+      mask.dispose();
+      flashlight.dispose();
+      level.dispose();
+      dark.dispose();
+      disposeCrawlAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

@@ -1,6 +1,7 @@
 // stage-masks: the art of the stage-masks demos, one directory per demo (or `shared/` for what
 // several use) under `public/assets/stage-masks/`. `pnpm lookbook:assets --only=stage-masks`
 // regenerates all of them; README.md documents every output.
+import {generate as flashlight} from './flashlight/crawlspace.mjs';
 import {generate as foundFootage} from './found-footage/footage.mjs';
 import {generate as frozen} from './frozen/frozen.mjs';
 import {generate as heatHaze} from './heat-haze/heat-haze.mjs';
@@ -27,4 +28,5 @@ export async function generate(out, opts = {}) {
   await matteThreshold(out);
   await heatHaze(out);
   await matte3d(out, opts);
+  await flashlight(out);
 }

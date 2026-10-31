@@ -1,0 +1,17 @@
+{
+  "title": "stage masks: flashlight",
+  "shortDescription": "The Crawlspace: a flashlight cone that lies in the world of a parallax level, StageMask.inWorldOf() drawing the mask through the level's own camera, with things in the dark that only show where the light is not",
+  "description": "The crawlspace under an old house — joists, a dripping drain, pink insulation, toys nobody came back for, a child's drawings pinned to a post — painted in three layers at three depths of one `Stage2D` under a `ParallaxProjection`. The camera follows the player and leads where the light points.\n\nThe level's slot is masked by `StageMask.inWorldOf(level, flashlightScene)`: the flashlight scene is a cone and a small pool of light at the lens, plus the shaft of moonlight that falls through the vent in the back wall, all placed in the coordinates of the level. The mask draws that scene through the **current camera of the level**, so the cone stays on the joists while the camera moves, and the moonlight lies on the far wall and slides past with the slow parallax of the wall. The level's own materials are lit by the same uniforms, so the light and the edge of the mask agree.\n\nBelow the level lies the dark, the bottom slot, which shows where the mask leaves the level out — and the eyes in it. They wait beside the toys and shut when the light comes near; when the battery stutters, they are all there. *projection* swaps the projection of the level (and of the dark) between parallax and orthographic: the mask is told nothing and follows the new camera in the next frame. *cone angle* and *cone reach* shape the cone, *mask on the slot* is `setMask(level, undefined)` and back, and the read-outs show the level's camera and `maskOf(level)`. Aim with the pointer, hold it down to crawl, or use WASD and the arrow keys; `p` and `m` toggle projection and mask. See [Stage masks: masks in the world](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#masks-in-the-world) and [a flashlight in a level](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#a-flashlight-in-a-level).",
+  "url": "/demos/stage-masks-flashlight",
+  "tags": [
+    "StageMask",
+    "StageDirector",
+    "Stage2D",
+    "ParallaxProjection",
+    "OrthographicProjection",
+    "FeatureSprites",
+    "TexturedSpriteKind",
+    "masks",
+    "vanilla"
+  ]
+}

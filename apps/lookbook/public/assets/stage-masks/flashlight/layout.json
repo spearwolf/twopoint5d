@@ -1,0 +1,243 @@
+{
+  "cameraDistance": 500,
+  "floorY": -150,
+  "playerRange": 820,
+  "cameraRange": 700,
+  "layers": {
+    "back": {
+      "z": -400,
+      "ppu": 1.5,
+      "left": -1600,
+      "right": 1600,
+      "bottom": -540,
+      "top": 540,
+      "tiles": 2,
+      "images": ["back-0.webp", "back-1.webp"]
+    },
+    "mid": {
+      "z": -180,
+      "ppu": 2,
+      "left": -1380,
+      "right": 1380,
+      "bottom": -420,
+      "top": 420,
+      "tiles": 3,
+      "images": ["mid-0.webp", "mid-1.webp", "mid-2.webp"]
+    },
+    "play": {
+      "z": 0,
+      "ppu": 2,
+      "left": -1200,
+      "right": 1200,
+      "bottom": -320,
+      "top": 320,
+      "tiles": 2,
+      "images": ["play-0.webp", "play-1.webp"]
+    }
+  },
+  "vent": {
+    "x": 560,
+    "y": 70,
+    "hw": 58,
+    "hh": 26
+  },
+  "posts": [-520, 420],
+  "drain": {
+    "y": 104,
+    "drip": -260
+  },
+  "drawings": [
+    {
+      "name": "drawing-house",
+      "x": -520,
+      "y": 60,
+      "tilt": -0.06
+    },
+    {
+      "name": "drawing-family",
+      "x": -520,
+      "y": -18,
+      "tilt": 0.05
+    },
+    {
+      "name": "drawing-friend",
+      "x": -470,
+      "y": 22,
+      "tilt": 0.11
+    }
+  ],
+  "near": [
+    {
+      "name": "near-pier",
+      "x": -880,
+      "y": -40,
+      "z": 170
+    },
+    {
+      "name": "near-cobweb",
+      "x": -250,
+      "y": 250,
+      "z": 150
+    },
+    {
+      "name": "near-wires",
+      "x": 330,
+      "y": 205,
+      "z": 170
+    },
+    {
+      "name": "near-rubble",
+      "x": 760,
+      "y": -255,
+      "z": 170
+    },
+    {
+      "name": "near-pier",
+      "x": 1180,
+      "y": -40,
+      "z": 170
+    },
+    {
+      "name": "near-tuft",
+      "x": -1250,
+      "y": 240,
+      "z": 150
+    }
+  ],
+  "eyes": [
+    {
+      "x": -126,
+      "y": -92,
+      "z": 0,
+      "frame": "eyes-pale"
+    },
+    {
+      "x": -850,
+      "y": -96,
+      "z": -180,
+      "frame": "eyes-ember"
+    },
+    {
+      "x": 905,
+      "y": -88,
+      "z": -180,
+      "frame": "eyes-three"
+    },
+    {
+      "x": 600,
+      "y": -40,
+      "z": -400,
+      "frame": "eyes-pale"
+    },
+    {
+      "x": -430,
+      "y": 210,
+      "z": -180,
+      "frame": "eyes-ember"
+    },
+    {
+      "x": 790,
+      "y": -88,
+      "z": 0,
+      "frame": "eyes-three"
+    },
+    {
+      "x": -1060,
+      "y": 140,
+      "z": -400,
+      "frame": "eyes-pale"
+    },
+    {
+      "x": 140,
+      "y": 200,
+      "z": -180,
+      "frame": "eyes-ember"
+    },
+    {
+      "x": -592,
+      "y": -72,
+      "z": 0,
+      "frame": "eyes-ember"
+    },
+    {
+      "x": 1180,
+      "y": 160,
+      "z": -400,
+      "frame": "eyes-three"
+    }
+  ],
+  "lens": {
+    "x": 88,
+    "y": 4
+  },
+  "frames": {
+    "player-0": {
+      "w": 220,
+      "h": 120
+    },
+    "player-1": {
+      "w": 220,
+      "h": 120
+    },
+    "player-2": {
+      "w": 220,
+      "h": 120
+    },
+    "player-3": {
+      "w": 220,
+      "h": 120
+    },
+    "drawing-house": {
+      "w": 56,
+      "h": 72
+    },
+    "drawing-family": {
+      "w": 56,
+      "h": 72
+    },
+    "drawing-friend": {
+      "w": 56,
+      "h": 72
+    },
+    "eyes-pale": {
+      "w": 40,
+      "h": 18
+    },
+    "eyes-ember": {
+      "w": 40,
+      "h": 18
+    },
+    "eyes-three": {
+      "w": 46,
+      "h": 20
+    },
+    "drip": {
+      "w": 6,
+      "h": 12
+    },
+    "splash": {
+      "w": 24,
+      "h": 10
+    },
+    "near-pier": {
+      "w": 80,
+      "h": 520
+    },
+    "near-cobweb": {
+      "w": 260,
+      "h": 200
+    },
+    "near-wires": {
+      "w": 140,
+      "h": 200
+    },
+    "near-rubble": {
+      "w": 270,
+      "h": 90
+    },
+    "near-tuft": {
+      "w": 160,
+      "h": 180
+    }
+  }
+}
