@@ -81,16 +81,31 @@ import {description, title} from './_stage-masks-matte-ink.json';
     const sceneName = (stage: unknown) => (stage === hall.stage ? 'the drowned hall' : 'title card');
     const readout = {slot: sceneName(title.stage), time: '—', progress: ink.progress.toFixed(3)};
 
-    // the readouts, written once per frame: during a run they name both ends of the slot
+    // the readouts, looked at once per frame and written only when what they show changes: during
+    // a run the slot names both ends. Time and progress are compared in thousandths, as shown
+    let shownFrom: unknown = title.stage;
+    let shownTo: unknown;
+    let shownTime = -1;
+    let shownProgress = Math.round(ink.progress * 1000);
     const describe = () => {
-      if (running) {
-        readout.slot = `${sceneName(running.from)} → ${sceneName(running.to)}`;
-        readout.time = running.manual ? 'by hand' : Math.min(1, running.elapsed / running.duration).toFixed(3);
-      } else {
-        readout.slot = sceneName(director.stack[0]);
-        readout.time = '—';
+      const from = running ? running.from : director.stack[0];
+      const to = running ? running.to : undefined;
+      if (from !== shownFrom || to !== shownTo) {
+        shownFrom = from;
+        shownTo = to;
+        readout.slot = to === undefined ? sceneName(from) : `${sceneName(from)} → ${sceneName(to)}`;
       }
-      readout.progress = ink.progress.toFixed(3);
+      // -1 for no run, -2 for a run by hand, else the share of the duration in thousandths
+      const time = running ? (running.manual ? -2 : Math.round(Math.min(1, running.elapsed / running.duration) * 1000)) : -1;
+      if (time !== shownTime) {
+        shownTime = time;
+        readout.time = time === -1 ? '—' : time === -2 ? 'by hand' : (time / 1000).toFixed(3);
+      }
+      const progress = Math.round(ink.progress * 1000);
+      if (progress !== shownProgress) {
+        shownProgress = progress;
+        readout.progress = (progress / 1000).toFixed(3);
+      }
     };
 
     const begin = (manual: boolean): StageTransition => {
@@ -137,10 +152,14 @@ import {description, title} from './_stage-masks-matte-ink.json';
       }
     };
 
+    // one handler per frame: the clock of the ink (both its materials read it), the cycle, the readouts
     display.onRenderFrame(({deltaTime}) => {
-      if (!settings.cycle || settings.scrub || running) return;
-      hold -= deltaTime;
-      if (hold <= 0) begin(false);
+      layout.advance(deltaTime);
+      if (settings.cycle && !settings.scrub && !running) {
+        hold -= deltaTime;
+        if (hold <= 0) begin(false);
+      }
+      describe();
     });
 
     const gui = new GUI({container: getDemoUi(), title: 'The Inkwell Séance'});
@@ -164,9 +183,6 @@ import {description, title} from './_stage-masks-matte-ink.json';
     gui.add(readout, 'slot').name('in the slot').disable().listen();
     gui.add(readout, 'time').name('time / duration').disable().listen();
     gui.add(readout, 'progress').name('ink.progress').disable().listen();
-
-    const onFrame = () => describe();
-    display.onRenderFrame(onFrame);
 
     // space plays, S scrubs by hand
     const onKeyDown = (event: KeyboardEvent) => {

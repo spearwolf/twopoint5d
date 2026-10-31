@@ -75,6 +75,13 @@ interface Drop {
 export class InkBlotLayout {
   /** per seed: x, y in units, the progress it starts growing at, its full radius */
   readonly seeds: UniformNode<'vec4', Vector4>[] = [];
+  /**
+   * The clock of the ink, in seconds: the creep of the edge and the sheen of the wet edge. One
+   * uniform for both materials, advanced by {@link advance} from one place only — the mask stage
+   * updates only while a transition runs, the wet edge in every frame, and two clocks would drift
+   * apart and slide the rim off the edge of the matte.
+   */
+  readonly time = uniform(0) as unknown as UniformNode<'float', number>;
   readonly drops: Drop[] = [];
   readonly #rng: InkRandom;
 
@@ -83,6 +90,11 @@ export class InkBlotLayout {
     for (let i = 0; i < SEEDS; i++) this.seeds.push(uniform(new Vector4()) as unknown as UniformNode<'vec4', Vector4>);
     for (let i = 0; i < DROPS; i++) this.drops.push({seed: 0, x: 0, y: 0, distance: 0, radius: 0});
     this.scatter();
+  }
+
+  /** Advances the clock of the ink: once per frame, by the page. */
+  advance(deltaTime: number): void {
+    this.time.value += Math.min(deltaTime, 0.1);
   }
 
   /** A new layout: the first blot near the middle, the others spread over the view, later and later. */
@@ -145,7 +157,8 @@ export class InkBlotLayout {
    * The ink field at `p`: 1 on the edge of the blots, above 1 inside. Each blot is a metaball whose
    * edge is pushed out into tendrils by a noise around its middle; neighbours melt together.
    */
-  field(p: Node<'vec2'>, progress: Node<'float'>, time: Node<'float'>): Node<'float'> {
+  field(p: Node<'vec2'>, progress: Node<'float'>): Node<'float'> {
+    const time = this.time;
     // the whole edge wanders a little, slowly, as wet ink creeps
     const q = p.add(
       vec2(mx_noise_float(vec3(p.mul(0.007), time.mul(0.05))), mx_noise_float(vec3(p.mul(0.007).add(17), time.mul(0.05)))).mul(
@@ -191,7 +204,6 @@ export class InkBlotLayout {
 export class InkBlots {
   readonly stage = makeInkStage('ink');
   readonly layout: InkBlotLayout;
-  readonly #time = uniform(0);
   #plane: Mesh | undefined;
   readonly #drops = new SoftBlobs({
     capacity: DROPS,
@@ -209,7 +221,7 @@ export class InkBlots {
     // precompile() draws the mask stage before its first update: the pool has to have uploaded once
     this.#drops.update();
 
-    on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
+    on(this.stage, OnStageUpdateFrame, () => this.#update());
   }
 
   /**
@@ -219,7 +231,7 @@ export class InkBlots {
    */
   bind(mask: StageMask): void {
     this.#mask = mask;
-    const f = this.layout.field(positionWorld.xy, mask.progressNode, this.#time);
+    const f = this.layout.field(positionWorld.xy, mask.progressNode);
     // a narrow soft edge of about two pixels wherever it runs: where two blots melt together the
     // field climbs slowly, and a fixed band of the field would turn into a wide blur there. Capped:
     // near the middle of a blot the field and its derivative soar, and the edge is far away
@@ -232,8 +244,7 @@ export class InkBlots {
     this.stage.scene.add(this.#plane);
   }
 
-  #update(deltaTime: number): void {
-    this.#time.value += Math.min(deltaTime, 0.1);
+  #update(): void {
     const progress = this.#mask?.progress ?? 0;
     const {drops} = this.layout;
     const blobs = this.#drops.blobs;
@@ -268,7 +279,6 @@ export class WetEdge {
   /** whether a transition through the ink runs: the page sets it */
   running = false;
   readonly #layout: InkBlotLayout;
-  readonly #time = uniform(0);
   #plane: Mesh | undefined;
   readonly #rings = new SoftBlobs({
     capacity: DROPS,
@@ -291,19 +301,19 @@ export class WetEdge {
     // uploaded once now, as the drops of the mask stage are
     this.#rings.update();
 
-    on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
+    on(this.stage, OnStageUpdateFrame, () => this.#update());
   }
 
   /** Binds the mask of the ink: its `progressNode` and `progress` grow the edge as they grow the blots. */
   bind(mask: StageMask): void {
     this.#mask = mask;
     const p = positionWorld.xy;
-    const f = this.#layout.field(p, mask.progressNode, this.#time);
+    const f = this.#layout.field(p, mask.progressNode);
     // the ink soaks a little into the title outside the edge, and lies wet just inside it
     const band = smoothstep(0.7, 0.98, f).mul(float(1).sub(smoothstep(1.04, 1.9, f)));
     const sheen = pow(
       clamp(
-        mx_noise_float(vec3(p.mul(0.012), this.#time.mul(0.2)))
+        mx_noise_float(vec3(p.mul(0.012), this.#layout.time.mul(0.2)))
           .mul(0.5)
           .add(0.5),
         0,
@@ -326,8 +336,7 @@ export class WetEdge {
     this.stage.scene.add(this.#plane);
   }
 
-  #update(deltaTime: number): void {
-    this.#time.value += Math.min(deltaTime, 0.1);
+  #update(): void {
     const visible = this.enabled && this.running;
     if (this.#plane) this.#plane.visible = visible;
     this.#rings.mesh.visible = visible;
