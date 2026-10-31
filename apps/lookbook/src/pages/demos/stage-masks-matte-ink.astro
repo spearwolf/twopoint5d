@@ -1,0 +1,250 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-masks-matte-ink.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #000;
+  }
+</style>
+
+<script>
+  import {
+    Display,
+    matte,
+    StageDirector,
+    type StageDirectorShape,
+    StageMask,
+    type StageTransition,
+    type StageTransitionEasing,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {disposeDrownedHouseAssets, DrownedHall, loadDrownedHouseAssets, TitleCard} from '~demos/stage-masks/DrownedHouse';
+  import {InkBlotLayout, InkBlots, WetEdge} from '~demos/stage-masks/InkWell';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // how long a scene holds before the ink takes it back, while "cycle" is on, in seconds
+  const HOLD = 2.6;
+  // how long the card of the lookbook waits for the fog to drift in and the eyes to find the lantern, in ms
+  const PREVIEW_SETTLE = 2500;
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  canvas.style.touchAction = 'none';
+  const display = new Display(canvas);
+  const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+
+  const settings = {
+    duration: 3.2,
+    easing: 'ease-in' as StageTransitionEasing,
+    cycle: true,
+    wetEdge: true,
+    scrub: false,
+    progress: 0.45,
+  };
+
+  display.onInit(async ({renderer}) => {
+    const assets = await loadDrownedHouseAssets(renderer);
+    if (display.isDisposed) {
+      disposeDrownedHouseAssets(assets);
+      return;
+    }
+
+    const title = new TitleCard(assets);
+    const hall = new DrownedHall(assets);
+
+    // the ink: one layout of blots, read by the mask stage and by the wet edge above the slot.
+    // The mask stage is never in the stack: matte() names its mask, and the director draws the ink
+    // only while a transition through it runs
+    const layout = new InkBlotLayout(1931);
+    const blots = new InkBlots(layout);
+    const ink = new StageMask(blots.stage, {source: 'alpha'});
+    blots.bind(ink);
+    const edge = new WetEdge(layout);
+    edge.bind(ink);
+    // 'coverage' mode: the picture of the ink is the share of `to` — made once and reused
+    const inkIn = matte({mask: ink});
+
+    director.setStack([title.stage, edge.stage]);
+
+    let running: StageTransition | undefined;
+    let hold = HOLD;
+    const sceneName = (stage: unknown) => (stage === hall.stage ? 'the drowned hall' : 'title card');
+    const readout = {slot: sceneName(title.stage), time: '—', progress: ink.progress.toFixed(3)};
+
+    // the readouts, written once per frame: during a run they name both ends of the slot
+    const describe = () => {
+      if (running) {
+        readout.slot = `${sceneName(running.from)} → ${sceneName(running.to)}`;
+        readout.time = running.manual ? 'by hand' : Math.min(1, running.elapsed / running.duration).toFixed(3);
+      } else {
+        readout.slot = sceneName(director.stack[0]);
+        readout.time = '—';
+      }
+      readout.progress = ink.progress.toFixed(3);
+    };
+
+    const begin = (manual: boolean): StageTransition => {
+      const from = director.stack[0] === hall.stage ? hall : title;
+      const to = from === hall ? title : hall;
+      // a new run, new blots — but the card of the lookbook is the same every time
+      if (!isPreview) layout.scatter();
+      const transition = director.replace(from.stage, to.stage, {
+        effect: inkIn,
+        duration: settings.duration,
+        easing: settings.easing,
+        manual,
+      });
+      if (manual) transition.progress = settings.progress;
+      running = transition;
+      edge.running = true;
+      if (to === title) hall.pointer = undefined;
+      transition.finished.then((t) => {
+        if (display.isDisposed) return;
+        if (running === t) {
+          running = undefined;
+          edge.running = false;
+        }
+        hold = HOLD;
+        describe();
+      });
+      return transition;
+    };
+
+    const play = () => {
+      // a run already going is the one on the screen: let it finish
+      if (running || settings.scrub) return;
+      begin(false);
+    };
+
+    const setScrub = () => {
+      if (settings.scrub) {
+        running?.cancel('end');
+        running = undefined;
+        begin(true);
+      } else if (running?.manual) {
+        // let go of the slider: the transition ends where it is nearer to
+        running.cancel(running.progress >= 0.5 ? 'end' : 'start');
+      }
+    };
+
+    display.onRenderFrame(({deltaTime}) => {
+      if (!settings.cycle || settings.scrub || running) return;
+      hold -= deltaTime;
+      if (hold <= 0) begin(false);
+    });
+
+    const gui = new GUI({container: getDemoUi(), title: 'The Inkwell Séance'});
+    gui.add(settings, 'duration', 0.4, 8, 0.1).name('duration (s)');
+    gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']);
+    gui.add({play}, 'play').name('play (space)');
+    gui.add(settings, 'cycle').name('cycle by itself');
+    gui
+      .add(settings, 'wetEdge')
+      .name('wet edge (a layer above)')
+      .onChange(() => {
+        edge.enabled = settings.wetEdge;
+      });
+    gui.add(settings, 'scrub').name('scrub by hand (s)').onChange(setScrub).listen();
+    gui
+      .add(settings, 'progress', 0, 1, 0.001)
+      .name('transition.progress')
+      .onChange(() => {
+        if (running?.manual) running.progress = settings.progress;
+      });
+    gui.add(readout, 'slot').name('in the slot').disable().listen();
+    gui.add(readout, 'time').name('time / duration').disable().listen();
+    gui.add(readout, 'progress').name('ink.progress').disable().listen();
+
+    const onFrame = () => describe();
+    display.onRenderFrame(onFrame);
+
+    // space plays, S scrubs by hand
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (event.code === 'Space' || event.code === 'Enter') {
+        event.preventDefault();
+        play();
+      } else if (event.code === 'KeyS') {
+        settings.scrub = !settings.scrub;
+        setScrub();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    // in the hall the pointer takes the lantern over; the eyes follow it
+    const onPointerMove = (event: PointerEvent) => {
+      if (director.stack[0] !== hall.stage) return;
+      const view = hall.stage.projection!.getViewRect();
+      hall.pointer = {
+        x: (event.offsetX / canvas.clientWidth - 0.5) * view.width + view.offsetX,
+        y: (0.5 - event.offsetY / canvas.clientHeight) * view.height + view.offsetY,
+      };
+    };
+    const onPointerLeave = () => {
+      hall.pointer = undefined;
+    };
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+    window.addEventListener('blur', onPointerLeave);
+
+    // both shapes the slot takes — a scene alone, and the ink between two — with the ink and both
+    // scenes drawn once ahead. One source and invert, so one shader of the matte
+    const shapes: StageDirectorShape[] = [
+      ['layer', 'layer'],
+      [inkIn, 'layer'],
+    ];
+    const precompiled = director
+      .precompile(renderer, shapes, {layers: [title.stage, hall.stage, edge.stage, blots.stage]})
+      .catch((error: unknown) => {
+        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
+        console.error('stage-masks-matte-ink: precompile() failed, the shaders build on first use', error);
+      });
+
+    // the card of the lookbook: the ink held at a frame where the blots have met
+    if (isPreview) {
+      settings.cycle = false;
+      settings.progress = 0.55;
+      settings.scrub = true;
+      setScrub();
+    }
+
+    let previewTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    display.onDispose(() => {
+      clearTimeout(previewTimeout);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('blur', onPointerLeave);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerleave', onPointerLeave);
+      gui.destroy();
+      // the director lets go of the layers and of the mask stage first, then each goes
+      director.dispose();
+      ink.dispose();
+      blots.dispose();
+      edge.dispose();
+      title.dispose();
+      hall.dispose();
+      disposeDrownedHouseAssets(assets);
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

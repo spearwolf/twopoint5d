@@ -141,7 +141,7 @@
     {
       "name": "Stage masks",
       "tagId": "stage-masks",
-      "includeTags": ["StageMask", "createMaskNode", "masks"]
+      "includeTags": ["StageMask", "createMaskNode", "matte", "masks"]
     },
     {
       "name": "Vertex Objects",
