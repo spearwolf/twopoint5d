@@ -1,6 +1,6 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from 'chai';
-import {PanControl2D} from '@spearwolf/twopoint5d';
+import {OnPanControl2DRestoreCursor, PanControl2D} from '@spearwolf/twopoint5d';
 import {pointer, key, makeState} from './helpers/fixtures.js';
 
 // the key PanControl2D moves north by default, as the init of a key event: the
@@ -44,7 +44,7 @@ describe('PanControl2D — what it gives back when an input source is switched o
     control = new PanControl2D({state: makeState(), cursorStylesTarget: target});
 
     let restores = 0;
-    on(control, 'restoreCursor', () => {
+    on(control, OnPanControl2DRestoreCursor, () => {
       restores += 1;
     });
 

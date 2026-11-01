@@ -211,7 +211,7 @@ the controller finds the request it heard about settled, and its call joins the 
 
 ### 3.3 The event
 
-`src/events.ts` gains `OnDisplayFullscreenChange = 'fullscreenChange'` and its interface:
+`src/events.ts` gains `OnDisplayFullscreenChange = 'displayFullscreenChange'` and its interface:
 
 ```ts
 export interface DisplayFullscreenChangeProps {

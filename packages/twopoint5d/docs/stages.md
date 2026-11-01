@@ -1947,6 +1947,11 @@ renderer gives back what it got and joins no holder.
 All event names are exported from `@spearwolf/twopoint5d`; subscribe with `on()` from
 `@spearwolf/eventize`.
 
+Each name carries its emitter — `OnCanvas2DStageResize` is `'canvas2DStageResize'` —, so a
+listener object whose methods are keyed by the constants hears only the emitter it subscribes to.
+`OnStageDispose` and `OnCanvas2DStageDispose` share `'dispose'`: every stage of the library
+announces its end under that one name.
+
 | emitter | event | when, and what it carries |
 | --- | --- | --- |
 | `StageRenderer` | `OnStageAdded`, `OnStageRemoved` | at the parent, with `{stage, renderer}` |

@@ -8,18 +8,24 @@ import type {StageDirector} from './stage/StageDirector.js';
 import type {StageRenderer} from './stage/StageRenderer.js';
 import type {StageTransition} from './stage/StageTransition.js';
 
+// the value of every constant below is its name without `On`, the first letter in lower case. It
+// names the emitter, so two emitters never share a name by accident, and a listener object whose
+// methods are keyed by these names hears only the emitter it hangs on. The one exception is
+// 'dispose', under which every stage of the library — Stage2D, StageRenderer, StageMaskWorldStage,
+// Canvas2DStage — announces its end
+
 // ------------------------------------------------------------
 
-export const OnDisplayResize = 'resize';
-export const OnDisplayRenderFrame = 'renderFrame';
+export const OnDisplayResize = 'displayResize';
+export const OnDisplayRenderFrame = 'displayRenderFrame';
 
-export const OnDisplayInit = 'init';
-export const OnDisplayStart = 'start';
-export const OnDisplayRestart = 'restart';
-export const OnDisplayPause = 'pause';
-export const OnDisplayDispose = 'dispose';
-export const OnDisplayError = 'error';
-export const OnDisplayFullscreenChange = 'fullscreenChange';
+export const OnDisplayInit = 'displayInit';
+export const OnDisplayStart = 'displayStart';
+export const OnDisplayRestart = 'displayRestart';
+export const OnDisplayPause = 'displayPause';
+export const OnDisplayDispose = 'displayDispose';
+export const OnDisplayError = 'displayError';
+export const OnDisplayFullscreenChange = 'displayFullscreenChange';
 
 export interface IOnDisplayResize {
   [OnDisplayResize](props: DisplayEventProps): void;
@@ -145,6 +151,9 @@ export interface IStageAfterSceneChanged {
  * before the stage stops listening. A `StageRenderer` listens for it on every eventized stage it
  * holds and takes that stage out; a stage of your own that emits it from its `dispose()` gets the
  * same treatment.
+ *
+ * Shares its name, `'dispose'`, with {@link OnCanvas2DStageDispose}: every stage of the library
+ * announces its end under that one name, so a listener of it hears the end of any of them.
  */
 export const OnStageDispose = 'dispose';
 
@@ -199,13 +208,18 @@ export interface IStageTransitionEnd {
  * Emitted by `Canvas2DStage#render()`, with the stage, when the canvas has another size than at
  * the previous `render()`; the first `render()` counts as a change.
  */
-export const OnCanvas2DStageResize = 'resize';
+export const OnCanvas2DStageResize = 'canvas2DStageResize';
 /**
  * Emitted by every `Canvas2DStage#render()`, with the stage, before the canvas is uploaded: the
  * moment to draw into the canvas and set `needsUpdate`.
  */
-export const OnCanvas2DStageRender = 'render';
-/** Emitted once by `Canvas2DStage#dispose()`, with the stage, before it stops listening. */
+export const OnCanvas2DStageRender = 'canvas2DStageRender';
+/**
+ * Emitted once by `Canvas2DStage#dispose()`, with the stage, before it stops listening.
+ *
+ * Shares its name, `'dispose'`, with {@link OnStageDispose}: every stage of the library announces
+ * its end under that one name, so a listener of it hears the end of any of them.
+ */
 export const OnCanvas2DStageDispose = 'dispose';
 
 export interface ICanvas2DStageResize {
@@ -227,18 +241,18 @@ export interface ICanvas2DStageDispose {
  * after a state was assigned to `panView`, whether it moved or not. A disposed control
  * emits it no more.
  */
-export const OnPanControl2DUpdate = 'update';
+export const OnPanControl2DUpdate = 'panControl2DUpdate';
 /**
  * Emitted by `PanControl2D`, with the control, when a mouse drag with the pan button starts to move
  * and the control hides the cursor.
  */
-export const OnPanControl2DHideCursor = 'hideCursor';
+export const OnPanControl2DHideCursor = 'panControl2DHideCursor';
 /**
  * Emitted by `PanControl2D`, with the control, when a cursor it hid comes back — the pan button
  * goes up, the browser cancels the pointer, the pointer is switched off, the control unsubscribes
  * or is disposed. A cursor it never hid is not reported.
  */
-export const OnPanControl2DRestoreCursor = 'restoreCursor';
+export const OnPanControl2DRestoreCursor = 'panControl2DRestoreCursor';
 
 /** Where `PanControl2D#update()` moved the view to: a new object for every event, the listener may keep it. */
 export interface PanControl2DUpdateProps {

@@ -17,25 +17,37 @@ const indexKey: typeof voIndex = voIndex;
 // (the section on vertex-objects/) has the numbers and says why the accessors are not generated per
 // descriptor
 //
-// every accessor below takes for granted what it does not check: a vertex object alive in its
-// pool has its buffer, that buffer holds its typed array and lists the record of every buffer of
-// its descriptor at the position the accessor was built with. These accessors run per sprite
-// and per frame, so they assert it (`!`) rather than pay for a check on every value
-const makeAttributeGetter = (bufferIndex: number, instanceOffset: number, attrOffset: number) => {
+// every accessor below checks one thing and takes the rest for granted. A vertex object its pool
+// has let go of has no buffer, and the accessor answers it with an error that names the accessor
+// — one compare per call, the error built out of line. A vertex object alive in its pool has its
+// buffer, that buffer holds its typed array and lists the record of every buffer of its
+// descriptor at the position the accessor was built with: these accessors run per sprite and per
+// frame, so they assert that (`!`) rather than check it. Each factory binds the name of its
+// accessor, so no call builds a string
+
+// built out of line: the accessors carry one compare, and the call that builds the error never
+// runs on the hot path
+function releasedError(accessor: string): Error {
+  return new Error(
+    `VO#${accessor} is not available: this vertex object has been released by its pool — by freeVO(), by a usedCount or a resize() that left its slot behind, or by dispose()`,
+  );
+}
+
+const makeAttributeGetter = (bufferIndex: number, instanceOffset: number, attrOffset: number, subject: string) => {
   return function getAttribute(this: VO) {
-    // the vertex object is alive in its pool: see above the factories
+    const buffer = this[bufferKey];
+    if (buffer === undefined) throw releasedError(subject);
     const idx = this[indexKey] * instanceOffset + attrOffset;
-    const buf = this[bufferKey]!.bufferList[bufferIndex]!;
-    return buf.typedArray![idx];
+    return buffer.bufferList[bufferIndex]!.typedArray![idx];
   };
 };
 
-const makeAttributeSetter = (bufferIndex: number, instanceOffset: number, attrOffset: number) => {
+const makeAttributeSetter = (bufferIndex: number, instanceOffset: number, attrOffset: number, subject: string) => {
   return function setAttribute(this: VO, value: number) {
-    // the vertex object is alive in its pool: see above the factories
+    const buffer = this[bufferKey];
+    if (buffer === undefined) throw releasedError(subject);
     const idx = this[indexKey] * instanceOffset + attrOffset;
-    const buf = this[bufferKey]!.bufferList[bufferIndex]!;
-    buf.typedArray![idx] = value;
+    buffer.bufferList[bufferIndex]!.typedArray![idx] = value;
   };
 };
 
@@ -49,10 +61,12 @@ const makeAttributeValuesGetter = (
   getterName: string,
 ) => {
   const count = vertexCount * attrSize;
+  const subject = `${getterName}()`;
   return function getAttributeValues(this: VO, target?: TypedArray | number[]) {
-    // the vertex object is alive in its pool: see above the factories
+    const buffer = this[bufferKey];
+    if (buffer === undefined) throw releasedError(subject);
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
-    const buf = this[bufferKey]!.bufferList[bufferIndex]!;
+    const buf = buffer.bufferList[bufferIndex]!;
     const source = buf.typedArray!;
     if (target != null && target.length < count) {
       throw new RangeError(`${getterName}(): the target holds ${target.length} values, attribute "${attrName}" has ${count}`);
@@ -101,6 +115,7 @@ const makeFixedAttributeValueSetter = (
   vertexCount: number,
   attrOffset: number,
   attrSize: number,
+  subject: string,
 ) => {
   const count = vertexCount * attrSize;
   const offsetOf = (k: number) => Math.floor(k / attrSize) * bufferItemSize + (k % attrSize);
@@ -111,9 +126,10 @@ const makeFixedAttributeValueSetter = (
   // declared one by one, not as a rest parameter: a rest parameter allocates a fresh array on
   // every call, and these setters run per sprite and per frame
   return function setAttributeValues(this: VO, v0?: number | ArrayLike<number>, v1?: number, v2?: number, v3?: number) {
-    // the vertex object is alive in its pool: see above the factories
+    const buffer = this[bufferKey];
+    if (buffer === undefined) throw releasedError(subject);
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
-    const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
+    const target = buffer.bufferList[bufferIndex]!.typedArray!;
     if (typeof v0 === 'object' && v0 !== null) {
       writeValues(target, idx, v0, vertexCount, bufferItemSize, attrSize);
       return;
@@ -134,6 +150,7 @@ const makeWideAttributeValueSetter = (
   vertexCount: number,
   attrOffset: number,
   attrSize: number,
+  subject: string,
 ) => {
   const count = vertexCount * attrSize;
   // one offset for each of the sixteen parameters, those beyond the attribute included, like o0 … o3
@@ -159,9 +176,10 @@ const makeWideAttributeValueSetter = (
     v14?: number,
     v15?: number,
   ) {
-    // the vertex object is alive in its pool: see above the factories
+    const buffer = this[bufferKey];
+    if (buffer === undefined) throw releasedError(subject);
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
-    const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
+    const target = buffer.bufferList[bufferIndex]!.typedArray!;
     if (typeof v0 === 'object' && v0 !== null) {
       writeValues(target, idx, v0, vertexCount, bufferItemSize, attrSize);
       return;
@@ -195,12 +213,14 @@ const makeAttributeValueSetter = (
   vertexCount: number,
   attrOffset: number,
   attrSize: number,
+  subject: string,
 ) => {
   const count = vertexCount * attrSize;
   return function setAttributeValues(this: VO) {
-    // the vertex object is alive in its pool: see above the factories
+    const buffer = this[bufferKey];
+    if (buffer === undefined) throw releasedError(subject);
     const idx = this[indexKey] * vertexCount * bufferItemSize + attrOffset;
-    const target = this[bufferKey]!.bufferList[bufferIndex]!.typedArray!;
+    const target = buffer.bufferList[bufferIndex]!.typedArray!;
     // biome-ignore lint/complexity/noArguments: see the comment above the factory
     const first: unknown = arguments[0];
     if (typeof first === 'object' && first !== null) {
@@ -236,8 +256,8 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
           property.name,
           {
             enumerable: true,
-            get: makeAttributeGetter(bufferIndex, instanceOffset, attrOffset),
-            set: makeAttributeSetter(bufferIndex, instanceOffset, attrOffset),
+            get: makeAttributeGetter(bufferIndex, instanceOffset, attrOffset, property.name),
+            set: makeAttributeSetter(bufferIndex, instanceOffset, attrOffset, property.name),
           },
         ];
       }
@@ -261,16 +281,31 @@ export function createVertexObjectPrototype(voBuffer: VertexObjectBuffer): objec
       }
 
       const count = descriptor.vertexCount * attr.size;
+      const subject = `${property.name}()`;
       return [
         property.name,
         {
           enumerable: true,
           value:
             count <= FIXED_SETTER_VALUES
-              ? makeFixedAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size)
+              ? makeFixedAttributeValueSetter(
+                  bufferIndex,
+                  buf.itemSize,
+                  descriptor.vertexCount,
+                  bufAttr.offset,
+                  attr.size,
+                  subject,
+                )
               : count <= WIDE_SETTER_VALUES
-                ? makeWideAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size)
-                : makeAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size),
+                ? makeWideAttributeValueSetter(
+                    bufferIndex,
+                    buf.itemSize,
+                    descriptor.vertexCount,
+                    bufAttr.offset,
+                    attr.size,
+                    subject,
+                  )
+                : makeAttributeValueSetter(bufferIndex, buf.itemSize, descriptor.vertexCount, bufAttr.offset, attr.size, subject),
         },
       ];
     },

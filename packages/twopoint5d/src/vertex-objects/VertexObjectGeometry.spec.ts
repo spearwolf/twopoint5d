@@ -1,6 +1,10 @@
+import {createSandbox} from 'sinon';
 import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {BufferGeometry} from 'three/webgpu';
+import {afterEach, describe, expect, test} from 'vitest';
 
+import {VOBufferGeometry} from './VOBufferGeometry.js';
+import {VOBufferPool} from './VOBufferPool.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
@@ -167,6 +171,69 @@ describe('VertexObjectGeometry', () => {
       const build = () => new VertexObjectGeometry(pool, 10);
       expect(build, 'the message names the class').toThrow(/VOBufferGeometry/);
       expect(build, 'the message names the state').toThrow(/disposed/);
+    });
+  });
+
+  describe('a constructor that throws', () => {
+    const sandbox = createSandbox();
+
+    afterEach(() => sandbox.restore());
+
+    /** The pools built for `descriptor` that `dispose` saw a call on, each once. */
+    const disposedPoolsOf = (dispose: {thisValues: unknown[]}, descriptor: VertexObjectDescriptor) => [
+      ...new Set((dispose.thisValues as VOBufferPool[]).filter((pool) => pool.descriptor === descriptor)),
+    ];
+
+    // the descriptor has indices, so setIndex() runs through before the first setAttribute()
+    const failSetAttribute = () => sandbox.stub(BufferGeometry.prototype, 'setAttribute').throws(new Error('setAttribute'));
+
+    test('new VOBufferGeometry() disposes the pool it built from the descriptor', () => {
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+      failSetAttribute();
+
+      expect(() => new VOBufferGeometry(descriptor, 10)).toThrow('setAttribute');
+
+      const built = disposedPoolsOf(dispose, descriptor);
+      expect(built).toHaveLength(1);
+      expect(built[0]!.isDisposed).toBe(true);
+    });
+
+    test('new VOBufferGeometry() leaves a pool handed in alive and unattached', () => {
+      const handedIn = new VertexObjectPool<VO>(descriptor, 10);
+      const setAttribute = failSetAttribute();
+
+      expect(() => new VOBufferGeometry(handedIn, 10)).toThrow('setAttribute');
+      setAttribute.restore();
+
+      expect(handedIn.isDisposed).toBe(false);
+      expect(handedIn.isAttachedToGeometry).toBe(false);
+      expect(() => handedIn.resize(20)).not.toThrow();
+      expect(handedIn.capacity).toBe(20);
+    });
+
+    test('new VertexObjectGeometry() disposes the VertexObjectPool it built from the descriptor', () => {
+      const dispose = sandbox.spy(VOBufferPool.prototype, 'dispose');
+      failSetAttribute();
+
+      expect(() => new VertexObjectGeometry(descriptor, 10)).toThrow('setAttribute');
+
+      const built = disposedPoolsOf(dispose, descriptor);
+      expect(built).toHaveLength(1);
+      expect(built[0]).toBeInstanceOf(VertexObjectPool);
+      expect(built[0]!.isDisposed).toBe(true);
+    });
+
+    test('new VertexObjectGeometry() leaves a pool handed in alive and unattached', () => {
+      const handedIn = new VertexObjectPool<VO>(descriptor, 10);
+      const setAttribute = failSetAttribute();
+
+      expect(() => new VertexObjectGeometry(handedIn, 10)).toThrow('setAttribute');
+      setAttribute.restore();
+
+      expect(handedIn.isDisposed).toBe(false);
+      expect(handedIn.isAttachedToGeometry).toBe(false);
+      expect(() => handedIn.resize(20)).not.toThrow();
+      expect(handedIn.capacity).toBe(20);
     });
   });
 });

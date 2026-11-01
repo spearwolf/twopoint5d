@@ -1,6 +1,6 @@
 import {describe, expect, expectTypeOf, test, vi} from 'vitest';
 import {createTypedArray} from './createTypedArray.js';
-import type {VertexObjectDescription, VOAttrGetter, VOAttrSetter} from './types.js';
+import type {VertexObjectDescription, VO, VOAttrGetter, VOAttrSetter} from './types.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
@@ -604,5 +604,145 @@ describe('how the generated accessors reach their buffer', () => {
     pool.dispose();
 
     expect(buffer.bufferList.length).toBe(0);
+  });
+});
+
+describe('a vertex object its pool has let go of', () => {
+  const RELEASED = 'is not available: this vertex object has been released by its pool';
+  const X_MESSAGE =
+    'VO#x is not available: this vertex object has been released by its pool — by freeVO(), by a usedCount or a resize() that left its slot behind, or by dispose()';
+
+  interface InstanceVO {
+    rotation: number;
+    x: number;
+    y: number;
+    z: number;
+    setInstancePosition(x: number, y: number, z: number): void;
+    getInstancePosition(target?: Float32Array): Float32Array;
+  }
+
+  interface QuadVO {
+    setPosition(...values: number[]): void;
+    setColor(...values: number[]): void;
+  }
+
+  // one value per accessor factory: a single value through a getter and a setter, a fixed setter
+  // of three values and a getter of all values
+  const instanceDescription: VertexObjectDescription = {
+    vertexCount: 1,
+    attributes: {
+      rotation: {size: 1},
+      instancePosition: {components: ['x', 'y', 'z']},
+    },
+  };
+
+  // a wide setter of fifteen values and one of twenty that reads `arguments`
+  const quadDescription: VertexObjectDescription = {
+    vertexCount: 5,
+    attributes: {
+      position: {components: ['x', 'y', 'z']},
+      color: {size: 4},
+    },
+  };
+
+  const releasedInstance = () => {
+    const pool = new VertexObjectPool<InstanceVO>(instanceDescription, 2);
+    const vo = pool.createVO()!;
+    pool.freeVO(vo);
+    return vo;
+  };
+
+  const releasedQuad = () => {
+    const pool = new VertexObjectPool<QuadVO>(quadDescription, 2);
+    const vo = pool.createVO()!;
+    pool.freeVO(vo);
+    return vo;
+  };
+
+  const catchError = (access: () => unknown): Error => {
+    try {
+      access();
+    } catch (error) {
+      return error as Error;
+    }
+    throw new Error('the access did not throw');
+  };
+
+  test.each<[string, string, () => unknown]>([
+    ['reading', 'VO#rotation', () => releasedInstance().rotation],
+    [
+      'writing',
+      'VO#rotation',
+      () => {
+        releasedInstance().rotation = 1;
+      },
+    ],
+    ['reading', 'VO#x', () => releasedInstance().x],
+    [
+      'writing',
+      'VO#x',
+      () => {
+        releasedInstance().x = 1;
+      },
+    ],
+    ['calling', 'VO#getInstancePosition()', () => releasedInstance().getInstancePosition()],
+    ['calling', 'VO#setInstancePosition()', () => releasedInstance().setInstancePosition(1, 2, 3)],
+    ['calling', 'VO#setPosition()', () => releasedQuad().setPosition(1, 2, 3)],
+    [
+      'calling',
+      'VO#setColor()',
+      () => releasedQuad().setColor(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20),
+    ],
+  ])('%s %s throws an Error that names it', (_, subject, access) => {
+    const error = catchError(access);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(TypeError);
+    expect(error.message.startsWith(`${subject} ${RELEASED}`), error.message).toBe(true);
+  });
+
+  test('the message of VO#x, read and written', () => {
+    const vo = releasedInstance();
+
+    expect(() => vo.x).toThrow(X_MESSAGE);
+    expect(() => {
+      vo.x = 1;
+    }).toThrow(X_MESSAGE);
+  });
+
+  test.each<[string, (pool: VertexObjectPool<InstanceVO>, vo: InstanceVO & VO) => void]>([
+    ['freeVO()', (pool, vo) => pool.freeVO(vo)],
+    [
+      'a usedCount that leaves its slot behind',
+      (pool) => {
+        pool.usedCount = 0;
+      },
+    ],
+    ['a resize() that leaves its slot behind', (pool) => pool.resize(0)],
+    ['dispose()', (pool) => pool.dispose()],
+  ])('the same message after %s', (_, release) => {
+    const pool = new VertexObjectPool<InstanceVO>(instanceDescription, 2);
+    const vo = pool.createVO()!;
+
+    release(pool, vo);
+
+    expect(() => vo.x).toThrow(X_MESSAGE);
+  });
+
+  test('a vertex object alive in the same pool reads and writes on', () => {
+    const pool = new VertexObjectPool<InstanceVO>(instanceDescription, 2);
+    const released = pool.createVO()!;
+    const alive = pool.createVO()!;
+    alive.x = 1;
+
+    pool.freeVO(released);
+
+    expect(alive.x).toBe(1);
+    alive.x = 2;
+    alive.rotation = 3;
+    alive.setInstancePosition(4, 5, 6);
+    expect(alive.rotation).toBe(3);
+    expect(Array.from(alive.getInstancePosition())).toEqual([4, 5, 6]);
+    expect(() => released.x).toThrow(X_MESSAGE);
   });
 });

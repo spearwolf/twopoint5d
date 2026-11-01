@@ -1,6 +1,6 @@
 import {emit, on} from '@spearwolf/eventize';
 import {expect} from 'chai';
-import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
+import {OnPanControl2DUpdate, PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
 import {pointer, key, makeState} from './helpers/fixtures.js';
 
 // the default keys of PanControl2D, in the order the class reads them: up, down, left, right —
@@ -117,7 +117,7 @@ describe('PanControl2D — the contract after dispose()', () => {
     control = new PanControl2D({state: makeState()});
 
     let updates = 0;
-    on(control, 'update', () => {
+    on(control, OnPanControl2DUpdate, () => {
       updates += 1;
     });
 
@@ -128,7 +128,7 @@ describe('PanControl2D — the contract after dispose()', () => {
 
     // update() of a disposed control emits nothing, so a direct emit is what shows
     // whether the listener is still there
-    emit(control, 'update', {x: 0, y: 0});
+    emit(control, OnPanControl2DUpdate, {x: 0, y: 0});
 
     expect(updates, 'after dispose()').to.equal(1);
   });

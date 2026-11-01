@@ -2202,7 +2202,7 @@ export class Display {
     });
 
   /**
-   * Subscribes `listener` to the `error` event: the renderer of this display did not come up,
+   * Subscribes `listener` to `OnDisplayError`: the renderer of this display did not come up,
    * and no frame is going to follow.
    *
    * The event is retained, so a listener attached after the failure is told about it too.

@@ -133,8 +133,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    *
    * If the new capacity is larger, the pool will be able to hold more vertex objects.
    * If it is smaller, every vertex object from the new capacity onwards is unlinked from its
-   * buffer — any further read or write on such a vertex object fails. The `usedCount` is
-   * capped at the new capacity.
+   * buffer — any further read or write on such a vertex object throws an `Error` that names
+   * the accessor. The `usedCount` is capped at the new capacity.
    *
    * @throws a `RangeError` that names the value when `capacity` is no integer of 0 or more
    */

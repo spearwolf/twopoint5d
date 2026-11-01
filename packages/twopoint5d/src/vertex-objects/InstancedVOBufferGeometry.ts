@@ -233,7 +233,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * a pool whose attributes would take a slot this geometry has already had an attribute in is
    * refused. The gpu buffer of a displaced attribute could never be handed back — three.js frees
    * one attribute per name, the one sitting in the slot when the geometry is disposed. Give such
-   * a pool attribute names of its own, or build a second geometry for it.
+   * a pool attribute names of its own, or build a second geometry for it. A route detached later
+   * keeps its gpu memory until the geometry is disposed — see {@link detachInstancedPool}.
    *
    * Handing the same pool back under the name it already has changes nothing: every attribute
    * stays where it is, and an `autoDispose` passed along with it still takes effect.
@@ -384,6 +385,13 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * After `dispose()` every name is free: this answers `undefined` for any `name`, the way it
    * does before a route was ever attached under it.
+   *
+   * The gpu memory of the attributes this route built stays in use until this geometry is
+   * disposed: three.js frees the gpu buffer of an attribute only through the dispose event of the
+   * geometry, and the slot keeps the attribute, with an empty array, until then. A long-lived
+   * geometry that attaches and detaches pools under new attribute names again and again holds the
+   * gpu buffers of every one of them until `dispose()` — for changes like that, build a new
+   * geometry.
    *
    * @returns the pool that was attached under `name`, or `undefined` if the name was free.
    */

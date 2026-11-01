@@ -346,7 +346,8 @@ export interface VertexObjectBuffersData {
   usedCount: number;
   /**
    * The typed array of each buffer, keyed by buffer name, each in the layout of its buffer:
-   * `itemSize` elements per vertex, the padding behind an attribute included.
+   * `itemSize` elements per vertex, the padding behind an attribute included. Read by own
+   * property: a buffer this record does not hold as an own property gets a fresh array.
    */
   buffers: Record<string, TypedArray>;
 }

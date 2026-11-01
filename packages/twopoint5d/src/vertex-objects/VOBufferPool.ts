@@ -131,7 +131,8 @@ export class VOBufferPool {
    *
    * A lower value gives up the slots above it: on a `VertexObjectPool` every vertex object
    * sitting in one of them is let go of, as `VertexObjectPool#freeVO` would, and every
-   * further read or write through it fails. The data in the buffer stays where it is.
+   * further read or write through it throws an `Error` that names the accessor. The data in
+   * the buffer stays where it is.
    *
    * A write falls through on a disposed pool, which has no slot left to count: the getter
    * goes on answering `0`.
@@ -208,7 +209,8 @@ export class VOBufferPool {
    * so the underlying `ArrayBuffer`s can be reclaimed by the garbage collector
    * even if downstream `THREE.BufferAttribute`s temporarily still hold a copy of
    * the array reference. After `dispose()` the pool is **dead**: any further
-   * read/write operation on its vertex objects will fail, {@link createFromAttributes},
+   * read or write on its vertex objects throws an `Error` that names the accessor,
+   * {@link createFromAttributes},
    * {@link toBuffersData} and {@link fromBuffersData} throw, {@link availableCount} is `0`,
    * and on a `VertexObjectPool` `createVO()` answers `undefined` while `resize()`
    * throws. The method is idempotent.

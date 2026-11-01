@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpriteResources#setTexture()`, `FeatureSpritesMaterial#setTexture()` and `FeatureSprites#setTexture()`, and the `textures` of their options, refuse a value that is neither a three.js texture (`isTexture`) nor `undefined` or `null` with a `TypeError` that names the texture, before a texture changes; `null` unsets a texture as `undefined` does, and `getTexture()` answers `undefined` for it
 - a segment placement refuses a feature named `rotation` or `shear` as it refuses `Rotation` and `Shear`, judged by name as `NineSlice` is
 - `BitmapFont#info` and `BitmapFont#common` are frozen copies all the way down: `info.padding`, `info.spacing` and a `charset` list are frozen lists of their own, and `BitmapFontInfo` types them `readonly` — a write into them throws, and the font data handed in shares no list with the font (**BREAKING**). See the Migration Guide
+- change the values of the event constants of `Display`, `Canvas2DStage` and `PanControl2D`: each is the name of its constant without `On` — `OnDisplayResize` is `'displayResize'`, `OnDisplayRenderFrame` `'displayRenderFrame'`, `OnDisplayInit` `'displayInit'`, `OnDisplayStart` `'displayStart'`, `OnDisplayRestart` `'displayRestart'`, `OnDisplayPause` `'displayPause'`, `OnDisplayDispose` `'displayDispose'`, `OnDisplayError` `'displayError'`, `OnCanvas2DStageResize` `'canvas2DStageResize'`, `OnCanvas2DStageRender` `'canvas2DStageRender'`, `OnPanControl2DUpdate` `'panControl2DUpdate'`, `OnPanControl2DHideCursor` `'panControl2DHideCursor'` and `OnPanControl2DRestoreCursor` `'panControl2DRestoreCursor'`; `OnStageDispose` and `OnCanvas2DStageDispose` keep `'dispose'`, under which every stage of the library announces its end. A listener through the constants, computed keys or `display.onResize()` and the other `on…()` methods changes nothing; one through a string or a listener object with methods under the old names does (**BREAKING**). See the Migration Guide
 
 ### Deprecated
 
@@ -72,6 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AtlasTextureResource` reads `meta` and `meta.image` of an `atlasJson` written from outside without a raw throw: a `meta` that is no object or a `meta.image` that is no string names no image, and beside an `overrideImageUrl` a `meta` that is no object is reported as an `error` with `source: 'texture'`
 - a `TextureResource` reports a listener of the `dispose` event of a texture it lets go of — one a new image replaced, or one taken back with its image — that throws as an `error` event with `source: 'texture'`, after an error of the publish it goes with, each as an event of its own
 - `gridBase()` holds a base only while a kind, its geometries or the caller hold it: a grid nothing holds is let go and built anew by the next call with its options, so grid sizes derived from data hold no more bases than are in use
+- `VOBufferGeometry` and `VertexObjectGeometry` whose constructor throws dispose a pool they built from a descriptor or a description and leave a pool handed in alive and unattached, so `VertexObjectPool#resize()` takes it again
+- a pool built from buffers data takes a buffer only from an own property of `buffers`: a buffer named `constructor`, `toString` or `__proto__` that the data does not hold gets a fresh array
+- every generated accessor of a vertex object its pool has let go of — through `freeVO()`, a `usedCount` or `resize()` that leaves its slot behind, or `dispose()` — throws an `Error` that names the accessor: `VO#x is not available: this vertex object has been released by its pool …`
 
 ### Migration Guide
 
@@ -190,6 +194,24 @@ font.info.padding!.push(0);
 ```ts
 const padding = [...(font.info.padding ?? [])];
 padding.push(0);
+```
+
+#### Event names carry their emitter
+
+A listener through the constants, computed keys or the `on…()` methods of `Display` stays as it is. One that names an event of `Display`, `Canvas2DStage` or `PanControl2D` by a string, or a listener object with methods under those strings, takes the constant.
+
+**Before**
+
+```ts
+on(display, 'resize', ({width, height}) => {});
+on(stage, {render(stage) {}});
+```
+
+**After**
+
+```ts
+on(display, OnDisplayResize, ({width, height}) => {});
+on(stage, {[OnCanvas2DStageRender](stage) {}});
 ```
 
 #### The `three` peer dependency range

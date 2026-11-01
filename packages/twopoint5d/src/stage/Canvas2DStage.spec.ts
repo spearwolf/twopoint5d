@@ -119,13 +119,13 @@ describe('Canvas2DStage', () => {
     stage.render();
 
     expect(log).toEqual([
-      ['resize', stage],
-      ['render', stage],
+      [OnCanvas2DStageResize, stage],
+      [OnCanvas2DStageRender, stage],
     ]);
 
     stage.render();
 
-    expect(log.slice(2), 'a second render() without a size change only renders').toEqual([['render', stage]]);
+    expect(log.slice(2), 'a second render() without a size change only renders').toEqual([[OnCanvas2DStageRender, stage]]);
   });
 
   test('announces its dispose to a listener of ICanvas2DStageDispose with the stage', () => {

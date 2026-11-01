@@ -1,6 +1,6 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from 'chai';
-import {PanControl2D} from '@spearwolf/twopoint5d';
+import {OnPanControl2DRestoreCursor, OnPanControl2DUpdate, PanControl2D} from '@spearwolf/twopoint5d';
 import {pointer, makeState} from './helpers/fixtures.js';
 
 function makeBox({left = 0, width = 200, height = 200} = {}) {
@@ -182,7 +182,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     control = new PanControl2D({state: makeState(), disablePointer: true, disableKeyboard: true});
 
     let updates = 0;
-    on(control, 'update', () => {
+    on(control, OnPanControl2DUpdate, () => {
       updates += 1;
     });
 
@@ -215,7 +215,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     let updates = 0;
     let last;
-    on(control, 'update', (props) => {
+    on(control, OnPanControl2DUpdate, (props) => {
       updates += 1;
       last = props;
     });
@@ -236,7 +236,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     let updates = 0;
     let last;
-    on(control, 'update', (props) => {
+    on(control, OnPanControl2DUpdate, (props) => {
       updates += 1;
       last = props;
     });
@@ -258,7 +258,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     control = new PanControl2D({state, disablePointer: true, disableKeyboard: true});
 
     let updates = 0;
-    on(control, 'update', () => {
+    on(control, OnPanControl2DUpdate, () => {
       updates += 1;
     });
 
@@ -278,7 +278,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     control = new PanControl2D({state: makeState(), cursorStylesTarget: box});
 
     let restores = 0;
-    on(control, 'restoreCursor', () => {
+    on(control, OnPanControl2DRestoreCursor, () => {
       restores += 1;
     });
 

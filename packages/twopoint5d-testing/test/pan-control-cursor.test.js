@@ -1,6 +1,6 @@
 import {on} from '@spearwolf/eventize';
 import {expect} from 'chai';
-import {PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
+import {OnPanControl2DRestoreCursor, PanControl2D, Stylesheets} from '@spearwolf/twopoint5d';
 import {pointer, makeState} from './helpers/fixtures.js';
 
 function makeTarget() {
@@ -79,7 +79,7 @@ describe('PanControl2D — the cursor each control shows while panning', () => {
     const {control, target} = makeControl('grabbing');
 
     let restores = 0;
-    on(control, 'restoreCursor', () => {
+    on(control, OnPanControl2DRestoreCursor, () => {
       restores += 1;
     });
 

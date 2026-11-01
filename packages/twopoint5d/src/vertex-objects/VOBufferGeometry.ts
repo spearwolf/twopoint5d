@@ -36,7 +36,9 @@ export class VOBufferGeometry extends BufferGeometry {
 
   /**
    * @throws when the pool handed in has been disposed and holds no buffers to build attributes
-   *   on. The message names the class and the state, and no geometry comes into being.
+   *   on. The message names the class and the state, and no geometry comes into being. Whatever
+   *   the constructor throws, a pool it built from a descriptor or description is disposed, and a
+   *   pool handed in is left as it was — alive, and not counted as attached.
    */
   constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
     // before super(), so that a geometry which cannot get its attributes never comes into being
@@ -53,12 +55,23 @@ export class VOBufferGeometry extends BufferGeometry {
     if (!(source instanceof VOBufferPool)) {
       this.declareOwnedPool(this.pool);
     }
-    this.#attachments.attach(this.pool);
-    initializeAttributes(this, this.pool, this.#buffers, this.#bufferSerials, this.#slots);
 
-    // the route bundles the maps behind the read-only views, it does not copy them: this geometry
-    // draws one pool and has no halves, so the route carries no group
-    this.#routes.add({pool: this.pool, buffers: this.#buffers, bufferSerials: this.#bufferSerials});
+    try {
+      this.#attachments.attach(this.pool);
+      initializeAttributes(this, this.pool, this.#buffers, this.#bufferSerials, this.#slots);
+
+      // the route bundles the maps behind the read-only views, it does not copy them: this geometry
+      // draws one pool and has no halves, so the route carries no group
+      this.#routes.add({pool: this.pool, buffers: this.#buffers, bufferSerials: this.#bufferSerials});
+    } catch (error) {
+      // a constructor that throws leaves nothing behind: a pool it built goes, and a pool handed
+      // in is no longer counted as attached
+      this.#attachments.detachAll();
+      if (this.#attachments.owns(this.pool)) {
+        this.pool.dispose();
+      }
+      throw error;
+    }
   }
 
   /**

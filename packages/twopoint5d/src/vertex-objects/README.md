@@ -88,6 +88,11 @@ after `createVO()` reaches the GPU with it; a later change to a `'static'` attri
 `pool.touchVO(vo, 'attr')` for that object or `geometry.touch('attr')` for all of them.
 An attribute with `autoTouch` uploads on every `update()`.
 
+A vertex object its pool has let go of — through `freeVO()`, a `usedCount` or a
+`resize()` that leaves its slot behind, or `dispose()` — reads and writes nothing more:
+every generated accessor throws an `Error` that names it, such as `VO#x is not available:
+this vertex object has been released by its pool …`.
+
 ## A quad, step by step
 
 A quad is four vertices and two triangles. The vertices go around the square:

@@ -397,6 +397,28 @@ describe('VertexObjectPool', () => {
       expect(Array.from(pool.getVO(1)!.getFoo())).toEqual([11, 22, 33, 44, 55, 66, 77, 88]);
     });
 
+    test.each(['constructor', 'toString', '__proto__'])(
+      'builds a fresh array for a buffer named %s that the buffers data does not hold',
+      (bufferName) => {
+        const bufferDescriptor = new VertexObjectDescriptor({attributes: {a: {size: 1, bufferName}}});
+
+        const pool = new VertexObjectPool<VO>(bufferDescriptor, {capacity: 2, usedCount: 0, buffers: {}});
+
+        const array = pool.buffer.buffers.get(bufferName)!.typedArray;
+        expect(array).toBeInstanceOf(Float32Array);
+        expect(array).toHaveLength(2);
+      },
+    );
+
+    test('takes the array of a buffer named constructor from buffers data that holds it', () => {
+      const bufferDescriptor = new VertexObjectDescriptor({attributes: {a: {size: 1, bufferName: 'constructor'}}});
+      const source = new VertexObjectPool<VO>(bufferDescriptor, 2);
+
+      const pool = new VertexObjectPool<VO>(bufferDescriptor, source.toBuffersData());
+
+      expect(pool.buffer.buffers.get('constructor')!.typedArray).toBe(source.buffer.buffers.get('constructor')!.typedArray);
+    });
+
     test('the swap path leaves no stale vertex object behind in the vacated slot', () => {
       const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
 

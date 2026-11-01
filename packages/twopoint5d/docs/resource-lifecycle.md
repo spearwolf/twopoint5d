@@ -51,10 +51,12 @@ built on the canvas afterwards brings it back; a `WebGPURenderer` or a
 `getContext('webgl2')` of the caller's own on that canvas gets the lost context. A
 `Display` constructor that throws after it has built or taken over its renderer leaves
 nothing behind — it releases the renderer, gives a canvas handed in back and takes its own
-container out, as `dispose()` would. The constructors of `InstancedVOBufferGeometry` and
-`InstancedVertexObjectGeometry` and `InstancedVOBufferGeometry#attachInstancedPool()` do
-the same for the pools they build from a descriptor or a description: one that throws
-disposes them and leaves a pool handed in as it was.
+container out, as `dispose()` would. The constructors of `VOBufferGeometry`,
+`VertexObjectGeometry`, `InstancedVOBufferGeometry` and `InstancedVertexObjectGeometry`,
+and `InstancedVOBufferGeometry#attachInstancedPool()`, do the same for the pools they
+build from a descriptor or a description: one that throws disposes them and leaves a pool
+handed in as it was — alive, and not counted as attached, so its `resize()` takes it
+again.
 
 Reference implementation —
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) marks what it built and
@@ -405,6 +407,13 @@ cache key. A long-lived material that many short-lived meshes share therefore gr
 one `RenderObject` per mesh until it is disposed itself — dispose it along with the last
 of them, or accept the growth. `vertex-objects-heap.test.js` in
 `packages/twopoint5d-testing` measures it.
+
+**A detached route holds its gpu buffers until its geometry goes.**
+`InstancedVOBufferGeometry#detachInstancedPool()` lets go of the typed arrays of the
+route, but three frees a gpu buffer only through the dispose event of the geometry, one
+attribute per name: the slot keeps the attribute, with an empty array, and its gpu buffer
+stays until `dispose()`. A long-lived geometry that changes its pools under new attribute
+names grows by one gpu buffer per name — build a new geometry for changes like that.
 
 ## 6. Checklist for a new `dispose()`
 

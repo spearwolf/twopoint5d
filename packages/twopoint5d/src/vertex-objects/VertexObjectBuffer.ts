@@ -369,7 +369,10 @@ export class VertexObjectBuffer {
     itemSize: number,
   ): TypedArray {
     const length = this.capacity * this.descriptor.vertexCount * itemSize;
-    const array = buffersData?.buffers[bufferName];
+    // a buffer name is free text of the description: in a plain object, `constructor` or `__proto__`
+    // would find a member of Object.prototype rather than nothing
+    const array =
+      buffersData != null && Object.hasOwn(buffersData.buffers, bufferName) ? buffersData.buffers[bufferName] : undefined;
     if (array == null) {
       return createTypedArray(dataType, length);
     }

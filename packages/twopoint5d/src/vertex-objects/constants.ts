@@ -2,6 +2,8 @@
  * The key of the property through which a vertex object reaches the `VertexObjectBuffer` it
  * reads and writes. `undefined` once its pool has let it go — through `freeVO()`, a `usedCount`
  * or a `resize()` that leaves its slot behind, or `dispose()`. `VOUtils` reads and writes it.
+ * Every generated accessor answers a vertex object without a buffer with an `Error` that starts
+ * `VO#<accessor> is not available: …`.
  */
 export const voBuffer = Symbol('voBuffer');
 
