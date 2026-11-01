@@ -150,11 +150,12 @@ explicit instruction.
   Bump them there, never in an individual `package.json`. The catalog also holds every
   tool that more than one manifest names — `typescript` (7), `rimraf`, `@types/node`,
   `playwright` —, likewise to be raised only there. The four are peer dependencies of
-  the library; `@types/three` is an optional one (only a TypeScript consumer needs it).
-  The catalog range lands verbatim in the published manifest, and a 0.x minor of `three`
-  breaks, so `three` stays on the tilde — and every `three` bump is a release: until the
-  library publishes, a consumer on the newer `three` meets a peer conflict. The steps of a
-  bump are in [monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions).
+  the library; `@types/three` is an optional one (only a TypeScript consumer
+  needs it). The catalog range lands verbatim in the published manifest,
+  and a 0.x minor of `three` breaks, so `three` stays on the tilde — and
+  every `three` bump is a release: until the library publishes, a consumer
+  on the newer `three` meets a peer conflict. The steps of a bump are in
+  [monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions).
 - **Each package declares what it uses.** A workspace package lists every tool its scripts
   call and every package its code, specs, tests and configs import — type packages
   included — in its own `package.json`. The root lists only what the root scripts,

@@ -487,14 +487,15 @@ jellyfish) at (262, 66), so that the demo's overlays fit both.
 
 ### found-footage
 
-"Found Footage", the art of the demo `stage-masks-shared`, from `stage-masks/found-footage/footage.mjs`
-with `birch.mjs`, `props.mjs` and `ground.mjs`. (The directory is not named after the demo: `shared/`
-is kept for art several demos use.) The birch trunks are shaded pixel by pixel in JavaScript — a
-cylinder lit from the camera, bark noise, lenticels, black patches, the chevrons where branches fell
-off, a fissured base with moss — over twigs drawn as SVG, and the carvings are SVG strokes turned
-into a cut with a lit and a dark lip. The props and the litter of the floor are SVG rasterised by
-sharp's librsvg. Everything is drawn at 2 texels per unit in neutral greys: the demo tints it to
-the green of a camcorder's night shot. No font is used.
+"Found Footage", the art of the demo `stage-masks-shared`, from
+`stage-masks/found-footage/footage.mjs` with `birch.mjs`, `props.mjs` and `ground.mjs`. (The
+directory is not named after the demo: `shared/` is kept for art several demos use.) The birch
+trunks are shaded pixel by pixel in JavaScript — a cylinder lit from the camera, bark noise,
+lenticels, black patches, the chevrons where branches fell off, a fissured base with moss — over
+twigs drawn as SVG, and the carvings are SVG strokes turned into a cut with a lit and a dark lip.
+The props and the litter of the floor are SVG rasterised by sharp's librsvg. Everything is drawn at
+2 texels per unit in neutral greys: the demo tints it to the green of a camcorder's night shot. No
+font is used.
 
 | file | size | what |
 | --- | --- | --- |
@@ -586,21 +587,20 @@ laid over them.
 
 ### matte-3d
 
-"Mirror, Mirror", the art of the demo `stage-masks-matte-3d`, from `stage-masks/matte-3d/matte-3d.mjs`
-and `blender_bathroom.py`. Not drawn but **rendered**: Blender builds a cramped antique bathroom
-from primitives and procedural materials and renders it with Cycles twice, from one camera, so the
-two pictures lie exactly over each other. The camera looks straight at the wall of the medicine
-cabinet and frames lower by a lens shift, not a tilt, so the glass of the mirror is an exact
-rectangle in the picture and the mirror shows the room behind the viewer by a real reflection.
-Cycles renders on a GPU when it finds one (OptiX, CUDA, HIP, oneAPI, Metal) and on the CPU
-otherwise, with a fixed seed and OpenImageDenoise. The picture is the same on every run, the bytes
-are not: a GPU schedules its samples a little differently each time, and two renders differ by a
-few levels in a few pixels (a mean of 0.004 of 255) — the one exception to the byte-for-byte rule
-above. The PNGs land in
-`stage-masks/matte-3d/.render-cache/` (ignored by git), and `--skip-render` reuses them. Units of
-the stage throughout: origin in the middle of the picture, y up, 2 texels per unit, both images
-loaded with the default `flipY`. The shards, the panes and the ouroboros of the mask are no
-asset: the demo builds them as meshes at run time.
+"Mirror, Mirror", the art of the demo `stage-masks-matte-3d`, from
+`stage-masks/matte-3d/matte-3d.mjs` and `blender_bathroom.py`. Not drawn but **rendered**: Blender
+builds a cramped antique bathroom from primitives and procedural materials and renders it with
+Cycles twice, from one camera, so the two pictures lie exactly over each other. The camera looks
+straight at the wall of the medicine cabinet and frames lower by a lens shift, not a tilt, so the
+glass of the mirror is an exact rectangle in the picture and the mirror shows the room behind the
+viewer by a real reflection. Cycles renders on a GPU when it finds one (OptiX, CUDA, HIP, oneAPI,
+Metal) and on the CPU otherwise, with a fixed seed and OpenImageDenoise. The picture is the same on
+every run, the bytes are not: a GPU schedules its samples a little differently each time, and two
+renders differ by a few levels in a few pixels (a mean of 0.004 of 255) — the one exception to the
+byte-for-byte rule above. The PNGs land in `stage-masks/matte-3d/.render-cache/` (ignored by git),
+and `--skip-render` reuses them. Units of the stage throughout: origin in the middle of the picture,
+y up, 2 texels per unit, both images loaded with the default `flipY`. The shards, the panes and the
+ouroboros of the mask are no asset: the demo builds them as meshes at run time.
 
 | file | size | what |
 | --- | --- | --- |
@@ -636,14 +636,15 @@ this holds from 4:3 to 21:9 and in portrait.
 ### portal
 
 "The Painting in the Hallway", the art of the demo `stage-masks-portal`, from
-`stage-masks/portal/portal.mjs` with `kit.mjs` (the numbers of the hallway, a tiling value noise, the
-float image), `hall.mjs` (wall, floor, doors, frame) and `sprites.mjs` (the atlas). The hallway is a
-box in units of the stage — x across (±180), y up (floor −200, ceiling 220), z along the hallway —
-and the demo builds it from planes and lights it per pixel by its sconces, so the wall, the floor and
-the doors are unlit albedo. The patterns are worked out per pixel, 2 × 2 samples per texel, over SVG
-rasterised by sharp's librsvg; the frame is a height field shaded in JavaScript. No font is used: the
-door numbers are strokes of the spotlight's stroke font. The sky, the ridges, the heath and the mist
-of the moor in the painting are no asset: the demo works them out per pixel at run time.
+`stage-masks/portal/portal.mjs` with `kit.mjs` (the numbers of the hallway, a tiling value noise,
+the float image), `hall.mjs` (wall, floor, doors, frame) and `sprites.mjs` (the atlas). The hallway
+is a box in units of the stage — x across (±180), y up (floor −200, ceiling 220), z along the
+hallway — and the demo builds it from planes and lights it per pixel by its sconces, so the wall,
+the floor and the doors are unlit albedo. The patterns are worked out per pixel, 2 × 2 samples per
+texel, over SVG rasterised by sharp's librsvg; the frame is a height field shaded in JavaScript. No
+font is used: the door numbers are strokes of the spotlight's stroke font. The sky, the ridges, the
+heath and the mist of the moor in the painting are no asset: the demo works them out per pixel at
+run time.
 
 | file | size | what |
 | --- | --- | --- |

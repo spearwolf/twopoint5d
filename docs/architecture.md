@@ -115,8 +115,8 @@ the lock over once that process is gone. A second gate goes into a `git worktree
 has a `dist/` and a lock of its own. `ci:gate` called directly takes no lock.
 Ctrl-C reaches the gate once: the terminal sends SIGINT to the whole foreground process
 group, the command included, so the lock hands it on to nobody — Nx and pnpm take a second
-SIGINT for "stop at once". It hands on SIGTERM and SIGHUP; a run is stopped by its pid with
-SIGTERM, while a SIGINT to the pid of the lock alone stops nothing.
+SIGINT for "stop at once". It hands on SIGTERM and SIGHUP; a run is stopped by its pid
+with SIGTERM, while a SIGINT to the pid of the lock alone stops nothing.
 
 - `lint` = `biome ci --error-on-warnings .`: Biome checks the formatting of every `.ts`,
   `.js`, `.mjs`, `.astro`, `.json`, `.jsonc` and `.css` file outside the ignores in
@@ -638,8 +638,8 @@ project directory, `checkPeerDependenciesOnly.mjs` against a throwaway manifest,
 `scripts/ci/auditInstalledDependencies.mjs` against throwaway reports, because their
 exit codes, their messages and the manifest the first one does not write are wiring that
 no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon
-as its arguments fit; `decidePublish()` carries its decision and its spec covers it. No spec
-runs `checkDocSnippets.mjs`, which reads git and the file system.
+as its arguments fit; `decidePublish()` carries its decision and its spec covers it. No
+spec runs `checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 
