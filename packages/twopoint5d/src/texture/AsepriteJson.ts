@@ -261,6 +261,12 @@ const assertSlices = (slices: unknown): void => {
   }
 };
 
+// a key named __proto__ stays an entry of its own — defineProperty defines, an assignment would set
+// the prototype —, as BitmapFont keeps one
+function setOwn<T>(record: Record<string, T>, key: string, value: T): void {
+  Object.defineProperty(record, key, {value, enumerable: true, writable: true, configurable: true});
+}
+
 // the fields assertSlices() checked and nothing else of the json, copied and frozen: a frame shares no
 // object with the json handed in
 const frozenRect = ({x, y, w, h}: AsepriteRect): AsepriteRect => Object.freeze({x, y, w, h});
@@ -291,7 +297,7 @@ const slicesAt = (
       copy = frozenSlice(key);
       frozen.set(key, copy);
     }
-    inForce[slice.name] = copy;
+    setOwn(inForce, slice.name, copy);
   }
   return inForce;
 };
@@ -489,7 +495,11 @@ export class AsepriteJson {
     const frames: Record<string, AsepriteFrameData> = {};
     const frozenSlices = new Map<AsepriteSliceKey, AsepriteFrameSlice>();
     entries.forEach(([name, frameData], index) => {
-      frames[name] = {...frameData, index, slices: Object.freeze(slicesAt(slices as AsepriteSlice[], index, frozenSlices))};
+      setOwn(frames, name, {
+        ...frameData,
+        index,
+        slices: Object.freeze(slicesAt(slices as AsepriteSlice[], index, frozenSlices)),
+      });
     });
     // TexturePackerJson refuses a name twice in the json or taken in the target before it adds a frame
     const [atlas] = TexturePackerJson.parse(

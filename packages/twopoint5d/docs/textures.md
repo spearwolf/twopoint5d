@@ -65,6 +65,7 @@ item, so the json that names an image also says how it is read.
 | `anisotropy-2`, `anisotropy-4` | `anisotropy`, 2 or 4, capped at the maximum of the factory |
 | `no-anisotropy` | `anisotropy`, none |
 | `flipy`, `no-flipy` | `flipY`, `true` or `false` |
+| `mipmaps`, `no-mipmaps` | `generateMipmaps`, `true` or `false` |
 | `srgb`, `linear-srgb` | `colorSpace`, `SRGBColorSpace` or `LinearSRGBColorSpace` |
 | `repeat`, `mirror`, `clamp` | `wrapS` and `wrapT`: `RepeatWrapping`, `MirroredRepeatWrapping`, `ClampToEdgeWrapping` |
 | `repeat-s`, `mirror-s`, `clamp-s` | `wrapS` alone |
@@ -84,6 +85,10 @@ the anisotropy classes.
   from: a texture for a `FeatureSprites` leaves `flipy` out, a texture for a mesh of three.js names
   it. With `flipY = true` every frame of an atlas is read from the wrong place, and nothing reports
   it.
+- A texture of data — ids, a palette, a lookup table — names `nearest` and `no-mipmaps`. three.js
+  builds mip levels for every texture unless told otherwise; under WebGPU it reads a `nearest`
+  texture drawn smaller from them (the sampler takes its `mipmapFilter` from `minFilter`), under
+  WebGL 2 from level 0 alone. Without mip levels both read the texels as they are.
 - A wrap reads beyond the edge of the whole image. It is for an image of its own — a floor, a wall,
   the band of a backdrop; a frame of an atlas repeats within its bounds through
   `sampleAtlasFrame()`, see [the sprite guide](sprites.md#atlas-frames-on-meshes-of-ones-own).

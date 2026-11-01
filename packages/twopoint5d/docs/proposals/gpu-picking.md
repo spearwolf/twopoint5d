@@ -15,7 +15,10 @@ the pointer" and "Performance", and the browser proofs in
 - the snapshot copies the handles without `getVO()`; a slot without a handle gets one only when the
   pick hits it (§4);
 - a mesh whose material is not visible is left out (§3.2);
-- a drawing buffer of no pixels counts as one pixel, so the matrix of §3.3 stays finite (§3.3).
+- a drawing buffer of no pixels counts as one pixel, so the matrix of §3.3 stays finite (§3.3);
+- the pick meshes lie under mirrors of the ClippingGroups above the sprites and in a group with their
+  group order, so a pick clips and orders as the screen does (§3.2);
+- a mesh whose material slot holds no material of its kind without a pass is refused (§3.2, §5).
 
 Phase F, part 3, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.10, the
 card "sprite picking ?"), and the answer to the open point of [`pool-sorting.md`](pool-sorting.md)
@@ -142,14 +145,20 @@ a `Scene` of the picker's own. The geometry is the one the sprites hold when the
 a growth disposes it, and a geometry put into the slot is another one — either way the pick mesh and
 its material go, and the next pick builds both on the geometry the sprites hold then (§5). Before
 every pick it takes from the sprites the world matrix (after `updateWorldMatrix(true, false)` of the
-sprites), `layers` and `renderOrder`.
-`matrixAutoUpdate` and `matrixWorldAutoUpdate` are off on the mesh and the scene, so three does not
-compute the matrix a second time.
+sprites), `layers` and `renderOrder`. Each pick mesh lies in a `Group` of its own, which carries the
+`renderOrder` of the nearest group above the sprites that the camera sees — three's group order —,
+under a mirror of every enabled `ClippingGroup` above the sprites that the camera sees, root first,
+which shares its `clippingPlanes` and `clipIntersection`: the pick clips and orders as the screen
+does. The planes lie in world space, and the camera of the pick has the view of the caller's camera.
+`matrixAutoUpdate` and `matrixWorldAutoUpdate` are off on the mesh, the scene and the groups, so
+three does not compute the matrix a second time.
 
 A listed mesh is **left out** when it is disposed, when it or one of its ancestors is not `visible`,
 when its material is not `visible` — three draws none of these —, and when its pool holds no sprite.
 A mesh listed twice is drawn once, at its first place. Nothing left to draw answers `undefined`
-without a draw.
+without a draw. A listed mesh whose material slot holds no `FeatureSpritesMaterial`, one of another
+kind or one built for a pass is **refused** with a `TypeError` that names its entry: the pick could
+not draw it as the screen does.
 
 ### 3.3 The pixel under the pointer
 
@@ -267,6 +276,13 @@ resolves).
   2²⁴ sprites rejects the pick with a `RangeError` before anything is drawn (`… the entry 0 of the
   list holds 16777217 sprites, and the float target names a slot exactly up to 16777216 — split the
   sprites into meshes of at most 16777216`).
+- A listed mesh whose material slot holds no material of its kind without a pass rejects the pick
+  with a `TypeError` that names its entry, before anything is drawn: no `FeatureSpritesMaterial`
+  (`… the entry 1 of the list holds undefined in its material slot — the picker builds its pick
+  material from the FeatureSpritesMaterial of the sprites`), one of another kind (`… the entry 1 of
+  the list holds a material built for another sprite kind in its material slot`), one built for a
+  pass (`… the entry 1 of the list holds a material built for pass "shadow" in its material slot —
+  the picker draws the sprites themselves; put a material built without a pass there`).
 - **Ownership**: the renderer, the camera and every mesh stay the caller's. The picker owns its
   target, its scene, its camera, its pick meshes and pick materials. A pick material borrows the
   resources of its mesh and does not release them.

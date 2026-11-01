@@ -144,8 +144,9 @@ const catalog: TextureStoreData = {
   items: {
     glass: {imageUrl: 'glass.webp', texture: ['anisotropy']},
     // the ids of the panes are numbers, not colours: never blended, and without an anisotropy
-    // class the texture has none
-    panes: {imageUrl: 'panes.png', texture: ['nearest']},
+    // class the texture has none. Without mip levels: under WebGPU a sampler with NearestFilter
+    // reads them all the same and would mix the ids of neighbouring panes
+    panes: {imageUrl: 'panes.png', texture: ['nearest', 'no-mipmaps']},
     frame: {imageUrl: 'frame.webp', texture: ['srgb', 'anisotropy']},
     room: {imageUrl: 'room.webp', texture: ['srgb', 'anisotropy']},
     sprites: {atlasUrl: 'sprites.json', texture: ['srgb', 'anisotropy']},
@@ -183,10 +184,6 @@ export async function loadChapelAssets(renderer: WebGPURenderer): Promise<Chapel
       fetchJson<RoseWindowJson>('MothChapel', assetsUrl(`${DIR}/window.json`)),
       fetchJson<RoomJson>('MothChapel', assetsUrl(`${DIR}/room.json`)),
     ]);
-    // No texture class writes generateMipmaps: under WebGPU a sampler with NearestFilter would read
-    // mip levels all the same and mix the ids of neighbouring panes. The store of this scene builds
-    // the texture exactly once — neither its renderer nor its classes change —, so the value stays
-    panes.generateMipmaps = false;
     // the face maps lie beside the frames in the json of the atlas
     const resource = await store.whenResource('sprites');
     const faceMap = readFaceMap('atlasJson' in resource ? resource.atlasJson : undefined);

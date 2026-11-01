@@ -154,6 +154,36 @@ describe('AsepriteJson', () => {
       expect(JSON.stringify(data)).toBe(before);
     });
 
+    test('keeps a frame named __proto__, in the layout "Hash" and in the layout "Array"', () => {
+      // JSON.parse() makes __proto__ an own key of the frames, as a sheet read from a file has it
+      const hash = JSON.parse(JSON.stringify(sheet(2)).replace('"f1"', '"__proto__"')) as AsepriteJsonData;
+      const array = {
+        ...hash,
+        frames: Object.entries(hash.frames as Record<string, object>).map(([filename, entry]) => ({...entry, filename})),
+      } as unknown as AsepriteJsonData;
+
+      for (const data of [hash, array]) {
+        const [atlas] = AsepriteJson.parse(data);
+        expect(atlas.frameNames()).toEqual(['f0', '__proto__']);
+        expect(atlas.frameId('__proto__')).toBeDefined();
+        expect(atlas.frame('__proto__')!.data!.index).toBe(1);
+        expect(atlas.frame('__proto__')!.coords.x).toBe(4);
+      }
+    });
+
+    test('keeps a slice named __proto__ in the slices of a frame', () => {
+      const data = sheet(1, {
+        slices: [{name: '__proto__', color: '#0000ffff', keys: [{frame: 0, bounds: {x: 0, y: 0, w: 2, h: 2}}]}],
+      } as never);
+
+      const [atlas] = AsepriteJson.parse(data);
+
+      const {slices} = atlas.frame('f0')!.data!;
+      expect(Object.hasOwn(slices, '__proto__')).toBe(true);
+      expect(Object.getOwnPropertyDescriptor(slices, '__proto__')?.value).toEqual({bounds: {x: 0, y: 0, w: 2, h: 2}});
+      expect(Object.getPrototypeOf(slices)).toBe(Object.prototype);
+    });
+
     test('the json handed in is left as it was', () => {
       const data = fixture('fighter-hash.json');
       const before = JSON.stringify(data);

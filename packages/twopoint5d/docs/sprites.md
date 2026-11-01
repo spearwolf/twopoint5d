@@ -1954,9 +1954,11 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   `outputNode`), so no colour stage can change it.
 - **The nearest sprite wins**, by the depth test, whatever the sprites blend or write. At one depth
   — a 2D scene on one plane — the sprite drawn later wins, as on the screen: the later slot of a
-  mesh, the later mesh by `renderOrder`. Only the sprites are drawn, not their passes: a shadow or a
-  reflection is nothing to hit. A mesh that is disposed, not visible, whose material is not visible,
-  or empty is left out.
+  mesh, the later mesh by the `renderOrder` of the nearest group above it, then by its own, as three
+  sorts them. A mesh under a `ClippingGroup` is clipped in its pick as on the screen: a click where
+  the planes cut a sprite away lands on what lies behind. Only the sprites are drawn, not their
+  passes: a shadow or a reflection is nothing to hit. A mesh that is disposed, not visible, whose
+  material is not visible, or empty is left out.
 - **One frame of latency.** The answer comes once the gpu has drawn and the pixel is read back —
   fine for a click, and for hover every frame too. Pick after `update()`, as you render.
 - **Sorted and growing meshes work.** The pick resolves a slot to its handle as the slots stood at
@@ -1985,7 +1987,8 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   lives as long as the picker — dispose it, or the picker. `dispose()`
   releases the target and every pick material and rejects every pick still in flight; a `pick()`
   after it answers `undefined`. A camera, a pointer or a list of the wrong shape is refused with a
-  `TypeError` that names the fix.
+  `TypeError` that names the fix, and so is a mesh whose material slot holds a material the picker
+  cannot draw from — none, one of another kind, one built for a pass.
 
 ## Presets
 

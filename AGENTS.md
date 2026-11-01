@@ -130,12 +130,14 @@ explicit instruction.
   comment that says why. A refused value is quoted through
   `describeValue()` in `src/utils/`, never through `String()`, `JSON.stringify()`,
   `toString()` or an interpolation, bare or in quotes of its own: it writes a string in
-  double quotes, a symbol as `Symbol(a)`, a BigInt as `1n`, and an array or a plain object
-  by its content, and it throws for no value. A name that may be a symbol — of a frame, of
-  an animation — and each argument of a call a message writes out
-  (`getAsync("hero", ["atlas", "texture"])`) go through it as well; a name typed as a
+  double quotes, with a quote, a backslash, a control char, a line or paragraph separator and
+  a lone surrogate escaped as in a JSON string, a symbol as `Symbol(a)`, a BigInt as `1n`,
+  and an array or a plain object by its content, and it throws for no value. A name that may
+  be a symbol — of a frame, of an animation — and each argument of a call a message writes
+  out (`getAsync("hero", ["atlas", "texture"])`) go through it as well; a name typed as a
   string, one that tells instances apart or one a look-up did not find, is quoted by hand
-  (`"${name}"`), which writes the same. A three.js object refused for its class is named
+  (`"${name}"`), which writes the same for a name without a char `describeValue()` escapes.
+  A three.js object refused for its class is named
   by its `type`, through `describeThreeValue()` in `src/utils/`. A failure of
   `expectDefined()` reports a broken invariant of the library, not a refusal, and names no
   subject; the refusals a feature's `checkKind` throws get theirs from `defineSprite()`.

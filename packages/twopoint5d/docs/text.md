@@ -173,7 +173,8 @@ objects through a sort, still in reading order.
 
 **Refusals.** A kind without `InstancePosition`, `QuadSize` or `AtlasFrame` — `AnimatedSpriteKind`,
 whose frame comes out of an `animsMap` — is refused with a `TypeError` before a sprite is created,
-naming every feature missing. A pool that runs full is refused with a `RangeError` naming how many
+naming every feature missing. The features are judged by name, so a copy such as
+`defineFeature({...QuadSize})` counts. A pool that runs full is refused with a `RangeError` naming how many
 sprites the text needs; the sprites created so far are freed again, so nothing of the text is left
 behind. An error of `createSprite()` — under `grow`, a pool that cannot grow — goes on to the caller
 unchanged, after the same freeing. A `scale`, `lineHeight` or `maxWidth` that is no finite number

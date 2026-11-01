@@ -1,18 +1,23 @@
 import {
   Camera,
+  ClippingGroup,
   Color,
   DoubleSide,
   FloatType,
   Group,
   Matrix4,
+  type Mesh,
   NodeMaterial,
   NoBlending,
   type Object3D,
   OrthographicCamera,
   PerspectiveCamera,
+  Plane,
   type Renderer,
   RenderTarget,
+  Scene,
   Texture,
+  Vector3,
   WebGLCoordinateSystem,
   WebGPUCoordinateSystem,
 } from 'three/webgpu';
@@ -38,7 +43,10 @@ import {DRAWN_FRAGMENTS, type SpritePick, SpritePicker} from './SpritePicker.js'
 const DotKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor]});
 
 interface Rendered {
+  /** Every mesh under the scene, in the order of a traversal. */
   children: Object3D[];
+  /** The children of the scene itself: the top of each chain of a pick mesh. */
+  tops: Object3D[];
   projection: Matrix4;
   matrixWorld: Matrix4;
   matrixWorldInverse: Matrix4;
@@ -147,8 +155,13 @@ function makeRenderer() {
         setReversedDepth(camera, true);
         (camera as unknown as {updateProjectionMatrix(): void}).updateProjectionMatrix();
       }
+      const children: Object3D[] = [];
+      scene.traverse((node) => {
+        if ((node as Mesh).isMesh === true) children.push(node);
+      });
       rendered.push({
-        children: [...scene.children],
+        children,
+        tops: [...scene.children],
         projection: camera.projectionMatrix.clone(),
         matrixWorld: camera.matrixWorld.clone(),
         matrixWorldInverse: camera.matrixWorldInverse.clone(),
@@ -407,7 +420,7 @@ describe('SpritePicker', () => {
 
     vi.spyOn(b.spritePool!, 'usedCount', 'get').mockReturnValue(2 ** 24 + 1);
     await expect(picker.pick(makeCamera(), center, [a, b])).rejects.toThrow(RangeError);
-    expect(pickMesh.parent, 'the pick mesh of the entry before the refused one').toBeNull();
+    expect(pickMesh.parent?.parent, 'the chain of the pick mesh of the entry before the refused one').toBeNull();
 
     await picker.pick(makeCamera(), center, [a]);
     expect(taken.at(-1), 'the handle array the refused pick gave back').toBe(first);
@@ -1085,6 +1098,155 @@ describe('SpritePicker', () => {
       other.dispose();
     }).not.toThrow();
     picker.dispose();
+  });
+
+  describe('the ancestors of a mesh', () => {
+    const holderOf = (rendered: Rendered) => rendered.children[0]!.parent!;
+
+    test('a mesh under ClippingGroups lies under a mirror of each that the camera sees and that is enabled, root first, with its planes and clipIntersection', async () => {
+      const {renderer, rendered} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      const outer = new ClippingGroup();
+      outer.clippingPlanes = [new Plane(new Vector3(1, 0, 0), 0)];
+      outer.clipIntersection = true;
+      const off = new ClippingGroup();
+      off.clippingPlanes = [new Plane(new Vector3(0, 1, 0), 0)];
+      off.enabled = false;
+      const hidden = new ClippingGroup();
+      hidden.clippingPlanes = [new Plane(new Vector3(0, -1, 0), 0)];
+      hidden.layers.set(5);
+      outer.add(off);
+      off.add(hidden);
+      hidden.add(sprites);
+
+      await picker.pick(makeCamera(), center, [sprites]);
+
+      const holder = holderOf(rendered[0]!);
+      expect((holder as ClippingGroup).isClippingGroup, 'the group the pick mesh lies in').toBeUndefined();
+      expect((holder as Group).isGroup).toBe(true);
+      const mirror = holder.parent as ClippingGroup;
+      expect(mirror.isClippingGroup).toBe(true);
+      expect(mirror).not.toBe(outer);
+      expect(mirror.clippingPlanes).toBe(outer.clippingPlanes);
+      expect(mirror.clipIntersection).toBe(true);
+      expect(mirror.parent, 'the top of the chain, out of the scene once the pick is done').toBeNull();
+      expect(rendered[0]!.tops).toEqual([mirror]);
+      sprites.dispose();
+      picker.dispose();
+    });
+
+    test('the group of a pick mesh carries the renderOrder of the nearest group above the sprites that the camera sees, and 0 without one', async () => {
+      const {renderer, rendered} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      const root = new Group();
+      root.renderOrder = 9;
+      const seen = new Group();
+      seen.renderOrder = 3;
+      const unseen = new Group();
+      unseen.renderOrder = 7;
+      unseen.layers.set(5);
+      // a scene is no group: it gives no group order
+      const world = new Scene();
+      world.add(root);
+      root.add(seen);
+      seen.add(unseen);
+      unseen.add(sprites);
+      const loose = makeSprites(1).sprites;
+
+      await picker.pick(makeCamera(), center, [sprites, loose]);
+
+      const [inGroups, alone] = rendered[0]!.children;
+      expect(inGroups!.parent!.renderOrder, 'the nearest group the camera sees').toBe(3);
+      expect(alone!.parent!.renderOrder, 'no group above the sprites').toBe(0);
+      sprites.dispose();
+      loose.dispose();
+      picker.dispose();
+    });
+
+    test('keeps its mirrors over picks and follows a mesh into another ClippingGroup and out of every one', async () => {
+      const {renderer, rendered} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      const first = new ClippingGroup();
+      first.clippingPlanes = [new Plane(new Vector3(1, 0, 0), 0)];
+      const second = new ClippingGroup();
+      second.clippingPlanes = [new Plane(new Vector3(0, 1, 0), 0)];
+      first.add(sprites);
+
+      await picker.pick(makeCamera(), center, [sprites]);
+      await picker.pick(makeCamera(), center, [sprites]);
+      const mirror = rendered[0]!.tops[0] as ClippingGroup;
+      expect(rendered[1]!.tops[0], 'the same mirror at the next pick').toBe(mirror);
+      expect(holderOf(rendered[1]!)).toBe(holderOf(rendered[0]!));
+
+      second.add(sprites);
+      await picker.pick(makeCamera(), center, [sprites]);
+      const next = rendered[2]!.tops[0] as ClippingGroup;
+      expect(next).not.toBe(mirror);
+      expect(next.clippingPlanes).toBe(second.clippingPlanes);
+
+      // nested: a mirror of each, root first; then out of the inner one, whose mirror leaves the chain
+      first.add(second);
+      await picker.pick(makeCamera(), center, [sprites]);
+      const root = rendered[3]!.tops[0] as ClippingGroup;
+      expect(root.clippingPlanes).toBe(first.clippingPlanes);
+      const inner = holderOf(rendered[3]!).parent as ClippingGroup;
+      expect(inner.clippingPlanes).toBe(second.clippingPlanes);
+      await picker.pick(makeCamera(), center, [sprites]);
+      expect(rendered[4]!.tops, 'the nested chain kept over picks').toEqual([root]);
+      expect(root.children).toEqual([inner]);
+      first.add(sprites);
+      await picker.pick(makeCamera(), center, [sprites]);
+      expect(rendered[5]!.tops).toEqual([root]);
+      expect(root.children).toEqual([holderOf(rendered[5]!)]);
+
+      sprites.removeFromParent();
+      await picker.pick(makeCamera(), center, [sprites]);
+      expect(rendered[6]!.tops).toEqual([holderOf(rendered[6]!)]);
+      sprites.dispose();
+      picker.dispose();
+    });
+
+    test('refuses an entry whose material slot holds a material built for a pass, one of another kind or none, naming the entry', async () => {
+      const {renderer, rendered} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const loose = makeSprites(1).sprites;
+      const {sprites} = makeSprites(1, {passes: [ShadowPass]});
+      const own = sprites.material!;
+      const forPass = new FeatureSpritesMaterial(TexturedSpriteKind, {pass: ShadowPass, resources: own.resources});
+      const ofAnotherKind = new FeatureSpritesMaterial(DotKind);
+
+      sprites.material = forPass as unknown as typeof own;
+      await expect(picker.pick(makeCamera(), center, [loose, sprites])).rejects.toThrow(
+        new TypeError(
+          'SpritePicker#pick(): the entry 1 of the list holds a material built for pass "shadow" in its material slot — the picker draws the sprites themselves; put a material built without a pass there',
+        ),
+      );
+      sprites.material = ofAnotherKind as unknown as typeof own;
+      await expect(picker.pick(makeCamera(), center, [loose, sprites])).rejects.toThrow(
+        new TypeError(
+          'SpritePicker#pick(): the entry 1 of the list holds a material built for another sprite kind in its material slot',
+        ),
+      );
+      sprites.material = undefined as unknown as typeof own;
+      await expect(picker.pick(makeCamera(), center, [loose, sprites])).rejects.toThrow(
+        new TypeError(
+          'SpritePicker#pick(): the entry 1 of the list holds undefined in its material slot — the picker builds its pick material from the FeatureSpritesMaterial of the sprites',
+        ),
+      );
+      expect(rendered).toHaveLength(0);
+
+      sprites.material = own;
+      await picker.pick(makeCamera(), center, [loose, sprites]);
+      expect(rendered[0]!.children).toHaveLength(2);
+      sprites.dispose();
+      loose.dispose();
+      forPass.dispose();
+      ofAnotherKind.dispose();
+      picker.dispose();
+    });
   });
 
   describe('dispose()', () => {

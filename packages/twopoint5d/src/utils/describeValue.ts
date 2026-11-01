@@ -4,22 +4,38 @@ const MAX_DEPTH = 3;
 // JSON body
 const MAX_STRING_LENGTH = 120;
 
+// what would end the quotes, break the line or stand as half a char: a quote, a backslash, a control
+// char (C0, DEL, C1), a line or paragraph separator and a lone surrogate — a pair stays one char
+const ESCAPED = /["\\\p{Cc}\u2028\u2029\p{Cs}]/gu;
+const SHORT_ESCAPES: ReadonlyMap<string, string> = new Map([
+  ['"', '\\"'],
+  ['\\', '\\\\'],
+  ['\b', '\\b'],
+  ['\t', '\\t'],
+  ['\n', '\\n'],
+  ['\f', '\\f'],
+  ['\r', '\\r'],
+]);
+const escapeChar = (char: string): string => SHORT_ESCAPES.get(char) ?? `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`;
+
 const BARE_KEY = /^[A-Za-z_$][\w$]*$/;
 
 /**
  * A value the way an error message quotes it, so that the refused value stays readable and
- * tells itself apart from its neighbours: a string in double quotes (`"16"` is not `16`), a
- * symbol as `Symbol(a)`, distinct from the string `"Symbol(a)"`, a BigInt with its `n` (`1n` is
- * not `1`), a function by its name, never its source, and an array or a plain object by its
- * content (`[1.5, NaN, -1]`, `{value: 1n}`), so that one object is told apart from another. Up
- * to eight entries per container and three levels deep are shown, the rest as `…` — that keeps
- * a message short for a large array and ends a cycle. A string of more than 120 UTF-16 units
- * shows its first 120 and `…` (`"abc…"`), one less where the 120th would split a surrogate
- * pair, inside an array or an object as well, and so does the key of an object, always in double
- * quotes then. A typed array is shown by its kind and its
- * entries, as an array is (`Float32Array [1.5, NaN]`); a `DataView` is not one of them.
- * Everything else is written as `String()` writes it. `JSON.stringify()` is no option: it
- * throws for a BigInt, and the message would be lost.
+ * tells itself apart from its neighbours: a string in double quotes (`"16"` is not `16`), with a
+ * quote, a backslash, a control char, a line or paragraph separator and a lone surrogate escaped as
+ * in a JSON string (`"a\"b\n"`, `"\u2028"`), so that a quoted string stays on one line and ends at
+ * its closing quote; a symbol as `Symbol(a)`, distinct from the string `"Symbol(a)"`, a BigInt with
+ * its `n` (`1n` is not `1`), a function by its name, never its source, and an array or a plain
+ * object by its content (`[1.5, NaN, -1]`, `{value: 1n}`), so that one object is told apart from
+ * another. Up to eight entries per container and three levels deep are shown, the rest as `…` —
+ * that keeps a message short for a large array and ends a cycle. A string of more than 120 UTF-16
+ * units shows its first 120 — counted on the raw string, before the escape — and `…` (`"abc…"`),
+ * one less where the 120th would split a surrogate pair, inside an array or an object as well, and
+ * so does the key of an object, always in double quotes then. A typed array is shown by its kind
+ * and its entries, as an array is (`Float32Array [1.5, NaN]`); a `DataView` is not one of them.
+ * Everything else is written as `String()` writes it. `JSON.stringify()` is no option: it throws
+ * for a BigInt, and the message would be lost.
  *
  * An accessor of a plain object or an array stands as `[Getter]`, `[Setter]` or
  * `[Getter/Setter]` and is not called: a message runs no code of the caller. A value that
@@ -69,11 +85,12 @@ function describeUnguarded(value: unknown, depth: number): string {
 }
 
 function describeString(value: string): string {
-  if (value.length <= MAX_STRING_LENGTH) return `"${value}"`;
+  if (value.length <= MAX_STRING_LENGTH) return `"${value.replace(ESCAPED, escapeChar)}"`;
   // a cut between the two halves of a surrogate pair would leave half a char in the message
   const high = value.charCodeAt(MAX_STRING_LENGTH - 1);
   const end = high >= 0xd800 && high <= 0xdbff ? MAX_STRING_LENGTH - 1 : MAX_STRING_LENGTH;
-  return `"${value.slice(0, end)}…"`;
+  // cut before the escape: the 120 units count the raw string
+  return `"${value.slice(0, end).replace(ESCAPED, escapeChar)}…"`;
 }
 
 type TypedArray = ArrayLike<number | bigint>;

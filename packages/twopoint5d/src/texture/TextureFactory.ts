@@ -42,6 +42,11 @@ export interface TextureOptions {
    */
   anisotrophy?: number;
   flipY: boolean;
+  /**
+   * Whether three.js builds the mip levels of the texture. No class of the factory's seed writes it: a
+   * texture without a mipmap class keeps what it has, `true` for a new one.
+   */
+  generateMipmaps: boolean;
   colorSpace: ColorSpace;
   /**
    * How the texture is read beyond its edges along its width. No class of the factory's seed writes
@@ -105,6 +110,12 @@ const TextureClasses = {
   },
   'no-flipy': {
     flipY: false,
+  },
+  mipmaps: {
+    generateMipmaps: true,
+  },
+  'no-mipmaps': {
+    generateMipmaps: false,
   },
   srgb: {
     colorSpace: SRGBColorSpace,
@@ -196,6 +207,9 @@ const TextureClassPriority: Record<TextureOptionClasses, number> = {
 
   flipy: 500,
   'no-flipy': 500,
+
+  mipmaps: 500,
+  'no-mipmaps': 500,
 
   srgb: 500,
   'linear-srgb': 500,

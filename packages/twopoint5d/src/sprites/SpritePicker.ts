@@ -1,8 +1,11 @@
 import {add, float, instanceIndex, uniform, vec4} from 'three/tsl';
 import {
   Camera,
+  ClippingGroup,
   Color,
   FloatType,
+  Group,
+  type Layers,
   Matrix4,
   Mesh,
   type MRTNode,
@@ -96,8 +99,21 @@ const REVERSE_DEPTH_WEBGL = new Matrix4().set(
   0, 0, 0, 1,
 );
 
+/** The mirror of a ClippingGroup above the sprites, in the scene of the pick. */
+interface ClippingMirror {
+  readonly source: ClippingGroup;
+  readonly mirror: ClippingGroup;
+}
+
 interface PickEntry {
   readonly mesh: Mesh;
+  /**
+   * The group the pick mesh lies in; it carries the group order three takes from the nearest group
+   * above the sprites.
+   */
+  readonly holder: Group;
+  /** The mirrors of the ClippingGroups that clip the sprites, root first; the chain ends in {@link holder}. */
+  readonly clipping: ClippingMirror[];
   readonly material: FeatureSpritesMaterial;
   /** The geometry of the sprites the pick mesh is built on and draws. */
   readonly geometry: FeatureSpritesGeometry;
@@ -138,6 +154,33 @@ function isShown(object: Object3D): boolean {
   return true;
 }
 
+// what three takes from the ancestors of a mesh as it projects the scene (three 0.187.0,
+// StandardDrawingPipeline#project()): every group the camera sees sets the group order of what
+// lies below it, the nearest one last, and every enabled ClippingGroup among them adds its
+// planes, root first. Fills `clipping` and answers the group order
+function readAncestry(object: Object3D, layers: Layers, clipping: ClippingGroup[]): number {
+  clipping.length = 0;
+  let groupOrder: number | undefined;
+  for (let node = object.parent; node != null; node = node.parent) {
+    if (!node.layers.test(layers)) continue;
+    if ((node as Group).isGroup === true) groupOrder ??= node.renderOrder;
+    if ((node as ClippingGroup).isClippingGroup === true && (node as ClippingGroup).enabled) clipping.push(node as ClippingGroup);
+  }
+  clipping.reverse();
+  return groupOrder ?? 0;
+}
+
+// only the groups the camera sees are mirrored, so a link applies under every camera; the scene of
+// the pick keeps its matrices as they are, the groups carry none that counts — the planes are in
+// world space and the pick mesh carries the world matrix of its sprites
+function makeChainLink<T extends Group>(group: T): T {
+  group.name = 'twopoint5d.SpritePicker';
+  group.layers.enableAll();
+  group.matrixAutoUpdate = false;
+  group.matrixWorldAutoUpdate = false;
+  return group;
+}
+
 /**
  * Picks the sprite under the pointer on the gpu: it draws the meshes it is handed into one pixel
  * under the pointer, each sprite writing its slot and the place of its mesh in the list instead of a
@@ -166,6 +209,8 @@ export class SpritePicker {
   readonly #pending = new Set<(error: Error) => void>();
   // the arrays of handles of the picks that have resolved, for the next ones to fill
   readonly #spareHandles: ((object & VO) | undefined)[][] = [];
+  // filled by readAncestry() for each mesh of a pick
+  readonly #clippingScratch: ClippingGroup[] = [];
   #target: RenderTarget | undefined;
   #disposed = false;
 
@@ -196,21 +241,24 @@ export class SpritePicker {
    * pointer and the list are taken as they are at the call; the camera is read at the draw: its
    * coordinate system is set to the renderer's, as its next render would, and its depth convention
    * is left alone — under a reversed depth buffer the pick turns its projection over itself. Only
-   * the sprites are drawn, not their passes. A mesh that is disposed, not visible (or under a parent
-   * that is not), whose material is not visible, or that holds no sprite is left out; a mesh listed
-   * twice is drawn once, at its first place. A mesh drawn once is held until it or the picker is
-   * disposed, also when no later pick lists it. A pointer outside the view answers `undefined` without
-   * a draw. The state of the renderer the pick changes — render target, MRT, clear color, the
-   * `autoClear` flags — is restored before it returns.
+   * the sprites are drawn, not their passes. A mesh under a `ClippingGroup` is clipped in the pick as
+   * on the screen, and at one depth the mesh drawn later wins — by the `renderOrder` of the nearest
+   * group above it, then by its own, as three sorts them. A mesh that is disposed, not visible (or
+   * under a parent that is not), whose material is not visible, or that holds no sprite is left out;
+   * a mesh listed twice is drawn once, at its first place. A mesh drawn once is held until it or the
+   * picker is disposed, also when no later pick lists it. A pointer outside the view answers
+   * `undefined` without a draw. The state of the renderer the pick changes — render target, MRT,
+   * clear color, the `autoClear` flags — is restored before it returns.
    *
    * @param pointer the point of the view of `camera` in normalized device coordinates, snapped to
    *   the centre of the pixel of the renderer's drawing buffer it lies in
    * @returns `undefined` once disposed
    * @throws (rejects with) a `TypeError` for a camera that is no three.js camera, a pointer whose `x`
-   *   or `y` is no finite number, a list that is no array and an entry that is no `FeatureSprites`; a
-   *   `RangeError` for a mesh of more than 2^24 sprites, whose slots the float target cannot name;
-   *   an `Error` for a pick still in flight when the picker is disposed; and whatever the
-   *   `onCreateVO` hook of the pool throws for a sprite without a handle
+   *   or `y` is no finite number, a list that is no array, an entry that is no `FeatureSprites` and
+   *   an entry whose material slot holds no `FeatureSpritesMaterial`, one of another kind or one
+   *   built for a pass; a `RangeError` for a mesh of more than 2^24 sprites, whose slots the float
+   *   target cannot name; an `Error` for a pick still in flight when the picker is disposed; and
+   *   whatever the `onCreateVO` hook of the pool throws for a sprite without a handle
    */
   // FeatureSprites is invariant in its handle type — the onCreateVO hook of its pool takes one —, so
   // only `any` admits a list of meshes of several kinds
@@ -254,7 +302,7 @@ export class SpritePicker {
     const drawn: Drawn[] = [];
     try {
       // inside the try: a refusal halfway through the list gives back what the meshes before it took
-      this.#gather(list, drawn);
+      this.#gather(list, drawn, camera);
       if (drawn.length === 0) return undefined;
       this.#aim(camera, pointer);
       const pixel = await this.#draw();
@@ -271,7 +319,7 @@ export class SpritePicker {
   }
 
   /** Fills `drawn` with the meshes to draw, by their place in the list; the pick meshes in the scene, synced. */
-  #gather(list: readonly FeatureSprites[], drawn: Drawn[]): void {
+  #gather(list: readonly FeatureSprites[], drawn: Drawn[], camera: Camera): void {
     const scene = this.#scene;
     scene.clear();
     for (let k = 0; k < list.length; k++) {
@@ -285,8 +333,9 @@ export class SpritePicker {
           `${WHERE}: the entry ${k} of the list holds ${pool.usedCount} sprites, and the float target names a slot exactly up to ${MAX_SPRITES_PER_MESH} — split the sprites into meshes of at most ${MAX_SPRITES_PER_MESH}`,
         );
       }
-      const entry = this.#sync(sprites, k + 1);
-      scene.add(entry.mesh);
+      const material = slotMaterialOf(sprites, k);
+      const entry = this.#sync(sprites, material, k + 1);
+      this.#place(entry, sprites, camera);
       // in drawn before the copy: whatever throws from here on, the finally of #pick() gives the array back
       const record: Drawn = {sprites, pool, slotMoves: pool.slotMoves, handles: this.#spareHandles.pop() ?? []};
       drawn[k] = record;
@@ -297,9 +346,7 @@ export class SpritePicker {
     }
   }
 
-  #sync(sprites: FeatureSprites, meshNumber: number): PickEntry {
-    // the mesh is not disposed — it has a pool —, so it has its material
-    const material = sprites.material!;
+  #sync(sprites: FeatureSprites, material: FeatureSpritesMaterial, meshNumber: number): PickEntry {
     let entry = this.#entries.get(sprites);
     // a material swapped on the mesh reads other uniforms and textures, a geometry put into the slot is
     // another to draw: for either the pick mesh is built anew
@@ -324,6 +371,36 @@ export class SpritePicker {
     return entry;
   }
 
+  /**
+   * Lays the chain of `entry` into the scene of the pick, under mirrors of the ClippingGroups above
+   * `sprites` and with their group order.
+   */
+  #place(entry: PickEntry, sprites: FeatureSprites, camera: Camera): void {
+    const applied = this.#clippingScratch;
+    const groupOrder = readAncestry(sprites, camera.layers, applied);
+    const {clipping} = entry;
+    // a mirror of a ClippingGroup that no longer clips the sprites leaves the chain, so that it hangs
+    // empty under none of the mirrors kept
+    for (let i = 0; i < applied.length; i++) {
+      if (clipping[i]?.source === applied[i]) continue;
+      clipping[i]?.mirror.removeFromParent();
+      clipping[i] = {source: applied[i]!, mirror: makeChainLink(new ClippingGroup())};
+    }
+    for (let i = applied.length; i < clipping.length; i++) clipping[i]!.mirror.removeFromParent();
+    clipping.length = applied.length;
+
+    let parent: Object3D = this.#scene;
+    for (const {source, mirror} of clipping) {
+      // the planes are shared, not copied — three reads them at every draw
+      mirror.clippingPlanes = source.clippingPlanes;
+      mirror.clipIntersection = source.clipIntersection;
+      if (mirror.parent !== parent) parent.add(mirror);
+      parent = mirror;
+    }
+    if (entry.holder.parent !== parent) parent.add(entry.holder);
+    entry.holder.renderOrder = groupOrder;
+  }
+
   #build(sprites: FeatureSprites, material: FeatureSpritesMaterial): PickEntry {
     const meshNumber = uniform(0) as unknown as UniformNode<'float', number>;
     const pickMaterial = new FeatureSpritesMaterial(sprites.kind, {
@@ -345,9 +422,13 @@ export class SpritePicker {
     mesh.frustumCulled = false;
     mesh.matrixAutoUpdate = false;
     mesh.matrixWorldAutoUpdate = false;
+    const holder = makeChainLink(new Group());
+    holder.add(mesh);
 
     const entry: PickEntry = {
       mesh,
+      holder,
+      clipping: [],
       material: pickMaterial,
       geometry,
       meshNumber,
@@ -367,7 +448,8 @@ export class SpritePicker {
     sprites.removeEventListener('dispose', entry.onDispose);
     entry.geometry.removeEventListener('dispose', entry.onDispose);
     this.#entries.delete(sprites);
-    entry.mesh.removeFromParent();
+    // the chain stays linked; only its top lies in the scene
+    (entry.clipping[0]?.mirror ?? entry.holder).removeFromParent();
     // three's dispose event for the pick mesh, so the renderer drops its render objects
     entry.mesh.dispose();
     entry.material.dispose();
@@ -506,6 +588,28 @@ function checkArguments(camera: Camera, pointer: PickPointer, sprites: readonly 
     }
   }
   return {x, y};
+}
+
+// the material three draws the mesh with, as the pick builds its own from it: the material of the
+// sprites, of their kind and without a pass — the conditions new FeatureSprites() puts on one
+function slotMaterialOf(sprites: FeatureSprites, k: number): FeatureSpritesMaterial {
+  const {material} = sprites as {material: unknown};
+  if (!(material instanceof FeatureSpritesMaterial)) {
+    throw new TypeError(
+      `${WHERE}: the entry ${k} of the list holds ${describeThreeValue(material, 'isMaterial')} in its material slot — the picker builds its pick material from the FeatureSpritesMaterial of the sprites`,
+    );
+  }
+  if (material.kind !== sprites.kind) {
+    throw new TypeError(
+      `${WHERE}: the entry ${k} of the list holds a material built for another sprite kind in its material slot`,
+    );
+  }
+  if (material.pass != null) {
+    throw new TypeError(
+      `${WHERE}: the entry ${k} of the list holds a material built for pass "${material.pass.name}" in its material slot — the picker draws the sprites themselves; put a material built without a pass there`,
+    );
+  }
+  return material;
 }
 
 // the red of the pixel is the slot + 1 (0: nothing), the green the place of the mesh in the list + 1

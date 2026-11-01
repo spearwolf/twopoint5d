@@ -11,6 +11,7 @@ import {TextureColor} from '../sprites/features/TextureColor.js';
 import {FeatureSprites, type FeatureSpritesOptions} from '../sprites/FeatureSprites/FeatureSprites.js';
 import {AnimatedSpriteKind, TexturedSpriteKind} from '../sprites/presets.js';
 import {QuadBase} from '../sprites/SpriteBase.js';
+import {defineFeature} from '../sprites/SpriteFeature.js';
 import {tinyFontData} from '../testing/bitmapFonts.js';
 import {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import {VOUtils} from '../vertex-objects/VOUtils.js';
@@ -18,6 +19,18 @@ import {BitmapFont} from './BitmapFont.js';
 import {rewriteText, writeText} from './writeText.js';
 
 const font = new BitmapFont(tinyFontData());
+
+// a kind whose InstancePosition, QuadSize and AtlasFrame are copies: the same API under the same names
+const CopiedKind = defineSprite({
+  base: QuadBase,
+  features: [
+    defineFeature({...InstancePosition}),
+    FlatPlacement,
+    defineFeature({...QuadSize}),
+    defineFeature({...AtlasFrame}),
+    TextureColor,
+  ],
+});
 
 const position = (sprite: {x: number; y: number; z: number}) => [sprite.x, sprite.y, sprite.z];
 const size = (sprite: {width: number; height: number}) => [sprite.width, sprite.height];
@@ -137,6 +150,15 @@ describe('writeText()', () => {
     for (const glyph of glyphs) sprites.freeSprite(glyph);
     expect(sprites.spritePool?.usedCount).toBe(1);
     expect(sprites.spritePool?.containsVO(other)).toBe(true);
+  });
+
+  test('takes a kind whose features are copies of InstancePosition, QuadSize and AtlasFrame, judged by name', () => {
+    const sprites = spritesOf(CopiedKind, {capacity: 4});
+    const glyphs = writeText(sprites, font, 'AV', {x: 10, y: 20});
+    expect(glyphs.map(position)).toEqual([
+      [11.5, 17, 0],
+      [13.5, 17, 0],
+    ]);
   });
 
   test('a text of no visible glyph creates no sprite', () => {
@@ -381,6 +403,17 @@ describe('rewriteText()', () => {
     expect(() => rewriteText(spritesOf(Bare, {capacity: 2}) as never, [], font, 'A')).toThrow(
       'rewriteText: the sprites lack the features QuadSize, AtlasFrame — rewriteText() writes',
     );
+  });
+
+  test('takes a kind whose features are copies of InstancePosition, QuadSize and AtlasFrame, judged by name', () => {
+    const sprites = spritesOf(CopiedKind, {capacity: 4});
+    const glyphs = writeText(sprites, font, 'AV');
+    const answer = rewriteText(sprites, glyphs, font, 'AVA', {x: 10, y: 20});
+    expect(answer.map(position)).toEqual([
+      [11.5, 17, 0],
+      [13.5, 17, 0],
+      [18.5, 17, 0],
+    ]);
   });
 
   test('disposed sprites empty the array and answer it', () => {

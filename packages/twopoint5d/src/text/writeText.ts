@@ -25,7 +25,9 @@ export type TextSpriteApi = InstancePositionApi & QuadSizeApi & AtlasFrameApi;
 const WRITE = 'writeText';
 const REWRITE = 'rewriteText';
 
-// the features writeText() and rewriteText() write, by the names they are exported under
+// the features writeText() and rewriteText() write, by the names they are exported under; judged by
+// the name of the feature, as `requires` and the segment placement judge one: a copy such as
+// `defineFeature({...QuadSize})` carries the same API
 const REQUIRED: readonly (readonly [SpriteFeature, string])[] = [
   [InstancePosition, 'InstancePosition'],
   [QuadSize, 'QuadSize'],
@@ -47,7 +49,9 @@ const prepare = <Api extends TextSpriteApi>(
   text: string,
   options: WriteTextOptions | undefined,
 ): {layout: TextLayout; z: number} => {
-  const missing = REQUIRED.filter(([feature]) => !sprites.kind.features.includes(feature)).map(([, name]) => name);
+  const missing = REQUIRED.filter(([feature]) => !sprites.kind.features.some(({name}) => name === feature.name)).map(
+    ([, name]) => name,
+  );
   if (missing.length > 0) {
     throw new TypeError(
       `${where}: the sprites lack the feature${missing.length > 1 ? 's' : ''} ${missing.join(', ')} — ${where}() writes the position, the size and the frame of every glyph; build the kind with InstancePosition, QuadSize and AtlasFrame, as TexturedSpriteKind does`,
@@ -128,8 +132,9 @@ const writeGlyphs = <Api extends TextSpriteApi>(
  *
  * Disposed sprites write nothing: the answer is an empty array.
  *
- * @throws {TypeError} for sprites whose kind lacks `InstancePosition`, `QuadSize` or `AtlasFrame`, naming
- *   every one missing, before a sprite is created.
+ * @throws {TypeError} for sprites whose kind holds no feature named as `InstancePosition`, `QuadSize` or
+ *   `AtlasFrame` — judged by the name, so a copy of one counts —, naming every one missing, before a sprite
+ *   is created.
  * @throws {RangeError} for a pool that runs full: the sprites created so far are freed again, and the count
  *   is named. `createSprite()` says once on the console that the pool is full.
  * @throws every error of `createSprite()` — under `grow`, a pool that cannot grow —, after the sprites
@@ -172,8 +177,9 @@ export function writeText<Api extends TextSpriteApi>(
  *
  * Disposed sprites write nothing: `glyphs` is emptied and answered.
  *
- * @throws {TypeError} for sprites whose kind lacks `InstancePosition`, `QuadSize` or `AtlasFrame`, and for
- *   a glyph that is no sprite of these sprites, naming its index — before anything changes.
+ * @throws {TypeError} for sprites whose kind holds no feature named as `InstancePosition`, `QuadSize` or
+ *   `AtlasFrame` — judged by the name, so a copy of one counts —, and for a glyph that is no sprite of these
+ *   sprites, naming its index — before anything changes.
  * @throws {RangeError} for a pool that runs full: the sprites created so far are freed again, and `glyphs`
  *   keeps the text it had — its length, its handles and their values.
  * @throws every error of `createSprite()`, after the sprites created so far are freed again; `glyphs` keeps

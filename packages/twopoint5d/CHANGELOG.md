@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `StageRenderer#shouldRenderPass(child)`, protected: a subclass that answers `false` keeps the picture of a nested renderer from an earlier frame in the composed mode
 - add `Map2DSpatialHashGrid#clear()`, which takes every renderable out of every cell and leaves the grid as a new one with the same cells and the same `maxCellsPerRenderable` — for a change of map or the reset of a level —, and `Map2DSpatialHashGrid#size`, how many renderables the grid holds, each counted once however many cells it lies in
 - add the quad tree over chunks, the data chunks and the spatial hash grid to the tile map guide `docs/map2d.md`: "Chunks of a map, found by a quad tree" and "Renderables in a spatial hash grid", with their defaults and who disposes what
+- add the texture classes `mipmaps` and `no-mipmaps` of `TextureFactory`, which write `generateMipmaps` (`TextureOptions` gains `generateMipmaps`); a texture without either keeps what it has, and a `TextureStore` catalog names them like any other class — a texture of data such as ids names `nearest` and `no-mipmaps` (see "Texture classes" in `docs/textures.md`)
 
 ### Changed
 
@@ -53,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Stage2D#asPassNode()` hands the same node back for the life of the stage: a new `scene` or `camera` goes into it as it is assigned, so a node handed out before follows it, and a `StageRenderer` that composes the stage keeps its output node — a new camera, a change of the projection or a new scene builds neither a pass node nor a shader. A composing `StageRenderer` rebuilds its output node after `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged` only for a stage that hands a new pass node
 - change `AtlasTextureResource#atlasUrl`: clearing it takes back the json fetched from it and, with it, `imageUrl`, `imageCoords`, `texture` (released), `atlas` and `frameBasedAnimations`, as clearing `imageUrl` does on an image or a tile set resource; an `atlasJson` written from outside stays (**BREAKING**). See the Migration Guide
 - `new FeatureSprites()` refuses a `material` built for a pass — one whose `pass` is set — with a `TypeError` that names the pass
+- `SpritePicker#pick()` refuses a mesh whose material slot holds a material built for a pass, one of another sprite kind or none with a `TypeError` that names the entry — the pick cannot draw such a mesh as the screen does
 - `SpriteResources#setTexture()`, `FeatureSpritesMaterial#setTexture()` and `FeatureSprites#setTexture()`, and the `textures` of their options, refuse a value that is neither a three.js texture (`isTexture`) nor `undefined` or `null` with a `TypeError` that names the texture, before a texture changes; `null` unsets a texture as `undefined` does, and `getTexture()` answers `undefined` for it
 - a segment placement refuses a feature named `rotation` or `shear` as it refuses `Rotation` and `Shear`, judged by name as `NineSlice` is
 - `BitmapFont#info` and `BitmapFont#common` are frozen copies all the way down: `info.padding`, `info.spacing` and a `charset` list are frozen lists of their own, and `BitmapFontInfo` types them `readonly` — a write into them throws, and the font data handed in shares no list with the font (**BREAKING**). See the Migration Guide
@@ -83,6 +85,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ChunkQuadTreeNode#subdivide()` splits a node whose chunks only one axis separates — a row or a column of chunks — into two quadrants, the other axis on the outer edge of the chunks, and `findChunks()`/`findChunksAt()` descend into them
 - `DataIdsChunk2D#readDataIdAt()` answers the id of the cell a fractional point of the chunk lies in, counted from the corner of the chunk
 - a recomputation of `RectangularVisibilityArea` costs the tiles of its own area, whatever area it covered before
+- a pick of `SpritePicker` clips a mesh under a `ClippingGroup` as the screen does and, at one depth, orders meshes by the `renderOrder` of the nearest group above them first
+- `writeText()` and `rewriteText()` take a kind whose `InstancePosition`, `QuadSize` or `AtlasFrame` is a copy, judged by name
+- a refused string in an error message is quoted with its quotes, backslashes, control chars, line and paragraph separators and lone surrogates escaped as in a JSON string, so it stays on one line and ends at its closing quote
+- `AsepriteJson.parse()` keeps a frame and a slice named `__proto__`
 
 ### Migration Guide
 

@@ -2,9 +2,33 @@ import {describe, expect, test} from 'vitest';
 import {describeValue} from './describeValue.js';
 
 describe('describeValue', () => {
-  test('shows a string in double quotes, unescaped', () => {
+  test('shows a string in double quotes, with a quote, a backslash, a control char, a line or paragraph separator and a lone surrogate escaped as in a JSON string', () => {
     expect(describeValue('16')).toBe('"16"');
-    expect(describeValue('a "b"')).toBe('"a "b""');
+    expect(describeValue('a "b"')).toBe(String.raw`"a \"b\""`);
+    expect(describeValue('a\\b')).toBe(String.raw`"a\\b"`);
+    expect(describeValue('a\nb')).toBe(String.raw`"a\nb"`);
+    expect(describeValue('\b\t\f\r')).toBe(String.raw`"\b\t\f\r"`);
+    expect(describeValue('\u0000')).toBe(String.raw`"\u0000"`);
+    expect(describeValue('\u0007')).toBe(String.raw`"\u0007"`);
+    expect(describeValue('\u007f')).toBe(String.raw`"\u007f"`);
+    expect(describeValue('\u0085')).toBe(String.raw`"\u0085"`);
+    expect(describeValue('\u2028')).toBe(String.raw`"\u2028"`);
+    expect(describeValue('\u2029')).toBe(String.raw`"\u2029"`);
+    expect(describeValue('\ud800')).toBe(String.raw`"\ud800"`);
+    expect(describeValue('x\udc00y')).toBe(String.raw`"x\udc00y"`);
+    // a whole pair and a char outside ASCII stay as they are
+    expect(describeValue('😀 é')).toBe('"😀 é"');
+  });
+
+  test('escapes a key of an object as it escapes a string', () => {
+    expect(describeValue({'a"b': 1})).toBe(String.raw`{"a\"b": 1}`);
+    expect(describeValue({'a\nb': 1})).toBe(String.raw`{"a\nb": 1}`);
+  });
+
+  test('cuts a string short before it escapes it', () => {
+    // 121 units: the cut counts 120 of the raw string, the quote among them written as two chars
+    const value = `aaaaa"${'a'.repeat(115)}`;
+    expect(describeValue(value)).toBe(`"aaaaa\\"${'a'.repeat(114)}…"`);
   });
 
   test('cuts a string of more than 120 UTF-16 units short after 120, and keeps one of 120 whole', () => {

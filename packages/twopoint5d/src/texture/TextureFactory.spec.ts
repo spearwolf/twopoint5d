@@ -300,6 +300,26 @@ describe('TextureFactory', () => {
     });
   });
 
+  describe('the mipmap classes write generateMipmaps', () => {
+    test('no-mipmaps turns the mip levels of a texture off, mipmaps on, and a texture without either keeps its own', () => {
+      const factory = new TextureFactory(16);
+      // no image is read: the factory hands the source to new Texture() and nothing more
+      const image = {} as HTMLImageElement;
+
+      expect(factory.create(image, 'nearest', 'no-mipmaps').generateMipmaps).toBe(false);
+      expect(factory.create(image, 'nearest').generateMipmaps, 'a new texture').toBe(true);
+
+      const off = new Texture();
+      off.generateMipmaps = false;
+      expect(factory.update(off, 'linear').generateMipmaps, 'without a mipmap class').toBe(false);
+      expect(factory.update(off, 'mipmaps').generateMipmaps).toBe(true);
+      // two classes of the same breadth: the one named last wins
+      expect(factory.update(new Texture(), 'mipmaps', 'no-mipmaps').generateMipmaps).toBe(false);
+      expect(factory.update(new Texture(), 'no-mipmaps', 'mipmaps').generateMipmaps).toBe(true);
+      expect(factory.getOptions(['no-mipmaps']).generateMipmaps).toBe(false);
+    });
+  });
+
   describe('isTextureOptionClass() tells class names from other values, and getOptions() skips the others', () => {
     const everyClassName = [
       'anisotropy',
@@ -318,6 +338,8 @@ describe('TextureFactory', () => {
       'min-linear',
       'flipy',
       'no-flipy',
+      'mipmaps',
+      'no-mipmaps',
       'srgb',
       'linear-srgb',
       'repeat',

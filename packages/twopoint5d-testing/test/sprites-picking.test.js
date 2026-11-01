@@ -18,7 +18,7 @@ import {
   TextureColor,
   Tint,
 } from '@spearwolf/twopoint5d';
-import {Color, OrthographicCamera, PerspectiveCamera, Scene, Vector3} from 'three/webgpu';
+import {ClippingGroup, Color, Group, OrthographicCamera, PerspectiveCamera, Plane, Scene, Vector3} from 'three/webgpu';
 import {
   disposeDisplay,
   disposeKept,
@@ -434,6 +434,61 @@ describe('sprites — picking', function () {
     const hit = await picker.pick(camera, pointerAt(camera, 0, 0), [sprites]);
 
     expect(hit?.sprite === back, 'the faded front sprite lets the pick through').to.be.true;
+  });
+
+  it('does not hit a sprite where a ClippingGroup above it clips it away, but what lies behind, and hits it where the plane keeps it', async () => {
+    const camera = makeFlatCamera();
+    const back = makeSprites(FlatKind, [[0, 0, 0]]);
+    const front = makeSprites(FlatKind, [[0, 0, 1]]);
+    // keeps x > 0
+    const clipping = new ClippingGroup();
+    clipping.clippingPlanes = [new Plane(new Vector3(1, 0, 0), 0)];
+    clipping.add(front.sprites);
+
+    const left = await picker.pick(camera, pointerAt(camera, -0.5, 0), [back.sprites, front.sprites]);
+    const right = await picker.pick(camera, pointerAt(camera, 0.5, 0), [back.sprites, front.sprites]);
+
+    expect(left?.sprite === back.all[0], 'the back sprite where the plane cuts the front one away').to.be.true;
+    expect(right?.sprite === front.all[0], 'the front sprite where the plane keeps it').to.be.true;
+  });
+
+  it('picks the mesh drawn later at one depth by the renderOrder of the group above it before its own', async () => {
+    const camera = makeFlatCamera();
+    const a = makeSprites(FlatKind, [[-0.5, 0, 0]]);
+    const b = makeSprites(FlatKind, [[0.5, 0, 0]]);
+    a.sprites.renderOrder = 1;
+    b.sprites.renderOrder = 0;
+    const groupOfA = new Group();
+    groupOfA.renderOrder = 0;
+    groupOfA.add(a.sprites);
+    const groupOfB = new Group();
+    groupOfB.renderOrder = 1;
+    groupOfB.add(b.sprites);
+
+    // three draws b after a: its group comes later
+    const hit = await picker.pick(camera, pointerAt(camera, 0, 0), [a.sprites, b.sprites]);
+
+    expect(hit?.sprites === b.sprites, 'the mesh whose group draws later').to.be.true;
+    expect(hit?.sprite === b.all[0]).to.be.true;
+  });
+
+  it('builds nothing more over 50 picks of a mesh under a ClippingGroup', async () => {
+    const memory = () => {
+      const {textures, renderTargets, uniformBuffers, programs, geometries, attributes} = display.renderer.info.memory;
+      return {textures, renderTargets, uniformBuffers, programs, geometries, attributes};
+    };
+    const camera = makeFlatCamera();
+    const {sprites} = makeSprites(FlatKind, [[0, 0, 0]]);
+    const clipping = new ClippingGroup();
+    clipping.clippingPlanes = [new Plane(new Vector3(1, 0, 0), 0)];
+    clipping.add(sprites);
+
+    const first = await picker.pick(camera, pointerAt(camera, 0.5, 0), [sprites]);
+    const afterFirst = memory();
+    for (let i = 0; i < 49; i++) await picker.pick(camera, pointerAt(camera, 0.5, 0), [sprites]);
+
+    expect(first, 'the sprite where the plane keeps it').to.not.be.undefined;
+    expect(memory(), 'after 50 picks').to.deep.equal(afterFirst);
   });
 
   it('leaves the renderer as it found it', async () => {
