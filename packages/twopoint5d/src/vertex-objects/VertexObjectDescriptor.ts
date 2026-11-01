@@ -1,3 +1,4 @@
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {cloneVertexObjectDescription} from './cloneVertexObjectDescription.js';
@@ -111,7 +112,7 @@ export class VertexObjectDescriptor {
    * Reads the description and checks that its layout can hold it. The first rule that fails
    * throws:
    *
-   * 1. `vertexCount`, when given, is a positive integer (`RangeError`)
+   * 1. `vertexCount`, when given, is a whole number of 1 or more (`RangeError`)
    * 2. every attribute declares a `size` or `components`, and that size is at least 1 — a
    *    positive integer `size`, or at least one component (`RangeError`)
    * 3. an attribute that declares both `size` and `components` has no more components than its
@@ -153,9 +154,7 @@ export class VertexObjectDescriptor {
   // a malformed description would otherwise show up frames later as wrong pixels, far from here
   #validate(): void {
     const {vertexCount} = this.description;
-    if (vertexCount != null && !isPositiveInteger(vertexCount)) {
-      throw new RangeError(`VertexObjectDescriptor: vertexCount must be a positive integer, got ${describeValue(vertexCount)}`);
-    }
+    if (vertexCount != null) assertWholeNumber(vertexCount, 'VertexObjectDescriptor', 'vertexCount', 1);
 
     for (const attr of this.attributes.values()) {
       // the raw description, because the descriptor's own `size` getter already falls back to 1

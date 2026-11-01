@@ -105,6 +105,14 @@ describe('TileSet', () => {
       );
     });
 
+    test('a baseCoords height that is not finite is refused', () => {
+      const options = {tileWidth: 16, tileHeight: 16, tileCount: 4};
+
+      expect(() => new TileSet(new TextureCoords(0, 0, 64, NaN), options)).toThrow(
+        new RangeError('TileSet: baseCoords.height must be a finite number, got NaN'),
+      );
+    });
+
     // without a tileCount the layout loop has nothing but the step to end it
     test('a tileWidth of 0 without a tileCount is refused', () => {
       expect(() => new TileSet(base, {tileWidth: 0, tileHeight: 16})).toThrow(

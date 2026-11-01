@@ -615,6 +615,7 @@ describe('DynamicAtlas', () => {
       [{width: 0, height: 4}, 'DynamicAtlas: the width of the frame "a" must be a finite number above 0, got 0'],
       [{width: 4, height: Number.NaN}, 'DynamicAtlas: the height of the frame "a" must be a finite number above 0, got NaN'],
       [{width: Infinity, height: 4}, 'DynamicAtlas: the width of the frame "a" must be a finite number above 0, got Infinity'],
+      [{width: '4' as never, height: 4}, 'DynamicAtlas: the width of the frame "a" must be a finite number above 0, got "4"'],
     ])('refuses the size %o', (size, message) => {
       const {atlas} = atlasOn(64, 32);
       expect(() => atlas.add('a', noop, size)).toThrow(RangeError);

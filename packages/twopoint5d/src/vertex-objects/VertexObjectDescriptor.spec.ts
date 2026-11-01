@@ -235,18 +235,18 @@ describe('VertexObjectDescriptor', () => {
     const build = (description: VertexObjectDescription) => () => new VertexObjectDescriptor(description);
     const pos = {components: ['x', 'y']};
 
-    test('a vertexCount that is not a positive integer', () => {
+    test('a vertexCount that is no whole number of 1 or more', () => {
       for (const vertexCount of [0, 1.5, -1]) {
         expect(build({vertexCount, attributes: {pos}})).toThrow(RangeError);
       }
       expect(build({vertexCount: 0, attributes: {pos}})).toThrow(
-        'VertexObjectDescriptor: vertexCount must be a positive integer, got 0',
+        'VertexObjectDescriptor: vertexCount must be a whole number of 1 or more, got 0',
       );
     });
 
     test('a vertexCount given as a string, quoted', () => {
       expect(build({vertexCount: '4' as never, attributes: {pos}})).toThrow(
-        'VertexObjectDescriptor: vertexCount must be a positive integer, got "4"',
+        'VertexObjectDescriptor: vertexCount must be a whole number of 1 or more, got "4"',
       );
     });
 

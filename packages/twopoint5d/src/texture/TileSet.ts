@@ -1,4 +1,6 @@
+import {assertFinite} from '../utils/assertFinite.js';
 import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {randomInt} from '../utils/randomInt.js';
@@ -284,15 +286,10 @@ export class TileSet<D = TextureAtlasFrameData> {
     // one that does not hold would count no number or an endless one — so they are refused before the
     // count. The number of tiles is held to MaxTiles before the first one is laid as well: a tiny
     // tileWidth out of the catalog would fill the memory otherwise.
-    assertOption(Number.isFinite(baseWidth), 'baseCoords.width', 'a finite number', baseWidth);
-    assertOption(Number.isFinite(baseHeight), 'baseCoords.height', 'a finite number', baseHeight);
-    assertOption(Number.isFinite(this.tileWidth) && this.tileWidth > 0, 'tileWidth', 'a finite number above 0', this.tileWidth);
-    assertOption(
-      Number.isFinite(this.tileHeight) && this.tileHeight > 0,
-      'tileHeight',
-      'a finite number above 0',
-      this.tileHeight,
-    );
+    assertFinite(baseWidth, 'TileSet', 'baseCoords.width');
+    assertFinite(baseHeight, 'TileSet', 'baseCoords.height');
+    assertPositiveFinite(this.tileWidth, 'TileSet', 'tileWidth');
+    assertPositiveFinite(this.tileHeight, 'TileSet', 'tileHeight');
     assertFiniteAtLeast(margin, 'TileSet', 'margin', 0);
     assertFiniteAtLeast(padding, 'TileSet', 'padding', 0);
     assertFiniteAtLeast(spacing, 'TileSet', 'spacing', 0);

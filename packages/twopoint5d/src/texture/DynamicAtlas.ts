@@ -1,4 +1,5 @@
 import {Box2, CanvasTexture, LinearFilter, NearestFilter, SRGBColorSpace, Vector2, type WebGPURenderer} from 'three/webgpu';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {expectDefined} from '../utils/expectDefined.js';
@@ -565,14 +566,8 @@ export class DynamicAtlas {
       if (size == null) return this.#naturalSize(name, source);
     }
     const given = size as DynamicAtlasSize;
-    const check = (value: unknown, what: string): number => {
-      if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-        throw new RangeError(
-          `${WHERE}: the ${what} of the frame ${describeValue(name)} must be a finite number above 0, got ${describeValue(value)}`,
-        );
-      }
-      return Math.ceil(value);
-    };
+    const check = (value: unknown, what: string): number =>
+      Math.ceil(assertPositiveFinite(value, WHERE, `the ${what} of the frame ${describeValue(name)}`));
     return {width: check(given.width, 'width'), height: check(given.height, 'height')};
   }
 
