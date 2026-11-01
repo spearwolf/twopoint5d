@@ -298,6 +298,47 @@ describe('Stage2D', () => {
       expect([stage.width, stage.height]).toEqual([800, 600]);
     });
 
+    for (const method of ['updateViewRect', 'getViewRect'] as const) {
+      const throwingStage = () => {
+        const projection = new OrthographicProjection('xy|bottom-left', {fit: 'fill'});
+        const stage = new Stage2D(projection);
+        stage.resize(800, 600);
+        expect(stage.camera).toBeDefined();
+        const failure = new Error(`${method} failed`);
+        const spy = vi.spyOn(projection, method).mockImplementationOnce(() => {
+          throw failure;
+        });
+        stage.needsUpdate = true;
+        return {stage, spy, failure};
+      };
+
+      it(`keeps needsUpdate when ${method}() of the projection throws in updateFrame(), and tries again in the next`, () => {
+        const {stage, spy, failure} = throwingStage();
+
+        expect(() => stage.updateFrame(1, 0.016, 1)).toThrow(failure);
+        expect(stage.needsUpdate).toBe(true);
+        expect([stage.width, stage.height]).toEqual([800, 600]);
+
+        stage.updateFrame(2, 0.016, 2);
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(stage.needsUpdate).toBe(false);
+        expect([stage.width, stage.height]).toEqual([800, 600]);
+      });
+
+      it(`keeps needsUpdate when ${method}() of the projection throws in updateProjection()`, () => {
+        const {stage, spy, failure} = throwingStage();
+
+        expect(() => stage.updateProjection()).toThrow(failure);
+        expect(stage.needsUpdate).toBe(true);
+        expect([stage.width, stage.height]).toEqual([800, 600]);
+
+        stage.updateProjection();
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(stage.needsUpdate).toBe(false);
+        expect([stage.width, stage.height]).toEqual([800, 600]);
+      });
+    }
+
     it('creates the camera in the frame that applies needsUpdate', () => {
       const projection = new ParallaxProjection('xy|bottom-left', {});
       const stage = new Stage2D(projection);
@@ -686,28 +727,64 @@ describe('Stage2D', () => {
       expect(rtDispose.callCount, 'after dispose()').toBe(0);
     });
 
-    it('builds a new node for a new camera and releases the one before', () => {
+    it('keeps its node for a new camera and renders through that camera', () => {
       const stage = makeStage();
-      const first = stage.asPassNode(noRenderer) as PassNode;
-      const firstDispose = sandbox.spy(first, 'dispose');
+      const node = stage.asPassNode(noRenderer) as PassNode;
+      const nodeDispose = sandbox.spy(node, 'dispose');
 
-      stage.camera = new PerspectiveCamera();
-      const second = stage.asPassNode(noRenderer);
+      const camera = new PerspectiveCamera();
+      stage.camera = camera;
 
-      expect(second, 'a camera of its own needs a node of its own').not.toBe(first);
-      expect(firstDispose.calledOnce, 'the node of the camera before is released').toBe(true);
+      expect(stage.asPassNode(noRenderer), 'the same node').toBe(node);
+      expect(node.camera).toBe(camera);
+      expect(nodeDispose.called, 'nothing released').toBe(false);
     });
 
-    it('builds a new node for a new scene and releases the one before', () => {
+    it('keeps its node for a new scene and renders that scene', () => {
       const stage = makeStage();
-      const first = stage.asPassNode(noRenderer) as PassNode;
-      const firstDispose = sandbox.spy(first, 'dispose');
+      const node = stage.asPassNode(noRenderer) as PassNode;
+      const nodeDispose = sandbox.spy(node, 'dispose');
 
-      stage.scene = new Scene();
-      const second = stage.asPassNode(noRenderer);
+      const scene = new Scene();
+      stage.scene = scene;
 
-      expect(second, 'another scene needs a node of its own').not.toBe(first);
-      expect(firstDispose.calledOnce, 'the node of the scene before is released').toBe(true);
+      expect(stage.asPassNode(noRenderer), 'the same node').toBe(node);
+      expect(node.scene).toBe(scene);
+      expect(nodeDispose.called, 'nothing released').toBe(false);
+    });
+
+    it('a node handed out before follows a new camera and a new scene without another asPassNode()', () => {
+      const stage = makeStage();
+      const node = stage.asPassNode(noRenderer) as PassNode;
+
+      const camera = new OrthographicCamera();
+      stage.camera = camera;
+      expect(node.camera).toBe(camera);
+
+      const scene = new Scene();
+      stage.scene = scene;
+      expect(node.scene).toBe(scene);
+
+      // back to the camera of the projection
+      stage.camera = undefined;
+      expect(node.camera).toBe(stage.camera);
+      expect(node.camera).not.toBe(camera);
+    });
+
+    it('a camera that goes away leaves the node with the camera it had, and the next one goes into it', () => {
+      const stage = makeStage();
+      const node = stage.asPassNode(noRenderer) as PassNode;
+      const before = stage.camera;
+
+      stage.projection = undefined;
+      expect(stage.camera).toBeUndefined();
+      expect(node.camera, 'the camera it had').toBe(before);
+
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      expect(stage.camera).toBeDefined();
+      expect(stage.camera).not.toBe(before);
+      expect(node.camera).toBe(stage.camera);
+      expect(stage.asPassNode(noRenderer), 'the same node').toBe(node);
     });
   });
 

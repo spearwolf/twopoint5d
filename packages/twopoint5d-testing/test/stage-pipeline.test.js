@@ -10,7 +10,7 @@ import {
   StageRenderTargetPool,
 } from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget, Scene} from 'three/webgpu';
-import {makeContainer, disposeDisplay, disposeKept, isNearColor, keep, rgbAt} from './helpers/fixtures.js';
+import {countNodeBuilds, makeContainer, disposeDisplay, disposeKept, isNearColor, keep, rgbAt} from './helpers/fixtures.js';
 
 /** @import {PassNode} from 'three/webgpu' */
 
@@ -88,21 +88,32 @@ describe('StageRenderer — pipeline integration', () => {
     expect(lastPasses).to.have.length(1);
   });
 
-  it('composed mode: swapping the stage projection after the first frame rebuilds the output node through the new camera', async () => {
+  /**
+   * A 50 x 50 orange square at the origin, drawn by a renderer on the display through a
+   * `RenderPipeline` and a `buildOutputNode` that hands on the first pass. The renderer writes into
+   * a target of the size of the display, 320 pixels wide — a multiple of 64, so that rgbAt() reads
+   * its rows at that length — and `pixels()` reads it back.
+   */
+  async function makeComposedSquare() {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
-    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
-    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+    const stage = keep(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320})));
+    const geometry = keep(new PlaneGeometry(50, 50));
+    const material = keep(new MeshBasicMaterial({color: new Color('#f80')}));
+    stage.scene.add(new Mesh(geometry, material));
+    const target = keep(new RenderTarget(320, 200));
 
+    const pipeline = keep(new RenderPipeline(display.renderer));
     const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
-    sr.pipeline = new RenderPipeline(display.renderer);
+    // the renderer lets go first: it holds the stage and the pipeline
+    keep(sr);
+    sr.pipeline = pipeline;
+    sr.outputRenderTarget = target;
 
-    let buildCalls = 0;
-    /** @type {PassNode[] | undefined} */
-    let lastPasses;
+    const built = {calls: 0, /** @type {PassNode[]} */ passes: []};
     sr.buildOutputNode = (passes) => {
-      buildCalls += 1;
-      lastPasses = /** @type {PassNode[]} */ (passes);
+      built.calls += 1;
+      built.passes = /** @type {PassNode[]} */ (passes);
       return passes[0];
     };
 
@@ -110,46 +121,69 @@ describe('StageRenderer — pipeline integration', () => {
     await display.nextFrame();
     await display.nextFrame();
 
-    expect(buildCalls).to.equal(1);
+    const pixels = () => display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 320, 200);
+    return {stage, built, pixels};
+  }
+
+  const ORANGE = [255, 136, 0];
+  const BLACK = [0, 0, 0];
+
+  it('composed mode: swapping the stage projection after the first frame keeps the output node and draws through the new camera', async () => {
+    const {stage, built, pixels} = await makeComposedSquare();
+    expect(built.calls).to.equal(1);
+    const node = built.passes[0];
+    // 40 pixels right of the middle lies outside the square of 50 pixels
+    expect(isNearColor(rgbAt(await pixels(), 320, 200, 100), BLACK), 'outside the square before the zoom').to.be.true;
 
     stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 160});
     await display.nextFrame();
 
-    expect(buildCalls, 'the new camera needs a new pass node').to.equal(2);
-    expect(lastPasses[0].camera, 'the pass node renders through the camera of the new projection').to.equal(stage.camera);
+    expect(built.calls, 'the output node stays').to.equal(1);
+    expect(built.passes[0], 'the same pass node').to.equal(node);
+    expect(node.camera, 'the pass node renders through the camera of the new projection').to.equal(stage.camera);
+    const zoomed = rgbAt(await pixels(), 320, 200, 100);
+    expect(isNearColor(zoomed, ORANGE, 8), `inside the square zoomed by 2, got ${zoomed}`).to.be.true;
   });
 
-  it('composed mode: swapping the stage scene after the first frame rebuilds the output node for the new scene', async () => {
-    host = makeContainer({width: 320, height: 200});
-    display = new Display(host);
-    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
-    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
-
-    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
-    sr.pipeline = new RenderPipeline(display.renderer);
-
-    let buildCalls = 0;
-    /** @type {PassNode[] | undefined} */
-    let lastPasses;
-    sr.buildOutputNode = (passes) => {
-      buildCalls += 1;
-      lastPasses = /** @type {PassNode[]} */ (passes);
-      return passes[0];
-    };
-
-    await display.start();
-    await display.nextFrame();
-    await display.nextFrame();
-
-    expect(buildCalls).to.equal(1);
+  it('composed mode: swapping the stage scene after the first frame keeps the output node and draws the new scene', async () => {
+    const {stage, built, pixels} = await makeComposedSquare();
+    expect(built.calls).to.equal(1);
+    const node = built.passes[0];
 
     const scene = new Scene();
-    scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#08f')})));
+    const geometry = keep(new PlaneGeometry(50, 50));
+    const material = keep(new MeshBasicMaterial({color: new Color('#08f')}));
+    scene.add(new Mesh(geometry, material));
     stage.scene = scene;
     await display.nextFrame();
 
-    expect(buildCalls, 'the new scene needs a new pass node').to.equal(2);
-    expect(lastPasses[0].scene, 'the pass node renders the new scene').to.equal(stage.scene);
+    expect(built.calls, 'the output node stays').to.equal(1);
+    expect(built.passes[0], 'the same pass node').to.equal(node);
+    expect(node.scene, 'the pass node renders the new scene').to.equal(stage.scene);
+    const middle = rgbAt(await pixels(), 320, 160, 100);
+    expect(isNearColor(middle, [0, 136, 255], 8), `the square of the new scene, got ${middle}`).to.be.true;
+  });
+
+  it('composed mode: a new projection of the same kind builds no node', async () => {
+    const {stage, built} = await makeComposedSquare();
+    const a = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+    const b = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 160});
+    // warmed through A, B and A again: whatever three builds once for the kind of camera is built
+    for (const projection of [a, b, a]) {
+      stage.projection = projection;
+      await display.nextFrame();
+    }
+
+    const counter = await countNodeBuilds(display.renderer);
+    try {
+      stage.projection = b;
+      await display.nextFrame();
+    } finally {
+      counter.stop();
+    }
+
+    expect(counter.count, 'node builds for the switch to B').to.equal(0);
+    expect(built.calls, 'the output node stays').to.equal(1);
   });
 
   it('composed mode: a stage disposed while the renderer holds it leaves the renderer, and the next frame composes the stages that are left', async () => {

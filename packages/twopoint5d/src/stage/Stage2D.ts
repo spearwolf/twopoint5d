@@ -48,10 +48,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   /**
    * The `THREE.Scene` this stage renders. A new scene applies from the next frame on, in every
    * mode of a `StageRenderer`: every change emits `OnStageAfterSceneChanged` with the scene it
-   * replaced, and a renderer that composes pass nodes builds its output node anew on it. Every
-   * listener hears the event, also behind one that throws; the stage has taken the new scene by
-   * then, and the error reaches the caller afterwards — one unchanged, several as an
-   * `AggregateError`.
+   * replaced; the pass node of {@link asPassNode} renders the new scene from its next draw, and a
+   * renderer that composes this stage keeps its output node. Every listener hears the event, also
+   * behind one that throws; the stage has taken the new scene by then, and the error reaches the
+   * caller afterwards — one unchanged, several as an `AggregateError`.
    *
    * The scene belongs to the caller: a new one leaves the previous one as it is. After
    * {@link dispose} a write goes through and announces nothing.
@@ -65,6 +65,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
     const prevScene = this.#scene;
     this.#scene = scene;
+    // after dispose() there is no node left to write into
+    if (this.#passNode != null) this.#passNode.scene = scene;
 
     if (this.#disposed) return;
 
@@ -78,7 +80,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * or an own `updateProjection()` before it.
    *
    * The flag stays `true` as long as the container has no area, and turns `false` as soon as the
-   * projection has been asked; a projection that cannot place the camera leaves it set.
+   * projection has answered; a projection that throws, or cannot place the camera, leaves it set.
    */
   needsUpdate = false;
 
@@ -191,7 +193,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * assignment itself leaves the camera where it is; the next of these calls places it. A stage
    * whose camera you place yourself gets no projection.
    *
-   * Every change of the camera emits `OnStageAfterCameraChanged` with the camera it replaced.
+   * The pass node of {@link asPassNode} renders through a new camera from its next draw, and a
+   * renderer that composes this stage keeps its output node. Every change of the camera emits
+   * `OnStageAfterCameraChanged` with the camera it replaced.
    * Every listener hears it, also behind one that throws; the stage has taken the new camera by
    * then, and the error reaches the caller afterwards — one unchanged, several as an
    * `AggregateError`.
@@ -225,6 +229,12 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     const prevCamera = this.camera;
     updateCallback();
     if (prevCamera !== this.camera) {
+      // a PassNode reads its camera as a plain field when it draws, and nothing of its graph
+      // depends on the camera: the node takes the new one as it is, and is drawn through it from
+      // its next frame on. A camera that goes away leaves it the one it had — without a camera
+      // the node is not drawn — and the next one goes into it
+      const camera = this.camera;
+      if (camera != null && this.#passNode != null) this.#passNode.camera = camera;
       const args: StageAfterCameraChangedArgs = [this, prevCamera];
       try {
         emitStrict(this, OnStageAfterCameraChanged, ...args);
@@ -315,8 +325,15 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     const prevNeedsUpdate = this.needsUpdate;
     this.needsUpdate = false;
 
-    this.projection!.updateViewRect(width, height, pixelRatio);
-    const {width: w, height: h} = this.projection!.getViewRect();
+    let w: number;
+    let h: number;
+    try {
+      this.projection!.updateViewRect(width, height, pixelRatio);
+      ({width: w, height: h} = this.projection!.getViewRect());
+    } catch (error) {
+      this.needsUpdate = prevNeedsUpdate;
+      throw error;
+    }
 
     // specs that give no view with an area leave the projection without one: there is nothing to
     // build a camera from, so the stage keeps the camera and the size it has
@@ -459,21 +476,16 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   }
 
   #passNode?: PassNode;
-  #passNodeScene?: Scene;
-  #passNodeCamera?: Camera;
 
   /**
    * Return a TSL `pass(scene, camera)` node for use inside a parent
    * `RenderPipeline`. Requires `camera` — a `resize()` with an area, or an assigned camera.
    *
-   * The same node comes back for as long as {@link scene} and {@link camera} stay what they
-   * were. The comparison sits in this call and not in the assignment: a change of either
-   * releases the node built for the pair before it, and its render target with it, on the next
-   * call of this method, or in {@link dispose} if none comes. A `StageRenderer` that composes this
-   * stage listens for both changes — `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged` —
-   * and calls this method again on its next render. A stage added to two
-   * `StageRenderer`s hands both the very same node — one node that renders its scene once per
-   * frame, and two readers of that one result.
+   * The same node comes back for the life of the stage: a new scene or camera goes into it as it
+   * is assigned and applies from its next draw, so a renderer that composes this stage keeps its
+   * graph and builds no shader for it. A camera that goes away leaves the node with the camera it
+   * had. A stage added to two `StageRenderer`s hands both the very same node — one node that
+   * renders its scene once per frame, and two readers of that one result.
    *
    * The node belongs to the stage and is released by {@link dispose}. Throws on a disposed
    * stage, which builds no further node.
@@ -491,18 +503,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       );
     }
 
-    // the node renders one scene through one camera; either of them moving makes a node
-    // built for the pair before it useless, and it takes its render target with it
-    if (this.#passNode != null && this.#passNodeScene === scene && this.#passNodeCamera === camera) {
-      return this.#passNode;
-    }
-
-    this.#disposePassNode();
-
-    this.#passNode = pass(scene, camera);
-    this.#passNodeScene = scene;
-    this.#passNodeCamera = camera;
-
+    // one node for the life of the stage: the setters of scene and camera write into it
+    this.#passNode ??= pass(scene, camera);
     return this.#passNode;
   }
 
@@ -523,8 +525,6 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   #disposePassNode(): void {
     this.#passNode?.dispose();
     this.#passNode = undefined;
-    this.#passNodeScene = undefined;
-    this.#passNodeCamera = undefined;
   }
 
   #disposed = false;

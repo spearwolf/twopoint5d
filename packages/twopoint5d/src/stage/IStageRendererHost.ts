@@ -18,6 +18,10 @@ export type StageRendererHostEventHandler = (handler: (props: DisplayEventProps)
  * that throws does not keep the renderer from giving up its other subscription. Neither
  * error is swallowed: both reach the caller of the call that moved the renderer, see
  * `StageRenderer#parent`.
+ *
+ * A host may hand its current size to the listener while `onResize()` subscribes, as a `Display`
+ * does: the renderer holds that size until both subscriptions stand and hands it to its `resize()`
+ * afterwards, so a stage that refuses it reaches the caller as well.
  */
 export interface IStageRendererHost {
   onResize: StageRendererHostEventHandler;

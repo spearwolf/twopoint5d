@@ -1,4 +1,15 @@
 import {RenderTarget, type TextureDataType} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
+
+// the numbers of acquire() are pixels of the target itself: a fraction, 0 or a negative value would
+// give a texture three.js cannot build, and the error would come from deep inside its next draw
+function assertWholeNumber(value: unknown, name: string, min: number): void {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min) {
+    throw new RangeError(
+      `StageRenderTargetPool#acquire(): ${name} must be a whole number of ${min} or more, got ${describeValue(value)}`,
+    );
+  }
+}
 
 interface StageRenderTargetPoolEntry {
   readonly renderTarget: RenderTarget;
@@ -55,9 +66,19 @@ export class StageRenderTargetPool {
    * logical size. Every `acquire()` is paired with one {@link release} of the target it answered;
    * code of your own may borrow from the same pool on the same terms.
    *
+   * `width` and `height` are whole numbers of 1 or more, `samples` a whole number of 0 or more; any
+   * other value is refused with a `RangeError` that names the call, the argument and the value,
+   * before the pool changes — a refused call resizes and releases no target. The check comes
+   * first, also after `dispose()`.
+   *
    * Throws an error naming the class and the state once {@link dispose} has run.
    */
   acquire(width: number, height: number, type: TextureDataType, samples: number): RenderTarget {
+    // before the search: a refused call may neither resize a free target nor release the others
+    assertWholeNumber(width, 'width', 1);
+    assertWholeNumber(height, 'height', 1);
+    assertWholeNumber(samples, 'samples', 0);
+
     if (this.#disposed) {
       throw new Error('StageRenderTargetPool#acquire() is not available: this pool has been disposed');
     }

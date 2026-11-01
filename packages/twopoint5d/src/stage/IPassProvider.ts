@@ -11,6 +11,10 @@ import type {Node, WebGPURenderer} from 'three/webgpu';
  * `StageRenderer` the render target its `texture()` node samples — so a caller composes the
  * node into a pipeline and never disposes it. An implementation of this interface owns what it
  * builds here in the same way.
+ *
+ * A composing `StageRenderer` asks an eventized provider for its node again after it announced
+ * `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged`, and rebuilds its output node only for
+ * a node that differs from the one it composed.
  */
 export interface IPassProvider {
   asPassNode(renderer: WebGPURenderer): Node;

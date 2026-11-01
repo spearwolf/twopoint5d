@@ -72,14 +72,23 @@ function disposedError(member: string): Error {
 const ADD_THREW =
   'StageRenderer#add(): more than one listener of OnRemoveFromParent, OnStageRemoved, OnStageAdded and OnAddToParent or unsubscribe of the previous host threw';
 
+/**
+ * One stage of a `StageRenderer` and the size it carries — the record `resize()` keeps of which
+ * size each stage has taken. Read-only: the renderer writes it in `add()` and `resize()`, and
+ * nothing else does.
+ */
 export interface StageItem {
-  stage: IStage & IRenderable;
+  readonly stage: IStage & IRenderable;
 
-  width: number;
-  height: number;
+  readonly width: number;
+  readonly height: number;
   /** The pixel ratio the stage carries, handed to it with `width` and `height`. */
-  pixelRatio: number;
+  readonly pixelRatio: number;
 }
+
+// the item as the renderer keeps it, writable; derived, so that it keeps step with StageItem. Not
+// exported: public-api.ts re-exports this module whole
+type StageItemRecord = {-readonly [K in keyof StageItem]: StageItem[K]};
 
 export interface StageRenderer extends EventizedObject {}
 
@@ -122,7 +131,9 @@ export interface StageRenderer extends EventizedObject {}
  * before that draw — `renderer.autoClear` with the `autoClearColor`, `autoClearDepth` and
  * `autoClearStencil` flags of every buffer the own clear covers, as three.js sets them by default.
  * The target ends up the same either way, and on the canvas the clear would cost a full-screen draw
- * of its own.
+ * of its own. A renderer without a pipeline that draws a nested renderer with a pipeline of its own
+ * beside other stages into one target warns once on the console — see "One writer per canvas" in
+ * the stages guide.
  *
  * Setting `clearColor` to a non-null value also sets `clear = true` as a
  * convenience. Multiple stages are drawn additively into the same target —
@@ -216,13 +227,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   #oldClearColor = new Color(0x000000);
 
-  readonly #stages: StageItem[] = [];
+  readonly #stages: StageItemRecord[] = [];
 
   /**
    * Every stage of this renderer, in the order they were added — a read-only view of the live
-   * list; {@link add} and {@link remove} are the only way in and out. The order in which the
-   * stages update and draw is {@link orderedStages}: a stage that {@link renderOrder} does not
-   * place is in here and not there, and {@link resize} reaches it all the same.
+   * list, its items included; {@link add} and {@link remove} are the only way in and out. The
+   * order in which the stages update and draw is {@link orderedStages}: a stage that
+   * {@link renderOrder} does not place is in here and not there, and {@link resize} reaches it all
+   * the same.
    */
   get stages(): ReadonlyArray<StageItem> {
     return this.#stages;
@@ -295,6 +307,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * disposes this renderer or gives it another holder while it leaves its holder ends the
    * assignment there. For a `StageRenderer` assigned here, {@link add} says the same.
    *
+   * A host that hands its current size to a new subscriber — a `Display` does — gives it to this
+   * renderer once the renderer has joined, before `OnAddToParent`: a stage that refuses it makes the
+   * assignment throw that error after the join, together with the errors of the listeners. The
+   * renderer stays joined and keeps the size it had, see {@link resize}, and the next resize of the
+   * host asks the stage again. A listener of that resize that disposes this renderer or gives it
+   * another holder ends the join there: no `OnAddToParent` goes out for the host, while the
+   * `OnRemoveFromParent` of leaving it does.
+   *
    * A host whose `onResize()` or `onRenderFrame()` throws as this renderer joins it
    * holds nothing of it: the renderer gives back the subscription the host had handed
    * out and joins no holder — `parent` answers `undefined`, and `OnAddToParent` does
@@ -332,10 +352,14 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (!this.#disposed && this.#parent === undefined && parent) {
       this.#parent = parent;
       if (this.#addToHost(parent, errors)) {
-        try {
-          emitStrict(this, OnAddToParent);
-        } catch (error) {
-          errors.push(error);
+        // a listener of the size the host handed in can have disposed this renderer or given it
+        // another holder: the join ends there, and OnAddToParent is that holder's to send
+        if (!this.#disposed && this.#parent === parent) {
+          try {
+            emitStrict(this, OnAddToParent);
+          } catch (error) {
+            errors.push(error);
+          }
         }
       } else {
         // a host that refused a subscription does not hold this renderer
@@ -344,7 +368,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
+      'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent, subscribe or unsubscribe at a host, or a stage that refused the size of the host threw',
     );
   }
 
@@ -394,11 +418,30 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   // each handle is booked as soon as the host hands it out. A host that throws on
   // either subscription gets back what it handed out and holds nothing of this
-  // renderer; its error waits for the caller. Answers whether the host took both
+  // renderer; its error waits for the caller, and so does the error of a stage that refuses
+  // the size the host handed in while it subscribed. Answers whether the host took both
   #addToHost(host: IStageRendererHost, errors: unknown[]): boolean {
+    // plain locals, no object: nothing is allocated per resize of the host
+    let joining = true;
+    let replayed = false;
+    let replayedWidth = 0;
+    let replayedHeight = 0;
+    let replayedPixelRatio = 1;
     try {
+      // a host that hands its last size to a new subscriber — a Display retains its resize event —
+      // hands it in during onResize(), and eventize catches what a listener throws there. Held
+      // until both subscriptions are booked, the size reaches resize() outside of the subscription:
+      // a stage that refuses it reaches the caller, and a listener of this resize that disposes the
+      // renderer or attaches it elsewhere finds every subscription booked
       this.#hostSubscriptions.push(
         host.onResize(({width, height, pixelRatio}) => {
+          if (joining) {
+            replayed = true;
+            replayedWidth = width;
+            replayedHeight = height;
+            replayedPixelRatio = pixelRatio;
+            return;
+          }
           this.resize(width, height, pixelRatio);
         }),
       );
@@ -408,12 +451,22 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
           this.renderTo(renderer);
         }),
       );
-      return true;
     } catch (error) {
+      // the size a host handed in goes with the handles: the renderer holds nothing of that host
       errors.push(error);
       this.#unsubscribeFromHost(errors);
       return false;
+    } finally {
+      joining = false;
     }
+    if (replayed) {
+      try {
+        this.resize(replayedWidth, replayedHeight, replayedPixelRatio);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    return true;
   }
 
   /**
@@ -552,15 +605,21 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * already, and writes them into the item as soon as the stage has taken them. {@link resize}
    * calls it for every stage, {@link add} for the new stage before it is in {@link stages}. An
    * override that throws counts as the stage refusing the size (see `resize()`).
+   *
+   * The item is read-only to an override: this method is the one place that writes it, so an
+   * override that leaves out `super.resizeStage()` leaves the item at the size it had.
    */
   protected resizeStage(stageItem: StageItem, width: number, height: number, pixelRatio: number): void {
-    if (stageItem.width !== width || stageItem.height !== height || stageItem.pixelRatio !== pixelRatio) {
+    // every item is a record this renderer built in add(); `readonly` keeps callers outside of it
+    // from writing, and this is where the renderer writes
+    const record: StageItemRecord = stageItem;
+    if (record.width !== width || record.height !== height || record.pixelRatio !== pixelRatio) {
       // the size a stage refuses is not the size it shows: the item keeps the one it had, so the
       // next resize() asks that stage again instead of taking it for done
-      stageItem.stage.resize(width, height, pixelRatio);
-      stageItem.width = width;
-      stageItem.height = height;
-      stageItem.pixelRatio = pixelRatio;
+      record.stage.resize(width, height, pixelRatio);
+      record.width = width;
+      record.height = height;
+      record.pixelRatio = pixelRatio;
     }
   }
 
@@ -788,11 +847,20 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #internalOutputTexture?: Texture;
   /**
    * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their order
-   * or names, the pipeline, `buildOutputNode` or the camera or the scene of a stage changed. Only
-   * the composed mode reads it; the whole-picture mode keeps its own node, see
-   * `#wireInternalOutputNode()`.
+   * or names, the pipeline, `buildOutputNode` changed, or a stage handed a new pass node after a
+   * change of its camera or scene (see `#composedPassesChanged()`). Only the composed mode reads
+   * it; the whole-picture mode keeps its own node, see `#wireInternalOutputNode()`.
    */
   #outputDirty = true;
+
+  /**
+   * Set when a stage announced a new camera or scene: the next composing frame asks the stages
+   * for their pass nodes and compares them with `#composedPasses`.
+   */
+  #passesToCheck = false;
+
+  /** The pass nodes the output node of the composed mode was last built from, one per stage. */
+  #composedPasses: Node[] = [];
 
   /** Invalidate the cached `pipeline.outputNode`; the next render rebuilds it, in either pipeline mode. */
   invalidateOutputNode(): void {
@@ -904,8 +972,34 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /** Plain mode: clear (if requested), then render stages into the current target. */
   #renderStagesInline(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
+    // a child with a pipeline alone is the one writer of the target; beside a second stage its quad
+    // covers what the others drew
+    if (!this.#warnedAboutPipelineChild && stages.length > 1) this.#warnAboutPipelineChild(stages);
     if (this.clear) this.#applyClear(renderer);
     this.#drawStages(renderer, stages);
+  }
+
+  #warnedAboutPipelineChild = false;
+
+  /**
+   * Warns once, for the first nested renderer among `stages` that runs a pipeline of its own and
+   * draws into the target of this renderer — one without an `outputRenderTarget`. An
+   * `outputRenderTarget` of this renderer changes nothing: the quad covers whatever target this
+   * renderer draws into.
+   */
+  #warnAboutPipelineChild(stages: ReadonlyArray<StageItem>): void {
+    // indexed, as in #canCompose(): this runs in every frame until it has warned
+    for (let i = 0; i < stages.length; i++) {
+      const child = stages[i]!.stage;
+      if (child instanceof StageRenderer && child.#renderMode() !== 'plain' && child.outputRenderTarget == null) {
+        this.#warnedAboutPipelineChild = true;
+        // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+        console.warn(
+          `StageRenderer "${this.name}" has no pipeline and draws the renderer "${child.name}", which runs a pipeline of its own, into one target with other stages: the quad of that pipeline covers every pixel of the target without blending, and what the stages before it drew there is lost. Give the outer renderer the pipeline — a RootRenderPipeline composes every child —, or give "${child.name}" an outputRenderTarget of its own.`,
+        );
+        return;
+      }
+    }
   }
 
   /** Draws the stages into the current target, with renderer.autoClear off while they draw and restored afterwards. */
@@ -1035,6 +1129,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       return;
     }
     this.#prerenderNestedRenderers(renderer, stages);
+    if (!this.#outputDirty && this.#passesToCheck) {
+      this.#passesToCheck = false;
+      if (this.#composedPassesChanged(renderer, stages)) this.#outputDirty = true;
+    }
     if (this.#outputDirty) this.#rebuildComposedOutputNode(renderer, stages);
     this.#clearBeforePipeline(renderer);
     this.pipeline!.render();
@@ -1101,6 +1199,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #rebuildComposedOutputNode(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     const passes = stages.map((s) => this.#getStagePass(s, renderer));
+    // a copy of its own, taken once per rebuild: a builder may keep the array it is handed and
+    // reorder or shorten it, and #composedPassesChanged() compares with what was composed
+    const composed = passes.slice();
     const compose = this.buildOutputNode ?? RootRenderPipeline.buildOutputNode;
     const pipeline = this.pipeline!;
     const outputNode = compose(passes);
@@ -1108,7 +1209,26 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       pipeline.outputNode = outputNode;
       pipeline.needsUpdate = true;
     }
+    this.#composedPasses = composed;
     this.#outputDirty = false;
+    this.#passesToCheck = false;
+  }
+
+  /**
+   * Whether a stage hands a pass node other than the one the output node was built from. A nested
+   * `StageRenderer` is left out: its `asPassNode()` builds a new `texture()` node over the same pass
+   * target on every call, and it announces neither a camera nor a scene. Indexed and without a
+   * closure, as every loop of a frame: a `Stage2D` hands its node, and nothing is allocated.
+   */
+  #composedPassesChanged(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): boolean {
+    const composed = this.#composedPasses;
+    if (stages.length !== composed.length) return true;
+    for (let i = 0; i < stages.length; i++) {
+      const item = stages[i]!;
+      if (item.stage instanceof StageRenderer) continue;
+      if (this.#getStagePass(item, renderer) !== composed[i]) return true;
+    }
+    return false;
   }
 
   /**
@@ -1258,6 +1378,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#targets.dispose();
     this.#internalOutputNode = undefined;
     this.#internalOutputTexture = undefined;
+    // the pass nodes belong to the stages, which this renderer has let go of
+    this.#composedPasses = [];
 
     // the parent setter refuses a disposed renderer, so the detach runs on the field itself.
     // #removeFromParent() gives up the host subscriptions from #addToHost() and emits
@@ -1367,11 +1489,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    *
    * On an eventized stage — every `Stage2D` and every `StageRenderer` — it
    * listens for `OnStageAfterCameraChanged` and `OnStageAfterSceneChanged`
-   * and, in the composed mode, rebuilds the output node on the next render,
-   * and for `OnStageDispose`, on which it takes the stage out through
-   * {@link remove}; `remove()` stops listening. A child `StageRenderer` does
-   * not wait for that event: its own `dispose()` takes it out of this
-   * renderer first.
+   * and, in the composed mode, rebuilds the output node on the next render
+   * for a stage that hands a new pass node after either — a `Stage2D` keeps
+   * its node, and nothing is rebuilt for it —, and for `OnStageDispose`, on
+   * which it takes the stage out through {@link remove}; `remove()` stops
+   * listening. A child `StageRenderer` does not wait for that event: its own
+   * `dispose()` takes it out of this renderer first.
    *
    * A stage added during `updateFrame()`, `renderTo()` or `resize()` is
    * reached from the next call on, see {@link orderedStages}.
@@ -1405,7 +1528,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       throw new TypeError(`StageRenderer#add() cannot take the stage "${stage.name}": that stage ${NO_PASS_NODE}`);
     }
 
-    const item: StageItem = {stage, width: 0, height: 0, pixelRatio: 1};
+    const item: StageItemRecord = {stage, width: 0, height: 0, pixelRatio: 1};
 
     // the size first: a stage that refuses it leaves with its error before anything here, on the
     // stage or at the previous holder of a child renderer has changed
@@ -1431,13 +1554,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#outputDirty = true;
 
     if (isEventized(stage)) {
-      // a pass node keeps the scene and the camera it was built with: a stage that announces a
-      // new one of either needs a new pass node, and with it a new output node — in the composed
-      // mode only, since the node of the whole-picture mode samples the internal target and holds
-      // neither scene nor camera, and so the flag is set here rather than through
-      // invalidateOutputNode(), which drops that node as well
+      // a stage that announces a new camera or scene can hand a new pass node — a Stage2D keeps
+      // its node and writes both into it —, so the next composing frame asks and rebuilds only for
+      // another node. The whole-picture mode does not read the flag: its node samples the internal
+      // target and holds neither scene nor camera
       const unsubscribeChanges = on(stage, [OnStageAfterCameraChanged, OnStageAfterSceneChanged], () => {
-        this.#outputDirty = true;
+        this.#passesToCheck = true;
       });
       // a disposed stage has no pass node left to give: the renderer lets go of it on the spot
       const unsubscribeDispose = on(stage, OnStageDispose, () => {
@@ -1452,7 +1574,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (child) child.#parent = this;
 
     try {
-      emitStrict(this, OnStageAdded, {stage, renderer: this} as StageAddedProps);
+      emitStrict(this, OnStageAdded, {stage, renderer: this} satisfies StageAddedProps);
     } catch (error) {
       errors.push(error);
     }
@@ -1499,7 +1621,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#outputDirty = true;
       const errors: unknown[] = [];
       try {
-        emitStrict(this, OnStageRemoved, {stage, renderer: this} as StageRemovedProps);
+        emitStrict(this, OnStageRemoved, {stage, renderer: this} satisfies StageRemovedProps);
       } catch (error) {
         errors.push(error);
       }

@@ -36,7 +36,7 @@ import {RootRenderPipeline} from './RootRenderPipeline.js';
 import {Stage2D} from './Stage2D.js';
 import {StageRenderer} from './StageRenderer.js';
 import {StageRenderTargetPool} from './StageRenderTargetPool.js';
-import {getSubscriptionCount, on} from '@spearwolf/eventize';
+import {emit, eventize, getSubscriptionCount, on, retain} from '@spearwolf/eventize';
 
 // the BloomNodes reachable from `root`, found through Node#getChildren()
 function findBlooms(root: Node): BloomNode[] {
@@ -508,6 +508,23 @@ describe('StageRenderer', () => {
       expect(added).toHaveBeenCalledWith({stage, renderer: sr});
       expect(sr.remove(stage)).toBe(sr);
       expect(removed).toHaveBeenCalledWith({stage, renderer: sr});
+    });
+
+    it('hands out its stage items read-only, and resize() is the way to a new size', () => {
+      const sr = new StageRenderer();
+      const stage = fakeStage('s');
+      sr.add(stage);
+      // the writes are the type check: `readonly` holds at compile time only, so the two that would
+      // change the record at run time write what it holds already
+      // @ts-expect-error a stage item is read-only
+      sr.stages[0]!.width = 800;
+      // @ts-expect-error a stage item is read-only
+      sr.stages[0]!.stage = stage;
+      // @ts-expect-error a stage item is read-only
+      sr.stages[0]!.pixelRatio = 1;
+      sr.resize(800, 600);
+      expect(stage.resize).toHaveBeenLastCalledWith(800, 600, 1);
+      expect(sr.stages[0]).toMatchObject({stage, width: 800, height: 600});
     });
 
     it('add() is idempotent', () => {
@@ -1411,7 +1428,7 @@ describe('StageRenderer', () => {
 
       expect(error).toBeInstanceOf(AggregateError);
       expect(error.message).toBe(
-        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent, subscribe or unsubscribe at a host, or a stage that refused the size of the host threw',
       );
       expect(error.errors).toHaveLength(2);
       expect(error.errors[0]).toBe(e1);
@@ -1546,7 +1563,7 @@ describe('StageRenderer', () => {
 
       expect(error).toBeInstanceOf(AggregateError);
       expect(error.message).toBe(
-        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent, subscribe or unsubscribe at a host, or a stage that refused the size of the host threw',
       );
       expect(error.errors).toEqual([eP, eS]);
       expect(sr.parent).toBeUndefined();
@@ -1565,7 +1582,7 @@ describe('StageRenderer', () => {
 
       expect(error).toBeInstanceOf(AggregateError);
       expect(error.message).toBe(
-        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent, subscribe or unsubscribe at a host, or a stage that refused the size of the host threw',
       );
       expect(error.errors).toEqual([eS, eU]);
       expect(host._unsubs).toBe(1);
@@ -1610,7 +1627,7 @@ describe('StageRenderer', () => {
 
       expect(error).toBeInstanceOf(AggregateError);
       expect(error.message).toBe(
-        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent or subscribe or unsubscribe at a host threw',
+        'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent, subscribe or unsubscribe at a host, or a stage that refused the size of the host threw',
       );
       expect(error.errors).toEqual([eU, eP, eA]);
       expect(sr.parent).toBe(hostB);
@@ -1635,6 +1652,160 @@ describe('StageRenderer', () => {
       host._emitFrame(1, 0.016, 1);
       expect(inner.updateFrame).not.toHaveBeenCalled();
       expect(inner.renderTo).not.toHaveBeenCalled();
+    });
+
+    describe('a host that hands its current size to a new subscriber', () => {
+      // a host on real eventize, as a Display is: the resize is retained, so onResize() plays the
+      // last size to the listener while it subscribes. The props carry the fields #addToHost() reads
+      function makeRetainingHost() {
+        const host = eventize({
+          onResize: ((listener) => on(host, 'resize', listener)) as IStageRendererHost['onResize'],
+          onRenderFrame: ((listener) => on(host, 'frame', listener)) as IStageRendererHost['onRenderFrame'],
+          emitResize(width: number, height: number, pixelRatio = 1) {
+            emit(host, 'resize', {width, height, pixelRatio});
+          },
+        });
+        retain(host, 'resize');
+        return host;
+      }
+
+      it('makes attach() throw the error of a stage that refuses the size, after the join', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const failure = new Error('the stage refused the size');
+        const host = makeRetainingHost();
+        host.emitResize(100, 50);
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        stage.resize.mockImplementationOnce(() => {
+          throw failure;
+        });
+        sr.add(stage);
+        const added = vi.fn();
+        on(sr, OnAddToParent, added);
+
+        try {
+          expect(thrownBy(() => sr.attach(host))).toBe(failure);
+          expect(warn, 'the refusal does not end in a console warning of eventize').not.toHaveBeenCalled();
+        } finally {
+          warn.mockRestore();
+        }
+
+        expect(sr.parent, 'the renderer stays joined').toBe(host);
+        expect(added).toHaveBeenCalledTimes(1);
+        expect(getSubscriptionCount(host)).toBe(2);
+        expect([sr.width, sr.height], 'and keeps the size it had').toEqual([0, 0]);
+
+        host.emitResize(100, 50);
+        expect(stage.resize, 'the same size asks the stage again').toHaveBeenCalledTimes(2);
+        expect(stage.resize).toHaveBeenLastCalledWith(100, 50, 1);
+        expect([sr.width, sr.height]).toEqual([100, 50]);
+      });
+
+      it('names the refusal of the size beside a listener of OnAddToParent that throws', () => {
+        const failure = new Error('the stage refused the size');
+        const listenerFailure = new Error('the listener failed');
+        const host = makeRetainingHost();
+        host.emitResize(100, 50);
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        stage.resize.mockImplementationOnce(() => {
+          throw failure;
+        });
+        sr.add(stage);
+        on(sr, OnAddToParent, () => {
+          throw listenerFailure;
+        });
+
+        const error = thrownBy(() => sr.attach(host)) as AggregateError;
+
+        expect(error).toBeInstanceOf(AggregateError);
+        expect(error.message).toBe(
+          'StageRenderer#parent: more than one listener of OnRemoveFromParent, OnStageRemoved and OnAddToParent, subscribe or unsubscribe at a host, or a stage that refused the size of the host threw',
+        );
+        expect(error.errors).toEqual([failure, listenerFailure]);
+        expect(sr.parent).toBe(host);
+      });
+
+      it('carries the size of the host before OnAddToParent goes out', () => {
+        const host = makeRetainingHost();
+        host.emitResize(100, 50, 2);
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        sr.add(stage);
+        const seen: number[][] = [];
+        on(sr, OnAddToParent, () => seen.push([sr.width, sr.height, sr.pixelRatio]));
+
+        sr.attach(host);
+
+        expect(seen).toEqual([[100, 50, 2]]);
+        expect(stage.resize).toHaveBeenCalledWith(100, 50, 2);
+        expect(getSubscriptionCount(host)).toBe(2);
+      });
+
+      it('leaves no subscription at the host when a stage disposes the renderer on that size', () => {
+        const host = makeRetainingHost();
+        host.emitResize(100, 50);
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        stage.resize.mockImplementation((width: number) => {
+          if (width > 0) sr.dispose();
+        });
+        sr.add(stage);
+        const added = vi.fn();
+        const removed = vi.fn();
+        on(sr, OnAddToParent, added);
+        on(sr, OnRemoveFromParent, removed);
+
+        sr.attach(host);
+
+        expect(sr.isDisposed).toBe(true);
+        expect(getSubscriptionCount(host)).toBe(0);
+        expect(added).not.toHaveBeenCalled();
+        expect(removed, 'the renderer left the host it had joined').toHaveBeenCalledTimes(1);
+        expect(sr.parent).toBeUndefined();
+      });
+
+      it('ends the join when a stage attaches the renderer to another host on that size', () => {
+        const host1 = makeRetainingHost();
+        host1.emitResize(100, 50);
+        const host2 = makeRetainingHost();
+        const sr = new StageRenderer();
+        const stage = fakeStage('s');
+        stage.resize.mockImplementation((width: number) => {
+          if (width > 0 && sr.parent === host1) sr.attach(host2);
+        });
+        sr.add(stage);
+        const added = vi.fn();
+        const removed = vi.fn();
+        on(sr, OnAddToParent, added);
+        on(sr, OnRemoveFromParent, removed);
+
+        sr.attach(host1);
+
+        expect(sr.parent).toBe(host2);
+        expect(getSubscriptionCount(host1)).toBe(0);
+        expect(getSubscriptionCount(host2)).toBe(2);
+        expect(added, 'for host2 alone').toHaveBeenCalledTimes(1);
+        expect(removed, 'for leaving host1').toHaveBeenCalledTimes(1);
+
+        const frame = vi.fn();
+        stage.renderTo.mockImplementation(frame);
+        emit(host1, 'frame', {renderer, now: 1, deltaTime: 0.016, frameNo: 1});
+        expect(frame, 'host1 drives it no longer').not.toHaveBeenCalled();
+        emit(host2, 'frame', {renderer, now: 1, deltaTime: 0.016, frameNo: 1});
+        expect(frame).toHaveBeenCalledTimes(1);
+      });
+
+      it('new StageRenderer(host) carries the size of the host after the constructor', () => {
+        const host = makeRetainingHost();
+        host.emitResize(100, 50, 1.5);
+
+        const sr = new StageRenderer(host);
+
+        expect([sr.width, sr.height, sr.pixelRatio]).toEqual([100, 50, 1.5]);
+        expect(sr.parent).toBe(host);
+        expect(getSubscriptionCount(host)).toBe(2);
+      });
     });
   });
 
@@ -1785,6 +1956,91 @@ describe('StageRenderer', () => {
       expect(stage.renderTo).toHaveBeenCalledTimes(1);
       // Restored
       expect(renderer.__renderTarget).toBe(beforeRT);
+    });
+  });
+
+  describe('a child with a pipeline under a renderer without one', () => {
+    let warn: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+    });
+
+    const WARNING =
+      'StageRenderer "root" has no pipeline and draws the renderer "bloom", which runs a pipeline of its own, into one target with other stages: the quad of that pipeline covers every pixel of the target without blending, and what the stages before it drew there is lost. Give the outer renderer the pipeline — a RootRenderPipeline composes every child —, or give "bloom" an outputRenderTarget of its own.';
+
+    // a stage that composes as well, so a composing parent can take it
+    const passStage = (name: string) => Object.assign(fakeStage(name), {asPassNode: vi.fn(() => ({}) as Node)});
+
+    function makeTree({withSibling = true, childPipeline = true} = {}) {
+      const root = new StageRenderer();
+      root.name = 'root';
+      root.resize(100, 50);
+      if (withSibling) root.add(passStage('bg'));
+      const child = new StageRenderer();
+      child.name = 'bloom';
+      child.add(fakeStage('inner'));
+      if (childPipeline) child.pipeline = makePipelineMock() as any;
+      root.add(child);
+      return {root, child};
+    }
+
+    const drawTwice = (root: StageRenderer) => {
+      root.renderTo(renderer as any);
+      root.renderTo(renderer as any);
+    };
+
+    it('warns once when it draws such a child beside another stage', () => {
+      const {root} = makeTree();
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('warns with an outputRenderTarget of its own as well', () => {
+      const {root} = makeTree();
+      root.outputRenderTarget = new RenderTarget(100, 50);
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('does not warn for such a child alone', () => {
+      const {root} = makeTree({withSibling: false});
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not warn for a child with an outputRenderTarget of its own', () => {
+      const {root, child} = makeTree();
+      child.outputRenderTarget = new RenderTarget(100, 50);
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not warn for a child without a pipeline', () => {
+      const {root} = makeTree({childPipeline: false});
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not warn in the composed mode', () => {
+      const {root} = makeTree();
+      root.buildOutputNode = (passes) => passes[0]!;
+      root.pipeline = makePipelineMock() as any;
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not warn in the whole-picture mode', () => {
+      const {root} = makeTree();
+      root.pipeline = makePipelineMock() as any;
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
     });
   });
 
@@ -2545,48 +2801,73 @@ describe('StageRenderer', () => {
       return {sr, stage, buildOutputNode, pipeline};
     }
 
-    it('swapping the projection of a Stage2D after the first render rebuilds with a new pass node', () => {
-      const {sr, stage, buildOutputNode} = makeComposedSetup();
-      sr.resize(100, 100);
+    // the first frame builds the output node; the flag is set back, so a second build shows
+    const renderFirstFrame = (sr: StageRenderer, pipeline: {needsUpdate: boolean}) => {
       sr.renderTo(renderer as any);
-      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate, 'the first frame builds').toBe(true);
+      pipeline.needsUpdate = false;
+    };
+
+    it('swapping the projection of a Stage2D after the first render keeps the output node', () => {
+      const {sr, stage, buildOutputNode, pipeline} = makeComposedSetup();
+      sr.resize(100, 100);
+      renderFirstFrame(sr, pipeline);
+      const pass = buildOutputNode.mock.calls[0]![0][0];
+      const before = stage.camera;
 
       stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 50});
       sr.renderTo(renderer as any);
 
-      expect(buildOutputNode).toHaveBeenCalledTimes(2);
-      const firstPass = buildOutputNode.mock.calls[0]![0][0];
-      const secondPass = buildOutputNode.mock.calls[1]![0][0];
-      expect(secondPass).not.toBe(firstPass);
-      expect(secondPass.camera).toBe(stage.camera);
+      expect(stage.camera).not.toBe(before);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+      expect(pass.camera, 'the composed pass draws through the new camera').toBe(stage.camera);
     });
 
-    it('assigning a camera to a Stage2D rebuilds the output node', () => {
-      const {sr, stage, buildOutputNode} = makeComposedSetup();
+    it('assigning a camera to a Stage2D keeps the output node', () => {
+      const {sr, stage, buildOutputNode, pipeline} = makeComposedSetup();
       sr.resize(100, 100);
-      sr.renderTo(renderer as any);
+      renderFirstFrame(sr, pipeline);
 
       const camera = new PerspectiveCamera();
       stage.camera = camera;
       sr.renderTo(renderer as any);
 
-      expect(buildOutputNode).toHaveBeenCalledTimes(2);
-      expect(buildOutputNode.mock.calls[1]![0][0].camera).toBe(camera);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+      expect(buildOutputNode.mock.calls[0]![0][0].camera).toBe(camera);
     });
 
-    it('assigning a scene to a Stage2D rebuilds the output node', () => {
-      const {sr, stage, buildOutputNode} = makeComposedSetup();
+    it('a builder that empties the array it is handed causes no rebuild for a new camera', () => {
+      const {sr, stage, pipeline} = makeComposedSetup();
+      const buildOutputNode = vi.fn((passes: any[]) => {
+        const node = passes[0];
+        passes.length = 0;
+        return node;
+      });
+      sr.buildOutputNode = buildOutputNode;
       sr.resize(100, 100);
+      renderFirstFrame(sr, pipeline);
+
+      stage.camera = new PerspectiveCamera();
       sr.renderTo(renderer as any);
 
-      stage.scene = new Scene();
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+    });
+
+    it('assigning a scene to a Stage2D keeps the output node', () => {
+      const {sr, stage, buildOutputNode, pipeline} = makeComposedSetup();
+      sr.resize(100, 100);
+      renderFirstFrame(sr, pipeline);
+
+      const scene = new Scene();
+      stage.scene = scene;
       sr.renderTo(renderer as any);
 
-      expect(buildOutputNode).toHaveBeenCalledTimes(2);
-      const firstPass = buildOutputNode.mock.calls[0]![0][0];
-      const secondPass = buildOutputNode.mock.calls[1]![0][0];
-      expect(secondPass).not.toBe(firstPass);
-      expect(secondPass.scene).toBe(stage.scene);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+      expect(buildOutputNode.mock.calls[0]![0][0].scene).toBe(scene);
     });
 
     // the listener sits ahead of the one the renderer places in add(), and throws for every change
@@ -2606,13 +2887,13 @@ describe('StageRenderer', () => {
       sr.buildOutputNode = buildOutputNode;
       const pipeline = {outputNode: undefined as unknown, needsUpdate: false, render: vi.fn(), dispose: vi.fn()};
       sr.pipeline = pipeline as any;
-      sr.renderTo(renderer as any);
+      renderFirstFrame(sr, pipeline);
       expect(buildOutputNode).toHaveBeenCalledTimes(1);
-      return {sr, stage, buildOutputNode, failure};
+      return {sr, stage, buildOutputNode, pipeline, failure};
     }
 
-    it('rebuilds the output node for a camera change behind a listener of OnStageAfterCameraChanged that throws', () => {
-      const {sr, stage, buildOutputNode, failure} = makeComposedSetupBehindAThrowingListener(OnStageAfterCameraChanged);
+    it('keeps the output node for a camera change behind a listener of OnStageAfterCameraChanged that throws', () => {
+      const {sr, stage, buildOutputNode, pipeline, failure} = makeComposedSetupBehindAThrowingListener(OnStageAfterCameraChanged);
       const camera = new OrthographicCamera();
 
       expect(
@@ -2622,12 +2903,13 @@ describe('StageRenderer', () => {
       ).toBe(failure);
       sr.renderTo(renderer as any);
 
-      expect(buildOutputNode).toHaveBeenCalledTimes(2);
-      expect(buildOutputNode.mock.calls[1]![0][0].camera).toBe(camera);
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+      expect(buildOutputNode.mock.calls[0]![0][0].camera, 'the node took the camera all the same').toBe(camera);
     });
 
-    it('rebuilds the output node for a scene change behind a listener of OnStageAfterSceneChanged that throws', () => {
-      const {sr, stage, buildOutputNode, failure} = makeComposedSetupBehindAThrowingListener(OnStageAfterSceneChanged);
+    it('keeps the output node for a scene change behind a listener of OnStageAfterSceneChanged that throws', () => {
+      const {sr, stage, buildOutputNode, pipeline, failure} = makeComposedSetupBehindAThrowingListener(OnStageAfterSceneChanged);
       const scene = new Scene();
 
       expect(
@@ -2637,8 +2919,58 @@ describe('StageRenderer', () => {
       ).toBe(failure);
       sr.renderTo(renderer as any);
 
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+      expect(buildOutputNode.mock.calls[0]![0][0].scene, 'the node took the scene all the same').toBe(scene);
+    });
+
+    it('rebuilds once for a stage of its own that hands a new node after its OnStageAfterCameraChanged', () => {
+      let node = fakePassNode('first');
+      const stage = eventize({...fakeStage('own'), asPassNode: vi.fn(() => node)});
+      const sr = new StageRenderer();
+      sr.resize(100, 100);
+      sr.add(stage);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[0]);
+      sr.buildOutputNode = buildOutputNode;
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      renderFirstFrame(sr, pipeline);
+
+      emit(stage, OnStageAfterCameraChanged, stage, undefined);
+      sr.renderTo(renderer as any);
+      expect(buildOutputNode, 'the same node after the event').toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+
+      node = fakePassNode('second');
+      emit(stage, OnStageAfterCameraChanged, stage, undefined);
+      sr.renderTo(renderer as any);
+      sr.renderTo(renderer as any);
+
       expect(buildOutputNode).toHaveBeenCalledTimes(2);
-      expect(buildOutputNode.mock.calls[1]![0][0].scene).toBe(scene);
+      expect(buildOutputNode).toHaveBeenLastCalledWith([node]);
+      expect(pipeline.outputNode).toBe(node);
+      expect(pipeline.needsUpdate).toBe(true);
+    });
+
+    it('builds nothing for a nested renderer beside a Stage2D with a new camera', () => {
+      const sr = new StageRenderer();
+      const child = new StageRenderer();
+      child.add(fakeStage('inner'));
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      sr.add(child).add(stage);
+      sr.resize(100, 100);
+      const buildOutputNode = vi.fn((passes: any[]) => passes[1]);
+      sr.buildOutputNode = buildOutputNode;
+      const pipeline = makePipelineMock();
+      sr.pipeline = pipeline as any;
+      renderFirstFrame(sr, pipeline);
+
+      stage.camera = new PerspectiveCamera();
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(1);
+      expect(pipeline.needsUpdate).toBe(false);
+      expect(buildOutputNode.mock.calls[0]![0][1].camera).toBe(stage.camera);
     });
 
     it('remove() stops listening to the camera and the scene of a stage', () => {

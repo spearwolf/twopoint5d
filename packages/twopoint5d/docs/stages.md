@@ -422,7 +422,10 @@ renderers included: `resize(width, height, pixelRatio)`. A stage refuses the siz
   renderer nor the previous holder of a child renderer has changed;
 - in `resize()`, every stage is asked, also behind one that refuses. The renderer keeps the size
   it had, and so does its record of the refusing stage, so the next `resize()` with that size asks
-  that stage again; the stages that took the size keep it.
+  that stage again; the stages that took the size keep it;
+- in `attach(host)` or `parent = host` on a `Display` that already has a size, the renderer joins
+  first and takes the size after: a stage that refuses it makes the call throw once the renderer
+  has joined; the renderer keeps the size it had, and the next resize of the display asks again.
 
 What the stage itself keeps depends on where the throw comes from. A `Stage2D` whose projection
 throws keeps its previous container, view and camera. A `Stage2D` whose projection took the size
@@ -590,13 +593,15 @@ one whenever the other rebuilds.
 
 What the passes are:
 
-- a `Stage2D` gives `pass(scene, camera)`, one node for as long as scene and camera stay the same;
+- a `Stage2D` gives `pass(scene, camera)`, one node for the life of the stage: a new scene or
+  camera goes into that node, and the composition stays;
 - a nested `StageRenderer` gives a `texture()` node of a target of its own, which the parent
   clears and draws the child into before its pipeline runs.
 
 `buildOutputNode` runs again on the next frame after a stage was added or removed, after a change
 of `renderOrder` or of a stage name, after a new `pipeline` or `buildOutputNode`, after a stage
-got a new camera or a new scene, and after `invalidateOutputNode()`. While the renderer has no
+of your own handed a new node following its `OnStageAfterCameraChanged` or
+`OnStageAfterSceneChanged`, and after `invalidateOutputNode()`. While the renderer has no
 size, or a `Stage2D` it composes has no camera yet, it draws nothing. Without any stage it draws
 its own clear and calls neither the callback nor the pipeline.
 
@@ -683,7 +688,8 @@ two is lost, under WebGPU and under WebGL 2 alike. Two patterns are stable:
    renderer gets the pipeline and composes every child — the composed mode, or nested pipelines.
    The outer pipeline makes the one draw to the canvas.
 2. **No mixed writers.** A root without a pipeline whose children write to the canvas, some through
-   a pipeline and some plain, is not supported.
+   a pipeline and some plain, is not supported. A renderer without a pipeline that draws such a
+   child beside other stages warns once on the console.
 
 ### What a pipeline costs
 
@@ -1840,7 +1846,10 @@ class MyStage implements IStage, IRenderable {
 - `renderTo(renderer)` — draw yourself into the current target of the renderer.
 
 To work under a composing pipeline, a stage also implements `IPassProvider`: `asPassNode(renderer)`
-returns the node that stands for it in the composition. The node belongs to the stage — build it
+returns the node that stands for it in the composition. A stage that builds a new node for a new
+scene or camera announces it through `OnStageAfterSceneChanged` or `OnStageAfterCameraChanged`,
+and a composing renderer rebuilds its output node for it; one that writes the new scene or camera
+into the node it has, as `Stage2D` does, costs no rebuild. The node belongs to the stage — build it
 once, keep it as long as it stays valid, and release it in the stage's `dispose()`:
 
 ```ts
@@ -2029,7 +2038,8 @@ pipeline.dispose();
 - **`ClearStage` under a composing pipeline.** Refused with a `TypeError`; it belongs to layers
   without a pipeline and to the whole-picture mode.
 - **Mixed writers on the canvas.** One pipeline at the top composes everything — see
-  [one writer per canvas](#one-writer-per-canvas).
+  [one writer per canvas](#one-writer-per-canvas); a root without a pipeline warns once when it
+  draws a child with a pipeline beside other stages.
 - **Disposing a stage a renderer still holds.** A stage of your own without `OnStageDispose` goes
   out with `remove(stage)` first. A renderer that still lists it keeps its released pass node in
   the composition and throws on its next rebuild, in the middle of the frame loop. A `Stage2D`

@@ -45,11 +45,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - change `StageRenderer#resize()`, `Stage2D#resize()`, `IStage#resize()` and `IProjection#updateViewRect()` to take the pixel ratio as an optional third argument, `1` where it is left out or not a finite number above 0: a `StageRenderer` hands the `pixelRatio` of its host on to every stage, nested renderers included, and a change of the ratio alone reaches them as well. `StageRenderer#pixelRatio`, `StageItem#pixelRatio` and `Stage2D#containerPixelRatio` read the ratio a renderer, an item and a stage carry
 - change `ProjectionViewRect` to carry `offsetX` and `offsetY`, how far the middle of the view lies right of and above the point the camera looks at: `0`, or in `[0, 1)` under `pixelSnap`
 - change the size source of a `Display` while an element that contains its canvas is in fullscreen — native, by anyone, or the pseudo fullscreen: a size source element outside it, or the canvas as its own size source while the fullscreen element is not the canvas, gives way to the fullscreen element, so the drawing buffer takes the size of the screen; `resize-to="window"` and a `resizeTo` callback stay as they are, and a canvas that measured a fullscreen parent gets back its inline size once the fullscreen is left
+- `StageItem` is read-only: `stage`, `width`, `height` and `pixelRatio` of an item in `StageRenderer#stages` and `orderedStages` are `readonly`, so a write into the record of the renderer no longer compiles
+- `StageRenderTargetPool#acquire()` refuses a `width` or `height` that is not a whole number of 1 or more and a `samples` that is not a whole number of 0 or more with a `RangeError`, before it lends, resizes or releases a target
+- a `StageRenderer` without a pipeline warns once on the console when it draws a nested renderer with a pipeline of its own and without an `outputRenderTarget` beside other stages into one target — the combination the stages guide calls not supported
+- `Stage2D#asPassNode()` hands the same node back for the life of the stage: a new `scene` or `camera` goes into it as it is assigned, so a node handed out before follows it, and a `StageRenderer` that composes the stage keeps its output node — a new camera, a change of the projection or a new scene builds neither a pass node nor a shader. A composing `StageRenderer` rebuilds its output node after `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged` only for a stage that hands a new pass node
 
 ### Deprecated
 
 - deprecate `resize-to="fullscreen"` (and `":fullscreen"`): an alias of `"window"` that means the window, not the fullscreen of the browser; it keeps working and warns once per page
 - deprecate `Display.CssRulesPrefixFullscreen`: it names the class of the canvas under `resize-to="window"`, and it is renamed to `CssRulesPrefixWindow`, the class to `twopoint5d-canvas--window`, together with the removal of `resize-to="fullscreen"`
+
+### Fixed
+
+- `Stage2D` keeps `needsUpdate` set when `updateViewRect()` or `getViewRect()` of its projection throws, so the next `updateFrame()` tries the update again, as its documentation says
+- a `StageRenderer` that joins a `Display` — or another host that hands its current size to a new subscriber — takes that size once it has joined: a stage that refuses it makes `attach()` or the `parent` assignment throw that error, and a listener of that resize that disposes the renderer or attaches it elsewhere leaves no subscription behind at the host
 
 ### Migration Guide
 
@@ -88,6 +97,33 @@ protected resizeStage(item: StageItem, width: number, height: number): void {
 **After**
 
 ```ts
+protected resizeStage(item: StageItem, width: number, height: number, pixelRatio: number): void {
+  super.resizeStage(item, width, height, pixelRatio);
+}
+```
+
+#### `StageItem` is read-only
+
+An item of `StageRenderer#stages` or `orderedStages` is the record of the renderer: its size goes in through `resize()`, its stage through `add()` and `remove()`. A subclass that wrote into the item in its `resizeStage()` override calls `super.resizeStage()`, the one place that writes it.
+
+**Before**
+
+```ts
+renderer.stages[0].width = 800;
+
+protected resizeStage(item: StageItem, width: number, height: number, pixelRatio: number): void {
+  item.stage.resize(width, height, pixelRatio);
+  item.width = width;
+  item.height = height;
+  item.pixelRatio = pixelRatio;
+}
+```
+
+**After**
+
+```ts
+renderer.resize(800, renderer.height, renderer.pixelRatio);
+
 protected resizeStage(item: StageItem, width: number, height: number, pixelRatio: number): void {
   super.resizeStage(item, width, height, pixelRatio);
 }

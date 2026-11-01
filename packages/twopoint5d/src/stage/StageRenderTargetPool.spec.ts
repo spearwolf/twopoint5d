@@ -46,6 +46,58 @@ describe('StageRenderTargetPool', () => {
     expect(pool.acquire(200, 100, FloatType, 4), 'the second one built').toBe(second);
   });
 
+  describe('acquire() takes whole numbers in range only', () => {
+    const refused: [name: 'width' | 'height' | 'samples', value: unknown, shown: string, min: number][] = [
+      ...(['width', 'height'] as const).flatMap((name) =>
+        (
+          [
+            [NaN, 'NaN'],
+            [0, '0'],
+            [-1, '-1'],
+            [1.5, '1.5'],
+            [Infinity, 'Infinity'],
+            ['8', '"8"'],
+          ] as const
+        ).map(([value, shown]) => [name, value, shown, 1] as [typeof name, unknown, string, number]),
+      ),
+      ['samples', -1, '-1', 0],
+      ['samples', 1.5, '1.5', 0],
+      ['samples', NaN, 'NaN', 0],
+    ];
+
+    const argsWith = (name: string, value: unknown): [number, number, TextureDataType, number] => {
+      const args: [unknown, unknown, TextureDataType, unknown] = [200, 100, FloatType, 4];
+      args[name === 'width' ? 0 : name === 'height' ? 1 : 3] = value;
+      return args as [number, number, TextureDataType, number];
+    };
+
+    for (const [name, value, shown, min] of refused) {
+      it(`refuses ${name} = ${shown} with a RangeError before the pool changes`, () => {
+        const pool = new StageRenderTargetPool();
+        const rt = pool.acquire(200, 100, FloatType, 4);
+        pool.release(rt);
+        const rtDispose = sandbox.spy(RenderTarget.prototype, 'dispose');
+
+        const call = () => pool.acquire(...argsWith(name, value));
+        expect(call).toThrow(RangeError);
+        expect(call).toThrow(`StageRenderTargetPool#acquire(): ${name} must be a whole number of ${min} or more, got ${shown}`);
+
+        expect(pool.acquire(200, 100, FloatType, 4), 'the target lent before, as it was').toBe(rt);
+        expect([rt.width, rt.height]).toEqual([200, 100]);
+        expect(rtDispose.called, 'no target released').toBe(false);
+      });
+    }
+
+    it('checks its numbers before it says it has been disposed', () => {
+      const pool = new StageRenderTargetPool();
+      pool.dispose();
+      expect(() => pool.acquire(NaN, 100, FloatType, 4)).toThrow(RangeError);
+      expect(() => pool.acquire(NaN, 100, FloatType, 4)).toThrow(
+        'StageRenderTargetPool#acquire(): width must be a whole number of 1 or more, got NaN',
+      );
+    });
+  });
+
   const resized: [string, [number, number, TextureDataType, number]][] = [
     ['width', [300, 100, FloatType, 4]],
     ['height', [200, 150, FloatType, 4]],
