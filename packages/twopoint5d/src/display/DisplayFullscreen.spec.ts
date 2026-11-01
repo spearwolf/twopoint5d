@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
 import type {Display} from './Display.js';
 import {DisplayFullscreen, type DisplayFullscreenHost, resetFullscreenWarnings} from './DisplayFullscreen.js';
+import {type EventTargetStub, makeEventTarget} from '../testing/eventTargetStub.js';
 import {Stylesheets} from './Stylesheets.js';
 import type {DisplayFullscreenChangeProps, DisplayFullscreenOptions} from './types.js';
 
@@ -11,38 +12,6 @@ vi.mock('./Stylesheets.js', () => ({
     releaseRule: vi.fn(),
   },
 }));
-
-type Listener = (event?: unknown) => void;
-
-interface EventTargetStub {
-  addEventListener: Mock<(type: string, listener: Listener, options?: unknown) => void>;
-  removeEventListener: Mock<(type: string, listener: Listener, options?: unknown) => void>;
-  dispatch(type: string, event?: unknown): void;
-  listenerCount(type: string): number;
-}
-
-function makeEventTarget(): EventTargetStub {
-  const listeners = new Map<string, Set<Listener>>();
-  return {
-    addEventListener: vi.fn((type: string, listener: Listener) => {
-      let set = listeners.get(type);
-      if (set == null) {
-        set = new Set();
-        listeners.set(type, set);
-      }
-      set.add(listener);
-    }),
-    removeEventListener: vi.fn((type: string, listener: Listener) => {
-      listeners.get(type)?.delete(listener);
-    }),
-    dispatch(type: string, event?: unknown) {
-      for (const listener of [...(listeners.get(type) ?? [])]) listener(event);
-    },
-    listenerCount(type: string) {
-      return listeners.get(type)?.size ?? 0;
-    },
-  };
-}
 
 interface DocStub extends EventTargetStub {
   fullscreenEnabled: boolean;
@@ -1142,6 +1111,116 @@ describe('DisplayFullscreen', () => {
       expect(fs.isArmed).toBe(true);
     });
 
+    it('a request() of the page on an armed display disarms once the target is in fullscreen, and leaving it in landscape arms nothing', async () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+      expect(fs.isArmed).toBe(true);
+
+      await fs.request();
+
+      expect(fs.isActive).toBe(true);
+      expect(fs.isArmed).toBe(false);
+      expect(emitted.at(-1)).toMatchObject({isActive: true, isArmed: false});
+      expect(emitted.some((props) => props.isActive && props.isArmed)).toBe(false);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+      expect(defaultTarget.listenerCount('click')).toBe(0);
+
+      // Escape while the screen is still landscape
+      fireFullscreenChange(null);
+      expect(fs.isArmed).toBe(false);
+      tap('touch');
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    it('a fullscreen someone else enters on the target disarms', () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+
+      fireFullscreenChange(defaultTarget);
+
+      expect(fs.isActive).toBe(true);
+      expect(fs.isArmed).toBe(false);
+      expect(emitted.at(-1)).toMatchObject({isActive: true, isArmed: false});
+    });
+
+    it('a half turn of an armed display asks again, and the fullscreen the browser grants is not armed', async () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+      expect(fs.isArmed).toBe(true);
+
+      turn('landscape-secondary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(true);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('onLandscape = true beside a request() the browser has not answered arms nothing, and nothing once the browser grants it', async () => {
+      orientation.type = 'landscape-primary';
+      const answer = answerLater(defaultTarget);
+      const fs = make();
+      const requested = fs.request();
+
+      fs.onLandscape = true;
+      expect(fs.isArmed).toBe(false);
+
+      answer.grant();
+      await expect(requested).resolves.toBe(true);
+      await flush();
+
+      expect(fs.isArmed).toBe(false);
+      expect(emitted.some((props) => props.isArmed)).toBe(false);
+    });
+
+    it('onLandscape = true beside a request() the browser refuses arms once the refusal is in', async () => {
+      orientation.type = 'landscape-primary';
+      const answer = answerLater(defaultTarget);
+      const fs = make();
+      const requested = fs.request();
+
+      fs.onLandscape = true;
+
+      answer.refuse();
+      await expect(requested).resolves.toBe(false);
+      await flush();
+
+      expect(fs.isArmed).toBe(true);
+      expect(emitted.at(-1)).toMatchObject({isActive: false, isArmed: true});
+    });
+
+    it('onLandscape = true while an exit() is under way arms once the exit is through', async () => {
+      orientation.type = 'landscape-primary';
+      const fs = make();
+      await fs.request();
+
+      const exit = exitLater();
+      const left = fs.exit();
+      fs.onLandscape = true;
+      expect(fs.isArmed).toBe(false);
+
+      exit.finish();
+      await expect(left).resolves.toBe(false);
+      await flush();
+
+      expect(fs.isArmed).toBe(true);
+    });
+
+    it('onLandscape = true beside a request() arms nothing once dispose() has run before the answer', async () => {
+      orientation.type = 'landscape-primary';
+      const answer = answerLater(defaultTarget);
+      const fs = make();
+      void fs.request();
+      fs.onLandscape = true;
+
+      fs.dispose();
+      answer.refuse();
+      await flush();
+
+      expect(fs.isArmed).toBe(false);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+    });
+
     it('a landscape lock that holds turns the default exitOnPortrait off without a warning', async () => {
       const fs = make({onLandscape: true, orientationLock: 'landscape'});
       expect(fs.exitOnPortrait, 'before any lock').toBe(true);
@@ -2048,6 +2127,21 @@ describe('DisplayFullscreen', () => {
         turn('portrait-primary');
         turn('landscape-primary');
         expect(fs.mode).toBe('pseudo');
+      });
+
+      it('a pseudo mode entered while armed disarms', async () => {
+        doc.fullscreenEnabled = true;
+        orientation.type = 'landscape-primary';
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+        expect(fs.isArmed).toBe(true);
+
+        // isSupported is read anew at every request
+        doc.fullscreenEnabled = false;
+        await fs.request();
+
+        expect(fs.mode).toBe('pseudo');
+        expect(fs.isArmed).toBe(false);
+        expect(defaultTarget.listenerCount('pointerup')).toBe(0);
       });
     });
   });

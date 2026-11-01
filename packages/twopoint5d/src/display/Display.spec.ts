@@ -12,6 +12,7 @@ import {
   OnDisplayRestart,
   OnDisplayStart,
 } from '../events.js';
+import {type EventTargetStub, makeEventTarget} from '../testing/eventTargetStub.js';
 import {AdaptiveResolution} from './AdaptiveResolution.js';
 import {Display} from './Display.js';
 import {DisplayFullscreen} from './DisplayFullscreen.js';
@@ -34,14 +35,12 @@ const LIFECYCLE_EVENTS = [OnDisplayInit, OnDisplayStart, OnDisplayPause, OnDispl
 
 type DocumentListenerStub = Mock<(type: string, listener: () => void, capture?: boolean) => void>;
 
-interface DocumentStub {
+interface DocumentStub extends EventTargetStub {
   hidden: boolean;
   fullscreenEnabled?: boolean;
   fullscreenElement?: unknown;
   exitFullscreen?: () => Promise<void>;
   head: object;
-  addEventListener: DocumentListenerStub;
-  removeEventListener: DocumentListenerStub;
 }
 
 let doc: DocumentStub;
@@ -126,13 +125,11 @@ function documentListener(type: string): (() => void) | undefined {
   return doc.addEventListener.mock.calls.filter(([t]) => t === type).at(-1)?.[1];
 }
 
-// as the browser does it: `element` becomes the fullscreen element of the document, and the
-// document hears fullscreenchange — every listener for it, the display's and the controller's
+// as the browser does it: `element` becomes the fullscreen element of the document, and every
+// listener the document holds for fullscreenchange hears it — the display's and the controller's
 function fireFullscreenChange(element: unknown) {
   doc.fullscreenElement = element;
-  for (const [type, listener] of doc.addEventListener.mock.calls) {
-    if (type === 'fullscreenchange') listener();
-  }
+  doc.dispatch('fullscreenchange');
 }
 
 // lets every reaction to an already settled promise run, the ones they queue in turn included
@@ -140,7 +137,7 @@ const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 describe('Display', () => {
   beforeEach(() => {
-    doc = {hidden: false, head: {}, addEventListener: vi.fn(), removeEventListener: vi.fn()};
+    doc = Object.assign(makeEventTarget(), {hidden: false, head: {}});
     getComputedStyleStub = vi.fn(() => ({
       getPropertyValue: (name: string) => (name === 'box-sizing' ? 'border-box' : ''),
     }));
@@ -2804,6 +2801,7 @@ describe('Display', () => {
 
         const removed = doc.removeEventListener.mock.calls.filter(([type]) => type === 'fullscreenchange').map(([, l]) => l);
         for (const listener of added) expect(removed).toContain(listener);
+        expect(doc.listenerCount('fullscreenchange')).toBe(0);
       });
     });
 

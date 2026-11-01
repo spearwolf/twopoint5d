@@ -311,7 +311,6 @@ export class DisplayFullscreen {
     host.doc.addEventListener('fullscreenchange', this.#onFullscreenChange);
 
     this.onLandscape = options?.onLandscape ?? false;
-    this.#warnConflicts();
   }
 
   /**
@@ -336,6 +335,9 @@ export class DisplayFullscreen {
    * on the target ({@link DisplayFullscreen.isArmed}). The user who leaves such a fullscreen in
    * landscape is not thrown back into it until the screen has turned to portrait and back.
    *
+   * Switched on while the browser is still answering a request or an exit, it arms once that answer
+   * is in — where the screen is still landscape and the target out of fullscreen.
+   *
    * After {@link Display.dispose} a write changes nothing; the getter answers the last value.
    */
   get onLandscape(): boolean {
@@ -348,10 +350,16 @@ export class DisplayFullscreen {
     if (on) {
       this.#watchOrientation();
       // no turn has happened, and nothing grants an exemption: a page in landscape arms — or, where
-      // only the pseudo mode is there, which needs no gesture, enters it
-      if (this.#isLandscape() && this.#gateIsOpen() && !this.#holdsTarget()) {
-        if (this.isSupported) this.#arm();
-        else if (this.fallback === 'pseudo') this.#enterPseudo('landscape');
+      // only the pseudo mode is there, which needs no gesture, enters it. While the browser is still
+      // answering a request or an exit, its answer decides first: the arming is held against the state
+      // once the run is through, as the answer of a request of onLandscape is
+      if (this.#isLandscape() && this.#gateIsOpen()) {
+        if (this.#pending != null || this.#pendingExit != null) {
+          void this.#joinRun().then((active) => this.#rearm(active));
+        } else if (!this.#holdsTarget()) {
+          if (this.isSupported) this.#arm();
+          else if (this.fallback === 'pseudo') this.#enterPseudo('landscape');
+        }
       }
     } else {
       this.#unwatchOrientation();
@@ -438,6 +446,8 @@ export class DisplayFullscreen {
 
   /**
    * `onLandscape` waits for a tap on the target to enter fullscreen. A page can show a hint by it.
+   * Never `true` while the target is in fullscreen — whoever entered it, native or pseudo — or lies
+   * under an element stacked on it.
    *
    * `false` after {@link Display.dispose}.
    */
@@ -783,6 +793,8 @@ export class DisplayFullscreen {
 
     const active = this.#nativeElement();
     if (active != null) {
+      // the target lies on top, whoever entered it: no tap is awaited
+      this.#disarm();
       if (this.#activeElement == null) {
         this.#activeElement = active;
         this.#entered = this.#pending?.by;
@@ -916,8 +928,9 @@ export class DisplayFullscreen {
     void this.#request('landscape', false).then((active) => this.#rearm(active));
   }
 
-  // after the run of a request of onLandscape: a refusal arms, unless the controller is disposed
-  // or anything has changed in the meantime — a newer request or an exit is under way, say
+  // after a run of answers of the browser that onLandscape waits for — its own request, or
+  // onLandscape switched on while one was under way: a refusal arms, unless the controller is
+  // disposed or anything has changed in the meantime — a newer request or an exit is under way, say
   #rearm(active: boolean): void {
     if (
       !active &&
@@ -961,6 +974,7 @@ export class DisplayFullscreen {
       documentElement.classList.add(pseudo.rootClassName);
     }
 
+    this.#disarm();
     this.#pseudo = pseudo;
     this.#host.doc.addEventListener('keydown', this.#onPseudoKey);
     this.#host.pseudoTargetChanged(element);

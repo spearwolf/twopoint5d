@@ -143,7 +143,7 @@ export class DisplayFullscreen {
   get isActive(): boolean;
   /** How it is: `'native'`, `'pseudo'`, or `undefined` while not active. */
   get mode(): FullscreenMode | undefined;
-  /** `onLandscape` waits for a tap to enter fullscreen, §6.2. A page can show a hint by it. */
+  /** `onLandscape` waits for a tap to enter fullscreen, §6.2; never while the target is in fullscreen. A page can show a hint by it. */
   get isArmed(): boolean;
   /** The display that built the controller is disposed, §9. */
   get isDisposed(): boolean;
@@ -351,12 +351,18 @@ Every turn to landscape, with the gate of §6.1 open and the target not active:
    for the next one — as long as the screen is still landscape, the target not active and the user
    has not left in landscape (§6.3).
 
+A fullscreen of the target disarms, whoever entered it — the armed tap, a `request()` of the page,
+the answer to a half turn from one landscape to the other, a request of someone else on the target,
+the pseudo mode —, and leaving it arms nothing by itself: the next turn to landscape does.
+
 The answer of every request of §6 is held against the state of the controller once the calls that
 overlap with it (§3.2) are through: a refusal after `dispose()` arms nothing, and neither does one
 while a newer request or an exit is under way — the answer of that one decides.
 
 A page that loads in landscape arms at construction and does not try at once: no turn has
-happened, and nothing grants an exemption. `onLandscape` set to `true` later does the same.
+happened, and nothing grants an exemption. `onLandscape` set to `true` later does the same — while
+the browser is still answering a request or an exit, once that answer is in, held against the state
+then as the answer of a request of §6 is.
 
 Where native fullscreen is not available and `fallback` is `'pseudo'`, the pseudo mode needs no
 gesture: the turn enters it at once and never arms, and a page that loads in landscape enters it at
@@ -567,8 +573,10 @@ that runs without a real turn of a screen.
   lock;
 - §6: a turn tries at once; a refusal arms; the armed tap requests and disarms; a turn back disarms
   and leaves only what `onLandscape` entered; the user's exit holds off arming until portrait and
-  back; the gate keeps a fine pointer out; a page that loads in landscape arms; `onLandscape = false`
-  takes the listeners down;
+  back; the gate keeps a fine pointer out; a page that loads in landscape arms; a fullscreen of the
+  target disarms, whoever entered it, and leaving it in landscape arms nothing; `onLandscape = true`
+  beside a request or an exit still under way arms once the browser has answered, and only where the
+  target is out of fullscreen then; `onLandscape = false` takes the listeners down;
 - §7: used only where `isSupported` is `false`; classes on and off; Escape leaves; a turn enters
   without arming;
 - `dispose()` leaves only a fullscreen this controller entered, and leaves no listener behind;

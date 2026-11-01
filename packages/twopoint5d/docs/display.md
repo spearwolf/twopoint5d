@@ -503,9 +503,9 @@ export {display};
 With `onLandscape`, turning the phone sideways enters fullscreen, and turning it back leaves it.
 Some browsers let the turn itself count as a gesture; the others refuse, and then the next tap on
 the target enters fullscreen — `isArmed` is `true` while the display waits for it, and the tap
-still reaches the game. It only acts on devices whose primary input is a finger
-(`(pointer: coarse) and (hover: none)`): a desktop window that is wider than tall does nothing, a
-tablet does the same as a phone.
+still reaches the game. Once the target is in fullscreen, whoever put it there, `isArmed` is
+`false`. It only acts on devices whose primary input is a finger (`(pointer: coarse) and (hover: none)`):
+a desktop window that is wider than tall does nothing, a tablet does the same as a phone.
 
 Whoever leaves the fullscreen while the phone is still sideways — Escape, the back gesture, a button
 of the page — stays out of it until the phone has turned upright and back. A fullscreen the page
@@ -657,7 +657,7 @@ The options go into `fullscreen: {…}` of the constructor; each is a property o
 | `isAvailable` | a request can succeed: `isSupported`, or the pseudo fallback; `false` after `dispose()` |
 | `isDisposed` | the display is disposed; the calls resolve `false` |
 | `isActive`, `mode` | in fullscreen right now, `'native'` or `'pseudo'` |
-| `isArmed` | `onLandscape` waits for a tap |
+| `isArmed` | `onLandscape` waits for a tap; never while in fullscreen |
 | `display.onFullscreenChange(listener)` | every change of `isActive`, `mode` and `isArmed`; retained |
 
 ### The fit of a projection
