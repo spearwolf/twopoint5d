@@ -805,8 +805,10 @@ its own to compile it ahead.
 
 The shapes cover the composition of the director. A layer builds its own materials and pipelines
 on its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
-their first frame in the stack builds nothing. A stage that is not in the stack yet takes the size
-of the director for that draw, so call `precompile()` once the display runs, and outside of a
+their first frame in the stack builds nothing. That draw is no frame of the stage: it sends no
+`OnStageUpdateFrame`, so sprites that wait for that event for their first `update()` draw no
+instance there, and their material builds all the same. A stage that is not in the stack yet takes
+the size of the director for that draw, so call `precompile()` once the display runs, and outside of a
 frame.
 
 ### One scene into another, as a whole

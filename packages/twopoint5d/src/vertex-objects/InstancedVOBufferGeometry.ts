@@ -116,6 +116,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * Built from a `BufferGeometry`, the geometry copies its attributes, its index and its draw
    * range; `update()` leaves that draw range as it is.
    *
+   * The geometry draws no instance until its first `update()`: `instanceCount` starts at 0, built
+   * from a `BufferGeometry` as well, under WebGPU and under WebGL 2.
+   *
    * @throws when the instanced pool or the base pool handed in has been disposed and holds no
    *   buffers to build attributes on. The message names the class, which of the two it is about
    *   and the state, and no geometry comes into being. Whatever the constructor throws, a pool it
@@ -190,6 +193,12 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
         bufferSerials: this.#instancedBufferSerials,
         group: 'instanced',
       });
+
+      // three starts an InstancedBufferGeometry at an instanceCount of Infinity, and copy() of a plain
+      // BufferGeometry leaves it undefined. A draw before the first update() hands either on to the
+      // backend: WebGPU refuses Infinity in drawIndexed(), where WebGL 2 turns it into 0. Until
+      // update() reads the instanced pool, no instance is drawn.
+      this.instanceCount = 0;
     } catch (error) {
       // a constructor that throws leaves nothing behind: the pools it built go, and a pool handed
       // in is no longer counted as attached
@@ -596,8 +605,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   }
 
   /**
-   * Sets `instanceCount` from the instanced pool and, on a geometry with a base pool, the draw
-   * range from that pool, uploads the buffers that need it and syncs the attribute arrays to the
+   * Sets `instanceCount` from the instanced pool — until the first call it is 0 — and, on a
+   * geometry with a base pool, the draw range from that pool, uploads the buffers that need it and syncs the attribute arrays to the
    * pools' own. A geometry built from a `BufferGeometry` keeps the draw range it copied from it,
    * and one set on it since.
    *

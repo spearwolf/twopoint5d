@@ -86,7 +86,8 @@ array it is handed and answers that one — the form for a loop that runs every 
 A generated setter marks nothing for upload. What is written before the first `update()`
 after `createVO()` reaches the GPU with it; a later change to a `'static'` attribute needs
 `pool.touchVO(vo, 'attr')` for that object or `geometry.touch('attr')` for all of them.
-An attribute with `autoTouch` uploads on every `update()`.
+An attribute with `autoTouch` uploads on every `update()`. An *instanced* geometry draws no
+instance before its first `update()`: its `instanceCount` starts at 0.
 
 A vertex object its pool has let go of — through `freeVO()`, a `usedCount` or a
 `resize()` that leaves its slot behind, or `dispose()` — reads and writes nothing more:

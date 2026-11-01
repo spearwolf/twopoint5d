@@ -1352,7 +1352,9 @@ export class StageDirector extends StageRenderer {
    * screen, as the director draws a layer — into a target of the type and the samples of its pass
    * targets, on linear output —, so that their own materials and pipelines, a bloom of a level, are
    * built before their first frame in the stack. A stage that is no layer of the director yet takes
-   * the size of the director first.
+   * the size of the director first. The draw is no frame of these stages: no `updateFrame()` and no
+   * `OnStageUpdateFrame` — sprites whose first `update()` waits for that event draw no instance
+   * there, and their material builds all the same.
    *
    * The shapes are compiled for the target the director draws into: its `outputRenderTarget`, or
    * else the renderer's current target — the canvas, called outside of a frame. A director inside

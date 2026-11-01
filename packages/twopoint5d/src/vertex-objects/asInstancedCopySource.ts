@@ -5,8 +5,8 @@ import type {BufferGeometry, InstancedBufferGeometry} from 'three/webgpu';
  *
  * three narrows `copy()` to its own class, but the body reads what every
  * `BufferGeometry` carries plus `instanceCount` — which a plain geometry does not have,
- * so the copy leaves it `undefined`. `InstancedVOBufferGeometry#update()` writes its own
- * `instanceCount` from the instanced pool before the first frame is drawn.
+ * so the copy leaves it `undefined`. The constructor of `InstancedVOBufferGeometry` sets
+ * `instanceCount` to 0 after the `copy()`, and `update()` takes it from the instanced pool.
  * `InstancedBufferGeometry#copy()` in three; `threeVertexLayout.spec.ts` holds it.
  */
 export function asInstancedCopySource(geometry: BufferGeometry): InstancedBufferGeometry {

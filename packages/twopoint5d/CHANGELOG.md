@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- an `InstancedVOBufferGeometry` — and with it the geometry of `FeatureSprites` and `InstancedVertexObjectGeometry` — draws no instance before its first `update()`, under WebGPU as under WebGL 2, built from a `BufferGeometry` as well: `instanceCount` starts at 0. `StageDirector#precompile()` draws a stage of `layers` whose sprites wait for their first `update()` without an error from `drawIndexed()`
 - `Stage2D` keeps `needsUpdate` set when `updateViewRect()` or `getViewRect()` of its projection throws, so the next `updateFrame()` tries the update again, as its documentation says
 - a `StageRenderer` that joins a `Display` — or another host that hands its current size to a new subscriber — takes that size once it has joined: a stage that refuses it makes `attach()` or the `parent` assignment throw that error, and a listener of that resize that disposes the renderer or attaches it elsewhere leaves no subscription behind at the host
 - `AsepriteJson.parse()` refuses a tag whose repeat plays more than `FrameBasedAnimations.MaxTextureSize` frames — more fit into no data texture —, naming the tag, the frames and the repeat, before it lays out a frame list and before the first frame reaches `options.target`; a ping-pong over one frame plays that frame once, whatever its repeat

@@ -302,6 +302,28 @@ describe('vertex-objects — gpu upload', function () {
     ]);
   });
 
+  it('an instanced geometry drawn before its first update() draws nothing and throws nothing', async function () {
+    /** @type {InstancedVertexObjectGeometry<InstanceVO, QuadVO>} */
+    const geometry = new InstancedVertexObjectGeometry(instancedDescription, 8, quadDescription, 1);
+    const material = new MeshBasicNodeMaterial();
+    material.positionNode = attribute('position', /** @type {const} */ ('vec3')).add(attribute('instanceOffset', 'vec3'));
+    const mesh = new VertexObjects(geometry, material);
+    scene.add(mesh);
+
+    geometry.basePool.createVO().setPosition([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+    geometry.instancedPool.createVO().setInstanceOffset([1, 1, 1]);
+
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    mesh.update();
+    display.renderer.render(scene, camera);
+    await display.nextFrame();
+
+    const instanceOffset = geometry.getAttribute('instanceOffset');
+    expect((await readBack(display.renderer, instanceOffset)).slice(0, 3), 'the instance').to.deep.equal([1, 1, 1]);
+  });
+
   it('an object whose indices leave a vertex unused is drawn from its own vertices', async function () {
     // four vertices per object, of which the indices name three: the second object starts at vertex 4
     /** @type {VertexObjectDescription} */

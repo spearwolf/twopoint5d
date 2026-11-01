@@ -1178,7 +1178,8 @@ export function cycle(time: number) {
 
 ## Uploads: static and dynamic attributes
 
-`update()` of the mesh uploads what the sprite pool marked. Position, rotation, shear, `fade`,
+A mesh draws none of its sprites before its first `update()`, and `update()` sets how many it
+draws. `update()` of the mesh uploads what the sprite pool marked. Position, rotation, shear, `fade`,
 `flash` and `segmentEnd` are **dynamic**: every `update()` uploads them. Everything else is
 **static**: written before the first `update()` after `createSprite()` it reaches the gpu with that
 sprite; a later change reaches the gpu only once it is marked —

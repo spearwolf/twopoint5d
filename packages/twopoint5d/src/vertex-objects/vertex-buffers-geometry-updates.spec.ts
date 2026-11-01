@@ -171,6 +171,16 @@ describe('vertex-buffers-geometry-updates', () => {
       return [geometry, pool, vo0, vo1, vo2, base] as const;
     };
 
+    test('draws no instance before its first update(): instanceCount starts at 0 and follows the instanced pool from the first update() on', () => {
+      const [geometry] = makeInstancedGeometry();
+
+      expect(geometry.instanceCount).toBe(0);
+
+      geometry.update();
+
+      expect(geometry.instanceCount).toBe(3);
+    });
+
     describe('create buffers and arrays', () => {
       test('position', () => {
         const [geometry] = makeInstancedGeometry();
@@ -1047,6 +1057,15 @@ describe('vertex-buffers-geometry-updates', () => {
       const geometry = new InstancedVOBufferGeometry(instancedDesc, 10, base);
 
       expect(geometry.name).toBe('InstancedVOBufferGeometry');
+    });
+
+    test('starts at an instanceCount of 0, where copy() of a plain BufferGeometry would leave it undefined', () => {
+      const base = new BufferGeometry();
+      base.setAttribute('position', new BufferAttribute(new Float32Array(12), 3));
+
+      const geometry = new InstancedVOBufferGeometry(instancedDesc, 10, base);
+
+      expect(geometry.instanceCount).toBe(0);
     });
 
     test('takes no name from the geometry it is built from', () => {

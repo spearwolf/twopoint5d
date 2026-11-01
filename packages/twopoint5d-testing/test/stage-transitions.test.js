@@ -1,10 +1,12 @@
 import {expect} from 'chai';
 import {
   Display,
+  FeatureSprites,
   OrthographicProjection,
   Stage2D,
   StageDirector,
   StageRenderer,
+  TexturedSpriteKind,
   crossfade,
   dissolve,
   fade,
@@ -19,6 +21,7 @@ import {
   disposeKept,
   isNearColor,
   keep,
+  makeColorTexture,
   makeContainer,
   readsTopDown,
   rgbAt,
@@ -298,6 +301,28 @@ describe('StageDirector — transitions on the GPU', () => {
     } finally {
       builds.stop();
     }
+  });
+
+  it('precompile() draws a layer whose sprites wait for their first update(), and resolves', async () => {
+    const red = layer('red', '#f00');
+    const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
+    stage.name = 'sprites';
+    const colorMap = keep(makeColorTexture([[255, 0, 0, 255]]));
+    const sprites = keep(new FeatureSprites(TexturedSpriteKind, {capacity: 2, textures: {colorMap}}));
+    const sprite = sprites.createSprite();
+    sprite.setSize(SIZE, SIZE);
+    sprite.setTexCoords(0, 0, 1, 1);
+    stage.scene.add(sprites);
+    director.setStack([red.stage]);
+    await draw();
+
+    const effect = crossfade();
+    await director.precompile(display.renderer, [[effect]], {layers: [stage]});
+
+    sprites.update();
+    const t = director.replace(red.stage, stage, {effect, manual: true});
+    t.progress = 1;
+    expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [255, 0, 0]), 'the sprite, once it is updated').to.be.true;
   });
 
   it('precompile() of a director inside another one compiles for its place there', async () => {
