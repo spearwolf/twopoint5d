@@ -138,6 +138,33 @@ describe('StageDirector', () => {
       expect(() => director.show(gone)).toThrow('that stage has been disposed');
     });
 
+    it('refuses a stage argument that is no object, with the call as its subject', () => {
+      director.setStack([a]);
+      expect(() => director.hide(undefined as any)).toThrow(
+        new TypeError('StageDirector#hide(): stage must be a stage, got undefined'),
+      );
+      expect(() => director.replace(undefined as any, b)).toThrow(
+        new TypeError('StageDirector#replace(): from must be a stage, got undefined'),
+      );
+      expect(() => director.setMask(null as any, undefined)).toThrow(
+        new TypeError('StageDirector#setMask(): stage must be a stage, got null'),
+      );
+      expect(() => director.freeze(undefined as any)).toThrow(
+        new TypeError('StageDirector#freeze(): stage must be a stage, got undefined'),
+      );
+      expect(() => director.run(7 as any)).toThrow(new TypeError('StageDirector#run(): stage must be a stage, got 7'));
+      for (const call of [
+        () => director.hide(undefined as any),
+        () => director.replace(undefined as any, b),
+        () => director.setMask(null as any, undefined),
+        () => director.freeze(undefined as any),
+        () => director.run(7 as any),
+      ]) {
+        expect(call).toThrow(TypeError);
+      }
+      expect(names(director.stack)).toEqual(['a']);
+    });
+
     it('owns pipeline, buildOutputNode and renderOrder', () => {
       expect(() => {
         director.pipeline = undefined;
@@ -337,6 +364,43 @@ describe('StageDirector', () => {
       expect(director.isFrozen(b)).toBe(true);
       t.complete();
       expect(director.isFrozen(b)).toBe(false);
+    });
+
+    it('a freeze() by hand of the stage a transition brings stays past its end', () => {
+      director.setStack([a]);
+      director.replace(a, b, {duration: 0.2});
+      frame();
+      director.freeze(b);
+      frame();
+      expect(director.transitions).toEqual([]);
+      expect(director.isFrozen(b)).toBe(true);
+    });
+
+    it('a run() by hand of the stage a transition leaves stays when the transition is cancelled', () => {
+      director.setStack([a]);
+      director.freeze(a);
+      const t = director.replace(a, b, {duration: 1});
+      frame();
+      director.run(a);
+      t.cancel();
+      expect(names(director.stack)).toEqual(['a']);
+      expect(director.isFrozen(a)).toBe(false);
+    });
+
+    it('a freeze() by hand of the layer a push() froze below stays through pop()', () => {
+      director.setStack([a]);
+      director.push(b, {below: 'freeze'});
+      director.freeze(a);
+      director.pop();
+      expect(director.isFrozen(a)).toBe(true);
+    });
+
+    it('a freeze() by hand of the layer a push() froze below stays through setStack()', () => {
+      director.setStack([a]);
+      director.push(b, {below: 'freeze'});
+      director.freeze(a);
+      director.setStack([a, b]);
+      expect(director.isFrozen(a)).toBe(true);
     });
 
     it('a frozen layer draws once, then keeps its picture until it is resized', () => {
@@ -785,6 +849,14 @@ describe('StageDirector', () => {
         ['replace()', () => director.replace(a, c, {effect: crossfade(), duration: 0.2})],
         ['setStack()', () => director.setStack([a, c])],
         ['setMask()', () => director.setMask(a, new StageMask(m))],
+        [
+          'hide() with the masks of an effect',
+          () => director.hide(a, {effect: {...crossfade(), masks: [new StageMask(m)]}, duration: 0.2}),
+        ],
+        [
+          'pop() with the masks of an effect',
+          () => director.pop({effect: {...crossfade(), masks: [new StageMask(m)]}, duration: 0.2}),
+        ],
       ];
       for (const [name, change] of changes) {
         director = new StageDirector();
@@ -806,6 +878,42 @@ describe('StageDirector', () => {
         expect(() => other.setMask(b, new StageMask(m)), name).not.toThrow();
         other.dispose();
       }
+    });
+
+    it('show() with a mask and the masks of an effect answers a cancelled transition when a listener of the join of the mask disposes the director and a mask stage of the effect', () => {
+      director.setStack([a]);
+      const m = fakeStage('m');
+      // a FakeStage has no dispose()
+      const n = new StageRenderer();
+      n.name = 'n';
+      once(director, OnStageAdded, () => {
+        director.dispose();
+        n.dispose();
+      });
+      let t: StageTransition | undefined;
+      expect(() => {
+        t = director.show(c, {mask: new StageMask(m), effect: {...crossfade(), masks: [new StageMask(n)]}, duration: 0.2});
+      }).not.toThrow();
+      expect(t?.state).toBe('cancelled');
+      expect(director.isDisposed).toBe(true);
+      expect(director.stack).toEqual([]);
+      expect(director.stages).toHaveLength(0);
+    });
+
+    it('a listener of OnAddToParent that disposes the director makes setMask() answer the director', () => {
+      director.setStack([a]);
+      const m = new StageRenderer();
+      m.name = 'm';
+      once(m, OnAddToParent, () => director.dispose());
+      expect(director.setMask(a, new StageMask(m))).toBe(director);
+      expect(director.isDisposed).toBe(true);
+      expect(director.stack).toEqual([]);
+      expect(m.parent).toBeUndefined();
+      expect(m.isDisposed).toBe(false);
+      const other = new StageDirector();
+      other.setStack([b]);
+      expect(() => other.setMask(b, new StageMask(m))).not.toThrow();
+      other.dispose();
     });
 
     it('a listener of OnAddToParent that disposes the director makes show() answer a cancelled transition', () => {
@@ -851,6 +959,23 @@ describe('StageDirector', () => {
       expect(handle?.state).toBe('cancelled');
       expect(names(director.stack)).toEqual(['a']);
       expect(director.transitions).toEqual([]);
+    });
+
+    it('a change a listener asks for under the lock of setStack() refuses its invalid arguments', () => {
+      director.setStack([a]);
+      director.replace(a, b, {duration: 1});
+      let caught: unknown;
+      once(director, OnStageTransitionEnd, () => {
+        try {
+          director.show(c, {duration: -1});
+        } catch (error) {
+          caught = error;
+        }
+      });
+      director.setStack([a]);
+      expect(caught).toBeInstanceOf(RangeError);
+      expect((caught as Error).message).toBe('StageDirector#show(): duration must be a finite number of 0 or above, got -1');
+      expect(names(director.stack)).toEqual(['a']);
     });
 
     it('setStack() leaves out a stage a listener removed while it ended the transitions', () => {
@@ -1005,6 +1130,81 @@ describe('StageDirector', () => {
       expect(() => draw()).not.toThrow();
     });
 
+    const holdCompile = () => {
+      const held: {release: () => void; fail: (error: Error) => void} = {release: () => {}, fail: () => {}};
+      renderer.compileAsync.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            held.release = resolve;
+            held.fail = reject;
+          }),
+      );
+      return held;
+    };
+
+    it('a second precompile() of a shape the first one still compiles resolves once that compile is through', async () => {
+      const held = holdCompile();
+      const effect = crossfade();
+      const first = director.precompile(renderer as any, [['layer', effect]]);
+      let through = false;
+      const second = director.precompile(renderer as any, [['layer', effect]]).then(() => {
+        through = true;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(through).toBe(false);
+      held.release();
+      await first;
+      await second;
+      expect(through).toBe(true);
+      expect(renderer.compileAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('a shape whose compile failed compiles again with the next precompile()', async () => {
+      renderer.compileAsync.mockRejectedValueOnce(new Error('compile failed'));
+      const effect = crossfade();
+      await expect(director.precompile(renderer as any, [['layer', effect]])).rejects.toThrow('compile failed');
+      await expect(director.precompile(renderer as any, [['layer', effect]])).resolves.toBeUndefined();
+      expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('a precompile() that waits for a compile that fails rejects with its error', async () => {
+      const held = holdCompile();
+      const effect = crossfade();
+      const first = director.precompile(renderer as any, [['layer', effect]]);
+      const second = director.precompile(renderer as any, [['layer', effect]]);
+      held.fail(new Error('compile failed'));
+      await expect(first).rejects.toThrow('compile failed');
+      await expect(second).rejects.toThrow('compile failed');
+      await director.precompile(renderer as any, [['layer', effect]]);
+      expect(renderer.compileAsync).toHaveBeenCalledTimes(2);
+    });
+
+    it('a compile that fails after dispose() resolves the precompile() that started it and the one that waits for it', async () => {
+      const held = holdCompile();
+      const effect = crossfade();
+      const first = director.precompile(renderer as any, [['layer', effect]]);
+      const second = director.precompile(renderer as any, [['layer', effect]]);
+      director.dispose();
+      held.fail(new Error('compile failed'));
+      await expect(first).resolves.toBeUndefined();
+      await expect(second).resolves.toBeUndefined();
+    });
+
+    it('a shape the stack draws while its compile fails stays the shape of the stack', async () => {
+      const held = holdCompile();
+      const effect = crossfade();
+      const done = director.precompile(renderer as any, [['layer', effect]]);
+      director.setStack([a]);
+      director.show(b, {effect, duration: 1});
+      frame();
+      draw();
+      const pipeline = director.pipeline;
+      held.fail(new Error('compile failed'));
+      await expect(done).rejects.toThrow('compile failed');
+      expect(() => draw()).not.toThrow();
+      expect(director.pipeline).toBe(pipeline);
+    });
+
     it('resolves when the director is disposed during a compile, and compiles nothing more', async () => {
       let release!: () => void;
       renderer.compileAsync.mockImplementationOnce(
@@ -1046,6 +1246,51 @@ describe('StageDirector', () => {
       director.dispose();
       expect(director.show(a).state).toBe('cancelled');
       expect(director.stack).toEqual([]);
+    });
+
+    it('refuses invalid arguments after dispose() as before, and answers valid ones as a disposed director', () => {
+      director.setStack([a]);
+      director.dispose();
+      expect(() => director.show(b, {duration: -1})).toThrow(
+        'StageDirector#show(): duration must be a finite number of 0 or above, got -1',
+      );
+      expect(() => director.push(b, {below: 'still' as any})).toThrow(
+        `StageDirector#push(): below must be 'run' or 'freeze', got "still"`,
+      );
+      expect(() => director.show(b, {at: -1})).toThrow(
+        new RangeError('StageDirector#show(): at must be a whole number of 0 or above, got -1'),
+      );
+      expect(() => director.show(b, {mask: 'm' as any})).toThrow('StageDirector#show(): mask must be a StageMask, got "m"');
+      expect(() => director.show(new ClearStage())).toThrow(TypeError);
+      expect(() => director.hide(undefined as any)).toThrow('StageDirector#hide(): stage must be a stage, got undefined');
+      expect(() => director.replace(a, b, {easing: 'bounce' as any})).toThrow(/StageDirector#replace\(\): easing must be/);
+      expect(() => director.pop({effect: 5 as any})).toThrow(
+        'StageDirector#pop(): effect must be a StageTransitionEffect, got 5',
+      );
+      expect(() => director.setStack('x' as any)).toThrow('StageDirector#setStack(): the stages must be an array, got "x"');
+      expect(() => director.setMask(a, 'm' as any)).toThrow('StageDirector#setMask(): mask must be a StageMask, got "m"');
+      expect(() => director.freeze(null as any)).toThrow('StageDirector#freeze(): stage must be a stage, got null');
+
+      // an `at` past the empty stack is no refusal
+      expect(director.show(b, {at: 3}).state).toBe('cancelled');
+      expect(director.hide(a).state).toBe('cancelled');
+      expect(director.setStack([a, b])).toBe(director);
+      expect(director.freeze(a)).toBe(director);
+      expect(director.stack).toEqual([]);
+    });
+
+    it('ignores a write to pipeline, buildOutputNode and renderOrder after dispose()', () => {
+      director.dispose();
+      expect(() => {
+        director.pipeline = undefined;
+      }).not.toThrow();
+      expect(() => {
+        director.buildOutputNode = undefined;
+      }).not.toThrow();
+      expect(() => {
+        director.renderOrder = 'a,b';
+      }).not.toThrow();
+      expect(director.renderOrder).toBe('');
     });
   });
 });

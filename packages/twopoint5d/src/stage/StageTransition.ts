@@ -170,6 +170,10 @@ export class StageTransition {
     this.#progress = Math.min(1, Math.max(0, value));
   }
 
+  /**
+   * Resolves with the transition once it is over — finished, or cancelled, as
+   * `StageDirector#dispose()` cancels it —, and never rejects.
+   */
   get finished(): Promise<StageTransition> {
     return this.#finished;
   }

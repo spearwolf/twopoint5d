@@ -207,7 +207,8 @@ export interface Display extends EventizedObject {}
  *    the start and that of the pause — each an `AggregateError` itself when
  *    more than one listener of its event throws.
  * 3. `display.dispose()` — stops the loop, takes the size watch and the `visibilitychange`
- *    listener — and the observer of {@link DisplayParameters.pauseOutsideViewport} — down, fires
+ *    listener — and the observer of {@link DisplayParameters.pauseOutsideViewport} — down, leaves
+ *    a fullscreen this display entered or has asked for (see {@link Display.fullscreen}), fires
  *    `OnDisplayDispose` and gives up {@link Display.renderer} right away. A
  *    listener that throws does not stop it; its error follows once the display
  *    is down — see {@link Display.dispose}. A container this display created

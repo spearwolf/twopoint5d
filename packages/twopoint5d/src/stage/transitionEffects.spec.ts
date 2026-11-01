@@ -73,6 +73,18 @@ describe('transition effects', () => {
     expect(() => wipe('left' as any)).toThrow('wipe: the options must be an object');
   });
 
+  it('refuses a direction that names a member of Object.prototype', () => {
+    expect(() => wipe({direction: 'constructor' as any})).toThrow(
+      `wipe: direction must be 'left', 'right', 'up', 'down' or an angle in radians, got "constructor"`,
+    );
+    expect(() => wipe({direction: '__proto__' as any})).toThrow(
+      `wipe: direction must be 'left', 'right', 'up', 'down' or an angle in radians, got "__proto__"`,
+    );
+    expect(() => slide({direction: 'toString' as any})).toThrow(
+      `slide: direction must be 'left', 'right', 'up' or 'down', got "toString"`,
+    );
+  });
+
   describe('createTransitionNode()', () => {
     it('takes a texture node, a pass node and nothing, and makes a progress uniform when none is handed in', () => {
       const a = texture(tex()) as unknown as TextureNode;

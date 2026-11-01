@@ -791,8 +791,9 @@ await director.precompile(
 A shape lists the slots of the stack bottom to top: `'layer'` for a slot that shows a layer, the
 effect for a slot in a transition — the same effect object the transition will take, since the
 director tells shapes apart by their effect objects —, and `{effect?, mask}` for a slot with a
-[mask](#no-hitch-precompile-with-masks). A shape the director holds is skipped, and what
-`precompile()` compiles stays until the director is disposed, or until it draws or precompiles
+[mask](#no-hitch-precompile-with-masks). A shape the director holds is skipped — once its
+compile is through, when another `precompile()` still compiles it —, a shape whose compile failed
+is built and compiled again by the next call, and what `precompile()` compiles stays until the director is disposed, or until it draws or precompiles
 with another renderer. A transition without an `effect` cannot be named ahead: give it an effect of
 its own to compile it ahead.
 
@@ -861,7 +862,7 @@ below show through wherever it draws nothing.
   and its events go out. So does a transition that takes a stage out of the stack, when `show()`,
   `push()` or `replace()` brings that stage back.
 - `pipeline`, `buildOutputNode` and `renderOrder` are the director's own; a write to any of them
-  throws. The director draws only its clear while the stack is empty.
+  throws until the director is disposed. The director draws only its clear while the stack is empty.
 
 ### Layers
 
@@ -892,6 +893,8 @@ or precompiled with last.
 pushed back while its `pop()` still fades it out comes back over a frozen level.
 
 `director.freeze(stage)` and `director.run(stage)` set it by hand; `director.isFrozen(stage)` asks.
+A state set by hand is yours: the end of a transition with the layer as a source, and the `pop()`
+or `setStack()` that ends a `push()` with `below: 'freeze'`, leave it as it is.
 
 ### The transition
 
@@ -938,7 +941,8 @@ call that ended the transition goes on with the stack as the listener left it. `
 and `replace()` refuse with an error, and give back what they held, when the listener took their
 stage out of its slot or put it into the stack. While `setStack()` or `dispose()` end the running
 transitions, a change a listener asks for answers a cancelled `StageTransition` and changes
-nothing; `remove()` still takes a stage out. A call whose listener disposes the director — one of
+nothing — its arguments are checked all the same, and an invalid one is refused as anywhere —;
+`remove()` still takes a stage out. A call whose listener disposes the director — one of
 an end, or one of `OnStageAdded` or `OnAddToParent` as a stage joins — changes nothing more: it
 answers a cancelled `StageTransition`, and `setStack()` and `setMask()` answer the director.
 
@@ -2001,6 +2005,9 @@ pipeline.dispose();
   to `pipeline`, `buildOutputNode` or `internalTargetPool` is ignored; another renderer refuses it
   as a child or a parent. A disposed `Stage2D` ignores `resize()`, `updateFrame()`, `renderTo()` and
   writes to `projection` and `camera`, and `asPassNode()` throws.
+- After `dispose()` every change of a `StageDirector` answers a cancelled `StageTransition` —
+  `setStack()` and `setMask()` the director —, invalid arguments are refused as before, a write to
+  `pipeline`, `buildOutputNode` and `renderOrder` is ignored, and `precompile()` resolves at once.
 - A renderer that leaves the composed mode, or a stage that leaves a renderer, releases the GPU
   memory of the targets behind the pass nodes, but keeps the nodes: three.js allocates the memory
   again on the next draw that needs it.

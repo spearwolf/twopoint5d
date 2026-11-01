@@ -106,7 +106,11 @@ function directionVector(subject: string, direction: unknown): readonly [number,
     // counter-clockwise on the screen, which runs clockwise in a uv that grows downwards
     return [Math.cos(direction), -Math.sin(direction)];
   }
-  const vector = typeof direction === 'string' ? DIRECTIONS[direction as StageTransitionDirection] : undefined;
+  // own keys only: a name of a member of Object.prototype is no direction
+  const vector =
+    typeof direction === 'string' && Object.hasOwn(DIRECTIONS, direction)
+      ? DIRECTIONS[direction as StageTransitionDirection]
+      : undefined;
   if (vector === undefined) {
     throw new TypeError(
       `${subject}: direction must be 'left', 'right', 'up', 'down' or an angle in radians, got ${describeValue(direction)}`,
@@ -226,7 +230,7 @@ export interface SlideOptions {
 export function slide(options?: SlideOptions): StageTransitionEffect {
   const opts = optionsOf('slide', options, '{direction?, mode?}');
   const direction = opts.direction ?? 'left';
-  if (typeof direction === 'number' || !(direction in DIRECTIONS)) {
+  if (typeof direction === 'number' || !Object.hasOwn(DIRECTIONS, direction as PropertyKey)) {
     throw new TypeError(`slide: direction must be 'left', 'right', 'up' or 'down', got ${describeValue(direction)}`);
   }
   const [dx, dy] = directionVector('slide', direction);

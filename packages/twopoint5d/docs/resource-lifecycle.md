@@ -20,9 +20,15 @@ The loaders of the texture module —
 [`TextureAtlasLoader`](../src/texture/TextureAtlasLoader.ts) —,
 [`TextureFactory`](../src/texture/TextureFactory.ts)`#create()`, `#load()` and
 `#loadAsync()`, and
-[`FrameBasedAnimations`](../src/texture/FrameBasedAnimations.ts)`#bakeDataTexture()`
+[`FrameBasedAnimations`](../src/texture/FrameBasedAnimations.ts)`#bakeDataTexture()` and
+[`FrameTable`](../src/texture/FrameTable.ts)`#bakeDataTexture()`
 build a new texture on every call and have no `dispose()` of their own: whoever called
-them disposes what came back. [`TextureResource`](../src/texture/TextureResource.ts) is
+them disposes what came back. A material that takes such a texture as its `frameTable`
+borrows it. [`DynamicAtlas`](../src/texture/DynamicAtlas.ts) owns what it builds — its
+`texture`, the second texture of `textureFor()`, a canvas it built itself and the staging
+canvas and texture of `upload()` —, and its `dispose()` releases them: the textures are
+disposed, its own canvas and the staging canvas shrink to 0 × 0. A canvas handed to it
+stays the caller's: the atlas draws on it, but neither resizes nor releases it. [`TextureResource`](../src/texture/TextureResource.ts) is
 the other case: it keeps the texture it built and disposes it itself when a successor
 takes its place, when its `imageUrl` is cleared and on `dispose()`, and a subscriber of
 `TextureStore` only borrows it. `TextureStore#acquireAsync()` holds the resource against
@@ -119,7 +125,8 @@ listening, and rejects every pick still in flight (section 3).
 
 **`dispose()` may be called any number of times** — the second call releases nothing
 again and does not throw. Default shape, as in
-[`VOBufferPool.dispose()`](../src/vertex-objects/VOBufferPool.ts):
+[`VOBufferPool.dispose()`](../src/vertex-objects/VOBufferPool.ts) and
+[`DynamicAtlas.dispose()`](../src/texture/DynamicAtlas.ts):
 
 ```ts
 dispose(): void {
@@ -138,8 +145,9 @@ itself gives up, the way
 `tileFactory === null`. Neither is claimed, both are shown by assertion (d).
 
 Where callers have to branch on the state, expose a read-only getter —
-[`VOBufferPool`](../src/vertex-objects/VOBufferPool.ts) and
-[`FixedFrameLoop`](../src/display/FixedFrameLoop.ts) do. Not boilerplate on every class.
+[`VOBufferPool`](../src/vertex-objects/VOBufferPool.ts),
+[`FixedFrameLoop`](../src/display/FixedFrameLoop.ts) and
+[`DynamicAtlas`](../src/texture/DynamicAtlas.ts) do. Not boilerplate on every class.
 
 ```ts
 get isDisposed(): boolean {
@@ -169,6 +177,11 @@ says which.
    [`VOBufferPool#fromBuffersData()`](../src/vertex-objects/VOBufferPool.ts) keeps
    rejecting a mismatched capacity.
 
+[`DynamicAtlas`](../src/texture/DynamicAtlas.ts) shows all three: `texture`,
+`textureFor()`, `canvas` and `context` throw, and so do `add()` and `redraw()`, which
+answer a `TextureAtlasFrame`; `remove()` answers `false`; `clear()` and `upload()` do
+nothing; `atlas` and the sizes answer what they held.
+
 **A member over plain values keeps working.** What it reads or writes is no resource the
 instance gives back — a uniform, the placement a graph was last built with —, so after
 `dispose()` it answers and takes values as before, and a write reaches only what still
@@ -186,6 +199,23 @@ This rules out a `TypeError` from deep inside the class because a field quietly 
 
 A pending promise does not survive either — anything a caller is still awaiting when
 `dispose()` runs is rejected as part of it.
+
+One exception: a promise that stands for the end of something whose end is no error
+resolves on `dispose()` with that end instead of rejecting. Its value carries the outcome,
+and an `await` in the UI needs no `try`/`catch`.
+
+- [`StageTransition`](../src/stage/StageTransition.ts)`#finished` resolves with the
+  transition that `StageDirector#dispose()` ends as `'cancelled'` — a pause menu that
+  never quite faded in is no error.
+- [`StageDirector`](../src/stage/StageDirector.ts)`#precompile()`: a `dispose()` while it
+  runs ends the work, and the promise resolves — there is nothing left to compile for.
+- [`DisplayFullscreen`](../src/display/DisplayFullscreen.ts)`#request()`, `exit()` and
+  `toggle()`: a call still open when `Display#dispose()` runs resolves `false`, a
+  fullscreen the browser grants afterwards is left again, and
+  `DisplayFullscreen#isDisposed` says so.
+
+Each of these members says so in its own TSDoc. A new member takes the exception only
+when its resolved value carries the outcome, and says so in its TSDoc as well.
 
 The rule points outwards too: a constructor or method handed an already-disposed
 instance refuses it, with an error naming the call and the state. Otherwise it builds
@@ -389,7 +419,8 @@ of them, or accept the growth. `vertex-objects-heap.test.js` in
    comment at the call.
 6. Decide every public member's post-dispose behaviour by the type rule in section 3 and
    state it in that member's TSDoc.
-7. Reject every pending promise.
+7. Reject every pending promise — or, under the exception in section 3, resolve it with
+   the outcome its value carries, and say so in its TSDoc.
 8. Expose `isDisposed` where callers have to branch on it.
 9. Ship the tests from section 7.
 
