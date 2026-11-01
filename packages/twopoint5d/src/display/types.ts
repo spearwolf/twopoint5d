@@ -69,7 +69,11 @@ export interface DisplayFullscreenChangeProps {
   display: Display;
   isActive: boolean;
   mode: FullscreenMode | undefined;
-  /** `onLandscape` waits for a tap to enter fullscreen. */
+  /**
+   * `onLandscape` waits for a tap on the target to enter fullscreen, see
+   * {@link DisplayFullscreen.isArmed}. Never `true` while the target is in fullscreen — whoever
+   * entered it, native or pseudo — or lies under an element stacked on it.
+   */
   isArmed: boolean;
   /** The element in fullscreen, or the target of the next request while not active. */
   element: HTMLElement;
