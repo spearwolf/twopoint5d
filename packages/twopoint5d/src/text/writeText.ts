@@ -25,9 +25,10 @@ export type TextSpriteApi = InstancePositionApi & QuadSizeApi & AtlasFrameApi;
 const WRITE = 'writeText';
 const REWRITE = 'rewriteText';
 
-// the features writeText() and rewriteText() write, by the names they are exported under; judged by
-// the name of the feature, as `requires` and the segment placement judge one: a copy such as
-// `defineFeature({...QuadSize})` carries the same API
+// the features writeText() and rewriteText() write, each beside the name it is exported under,
+// which a refusal names. A kind holds one when one of its features carries the same `name`, as
+// `requires` and the segment placement judge it: a copy such as `defineFeature({...QuadSize})`
+// carries the same API
 const REQUIRED: readonly (readonly [SpriteFeature, string])[] = [
   [InstancePosition, 'InstancePosition'],
   [QuadSize, 'QuadSize'],

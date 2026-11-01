@@ -990,7 +990,8 @@ export class DisplayFullscreen {
 
   // The target is in fullscreen, or under an element stacked on it: isActive is false while a video
   // or a dialog of the app lies on top, and a request or an arming would pull the target over it.
-  // #fullscreenHolds() counts the fullscreens of other elements on top of it
+  // #fullscreenHolds() adds what this leaves out: another element in fullscreen while the
+  // target is not in the stack
   #holdsTarget(): boolean {
     return this.isActive || this.#activeElement != null;
   }

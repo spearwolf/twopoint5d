@@ -249,8 +249,8 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     truncateArray(createTiles);
 
     // Only the cells of this call are cleared, so the cost follows the area of this call. The array
-    // stays at the largest area it has covered — at most `maxVisibleTiles` bytes —, because
-    // shrinking it would allocate anew on every switch of an area that swings between two sizes.
+    // stays at the largest area it has covered, one byte per tile, because shrinking it would
+    // allocate anew on every switch of an area that swings between two sizes.
     let tileCreated = this.#tileCreated;
     if (tileCreated == null || tileCreated.length < tilesLength) {
       this.#tileCreated = new Uint8Array(tilesLength);

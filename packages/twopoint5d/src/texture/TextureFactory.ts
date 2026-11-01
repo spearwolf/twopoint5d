@@ -162,8 +162,8 @@ const TextureClasses = {
  * with `-s` or `-t` the one axis: `s` runs along the width of the image, `t` along its height.
  *
  * When two classes write the same option, the narrower one has the last word: `mag-linear`
- * beats `linear`, and `clamp-t` beats `repeat`, whoever named them. Between two classes of the same breadth the order in
- * which they were named decides, and the one named last wins.
+ * beats `linear`, and `clamp-t` beats `repeat`, whoever named them. Between two classes of the same
+ * breadth the order in which they were named decides, and the one named last wins.
  *
  * A {@link TextureStore} lines the classes of an item up behind its own defaults, so an item
  * overrules the store default it collides with on equal breadth. A narrower default keeps the

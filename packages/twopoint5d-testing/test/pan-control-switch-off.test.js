@@ -54,7 +54,7 @@ describe('PanControl2D — what it gives back when an input source is switched o
     control.pointerDisabled = true;
 
     expect(target.classList.length, 'the cursor class after the pointer is switched off').to.equal(0);
-    expect(restores, 'restoreCursor events').to.equal(1);
+    expect(restores, 'OnPanControl2DRestoreCursor events').to.equal(1);
   });
 
   it('hands back pan, keys and cursor when it is switched inactive', () => {

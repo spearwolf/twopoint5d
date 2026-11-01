@@ -51,8 +51,9 @@ function inputWith(mask: StageMask, coverage: Node<'float'>) {
 /**
  * The shape of a graph as text: operators and constants by value, the leaves it was built from
  * (uniforms, texture nodes, the uv) by the order of their first appearance. Two graphs built from
- * the same leaves in the same way have the same shape; `labels` names leaves that must stay apart. (The cache key of a node is no help here: it
- * holds the identity of every node, so two equal graphs differ.)
+ * the same leaves in the same way have the same shape; `labels` names leaves that must stay apart.
+ * (The cache key of a node is no help here: it holds the identity of every node, so two equal
+ * graphs differ.)
  */
 function keyOf(root: Node, labels?: ReadonlyMap<Node, string>): string {
   const ids = new Map<Node, number>();

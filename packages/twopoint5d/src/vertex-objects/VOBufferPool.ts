@@ -125,7 +125,8 @@ export class VOBufferPool {
   /**
    * Takes every whole number, clamped to `0` … {@link capacity}; `Infinity` and `-Infinity` are
    * clamped the same way. Throws a `RangeError` for `NaN`, for a fraction and for a value that is
-   * no number — `undefined`, a string —, none of which names a slot — on a disposed pool as well.
+   * no number, such as `undefined` or a string: none of them names a slot. It throws on a
+   * disposed pool as well.
    *
    * A lower value gives up the slots above it: on a `VertexObjectPool` every vertex object
    * sitting in one of them is let go of, as `VertexObjectPool#freeVO` would, and every
@@ -208,10 +209,9 @@ export class VOBufferPool {
    * even if downstream `THREE.BufferAttribute`s temporarily still hold a copy of
    * the array reference. After `dispose()` the pool is **dead**: any further
    * read or write on its vertex objects throws an `Error` that names the accessor,
-   * {@link createFromAttributes},
-   * {@link toBuffersData} and {@link fromBuffersData} throw, {@link availableCount} is `0`,
-   * and on a `VertexObjectPool` `createVO()` answers `undefined` while `resize()`
-   * throws. The method is idempotent.
+   * {@link createFromAttributes}, {@link toBuffersData} and {@link fromBuffersData} throw,
+   * {@link availableCount} is `0`, and on a `VertexObjectPool` `createVO()` answers `undefined`
+   * while `resize()` throws. The method is idempotent.
    *
    * `dispose()` does **not** automatically dispose any `THREE.BufferAttribute`s
    * that were created on top of this pool — the geometry that owns those is

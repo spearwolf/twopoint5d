@@ -92,7 +92,7 @@ describe('PanControl2D — the cursor each control shows while panning', () => {
     pointer('pointermove', {x: 60, y: 10, buttons: 2});
 
     expect(target.classList.length, 'cursor classes once the pan button is up').to.equal(0);
-    expect(restores, 'restoreCursor events once the pan button is up').to.equal(1);
+    expect(restores, 'OnPanControl2DRestoreCursor events once the pan button is up').to.equal(1);
 
     // the pan button goes down again within the chord, which raises no pointerdown: the pan stays over
     pointer('pointermove', {x: 70, y: 10, buttons: 3});
@@ -101,7 +101,7 @@ describe('PanControl2D — the cursor each control shows while panning', () => {
 
     pointer('pointerup', {x: 90, y: 10, buttons: 0});
 
-    expect(restores, 'restoreCursor events after the last button is up').to.equal(1);
+    expect(restores, 'OnPanControl2DRestoreCursor events after the last button is up').to.equal(1);
   });
 });
 

@@ -113,8 +113,8 @@ export class VertexObjectDescriptor {
    * throws:
    *
    * 1. `vertexCount`, when given, is a whole number of 1 or more (`RangeError`)
-   * 2. every attribute declares a `size` or `components`, and that size is at least 1 — a
-   *    positive integer `size`, or at least one component (`RangeError`)
+   * 2. every attribute declares a `size` or `components`, and its size is a whole number of 1 or
+   *    more: the `size` it declares or, without one, the number of its `components` (`RangeError`)
    * 3. an attribute that declares both `size` and `components` has no more components than its
    *    size; fewer pad the attribute to its size (`RangeError`)
    * 4. every attribute holds at most 4 values per vertex (`RangeError`)

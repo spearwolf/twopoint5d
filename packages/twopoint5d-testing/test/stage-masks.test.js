@@ -14,8 +14,8 @@ import {
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget, Scene} from 'three/webgpu';
 import {mix} from 'three/tsl';
 import {
-  disposeDisplay,
   countNodeBuilds,
+  disposeDisplay,
   disposeKept,
   isNearColor,
   keep,

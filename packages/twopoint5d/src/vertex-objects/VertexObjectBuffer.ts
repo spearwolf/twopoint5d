@@ -173,9 +173,9 @@ export class VertexObjectBuffer {
    * a fresh, zeroed array sized for the given capacity and layout. The capacity then comes from
    * `buffersData.capacity`; `usedCount` belongs to the pool, not the buffer.
    *
-   * The capacity, given as a number or as `buffersData.capacity`, has to be an integer of 0 or
-   * more; beyond that this constructor checks it against nothing. A buffer built here stands on
-   * its own: a pool builds its buffer itself and takes no other one. To restore a pool from
+   * The capacity, given as a number or as `buffersData.capacity`, has to be a whole number of 0 or
+   * more; beyond that this constructor checks it against nothing. A buffer built here stands on its
+   * own: a pool builds its buffer itself and takes no other one. To restore a pool from
    * `toBuffersData()` output, hand the buffers data to the `VOBufferPool` or `VertexObjectPool`
    * constructor, or to `VOBufferPool#fromBuffersData()` of a pool of the same capacity, which
    * throws on a mismatch.
@@ -188,7 +188,7 @@ export class VertexObjectBuffer {
    * @throws when `source` is the buffer of a disposed pool, which has no data to build a second
    * buffer from
    * @throws a `RangeError` that names the value when the capacity, given as a number or as
-   * `buffersData.capacity`, is no integer of 0 or more
+   * `buffersData.capacity`, is no whole number of 0 or more
    */
   constructor(source: VertexObjectDescriptor | VertexObjectBuffer, capacityOrBuffersData: number | VertexObjectBuffersData) {
     if (source instanceof VertexObjectBuffer && source.#released) {
@@ -406,8 +406,8 @@ export class VertexObjectBuffer {
    * other buffer throws when `other` is the buffer of a disposed pool, which has no data to read,
    * and for a buffer of this one that `other` does not have.
    *
-   * @throws a `RangeError` that names the values when `targetObjectOffset` is no integer of 0 or
-   * more, when the two descriptors disagree about their `vertexCount`, when a buffer pair
+   * @throws a `RangeError` that names the values when `targetObjectOffset` is no whole number of 0
+   * or more, when the two descriptors disagree about their `vertexCount`, when a buffer pair
    * disagrees about its `itemSize`, or when a buffer of `other` does not fit its counterpart here
    * at that offset
    * @throws a `TypeError` that names the buffer and both types when a buffer pair disagrees about
@@ -505,8 +505,8 @@ export class VertexObjectBuffer {
    * included, each attribute at its `offset`. A source shorter than the buffer is taken as it is
    * and fills the objects it reaches.
    *
-   * @throws a `RangeError` that names the values when `targetObjectOffset` is no integer of 0 or
-   * more, or when the source reaches past the last object of the buffer from that offset on.
+   * @throws a `RangeError` that names the values when `targetObjectOffset` is no whole number of 0
+   * or more, or when the source reaches past the last object of the buffer from that offset on.
    * Nothing is written then.
    */
   copyArray(source: TypedArray, bufferName: string, targetObjectOffset = 0): void {
@@ -580,9 +580,9 @@ export class VertexObjectBuffer {
    *
    * @returns the largest number of objects copied over all attributes
    *
-   * @throws a `RangeError` that names the value when `targetObjectOffset` is no integer of 0 or
-   * more; nothing is written then. Throws on the buffer of a disposed pool, which has no array to
-   * write into.
+   * @throws a `RangeError` that names the value when `targetObjectOffset` is no whole number of 0
+   * or more; nothing is written then. Throws on the buffer of a disposed pool, which has no array
+   * to write into.
    */
   copyAttributes(attributes: Record<string, ArrayLike<number>>, targetObjectOffset = 0): number {
     assertWholeNumber(targetObjectOffset, 'VertexObjectBuffer#copyAttributes()', 'targetObjectOffset', 0);

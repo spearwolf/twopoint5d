@@ -1113,7 +1113,7 @@ describe('VertexObjectBuffer', () => {
     }
   });
 
-  describe('a capacity that is no integer of 0 or more', () => {
+  describe('a capacity that is no whole number of 0 or more', () => {
     const makeDescriptor = () =>
       new VertexObjectDescriptor({
         vertexCount: 2,

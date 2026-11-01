@@ -271,7 +271,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     expect(updates, 'update events after the same state was assigned again').to.equal(1);
   });
 
-  it('reports restoreCursor only for a cursor it hid', () => {
+  it('reports OnPanControl2DRestoreCursor only for a cursor it hid', () => {
     const box = makeBox();
     boxes = [box];
 
@@ -286,7 +286,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
     pointer('pointermove', {target: box, x: 10, y: 10, buttons: 0});
     pointer('pointermove', {target: box, x: 20, y: 10, buttons: 0});
 
-    expect(restores, 'restoreCursor events without a drag').to.equal(0);
+    expect(restores, 'OnPanControl2DRestoreCursor events without a drag').to.equal(0);
 
     pointer('pointerdown', {target: box, x: 10, y: 10});
     pointer('pointermove', {target: box, x: 30, y: 10});
@@ -295,7 +295,7 @@ describe('PanControl2D — what it measures and what it reports', () => {
 
     pointer('pointerup', {target: box, x: 30, y: 10, buttons: 0});
 
-    expect(restores, 'restoreCursor events after a drag that hid the cursor').to.equal(1);
+    expect(restores, 'OnPanControl2DRestoreCursor events after a drag that hid the cursor').to.equal(1);
     expect(box.classList.length, 'the cursor class after the drag').to.equal(0);
   });
 

@@ -337,12 +337,12 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    *   material of another kind, for a material built for a pass, for parameters that would build a
    *   geometry or a material next to one handed in, for passes next to a material handed in and for
    *   two passes of one name, for options that are no object, for `passes` that are no list and for
-   *   a `grow` that is neither `true` nor `false`; an `Error` for a pass the kind cannot draw, with the placement the
-   *   sprites start with; what `new FeatureSpritesGeometry()` and `new FeatureSpritesMaterial()`
-   *   refuse of the options, in their name; and what `new SpriteResources()` refuses of `textures`
-   *   and `uniforms`, in the name of the class that builds the resources — `FeatureSpritesMaterial`
-   *   without passes, `FeatureSprites` with them. A constructor that throws leaves nothing behind
-   *   it built.
+   *   a `grow` that is neither `true` nor `false`; an `Error` for a pass the kind cannot draw, with
+   *   the placement the sprites start with; what `new FeatureSpritesGeometry()` and `new
+   *   FeatureSpritesMaterial()` refuse of the options, in their name; and what `new
+   *   SpriteResources()` refuses of `textures` and `uniforms`, in the name of the class that builds
+   *   the resources — `FeatureSpritesMaterial` without passes, `FeatureSprites` with them. A
+   *   constructor that throws leaves nothing behind it built.
    */
   constructor(kind: SpriteKind<Api>, options: FeatureSpritesOptions<Api> & {isMaterial?: never; isTexture?: never} = {}) {
     const {geometry, material, ownsGeometry, grows, resources} = resolveParts(kind, options);

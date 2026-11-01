@@ -61,11 +61,11 @@ const NAMES: Readonly<Record<SegmentFacing, string>> = {
  * Returns one frozen feature per set of options: `segmentPlacement`, `segmentPlacement+xz` and
  * `segmentPlacement+camera`, which stand in for each other on a live material. A kind with
  * `Rotation` or `Shear` — judged by the names `rotation` and `shear` — is refused: a segment lies
- * along its ends. So is a kind with `NineSlice`,
- * which sets its border in the local quad, where a segment holds only its caps.
+ * along its ends. So is a kind with `NineSlice`, which sets its border in the local quad, where a
+ * segment holds only its caps.
  *
- * @throws a `TypeError` for options that are no object, for a facing or a plane it does not know, and for a plane next to
- *   `facing: 'camera'`
+ * @throws a `TypeError` for options that are no object, for a facing or a plane it does not know,
+ *   and for a plane next to `facing: 'camera'`
  */
 export function segmentPlacement(options?: SegmentPlacementOptions): SpriteFeature {
   if (options !== undefined && !isObject(options as unknown)) {

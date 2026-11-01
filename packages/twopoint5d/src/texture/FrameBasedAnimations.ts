@@ -407,12 +407,11 @@ export class FrameBasedAnimations {
    *
    * What picks the frames is refused as well when it cannot pick any: a tile id that is no whole
    * number, naming its index; a frame of a list that is no `TextureCoords`, naming its index; a
-   * `firstTileId` that is no whole number; a `tileCount` that is no
-   * whole number from 1 to {@link FrameBasedAnimations.MaxTextureSize} — more frames fit into no
-   * data texture; and a `frameNameQuery` that is neither a string nor a `RegExp`. Tile ids and a
-   * `firstTileId` may be negative, the tile set wraps them. `firstTileId` and `tileCount` are
-   * checked only when they are passed: their defaults come from the tile set, which may hold more
-   * tiles than `MaxTextureSize`.
+   * `firstTileId` that is no whole number; a `tileCount` that is no whole number from 1 to
+   * {@link FrameBasedAnimations.MaxTextureSize} — more frames fit into no data texture; and a
+   * `frameNameQuery` that is neither a string nor a `RegExp`. Tile ids and a `firstTileId` may be
+   * negative, the tile set wraps them. `firstTileId` and `tileCount` are checked only when they are
+   * passed: their defaults come from the tile set, which may hold more tiles than `MaxTextureSize`.
    *
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,

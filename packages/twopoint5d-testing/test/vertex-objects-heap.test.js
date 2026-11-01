@@ -26,10 +26,10 @@ import {makeContainer, disposeDisplay, quadDescription, instancedDescription} fr
 //   shares a vertex array object between the render objects on the same gpu buffers and deletes
 //   it once the last of them lets go of it or one of its buffers is destroyed
 //   (`webgl-fallback/utils/WebGLVertexArrayUtils.js`), so none outlives its round.
-// Disposing the material every 20 rounds leaves about 2.5 KB per round (1.8 % over 100 rounds,
-// measured as above). Runs repeat to within 0.01 points. The limit sits about seven points above
-// them, so a shift in three or V8 does not fail the test, while a leak of some 10 KB per round
-// on top of what three keeps here pushes the growth past it.
+// Disposing the material every 20 rounds leaves about 2.5 KB per round (1.8 % over 100 rounds under
+// WebGL2 and 1.9 % under WebGPU, measured as above). Runs repeat to within 0.01 points. The limit
+// sits about seven points above them, so a shift in three or V8 does not fail the test, while a
+// leak of some 10 KB per round on top of what three keeps here pushes the growth past it.
 const MAX_HEAP_GROWTH = 0.15;
 
 // Chrome's non-standard heap counter; Firefox has none, which the `before()` hook checks for

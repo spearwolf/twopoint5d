@@ -137,7 +137,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * buffer — any further read or write on such a vertex object throws an `Error` that names
    * the accessor. The `usedCount` is capped at the new capacity.
    *
-   * @throws a `RangeError` that names the value when `capacity` is no integer of 0 or more
+   * @throws a `RangeError` that names the value when `capacity` is no whole number of 0 or more
    */
   resize(capacity: number): void {
     if (this.isDisposed) {

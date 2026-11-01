@@ -1010,8 +1010,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   /**
-   * Places a tile the search kept, and sorts it into `reuseTiles` or `createTiles`. Expects the
-   * search to have kept it.
+   * Places a tile the search kept, and sorts it into `reuseTiles` or `createTiles`.
    */
   #placeTile(tile: PooledTileBox, reuseTiles: IMap2DTileCoords[], createTiles: IMap2DTileCoords[]): void {
     const coords = tile.coords;

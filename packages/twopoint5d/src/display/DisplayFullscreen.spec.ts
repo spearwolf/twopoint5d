@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
+import {type EventTargetStub, makeEventTarget} from '../testing/eventTargetStub.js';
 import type {Display} from './Display.js';
 import {DisplayFullscreen, type DisplayFullscreenHost, resetFullscreenWarnings} from './DisplayFullscreen.js';
-import {type EventTargetStub, makeEventTarget} from '../testing/eventTargetStub.js';
 import {Stylesheets} from './Stylesheets.js';
 import type {DisplayFullscreenChangeProps, DisplayFullscreenOptions} from './types.js';
 

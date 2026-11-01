@@ -582,9 +582,9 @@ describe('PanControl2D', () => {
       expect(restored).toHaveBeenCalledExactlyOnceWith(control);
     });
 
-    it('a restoreCursor listener that throws does not stop dispose(): every listener hears it, the cursor rule goes back, the control lets go of its listeners, then dispose() throws its error', () => {
+    it('an onRestoreCursor() listener that throws does not stop dispose(): every listener hears it, the cursor rule goes back, the control lets go of its listeners, then dispose() throws its error', () => {
       const control = makeControl();
-      const error = new Error('restoreCursor listener fails on purpose');
+      const error = new Error('onRestoreCursor() listener fails on purpose');
       control.onRestoreCursor(() => {
         throw error;
       });
@@ -603,9 +603,9 @@ describe('PanControl2D', () => {
       expect(() => control.dispose()).not.toThrow();
     });
 
-    it('pointerDisabled = true with a restoreCursor listener that throws: every listener hears it, the pointer is off, then the setter throws', () => {
+    it('pointerDisabled = true with an onRestoreCursor() listener that throws: every listener hears it, the pointer is off, then the setter throws', () => {
       const control = makeControl();
-      const error = new Error('restoreCursor listener fails on purpose');
+      const error = new Error('onRestoreCursor() listener fails on purpose');
       const hidden = vi.fn();
       control.onHideCursor(hidden);
       control.onRestoreCursor(() => {

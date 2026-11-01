@@ -24,13 +24,13 @@ export class VertexObjectGeometry<VOType extends VO> extends VOBufferGeometry {
       super(pool, capacity);
     } catch (error) {
       // super() only ever sees a pool and cannot tell that it was built here, so the pool built
-      // above goes here
+      // above is disposed here
       if (buildsPool) pool.dispose();
       throw error;
     }
     this.name = 'VertexObjectGeometry';
 
-    // the pool built above belongs to this geometry; super() only ever sees a pool and cannot tell
+    // the pool built above belongs to this geometry
     if (buildsPool) {
       this.declareOwnedPool(this.pool);
     }

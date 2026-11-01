@@ -523,11 +523,11 @@ export class DynamicAtlas {
   }
 
   /**
-   * Disposes the textures — the second one of {@link textureFor} among them — and the staging texture
-   * of {@link upload}, and shrinks a canvas the atlas built
-   * itself and the staging canvas to 0 × 0; a canvas handed in is left alone. Afterwards `texture`,
-   * `textureFor()`, `canvas` and `context` throw, and so do `add()` and `redraw()`; `remove()` answers `false`, and
-   * `clear()` and `upload()` do nothing; `atlas` and the sizes answer what they held. A second call does
+   * Disposes the textures — the second one of {@link textureFor} among them — and the staging
+   * texture of {@link upload}, and shrinks a canvas the atlas built itself and the staging canvas
+   * to 0 × 0; a canvas handed in is left alone. Afterwards `texture`, `textureFor()`, `canvas` and
+   * `context` throw, and so do `add()` and `redraw()`; `remove()` answers `false`, and `clear()`
+   * and `upload()` do nothing; `atlas` and the sizes answer what they held. A second call does
    * nothing.
    */
   dispose(): void {

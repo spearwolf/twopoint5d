@@ -683,11 +683,11 @@ export class PanControl2D extends InputControlBase {
   }
 
   #restoreCursorStyle() {
-    // Only YES has a cursor to restore: that is the one state in which the class went
-    // onto the target and a hideCursor went out. From MAYBE the state is taken back and
-    // nothing else happens, and from NO there is nothing to take back — a control that
-    // never hid a cursor passes here as well, when the pointer is switched off and on
-    // dispose(), and would otherwise report a restore of a cursor nobody hid.
+    // Only YES has a cursor to restore: that is the one state in which the class went onto the
+    // target and `OnPanControl2DHideCursor` went out. From MAYBE the state is taken back and
+    // nothing else happens, and from NO there is nothing to take back — a control that never hid a
+    // cursor passes here as well, when the pointer is switched off and on dispose(), and would
+    // otherwise report a restore of a cursor nobody hid.
     const wasHidden = this.#hideCursorState === HideCursorState.YES;
 
     this.#hideCursorState = HideCursorState.NO;
@@ -827,12 +827,12 @@ export class PanControl2D extends InputControlBase {
 
     try {
       // super.dispose() takes the listeners off and, through unsubscribe(), hands back what the
-      // input sources were holding — while the listeners of this control are still attached, so
-      // the restoreCursor that goes out on the way still reaches them
+      // input sources were holding — while the listeners of this control are still attached, so the
+      // `OnPanControl2DRestoreCursor` that goes out on the way still reaches them
       super.dispose();
     } finally {
-      // runs also behind a restoreCursor listener that threw: the error leaves dispose() after
-      // the teardown is through
+      // runs also behind a listener of `OnPanControl2DRestoreCursor` that threw: the error leaves
+      // dispose() after the teardown is through
 
       // after super.dispose(): the cursor class is off the target by then (unsubscribe() restores
       // the cursor), so no element points at a rule that may leave the sheet here. unsubscribe()
@@ -843,7 +843,8 @@ export class PanControl2D extends InputControlBase {
         this.#cursorPanRuleRoot = undefined;
       }
 
-      // last: the restoreCursor above still has to reach the listeners that act on it
+      // last: the `OnPanControl2DRestoreCursor` above still has to reach the listeners that act on
+      // it
       off(this);
     }
   }

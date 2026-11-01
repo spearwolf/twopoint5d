@@ -144,6 +144,7 @@ describe('DataIdsChunk2D', () => {
     expect(chunk.readDataIdAt(1, 1)).toBe(4);
     expect(seen).toEqual(['AQAAAAIAAAADAAAABAAAAA==']);
   });
+
   describe('readDataIdAt() at a fractional point', () => {
     const chunkAt = (x: number, y: number) =>
       new DataIdsChunk2D({x, y, width: 2, height: 2, uint32Arr: new Uint32Array([1, 2, 3, 4])});

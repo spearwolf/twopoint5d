@@ -254,8 +254,8 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    * @typeParam VOType - the vertex object type of the attached pool; `unknown` if not given.
    * @param name - unique key for this attached pool, used by {@link detachInstancedPool} and the
    *   `extraInstancedPools` / `extraInstancedBuffers` / `extraInstancedBufferSerials` maps.
-   * @param pool - an existing {@link VertexObjectPool} or a descriptor / description that will be wrapped in a new pool
-   *   with the capacity of the `.instancedPool`.
+   * @param pool - an existing {@link VertexObjectPool} or a descriptor / description that will be
+   *   wrapped in a new pool with the capacity of the `.instancedPool`.
    * @param options.autoDispose - when `true`, the attached pool is disposed together with this
    *   geometry on {@link dispose}. The **default** is whether this geometry built the pool
    *   itself: a descriptor or description handed in here becomes a pool that belongs to this
@@ -607,9 +607,9 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
 
   /**
    * Sets `instanceCount` from the instanced pool — until the first call it is 0 — and, on a
-   * geometry with a base pool, the draw range from that pool, uploads the buffers that need it and syncs the attribute arrays to the
-   * pools' own. A geometry built from a `BufferGeometry` keeps the draw range it copied from it,
-   * and one set on it since.
+   * geometry with a base pool, the draw range from that pool, uploads the buffers that need it and
+   * syncs the attribute arrays to the pools' own. A geometry built from a `BufferGeometry` keeps
+   * the draw range it copied from it, and one set on it since.
    *
    * A no-op after `dispose()`: the geometry has no attribute left to draw or upload, and an
    * `instanceCount` or draw range taken from a pool that is still alive would name instances or

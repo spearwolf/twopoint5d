@@ -20,8 +20,8 @@ export type TypedArray =
 
 /**
  * The element type of the buffer an attribute is stored in, named as the typed array that holds it:
- * `'float32'` is a `Float32Array`.
- * `'float64'` and `'uint8clamped'` have no WebGPU vertex format, and a `VertexObjectDescriptor` refuses an attribute of either.
+ * `'float32'` is a `Float32Array`. `'float64'` and `'uint8clamped'` have no WebGPU vertex format,
+ * and a `VertexObjectDescriptor` refuses an attribute of either.
  */
 export type VertexAttributeDataType =
   | 'float64'

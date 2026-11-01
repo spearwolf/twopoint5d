@@ -890,10 +890,10 @@ export class TextureStore {
    * with `source: 'parse'` and its id: one that is no object, one with a field of the wrong
    * type — a url that is no string, a `tileSet`, `frameBasedAnimations` or `playback` that is no
    * object, a `texture` that is no array, a `playback` with a value other than `'loop'`, `'once'`
-   * and `'pingpong'`; absent is `undefined`, a `null` is a field of the wrong type —, one that names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`, and an atlas
-   * item that names an `atlasAdapter` the store does not know (see
-   * {@link TextureStore.registerAtlasAdapter}). A resource that already carries that id stays as it
-   * is.
+   * and `'pingpong'`; absent is `undefined`, a `null` is a field of the wrong type —, one that
+   * names neither a `tileSet`, an `atlasUrl` nor an `imageUrl`, and an atlas item that names an
+   * `atlasAdapter` the store does not know (see {@link TextureStore.registerAtlasAdapter}). A
+   * resource that already carries that id stays as it is.
    *
    * The type of the resource an item builds is the first of `tileSet` (a tile set), `atlasUrl` (an
    * atlas) and `imageUrl` (an image) it names. Every other field the item names that this type does
