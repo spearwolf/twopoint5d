@@ -46,6 +46,7 @@ import {description, title} from './_ui-panels.json';
   import {DungeonScreen, PANEL_STYLES} from '~demos/ui-panels/DungeonScreen';
   import {PARTY} from '~demos/ui-panels/party';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
@@ -74,7 +75,7 @@ import {description, title} from './_ui-panels.json';
     return image;
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'ui-panels', async ({renderer}) => {
     // a catalog of this demo's own, parsed in place: an Aseprite json goes to the Aseprite adapter
     // by its meta.app, and its slices travel with the frame
     const store = new TextureStore(renderer);

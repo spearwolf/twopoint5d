@@ -23,13 +23,16 @@ import {description, title} from './_stage-transitions-game-menu.json';
   import {PauseMenu} from '~demos/stage-transitions/PauseMenu';
   import {Starfield} from '~demos/stage-transitions/Starfield';
   import {TitleMenu} from '~demos/stage-transitions/TitleMenu';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
   const preview = deferPreview();
 
-  const display = new Display(getFullscreenCanvas());
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
 
   // the director is the one renderer of the display: it draws every layer into a target of its own
   // and composes the stack in one pipeline, bottom to top, over its clear color
@@ -45,7 +48,7 @@ import {description, title} from './_stage-transitions-game-menu.json';
 
   const input: LevelInput = {left: false, right: false, up: false, down: false};
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-transitions-game-menu', async ({renderer}) => {
     const {store, assets} = await loadStageTransitionAssets(renderer);
     if (display.isDisposed) {
       store.dispose();
@@ -119,7 +122,9 @@ import {description, title} from './_stage-transitions-game-menu.json';
       KeyW: 'up',
       KeyS: 'down',
     };
-    window.addEventListener('keydown', (event) => {
+    // a key in a field or on a button of the gui stays there: Space on "start (enter)" presses it once
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (ignoredKey(event)) return;
       const key = keys[event.code];
       if (key) {
         input[key] = true;
@@ -129,12 +134,15 @@ import {description, title} from './_stage-transitions-game-menu.json';
       if (event.code === 'Enter' || event.code === 'Space') start();
       else if (event.code === 'Escape') togglePause();
       else if (event.code === 'KeyQ') quit();
-    });
-    window.addEventListener('keyup', (event) => {
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
       const key = keys[event.code];
       if (key) input[key] = false;
-    });
-    getFullscreenCanvas().addEventListener('click', start);
+    };
+    const onClick = start;
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    canvas.addEventListener('click', onClick);
 
     const menuEffects = [...effects.keys()].filter((name) => !name.startsWith('luma'));
 
@@ -152,7 +160,10 @@ import {description, title} from './_stage-transitions-game-menu.json';
     ];
     // the title runs while the shapes compile, one after the other; the level and the pause menu
     // draw once off screen, so their sprites and the bloom of the level are built before the start
-    const precompiled = director.precompile(renderer, shapes, {layers: [level.renderer, pause.stage]});
+    const precompiled = catchPrecompile(
+      'stage-transitions-game-menu',
+      director.precompile(renderer, shapes, {layers: [level.renderer, pause.stage]}),
+    );
 
     const gui = new GUI({container: getDemoUi(), title: 'transition'});
     gui.add(settings, 'effect', menuEffects).onChange(showInfo);
@@ -164,6 +175,9 @@ import {description, title} from './_stage-transitions-game-menu.json';
     gui.add({quit}, 'quit').name('quit to title (q)');
 
     display.onDispose(() => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      canvas.removeEventListener('click', onClick);
       gui.destroy();
       // the director lets go of the layers first, then each layer goes
       director.dispose();

@@ -49,6 +49,7 @@ import {description, title} from './_rope-bridge.json';
   } from '@spearwolf/twopoint5d';
   import {Color, RenderPipeline} from 'three/webgpu';
   import {CAVE_HEIGHT, RopeBridge} from '~demos/rope-bridge/RopeBridge';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
@@ -85,7 +86,7 @@ import {description, title} from './_rope-bridge.json';
 
   on(stage, OnStageResize, ({width, height}) => bridge?.resizeView(width, height));
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'rope-bridge', async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
     const [[atlas, texture], [caveBack], [caveMid], [caveFront]] = await Promise.all([
       store.getAsync('ropeBridgeAtlas', ['atlas', 'texture']),

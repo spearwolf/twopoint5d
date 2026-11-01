@@ -37,6 +37,8 @@ import {description, title} from './_stage-masks-spotlight.json';
     WardPlayer,
   } from '~demos/stage-masks/WardC';
   import {type RigInput, WardRig} from '~demos/stage-masks/WardRig';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -57,7 +59,7 @@ import {description, title} from './_stage-masks-spotlight.json';
     mask: true,
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-spotlight', async ({renderer}) => {
     const assets = await loadWardAssets(renderer);
     if (display.isDisposed) {
       disposeWardAssets(assets);
@@ -145,10 +147,10 @@ import {description, title} from './_stage-masks-spotlight.json';
       KeyW: 'up',
       KeyS: 'down',
     };
-    // a shortcut of the browser or the system is not a step of the player
-    const withModifier = (event: KeyboardEvent) => event.ctrlKey || event.metaKey || event.altKey;
+    // a shortcut of the browser or the system is not a step of the player, and neither is typing
+    // into the gui
     const onKeyDown = (event: KeyboardEvent) => {
-      if (withModifier(event)) return;
+      if (ignoredKey(event)) return;
       const key = keys[event.code];
       if (key) {
         rig.input[key] = true;
@@ -221,7 +223,10 @@ import {description, title} from './_stage-masks-spotlight.json';
       ['layer', 'layer', 'layer'],
       ['layer', effect, 'layer'],
     ];
-    const precompiled = director.precompile(renderer, shapes, {layers: [laundromat.stage, fog.stage]});
+    const precompiled = catchPrecompile(
+      'stage-masks-spotlight',
+      director.precompile(renderer, shapes, {layers: [laundromat.stage, fog.stage]}),
+    );
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 

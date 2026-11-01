@@ -124,6 +124,25 @@ const {title, description, fullscreenCanvas = false} = Astro.props;
     background-color: var(--widget-color);
     color: var(--text-color);
   }
+  /* the line a demo that failed to start writes over its canvas, from onDemoInit(): in the bottom
+     left corner, clear of the lil-gui panel. Outside the layer, it may land in the <body> as well */
+  .demo-failure {
+    position: fixed;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: var(--demo-layer-ui);
+    max-width: min(36rem, calc(100% - 2rem));
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    background: rgb(0 0 0 / 0.82);
+    color: #ffb3a7;
+    font:
+      13px / 1.45 ui-monospace,
+      'SFMono-Regular',
+      Menlo,
+      monospace;
+  }
   html {
     font-family: system-ui, sans-serif;
     background-color: #232348;

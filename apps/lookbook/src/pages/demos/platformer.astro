@@ -46,6 +46,7 @@ import {description, title} from './_platformer.json';
   import {Display} from '@spearwolf/twopoint5d';
   import {loadPlatformerAssets} from '~demos/platformer/assets';
   import {Platformer} from '~demos/platformer/Platformer';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {bindFullscreenButton} from '~demos/utils/fullscreenButton';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -56,7 +57,7 @@ import {description, title} from './_platformer.json';
   const display = new Display(getFullscreenCanvas(), {fullscreen: {onLandscape: true, fallback: 'pseudo'}});
   bindFullscreenButton(display);
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'platformer', async ({renderer}) => {
     const assets = await loadPlatformerAssets(renderer);
     // a dispose() while the sheets loaded has gone out already: nothing is built
     if (display.isDisposed) {

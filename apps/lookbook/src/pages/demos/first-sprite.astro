@@ -15,6 +15,7 @@ import {description, title} from './_first-sprite.json';
   import {Display, FeatureSprites, TexturedSpriteKind, TextureStore} from '@spearwolf/twopoint5d';
   import {PerspectiveCamera, Scene} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {deferPreview} from '~demos/utils/demoPreview';
 
@@ -42,7 +43,9 @@ import {description, title} from './_first-sprite.json';
     camera.updateProjectionMatrix();
   });
 
-  display.onInit(async ({renderer}) => {
+  // the display does not wait for the promise of an async init: onDemoInit() catches a failed
+  // load and shows it under the name of the demo, in the console and over the canvas
+  onDemoInit(display, 'first-sprite', async ({renderer}) => {
     // the catalog of the lookbook names each texture, the image behind it and its frames
     const store = new TextureStore(renderer);
     await store.loadAsync(assetsUrl('textures.json'));

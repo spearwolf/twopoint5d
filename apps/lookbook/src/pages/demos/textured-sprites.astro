@@ -28,6 +28,7 @@ import {description, title} from './_textured-sprites.json';
   import {LessEqualDepth} from 'three/webgpu';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
@@ -35,7 +36,7 @@ import {description, title} from './_textured-sprites.json';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
-  demo.onInit(async ({renderer}) => {
+  onDemoInit(demo, 'textured-sprites', async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
     const [tileSet, texture] = await store.getAsync('skinballTiles', ['tileSet', 'texture']);
 

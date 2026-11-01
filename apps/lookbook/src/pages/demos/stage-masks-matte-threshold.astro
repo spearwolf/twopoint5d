@@ -46,14 +46,15 @@ import {description, title} from './_stage-masks-matte-threshold.json';
     StageDirector,
     type StageDirectorShape,
     StageMask,
-    type StageTransition,
     type StageTransitionEasing,
     type StageTransitionEffect,
   } from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
   import {SONAR_KINDS, SonarField, SonarHud, type SonarKind, SonarMaskStage} from '~demos/stage-masks/Sonar';
+  import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {disposeTrenchAssets, loadTrenchAssets, ThingView, TrenchView} from '~demos/stage-masks/Trench';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -85,7 +86,7 @@ import {description, title} from './_stage-masks-matte-threshold.json';
     progress: 0.45,
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-matte-threshold', async ({renderer}) => {
     const assets = await loadTrenchAssets(renderer);
     if (display.isDisposed) {
       disposeTrenchAssets(assets);
@@ -111,92 +112,47 @@ import {description, title} from './_stage-masks-matte-threshold.json';
 
     director.setStack([survey.stage, hud.stage]);
 
-    let running: StageTransition | undefined;
     let runningSoftness: number = settings.softness;
-    let hold = HOLD;
-    const sceneName = (stage: unknown) => (stage === thing.stage ? 'the thing' : 'survey');
-    const readout = {slot: 'survey', time: '—', progress: ping.progress.toFixed(3), softness: '—'};
 
-    // the readouts, written once per frame: during a run they name both ends of the slot
-    const describe = () => {
-      if (running) {
-        readout.slot = `${sceneName(running.from)} → ${sceneName(running.to)}`;
-        readout.time = running.manual ? 'by hand' : Math.min(1, running.elapsed / running.duration).toFixed(3);
-        readout.softness = runningSoftness.toFixed(2);
-      } else {
-        readout.slot = sceneName(director.stack[0]);
-        readout.time = '—';
-        readout.softness = '—';
-      }
-      readout.progress = ping.progress.toFixed(3);
+    display.onRenderFrame(({deltaTime}) => field.update(deltaTime));
+
+    // K picks the next mask kind
+    const nextKind = () => {
+      settings.kind = SONAR_KINDS[(SONAR_KINDS.indexOf(settings.kind) + 1) % SONAR_KINDS.length]!;
+      field.kind = settings.kind;
     };
 
-    const begin = (manual: boolean): StageTransition => {
-      const from = director.stack[0] === thing.stage ? thing : survey;
-      const to = from === thing ? survey : thing;
-      if (to === thing) thing.wake();
-      runningSoftness = settings.softness;
-      hud.softness.value = runningSoftness;
-      const transition = director.replace(from.stage, to.stage, {
-        effect: effects.get(runningSoftness)!,
-        duration: settings.duration,
-        easing: settings.easing,
-        manual,
-      });
-      if (manual) transition.progress = settings.progress;
-      running = transition;
-      hud.running = true;
-      transition.finished.then((t) => {
-        if (display.isDisposed) return;
-        if (running === t) {
-          running = undefined;
-          hud.running = false;
-        }
-        hold = HOLD;
-        describe();
-      });
-      return transition;
-    };
-
-    const play = () => {
-      // a run already going is the one on the screen: let it finish
-      if (running || settings.scrub) return;
-      begin(false);
-    };
-
-    const setScrub = () => {
-      if (settings.scrub) {
-        running?.cancel('end');
-        running = undefined;
-        begin(true);
-      } else if (running?.manual) {
-        // let go of the slider: the transition ends where it is nearer to
-        running.cancel(running.progress >= 0.5 ? 'end' : 'start');
-      }
-    };
-
-    // a new softness is a new effect: a run by hand starts again with it, at the same progress, in
-    // the same direction; a run by the clock keeps its own and the next one takes the new value
-    const setSoftness = () => {
-      if (!running?.manual) return;
-      const toward = running.to;
-      running.cancel('start');
-      running = undefined;
-      if (director.stack[0] !== toward) begin(true);
-    };
-
-    display.onRenderFrame(({deltaTime}) => {
-      field.update(deltaTime);
-      if (!settings.cycle || settings.scrub || running) return;
-      hold -= deltaTime;
-      if (hold <= 0) begin(false);
+    // the slot between the survey and the thing: played, scrubbed by hand or cycled, with Space,
+    // Enter and S
+    const cycler = new TransitionCycler({
+      display,
+      director,
+      stages: [survey.stage, thing.stage],
+      names: ['survey', 'the thing'],
+      settings,
+      hold: HOLD,
+      onBegin: (_from, to) => {
+        if (to === thing.stage) thing.wake();
+        runningSoftness = settings.softness;
+        hud.softness.value = runningSoftness;
+        hud.running = true;
+      },
+      onEnd: () => {
+        hud.running = false;
+      },
+      effect: () => effects.get(runningSoftness)!,
+      progress: () => ping.progress,
+      progressName: 'ping.progress',
+      keys: {KeyK: nextKind},
     });
 
     const gui = new GUI({container: getDemoUi(), title: 'Sonar'});
+    // a new softness is a new effect: a run by hand starts again with it, at the same progress, in
+    // the same direction; a run by the clock keeps its own and the next one takes the new value
     gui
       .add(settings, 'softness', SOFTNESS as unknown as number[])
       .name('matte softness')
-      .onChange(setSoftness);
+      .onChange(() => cycler.restart());
     gui
       .add(settings, 'kind', SONAR_KINDS as unknown as string[])
       .name('mask kind (k)')
@@ -204,34 +160,28 @@ import {description, title} from './_stage-masks-matte-threshold.json';
         field.kind = settings.kind;
       })
       .listen();
-    gui.add(settings, 'duration', 0.5, 10, 0.1).name('duration (s)');
-    gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']);
-    gui.add({play}, 'play').name('play (space)');
-    gui.add(settings, 'cycle').name('cycle by itself');
     gui
       .add(settings, 'scope')
       .name('scope: the raw mask')
       .onChange(() => {
         hud.scopeVisible = settings.scope;
       });
-    gui.add(settings, 'scrub').name('scrub by hand (s)').onChange(setScrub).listen();
-    gui
-      .add(settings, 'progress', 0, 1, 0.001)
-      .name('transition.progress')
-      .onChange(() => {
-        if (running?.manual) running.progress = settings.progress;
-      });
-    gui.add(readout, 'slot').name('in the slot').disable().listen();
-    gui.add(readout, 'time').name('time / duration').disable().listen();
-    gui.add(readout, 'progress').name('ping.progress').disable().listen();
+    cycler.addControls(gui, {min: 0.5, max: 10});
+    // the softness of the run on the screen, written only when it changes
+    const readout = {softness: '—'};
     gui.add(readout, 'softness').name('softness of the run').disable().listen();
+    let shownSoftness = -1;
 
     // the caption of the scope follows where the HUD put it
     let captionShown = false;
     let captionBottom = -1;
     let captionRight = -1;
     const onFrame = () => {
-      describe();
+      const softness = cycler.running ? runningSoftness : -1;
+      if (softness !== shownSoftness) {
+        shownSoftness = softness;
+        readout.softness = softness === -1 ? '—' : softness.toFixed(2);
+      }
       const show = settings.scope && hud.scope.width > 0;
       if (show !== captionShown) {
         captionShown = show;
@@ -247,52 +197,29 @@ import {description, title} from './_stage-masks-matte-threshold.json';
     };
     display.onRenderFrame(onFrame);
 
-    // space plays, S scrubs by hand, K picks the next mask kind
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
-      if (event.code === 'Space' || event.code === 'Enter') {
-        event.preventDefault();
-        play();
-      } else if (event.code === 'KeyS') {
-        settings.scrub = !settings.scrub;
-        setScrub();
-      } else if (event.code === 'KeyK') {
-        settings.kind = SONAR_KINDS[(SONAR_KINDS.indexOf(settings.kind) + 1) % SONAR_KINDS.length]!;
-        field.kind = settings.kind;
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-
     // every shape the slot takes — a scene alone, and the sonar between two at each softness — with
     // both scenes, the display and the mask stage drawn once ahead. One mask with one source and
     // invert, so one shader per softness; the mask kind is a uniform and needs none
     const shapes: StageDirectorShape[] = [['layer', 'layer']];
     for (const effect of effects.values()) shapes.push([effect, 'layer']);
-    const precompiled = director
-      .precompile(renderer, shapes, {layers: [survey.stage, thing.stage, hud.stage, sonar.stage]})
-      .catch((error: unknown) => {
-        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
-        console.error('stage-masks-matte-threshold: precompile() failed, the shaders build on first use', error);
-      });
+    const precompiled = catchPrecompile(
+      'stage-masks-matte-threshold',
+      director.precompile(renderer, shapes, {layers: [survey.stage, thing.stage, hud.stage, sonar.stage]}),
+    );
 
     // the card of the lookbook: the pulse rings held where half the trench has switched — the rings
     // cut the thing into bands wherever the pings are, so the card always shows it
     if (isPreview) {
-      settings.cycle = false;
       settings.kind = 'pulse rings';
       field.kind = settings.kind;
-      settings.progress = 0.5;
-      settings.scrub = true;
-      setScrub();
+      cycler.holdAt(0.5);
     }
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
     display.onDispose(() => {
       clearTimeout(previewTimeout);
-      window.removeEventListener('keydown', onKeyDown);
+      cycler.dispose();
       gui.destroy();
       // the director lets go of the layers and of the mask stage first, then each goes
       director.dispose();

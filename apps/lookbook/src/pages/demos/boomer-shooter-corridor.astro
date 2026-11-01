@@ -59,6 +59,7 @@ import {description, title} from './_boomer-shooter-corridor.json';
   import {CorridorWalker} from '~demos/boomer-shooter-corridor/CorridorWalker';
   import {NeonSigns} from '~demos/boomer-shooter-corridor/NeonSigns';
   import {Stalkers} from '~demos/boomer-shooter-corridor/Stalkers';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {bindFullscreenButton} from '~demos/utils/fullscreenButton';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -96,7 +97,7 @@ import {description, title} from './_boomer-shooter-corridor.json';
 
   const walker = new CorridorWalker(camera, canvas);
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'boomer-shooter-corridor', async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
     const [[stalkerAtlas, stalkerTexture], [signsAtlas, signsTexture], [wall], [floor], [ceiling], [door]] = await Promise.all([
       store.getAsync('boomerStalker', ['atlas', 'texture']),

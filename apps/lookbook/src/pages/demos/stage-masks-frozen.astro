@@ -28,6 +28,8 @@ import {description, title} from './_stage-masks-frozen.json';
     SeanceRoom,
   } from '~demos/stage-masks/MothChapel';
   import {RoseWindow} from '~demos/stage-masks/RoseWindow';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -41,7 +43,7 @@ import {description, title} from './_stage-masks-frozen.json';
 
   const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-frozen', async ({renderer}) => {
     const assets = await loadChapelAssets(renderer);
     if (display.isDisposed) {
       disposeChapelAssets(assets);
@@ -130,9 +132,7 @@ import {description, title} from './_stage-masks-frozen.json';
 
     // F freezes and runs the mask stage, S scrambles the mask scene, M mends the glass
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (ignoredKey(event) || event.repeat) return;
       if (event.code === 'KeyF') {
         settings.mode = settings.mode === 'freeze' ? 'run' : 'freeze';
         apply();
@@ -153,10 +153,10 @@ import {description, title} from './_stage-masks-frozen.json';
     // the one shape of the stack: run and freeze change no shape, and the masks never come off.
     // Every stage draws once ahead, so its materials are built before the first frame
     const shapes: StageDirectorShape[] = [['layer', {mask: throughGlass}, {mask: amberGlass}, {mask: violetGlass}, 'layer']];
-    const precompiled = director.precompile(renderer, shapes, {layers: [...layers, rose.stage]}).catch((error: unknown) => {
-      // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
-      console.error('stage-masks-frozen: precompile() failed, the shaders build on first use', error);
-    });
+    const precompiled = catchPrecompile(
+      'stage-masks-frozen',
+      director.precompile(renderer, shapes, {layers: [...layers, rose.stage]}),
+    );
     // precompile() draws the stages off screen in its synchronous part, before its first await: those
     // draws of the rose are not the frames', and the frozen mask still owes its first picture
     rose.takeDraws();

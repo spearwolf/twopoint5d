@@ -28,6 +28,8 @@ import {description, title} from './_stage-masks-portal.json';
     MIN_DISTANCE,
     PortalState,
   } from '~demos/stage-masks/PaintingHallway';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -43,7 +45,7 @@ import {description, title} from './_stage-masks-portal.json';
 
   const director = new StageDirector(display).setClearColor(new Color('#030305'), 1);
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-portal', async ({renderer}) => {
     const assets = await loadPortalAssets(renderer);
     if (display.isDisposed) {
       disposePortalAssets(assets);
@@ -119,13 +121,8 @@ import {description, title} from './_stage-masks-portal.json';
       KeyD: 'right',
     };
     // a shortcut of the browser or the system moves nothing, and neither does typing into the gui
-    const ignored = (event: KeyboardEvent) =>
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      (event.target instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName));
     const onKeyDown = (event: KeyboardEvent) => {
-      if (ignored(event)) return;
+      if (ignoredKey(event)) return;
       const key = keys[event.code];
       if (key) {
         state.input[key] = true;
@@ -196,12 +193,10 @@ import {description, title} from './_stage-masks-portal.json';
 
     // the one shape the demo reaches: the moor masked by the portal between two plain layers
     const shapes: StageDirectorShape[] = [['layer', {mask: portal.mask}, 'layer']];
-    const precompiled = director
-      .precompile(renderer, shapes, {layers: [hallway.stage, moor.stage, glaze.stage, portal.mask.stage]})
-      .catch((error: unknown) => {
-        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
-        console.error('stage-masks-portal: precompile() failed, the first frame builds the shader instead', error);
-      });
+    const precompiled = catchPrecompile(
+      'stage-masks-portal',
+      director.precompile(renderer, shapes, {layers: [hallway.stage, moor.stage, glaze.stage, portal.mask.stage]}),
+    );
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 

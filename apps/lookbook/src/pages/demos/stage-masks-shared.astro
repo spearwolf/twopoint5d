@@ -21,6 +21,8 @@ import {description, title} from './_stage-masks-shared.json';
   import {CamcorderHud, VhsNoise} from '~demos/stage-masks/Camcorder';
   import {disposeFootageAssets, FootageClock, ForestLevel, loadFootageAssets, RotLayer} from '~demos/stage-masks/FoundFootage';
   import {InkVignette} from '~demos/stage-masks/InkVignette';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -40,7 +42,7 @@ import {description, title} from './_stage-masks-shared.json';
     strength: 0.35,
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-shared', async ({renderer}) => {
     const assets = await loadFootageAssets(renderer);
     if (display.isDisposed) {
       disposeFootageAssets(assets);
@@ -94,9 +96,7 @@ import {description, title} from './_stage-masks-shared.json';
 
     // L and H toggle the mask of the level and of the HUD
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+      if (ignoredKey(event) || event.repeat) return;
       if (event.code === 'KeyL') settings.level = !settings.level;
       else if (event.code === 'KeyH') settings.hud = !settings.hud;
       else return;
@@ -126,12 +126,7 @@ import {description, title} from './_stage-masks-shared.json';
       ['layer', 'layer', 'layer', {mask: inkMask}],
       ['layer', 'layer', 'layer', 'layer'],
     ];
-    const precompiled = director
-      .precompile(renderer, shapes, {layers: [ink.stage]})
-      .catch((error: unknown) => {
-        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
-        console.error('stage-masks-shared: precompile() failed, the shaders build on first use', error);
-      })
+    const precompiled = catchPrecompile('stage-masks-shared', director.precompile(renderer, shapes, {layers: [ink.stage]}))
       // precompile() draws the mask stage off screen: those draws are not the frame's
       .finally(() => ink.takeDraws());
 

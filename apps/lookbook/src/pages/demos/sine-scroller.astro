@@ -37,6 +37,7 @@ import {description, title} from './_sine-scroller.json';
   import {Color, RenderPipeline} from 'three/webgpu';
   import {FONT_PALETTES, SineScroller, TUNNEL_PALETTES} from '~demos/sine-scroller/SineScroller';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
@@ -105,7 +106,7 @@ import {description, title} from './_sine-scroller.json';
     return font;
   }
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'sine-scroller', async ({renderer}) => {
     const store = new TextureStore(renderer);
     store.parse(catalog, {baseUrl: assetsUrl('sine-scroller/')});
 

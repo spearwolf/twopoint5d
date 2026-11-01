@@ -148,6 +148,14 @@ export class GalleryMattes {
     ['matte (noise, threshold)', matte({mask: this.#noise.mask, mode: 'threshold', softness: 0.12})],
   ]);
 
+  /**
+   * The mask stages of both mattes, for the `layers` of `precompile()`: neither is in the stack,
+   * so only a draw ahead builds their materials before the first transition through them.
+   */
+  get maskStages(): readonly Stage2D[] {
+    return [this.#ink.stage, this.#noise.stage];
+  }
+
   dispose(): void {
     this.#ink.dispose();
     this.#noise.dispose();

@@ -27,6 +27,8 @@ import {description, title} from './_stage-masks-rift.json';
   import {Color} from 'three/webgpu';
   import {disposeDeepAssets, DrownedRoom, ListeningRoom, loadDeepAssets, TvSnow} from '~demos/stage-masks/DeepListening';
   import {RiftMembrane, RiftRim, type RiftInput, RiftState} from '~demos/stage-masks/RiftMembrane';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -46,7 +48,7 @@ import {description, title} from './_stage-masks-rift.json';
     source: 'alpha' as StageMaskCoverageSource,
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-rift', async ({renderer}) => {
     const assets = await loadDeepAssets(renderer);
     if (display.isDisposed) {
       disposeDeepAssets(assets);
@@ -120,10 +122,9 @@ import {description, title} from './_stage-masks-rift.json';
       KeyW: 'up',
       KeyS: 'down',
     };
-    // a shortcut of the browser or the system moves nothing
-    const withModifier = (event: KeyboardEvent) => event.ctrlKey || event.metaKey || event.altKey;
+    // a shortcut of the browser or the system moves nothing, and neither does typing into the gui
     const onKeyDown = (event: KeyboardEvent) => {
-      if (withModifier(event)) return;
+      if (ignoredKey(event)) return;
       const key = keys[event.code];
       if (key) {
         rift.input[key] = true;
@@ -194,7 +195,7 @@ import {description, title} from './_stage-masks-rift.json';
       ['layer', 'layer', {mask: riftMask}, 'layer'],
       ['layer', {mask: cutMask}, {mask: riftMask}, 'layer'],
     ];
-    const precompiled = director.precompile(renderer, shapes, {layers: [membrane.stage]});
+    const precompiled = catchPrecompile('stage-masks-rift', director.precompile(renderer, shapes, {layers: [membrane.stage]}));
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 

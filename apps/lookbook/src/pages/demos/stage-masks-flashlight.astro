@@ -29,6 +29,8 @@ import {description, title} from './_stage-masks-flashlight.json';
     makeLightNodes,
     makeProjection,
   } from '~demos/stage-masks/Crawlspace';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -53,7 +55,7 @@ import {description, title} from './_stage-masks-flashlight.json';
     flicker: true,
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-flashlight', async ({renderer}) => {
     const assets = await loadCrawlAssets(renderer);
     if (display.isDisposed) {
       disposeCrawlAssets(assets);
@@ -114,13 +116,8 @@ import {description, title} from './_stage-masks-flashlight.json';
       KeyW: 'up',
       KeyS: 'down',
     };
-    const ignored = (event: KeyboardEvent) =>
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      (event.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName));
     const onKeyDown = (event: KeyboardEvent) => {
-      if (ignored(event)) return;
+      if (ignoredKey(event)) return;
       const key = keys[event.code];
       if (key) {
         rig.input[key] = true;
@@ -190,10 +187,7 @@ import {description, title} from './_stage-masks-flashlight.json';
       ['layer', {mask}],
       ['layer', 'layer'],
     ];
-    const precompiled = director.precompile(renderer, shapes, {layers: [mask.stage]}).catch((error: unknown) => {
-      // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
-      console.error('stage-masks-flashlight: precompile() failed, the shaders build on their first frame', error);
-    });
+    const precompiled = catchPrecompile('stage-masks-flashlight', director.precompile(renderer, shapes, {layers: [mask.stage]}));
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 

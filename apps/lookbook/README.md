@@ -59,6 +59,14 @@ together.
    URL of any demo page hides the navbar, e.g. for a demo embedded in an iframe, and sets
    the variable to `0px`; `?preview=1` hides the `<demo-ui>` as well, see
    [Preview images](#preview-images).
+
+   An `onInit` that awaits goes through `onDemoInit(display, '<name>', …)` from
+   `src/demos/utils/demoInit.ts`: a `Display` does not wait for the promise of its
+   listener, and `onDemoInit()` shows a failure under the name of the demo, in the console
+   and over the canvas. A `director.precompile()` goes through `catchPrecompile('<name>', …)`
+   from the same file, which logs a failure and lets the page go on. A keyboard shortcut
+   asks `ignoredKey(event)` from `src/demos/utils/demoKeys.ts` first, so a key in a field
+   of lil-gui, or one that presses its buttons, stays there.
 3. Add `src/pages/demos/_<name>.json` next to it. The leading underscore keeps Astro from
    turning it into a route, while `import.meta.glob('../../pages/demos/*.json')` in
    `src/demos/utils/loadMetadataForDemos.ts` still picks it up. `title` and `url` are

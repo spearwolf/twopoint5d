@@ -33,6 +33,7 @@ import {description, title} from './_stage-transitions-gallery.json';
   import {makeEffects, makeMasks} from '~demos/stage-transitions/effects';
   import {COLD, GalleryScene, WARM} from '~demos/stage-transitions/GalleryScene';
   import {GalleryMattes} from '~demos/stage-transitions/matteMasks';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -60,7 +61,7 @@ import {description, title} from './_stage-transitions-gallery.json';
     progress: 0.5,
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-transitions-gallery', async ({renderer}) => {
     const {store, assets} = await loadStageTransitionAssets(renderer);
     if (display.isDisposed) {
       store.dispose();
@@ -96,13 +97,16 @@ import {description, title} from './_stage-transitions-gallery.json';
 
     director.setStack([a.stage, label]);
     // a transition in the lower slot under the label, for every effect: the gallery shows each one
-    // without the hitch of its first shader build
-    const precompiled = director
-      .precompile(renderer, [['layer', 'layer'], ...[...effects.values()].map((effect): StageDirectorShape => [effect, 'layer'])])
-      .catch((error: unknown) => {
-        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
-        console.error('stage-transitions-gallery: precompile() failed, the shaders build on first use', error);
-      });
+    // without the hitch of its first shader build. B, not yet in the stack, and the two mask stages
+    // of the mattes draw once ahead, so their materials are built before the first transition too
+    const precompiled = catchPrecompile(
+      'stage-transitions-gallery',
+      director.precompile(
+        renderer,
+        [['layer', 'layer'], ...[...effects.values()].map((effect): StageDirectorShape => [effect, 'layer'])],
+        {layers: [b.stage, ...mattes.maskStages]},
+      ),
+    );
     let shown = a;
     let hold = HOLD;
     let running: StageTransition | undefined;

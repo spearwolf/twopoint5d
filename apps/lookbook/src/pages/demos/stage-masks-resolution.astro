@@ -56,6 +56,8 @@ import {description, title} from './_stage-masks-resolution.json';
     SeanceRoom,
     SpiritPlate,
   } from '~demos/stage-masks/SeancePhotographs';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -87,7 +89,7 @@ import {description, title} from './_stage-masks-resolution.json';
     drift: true,
   };
 
-  display.onInit(async ({renderer}) => {
+  onDemoInit(display, 'stage-masks-resolution', async ({renderer}) => {
     const assets = await loadSeanceAssets(renderer);
     if (display.isDisposed) {
       disposeSeanceAssets(assets);
@@ -233,9 +235,7 @@ import {description, title} from './_stage-masks-resolution.json';
 
     // E switches the edges, space holds the fog
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
-      const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(target.tagName)) return;
+      if (ignoredKey(event) || event.repeat) return;
       if (event.code === 'KeyE') {
         settings.edges = settings.edges === 'soft' ? 'hard' : 'soft';
         applyEdges();
@@ -250,12 +250,10 @@ import {description, title} from './_stage-masks-resolution.json';
     // the same source and invert, so it finds this shape compiled; the soft/hard switch is a
     // uniform of the fog material. The fog stages draw once ahead with the layers
     const shape: StageDirectorShape = ['layer', ...masks.map((mask) => ({mask}))];
-    const precompiled = director
-      .precompile(renderer, [shape], {layers: [room.stage, ...plates.map((p) => p.stage), ...fogs.map((f) => f.stage)]})
-      .catch((error: unknown) => {
-        // biome-ignore lint/suspicious/noConsole: a failed precompile() is worth a line in the devtools, the page goes on
-        console.error('stage-masks-resolution: precompile() failed, the shaders build on their first frame', error);
-      });
+    const precompiled = catchPrecompile(
+      'stage-masks-resolution',
+      director.precompile(renderer, [shape], {layers: [room.stage, ...plates.map((p) => p.stage), ...fogs.map((f) => f.stage)]}),
+    );
 
     // the card of the lookbook: the hard edges, where the scales tell apart
     if (isPreview) {
