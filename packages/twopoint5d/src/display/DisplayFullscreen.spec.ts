@@ -124,6 +124,23 @@ function stackOn(target: TargetStub): TargetStub {
   return child;
 }
 
+/**
+ * Another element goes fullscreen while the target is not in the fullscreen stack: a video or a
+ * dialog of the app that goes fullscreen on its own — inside the target, or anywhere else on the
+ * page. With `fire: false` the browser has made it the fullscreen element and fires the event only
+ * in a later rendering update.
+ */
+function otherGoesFullscreen(
+  target: TargetStub,
+  {inside = false, fire = true}: {inside?: boolean; fire?: boolean} = {},
+): TargetStub {
+  const other = makeTarget(inside ? 'video inside the target' : 'video');
+  if (inside) target.contains.mockImplementation((element) => element === other);
+  if (fire) fireFullscreenChange(other);
+  else doc.fullscreenElement = other;
+  return other;
+}
+
 function make(options?: DisplayFullscreenOptions): DisplayFullscreen {
   const controller = new DisplayFullscreen(display, host, options);
   controllers.push(controller);
@@ -982,6 +999,84 @@ describe('DisplayFullscreen', () => {
       expect(fs.isArmed).toBe(false);
     });
 
+    it('the user leaving in landscape a fullscreen the page entered holds off a half turn until portrait and back', async () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+      await fs.request();
+
+      // Escape, the back gesture: the browser leaves, the controller did not ask
+      fireFullscreenChange(null);
+      turn('landscape-secondary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isArmed).toBe(false);
+
+      turn('portrait-primary');
+      turn('landscape-primary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+    });
+
+    it('the user leaving in landscape a fullscreen someone else entered on the target holds off a half turn', async () => {
+      orientation.type = 'landscape-primary';
+      make({onLandscape: true});
+      fireFullscreenChange(defaultTarget);
+
+      fireFullscreenChange(null);
+      turn('landscape-secondary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+
+      turn('portrait-primary');
+      turn('landscape-primary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    it('an exit() of the page in landscape on a fullscreen the page entered holds off the arming', async () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+      await fs.request();
+
+      await fs.exit();
+      turn('landscape-secondary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it.each([{grants: true}, {grants: false}])(
+      'an exit() of the page in landscape while its own request() is pending holds off the arming and disarms, however the browser answers (the browser grants: $grants)',
+      async ({grants}) => {
+        orientation.type = 'landscape-primary';
+        const fs = make({onLandscape: true});
+        expect(fs.isArmed).toBe(true);
+        const answer = answerLater(defaultTarget);
+
+        const requested = fs.request();
+        const exited = fs.exit();
+        if (grants) answer.grant();
+        else answer.refuse();
+        await flush();
+
+        expect(await outcomeOf(requested)).toBe(false);
+        expect(await outcomeOf(exited)).toBe(false);
+        expect(fs.isActive).toBe(false);
+        expect(fs.isArmed).toBe(false);
+        expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+
+        turn('landscape-secondary');
+        await flush();
+
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      },
+    );
+
     it('the user leaving a fullscreen the armed tap entered holds off as well', async () => {
       defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
       const fs = make({onLandscape: true});
@@ -1523,8 +1618,11 @@ describe('DisplayFullscreen', () => {
         // what the calls of the page resolve with, where it is not the end: a turn evaluated anew once
         // the exit is through is a turn of its own, after the calls of the page
         resolves?: boolean;
-        // a half turn to the other landscape asks the browser again: nothing holds off the arming.
-        // Not asked of a fullscreen of onLandscape that stays, which a leave in landscape would refuse
+        // the probe leaves in landscape the fullscreen the steps leave behind, then turns the phone
+        // half round: does the half turn ask the browser again? Every such leave holds off the arming,
+        // whoever entered the fullscreen, so on a row that ends active the probe shows the refusal of
+        // that leave; the rows that do not end active show the request() taking back the exit().
+        // Not asked of a fullscreen of onLandscape that stays
         halfTurnAsks?: boolean;
       }
 
@@ -1537,9 +1635,9 @@ describe('DisplayFullscreen', () => {
         {branch: EXITING, steps: ['exit'], grants: true, active: false, armed: false, halfTurnAsks: false},
         {branch: EXITING, steps: ['exit'], grants: false, active: false, armed: false, halfTurnAsks: false},
         // a request() after it takes the refusal back with the exit
-        {branch: PENDING, steps: ['exit', 'request'], grants: true, active: true, armed: false, halfTurnAsks: true},
+        {branch: PENDING, steps: ['exit', 'request'], grants: true, active: true, armed: false, halfTurnAsks: false},
         {branch: PENDING, steps: ['exit', 'request'], grants: false, active: false, armed: true, halfTurnAsks: true},
-        {branch: EXITING, steps: ['exit', 'request'], grants: true, active: true, armed: false, halfTurnAsks: true},
+        {branch: EXITING, steps: ['exit', 'request'], grants: true, active: true, armed: false, halfTurnAsks: false},
         {branch: EXITING, steps: ['exit', 'request'], grants: false, active: false, armed: false, halfTurnAsks: true},
         // a turn to portrait and back before the browser answers lifts it, as it would after the answer
         {branch: PENDING, steps: ['exit', 'portrait and back'], grants: true, active: false, armed: true, halfTurnAsks: true},
@@ -1586,7 +1684,8 @@ describe('DisplayFullscreen', () => {
           expect(fs.isArmed).toBe(armed);
 
           if (halfTurnAsks == null) return;
-          // the user leaves a fullscreen of the page — no refusal —, then turns the phone half round
+          // the user leaves in landscape — a refusal, whoever entered the fullscreen —, then turns the
+          // phone half round
           if (fs.isActive) fireFullscreenChange(null);
           const asked = defaultTarget.requestFullscreen.mock.calls.length;
           turn('landscape-secondary');
@@ -1795,6 +1894,160 @@ describe('DisplayFullscreen', () => {
 
       expect(fs.isArmed).toBe(false);
       expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    describe('a fullscreen of another element: onLandscape takes nothing from it', () => {
+      it.each([{inside: true}, {inside: false}])(
+        'a turn to landscape while another element is in fullscreen asks nothing and arms nothing (inside the target: $inside)',
+        async ({inside}) => {
+          const fs = make({onLandscape: true});
+          otherGoesFullscreen(defaultTarget, {inside});
+
+          turn('landscape-primary');
+          await flush();
+
+          expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+          expect(fs.isArmed).toBe(false);
+          expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+        },
+      );
+
+      it.each([{inside: true}, {inside: false}])(
+        'onLandscape = true in landscape while another element is in fullscreen arms nothing (inside the target: $inside)',
+        ({inside}) => {
+          orientation.type = 'landscape-primary';
+          const fs = make();
+          otherGoesFullscreen(defaultTarget, {inside});
+
+          fs.onLandscape = true;
+
+          expect(fs.isArmed).toBe(false);
+          expect(emitted.some((props) => props.isArmed)).toBe(false);
+          expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+        },
+      );
+
+      it('a display built in landscape while another element is in fullscreen arms nothing, and once that fullscreen is left in landscape a half turn asks nothing until portrait and back', async () => {
+        orientation.type = 'landscape-primary';
+        otherGoesFullscreen(defaultTarget);
+        const fs = make({onLandscape: true});
+
+        expect(fs.isArmed).toBe(false);
+
+        fireFullscreenChange(null);
+        turn('landscape-secondary');
+        await flush();
+
+        expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+
+        turn('portrait-primary');
+        turn('landscape-primary');
+        await flush();
+
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      });
+
+      it.each([{inside: true}, {inside: false}])(
+        'a fullscreen another element enters disarms an armed display, and a tap asks nothing (inside the target: $inside)',
+        ({inside}) => {
+          orientation.type = 'landscape-primary';
+          const fs = make({onLandscape: true});
+          expect(fs.isArmed).toBe(true);
+
+          otherGoesFullscreen(defaultTarget, {inside});
+          tap();
+
+          expect(fs.isArmed).toBe(false);
+          expect(emitted.at(-1)).toMatchObject({isActive: false, isArmed: false});
+          expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+          expect(defaultTarget.listenerCount('click')).toBe(0);
+          expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+        },
+      );
+
+      it('the armed tap asks nothing while another element is in fullscreen, also before the browser has fired its event', () => {
+        orientation.type = 'landscape-primary';
+        const fs = make({onLandscape: true});
+        expect(fs.isArmed).toBe(true);
+
+        otherGoesFullscreen(defaultTarget, {fire: false});
+        tap();
+
+        expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+        expect(fs.isArmed).toBe(false);
+        expect(emitted.at(-1)).toMatchObject({isArmed: false});
+      });
+
+      it.each([{inside: true}, {inside: false}])(
+        'a refused request of a turn arms nothing once another element has gone fullscreen meanwhile (inside the target: $inside)',
+        async ({inside}) => {
+          const answer = answerLater(defaultTarget);
+          const fs = make({onLandscape: true});
+          turn('landscape-primary');
+
+          otherGoesFullscreen(defaultTarget, {inside});
+          answer.refuse();
+          await flush();
+
+          expect(fs.isArmed).toBe(false);
+        },
+      );
+
+      it('a target in a shadow root: a fullscreen of an element outside it holds onLandscape off as well', async () => {
+        const target = makeTarget('in a shadow root', {fullscreenElement: null});
+        const fs = make({onLandscape: true, element: asElement(target)});
+        // the document names the element outside; the shadow root of the target names none
+        fireFullscreenChange(makeTarget('video'));
+
+        turn('landscape-primary');
+        await flush();
+
+        expect(target.requestFullscreen).not.toHaveBeenCalled();
+        expect(fs.isArmed).toBe(false);
+      });
+
+      it.each([{inside: true}, {inside: false}])(
+        'leaving the fullscreen of another element in landscape holds off the arming until portrait and back (inside the target: $inside)',
+        async ({inside}) => {
+          orientation.type = 'landscape-primary';
+          const fs = make({onLandscape: true});
+          otherGoesFullscreen(defaultTarget, {inside});
+
+          fireFullscreenChange(null);
+          expect(fs.isArmed).toBe(false);
+          turn('landscape-secondary');
+          await flush();
+
+          expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+
+          turn('portrait-primary');
+          turn('landscape-primary');
+          await flush();
+
+          expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+        },
+      );
+
+      it('once another element has left its fullscreen in portrait, the next turn to landscape asks again', async () => {
+        make({onLandscape: true});
+        otherGoesFullscreen(defaultTarget);
+        fireFullscreenChange(null);
+
+        turn('landscape-primary');
+        await flush();
+
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      });
+
+      it('a request() of the page while another element is in fullscreen still asks the browser', async () => {
+        const fs = make({onLandscape: true});
+        otherGoesFullscreen(defaultTarget);
+
+        await fs.request();
+
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+        expect(fs.isActive).toBe(true);
+      });
     });
 
     it('a turn to portrait and back while the request of a turn is pending keeps what the browser grants', async () => {
@@ -2122,6 +2375,20 @@ describe('DisplayFullscreen', () => {
 
         pressEscape();
         turn('landscape-primary');
+        expect(fs.isActive).toBe(false);
+
+        turn('portrait-primary');
+        turn('landscape-primary');
+        expect(fs.mode).toBe('pseudo');
+      });
+
+      it('Escape in landscape on a pseudo mode the page entered holds off re-entering until portrait and back', async () => {
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+        await fs.request();
+        turn('landscape-primary');
+
+        pressEscape();
+        turn('landscape-secondary');
         expect(fs.isActive).toBe(false);
 
         turn('portrait-primary');

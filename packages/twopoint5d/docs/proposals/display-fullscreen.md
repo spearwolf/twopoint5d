@@ -18,8 +18,10 @@ the build from the first draft of this spec, which the sections below now state 
   or an exit resolves before `fullscreenchange` (§5);
 - a canvas that measured a fullscreen parent gets back its inline size when the fullscreen is left
   (§5);
-- every leave in landscape of a fullscreen `onLandscape` entered holds off the arming, an exit
-  button of the page included (§6.3);
+- every leave in landscape holds off the arming — of a fullscreen of the target, whoever entered
+  it, an exit button of the page included, and of a fullscreen of another element (§6.3);
+- a fullscreen of another element than the target, wherever it lies, holds `onLandscape` off: it
+  neither asks nor arms, and an armed controller disarms (§3.2, §6.2);
 - with only the pseudo mode there, a page that loads in landscape enters it at once (§6.2);
 - the `overflow:hidden` of the root element lives in the sheet of the document, not in
   `styleSheetRoot` (§7);
@@ -143,7 +145,7 @@ export class DisplayFullscreen {
   get isActive(): boolean;
   /** How it is: `'native'`, `'pseudo'`, or `undefined` while not active. */
   get mode(): FullscreenMode | undefined;
-  /** `onLandscape` waits for a tap to enter fullscreen, §6.2; never while the target is in fullscreen. A page can show a hint by it. */
+  /** `onLandscape` waits for a tap to enter fullscreen, §6.2. A page can show a hint by it; never while the target or another element is in fullscreen. */
   get isArmed(): boolean;
   /** The display that built the controller is disposed, §9. */
   get isDisposed(): boolean;
@@ -185,7 +187,13 @@ that element — `:fullscreen` matches it, or the fullscreen element of its root
 the controller keeps who entered it and its lock of §6.4 — a lock the browser grants only while
 the element lies on top holds as well. Holding the target counts as active for §6: a turn to
 landscape asks nothing and arms nothing, and neither does `onLandscape = true`, since a request
-would pull the target over the element. Once the target is on top again, the fullscreen is the
+would pull the target over the element. So does a fullscreen of any other element, wherever it
+lies — a video of the app that went fullscreen while the target was not, inside it or outside it,
+or an element of someone else: the controller takes no fullscreen from anyone. It reads it off
+`fullscreenElement` of the document and of the root of the target, since a shadow root names no
+element outside it. A `fullscreenchange` that brings one disarms, the armed tap asks nothing while
+one holds, and its end in landscape holds off the arming as the user's leave of §6.3 does. A
+`request()` of the page still asks. Once the target is on top again, the fullscreen is the
 controller's own as before, for `exitOnPortrait` and for `dispose()`. A turn to portrait while the
 element lies on top leaves nothing (`exit()` does not pop it) and is not evaluated again once the
 stack is down: the controller keeps no record of turns it could not act on, and the next turn
@@ -339,7 +347,8 @@ The listeners for the orientation and the query exist only while `onLandscape` i
 
 ### 6.2 Entering
 
-Every turn to landscape, with the gate of §6.1 open and the target not active:
+Every turn to landscape, with the gate of §6.1 open, the target not active and no other element in
+fullscreen (§3.2):
 
 1. **Try at once.** `request()` from the `change` handler of the orientation (§2.2). Where it
    succeeds, done.
@@ -348,18 +357,21 @@ Every turn to landscape, with the gate of §6.1 open and the target not active:
    `click` — in the capture phase, passive, without `preventDefault()`, so the tap reaches the game
    as well. That tap disarms and calls `request()` synchronously in its handler, before the event
    of the disarming goes out. Where the browser refuses the tap as well, the controller arms again
-   for the next one — as long as the screen is still landscape, the target not active and the user
-   has not left in landscape (§6.3).
+   for the next one — as long as the screen is still landscape, the target not active, no other
+   element in fullscreen and the user has not left in landscape (§6.3).
 
 A fullscreen of the target disarms, whoever entered it — the armed tap, a `request()` of the page,
 the answer to a half turn from one landscape to the other, a request of someone else on the target,
-the pseudo mode —, and leaving it arms nothing by itself: the next turn to landscape does.
+the pseudo mode —, and so does a fullscreen of another element (§3.2). Leaving either arms nothing
+by itself: left in landscape it holds off the arming (§6.3), left in portrait the next turn to
+landscape acts.
 
 The answer of every request of §6 is held against the state of the controller once the calls that
 overlap with it (§3.2) are through: a refusal after `dispose()` arms nothing, and neither does one
 while a newer request or an exit is under way — the answer of that one decides.
 
-A page that loads in landscape arms at construction and does not try at once: no turn has
+A page that loads in landscape arms at construction — unless the target or another element is in
+fullscreen — and does not try at once: no turn has
 happened, and nothing grants an exemption. `onLandscape` set to `true` later does the same — while
 the browser is still answering a request or an exit, once that answer is in, held against the state
 then as the answer of a request of §6 is.
@@ -385,12 +397,13 @@ construction.
   is under way waits for it; once it is through, the controller evaluates the turn anew — it enters
   again, or arms where the browser refuses —, unless an `exit()` of the page came after the turn. A
   `request()` of the page noted on that exit goes to the browser first, and the turn shares it.
-- **The user leaves.** Where the user leaves a fullscreen that `onLandscape` entered — Escape, the
-  back gesture, the browser's own control, an exit button of the page — while the screen is still
-  landscape, the controller does not arm again until the screen has turned to portrait and back. For
-  an `exit()` of the page the screen at the call decides, not the screen once the browser answers —
-  also for one that joins the exit of the turn to portrait or a pending request of the turn or of the
-  armed tap: called in landscape it holds off the arming, whatever the browser answers; called in
+- **The user leaves.** Where the user leaves a fullscreen while the screen is still landscape — one
+  of the target, whoever entered it (`onLandscape`, a `request()` of the page, someone else; native
+  or pseudo), or one of another element (§3.2) — through Escape, the back gesture, the browser's own
+  control or an exit button of the page, the controller does not arm again until the screen has
+  turned to portrait and back. For an `exit()` of the page the screen at the call decides, not the
+  screen once the browser answers — also for one that joins the exit of the turn to portrait or a
+  pending request — of the turn, of the armed tap or of the page: called in landscape it holds off the arming, whatever the browser answers; called in
   portrait it does not, however quickly the screen turns back. Until the browser has answered, the
   hold is noted on the call under way and belongs to the `exit()`: a `request()` of the page after
   it takes it back with the exit, and a turn to portrait lifts it, as a turn after the answer would.
@@ -572,8 +585,9 @@ that runs without a real turn of a screen.
   warning and warns for an explicit `true`; a portrait lock beside `onLandscape` warns and does not
   lock;
 - §6: a turn tries at once; a refusal arms; the armed tap requests and disarms; a turn back disarms
-  and leaves only what `onLandscape` entered; the user's exit holds off arming until portrait and
-  back; the gate keeps a fine pointer out; a page that loads in landscape arms; a fullscreen of the
+  and leaves only what `onLandscape` entered; the user's leave in landscape holds off arming until
+  portrait and back, whoever entered the fullscreen, and so does the end of one of another element;
+  the gate keeps a fine pointer out; a page that loads in landscape arms; a fullscreen of the
   target disarms, whoever entered it, and leaving it in landscape arms nothing; `onLandscape = true`
   beside a request or an exit still under way arms once the browser has answered, and only where the
   target is out of fullscreen then; `onLandscape = false` takes the listeners down;
@@ -616,7 +630,13 @@ that runs without a real turn of a screen.
   `dispose()` and for the turn to portrait; a turn to landscape and `onLandscape = true` while it
   holds ask nothing and arm nothing; a `request()` of the page while it lies on a fullscreen
   `onLandscape` entered makes that fullscreen the page's own — the next turn to portrait leaves
-  nothing, also one that comes before the browser answers.
+  nothing, also one that comes before the browser answers;
+- a fullscreen of another element, inside the target or outside it, the target not in its stack —
+  also one outside the shadow root of the target: a turn to landscape, `onLandscape = true`, a
+  display built meanwhile and a refused request of a turn ask nothing and arm nothing; a
+  `fullscreenchange` that brings it disarms; the armed tap asks nothing while it holds, also before
+  its `fullscreenchange`; leaving it in landscape holds off the arming until portrait and back,
+  leaving it in portrait does not; a `request()` of the page still asks.
 
 `Display.spec.ts` gains the size source rule of §5: a canvas in fullscreen with a parent as size
 source measures the fullscreen element; so does a canvas that is its own size source, inside a

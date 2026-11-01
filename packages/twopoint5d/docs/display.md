@@ -504,11 +504,15 @@ With `onLandscape`, turning the phone sideways enters fullscreen, and turning it
 Some browsers let the turn itself count as a gesture; the others refuse, and then the next tap on
 the target enters fullscreen — `isArmed` is `true` while the display waits for it, and the tap
 still reaches the game. Once the target is in fullscreen, whoever put it there, `isArmed` is
-`false`. It only acts on devices whose primary input is a finger (`(pointer: coarse) and (hover: none)`):
-a desktop window that is wider than tall does nothing, a tablet does the same as a phone.
+`false`. So it is while another element of the page is in fullscreen — a video that went fullscreen
+on its own, inside the target or anywhere else: the display takes no fullscreen from anyone, and
+turning the phone sideways asks for nothing then. It only acts on devices whose primary input is a
+finger (`(pointer: coarse) and (hover: none)`): a desktop window that is wider than tall does
+nothing, a tablet does the same as a phone.
 
-Whoever leaves the fullscreen while the phone is still sideways — Escape, the back gesture, a button
-of the page — stays out of it until the phone has turned upright and back. A fullscreen the page
+Whoever leaves a fullscreen while the phone is still sideways — the one of the turn, one the page
+asked for with `request()`, or the one of a video; through Escape, the back gesture or a button of
+the page — stays out of fullscreen until the phone has turned upright and back. A fullscreen the page
 entered with `request()` stays when the phone turns upright, and so does one the display entered
 sideways once the page has called `request()` on it; `exitOnPortrait: false` keeps the one of
 `onLandscape` as well.
@@ -602,6 +606,11 @@ phone turns sideways") —, and `dispose()` leaves it. A turn while the video
 lies on top is not caught up afterwards: a phone turned upright meanwhile keeps the fullscreen
 until it turns sideways and back.
 
+A video that goes fullscreen while the target is not — inside the target or anywhere on the page —
+is no fullscreen of the display: `isActive` stays `false`, `onLandscape` neither asks for the target
+nor arms while it holds, and leaving it sideways counts as leaving (see "Fullscreen when the phone
+turns sideways"). A `request()` of the page still asks: the page decides over its own fullscreens.
+
 `resize-to="fullscreen"` is an old name of `resize-to="window"`: it means the window and has
 nothing to do with the fullscreen of the browser. It still works and warns once per page; write
 `"window"`.
@@ -657,7 +666,7 @@ The options go into `fullscreen: {…}` of the constructor; each is a property o
 | `isAvailable` | a request can succeed: `isSupported`, or the pseudo fallback; `false` after `dispose()` |
 | `isDisposed` | the display is disposed; the calls resolve `false` |
 | `isActive`, `mode` | in fullscreen right now, `'native'` or `'pseudo'` |
-| `isArmed` | `onLandscape` waits for a tap; never while in fullscreen |
+| `isArmed` | `onLandscape` waits for a tap; never while the target or another element is in fullscreen |
 | `display.onFullscreenChange(listener)` | every change of `isActive`, `mode` and `isArmed`; retained |
 
 ### The fit of a projection

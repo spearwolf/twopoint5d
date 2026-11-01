@@ -72,7 +72,8 @@ export interface DisplayFullscreenChangeProps {
   /**
    * `onLandscape` waits for a tap on the target to enter fullscreen, see
    * {@link DisplayFullscreen.isArmed}. Never `true` while the target is in fullscreen — whoever
-   * entered it, native or pseudo — or lies under an element stacked on it.
+   * entered it, native or pseudo — or lies under an element stacked on it, nor while another
+   * element of the page is in fullscreen.
    */
   isArmed: boolean;
   /** The element in fullscreen, or the target of the next request while not active. */

@@ -201,6 +201,11 @@ export interface DisplayFullscreenHost {
  * neither requests nor arms. Once it is left the fullscreen is the controller's own again, as
  * before; a turn while it held is not caught up.
  *
+ * `onLandscape` takes no fullscreen from anyone. While another element of the page is in
+ * fullscreen and the target is not in its stack — a video or a dialog that went fullscreen on its
+ * own, inside the target or outside it — it neither requests nor arms, and an armed display
+ * disarms. Leaving that fullscreen in landscape holds off the arming as leaving the target's does.
+ *
  * The controller outlives {@link Display.dispose} as a reference someone holds, and stays usable
  * as one: `request()`, `exit()` and `toggle()` resolve `false` — a call still open at the dispose
  * as well —, and {@link DisplayFullscreen.isDisposed} says so.
@@ -263,10 +268,14 @@ export class DisplayFullscreen {
   #watchedOrientation?: EventTarget;
   // the element whose next tap requests fullscreen while armed
   #armedElement?: HTMLElement;
-  // the user left a fullscreen onLandscape entered while the screen was landscape: no arming
-  // until the screen has turned to portrait and back. An exit() of the page decides it at the call;
-  // while the browser is still answering it is noted on the call under way
+  // the user left a fullscreen while the screen was landscape — the target's, whoever entered it, or
+  // one of another element: no arming until the screen has turned to portrait and back. An exit() of
+  // the page decides it at the call; while the browser is still answering it is noted on the call
+  // under way
   #declined = false;
+  // what #readState() read last: another element than the target is in fullscreen. The end of that
+  // fullscreen in landscape counts as a leave of the user
+  #foreignHeld = false;
 
   readonly #onTurn = (): void => {
     this.#turned();
@@ -282,6 +291,13 @@ export class DisplayFullscreen {
   readonly #onArmedTap = (event: Event): void => {
     // a mouse grants a gesture with its pointerdown, not with its pointerup; its click follows
     if (event.type === 'pointerup' && (event as PointerEvent).pointerType === 'mouse') return;
+    // a fullscreen the browser has granted another element before its fullscreenchange: the tap
+    // takes nothing from it
+    if (this.#fullscreenHolds()) {
+      this.#disarm();
+      this.#emitIfChanged();
+      return;
+    }
     this.#disarm();
     // synchronously in the handler of the tap: the gesture reaches the browser
     const answer = this.#request('landscape');
@@ -309,6 +325,9 @@ export class DisplayFullscreen {
     this.#exitOnPortrait = options?.exitOnPortrait;
 
     host.doc.addEventListener('fullscreenchange', this.#onFullscreenChange);
+    // a display built while a video is in fullscreen: the end of that fullscreen in landscape is a
+    // leave as well
+    this.#foreignHeld = this.#foreignFullscreen();
 
     this.onLandscape = options?.onLandscape ?? false;
   }
@@ -332,11 +351,14 @@ export class DisplayFullscreen {
   /**
    * Enter fullscreen when the screen turns to landscape, on a device whose primary input is a
    * finger: at once where the browser lets the turn count as a gesture, else with the next tap
-   * on the target ({@link DisplayFullscreen.isArmed}). The user who leaves such a fullscreen in
-   * landscape is not thrown back into it until the screen has turned to portrait and back.
+   * on the target ({@link DisplayFullscreen.isArmed}). The user who leaves a fullscreen in
+   * landscape — the target's, whoever entered it, or one of another element — is not thrown into
+   * one until the screen has turned to portrait and back. While another element of the page is in
+   * fullscreen, a turn asks nothing and arms nothing: a request would pull the target over it.
    *
    * Switched on while the browser is still answering a request or an exit, it arms once that answer
-   * is in — where the screen is still landscape and the target out of fullscreen.
+   * is in — where the screen is still landscape, the target out of fullscreen and no other element
+   * in fullscreen.
    *
    * After {@link Display.dispose} a write changes nothing; the getter answers the last value.
    */
@@ -356,7 +378,7 @@ export class DisplayFullscreen {
       if (this.#isLandscape() && this.#gateIsOpen()) {
         if (this.#pending != null || this.#pendingExit != null) {
           void this.#joinRun().then((active) => this.#rearm(active));
-        } else if (!this.#holdsTarget()) {
+        } else if (!this.#fullscreenHolds()) {
           if (this.isSupported) this.#arm();
           else if (this.fallback === 'pseudo') this.#enterPseudo('landscape');
         }
@@ -447,7 +469,7 @@ export class DisplayFullscreen {
   /**
    * `onLandscape` waits for a tap on the target to enter fullscreen. A page can show a hint by it.
    * Never `true` while the target is in fullscreen — whoever entered it, native or pseudo — or lies
-   * under an element stacked on it.
+   * under an element stacked on it, nor while another element of the page is in fullscreen.
    *
    * `false` after {@link Display.dispose}.
    */
@@ -492,10 +514,10 @@ export class DisplayFullscreen {
    * While the browser is still answering, the last call wins: an exit while a request is open leaves
    * once the browser has granted it, and one while an exit is under way joins that exit and takes
    * back a `request()` called after it. Every call of such an overlap resolves with `isActive` once
-   * the controller has done what the last one asked. Called in landscape on a fullscreen of
-   * `onLandscape`, it holds off the arming until the screen has turned to portrait and back,
-   * however late the browser answers — unless a `request()` after it, while the browser is still
-   * answering, takes it back.
+   * the controller has done what the last one asked. Called in landscape while `onLandscape` is on,
+   * it holds off the arming until the screen has turned to portrait and back — whoever entered the
+   * fullscreen, and however late the browser answers —, unless a `request()` after it, while the
+   * browser is still answering, takes it back.
    *
    * After {@link Display.dispose} it resolves `false` and leaves nothing; an exit still open when
    * the dispose runs resolves `false`.
@@ -678,9 +700,11 @@ export class DisplayFullscreen {
         this.#pending = undefined;
         if (this.#disposed) return;
         // the user left before the browser answered: the refusal noted at the call holds off the
-        // arming that follows the end of the run
-        if (request.declines && this.#onLandscape) this.#declined = true;
+        // arming that follows the end of the run, and takes down an arming that waits for a tap
+        if (request.declines && this.#onLandscape) this.#decline();
         if (request.warn) warnRefused();
+        // only where the refusal of the user has disarmed: a refusal of the browser alone emits nothing
+        this.#emitIfChanged();
         this.#endRun();
       },
     );
@@ -696,11 +720,11 @@ export class DisplayFullscreen {
       return Promise.resolve(this.isActive);
     }
 
-    // the user leaves what onLandscape entered, or is entering: decided where the screen is at the
-    // call, not where it is once the browser answers, and noted on the call under way until the
-    // browser has answered — a request() after it takes it back, a turn to portrait lifts it, as one
-    // after the answer would
-    const declines = by === 'call' && this.#onLandscape && this.#isLandscape() && this.#enteredBy() === 'landscape';
+    // the user leaves in landscape, whatever is left — whoever entered it, or is entering it: decided
+    // where the screen is at the call, not where it is once the browser answers, and noted on the call
+    // under way until the browser has answered — a request() after it takes it back, a turn to
+    // portrait lifts it, as one after the answer would
+    const declines = by === 'call' && this.#onLandscape && this.#isLandscape();
 
     const running = this.#pendingExit;
     if (running != null) {
@@ -744,7 +768,7 @@ export class DisplayFullscreen {
       this.#readState();
       this.#pendingExit = undefined;
       // the refusal of the exit() of the page, unless a request() or a turn to portrait has taken it back
-      if (exit.declines && this.#onLandscape) this.#declined = true;
+      if (exit.declines && this.#onLandscape) this.#decline();
       // the page asked to enter while the browser was leaving: ask now, still inside the run
       if (exit.requestAfter) void this.#request('request');
       this.#emitIfChanged();
@@ -800,13 +824,13 @@ export class DisplayFullscreen {
         this.#entered = this.#pending?.by;
       }
     } else if (this.#activeElement != null && !isInFullscreenStack(this.#activeElement)) {
-      // the user left what onLandscape entered while the screen still is landscape — Escape, the
-      // back gesture, the browser's own control: a page that throws them back in with the next tap
-      // is a trap. An exit of this controller has decided that at its call: an exit() of the page
-      // where the screen was then, and the exit of the turn to portrait never — a quick turn back
-      // would leave the page in landscape without a fullscreen and unarmed
-      if (this.#pendingExit == null && this.#entered === 'landscape' && this.#onLandscape && this.#isLandscape()) {
-        this.#declined = true;
+      // the user left the fullscreen of the target, whoever entered it, while the screen still is
+      // landscape — Escape, the back gesture, the browser's own control: a page that throws them back
+      // in with the next tap is a trap. An exit of this controller has decided that at its call: an
+      // exit() of the page where the screen was then, and the exit of the turn to portrait never — a
+      // quick turn back would leave the page in landscape without a fullscreen and unarmed
+      if (this.#pendingExit == null && this.#onLandscape && this.#isLandscape()) {
+        this.#decline();
       }
       this.#activeElement = undefined;
       this.#entered = undefined;
@@ -814,6 +838,23 @@ export class DisplayFullscreen {
     }
     // else a fullscreen stacked on the target, or none: the target keeps who entered it and its
     // lock until it lies on top again or leaves the stack
+
+    const foreign = this.#foreignFullscreen();
+    if (foreign) {
+      // a fullscreen of another element: no tap is awaited, onLandscape takes nothing from it
+      this.#disarm();
+    } else if (
+      this.#foreignHeld &&
+      !this.#holdsTarget() &&
+      this.#pendingExit == null &&
+      this.#onLandscape &&
+      this.#isLandscape()
+    ) {
+      // its end in landscape is a leave as the target's is; an exit of this controller has decided
+      // at its call
+      this.#decline();
+    }
+    this.#foreignHeld = foreign;
   }
 
   #orientation(): LockableOrientation | undefined {
@@ -916,7 +957,7 @@ export class DisplayFullscreen {
     // is taken back, and what the browser grants stays — unless the page has called exit() meanwhile
     if (this.#pending?.exitAfter === 'portrait') this.#pending.exitAfter = undefined;
 
-    if (this.#holdsTarget() || this.#declined || !this.#gateIsOpen()) return;
+    if (this.#fullscreenHolds() || this.#declined || !this.#gateIsOpen()) return;
 
     if (!this.isSupported) {
       // the pseudo mode needs no gesture: the turn enters it, and nothing arms
@@ -937,7 +978,7 @@ export class DisplayFullscreen {
       !this.#disposed &&
       this.#onLandscape &&
       this.#isLandscape() &&
-      !this.#holdsTarget() &&
+      !this.#fullscreenHolds() &&
       !this.#declined &&
       this.#pending == null &&
       this.#pendingExit == null
@@ -947,9 +988,32 @@ export class DisplayFullscreen {
   }
 
   // The target is in fullscreen, or under an element stacked on it: isActive is false while a video
-  // or a dialog of the app lies on top, and a request or an arming would pull the target over it
+  // or a dialog of the app lies on top, and a request or an arming would pull the target over it.
+  // #fullscreenHolds() counts the fullscreens of other elements on top of it
   #holdsTarget(): boolean {
     return this.isActive || this.#activeElement != null;
+  }
+
+  // Another element than the target is in fullscreen — a video or a dialog of the app that went
+  // fullscreen on its own, inside the target or outside it, or an element of someone else — while the
+  // target is not in the stack. The document names every fullscreen of the page, a shadow root none
+  // outside it; the root of the target covers a target in another document
+  #foreignFullscreen(): boolean {
+    if (this.#holdsTarget()) return false;
+    return this.#host.doc.fullscreenElement != null || fullscreenElementOfRoot(this.element) != null;
+  }
+
+  // onLandscape takes no fullscreen from anyone: it neither requests nor arms while the target holds
+  // a fullscreen or another element is in one
+  #fullscreenHolds(): boolean {
+    return this.#holdsTarget() || this.#foreignFullscreen();
+  }
+
+  // the user has left a fullscreen in landscape: no arming until the screen has turned to portrait
+  // and back — and no tap that waits for one either. State alone: the caller emits
+  #decline(): void {
+    this.#declined = true;
+    this.#disarm();
   }
 
   // a request still open counts: a turn to portrait leaves what the browser grants it
@@ -986,8 +1050,9 @@ export class DisplayFullscreen {
     const pseudo = this.#pseudo;
     if (pseudo == null) return;
 
-    // as for the native mode: the user who leaves in landscape is not thrown back in
-    if (pseudo.by === 'landscape' && this.#onLandscape && this.#isLandscape()) this.#declined = true;
+    // as for the native mode: the user who leaves in landscape, whoever entered the pseudo mode, is
+    // not thrown back in
+    if (this.#onLandscape && this.#isLandscape()) this.#decline();
 
     pseudo.element.classList.remove(pseudo.className);
     Stylesheets.releaseRule(DisplayFullscreen.CssRulesPrefixPseudo, pseudo.root);
