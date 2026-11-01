@@ -78,10 +78,12 @@ import {description, title} from './_sine-scroller.json';
   stageRenderer.buildOutputNode = withGlow;
 
   display.onDispose(() => {
-    // the renderer lets go of the builder first, then the builder and the pipeline go
+    // the renderer lets go of the builder first, then the builder and the pipeline go, and last the
+    // stage, which the renderer only let go of
     stageRenderer.dispose();
     withGlow.dispose();
     pipeline.dispose();
+    stage.dispose();
   });
 
   // the catalog of this demo, written here instead of in a json of its own: every image of the
@@ -168,27 +170,46 @@ import {description, title} from './_sine-scroller.json';
     const flashButton = document.querySelector('.toggleFlash')!;
     const fontButton = document.querySelector('.nextFontPalette')!;
     const tunnelButton = document.querySelector('.nextTunnelPalette')!;
-    bloomButton.addEventListener('click', () => {
-      // without the builder the pipeline draws the stage as it is: the sabers clamp to their
-      // brightest colour and nothing spills over
-      const glow = stageRenderer.buildOutputNode == null;
-      stageRenderer.buildOutputNode = glow ? withGlow : undefined;
-      bloomButton.textContent = `bloom: ${glow ? 'on' : 'off'}`;
-    });
-    flashButton.addEventListener('click', () => {
-      scroller.beatFlash = !scroller.beatFlash;
-      flashButton.textContent = `beat flash: ${scroller.beatFlash ? 'on' : 'off'}`;
-    });
-    fontButton.addEventListener('click', () => {
-      scroller.fontPalette = (scroller.fontPalette + 1) % FONT_PALETTES.length;
-      fontButton.textContent = `font: ${FONT_PALETTES[scroller.fontPalette]}`;
-    });
-    tunnelButton.addEventListener('click', () => {
-      scroller.tunnelPalette = (scroller.tunnelPalette + 1) % TUNNEL_PALETTES.length;
-      tunnelButton.textContent = `tunnel: ${TUNNEL_PALETTES[scroller.tunnelPalette]}`;
-    });
+    const listening = new AbortController();
+    const {signal} = listening;
+    bloomButton.addEventListener(
+      'click',
+      () => {
+        // without the builder the pipeline draws the stage as it is: the sabers clamp to their
+        // brightest colour and nothing spills over
+        const glow = stageRenderer.buildOutputNode == null;
+        stageRenderer.buildOutputNode = glow ? withGlow : undefined;
+        bloomButton.textContent = `bloom: ${glow ? 'on' : 'off'}`;
+      },
+      {signal},
+    );
+    flashButton.addEventListener(
+      'click',
+      () => {
+        scroller.beatFlash = !scroller.beatFlash;
+        flashButton.textContent = `beat flash: ${scroller.beatFlash ? 'on' : 'off'}`;
+      },
+      {signal},
+    );
+    fontButton.addEventListener(
+      'click',
+      () => {
+        scroller.fontPalette = (scroller.fontPalette + 1) % FONT_PALETTES.length;
+        fontButton.textContent = `font: ${FONT_PALETTES[scroller.fontPalette]}`;
+      },
+      {signal},
+    );
+    tunnelButton.addEventListener(
+      'click',
+      () => {
+        scroller.tunnelPalette = (scroller.tunnelPalette + 1) % TUNNEL_PALETTES.length;
+        tunnelButton.textContent = `tunnel: ${TUNNEL_PALETTES[scroller.tunnelPalette]}`;
+      },
+      {signal},
+    );
 
     display.onDispose(() => {
+      listening.abort();
       // the meshes release the materials they built, the store its textures
       scroller.dispose();
       store.dispose();

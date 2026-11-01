@@ -55,6 +55,10 @@ import {description, title} from './_quadtree-playground.json';
   // -----------------------------
 
   const gui = new GUI({title: 'quadtree playground', container: getDemoUi()});
+  display.onDispose(() => {
+    gui.destroy();
+    visual.dispose();
+  });
 
   const actions = {
     randomChunkCount: 100,

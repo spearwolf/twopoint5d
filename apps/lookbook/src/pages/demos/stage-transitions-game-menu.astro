@@ -37,6 +37,8 @@ import {description, title} from './_stage-transitions-game-menu.json';
   // the director is the one renderer of the display: it draws every layer into a target of its own
   // and composes the stack in one pipeline, bottom to top, over its clear color
   const director = new StageDirector(display).setClearColor(new Color('#05060d'), 1);
+  // the director lets go of its layers; each layer goes in the onDispose() of the init
+  display.onDispose(() => director.dispose());
 
   const effects = makeEffects();
   const settings = {
@@ -50,7 +52,9 @@ import {description, title} from './_stage-transitions-game-menu.json';
 
   onDemoInit(display, 'stage-transitions-game-menu', async ({renderer}) => {
     const {store, assets} = await loadStageTransitionAssets(renderer);
+    // a dispose() while the assets loaded has gone out already: nothing is built
     if (display.isDisposed) {
+      assets.dot.dispose();
       store.dispose();
       return;
     }
@@ -179,8 +183,6 @@ import {description, title} from './_stage-transitions-game-menu.json';
       window.removeEventListener('keyup', onKeyUp);
       canvas.removeEventListener('click', onClick);
       gui.destroy();
-      // the director lets go of the layers first, then each layer goes
-      director.dispose();
       stars.dispose();
       title.dispose();
       level.dispose();
@@ -190,6 +192,7 @@ import {description, title} from './_stage-transitions-game-menu.json';
     });
 
     await precompiled;
+    if (display.isDisposed) return;
     preview.ready(display);
   });
 

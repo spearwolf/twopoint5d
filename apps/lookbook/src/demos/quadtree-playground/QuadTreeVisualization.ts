@@ -21,6 +21,14 @@ export class QuadTreeVisualization {
     this.ctx = this.canvasStage.canvas.getContext('2d')!;
   }
 
+  /**
+   * Frees the {@link Canvas2DStage}, which disposes the stage, the renderer, the canvas texture and
+   * the material it built. The renderer handed to the constructor stays the caller's.
+   */
+  dispose(): void {
+    this.canvasStage.dispose();
+  }
+
   render() {
     this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
 

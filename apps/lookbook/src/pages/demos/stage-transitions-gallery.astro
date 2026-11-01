@@ -52,6 +52,13 @@ import {description, title} from './_stage-transitions-gallery.json';
   for (const [name, effect] of mattes.effects) effects.set(name, effect);
   const names = [...effects.keys()];
 
+  display.onDispose(() => {
+    // the director lets go of its stages and effects, then the masks and the mattes go
+    director.dispose();
+    for (const mask of Object.values(masks)) mask.dispose();
+    mattes.dispose();
+  });
+
   const settings = {
     effect: names[0]!,
     cycle: true,
@@ -63,7 +70,9 @@ import {description, title} from './_stage-transitions-gallery.json';
 
   onDemoInit(display, 'stage-transitions-gallery', async ({renderer}) => {
     const {store, assets} = await loadStageTransitionAssets(renderer);
+    // a dispose() while the assets loaded has gone out already: nothing is built
     if (display.isDisposed) {
+      assets.dot.dispose();
       store.dispose();
       return;
     }
@@ -125,6 +134,7 @@ import {description, title} from './_stage-transitions-gallery.json';
       if (manual) transition.progress = settings.progress;
       running = transition;
       transition.finished.then((t) => {
+        if (display.isDisposed) return;
         if (running === t) running = undefined;
         // a transition that finished leaves the other picture in front; a cancelled one leaves this one
         if (t.state === 'finished') shown = next;
@@ -134,6 +144,7 @@ import {description, title} from './_stage-transitions-gallery.json';
     };
 
     const nextEffect = (t: StageTransition) => {
+      if (display.isDisposed) return;
       // a transition cancelled by the scrub mode keeps its effect for the scrub
       if (!settings.cycle || settings.scrub || t.state !== 'finished') return;
       settings.effect = names[(names.indexOf(settings.effect) + 1) % names.length]!;
@@ -195,18 +206,16 @@ import {description, title} from './_stage-transitions-gallery.json';
 
     display.onDispose(() => {
       gui.destroy();
-      director.dispose();
       a.dispose();
       b.dispose();
       text.dispose();
       label.dispose();
-      for (const mask of Object.values(masks)) mask.dispose();
-      mattes.dispose();
       assets.dot.dispose();
       store.dispose();
     });
 
     await precompiled;
+    if (display.isDisposed) return;
     preview.ready(display);
   });
 

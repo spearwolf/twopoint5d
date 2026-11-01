@@ -56,10 +56,22 @@ import {description, title} from './_animated-billboards.json';
 
     const CAPACITY = 400;
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
-
     const store = await loadTextureCatalog(renderer);
-    const [tileSet, texture] = await store.getAsync('nobingerTiles', ['tileSet', 'texture']);
+    const [[tileSet, texture], blueGroundTexture] = await Promise.all([
+      store.getAsync('nobingerTiles', ['tileSet', 'texture']),
+      store.getAsync('blueGround', 'texture'),
+    ]).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
+
+    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
 
     const anims = new FrameBasedAnimations();
     const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
@@ -68,9 +80,11 @@ import {description, title} from './_animated-billboards.json';
 
     bouncingSprites.createSprites(CAPACITY, animId);
 
+    // bakeDataTexture() hands its texture over to this page
+    const animsMap = anims.bakeDataTexture({renderer});
     const mesh = new FeatureSprites(AnimatedSpriteKind, {
       geometry,
-      textures: {colorMap: texture, animsMap: anims.bakeDataTexture({renderer})},
+      textures: {colorMap: texture, animsMap},
       placement: BillboardPlacement,
       depthTest: true,
       depthWrite: true,
@@ -96,8 +110,6 @@ import {description, title} from './_animated-billboards.json';
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('BouncingSprites', bouncingSprites);
 
-    const blueGroundTexture = await store.getAsync('blueGround', 'texture');
-
     const planeGeometry = new PlaneGeometry(400, 400);
     const planeMaterial = new MeshBasicMaterial({
       transparent: true,
@@ -116,6 +128,17 @@ import {description, title} from './_animated-billboards.json';
     // the front face of the ground looks up: rotation.x = -π/2 turns its normal +Z to +Y
     mesh.bindUniform('groundPlane', planeOf(plane));
     mesh.bindUniform('shadowLight', lightOf(sun));
+
+    demo.onDispose(() => {
+      // what this init built; the geometry was handed to the sprites, which leave it to the page,
+      // and what the store lent goes with the store
+      mesh.dispose();
+      geometry.dispose();
+      animsMap.dispose();
+      planeGeometry.dispose();
+      planeMaterial.dispose();
+      store.dispose();
+    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('FeatureSprites', mesh);

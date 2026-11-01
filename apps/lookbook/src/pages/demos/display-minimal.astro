@@ -36,6 +36,15 @@ import {description, title} from './_display-minimal.json';
   sprite.scale.set(width, height, 1);
   stage.scene.add(sprite);
 
+  display.onDispose(() => {
+    // the renderer only lets go of the stage; the material is this page's, and so is the texture
+    // TextureFactory#load() handed over
+    stageRenderer.dispose();
+    stage.dispose();
+    material.dispose();
+    textureImage.dispose();
+  });
+
   display.start();
 
   // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose

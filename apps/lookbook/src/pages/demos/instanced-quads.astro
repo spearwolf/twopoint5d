@@ -42,11 +42,18 @@ import {description, title} from './_instanced-quads.json';
     // Now, create the instanced quads ..
     createQuads(geometry.instancedPool, rows, columns, size, offset);
 
-    const mesh = new VertexObjects(geometry, createMaterial());
+    const material = createMaterial();
+    const mesh = new VertexObjects(geometry, material);
 
     mesh.name = 'InstancedQuadsMesh';
 
     mesh.update();
+
+    // a VertexObjects frees nothing of its own: the geometry and the material are this page's
+    demo.onDispose(() => {
+      geometry.dispose();
+      material.dispose();
+    });
 
     return mesh;
   }

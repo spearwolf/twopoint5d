@@ -67,13 +67,34 @@ import {description, title} from './_swaying-grass.json';
   stageRenderer.pipeline = pipeline;
   stageRenderer.buildOutputNode = withGlow;
 
+  display.onDispose(() => {
+    // the controls take their listeners off; the renderer lets go first, then the builder and the
+    // pipeline go, and the stage, which the renderer only let go of
+    controls.dispose();
+    stageRenderer.dispose();
+    withGlow.dispose();
+    pipeline.dispose();
+    stage.dispose();
+  });
+
   await display.start(async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
     // meadow.json is free-tex-packer's "JSON (hash)": the store reads it with TexturePackerJson,
     // picked by meta.app, unchanged
-    const [atlas, texture] = await store.getAsync('meadowAtlas', ['atlas', 'texture']);
-    const [back] = await store.getAsync('meadowBack', ['texture']);
-    const [ground] = await store.getAsync('meadowGround', ['texture']);
+    const [[atlas, texture], [back], [ground]] = await Promise.all([
+      store.getAsync('meadowAtlas', ['atlas', 'texture']),
+      store.getAsync('meadowBack', ['texture']),
+      store.getAsync('meadowGround', ['texture']),
+    ]).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (display.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     const meadow = new SwayingMeadow({atlas, texture}, {back, ground});
     stage.scene.add(meadow);
@@ -163,10 +184,6 @@ import {description, title} from './_swaying-grass.json';
 
     display.onDispose(() => {
       gui.destroy();
-      controls.dispose();
-      stageRenderer.dispose();
-      withGlow.dispose();
-      pipeline.dispose();
       meadow.dispose();
       store.dispose();
     });

@@ -38,7 +38,16 @@ import {description, title} from './_textured-sprites.json';
 
   onDemoInit(demo, 'textured-sprites', async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
-    const [tileSet, texture] = await store.getAsync('skinballTiles', ['tileSet', 'texture']);
+    const [tileSet, texture] = await store.getAsync('skinballTiles', ['tileSet', 'texture']).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     const CAPACITY = 256;
 
@@ -52,22 +61,27 @@ import {description, title} from './_textured-sprites.json';
     material.depthTest = true;
 
     // the .render-as-billboards element is written by the markup of this very page
-    document.querySelector(`.${RENDER_AS_BILLBOARDS}`)!.addEventListener('pointerdown', (e) => {
-      const el = e.currentTarget as HTMLElement;
-      const dataValue = el.getAttribute(`data-${RENDER_AS_BILLBOARDS}`) === 'true';
+    const listening = new AbortController();
+    document.querySelector(`.${RENDER_AS_BILLBOARDS}`)!.addEventListener(
+      'pointerdown',
+      (e) => {
+        const el = e.currentTarget as HTMLElement;
+        const dataValue = el.getAttribute(`data-${RENDER_AS_BILLBOARDS}`) === 'true';
 
-      sprites.placement = dataValue ? BillboardPlacement : FlatPlacement;
+        sprites.placement = dataValue ? BillboardPlacement : FlatPlacement;
 
-      el.setAttribute(`data-${RENDER_AS_BILLBOARDS}`, String(!dataValue));
-      if (dataValue) {
-        el.textContent = 'render as sprites';
-      } else {
-        el.textContent = 'render as billboards';
-      }
-    });
+        el.setAttribute(`data-${RENDER_AS_BILLBOARDS}`, String(!dataValue));
+        if (dataValue) {
+          el.textContent = 'render as sprites';
+        } else {
+          el.textContent = 'render as billboards';
+        }
+      },
+      {signal: listening.signal},
+    );
 
-    const spritePool = sprites.spritePool;
-    if (spritePool == null) return; // the sprites were disposed
+    // a FeatureSprites has no pool only after its dispose(), and these sprites were just built
+    const spritePool = sprites.spritePool!;
 
     const bouncingSprites = new BouncingSprites(spritePool, tileSet.atlas, 100, 75, 4, CAPACITY);
     bouncingSprites.shouldRotate = false;
@@ -79,6 +93,13 @@ import {description, title} from './_textured-sprites.json';
     demo.onRenderFrame(({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
       sprites.update();
+    });
+
+    demo.onDispose(() => {
+      listening.abort();
+      // the sprites release the geometry and the material they built; the store lent the texture
+      sprites.dispose();
+      store.dispose();
     });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose

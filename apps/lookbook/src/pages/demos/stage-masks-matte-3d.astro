@@ -46,6 +46,9 @@ import {description, title} from './_stage-masks-matte-3d.json';
   // the silhouettes of the mask's geometry are the edge of the transition: they get MSAA
   const display = new Display(canvas, {antialias: true});
   const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {
     scene: 'shatter' as MirrorMaskScene,
@@ -160,8 +163,6 @@ import {description, title} from './_stage-masks-matte-3d.json';
       clearTimeout(previewTimeout);
       cycler.dispose();
       gui.destroy();
-      // the director lets go of the layers and of the mask stage first, then each goes
-      director.dispose();
       byCoverage.dispose();
       byLook.dispose();
       shatter.dispose();

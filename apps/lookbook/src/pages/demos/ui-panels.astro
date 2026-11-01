@@ -60,7 +60,12 @@ import {description, title} from './_ui-panels.json';
   // a 2D stage: an orthographic camera in the middle of it, y up, one unit per CSS pixel of the
   // canvas ('fill' without a pixelZoom). The screen scales its pixel art by a whole number itself
   const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'fill'}));
-  new StageRenderer(display).setClearColor(new Color('#0b0912')).add(stage);
+  const stageRenderer = new StageRenderer(display).setClearColor(new Color('#0b0912')).add(stage);
+  display.onDispose(() => {
+    // the renderer only lets go of the stage, so the stage goes after it
+    stageRenderer.dispose();
+    stage.dispose();
+  });
 
   // the controls lie over the top of the canvas: the screen starts below them
   const controls = document.querySelector<HTMLElement>('.controls')!;
@@ -136,25 +141,39 @@ import {description, title} from './_ui-panels.json';
       const rect = canvas.getBoundingClientRect();
       return [event.clientX - rect.left, event.clientY - rect.top, topInset()] as const;
     };
-    canvas.addEventListener('pointermove', (event) => {
-      canvas.style.cursor = screen.pointerMove(...at(event)) ? 'pointer' : '';
-    });
-    canvas.addEventListener('pointerdown', (event) => screen.pointerDown(...at(event)));
-    canvas.addEventListener('pointerup', (event) => screen.pointerUp(...at(event)));
+    const listening = new AbortController();
+    const {signal} = listening;
+    canvas.addEventListener(
+      'pointermove',
+      (event) => {
+        canvas.style.cursor = screen.pointerMove(...at(event)) ? 'pointer' : '';
+      },
+      {signal},
+    );
+    canvas.addEventListener('pointerdown', (event) => screen.pointerDown(...at(event)), {signal});
+    canvas.addEventListener('pointerup', (event) => screen.pointerUp(...at(event)), {signal});
 
     // the buttons and the readout are written by the markup of this very page
     const styleButton = document.querySelector('.toggleStyle')!;
     const inventoryButton = document.querySelector('.toggleInventory')!;
     const drawCalls = document.querySelector('.drawCalls')!;
-    styleButton.addEventListener('click', () => {
-      screen.style = PANEL_STYLES[(PANEL_STYLES.indexOf(screen.style) + 1) % PANEL_STYLES.length]!;
-      styleButton.textContent = `style: ${screen.style.replace('panel-', '')}`;
-    });
-    inventoryButton.addEventListener('click', () => {
-      screen.inventoryOpen = !screen.inventoryOpen;
-      inventoryButton.textContent = `inventory: ${screen.inventoryOpen ? 'open' : 'closed'}`;
-    });
-    document.querySelector('.hitParty')!.addEventListener('click', () => screen.hit());
+    styleButton.addEventListener(
+      'click',
+      () => {
+        screen.style = PANEL_STYLES[(PANEL_STYLES.indexOf(screen.style) + 1) % PANEL_STYLES.length]!;
+        styleButton.textContent = `style: ${screen.style.replace('panel-', '')}`;
+      },
+      {signal},
+    );
+    inventoryButton.addEventListener(
+      'click',
+      () => {
+        screen.inventoryOpen = !screen.inventoryOpen;
+        inventoryButton.textContent = `inventory: ${screen.inventoryOpen ? 'open' : 'closed'}`;
+      },
+      {signal},
+    );
+    document.querySelector('.hitParty')!.addEventListener('click', () => screen.hit(), {signal});
 
     // read between two frames: the renderer counts anew at the start of each render
     const readout = setInterval(() => {
@@ -165,6 +184,7 @@ import {description, title} from './_ui-panels.json';
     console.log('ui panels', screen);
 
     display.onDispose(() => {
+      listening.abort();
       clearInterval(readout);
       // the screen releases its meshes and its DynamicAtlas, the store the textures it loaded
       screen.dispose();

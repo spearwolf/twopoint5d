@@ -68,14 +68,18 @@ import {description, title} from './_stage-projections.json';
     {z: 150, color: '#ef476f'},
   ];
 
-  function setupPane(container: HTMLElement, projection: OrthographicProjection | ParallaxProjection): Stage2D {
+  function setupPane(
+    container: HTMLElement,
+    projection: OrthographicProjection | ParallaxProjection,
+  ): {display: Display; stage: Stage2D} {
     const display = new Display(container);
     const stage = new Stage2D(projection);
     const stageRenderer = new StageRenderer(display).setClearColor(new Color('#0a0a1f'), 1).add(stage);
 
     // the frame of the 800x600 rectangle of the specs at z = 0: it shows how each fit lays the
     // rectangle into the cell
-    const frameGeometry = new EdgesGeometry(new PlaneGeometry(800, 600));
+    const planeGeometry = new PlaneGeometry(800, 600);
+    const frameGeometry = new EdgesGeometry(planeGeometry);
     const frameMaterial = new LineBasicMaterial({color: '#ffd166'});
     stage.scene.add(new LineSegments(frameGeometry, frameMaterial));
 
@@ -115,26 +119,37 @@ import {description, title} from './_stage-projections.json';
       for (const sprite of sprites) sprite.removeFromParent();
       for (const material of materials) material.dispose();
       frameGeometry.dispose();
+      planeGeometry.dispose();
       frameMaterial.dispose();
       texture.dispose();
     });
 
     display.start();
 
-    return stage;
+    return {display, stage};
   }
 
   const [orthographicContainer, parallaxContainer] = Array.from(document.querySelectorAll<HTMLElement>('.canvasContainer'));
 
-  const stages = [
+  const panes = [
     setupPane(orthographicContainer!, new OrthographicProjection('xy|bottom-left', specs)),
     setupPane(parallaxContainer!, new ParallaxProjection('xy|bottom-left', specs)),
   ];
+  const stages = panes.map(({stage}) => stage);
 
   const gui = new GUI({title: 'stage projections', container: getDemoUi()});
   gui.add(specs, 'fit', ['contain', 'cover', 'fill']).onChange(() => {
     for (const stage of stages) stage.needsUpdate = true;
   });
+
+  // the gui belongs to neither display: it goes with the last of them
+  let open = panes.length;
+  for (const {display} of panes) {
+    display.onDispose(() => {
+      open -= 1;
+      if (open === 0) gui.destroy();
+    });
+  }
 </script>
 
 <style>

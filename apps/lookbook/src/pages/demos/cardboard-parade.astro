@@ -52,8 +52,19 @@ import {description, title} from './_cardboard-parade.json';
     demo.controls.maxDistance = 40;
 
     const store = await loadTextureCatalog(renderer);
-    const [atlas, texture] = await store.getAsync('cardboardAtlas', ['atlas', 'texture']);
-    const [turntable] = await store.getAsync('cardboardTurntable', ['texture']);
+    const [[atlas, texture], [turntable]] = await Promise.all([
+      store.getAsync('cardboardAtlas', ['atlas', 'texture']),
+      store.getAsync('cardboardTurntable', ['texture']),
+    ]).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     const parade = new CardboardParade({atlas, texture}, turntable);
     demo.scene.add(parade);
@@ -62,21 +73,38 @@ import {description, title} from './_cardboard-parade.json';
     const spinButton = document.querySelector('.toggleSpin')!;
     const facingButton = document.querySelector('.toggleFacing')!;
     const drawCalls = document.querySelector('.drawCalls')!;
-    spinButton.addEventListener('click', () => {
-      parade.spinning = !parade.spinning;
-      spinButton.textContent = `turntable: ${parade.spinning ? 'on' : 'off'}`;
-    });
-    facingButton.addEventListener('click', () => {
-      parade.facing = !parade.facing;
-      facingButton.textContent = `facing: ${parade.facing ? 'on' : 'off'}`;
-    });
+    const listening = new AbortController();
+    spinButton.addEventListener(
+      'click',
+      () => {
+        parade.spinning = !parade.spinning;
+        spinButton.textContent = `turntable: ${parade.spinning ? 'on' : 'off'}`;
+      },
+      {signal: listening.signal},
+    );
+    facingButton.addEventListener(
+      'click',
+      () => {
+        parade.facing = !parade.facing;
+        facingButton.textContent = `facing: ${parade.facing ? 'on' : 'off'}`;
+      },
+      {signal: listening.signal},
+    );
 
     on(demo, OnDisplayRenderFrame, ({deltaTime}) => parade.update(deltaTime));
 
     // read between two frames: the renderer counts anew at the start of each render
-    setInterval(() => {
+    const readout = setInterval(() => {
       drawCalls.textContent = `draw calls: ${renderer.info.render.drawCalls}`;
     }, 250);
+
+    demo.onDispose(() => {
+      listening.abort();
+      clearInterval(readout);
+      // the parade releases what it built, the store what it lent
+      parade.dispose();
+      store.dispose();
+    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('cardboard parade', parade);

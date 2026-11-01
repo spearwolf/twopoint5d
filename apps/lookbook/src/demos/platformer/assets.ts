@@ -53,8 +53,13 @@ export interface PlatformerAssets {
   dispose(): void;
 }
 
-async function loadSheet(store: TextureStore, id: string): Promise<Sheet> {
-  const [atlas, colorMap, animations] = await store.getAsync(id, ['atlas', 'texture', 'frameBasedAnimations']);
+const SHEET_PARTS = ['atlas', 'texture', 'frameBasedAnimations'] as const;
+
+/**
+ * A sheet out of the parts the store lent; it bakes the animsMap, which the caller frees. Called
+ * once every load is through, so that a load that fails leaves no baked texture behind.
+ */
+function toSheet([atlas, colorMap, animations]: [TextureAtlas, Texture, FrameBasedAnimations]): Sheet {
   const infos = new Map<string, FrameBasedAnimationInfo>();
   return {
     atlas,
@@ -78,15 +83,18 @@ export async function loadPlatformerAssets(renderer: WebGPURenderer): Promise<Pl
   try {
     store.parse(CATALOG, {baseUrl: new URL(assetsUrl('platformer/'), location.href)});
 
-    const [fighter, goblin, [goblinPalette], [tilesAtlas, tilesMap], [sky], [mountains], [machines]] = await Promise.all([
-      loadSheet(store, 'fighter'),
-      loadSheet(store, 'goblin'),
-      store.getAsync('goblinPalette', ['texture']),
-      store.getAsync('tiles', ['atlas', 'texture']),
-      store.getAsync('sky', ['texture']),
-      store.getAsync('mountains', ['texture']),
-      store.getAsync('machines', ['texture']),
-    ]);
+    const [fighterParts, goblinParts, [goblinPalette], [tilesAtlas, tilesMap], [sky], [mountains], [machines]] =
+      await Promise.all([
+        store.getAsync('fighter', SHEET_PARTS),
+        store.getAsync('goblin', SHEET_PARTS),
+        store.getAsync('goblinPalette', ['texture']),
+        store.getAsync('tiles', ['atlas', 'texture']),
+        store.getAsync('sky', ['texture']),
+        store.getAsync('mountains', ['texture']),
+        store.getAsync('machines', ['texture']),
+      ]);
+    const fighter = toSheet(fighterParts);
+    const goblin = toSheet(goblinParts);
 
     return {
       store,

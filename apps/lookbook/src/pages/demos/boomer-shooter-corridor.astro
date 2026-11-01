@@ -97,6 +97,16 @@ import {description, title} from './_boomer-shooter-corridor.json';
 
   const walker = new CorridorWalker(camera, canvas);
 
+  display.onDispose(() => {
+    // the walker takes its listeners off; the renderer lets go first, then the builder and the
+    // pipeline go, and the stage, which the renderer only let go of
+    walker.dispose();
+    stageRenderer.dispose();
+    withGlow.dispose();
+    pipeline.dispose();
+    stage.dispose();
+  });
+
   onDemoInit(display, 'boomer-shooter-corridor', async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
     const [[stalkerAtlas, stalkerTexture], [signsAtlas, signsTexture], [wall], [floor], [ceiling], [door]] = await Promise.all([
@@ -106,7 +116,11 @@ import {description, title} from './_boomer-shooter-corridor.json';
       store.getAsync('boomerFloor', ['texture']),
       store.getAsync('boomerCeiling', ['texture']),
       store.getAsync('boomerDoor', ['texture']),
-    ]);
+    ]).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
     if (display.isDisposed) {
       store.dispose();
       return;
@@ -129,8 +143,12 @@ import {description, title} from './_boomer-shooter-corridor.json';
     let hits = 0;
     let downs = 0;
     walker.onClick = async (pointer) => {
-      const hit = await picker.pick(camera, pointer, [stalkers.sprites]);
-      if (hit == null) return;
+      // picker.dispose() turns a pick down that is still under way: after the dispose that is no error
+      const hit = await picker.pick(camera, pointer, [stalkers.sprites]).catch((error: unknown) => {
+        if (display.isDisposed) return undefined;
+        throw error;
+      });
+      if (display.isDisposed || hit == null) return;
       const result = stalkers.hit(hit.sprite);
       if (result === 'miss') return;
       hits += 1;
@@ -156,29 +174,40 @@ import {description, title} from './_boomer-shooter-corridor.json';
     walker.onAutoplayChange = (on) => {
       autoplayButton.textContent = `autoplay: ${on ? 'on' : 'off'}`;
     };
-    autoplayButton.addEventListener('click', () => {
-      walker.autoplay = !walker.autoplay;
-    });
-    placementButton.addEventListener('click', () => {
-      // AxisBillboardPlacement stays upright at any pitch; BillboardPlacement leans back with the camera
-      stalkers.upright = !stalkers.upright;
-      placementButton.textContent = `stalkers: ${stalkers.upright ? 'axis billboards' : 'billboards'}`;
-    });
-    shadowsButton.addEventListener('click', () => {
-      const shadow = stalkers.sprites.passes['shadow']!;
-      shadow.enabled = !shadow.enabled;
-      shadowsButton.textContent = `shadows: ${shadow.enabled ? 'on' : 'off'}`;
-    });
+    const listening = new AbortController();
+    const {signal} = listening;
+    autoplayButton.addEventListener(
+      'click',
+      () => {
+        walker.autoplay = !walker.autoplay;
+      },
+      {signal},
+    );
+    placementButton.addEventListener(
+      'click',
+      () => {
+        // AxisBillboardPlacement stays upright at any pitch; BillboardPlacement leans back with the camera
+        stalkers.upright = !stalkers.upright;
+        placementButton.textContent = `stalkers: ${stalkers.upright ? 'axis billboards' : 'billboards'}`;
+      },
+      {signal},
+    );
+    shadowsButton.addEventListener(
+      'click',
+      () => {
+        const shadow = stalkers.sprites.passes['shadow']!;
+        shadow.enabled = !shadow.enabled;
+        shadowsButton.textContent = `shadows: ${shadow.enabled ? 'on' : 'off'}`;
+      },
+      {signal},
+    );
 
     display.onDispose(() => {
-      walker.dispose();
+      listening.abort();
       picker.dispose();
       stalkers.dispose();
       signs.dispose();
       corridor.dispose();
-      stageRenderer.dispose();
-      withGlow.dispose();
-      pipeline.dispose();
       store.dispose();
     });
 

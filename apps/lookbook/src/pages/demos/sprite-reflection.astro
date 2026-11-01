@@ -35,7 +35,6 @@ import {description, title} from './_sprite-reflection.json';
     AnimatedSpriteKind,
     FeatureSprites,
     FeatureSpritesGeometry,
-    OnDisplayInit,
     OnDisplayRenderFrame,
     OnDisplayResize,
     planeOf,
@@ -46,6 +45,7 @@ import {description, title} from './_sprite-reflection.json';
   import {BouncingSprites} from '~demos/animated-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {onDemoInit} from '~demos/utils/demoInit';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
@@ -62,7 +62,8 @@ import {description, title} from './_sprite-reflection.json';
     document.querySelector('.spriteCount')!.textContent = count.toString();
   };
 
-  on(demo, OnDisplayInit, async ({scene, camera, renderer}) => {
+  onDemoInit(demo, 'sprite-reflection', async ({renderer}) => {
+    const {scene, camera} = demo;
     // on the mirror, looking straight at the sprites: the horizon runs through the middle of the
     // window, and the upper half shows UPPER_HALF units at the plane of the sprites
     const halfFov = (camera.fov * Math.PI) / 360;
@@ -73,8 +74,19 @@ import {description, title} from './_sprite-reflection.json';
       // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
       console.error(`[sprite-reflection] TextureStore ${source} failed for ${url ?? id}`, error);
     });
-    await store.loadAsync(assetsUrl('nobingers.json'));
-    const [texture, frameBasedAnimations] = await store.getAsync('nobingers', ['texture', 'frameBasedAnimations']);
+    const [texture, frameBasedAnimations] = await store
+      .loadAsync(assetsUrl('nobingers.json'))
+      .then(() => store.getAsync('nobingers', ['texture', 'frameBasedAnimations']))
+      .catch((error: unknown) => {
+        // a loader that fails disposes the store it built
+        store.dispose();
+        throw error;
+      });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, 500, HEIGHT, SPRITE_SIZE);
@@ -90,9 +102,11 @@ import {description, title} from './_sprite-reflection.json';
     bouncingSprites.createSprites(INITIAL_SPRITE_COUNT, animId);
     renderSpriteCount(INITIAL_SPRITE_COUNT);
 
+    // bakeDataTexture() hands its texture over to this page
+    const animsMap = frameBasedAnimations.bakeDataTexture({renderer});
     const sprites = new FeatureSprites(AnimatedSpriteKind, {
       geometry,
-      textures: {colorMap: texture, animsMap: frameBasedAnimations.bakeDataTexture({renderer})},
+      textures: {colorMap: texture, animsMap},
       depthTest: false,
       depthWrite: false,
       passes: [ReflectionPass],
@@ -127,13 +141,34 @@ import {description, title} from './_sprite-reflection.json';
     console.log('FeatureSprites', sprites);
 
     // the .moreSprites and .lessSprites buttons are written by the markup of this very page
-    document.querySelector('.moreSprites')!.addEventListener('click', () => {
-      bouncingSprites.createSprites(20, animId);
-      renderSpriteCount(bouncingSprites.sprites.length);
-    });
-    document.querySelector('.lessSprites')!.addEventListener('click', () => {
-      bouncingSprites.destroySprites(20);
-      renderSpriteCount(bouncingSprites.sprites.length);
+    const listening = new AbortController();
+    document.querySelector('.moreSprites')!.addEventListener(
+      'click',
+      () => {
+        bouncingSprites.createSprites(20, animId);
+        renderSpriteCount(bouncingSprites.sprites.length);
+      },
+      {signal: listening.signal},
+    );
+    document.querySelector('.lessSprites')!.addEventListener(
+      'click',
+      () => {
+        bouncingSprites.destroySprites(20);
+        renderSpriteCount(bouncingSprites.sprites.length);
+      },
+      {signal: listening.signal},
+    );
+
+    demo.onDispose(() => {
+      listening.abort();
+      // the sprites release the material they built and leave the geometry they were handed to the
+      // page; the store takes its error listener and what it lent along
+      sprites.dispose();
+      geometry.dispose();
+      animsMap.dispose();
+      horizon.geometry.dispose();
+      horizon.material.dispose();
+      store.dispose();
     });
   });
 

@@ -80,7 +80,16 @@ import {description, title} from './_textured-quads-from-tileset.json';
     renderer.toneMapping = NeutralToneMapping;
 
     const store = await loadTextureCatalog(renderer);
-    const [tileSet, texture] = await store.getAsync('glaskugelnTiles', ['tileSet', 'texture']);
+    const [tileSet, texture] = await store.getAsync('glaskugelnTiles', ['tileSet', 'texture']).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loaded tileset', {tileSet, texture});
@@ -88,7 +97,16 @@ import {description, title} from './_textured-quads-from-tileset.json';
     // the <TexturePreview> in the markup of this very page writes #texture-preview
     showTexturePreview(texture);
 
-    demo.scene.add(makeMesh(16, 32, 3.5, 1, tileSet, texture));
+    const mesh = makeMesh(16, 32, 3.5, 1, tileSet, texture);
+    demo.scene.add(mesh);
+
+    demo.onDispose(() => {
+      // createTexturedQuads() built the geometry, makeMesh() the one material it handed over, the
+      // store lent the texture; VertexObjects types its material as a list or none as well
+      mesh.geometry?.dispose();
+      (mesh.material as MeshBasicNodeMaterial).dispose();
+      store.dispose();
+    });
   });
 
   // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose

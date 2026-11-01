@@ -73,6 +73,21 @@ together.
    the scenes under `src/demos/stage-masks/` —, and a JSON or text file beside them through
    `fetchJson()`/`fetchText()` from `src/demos/utils/fetchAsset.ts`, which name the file and
    the status when it fails; a loader that fails disposes the store it built.
+
+   Whatever the page builds, it frees in `display.onDispose()`: the store, the geometries,
+   materials and textures it made — `bakeDataTexture()` and `TextureFactory#load()` hand theirs
+   over —, stages, a `StageRenderer` or `StageDirector` with their pipelines and output node
+   builders, sprites, a picker, a lil-gui panel. `StageRenderer#dispose()` lets go of its stages
+   without disposing them, so the page disposes them too; a texture a store lent goes with the
+   store. What the page builds before `display.start()` is freed by an `onDispose()` right after
+   it is built, what the init builds after an `await` by one at the end of the init. Every
+   listener the page puts on the canvas, the window, the document or an element of its markup
+   comes off there as well — through the `signal` of an `AbortController` whose `abort()` the
+   `onDispose()` calls; the display drops the listeners of its own events itself. After every
+   `await` of its start the page asks `display.isDisposed` before it builds on, and frees what
+   the `await` handed it; a `then` that touches the page asks first as well. `platformer.astro`
+   and `rope-bridge.astro` show the pattern, and `PerspectiveOrbitDemo` frees its orbit controls
+   itself.
 3. Add `src/pages/demos/_<name>.json` next to it. The leading underscore keeps Astro from
    turning it into a route, while `import.meta.glob('../../pages/demos/*.json')` in
    `src/demos/utils/loadMetadataForDemos.ts` still picks it up. `title` and `url` are

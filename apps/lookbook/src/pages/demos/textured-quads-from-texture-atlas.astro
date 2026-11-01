@@ -18,7 +18,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
 
 <script>
   import type {TextureAtlas} from '@spearwolf/twopoint5d';
-  import type {Texture} from 'three/webgpu';
+  import type {NodeMaterial, Texture} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
@@ -74,7 +74,16 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
 
   await demo.start(async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
-    const [atlas, texture] = await store.getAsync('labWallsAtlas', ['atlas', 'texture']);
+    const [atlas, texture] = await store.getAsync('labWallsAtlas', ['atlas', 'texture']).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loaded texture-atlas', {atlas, texture});
@@ -88,5 +97,13 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
     console.log('TexturedQuadsMesh', mesh);
 
     demo.scene.add(mesh);
+
+    demo.onDispose(() => {
+      // createTexturedQuads() built the geometry and the one material, the store lent the texture;
+      // VertexObjects types its material as a list or none as well
+      mesh.geometry?.dispose();
+      (mesh.material as NodeMaterial).dispose();
+      store.dispose();
+    });
   });
 </script>

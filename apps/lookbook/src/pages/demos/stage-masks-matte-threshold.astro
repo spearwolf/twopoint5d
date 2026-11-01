@@ -74,6 +74,9 @@ import {description, title} from './_stage-masks-matte-threshold.json';
   const caption = document.getElementById('scope-caption') as HTMLElement;
   const display = new Display(canvas);
   const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {
     softness: 0.05 as number,
@@ -150,11 +153,11 @@ import {description, title} from './_stage-masks-matte-threshold.json';
     // a new softness is a new effect: a run by hand starts again with it, at the same progress, in
     // the same direction; a run by the clock keeps its own and the next one takes the new value
     gui
-      .add(settings, 'softness', SOFTNESS as unknown as number[])
+      .add(settings, 'softness', [...SOFTNESS])
       .name('matte softness')
       .onChange(() => cycler.restart());
     gui
-      .add(settings, 'kind', SONAR_KINDS as unknown as string[])
+      .add(settings, 'kind', [...SONAR_KINDS])
       .name('mask kind (k)')
       .onChange(() => {
         field.kind = settings.kind;
@@ -221,8 +224,6 @@ import {description, title} from './_stage-masks-matte-threshold.json';
       clearTimeout(previewTimeout);
       cycler.dispose();
       gui.destroy();
-      // the director lets go of the layers and of the mask stage first, then each goes
-      director.dispose();
       ping.dispose();
       sonar.dispose();
       hud.dispose();

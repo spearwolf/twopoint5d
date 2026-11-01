@@ -60,6 +60,12 @@ import {description, title} from './_crosses.json';
     mesh.name = 'CrossMesh';
 
     demo.scene.add(mesh);
+
+    // a VertexObjects frees nothing of its own: the geometry and the material are this page's
+    demo.onDispose(() => {
+      geometry.dispose();
+      material.dispose();
+    });
   });
 
   demo.start();

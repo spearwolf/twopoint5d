@@ -49,13 +49,19 @@ import {description, title} from './_stage-nested-pipelines.json';
   const worldRenderer = new StageRenderer(root).setClearColor(new Color('#0a0a1f'), 1).add(worldStage);
   worldRenderer.name = 'world-renderer';
   // the display was constructed above, so it holds its renderer; only dispose() takes it away again
-  worldRenderer.pipeline = new RenderPipeline(display.renderer!);
-  worldRenderer.buildOutputNode = createBloomOutputNodeBuilder({strength: 1.5, radius: 0.5});
+  const worldPipeline = new RenderPipeline(display.renderer!);
+  const withBloom = createBloomOutputNodeBuilder({strength: 1.5, radius: 0.5});
+  worldRenderer.pipeline = worldPipeline;
+  worldRenderer.buildOutputNode = withBloom;
 
   const palette = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ffe0b3'];
   const worldSprites: Sprite[] = [];
+  // every SpriteMaterial of the page, freed with the display
+  const materials: SpriteMaterial[] = [];
   for (let i = 0; i < 24; i++) {
-    const sprite = new Sprite(new SpriteMaterial({map: ballTexture, color: new Color(palette[i % palette.length])}));
+    const material = new SpriteMaterial({map: ballTexture, color: new Color(palette[i % palette.length])});
+    materials.push(material);
+    const sprite = new Sprite(material);
     sprite.scale.set(50, 50, 1);
     worldStage.scene.add(sprite);
     worldSprites.push(sprite);
@@ -75,7 +81,9 @@ import {description, title} from './_stage-nested-pipelines.json';
   // ---------------------------------------------------------------
   const uiStage = new Stage2D(new ParallaxProjection('xy|bottom-left', {width: 800, height: 600, fit: 'contain'}));
   uiStage.name = 'ui';
-  const logoSprite = new Sprite(new SpriteMaterial({map: logoTexture, transparent: true}));
+  const logoMaterial = new SpriteMaterial({map: logoTexture, transparent: true});
+  materials.push(logoMaterial);
+  const logoSprite = new Sprite(logoMaterial);
   logoSprite.scale.set(420, 100, 1);
   logoSprite.position.set(-150, 220, 0);
   uiStage.scene.add(logoSprite);
@@ -86,7 +94,24 @@ import {description, title} from './_stage-nested-pipelines.json';
   // Root pipeline: a `RootRenderPipeline` composes every child pass
   // additively, so no `buildOutputNode` boilerplate is needed.
   // ---------------------------------------------------------------
-  root.pipeline = new RootRenderPipeline(display.renderer!);
+  const rootPipeline = new RootRenderPipeline(display.renderer!);
+  root.pipeline = rootPipeline;
+
+  display.onDispose(() => {
+    // the renderers let go first, the outer one before the inner one, then their builder and their
+    // pipelines go, and the stages, which the renderers only let go of
+    root.dispose();
+    worldRenderer.dispose();
+    withBloom.dispose();
+    worldPipeline.dispose();
+    rootPipeline.dispose();
+    worldStage.dispose();
+    uiStage.dispose();
+    for (const material of materials) material.dispose();
+    // TextureFactory#load() handed both textures over to this page
+    ballTexture.dispose();
+    logoTexture.dispose();
+  });
 
   display.start();
 

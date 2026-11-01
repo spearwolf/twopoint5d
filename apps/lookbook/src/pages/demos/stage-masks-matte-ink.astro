@@ -43,6 +43,9 @@ import {description, title} from './_stage-masks-matte-ink.json';
   canvas.style.touchAction = 'none';
   const display = new Display(canvas);
   const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {
     duration: 3.2,
@@ -151,8 +154,6 @@ import {description, title} from './_stage-masks-matte-ink.json';
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerleave', onPointerLeave);
       gui.destroy();
-      // the director lets go of the layers and of the mask stage first, then each goes
-      director.dispose();
       ink.dispose();
       blots.dispose();
       edge.dispose();

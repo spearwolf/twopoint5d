@@ -88,14 +88,19 @@ import {description, title} from './_platformer.json';
     });
 
     // the buttons are written by the markup of this page
+    const listening = new AbortController();
     const toggle = (selector: string, label: string, values: [string, string], apply: (on: boolean) => void) => {
       const button = document.querySelector(selector)!;
       let on = true;
-      button.addEventListener('click', () => {
-        on = !on;
-        apply(on);
-        button.textContent = `${label}: ${values[on ? 0 : 1]}`;
-      });
+      button.addEventListener(
+        'click',
+        () => {
+          on = !on;
+          apply(on);
+          button.textContent = `${label}: ${values[on ? 0 : 1]}`;
+        },
+        {signal: listening.signal},
+      );
     };
     toggle('.togglePalette', 'palette swap', ['on', 'off'], (on) => {
       game.goblins.paletteSwap = on;
@@ -117,6 +122,7 @@ import {description, title} from './_platformer.json';
     };
 
     display.onDispose(() => {
+      listening.abort();
       clearTimeout(timeout);
       window.removeEventListener('keydown', game.onKeyDown);
       window.removeEventListener('keyup', game.onKeyUp);

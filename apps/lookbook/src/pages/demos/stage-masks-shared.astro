@@ -35,6 +35,9 @@ import {description, title} from './_stage-masks-shared.json';
   const display = new Display(canvas);
 
   const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {
     level: true,
@@ -136,8 +139,6 @@ import {description, title} from './_stage-masks-shared.json';
       clearTimeout(previewTimeout);
       window.removeEventListener('keydown', onKeyDown);
       gui.destroy();
-      // the director lets go of the layers and the mask stage first, then each goes
-      director.dispose();
       inkMask.dispose();
       ink.dispose();
       rot.dispose();

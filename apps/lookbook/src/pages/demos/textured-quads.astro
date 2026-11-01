@@ -98,7 +98,16 @@ import {description, title} from './_textured-quads.json';
     renderer.toneMappingExposure = 1.1;
 
     const store = await loadTextureCatalog(renderer);
-    const [texCoords, texture] = await store.getAsync('ballPatternRot', ['imageCoords', 'texture']);
+    const [texCoords, texture] = await store.getAsync('ballPatternRot', ['imageCoords', 'texture']).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loaded texture-image', {texCoords, texture});
@@ -106,7 +115,16 @@ import {description, title} from './_textured-quads.json';
     // the <TexturePreview> in the markup of this very page writes #texture-preview
     showTexturePreview(texture);
 
-    demo.scene.add(createMesh(16, 32, 3.7, 1, texCoords, texture));
+    const mesh = createMesh(16, 32, 3.7, 1, texCoords, texture);
+    demo.scene.add(mesh);
+
+    demo.onDispose(() => {
+      // createMesh() built the geometry and the one material, the store lent the texture;
+      // VertexObjects types its material as a list or none as well
+      mesh.geometry?.dispose();
+      (mesh.material as NodeMaterial).dispose();
+      store.dispose();
+    });
   });
 
   // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose

@@ -31,19 +31,20 @@ import {description, title} from './_stage-postprocessing.json';
 
   // A tiny post-pass: bloom on top of the rendered scene.
   // The display was constructed above, so it holds its renderer; only dispose() takes it away again.
-  stageRenderer.pipeline = new RenderPipeline(display.renderer!);
-  stageRenderer.buildOutputNode = createBloomOutputNodeBuilder({strength: 1.2, radius: 0.6});
+  const pipeline = new RenderPipeline(display.renderer!);
+  const withBloom = createBloomOutputNodeBuilder({strength: 1.2, radius: 0.6});
+  stageRenderer.pipeline = pipeline;
+  stageRenderer.buildOutputNode = withBloom;
 
-  const textureFactory = new TextureFactory(display.renderer, ['nearest', 'srgb', 'flipy']);
+  // one texture for all the sprites; TextureFactory#load() hands it over to this page
+  const texture = new TextureFactory(display.renderer, ['nearest', 'srgb', 'flipy']).load(assetsUrl('skinball-256.png'));
 
   // A few bright sprites — bloom will smear them across the screen
   const sprites: Sprite[] = [];
   const colors = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ffe0b3'];
 
   for (let i = 0; i < 80; i++) {
-    const sprite = new Sprite(
-      new SpriteMaterial({map: textureFactory.load(assetsUrl('skinball-256.png')), color: new Color(colors[i % colors.length])}),
-    );
+    const sprite = new Sprite(new SpriteMaterial({map: texture, color: new Color(colors[i % colors.length])}));
     sprite.scale.set(40, 40, 1);
     sprite.position.set(Math.random() * 800, Math.random() * 600, 0);
     stage.scene.add(sprite);
@@ -60,6 +61,17 @@ import {description, title} from './_stage-postprocessing.json';
       const a = phases[i]! + now * 0.6;
       sprites[i]!.position.set(400 + Math.cos(a) * 220, 300 + Math.sin(a * 1.3) * 160, 0);
     }
+  });
+
+  display.onDispose(() => {
+    // the renderer lets go first, then the builder and the pipeline go, and the stage, which the
+    // renderer only let go of
+    stageRenderer.dispose();
+    withBloom.dispose();
+    pipeline.dispose();
+    stage.dispose();
+    for (const sprite of sprites) sprite.material.dispose();
+    texture.dispose();
   });
 
   display.start();

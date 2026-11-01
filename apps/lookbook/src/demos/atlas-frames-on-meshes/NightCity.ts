@@ -234,3 +234,18 @@ export function makeNightCity(atlases: {track: NightCityAtlas; facades: NightCit
   );
   return city;
 }
+
+/**
+ * Frees what {@link makeNightCity} built: the geometry and the material of every mesh of the city,
+ * each its own, and the instance matrices of the buildings. The atlas textures belong to the store
+ * they came from.
+ */
+export function disposeNightCity(city: Group): void {
+  city.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    object.geometry.dispose();
+    // every mesh of the city is built with one material of its own, none with a list
+    (object.material as MeshBasicNodeMaterial).dispose();
+    if (object instanceof InstancedMesh) object.dispose();
+  });
+}

@@ -45,7 +45,17 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     map2d.centerY = 0;
 
     const store = await loadTextureCatalog(renderer);
-    const [tileSet, texture] = await store.getAsync('ballPatternTiles', ['tileSet', 'texture']);
+    const [tileSet, texture] = await store.getAsync('ballPatternTiles', ['tileSet', 'texture']).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the tiles loaded has gone out already: the map built before goes as well
+    if (demo.isDisposed) {
+      map2d.dispose();
+      store.dispose();
+      return;
+    }
 
     const tileData = new RepeatingTilesProvider([
       [1, 1, 1, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3],

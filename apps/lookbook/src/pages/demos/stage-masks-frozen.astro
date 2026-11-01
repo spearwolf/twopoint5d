@@ -34,6 +34,9 @@ import {description, title} from './_stage-masks-frozen.json';
   const display = new Display(canvas);
 
   const director = new StageDirector(display).setClearColor(new Color('#000000'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   onDemoInit(display, 'stage-masks-frozen', async ({renderer}) => {
     const assets = await loadChapelAssets(renderer);
@@ -159,8 +162,6 @@ import {description, title} from './_stage-masks-frozen.json';
       clearTimeout(previewTimeout);
       window.removeEventListener('keydown', onKeyDown);
       gui.destroy();
-      // the director lets go of the layers and the mask stage first, then each goes
-      director.dispose();
       throughGlass.dispose();
       amberGlass.dispose();
       violetGlass.dispose();

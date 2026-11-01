@@ -51,6 +51,9 @@ import {description, title} from './_stage-masks-spotlight.json';
 
   // the director composes three slots over its clear color: the deep, the level, the player
   const director = new StageDirector(display).setClearColor(new Color('#010204'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {
     source: 'alpha' as StageMaskCoverageSource,
@@ -239,8 +242,6 @@ import {description, title} from './_stage-masks-spotlight.json';
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
       gui.destroy();
-      // the director lets go of the layers and the mask stage first, then each goes
-      director.dispose();
       mask.dispose();
       deep.dispose();
       ward.dispose();

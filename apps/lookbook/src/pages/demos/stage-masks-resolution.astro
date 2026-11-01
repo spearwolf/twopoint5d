@@ -80,6 +80,9 @@ import {description, title} from './_stage-masks-resolution.json';
   const canvas = getFullscreenCanvas();
   const display = new Display(canvas);
   const director = new StageDirector(display).setClearColor(new Color('#050406'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {
     preset: '1 · 0.5 · 0.25',
@@ -271,8 +274,6 @@ import {description, title} from './_stage-masks-resolution.json';
       window.removeEventListener('keydown', onKeyDown);
       gui.destroy();
       for (const el of plaques) el.remove();
-      // the director lets go of the layers and of the fog stages first, then each goes
-      director.dispose();
       for (const mask of masks) mask.dispose();
       for (const fog of fogs) fog.dispose();
       for (const plate of plates) plate.dispose();

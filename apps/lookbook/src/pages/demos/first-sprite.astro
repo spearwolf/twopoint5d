@@ -48,8 +48,14 @@ import {description, title} from './_first-sprite.json';
   onDemoInit(display, 'first-sprite', async ({renderer}) => {
     // the catalog of the lookbook names each texture, the image behind it and its frames
     const store = new TextureStore(renderer);
-    await store.loadAsync(assetsUrl('textures.json'));
-    const [atlas, texture] = await store.getAsync('splotchs', ['atlas', 'texture']);
+    const [atlas, texture] = await store
+      .loadAsync(assetsUrl('textures.json'))
+      .then(() => store.getAsync('splotchs', ['atlas', 'texture']))
+      .catch((error: unknown) => {
+        // a loader that fails disposes the store it built
+        store.dispose();
+        throw error;
+      });
 
     // a dispose() while the catalog and the texture loaded has gone out already, and an
     // onDispose() from here on would never hear it: the store goes, and nothing is built

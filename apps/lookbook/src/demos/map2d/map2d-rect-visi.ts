@@ -28,7 +28,7 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     scene.fog = new Fog(0x458497, 300, 1500);
 
     // biome-ignore format: the line breaks lay the numbers out row by row
-    scene.add(makePoints([
+    const points = makePoints([
       -384, 11, -384,
       -128, 11, -384,
       128, 11, -384,
@@ -48,7 +48,8 @@ export const run = (demo: PerspectiveOrbitDemo) =>
       -128, 11, 384,
       128, 11, 384,
       384, 11, 384,
-    ]));
+    ]);
+    scene.add(points);
 
     // -------------------------------------
 
@@ -72,7 +73,20 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     map2d.centerY = 0;
 
     const store = await loadTextureCatalog(renderer);
-    const [tileSet, texture] = await store.getAsync('map2dDebugTiles', ['tileSet', 'texture']);
+    const [tileSet, texture] = await store.getAsync('map2dDebugTiles', ['tileSet', 'texture']).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the tiles loaded has gone out already: what was built before goes as well
+    if (demo.isDisposed) {
+      rectVisiAreaHelpers.dispose();
+      map2d.dispose();
+      points.geometry.dispose();
+      points.material.dispose();
+      store.dispose();
+      return;
+    }
 
     const tileData = new RepeatingTilesProvider([
       [1, 2],
@@ -127,5 +141,8 @@ export const run = (demo: PerspectiveOrbitDemo) =>
       // the texture belongs to the store, which releases it with its resource
       store.dispose();
       panControl.dispose();
+      // the markers of the tile corners
+      points.geometry.dispose();
+      points.material.dispose();
     });
   });

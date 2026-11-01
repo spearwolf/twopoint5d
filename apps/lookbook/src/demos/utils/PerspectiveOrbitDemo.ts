@@ -10,7 +10,9 @@ export interface PerspectiveOrbitDemoEventProps extends DisplayEventProps {
 }
 
 /**
- * Create a [[Display]] with a scene, perspective camera and an orbit control that as a transparent background.
+ * A {@link Display} with a scene, a perspective camera and orbit controls, drawn on a transparent
+ * background. Its `dispose()` frees the orbit controls as well; what a page puts into the scene,
+ * the page frees itself.
  */
 export class PerspectiveOrbitDemo extends Display {
   scene: Scene;
@@ -28,6 +30,8 @@ export class PerspectiveOrbitDemo extends Display {
     // inside the constructor of a Display subclass the renderer exists: `super(...)` made it
     this.controls = new OrbitControls(this.camera, this.renderer!.domElement);
     this.controls.enableDamping = true;
+    // the controls hold listeners on the canvas and on the document, which a Display does not know of
+    this.onDispose(() => this.controls.dispose());
 
     on(this, 'enableOrbitControls', (enabled) => {
       this.controls.enabled = enabled;

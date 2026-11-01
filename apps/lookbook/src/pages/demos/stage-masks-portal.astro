@@ -36,6 +36,9 @@ import {description, title} from './_stage-masks-portal.json';
   const display = new Display(canvas);
 
   const director = new StageDirector(display).setClearColor(new Color('#030305'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   onDemoInit(display, 'stage-masks-portal', async ({renderer}) => {
     const assets = await loadPortalAssets(renderer);
@@ -181,7 +184,7 @@ import {description, title} from './_stage-masks-portal.json';
     gui.add(readout, 'camera').name('camera').disable().listen();
     gui.add(readout, 'distance').name('distance to canvas').disable().listen();
     gui.add(readout, 'size').name('portal on screen').disable().listen();
-    gui.add(readout, 'maskOf').name('maskOf(other)').disable().listen();
+    gui.add(readout, 'maskOf').name('maskOf(moor)').disable().listen();
 
     // the one shape the demo reaches: the moor masked by the portal between two plain layers
     const shapes: StageDirectorShape[] = [['layer', {mask: portal.mask}, 'layer']];
@@ -204,8 +207,6 @@ import {description, title} from './_stage-masks-portal.json';
       unsubscribePlace();
       unsubscribeReadouts();
       gui.destroy();
-      // the director lets go of the layers and the mask stage first, then each goes
-      director.dispose();
       portal.dispose();
       glaze.dispose();
       moor.dispose();

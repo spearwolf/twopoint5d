@@ -45,6 +45,9 @@ import {description, title} from './_stage-masks-flashlight.json';
 
   // two slots over the clear color: the dark with its eyes, and the level, masked by the flashlight
   const director = new StageDirector(display).setClearColor(new Color('#020203'), 1);
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads; it only lets go of what it shows, which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {
     projection: 'parallax' as CrawlProjection,
@@ -201,9 +204,7 @@ import {description, title} from './_stage-masks-flashlight.json';
       canvas.removeEventListener('pointerup', onPointerUp);
       canvas.removeEventListener('pointercancel', onPointerUp);
       gui.destroy();
-      // the director lets go of the layers and the mask stage first; the mask owns the stage it
-      // built, the scene stays the flashlight's
-      director.dispose();
+      // the mask owns the stage it built, the scene stays the flashlight's
       mask.dispose();
       flashlight.dispose();
       level.dispose();

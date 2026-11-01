@@ -93,7 +93,11 @@ import {description, title} from './_rope-bridge.json';
       store.getAsync('ropeBridgeCaveBack', ['texture']),
       store.getAsync('ropeBridgeCaveMid', ['texture']),
       store.getAsync('ropeBridgeCaveFront', ['texture']),
-    ]);
+    ]).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
 
     // a dispose() while the textures loaded has gone out already: nothing is built
     if (display.isDisposed) {
@@ -121,45 +125,62 @@ import {description, title} from './_rope-bridge.json';
         (rect.height / 2 - (event.clientY - rect.top)) / view.pixelRatioY + view.offsetY,
       ];
     };
-    canvas.addEventListener('pointerdown', (event) => {
-      if (bridge?.pointerDown(...toView(event)) === 'grab') {
-        canvas.setPointerCapture(event.pointerId);
-        canvas.classList.add('dragging');
-      }
-    });
-    canvas.addEventListener('pointermove', (event) => bridge?.pointerMove(...toView(event)));
+    const listening = new AbortController();
+    const {signal} = listening;
+    canvas.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (bridge?.pointerDown(...toView(event)) === 'grab') {
+          canvas.setPointerCapture(event.pointerId);
+          canvas.classList.add('dragging');
+        }
+      },
+      {signal},
+    );
+    canvas.addEventListener('pointermove', (event) => bridge?.pointerMove(...toView(event)), {signal});
     const letGo = () => {
       bridge?.pointerUp();
       canvas.classList.remove('dragging');
     };
-    canvas.addEventListener('pointerup', letGo);
-    canvas.addEventListener('pointercancel', letGo);
+    canvas.addEventListener('pointerup', letGo, {signal});
+    canvas.addEventListener('pointercancel', letGo, {signal});
 
     // the buttons and the readout are written by the markup of this very page
     const repeatButton = document.querySelector('.toggleRepeat')!;
-    repeatButton.addEventListener('click', () => {
-      bridge!.repeating = !bridge!.repeating;
-      repeatButton.textContent = `texture: ${bridge!.repeating ? 'repeating' : 'stretched'}`;
-    });
-    document.querySelector('.dropLantern')!.addEventListener('click', () => {
-      bridge?.dropLantern((Math.random() - 0.5) * 240, 150);
-    });
+    repeatButton.addEventListener(
+      'click',
+      () => {
+        bridge!.repeating = !bridge!.repeating;
+        repeatButton.textContent = `texture: ${bridge!.repeating ? 'repeating' : 'stretched'}`;
+      },
+      {signal},
+    );
+    document.querySelector('.dropLantern')!.addEventListener(
+      'click',
+      () => {
+        bridge?.dropLantern((Math.random() - 0.5) * 240, 150);
+      },
+      {signal},
+    );
     document.querySelector('.linkCount')!.textContent = `${bridge.linkCount} rope links · 1 draw call`;
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('rope bridge', bridge);
 
     display.onDispose(() => {
+      listening.abort();
       bridge?.dispose();
       store.dispose();
     });
   });
 
   display.onDispose(() => {
-    // the renderer lets go first, then the builder and the pipeline go
+    // the renderer lets go first, then the builder and the pipeline go, and the stage, which the
+    // renderer only let go of
     stageRenderer.dispose();
     withGlow.dispose();
     pipeline.dispose();
+    stage.dispose();
   });
 
   await display.start();

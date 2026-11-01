@@ -52,6 +52,7 @@ import {description, title} from './_vector-balls.json';
   };
   fitPixelZoom();
   window.addEventListener('resize', fitPixelZoom);
+  demo.onDispose(() => window.removeEventListener('resize', fitPixelZoom));
 
   await demo.start(async ({renderer}) => {
     demo.camera.fov = 40;
@@ -63,7 +64,16 @@ import {description, title} from './_vector-balls.json';
     demo.controls.maxDistance = 20;
 
     const store = await loadTextureCatalog(renderer);
-    const [atlas, texture] = await store.getAsync('vectorBalls', ['atlas', 'texture']);
+    const [atlas, texture] = await store.getAsync('vectorBalls', ['atlas', 'texture']).catch((error: unknown) => {
+      // a loader that fails disposes the store it built
+      store.dispose();
+      throw error;
+    });
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (demo.isDisposed) {
+      store.dispose();
+      return;
+    }
 
     const vectorBalls = new VectorBalls({atlas, texture}, MIN_BALLS);
     demo.scene.add(vectorBalls);
@@ -74,23 +84,41 @@ import {description, title} from './_vector-balls.json';
     const sortButton = document.querySelector('.toggleSort')!;
     const mirrorButton = document.querySelector('.toggleMirror')!;
     const readout = document.querySelector('.readout')!;
-    sortButton.addEventListener('click', () => {
-      vectorBalls.sorting = !vectorBalls.sorting;
-      sortButton.textContent = `sort: ${vectorBalls.sorting ? 'on' : 'off'}`;
-    });
-    mirrorButton.addEventListener('click', () => {
-      vectorBalls.mirror = !vectorBalls.mirror;
-      mirrorButton.textContent = `mirror: ${vectorBalls.mirror ? 'on' : 'off'}`;
-    });
+    const listening = new AbortController();
+    const {signal} = listening;
+    sortButton.addEventListener(
+      'click',
+      () => {
+        vectorBalls.sorting = !vectorBalls.sorting;
+        sortButton.textContent = `sort: ${vectorBalls.sorting ? 'on' : 'off'}`;
+      },
+      {signal},
+    );
+    mirrorButton.addEventListener(
+      'click',
+      () => {
+        vectorBalls.mirror = !vectorBalls.mirror;
+        mirrorButton.textContent = `mirror: ${vectorBalls.mirror ? 'on' : 'off'}`;
+      },
+      {signal},
+    );
     // twice the balls: past the capacity the next createSprite() grows the pool
-    document.querySelector('.moreBalls')!.addEventListener('click', () => {
-      vectorBalls.setCount(Math.min(MAX_BALLS, vectorBalls.ballCount * 2));
-    });
-    document.querySelector('.fewerBalls')!.addEventListener('click', () => {
-      vectorBalls.setCount(Math.max(MIN_BALLS, vectorBalls.ballCount / 2));
-    });
+    document.querySelector('.moreBalls')!.addEventListener(
+      'click',
+      () => {
+        vectorBalls.setCount(Math.min(MAX_BALLS, vectorBalls.ballCount * 2));
+      },
+      {signal},
+    );
+    document.querySelector('.fewerBalls')!.addEventListener(
+      'click',
+      () => {
+        vectorBalls.setCount(Math.max(MIN_BALLS, vectorBalls.ballCount / 2));
+      },
+      {signal},
+    );
 
-    setInterval(() => {
+    const readoutTimer = setInterval(() => {
       const sort = vectorBalls.sorting ? `${vectorBalls.sortMillis.toFixed(2)} ms` : 'off';
       readout.textContent = `balls ${vectorBalls.ballCount}  capacity ${vectorBalls.capacity}\nsortByViewDepth() ${sort}`;
     }, 250);
@@ -100,18 +128,40 @@ import {description, title} from './_vector-balls.json';
     const picker = new SpritePicker(renderer);
     const canvas = renderer.domElement;
     let down: {x: number; y: number} | undefined;
-    canvas.addEventListener('pointerdown', (event) => {
-      down = {x: event.clientX, y: event.clientY};
-    });
-    canvas.addEventListener('pointerup', async (event) => {
-      if (down == null || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return;
-      const rect = canvas.getBoundingClientRect();
-      const pointer = {
-        x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
-      };
-      const hit = await picker.pick(demo.camera, pointer, [vectorBalls.balls]);
-      if (hit != null) vectorBalls.flash(hit.sprite);
+    canvas.addEventListener(
+      'pointerdown',
+      (event) => {
+        down = {x: event.clientX, y: event.clientY};
+      },
+      {signal},
+    );
+    canvas.addEventListener(
+      'pointerup',
+      async (event) => {
+        if (down == null || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 4) return;
+        const rect = canvas.getBoundingClientRect();
+        const pointer = {
+          x: ((event.clientX - rect.left) / rect.width) * 2 - 1,
+          y: -((event.clientY - rect.top) / rect.height) * 2 + 1,
+        };
+        // picker.dispose() turns a pick down that is still under way: after the dispose that is no error
+        const hit = await picker.pick(demo.camera, pointer, [vectorBalls.balls]).catch((error: unknown) => {
+          if (demo.isDisposed) return undefined;
+          throw error;
+        });
+        if (demo.isDisposed) return;
+        if (hit != null) vectorBalls.flash(hit.sprite);
+      },
+      {signal},
+    );
+
+    demo.onDispose(() => {
+      listening.abort();
+      clearInterval(readoutTimer);
+      // the picker first: it turns down a pick still under way before the balls go
+      picker.dispose();
+      vectorBalls.dispose();
+      store.dispose();
     });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
