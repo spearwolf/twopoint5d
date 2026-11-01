@@ -1,3 +1,5 @@
+import type {JsonCheck} from './checkJson';
+
 /**
  * The text of the file at `url`. A failure names `subject` and the url: a fetch that cannot reach
  * the file rejects with `<subject>: <url> could not be fetched` and the reason as its `cause`, an
@@ -20,20 +22,29 @@ export async function fetchText(subject: string, url: string): Promise<string> {
 }
 
 /**
- * The JSON of the file at `url`, parsed; it fails as {@link fetchText} does, and a body that is no
- * JSON — the HTML page of a server that does not know the file — rejects with
+ * The JSON of the file at `url`, parsed and held to `check`; it fails as {@link fetchText} does,
+ * and a body that is no JSON — the HTML page of a server that does not know the file — rejects with
  * `<subject>: <url> is no JSON` and the `SyntaxError` as its `cause`.
  *
- * The shape of the value is not checked: `T` is what the caller expects. The layout files of the
- * demos are written by the generators under `assets-src/`, committed with their demo, and
+ * `check` holds the value to what the caller reads (see `checkJson.ts`); a value it refuses
+ * rejects with `<subject>: <url> is not what <subject> reads: <message>` and the `TypeError` of
+ * the check as its `cause`, and the message names the field that does not fit. The layout files of
+ * the demos are written by the generators under `assets-src/`, committed with their demo, and
  * `assets-src/README.md` is their contract; what the library reads — the atlases — the
  * `TextureStore` checks itself.
  */
-export async function fetchJson<T>(subject: string, url: string): Promise<T> {
+export async function fetchJson<T>(subject: string, url: string, check: JsonCheck<T>): Promise<T> {
   const text = await fetchText(subject, url);
+  let value: unknown;
   try {
-    return JSON.parse(text);
+    value = JSON.parse(text);
   } catch (cause) {
     throw new Error(`${subject}: ${url} is no JSON`, {cause});
+  }
+  try {
+    return check(value, '');
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`${subject}: ${url} is not what ${subject} reads: ${message}`, {cause});
   }
 }

@@ -36,10 +36,10 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   no release younger than a day (`minimumReleaseAge` in `pnpm-workspace.yaml`)
 - `pnpm exec playwright install chromium firefox webkit` — the browsers for
   `pnpm test:browser`; once after the first install and after every Playwright bump
-- `pnpm lint` — `biome ci`: Biome's linter and formatter check, nothing written;
-  `pnpm format` writes the formatting and the safe lint fixes (`biome check --write`).
-  Config in `biome.jsonc`; a suppression is `// biome-ignore <rule>: <reason>`, and the
-  reason is required
+- `pnpm lint` — `biome ci --error-on-warnings`: Biome's linter and formatter check,
+  nothing written, and a warning fails it as an error does; `pnpm format` writes the
+  formatting and the safe lint fixes (`biome check --write`). Config in `biome.jsonc`; a
+  suppression is `// biome-ignore <rule>: <reason>`, and the reason is required
 - `pnpm build` — everything; `pnpm build:twopoint5d` — the library only
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
   `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph

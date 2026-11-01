@@ -23,7 +23,7 @@
     "test:twopoint5d": "pnpm nx run-many -t test --projects=tag:twopoint5d",
     "test:affected": "pnpm nx affected -t test",
     "bench": "pnpm nx run-many -t bench",
-    "lint": "biome ci .",
+    "lint": "biome ci --error-on-warnings .",
     "format": "biome check --write .",
     "clean": "pnpm nx run-many -t clean && rimraf dist",
     "typecheck": "pnpm nx run-many -t typecheck",

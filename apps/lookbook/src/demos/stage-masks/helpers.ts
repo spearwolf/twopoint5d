@@ -10,12 +10,10 @@ import {
   ZeroFactor,
 } from 'three/webgpu';
 
-/**
- * The helpers the scenes of the stage mask demos have in common. A scene imports from this
- * module, from `SoftBlobs.ts` (a building block, not a scene) and from the modules of its own demo
- * page, never from the module of another demo: a scene that someone takes as a template brings
- * nothing foreign with it.
- */
+// The helpers the scenes of the stage mask demos have in common. A scene imports from this
+// module, from `SoftBlobs.ts` (a building block, not a scene) and from the modules of its own
+// demo page, never from the module of another demo: a scene that someone takes as a template
+// brings nothing foreign with it.
 
 /** the step of the state of the generator */
 const STEP = 0x6d2b79f5;
@@ -42,6 +40,7 @@ export class SeededRandom {
     return mix32(this.#state);
   }
 
+  /** A value in [min, max), drawn with the next value of the generator. */
   range(min: number, max: number): number {
     return min + (max - min) * this.next();
   }

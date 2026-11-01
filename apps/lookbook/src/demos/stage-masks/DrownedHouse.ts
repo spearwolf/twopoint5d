@@ -26,6 +26,7 @@ import {
 } from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type Texture, Vector2, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonList, jsonNumber, jsonObject, jsonString} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {hash21} from './helpers';
 import {makeInkStage} from './InkWell';
@@ -60,6 +61,26 @@ interface Layout {
     eyeParts: {sclera: {x: number; y: number; w: number; h: number}; iris: {x: number; y: number; w: number; h: number}};
   };
 }
+
+const checkPoint = jsonObject({x: jsonNumber, y: jsonNumber});
+const checkSize = jsonObject({w: jsonNumber, h: jsonNumber});
+const checkRect = jsonObject({x: jsonNumber, y: jsonNumber, w: jsonNumber, h: jsonNumber});
+const checkEye = jsonObject<Eye>({x: jsonNumber, y: jsonNumber, rx: jsonNumber, ry: jsonNumber, portrait: jsonString});
+const checkLayout = jsonObject<Layout>({
+  title: jsonObject({
+    marshY: jsonNumber,
+    moon: jsonObject({x: jsonNumber, y: jsonNumber, r: jsonNumber}),
+    litWindow: checkPoint,
+    titleSize: checkSize,
+    promptSize: checkSize,
+  }),
+  hall: jsonObject({
+    waterY: jsonNumber,
+    stairLight: checkPoint,
+    eyes: jsonList(checkEye),
+    eyeParts: jsonObject({sclera: checkRect, iris: checkRect}),
+  }),
+});
 
 export interface DrownedHouseAssets {
   /** holds the textures; dispose it with the demo */
@@ -98,7 +119,7 @@ export async function loadDrownedHouseAssets(renderer: WebGPURenderer): Promise<
       store.getAsync('prompt', 'texture'),
       store.getAsync('hall', 'texture'),
       store.getAsync('eyes', 'texture'),
-      fetchJson<Layout>('DrownedHouse', assetsUrl(`${DIR}/layout.json`)),
+      fetchJson('DrownedHouse', assetsUrl(`${DIR}/layout.json`), checkLayout),
     ]);
     return {store, house, title, prompt, hall, eyes, layout};
   } catch (error) {

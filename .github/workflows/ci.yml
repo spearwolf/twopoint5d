@@ -92,11 +92,16 @@ jobs:
         # summary, where it does not sit unread in the log of a green step;
         # continue-on-error keeps an audit that times out from failing the job. The build
         # job of the deploy holds what it installs to the same level and stops on a hit.
-        # The dependencies are the same under both Node lines, so one job audits them
+        # The dependencies are the same under both Node lines, so one job audits them.
+        # pnpm audit gets 90 seconds, inside the two minutes of the step, so its output
+        # reaches the log and the summary.
         if: matrix.task == 'checks' && matrix.node == 24
         run: |
           status=0
-          pnpm audit --audit-level=high > "$RUNNER_TEMP/pnpm-audit.txt" 2>&1 || status=$?
+          timeout -k 10 90 pnpm audit --audit-level=high > "$RUNNER_TEMP/pnpm-audit.txt" 2>&1 || status=$?
+          if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            echo "pnpm audit gave no answer within 90 seconds" >> "$RUNNER_TEMP/pnpm-audit.txt"
+          fi
           cat "$RUNNER_TEMP/pnpm-audit.txt"
           if [ "$status" -ne 0 ]; then
             echo "::warning title=pnpm audit::pnpm audit --audit-level=high exited with $status: high or critical advisories, or no answer from the registry. The job summary holds the report."

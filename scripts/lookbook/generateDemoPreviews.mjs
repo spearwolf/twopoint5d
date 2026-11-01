@@ -153,13 +153,13 @@ async function main() {
     });
 
     const adapter = await describeWebGpuAdapter(context, baseUrl);
-    console.log(`lookbook at ${baseUrl}`);
-    console.log(`WebGPU adapter: ${adapter ?? 'none, three.js renders with WebGL 2'}`);
     const refusal = refuseAdapter(adapter, options.allowWebgl2);
     if (refusal) {
       console.error(`generateDemoPreviews: ${refusal}`);
       return 2;
     }
+    console.log(`lookbook at ${baseUrl}`);
+    console.log(`WebGPU adapter: ${adapter ?? 'none, three.js renders with WebGL 2'}`);
     console.log(`${ids.length} demo(s) into ${path.relative(process.cwd(), previewDir)}\n`);
 
     /** @type {DemoResult[]} */

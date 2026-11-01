@@ -1,4 +1,5 @@
 import {Vector2, Vector3} from 'three/webgpu';
+import {jsonList, jsonNumber, jsonObject, jsonRecord, jsonString} from '~demos/utils/checkJson';
 import {randomAt, SeededRandom, smoothstepCpu} from './helpers';
 
 /** What `assets-src/stage-masks/flashlight/` writes into `layout.json`. */
@@ -20,6 +21,33 @@ export interface CrawlLayout {
   lens: {x: number; y: number};
   frames: Record<string, {w: number; h: number}>;
 }
+
+const checkPoint = jsonObject({x: jsonNumber, y: jsonNumber});
+const checkLayer = jsonObject({
+  z: jsonNumber,
+  ppu: jsonNumber,
+  left: jsonNumber,
+  right: jsonNumber,
+  bottom: jsonNumber,
+  top: jsonNumber,
+  tiles: jsonNumber,
+  images: jsonList(jsonString),
+});
+export const checkCrawlLayout = jsonObject<CrawlLayout>({
+  cameraDistance: jsonNumber,
+  floorY: jsonNumber,
+  playerRange: jsonNumber,
+  cameraRange: jsonNumber,
+  layers: jsonObject({back: checkLayer, mid: checkLayer, play: checkLayer}),
+  vent: jsonObject({x: jsonNumber, y: jsonNumber, hw: jsonNumber, hh: jsonNumber}),
+  posts: jsonList(jsonNumber),
+  drain: jsonObject({y: jsonNumber, drip: jsonNumber}),
+  drawings: jsonList(jsonObject({name: jsonString, x: jsonNumber, y: jsonNumber, tilt: jsonNumber})),
+  near: jsonList(jsonObject({name: jsonString, x: jsonNumber, y: jsonNumber, z: jsonNumber})),
+  eyes: jsonList(jsonObject({x: jsonNumber, y: jsonNumber, z: jsonNumber, frame: jsonString})),
+  lens: checkPoint,
+  frames: jsonRecord(jsonObject({w: jsonNumber, h: jsonNumber})),
+});
 
 /** The depth of the back wall, where the moonlight of the vent falls. */
 export const BACK_Z = -400;

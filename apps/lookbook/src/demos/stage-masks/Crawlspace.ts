@@ -48,6 +48,7 @@ import assetsUrl from '~demos/utils/assetsUrl';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {
   BACK_Z,
+  checkCrawlLayout,
   type CrawlLayout,
   type CrawlRig,
   PLAYER_CENTER_ABOVE_FLOOR,
@@ -99,7 +100,7 @@ function crawlCatalog(layout: CrawlLayout): TextureStoreData {
 export async function loadCrawlAssets(renderer: WebGPURenderer): Promise<CrawlAssets> {
   const store = new TextureStore(renderer);
   try {
-    const layout = await fetchJson<CrawlLayout>('Crawlspace', assetsUrl(`${DIR}/layout.json`));
+    const layout = await fetchJson('Crawlspace', assetsUrl(`${DIR}/layout.json`), checkCrawlLayout);
     store.parse(crawlCatalog(layout), {baseUrl: assetsUrl(`${DIR}/`)});
     const tiles = (names: string[]) => Promise.all(names.map((name) => store.getAsync(name, 'texture')));
     const [back, mid, play, [atlas, sprites]] = await Promise.all([

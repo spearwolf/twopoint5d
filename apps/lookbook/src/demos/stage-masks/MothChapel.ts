@@ -49,6 +49,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonList, jsonNumber, jsonObject, jsonOneOf, jsonRecord, jsonString, jsonTuple} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {atlasFrame, SeededRandom, smoothstepCpu} from './helpers';
 
@@ -114,6 +115,53 @@ interface RoomJson {
   heads: HeadJson[];
   lights: {x: number; y: number; z: number; power: number}[];
 }
+
+const checkPaneInfo = jsonObject<PaneInfo>({
+  id: jsonNumber,
+  ring: jsonOneOf('eye', 'petal', 'lancet'),
+  sector: jsonNumber,
+  part: jsonString,
+  kind: jsonString,
+  x0: jsonNumber,
+  y0: jsonNumber,
+  x1: jsonNumber,
+  y1: jsonNumber,
+  cx: jsonNumber,
+  cy: jsonNumber,
+  area: jsonNumber,
+});
+const checkRoseWindowJson = jsonObject<RoseWindowJson>({
+  texelsPerUnit: jsonNumber,
+  extent: jsonNumber,
+  stoneRadius: jsonNumber,
+  panes: jsonList(checkPaneInfo),
+});
+const checkPoint = jsonObject({x: jsonNumber, y: jsonNumber});
+const checkSizedPoint = jsonObject({x: jsonNumber, y: jsonNumber, size: jsonNumber});
+const checkHeadJson = jsonObject<HeadJson>({
+  name: jsonString,
+  x: jsonNumber,
+  y: jsonNumber,
+  r: jsonNumber,
+  face: jsonString,
+  yaw: jsonNumber,
+  pitch: jsonNumber,
+});
+const checkRoomJson = jsonObject<RoomJson>({
+  extent: jsonNumber,
+  board: jsonObject({
+    x: jsonNumber,
+    y: jsonNumber,
+    w: jsonNumber,
+    h: jsonNumber,
+    marks: jsonRecord(jsonTuple(jsonNumber, jsonNumber)),
+  }),
+  lens: checkPoint,
+  candles: jsonList(checkSizedPoint),
+  stands: jsonList(checkSizedPoint),
+  heads: jsonList(checkHeadJson),
+  lights: jsonList(jsonObject({x: jsonNumber, y: jsonNumber, z: jsonNumber, power: jsonNumber})),
+});
 
 /** How the face maps lie in the atlas: what `assets-src/stage-masks/frozen/` writes beside the frames of `sprites.json`. */
 interface FaceMap {
@@ -181,8 +229,8 @@ export async function loadChapelAssets(renderer: WebGPURenderer): Promise<Chapel
       store.getAsync('frame', 'texture'),
       store.getAsync('room', 'texture'),
       store.getAsync('sprites', ['atlas', 'texture']),
-      fetchJson<RoseWindowJson>('MothChapel', assetsUrl(`${DIR}/window.json`)),
-      fetchJson<RoomJson>('MothChapel', assetsUrl(`${DIR}/room.json`)),
+      fetchJson('MothChapel', assetsUrl(`${DIR}/window.json`), checkRoseWindowJson),
+      fetchJson('MothChapel', assetsUrl(`${DIR}/room.json`), checkRoomJson),
     ]);
     // the face maps lie beside the frames in the json of the atlas
     const resource = await store.whenResource('sprites');

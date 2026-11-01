@@ -10,6 +10,7 @@ import {
 import {clamp, exp, float, length, mx_noise_float, positionWorld, smoothstep, uniform, vec2, vec3, vec4} from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonNumber, jsonObject} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {additive, SeededRandom, smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
@@ -41,6 +42,16 @@ export interface CrematoriumLayout {
   vent: {x: number; y: number; hw: number; hh: number};
   lamp: {x: number; y: number};
 }
+
+const checkBox = jsonObject<Box>({left: jsonNumber, right: jsonNumber, bottom: jsonNumber, top: jsonNumber});
+const checkArch = jsonObject<Arch>({hw: jsonNumber, sill: jsonNumber, spring: jsonNumber, apex: jsonNumber});
+const checkCrematoriumLayout = jsonObject<CrematoriumLayout>({
+  world: checkBox,
+  outside: checkBox,
+  glass: checkArch,
+  vent: jsonObject({x: jsonNumber, y: jsonNumber, hw: jsonNumber, hh: jsonNumber}),
+  lamp: jsonObject({x: jsonNumber, y: jsonNumber}),
+});
 
 export type CrematoriumVariant = 'snow' | 'ash';
 
@@ -76,7 +87,7 @@ export async function loadCrematoriumAssets(renderer: WebGPURenderer): Promise<C
       store.getAsync('outsideAsh', 'texture'),
       store.getAsync('roomSnow', 'texture'),
       store.getAsync('roomAsh', 'texture'),
-      fetchJson<CrematoriumLayout>('CrematoriumWindow', assetsUrl(`${DIR}/layout.json`)),
+      fetchJson('CrematoriumWindow', assetsUrl(`${DIR}/layout.json`), checkCrematoriumLayout),
     ]);
     return {store, outside: {snow: outsideSnow, ash: outsideAsh}, room: {snow: roomSnow, ash: roomAsh}, layout};
   } catch (error) {

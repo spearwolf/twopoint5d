@@ -17,6 +17,7 @@ import {
 import {float, length, mix, smoothstep, uv, vec2, vec3, vec4} from 'three/tsl';
 import {Color, Mesh, MeshBasicMaterial, type Node, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonList, jsonNumber, jsonObject, jsonOneOf, jsonTuple} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
@@ -53,6 +54,20 @@ interface EyesJson {
   eyes: EyeSpec[];
   eyeParts: {sclera: [number, number, number, number]; iris: [number, number, number, number]; irisRadius: number};
 }
+
+const checkRect = jsonTuple(jsonNumber, jsonNumber, jsonNumber, jsonNumber);
+const checkEyeSpec = jsonObject<EyeSpec>({
+  x: jsonNumber,
+  y: jsonNumber,
+  rx: jsonNumber,
+  ry: jsonNumber,
+  kind: jsonOneOf('big', 'scroll', 'face'),
+});
+const checkEyesJson = jsonObject<EyesJson>({
+  tileSize: jsonNumber,
+  eyes: jsonList(checkEyeSpec),
+  eyeParts: jsonObject({sclera: checkRect, iris: checkRect, irisRadius: jsonNumber}),
+});
 
 export interface WallpaperAssets {
   /** holds the textures; dispose it with the demo */
@@ -93,7 +108,7 @@ export async function loadWallpaperAssets(renderer: WebGPURenderer): Promise<Wal
       store.getAsync('wainscotPlain', 'texture'),
       store.getAsync('wainscotHaunted', 'texture'),
       store.getAsync('eyeParts', 'texture'),
-      fetchJson<EyesJson>('WatchingWallpaper', assetsUrl(`${DIR}/eyes.json`)),
+      fetchJson('WatchingWallpaper', assetsUrl(`${DIR}/eyes.json`), checkEyesJson),
     ]);
     return {store, plain, haunted, wainscotPlain, wainscotHaunted, eyeParts, eyes};
   } catch (error) {

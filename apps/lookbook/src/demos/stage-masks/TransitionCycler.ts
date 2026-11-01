@@ -36,7 +36,7 @@ export interface TransitionCyclerOptions {
   /** the name of that readout, as `heat.progress` */
   progressName: string;
   /** called as a run begins, before `effect()` and `replace()` */
-  onBegin?: (from: IStage, to: IStage) => void;
+  onBegin?: (from: StageDirectorLayer, to: StageDirectorLayer) => void;
   /** called as the run on the screen ends, before the readouts are written */
   onEnd?: () => void;
   /** further shortcuts of the page by `KeyboardEvent.code`, beside Space, Enter and S */

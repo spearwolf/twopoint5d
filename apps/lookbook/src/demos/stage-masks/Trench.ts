@@ -25,10 +25,11 @@ import {
 } from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonList, jsonNumber, jsonObject} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
-import {makeSonarStage} from './Sonar';
 import {SeededRandom} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
+import {makeSonarStage} from './Sonar';
 
 const DIR = 'stage-masks/matte-threshold';
 /** the two scene images cover x in ±600, y in ±320 units, 2 texels per unit */
@@ -51,6 +52,18 @@ export interface TrenchLayout {
   eyes: {x: number; y: number; w: number; rot: number; light: number}[];
   parasites: {x: number; y: number; r: number}[];
 }
+
+const checkPoint = jsonObject<Point>({x: jsonNumber, y: jsonNumber});
+const checkTrenchLayout = jsonObject<TrenchLayout>({
+  VP: checkPoint,
+  SUB: checkPoint,
+  NOSE: checkPoint,
+  POOL: checkPoint,
+  eyeFrames: jsonNumber,
+  eyeCell: jsonObject({w: jsonNumber, h: jsonNumber}),
+  eyes: jsonList(jsonObject({x: jsonNumber, y: jsonNumber, w: jsonNumber, rot: jsonNumber, light: jsonNumber})),
+  parasites: jsonList(jsonObject({x: jsonNumber, y: jsonNumber, r: jsonNumber})),
+});
 
 export interface TrenchAssets {
   /** holds the textures; dispose it with the demo */
@@ -83,7 +96,7 @@ export async function loadTrenchAssets(renderer: WebGPURenderer): Promise<Trench
       store.getAsync('survey', 'texture'),
       store.getAsync('thing', 'texture'),
       store.getAsync('eyes', 'texture'),
-      fetchJson<TrenchLayout>('Trench', assetsUrl(`${DIR}/layout.json`)),
+      fetchJson('Trench', assetsUrl(`${DIR}/layout.json`), checkTrenchLayout),
     ]);
     return {store, survey, thing, eyes, layout};
   } catch (error) {

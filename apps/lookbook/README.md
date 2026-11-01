@@ -72,7 +72,9 @@ together.
    `public/assets/textures.json` through `loadTextureCatalog()`, or a catalog of its own like
    the scenes under `src/demos/stage-masks/` —, and a JSON or text file beside them through
    `fetchJson()`/`fetchText()` from `src/demos/utils/fetchAsset.ts`, which name the file and
-   the status when it fails; a loader that fails disposes the store it built.
+   the status when it fails. `fetchJson()` also holds the value to a check from
+   `src/demos/utils/checkJson.ts`, which says what the demo reads, and names the field that
+   does not fit; a loader that fails disposes the store it built.
 
    Whatever the page builds, it frees in `display.onDispose()`: the store, the geometries,
    materials and textures it made — `bakeDataTexture()` and `TextureFactory#load()` hand theirs

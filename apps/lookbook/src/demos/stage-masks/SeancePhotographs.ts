@@ -12,6 +12,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonList, jsonNumber, jsonObject} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 
 const DIR = 'stage-masks/resolution';
@@ -37,6 +38,14 @@ export interface SeanceLayout {
   /** the brass plaque under each frame: its middle `dy` below the photograph's, its size */
   plaque: {dy: number; w: number; h: number};
 }
+
+const checkSeanceLayout = jsonObject<SeanceLayout>({
+  texelsPerUnit: jsonNumber,
+  wall: jsonObject<Box>({left: jsonNumber, right: jsonNumber, bottom: jsonNumber, top: jsonNumber}),
+  photo: jsonObject({w: jsonNumber, h: jsonNumber, arch: jsonNumber}),
+  panels: jsonList(jsonObject({x: jsonNumber, y: jsonNumber})),
+  plaque: jsonObject({dy: jsonNumber, w: jsonNumber, h: jsonNumber}),
+});
 
 export interface SeanceAssets {
   /** holds the textures; dispose it with the demo */
@@ -69,7 +78,7 @@ export async function loadSeanceAssets(renderer: WebGPURenderer): Promise<Seance
       store.getAsync('wall', 'texture'),
       store.getAsync('living', 'texture'),
       store.getAsync('spirit', 'texture'),
-      fetchJson<SeanceLayout>('SeancePhotographs', assetsUrl(`${DIR}/layout.json`)),
+      fetchJson('SeancePhotographs', assetsUrl(`${DIR}/layout.json`), checkSeanceLayout),
     ]);
     return {store, wall, living, spirit, layout};
   } catch (error) {

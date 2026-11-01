@@ -52,9 +52,11 @@ auditConfig:
     # 2 or more, which nx never sets (the default is 1), and nx matches the patterns of this
     # workspace alone. Drop this entry once the nx in package.json depends on minimatch >=11.0.1.
     - GHSA-g3hv-75wg-m249
-    # deepmerge: no release fixes it. Its one caller, the nodeResolvePlugin of @web/dev-server,
-    # merges defaults of its own with the nodeResolve option of
-    # packages/twopoint5d-testing/web-test-runner.config.js, which is `true`: nothing from outside
-    # the repo reaches it. Drop this entry once deepmerge publishes a fix or @web/dev-server lets
-    # go of it.
+    # deepmerge: no release fixes it, and a patch cannot answer it: pnpm audit judges a
+    # package by its version, and a patched 4.3.1 is still 4.3.1. Its two callers merge
+    # nothing from outside the repo: the nodeResolvePlugin of @web/dev-server merges defaults
+    # of its own with the nodeResolve option of
+    # packages/twopoint5d-testing/web-test-runner.config.js, which is `true`, and
+    # @rollup/plugin-node-resolve copies its own defaults. Drop this entry once deepmerge
+    # publishes a fix or both let go of it.
     - GHSA-gcqx-w48m-w2h4

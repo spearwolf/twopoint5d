@@ -3,6 +3,7 @@ import {OnStageUpdateFrame, OrthographicProjection, Stage2D, TextureStore, type 
 import {exp, float, positionWorld, screenCoordinate, sin, smoothstep, texture, uniform, vec2, vec3, vec4} from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonList, jsonNumber, jsonObject, jsonTuple} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {hash21} from './helpers';
 
@@ -22,6 +23,13 @@ export interface MirrorLayout {
   figureEyes: [number, number][];
   units: {width: number; height: number; texelsPerUnit: number};
 }
+
+const checkMirrorLayout = jsonObject<MirrorLayout>({
+  glass: jsonObject({left: jsonNumber, bottom: jsonNumber, right: jsonNumber, top: jsonNumber}),
+  sconces: jsonList(jsonTuple(jsonNumber, jsonNumber)),
+  figureEyes: jsonList(jsonTuple(jsonNumber, jsonNumber)),
+  units: jsonObject({width: jsonNumber, height: jsonNumber, texelsPerUnit: jsonNumber}),
+});
 
 export interface MirrorAssets {
   /** holds the textures; dispose it with the demo */
@@ -51,7 +59,7 @@ export async function loadMirrorAssets(renderer: WebGPURenderer): Promise<Mirror
     const [bathroom, reflection, layout] = await Promise.all([
       store.getAsync('bathroom', 'texture'),
       store.getAsync('reflection', 'texture'),
-      fetchJson<MirrorLayout>('MirrorBathroom', assetsUrl(`${DIR}/layout.json`)),
+      fetchJson('MirrorBathroom', assetsUrl(`${DIR}/layout.json`), checkMirrorLayout),
     ]);
     return {store, bathroom, reflection, layout};
   } catch (error) {

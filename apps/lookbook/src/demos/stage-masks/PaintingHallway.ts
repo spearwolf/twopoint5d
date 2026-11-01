@@ -46,6 +46,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {jsonNumber, jsonObject, jsonRecord} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {atlasFrame, setMirroredFrame} from './helpers';
 
@@ -105,6 +106,16 @@ interface LayoutJson {
   sprites: Record<string, {w: number; h: number}>;
 }
 
+const checkSize = jsonObject({w: jsonNumber, h: jsonNumber});
+const checkLayoutJson = jsonObject<LayoutJson>({
+  door: jsonObject({
+    w: jsonNumber,
+    h: jsonNumber,
+    frames: jsonRecord(jsonObject({x: jsonNumber, y: jsonNumber, w: jsonNumber, h: jsonNumber})),
+  }),
+  sprites: jsonRecord(checkSize),
+});
+
 export interface PortalAssets {
   /** holds the textures; dispose it with the demo */
   store: TextureStore;
@@ -145,7 +156,7 @@ export async function loadPortalAssets(renderer: WebGPURenderer): Promise<Portal
       store.getAsync('doors', 'texture'),
       store.getAsync('frame', 'texture'),
       store.getAsync('sprites', ['atlas', 'texture']),
-      fetchJson<LayoutJson>('PaintingHallway', assetsUrl(`${DIR}/layout.json`)),
+      fetchJson('PaintingHallway', assetsUrl(`${DIR}/layout.json`), checkLayoutJson),
     ]);
     return {store, wall, floor, doors, frame, sprites, atlas, layout};
   } catch (error) {

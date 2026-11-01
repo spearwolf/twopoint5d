@@ -46,13 +46,15 @@ const RIPPLE_X = [37.1, 14.7] as const;
  * An effect of the demo's own that reads a living mask through `input.mask()`: hot air rising
  * between `from` and `to`. The coverage of the mask does two things at once:
  *
- * - **It bends both pictures.** The slope of the coverage — sampled 8 px away on the card of the
- *   lookbook (a fixed share of the picture's height, so at any pixel ratio) — is the gradient of the hot air's density, and the uv is pushed along it: refraction, strongest
- *   at the edges of the plumes, where the coverage changes fastest. The four points stay inside
- *   the picture — the coverage of a mask is 0 outside `[0, 1]`, and a point beyond the edge would
- *   read a rim the heat does not have —, so at the edge the slope is taken on the one side; whoever
- *   takes the slope of a coverage in an effect of their own needs the same. A ripple whose phase is the
- *   coverage itself adds the fine shimmer; it crawls as the plumes rise, with no clock of its own.
+ * - **It bends both pictures.** The slope of the coverage is the gradient of the hot air's
+ *   density, and the uv is pushed along it: refraction, strongest at the edges of the plumes,
+ *   where the coverage changes fastest. The slope is sampled 8 px away on the card of the
+ *   lookbook, a fixed share of the picture's height and so the same at any pixel ratio. The four
+ *   points stay inside the picture: the coverage of a mask is 0 outside `[0, 1]`, and a point
+ *   beyond the edge would read a rim the heat does not have. So at the edge the slope is taken on
+ *   the one side; whoever takes the slope of a coverage in an effect of their own needs the same.
+ *   A ripple whose phase is the coverage itself adds the fine shimmer; it crawls as the plumes
+ *   rise, with no clock of its own.
  * - **It is the share of `to`.** Where the heat is dense the new world shows through it.
  *
  * The ends hold whatever the mask draws: the bend is scaled by `sin(π·progress)` and is exactly 0

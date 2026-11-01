@@ -104,9 +104,14 @@ jobs:
         # uploads, so a high or critical advisory in it stops the deploy. pnpm audit reads
         # the whole lockfile and takes no --filter; the script keeps the advisories reached
         # from the two projects installed above. An audit without an answer stops the
-        # deploy as well: re-run the job once the registry answers
+        # deploy as well: re-run the job once the registry answers. pnpm audit gets 90
+        # seconds, inside the two minutes of the step, so what it printed reaches the log.
         run: |
-          pnpm audit --json > "$RUNNER_TEMP/pnpm-audit.json" 2> "$RUNNER_TEMP/pnpm-audit.err" || true
+          status=0
+          timeout -k 10 90 pnpm audit --json > "$RUNNER_TEMP/pnpm-audit.json" 2> "$RUNNER_TEMP/pnpm-audit.err" || status=$?
+          if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+            echo "pnpm audit gave no answer within 90 seconds" >> "$RUNNER_TEMP/pnpm-audit.err"
+          fi
           if ! node scripts/ci/auditInstalledDependencies.mjs --report "$RUNNER_TEMP/pnpm-audit.json" --importer . --importer packages/twopoint5d; then
             cat "$RUNNER_TEMP/pnpm-audit.err"
             exit 1

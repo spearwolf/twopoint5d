@@ -118,9 +118,10 @@ group, the command included, so the lock hands it on to nobody — Nx and pnpm t
 SIGINT for "stop at once". It hands on SIGTERM and SIGHUP; a run is stopped by its pid with
 SIGTERM, while a SIGINT to the pid of the lock alone stops nothing.
 
-- `lint` = `biome ci .`: Biome checks the formatting of every `.ts`, `.js`, `.mjs`,
-  `.astro`, `.json`, `.jsonc` and `.css` file outside the ignores in `biome.jsonc`,
-  lints all of them but the stylesheets, and writes nothing; `pnpm format` writes.
+- `lint` = `biome ci --error-on-warnings .`: Biome checks the formatting of every `.ts`,
+  `.js`, `.mjs`, `.astro`, `.json`, `.jsonc` and `.css` file outside the ignores in
+  `biome.jsonc`, lints all of them but the stylesheets, and writes nothing, and a warning
+  fails it as an error does; `pnpm format` writes.
   Markdown, YAML and the SVG assets are neither formatted nor linted. `noConsole` is an
   error everywhere except in the `.mjs` scripts and the browser tests. The `.ts` rules
   (`useImportType`, the ban on a `.ts` suffix in a relative import through
@@ -231,9 +232,10 @@ It reports high and critical advisories without failing the run: the published p
 declares peer dependencies only (`lintPkg` holds that), so whatever the audit finds sits
 in tooling, and Dependabot proposes the update that fixes it (§5). A hit, or an audit that
 gets no answer from the registry, puts a warning on the summary page of the run and the
-report into the job summary; an audit that times out leaves the job green. Dependabot also
-keeps the commit SHAs of the actions, and the version comment next to each, current. The
-build job of the deploy holds what it installs to the same level and stops on a hit (§4).
+report into the job summary; `pnpm audit` gets 90 seconds, so an audit that runs out of
+them puts up the same warning, and it leaves the job green. Dependabot also keeps the
+commit SHAs of the actions, and the version comment next to each, current. The build job
+of the deploy holds what it installs to the same level and stops on a hit (§4).
 
 The benchmarks run in a workflow of their own, `.github/workflows/bench.yml`: nightly on
 `main` and by hand (`workflow_dispatch`) on any branch. It installs the workspace root and
@@ -436,8 +438,9 @@ it — a version bump whose deploy waits behind another would never be published
   @spearwolf/twopoint5d`, so the lookbook, the browser tests and their dependencies stay
   out; it audits what it installed and stops on a high or critical advisory reached from
   the workspace root or the library (`scripts/ci/auditInstalledDependencies.mjs`), and on
-  an audit without an answer; it builds the library, runs `checkPkgTypes`, `lintPkg` and
-  `checkNameableTypes` and hands `dist/` on as the artifact `package`.
+  an audit without an answer within 90 seconds, whose output then stands in the log; it
+  builds the library, runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` and hands
+  `dist/` on as the artifact `package`.
 - `publish` is the only job with `id-token: write`. It installs nothing: it checks out
   the commit, takes `dist/` from the artifact and runs `node
   ../../scripts/publishNpmPkg.mjs dist` in `packages/twopoint5d`, so with the publish
@@ -497,7 +500,8 @@ goes into `auditConfig.ignoreGhsas` in the same file, with a comment that says w
 cannot reach the workspace and when the entry can go; `pnpm audit` leaves it out, and so
 do the audit step of CI (§3) and the audit filter of the deploy (§4); both act on a `high`
 or `critical` advisory alone, so an entry of lower severity quiets a plain `pnpm audit`
-and changes nothing there.
+and changes nothing there. A `pnpm patch` answers none of them: `pnpm audit` judges a
+package by its version, and a patched release keeps it.
 
 The catalog ranges of `three` and `@types/three` land verbatim as peer ranges in the
 published manifest. They stay a tilde on exactly one minor: a 0.x minor of `three` breaks,
