@@ -1,16 +1,8 @@
 import {mix} from 'three/tsl';
-import {
-  ACESFilmicToneMapping,
-  Color,
-  FloatType,
-  type Node,
-  PerspectiveCamera,
-  RenderPipeline,
-  SRGBColorSpace,
-  Scene,
-} from 'three/webgpu';
+import {type Node, PerspectiveCamera, RenderPipeline, Scene} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
+import {createPlainRenderer, plainStage} from '../testing/stageFixtures.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 import {Stage2D} from './Stage2D.js';
@@ -23,40 +15,9 @@ import {matte, type StageTransitionEffect} from './transitionEffects.js';
 const BYTES_PER_CALL_LIMIT = 1;
 const CALLS = 1000;
 
-const stage = (name: string): IStage & IRenderable => ({name, resize() {}, updateFrame() {}, renderTo() {}});
-
-/** The parts of a WebGPURenderer the director touches, as plain functions: a mock records its calls. */
-function plainRenderer() {
-  let target: unknown = null;
-  const clearColor = new Color(0x111111);
-  return {
-    autoClear: true,
-    autoClearColor: true,
-    autoClearDepth: true,
-    autoClearStencil: true,
-    samples: 0,
-    toneMapping: ACESFilmicToneMapping,
-    outputColorSpace: SRGBColorSpace,
-    xr: {enabled: false},
-    initialized: true,
-    setClearColor() {},
-    getClearColor: (out: Color) => out.copy(clearColor),
-    setClearAlpha() {},
-    getClearAlpha: () => 1,
-    clear() {},
-    render() {},
-    setRenderTarget(rt: unknown) {
-      target = rt;
-    },
-    getRenderTarget: () => target,
-    getPixelRatio: () => 1,
-    getOutputBufferType: () => FloatType,
-  };
-}
-
 /** Measures `updateFrame()` and `renderTo()` of `director` per call, the pipeline kept off the GPU. */
 async function bytesPerFrame(director: StageDirector): Promise<number> {
-  const renderer = plainRenderer();
+  const renderer = createPlainRenderer();
   const render = RenderPipeline.prototype.render;
   RenderPipeline.prototype.render = function () {};
   try {
@@ -79,9 +40,9 @@ describe('StageDirector on the hot path', () => {
   test('updateFrame() with a running transition allocates nothing per call', async () => {
     const director = new StageDirector();
     director.resize(64, 64);
-    const from = stage('from');
-    const to = stage('to');
-    director.setStack([stage('below'), from]);
+    const from = plainStage('from');
+    const to = plainStage('to');
+    director.setStack([plainStage('below'), from]);
     // long enough that no round reaches its end
     director.replace(from, to, {duration: 1e9, easing: 'ease-in-out'});
     // the first frame starts the transition and builds the order of the layers
@@ -99,9 +60,9 @@ describe('StageDirector on the hot path', () => {
   test('updateFrame() and renderTo() with a masked slot allocate nothing per call', async () => {
     const director = new StageDirector();
     director.resize(64, 64);
-    const level = stage('level');
-    director.setStack([stage('below'), level]);
-    director.setMask(level, new StageMask(stage('fog')));
+    const level = plainStage('level');
+    director.setStack([plainStage('below'), level]);
+    director.setMask(level, new StageMask(plainStage('fog')));
 
     const bytesPerCall = await bytesPerFrame(director);
 
@@ -112,16 +73,16 @@ describe('StageDirector on the hot path', () => {
   test('a running transition whose effect names a mask allocates nothing', async () => {
     const director = new StageDirector();
     director.resize(64, 64);
-    const from = stage('from');
-    const ink = new StageMask(stage('ink'), {source: 'luminance'});
+    const from = plainStage('from');
+    const ink = new StageMask(plainStage('ink'), {source: 'luminance'});
     const inkIn: StageTransitionEffect = {
       name: 'inkIn',
       masks: [ink],
       build: ({from, to, uv, mask}) => mix(from.sample(uv), to.sample(uv), mask(ink).coverage(uv)) as Node<'vec4'>,
     };
-    director.setStack([stage('below'), from]);
+    director.setStack([plainStage('below'), from]);
     // long enough that no round reaches its end
-    const t = director.replace(from, stage('to'), {effect: inkIn, manual: true});
+    const t = director.replace(from, plainStage('to'), {effect: inkIn, manual: true});
     t.progress = 0.25;
 
     const bytesPerCall = await bytesPerFrame(director);
@@ -134,11 +95,11 @@ describe('StageDirector on the hot path', () => {
   test('a running matte allocates nothing', async () => {
     const director = new StageDirector();
     director.resize(64, 64);
-    const from = stage('from');
+    const from = plainStage('from');
     // a mask stage that reads the progress of its mask in every frame, as a living matte does
     let reads = 0;
     const inkStage: IStage & IRenderable = {
-      ...stage('ink'),
+      ...plainStage('ink'),
       updateFrame() {
         if (ink.progress > 0) reads++;
       },
@@ -150,9 +111,9 @@ describe('StageDirector on the hot path', () => {
       build: ({from, to, uv, mask}) =>
         mix(from.sample(uv), to.sample(uv), mask(ink).coverage(uv).mul(ink.progressNode)) as Node<'vec4'>,
     };
-    director.setStack([stage('below'), from]);
+    director.setStack([plainStage('below'), from]);
     // a fixed progress: a uniform written with a changing double boxes it, 16 B per write
-    const t = director.replace(from, stage('to'), {effect: inkIn, manual: true});
+    const t = director.replace(from, plainStage('to'), {effect: inkIn, manual: true});
     t.progress = 0.25;
 
     const bytesPerCall = await bytesPerFrame(director);
@@ -173,14 +134,14 @@ describe('StageDirector on the hot path', () => {
     const world = new Stage2D();
     world.name = 'world';
     world.camera = new PerspectiveCamera();
-    const from = stage('from');
-    const level = stage('level');
+    const from = plainStage('from');
+    const level = plainStage('level');
     director.setStack([from, level]);
     // the mask reads the camera of the world at every draw
     director.setMask(level, StageMask.inWorldOf(world, new Scene()));
     const flashlight = StageMask.inWorldOf(world, new Scene(), {source: 'luminance'});
     // a fixed progress: a uniform written with a changing double boxes it, 16 B per write
-    const t = director.replace(from, stage('next'), {effect: matte({mask: flashlight}), manual: true});
+    const t = director.replace(from, plainStage('next'), {effect: matte({mask: flashlight}), manual: true});
     t.progress = 0.25;
 
     const bytesPerCall = await bytesPerFrame(director);

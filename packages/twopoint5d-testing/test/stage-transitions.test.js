@@ -94,6 +94,29 @@ describe('StageDirector — transitions on the GPU', () => {
     expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [0, 255, 0]), 'the end').to.be.true;
   });
 
+  it('a director drawn by a second renderer draws its stack there', async () => {
+    const secondHost = makeContainer({width: SIZE, height: SIZE});
+    const second = new Display(secondHost);
+    try {
+      await second.start();
+      const red = layer('red', '#f00');
+      const green = layer('green', '#0f0');
+      director.setStack([red.stage]);
+      const t = director.replace(red.stage, green.stage, {effect: crossfade(), manual: true});
+      t.progress = 0.5;
+      const half = srgb(0.5);
+      expect(isNearColor(rgbAt(await draw(), SIZE, 32, 32), [half, half, 0], 3), 'the first renderer').to.be.true;
+
+      director.updateFrame(0, 0, 0);
+      director.renderTo(second.renderer);
+      const pixels = await second.renderer.readRenderTargetPixelsAsync(target, 0, 0, SIZE, SIZE);
+      expect(isNearColor(rgbAt(pixels, SIZE, 32, 32), [half, half, 0], 3), 'the second renderer').to.be.true;
+    } finally {
+      disposeDisplay(second);
+      secondHost.remove();
+    }
+  });
+
   it('wipe() "left" starts at the right side, "up" at the bottom', async () => {
     const topDown = await readsTopDown(display.renderer, target);
     const red = layer('red', '#f00');

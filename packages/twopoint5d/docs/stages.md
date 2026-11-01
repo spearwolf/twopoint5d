@@ -739,15 +739,19 @@ of the world alone, a palette effect —, and the director composes its output l
 ### A pause menu over the frozen game
 
 ```ts
+// made once, reused by every pause: one effect object, one shape, one shader
+const menuFade = fade();
+const toBlack = dipToColor({color: new Color('#000')});
+
 // the level keeps its last picture under the menu: neither updated nor drawn
-director.push(pauseMenu, {effect: fade(), duration: 0.2, below: 'freeze'});
+director.push(pauseMenu, {effect: menuFade, duration: 0.2, below: 'freeze'});
 
 // back to the game, which runs on from the frame it stopped at
-director.pop({effect: fade(), duration: 0.2});
+director.pop({effect: menuFade, duration: 0.2});
 
 // or back to the title, through black
 director.hide(pauseMenu);
-director.replace(level, title, {effect: dipToColor({color: new Color('#000')}), duration: 1});
+director.replace(level, title, {effect: toBlack, duration: 1});
 ```
 
 ### A loading screen that follows the loader
@@ -787,7 +791,10 @@ await director.precompile(
 A shape lists the slots of the stack bottom to top: `'layer'` for a slot that shows a layer, the
 effect for a slot in a transition — the same effect object the transition will take, since the
 director tells shapes apart by their effect objects —, and `{effect?, mask}` for a slot with a
-[mask](#no-hitch-precompile-with-masks). A shape drawn or compiled before is skipped.
+[mask](#no-hitch-precompile-with-masks). A shape the director holds is skipped, and what
+`precompile()` compiles stays until the director is disposed, or until it draws or precompiles
+with another renderer. A transition without an `effect` cannot be named ahead: give it an effect of
+its own to compile it ahead.
 
 The shapes cover the composition of the director. A layer builds its own materials and pipelines
 on its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
@@ -871,7 +878,9 @@ the director, when it comes back; a layer that leaves releases the GPU memory of
 
 Every layer in a slot updates and draws every frame, unless it is **frozen**: then it is neither
 updated nor drawn, and the composition samples the last picture it drew. Freezing costs nothing —
-no draw, no copy. A frozen layer whose size changes draws once at the new size, without an update.
+no draw, no copy. A frozen layer whose size changes draws once at the new size, without an update,
+and so does every frozen layer when the director draws with a renderer other than the one it drew
+or precompiled with last.
 
 | where | option | `'run'` | `'freeze'` |
 | --- | --- | --- | --- |
@@ -903,7 +912,7 @@ The options of every change:
 
 | option | default | |
 | --- | --- | --- |
-| `effect` | `crossfade()` | |
+| `effect` | one shared `crossfade()` | |
 | `duration` | `0.5` with an `effect`, `0` without | seconds |
 | `easing` | `'ease-in-out'` | `'linear'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'` — cubic — or a function of your own |
 | `delay` | `0` | seconds before it starts |
@@ -923,6 +932,15 @@ after its delay; `OnStageTransitionEnd` in the frame or the call that ends it. B
 `{director, transition}`; a change without a transition emits both at once. A listener that throws
 keeps neither the other listeners, the layers nor the change of the stack from happening; its
 error comes out of the call afterwards.
+
+A listener may change the stack — chain the next transition from the end of the last one, say. The
+call that ended the transition goes on with the stack as the listener left it. `show()`, `hide()`
+and `replace()` refuse with an error, and give back what they held, when the listener took their
+stage out of its slot or put it into the stack. While `setStack()` or `dispose()` end the running
+transitions, a change a listener asks for answers a cancelled `StageTransition` and changes
+nothing; `remove()` still takes a stage out. A call whose listener disposes the director — one of
+an end, or one of `OnStageAdded` or `OnAddToParent` as a stage joins — changes nothing more: it
+answers a cancelled `StageTransition`, and `setStack()` and `setMask()` answer the director.
 
 ### Effects
 
@@ -944,7 +962,12 @@ opacity fade, `wipe()` from nothing a reveal. An effect is a description — its
 when you make it —, so one effect serves every director and every transition at once. Make it once
 and reuse it: the director keeps one graph per shape of its stack, and a second transition with
 the same effect object in the same slot swaps textures instead of building a shader. A new effect
-object, even with the same options, builds a shader on its first use.
+object, even with the same options, builds a shader on its first use. A transition without an
+`effect` takes the one `crossfade()` the director shares among all of them.
+
+The director keeps the shapes `precompile()` compiled and the 16 it drew last; an older one builds
+again on its next visit. Drawn or precompiled with another renderer, it builds all of them again
+for that one.
 
 ### An effect of your own
 
@@ -969,9 +992,11 @@ export const wobble = (amplitude = 0.03): StageTransitionEffect => ({
 black outside `[0, 1]` —, the eased progress as a float node, the uv of the pixel with its origin
 at the top left of the picture, the size of the picture in pixels of the drawing buffer, and
 `mask()`, which reads a mask the effect names — see [an effect that reads a
-mask](#an-effect-that-reads-a-mask). An effect
-whose nodes own GPU memory releases it in an optional `dispose(node)`, which the director calls
-in its own `dispose()`.
+mask](#an-effect-that-reads-a-mask). An effect whose nodes own GPU memory releases it in an
+optional `dispose(node)`, which the director calls whenever it lets go of a shape: in its own
+`dispose()`, when the shape falls out of the ones it keeps, and when it draws or precompiles with
+another renderer. A `dispose()` that throws holds up none of the others; its error comes out of the
+call afterwards.
 
 ### Without a director
 
@@ -995,7 +1020,10 @@ no draw of its own: it is a part of the one quad of the director's pipeline.
 
 A shape the stack has not had before builds a shader on its first frame; every later visit to it
 swaps textures and builds nothing. [`precompile()`](#no-hitch-on-the-first-transition) moves that
-build to the start.
+build to the start. The director keeps the shapes `precompile()` compiled and the 16 it drew last;
+an older one builds again on its next visit, and a draw or a `precompile()` with another renderer
+builds them all again. A transition without an `effect` takes the shared crossfade, so that all of
+them share one shape.
 
 ## Stage masks
 
@@ -2011,8 +2039,10 @@ pipeline.dispose();
   with `setMask(stage, undefined)`, then set the new one.
 - **Masks after `setStack()`.** It makes new slots and drops every mask: set them again.
 - **A new effect object per transition.** Each one builds a shader on its first use, and a shape
-  compiled with one effect object does not match a transition with another. Make the effects once
-  and reuse them — in `precompile()` and in the transitions.
+  compiled with one effect object does not match a transition with another. Beside the shapes
+  `precompile()` compiled, the director keeps only the 16 it drew last, so a new object per
+  transition builds a shader every time. Make the effects once and reuse them — in `precompile()`
+  and in the transitions.
 
 ## Cheat sheet
 
@@ -2075,5 +2105,5 @@ pipeline.dispose();
 | `createBloomOutputNodeBuilder()` | `strength: 1`, `radius: 0`, `threshold: 0` |
 | `StageMask` | `source: 'alpha'`, `invert: false`, `scale: 1` |
 | `matte()` | `mode: 'coverage'`, `softness: 0.05` (`'threshold'` only) |
-| a transition of `StageDirector` | `crossfade()`, `0.5` s with an effect and `0` without, `'ease-in-out'`, no delay |
+| a transition of `StageDirector` | one shared `crossfade()`, `0.5` s with an effect and `0` without, `'ease-in-out'`, no delay |
 | `outgoing`, `incoming`, `below` | `'run'` |

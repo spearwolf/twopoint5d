@@ -1,78 +1,15 @@
-import {emit, eventize, on} from '@spearwolf/eventize';
+import {emit, eventize, on, once} from '@spearwolf/eventize';
 import {mix} from 'three/tsl';
-import {
-  ACESFilmicToneMapping,
-  Color,
-  FloatType,
-  type Node,
-  PerspectiveCamera,
-  RenderPipeline,
-  type RenderTarget,
-  Scene,
-  SRGBColorSpace,
-  type TextureNode,
-} from 'three/webgpu';
-import {beforeEach, describe, expect, it, type Mock, vi} from 'vitest';
+import {type Node, PerspectiveCamera, RenderPipeline, type RenderTarget, Scene, type TextureNode} from 'three/webgpu';
+import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {OnStageAdded, OnStageDispose, OnStageRemoved, OnStageTransitionEnd} from '../events.js';
-import type {IRenderable} from './IRenderable.js';
+import {createRendererMock, type FakeStage, fakeStage, names} from '../testing/stageFixtures.js';
 import type {IStage} from './IStage.js';
 import {Stage2D} from './Stage2D.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
 import {crossfade, matte, type StageTransitionEffect, type StageTransitionInput} from './transitionEffects.js';
-
-// the parts of a WebGPURenderer the director and its pipelines touch, as StageDirector.spec.ts mocks them
-function createRendererMock() {
-  const m = {
-    autoClear: true,
-    autoClearColor: true,
-    autoClearDepth: true,
-    autoClearStencil: true,
-    __clearColor: new Color(0x111111),
-    __clearAlpha: 1,
-    __renderTarget: null as unknown,
-    setClearColor: vi.fn(),
-    getClearColor: vi.fn(),
-    setClearAlpha: vi.fn(),
-    getClearAlpha: vi.fn(),
-    clear: vi.fn(),
-    render: vi.fn(),
-    setRenderTarget: vi.fn(),
-    getRenderTarget: vi.fn(),
-    getPixelRatio: vi.fn(() => 1),
-    samples: 0,
-    getOutputBufferType: vi.fn(() => FloatType),
-    toneMapping: ACESFilmicToneMapping,
-    outputColorSpace: SRGBColorSpace,
-    xr: {enabled: false},
-    initialized: true,
-    init: vi.fn(async () => {}),
-    compileAsync: vi.fn(async (_scene: unknown, _camera: unknown) => {}),
-  };
-  m.setRenderTarget.mockImplementation((rt) => {
-    m.__renderTarget = rt;
-  });
-  m.getRenderTarget.mockImplementation(() => m.__renderTarget);
-  m.setClearColor.mockImplementation((c: Color, a?: number) => {
-    m.__clearColor.copy(c);
-    if (typeof a === 'number') m.__clearAlpha = a;
-  });
-  m.getClearColor.mockImplementation((out: Color) => out.copy(m.__clearColor));
-  m.setClearAlpha.mockImplementation((a: number) => {
-    m.__clearAlpha = a;
-  });
-  m.getClearAlpha.mockImplementation(() => m.__clearAlpha);
-  return m;
-}
-
-type FakeStage = IStage & IRenderable & {renderTo: Mock; resize: Mock; updateFrame: Mock};
-
-function fakeStage(name: string): FakeStage {
-  return {name, resize: vi.fn(), updateFrame: vi.fn(), renderTo: vi.fn()};
-}
-
-const names = (stages: ReadonlyArray<IStage>) => stages.map((s) => s.name);
 
 /** The texture nodes a graph samples, each counted once: the base of every sample() of it. */
 function textureNodesOf(node: Node): Set<TextureNode> {
@@ -916,6 +853,19 @@ describe('StageDirector masks', () => {
       expect(ordered()).not.toContain('ink');
       // the mask stage is no mask of the director any more
       expect(() => director.show(inkStage)).not.toThrow();
+    });
+
+    it('hide() refused by a listener that took its slot out gives the masks of its effect back', () => {
+      director.setStack([stars]);
+      director.replace(stars, level, {duration: 1});
+      frame();
+      once(director, OnStageTransitionEnd, () => director.remove(level));
+      expect(() => director.hide(level, {effect: inkIn, duration: 0.2})).toThrow(
+        'StageDirector#hide() cannot hide the stage "level": a listener of OnStageTransitionEnd changed its slot',
+      );
+      expect(ordered()).not.toContain('ink');
+      // the mask drives nothing
+      expect(() => director.show(nextLevel, {effect: inkIn, duration: 1})).not.toThrow();
     });
 
     it('replace() in the slot of a running matte reuses its mask', () => {

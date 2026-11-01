@@ -22,7 +22,6 @@ built:
   nothing (§5.2);
 - `push()` finishes a transition that still has the pushed stage first, and with `below: 'freeze'`
   a transition that runs in the slot below; the slot below is the one that stays (§4.3);
-- an effect's `dispose(node)` runs in the director's `dispose()`, where its graphs go (§6.1, §8);
 - `precompile()` takes the renderer along with the shapes, and a shape is a list of `'layer'` and
   effect objects (§7.1);
 - every texture node of a shape samples a placeholder of its own while it has no pass, not one
@@ -31,7 +30,13 @@ built:
   director inside a renderer that composes for its pass target there (§7.1);
 - a fourth seam in `StageRenderer`: the draw of a renderer is the protected
   `renderToCurrentTarget()`, which a parent that composes calls as well, and the director prepares
-  its shape there instead of in `renderTo()` (§9).
+  its shape there instead of in `renderTo()` (§9);
+- a transition without an `effect` takes one `crossfade()` the director shares among all of them,
+  so that they share their shapes (§5.1);
+- the director keeps the shapes `precompile()` compiled and the 16 it drew last, and builds them
+  again when it draws or precompiles with another renderer; an effect's `dispose(node)` runs
+  whenever the director lets go of a shape — in its `dispose()`, as the shape falls out of the ones
+  it keeps, and as the director draws or precompiles with another renderer (§6.1, §7.1, §8).
 
 A game is rarely one stage. It opens on a title menu, cuts to a loading screen, plays a level,
 lays a pause menu over the frozen level and goes back to the title. Today a `StageRenderer` can
@@ -245,7 +250,7 @@ wrapper of §4.2 is disposed when its stage leaves the stack and is built again 
 
 ```ts
 interface StageTransitionOptions {
-  effect?: StageTransitionEffect; // default: crossfade()
+  effect?: StageTransitionEffect; // default: one crossfade() the director shares
   duration?: number;              // seconds, default 0.5; 0 is an instant change
   easing?: StageTransitionEasing; // 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | (t: number) => number; default 'ease-in-out'
   delay?: number;                 // seconds before the transition starts, default 0
@@ -330,6 +335,17 @@ Both go out on the director through `emitStrict`; a listener that throws keeps n
 listeners nor the change of the stack from happening, and its error reaches the caller of
 `updateFrame()` afterwards, as for every event of the stage layer.
 
+A listener may change the stack — chain the next transition from the end of the last one, say. The
+call that ended the transition goes on with the stack as the listener left it. `show()`, `hide()`
+and `replace()` refuse with an error, and give back what they held, when the listener took their
+stage out of its slot or put it into the stack. While `setStack()` or `dispose()` end the running
+transitions, a change a listener asks for answers a cancelled `StageTransition` and changes
+nothing; `remove()` still takes a stage out. A call whose listener disposes the director — one of
+an end, or one of `OnStageAdded` or `OnAddToParent` as a stage joins — changes nothing more: it
+answers a cancelled `StageTransition`, and `setStack()` and `setMask()` answer the director. A stage
+that joins while a listener disposes the director becomes no layer of it: the dispose has taken its
+renderer out of the base already, and the director lets go of a wrapper it built for the stage.
+
 ## 6. Effects
 
 ### 6.1 The contract
@@ -365,8 +381,9 @@ An effect is a description: its options are read when it is built, and `build()`
 nodes on every call. One effect object can therefore serve every director, every slot and every
 transition at once — unlike an `OutputNodeBuilder`, which belongs to one renderer. An effect
 whose nodes own GPU memory releases it through an optional `dispose(node)` that the director calls
-for every node it built, in its own `dispose()`, where the graphs of its shapes go; the built-in
-effects own none.
+for every node it built whenever it lets go of a shape: in its own `dispose()`, when the shape falls
+out of the ones it keeps (§7.1), and when it draws or precompiles with another renderer. The
+built-in effects own none.
 
 The uv is the one the pipeline quad samples its textures at: under WebGPU and under WebGL 2 alike
 its origin is the top left of the picture, which the browser test of §10.2 holds with a `wipe()`
@@ -453,6 +470,12 @@ director therefore keeps the structure of its graph apart from what fills it:
   `crossfade()` between any two layers in the same slot — swaps textures. A change that makes a new
   shape builds its graph and its pipeline once; every later visit to that shape switches to its
   pipeline, whose material is built already, and runs no `NodeBuilder`.
+- The director keeps the shapes `precompile()` compiled and the 16 it drew last, in the order of
+  their use: a seventeenth lets go of the one unused longest, which builds again on its next visit.
+  A transition without an `effect` takes one `crossfade()` the director shares, so that all of them
+  are one shape. Shapes and placeholders belong to the renderer they are built for; drawn or
+  precompiled with another one, the director lets go of all of them and builds them again for it,
+  and a frozen layer draws once for it.
 
 A first visit to a shape builds a shader, unless the game names the shape ahead:
 
@@ -472,8 +495,11 @@ a `renderer.compileAsync()` of its quad: the pipeline sets the renderer up as fo
 output, no XR — and its quad puts on the vertex node it draws with, so the node build sees what
 a frame would see and the first frame of the shape finds its material built. The target is the
 director's `outputRenderTarget`, or else the renderer's current one, the canvas outside of a frame.
-The shapes compile one after the other and the frames between them go on; a shape drawn or
-compiled before is skipped, and a disposed director resolves at once.
+The shapes compile one after the other and the frames between them go on; a shape the director
+holds is skipped, what `precompile()` compiles stays until `dispose()`, or until the director draws
+or precompiles with another renderer, and a disposed director resolves at once. A transition
+without an `effect` cannot be named ahead; a game that wants it compiled gives it an effect of its
+own.
 
 The shapes cover the composition of the director. The materials and pipelines of a layer build on
 its first draw, and a bloom of a layer builds its passes only in a draw — a compile never reaches
@@ -509,10 +535,10 @@ Following [the resource lifecycle rules](../resource-lifecycle.md):
 
 | what | whose | disposed by |
 | --- | --- | --- |
-| the `RootRenderPipeline` of every shape | the director | `StageDirector#dispose()` |
+| the `RootRenderPipeline` of every shape | the director | `StageDirector#dispose()`, or the director as the shape falls out of the ones it keeps or as it draws or precompiles with another renderer |
 | the wrapper `StageRenderer` of a `Stage2D` | the director | the director, when its stage leaves the stack and in `dispose()` |
 | a stage handed in | the caller | the caller; the director only lets go |
-| the empty target, the graphs, their uniforms and texture nodes | the director | `dispose()`, which calls `dispose(node)` of every effect that has one for the node it built |
+| the empty target, the graphs, their uniforms and texture nodes | the director | `dispose()`, which calls `dispose(node)` of every effect that has one for the node it built; a graph also goes with its shape as above |
 | an effect object and a mask texture | the caller | the caller |
 
 `dispose()` cancels every running transition — their `finished` resolve as `cancelled`, their
