@@ -32,7 +32,29 @@ onlyBuiltDependencies:
   - sharp
 
 overrides:
-  # nx 23.3.x pins undici 7.29.0, inside the range of ten advisories that 7.29.1 fixes,
+  # nx 23.3 to 24.0.2 pin undici 7.29.0, inside the range of ten advisories that 7.29.1 fixes,
   # GHSA-rfgv-xxqx-mfg5 and GHSA-w293-vg96-wgc3 among them. Drop this entry once the nx in
-  # package.json depends on undici >=7.29.1 itself.
+  # package.json depends on undici >=7.29.1 itself (24.0.3 does).
   'nx>undici': ^7.29.1
+  # rimraf 6.1.3 asks for glob ^13.0.3, inside the range of GHSA-3g3m-2fjr-6pw4, which glob
+  # 14.0.2 fixes; glob 14 brings minimatch 11, outside the range of GHSA-g3hv-75wg-m249. rimraf
+  # calls glob() and globSync() alone, which glob 14 keeps as they were. Drop this entry once the
+  # rimraf in the catalog depends on glob >=14.0.2 itself.
+  'rimraf>glob': ^14.0.2
+
+# Advisories that no update and no override can answer. pnpm audit leaves them out, and with it
+# the audit step of CI and the audit filter of the deploy (docs/architecture.md §5). Each entry
+# says why it cannot reach this workspace and when it can go.
+auditConfig:
+  ignoreGhsas:
+    # minimatch: nx 24.0.0 to 24.0.3 pin minimatch 10.2.5 and call minimatch.makeRe(), which
+    # minimatch 11 removes, so an override breaks nx. The advisory needs an optimizationLevel of
+    # 2 or more, which nx never sets (the default is 1), and nx matches the patterns of this
+    # workspace alone. Drop this entry once the nx in package.json depends on minimatch >=11.0.1.
+    - GHSA-g3hv-75wg-m249
+    # deepmerge: no release fixes it. Its one caller, the nodeResolvePlugin of @web/dev-server,
+    # merges defaults of its own with the nodeResolve option of
+    # packages/twopoint5d-testing/web-test-runner.config.js, which is `true`: nothing from outside
+    # the repo reaches it. Drop this entry once deepmerge publishes a fix or @web/dev-server lets
+    # go of it.
+    - GHSA-gcqx-w48m-w2h4

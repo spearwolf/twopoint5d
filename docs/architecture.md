@@ -488,7 +488,11 @@ in the published manifest. So each of them, and every major update but those of
 itself, to be reviewed on its own. `playwright` stays out of the group as well: each of
 its updates brings the Chromium, Firefox and WebKit the browser suite runs on, so it comes
 as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
-comment that names the advisory it answers and says when the entry can go.
+comment that names the advisory it answers and says when the entry can go. An advisory that
+no update and no override can answer — no release fixes it, or the package that depends on it
+cannot take the release that does — goes into `auditConfig.ignoreGhsas` in the same file, with
+a comment that says why it cannot reach the workspace and when the entry can go; `pnpm audit`
+leaves it out, and with it the audit step of CI (§3) and the audit filter of the deploy (§4).
 
 The catalog ranges of `three` and `@types/three` land verbatim as peer ranges in the
 published manifest. They stay a tilde on exactly one minor: a 0.x minor of `three` breaks,

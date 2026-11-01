@@ -10,7 +10,16 @@ import {
   StageRenderTargetPool,
 } from '@spearwolf/twopoint5d';
 import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, RenderPipeline, RenderTarget, Scene} from 'three/webgpu';
-import {countNodeBuilds, makeContainer, disposeDisplay, disposeKept, isNearColor, keep, rgbAt} from './helpers/fixtures.js';
+import {
+  countNodeBuilds,
+  makeContainer,
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  release,
+  rgbAt,
+} from './helpers/fixtures.js';
 
 /** @import {PassNode} from 'three/webgpu' */
 
@@ -33,11 +42,16 @@ describe('StageRenderer — pipeline integration', () => {
   it('whole-picture mode: pipeline samples internal RT; the pipeline runs once per frame', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
-    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
-    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#0f0')})));
+    const stage = keep(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320})));
+    const geometry = keep(new PlaneGeometry(50, 50));
+    const material = keep(new MeshBasicMaterial({color: new Color('#0f0')}));
+    stage.scene.add(new Mesh(geometry, material));
 
+    const pipeline = keep(new RenderPipeline(display.renderer));
     const sr = new StageRenderer(display).setClearColor(new Color('#102030'), 1).add(stage);
-    sr.pipeline = new RenderPipeline(display.renderer);
+    // the renderer lets go first: it holds the stage and the pipeline
+    keep(sr);
+    sr.pipeline = pipeline;
     // No buildOutputNode → whole-picture mode (samples internal RT as texture)
 
     // subscribed after the renderer, so it runs in the same emit right behind it
@@ -65,11 +79,16 @@ describe('StageRenderer — pipeline integration', () => {
   it('composed mode: buildOutputNode is invoked, pipeline.outputNode is the composed graph', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
-    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
-    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+    const stage = keep(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320})));
+    const geometry = keep(new PlaneGeometry(50, 50));
+    const material = keep(new MeshBasicMaterial({color: new Color('#f80')}));
+    stage.scene.add(new Mesh(geometry, material));
 
+    const pipeline = keep(new RenderPipeline(display.renderer));
     const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
-    sr.pipeline = new RenderPipeline(display.renderer);
+    // the renderer lets go first: it holds the stage and the pipeline
+    keep(sr);
+    sr.pipeline = pipeline;
 
     let buildCalls = 0;
     /** @type {PassNode[] | undefined} */
@@ -191,10 +210,14 @@ describe('StageRenderer — pipeline integration', () => {
     display = new Display(host);
     const first = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
     first.name = 'first';
-    first.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+    const firstGeometry = keep(new PlaneGeometry(50, 50));
+    const firstMaterial = keep(new MeshBasicMaterial({color: new Color('#f80')}));
+    first.scene.add(new Mesh(firstGeometry, firstMaterial));
     const second = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
     second.name = 'second';
-    second.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#08f')})));
+    const secondGeometry = keep(new PlaneGeometry(50, 50));
+    const secondMaterial = keep(new MeshBasicMaterial({color: new Color('#08f')}));
+    second.scene.add(new Mesh(secondGeometry, secondMaterial));
 
     const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(first).add(second);
     const pipeline = new RenderPipeline(display.renderer);
@@ -202,6 +225,7 @@ describe('StageRenderer — pipeline integration', () => {
     // the pipeline and the stages belong to this test: the renderer lets go first
     keep(pipeline);
     keep(first);
+    keep(second);
     keep(sr);
 
     /** @type {PassNode[][]} */
@@ -218,7 +242,7 @@ describe('StageRenderer — pipeline integration', () => {
     expect(calls).to.have.length(1);
     expect(calls[0]).to.have.length(2);
 
-    second.dispose();
+    release(second);
 
     expect(sr.hasStage(second), 'the renderer let go of the disposed stage').to.be.false;
 
@@ -232,11 +256,16 @@ describe('StageRenderer — pipeline integration', () => {
   it('composed mode: a rebuild without a camera change keeps the pass node and its render target', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
-    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
-    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#f80')})));
+    const stage = keep(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320})));
+    const geometry = keep(new PlaneGeometry(50, 50));
+    const material = keep(new MeshBasicMaterial({color: new Color('#f80')}));
+    stage.scene.add(new Mesh(geometry, material));
 
+    const pipeline = keep(new RenderPipeline(display.renderer));
     const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
-    sr.pipeline = new RenderPipeline(display.renderer);
+    // the renderer lets go first: it holds the stage and the pipeline
+    keep(sr);
+    sr.pipeline = pipeline;
 
     let buildCalls = 0;
     /** @type {PassNode[] | undefined} */
@@ -266,12 +295,16 @@ describe('StageRenderer — pipeline integration', () => {
   it('stage.dispose() releases the render target of its pass node and closes the stage', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
-    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
-    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#08f')})));
+    const stage = keep(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320})));
+    const geometry = keep(new PlaneGeometry(50, 50));
+    const material = keep(new MeshBasicMaterial({color: new Color('#08f')}));
+    stage.scene.add(new Mesh(geometry, material));
 
     const sr = new StageRenderer(display).setClearColor(new Color('#000'), 1).add(stage);
     // the pipeline was handed to the renderer and belongs to this test
     const pipeline = keep(new RenderPipeline(display.renderer));
+    // the renderer lets go first: it holds the stage and the pipeline
+    keep(sr);
     sr.pipeline = pipeline;
     sr.buildOutputNode = (passes) => passes[0];
 
@@ -289,9 +322,9 @@ describe('StageRenderer — pipeline integration', () => {
     // the renderer composed the pass node into its output and is driven by the display: it lets go
     // of the stage before the stage gives the node up, so no frame reaches a released render target.
     // Letting go, it releases the memory of the render target, which the node keeps
-    sr.dispose();
+    release(sr);
     expect(disposeCalls, 'the renderer releases the memory of the render target it no longer composes').to.equal(1);
-    stage.dispose();
+    release(stage);
 
     expect(disposeCalls, 'the stage gives up the render target it allocated').to.equal(2);
     expect(() => stage.asPassNode(display.renderer), 'and builds no further pass node').to.throw();
@@ -300,8 +333,10 @@ describe('StageRenderer — pipeline integration', () => {
   it('whole-picture mode: a replaced pipeline takes over the output', async () => {
     host = makeContainer({width: 320, height: 200});
     display = new Display(host);
-    const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320}));
-    stage.scene.add(new Mesh(new PlaneGeometry(50, 50), new MeshBasicMaterial({color: new Color('#0f0')})));
+    const stage = keep(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320})));
+    const geometry = keep(new PlaneGeometry(50, 50));
+    const material = keep(new MeshBasicMaterial({color: new Color('#0f0')}));
+    stage.scene.add(new Mesh(geometry, material));
 
     const sr = new StageRenderer(display).setClearColor(new Color('#102030'), 1).add(stage);
     const first = keep(new RenderPipeline(display.renderer));
@@ -335,9 +370,12 @@ describe('StageRenderer — pipeline integration', () => {
     host = makeContainer({width: 200, height: 200});
     display = new Display(host);
     const sr = new StageRenderer(display);
-    const pipeline = new RenderPipeline(display.renderer);
+    const pipeline = keep(new RenderPipeline(display.renderer));
+    const stage = keep(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 200})));
+    // the renderer lets go first: it holds the stage and the pipeline
+    keep(sr);
     sr.pipeline = pipeline;
-    sr.add(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 200})));
+    sr.add(stage);
     await display.start();
     await display.nextFrame();
 
@@ -348,13 +386,13 @@ describe('StageRenderer — pipeline integration', () => {
       return origDispose(...a);
     };
 
-    sr.dispose();
+    release(sr);
 
     expect(sr.pipeline).to.be.undefined;
     expect(disposeCalls, 'the renderer does not dispose a pipeline it was handed').to.equal(0);
 
     // the owner disposes it, and the pipeline is still there to take the call
-    pipeline.dispose();
+    release(pipeline);
     expect(disposeCalls).to.equal(1);
   });
 

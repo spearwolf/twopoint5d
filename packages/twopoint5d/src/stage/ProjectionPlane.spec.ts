@@ -36,6 +36,12 @@ describe('ProjectionPlane', () => {
       expect(plane.plane.constant).toBe(-2);
       expect(plane.up.toArray()).toEqual([0, 1, 0]);
     });
+
+    it('refuses a custom plane without up', () => {
+      expect(() => new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1)))).toThrow(
+        'ProjectionPlane: up is mandatory for a custom projection plane',
+      );
+    });
   });
 
   describe('getPointByDistance()', () => {
@@ -184,14 +190,6 @@ describe('ProjectionPlane', () => {
       const xz = ProjectionPlane.get('xz|bottom-left');
       const p = xz.getPoint(5, 4);
       expect(p.equals(new Vector3(5, 0, 4))).toBeTruthy();
-    });
-  });
-
-  describe('constructor', () => {
-    it('refuses a custom plane without up', () => {
-      expect(() => new ProjectionPlane(new THREE_Plane(new Vector3(0, 0, 1)))).toThrow(
-        'ProjectionPlane: up is mandatory for a custom projection plane',
-      );
     });
   });
 

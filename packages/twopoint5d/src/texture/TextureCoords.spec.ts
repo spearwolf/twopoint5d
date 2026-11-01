@@ -127,6 +127,12 @@ describe('TextureCoords', () => {
       expect(texCoords.parent).toBe(parent);
       expect(texCoords.root).toBe(root);
     });
+
+    test('root is a TextureCoords, never undefined', () => {
+      const tex = new TextureCoords(new TextureCoords(0, 0, 8, 8), 1, 1, 2, 2);
+
+      expectTypeOf(tex.root).toEqualTypeOf<TextureCoords>();
+    });
   });
   describe('s,t,u,v', () => {
     test('parentless', () => {
@@ -224,14 +230,6 @@ describe('TextureCoords', () => {
       });
     });
   });
-  describe('root', () => {
-    test('root is a TextureCoords, never undefined', () => {
-      const tex = new TextureCoords(new TextureCoords(0, 0, 8, 8), 1, 1, 2, 2);
-
-      expectTypeOf(tex.root).toEqualTypeOf<TextureCoords>();
-    });
-  });
-
   describe('getTexCoords()', () => {
     const makeTex = (flip: number) => {
       const root = new TextureCoords(0, 0, 320, 160);
