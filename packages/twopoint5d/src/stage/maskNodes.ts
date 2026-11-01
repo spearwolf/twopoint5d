@@ -34,7 +34,8 @@ export function maskCoverage(picture: Node<'vec4'>, source: StageMaskCoverageSou
 
 /**
  * The source of `mask` whose picture `node` holds: the premultiplied picture, transparent black
- * outside `[0, 1]`, and its coverage by the `source` and `invert` of the mask, 0 outside `[0, 1]`.
+ * outside `[0, 1]`, and its coverage by the `source` and `invert` of the mask — outside `[0, 1]`
+ * the coverage of that transparent black: 0, or 1 with `invert`.
  * @internal
  */
 export function maskSource(node: TextureNode, mask: StageMask): StageMaskSource {
@@ -60,8 +61,8 @@ function sourceOf(node: StageTransitionSourceNode, role: string): StageTransitio
 /**
  * Builds the node of `content` masked by `mask`, premultiplied, for a `buildOutputNode` of one's
  * own: all four channels of `content` times the coverage of `mask`. A source is a `TextureNode`
- * or the `PassNode` of a `Stage2D`, as for `createTransitionNode()`; both show nothing outside
- * `[0, 1]`, so a mask that does not reach a pixel covers 0 of it.
+ * or the `PassNode` of a `Stage2D`, as for `createTransitionNode()`; both show transparent black
+ * outside `[0, 1]`, so a mask that does not reach a pixel covers 0 of it, or 1 with `invert`.
  */
 export function createMaskNode(
   content: StageTransitionSourceNode,

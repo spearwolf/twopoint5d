@@ -4,8 +4,8 @@ import {defineFeature, FrameOrder} from '../SpriteFeature.js';
 export interface FlipApi {
   /**
    * Mirrors the image of the sprite left for right: 1 mirrors it, 0 — what a new sprite starts with —
-   * draws it as it is; a value above 0.5 counts as 1. The triangles never turn over, so the sprite
-   * stays visible under `FrontSide`.
+   * draws it as it is; a value of 0.5 and above counts as 1. The triangles never turn over, so the
+   * sprite stays visible under `FrontSide`.
    *
    * `flip` — `flipX` and `flipY` — is a static attribute: a later change reaches the gpu once it is
    * marked — `spritePool.touchVO(sprite, 'flip')` — or with every `update()` in a geometry built with

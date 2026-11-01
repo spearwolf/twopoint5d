@@ -38,8 +38,9 @@ may](images/display/display-choose-a-setup.svg)
 | the sharpest image | `maxPixelRatio: 0` | one pixel of the buffer per device pixel |
 
 There is no preset object to pass: each setup is a handful of settings, and the recipes below are
-the presets. Every recipe is a complete program — a `Display`, a `Stage2D` and a `StageRenderer`
-that draws the stage into the display, as in [stages](stages.md).
+the presets. The recipes that set up a stage are complete programs — a `Display`, a `Stage2D` and
+a `StageRenderer` that draws the stage into the display, as in [stages](stages.md); the others
+build the `Display` alone, since their settings concern the display and nothing else.
 
 ## Pixel art
 
@@ -346,10 +347,10 @@ import {Display} from '@spearwolf/twopoint5d';
 const display = new Display(document.querySelector('canvas')!, {adaptiveResolution: true});
 
 const adaptive = display.adaptiveResolution!;
-adaptive.method; //   'gpu-time' or 'frame-pacing', undefined before the first frame
+adaptive.method; //   'gpu-time' or 'frame-pacing'; undefined before the first frame, after dispose()
 adaptive.scale; //    the resolutionScale it has set
 adaptive.gpuTime; //  the median GPU time of the frames it judged last, in ms
-adaptive.enabled = false; // hold it still, and give back the scale it found
+adaptive.enabled = false; // hold it still, and give back the scale the display had before it
 
 // every step it takes is a resize of the display
 display.onResize(({pixelRatio}) => console.log(`drawing at ${pixelRatio} device pixels per CSS pixel`));
@@ -469,19 +470,25 @@ and, on Android, the navigation bar. `request()`, `exit()` and `toggle()` never 
 resolves with `isActive` afterwards, `false` where the browser refused. A refusal is told once per
 page on the console — almost always a call that did not come straight from a click, a key or a
 tap. Anything awaited before the call — a fetch, a timeout, the renderer — loses the gesture.
-Calls made while the browser is still answering an earlier one do not race: the last call wins. An
-`exit()` before the browser has granted a `request()` ends outside the fullscreen, a `request()`
-while it is still being left ends inside, `toggle()` goes by what the event last told the page, and
-every call of such a burst resolves with the state it ends in.
+Where the browser offers no native fullscreen at all and `fallback` is not set, `request()`
+resolves `false` as well, and a second warning, also once per page, says that native fullscreen is
+not available here and names `fallback: 'pseudo'`. Calls made while the browser is still
+answering an earlier one do not race: the last call wins. An `exit()` before the browser has
+granted a `request()` ends outside the fullscreen, a `request()` while it is still being left ends
+inside, `toggle()` goes by what the event last told the page, and every call of such a burst
+resolves with the state it ends in.
 
-The event `OnDisplayFullscreenChange` is retained: a button attached later hears the state it has
-to show. Every listener hears it, even behind one that throws; a listener that throws is reported
-on the console and changes neither the fullscreen nor what the three calls resolve with.
+The event `OnDisplayFullscreenChange` carries `isActive`, `mode` and `isArmed`, the `display`, and
+the `element`: the element in fullscreen, or the target of the next request while not active. It
+is retained: a button attached later hears the state it has to show. Every listener hears it, even
+behind one that throws; a listener that throws is reported on the console and changes neither the
+fullscreen nor what the three calls resolve with.
 
-After `display.dispose()` the three calls resolve `false` and do nothing, and so does a call still
-open when the display is disposed; a fullscreen the browser grants after the dispose is left again.
-A component that holds on to `display.fullscreen` asks `isDisposed` first, and `isAvailable` is
-`false` from then on.
+After `display.dispose()` the getter `display.fullscreen` throws. A reference to the controller
+taken before the dispose stays usable: its three calls resolve `false` and do nothing, and so does
+a call still open when the display is disposed; a fullscreen the browser grants after the dispose
+is left again. A component that holds on to such a reference asks its `isDisposed` first, and
+`isAvailable` is `false` from then on.
 
 ### Fullscreen when the phone turns sideways
 
@@ -510,6 +517,11 @@ on its own, inside the target or anywhere else: the display takes no fullscreen 
 turning the phone sideways asks for nothing then. It only acts on devices whose primary input is a
 finger (`(pointer: coarse) and (hover: none)`): a desktop window that is wider than tall does
 nothing, a tablet does the same as a phone.
+
+A phone that is sideways already when `onLandscape` is switched on — through the option of the
+constructor or through `display.fullscreen.onLandscape = true` — has made no turn that could count
+as a gesture: the display arms at once and waits for the next tap. Where only the pseudo fallback
+is there, which needs no gesture, it enters the pseudo mode right away.
 
 Whoever leaves a fullscreen while the phone is still sideways — the one of the turn, one the page
 asked for with `request()`, or the one of a video; through Escape, the back gesture or a button of
@@ -540,7 +552,8 @@ The lock is a wish: browsers grant it in fullscreen only, and many — on the iP
 not at all. While it holds, the phone cannot turn upright, and `exitOnPortrait` is `false`. Where
 the browser refuses it, and in the pseudo fallback, which never locks, turning the phone upright
 leaves the fullscreen as it does without a lock. A portrait lock does not go with `onLandscape`:
-the display warns once and does not lock.
+the display warns once and does not lock. An `exitOnPortrait: true` set beside a landscape lock and
+`onLandscape` warns once as well, since it has no effect while the lock holds.
 
 ### Without native fullscreen: the pseudo fallback
 
@@ -583,9 +596,12 @@ through *Share → Add to Home Screen*.
 
 ### Which element goes fullscreen
 
-By default the element around the canvas: the element a display was built in, or the parent of a
-canvas handed in. HTML beside the canvas — a HUD, a menu — stays on the screen with it, and the
-display measures the fullscreen element, so the drawing buffer takes the size of the screen.
+By default the element around the canvas: the element a display was built in. A canvas handed in,
+or the canvas of a renderer handed in, gives its parent at the time of the request, and a canvas
+without a parent goes fullscreen itself. HTML beside the canvas — a HUD, a menu — stays on the
+screen with it, and the display measures the fullscreen element, so the drawing buffer takes the
+size of the screen. Two size sources stay as they are: `resize-to="window"` measures the window,
+which the fullscreen fills anyway, and a `resizeTo` callback keeps answering the size itself.
 `fullscreen: {element}` names another target; a new `display.fullscreen.element` takes effect with
 the next request.
 
@@ -612,9 +628,13 @@ is no fullscreen of the display: `isActive` stays `false`, `onLandscape` neither
 nor arms while it holds, and leaving it sideways counts as leaving (see "Fullscreen when the phone
 turns sideways"). A `request()` of the page still asks: the page decides over its own fullscreens.
 
-`resize-to="fullscreen"` is an old name of `resize-to="window"`: it means the window and has
-nothing to do with the fullscreen of the browser. It still works and warns once per page; write
-`"window"`.
+`resize-to="fullscreen"`, and `":fullscreen"` with its colon, is a deprecated alias of
+`resize-to="window"`: it means the window and has nothing to do with the fullscreen of the browser.
+It works as `"window"` does and warns once per page; write `"window"`. Deprecated with it is
+`Display.CssRulesPrefixFullscreen`, the base of the class the canvas carries under
+`resize-to="window"`: `twopoint5d-canvas--fullscreen`, followed by a random suffix. With the
+removal of the alias it is renamed to `CssRulesPrefixWindow`, and the class to
+`twopoint5d-canvas--window`.
 
 ### Fullscreen presets
 
@@ -665,10 +685,10 @@ The options go into `fullscreen: {…}` of the constructor; each is a property o
 | `request()`, `exit()`, `toggle()` | enter, leave, switch; each resolves with `isActive` and never rejects; `false` after `dispose()` |
 | `isSupported` | the browser offers fullscreen for elements here |
 | `isAvailable` | a request can succeed: `isSupported`, or the pseudo fallback; `false` after `dispose()` |
-| `isDisposed` | the display is disposed; the calls resolve `false` |
+| `isDisposed` | the display is disposed; the calls resolve `false`. Read on a reference taken before: `display.fullscreen` throws after `dispose()` |
 | `isActive`, `mode` | in fullscreen right now, `'native'` or `'pseudo'` |
 | `isArmed` | `onLandscape` waits for a tap; never while the target or another element is in fullscreen |
-| `display.onFullscreenChange(listener)` | every change of `isActive`, `mode` and `isArmed`; retained |
+| `display.onFullscreenChange(listener)` | every change of `isActive`, `mode` and `isArmed`, with those three, the `display` and the `element` in fullscreen or to request; retained |
 
 ### The fit of a projection
 
@@ -826,8 +846,11 @@ when the controller is disabled, or when the display goes over to a `pixelZoom`.
 What to know about it:
 
 - A display that builds its renderer asks it for `trackTimestamp: true`, which `gpu-time` needs. A
-  renderer handed to the constructor, a WebGPU adapter without `timestamp-query` and a WebGL 2
-  without the timer extension — Android Chrome often hides it — leave `frame-pacing`.
+  renderer handed to the constructor measures the GPU time where it was built with
+  `trackTimestamp: true`, as in the example below. A renderer built without it, a WebGPU adapter
+  without `timestamp-query` and a WebGL 2 without the timer extension — Android Chrome often hides
+  it — leave `frame-pacing`. So does a renderer that resolves no GPU time for 60 frames in a row:
+  the controller goes over to `frame-pacing` then, and `gpuTime` answers `undefined`.
 
   A renderer the display built with `trackTimestamp: true` measures timestamps for its whole life:
   while the controller holds still under a `pixelZoom`, after `adaptive.enabled = false` and after

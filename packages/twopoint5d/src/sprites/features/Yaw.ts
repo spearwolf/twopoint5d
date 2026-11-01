@@ -16,7 +16,8 @@ export interface YawApi {
 
 /**
  * The facing of a sprite as a turn about +Y of its mesh. Data alone: a placement of
- * `flatPlacement({orientation: 'yaw'})` reads it, every other placement leaves it be.
+ * `flatPlacement({orientation: 'yaw'})` and the frame slot of `tableFrame({views})` read it, every
+ * other placement leaves it be.
  */
 export const Yaw = defineFeature<YawApi>({
   name: 'yaw',

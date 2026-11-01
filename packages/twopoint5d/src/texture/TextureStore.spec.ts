@@ -4205,7 +4205,7 @@ describe('TextureStore', () => {
       ],
       [
         () => new TextureStore().registerAtlasAdapter('x', 5 as never),
-        'TextureStore: registerAtlasAdapter() got an adapter for "x" that is no function — an adapter is (json, parentCoords) => {atlas, animations?}',
+        'TextureStore: registerAtlasAdapter() got an adapter for "x" that is no function — an adapter is (json, parentCoords, options?) => {atlas, animations?}',
       ],
       [
         () => new TextureStore().registerAtlasAdapter('x', () => ({atlas: new TextureAtlas()}), {app: 'aseprite' as never}),

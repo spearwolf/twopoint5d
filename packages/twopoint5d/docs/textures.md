@@ -100,10 +100,13 @@ two options yields to one that writes one of them, whoever named them first — 
 `linear`, `clamp-t` beats `repeat` along `t`. Between two classes of the same breadth, the one named
 last wins.
 
-**What is left alone.** An option that no class names keeps the value of the texture: `update()`
-without a wrap class leaves `wrapS` and `wrapT` as they are, and one without a mipmap class leaves
-`generateMipmaps`; a new texture keeps the `ClampToEdgeWrapping` and the `generateMipmaps = true` of
-three.js.
+**What is left alone.** Two options are written every time: `flipY`, `false` unless `flipy` or the
+`defaultOptions` of the factory say otherwise, and `anisotropy`, none unless an anisotropy class or
+the `defaultOptions` name one. Every other option that neither a class nor the `defaultOptions`
+name keeps the value of the texture: `update()` without a wrap class leaves `wrapS` and `wrapT` as
+they are, one without a mipmap class leaves `generateMipmaps`, one without a color-space class
+leaves `colorSpace`; a new texture keeps the `ClampToEdgeWrapping` and the `generateMipmaps = true`
+of three.js.
 
 **Names out of json.** A name that is no texture class is skipped wherever classes are applied;
 `isTextureOptionClass(name)` tells the two apart. A `TextureStore` reports such a name as well —
@@ -214,8 +217,12 @@ the whole image.
 | `margin` | 0 | the space around the whole grid |
 | `spacing` | 0 | the space between two neighbouring tiles |
 | `padding` | 0 | the space around each tile inside its cell |
-| `tileCount` | as many as fit | how many tiles the set holds |
+| `tileCount` | as many as fit | how many tiles the set holds, at most `TileSet.MaxTiles` |
 | `firstId` | 1 | the id of the first tile |
+
+A tile set holds at most `TileSet.MaxTiles` tiles, 2^20: a `tileCount` above it, and an image into
+which more tiles fit while no `tileCount` is given, are refused with a `RangeError`, as a
+`tileCount` is that does not fit into the image.
 
 The tile ids run row by row from the top left, starting at `firstId`. A tile set item builds a
 `tileSet`, the `atlas` of its tiles, the texture and — with `frameBasedAnimations` — animations over
@@ -415,8 +422,10 @@ Each resource offers its values under five **subtypes**:
 | `'frameBasedAnimations'` | `FrameBasedAnimations` | | ✓ | ✓ |
 
 `TextureResourceSubtypes` carries the same names as constants, `TextureResourceSubtypes.Texture`
-for `'texture'`. Animations arrive only for an item that carries animation data or an atlas whose
-json brings tags.
+for `'texture'`. Animations arrive for an item that carries animation data and for an atlas whose
+adapter reads animations out of its json. `'aseprite'` always does — an empty `FrameBasedAnimations`
+for a sheet without tags —, so a `'texturepacker'` atlas without animation data is the atlas that
+has none.
 
 **Once: `getAsync()`.** One subtype resolves with its value, a list with a tuple of values in the
 order asked for, all from the same image:
@@ -450,10 +459,12 @@ forever when the answer is clear:
 - the store has parsed and knows no such id — the error names the id, and for an item the store
   refused, why;
 - the resource never builds the subtype — the `atlas` of an image item, the `tileSet` of an atlas,
-  the animations of an item without animation data;
+  the animations of a tile set item without animation data or of a `'texturepacker'` atlas without
+  it;
 - a step the value needs failed: an image that does not load, an atlas json that cannot be fetched
-  or read, tile set options `TileSet` refuses — the error names the step and the url and carries
-  the original as its `cause`;
+  or read, tile set options `TileSet` refuses — the error names the step, the url where one failed,
+  and carries the original as its `cause`; tile set options `TileSet` refuses and an atlas json its
+  adapter cannot read name no url;
 - `options.signal` aborts, the store is disposed, or the resource is.
 
 **Following: `on()`.** `store.on(id, subtypes, callback)` calls the callback with the current
@@ -582,7 +593,7 @@ A store reports what goes wrong as an `error` event, with a `TextureStoreErrorEv
 | `source` | carries | when |
 | --- | --- | --- |
 | `'fetch'` | `url`, `status?`, `error` | the catalog could not be fetched, or the server answered with a status |
-| `'parse'` | `url?`, `id?`, `error` | the body is no json; the data cannot be read; an item builds nothing; a field the type of an item does not read; a texture class no factory knows; a tile set item without an `imageUrl`; a subscriber that throws |
+| `'parse'` | `url?`, `id?`, `error` | the body is no json; the data cannot be read; an item builds nothing; a field the type of an item does not read; a texture class no factory knows; a tile set item without an `imageUrl`; a subscriber that throws; a listener of the `dispose` event of a resource that `evictMissing` disposes that throws |
 
 An event with an `id` belongs to that item, one without to the catalog as a whole.
 
@@ -632,6 +643,17 @@ store.onResource('hero', (resource) => {
 });
 ```
 
+Two more failures go out with `source: 'texture'`:
+
+- **An `atlasJson` written from outside that cannot be read**, once per write: a `meta` that is no
+  object, beside an `overrideImageUrl` as well, and a `meta.image` that is set but is no string
+  while no `overrideImageUrl` stands beside it. It builds no atlas, and a `getAsync()` of its atlas
+  rejects; without an `overrideImageUrl` it names no image either, and a `getAsync()` of its
+  texture waits for one. A json without `meta.image` names no image and is not reported.
+- **A listener of the `dispose` event of a texture the resource lets go of** that throws — of one
+  a new image replaced, or one taken back with its image. The value it goes with stays published,
+  and no `getAsync()` rejects on it.
+
 A failed step does not retry by itself. It runs again when what it reads changes — its url, its
 options, the texture classes, the renderer —, through a `parse()` or a setter of the resource.
 
@@ -662,12 +684,21 @@ import {TextureStore, texturePackerAtlasAdapter} from '@spearwolf/twopoint5d';
 const store = new TextureStore();
 
 // a packer that writes the TexturePacker envelope, under a name of its own
-store.registerAtlasAdapter('my-packer', (json, parentCoords) => texturePackerAtlasAdapter(json, parentCoords), {
-  app: /my-packer/i,
-});
+store.registerAtlasAdapter(
+  'my-packer',
+  (json, parentCoords, options) => texturePackerAtlasAdapter(json, parentCoords, options),
+  {app: /my-packer/i},
+);
 
 store.parse({items: {props: {atlasUrl: 'props.json'}}}); // picked by meta.app
 ```
+
+The `options` an adapter is handed are `AtlasAdapterOptions`: their `playback` is the `playback` of
+the item — or the one written to `AtlasTextureResource#playback` —, the playback of an animation
+the adapter reads, by its name. `asepriteAtlasAdapter`, the `'aseprite'` adapter, refuses a tag the
+sheet lacks, and `texturePackerAtlasAdapter`, the `'texturepacker'` one, any playback at all; the
+refusal is an `error` of the resource with `source: 'texture'`, and the atlas is not built. An
+adapter of one's own that hands the json on to one of the two hands `options` on with it.
 
 The resource reads `meta.image` and `meta.size` before any adapter runs, so the json of an adapter
 of one's own keeps the envelope the three packers share — `frames`, `meta.size`, `meta.image`; a
@@ -726,6 +757,7 @@ there is no image cache, no `getAsync()` and no `refCount` to hold it by — `di
 | `MapSubTypes`, `MapTuple` | `TextureResourceSubTypeMap['atlas']`, or a tuple of them |
 | `TextureImageLoader`, `TileSetLoader`, `TextureAtlasLoader`, `PowerOf2ImageLoader` | a `TextureStore` |
 | the classes `anisotrophy`, `anisotrophy-2`, `anisotrophy-4`, `no-anisotrophy` | `anisotropy`, `anisotropy-2`, `anisotropy-4`, `no-anisotropy` |
+| `TextureOptions#anisotrophy`, counted from 0, where 0 is none — in `defaultOptions` and in what `getOptions()` answers | `TextureOptions#anisotropy`, counted as three.js counts it, from 1 |
 
 `TextureImageLoader`, `TileSetLoader` and `TextureAtlasLoader` differ from the store in what they
 hand out: they pad an image whose sides are no powers of 2 onto a canvas whose sides are, start from

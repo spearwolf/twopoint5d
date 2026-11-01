@@ -46,6 +46,12 @@ and are **untrimmed**: the offsets place a glyph in its line, they are no trim m
 font in pixels; BMFont writes it negative for a font made with "match char height", so the font
 answers its amount and `font.info.size` keeps the value as written.
 
+`font.info` and `font.common` are the `info` and `common` blocks of the file as read, frozen copies
+all the way down: their lists — `info.padding`, `info.spacing`, a `charset` list — are frozen lists
+of their own, TypeScript types them `readonly`, and a write into either block or one of its lists
+throws. The font data handed in shares no list or record with the font; a change goes into a copy
+of one's own, `[...(font.info.padding ?? [])]`.
+
 **One page.** A font is drawn out of one texture, so a font of several pages is refused: export it
 onto one page, in BMFont with a larger texture size. `BitmapFont.parse(source, {parentCoords})`
 reads a page that was packed into a larger image, at the coords given.
@@ -58,8 +64,8 @@ Everything else is refused with an `Error`: a source in none of the three spelli
 not parse, font data that is no object, a font without a `common` block, without `chars` or with
 more than one page, a char with an id that is no whole number from 0 to 0x10FFFF, a glyph that
 reaches beyond the page, two chars of one id, and a kerning pair whose chars are no code points. A
-numeric entity in the XML that is no code point stays as it is written, like an entity the reader
-does not know.
+numeric entity in the XML that names no char — beyond U+10FFFF, or a surrogate — stays as it is
+written, like an entity the reader does not know.
 
 A font and its atlas are plain data: nothing to dispose. The page texture is the caller's.
 
@@ -92,6 +98,20 @@ export function rewrite(next: string) {
   text.update();
 }
 ```
+
+The options are `WriteTextOptions`: the `TextLayoutOptions` that `layoutText()` takes as well, and
+`z`.
+
+| option | default | what it is |
+| --- | --- | --- |
+| `x`, `y` | 0 | where the text goes, in units of the mesh: `y` the top of the first line, `x` its edge or middle by `align` |
+| `z` | 0 | the `z` of every glyph, in units of the mesh — `writeText()` and `rewriteText()` alone |
+| `align` | `'left'` | how each line lies against `x`: `'left'`, `'center'` or `'right'` |
+| `scale` | 1 | units of the mesh per pixel of the font |
+| `letterSpacing` | 0 | extra space between two glyphs of a line, in pixels of the font |
+| `lineHeight` | the `lineHeight` of the font | the distance of two lines, in pixels of the font |
+| `maxWidth` | none: no wrap | the width a line breaks at, in units of the mesh — see word wrap below |
+| `fallback` | none: a char the font lacks is skipped | the char drawn in place of one the font lacks |
 
 **Coordinates.** The text lies in the x/y plane of the mesh, **y up** — the plane of `FlatPlacement`
 and of every billboard; a text on the ground is a `FlatPlacement` mesh turned by
@@ -176,12 +196,12 @@ whose frame comes out of an `animsMap` — is refused with a `TypeError` before 
 naming every feature missing. The features are judged by name, so a copy such as
 `defineFeature({...QuadSize})` counts. A pool that runs full is refused with a `RangeError` naming
 how many sprites the text needs; the sprites created so far are freed again, so nothing of the text
-is left behind. An error of `createSprite()` — under `grow`, a pool that cannot grow — goes on to
-the caller unchanged, after the same freeing. A `scale`, `lineHeight` or `maxWidth` that is no
-finite number
-above 0, and an `x`, `y`, `z` or `letterSpacing` that is no finite number, are refused with a
-`RangeError`; an `align` it does not know and a `fallback` that is no single char or no glyph of the
-font with an `Error` — each naming the option. A text that is no string is refused with a
+is left behind, and `createSprite()` says once on the console that the pool is full. An error of
+`createSprite()` — under `grow`, a pool that cannot grow — goes on to the caller unchanged, after
+the same freeing. A `scale`, `lineHeight` or `maxWidth` that is no finite number above 0, and an
+`x`, `y`, `z` or `letterSpacing` that is no finite number, are refused with a `RangeError`; an
+`align` it does not know and a `fallback` that is no single char or no glyph of the font with an
+`Error` — each naming the option. A text that is no string is refused with a
 `TypeError`. `rewriteText()` refuses a glyph that is no sprite of the sprites handed in with a
 `TypeError` naming its index, before anything changes; on a pool that runs full the glyphs keep the
 text they had. Sprites that are disposed write nothing: `writeText()` answers an empty array,

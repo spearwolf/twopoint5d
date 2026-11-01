@@ -152,7 +152,7 @@ sprite presets; [Sprites](packages/twopoint5d/docs/sprites.md) shows how to comp
 kind of your own from features. From there:
 
 - [Stages](packages/twopoint5d/docs/stages.md) — projections, several stages in one
-  frame, post-processing
+  frame, post-processing, transitions between stages and stage masks
 - [Vertex objects](packages/twopoint5d/src/vertex-objects/README.md) — what a vertex
   object description declares, for sprites of your own
 - [Resource lifecycle](packages/twopoint5d/docs/resource-lifecycle.md) — what

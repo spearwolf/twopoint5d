@@ -131,12 +131,12 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * is room. The target is 60 frames per second, or `maxFps` where that is lower.
    *
    * A display that builds its renderer asks it for `trackTimestamp: true`, so the controller reads
-   * the GPU time of a frame; a renderer handed in, or one without timestamp queries, leaves it the
-   * pace of the frames. A renderer the display built with `trackTimestamp: true` measures
-   * timestamps for its whole life, while the controller holds still, is disabled or disposed as
-   * well; `trackTimestamp: false` beside this option builds it without them, and the controller
-   * reads the pace of the frames. Off by default. Read once, by the constructor; the controller is
-   * {@link Display.adaptiveResolution} until it is disposed.
+   * the GPU time of a frame; a renderer handed in that was built without `trackTimestamp: true`,
+   * or one without timestamp queries, leaves it the pace of the frames. A renderer the display
+   * built with `trackTimestamp: true` measures timestamps for its whole life, while the controller
+   * holds still, is disabled or disposed as well; `trackTimestamp: false` beside this option builds
+   * it without them, and the controller reads the pace of the frames. Off by default. Read once, by
+   * the constructor; the controller is {@link Display.adaptiveResolution} until it is disposed.
    */
   adaptiveResolution?: boolean | AdaptiveResolutionOptions;
 

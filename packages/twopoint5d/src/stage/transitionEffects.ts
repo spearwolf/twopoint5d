@@ -56,7 +56,10 @@ export interface StageTransitionInput {
 
 /** The picture of a stage mask, as {@link StageTransitionInput.mask} answers it. */
 export interface StageMaskSource extends StageTransitionSource {
-  /** The coverage of the mask at `uv` by its `source` and `invert`, 0 to 1; 0 outside `[0, 1]`. */
+  /**
+   * The coverage of the mask at `uv` by its `source` and `invert`, 0 to 1. Outside `[0, 1]` the
+   * picture is transparent black, so the coverage there is 0, or 1 with `invert`.
+   */
   coverage(uv: Node<'vec2'>): Node<'float'>;
 }
 

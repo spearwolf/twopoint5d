@@ -37,22 +37,27 @@ Use only these, in this order, and only the ones that apply:
 1. **Open the relevant `CHANGELOG.md`.** This repo currently has one: `packages/twopoint5d/CHANGELOG.md`. Confirm the change you are documenting belongs to that package.
 2. **Locate `## [Unreleased]`.** If it does not exist, create it directly under the file's header preamble and above the most recent released version.
 3. **Pick the subsection.** Match the change to exactly one of the categories above. If the change is genuinely two things (e.g. fixed a bug *and* added a new method), write two entries in their respective subsections.
-4. **Write the entry.** One bullet. Concise, precise, present-tense imperative or noun phrase. Mention the affected symbol in backticks. Skip implementation chatter unless it is the point (perf entries may include the algorithmic detail).
+4. **Write the entry.** One bullet per discrete change. Precise, present-tense imperative or noun phrase. Mention the affected symbol in backticks. Skip implementation chatter unless it is the point (perf entries may include the algorithmic detail).
 5. **Migration check.** Ask: "Does a consumer of `@spearwolf/twopoint5d` need to change their code to upgrade past this?" If yes → add a `### Migration Guide` block (see below).
 6. **Do not touch released sections.** Verify your diff only modifies the `[Unreleased]` block.
 
 ## Entry style
 
 - **Subject in backticks:** `` `ClassName#method()` ``, `` `module/file.ts` ``, `` `optionName` ``.
-- **Concise.** One line preferred. Multi-line bullets only for genuinely composite changes (e.g. a perf entry that lists the techniques applied).
-- **Precise.** State the user-visible effect, not the patch. "fix `AABB2#isInsideAABB()`: corner test no longer swaps x/y" beats "tweaked logic in AABB2".
+- **One bullet per discrete change.** A bullet is one Markdown line, however long: it names the symbol, the user-visible effect and the edge cases a consumer meets (defaults, what is refused and with which error, what `dispose()` does). Several changes are several bullets, not one paragraph.
+- **Precise.** State the user-visible effect, not the patch. "`AABB2#isInsideAABB()` tests its corners with x and y in their places" beats "tweaked logic in AABB2".
+- **Breaking changes** end their bullet with `(**BREAKING**). See the Migration Guide` and get a `####` block there.
+- **Guide pointers.** Where a guide in `packages/twopoint5d/docs/` covers the change, name the section, as in ``(see "Stage masks" in `docs/stages.md`)``. The guide section changes in the same commit.
 - **No PR/issue links** unless they add real context (e.g. an upstream three.js bug).
 - **No emoji**, no headings inside bullets.
 - **Plural / multi-package commits:** add one entry per affected package CHANGELOG.
 
 ### Verb prefixes that match the existing style
 
-`add`, `fix`, `remove`, `change`, `simplify`, `refactor`, `perf`, `typecheck`, `upgrade`. These are conventional in this repo's Unreleased entries — keep using them.
+`add`, `change`, `deprecate`, `remove`, `upgrade`, `perf` open most entries under `Added`, `Changed`, `Deprecated` and `Removed`. Two other forms are just as common and fine:
+
+- an entry under `### Fixed` states the behaviour as it is after the fix, with the symbol as subject — "`ChunkQuadTreeNode#subdivide()` splits a node whose chunks only one axis separates …" — rather than "fix …";
+- a refusal or a read-only change states the rule — "`StageItem` is read-only: …", "`new FeatureSprites()` refuses a `material` built for a pass …".
 
 ## Migration Guide
 
@@ -135,12 +140,18 @@ const stage = new Stage2D({projection: new ParallaxProjection(...)}); // opt bac
 ...
 ```
 
-## Existing flat `[Unreleased]` entries
+## Code blocks
 
-`packages/twopoint5d/CHANGELOG.md` currently has a flat (uncategorized) list under `[Unreleased]`. When you add new entries:
+A `ts` block in a changelog is an excerpt and nothing checks it. A block that stands on its own carries `ts check`, and `pnpm typecheck` compiles it — but only inside `## [Unreleased]`; once the section is released, its blocks are history and stay as they are (see "Code blocks in Markdown" in `AGENTS.md`).
 
-- **Add** them into proper `### <Category>` subsections at the top of `[Unreleased]`, above the existing flat bullets.
-- **Do not silently rewrite** the existing flat bullets unless the user explicitly asks for a cleanup pass — those bullets are pre-existing work that the maintainer wrote in that form on purpose. If you think a cleanup pass is warranted, *propose* it before doing it.
+## Cutting a release
+
+Only on an explicit instruction. A release is one commit, `chore: release twopoint5d vX.Y.Z`, that touches two files:
+
+1. `packages/twopoint5d/CHANGELOG.md`: insert `## [X.Y.Z] - YYYY-MM-DD` directly under `## [Unreleased]`, so the existing subsections move into the release and `## [Unreleased]` stays as an empty heading. Under the new heading, above `### Added`, write one paragraph that says what the release brings and that the Migration Guide at its end walks through every break (see `## [0.24.0]`).
+2. `packages/twopoint5d/package.json`: `version` to `X.Y.Z`.
+
+Before the commit, `pnpm run ci` passes. The push to `main` is the publication: the Deploy workflow runs after CI, publishes the version if npm does not list it yet and writes the tag `vX.Y.Z` — so the push waits for the maintainer. Never run `pnpm publishNpmPkg` yourself.
 
 ## Common mistakes
 
@@ -159,5 +170,4 @@ const stage = new Stage2D({projection: new ParallaxProjection(...)}); // opt bac
 
 - About to edit a section under `## [x.y.z] - YYYY-MM-DD` → **stop**, the past is immutable.
 - About to delete or reword an existing `[Unreleased]` bullet you didn't write this session → **ask first**.
-- Tempted to add a date to `[Unreleased]` → **don't**. Releases happen via the publish pipeline, not via this skill.
-- Tempted to bump a version heading or add a new `## [x.y.z]` block → **don't**. Out of scope; releases are handled separately.
+- Tempted to add a date to `[Unreleased]` or a new `## [x.y.z]` block without being asked for a release → **don't**. Releases follow "Cutting a release" above, on an explicit instruction only.

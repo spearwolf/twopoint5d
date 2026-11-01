@@ -44,7 +44,7 @@ fragment: colorSource(frame, ctx.uv) ─▶ color stages ─▶ colorNode
 | `frameStage` | any, by `order` | `Flip` |
 | trim shift | built in, runs when the frame has trim margins | — |
 | `local` | any, by `order` | `Anchor`, `NineSlice`, `QuadSize`, `Shear`, `Rotation` |
-| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()`, `SegmentPlacement`, `segmentPlacement()` |
+| `placement` | exactly 1 | `FlatPlacement`, `GroundPlacement`, `flatPlacement()`, `BillboardPlacement`, `AxisBillboardPlacement`, `axisBillboardPlacement()`, `SegmentPlacement`, `segmentPlacement()`; `LightFacingPlacement`, `MirroredBillboardPlacement` (passes) |
 | `mesh` | any, by `order` | `wave()`, `Visible`; `PlanarShadow`, `MirrorAtPlane` (passes) |
 | `uv` | any, by `order` | `NineSlice` |
 | `colorSource` | 0 or 1; without one the sprite is flat grey | `TextureColor`, `RepeatingTextureColor` |
@@ -113,9 +113,10 @@ its `VO`, the type argument of `FeatureSprites`, `FeatureSpritesGeometry` and
 `defineSprite()` merges the attributes and methods of all features into **one** instanced vertex
 object description: one pool, one sprite handle carrying every accessor, one `freeVO()` that moves
 every attribute of a freed sprite at once. It throws, naming the features, when two of them
-declare the same attribute, uniform, texture, usage alias or sprite-handle property, when a
-`requires` is not met, when a slot of one gets two, when no feature places the sprite, and when
-the merged attributes cannot be laid out.
+declare the same attribute, uniform, texture, usage alias or sprite-handle property — features
+that declare a uniform shared, of one type and start value, hold one uniform instead (see
+"Writing a feature") —, when a `requires` is not met, when a slot of one gets two, when no feature
+places the sprite, and when the merged attributes cannot be laid out.
 
 Every kind brings a prototype of its own. One loop over the sprites of more than four kinds is
 megamorphic and runs about eighteen times slower per sprite (see `docs/architecture.md`, the
@@ -225,9 +226,10 @@ flags.dispose();
 `InstancePosition` is data alone. `FlatPlacement`, `GroundPlacement` and `BillboardPlacement` read
 it and bring nothing but their placement stage, so one stands in for another on a live material
 (see "Flat sprites and billboards"). `setPosition(x, y)` without a `z` keeps the `z` the sprite
-has. `Yaw` and `Orientation` are data alone as well: only a placement of
-`flatPlacement({orientation: 'yaw'})` reads the one, only one of `flatPlacement({orientation:
-'quaternion'})` the other (see "Planes and turns").
+has. `Yaw` and `Orientation` are data alone as well: a placement of
+`flatPlacement({orientation: 'yaw'})` and the frame slot of `tableFrame({views})` read the one,
+only a placement of `flatPlacement({orientation: 'quaternion'})` the other (see "Planes and
+turns" and "Frames out of a table: `tableFrame()`").
 
 `BillboardPlacement` maps the x and y of the local vertex — trimmed, scaled, sheared and turned
 already — onto the camera's right and up vectors in the local space of the mesh, so a mesh or its
@@ -261,9 +263,10 @@ const margins: FrameTrimMargins = frameTrimMargins(frame.data);
 
 `TexturePackerJson` reads the "JSON Hash" and "JSON Array" exports of TexturePacker and of
 free-tex-packer alike, rotated and trimmed frames included. It refuses a frame that is no object
-or has no `frame`, a number of `frame` that is no finite number of 0 or more (a `RangeError`), and
-— without `parentCoords` — a `meta.size` without an area above 0, each naming the frame or the
-field, before the first frame goes into the atlas: a refused json leaves the `target` as it was.
+or has no `frame`, a number of `frame` that is no finite number of 0 or more (a `RangeError`), a
+`meta` that is no object (a `TypeError`, with `parentCoords` as well), and — without
+`parentCoords` — a `meta.size` without an area above 0, each naming the frame or the field,
+before the first frame goes into the atlas: a refused json leaves the `target` as it was.
 
 The quad of the sprite stands for the **untrimmed** sprite: size a sprite that shows trimmed
 frames by the `sourceSize` of its frames, not by the measures of their `coords`.
@@ -380,19 +383,25 @@ they differ. Every frame carries its duration, and Aseprite writes one above 0 f
 without it, in a tag or not, is refused with a `RangeError` naming it, before the first frame goes
 into the atlas. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its
 frames played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1
-is a one-shot. A tag that plays more than `FrameBasedAnimations.MaxTextureSize` (8192) frames —
-through its repeat, or because it spans that many itself, with a playback of its own as well — is
-refused, naming the tag, before the first frame goes into the atlas — more fit into no data
-texture. The message advises a lower repeat where one pass of the tag fits, and a split into
-shorter tags where it does not. `parse(json, {playback: {kick: 'once'}})` names the playback of a
-tag from code instead. It reads its own keys only — an inherited one such as `constructor` names no
-tag —, and a value that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag,
-before the first frame goes into the atlas: a refused sheet leaves `options.target` as it was.
+is a one-shot. A ping-pong over one frame shows that frame once, whatever its repeat. A tag that
+plays more than `FrameBasedAnimations.MaxTextureSize` (8192) frames — through its repeat, or
+because it spans that many itself, with a playback of its own as well — is refused, naming the
+tag, before the first frame goes into the atlas — more fit into no data texture. The message
+advises a lower repeat where one pass of the tag fits, and a split into shorter tags where it does
+not. A tag whose frames differ in their durations holds at most
+`FrameBasedAnimations.MaxFramesWithDurations` (8191) frames and is refused the same way above it:
+the message advises a lower repeat where one pass fits, and one duration for its frames or a split
+into shorter tags where it does not. `parse(json, {playback: {kick: 'once'}})` names the playback
+of a tag from code instead. It reads its own keys only — an inherited one such as `constructor`
+names no tag —, and a value that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming
+the tag, before the first frame goes into the atlas: a refused sheet leaves `options.target` as it
+was.
 
 A json that Aseprite does not write that way — without `frames` or `meta`, a frame of the layout
 "Array" without a `filename`, a tag or a slice without a `name`, slice keys, `bounds`, `center` or
 `pivot` the parser cannot read, two slices of one name — is refused before the first frame goes into
-the atlas, and the error names what is wrong.
+the atlas, and the error names what is wrong. A frame or a slice named `__proto__` is kept under
+that name, as any other.
 
 ```ts check
 import {AnimatedSpriteKind, AsepriteJson, type AsepriteJsonData, FeatureSprites} from '@spearwolf/twopoint5d';
@@ -567,9 +576,9 @@ transform, a `globalAlpha`, a composite operation — and gives that state back 
 **The texture** is read upright (`flipY = false`, as every atlas of the library), in sRGB, with
 straight alpha and without mipmaps; `filter: 'nearest'` for pixel art, `'linear'` by default.
 `textureFor(filter)` answers the texture of the canvas with a filter: `texture` for the filter of
-the atlas, else a second texture of the same canvas, the same in every setting but its filters —
-smooth portraits beside pixel labels out of one atlas. A `FeatureSprites` reads one `colorMap`, so
-the sprites of the other filter go into a mesh of their own:
+the atlas, which its `filter` names, else a second texture of the same canvas, the same in every
+setting but its filters — smooth portraits beside pixel labels out of one atlas. A `FeatureSprites`
+reads one `colorMap`, so the sprites of the other filter go into a mesh of their own:
 
 ```ts check
 import {DynamicAtlas, FeatureSprites, TexturedSpriteKind} from '@spearwolf/twopoint5d';
@@ -773,9 +782,9 @@ export function walk(velocityX: number) {
   `AtlasFrame`, every frame `AnimatedFrames` picks — in every playback mode — and a frame the
   packer turned or trimmed alike; a trimmed frame stays where the flipped untrimmed sprite has it,
   on its foot. Without a frame feature it mirrors the whole texture.
-- **0 or 1.** A value above 0.5 counts as 1, so a flag never draws a squeezed image. `flip` is
-  static: mark a change with `touchVO(sprite, 'flip')`, or build a geometry with `attributeUsage:
-  {dynamic: ['flip']}` for sprites that turn every few frames.
+- **0 or 1.** A value of 0.5 and above counts as 1, so a flag never draws a squeezed image.
+  `flip` is static: mark a change with `touchVO(sprite, 'flip')`, or build a geometry with
+  `attributeUsage: {dynamic: ['flip']}` for sprites that turn every few frames.
 - **The frame records the mirror** in `mirror`, so `Anchor` mirrors the anchor and `NineSlice` the
   border along with the image.
 - **Every base and every pass.** It works on the quad and on `gridBase()`, and `ShadowPass`,
@@ -1209,9 +1218,9 @@ the kind and, besides every three.js material parameter, its own options: `name`
 with other materials, which then stay the caller's. It takes only a kind out of `defineSprite()`,
 its options as an object, `resources` as a `SpriteResources` and `textures` and `uniforms` as
 objects by name, each start value of the type of its uniform — a finite number for a `float`, 2 to 4
-finite numbers for a `vec2` to `vec4` —, and each texture in `textures` a three.js Texture; anything
-else throws a `TypeError`. A start value of `undefined` or `null` keeps the one the feature
-declares.
+finite numbers for a `vec2` to `vec4` —, and each texture in `textures` a three.js Texture,
+`undefined` or `null`; anything else throws a `TypeError`. A start value of `undefined` or `null`
+keeps the one the feature declares, and a texture of `undefined` or `null` leaves it unset.
 
 ```ts check
 import {
@@ -2388,7 +2397,9 @@ The rules:
   one set of uniforms and textures, which `textures` and `uniforms` start: `setUniform()` and
   `setTexture()` of the sprites reach every pass, and the shadow of an animated sprite shows the
   frame the sprite shows, since `time` is one uniform for all of them. Two features — of the kind
-  or of any pass — that declare the same name are refused, and so are two passes of one name.
+  or of any pass — that declare the same name are refused, unless both declare a uniform shared,
+  of one type and start value, which they hold as one; a feature that comes along in the kind and
+  again in a pass counts once. Two passes of one name are refused as well.
 - **Renamed uniforms.** `uniformNames` maps names the features of the pass declare to names of
   the pass; the pass draws with copies of its features that declare and read those names, at the
   start values of the feature. Only the features of the pass are renamed, never those of the kind

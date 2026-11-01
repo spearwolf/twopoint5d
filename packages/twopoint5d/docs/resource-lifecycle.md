@@ -36,9 +36,11 @@ it. `TextureStore#acquireAsync()` holds the resource against `clearUnused()` and
 `evictMissing` until its `release()` comes; the texture stays the resource's all the same.
 
 **A take-over counts only where the receiving side promises it in its own TSDoc** — at
-the constructor parameter, at the field, at the method that accepts the resource. One
-exists today: [`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its
-constructor receives. An undocumented take-over is a bug.
+the constructor parameter, at the field, at the method that accepts the resource. Two
+exist today: [`Display`](../src/display/Display.ts) takes over the `WebGPURenderer` its
+constructor receives, and `InstancedVOBufferGeometry#attachInstancedPool()` takes over a
+pool handed to it when the caller asks for it with `autoDispose: true` (see below). An
+undocumented take-over is a bug.
 
 A canvas handed to the `Display` constructor is not taken over, and `dispose()` gives it
 back as the display found it: its classes, the inline `width`, `height` and
@@ -122,6 +124,19 @@ next pick builds them anew. Up to one of those events it holds each mesh it has 
 whether a later pick lists it or not: a mesh its owner drops without `dispose()` lives as
 long as the picker. Its `dispose()` releases the target and every pick material, stops
 listening, and rejects every pick still in flight (section 3).
+
+**A stage handed in stays the caller's, whoever draws it.**
+[`StageDirector#dispose()`](../src/stage/StageDirector.ts) ends its running transitions as
+cancelled and disposes what the director built: its pipelines, the renderers it wrapped
+stages in and the nodes of its effects. It disposes no stage and no effect: the stages of
+its stack and the effects stay the caller's, and a mask stage stays with its mask, so a
+mask goes back into a slot or an effect as often as the caller likes. A
+[`StageMask`](../src/stage/StageMask.ts) holds its stage and never disposes it: on its
+`dispose()` a director that holds the mask takes it off every slot and ends the transitions
+whose effect names it, and the mask lets go of the stage. The exception is the stage
+[`StageMask.inWorldOf()`](../src/stage/StageMask.ts) builds to draw a scene through the
+camera of a `Stage2D`: the mask owns that one and disposes it in its `dispose()`, while the
+`Stage2D` and the scene stay the caller's.
 
 ## 2. Idempotence
 

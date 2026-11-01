@@ -585,7 +585,7 @@ export class TextureStore {
     }
     if (typeof adapter !== 'function') {
       throw new TypeError(
-        `TextureStore: registerAtlasAdapter() got an adapter for ${describeValue(name)} that is no function — an adapter is (json, parentCoords) => {atlas, animations?}`,
+        `TextureStore: registerAtlasAdapter() got an adapter for ${describeValue(name)} that is no function — an adapter is (json, parentCoords, options?) => {atlas, animations?}`,
       );
     }
     const app: unknown = options?.app;

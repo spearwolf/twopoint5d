@@ -44,6 +44,8 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 - **Waves.** Grass and banners sway, and lines of text roll along a sine like the scrollers
   of the old Amiga demos.
 - **Fade and flash.** Sprites fade in and out, or flash white or in any colour when hit.
+- **Show and hide.** A hidden sprite keeps all its values, draws nothing, casts no shadow
+  and is never picked.
 - **Palette swap and colour cycling.** One sprite sheet in many colour variants, and
   palettes that rotate for water, fire and the classic copper look.
 - **Tint, trim and turned frames.** Sprites are coloured per instance. Frames that a packer
@@ -78,8 +80,8 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 ### 🧱 Tile maps
 
 - **Endless 2D tile maps**, streamed in around the camera.
-- **Visibility** is worked out from the camera's view or from a plain rectangle, nearest
-  tiles first. A camera that stands still costs nothing.
+- **Visibility** is worked out from the camera's view, nearest tiles first, or from a plain
+  rectangle. A view that stands still costs nothing.
 - **Spatial indexes** for fast lookups in large maps.
 - How a map is put together: [the tile map guide](docs/map2d.md).
 
@@ -94,8 +96,14 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 
 - **Responsive scenes.** You describe the view, and the library keeps it fitted to the
   canvas: filled, contained or covered, at a whole-pixel zoom when you want one.
+- **Pixel-snapped scrolling.** Pixel art stays crisp at a fractional pixel ratio and does
+  not shimmer as the view scrolls.
 - **Orthographic and parallax** projections.
 - **Several stages in one frame**, layered and nested.
+- **Transitions between stages.** A stack of layers — menu, game, pause screen — changes
+  through crossfades, wipes, slides, dissolves and effects of your own.
+- **Stage masks.** A layer shows only where the picture of another stage covers it: a fog
+  of war, a rift into a second world.
 - **Post-processing** with a node-based pipeline. Bloom is built in.
 - **2D canvas on a sprite.** Whatever you draw on an HTML canvas shows up in the scene and
   is uploaded again after every change.
@@ -110,6 +118,8 @@ Thousands of textured sprites in 3D space, drawn in a single draw call.
 - **Holds its frame rate.** A budget of pixels keeps large screens affordable, and with
   `adaptiveResolution: true` the display measures what every frame costs the GPU and
   draws fewer or more pixels to stay at 60 frames per second.
+- **Fullscreen.** A fullscreen button in one call, fullscreen when a phone turns sideways,
+  and a fallback through CSS where the browser has no native fullscreen to give.
 - **A good starting point** for your three.js demos.
 
 ### 🎮 Controls

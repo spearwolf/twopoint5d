@@ -392,6 +392,10 @@ update and draw. A stage `renderOrder` places nowhere — the list names neither
 the first list and not in the second: it is resized, but neither updated nor drawn.
 `root.hasStage(stage)` asks whether a stage is in.
 
+Both lists hold read-only records, `{stage, width, height, pixelRatio}`: the stage and the size the
+renderer last handed it — `root.stages.map((item) => item.stage)` gives the stages themselves.
+`add()` and `remove()` are the only way in and out, and `resize()` alone writes the size.
+
 ### Nested renderers
 
 A `StageRenderer` is a stage itself, so one renderer goes into another. The inner renderer has its
@@ -415,8 +419,9 @@ takes neither itself nor a renderer that holds it — `add()` and `parent` throw
 anything has moved.
 
 A `StageRenderer` hands its size and the pixel ratio of its host on to every stage, nested
-renderers included: `resize(width, height, pixelRatio)`. A stage refuses the size when its
-`resize()` throws:
+renderers included: `resize(width, height, pixelRatio)`. `root.width`, `root.height` and
+`root.pixelRatio` read what the renderer carries, the `width`, `height` and `pixelRatio` of an item
+of `root.stages` what that stage has taken. A stage refuses the size when its `resize()` throws:
 
 - in `add()`, the size comes first: a stage that refuses it is not added, and neither the
   renderer nor the previous holder of a child renderer has changed;
@@ -453,9 +458,10 @@ is `false`, whatever you set; the renderer restores it afterwards, as it restore
 and alpha right after its clear.
 
 The `stencil` of a `ClearStage` takes effect only on a display whose renderer has a stencil buffer
-(`rendererOptions: {stencil: true}`), only in the modes that draw into one target, and only in a
-renderer that draws to the canvas or to an `outputRenderTarget` with a stencil buffer — not in the
-pass target a composing parent draws it into.
+(`rendererOptions: {stencil: true}`), and only in a renderer without a pipeline whose stages draw
+straight into the canvas or into an `outputRenderTarget` with a stencil buffer. The targets a
+renderer builds for itself have none: neither the internal target of the whole-picture mode nor
+the pass target a composing parent draws it into.
 
 The targets a renderer builds for itself start every frame empty: the internal target of
 [a pipeline on the whole picture](#a-pipeline-on-the-whole-picture) and the target of a
@@ -561,8 +567,15 @@ when a stage or the pipeline throws. Renderers that draw one after another share
 renderer that draws while another one holds the target, such as a child inside a parent that is
 in the whole-picture mode as well, gets a second one from the pool. The pool lends targets of
 exactly the size asked for: give renderers of different sizes a pool each, or the pool resizes its
-target at every switch between
-them and allocates new GPU memory each time. Without a pool nothing changes.
+target at every switch between them and allocates new GPU memory each time. Without a pool nothing
+changes.
+
+Code of your own may borrow from the same pool on the same terms: `pool.acquire(width, height,
+type, samples)` lends a target of exactly that many pixels, and every `acquire()` is paired with
+one `pool.release(target)`. A `width` or `height` that is not a whole number of 1 or more, and a
+`samples` that is not a whole number of 0 or more, is refused with a `RangeError` that names the
+argument and the value, before the pool changes; `release()` throws for a target that is not on
+loan from that pool.
 
 ### Composed: one pass per stage, `buildOutputNode`
 
@@ -599,17 +612,22 @@ What the passes are:
   clears and draws the child into before its pipeline runs.
 
 `buildOutputNode` runs again on the next frame after a stage was added or removed, after a change
-of `renderOrder` or of a stage name, after a new `pipeline` or `buildOutputNode`, after a stage
-of your own handed a new node following its `OnStageAfterCameraChanged` or
-`OnStageAfterSceneChanged`, and after `invalidateOutputNode()`. While the renderer has no
-size, or a `Stage2D` it composes has no camera yet, it draws nothing. Without any stage it draws
-its own clear and calls neither the callback nor the pipeline.
+of `renderOrder`, after a stage was renamed while `renderOrder` lists names, after a new
+`pipeline` or `buildOutputNode`, after a stage of your own handed a new node following its
+`OnStageAfterCameraChanged` or `OnStageAfterSceneChanged`, and after `invalidateOutputNode()`.
+While the renderer has no size, or a `Stage2D` it composes has no camera yet, it draws nothing.
+Without any stage it draws its own clear and calls neither the callback nor the pipeline.
 
 #### A builder of your own
 
 Neither the renderer nor three's `RenderPipeline` releases an output node a rebuild replaces. An
 effect node that owns render targets — `bloom()` does — is the callback's to release: the one of
 the previous call once the new one stands, the last one when you are done.
+
+A rebuild that answers the node the pipeline holds already leaves `pipeline.outputNode` and
+`pipeline.needsUpdate` alone, since three.js builds its shader again for every `needsUpdate`. A
+callback that keeps its node and changes the graph behind it sets `pipeline.needsUpdate = true`
+itself.
 
 ```ts
 import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
@@ -741,6 +759,10 @@ display.start();
 The stars sit in the bottom slot from the first frame to the last; every transition runs above
 them. The level is a `StageRenderer` of its own, so it may carry a pipeline of its own — a bloom
 of the world alone, a palette effect —, and the director composes its output like any other layer.
+A bloom keeps the alpha of the layer only when its builder keeps it:
+`createBloomOutputNodeBuilder()` adds the glow of `bloom()`, whose alpha is 1 everywhere, to the
+alpha of the layer as well, and the level hides the stars below it. A builder of your own adds the
+glow to the color alone — see [pitfalls](#pitfalls).
 
 ### A pause menu over the frozen game
 
@@ -770,7 +792,7 @@ loader.onDone = () => transition.complete();
 
 With `manual: true` the director does not advance the transition: the caller writes `progress`,
 clamped to `[0, 1]`, and ends it with `complete()` or `cancel()`. `duration` and `easing` do not
-apply.
+apply, and `reverse()` does nothing.
 
 ### No hitch on the first transition
 
@@ -802,6 +824,10 @@ through, when another `precompile()` still compiles it —, a shape whose compil
 compiled again by the next call, and what `precompile()` compiles stays until the director is
 disposed, or until it draws or precompiles with another renderer. A transition without an `effect`
 cannot be named ahead: give it an effect of its own to compile it ahead.
+
+`precompile()` takes a `WebGPURenderer`, under either backend; a `WebGLRenderer` rejects the
+promise with a `TypeError`. A director disposed while the call runs ends the work there, and the
+promise resolves — also when a compile it waits for fails after the dispose.
 
 The shapes cover the composition of the director. A layer builds its own materials and pipelines on
 its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
@@ -855,8 +881,9 @@ below show through wherever it draws nothing.
 | `pop(opts?)` | `[a, b]` → `[a]` | the top layer into nothing; the layer below runs again |
 | `setStack(stages)` | anything → `stages` | nothing: an instant cut; running transitions end as cancelled, and every [mask](#masks-on-a-slot) is dropped |
 
-- Without an `effect`, a `duration` above 0 or `manual`, a change lands at once — the stack
-  changes in the call, and the next frame draws it.
+- A change that is not `manual` and whose `duration` is 0 lands at once, with an `effect` or
+  without — without one that is the default duration, with one it takes `duration: 0`. The stack
+  changes in the call, the next frame draws it, and a `delay` does not apply.
 - `director.stack` is the stack as it stands once every running transition has ended;
   `director.transitions` lists the transitions that run, `director.has(stage)` asks for one stage.
 - `add(stage)` shows a stage on top at once — `new StageRenderer(director)` and
@@ -868,7 +895,9 @@ below show through wherever it draws nothing.
   negative `duration` or `delay`, an easing it does not know, an `at` outside the stack.
 - A change of a slot that is in a transition finishes that transition first: its end state lands
   and its events go out. So does a transition that takes a stage out of the stack, when `show()`,
-  `push()` or `replace()` brings that stage back.
+  `push()` or `replace()` brings that stage back, and a transition in the slot below a `push()`
+  with `below: 'freeze'` — one that ends with nothing takes its slot out, and the transition in the
+  slot below that finishes as well, until a slot with a layer lies below the new one.
 - `pipeline`, `buildOutputNode` and `renderOrder` are the director's own; a write to any of them
   throws until the director is disposed. The director draws only its clear while the stack is empty.
 
@@ -893,12 +922,14 @@ or precompiled with last.
 
 | where | option | `'run'` | `'freeze'` |
 | --- | --- | --- | --- |
-| under a `push()` | `below` | the default: the layer below plays on | it stops until `pop()` |
+| under a `push()` | `below` | the default: the layer below plays on | it stops until the pushed slot goes |
 | the layer a transition leaves | `outgoing` | the default | its last picture goes |
 | the layer a transition brings | `incoming` | the default | its first picture comes; it runs from the end on |
 
 `push()` with `below: 'freeze'` freezes the layer that stays below the new slot: a pause menu
-pushed back while its `pop()` still fades it out comes back over a frozen level.
+pushed back while its `pop()` still fades it out comes back over a frozen level. The layer runs
+again as `pop()` begins; `hide()`, `remove()` and `setStack()` let it run once the pushed slot has
+left the stack — `hide()` at the end of its transition.
 
 `director.freeze(stage)` and `director.run(stage)` set it by hand; `director.isFrozen(stage)` asks.
 A state set by hand is yours: the end of a transition with the layer as a source, and the `pop()`
@@ -911,13 +942,23 @@ Every method but `setStack()` answers a `StageTransition`, the instant ones incl
 | member | |
 | --- | --- |
 | `from`, `to` | the stages, `undefined` for nothing |
-| `effect`, `duration`, `delay`, `manual` | as handed in |
+| `effect`, `duration`, `delay`, `manual` | as handed in, or their defaults — the shared `crossfade()`, the default `duration` |
 | `state` | `'pending'` until its first frame, `'running'`, then `'finished'` or `'cancelled'` |
-| `elapsed`, `progress` | seconds since its start; the eased progress, `0`…`1` — writable while `manual` |
+| `elapsed`, `progress` | seconds since its start; the eased progress, `0`…`1` — writable while `manual`, see below |
 | `finished` | resolves with the transition once it ended, also when it was cancelled; it never rejects |
 | `complete()` | ends it now, with `to` in the slot |
 | `cancel(jumpTo?)` | ends it now as cancelled: `'start'`, the default, leaves `from`, `'end'` leaves `to` |
-| `reverse()` | runs it back from where it is; back at the start it ends as cancelled |
+| `reverse()` | runs it back from where it is, a second call forward again; back at the start it ends as cancelled |
+
+- `reverse()` before the first frame ends the transition as cancelled at once, with `from` in its
+  slot; on a `manual` transition and on one that has ended it does nothing.
+- A write to `progress` is clamped to `[0, 1]`, and the next draw of the director shows it. On a
+  transition that is not `manual` it throws, `NaN` or a value that is no number throws a
+  `RangeError`, and a write to a manual transition that has ended does nothing.
+- A call that changes nothing — after `dispose()`, while `setStack()` or `dispose()` end the
+  running transitions, or once a listener disposed the director — answers a cancelled transition
+  with the shared `crossfade()`, a `duration` and a `delay` of 0 and `manual: false`, whatever the
+  call was handed.
 
 The options of every change:
 
@@ -930,6 +971,7 @@ The options of every change:
 | `manual` | `false` | |
 | `outgoing`, `incoming` | `'run'` | see [run and freeze](#run-and-freeze) |
 | `at` | the top | `show()` and `push()`: the position in the stack |
+| `mask` | none | `show()` and `push()`: the [mask](#masks-on-a-slot) of the new slot, from its first frame on |
 | `below` | `'run'` | `push()` |
 
 **Time.** A transition runs on the `updateFrame()` of the director, by its `deltaTime`: a paused
@@ -1408,8 +1450,8 @@ display.start();
 At progress 0 the title shows alone, with the blots at size 0; at 1 the level shows alone. Between
 them every pixel shows the share of the level that the ink covers there — a pixel inside a blot the
 level, outside it the title, the edge of a soft blot a mix of both. The mask stage is never in the
-stack: the director draws it while the transition runs and lets it go when the transition ends, so a
-matte costs nothing before and after.
+stack: the director draws it from the call that starts the transition, a `delay` included, and lets
+it go when the transition ends, so a matte costs nothing before and after.
 
 **Progress, not the clock.** A matte that grows with the clock of the display would end early under
 a slowed transition, late under a fast one and never under a `manual: true` one. `ink.progress` is
@@ -1510,14 +1552,19 @@ export const throughTheLight = (light: StageMask): StageTransitionEffect => ({
 });
 ```
 
-- `masks` is a list of `StageMask` objects, read when a transition with the effect begins. The
-  director draws their stages while the transition runs and lets them go afterwards. A list changed
-  later changes no transition that runs.
+- `masks` is a list of `StageMask` objects, read by the call that starts a transition with the
+  effect. The director draws their stages from that call on — through a `delay` as well, with
+  `progress` at 0 — and lets them go once the transition has ended. A list changed later changes no
+  transition that runs.
+- A change at once — `duration: 0` and not `manual` — draws no effect and drives none of its
+  masks. They are checked as the mask of a slot is — a disposed one, or one whose stage another
+  director holds, is refused —, but a mask busy with another transition does not refuse the call.
 - `input.mask(mask)` answers a `StageMaskSource` for one of the masks the effect named. It is the
   `StageTransitionSource` of the stage, `sample(uv)` — the premultiplied picture, transparent black
   outside `[0, 1]` — with one member more: `coverage(uv)`, the coverage by the `source` and the
-  `invert` of the mask, from 0 to 1 and 0 outside `[0, 1]`. A mask the effect did not name throws,
-  also another `StageMask` on the same stage.
+  `invert` of the mask, from 0 to 1. Outside `[0, 1]` it is the coverage of transparent black: 0,
+  or 1 with `invert`. A mask the effect did not name throws, also another `StageMask` on the same
+  stage.
 - The mask is sampled at the `uv` of the effect, as the layers are: a mask stage is a picture of
   the screen, not a texture of a mesh. A mask stage that draws into its top half is the top half of
   the picture.
@@ -1594,15 +1641,16 @@ they are.
 - `setStack()` makes new slots and drops every mask, also those of the stages that stay in the
   stack. Set the masks again after the call.
 - `hide()`, `pop()` and `remove()` of a layer take the mask off the slot that goes with it.
-- `remove(maskStage)` and the `dispose()` of a mask stage take the mask off every slot it lies on,
-  and so does the `dispose()` of the mask itself.
+- `remove(maskStage)` and the `dispose()` of a mask stage take every mask on that stage off every
+  slot it lies on, and end as cancelled every transition whose effect names a mask on that stage.
+  The `dispose()` of a mask does the same for that one mask.
   `remove()` of a stage that is neither a layer nor a mask does what it does without masks.
 - Every refusal comes before anything changes. `setMask()` refuses a `stage` that is not in the
   stack, a `mask` that is not a `StageMask`, a disposed mask or mask stage, a mask whose stage is a
   layer of the stack, is the director or holds it, and a mask stage that another director draws
   as a mask or as a layer. `show()` and `push()` refuse a `mask` the same way. The other way round,
-  `show()`, `push()`, `replace()`, `setStack()` and `add()` refuse a stage that is a mask stage of
-  the director as a layer.
+  `show()`, `push()`, `replace()`, `setStack()` and `add()` refuse as a layer a stage that this
+  director or another one draws as a mask.
 - The mask stages are updated and drawn after every layer, in the order of the slots they lie on,
   bottom to top. A mask that follows something in the world of a layer reads the camera that moved
   in this frame.
@@ -1613,10 +1661,10 @@ A mask stage updates and draws every frame for as long as a slot references it, 
 stages of the director as a layer does when nothing references it any more: the GPU memory of its
 pass target goes, and a `StageRenderer` the director built around a `Stage2D` is disposed.
 
-`freeze(stage)`, `run(stage)` and `isFrozen(stage)` take the stage of a mask as they take a layer; a
-stage that is neither a layer nor a mask of this director is refused with "no layer or mask of this
-director". A frozen mask keeps its last picture and costs a texture fetch per pixel; `run()` sets it
-going again.
+`freeze(stage)`, `run(stage)` and `isFrozen(stage)` take the stage of a mask as they take a layer.
+`freeze()` and `run()` refuse a stage that is neither a layer nor a mask of this director with "no
+layer or mask of this director"; `isFrozen()` answers `false` for it. A frozen mask keeps its last
+picture and costs a texture fetch per pixel; `run()` sets it going again.
 
 ### The progress of a mask
 
@@ -1639,8 +1687,8 @@ A mask that a transition uses carries the progress of that transition to its sta
   the call ends anyway have ended: `replace()` ends the run in its own slot first, so
   `director.replace(a, b, {effect: inkIn})` in the slot whose `inkIn` run is still going is allowed —
   the old run ends, and the mask starts again at progress 0, with the same mask and the same stage.
-- **Without a transition.** A change that happens at once, without an effect, drives no mask and
-  leaves `progress` as it was.
+- **Without a transition.** A change that happens at once drives no mask, also with an effect that
+  names one, and leaves `progress` as it was.
 - **The reverse.** `reverse()` runs the transition back, and the mask follows it back with it.
 
 ```ts
@@ -1732,7 +1780,7 @@ source and the `invert` are the same — a mask, unlike an effect, goes by its o
 | a mask that runs | the draws of its stage | 1 pass target |
 | a frozen mask | none | 1 pass target, kept |
 | a masked slot | none of its own: one texture fetch and one multiplication in the quad | none of its own |
-| a transition through `matte()` | its two sources and the mask stage, for the length of the transition | 1 pass target, for the length of the transition |
+| a transition through `matte()` | its two sources and the mask stage, from the call to the end of the transition, `delay` included | 1 pass target, from the call to the end of the transition |
 
 Against a nested pipeline that masks a layer in a pass of its own, a masked slot saves a pass
 target with its depth buffer — about 100 MB at 3840 × 2160 — and a full-screen quad per masked
@@ -1853,8 +1901,11 @@ To work under a composing pipeline, a stage also implements `IPassProvider`: `as
 returns the node that stands for it in the composition. A stage that builds a new node for a new
 scene or camera announces it through `OnStageAfterSceneChanged` or `OnStageAfterCameraChanged`,
 and a composing renderer rebuilds its output node for it; one that writes the new scene or camera
-into the node it has, as `Stage2D` does, costs no rebuild. The node belongs to the stage — build it
-once, keep it as long as it stays valid, and release it in the stage's `dispose()`:
+into the node it has, as `Stage2D` does, costs no rebuild. The renderer listens for the two events
+on an eventized stage alone (`eventize(this)` from `@spearwolf/eventize`): of a stage that is not
+eventized, the composition keeps the node it took until something else rebuilds it. The node
+belongs to the stage — build it once, keep it as long as it stays valid, and release it in the
+stage's `dispose()`:
 
 ```ts
 import type {IPassProvider} from '@spearwolf/twopoint5d';
@@ -1894,6 +1945,23 @@ A stage that ends announces it: an eventized stage (`eventize(this)` from `@spea
 that emits `OnStageDispose` in its `dispose()`, as `Stage2D` does, is taken out of every renderer
 that holds it. Take any other stage out with `remove(stage)` before you dispose it — see
 [pitfalls](#pitfalls).
+
+A projection of your own for a `Stage2D` implements `IProjection`. Its
+`updateViewRect(width, height, pixelRatio?)` takes the container and the pixels of the drawing
+buffer per unit of it, `1` where the ratio is left out, and its `getViewRect()` answers
+`{width, height, pixelRatioX, pixelRatioY, offsetX, offsetY}` as a new object on every call. The
+offsets say how far the middle of the view lies right of and above the point the camera looks at;
+a projection that does not shift its frustum answers `0` for both.
+
+A subclass of `StageRenderer` has protected hooks. `renderToCurrentTarget(renderer)` is the one
+draw of a renderer, called by its own `renderTo()` and by a parent that composes it into its pass
+target, so an override that prepares the draw and calls `super.renderToCurrentTarget(renderer)`
+covers both. `shouldRenderPass(child)` is asked in the composed mode for every nested renderer:
+`false` keeps the picture its pass target holds from an earlier frame, neither cleared nor drawn,
+and the composition samples that picture. `resizeStage(item, width, height, pixelRatio)` hands the
+size to one stage and is the one place that writes its item: an override hands all four on to
+`super.resizeStage()`, or the item keeps the size it had, and one that throws counts as the stage
+refusing the size.
 
 ## Driving the frame loop yourself
 
@@ -1951,10 +2019,11 @@ renderer gives back what it got and joins no holder.
 All event names are exported from `@spearwolf/twopoint5d`; subscribe with `on()` from
 `@spearwolf/eventize`.
 
-Each name carries its emitter — `OnCanvas2DStageResize` is `'canvas2DStageResize'` —, so a
-listener object whose methods are keyed by the constants hears only the emitter it subscribes to.
-`OnStageDispose` and `OnCanvas2DStageDispose` share `'dispose'`: every stage of the library
-announces its end under that one name.
+Each value is the name of its constant without `On`, its first letter in lower case —
+`OnCanvas2DStageResize` is `'canvas2DStageResize'`, `OnAddToParent` is `'addToParent'` —, so no
+two of the constants share a value, and a listener object whose methods are keyed by them hears
+no event of another kind. The one exception: `OnStageDispose` and `OnCanvas2DStageDispose` share
+`'dispose'`, since every stage of the library announces its end under that one name.
 
 | emitter | event | when, and what it carries |
 | --- | --- | --- |
@@ -2103,7 +2172,7 @@ pipeline.dispose();
 | `IStage` | `name`, `resize(w, h, pixelRatio?)`, `updateFrame(now, dt, frameNo)` | anything a `StageRenderer` sizes and ticks |
 | `IRenderable` | `renderTo(renderer)` | anything a `StageRenderer` draws |
 | `IPassProvider` | `asPassNode(renderer)` | a stage under a composing pipeline |
-| `IProjection` | `updateViewRect()`, `getViewRect()`, `projectionPlane`, `getScaleFactor()`, `createCamera()`, `updateCamera()` | a projection of your own for a `Stage2D` |
+| `IProjection` | `updateViewRect(w, h, pixelRatio?)`, `getViewRect()` with `offsetX` and `offsetY`, `projectionPlane`, `getScaleFactor()`, `createCamera()`, `updateCamera()` | a projection of your own for a `Stage2D` |
 | `IStageRendererHost` | `onResize`, `onRenderFrame`, `isDisposed?` | the frame loop that drives a `StageRenderer` |
 
 ### The modes

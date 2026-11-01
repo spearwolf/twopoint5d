@@ -18,15 +18,18 @@ of `public-api.ts` files _is_ the package's API contract:
   imports, so internal files can be renamed and reshaped freely.
 - `display/`, `texture/`, `map2d/` (with `chunk-quad-tree/`) and `sprites/` name their
   exports one by one, because their files export for their neighbours as well: a new
-  export of such a file stays internal until it is listed. A helper listed only because
-  an earlier release published it carries `@deprecated`.
+  export of such a file stays internal until it is listed. `stage/` and `text/` do the
+  same for those of their files that export internals — `StageDirector.ts`,
+  `StageMask.ts`, `StageTransition.ts`, `transitionEffects.ts` and `maskNodes.ts` in
+  `stage/`, `layoutText.ts` in `text/` — and re-export the rest whole. A helper listed
+  only because an earlier release published it carries `@deprecated`.
 - A new public symbol is not published until it is added to its module's
   `public-api.ts`. `pnpm checkNameableTypes` fails the build when a published
   declaration references a type that consumers cannot name — usually the symptom of a
   type that was forgotten here.
 - Type-only exports go through `export type` — `export type * from './types.js'`, or a
-  named `export type {…}` list in a module that names its exports one by one, as the
-  four modules above do — matching Biome's `useImportType` on the import side.
+  named `export type {…}` list where a module names its exports one by one, as the
+  modules above do — matching Biome's `useImportType` on the import side.
 
 ## 2. Layers
 
@@ -129,7 +132,8 @@ setter of more than sixteen values.
 
 `TextureAtlas` and `TileSet` describe where a frame lives inside an image;
 `TextureCoords` is the value type they hand out. `TextureFactory` builds three.js
-textures with a given set of options.
+textures with a given set of options, named as texture classes — filters, anisotropy,
+`flipY`, mipmaps, color space and wrap —, which a `TextureStore` catalog names per item.
 
 `TextureStore` with its `TextureResource`s is the way to load textures, atlases and tile
 sets: a catalog names the resources, every image is fetched once however many resources
@@ -147,7 +151,9 @@ timing data the `AnimatedFrames` sprite feature reads. `AtlasFrameTable` lays fr
 into a uniform array, and `sampleAtlasFrame()` samples one of them per fragment in a `NodeMaterial`
 of one's own — a repeated frame on a mesh — the first TSL of this layer. `DynamicAtlas` packs frames
 drawn at run time onto the shelves of a canvas and hands out a `CanvasTexture` of it and an ordinary
-`TextureAtlas` of its frames.
+`TextureAtlas` of its frames; `textureFor(filter)` hands out a second texture of the same canvas
+with the other filter, owned by the atlas as the first is. The guide of the layer is
+[`docs/textures.md`](./textures.md).
 
 ### `display/`
 
@@ -167,7 +173,11 @@ predicts its steps with. The handover of a canvas between two displays — waiti
 of the one before, keeping its WebGL context lost but restorable, giving a canvas that was handed
 in back as the display found it — is an internal module, `src/display/canvasHandover.ts`, which
 `Display` enters at two places: `waitForCanvas()` before the init of its renderer and
-`releaseRenderer()` after `dispose()`.
+`releaseRenderer()` after `dispose()`. `display.fullscreen` is a `DisplayFullscreen` the
+display builds from its `fullscreen` option: the browser's native fullscreen on the element
+around the canvas or another target, fullscreen when a phone turns sideways (`onLandscape`)
+and a pseudo fullscreen through CSS as the opt-in `fallback`; `Display#dispose()` leaves a
+fullscreen the display entered before it lets go of the renderer.
 
 ### `stage/`
 
@@ -175,8 +185,24 @@ in back as the display found it — is an internal module, `src/display/canvasHa
 (`OrthographicProjection`, `ParallaxProjection`, with `ProjectionPlane` and
 `fitIntoRectangle` doing the geometry) decide how world units map to the viewport when
 the canvas resizes. `StageRenderer` composes several stages into one frame, and
-`RootRenderPipeline` / `IPassProvider` wire in post-processing passes. The guide of the
-layer, including render-target ownership, is [`docs/stages.md`](./stages.md).
+`RootRenderPipeline` / `IPassProvider` wire in post-processing passes. `ClearStage` clears
+buffers between sibling stages, the depth buffer unless told otherwise, and a
+`StageRenderTargetPool` lends the internal target of the whole-picture mode to the
+renderers that share it. `Canvas2DStage` shows a 2D canvas on a sprite through a
+`StageRenderer` of its own.
+
+`StageDirector` is a `StageRenderer` that holds a stack of layers and changes it through
+transitions: `show()`, `hide()`, `replace()`, `push()` and `pop()` each answer a
+`StageTransition` handle, `setStack()` sets the stack at once. It draws every layer into a
+target of its own and composes the stack in one `RootRenderPipeline` per shape of it; the
+effects of a transition (`crossfade()`, `wipe()`, `dissolve()`, `matte()` and the others,
+or a `StageTransitionEffect` of one's own in TSL) are nodes of that composition, and
+`createTransitionNode()` builds one for a `buildOutputNode` of one's own. A `StageMask`
+binds a stage as the mask of a slot or of an effect, by the coverage of its picture;
+`StageMask.inWorldOf()` draws a scene through the camera of a `Stage2D` as such a mask, and
+`createMaskNode()` multiplies a picture by the coverage of a mask in a `buildOutputNode` of
+one's own. The guide of the layer, including render-target ownership, is
+[`docs/stages.md`](./stages.md).
 
 ### `sprites/`
 
