@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-01
+
+This release brings the `StageDirector`, a stack of stages that changes through transitions —
+`crossfade()`, `wipe()`, `slide()`, `iris()`, `dissolve()`, `lumaMask()`, `pixelate()`, `matte()`
+and effects of one's own in TSL —, and stage masks: a stage that masks a slot or drives an
+effect, also in the world of a `Stage2D`. A `Display` gains native fullscreen with a pseudo
+fallback and a turn to landscape on phones, projections gain `pixelSnap` for crisp pixel art at
+any pixel ratio, sprites the `Visible` feature, and textures the wrap and mipmap classes,
+`DynamicAtlas#textureFor()` and the `playback` of a catalog atlas. The `three` peer dependency
+moves to `~0.187.0`, the event constants carry their emitter, and many calls refuse input they
+took silently before; the Migration Guide at the end of this section walks a project through
+every break.
+
 ### Added
 
 - add `StageMask`, a stage bound as a mask (`source`: `'alpha'`, `'luminance'`, `'red'`, `'green'` or `'blue'`, read from the premultiplied picture of the stage; `invert`), and `createMaskNode(content, mask, options?)`, the node of a picture times the coverage of a mask for a `buildOutputNode` of one's own; and the types `StageMaskOptions`, `StageMaskCoverageSource` and `MaskNodeOptions`. A `StageMask` holds its stage and leaves it undisposed (see "Stage masks" in `docs/stages.md`)
