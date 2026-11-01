@@ -297,6 +297,120 @@ describe('Map2DSpatialHashGrid', () => {
     expect(grid.getTile(3, 5)?.has(b)).toBe(true);
   });
 
+  describe('clear() and size', () => {
+    // a grid of 10 × 10 cells with a renderable over four cells and one in a single cell
+    const filledGrid = () => {
+      const grid = new Map2DSpatialHashGrid<IMap2DRenderableArea>(10, 10);
+      const wide: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 20, 20)};
+      const small: IMap2DRenderableArea = {aabb: new AABB2(50, 50, 5, 5)};
+      grid.add(wide, small);
+      return {grid, wide, small};
+    };
+
+    const occupiedCells = [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+      [5, 5],
+    ] as const;
+
+    test('size is 0 for a new grid', () => {
+      expect(new Map2DSpatialHashGrid().size).toBe(0);
+    });
+
+    test('size counts a renderable once, over several cells and after a second add()', () => {
+      const {grid, wide} = filledGrid();
+      expect(grid.size).toBe(2);
+
+      wide.aabb.set(30, 30, 20, 20);
+      grid.add(wide);
+      expect(grid.size).toBe(2);
+    });
+
+    test('size drops with remove() and stands when remove() is handed a renderable it does not hold', () => {
+      const {grid, wide} = filledGrid();
+      grid.remove(wide);
+      expect(grid.size).toBe(1);
+
+      grid.remove(wide, {aabb: new AABB2(0, 0, 1, 1)});
+      expect(grid.size).toBe(1);
+    });
+
+    test('clear() leaves the grid empty', () => {
+      const {grid} = filledGrid();
+      const everywhere = new AABB2(-100, -100, 300, 300);
+
+      grid.clear();
+
+      expect(grid.size).toBe(0);
+      for (const [x, y] of occupiedCells) {
+        expect(grid.getTile(x, y), `cell ${x},${y}`).toBeUndefined();
+      }
+      expect(grid.findWithin(everywhere)).toBeUndefined();
+      const out: IMap2DRenderableArea[] = [{aabb: new AABB2()}];
+      expect(grid.findWithin(everywhere, out)).toBe(out);
+      expect(out).toEqual([]);
+      expect(grid.getTiles(-10, -10, 30, 30)).toBeUndefined();
+      expect(grid.getTiles(-10, -10, 30, 30, out)).toEqual([]);
+      // a range over fewer cells than the grid held walks its own rectangle
+      expect(grid.getTiles(0, 0, 1, 1)).toBeUndefined();
+    });
+
+    test('clear() empties a set getTile() handed out before', () => {
+      const {grid, wide} = filledGrid();
+      const cell = grid.getTile(0, 0)!;
+      expect(cell.has(wide)).toBe(true);
+
+      grid.clear();
+
+      expect(cell.size).toBe(0);
+    });
+
+    test('remove() passes over a renderable from before clear()', () => {
+      const {grid, wide} = filledGrid();
+      grid.clear();
+
+      expect(() => grid.remove(wide)).not.toThrow();
+      expect(grid.size).toBe(0);
+    });
+
+    test('add() after clear() puts a renderable into its cells again, and queries find it', () => {
+      const {grid, wide, small} = filledGrid();
+      grid.clear();
+
+      grid.add(small);
+
+      expect(grid.size).toBe(1);
+      expect(grid.getTile(5, 5)?.has(small)).toBe(true);
+      expect(grid.getTile(0, 0)).toBeUndefined();
+      expect(grid.findWithin(new AABB2(0, 0, 100, 100), [])).toEqual([small]);
+      expect([...(grid.findWithin(new AABB2(45, 45, 10, 10)) ?? [])]).toEqual([small]);
+
+      grid.add(wide);
+      expect(grid.size).toBe(2);
+      expect(new Set(grid.findWithin(new AABB2(0, 0, 100, 100), []))).toEqual(new Set([wide, small]));
+    });
+
+    test('clear() on an empty grid does nothing', () => {
+      const grid = new Map2DSpatialHashGrid();
+      grid.clear();
+
+      expect(grid.size).toBe(0);
+      expect(grid.findWithin(new AABB2(0, 0, 10, 10))).toBeUndefined();
+    });
+
+    test('clear() keeps maxCellsPerRenderable', () => {
+      const {grid} = filledGrid();
+      grid.maxCellsPerRenderable = 4;
+
+      grid.clear();
+
+      expect(grid.maxCellsPerRenderable).toBe(4);
+      expect(() => grid.add({aabb: new AABB2(0, 0, 30, 30)})).toThrow(RangeError);
+    });
+  });
+
   describe('maxCellsPerRenderable', () => {
     test('add() refuses an aabb that reaches into more than maxCellsPerRenderable cells and adds none of the renderables', () => {
       const grid = new Map2DSpatialHashGrid(1, 1);
@@ -329,7 +443,9 @@ describe('Map2DSpatialHashGrid', () => {
       const write = () => (grid.maxCellsPerRenderable = value);
 
       expect(write).toThrow(
-        new RangeError(`Map2DSpatialHashGrid: maxCellsPerRenderable must be a whole number above 0 or Infinity, got ${value}`),
+        new RangeError(
+          `Map2DSpatialHashGrid: maxCellsPerRenderable must be a whole number of 1 or more, or Infinity, got ${value}`,
+        ),
       );
       expect(grid.maxCellsPerRenderable).toBe(100);
     });

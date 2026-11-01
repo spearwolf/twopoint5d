@@ -96,7 +96,7 @@ describe('matte()', () => {
 
   it('refuses a negative softness', () => {
     const mask = new StageMask(stage());
-    expect(() => matte({mask, softness: -0.1})).toThrow('matte: softness must be a finite number of 0 or above, got -0.1');
+    expect(() => matte({mask, softness: -0.1})).toThrow('matte: softness must be a finite number of 0 or more, got -0.1');
     expect(() => matte({mask, softness: Number.NaN})).toThrow(RangeError);
     expect(() => matte({mask, softness: 0})).not.toThrow();
   });

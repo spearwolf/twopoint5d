@@ -16,7 +16,8 @@ import {
 } from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
 import {OnStageDispose, OnStageTransitionEnd, OnStageTransitionStart, type StageTransitionProps} from '../events.js';
-import {assertFinite} from '../utils/assertFinite.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {ClearStage} from './ClearStage.js';
@@ -422,11 +423,9 @@ function stageArgument(subject: string, name: string, stage: unknown): void {
   }
 }
 
-/** Refuses an `at` that is no whole number of 0 or above; `#slotIndexAt()` holds it to the length of the stack. */
+/** Refuses an `at` that is no whole number of 0 or more; `#slotIndexAt()` holds it to the length of the stack. */
 function atOption(subject: string, at: unknown): void {
-  if (at !== undefined && (!Number.isInteger(at) || (at as number) < 0)) {
-    throw new RangeError(`${subject}: at must be a whole number of 0 or above, got ${describeValue(at)}`);
-  }
+  if (at !== undefined) assertWholeNumber(at, subject, 'at', 0);
 }
 
 /** Refuses a `mask` that is neither `undefined` nor a `StageMask`; `#checkMask()` checks the rest. */
@@ -438,9 +437,7 @@ function maskOption(subject: string, mask: unknown): void {
 
 function nonNegative(subject: string, name: string, value: unknown, fallback: number): number {
   if (value === undefined) return fallback;
-  const number = assertFinite(value, subject, name);
-  if (number < 0) throw new RangeError(`${subject}: ${name} must be a finite number of 0 or above, got ${describeValue(value)}`);
-  return number;
+  return assertFiniteAtLeast(value, subject, name, 0);
 }
 
 interface ParsedOptions {

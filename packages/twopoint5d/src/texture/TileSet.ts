@@ -1,3 +1,5 @@
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {randomInt} from '../utils/randomInt.js';
 import {TextureAtlas, type TextureAtlasFrame, type TextureAtlasFrameData} from './TextureAtlas.js';
@@ -224,7 +226,7 @@ export class TileSet<D = TextureAtlasFrameData> {
    * @throws {RangeError} if `tileId` is not a whole number; a negative whole number is fine, the arithmetic wraps it around.
    */
   frameId(tileId: number): number {
-    assertOption(Number.isInteger(tileId), 'tileId', 'a whole number', tileId);
+    assertWholeNumber(tileId, 'TileSet', 'tileId');
     return ((((tileId - this.firstId) % this.tileCount) + this.tileCount) % this.tileCount) + this.firstFrameId;
   }
 
@@ -291,9 +293,9 @@ export class TileSet<D = TextureAtlasFrameData> {
       'a finite number above 0',
       this.tileHeight,
     );
-    assertOption(Number.isFinite(margin) && margin >= 0, 'margin', 'a finite number of 0 or more', margin);
-    assertOption(Number.isFinite(padding) && padding >= 0, 'padding', 'a finite number of 0 or more', padding);
-    assertOption(Number.isFinite(spacing) && spacing >= 0, 'spacing', 'a finite number of 0 or more', spacing);
+    assertFiniteAtLeast(margin, 'TileSet', 'margin', 0);
+    assertFiniteAtLeast(padding, 'TileSet', 'padding', 0);
+    assertFiniteAtLeast(spacing, 'TileSet', 'spacing', 0);
     assertOption(
       tileCountLimit === Infinity ||
         (Number.isInteger(tileCountLimit) && tileCountLimit >= 1 && tileCountLimit <= TileSet.MaxTiles),
@@ -302,7 +304,7 @@ export class TileSet<D = TextureAtlasFrameData> {
       tileCountLimit,
     );
     // the ids of the tiles are counted from here: a string would be concatenated, not added
-    assertOption(Number.isInteger(this.firstId), 'firstId', 'a whole number', this.firstId);
+    assertWholeNumber(this.firstId, 'TileSet', 'firstId');
 
     const tileOuterWidth = this.tileWidth + padding * 2;
     const tileOuterHeight = this.tileHeight + padding * 2;

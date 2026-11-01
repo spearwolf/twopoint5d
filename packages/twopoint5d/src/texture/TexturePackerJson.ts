@@ -1,4 +1,4 @@
-import {assertFinite} from '../utils/assertFinite.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
@@ -151,12 +151,7 @@ export class TexturePackerJson {
       }
       for (const key of FRAME_KEYS) {
         // 0 is taken: a packer may write an area of 0 for a sprite that is transparent all over
-        const value = assertFinite(frame[key], 'TexturePackerJson', `the ${key} of the frame "${name}"`);
-        if (value < 0) {
-          throw new RangeError(
-            `TexturePackerJson: the ${key} of the frame "${name}" must be a finite number of 0 or more, got ${describeValue(value)}`,
-          );
-        }
+        assertFiniteAtLeast(frame[key], 'TexturePackerJson', `the ${key} of the frame "${name}"`, 0);
       }
       // what the add() below reads of a frame is checked now
       checked.push([name, frameData as D]);

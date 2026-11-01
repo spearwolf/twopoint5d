@@ -268,6 +268,31 @@ describe('RectangularVisibilityArea', () => {
       }
     });
 
+    test('a recomputation after a smaller area lays out every tile a larger one covers again', () => {
+      const grid = new Map2DTileCoordsUtil(1, 1);
+      const area = new RectangularVisibilityArea(10, 10);
+
+      const large = area.computeVisibleTiles([], [0, 0], grid, matrixWorld)!;
+      expect(large.tiles).toHaveLength(100);
+
+      area.width = 2;
+      area.height = 2;
+      const small = area.computeVisibleTiles(large.tiles, [0, 0], grid, matrixWorld)!;
+      expect(small.reuseTiles).toHaveLength(4);
+      expect(small.removeTiles).toHaveLength(96);
+      expect(small.createTiles).toHaveLength(0);
+      const kept = ids(small.tiles);
+
+      area.width = 6;
+      area.height = 6;
+      const medium = area.computeVisibleTiles(small.tiles, [0, 0], grid, matrixWorld)!;
+      expect(medium.tiles).toHaveLength(36);
+      expect(ids(medium.reuseTiles)).toEqual(kept);
+      expect(medium.createTiles).toHaveLength(32);
+      expect(medium.removeTiles).toHaveLength(0);
+      expect(new Set(ids(medium.tiles)).size).toBe(36);
+    });
+
     test('refuses a center point that is no pair of finite numbers before anything changes', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const first = area.computeVisibleTiles([], [0, 0], tileCoords, matrixWorld)!;
@@ -440,7 +465,9 @@ describe('RectangularVisibilityArea', () => {
       };
 
       expect(write).toThrow(
-        new RangeError(`RectangularVisibilityArea: maxVisibleTiles must be a whole number above 0 or Infinity, got ${written}`),
+        new RangeError(
+          `RectangularVisibilityArea: maxVisibleTiles must be a whole number of 1 or more, or Infinity, got ${written}`,
+        ),
       );
       expect(area.maxVisibleTiles).toBe(50);
     });
@@ -505,26 +532,26 @@ describe('RectangularVisibilityArea', () => {
     test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a width of %s', (v) => {
       const create = () => new RectangularVisibilityArea(v, 240);
 
-      expect(create).toThrow(new RangeError(`RectangularVisibilityArea: width must be 0 or a finite number above 0, got ${v}`));
+      expect(create).toThrow(new RangeError(`RectangularVisibilityArea: width must be a finite number of 0 or more, got ${v}`));
     });
 
     test.each([-1, NaN, Infinity, -Infinity])('the constructor refuses a height of %s', (v) => {
       const create = () => new RectangularVisibilityArea(320, v);
 
-      expect(create).toThrow(new RangeError(`RectangularVisibilityArea: height must be 0 or a finite number above 0, got ${v}`));
+      expect(create).toThrow(new RangeError(`RectangularVisibilityArea: height must be a finite number of 0 or more, got ${v}`));
     });
 
     test('a width that is a string is quoted in the message', () => {
       const create = () => new RectangularVisibilityArea('5' as unknown as number, 240);
 
-      expect(create).toThrow(new RangeError('RectangularVisibilityArea: width must be 0 or a finite number above 0, got "5"'));
+      expect(create).toThrow(new RangeError('RectangularVisibilityArea: width must be a finite number of 0 or more, got "5"'));
     });
 
     test('a refused width leaves the width as it was', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const write = () => (area.width = -1);
 
-      expect(write).toThrow(new RangeError('RectangularVisibilityArea: width must be 0 or a finite number above 0, got -1'));
+      expect(write).toThrow(new RangeError('RectangularVisibilityArea: width must be a finite number of 0 or more, got -1'));
       expect(area.width).toBe(320);
     });
 
@@ -532,7 +559,7 @@ describe('RectangularVisibilityArea', () => {
       const area = new RectangularVisibilityArea(320, 240);
       const write = () => (area.height = -1);
 
-      expect(write).toThrow(new RangeError('RectangularVisibilityArea: height must be 0 or a finite number above 0, got -1'));
+      expect(write).toThrow(new RangeError('RectangularVisibilityArea: height must be a finite number of 0 or more, got -1'));
       expect(area.height).toBe(240);
     });
 

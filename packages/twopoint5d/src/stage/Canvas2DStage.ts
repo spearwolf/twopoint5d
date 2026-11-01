@@ -5,8 +5,8 @@ import {Chronometer} from '../display/Chronometer.js';
 import {OnCanvas2DStageDispose, OnCanvas2DStageRender, OnCanvas2DStageResize} from '../events.js';
 import {TextureFactory} from '../texture/TextureFactory.js';
 import {assertFinite} from '../utils/assertFinite.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {describeValue} from '../utils/describeValue.js';
-import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {Stage2D} from './Stage2D.js';
@@ -35,14 +35,6 @@ function checkFit(fit: unknown, subject: string): Canvas2DStageFitType {
     throw new TypeError(`${subject}: fit must be "contain" or "cover", got ${describeValue(fit)}`);
   }
   return fit as Canvas2DStageFitType;
-}
-
-// a canvas takes its width and its height as whole numbers and rounds a fraction down: below 1 it has no area
-function assertCanvasSide(value: unknown, subject: string, name: string): number {
-  if (!isFiniteNumber(value) || value < 1) {
-    throw new RangeError(`${subject}: ${name} must be a finite number of 1 or more, got ${describeValue(value)}`);
-  }
-  return value;
 }
 
 export interface Canvas2DStage extends EventizedObject {}
@@ -193,8 +185,10 @@ export class Canvas2DStage {
     // the view would take its size; a fit the projection does not know gives no view at all
     let fit: Canvas2DStageFitType;
     if (typeof args[0] === 'number') {
-      assertCanvasSide(args[0], 'new Canvas2DStage()', 'width');
-      assertCanvasSide(args[1], 'new Canvas2DStage()', 'height');
+      // a canvas takes its width and its height as whole numbers and rounds a fraction down: below
+      // 1 it has no area
+      assertFiniteAtLeast(args[0], 'new Canvas2DStage()', 'width', 1);
+      assertFiniteAtLeast(args[1], 'new Canvas2DStage()', 'height', 1);
       fit = checkFit(args[2] ?? 'contain', 'new Canvas2DStage()');
     } else {
       fit = checkFit(args[1] ?? 'contain', 'new Canvas2DStage()');
@@ -308,9 +302,10 @@ export class Canvas2DStage {
    *   this call, before anything is written — after {@link dispose} as well.
    */
   setCanvasSize(width: number, height: number): void {
-    // refused on a disposed stage as well: a size that is no size is wrong whatever the state
-    assertCanvasSide(width, 'Canvas2DStage#setCanvasSize()', 'width');
-    assertCanvasSide(height, 'Canvas2DStage#setCanvasSize()', 'height');
+    // refused on a disposed stage as well: a size that is no size is wrong whatever the state. A
+    // canvas rounds a fraction down, and below 1 it has no area
+    assertFiniteAtLeast(width, 'Canvas2DStage#setCanvasSize()', 'width', 1);
+    assertFiniteAtLeast(height, 'Canvas2DStage#setCanvasSize()', 'height', 1);
 
     // the canvas may have been handed in, and a disposed stage does not write to it
     if (this.#disposed) return;

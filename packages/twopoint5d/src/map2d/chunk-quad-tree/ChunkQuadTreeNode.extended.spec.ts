@@ -273,6 +273,75 @@ describe('ChunkQuadTreeNode (extended)', () => {
         expect(root.nodes.northEast!.isLeaf).toBe(false);
       });
     });
+
+    describe('chunks that only one axis separates', () => {
+      // five chunks of 64 × 64, side by side in a row or one above the other in a column
+      const row = () =>
+        Array.from({length: 5}, (_, i) => new StringDataChunk2D({x: i * 64, y: 0, width: 64, height: 64, data: `R${i}`}));
+      const column = () =>
+        Array.from({length: 5}, (_, i) => new StringDataChunk2D({x: 0, y: i * 64, width: 64, height: 64, data: `C${i}`}));
+
+      it('splits a row into a west and an east quadrant, the y axis on the bottom edge of the chunks', () => {
+        const chunks = row();
+        const root = new ChunkQuadTreeNode<StringDataChunk2D>(chunks);
+        root.subdivide();
+
+        expect(root.isLeaf).toBe(false);
+        // the score of the axis ties at 128 and 192, and the first cut wins
+        expect(root.originX).toBe(128);
+        expect(root.originY).toBe(64);
+        expect(root.nodes.southWest).toBeNull();
+        expect(root.nodes.southEast).toBeNull();
+
+        for (const chunk of chunks) {
+          expect(root.findChunksAt(chunk.left + 32, 32)).toEqual([chunk]);
+        }
+        expect(sortedNames(root.findChunks(new AABB2(64, 0, 128, 64)))).toEqual(['R1', 'R2']);
+        expect(sortedNames(subtreeOf(root))).toEqual(sortedNames(chunks));
+      });
+
+      it('splits a column into a north and a south quadrant, the x axis on the right edge of the chunks', () => {
+        const chunks = column();
+        const root = new ChunkQuadTreeNode<StringDataChunk2D>(chunks);
+        root.subdivide();
+
+        expect(root.isLeaf).toBe(false);
+        expect(root.originX).toBe(64);
+        expect(root.originY).toBe(128);
+        expect(root.nodes.northEast).toBeNull();
+        expect(root.nodes.southEast).toBeNull();
+
+        for (const chunk of chunks) {
+          expect(root.findChunksAt(32, chunk.top + 32)).toEqual([chunk]);
+        }
+        expect(sortedNames(root.findChunks(new AABB2(0, 64, 64, 128)))).toEqual(['C1', 'C2']);
+        expect(sortedNames(subtreeOf(root))).toEqual(sortedNames(chunks));
+      });
+
+      it('puts a chunk appended beyond the row into a quadrant of its own', () => {
+        const root = new ChunkQuadTreeNode<StringDataChunk2D>(row());
+        root.subdivide();
+
+        const below = new StringDataChunk2D({x: 0, y: 128, width: 64, height: 64, data: 'below'});
+        root.appendChunk(below);
+
+        expect(root.nodes.southWest!.chunks).toEqual([below]);
+        expect(root.findChunksAt(32, 160)).toEqual([below]);
+      });
+
+      it('keeps a node a leaf when the separating axis finds no outer edge to put the other one on', () => {
+        // the chunks are separated along x, and every bottom edge is -Infinity: no axis separates
+        // them along y, and no bottom edge lies beyond -Infinity
+        const a = new StringDataChunk2D({x: 0, y: -Infinity, width: 1, height: 1, data: 'A'});
+        const b = new StringDataChunk2D({x: 2, y: -Infinity, width: 1, height: 1, data: 'B'});
+        const c = new StringDataChunk2D({x: 4, y: -Infinity, width: 1, height: 1, data: 'C'});
+        const root = new ChunkQuadTreeNode<StringDataChunk2D>([a, b, c]);
+        root.subdivide();
+
+        expect(root.isLeaf).toBe(true);
+        expect(root.chunks.length).toBe(3);
+      });
+    });
   });
 
   describe('axis choice', () => {
@@ -373,11 +442,12 @@ describe('ChunkQuadTreeNode (extended)', () => {
             const expectedX = bruteForceAxis(subtree, 'right', 'left');
             const expectedY = bruteForceAxis(subtree, 'bottom', 'top');
             if (node.isLeaf) {
-              if (subtree.length > 2) expect(expectedX === undefined || expectedY === undefined).toBe(true);
+              if (subtree.length > 2) expect(expectedX === undefined && expectedY === undefined).toBe(true);
             } else {
               inner++;
-              expect(node.originX).toBe(expectedX);
-              expect(node.originY).toBe(expectedY);
+              // an axis that separates nothing lies on the outer edge of the chunks
+              expect(node.originX).toBe(expectedX ?? Math.max(...subtree.map((c) => c.right)));
+              expect(node.originY).toBe(expectedY ?? Math.max(...subtree.map((c) => c.bottom)));
             }
           }
           expect(inner).toBeGreaterThan(0);

@@ -1,6 +1,7 @@
 import {TextureAtlas, type TextureAtlasFrame} from '../texture/TextureAtlas.js';
 import {TextureCoords} from '../texture/TextureCoords.js';
 import {assertFinite} from '../utils/assertFinite.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
@@ -246,12 +247,9 @@ export class BitmapFont {
       // a converter that leaves out page and chnl writes a font of one page, all four channels
       const char: BitmapFontChar = {...raw, page: raw.page ?? 0, chnl: raw.chnl ?? 15};
       for (const field of CHAR_FIELDS) {
-        const value = assertFinite(char[field], WHERE, `the ${field} of the char ${label}`);
-        if (AT_LEAST_ZERO.has(field) && value < 0) {
-          throw new RangeError(
-            `${WHERE}: the ${field} of the char ${label} must be a finite number of 0 or more, got ${describeValue(value)}`,
-          );
-        }
+        const name = `the ${field} of the char ${label}`;
+        if (AT_LEAST_ZERO.has(field)) assertFiniteAtLeast(char[field], WHERE, name, 0);
+        else assertFinite(char[field], WHERE, name);
       }
       if (char.x + char.width > scaleW) {
         throw new Error(

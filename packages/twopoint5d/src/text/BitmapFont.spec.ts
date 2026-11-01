@@ -466,6 +466,12 @@ describe('BitmapFont', () => {
         'BitmapFont: the x of the char "A" (65) must be a finite number of 0 or more, got -1',
       ],
       [
+        'a height that is NaN',
+        {height: Number.NaN},
+        RangeError,
+        'BitmapFont: the height of the char "A" (65) must be a finite number of 0 or more, got NaN',
+      ],
+      [
         'a char beyond the page',
         {x: 14},
         Error,

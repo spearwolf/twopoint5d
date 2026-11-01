@@ -1,21 +1,15 @@
 import type {Matrix4} from 'three/webgpu';
 import {Vector2, Vector3} from 'three/webgpu';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
+import {assertWholeNumberOrInfinity} from '../utils/assertWholeNumberOrInfinity.js';
 import {Dependencies, type DependencyValues} from '../utils/Dependencies.js';
 import {describeValue} from '../utils/describeValue.js';
-import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {truncateArray} from '../utils/truncateArray.js';
 import {AABB2} from './AABB2.js';
 import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import type {Map2DTileCoordsUtil, TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
-
-// 0 is the off switch of an area, so it is as valid as a finite number above 0
-function assertAreaSize(value: number, name: 'width' | 'height'): void {
-  if (value !== 0 && !isPositiveFinite(value)) {
-    throw new RangeError(`RectangularVisibilityArea: ${name} must be 0 or a finite number above 0, got ${describeValue(value)}`);
-  }
-}
 
 /** The objects the dependency gate of {@link RectangularVisibilityArea} compares. */
 interface AreaDependencies {
@@ -101,7 +95,8 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   }
 
   set width(width: number) {
-    assertAreaSize(width, 'width');
+    // 0 is the off switch of an area, so it is as valid as a finite number above 0
+    assertFiniteAtLeast(width, 'RectangularVisibilityArea', 'width', 0);
     if (this.#width !== width) {
       this.#width = width;
       this.needsUpdate = true;
@@ -121,7 +116,8 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   }
 
   set height(height: number) {
-    assertAreaSize(height, 'height');
+    // 0 is the off switch of an area, so it is as valid as a finite number above 0
+    assertFiniteAtLeast(height, 'RectangularVisibilityArea', 'height', 0);
     if (this.#height !== height) {
       this.#height = height;
       this.needsUpdate = true;
@@ -143,11 +139,7 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   }
 
   set maxVisibleTiles(value: number) {
-    if (!(Number.isInteger(value) && value >= 1) && value !== Infinity) {
-      throw new RangeError(
-        `RectangularVisibilityArea: maxVisibleTiles must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
-      );
-    }
+    assertWholeNumberOrInfinity(value, 'RectangularVisibilityArea', 'maxVisibleTiles', 1);
     if (this.#maxVisibleTiles !== value) {
       this.#maxVisibleTiles = value;
       this.needsUpdate = true;
@@ -256,12 +248,15 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     truncateArray(removeTiles);
     truncateArray(createTiles);
 
+    // Only the cells of this call are cleared, so the cost follows the area of this call. The array
+    // stays at the largest area it has covered — at most `maxVisibleTiles` bytes —, because
+    // shrinking it would allocate anew on every switch of an area that swings between two sizes.
     let tileCreated = this.#tileCreated;
     if (tileCreated == null || tileCreated.length < tilesLength) {
       this.#tileCreated = new Uint8Array(tilesLength);
       tileCreated = this.#tileCreated;
     } else {
-      tileCreated.fill(0);
+      tileCreated.fill(0, 0, tilesLength);
     }
 
     // `previousTiles` can be the `tiles` list of the last result — the tile streamer hands it

@@ -1,3 +1,4 @@
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {alignedAttributeSize} from './alignedAttributeSize.js';
 import {checkBufferArray} from './checkBufferArray.js';
@@ -193,12 +194,12 @@ export class VertexObjectBuffer {
 
     // the rule the pools measure a capacity by: a fraction or NaN would yield typed arrays of a
     // truncated or empty length, and `capacity` would then state something no array holds
-    if (capacity < 0 || !Number.isInteger(capacity)) {
-      const name = typeof capacityOrBuffersData === 'number' ? 'capacity' : 'buffersData.capacity';
-      throw new RangeError(`VertexObjectBuffer: ${name} must be a non-negative integer, got ${describeValue(capacity)}`);
-    }
-
-    this.capacity = capacity;
+    this.capacity = assertWholeNumber(
+      capacity,
+      'VertexObjectBuffer',
+      typeof capacityOrBuffersData === 'number' ? 'capacity' : 'buffersData.capacity',
+      0,
+    );
     const buffersData = typeof capacityOrBuffersData === 'number' ? undefined : capacityOrBuffersData;
 
     if (source instanceof VertexObjectBuffer) {
@@ -410,11 +411,7 @@ export class VertexObjectBuffer {
     // below would weigh a copy that has nowhere to land either way
     if (this.#buffers.size === 0) return this;
 
-    if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
-      throw new RangeError(
-        `VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got ${describeValue(targetObjectOffset)}`,
-      );
-    }
+    assertWholeNumber(targetObjectOffset, 'VertexObjectBuffer#copy()', 'targetObjectOffset', 0);
     if (targetObjectOffset + other.capacity > this.capacity) {
       throw new RangeError(
         `VertexObjectBuffer#copy(): ${other.capacity} objects at offset ${targetObjectOffset} do not fit a buffer of ${this.capacity}`,
@@ -516,11 +513,7 @@ export class VertexObjectBuffer {
     // as many objects as the source fills, rounded up: a source that ends inside an object still
     // wrote into that object
     const objCount = Math.ceil(source.length / (this.descriptor.vertexCount * buf.itemSize));
-    if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
-      throw new RangeError(
-        `VertexObjectBuffer#copyArray(): targetObjectOffset must be a non-negative integer, got ${describeValue(targetObjectOffset)}`,
-      );
-    }
+    assertWholeNumber(targetObjectOffset, 'VertexObjectBuffer#copyArray()', 'targetObjectOffset', 0);
     if (targetObjectOffset + objCount > this.capacity) {
       throw new RangeError(
         `VertexObjectBuffer#copyArray(): buffer "${bufferName}" takes ${objCount} objects at offset ${targetObjectOffset}, which does not fit a buffer of ${this.capacity}`,
@@ -584,11 +577,7 @@ export class VertexObjectBuffer {
    * write into.
    */
   copyAttributes(attributes: Record<string, ArrayLike<number>>, targetObjectOffset = 0): number {
-    if (!Number.isInteger(targetObjectOffset) || targetObjectOffset < 0) {
-      throw new RangeError(
-        `VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got ${describeValue(targetObjectOffset)}`,
-      );
-    }
+    assertWholeNumber(targetObjectOffset, 'VertexObjectBuffer#copyAttributes()', 'targetObjectOffset', 0);
     let copiedObjCount = 0;
     for (const [attrName, data] of Object.entries(attributes)) {
       const attr = this.bufferAttributes.get(attrName);

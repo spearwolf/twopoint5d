@@ -149,6 +149,13 @@ describe('RectangularVisibilityAreaHelpers', () => {
 
       expect(helpers.visibilityArea, 'the area was handed in and stays').toBe(area);
       expect([area.width, area.height], 'and nothing in it was rewritten').toEqual([640, 480]);
+
+      // never called: the type check alone holds the write
+      const replaceArea = () => {
+        // @ts-expect-error — the area is fixed with the helper
+        helpers.visibilityArea = makeArea();
+      };
+      void replaceArea;
     });
 
     test('stays down after dispose()', () => {

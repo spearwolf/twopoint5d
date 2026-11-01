@@ -22,6 +22,7 @@ import {
 } from 'three/tsl';
 import {Color, type Node, type Texture, type TextureNode, type UniformNode} from 'three/webgpu';
 import {assertFinite} from '../utils/assertFinite.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
@@ -129,10 +130,7 @@ function optionsOf<T extends object>(subject: string, options: T | undefined, sh
 
 function softnessOf(subject: string, softness: unknown, fallback: number): number {
   if (softness === undefined) return fallback;
-  const value = assertFinite(softness, subject, 'softness');
-  if (value < 0)
-    throw new RangeError(`${subject}: softness must be a finite number of 0 or above, got ${describeValue(softness)}`);
-  return value;
+  return assertFiniteAtLeast(softness, subject, 'softness', 0);
 }
 
 /**

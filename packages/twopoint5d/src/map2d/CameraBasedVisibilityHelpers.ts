@@ -1,8 +1,8 @@
 import type {ColorRepresentation, LineBasicMaterial, Object3D} from 'three/webgpu';
 import {Box3, Box3Helper, BoxGeometry, Color, Mesh, MeshBasicMaterial, PlaneHelper, Vector2, Vector3} from 'three/webgpu';
 import {assertFinite} from '../utils/assertFinite.js';
+import {assertWholeNumberOrInfinity} from '../utils/assertWholeNumberOrInfinity.js';
 import {Dependencies, type DependencyValues} from '../utils/Dependencies.js';
-import {describeValue} from '../utils/describeValue.js';
 import type {CameraBasedVisibility, TileBox} from './CameraBasedVisibility.js';
 import {HelpersManager} from './HelpersManager.js';
 import type {IMap2DVisibilitorHelpers} from './types.js';
@@ -71,12 +71,7 @@ export class CameraBasedVisibilityHelpers implements IMap2DVisibilitorHelpers {
   }
 
   set maxDebugHelpers(value: number) {
-    if (!(Number.isInteger(value) && value >= 0) && value !== Infinity) {
-      throw new RangeError(
-        `CameraBasedVisibilityHelpers: maxDebugHelpers must be a whole number of 0 or more, or Infinity, got ${describeValue(value)}`,
-      );
-    }
-    this.#maxDebugHelpers = value;
+    this.#maxDebugHelpers = assertWholeNumberOrInfinity(value, 'CameraBasedVisibilityHelpers', 'maxDebugHelpers', 0);
   }
 
   /**

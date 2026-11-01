@@ -1,4 +1,5 @@
 import {Box2, CanvasTexture, LinearFilter, NearestFilter, SRGBColorSpace, Vector2, type WebGPURenderer} from 'three/webgpu';
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {expectDefined} from '../utils/expectDefined.js';
 import {forgetFrameName} from './internals.js';
@@ -99,16 +100,6 @@ function assertFilter(filter: unknown): asserts filter is DynamicAtlasFilter {
   }
 }
 
-const isWhole = (value: unknown, min: number): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= min;
-
-const assertWhole = (value: unknown, min: number, what: string): number => {
-  if (!isWhole(value, min)) {
-    throw new RangeError(`${WHERE}: the ${what} must be a whole number of ${min} or more, got ${describeValue(value)}`);
-  }
-  return value;
-};
-
 // the size an image is drawn at by itself: the natural size of an image element, the size of the rest
 const sizeOfImage = (image: DynamicAtlasImage): {width: number; height: number} =>
   'naturalWidth' in image ? {width: image.naturalWidth, height: image.naturalHeight} : {width: image.width, height: image.height};
@@ -196,17 +187,17 @@ export class DynamicAtlas {
       if (options.width !== undefined || options.height !== undefined) {
         throw new TypeError(`${WHERE}: the size comes from the canvas handed in — leave out width and height`);
       }
-      width = assertWhole(canvas.width, 1, 'width of the canvas');
-      height = assertWhole(canvas.height, 1, 'height of the canvas');
+      width = assertWholeNumber(canvas.width, WHERE, 'the width of the canvas', 1);
+      height = assertWholeNumber(canvas.height, WHERE, 'the height of the canvas', 1);
     } else {
       if (options.width === undefined || options.height === undefined) {
         throw new TypeError(`${WHERE}: give the size of the atlas — new DynamicAtlas({width: 1024, height: 1024})`);
       }
-      width = assertWhole(options.width, 1, 'width');
-      height = assertWhole(options.height, 1, 'height');
+      width = assertWholeNumber(options.width, WHERE, 'the width', 1);
+      height = assertWholeNumber(options.height, WHERE, 'the height', 1);
     }
-    this.padding = assertWhole(padding, 0, 'padding');
-    this.extrude = assertWhole(extrude, 0, 'extrude');
+    this.padding = assertWholeNumber(padding, WHERE, 'the padding', 0);
+    this.extrude = assertWholeNumber(extrude, WHERE, 'the extrude', 0);
     assertFilter(filter);
     this.filter = filter;
     this.width = width;

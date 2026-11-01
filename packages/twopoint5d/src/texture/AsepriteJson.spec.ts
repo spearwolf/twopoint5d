@@ -637,7 +637,7 @@ describe('AsepriteJson', () => {
           'an h of Infinity in the center',
           slicesOf(slice({}, {center: {...rect, h: Infinity}})),
           RangeError,
-          'the h of the center of the key 0 of the slice "s" must be a finite number, got Infinity',
+          'the h of the center of the key 0 of the slice "s" must be a finite number of 0 or more, got Infinity',
         ],
         [
           'a pivot that is no object',

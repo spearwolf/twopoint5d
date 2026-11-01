@@ -1,3 +1,4 @@
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import type {IMap2DTileDataProvider} from './types.js';
 
@@ -11,18 +12,6 @@ const wrap = (i: number, n: number): number => ((i % n) + n) % n;
 // the largest value a cell of the Uint32Array of getTileIdsWithin() holds: an id above it, a fraction
 // or a negative one would be answered as another id there than by getTileIdAt()
 const MAX_TILE_ID = 0xffffffff;
-
-// A tile coordinate and a count of tiles are whole numbers; `Number.isInteger()` takes NaN and the
-// infinities out as well. `min` is given for the counts only, which start at 0.
-function assertWholeNumber(value: number, call: string, name: string, min?: number): void {
-  if (min === undefined) {
-    if (!Number.isInteger(value)) {
-      throw new RangeError(`${call}: ${name} must be a whole number, got ${describeValue(value)}`);
-    }
-  } else if (!Number.isInteger(value) || value < min) {
-    throw new RangeError(`${call}: ${name} must be a whole number of ${min} or more, got ${describeValue(value)}`);
-  }
-}
 
 /**
  * The `RepeatingTilesProvider` repeats a 2D pattern of tile IDs endlessly.
@@ -119,7 +108,8 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
    * throws a `RangeError`.
    */
   getTileIdAt(col: number, row: number): number {
-    // before the guard below: an invalid coordinate is invalid whatever pattern stands there
+    // before the guard below: an invalid coordinate is invalid whatever pattern stands there. A
+    // tile coordinate is a whole number
     assertWholeNumber(col, 'RepeatingTilesProvider#getTileIdAt()', 'col');
     assertWholeNumber(row, 'RepeatingTilesProvider#getTileIdAt()', 'row');
 
@@ -182,6 +172,7 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
    * @returns `target`, or a new `Uint32Array` of `width * height` ids without one.
    */
   getTileIdsWithin(left: number, top: number, width: number, height: number, target?: Uint32Array): Uint32Array {
+    // a tile coordinate and a count of tiles are whole numbers, and a count starts at 0
     assertWholeNumber(left, 'RepeatingTilesProvider#getTileIdsWithin()', 'left');
     assertWholeNumber(top, 'RepeatingTilesProvider#getTileIdsWithin()', 'top');
     assertWholeNumber(width, 'RepeatingTilesProvider#getTileIdsWithin()', 'width', 0);

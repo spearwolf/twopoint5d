@@ -1,5 +1,7 @@
 import type {Box3, OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
 import {Frustum, Line3, Matrix4, Plane, Vector2, Vector3, WebGPUCoordinateSystem} from 'three/webgpu';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
+import {assertWholeNumberOrInfinity} from '../utils/assertWholeNumberOrInfinity.js';
 import {Dependencies, type DependencyValues} from '../utils/Dependencies.js';
 import {describeValue} from '../utils/describeValue.js';
 import {truncateArray} from '../utils/truncateArray.js';
@@ -229,12 +231,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   set frustumBoxScale(value: number) {
-    if (!(Number.isFinite(value) && value >= 1)) {
-      throw new RangeError(
-        `CameraBasedVisibility: frustumBoxScale must be a finite number of at least 1, got ${describeValue(value)}`,
-      );
-    }
-    this.#frustumBoxScale = value;
+    this.#frustumBoxScale = assertFiniteAtLeast(value, 'CameraBasedVisibility', 'frustumBoxScale', 1);
   }
 
   #maxVisibleTiles = 10_000;
@@ -263,12 +260,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   set maxVisibleTiles(value: number) {
-    if (!(Number.isInteger(value) && value >= 1) && value !== Infinity) {
-      throw new RangeError(
-        `CameraBasedVisibility: maxVisibleTiles must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
-      );
-    }
-    this.#maxVisibleTiles = value;
+    this.#maxVisibleTiles = assertWholeNumberOrInfinity(value, 'CameraBasedVisibility', 'maxVisibleTiles', 1);
   }
 
   /**
@@ -315,10 +307,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   set depth(value: number) {
-    if (!(Number.isFinite(value) && value >= 0)) {
-      throw new RangeError(`CameraBasedVisibility: depth must be a finite number of at least 0, got ${describeValue(value)}`);
-    }
-    this.#depth = value;
+    this.#depth = assertFiniteAtLeast(value, 'CameraBasedVisibility', 'depth', 0);
   }
 
   camera?: PerspectiveCamera | OrthographicCamera;

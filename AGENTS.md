@@ -121,8 +121,13 @@ explicit instruction.
   (`writeText: …`). A quoted name may follow the subject where it tells instances apart
   (`FeatureSprites "hud": …`). The subject is followed by a colon and what is wrong, or a
   sentence goes on from it (`StageRenderer#add() cannot take …`). A number check goes
-  through `assertFinite()` or `assertPositiveFinite()` in `src/utils/`, which write
-  `Subject: name must be a finite number …, got …`. A refused value is quoted through
+  through the helpers in `src/utils/` — `assertFinite()`, `assertPositiveFinite()`,
+  `assertFiniteAtLeast()`, `assertWholeNumber()`, `assertWholeNumberOrInfinity()` —, which
+  write `Subject: name must be a finite number …, got …` or `… a whole number …, got …`, a
+  lower bound as `of 1 or more` and a limit that `Infinity` turns off with `, or Infinity`.
+  A check whose message says more — an upper bound, the place of the value in a list, a
+  hint after it — writes its own in the same words; one on a hot path stays inline, with a
+  comment that says why. A refused value is quoted through
   `describeValue()` in `src/utils/`, never through `String()`, `JSON.stringify()`,
   `toString()` or an interpolation, bare or in quotes of its own: it writes a string in
   double quotes, a symbol as `Symbol(a)`, a BigInt as `1n`, and an array or a plain object

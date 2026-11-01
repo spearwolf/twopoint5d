@@ -91,15 +91,23 @@ export class DataIdsChunk2D extends DataChunk2D {
   protected readDataIdAtLocal(x: number, y: number): number | undefined {
     const width = this.#width;
     const height = this.#height;
-    // `y * width + x` folds a coordinate from outside into the neighbouring row and lands on a
+    // a fractional point belongs to the cell it lies in, counted from the corner of the chunk
+    const col = Math.floor(x);
+    const row = Math.floor(y);
+    // `row * width + col` folds a coordinate from outside into the neighbouring row and lands on a
     // valid-looking id there, so the index is held against both axes rather than against the
-    // length of the array alone
-    if (x < 0 || x >= width || y < 0 || y >= height) return undefined;
-    return this.uint32Arr[y * width + x];
+    // length of the array alone; the negated test refuses `NaN` as well
+    if (!(col >= 0 && col < width && row >= 0 && row < height)) return undefined;
+    return this.uint32Arr[row * width + col];
   }
 
   /**
-   * The data id stored at `(x, y)`, or `undefined` when the coordinates lie outside this chunk.
+   * The data id stored at `(x, y)`, or `undefined` when the point lies outside this chunk or a
+   * coordinate is not a number.
+   *
+   * `x` and `y` are coordinates of the map. A fractional point counts to the cell it lies in —
+   * `Math.floor()` from the corner of the chunk, the cell `containsDataAt()` counts it to —, so
+   * every point the chunk contains answers an id.
    *
    * The first read of a base64 string decodes it: a string that does not hold `width × height`
    * ids throws a `RangeError`, and data that names a `compression` throws an `Error`.

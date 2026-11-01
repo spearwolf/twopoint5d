@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add the events `OnStageTransitionStart` and `OnStageTransitionEnd` with `StageTransitionProps` (`director`, `transition`)
 - add `StageRenderer#renderToCurrentTarget(renderer)`, protected: the one draw of a renderer, called by its `renderTo()` and by a parent that composes it into its pass target, so a subclass prepares its draw for both
 - add `StageRenderer#shouldRenderPass(child)`, protected: a subclass that answers `false` keeps the picture of a nested renderer from an earlier frame in the composed mode
+- add `Map2DSpatialHashGrid#clear()`, which takes every renderable out of every cell and leaves the grid as a new one with the same cells and the same `maxCellsPerRenderable` — for a change of map or the reset of a level —, and `Map2DSpatialHashGrid#size`, how many renderables the grid holds, each counted once however many cells it lies in
+- add the quad tree over chunks, the data chunks and the spatial hash grid to the tile map guide `docs/map2d.md`: "Chunks of a map, found by a quad tree" and "Renderables in a spatial hash grid", with their defaults and who disposes what
 
 ### Changed
 
@@ -55,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a segment placement refuses a feature named `rotation` or `shear` as it refuses `Rotation` and `Shear`, judged by name as `NineSlice` is
 - `BitmapFont#info` and `BitmapFont#common` are frozen copies all the way down: `info.padding`, `info.spacing` and a `charset` list are frozen lists of their own, and `BitmapFontInfo` types them `readonly` — a write into them throws, and the font data handed in shares no list with the font (**BREAKING**). See the Migration Guide
 - change the values of the event constants of `Display`, `Canvas2DStage` and `PanControl2D`: each is the name of its constant without `On` — `OnDisplayResize` is `'displayResize'`, `OnDisplayRenderFrame` `'displayRenderFrame'`, `OnDisplayInit` `'displayInit'`, `OnDisplayStart` `'displayStart'`, `OnDisplayRestart` `'displayRestart'`, `OnDisplayPause` `'displayPause'`, `OnDisplayDispose` `'displayDispose'`, `OnDisplayError` `'displayError'`, `OnCanvas2DStageResize` `'canvas2DStageResize'`, `OnCanvas2DStageRender` `'canvas2DStageRender'`, `OnPanControl2DUpdate` `'panControl2DUpdate'`, `OnPanControl2DHideCursor` `'panControl2DHideCursor'` and `OnPanControl2DRestoreCursor` `'panControl2DRestoreCursor'`; `OnStageDispose` and `OnCanvas2DStageDispose` keep `'dispose'`, under which every stage of the library announces its end. A listener through the constants, computed keys or `display.onResize()` and the other `on…()` methods changes nothing; one through a string or a listener object with methods under the old names does (**BREAKING**). See the Migration Guide
+- the `RangeError` of a refused number reads alike throughout the library — `… must be a finite number of 0 or more, got …`, `… must be a whole number of 1 or more, got …`, `… must be a whole number of 1 or more, or Infinity, got …`. The wording changes at `CameraBasedVisibility` (`frustumBoxScale`, `depth`, `maxVisibleTiles`), `RectangularVisibilityArea` (`width`, `height`, `maxVisibleTiles`), `Map2DSpatialHashGrid#maxCellsPerRenderable`, `StageDirector` (`duration`, `delay`, `at`), the effects with a `softness` (`wipe()`, `iris()`, `dissolve()`, `lumaMask()`, `matte()`), `VertexObjectPool#resize()`, the constructor, `copy()`, `copyArray()` and `copyAttributes()` of `VertexObjectBuffer` and the constructor of `VOBufferPool`, and for `NaN` or a value that is no number at the measures of a frame in `TexturePackerJson.parse()`, the `w` and `h` of a slice key in `AsepriteJson.parse()` and the `x`, `y`, `width` and `height` of a char in `BitmapFont`. The kind of error and what is refused stay as they are
+- `RectangularVisibilityAreaHelpers#visibilityArea` is `readonly`: the area is handed to the constructor and fixed for the life of the helper, as the visibility of `CameraBasedVisibilityHelpers` is, so a write to it does not compile (**BREAKING**). See the Migration Guide
 
 ### Deprecated
 
@@ -76,6 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VOBufferGeometry` and `VertexObjectGeometry` whose constructor throws dispose a pool they built from a descriptor or a description and leave a pool handed in alive and unattached, so `VertexObjectPool#resize()` takes it again
 - a pool built from buffers data takes a buffer only from an own property of `buffers`: a buffer named `constructor`, `toString` or `__proto__` that the data does not hold gets a fresh array
 - every generated accessor of a vertex object its pool has let go of — through `freeVO()`, a `usedCount` or `resize()` that leaves its slot behind, or `dispose()` — throws an `Error` that names the accessor: `VO#x is not available: this vertex object has been released by its pool …`
+- `ChunkQuadTreeNode#subdivide()` splits a node whose chunks only one axis separates — a row or a column of chunks — into two quadrants, the other axis on the outer edge of the chunks, and `findChunks()`/`findChunksAt()` descend into them
+- `DataIdsChunk2D#readDataIdAt()` answers the id of the cell a fractional point of the chunk lies in, counted from the corner of the chunk
+- a recomputation of `RectangularVisibilityArea` costs the tiles of its own area, whatever area it covered before
 
 ### Migration Guide
 
@@ -212,6 +219,25 @@ on(stage, {render(stage) {}});
 ```ts
 on(display, OnDisplayResize, ({width, height}) => {});
 on(stage, {[OnCanvas2DStageRender](stage) {}});
+```
+
+#### `RectangularVisibilityAreaHelpers#visibilityArea` is read-only
+
+A helper draws the area it was built for. For another area, build a helper for it and take the old one down with `dispose()`.
+
+**Before**
+
+```ts
+helpers.visibilityArea = otherArea;
+```
+
+**After**
+
+```ts
+helpers.dispose();
+helpers = new RectangularVisibilityAreaHelpers(otherArea);
+helpers.add(map2d);
+helpers.show = true;
 ```
 
 #### The `three` peer dependency range

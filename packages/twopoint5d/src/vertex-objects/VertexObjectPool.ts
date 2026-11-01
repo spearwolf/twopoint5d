@@ -1,4 +1,4 @@
-import {describeValue} from '../utils/describeValue.js';
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
@@ -143,9 +143,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       throw disposedError('resize()');
     }
 
-    if (capacity < 0 || !Number.isInteger(capacity)) {
-      throw new RangeError(`VertexObjectPool#resize(): capacity must be a non-negative integer, got ${describeValue(capacity)}`);
-    }
+    assertWholeNumber(capacity, 'VertexObjectPool#resize()', 'capacity', 0);
 
     if (capacity === this.capacity) return;
 

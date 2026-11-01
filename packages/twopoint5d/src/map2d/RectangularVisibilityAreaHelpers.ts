@@ -1,12 +1,16 @@
 import type {LineBasicMaterial, Object3D} from 'three/webgpu';
 import {Box3, Box3Helper, Color} from 'three/webgpu';
-import {describeValue} from '../utils/describeValue.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {HelpersManager} from './HelpersManager.js';
 import type {RectangularVisibilityArea} from './RectangularVisibilityArea.js';
 import type {IMap2DVisibilitorHelpers} from './types.js';
 
 export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelpers {
-  visibilityArea: RectangularVisibilityArea;
+  /**
+   * The area this helper draws, handed to the constructor and fixed for the whole life of the
+   * helper; {@link update} reads its `width` and `height` on every pass.
+   */
+  readonly visibilityArea: RectangularVisibilityArea;
 
   // read by `update()` through the field, not through the accessor
   #viewRectHelperHeight = 20;
@@ -38,12 +42,7 @@ export class RectangularVisibilityAreaHelpers implements IMap2DVisibilitorHelper
   }
 
   set viewRectHelperHeight(value: number) {
-    if (!(Number.isFinite(value) && value >= 0)) {
-      throw new RangeError(
-        `RectangularVisibilityAreaHelpers: viewRectHelperHeight must be a finite number of 0 or more, got ${describeValue(value)}`,
-      );
-    }
-    this.#viewRectHelperHeight = value;
+    this.#viewRectHelperHeight = assertFiniteAtLeast(value, 'RectangularVisibilityAreaHelpers', 'viewRectHelperHeight', 0);
   }
 
   /** `true` once {@link dispose} has run. */

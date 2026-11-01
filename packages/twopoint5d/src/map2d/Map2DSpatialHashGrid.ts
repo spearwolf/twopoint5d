@@ -1,5 +1,6 @@
 import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
+import {assertWholeNumberOrInfinity} from '../utils/assertWholeNumberOrInfinity.js';
 import {describeValue} from '../utils/describeValue.js';
 import {undefinedValueError} from '../utils/expectDefined.js';
 import {truncateArray} from '../utils/truncateArray.js';
@@ -101,12 +102,7 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   }
 
   set maxCellsPerRenderable(value: number) {
-    if (!(Number.isInteger(value) && value >= 1) && value !== Infinity) {
-      throw new RangeError(
-        `Map2DSpatialHashGrid: maxCellsPerRenderable must be a whole number above 0 or Infinity, got ${describeValue(value)}`,
-      );
-    }
-    this.#maxCellsPerRenderable = value;
+    this.#maxCellsPerRenderable = assertWholeNumberOrInfinity(value, 'Map2DSpatialHashGrid', 'maxCellsPerRenderable', 1);
   }
 
   /**
@@ -170,6 +166,31 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
       this.#takeOut(renderable);
     }
     return this;
+  }
+
+  /**
+   * How many renderables the grid holds, each counted once, however many cells it lies in.
+   */
+  get size(): number {
+    return this.#placements.size;
+  }
+
+  /**
+   * Takes every renderable out of every cell and leaves the grid empty, as a new one with the same
+   * cells and the same {@link maxCellsPerRenderable} — for a change of map or the reset of a level;
+   * up to then the grid holds on to its renderables. A cell leaves the grid with its set emptied,
+   * as on {@link remove}.
+   */
+  clear(): void {
+    const occupied = this.#occupied;
+    for (let i = 0; i < occupied.length; i++) {
+      // The loop bound is `occupied.length`.
+      const cell = occupied[i]!;
+      cell.renderables.clear();
+      this.#cells.remove(cell);
+    }
+    truncateArray(occupied);
+    this.#placements.clear();
   }
 
   #takeOut(renderable: Renderable): void {
@@ -254,9 +275,9 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * The renderables in the cell at `(tileX, tileY)`, or `undefined` when nothing lies there.
    *
    * The set is the one the grid keeps for the cell, handed out read-only and without a copy, so the
-   * lookup allocates nothing. Only {@link add} and {@link remove} change it, and a cell that loses
-   * its last renderable leaves the grid with its set emptied: a caller that keeps the answer past
-   * the next `add()` or `remove()` takes a copy.
+   * lookup allocates nothing. Only {@link add}, {@link remove} and {@link clear} change it, and a
+   * cell that loses its last renderable leaves the grid with its set emptied: a caller that keeps
+   * the answer past the next `add()`, `remove()` or `clear()` takes a copy.
    */
   getTile(tileX: number, tileY: number): ReadonlySet<Renderable> | undefined {
     return this.#cells.get(tileX, tileY)?.renderables;

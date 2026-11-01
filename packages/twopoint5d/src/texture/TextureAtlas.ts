@@ -1,15 +1,9 @@
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {randomInt} from '../utils/randomInt.js';
 import {forgetFrameName, liveFrameIds} from './internals.js';
 import type {TextureCoords} from './TextureCoords.js';
 import type {TexturePackerFrameData} from './TexturePackerJson.js';
-
-// a count of random draws is a whole number of 0 or more; `Number.isInteger()` takes NaN and the infinities out too
-function assertCount(count: unknown, call: string): asserts count is number {
-  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
-    throw new RangeError(`TextureAtlas#${call}(): count must be a whole number of 0 or more, got ${describeValue(count)}`);
-  }
-}
 
 /**
  * The data a frame of a {@link TextureAtlas} carries when the atlas names no type of its own: its entry
@@ -183,7 +177,7 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
    * @throws {RangeError} if `count` is no whole number of 0 or more.
    */
   randomFrameIds(count: number): number[] {
-    assertCount(count, 'randomFrameIds');
+    assertWholeNumber(count, 'TextureAtlas#randomFrameIds()', 'count', 0);
     const frameIds: number[] = [];
     for (let i = 0; i < count; i++) {
       frameIds.push(this.randomFrameId());
@@ -198,7 +192,7 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
    * @throws {RangeError} if `count` is no whole number of 0 or more.
    */
   randomFrames(count: number): (TextureAtlasFrame<D> | undefined)[] {
-    assertCount(count, 'randomFrames');
+    assertWholeNumber(count, 'TextureAtlas#randomFrames()', 'count', 0);
     const frames: (TextureAtlasFrame<D> | undefined)[] = [];
     for (let i = 0; i < count; i++) {
       frames.push(this.randomFrame());
@@ -213,7 +207,7 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
    * @throws {RangeError} if `count` is no whole number of 0 or more.
    */
   randomFrameNames(count: number): (TextureAtlasFrameName | undefined)[] {
-    assertCount(count, 'randomFrameNames');
+    assertWholeNumber(count, 'TextureAtlas#randomFrameNames()', 'count', 0);
     const names: (TextureAtlasFrameName | undefined)[] = [];
     for (let i = 0; i < count; i++) {
       names.push(this.randomFrameName());

@@ -3,7 +3,9 @@
 A tile map is an endless 2D map on the XZ plane of a `Map2D` node, streamed in around the view:
 only the tiles the view reaches exist, one sprite per cell of the grid, and the tiles that leave
 the view give their sprite back for the ones that enter it. The module `map2d/` splits that work
-into a handful of parts, and a map is built by plugging them together.
+into a handful of parts, and a map is built by plugging them together. Beside the streaming, it
+holds two spatial indexes for the data of a map: a quad tree over chunks and a hash grid over
+renderables.
 
 | part | its role |
 | --- | --- |
@@ -16,6 +18,10 @@ into a handful of parts, and a map is built by plugging them together.
 | `TileSprites` with `TileSpritesGeometry` and `TileSpritesMaterial` | the instanced mesh the sprites live in |
 | `RepeatingTilesProvider` | an `IMap2DTileDataProvider` that repeats a pattern of tile ids |
 | `CameraBasedVisibilityHelpers`, `RectangularVisibilityAreaHelpers` | a debug view of what the visibilitor decided |
+| `ChunkQuadTreeNode` | a quad tree over the chunks of a map: `subdivide()` once after filling it, `findChunks()`/`findChunksAt()` per query |
+| `DataIdsChunk2D`, `NumberDataChunk2D`, `StringDataChunk2D`, `DataChunk2D` | a rectangle of the map with its data: tile ids out of a `Uint32Array` or base64, a number, a string, nothing |
+| `Map2DSpatialHashGrid` | a spatial index of renderables over a grid of cells: `add()`, `findWithin()`, `remove()`, `clear()` |
+| `AABB2` | the rectangle all of them take: `left`, `top`, `width`, `height` |
 
 ## A map under a camera
 
@@ -120,6 +126,116 @@ A rectangle that covers more than `maxVisibleTiles` tiles of the grid, 10 000 un
 `RangeError` on the next `update()` before it builds a tile: make the area smaller or the tiles
 larger, or raise the limit.
 
+## Chunks of a map, found by a quad tree
+
+The tile layers of a large map come in chunks — an infinite layer of a Tiled map writes each as
+`{x, y, width, height, data}`, the ids in base64. Each chunk becomes a `DataIdsChunk2D`, all of
+them go into a `ChunkQuadTreeNode`, and one `subdivide()` builds the tree. A frame then asks for
+the chunks its view reaches, and a point asks for the chunks that hold it.
+
+```ts check
+import {AABB2, ChunkQuadTreeNode, DataIdsChunk2D} from '@spearwolf/twopoint5d';
+
+// a chunk of an infinite tile layer of a Tiled map, in tiles, the ids in base64 without compression
+interface TiledChunk {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  data: string;
+}
+
+declare const layerChunks: TiledChunk[];
+declare function drawChunk(chunk: DataIdsChunk2D): void;
+
+const tree = new ChunkQuadTreeNode<DataIdsChunk2D>(layerChunks.map((chunk) => new DataIdsChunk2D(chunk)));
+// once, after the tree is filled
+tree.subdivide();
+
+// kept across frames: a query empties and fills the array it is handed, and allocates nothing
+const view = new AABB2();
+const visibleChunks: DataIdsChunk2D[] = [];
+const chunksAtPoint: DataIdsChunk2D[] = [];
+
+export function frame(left: number, top: number, width: number, height: number) {
+  view.set(left, top, width, height);
+  for (const chunk of tree.findChunks(view, visibleChunks)) drawChunk(chunk);
+}
+
+// the tile id at a point of the map, undefined where no chunk lies
+export function tileIdAt(x: number, y: number): number | undefined {
+  return tree.findChunksAt(x, y, chunksAtPoint)[0]?.readDataIdAt(x, y);
+}
+```
+
+A base64 string is decoded on the first read of its chunk: a string that does not hold
+`width × height` ids throws a `RangeError` then, and data that names a `compression` throws an
+`Error` — inflate a compressed layer before. `readDataIdAt()` takes coordinates of the map and
+answers `undefined` outside the chunk; a fractional point gets the id of the cell it lies in.
+
+A chunk that arrives later goes in through `appendChunk()`, followed by `subdivide()` on the root,
+which splits the leaves filled since. `subdivide(maxChunkNodes)` leaves up to that many chunks in a
+leaf, 2 unless given, and splits a row or a column of chunks as well as a block of them. `clear()`
+empties the tree.
+
+## Renderables in a spatial hash grid
+
+`Map2DSpatialHashGrid` finds objects by where they are: anything with an `aabb`
+(`IMap2DRenderableArea`) goes into the cells of a grid that its `aabb` reaches into, and a query
+hands out what lies in the cells of a rectangle.
+
+```ts check
+import {AABB2, type IMap2DRenderableArea, Map2DSpatialHashGrid} from '@spearwolf/twopoint5d';
+
+// anything with an aabb in the units of the map goes into the grid
+interface Pickup extends IMap2DRenderableArea {
+  kind: string;
+}
+
+declare function drawPickup(pickup: Pickup): void;
+
+// cells of 64 × 64, the first one at (0, 0)
+const grid = new Map2DSpatialHashGrid<Pickup>(64, 64, 0, 0);
+
+const coin: Pickup = {kind: 'coin', aabb: new AABB2(100, 40, 16, 16)};
+const key: Pickup = {kind: 'key', aabb: new AABB2(300, 200, 16, 16)};
+grid.add(coin, key);
+
+// kept across frames, as for the quad tree
+const view = new AABB2();
+const inView: Pickup[] = [];
+
+export function frame(left: number, top: number, width: number, height: number) {
+  view.set(left, top, width, height);
+  for (const pickup of grid.findWithin(view, inView)) drawPickup(pickup);
+}
+
+export function moveCoin(x: number, y: number) {
+  coin.aabb.set(x, y, 16, 16);
+  // a second add() moves the coin into the cells of its aabb as it is now
+  grid.add(coin);
+}
+
+export function collect(pickup: Pickup) {
+  grid.remove(pickup);
+}
+
+// a new level: the grid lets go of every pickup, and size counts 0
+export function nextLevel(): number {
+  grid.clear();
+  return grid.size;
+}
+```
+
+The grid remembers the cells of a renderable when it is added: a changed `aabb` leaves the
+renderable where it lies until it is added again. An `aabb` that reaches into more than
+`maxCellsPerRenderable` cells — 65 536 unless set, and `Infinity` turns the limit off — throws a
+`RangeError` in `add()`, and none of the renderables of that call goes in: give the grid larger
+cells or raise the limit. A query costs the cells of its rectangle or the cells the grid holds,
+whichever are fewer, and hands out each renderable once, in no fixed order. `getTile()` hands out
+the set of the cell itself; whoever needs it past the next `add()`, `remove()` or `clear()` keeps a
+copy.
+
 ## Defaults and how they play together
 
 Every default works on its own; a few of them have to fit one another.
@@ -136,6 +252,9 @@ Every default works on its own; a few of them have to fit one another.
 | camera `far` | the camera's own | bounds how far out the ground is searched; tilted towards the horizon, the ground in view grows with `far²` |
 | `RectangularVisibilityArea` | `320 × 240` | the size of the rectangle, in world units |
 | `RectangularVisibilityArea#maxVisibleTiles` | `10 000` | the most tiles the rectangle may cover on the grid; a larger one throws a `RangeError` on the next `update()`. 320 × 240 on the default grid of 1 covers 76 800 — set the tile size or the area |
+| `ChunkQuadTreeNode#subdivide()` `maxChunkNodes` | `2` | the most chunks a leaf keeps; a query tests every chunk of each node on its way down, so a higher value gives a flatter tree with longer lists |
+| `Map2DSpatialHashGrid` cell size and offset | `1 × 1`, `(0, 0)` | the grid a renderable is placed on, in the units of its `aabb`; cells about the size of the renderables keep each of them in a few cells |
+| `Map2DSpatialHashGrid#maxCellsPerRenderable` | `65 536` | the most cells one `aabb` may reach into; on the default cells of 1 × 1 that is a renderable of 256 × 256, and a larger one throws in `add()` — size the cells to the renderables |
 
 What `centerX`/`centerY` mean depends on the visibilitor; the TSDoc of `Map2D#centerX` lists each.
 
@@ -229,5 +348,6 @@ tileSprites.material?.dispose();
 // the texture of the tile set belongs to whoever loaded it, a TextureStore for one
 ```
 
-The helpers release their nodes in their own `dispose()`. The rules behind all of this stand in
+The helpers release their nodes in their own `dispose()`. The quad tree and the hash grid hold what
+they are given and release none of it; their `clear()` lets go of everything. The rules behind all of this stand in
 [the resource lifecycle](resource-lifecycle.md).

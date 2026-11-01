@@ -1216,7 +1216,7 @@ describe('CameraBasedVisibility', () => {
       expect(new CameraBasedVisibility().frustumBoxScale).toBeCloseTo(1.1);
     });
 
-    test('refuses anything but a finite number of at least 1', () => {
+    test('refuses anything but a finite number of 1 or more', () => {
       const visibility = new CameraBasedVisibility();
       visibility.frustumBoxScale = 1.5;
 
@@ -1228,7 +1228,7 @@ describe('CameraBasedVisibility', () => {
       }
       expect(() => {
         visibility.frustumBoxScale = 0.5;
-      }).toThrow('CameraBasedVisibility: frustumBoxScale must be a finite number of at least 1, got 0.5');
+      }).toThrow('CameraBasedVisibility: frustumBoxScale must be a finite number of 1 or more, got 0.5');
 
       visibility.frustumBoxScale = 1;
       expect(visibility.frustumBoxScale).toBe(1);
@@ -1278,7 +1278,7 @@ describe('CameraBasedVisibility', () => {
       expect(new CameraBasedVisibility().depth).toBe(100);
     });
 
-    test('refuses anything but a finite number of at least 0', () => {
+    test('refuses anything but a finite number of 0 or more', () => {
       const visibility = new CameraBasedVisibility();
       visibility.depth = 42;
 
@@ -1287,7 +1287,7 @@ describe('CameraBasedVisibility', () => {
         expect(visibility.depth, `depth after ${value}`).toBe(42);
       }
 
-      expect(() => (visibility.depth = -1)).toThrow('CameraBasedVisibility: depth must be a finite number of at least 0, got -1');
+      expect(() => (visibility.depth = -1)).toThrow('CameraBasedVisibility: depth must be a finite number of 0 or more, got -1');
 
       visibility.depth = 0;
       expect(visibility.depth).toBe(0);
@@ -1449,7 +1449,7 @@ describe('CameraBasedVisibility', () => {
       expect(new CameraBasedVisibility().maxVisibleTiles).toBe(10_000);
     });
 
-    test('refuses anything but a whole number above 0 or Infinity', () => {
+    test('refuses anything but a whole number of 1 or more, or Infinity', () => {
       const visibility = new CameraBasedVisibility();
       visibility.maxVisibleTiles = 42;
 
@@ -1459,6 +1459,9 @@ describe('CameraBasedVisibility', () => {
         }, String(value)).toThrow(RangeError);
         expect(visibility.maxVisibleTiles, `the value stands after ${value}`).toBe(42);
       }
+      expect(() => {
+        visibility.maxVisibleTiles = 0;
+      }).toThrow('CameraBasedVisibility: maxVisibleTiles must be a whole number of 1 or more, or Infinity, got 0');
 
       visibility.maxVisibleTiles = 1;
       expect(visibility.maxVisibleTiles).toBe(1);

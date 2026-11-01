@@ -1,3 +1,4 @@
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
 import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
@@ -101,12 +102,9 @@ export class VOBufferPool {
       this.descriptor = sharedVertexObjectDescriptor(descriptor);
     }
     const capacity = typeof capacityOrData === 'number' ? capacityOrData : capacityOrData.capacity;
-    if (capacity < 0 || !Number.isInteger(capacity)) {
-      // which of the two ways the capacity arrived, so a caller who handed in buffers data looks at
-      // its `capacity` field rather than at the argument
-      const capacityName = typeof capacityOrData === 'number' ? 'capacity' : 'buffersData.capacity';
-      throw new RangeError(`VOBufferPool: ${capacityName} must be a non-negative integer, got ${describeValue(capacity)}`);
-    }
+    // which of the two ways the capacity arrived, so a caller who handed in buffers data looks at
+    // its `capacity` field rather than at the argument
+    assertWholeNumber(capacity, 'VOBufferPool', typeof capacityOrData === 'number' ? 'capacity' : 'buffersData.capacity', 0);
     if (typeof capacityOrData === 'number') {
       this.#capacity = capacity;
       this.#buffer = new VertexObjectBuffer(this.descriptor, capacity);

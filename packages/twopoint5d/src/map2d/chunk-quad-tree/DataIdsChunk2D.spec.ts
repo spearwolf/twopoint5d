@@ -144,4 +144,45 @@ describe('DataIdsChunk2D', () => {
     expect(chunk.readDataIdAt(1, 1)).toBe(4);
     expect(seen).toEqual(['AQAAAAIAAAADAAAABAAAAA==']);
   });
+  describe('readDataIdAt() at a fractional point', () => {
+    const chunkAt = (x: number, y: number) =>
+      new DataIdsChunk2D({x, y, width: 2, height: 2, uint32Arr: new Uint32Array([1, 2, 3, 4])});
+
+    test('answers the id of the cell the point lies in', () => {
+      const chunk = chunkAt(0, 0);
+
+      expect(chunk.readDataIdAt(0.5, 0.5)).toBe(1);
+      expect(chunk.readDataIdAt(1.999, 0)).toBe(2);
+      expect(chunk.readDataIdAt(0, 1.5)).toBe(3);
+    });
+
+    test('counts the cells from the corner of a chunk away from the origin', () => {
+      expect(chunkAt(10, 20).readDataIdAt(10.5, 21.25)).toBe(3);
+      expect(chunkAt(-2, -2).readDataIdAt(-0.5, -0.5)).toBe(4);
+    });
+
+    test('counts the cells from the corner of a chunk at a fractional position', () => {
+      expect(chunkAt(0.5, 0.5).readDataIdAt(1.2, 0.5)).toBe(1);
+    });
+
+    test('answers an id for every point the chunk contains', () => {
+      for (const chunk of [chunkAt(0, 0), chunkAt(0.5, 0.5), chunkAt(-2, -2)]) {
+        for (let y = chunk.top - 0.75; y < chunk.bottom + 1; y += 0.25) {
+          for (let x = chunk.left - 0.75; x < chunk.right + 1; x += 0.25) {
+            const id = chunk.readDataIdAt(x, y);
+            if (chunk.containsDataAt(x, y)) expect(id, `(${x}, ${y})`).toBeTypeOf('number');
+            else expect(id, `(${x}, ${y})`).toBeUndefined();
+          }
+        }
+      }
+    });
+
+    test('answers undefined outside the chunk and for a coordinate that is not a number', () => {
+      const chunk = chunkAt(0, 0);
+
+      expect(chunk.readDataIdAt(-0.5, 0)).toBeUndefined();
+      expect(chunk.readDataIdAt(2, 0)).toBeUndefined();
+      expect(chunk.readDataIdAt(NaN, 0)).toBeUndefined();
+    });
+  });
 });

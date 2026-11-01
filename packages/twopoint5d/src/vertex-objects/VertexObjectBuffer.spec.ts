@@ -469,7 +469,7 @@ describe('VertexObjectBuffer', () => {
       const run = () => target.copy(source, 0.5);
 
       expect(run, 'the message names the class, the method and the value').toThrow(
-        new RangeError('VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got 0.5'),
+        new RangeError('VertexObjectBuffer#copy(): targetObjectOffset must be a whole number of 0 or more, got 0.5'),
       );
       // half an object is a whole number of elements wherever itemSize is even, so the write
       // would land inside object 0 and shift every value against the layout
@@ -485,7 +485,7 @@ describe('VertexObjectBuffer', () => {
       const run = () => buffer.copyArray(new Float32Array(4), 'dynamic_float32', 0.5);
 
       expect(run, 'the message names the class, the method and the value').toThrow(
-        new RangeError('VertexObjectBuffer#copyArray(): targetObjectOffset must be a non-negative integer, got 0.5'),
+        new RangeError('VertexObjectBuffer#copyArray(): targetObjectOffset must be a whole number of 0 or more, got 0.5'),
       );
       expect(contentsOf(buffer), 'no element of any buffer was written').toEqual(before);
     });
@@ -495,7 +495,7 @@ describe('VertexObjectBuffer', () => {
       const source = new VertexObjectBuffer(makeDescriptor(), 1);
 
       expect(() => target.copy(source, offset)).toThrow(
-        new RangeError(`VertexObjectBuffer#copy(): targetObjectOffset must be a non-negative integer, got ${offset}`),
+        new RangeError(`VertexObjectBuffer#copy(): targetObjectOffset must be a whole number of 0 or more, got ${offset}`),
       );
     });
   });
@@ -782,7 +782,7 @@ describe('VertexObjectBuffer', () => {
       const run = () => vob.copyAttributes({v: [1, 2, 3, 4]}, -1);
 
       expect(run).toThrow(
-        new RangeError('VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got -1'),
+        new RangeError('VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a whole number of 0 or more, got -1'),
       );
       expect(Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial])).toEqual(before);
     });
@@ -794,7 +794,7 @@ describe('VertexObjectBuffer', () => {
       const run = () => vob.copyAttributes({v: [1, 2, 3, 4]}, 1.5);
 
       expect(run).toThrow(
-        new RangeError('VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a non-negative integer, got 1.5'),
+        new RangeError('VertexObjectBuffer#copyAttributes(): targetObjectOffset must be a whole number of 0 or more, got 1.5'),
       );
       expect(Array.from(vob.buffers.values(), (buf) => [Array.from(buf.typedArray!), buf.serial])).toEqual(before);
     });
@@ -1131,14 +1131,18 @@ describe('VertexObjectBuffer', () => {
           const build = () => new VertexObjectBuffer(makeSource(), capacity);
 
           // a string, not a RegExp: the text of 1.5 holds a dot
-          expect(build).toThrow(new RangeError(`VertexObjectBuffer: capacity must be a non-negative integer, got ${capacity}`));
+          expect(build).toThrow(
+            new RangeError(`VertexObjectBuffer: capacity must be a whole number of 0 or more, got ${capacity}`),
+          );
         });
 
         test.each([1.5, NaN, -1, undefined])('refuses a buffersData.capacity of %s and names it', (capacity) => {
           const build = () => new VertexObjectBuffer(makeSource(), {capacity, usedCount: 0, buffers: {}} as never);
 
           expect(build).toThrow(
-            new RangeError(`VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got ${String(capacity)}`),
+            new RangeError(
+              `VertexObjectBuffer: buffersData.capacity must be a whole number of 0 or more, got ${String(capacity)}`,
+            ),
           );
         });
 
@@ -1146,7 +1150,7 @@ describe('VertexObjectBuffer', () => {
           const build = () => new VertexObjectBuffer(makeSource(), {capacity: '4', usedCount: 0, buffers: {}} as never);
 
           expect(build).toThrow(
-            new RangeError('VertexObjectBuffer: buffersData.capacity must be a non-negative integer, got "4"'),
+            new RangeError('VertexObjectBuffer: buffersData.capacity must be a whole number of 0 or more, got "4"'),
           );
         });
 

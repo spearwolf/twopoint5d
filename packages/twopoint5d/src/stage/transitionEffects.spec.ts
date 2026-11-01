@@ -61,7 +61,10 @@ describe('transition effects', () => {
     expect(() => wipe({direction: 'north' as any})).toThrow(
       "wipe: direction must be 'left', 'right', 'up', 'down' or an angle in radians",
     );
-    expect(() => wipe({softness: -1})).toThrow('wipe: softness must be a finite number of 0 or above, got -1');
+    expect(() => wipe({softness: -1})).toThrow('wipe: softness must be a finite number of 0 or more, got -1');
+    expect(() => wipe({softness: Number.NaN})).toThrow(
+      new RangeError('wipe: softness must be a finite number of 0 or more, got NaN'),
+    );
     expect(() => slide({direction: 1 as any})).toThrow("slide: direction must be 'left', 'right', 'up' or 'down'");
     expect(() => slide({mode: 'zoom' as any})).toThrow("slide: mode must be 'push', 'cover' or 'reveal'");
     expect(() => iris({center: [0.5] as any})).toThrow('iris: center must be a pair [x, y] in uv');

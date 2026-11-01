@@ -119,7 +119,7 @@ describe('StageDirector', () => {
       expect(() => director.replace(a, a)).toThrow('that stage is in the stack already');
       expect(() => director.show(b, {at: 5})).toThrow(RangeError);
       expect(() => director.show(b, {duration: -1})).toThrow(
-        'StageDirector#show(): duration must be a finite number of 0 or above, got -1',
+        'StageDirector#show(): duration must be a finite number of 0 or more, got -1',
       );
       expect(() => director.show(b, {easing: 'bounce' as any})).toThrow(/easing must be/);
       expect(() => director.show(new ClearStage())).toThrow(TypeError);
@@ -974,7 +974,7 @@ describe('StageDirector', () => {
       });
       director.setStack([a]);
       expect(caught).toBeInstanceOf(RangeError);
-      expect((caught as Error).message).toBe('StageDirector#show(): duration must be a finite number of 0 or above, got -1');
+      expect((caught as Error).message).toBe('StageDirector#show(): duration must be a finite number of 0 or more, got -1');
       expect(names(director.stack)).toEqual(['a']);
     });
 
@@ -1252,13 +1252,16 @@ describe('StageDirector', () => {
       director.setStack([a]);
       director.dispose();
       expect(() => director.show(b, {duration: -1})).toThrow(
-        'StageDirector#show(): duration must be a finite number of 0 or above, got -1',
+        'StageDirector#show(): duration must be a finite number of 0 or more, got -1',
+      );
+      expect(() => director.show(b, {delay: Number.NaN})).toThrow(
+        new RangeError('StageDirector#show(): delay must be a finite number of 0 or more, got NaN'),
       );
       expect(() => director.push(b, {below: 'still' as any})).toThrow(
         `StageDirector#push(): below must be 'run' or 'freeze', got "still"`,
       );
       expect(() => director.show(b, {at: -1})).toThrow(
-        new RangeError('StageDirector#show(): at must be a whole number of 0 or above, got -1'),
+        new RangeError('StageDirector#show(): at must be a whole number of 0 or more, got -1'),
       );
       expect(() => director.show(b, {mask: 'm' as any})).toThrow('StageDirector#show(): mask must be a StageMask, got "m"');
       expect(() => director.show(new ClearStage())).toThrow(TypeError);

@@ -1,6 +1,5 @@
 import {emit, type EventizedObject, eventize, off, on, type UnsubscribeFunc} from '@spearwolf/eventize';
-import {describeValue} from '../utils/describeValue.js';
-import {isFiniteNumber} from '../utils/isFiniteNumber.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 
 interface ISetAnimationLoop {
   // `null` is how three.js stops the loop again, and `stop()` below uses it. three's
@@ -18,13 +17,6 @@ const MEASURE_FPS_AFTER_NTH_FRAME = 30;
 // undefined, and that one is reported as well
 const NO_LOOP_ERROR = Symbol('no loop error');
 const MEASURE_COLLECTION_SIZE = 10;
-
-function checkMaxFps(maxFps: unknown, subject: string): number {
-  if (!isFiniteNumber(maxFps) || maxFps < 0) {
-    throw new RangeError(`${subject}: maxFps must be a finite number of 0 or more, got ${describeValue(maxFps)}`);
-  }
-  return maxFps;
-}
 
 // `let`, because a WeakMap cannot be emptied — only replaced. See FrameLoop.resetRAF().
 let rafUniqueInstances: WeakMap<object, RAF> = new WeakMap();
@@ -319,7 +311,7 @@ export class FrameLoop {
    */
   // the shape is written out, so the published signature names nothing the package keeps inside
   constructor(maxFps = 0, renderer?: {setAnimationLoop(callback: ((now: number) => unknown) | null): unknown}) {
-    checkMaxFps(maxFps, 'new FrameLoop()');
+    assertFiniteAtLeast(maxFps, 'new FrameLoop()', 'maxFps', 0);
     eventize(this);
     this.#raf = RAF.get(renderer);
     this.setFps(maxFps);
@@ -333,7 +325,7 @@ export class FrameLoop {
    *   limit it has.
    */
   setFps(maxFps: number): void {
-    checkMaxFps(maxFps, 'FrameLoop#setFps()');
+    assertFiniteAtLeast(maxFps, 'FrameLoop#setFps()', 'maxFps', 0);
     this.#maxFps = maxFps;
     this.#nextEmitAt = 0;
     this.#emitTolerance = this.#maxFps > 0 ? (1000 / this.#maxFps) * 0.02 : 0;

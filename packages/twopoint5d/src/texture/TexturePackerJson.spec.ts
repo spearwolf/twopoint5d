@@ -219,10 +219,10 @@ describe('TexturePackerJson.parse()', () => {
   });
 
   test.each([
-    ['x', NaN, 'TexturePackerJson: the x of the frame "b" must be a finite number, got NaN'],
+    ['x', NaN, 'TexturePackerJson: the x of the frame "b" must be a finite number of 0 or more, got NaN'],
     ['w', -1, 'TexturePackerJson: the w of the frame "b" must be a finite number of 0 or more, got -1'],
-    ['h', Infinity, 'TexturePackerJson: the h of the frame "b" must be a finite number, got Infinity'],
-    ['y', '4', 'TexturePackerJson: the y of the frame "b" must be a finite number, got "4"'],
+    ['h', Infinity, 'TexturePackerJson: the h of the frame "b" must be a finite number of 0 or more, got Infinity'],
+    ['y', '4', 'TexturePackerJson: the y of the frame "b" must be a finite number of 0 or more, got "4"'],
   ])(
     'refuses a measure of a frame that is no finite number of 0 or more with a RangeError naming the frame and the field (%s: %s)',
     (key, value, message) => {

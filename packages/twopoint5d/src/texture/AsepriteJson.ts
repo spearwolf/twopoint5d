@@ -1,4 +1,6 @@
 import {assertFinite} from '../utils/assertFinite.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
@@ -206,12 +208,7 @@ const assertSliceRect = (value: unknown, field: string, where: string): void => 
     assertFinite(value[side], 'AsepriteJson', `the ${side} of the ${field} of ${where}`);
   }
   for (const side of ['w', 'h'] as const) {
-    const measure = assertFinite(value[side], 'AsepriteJson', `the ${side} of the ${field} of ${where}`);
-    if (measure < 0) {
-      throw new RangeError(
-        `AsepriteJson: the ${side} of the ${field} of ${where} must be a finite number of 0 or more, got ${describeValue(measure)}`,
-      );
-    }
+    assertFiniteAtLeast(value[side], 'AsepriteJson', `the ${side} of the ${field} of ${where}`, 0);
   }
 };
 
@@ -247,12 +244,7 @@ const assertSlices = (slices: unknown): void => {
           `AsepriteJson: the key ${k} of the slice "${name}" is ${describeValue(key)} — a key of a slice is an object`,
         );
       }
-      const frame = key['frame'];
-      if (typeof frame !== 'number' || !Number.isInteger(frame) || frame < 0) {
-        throw new RangeError(
-          `AsepriteJson: the frame of the key ${k} of the slice "${name}" must be a whole number of 0 or more, got ${describeValue(frame)}`,
-        );
-      }
+      assertWholeNumber(key['frame'], 'AsepriteJson', `the frame of the key ${k} of the slice "${name}"`, 0);
       const where = `the key ${k} of the slice "${name}"`;
       assertSliceRect(key['bounds'], 'bounds', where);
       if (key['center'] != null) assertSliceRect(key['center'], 'center', where);

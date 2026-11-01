@@ -92,6 +92,18 @@ const findAxis = (chunks: IDataChunk2D[], beforeKey: AABBPropKey, afterKey: AABB
   return best;
 };
 
+// The outermost `key` edge of the chunks — the largest `right` or `bottom` —, or -Infinity when no
+// edge compares: `>` skips an edge that is `NaN`.
+const farEdge = (chunks: IDataChunk2D[], key: 'right' | 'bottom'): number => {
+  let edge = -Infinity;
+  for (let i = 0, n = chunks.length; i < n; i++) {
+    // The loop bound is `n`, taken from `chunks.length`.
+    const value = chunks[i]![key];
+    if (value > edge) edge = value;
+  }
+  return edge;
+};
+
 /**
  * A node is either a leaf without children or has exactly four children
  * corresponding to the celestial directions (quadrants).
@@ -133,9 +145,10 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   //               +y
   //
 
-  // Both origins are set in the same step that clears `#isLeaf` — `subdivide()` — and `clear()`
-  // takes both back together with it. A node that is not a leaf therefore carries both, which is
-  // what the reads below rest on; they do not repeat this note.
+  // Both origins are set in the same step that clears `#isLeaf` — `subdivide()`, which puts an
+  // origin no axis separates on the outer edge of the chunks — and `clear()` takes both back
+  // together with it. A node that is not a leaf therefore carries both, which is what the reads
+  // below rest on; they do not repeat this note.
   #originX: number | null = null;
   #originY: number | null = null;
 
@@ -151,7 +164,8 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
   };
 
   /**
-   * Where the vertical axis of this node lies, `null` on a leaf; `subdivide()` sets both origins,
+   * Where the vertical axis of this node lies, `null` on a leaf; `subdivide()` sets both origins —
+   * on the rightmost `right` edge of the chunks when only the horizontal axis separates them —,
    * `clear()` takes both back.
    */
   get originX(): number | null {
@@ -160,7 +174,8 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
 
   /**
    * Where the horizontal axis of this node lies, `null` on a leaf; `subdivide()` sets both
-   * origins, `clear()` takes both back.
+   * origins — on the lowest `bottom` edge of the chunks when only the vertical axis separates them
+   * —, `clear()` takes both back.
    */
   get originY(): number | null {
     return this.#originY;
@@ -222,7 +237,10 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
 
   /**
    * Splits a leaf into four quadrants, recursively, as long as a node holds more than
-   * `maxChunkNodes` chunks and an axis separates them. A chunk with `right <= originX` goes west,
+   * `maxChunkNodes` chunks and an axis separates them. When only one axis separates them — the
+   * chunks of a row or of a column —, the other origin lies on the outer edge of the chunks, the
+   * `right` or `bottom` edge that lies farthest out; every chunk lies before it, and the node falls
+   * into two quadrants: west and east, or north and south. A chunk with `right <= originX` goes west,
    * otherwise one with `left >= originX` goes east, and any other chunk crosses the axis and stays
    * at the node of that axis; north (`bottom <= originY`) and south (`top >= originY`) are chosen
    * the same way. West and north come first, so a chunk of width or height 0 whose edges lie on an
@@ -242,10 +260,15 @@ export class ChunkQuadTreeNode<ChunkType extends IDataChunk2D> {
     const chunks = this.#chunks.slice(0);
     const xAxis = findAxis(chunks, 'right', 'left');
     const yAxis = findAxis(chunks, 'bottom', 'top');
-    if (!xAxis || !yAxis) return;
+    if (!xAxis && !yAxis) return;
 
-    const originX = xAxis.origin;
-    const originY = yAxis.origin;
+    // An axis that `scoreAxis()` keeps has chunks on at least two of its three sides, and the
+    // distribution below agrees with that count, so every child holds fewer chunks than this node
+    // and the recursion ends — the missing axis on the outer edge adds no side, every chunk lies
+    // before it.
+    const originX = xAxis ? xAxis.origin : farEdge(chunks, 'right');
+    const originY = yAxis ? yAxis.origin : farEdge(chunks, 'bottom');
+    if (originX === -Infinity || originY === -Infinity) return;
     this.#originX = originX;
     this.#originY = originY;
     this.#isLeaf = false;
