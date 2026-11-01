@@ -1573,6 +1573,40 @@ describe('DisplayFullscreen', () => {
         expect(fs.isActive).toBe(true);
       });
 
+      it('a request() on a fullscreen onLandscape has entered while an element of the app lies on top of it makes it the page’s own: the next turn to portrait leaves nothing', async () => {
+        const fs = make({onLandscape: true});
+        turn('landscape-primary');
+        await flush();
+        stackOn(defaultTarget);
+        expect(fs.isActive).toBe(false);
+
+        await expect(fs.request()).resolves.toBe(true);
+        turn('portrait-primary');
+        await flush();
+
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+        expect(doc.exitFullscreen).not.toHaveBeenCalled();
+        expect(fs.isActive).toBe(true);
+      });
+
+      it('a request() on a fullscreen onLandscape has entered while an element of the app lies on top of it is the page’s own before the browser answers: a turn to portrait meanwhile leaves nothing', async () => {
+        const fs = make({onLandscape: true});
+        turn('landscape-primary');
+        await flush();
+        stackOn(defaultTarget);
+        const answer = answerLater(defaultTarget);
+
+        const requested = fs.request();
+        turn('portrait-primary');
+        answer.grant();
+        await flush();
+
+        await expect(requested).resolves.toBe(true);
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+        expect(doc.exitFullscreen).not.toHaveBeenCalled();
+        expect(fs.isActive).toBe(true);
+      });
+
       it('a request() after a turn to portrait while the request of a turn is pending keeps what the browser grants', async () => {
         const answer = answerLater(defaultTarget);
         const fs = make({onLandscape: true});

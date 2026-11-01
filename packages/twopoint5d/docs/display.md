@@ -596,7 +596,9 @@ Leaving the fullscreen gives the canvas back the size it had.
 A video or a dialog inside the target that goes fullscreen itself lies on top of it: `isActive` is
 `false` while it holds, the lock stays, and `onLandscape` neither asks for the target nor arms —
 the target would cover the video. Once it is left, the fullscreen is the display's again, as
-before: `exitOnPortrait` acts on the next turn, and `dispose()` leaves it. A turn while the video
+before: `exitOnPortrait` acts on the next turn — unless the page has called `request()` while the
+video lay on top, which makes the fullscreen the page's, as for one on top (see "Fullscreen when the
+phone turns sideways") —, and `dispose()` leaves it. A turn while the video
 lies on top is not caught up afterwards: a phone turned upright meanwhile keeps the fullscreen
 until it turns sideways and back.
 

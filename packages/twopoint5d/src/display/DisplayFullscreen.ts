@@ -463,8 +463,9 @@ export class DisplayFullscreen {
    * noted, and the browser is asked once the exit is through. Every call of such an overlap
    * resolves with `isActive` once the controller has done what the last one asked, and an `exit()`
    * it takes back holds off no arming. A fullscreen a request carries is the page's own, also when
-   * it shares the request of `onLandscape` or finds the fullscreen `onLandscape` has entered: a turn
-   * to portrait leaves it standing.
+   * it shares the request of `onLandscape` or finds the fullscreen `onLandscape` has entered — on
+   * top, or under an element of the app that lies on top of it: a turn to portrait leaves it
+   * standing.
    *
    * After {@link Display.dispose} it resolves `false` and asks nothing; a request still open when
    * the dispose runs resolves `false` as well, and a fullscreen the browser grants after the
@@ -608,9 +609,11 @@ export class DisplayFullscreen {
 
     if (by === 'request') {
       // whoever asked for a fullscreen decides: the page asks for the one onLandscape has entered,
-      // and it is the page's own from now on — a turn to portrait leaves it standing
+      // and it is the page's own from now on — a turn to portrait leaves it standing. So it is while
+      // an element of the app lies on top of the target as well: #entered stays set as long as the
+      // target is in the fullscreen stack, and the request below asks for the target again
       if (this.#pseudo?.by === 'landscape') this.#pseudo.by = 'request';
-      else if (this.#entered === 'landscape' && this.#nativeElement() != null) this.#entered = 'request';
+      else if (this.#entered === 'landscape') this.#entered = 'request';
     }
     if (this.isActive) return Promise.resolve(true);
 

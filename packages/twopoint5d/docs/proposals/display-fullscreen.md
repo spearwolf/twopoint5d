@@ -370,8 +370,8 @@ construction.
   portrait — stays: whoever asked for a fullscreen decides, so one a `request()` of the page carries
   stays as well when it shares a request of `onLandscape` — the turn's, or the armed tap's under the
   click of a button —, and so does one `onLandscape` has entered once the page calls `request()` on
-  it. The exit this turn starts is no refusal of the user: it does not hold off the
-  arming. An exit the browser refuses leaves the target on top and is not asked again in portrait.
+  it — also while an element of the app lies on top of the target (§3.2). The exit this turn
+  starts is no refusal of the user: it does not hold off the arming. An exit the browser refuses leaves the target on top and is not asked again in portrait.
 - **Turns that overlap with the answers of the browser.** The rule of §3.2 holds, and a turn gives way
   to the page: it is no call of the page, it notes the exit of a turn to portrait on a pending
   request only where the page has noted none, and a turn back to landscape before the browser answers
@@ -606,7 +606,9 @@ that runs without a real turn of a screen.
 - a fullscreen stacked on the target: `isActive` is `false` while it holds, the lock stays — one
   still pending as well —, and the target is the controller's own again once it is left — for
   `dispose()` and for the turn to portrait; a turn to landscape and `onLandscape = true` while it
-  holds ask nothing and arm nothing.
+  holds ask nothing and arm nothing; a `request()` of the page while it lies on a fullscreen
+  `onLandscape` entered makes that fullscreen the page's own — the next turn to portrait leaves
+  nothing, also one that comes before the browser answers.
 
 `Display.spec.ts` gains the size source rule of §5: a canvas in fullscreen with a parent as size
 source measures the fullscreen element; so does a canvas that is its own size source, inside a
