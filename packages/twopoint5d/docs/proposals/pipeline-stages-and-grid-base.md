@@ -173,16 +173,15 @@ export interface GridBaseVO extends SpriteBaseVO {
 export function gridBase(options: GridBaseOptions): GridBase;
 ```
 
-- **One frozen base per option set**, memoized by `columns × rows` as `flatPlacement()` memoizes
-  its features: `gridBase({columns: 3, rows: 3}) === gridBase({columns: 3, rows: 3})`, so a
-  feature recognizes its base by identity (§6) and every geometry of the kind shares one
-  descriptor. The cache holds each base through a `WeakRef`: a base stays the same object while a
-  kind, its geometries or the caller hold it, a base nothing holds is collected, and the next call
-  builds an equal one — grid sizes derived from data hold only the bases in use, and of a grid let
-  go only its key and the empty `WeakRef` stay, at most one per allowed pair (25 846). No
-  `FinalizationRegistry` clears them: its callback would run on a collection no test can time.
-  Frozen all the way down, its description and the
-  prototype of its base vertex included. Name: `grid 3x3`.
+- **One frozen base per option set**, memoized by `columns × rows` as `flatPlacement()` memoizes its
+  features: `gridBase({columns: 3, rows: 3}) === gridBase({columns: 3, rows: 3})`, so a feature
+  recognizes its base by identity (§6) and every geometry of the kind shares one descriptor. The
+  cache holds each base through a `WeakRef`: a base stays the same object while a kind, its
+  geometries or the caller hold it, a base nothing holds is collected, and the next call builds an
+  equal one — grid sizes derived from data hold only the bases in use, and of a grid let go only its
+  key and the empty `WeakRef` stay, at most one per allowed pair (25 846). No `FinalizationRegistry`
+  clears them: its callback would run on a collection no test can time. Frozen all the way down, its
+  description and the prototype of its base vertex included. Name: `grid 3x3`.
 - **Layout** — as `QuadBase` lays out four, on more vertices: `(columns + 1) × (rows + 1)`
   vertices, row by row from the top, left to right; vertex `k = j · (columns + 1) + i` for the
   column line `i ∈ 0 … columns` and the row line `j ∈ 0 … rows`:

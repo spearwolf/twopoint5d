@@ -2,7 +2,8 @@
 
 Status: **phase A, B and C implemented** — see [`docs/stages.md`](../stages.md), "Stage masks"
 ([the mask](../stages.md#the-mask), [masks on a slot](../stages.md#masks-on-a-slot),
-[run and freeze a mask](../stages.md#run-and-freeze-a-mask), [the progress of a mask](../stages.md#the-progress-of-a-mask),
+[run and freeze a mask](../stages.md#run-and-freeze-a-mask),
+[the progress of a mask](../stages.md#the-progress-of-a-mask),
 [a transition through a living matte](../stages.md#a-transition-through-a-living-matte),
 [an effect that reads a mask](../stages.md#an-effect-that-reads-a-mask),
 [masks in the world](../stages.md#masks-in-the-world),
@@ -181,8 +182,8 @@ anti-aliased silhouettes and half-transparent blobs of the mask stage come throu
   call puts them back. `hide()`, `pop()` and `remove()` of a layer take the mask off the slot that
   goes with it.
 - `remove(maskStage)`, the dispose of a mask stage and the dispose of a `StageMask` take the mask
-  off every slot it lies on, and end every transition whose effect names it as cancelled (§9). `remove()` of a stage that is
-  neither a layer nor a mask does what it does without masks.
+  off every slot it lies on, and end every transition whose effect names it as cancelled (§9).
+  `remove()` of a stage that is neither a layer nor a mask does what it does without masks.
 - The mask stages stand in the update and draw order of the director after every layer: first the
   distinct mask stages of the slot masks, bottom-up, then those of the running effects, slot by
   slot, each by its first appearance. They update after the layers, so a mask that draws in the
@@ -273,9 +274,9 @@ everything, and between them it is the picture of the stage. A stage that animat
 the display would end early under a slowed transition, late under a fast one, and never under a
 `manual: true` one. So the mask carries the progress to its stage:
 
-- `mask.progress` — a number, read-only, the eased progress of the transition that uses the mask, written by
-  the director in its `updateFrame()` after it has advanced its transitions and before it updates
-  the mask stage — the order of §5.2 of the transitions proposal already gives that;
+- `mask.progress` — a number, read-only, the eased progress of the transition that uses the mask,
+  written by the director in its `updateFrame()` after it has advanced its transitions and before it
+  updates the mask stage — the order of §5.2 of the transitions proposal already gives that;
 - `mask.progressNode` — a float uniform with the same value, for a mask stage whose materials
   animate on the GPU: a noise threshold in a sprite material, a dissolve of its own inside the
   mask.
@@ -284,10 +285,11 @@ A mask drives one transition at a time; a second transition whose effect names a
 busy is refused (`StageDirector#replace(): the mask "ink" drives a transition already`). Busy is a
 state of the **`StageMask` object**, not of its stage: the progress lives on the object, so two
 `StageMask` objects on one stage may drive two transitions at once, each stage reading the progress
-of its own mask. A mask is busy only after the runs that the call ends anyway have ended: `replace()` ends the run in its own
-slot first, so `replace(a, b, {effect: inkIn})` in the slot whose `inkIn` run is still going is
-allowed — the old run ends, and the mask starts again at progress 0. Between transitions `progress`
-holds the value of the last one; a new one starts it at 0.
+of its own mask. A mask is busy only after the runs that the call ends anyway have ended:
+`replace()` ends the run in its own slot first, so `replace(a, b, {effect: inkIn})` in the slot
+whose `inkIn` run is still going is allowed — the old run ends, and the mask starts again at
+progress 0. Between transitions `progress` holds the value of the last one; a new one starts it at
+0.
 
 Under `manual: true` the progress may be set after `updateFrame()` and before the draw. The
 `progressNode` is written again in `renderToCurrentTarget()`, as the progress uniforms of the shape

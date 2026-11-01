@@ -144,8 +144,8 @@ const catalog: TextureStoreData = {
   items: {
     glass: {imageUrl: 'glass.webp', texture: ['anisotropy']},
     // the ids of the panes are numbers, not colours: never blended, and without an anisotropy
-    // class the texture has none. Without mip levels: under WebGPU a sampler with NearestFilter
-    // reads them all the same and would mix the ids of neighbouring panes
+    // class the texture has none. With both filters NearestFilter three reads level 0 alone, so
+    // mip levels of the ids would only take memory
     panes: {imageUrl: 'panes.png', texture: ['nearest', 'no-mipmaps']},
     frame: {imageUrl: 'frame.webp', texture: ['srgb', 'anisotropy']},
     room: {imageUrl: 'room.webp', texture: ['srgb', 'anisotropy']},

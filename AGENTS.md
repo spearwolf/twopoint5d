@@ -57,19 +57,19 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   which the nightly workflow `bench.yml` archives. Not part of `pnpm run ci` nor of the
   CI workflow: timings are archived, not held to a limit
 - `pnpm test:scripts` — `node --test` over the helpers of the publish pipeline, the CI
-  cache server, the audit filter of the deploy, the docs' code block check, the Nameable-Types check and the lookbook's
-  preview generator (`scripts/**/*.test.mjs`), plus specs that start
-  `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs`, `checkNameableTypes.mjs`,
-  `nxCacheServer.mjs`, `runExclusive.mjs` and `auditInstalledDependencies.mjs` as child
-  processes, one that checks the
-  lookbook's vendored `rainbow-line` script, one that holds the tags and routes of the
-  lookbook's demo metadata to the library's exports, one that holds the preview images of
-  the lookbook to its demos, ids and card size, one that holds the view-transition names
-  of the lookbook's navbar to its two pages and the stylesheets to those names, one that
-  asks Nx whether every tracked Markdown file is an input of the docs' type check, one
-  that asks Nx whether every tracked file under the library's `src/` is an input of its
-  Vitest targets, and one that holds the publish script to Node's built-ins; the Nx
-  project `scripts` has no `test` target, so `pnpm test` leaves them out
+  cache server, the audit filter of the deploy, the docs' code block check, the
+  Nameable-Types check and the lookbook's preview generator (`scripts/**/*.test.mjs`),
+  plus specs that start `makePackageJson.mjs`, `checkPeerDependenciesOnly.mjs`,
+  `checkNameableTypes.mjs`, `nxCacheServer.mjs`, `runExclusive.mjs` and
+  `auditInstalledDependencies.mjs` as child processes, one that checks the lookbook's
+  vendored `rainbow-line` script, one that holds the tags and routes of the lookbook's
+  demo metadata to the library's exports, one that holds the preview images of the
+  lookbook to its demos, ids and card size, one that holds the view-transition names of
+  the lookbook's navbar to its two pages and the stylesheets to those names, one that asks
+  Nx whether every tracked Markdown file is an input of the docs' type check, one that
+  asks Nx whether every tracked file under the library's `src/` is an input of its Vitest
+  targets, and one that holds the publish script to Node's built-ins; the Nx project
+  `scripts` has no `test` target, so `pnpm test` leaves them out
 - one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
@@ -124,28 +124,27 @@ explicit instruction.
   through the helpers in `src/utils/` — `assertFinite()`, `assertPositiveFinite()`,
   `assertFiniteAtLeast()`, `assertWholeNumber()`, `assertWholeNumberOrInfinity()` —, which
   write `Subject: name must be a finite number …, got …` or `… a whole number …, got …`, a
-  lower bound as `of 1 or more` and a limit that `Infinity` turns off with `, or Infinity`.
-  A check whose message says more — an upper bound, the place of the value in a list, a
-  hint after it — writes its own in the same words; one on a hot path stays inline, with a
-  comment that says why. A refused value is quoted through
+  lower bound as `of 1 or more` and a limit that `Infinity` turns off with
+  `, or Infinity`. A check whose message says more — an upper bound, the place of the
+  value in a list, a hint after it — writes its own in the same words; one on a hot path
+  stays inline, with a comment that says why. A refused value is quoted through
   `describeValue()` in `src/utils/`, never through `String()`, `JSON.stringify()`,
   `toString()` or an interpolation, bare or in quotes of its own: it writes a string in
-  double quotes, with a quote, a backslash, a control char, a line or paragraph separator and
-  a lone surrogate escaped as in a JSON string, a symbol as `Symbol(a)`, a BigInt as `1n`,
-  and an array or a plain object by its content, and it throws for no value. Every name a
-  message writes goes through it as well, typed as a string or a symbol — of a feature, a
-  stage, a frame, a resource, a url —: the one that tells instances apart
+  double quotes, with a quote, a backslash, a control char, a line or paragraph separator
+  and a lone surrogate escaped as in a JSON string, a symbol as `Symbol(a)`, a BigInt as
+  `1n`, and an array or a plain object by its content, and it throws for no value. Every
+  name a message writes goes through it as well, typed as a string or a symbol — of a
+  feature, a stage, a frame, a resource, a url —: the one that tells instances apart
   (`FeatureSprites "hud": …`), the one a look-up did not find, and each of a list of the
-  names that are known (`its tags are: "idle", "run"`); and so does each argument of a call
-  a message writes out (`getAsync("hero", ["atlas", "texture"])`). A message quotes no
-  interpolation by hand: a `"${name}"` would leave a quote, a backslash or a line break in
-  the name unescaped. The words of the library's own vocabulary — the keys of its options,
-  the choices it lists from a constant, the names of its exports — are text of the message,
-  not names.
-  A three.js object refused for its class is named
-  by its `type`, through `describeThreeValue()` in `src/utils/`. A failure of
-  `expectDefined()` reports a broken invariant of the library, not a refusal, and names no
-  subject; the refusals a feature's `checkKind` throws get theirs from `defineSprite()`.
+  names that are known (`its tags are: "idle", "run"`); and so does each argument of a
+  call a message writes out (`getAsync("hero", ["atlas", "texture"])`). A message quotes
+  no interpolation by hand: a `"${name}"` would leave a quote, a backslash or a line break
+  in the name unescaped. The words of the library's own vocabulary — the keys of its
+  options, the choices it lists from a constant, the names of its exports — are text of
+  the message, not names. A three.js object refused for its class is named by its `type`,
+  through `describeThreeValue()` in `src/utils/`. A failure of `expectDefined()` reports a
+  broken invariant of the library, not a refusal, and names no subject; the refusals a
+  feature's `checkKind` throws get theirs from `defineSprite()`.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. The catalog also holds every
@@ -194,10 +193,11 @@ explicit instruction.
 - **`dispose()` and ownership** follow [the resource lifecycle
   rules](packages/twopoint5d/docs/resource-lifecycle.md). They are binding, not
   advisory.
-- **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and `*.test.js`
-  in `packages/twopoint5d-testing/test/` (real browsers, visual, every file that renders under WebGPU
-  and under WebGL 2; a file none of whose tests renders runs once per engine and goes into
-  `RENDERER_FREE_FILES` in `web-test-runner.config.js`). A change to rendering or GPU-buffer code needs both.
+- **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and `*.test.js` in
+  `packages/twopoint5d-testing/test/` (real browsers, visual, every file that renders
+  under WebGPU and under WebGL 2; a file none of whose tests renders runs once per engine
+  and goes into `RENDERER_FREE_FILES` in `web-test-runner.config.js`). A change to
+  rendering or GPU-buffer code needs both.
   A `hot-path-allocations.spec.ts` measures the heap bytes of a hot-path call through
   `measureSettledBytes()` in `src/testing/`: it collects what earlier tests left behind
   before the round warms up and answers the lowest of three measurements of
@@ -265,11 +265,12 @@ libraries.
   description declares and which accessors it generates
 - The guides of the library: [sprites](packages/twopoint5d/docs/sprites.md),
   [text](packages/twopoint5d/docs/text.md), [tile
-  maps](packages/twopoint5d/docs/map2d.md), [display](packages/twopoint5d/docs/display.md),
+  maps](packages/twopoint5d/docs/map2d.md),
+  [display](packages/twopoint5d/docs/display.md),
   [textures](packages/twopoint5d/docs/textures.md),
-  [stages](packages/twopoint5d/docs/stages.md) — written for the users of the library; they describe the code as it is, with no
-  internals and no history, and a new or changed feature changes its guide section in the
-  same commit
+  [stages](packages/twopoint5d/docs/stages.md) — written for the users of the library;
+  they describe the code as it is, with no internals and no history, and a new or changed
+  feature changes its guide section in the same commit
 - [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers
   of the library: the idea of each feature, its inner workings and the basis of its build;
   no tutorial for users. They may lag behind the code, and where one disagrees with a

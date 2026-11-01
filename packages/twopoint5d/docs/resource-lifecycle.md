@@ -28,12 +28,12 @@ borrows it. [`DynamicAtlas`](../src/texture/DynamicAtlas.ts) owns what it builds
 `texture`, the second texture of `textureFor()`, a canvas it built itself and the staging
 canvas and texture of `upload()` —, and its `dispose()` releases them: the textures are
 disposed, its own canvas and the staging canvas shrink to 0 × 0. A canvas handed to it
-stays the caller's: the atlas draws on it, but neither resizes nor releases it. [`TextureResource`](../src/texture/TextureResource.ts) is
-the other case: it keeps the texture it built and disposes it itself when a successor
-takes its place, when its `imageUrl` is cleared and on `dispose()`, and a subscriber of
-`TextureStore` only borrows it. `TextureStore#acquireAsync()` holds the resource against
-`clearUnused()` and `evictMissing` until its `release()` comes; the texture stays the
-resource's all the same.
+stays the caller's: the atlas draws on it, but neither resizes nor releases it.
+[`TextureResource`](../src/texture/TextureResource.ts) is the other case: it keeps the
+texture it built and disposes it itself when a successor takes its place, when its
+`imageUrl` is cleared and on `dispose()`, and a subscriber of `TextureStore` only borrows
+it. `TextureStore#acquireAsync()` holds the resource against `clearUnused()` and
+`evictMissing` until its `release()` comes; the texture stays the resource's all the same.
 
 **A take-over counts only where the receiving side promises it in its own TSDoc** — at
 the constructor parameter, at the field, at the method that accepts the resource. One

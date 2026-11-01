@@ -5,8 +5,8 @@ non-obvious mechanics sit. Read this before adding a feature or moving code betw
 modules. Day-to-day commands and repo rules are in the root `AGENTS.md`.
 
 Two companion docs carry the rules this one only points at:
-[**resource-lifecycle.md**](./resource-lifecycle.md) — binding for anything with a
-`dispose()`, see section 3 — and the [**stages guide**](./stages.md) for `Display` + `Stage2D` + `StageRenderer`,
+[**resource-lifecycle.md**](./resource-lifecycle.md) — binding for anything with a `dispose()`, see
+section 3 — and the [**stages guide**](./stages.md) for `Display` + `Stage2D` + `StageRenderer`,
 projections and post-processing.
 
 ## 1. The public surface

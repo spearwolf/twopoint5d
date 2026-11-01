@@ -162,11 +162,11 @@ bowl cut, black slippers. Canvas (`sourceSize`) 64 × 64; frames trimmed to thei
 | `hit` | 21–23 | `forward` | `"1"` | 80, 180, 160 — recoil and recover |
 
 `kick`, `flying-kick` and `hit` are one-shots: their repeat of 1 is what `AsepriteJson` and the
-built-in `aseprite` adapter of `TextureStore` read as `playback: 'once'`, which holds the last frame. Slice `pivot`: one key at frame
-0, bounds the whole canvas `{x: 0, y: 0, w: 64, h: 64}`, `pivot {x: 32, y: 63}` — the pixel the
-feet stand on, the middle of the bottom row; as an anchor, (0.5, 1) of the untrimmed frame. In
-`idle` and `walk` the soles are on row 63; the flying kick leaves the ground inside the canvas,
-so the pivot stays where the ground is.
+built-in `aseprite` adapter of `TextureStore` read as `playback: 'once'`, which holds the last
+frame. Slice `pivot`: one key at frame 0, bounds the whole canvas `{x: 0, y: 0, w: 64, h: 64}`,
+`pivot {x: 32, y: 63}` — the pixel the feet stand on, the middle of the bottom row; as an anchor,
+(0.5, 1) of the untrimmed frame. In `idle` and `walk` the soles are on row 63; the flying kick
+leaves the ground inside the canvas, so the pivot stays where the ground is.
 
 **`goblin`** — squat, big-eared, a spiked club over its shoulder, facing right. Canvas 56 × 48,
 trimmed. Slice `pivot`: bounds `{x: 0, y: 0, w: 56, h: 48}`, `pivot {x: 28, y: 47}`.
@@ -617,13 +617,12 @@ in units with y up, a grain over everything, cut into tiles; dirt, wood and bric
 `back.mjs`, `mid.mjs`, `play.mjs` (the three painted layers) and `sprites.mjs` (the atlas). Units of
 the level throughout: origin on the projection plane in the middle of the crawlspace, y up, the
 floor at y = −150 at every depth; the images of the layers are loaded with the default `flipY`, the
-atlas upright. The art is
-albedo, painted for a light that comes later: the demo lights it with the flashlight and the
-moonlight of the vent, and nothing is lit in the images themselves. Each layer is drawn at the
-texels per unit it has on the screen under the parallax projection (camera at z = 500, 2 pixels
-per unit on the plane) and covers the view at its depth wherever the camera goes (x within ±700,
-y within ±30); the view of `fit: 'cover'` is at most 960 × 540 units at any window shape, so this holds
-from 4:3 to 21:9 and in portrait.
+atlas upright. The art is albedo, painted for a light that comes later: the demo lights it with the
+flashlight and the moonlight of the vent, and nothing is lit in the images themselves. Each layer is
+drawn at the texels per unit it has on the screen under the parallax projection (camera at z = 500,
+2 pixels per unit on the plane) and covers the view at its depth wherever the camera goes (x within
+±700, y within ±30); the view of `fit: 'cover'` is at most 960 × 540 units at any window shape, so
+this holds from 4:3 to 21:9 and in portrait.
 
 | file | size | what |
 | --- | --- | --- |

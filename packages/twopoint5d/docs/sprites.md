@@ -483,9 +483,9 @@ An item that names an adapter the store does not know builds no resource and is 
 — is left out and reported the same way. A tile set item without an `imageUrl` is reported too, and
 built all the same, as a placeholder: a `getAsync()` of its texture or tile set waits until a later
 `parse()` names an image for it or an `imageUrl` is written to its resource — the one
-`whenResource(id)` hands out, of `type` `'tileset'`. An adapter reads the envelope the three packers share —
-`frames`, `meta.size`, `meta.image` — since the resource reads the image out of the json before any
-adapter runs; a packer of another format is converted to that envelope first.
+`whenResource(id)` hands out, of `type` `'tileset'`. An adapter reads the envelope the three packers
+share — `frames`, `meta.size`, `meta.image` — since the resource reads the image out of the json
+before any adapter runs; a packer of another format is converted to that envelope first.
 
 ### Atlases built at run time: `DynamicAtlas`
 
@@ -586,9 +586,9 @@ labels.createSprite();
 The second texture is built at the first call and kept; every change reaches both, and `upload()`
 copies each changed cell into both. It is a GPU texture of its own: the memory of the canvas once
 more, and a whole upload goes up twice. Read linearly, a frame wants an `extrude`, so that the
-filter at its edge reads the frame and not the padding. The canvas is an `OffscreenCanvas` where there is one, a canvas element otherwise, or the `canvas`
-handed in, whose size the atlas takes; under Node there is neither, and the constructor says to
-hand one in.
+filter at its edge reads the frame and not the padding. The canvas is an `OffscreenCanvas` where
+there is one, a canvas element otherwise, or the `canvas` handed in, whose size the atlas takes;
+under Node there is neither, and the constructor says to hand one in.
 
 Without `upload()`, every change marks the texture, and the next render uploads the whole canvas
 once — 16 MiB at 2048 × 2048, every frame for a label redrawn every frame. `upload(renderer)`,
@@ -1178,8 +1178,8 @@ export function cycle(time: number) {
 
 ## Uploads: static and dynamic attributes
 
-A mesh draws none of its sprites before its first `update()`, and `update()` sets how many it
-draws. `update()` of the mesh uploads what the sprite pool marked. Position, rotation, shear, `fade`,
+A mesh draws none of its sprites before its first `update()`. Each `update()` of the mesh uploads
+what the sprite pool marked and sets how many sprites it draws. Position, rotation, shear, `fade`,
 `flash` and `segmentEnd` are **dynamic**: every `update()` uploads them. Everything else is
 **static**: written before the first `update()` after `createSprite()` it reaches the gpu with that
 sprite; a later change reaches the gpu only once it is marked —
@@ -1203,13 +1203,13 @@ The geometry takes only a kind out of `defineSprite()`, its parameters as a numb
 
 `FeatureSpritesMaterial` folds the pipeline of a kind into `positionNode` and `colorNode`. It takes
 the kind and, besides every three.js material parameter, its own options: `name`, `textures` and
-`uniforms` to start with, and `resources` — the uniforms and textures of a `SpriteResources`
-shared with other materials, which then stay the caller's. It takes only a kind out of
-`defineSprite()`, its options as an object, `resources` as a `SpriteResources` and `textures` and
-`uniforms` as objects by name, each start value of the type of its uniform — a finite number for a
-`float`, 2 to 4 finite numbers for a `vec2` to `vec4` —, and each texture in `textures` a three.js
-Texture; anything else throws a `TypeError`. A start
-value of `undefined` or `null` keeps the one the feature declares.
+`uniforms` to start with, and `resources` — the uniforms and textures of a `SpriteResources` shared
+with other materials, which then stay the caller's. It takes only a kind out of `defineSprite()`,
+its options as an object, `resources` as a `SpriteResources` and `textures` and `uniforms` as
+objects by name, each start value of the type of its uniform — a finite number for a `float`, 2 to 4
+finite numbers for a `vec2` to `vec4` —, and each texture in `textures` a three.js Texture; anything
+else throws a `TypeError`. A start value of `undefined` or `null` keeps the one the feature
+declares.
 
 ```ts check
 import {
@@ -1610,7 +1610,8 @@ export function frame() {
   `defineSprite()` refuses either next to a segment placement — `a segment lies along its ends, so
   it cannot follow the local stage of "rotation" — move the ends instead, and take Rotation out of
   the kind`. The refusal goes by the name of the feature: a feature named `rotation` or `shear` — a
-  copy of `Rotation`, one of one's own — counts as `Rotation` or `Shear`. `Yaw` and `Orientation` are data and are ignored, as under a billboard.
+  copy of `Rotation`, one of one's own — counts as `Rotation` or `Shear`. `Yaw` and `Orientation`
+  are data and are ignored, as under a billboard.
 - **No `NineSlice`.** `NineSlice` sets its border in the local quad, and a segment holds only its
   caps there — the border would land inside the segment —, so `defineSprite()` refuses it next to a
   segment placement, and a segment placement cannot stand in on a live nine-slice material. For a
@@ -1804,10 +1805,11 @@ builds its pick material.
 **Refusals.** A `TypeError` instead of a mismatch: a kind that did not come from `defineSprite()`;
 options that are no object, `passes` that are no list, a `grow` that is neither `true` nor `false`;
 a `geometry` or a `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, or one
-built for another sprite kind — or a material built for a pass; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a
-`geometry`; any material parameter next to a `material`. The geometry and the material the
-constructor builds throw their own refusals in their own name — `baseArgs` that are no list —, and
-the uniforms and textures in the name of the class that builds them: `FeatureSpritesMaterial`
+built for another sprite kind — or a material built for a pass; `capacity`, `attributeUsage`,
+`baseArgs` or `grow: true` next to a `geometry`; any material parameter next to a `material`. The
+geometry and the material the constructor builds throw their own refusals in their own name —
+`baseArgs` that are no list —, and the uniforms and textures in the name of the class that builds
+them: `FeatureSpritesMaterial`
 without passes, `FeatureSprites` with them — `textures` that are no object. A material that cannot
 be built (a `placement` that cannot stand in, a texture name no feature declares) throws as well,
 and the geometry the constructor built for it is disposed first, so a refused constructor leaves
@@ -1951,8 +1953,8 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
 - **Pixel-perfect for free.** The colour of every sprite runs through its own colour source and
   colour stages — `Tint`, `Fade` and the rest — and the alpha test of its material drops the same
   texels it drops on the screen: a click into the transparent corner of a frame picks what lies
-  behind it, a sprite faded to 0 is not hit, and neither is one hidden by `Visible`. The id is written after all of it (three's
-  `outputNode`), so no colour stage can change it.
+  behind it, a sprite faded to 0 is not hit, and neither is one hidden by `Visible`. The id is
+  written after all of it (three's `outputNode`), so no colour stage can change it.
 - **The nearest sprite wins**, by the depth test, whatever the sprites blend or write. At one depth
   — a 2D scene on one plane — the sprite drawn later wins, as on the screen: the later slot of a
   mesh, the later mesh by the `renderOrder` of the nearest group above it, then by its own, as three

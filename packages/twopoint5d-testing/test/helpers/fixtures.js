@@ -37,7 +37,7 @@ import {
 
 /**
  * The backend this run renders under. Each browser of web-test-runner.config.js pins one before
- * the page loads, and a test file that starts a renderer runs under every one of them.
+ * the page loads, and a test file that renders runs under every one of them.
  *
  * @returns {'WebGPU' | 'WebGL2'}
  */

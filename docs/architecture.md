@@ -176,17 +176,18 @@ SIGTERM, while a SIGINT to the pid of the lock alone stops nothing.
   (`scripts/publishNpmPkg/publishDecision.mjs`), of the CI cache server and its entry
   script, of the lock of the gate, of the audit filter of the deploy (the filter itself
   and the script that runs it), of the helpers of the code block check, of its list of
-  tracked Markdown files and of the Nameable-Types check, of the tsconfig reader both share (`scripts/shared/`), of the
-  helpers of the lookbook's preview generator (`scripts/lookbook/demoPreviewConfig.mjs`,
-  `previewServer.mjs`, `webpSize.mjs`), the check that the publish script and its helpers
-  import nothing but Node's built-ins, the check that every tracked Markdown file is an
-  input of `twopoint5d-testing:typecheck`, the check that every file git tracks under
-  `packages/twopoint5d/src/` is an input of the library's `test`, `coverage` and
-  `allocations`, the check that every capitalised tag of the lookbook demos names an
-  export of the library, the check that the lookbook serves the script `RainbowLine` loads
-  at runtime, the check of the lookbook's preview images against its demos, their ids and
-  the size of the card, and the check of the view-transition names of the lookbook's
-  navbar against its two pages and the stylesheets.
+  tracked Markdown files and of the Nameable-Types check, of the tsconfig reader both
+  share (`scripts/shared/`), of the helpers of the lookbook's preview generator
+  (`scripts/lookbook/demoPreviewConfig.mjs`, `previewServer.mjs`, `webpSize.mjs`), the
+  check that the publish script and its helpers import nothing but Node's built-ins, the
+  check that every tracked Markdown file is an input of `twopoint5d-testing:typecheck`,
+  the check that every file git tracks under `packages/twopoint5d/src/` is an input of the
+  library's `test`, `coverage` and `allocations`, the check that every capitalised tag of
+  the lookbook demos names an export of the library, the check that the lookbook serves
+  the script `RainbowLine` loads at runtime, the check of the lookbook's preview images
+  against its demos, their ids and the size of the card, and the check of the
+  view-transition names of the lookbook's navbar against its two pages and the
+  stylesheets.
 - `test:coverage` runs the library's Vitest project `specs` once, with coverage, against
   the thresholds in `packages/twopoint5d/vite.config.ts`. `test:ci` is not part of the
   gate: it runs every spec without coverage. The thresholds sit two points under the level
@@ -244,23 +245,24 @@ for 3. The timings are archived, not held to a limit: a shared runner's timings
 vary too much for a gate, and a regression shows only in the series over weeks. What can
 be counted — the heap bytes of a hot-path call — the allocation specs hold in the gate.
 
-The browser suite runs every test file that starts a renderer in four browsers, each pinned to one backend of
-three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2`, `Firefox WebGL2` and
-`Webkit WebGL2` (`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter
-names a launcher after the capitalized product and the backend). Left to themselves the
-browsers would pick by machine — headless Chromium offers WebGPU only behind
-`--enable-unsafe-webgpu`, headless Firefox 155 finds no adapter — and measured with
-Playwright 1.63.0 both ended up on WebGL2, so WebGPU went untested. Now an init script of
-each launcher sets the backend before the page loads: for WebGL2 it takes `navigator.gpu`
-away, and three falls back as it does for a user without WebGPU. Chromium WebGPU runs on
-SwiftShader, the software adapter Chromium ships, with its compositor on SwiftShader as
-well (`--use-angle=swiftshader`, and on Linux through Vulkan: `--enable-features=Vulkan
---use-vulkan=swiftshader`). A compositor on anything else cannot take the canvas texture
-of a SwiftShader device, and Dawn drops the instance with every device of the page ("A
-valid external Instance reference no longer exists"). Measured with Playwright 1.63.0 on
-macOS and in its `v1.63.0-noble` image on arm64 and amd64: macOS needs the first flag,
-Linux all three. WebKit runs under WebGL 2 alone: Playwright's WebKit offers no
-`navigator.gpu` (measured with Playwright 1.63.0, WebKit 26.6, on macOS).
+The browser suite runs every test file that renders in four browsers, each pinned to one
+backend of three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2`,
+`Firefox WebGL2` and `Webkit WebGL2`
+(`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter names a launcher
+after the capitalized product and the backend). Left to themselves the browsers would pick
+by machine — headless Chromium offers WebGPU only behind `--enable-unsafe-webgpu`,
+headless Firefox 155 finds no adapter — and measured with Playwright 1.63.0 both ended up
+on WebGL2, so WebGPU went untested. Now an init script of each launcher sets the backend
+before the page loads: for WebGL2 it takes `navigator.gpu` away, and three falls back as
+it does for a user without WebGPU. Chromium WebGPU runs on SwiftShader, the software
+adapter Chromium ships, with its compositor on SwiftShader as well
+(`--use-angle=swiftshader`, and on Linux through Vulkan:
+`--enable-features=Vulkan --use-vulkan=swiftshader`). A compositor on anything else cannot
+take the canvas texture of a SwiftShader device, and Dawn drops the instance with every
+device of the page ("A valid external Instance reference no longer exists"). Measured with
+Playwright 1.63.0 on macOS and in its `v1.63.0-noble` image on arm64 and amd64: macOS
+needs the first flag, Linux all three. WebKit runs under WebGL 2 alone: Playwright's
+WebKit offers no `navigator.gpu` (measured with Playwright 1.63.0, WebKit 26.6, on macOS).
 
 three falls back to WebGL2 without a word when WebGPU fails its init, and every other
 test would then pass on the wrong backend. `test/renderer-backend.test.js` is the one
@@ -381,9 +383,10 @@ The logic of both scripts lives in `scripts/makePackageJson/` and
 `scripts/publishNpmPkg/`, next to its `node --test` specs; the scripts themselves only
 wire it up. Which of skip, publish and fail an answer of `npm show` means is
 `decidePublish()` in `scripts/publishNpmPkg/publishDecision.mjs`, whose spec goes through
-every answer; no spec starts the publish script itself. The refusal of those specifiers, `findUnpublishableSpecifiers`, lies in
-`scripts/publishNpmPkg/`, because the publish script holds it itself and imports nothing
-but Node's built-ins; `makePackageJson.mjs` imports it from there.
+every answer; no spec starts the publish script itself. The refusal of those specifiers,
+`findUnpublishableSpecifiers`, lies in `scripts/publishNpmPkg/`, because the publish
+script holds it itself and imports nothing but Node's built-ins; `makePackageJson.mjs`
+imports it from there.
 
 The publishable artifact is therefore `dist/`, not the source package directory.
 `publishNpmPkg` runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` first and then
@@ -465,7 +468,7 @@ the `catalog:` block of `pnpm-workspace.yaml`, and so is every tool that more th
 manifest names: `typescript` (7), `rimraf`, `@types/node` and `playwright`. Individual
 `package.json` files reference them as `"catalog:"`, so a version bump happens in exactly
 one place and stays consistent across library, test harness and lookbook. In the library
-the four first are `peerDependencies`; `@types/three` is an optional peer
+the first four are `peerDependencies`; `@types/three` is an optional peer
 (`peerDependenciesMeta`), because only a TypeScript consumer needs it.
 
 Each package declares what it uses. A workspace package lists every tool its scripts call
@@ -480,19 +483,21 @@ drift apart.
 
 `.github/dependabot.yml` has Dependabot look at `npm` and `github-actions` once a week.
 The minor and patch updates of the toolchain arrive as one pull request, the group
-`toolchain`. The four peer entries of the catalog stay out of it (the tool entries belong to the
-group): a jump of `three` moves the peer
-range of the library and is a release of its own, because the catalog range lands verbatim
-in the published manifest. So each of them, and every major update but those of
-`typescript` and `@types/node`, which it ignores (see below), comes as a pull request by
-itself, to be reviewed on its own. `playwright` stays out of the group as well: each of
-its updates brings the Chromium, Firefox and WebKit the browser suite runs on, so it comes
-as a pull request of its own. Overrides live in `pnpm-workspace.yaml`. Each one carries a
-comment that names the advisory it answers and says when the entry can go. An advisory that
-no update and no override can answer — no release fixes it, or the package that depends on it
-cannot take the release that does — goes into `auditConfig.ignoreGhsas` in the same file, with
-a comment that says why it cannot reach the workspace and when the entry can go; `pnpm audit`
-leaves it out, and with it the audit step of CI (§3) and the audit filter of the deploy (§4).
+`toolchain`. The four peer entries of the catalog stay out of it (the tool entries belong
+to the group): a jump of `three` moves the peer range of the library and is a release of
+its own, because the catalog range lands verbatim in the published manifest. So each of
+them, and every major update but those of `typescript` and `@types/node`, which it ignores
+(see below), comes as a pull request by itself, to be reviewed on its own. `playwright`
+stays out of the group as well: each of its updates brings the Chromium, Firefox and
+WebKit the browser suite runs on, so it comes as a pull request of its own. Overrides live
+in `pnpm-workspace.yaml`. Each one carries a comment that names the advisory it answers
+and says when the entry can go. An advisory that no update and no override can answer — no
+release fixes it, or the package that depends on it cannot take the release that does —
+goes into `auditConfig.ignoreGhsas` in the same file, with a comment that says why it
+cannot reach the workspace and when the entry can go; `pnpm audit` leaves it out, and so
+do the audit step of CI (§3) and the audit filter of the deploy (§4); both act on a `high`
+or `critical` advisory alone, so an entry of lower severity quiets a plain `pnpm audit`
+and changes nothing there.
 
 The catalog ranges of `three` and `@types/three` land verbatim as peer ranges in the
 published manifest. They stay a tilde on exactly one minor: a 0.x minor of `three` breaks,
@@ -504,8 +509,9 @@ steps:
 1. raise both entries together in the `catalog:` block of `pnpm-workspace.yaml`;
 2. `pnpm install`;
 3. check `packages/twopoint5d/src/testing/threeInternals.ts` and every place that names a
-   version of `three` (`git grep -nE "three 0\.[0-9]+|r1[0-9]{2}|@types/three@" -- packages`)
-   against the sources of the new release;
+   version of `three`
+   (`git grep -nE "three 0\.[0-9]+|r1[0-9]{2}|@types/three@" -- packages`) against the
+   sources of the new release;
 4. `pnpm run ci`;
 5. an entry under `### Changed` and a section "The `three` peer dependency range" in the
    `### Migration Guide` of `packages/twopoint5d/CHANGELOG.md`.
@@ -524,9 +530,10 @@ project of the workspace, the catalog entries included; an update comes through 
 or by hand, a catalog entry in `pnpm-workspace.yaml`.
 
 The repo runs two TypeScripts. The catalog's `typescript` is 7.x, the native compiler —
-the root, the library and the browser tests reference it: its `tsc` builds the library and runs every type check but the lookbook's. TypeScript 7
-exports no compiler API under `typescript` (only `typescript/unstable/*`, whose shape
-may still change), so the scripts that need one —
+the root, the library and the browser tests reference it: its `tsc` builds the library and
+runs every type check but the lookbook's. TypeScript 7 exports no compiler API under
+`typescript` (only `typescript/unstable/*`, whose shape may still change), so the scripts
+that need one —
 `scripts/checkNameableTypes/findUnnameableTypes.mjs`,
 `scripts/shared/readCompilerOptions.mjs`,
 `scripts/checkDocSnippets/compileSnippets.mjs`,
@@ -568,12 +575,13 @@ Two runners, deliberately in separate packages:
   to the source. No browser dependencies in the library package.
 - `@web/test-runner` with Playwright Chromium, Firefox and WebKit in
   `packages/twopoint5d-testing` (tag `browser`) — `*.test.js` under `test/`, for anything
-  that needs a real GPU context, every file that renders under WebGPU in Chromium and under
-  WebGL 2 in Chromium, Firefox and WebKit (the renderer-free files run once per engine, §3). `pnpm install` downloads no browsers; they come from `pnpm
-  exec playwright install chromium firefox webkit`. The `*.test.js` files are type-checked
-  with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from JSDoc —
-  vertex object interfaces, descriptions. `strictNullChecks` stays off for the browser
-  tests. Switched on, TypeScript 7.0.2 reports 828 errors in 56 files of the suite
+  that needs a real GPU context, every file that renders under WebGPU in Chromium and
+  under WebGL 2 in Chromium, Firefox and WebKit (the renderer-free files run once per
+  engine, §3). `pnpm install` downloads no browsers; they come from
+  `pnpm exec playwright install chromium firefox webkit`. The `*.test.js` files are
+  type-checked with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from
+  JSDoc — vertex object interfaces, descriptions. `strictNullChecks` stays off for the
+  browser tests. Switched on, TypeScript 7.0.2 reports 828 errors in 56 files of the suite
   (measured in October 2026): three in four are `'display' is possibly 'undefined'` and
   its kin — a fixture variable that a `beforeEach` assigns and an `afterEach` clears, an
   order the checker cannot see —, and most of the rest hand the same variables on as

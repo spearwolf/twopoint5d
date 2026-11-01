@@ -416,12 +416,12 @@ any adapter runs; a packer with another envelope is converted to it first.
   `'texturepacker'` (`app: /texturepacker|free-tex-packer/i`) and `'aseprite'` (`app: /aseprite/i`).
   A name that is no non-empty string, an adapter that is no function, an `app` that is no `RegExp`
   are refused with a `TypeError` naming the fix.
-- A catalog item names one with `atlasAdapter: 'aseprite'`. A name the store does not know
-  makes the item build no resource, reported as an `error` with `source: 'parse'` and the id
-  (`TextureStore: item "fighter" names the atlasAdapter "asprite", which this store does not
-  know — known: "texturepacker", "aseprite"; register it with registerAtlasAdapter() before parse()`);
-  `atlasAdapter` that is no string is a field of the wrong type; on an item without `atlasUrl` it
-  is reported and ignored (`… builds a "tileset" resource, which reads no atlasAdapter — left out`).
+- A catalog item names one with `atlasAdapter: 'aseprite'`. A name the store does not know makes the
+  item build no resource, reported as an `error` with `source: 'parse'` and the id (`TextureStore:
+  item "fighter" names the atlasAdapter "asprite", which this store does not know — known:
+  "texturepacker", "aseprite"; register it with registerAtlasAdapter() before parse()`);
+  `atlasAdapter` that is no string is a field of the wrong type; on an item without `atlasUrl` it is
+  reported and ignored (`… builds a "tileset" resource, which reads no atlasAdapter — left out`).
 - An item that names none is read by the adapter whose `app` matches `meta.app` of its json —
   the latest registered first — and by `'texturepacker'` when none does or `meta.app` is no string.
 - A `TextureResource` on its own (no store) picks among the two built-ins the same way.

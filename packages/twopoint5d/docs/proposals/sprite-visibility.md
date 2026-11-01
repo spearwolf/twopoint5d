@@ -187,10 +187,10 @@ under both backends is its check.
 ### 7.4 Docs and CHANGELOG
 
 - [`docs/sprites.md`](../sprites.md): a section "Showing and hiding sprites" under "Built-in
-  features", after "Fade and flash" — the recipe first: hide, show, the touch; the band `Hide 1000` in the table of
-  `MeshOrder` under "The pipeline" and under "Writing a feature", with the rule of §3.2; one line
-  under "Picking" and one under "Performance" — a hidden sprite is not picked, and it still runs its
-  vertices.
+  features", after "Fade and flash" — the recipe first: hide, show, the touch; the band `Hide 1000`
+  in the table of `MeshOrder` under "The pipeline" and under "Writing a feature", with the rule of
+  §3.2; one line under "Picking" and one under "Performance" — a hidden sprite is not picked, and it
+  still runs its vertices.
 - The row of §8 of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) marked built,
   pointing here.
 - `CHANGELOG.md` of the library, under `## [Unreleased]`: `Visible` and `MeshOrder.Hide` under

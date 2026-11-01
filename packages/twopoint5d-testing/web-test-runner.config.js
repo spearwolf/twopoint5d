@@ -210,12 +210,11 @@ export default {
   reporters: [defaultReporter({reportTestResults: true, reportTestProgress: !process.env.CI}), skippedTestsReporter()],
   filterBrowserLogs: ({type, args}) => !(type === 'warn' && args[0] === WEBGL2_FALLBACK_WARNING),
   plugins: [esbuildPlugin({target: 'auto'})],
-  // Every test file that starts a renderer runs under all four launchers; the files of
-  // RENDERER_FREE_FILES run under three. Which backend a browser would pick on its own depends on
-  // the machine — headless Chromium has no WebGPU without a flag, headless Firefox has no adapter
-  // at all, and Playwright's WebKit offers no navigator.gpu — so WebKit runs under WebGL 2 alone,
-  // and each launcher pins its backend and renderer-backend.test.js fails when three ends up on
-  // another one.
+  // Every test file that renders runs under all four launchers; the files of RENDERER_FREE_FILES
+  // run under three. Which backend a browser would pick on its own depends on the machine —
+  // headless Chromium has no WebGPU without a flag, headless Firefox has no adapter at all, and
+  // Playwright's WebKit offers no navigator.gpu — so WebKit runs under WebGL 2 alone, and each
+  // launcher pins its backend and renderer-backend.test.js fails when three ends up on another one.
   browsers: [chromiumWebGPU, chromiumWebGL2, firefoxWebGL2, webkitWebGL2],
   // the group of the files above runs on its own browsers, the same launcher objects: the runner
   // starts each launcher once, whatever number of groups names it

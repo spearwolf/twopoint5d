@@ -85,10 +85,12 @@ the anisotropy classes.
   from: a texture for a `FeatureSprites` leaves `flipy` out, a texture for a mesh of three.js names
   it. With `flipY = true` every frame of an atlas is read from the wrong place, and nothing reports
   it.
-- A texture of data — ids, a palette, a lookup table — names `nearest` and `no-mipmaps`. three.js
-  builds mip levels for every texture unless told otherwise; under WebGPU it reads a `nearest`
-  texture drawn smaller from them (the sampler takes its `mipmapFilter` from `minFilter`), under
-  WebGL 2 from level 0 alone. Without mip levels both read the texels as they are.
+- A texture of data — ids, a palette, a lookup table — names `nearest` and `no-mipmaps`. With both
+  filters `NearestFilter`, three.js reads level 0 alone, under WebGPU and under WebGL 2, so the mip
+  levels it builds for every texture unless told otherwise only take memory; under WebGPU a texture
+  that three.js samples with a linear filter reads them when drawn smaller, even with a `minFilter`
+  that names no mip levels (the sampler takes its `mipmapFilter` from `minFilter`). Without mip
+  levels every texture reads level 0.
 - A wrap reads beyond the edge of the whole image. It is for an image of its own — a floor, a wall,
   the band of a backdrop; a frame of an atlas repeats within its bounds through
   `sampleAtlasFrame()`, see [the sprite guide](sprites.md#atlas-frames-on-meshes-of-ones-own).
@@ -99,8 +101,9 @@ two options yields to one that writes one of them, whoever named them first — 
 last wins.
 
 **What is left alone.** An option that no class names keeps the value of the texture: `update()`
-without a wrap class leaves `wrapS` and `wrapT` as they are, and a new texture keeps the
-`ClampToEdgeWrapping` of three.js.
+without a wrap class leaves `wrapS` and `wrapT` as they are, and one without a mipmap class leaves
+`generateMipmaps`; a new texture keeps the `ClampToEdgeWrapping` and the `generateMipmaps = true` of
+three.js.
 
 **Names out of json.** A name that is no texture class is skipped wherever classes are applied;
 `isTextureOptionClass(name)` tells the two apart. A `TextureStore` reports such a name as well —
@@ -214,9 +217,9 @@ the whole image.
 | `tileCount` | as many as fit | how many tiles the set holds |
 | `firstId` | 1 | the id of the first tile |
 
-The tile ids run row by row from the top left, starting at `firstId`. A tile set item builds a `tileSet`, the `atlas` of its
-tiles, the texture and — with `frameBasedAnimations` — animations over its tiles, each named by
-`tileIds` or by a range of `firstTileId` and `tileCount`:
+The tile ids run row by row from the top left, starting at `firstId`. A tile set item builds a
+`tileSet`, the `atlas` of its tiles, the texture and — with `frameBasedAnimations` — animations over
+its tiles, each named by `tileIds` or by a range of `firstTileId` and `tileCount`:
 
 ```json
 {
@@ -562,12 +565,12 @@ if (level.type === 'tileset') {
 
 An `AtlasTextureResource` takes `atlasUrl`, `overrideImageUrl`, `atlasAdapter`, `playback`,
 `frameBasedAnimationsData` and `atlasJson` — a json already at hand, in place of a fetch. Its
-`imageUrl` is read-only: it comes from the json. Clearing its `atlasUrl` takes the json fetched
-from it back, and with it the image, the texture — released —, the atlas and the animations, as
-clearing `imageUrl` does on the other shapes; a json written from outside has no url and stays, so
-`resource.atlasJson = resource.atlasJson` before `resource.atlasUrl = undefined` keeps what it built.
-Every shape takes `textureClasses`. TypeScript refuses a setter of another shape, and in JavaScript
-it throws.
+`imageUrl` is read-only: it comes from the json. Clearing its `atlasUrl` takes the json fetched from
+it back, and with it the image, the texture — released —, the atlas and the animations, as clearing
+`imageUrl` does on the other shapes; a json written from outside has no url and stays, so
+`resource.atlasJson = resource.atlasJson` before `resource.atlasUrl = undefined` keeps what it
+built. Every shape takes `textureClasses`. TypeScript refuses a setter of another shape, and in
+JavaScript it throws.
 
 A resource disposed directly leaves its store: the next `parse()` that names its id builds a new
 one, and `on()` follows it.

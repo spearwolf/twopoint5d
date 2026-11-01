@@ -16,8 +16,8 @@ the pointer" and "Performance", and the browser proofs in
   pick hits it (§4);
 - a mesh whose material is not visible is left out (§3.2);
 - a drawing buffer of no pixels counts as one pixel, so the matrix of §3.3 stays finite (§3.3);
-- the pick meshes lie under mirrors of the ClippingGroups above the sprites and in a group with their
-  group order, so a pick clips and orders as the screen does (§3.2);
+- the pick meshes lie under mirrors of the ClippingGroups above the sprites and in a group with
+  their group order, so a pick clips and orders as the screen does (§3.2);
 - a mesh whose material slot holds no material of its kind without a pass is refused (§3.2, §5).
 
 Phase F, part 3, of [`sprite-and-texture-roadmap.md`](sprite-and-texture-roadmap.md) (§4.10, the
@@ -284,8 +284,10 @@ resolves).
   pass (`… the entry 1 of the list holds a material built for pass "shadow" in its material slot —
   the picker draws the sprites themselves; put a material built without a pass there`).
 - **Ownership**: the renderer, the camera and every mesh stay the caller's. The picker owns its
-  target, its scene, its camera, its pick meshes and pick materials. A pick material borrows the
-  resources of its mesh and does not release them.
+  target, its scene and its camera, and for every mesh it has drawn a pick mesh, its pick material,
+  the `Group` the pick mesh lies in and a mirror of each `ClippingGroup` above the sprites (§3.2). A
+  pick material borrows the resources of its mesh and does not release them; the group and the
+  mirrors have nothing to release and leave the scene of the pick with their pick mesh.
 - **A mesh disposed**: the picker listens to three's `dispose` event of every mesh it has drawn and
   releases its pick mesh and pick material then — the event comes before the sprites release their
   resources, so the pick material goes before what it reads. It listens to the `dispose` event of

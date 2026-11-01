@@ -412,11 +412,11 @@ color    = sampleFrameAt(lookup, {texCoords, flipDiagonal: flip, drawnTexels: dr
   `minFilter` when the graph is built and takes gradients for a mipmapped one.
   `RepeatingTextureColor` cannot: a texture of the same kind swaps in without a rebuild
   (`textureShapeKey()`), and the key tells `LinearFilter` from `LinearMipmapLinearFilter` no more
-  than three needs it to. It reads the one filter test the key holds — both filters `NearestFilter`,
-  which read level 0 alone, so that gradients change nothing there — and takes gradients for every
-  other texture. Gradients on a texture without mipmaps sample what a plain
-  sample samples. So a mipmapped frame repeats without a seam of the smallest mip level at its
-  wraps, after any swap.
+  than three needs it to. It reads the one filter test the key holds, whether both filters are
+  `NearestFilter`, and takes gradients for every texture that fails it; a texture that passes reads
+  level 0 alone, so gradients would change nothing there. Gradients on a texture without mipmaps
+  sample what a plain sample samples. So a mipmapped frame repeats without a seam of the smallest
+  mip level at its wraps, after any swap.
 - **The lookup** goes through `ctx.sample()`, so the material registers it and hands it a new
   texture; the `.grad()` copy three builds refers to the registered node for its value.
 

@@ -371,10 +371,9 @@ overlap with it (§3.2) are through: a refusal after `dispose()` arms nothing, a
 while a newer request or an exit is under way — the answer of that one decides.
 
 A page that loads in landscape arms at construction — unless the target or another element is in
-fullscreen — and does not try at once: no turn has
-happened, and nothing grants an exemption. `onLandscape` set to `true` later does the same — while
-the browser is still answering a request or an exit, once that answer is in, held against the state
-then as the answer of a request of §6 is.
+fullscreen — and does not try at once: no turn has happened, and nothing grants an exemption.
+`onLandscape` set to `true` later does the same — while the browser is still answering a request or
+an exit, once that answer is in, held against the state then as the answer of a request of §6 is.
 
 Where native fullscreen is not available and `fallback` is `'pseudo'`, the pseudo mode needs no
 gesture: the turn enters it at once and never arms, and a page that loads in landscape enters it at
@@ -388,26 +387,28 @@ construction.
   portrait — stays: whoever asked for a fullscreen decides, so one a `request()` of the page carries
   stays as well when it shares a request of `onLandscape` — the turn's, or the armed tap's under the
   click of a button —, and so does one `onLandscape` has entered once the page calls `request()` on
-  it — also while an element of the app lies on top of the target (§3.2). The exit this turn
-  starts is no refusal of the user: it does not hold off the arming. An exit the browser refuses leaves the target on top and is not asked again in portrait.
-- **Turns that overlap with the answers of the browser.** The rule of §3.2 holds, and a turn gives way
-  to the page: it is no call of the page, it notes the exit of a turn to portrait on a pending
-  request only where the page has noted none, and a turn back to landscape before the browser answers
-  takes back that exit of the turn, never one the page asked for. A turn to landscape while an exit
-  is under way waits for it; once it is through, the controller evaluates the turn anew — it enters
-  again, or arms where the browser refuses —, unless an `exit()` of the page came after the turn. A
-  `request()` of the page noted on that exit goes to the browser first, and the turn shares it.
+  it — also while an element of the app lies on top of the target (§3.2). The exit this turn starts
+  is no refusal of the user: it does not hold off the arming. An exit the browser refuses leaves the
+  target on top and is not asked again in portrait.
+- **Turns that overlap with the answers of the browser.** The rule of §3.2 holds, and a turn gives
+  way to the page: it is no call of the page, it notes the exit of a turn to portrait on a pending
+  request only where the page has noted none, and a turn back to landscape before the browser
+  answers takes back that exit of the turn, never one the page asked for. A turn to landscape while
+  an exit is under way waits for it; once it is through, the controller evaluates the turn anew — it
+  enters again, or arms where the browser refuses —, unless an `exit()` of the page came after the
+  turn. A `request()` of the page noted on that exit goes to the browser first, and the turn shares
+  it.
 - **The user leaves.** Where the user leaves a fullscreen while the screen is still landscape — one
   of the target, whoever entered it (`onLandscape`, a `request()` of the page, someone else; native
   or pseudo), or one of another element (§3.2) — through Escape, the back gesture, the browser's own
   control or an exit button of the page, the controller does not arm again until the screen has
   turned to portrait and back. For an `exit()` of the page the screen at the call decides, not the
-  screen once the browser answers — also for one that joins the exit of the turn to portrait or a
-  pending request — of the turn, of the armed tap or of the page: called in landscape it holds off the arming, whatever the browser answers; called in
-  portrait it does not, however quickly the screen turns back. Until the browser has answered, the
-  hold is noted on the call under way and belongs to the `exit()`: a `request()` of the page after
-  it takes it back with the exit, and a turn to portrait lifts it, as a turn after the answer would.
-  A page that throws the user back into
+  screen once the browser answers, also for an exit that joins the exit of the turn to portrait or a
+  pending request of the turn, of the armed tap or of the page. Called in landscape it holds off the
+  arming, whatever the browser answers; called in portrait it does not, however quickly the screen
+  turns back. Until the browser has answered, the hold is noted on the call under way and belongs to
+  the `exit()`: a `request()` of the page after it takes it back with the exit, and a turn to
+  portrait lifts it, as a turn after the answer would. A page that throws the user back into
   fullscreen at the next tap after they left it is a trap; this rule is the reason the feature can
   be on by default in a game.
 - **Switched off.** `onLandscape = false` disarms and takes the listeners down. A fullscreen in
@@ -602,8 +603,8 @@ that runs without a real turn of a screen.
   `toggle()` from a pending request and from an exit under way — a `request()` after the exit held
   back behind it —, each with the browser granting and refusing: the fullscreen ends where the last
   call asks, every promise resolves once with that end, and the browser is asked as often as that
-  takes; two requests share one; a listener of the change a granted request causes finds it
-  settled; a listener told active by a `fullscreenchange` during `requestFullscreen()` leaves with its
+  takes; two requests share one; a listener of the change a granted request causes finds it settled;
+  a listener told active by a `fullscreenchange` during `requestFullscreen()` leaves with its
   `toggle()`;
 - §6 and overlapping answers: a turn to portrait while the request of a turn is pending leaves
   what the browser grants; a turn back to landscape during the exit of the turn to portrait enters

@@ -181,10 +181,10 @@ height: 600, maxPixelZoom: 1}` never draws a unit larger than a CSS pixel, and o
 shows more than 800 × 600 instead. A `pixelZoom`, `minPixelZoom` or `maxPixelZoom` that is not a
 finite number above `0` has no effect — a `pixelZoom` like that zooms by `1`.
 
-Under a display `pixelZoom` the container counts pixels of the art instead of CSS pixels, and
-every row of the table above counts in them as well. `pixelSnap` keeps pixel art crisp at a
-fractional `devicePixelRatio`; how it rounds and where it does not go together with other
-settings is in [display: pixel art through a projection](display.md#pixel-art-through-a-projection-pixelsnap).
+Under a display `pixelZoom` the container counts pixels of the art instead of CSS pixels, and every
+row of the table above counts in them as well. `pixelSnap` keeps pixel art crisp at a fractional
+`devicePixelRatio`; how it rounds and where it does not go together with other settings is in
+[display: pixel art through a projection](display.md#pixel-art-through-a-projection-pixelsnap).
 
 The read-outs:
 
@@ -511,8 +511,8 @@ your own casts for both.
 
 ### A pipeline on the whole picture
 
-The whole-picture mode needs no TSL at all: the stages draw into an internal target, and the renderer sets
-`pipeline.outputNode` to a `texture()` node of it.
+The whole-picture mode needs no TSL at all: the stages draw into an internal target, and the
+renderer sets `pipeline.outputNode` to a `texture()` node of it.
 
 ```ts
 import {RenderPipeline} from 'three/webgpu';
@@ -529,8 +529,8 @@ next frame.
 
 #### Sharing the internal target: `StageRenderTargetPool`
 
-Each renderer in the whole-picture mode holds an internal target of its own. Several of them of the same size —
-children with a pipeline each under a composing root, say — can share one through a
+Each renderer in the whole-picture mode holds an internal target of its own. Several of them of the
+same size — children with a pipeline each under a composing root, say — can share one through a
 `StageRenderTargetPool` set as `internalTargetPool`:
 
 ```ts check
@@ -674,9 +674,9 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 
 The child's pipeline writes linear: while the root draws its children, `renderer.toneMapping` is
 `NoToneMapping` and `renderer.outputColorSpace` the working color space, restored before its own
-pipeline runs. Tone mapping and the output encoding apply once, in the outermost pipeline. The
-same holds for a child with a pipeline under a renderer in the whole-picture mode. The lookbook demo *stage nested
-pipelines* runs this setup.
+pipeline runs. Tone mapping and the output encoding apply once, in the outermost pipeline. The same
+holds for a child with a pipeline under a renderer in the whole-picture mode. The lookbook demo
+*stage nested pipelines* runs this setup.
 
 ### One writer per canvas
 
@@ -797,19 +797,19 @@ await director.precompile(
 A shape lists the slots of the stack bottom to top: `'layer'` for a slot that shows a layer, the
 effect for a slot in a transition — the same effect object the transition will take, since the
 director tells shapes apart by their effect objects —, and `{effect?, mask}` for a slot with a
-[mask](#no-hitch-precompile-with-masks). A shape the director holds is skipped — once its
-compile is through, when another `precompile()` still compiles it —, a shape whose compile failed
-is built and compiled again by the next call, and what `precompile()` compiles stays until the director is disposed, or until it draws or precompiles
-with another renderer. A transition without an `effect` cannot be named ahead: give it an effect of
-its own to compile it ahead.
+[mask](#no-hitch-precompile-with-masks). A shape the director holds is skipped — once its compile is
+through, when another `precompile()` still compiles it —, a shape whose compile failed is built and
+compiled again by the next call, and what `precompile()` compiles stays until the director is
+disposed, or until it draws or precompiles with another renderer. A transition without an `effect`
+cannot be named ahead: give it an effect of its own to compile it ahead.
 
-The shapes cover the composition of the director. A layer builds its own materials and pipelines
-on its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
+The shapes cover the composition of the director. A layer builds its own materials and pipelines on
+its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
 their first frame in the stack builds nothing. That draw is no frame of the stage: it sends no
 `OnStageUpdateFrame`, so sprites that wait for that event for their first `update()` draw no
 instance there, and their material builds all the same. A stage that is not in the stack yet takes
-the size of the director for that draw, so call `precompile()` once the display runs, and outside of a
-frame.
+the size of the director for that draw, so call `precompile()` once the display runs, and outside of
+a frame.
 
 ### One scene into another, as a whole
 
@@ -1411,11 +1411,12 @@ level, outside it the title, the edge of a soft blot a mix of both. The mask sta
 stack: the director draws it while the transition runs and lets it go when the transition ends, so a
 matte costs nothing before and after.
 
-**Progress, not the clock.** A matte that grows with the clock of the display would end early under a
-slowed transition, late under a fast one and never under a `manual: true` one. `ink.progress` is the
-eased progress of the transition; the stage reads it in its `OnStageUpdateFrame`, and the blots
-follow the transition at any duration and easing, also when it is [driven by hand](#a-loading-screen-that-follows-the-loader).
-More in [the progress of a mask](#the-progress-of-a-mask).
+**Progress, not the clock.** A matte that grows with the clock of the display would end early under
+a slowed transition, late under a fast one and never under a `manual: true` one. `ink.progress` is
+the eased progress of the transition; the stage reads it in its `OnStageUpdateFrame`, and the blots
+follow the transition at any duration and easing, also when it is [driven by
+hand](#a-loading-screen-that-follows-the-loader). More in [the progress of a
+mask](#the-progress-of-a-mask).
 
 **`mode`.** The default is `'coverage'`: the stage is the transition, and its coverage is the
 share of `to`. With `'threshold'` the coverage says **when** a pixel switches — a pixel of
@@ -1479,8 +1480,9 @@ promises neither. In `'coverage'` mode `matte()` holds the ends itself: the shar
 and 1 at progress 1, whatever the stage drew. Between them it is the stage alone — and a mask stage
 that does not cover the picture by the end **jumps** there: in the last frame the transition shows
 `to` in full, also at the pixels the stage never reached. The blots of the recipe grow with the
-square of the progress to a size that covers the picture, so they have covered it before the jump. A stage
-whose picture is not 1 everywhere at progress 1 shows the jump as a flash of `to` over what was left of `from`.
+square of the progress to a size that covers the picture, so they have covered it before the jump. A
+stage whose picture is not 1 everywhere at progress 1 shows the jump as a flash of `to` over what
+was left of `from`.
 
 An effect with a mask holds a stage, so it is no description any more: it serves **one director** at
 a time, and a second transition with an effect that names a busy mask is refused — see

@@ -6,9 +6,10 @@ that follows the size of the drawing buffer. The `Display` decides how many ther
 phone screen can cost 2.6 million pixels a pass or a tenth of a million, depending on four or five
 settings:
 
-![One phone screen of 412 × 915 CSS pixels at a devicePixelRatio of 2.625, drawn four ways: at
-every device pixel (2.6 M pixels a pass), with the defaults (1.5 M), with adaptive resolution at a
-scale of 0.75 (0.85 M) and as pixel art at a zoom of 2 (0.1 M)](images/display/display-setups-on-a-phone.svg)
+![One phone screen of 412 × 915 CSS pixels at a devicePixelRatio of 2.625, drawn four ways: at every
+device pixel (2.6 M pixels a pass), with the defaults (1.5 M), with adaptive resolution at a scale
+of 0.75 (0.85 M) and as pixel art at a zoom of 2 (0.1
+M)](images/display/display-setups-on-a-phone.svg)
 
 This guide starts from what you want to draw — pixel art, a display that holds its frame rate, or
 a display as sharp as the screen allows — and gives each a recipe to copy. A cheat sheet of every
@@ -512,10 +513,10 @@ nothing, a tablet does the same as a phone.
 
 Whoever leaves a fullscreen while the phone is still sideways — the one of the turn, one the page
 asked for with `request()`, or the one of a video; through Escape, the back gesture or a button of
-the page — stays out of fullscreen until the phone has turned upright and back. A fullscreen the page
-entered with `request()` stays when the phone turns upright, and so does one the display entered
-sideways once the page has called `request()` on it; `exitOnPortrait: false` keeps the one of
-`onLandscape` as well.
+the page — stays out of fullscreen until the phone has turned upright and back. A fullscreen the
+page entered with `request()` stays when the phone turns upright, and so does one the display
+entered sideways once the page has called `request()` on it; `exitOnPortrait: false` keeps the one
+of `onLandscape` as well.
 
 Where the browser refuses the tap as well, the display stays armed for the next one. A phone turned
 sideways again while the fullscreen is still being left enters it again once that is through, or
@@ -598,13 +599,13 @@ parent in fullscreen, not its position: elements in front of it push it partly o
 Leaving the fullscreen gives the canvas back the size it had.
 
 A video or a dialog inside the target that goes fullscreen itself lies on top of it: `isActive` is
-`false` while it holds, the lock stays, and `onLandscape` neither asks for the target nor arms —
-the target would cover the video. Once it is left, the fullscreen is the display's again, as
-before: `exitOnPortrait` acts on the next turn — unless the page has called `request()` while the
-video lay on top, which makes the fullscreen the page's, as for one on top (see "Fullscreen when the
-phone turns sideways") —, and `dispose()` leaves it. A turn while the video
-lies on top is not caught up afterwards: a phone turned upright meanwhile keeps the fullscreen
-until it turns sideways and back.
+`false` while it holds, the lock stays, and `onLandscape` neither asks for the target nor arms — the
+target would cover the video. Once it is left, the fullscreen is the display's again, as before:
+`exitOnPortrait` acts on the next turn, and `dispose()` leaves it. A `request()` the page calls
+while the video lies on top makes the fullscreen the page's, and a turn upright keeps it, as it
+keeps one of `onLandscape` the page has called `request()` on (see "Fullscreen when the phone turns
+sideways"). A turn while the video lies on top is not caught up afterwards: a phone turned upright
+meanwhile keeps the fullscreen until it turns sideways and back.
 
 A video that goes fullscreen while the target is not — inside the target or anywhere on the page —
 is no fullscreen of the display: `isActive` stays `false`, `onLandscape` neither asks for the target

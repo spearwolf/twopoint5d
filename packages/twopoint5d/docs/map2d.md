@@ -174,9 +174,10 @@ A base64 string is decoded on the first read of its chunk: a string that does no
 answers `undefined` outside the chunk; a fractional point gets the id of the cell it lies in.
 
 A chunk that arrives later goes in through `appendChunk()`, followed by `subdivide()` on the root,
-which splits the leaves filled since. `subdivide(maxChunkNodes)` leaves up to that many chunks in a
-leaf, 2 unless given, and splits a row or a column of chunks as well as a block of them. `clear()`
-empties the tree.
+which splits the leaves filled since. `subdivide(maxChunkNodes)` splits a leaf that holds more than
+that many chunks, 2 unless given, as long as an axis separates them, and splits a row or a column of
+chunks as well as a block of them. Chunks that no axis separates stay in one leaf however many they
+are, and a chunk that crosses an axis stays at the node of that axis. `clear()` empties the tree.
 
 ## Renderables in a spatial hash grid
 
@@ -252,7 +253,7 @@ Every default works on its own; a few of them have to fit one another.
 | camera `far` | the camera's own | bounds how far out the ground is searched; tilted towards the horizon, the ground in view grows with `far²` |
 | `RectangularVisibilityArea` | `320 × 240` | the size of the rectangle, in world units |
 | `RectangularVisibilityArea#maxVisibleTiles` | `10 000` | the most tiles the rectangle may cover on the grid; a larger one throws a `RangeError` on the next `update()`. 320 × 240 on the default grid of 1 covers 76 800 — set the tile size or the area |
-| `ChunkQuadTreeNode#subdivide()` `maxChunkNodes` | `2` | the most chunks a leaf keeps; a query tests every chunk of each node on its way down, so a higher value gives a flatter tree with longer lists |
+| `ChunkQuadTreeNode#subdivide()` `maxChunkNodes` | `2` | the most chunks a leaf keeps while an axis separates them — chunks that none separates stay in one leaf; a query tests every chunk of each node on its way down, so a higher value gives a flatter tree with longer lists |
 | `Map2DSpatialHashGrid` cell size and offset | `1 × 1`, `(0, 0)` | the grid a renderable is placed on, in the units of its `aabb`; cells about the size of the renderables keep each of them in a few cells |
 | `Map2DSpatialHashGrid#maxCellsPerRenderable` | `65 536` | the most cells one `aabb` may reach into; on the default cells of 1 × 1 that is a renderable of 256 × 256, and a larger one throws in `add()` — size the cells to the renderables |
 
@@ -349,5 +350,5 @@ tileSprites.material?.dispose();
 ```
 
 The helpers release their nodes in their own `dispose()`. The quad tree and the hash grid hold what
-they are given and release none of it; their `clear()` lets go of everything. The rules behind all of this stand in
-[the resource lifecycle](resource-lifecycle.md).
+they are given and release none of it; their `clear()` lets go of everything. The rules behind all
+of this stand in [the resource lifecycle](resource-lifecycle.md).
