@@ -1,8 +1,8 @@
-import {add, attribute, float, floor, mod, round, sub, uniform, vec2} from 'three/tsl';
-import type {Node} from 'three/webgpu';
+import {add, attribute, float, floor, mod, round, sub, texture, uniform, vec2} from 'three/tsl';
+import {type Node, Texture} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {evaluateNode, graphSignature} from './spriteGraph.js';
+import {attributeNameOf, evaluateNode, graphSignature, operatorOf, textureBasesOf, unwrap} from './spriteGraph.js';
 
 const graph = (op: typeof add, name = 'uv', constant = 1) =>
   op(attribute(name), vec2(float(constant), float(2))) as unknown as Node;
@@ -89,5 +89,36 @@ describe('evaluateNode()', () => {
     expect(evaluateNode(uniform(2.7).toInt() as unknown as Node)).toBe(2);
     expect(evaluateNode(uniform(2.7).toUint() as unknown as Node)).toBe(2);
     expect(evaluateNode(uniform(2.7).toFloat() as unknown as Node)).toBe(2.7);
+  });
+});
+
+describe('unwrap() and operatorOf()', () => {
+  test('give the node a VarNode holds, and any other node itself', () => {
+    const sum = add(float(1), float(2)) as unknown as Node;
+    const held = add(float(1), float(2)).toVar() as unknown as Node;
+
+    expect(unwrap(sum)).toBe(sum);
+    expect(unwrap(held)).not.toBe(held);
+    expect(unwrap(held).type).toBe('OperatorNode');
+    expect(operatorOf(held).op).toBe('+');
+    expect(operatorOf(sum)).toBe(sum);
+  });
+});
+
+describe('attributeNameOf()', () => {
+  test('answers the name of an attribute node without a builder', () => {
+    expect(attributeNameOf(attribute('uv') as unknown as Node)).toBe('uv');
+  });
+});
+
+describe('textureBasesOf()', () => {
+  test('answers the base of every texture node once, a sample of one counted as its base', () => {
+    const base = texture(new Texture());
+    const other = texture(new Texture());
+    const graph = add(add(base.sample(vec2(0.5, 0.5)), base), other) as unknown as Node;
+    const bases = textureBasesOf(graph);
+
+    expect([bases.size, bases.has(base), bases.has(other)]).toEqual([2, true, true]);
+    expect(textureBasesOf(float(1) as unknown as Node).size).toBe(0);
   });
 });

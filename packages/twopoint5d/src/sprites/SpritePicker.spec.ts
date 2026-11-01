@@ -5,6 +5,7 @@ import {
   FloatType,
   Group,
   Matrix4,
+  NodeMaterial,
   NoBlending,
   type Object3D,
   OrthographicCamera,
@@ -32,7 +33,7 @@ import {FeatureSpritesMaterial} from './FeatureSprites/FeatureSpritesMaterial.js
 import {ShadowPass} from './passes/passPresets.js';
 import {TexturedSpriteKind} from './presets.js';
 import {QuadBase} from './SpriteBase.js';
-import {type SpritePick, SpritePicker} from './SpritePicker.js';
+import {DRAWN_FRAGMENTS, type SpritePick, SpritePicker} from './SpritePicker.js';
 
 const DotKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor]});
 
@@ -198,6 +199,81 @@ const centerPixel = () => {
 const expectCloseTo = (actual: Matrix4, expected: Matrix4) => {
   actual.elements.forEach((value, i) => expect(value, `element ${i}`).toBeCloseTo(expected.elements[i]!, 12));
 };
+
+// the fields of a NodeMaterial of three 0.187.0 without its flags (is…) and its internals (_…):
+// DRAWN_FRAGMENTS is judged against them. A field three adds or renames fails here — judge it there
+const MATERIAL_FIELDS = [
+  'allowOverride',
+  'alphaHash',
+  'alphaTestNode',
+  'alphaToCoverage',
+  'aoNode',
+  'backdropAlphaNode',
+  'backdropNode',
+  'blendAlpha',
+  'blendColor',
+  'blendDst',
+  'blendDstAlpha',
+  'blendEquation',
+  'blendEquationAlpha',
+  'blendSrc',
+  'blendSrcAlpha',
+  'blending',
+  'castShadowNode',
+  'castShadowPositionNode',
+  'clipIntersection',
+  'clipShadows',
+  'clippingPlanes',
+  'colorNode',
+  'colorWrite',
+  'contextNode',
+  'depthFunc',
+  'depthNode',
+  'depthTest',
+  'depthWrite',
+  'dithering',
+  'envNode',
+  'fog',
+  'forceSinglePass',
+  'fragmentNode',
+  'geometryNode',
+  'lights',
+  'lightsNode',
+  'maskNode',
+  'maskShadowNode',
+  'mrtNode',
+  'name',
+  'normalNode',
+  'opacity',
+  'opacityNode',
+  'outputNode',
+  'polygonOffset',
+  'polygonOffsetFactor',
+  'polygonOffsetUnits',
+  'positionNode',
+  'precision',
+  'premultipliedAlpha',
+  'receivedShadowNode',
+  'receivedShadowPositionNode',
+  'shadowSide',
+  'side',
+  'stencilFail',
+  'stencilFunc',
+  'stencilFuncMask',
+  'stencilRef',
+  'stencilWrite',
+  'stencilWriteMask',
+  'stencilZFail',
+  'stencilZPass',
+  'toneMapped',
+  'transparent',
+  'userData',
+  'uuid',
+  'version',
+  'vertexColors',
+  'vertexNode',
+  'visible',
+];
 
 describe('SpritePicker', () => {
   describe('pick() refuses', () => {
@@ -826,6 +902,15 @@ describe('SpritePicker', () => {
       sprites.dispose();
       colorMap.dispose();
       picker.dispose();
+    });
+
+    test('copies the fields DRAWN_FRAGMENTS names, judged against the fields of a material of three', () => {
+      const material = new NodeMaterial();
+      const fields = Object.keys(material)
+        .filter((key) => !/^(?:is[A-Z]|_)/.test(key))
+        .sort();
+      expect(fields).toEqual(MATERIAL_FIELDS);
+      for (const key of DRAWN_FRAGMENTS) expect(key in material, key).toBe(true);
     });
 
     test('takes the fields that decide which fragments a sprite draws, before every pick', async () => {

@@ -18,18 +18,21 @@ export interface SegmentPlacementOptions {
   readonly plane?: 'xy' | 'xz';
 }
 
-// the local stages a segment cannot follow, and the names of their exports for the fix
-const REFUSED: readonly [SpriteFeature, string][] = [
-  [Rotation, 'Rotation'],
-  [Shear, 'Shear'],
+// the local stages a segment cannot follow, by the names of their features and the names of their
+// exports for the fix. By name and not by identity, as refuseNineSliceOnSegments() judges NineSlice: a
+// copy of Rotation — defineFeature({...Rotation}) — or a feature of one's own under its name turns the
+// local quad all the same
+const REFUSED: readonly (readonly [feature: string, exported: string])[] = [
+  [Rotation.name, 'Rotation'],
+  [Shear.name, 'Shear'],
 ];
 
 // also the check of a placement swap on a live material and of a pass that brings a segment placement
 function checkSegmentKind(kind: SpriteKindShape): void {
-  const held = REFUSED.filter(([feature]) => kind.features.includes(feature));
+  const held = REFUSED.filter(([name]) => kind.features.some((feature) => feature.name === name));
   if (held.length > 0) {
-    const names = held.map(([feature]) => `"${feature.name}"`).join(' and ');
-    const exports = held.map(([, name]) => name).join(' and ');
+    const names = held.map(([name]) => `"${name}"`).join(' and ');
+    const exports = held.map(([, exported]) => exported).join(' and ');
     throw new Error(
       `a segment lies along its ends, so it cannot follow the local ${held.length > 1 ? 'stages' : 'stage'} of ${names} — move the ends instead, and take ${exports} out of the kind`,
     );
@@ -57,7 +60,8 @@ const NAMES: Readonly<Record<SegmentFacing, string>> = {
  *
  * Returns one frozen feature per set of options: `segmentPlacement`, `segmentPlacement+xz` and
  * `segmentPlacement+camera`, which stand in for each other on a live material. A kind with
- * `Rotation` or `Shear` is refused: a segment lies along its ends. So is a kind with `NineSlice`,
+ * `Rotation` or `Shear` — judged by the names `rotation` and `shear` — is refused: a segment lies
+ * along its ends. So is a kind with `NineSlice`,
  * which sets its border in the local quad, where a segment holds only its caps.
  *
  * @throws a `TypeError` for options that are no object, for a facing or a plane it does not know, and for a plane next to

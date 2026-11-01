@@ -3,6 +3,7 @@ import {mix} from 'three/tsl';
 import {type Node, PerspectiveCamera, RenderPipeline, type RenderTarget, Scene, type TextureNode} from 'three/webgpu';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {OnStageAdded, OnStageDispose, OnStageRemoved, OnStageTransitionEnd} from '../events.js';
+import {textureBasesOf} from '../testing/spriteGraph.js';
 import {createRendererMock, type FakeStage, fakeStage, names} from '../testing/stageFixtures.js';
 import type {IStage} from './IStage.js';
 import {Stage2D} from './Stage2D.js';
@@ -10,15 +11,6 @@ import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
 import {crossfade, matte, type StageTransitionEffect, type StageTransitionInput} from './transitionEffects.js';
-
-/** The texture nodes a graph samples, each counted once: the base of every sample() of it. */
-function textureNodesOf(node: Node): Set<TextureNode> {
-  const found = new Set<TextureNode>();
-  node.traverse((child) => {
-    if ((child as Partial<TextureNode>).isTextureNode) found.add((child as TextureNode).getBase());
-  });
-  return found;
-}
 
 describe('StageDirector masks', () => {
   let renderer: ReturnType<typeof createRendererMock>;
@@ -588,7 +580,7 @@ describe('StageDirector masks', () => {
 
   describe('the shape', () => {
     const outputNode = () => director.pipeline!.outputNode as Node;
-    const texturesOf = () => [...textureNodesOf(outputNode())].map((node) => node.value);
+    const texturesOf = () => [...textureBasesOf(outputNode())].map((node) => node.value);
 
     it('two masks with the same options on stages in the same pattern answer the same output node', () => {
       const blobsStage = fakeStage('blobs');
@@ -615,7 +607,7 @@ describe('StageDirector masks', () => {
       director.setMask(stars, fog);
       director.setMask(level, fog);
       draw();
-      expect(textureNodesOf(outputNode()).size).toBe(3);
+      expect(textureBasesOf(outputNode()).size).toBe(3);
       const shared = director.pipeline;
 
       // a second StageMask object with the same options on the same stage is the same mask
@@ -627,7 +619,7 @@ describe('StageDirector masks', () => {
       director.setMask(level, new StageMask(fogStage, {invert: true}));
       draw();
       expect(director.pipeline).not.toBe(shared);
-      expect(textureNodesOf(outputNode()).size).toBe(3);
+      expect(textureBasesOf(outputNode()).size).toBe(3);
     });
 
     it('a red and a green mask on one stage and on two stages are two shapes', () => {
@@ -637,12 +629,12 @@ describe('StageDirector masks', () => {
       director.setMask(level, new StageMask(fogStage, {source: 'green'}));
       draw();
       const oneStage = director.pipeline;
-      expect(textureNodesOf(outputNode()).size).toBe(3);
+      expect(textureBasesOf(outputNode()).size).toBe(3);
 
       director.setMask(level, new StageMask(otherStage, {source: 'green'}));
       draw();
       expect(director.pipeline).not.toBe(oneStage);
-      expect(textureNodesOf(outputNode()).size).toBe(4);
+      expect(textureBasesOf(outputNode()).size).toBe(4);
     });
 
     it('a masked slot and an unmasked one are two shapes, and a transition runs inside the mask', () => {
@@ -659,7 +651,7 @@ describe('StageDirector masks', () => {
       draw();
       expect(director.pipeline).not.toBe(masked);
       // stars, from, to and the mask
-      expect(textureNodesOf(outputNode()).size).toBe(4);
+      expect(textureBasesOf(outputNode()).size).toBe(4);
       director.transitions[0]!.complete();
       draw();
       expect(director.pipeline).toBe(masked);
@@ -1049,7 +1041,7 @@ describe('StageDirector masks', () => {
       let pictureOf: Map<IStage, unknown>;
       /** The stages whose pictures the texture nodes of `node` sample, sorted. */
       const sampled = (node: Node) =>
-        [...textureNodesOf(node)]
+        [...textureBasesOf(node)]
           .map((textureNode) => [...pictureOf].find(([, picture]) => picture === textureNode.value)?.[0].name ?? 'placeholder')
           .sort();
 

@@ -207,6 +207,11 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
       );
     }
     if (material.kind !== kind) throw new TypeError(`${WHERE}: the material handed in was built for another sprite kind`);
+    if (material.pass != null) {
+      throw new TypeError(
+        `${WHERE}: the material handed in was built for pass "${material.pass.name}" — hand in a material built without a pass, or leave out the material and give the sprites the pass in passes`,
+      );
+    }
     const given = definedKeys(materialParameters);
     if (given.length > 0) throw new TypeError(`${WHERE}: ${given.join(', ')} build a material, and a material was handed in`);
     if (passes.length > 0) {
@@ -329,10 +334,10 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
    *   pass for them; the `isMaterial` and the `isTexture` they carry keep them out.
    * @throws a `TypeError` for a kind that did not come from `defineSprite()`, for a `geometry` or a
    *   `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, for a geometry or
-   *   material of another kind, for parameters that would build a geometry or a material next to
-   *   one handed in, for passes next to a material handed in and for two passes of one name, for
-   *   options that are no object, for `passes` that are no list and for a `grow` that is neither
-   *   `true` nor `false`; an `Error` for a pass the kind cannot draw, with the placement the
+   *   material of another kind, for a material built for a pass, for parameters that would build a
+   *   geometry or a material next to one handed in, for passes next to a material handed in and for
+   *   two passes of one name, for options that are no object, for `passes` that are no list and for
+   *   a `grow` that is neither `true` nor `false`; an `Error` for a pass the kind cannot draw, with the placement the
    *   sprites start with; what `new FeatureSpritesGeometry()` and `new FeatureSpritesMaterial()`
    *   refuse of the options, in their name; and what `new SpriteResources()` refuses of `textures`
    *   and `uniforms`, in the name of the class that builds the resources — `FeatureSpritesMaterial`
@@ -664,7 +669,9 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
 
   /**
    * Sets the texture `name` for the sprites and every pass; it stays the caller's. See
-   * {@link FeatureSpritesMaterial.setTexture}. Does nothing once disposed.
+   * {@link FeatureSpritesMaterial.setTexture}: a value that is no three.js Texture, `undefined` or
+   * `null` throws a `TypeError`, as {@link SpriteResources.setTexture} does. Does nothing once
+   * disposed.
    */
   setTexture(name: string, texture: Texture | undefined): void {
     this.#material?.setTexture(name, texture);

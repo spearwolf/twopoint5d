@@ -1,28 +1,11 @@
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import type {MeshBasicMaterial, Node, NodeBuilder, TextureNode} from 'three/webgpu';
-import {AttributeNode, SRGBColorSpace, Texture} from 'three/webgpu';
+import type {MeshBasicMaterial} from 'three/webgpu';
+import {SRGBColorSpace, Texture} from 'three/webgpu';
 import {afterEach, describe, expect, test} from 'vitest';
 
+import {attributeNamesOf, textureNodesOf} from '../../testing/spriteGraph.js';
 import {TileSpritesMaterial} from './TileSpritesMaterial.js';
-
-// the names of the attributes the graph below `root` reads — AttributeNode answers its name
-// without looking at the builder it is typed to take
-const attributeNamesOf = (root: Node): string[] => {
-  const nodes = new Set<Node>();
-  root.traverse((node) => nodes.add(node));
-  return [...nodes]
-    .filter((node): node is AttributeNode => node instanceof AttributeNode)
-    .map((node) => node.getAttributeName(undefined as unknown as NodeBuilder))
-    .sort();
-};
-
-// the texture nodes of the graph below `root`
-const textureNodesOf = (root: Node): TextureNode[] => {
-  const nodes = new Set<Node>();
-  root.traverse((node) => nodes.add(node));
-  return [...nodes].filter((node): node is TextureNode => (node as TextureNode).isTextureNode === true);
-};
 
 describe('TileSpritesMaterial', () => {
   const sandbox = createSandbox();

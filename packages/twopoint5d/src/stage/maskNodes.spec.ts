@@ -1,6 +1,7 @@
 import {texture, uv} from 'three/tsl';
 import {DataTexture, type Node, type TextureNode} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
+import {textureBasesOf} from '../testing/spriteGraph.js';
 import {createMaskNode, maskCoverage, maskSource} from './maskNodes.js';
 import {StageMask} from './StageMask.js';
 
@@ -66,10 +67,7 @@ describe('maskSource()', () => {
     const node = textureNode();
     const source = maskSource(node, new StageMask(stage, {source: 'red', invert: true}));
     const at = uv();
-    const sampled = new Set<unknown>();
-    source.coverage(at).traverse((child) => {
-      if ((child as Partial<TextureNode>).isTextureNode) sampled.add((child as TextureNode).getBase());
-    });
+    const sampled = textureBasesOf(source.coverage(at));
     expect([...sampled]).toEqual([node]);
     expect(isNode(source.sample(at))).toBe(true);
     expect(isNode(source.coverage(at))).toBe(true);

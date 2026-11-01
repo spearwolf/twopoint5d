@@ -44,6 +44,23 @@ describe('gridBase()', () => {
     expect(grid.defaultArgs).toEqual([0.5, 0.5]);
   });
 
+  test('lets go of a grid nothing holds, and answers a held one with every call', async () => {
+    // the Vitest config starts every worker with --expose-gc
+    const {gc} = globalThis;
+    if (typeof gc !== 'function') throw new Error('GridBase.spec.ts needs --expose-gc');
+    const held = gridBase({columns: 5, rows: 7});
+    const ref = new WeakRef(gridBase({columns: 13, rows: 11}));
+    // a WeakRef keeps its target to the end of the job that made or read it: each round ends the job first
+    for (let round = 0; round < 5 && ref.deref() !== undefined; round++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      gc();
+    }
+    expect(ref.deref()).toBeUndefined();
+    expect(gridBase({columns: 5, rows: 7})).toBe(held);
+    const again = gridBase({columns: 13, rows: 11});
+    expect([again.name, again.columns, again.rows, Object.isFrozen(again)]).toEqual(['grid 13x11', 13, 11, true]);
+  });
+
   test('answers a base frozen all the way down, its description and the prototype of its base vertex included', () => {
     const grid = gridBase({columns: 3, rows: 3});
     const {description} = grid;

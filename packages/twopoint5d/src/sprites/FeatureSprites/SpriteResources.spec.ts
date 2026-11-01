@@ -240,11 +240,50 @@ describe('SpriteResources', () => {
       expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
     });
 
+    test.each([
+      ['a number', 5, '5'],
+      ['a string', 'hero.png', '"hero.png"'],
+      ['an empty object', {}, '{}'],
+    ])('a texture in textures that is %s, and builds nothing', (_label, value, quoted) => {
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new SpriteResources([anim, color], {textures: {colorMap: value as never}})).toThrow(
+        new TypeError(`SpriteResources: the texture "colorMap" must be a three.js Texture or undefined, got ${quoted}`),
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+    });
+
+    test('a texture that is no three.js Texture in setTexture(), and keeps the one set', () => {
+      const texture = new Texture();
+      const resources = new SpriteResources([color], {textures: {colorMap: texture}});
+
+      expect(() => resources.setTexture('colorMap', 5 as never)).toThrow(
+        new TypeError('SpriteResources: the texture "colorMap" must be a three.js Texture or undefined, got 5'),
+      );
+      expect(resources.getTexture('colorMap')).toBe(texture);
+      resources.dispose();
+    });
+
     test('in the words of the caller it is handed', () => {
       expect(() => new SpriteResources(5 as never, {}, 'Mine')).toThrow(
         new TypeError('Mine: features is a list of features, got 5'),
       );
     });
+  });
+
+  test('a texture of null unsets it as undefined does, in setTexture() and in textures', () => {
+    const resources = new SpriteResources([color], {textures: {colorMap: new Texture()}});
+
+    resources.setTexture('colorMap', null as never);
+
+    expect(resources.getTexture('colorMap')).toBeUndefined();
+    expect(resources.shapeOf('colorMap')).toBeUndefined();
+    resources.dispose();
+
+    const unset = new SpriteResources([color], {textures: {colorMap: null as never}});
+    expect(unset.getTexture('colorMap')).toBeUndefined();
+    expect(unset.shapeOf('colorMap')).toBeUndefined();
+    unset.dispose();
   });
 
   describe('dispose()', () => {
@@ -284,6 +323,17 @@ describe('SpriteResources', () => {
       expect(resources.textureSize('animsMap')).toBe(size);
       expect(size.value).toEqual(new Vector2(4, 2));
       expect([resources.declares(anim), resources.declares(defineFeature({name: 'x', uniforms: {y: 1}}))]).toEqual([true, false]);
+    });
+
+    test('still refuses a texture that is no three.js Texture, and sets none', () => {
+      const resources = new SpriteResources([color]);
+      resources.dispose();
+
+      expect(() => resources.setTexture('colorMap', 5 as never)).toThrow(
+        new TypeError('SpriteResources: the texture "colorMap" must be a three.js Texture or undefined, got 5'),
+      );
+      expect(() => resources.setTexture('colorMap', new Texture())).not.toThrow();
+      expect(resources.getTexture('colorMap')).toBeUndefined();
     });
 
     test('still refuses a misspelled name', () => {

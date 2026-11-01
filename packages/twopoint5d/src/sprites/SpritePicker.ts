@@ -47,8 +47,10 @@ export interface PickPointer {
   readonly y: number;
 }
 
-// the fields of a material that decide which fragments a sprite draws, copied to its pick material
-const DRAWN_FRAGMENTS = [
+// the fields of a material that decide which fragments a sprite draws, copied to its pick material;
+// judged against the fields of a NodeMaterial of three 0.187.0, which SpritePicker.spec.ts holds
+/** @internal */
+export const DRAWN_FRAGMENTS = [
   'side',
   'alphaTest',
   'alphaTestNode',
@@ -57,7 +59,19 @@ const DRAWN_FRAGMENTS = [
   'maskNode',
   'alphaHash',
   'alphaToCoverage',
-] as const;
+] as const satisfies readonly (keyof FeatureSpritesMaterial)[];
+
+// writes the field `key` of the material of the sprites into the pick material, typed by its name:
+// a field three renames fails the build. Answers whether it changed
+const takeField = <K extends (typeof DRAWN_FRAGMENTS)[number]>(
+  to: FeatureSpritesMaterial,
+  from: FeatureSpritesMaterial,
+  key: K,
+): boolean => {
+  if (to[key] === from[key]) return false;
+  to[key] = from[key];
+  return true;
+};
 
 // a float names every whole number up to 2^24 exactly, and the target holds the slot + 1
 const MAX_SPRITES_PER_MESH = 2 ** 24;
@@ -297,15 +311,8 @@ export class SpritePicker {
 
     const pickMaterial = entry.material;
     if (pickMaterial.placement !== material.placement) pickMaterial.placement = material.placement;
-    const from = material as unknown as Record<string, unknown>;
-    const to = pickMaterial as unknown as Record<string, unknown>;
     let changed = false;
-    for (const key of DRAWN_FRAGMENTS) {
-      if (to[key] !== from[key]) {
-        to[key] = from[key];
-        changed = true;
-      }
-    }
+    for (const key of DRAWN_FRAGMENTS) if (takeField(pickMaterial, material, key)) changed = true;
     if (changed) pickMaterial.needsUpdate = true;
     entry.meshNumber.value = meshNumber;
 

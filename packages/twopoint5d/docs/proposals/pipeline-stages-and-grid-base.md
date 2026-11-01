@@ -176,8 +176,12 @@ export function gridBase(options: GridBaseOptions): GridBase;
 - **One frozen base per option set**, memoized by `columns × rows` as `flatPlacement()` memoizes
   its features: `gridBase({columns: 3, rows: 3}) === gridBase({columns: 3, rows: 3})`, so a
   feature recognizes its base by identity (§6) and every geometry of the kind shares one
-  descriptor; every grid built stays for the life of the page, so `gridBase()` is meant for a few
-  fixed grids, not for sizes derived from data. Frozen all the way down, its description and the
+  descriptor. The cache holds each base through a `WeakRef`: a base stays the same object while a
+  kind, its geometries or the caller hold it, a base nothing holds is collected, and the next call
+  builds an equal one — grid sizes derived from data hold only the bases in use, and of a grid let
+  go only its key and the empty `WeakRef` stay, at most one per allowed pair (25 846). No
+  `FinalizationRegistry` clears them: its callback would run on a collection no test can time.
+  Frozen all the way down, its description and the
   prototype of its base vertex included. Name: `grid 3x3`.
 - **Layout** — as `QuadBase` lays out four, on more vertices: `(columns + 1) × (rows + 1)`
   vertices, row by row from the top, left to right; vertex `k = j · (columns + 1) + i` for the
@@ -203,8 +207,8 @@ export function gridBase(options: GridBaseOptions): GridBase;
   from 1 to 1024`); a grid of more than 4096 cells (`gridBase: a grid of 1000 × 1000 is 1000000
   cells — a grid holds at most 4096`). Neither is a limit of the GPU: 1024 per axis keeps the grid
   line of every vertex exact in its uv, and 4096 cells keep a typo (`columns: 1000, rows: 1000`)
-  from building a base of a million vertices for every sprite, whose indices the cache of bases
-  would hold for the life of the page.
+  from building a base of a million vertices for every sprite — at most 5125 vertices and 24 576
+  indices per base.
 - `QuadBase` is unchanged. `gridBase({columns: 1, rows: 1})` draws what `QuadBase` draws, with
   another vertex order.
 

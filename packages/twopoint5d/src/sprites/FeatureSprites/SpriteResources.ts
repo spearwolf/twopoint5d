@@ -21,6 +21,7 @@ import {
   Vector3,
   Vector4,
 } from 'three/webgpu';
+import {describeThreeValue} from '../../utils/describeThreeValue.js';
 import {describeValue} from '../../utils/describeValue.js';
 import {isObject} from '../../utils/isObject.js';
 import {checkFeature} from '../checkFeature.js';
@@ -46,6 +47,10 @@ export interface SpriteResourcesOptions {
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
+
+// three tells a texture by its flag: a texture of another copy of three passes as well
+const isTextureOrNone = (value: unknown): value is Texture | null | undefined =>
+  value == null || (value as Partial<Texture>).isTexture === true;
 
 type ImageLike = {width?: number; height?: number} | null | undefined;
 
@@ -125,8 +130,9 @@ export class SpriteResources {
    *   `defineFeature()` —, for options that are no object and for `textures` or `uniforms` that
    *   are no object by name, and for a start value in `options.uniforms` that is not of the type of
    *   its uniform — a finite number for a `float`, 2 to 4 finite numbers for a `vec2` to `vec4` —;
-   *   an `Error` for a uniform or a texture no feature declares, and for declarations of one name
-   *   that collide — each before any signal is built.
+   *   a `TypeError` for a texture in `options.textures` that is no three.js Texture, `undefined` or
+   *   `null`; an `Error` for a uniform or a texture no feature declares, and for declarations of one
+   *   name that collide — each before any signal is built.
    */
   constructor(features: Iterable<SpriteFeature>, options: SpriteResourcesOptions = {}, where = 'SpriteResources') {
     this.#where = where;
@@ -177,6 +183,7 @@ export class SpriteResources {
           `${where}: no feature declares the texture "${name}"; declared: ${[...declarations.textures.keys()].join(', ')}`,
         );
       }
+      this.#checkTexture(name, options.textures![name]);
     }
 
     for (const [name, {needsImage}] of declarations.textures) {
@@ -249,6 +256,14 @@ export class SpriteResources {
     return size;
   }
 
+  #checkTexture(name: string, value: unknown): void {
+    if (!isTextureOrNone(value)) {
+      throw new TypeError(
+        `${this.#where}: the texture "${name}" must be a three.js Texture or undefined, got ${describeThreeValue(value, 'isTexture')}`,
+      );
+    }
+  }
+
   #shapeError(name: string, size: number): TypeError {
     return new TypeError(
       `${this.#where}: the uniform "${name}" is a ${VECTOR_TYPES[size - 1]} and takes ${size} value${size === 1 ? '' : 's'}`,
@@ -305,12 +320,16 @@ export class SpriteResources {
    * of the same kind as the one set costs no rebuild; another kind, or a change between none and
    * one, rebuilds the graphs that read it. With the texture that is set already it does nothing:
    * the kind of a texture whose filters or format changed is read by {@link touchTexture}. Does
-   * nothing once disposed.
+   * nothing once disposed. A `null` from JavaScript unsets it as `undefined` does.
+   *
+   * @throws a `TypeError` for a value that is no three.js Texture, `undefined` or `null`, and an
+   *   `Error` for a name no feature declares — after `dispose()` as well.
    */
   setTexture(name: string, texture: Texture | undefined): void {
     const slot = this.#slot(name);
+    this.#checkTexture(name, texture);
     if (this.#disposed) return;
-    slot.signal.set(texture);
+    slot.signal.set(texture ?? undefined);
   }
 
   /**
@@ -353,7 +372,8 @@ export class SpriteResources {
   /**
    * Gives up the textures — they belong to the caller and are not released — and tears down the
    * signals. Afterwards `getTexture()` answers `undefined`, `setTexture()` and `touchTexture()` do
-   * nothing; the uniforms stay readable and writable. A second call does nothing.
+   * nothing but refuse what they refuse before; the uniforms stay readable and writable. A second
+   * call does nothing.
    */
   dispose(): void {
     if (this.#disposed) return;

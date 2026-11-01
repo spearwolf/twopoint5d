@@ -8,6 +8,7 @@ import {QuadSize} from '../sprites/features/QuadSize.js';
 import type {FeatureSprites} from '../sprites/FeatureSprites/FeatureSprites.js';
 import type {SpriteFeature} from '../sprites/SpriteFeature.js';
 import {assertFinite} from '../utils/assertFinite.js';
+import {describeValue} from '../utils/describeValue.js';
 import type {VO} from '../vertex-objects/types.js';
 import type {BitmapFont} from './BitmapFont.js';
 import {type TextLayout, layoutTextFor, type TextLayoutOptions} from './layoutText.js';
@@ -149,7 +150,7 @@ export function writeText<Api extends TextSpriteApi>(
     sprites,
     needed,
     (count) =>
-      `${WRITE}: "${preview(text)}" needs ${needed} sprites, and the pool ran full after ${count} — give the sprites a larger capacity; no sprite was written`,
+      `${WRITE}: ${describeValue(preview(text))} needs ${needed} sprites, and the pool ran full after ${count} — give the sprites a larger capacity; no sprite was written`,
   );
   writeGlyphs(sprites, created, layout, z);
   return created;
@@ -208,7 +209,7 @@ export function rewriteText<Api extends TextSpriteApi>(
       sprites,
       needed - had,
       (count) =>
-        `${REWRITE}: "${preview(text)}" needs ${needed} sprites, ${had} of them the glyphs handed in, and the pool ran full after ${count} more — give the sprites a larger capacity; the glyphs keep the text they had`,
+        `${REWRITE}: ${describeValue(preview(text))} needs ${needed} sprites, ${had} of them the glyphs handed in, and the pool ran full after ${count} more — give the sprites a larger capacity; the glyphs keep the text they had`,
     );
     for (const sprite of created) glyphs.push(sprite);
   } else {

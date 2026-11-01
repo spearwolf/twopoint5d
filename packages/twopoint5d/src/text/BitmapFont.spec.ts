@@ -128,6 +128,72 @@ describe('BitmapFont', () => {
       expect(bare.info).toEqual({});
     });
 
+    test('holds info and common as frozen copies all the way down, sharing no list with the data handed in', () => {
+      const padding = [1, 2, 3, 4];
+      const spacing = [1, 1];
+      const charset = ['a', 'b'];
+      const data = tinyFont();
+      data.info = {...data.info, padding, spacing, charset};
+      const font = new BitmapFont(data);
+
+      for (const [copy, list] of [
+        [font.info.padding, padding],
+        [font.info.spacing, spacing],
+        [font.info.charset, charset],
+      ] as const) {
+        expect(copy).not.toBe(list);
+        expect(copy).toEqual(list);
+        expect(Object.isFrozen(copy)).toBe(true);
+        expect(() => (copy as unknown[]).push(0)).toThrow(TypeError);
+        expect(Object.isFrozen(list)).toBe(false);
+      }
+      padding.push(5);
+      spacing.push(5);
+      charset.push('c');
+      expect([font.info.padding, font.info.spacing, font.info.charset]).toEqual([
+        [1, 2, 3, 4],
+        [1, 1],
+        ['a', 'b'],
+      ]);
+      expect(Object.isFrozen(font.info)).toBe(true);
+      expect(Object.isFrozen(font.common)).toBe(true);
+    });
+
+    test('holds a list in common as a frozen copy of its own', () => {
+      const list = [1, 2];
+      const data = tinyFont();
+      (data.common as unknown as Record<string, unknown>)['extra'] = list;
+      const copy = (new BitmapFont(data).common as unknown as Record<string, unknown>)['extra'];
+
+      expect(copy).not.toBe(list);
+      expect(copy).toEqual([1, 2]);
+      expect(Object.isFrozen(copy)).toBe(true);
+    });
+
+    test('holds a cycle in info as a cycle of the copy, and a record without a prototype as a plain one', () => {
+      const cyclic: Record<string, unknown> = {name: 'loop'};
+      cyclic['self'] = cyclic;
+      const bare = Object.assign(Object.create(null) as Record<string, unknown>, {depth: 2});
+      const data = tinyFont();
+      data.info = {...data.info, cyclic, bare} as never;
+      const info = new BitmapFont(data).info as unknown as Record<string, Record<string, unknown>>;
+
+      expect(info['cyclic']).not.toBe(cyclic);
+      expect(info['cyclic']!['self']).toBe(info['cyclic']);
+      expect(Object.isFrozen(info['cyclic'])).toBe(true);
+      expect(info['bare']).not.toBe(bare);
+      expect(Object.getPrototypeOf(info['bare'])).toBe(Object.prototype);
+      expect(info['bare']).toEqual({depth: 2});
+    });
+
+    test('passes an object that is neither a list nor a plain record into info as it is', () => {
+      const when = new Date(0);
+      const data = tinyFont();
+      data.info = {...data.info, when} as never;
+
+      expect((new BitmapFont(data).info as unknown as Record<string, unknown>)['when']).toBe(when);
+    });
+
     test('a font without pages names no page', () => {
       const data = tinyFont();
       data.pages = [];

@@ -250,6 +250,26 @@ describe('FeatureSprites', () => {
       material.dispose();
     });
 
+    test('a material built for a pass, and leaves nothing built and the material alone', () => {
+      const material = new FeatureSpritesMaterial(kind, {pass: ShadowPass});
+      const materialDispose = sandbox.spy(material, 'dispose');
+      const geometryDispose = sandbox.spy(FeatureSpritesGeometry.prototype, 'dispose');
+      const signals = getSignalsCount();
+      const effects = getEffectsCount();
+
+      expect(() => new FeatureSprites(kind, {material})).toThrow(
+        new TypeError(
+          `FeatureSprites: the material handed in was built for pass "${ShadowPass.name}" — hand in a material built without a pass, or leave out the material and give the sprites the pass in passes`,
+        ),
+      );
+
+      expect(geometryDispose.called).toBe(false);
+      expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+      expect(materialDispose.called).toBe(false);
+      expect(material.resources.isDisposed).toBe(false);
+      material.dispose();
+    });
+
     test('geometry parameters next to a geometry, and material parameters next to a material', () => {
       const geometry = new FeatureSpritesGeometry(kind, 1);
       const material = new FeatureSpritesMaterial(kind);
@@ -570,6 +590,20 @@ describe('FeatureSprites', () => {
       );
 
       expect([getSignalsCount(), getEffectsCount()]).toEqual([signals, effects]);
+    });
+
+    test('refuses a texture that is no three.js Texture in the name of whoever builds the resources', () => {
+      const sprites = new FeatureSprites(kind);
+      const withPasses = new FeatureSprites(kind, {passes: [ShadowPass]});
+
+      expect(() => sprites.setTexture('colorMap', 5 as never)).toThrow(
+        new TypeError('FeatureSpritesMaterial: the texture "colorMap" must be a three.js Texture or undefined, got 5'),
+      );
+      expect(() => withPasses.setTexture('colorMap', 5 as never)).toThrow(
+        new TypeError('FeatureSprites: the texture "colorMap" must be a three.js Texture or undefined, got 5'),
+      );
+      sprites.dispose();
+      withPasses.dispose();
     });
 
     test('leaves a geometry handed in alone when the material it builds is refused', () => {

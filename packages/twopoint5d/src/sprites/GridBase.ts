@@ -29,8 +29,8 @@ export interface GridBaseVO extends SpriteBaseVO {
 }
 
 // No GPU limit, either of them. 1024 cells per axis keep the grid line of every vertex exact in its
-// uv (`round(uv.x · columns)`); 4096 cells bound the base itself, whose indices stay in the cache
-// `grids` for the life of the page, so that a typo builds no base of a million vertices per sprite
+// uv (`round(uv.x · columns)`); 4096 cells bound the base itself — at most 5125 vertices and 24 576
+// indices —, so that a typo builds no base of a million vertices per sprite
 const MAX_CELLS_PER_AXIS = 1024;
 const MAX_GRID_CELLS = 4096;
 
@@ -76,9 +76,11 @@ function gridIndices(columns: number, rows: number): number[] {
   return indices;
 }
 
-// one base per grid: a feature recognizes its base by identity, and every geometry of a kind shares
-// one descriptor
-const grids = new Map<string, GridBase>();
+// one base per grid while anything holds it — a kind, its geometries, the caller: a feature
+// recognizes its base by identity, and every geometry of a kind shares one descriptor. A base
+// nothing holds is collected, and the next call builds an equal one; its key and the empty
+// WeakRef stay, at most one per pair the limits allow
+const grids = new Map<string, WeakRef<GridBase>>();
 
 /**
  * A base of `columns × rows` cells — `(columns + 1) × (rows + 1)` vertices, `columns · rows · 2`
@@ -88,9 +90,11 @@ const grids = new Map<string, GridBase>();
  * bends the sprite — a wave — needs it; every other sprite takes the quad.
  *
  * The uv of a vertex names its grid line exactly: `round(uv.x · columns)` is its column line,
- * `round(uv.y · rows)` its row line. Equal options answer the same frozen base. Every grid built
- * stays for the life of the page — the identity is what a feature recognizes its base by —, so
- * `gridBase()` is meant for a few fixed grids, not for sizes derived from data.
+ * `round(uv.y · rows)` its row line. Equal options answer the same frozen base for as long as
+ * anything holds it — a kind built on it, its geometries, the caller. The cache holds no base of its
+ * own: a base nothing holds is collected, and the next call builds an equal one. It holds no more
+ * bases than are in use, each of at most 4096 cells — 5125 vertices and 24 576 indices —, and for a
+ * grid let go its key alone, at most 25 846 of them.
  *
  * @throws a `TypeError` for options that are no object, for a `columns` or `rows` that is no
  *   whole number from 1 to 1024, and for a grid of more than 4096 cells
@@ -117,7 +121,7 @@ export function gridBase(options: GridBaseOptions): GridBase {
   }
 
   const key = `${columns}x${rows}`;
-  let grid = grids.get(key);
+  let grid = grids.get(key)?.deref();
   if (grid == null) {
     grid = deepFreeze({
       name: `grid ${key}`,
@@ -134,7 +138,7 @@ export function gridBase(options: GridBaseOptions): GridBase {
       },
       defaultArgs: [0.5, 0.5] as const,
     });
-    grids.set(key, grid);
+    grids.set(key, new WeakRef(grid));
   }
   return grid;
 }

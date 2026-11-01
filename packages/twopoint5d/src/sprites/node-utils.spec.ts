@@ -1,19 +1,9 @@
 import {float, int, vec2, vec3, vec4} from 'three/tsl';
-import type {
-  ConstNode,
-  JoinNode,
-  Node,
-  NodeBuilder,
-  OperatorNode,
-  SplitNode,
-  TextureNode,
-  VarNode,
-  VaryingNode,
-} from 'three/webgpu';
-import {AttributeNode, Texture} from 'three/webgpu';
+import type {ConstNode, JoinNode, Node, OperatorNode, SplitNode, TextureNode, VaryingNode} from 'three/webgpu';
+import {Texture} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {evaluateNode} from '../testing/spriteGraph.js';
+import {attributeNameOf, attributeNamesOf, evaluateNode, nodesOf, operatorOf, unwrap} from '../testing/spriteGraph.js';
 
 import {
   billboardVertexByInstancePosition,
@@ -21,36 +11,6 @@ import {
   texCoordsFromIndex,
   vertexByInstancePosition,
 } from './node-utils.js';
-
-// the OperatorNode behind a TSL operator: three 0.187.0 answers the OperatorNode itself, and a
-// VarNode — that of `toVar()`, say — gives the one it holds as `node`
-const operatorOf = (node: Node | null | undefined): OperatorNode => {
-  const varNode = node as unknown as VarNode<unknown, OperatorNode>;
-  return varNode.isVarNode ? varNode.node : (node as unknown as OperatorNode);
-};
-
-// AttributeNode answers its name without looking at the builder it is typed to take
-const attributeNameOf = (node: Node): string => (node as AttributeNode).getAttributeName(undefined as unknown as NodeBuilder);
-
-// every node the graph below `root` is built from, `root` included
-const nodesOf = (root: Node): Set<Node> => {
-  const nodes = new Set<Node>();
-  root.traverse((node) => nodes.add(node));
-  return nodes;
-};
-
-// the names of the attributes the graph below `root` reads, sorted
-const attributeNamesOf = (root: Node): string[] =>
-  [...nodesOf(root)]
-    .filter((node): node is AttributeNode => node instanceof AttributeNode)
-    .map(attributeNameOf)
-    .sort();
-
-// `operatorOf` without the OperatorNode type: a VarNode gives its `node`, any other node itself
-const unwrap = (node: Node | null | undefined): Node => {
-  const varNode = node as unknown as VarNode<unknown, Node>;
-  return varNode.isVarNode ? varNode.node : (node as Node);
-};
 
 const vertexPosition = vec3(1, 2, 3);
 const instancePosition = vec3(4, 5, 6);

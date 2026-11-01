@@ -453,6 +453,9 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
    * With the texture that is set already it does nothing; see {@link SpriteResources.setTexture}.
    * Once disposed, a material that built its resources does nothing here. One handed its resources
    * writes through to them still, and the other materials that read them take the texture.
+   *
+   * @throws a `TypeError` for a value that is no three.js Texture, `undefined` or `null`, as
+   *   {@link SpriteResources.setTexture} does — after `dispose()` as well.
    */
   setTexture(name: string, value: Texture | undefined): void {
     this.resources.setTexture(name, value);

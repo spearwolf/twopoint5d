@@ -4,14 +4,21 @@ import {AttributeNode, Texture} from 'three/webgpu';
 
 import type {SpriteFrameNodes, SpriteShaderContext} from '../sprites/SpriteFeature.js';
 
+/** The node behind a VarNode — that of `toVar()`, say — which gives the one it holds as `node`; any other node itself. */
+export const unwrap = (node: Node | null | undefined): Node => {
+  const varNode = node as unknown as VarNode<unknown, Node>;
+  return varNode.isVarNode ? varNode.node : (node as Node);
+};
+
 /**
  * The OperatorNode behind a TSL operator: three 0.187.0 answers the OperatorNode itself, and a
  * VarNode — that of `toVar()`, say — gives the one it holds as `node`.
  */
-export const operatorOf = (node: Node | null | undefined): OperatorNode => {
-  const varNode = node as unknown as VarNode<unknown, OperatorNode>;
-  return varNode.isVarNode ? varNode.node : (node as unknown as OperatorNode);
-};
+export const operatorOf = (node: Node | null | undefined): OperatorNode => unwrap(node) as unknown as OperatorNode;
+
+/** The name of an `AttributeNode`, which it answers without looking at the builder it is typed to take. */
+export const attributeNameOf = (node: Node): string =>
+  (node as AttributeNode).getAttributeName(undefined as unknown as NodeBuilder);
 
 /**
  * Every node the graph below `root` is built from, `root` included. Each node is visited once:
@@ -54,7 +61,7 @@ const propsOf = (node: Node): string => {
   if (signed.method != null) props.push(`method=${signed.method}`);
   if (typeof signed.components === 'string') props.push(`components=${signed.components}`);
   if (typeof signed.convertTo === 'string') props.push(`convertTo=${signed.convertTo}`);
-  if (node instanceof AttributeNode) props.push(`attribute=${node.getAttributeName(undefined as unknown as NodeBuilder)}`);
+  if (node instanceof AttributeNode) props.push(`attribute=${attributeNameOf(node)}`);
   if (signed.isConstNode) props.push(`value=${constantOf(signed.value)}`);
   return props.join(' ');
 };
@@ -87,12 +94,15 @@ export const graphSignature = (root: Node): string => {
 export const attributeNamesOf = (root: Node): string[] =>
   [...nodesOf(root)]
     .filter((node): node is AttributeNode => node instanceof AttributeNode)
-    .map((node) => node.getAttributeName(undefined as unknown as NodeBuilder))
+    .map(attributeNameOf)
     .sort();
 
 /** The texture nodes of the graph below `root`. */
 export const textureNodesOf = (root: Node): TextureNode[] =>
   [...nodesOf(root)].filter((node): node is TextureNode => (node as TextureNode).isTextureNode === true);
+
+/** The base (`getBase()`) of every texture node of the graph below `root`, each once. */
+export const textureBasesOf = (root: Node): Set<TextureNode> => new Set(textureNodesOf(root).map((node) => node.getBase()));
 
 /** Whether the graph below `root` samples `value`. */
 export const samplesTexture = (root: Node, value: Texture): boolean => textureNodesOf(root).some((node) => node.value === value);

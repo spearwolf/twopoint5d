@@ -41,13 +41,13 @@ export interface BitmapFontInfo {
   size?: number;
   bold?: number;
   italic?: number;
-  charset?: string | string[];
+  charset?: string | readonly string[];
   unicode?: number;
   stretchH?: number;
   smooth?: number;
   aa?: number;
-  padding?: number[];
-  spacing?: number[];
+  padding?: readonly number[];
+  spacing?: readonly number[];
   outline?: number;
 }
 
@@ -103,6 +103,29 @@ const pairKey = (first: number, second: number) => first * 0x110000 + second;
 
 const codeOf = (char: string | number): number | undefined => (typeof char === 'number' ? char : char.codePointAt(0));
 
+// a frozen copy of a block of the font file, its plain records and lists all the way down, so the
+// font shares no object with the data it was read from. A key named __proto__ stays a field of its
+// own (defineProperty defines, an assignment would set the prototype), and a cycle stays a cycle
+function frozenCopy(value: unknown, copies = new WeakMap<object, unknown>()): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  const known = copies.get(value);
+  if (known !== undefined) return known;
+  if (Array.isArray(value)) {
+    const copy: unknown[] = [];
+    copies.set(value, copy);
+    for (const entry of value) copy.push(frozenCopy(entry, copies));
+    return Object.freeze(copy);
+  }
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  const copy = {};
+  copies.set(value, copy);
+  for (const [key, entry] of Object.entries(value)) {
+    Object.defineProperty(copy, key, {value: frozenCopy(entry, copies), enumerable: true, writable: true, configurable: true});
+  }
+  return Object.freeze(copy);
+}
+
 const CHAR_FIELDS = ['x', 'y', 'width', 'height', 'xoffset', 'yoffset', 'xadvance', 'page', 'chnl'] as const;
 const AT_LEAST_ZERO: ReadonlySet<string> = new Set(['x', 'y', 'width', 'height']);
 
@@ -154,9 +177,9 @@ export class BitmapFont {
   readonly scaleH: number;
   /** The file of the page as the font names it — relative to the font file — or `undefined`. */
   readonly page: string | undefined;
-  /** The `info` block as read, frozen. */
+  /** The `info` block as read, a frozen copy all the way down — its lists are frozen copies of their own. */
   readonly info: Readonly<BitmapFontInfo>;
-  /** The `common` block as read, frozen. */
+  /** The `common` block as read, a frozen copy all the way down — its lists are frozen copies of their own. */
   readonly common: Readonly<BitmapFontCommon>;
 
   readonly #glyphs = new Map<number, BitmapFontGlyph>();
@@ -219,7 +242,7 @@ export class BitmapFont {
       if (!isCodePoint(id)) {
         throw new Error(`${WHERE}: a char has the id ${describeValue(id)} — an id is a whole number from 0 to 0x10FFFF`);
       }
-      const label = `"${String.fromCodePoint(id)}" (${id})`;
+      const label = `${describeValue(String.fromCodePoint(id))} (${id})`;
       // a converter that leaves out page and chnl writes a font of one page, all four channels
       const char: BitmapFontChar = {...raw, page: raw.page ?? 0, chnl: raw.chnl ?? 15};
       for (const field of CHAR_FIELDS) {
@@ -261,8 +284,8 @@ export class BitmapFont {
     });
 
     // every check has run: nothing below throws
-    this.info = Object.freeze({...info});
-    this.common = Object.freeze({...common});
+    this.info = frozenCopy(info) as Readonly<BitmapFontInfo>;
+    this.common = frozenCopy(common) as Readonly<BitmapFontCommon>;
     this.face = face;
     this.lineHeight = common.lineHeight;
     this.base = common.base;

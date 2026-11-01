@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a `StageRenderer` without a pipeline warns once on the console when it draws a nested renderer with a pipeline of its own and without an `outputRenderTarget` beside other stages into one target — the combination the stages guide calls not supported
 - `Stage2D#asPassNode()` hands the same node back for the life of the stage: a new `scene` or `camera` goes into it as it is assigned, so a node handed out before follows it, and a `StageRenderer` that composes the stage keeps its output node — a new camera, a change of the projection or a new scene builds neither a pass node nor a shader. A composing `StageRenderer` rebuilds its output node after `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged` only for a stage that hands a new pass node
 - change `AtlasTextureResource#atlasUrl`: clearing it takes back the json fetched from it and, with it, `imageUrl`, `imageCoords`, `texture` (released), `atlas` and `frameBasedAnimations`, as clearing `imageUrl` does on an image or a tile set resource; an `atlasJson` written from outside stays (**BREAKING**). See the Migration Guide
+- `new FeatureSprites()` refuses a `material` built for a pass — one whose `pass` is set — with a `TypeError` that names the pass
+- `SpriteResources#setTexture()`, `FeatureSpritesMaterial#setTexture()` and `FeatureSprites#setTexture()`, and the `textures` of their options, refuse a value that is neither a three.js texture (`isTexture`) nor `undefined` or `null` with a `TypeError` that names the texture, before a texture changes; `null` unsets a texture as `undefined` does, and `getTexture()` answers `undefined` for it
+- a segment placement refuses a feature named `rotation` or `shear` as it refuses `Rotation` and `Shear`, judged by name as `NineSlice` is
+- `BitmapFont#info` and `BitmapFont#common` are frozen copies all the way down: `info.padding`, `info.spacing` and a `charset` list are frozen lists of their own, and `BitmapFontInfo` types them `readonly` — a write into them throws, and the font data handed in shares no list with the font (**BREAKING**). See the Migration Guide
 
 ### Deprecated
 
@@ -67,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PowerOf2ImageLoader#load()` without an `onErrorCallback` writes an image that does not load and a padding that fails to the console
 - `AtlasTextureResource` reads `meta` and `meta.image` of an `atlasJson` written from outside without a raw throw: a `meta` that is no object or a `meta.image` that is no string names no image, and beside an `overrideImageUrl` a `meta` that is no object is reported as an `error` with `source: 'texture'`
 - a `TextureResource` reports a listener of the `dispose` event of a texture it lets go of — one a new image replaced, or one taken back with its image — that throws as an `error` event with `source: 'texture'`, after an error of the publish it goes with, each as an event of its own
+- `gridBase()` holds a base only while a kind, its geometries or the caller hold it: a grid nothing holds is let go and built anew by the next call with its options, so grid sizes derived from data hold no more bases than are in use
 
 ### Migration Guide
 
@@ -168,6 +173,23 @@ The attribute value warns once per page; it sizes the canvas like `"window"`, wh
 
 ```html
 <canvas resize-to="window"></canvas>
+```
+
+#### The lists of `BitmapFont#info` are read-only
+
+`info.padding`, `info.spacing` and a `charset` list of a font are frozen copies; a change goes into a copy of one's own.
+
+**Before**
+
+```ts
+font.info.padding!.push(0);
+```
+
+**After**
+
+```ts
+const padding = [...(font.info.padding ?? [])];
+padding.push(0);
 ```
 
 #### The `three` peer dependency range

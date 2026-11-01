@@ -178,8 +178,9 @@ flags.dispose();
   slot, the uv stages' result `ctx.uv` aside.
 - **One base per grid.** `gridBase({columns: 3, rows: 3})` answers the same frozen base every time,
   named `grid 3x3`, with its `columns` and `rows`: a feature that needs a grid recognizes it by
-  identity in its `checkKind`. Every grid built stays for the life of the page, so `gridBase()` is
-  meant for a few fixed grids, not for sizes derived from data. Columns and rows are whole numbers
+  identity in its `checkKind`. The base stays for as long as a kind built on it, its geometries or
+  anyone else holds it; a grid nothing uses any more is let go, and the next call builds it anew —
+  grid sizes derived from data cost only the grids in use. Columns and rows are whole numbers
   from 1 to 1024, and a grid holds at most 4096 cells (`columns · rows`); anything else is refused
   with a `TypeError`.
 - **Everything else works on it unchanged**: the pool, every placement and pass, the trim shift —
@@ -1205,7 +1206,8 @@ the kind and, besides every three.js material parameter, its own options: `name`
 shared with other materials, which then stay the caller's. It takes only a kind out of
 `defineSprite()`, its options as an object, `resources` as a `SpriteResources` and `textures` and
 `uniforms` as objects by name, each start value of the type of its uniform — a finite number for a
-`float`, 2 to 4 finite numbers for a `vec2` to `vec4`; anything else throws a `TypeError`. A start
+`float`, 2 to 4 finite numbers for a `vec2` to `vec4` —, and each texture in `textures` a three.js
+Texture; anything else throws a `TypeError`. A start
 value of `undefined` or `null` keeps the one the feature declares.
 
 ```ts check
@@ -1242,7 +1244,9 @@ feature whose textures are not all set drops out of the graph until they are: a 
 with `needsImage` counts as set only once its image has measures.
 
 `setTexture(name, texture)` and `getTexture(name)` take the names the features declare; a texture
-stays the caller's, and `dispose()` does not release it. `TextureLoader` writes a loaded image into
+stays the caller's, and `dispose()` does not release it. A value that is no three.js texture throws
+a `TypeError` that names the texture before anything changes; `undefined` — from JavaScript `null`
+as well — takes the texture out. `TextureLoader` writes a loaded image into
 the same texture without an event, so `touchTexture(name)` re-reads it once it has loaded.
 `setTexture()` with the texture that is set already does nothing, and a change of its filters,
 `colorSpace`, `type` or `format` can make it a texture of another kind — from `NearestFilter` to
@@ -1604,7 +1608,8 @@ export function frame() {
 - **No `Rotation`, no `Shear`.** A segment lies along its ends whatever its local quad does, so
   `defineSprite()` refuses either next to a segment placement — `a segment lies along its ends, so
   it cannot follow the local stage of "rotation" — move the ends instead, and take Rotation out of
-  the kind`. `Yaw` and `Orientation` are data and are ignored, as under a billboard.
+  the kind`. The refusal goes by the name of the feature: a feature named `rotation` or `shear` — a
+  copy of `Rotation`, one of one's own — counts as `Rotation` or `Shear`. `Yaw` and `Orientation` are data and are ignored, as under a billboard.
 - **No `NineSlice`.** `NineSlice` sets its border in the local quad, and a segment holds only its
   caps there — the border would land inside the segment —, so `defineSprite()` refuses it next to a
   segment placement, and a segment placement cannot stand in on a live nine-slice material. For a
@@ -1798,7 +1803,7 @@ builds its pick material.
 **Refusals.** A `TypeError` instead of a mismatch: a kind that did not come from `defineSprite()`;
 options that are no object, `passes` that are no list, a `grow` that is neither `true` nor `false`;
 a `geometry` or a `material` that is no `FeatureSpritesGeometry` or `FeatureSpritesMaterial`, or one
-built for another sprite kind; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a
+built for another sprite kind — or a material built for a pass; `capacity`, `attributeUsage`, `baseArgs` or `grow: true` next to a
 `geometry`; any material parameter next to a `material`. The geometry and the material the
 constructor builds throw their own refusals in their own name — `baseArgs` that are no list —, and
 the uniforms and textures in the name of the class that builds them: `FeatureSpritesMaterial`

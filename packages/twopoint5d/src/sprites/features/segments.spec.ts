@@ -8,6 +8,7 @@ import {defineSprite, type SpriteOf} from '../defineSprite.js';
 import {FeatureSpritesMaterial} from '../FeatureSprites/FeatureSpritesMaterial.js';
 import {gridBase} from '../GridBase.js';
 import {QuadBase} from '../SpriteBase.js';
+import {defineFeature} from '../SpriteFeature.js';
 import {FlatPlacement} from './FlatPlacement.js';
 import {InstancePosition} from './InstancePosition.js';
 import {QuadSize} from './QuadSize.js';
@@ -160,6 +161,17 @@ describe('segmentPlacement()', () => {
     expect(() => kindOf(SegmentPlacement, Shear, Rotation)).toThrow(
       reason('stages', '"rotation" and "shear"', 'Rotation and Shear'),
     );
+  });
+
+  test('is refused next to a copy of Rotation or Shear, judged by the name of the feature', () => {
+    const reason = (names: string, exports: string) =>
+      `defineSprite: feature "segmentPlacement": a segment lies along its ends, so it cannot follow the local stage of ${names} — move the ends instead, and take ${exports} out of the kind`;
+    const rotation = defineFeature({...Rotation});
+    const shear = defineFeature({...Shear});
+
+    expect(defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, rotation]})).toBeDefined();
+    expect(() => kindOf(SegmentPlacement, QuadSize, rotation)).toThrow(reason('"rotation"', 'Rotation'));
+    expect(() => kindOf(SegmentPlacement, shear)).toThrow(reason('"shear"', 'Shear'));
   });
 
   test('keeps the error of its check as the cause', () => {
