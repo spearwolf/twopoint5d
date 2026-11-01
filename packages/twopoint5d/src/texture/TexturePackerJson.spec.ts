@@ -167,6 +167,20 @@ describe('TexturePackerJson.parse()', () => {
     expect(target.frameNames()).toEqual(['x']);
   });
 
+  test('escapes a line break in a frame name that appears twice', () => {
+    const data: TexturePackerJsonData = {
+      frames: [
+        {filename: 'dup\n.png', frame: {x: 0, y: 0, w: 8, h: 8}},
+        {filename: 'dup\n.png', frame: {x: 8, y: 0, w: 8, h: 8}},
+      ],
+      meta: {image: 'a.png', size: {w: 16, h: 16}},
+    };
+
+    expect(() => TexturePackerJson.parse(data)).toThrow(
+      'TexturePackerJson: the frame name "dup\\n.png" appears more than once in the json',
+    );
+  });
+
   test('a frame name the target atlas already holds is refused before any frame is added', () => {
     const target = new TextureAtlas();
     target.add('b', new TextureCoords(0, 0, 4, 4));

@@ -75,7 +75,7 @@ export const textureResourceDataProblems = (item: unknown): string[] => {
     } else {
       for (const [name, value] of Object.entries(playback)) {
         if (!isAnimationPlayback(value)) {
-          problems.push(`the playback of "${name}" is ${describeValue(value)}, not 'loop', 'once' or 'pingpong'`);
+          problems.push(`the playback of ${describeValue(name)} is ${describeValue(value)}, not 'loop', 'once' or 'pingpong'`);
         }
       }
     }

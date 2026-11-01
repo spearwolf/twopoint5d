@@ -187,6 +187,14 @@ describe('defineSprite()', () => {
       );
     });
 
+    test('escapes a quote in the name two features share', () => {
+      const quiet = () => defineFeature({name: 'qu"iet'});
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, quiet(), quiet()]})).toThrow(
+        'defineSprite: two features are named "qu\\"iet"',
+      );
+    });
+
     test('two features of one name ask the checkKind of the first to say why, before the plain refusal', () => {
       const seen: string[][] = [];
       const form = (name: string, refuse: boolean) =>
@@ -262,6 +270,15 @@ describe('defineSprite()', () => {
 
       expect(() => defineSprite({base: QuadBase, features: [position, flat, a, b]})).toThrow(
         /^defineSprite: the features do not fit into one sprite — attribute "one" of feature "a", attribute "two" of feature "b": VertexObjectDescriptor: buffer "shared"/,
+      );
+    });
+
+    test('names the attributes of features that do not fit, a quote in their names escaped', () => {
+      const a = defineFeature({name: 'a', attributes: {'o"ne': {size: 2, bufferName: 'shared'}}});
+      const b = defineFeature({name: 'b', attributes: {'t"wo': {size: 2, bufferName: 'shared', usage: 'dynamic'}}});
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, a, b]})).toThrow(
+        /^defineSprite: the features do not fit into one sprite — attribute "o\\"ne" of feature "a", attribute "t\\"wo" of feature "b": VertexObjectDescriptor: buffer "shared"/,
       );
     });
 

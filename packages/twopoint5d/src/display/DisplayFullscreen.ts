@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {Display} from './Display.js';
 import {Stylesheets} from './Stylesheets.js';
 import type {DisplayFullscreenChangeProps, DisplayFullscreenOptions, DisplayOrientationLock, FullscreenMode} from './types.js';
@@ -46,7 +47,7 @@ function warnPortraitLock(type: DisplayOrientationLock): void {
   portraitLockWarningWasShown = true;
   // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
   console.warn(
-    `Display#fullscreen: orientationLock '${type}' and onLandscape cannot work together; the screen is not locked while onLandscape is on.`,
+    `Display#fullscreen: orientationLock ${describeValue(type)} and onLandscape cannot work together; the screen is not locked while onLandscape is on.`,
   );
 }
 

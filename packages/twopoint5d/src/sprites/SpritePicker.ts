@@ -605,7 +605,7 @@ function slotMaterialOf(sprites: FeatureSprites, k: number): FeatureSpritesMater
   }
   if (material.pass != null) {
     throw new TypeError(
-      `${WHERE}: the entry ${k} of the list holds a material built for pass "${material.pass.name}" in its material slot — the picker draws the sprites themselves; put a material built without a pass there`,
+      `${WHERE}: the entry ${k} of the list holds a material built for pass ${describeValue(material.pass.name)} in its material slot — the picker draws the sprites themselves; put a material built without a pass there`,
     );
   }
   return material;

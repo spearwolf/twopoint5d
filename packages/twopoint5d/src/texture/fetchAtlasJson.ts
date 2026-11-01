@@ -41,7 +41,7 @@ export const fetchAtlasJson = async (url: string, signal: AbortSignal): Promise<
         failure: {
           source: 'atlas',
           url,
-          error: new Error(`TextureResource: the response of "${url}" is no texture atlas json`),
+          error: new Error(`TextureResource: the response of ${describeValue(url)} is no texture atlas json`),
         },
       };
     }

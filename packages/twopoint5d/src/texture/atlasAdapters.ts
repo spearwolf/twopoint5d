@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {AsepriteJson, type AsepriteJsonData} from './AsepriteJson.js';
 import type {AnimationPlayback, FrameBasedAnimations} from './FrameBasedAnimations.js';
 import type {TextureAtlas} from './TextureAtlas.js';
@@ -43,7 +44,7 @@ export const texturePackerAtlasAdapter: AtlasAdapter = (json, parentCoords, opti
   const named = Object.keys(options?.playback ?? {});
   if (named.length > 0) {
     throw new Error(
-      `texturePackerAtlasAdapter: got a playback for ${named.map((name) => `"${name}"`).join(', ')}, but a TexturePacker json carries no animations — name the playback of an entry of frameBasedAnimations in that entry`,
+      `texturePackerAtlasAdapter: got a playback for ${named.map(describeValue).join(', ')}, but a TexturePacker json carries no animations — name the playback of an entry of frameBasedAnimations in that entry`,
     );
   }
   const [atlas] = TexturePackerJson.parse(json, parentCoords);

@@ -49,7 +49,7 @@ function conflictOf(
   feature: SpriteFeature,
   declaration: {value: SpriteUniformValue; shared: boolean},
 ): string | undefined {
-  const head = `features "${known.feature.name}" and "${feature.name}" both declare the uniform "${name}"`;
+  const head = `features ${describeValue(known.feature.name)} and ${describeValue(feature.name)} both declare the uniform ${describeValue(name)}`;
   if (!known.shared && !declaration.shared) {
     return `${head} — rename one of them, or declare it as {value, shared: true} in both to share one uniform`;
   }
@@ -57,7 +57,7 @@ function conflictOf(
     const [sharing, other, value] = known.shared
       ? [known.feature, feature, known.value]
       : [feature, known.feature, declaration.value];
-    return `${head}, and only "${sharing.name}" shares it — declare it as {value: ${describeValue(value)}, shared: true} in "${other.name}" as well, or rename one of them`;
+    return `${head}, and only ${describeValue(sharing.name)} shares it — declare it as {value: ${describeValue(value)}, shared: true} in ${describeValue(other.name)} as well, or rename one of them`;
   }
   const [a, b] = [sizeOf(known.value), sizeOf(declaration.value)];
   if (a !== b) {
@@ -99,7 +99,7 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
       const declaration = declarationOf(declared);
       if (declaration == null) {
         throw new TypeError(
-          `${where}: feature "${feature.name}" starts the uniform "${name}" with ${describeValue(declared)}; a uniform takes a finite number, 2 to 4 finite numbers, or {value, shared}`,
+          `${where}: feature ${describeValue(feature.name)} starts the uniform ${describeValue(name)} with ${describeValue(declared)}; a uniform takes a finite number, 2 to 4 finite numbers, or {value, shared}`,
         );
       }
       if (known != null) {
@@ -113,7 +113,9 @@ export function collectSpriteDeclarations(features: Iterable<SpriteFeature>, whe
       const known = textures.get(name);
       if (known != null && originOf(known.feature) === origin) continue;
       if (known != null) {
-        throw new Error(`${where}: features "${known.feature.name}" and "${feature.name}" both declare the texture "${name}"`);
+        throw new Error(
+          `${where}: features ${describeValue(known.feature.name)} and ${describeValue(feature.name)} both declare the texture ${describeValue(name)}`,
+        );
       }
       textures.set(name, {feature, needsImage: declaration.needsImage === true});
     }

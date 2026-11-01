@@ -294,7 +294,7 @@ entry; the guide says to export without them.
   frames follow `direction`, `repeat` is not applied. It is read by its own keys only — an inherited
   one such as `constructor` names no tag. A name that is no tag of the sheet is refused
   (`AsepriteJson: parse() got a playback for the tag "x", which the sheet does not carry — its
-  tags are: idle, walk, kick`), and so is a value that is none of `'loop'`, `'once'` and
+  tags are: "idle", "walk", "kick"`), and so is a value that is none of `'loop'`, `'once'` and
   `'pingpong'`, naming the tag, before the first frame is added (`AsepriteJson: parse() got a
   playback of "bounce" for the tag "walk" — a playback is 'loop', 'once' or 'pingpong'`).
 - Refused, each with the tag named: a `from`/`to` that is no whole number or lies outside `0 …
@@ -419,7 +419,7 @@ any adapter runs; a packer with another envelope is converted to it first.
 - A catalog item names one with `atlasAdapter: 'aseprite'`. A name the store does not know
   makes the item build no resource, reported as an `error` with `source: 'parse'` and the id
   (`TextureStore: item "fighter" names the atlasAdapter "asprite", which this store does not
-  know — known: texturepacker, aseprite; register it with registerAtlasAdapter() before parse()`);
+  know — known: "texturepacker", "aseprite"; register it with registerAtlasAdapter() before parse()`);
   `atlasAdapter` that is no string is a field of the wrong type; on an item without `atlasUrl` it
   is reported and ignored (`… builds a "tileset" resource, which reads no atlasAdapter — left out`).
 - An item that names none is read by the adapter whose `app` matches `meta.app` of its json —

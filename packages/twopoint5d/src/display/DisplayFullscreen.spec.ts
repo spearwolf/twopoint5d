@@ -1362,7 +1362,7 @@ describe('DisplayFullscreen', () => {
       const fs = make({onLandscape: true, orientationLock: 'portrait'});
 
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(String(warn.mock.calls[0]?.[0])).toContain("orientationLock 'portrait' and onLandscape cannot work together");
+      expect(String(warn.mock.calls[0]?.[0])).toContain('orientationLock "portrait" and onLandscape cannot work together');
 
       await fs.request();
       await flush();

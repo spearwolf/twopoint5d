@@ -465,16 +465,16 @@ describe('NineSlice', () => {
           `setSliceFrame: the slice "pivot" has no center — turn on 9-Slices in Aseprite's slice properties, or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])`,
         );
         expect(() => sprite.setSliceFrame(kit, 'constructor')).toThrow(
-          'setSliceFrame: the frame carries no slice "constructor" — its slices are: panel-stone, button-up, pivot',
+          'setSliceFrame: the frame carries no slice "constructor" — its slices are: "panel-stone", "button-up", "pivot"',
         );
         expect(() => sprite.setSliceFrame(kit, 'panel')).toThrow(
-          'setSliceFrame: the frame carries no slice "panel" — its slices are: panel-stone, button-up, pivot',
+          'setSliceFrame: the frame carries no slice "panel" — its slices are: "panel-stone", "button-up", "pivot"',
         );
         expect(() => sprite.setSliceFrame(kit)).toThrow(
           'setSliceFrame: the slices "panel-stone", "button-up" of the frame have a center — name one: setSliceFrame(frame, "panel-stone")',
         );
         expect(() => sprite.setSliceFrame({...kit, data: {slices: {pivot: {bounds: {x: 0, y: 0, w: 1, h: 1}}}}})).toThrow(
-          `setSliceFrame: no slice of the frame has a center — its slices are: pivot; turn on 9-Slices for one in Aseprite's slice properties, or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])`,
+          `setSliceFrame: no slice of the frame has a center — its slices are: "pivot"; turn on 9-Slices for one in Aseprite's slice properties, or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])`,
         );
         expect(() => sprite.setSliceFrame({coords: kit.coords})).toThrow(
           'setSliceFrame: the frame carries no slices — read the sheet with AsepriteJson.parse(), exported with its slices (--list-slices), or hand the insets in: setSliceFrame(frame, [left, top, right, bottom])',

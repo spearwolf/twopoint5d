@@ -205,12 +205,12 @@ the frame's `coords` (`height × width` under `FLIP_DIAGONAL`).
   - a frame whose `data` carries no `slices`:
     `setAnchorFromPivot: the frame carries no slices — read the sheet with AsepriteJson.parse(), exported with its slices (--list-slices), or set the anchor with setAnchor(x, y)`
   - a `sliceName` the frame does not carry:
-    `setAnchorFromPivot: the frame carries no slice "feet" — its slices are: pivot, hitbox`
+    `setAnchorFromPivot: the frame carries no slice "feet" — its slices are: "pivot", "hitbox"`
     (`(none)` for none)
   - a named slice without a pivot:
     `setAnchorFromPivot: the slice "hitbox" has no pivot — give it one in Aseprite's slice properties, or set the anchor with setAnchor(x, y)`
   - no `sliceName`, and no slice with a pivot:
-    `setAnchorFromPivot: no slice of the frame has a pivot — its slices are: hitbox; give one a pivot in Aseprite's slice properties, or set the anchor with setAnchor(x, y)`
+    `setAnchorFromPivot: no slice of the frame has a pivot — its slices are: "hitbox"; give one a pivot in Aseprite's slice properties, or set the anchor with setAnchor(x, y)`
   - no `sliceName`, and several:
     `setAnchorFromPivot: the slices "pivot", "hand" of the frame have a pivot — name one: setAnchorFromPivot(frame, "pivot")`
 

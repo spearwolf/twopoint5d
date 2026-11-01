@@ -170,7 +170,7 @@ export class SpriteResources {
       // length as well, and would reach the vector as it is
       if (!isUniformValue(value) || sizeOfValue(value) !== size) {
         throw new TypeError(
-          `${where}: the uniform "${name}" is a ${VECTOR_TYPES[size - 1]} and takes ${size === 1 ? 'a finite number' : `${size} finite numbers`} as its start value, got ${describeValue(value)}`,
+          `${where}: the uniform ${describeValue(name)} is a ${VECTOR_TYPES[size - 1]} and takes ${size === 1 ? 'a finite number' : `${size} finite numbers`} as its start value, got ${describeValue(value)}`,
         );
       }
       this.setUniform(name, ...((typeof value === 'number' ? [value] : value) as [number, number?, number?, number?]));
@@ -180,7 +180,7 @@ export class SpriteResources {
     for (const name of Object.keys(options.textures ?? {})) {
       if (!declarations.textures.has(name)) {
         throw new Error(
-          `${where}: no feature declares the texture "${name}"; declared: ${[...declarations.textures.keys()].join(', ')}`,
+          `${where}: no feature declares the texture ${describeValue(name)}; declared: ${[...declarations.textures.keys()].map(describeValue).join(', ')}`,
         );
       }
       this.#checkTexture(name, options.textures![name]);
@@ -239,7 +239,7 @@ export class SpriteResources {
         warned = true;
         // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
-          `${this.#where}: the texture "${name}" is filtered with magFilter ${filterName(magFilter)} and minFilter ${filterName(minFilter)} — feature "${feature.name}" reads it texel for texel and needs NearestFilter for both; load it with the texture class 'nearest'`,
+          `${this.#where}: the texture ${describeValue(name)} is filtered with magFilter ${filterName(magFilter)} and minFilter ${filterName(minFilter)} — feature ${describeValue(feature.name)} reads it texel for texel and needs NearestFilter for both; load it with the texture class 'nearest'`,
         );
       },
       {attach: this},
@@ -250,7 +250,7 @@ export class SpriteResources {
     const size = this.#uniformSizes.get(name);
     if (size == null) {
       throw new Error(
-        `${this.#where}: no feature declares the uniform "${name}"; declared: ${[...this.#uniformSizes.keys()].join(', ')}`,
+        `${this.#where}: no feature declares the uniform ${describeValue(name)}; declared: ${[...this.#uniformSizes.keys()].map(describeValue).join(', ')}`,
       );
     }
     return size;
@@ -259,21 +259,23 @@ export class SpriteResources {
   #checkTexture(name: string, value: unknown): void {
     if (!isTextureOrNone(value)) {
       throw new TypeError(
-        `${this.#where}: the texture "${name}" must be a three.js Texture or undefined, got ${describeThreeValue(value, 'isTexture')}`,
+        `${this.#where}: the texture ${describeValue(name)} must be a three.js Texture or undefined, got ${describeThreeValue(value, 'isTexture')}`,
       );
     }
   }
 
   #shapeError(name: string, size: number): TypeError {
     return new TypeError(
-      `${this.#where}: the uniform "${name}" is a ${VECTOR_TYPES[size - 1]} and takes ${size} value${size === 1 ? '' : 's'}`,
+      `${this.#where}: the uniform ${describeValue(name)} is a ${VECTOR_TYPES[size - 1]} and takes ${size} value${size === 1 ? '' : 's'}`,
     );
   }
 
   #slot(name: string): TextureSlot {
     const slot = this.#textures.get(name);
     if (slot == null) {
-      throw new Error(`${this.#where}: no feature declares the texture "${name}"; declared: ${this.textureNames.join(', ')}`);
+      throw new Error(
+        `${this.#where}: no feature declares the texture ${describeValue(name)}; declared: ${this.textureNames.map(describeValue).join(', ')}`,
+      );
     }
     return slot;
   }
@@ -285,7 +287,8 @@ export class SpriteResources {
   uniform(name: string, where: string): SpriteUniformNode {
     // an own entry only: a name such as "constructor" is no uniform
     const node = Object.hasOwn(this.uniforms, name) ? this.uniforms[name] : undefined;
-    if (node == null) throw new Error(`${where} reads the uniform "${name}", which no feature of these sprites declares`);
+    if (node == null)
+      throw new Error(`${where} reads the uniform ${describeValue(name)}, which no feature of these sprites declares`);
     return node;
   }
 

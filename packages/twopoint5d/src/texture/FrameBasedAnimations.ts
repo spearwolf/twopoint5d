@@ -487,7 +487,7 @@ export class FrameBasedAnimations {
         const frame = atlas.frame(frameName);
         if (frame == null) {
           throw new Error(
-            `FrameBasedAnimations: add() got the frame name "${frameName}" at index ${index} for the animation ${animNameInError(name)}, which the atlas does not carry`,
+            `FrameBasedAnimations: add() got the frame name ${describeValue(frameName)} at index ${index} for the animation ${animNameInError(name)}, which the atlas does not carry`,
           );
         }
         return frame;

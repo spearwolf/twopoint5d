@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {voBuffer, voIndex} from './constants.js';
 import {createTypedArray} from './createTypedArray.js';
@@ -69,7 +70,9 @@ const makeAttributeValuesGetter = (
     const buf = buffer.bufferList[bufferIndex]!;
     const source = buf.typedArray!;
     if (target != null && target.length < count) {
-      throw new RangeError(`${getterName}(): the target holds ${target.length} values, attribute "${attrName}" has ${count}`);
+      throw new RangeError(
+        `${getterName}(): the target holds ${target.length} values, attribute ${describeValue(attrName)} has ${count}`,
+      );
     }
     const out = target ?? createTypedArray(buf.dataType, count);
     // element by element, not subarray(): subarray() allocates a new view per vertex, which is

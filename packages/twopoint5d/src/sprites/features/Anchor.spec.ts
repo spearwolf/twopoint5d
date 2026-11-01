@@ -159,7 +159,7 @@ describe('Anchor', () => {
       withSprite((sprite) => {
         const frame = asepriteFrame({pivot: PIVOT, hitbox: {bounds: PIVOT.bounds}});
         expect(() => sprite.setAnchorFromPivot(frame, 'feet')).toThrow(
-          'setAnchorFromPivot: the frame carries no slice "feet" — its slices are: pivot, hitbox',
+          'setAnchorFromPivot: the frame carries no slice "feet" — its slices are: "pivot", "hitbox"',
         );
         expect(() => sprite.setAnchorFromPivot(asepriteFrame({}), 'feet')).toThrow('its slices are: (none)');
         // a member of Object.prototype is no slice
@@ -181,7 +181,7 @@ describe('Anchor', () => {
     test('refuses, without a name, a frame with no slice of a pivot and one with several', () => {
       withSprite((sprite) => {
         expect(() => sprite.setAnchorFromPivot(asepriteFrame({hitbox: {bounds: PIVOT.bounds}}))).toThrow(
-          `setAnchorFromPivot: no slice of the frame has a pivot — its slices are: hitbox; give one a pivot in Aseprite's slice properties, or set the anchor with setAnchor(x, y)`,
+          `setAnchorFromPivot: no slice of the frame has a pivot — its slices are: "hitbox"; give one a pivot in Aseprite's slice properties, or set the anchor with setAnchor(x, y)`,
         );
         expect(() => sprite.setAnchorFromPivot(asepriteFrame({pivot: PIVOT, hand: PIVOT, box: {bounds: PIVOT.bounds}}))).toThrow(
           'setAnchorFromPivot: the slices "pivot", "hand" of the frame have a pivot — name one: setAnchorFromPivot(frame, "pivot")',

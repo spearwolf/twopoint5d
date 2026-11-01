@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {ImageLoader} from 'three/webgpu';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
 import {isPowerOf2} from '../utils/isPowerOf2.js';
@@ -65,7 +66,7 @@ export class PowerOf2ImageLoader {
 
             const context = canvas.getContext('2d');
             if (!context) {
-              throw new Error(`PowerOf2ImageLoader: no 2d context to pad "${url}" to a power of 2`);
+              throw new Error(`PowerOf2ImageLoader: no 2d context to pad ${describeValue(url)} to a power of 2`);
             }
             context.drawImage(img, 0, 0);
 
@@ -85,7 +86,7 @@ export class PowerOf2ImageLoader {
           } else {
             // biome-ignore lint/suspicious/noConsole: load() was given no onErrorCallback, and the failure must not vanish
             console.error(
-              `PowerOf2ImageLoader: the image "${url}" could not be padded to a power of 2, and load() was given no onErrorCallback`,
+              `PowerOf2ImageLoader: the image ${describeValue(url)} could not be padded to a power of 2, and load() was given no onErrorCallback`,
               error,
             );
           }
@@ -98,7 +99,10 @@ export class PowerOf2ImageLoader {
       onErrorCallback ??
         ((event) => {
           // biome-ignore lint/suspicious/noConsole: load() was given no onErrorCallback, and the failure must not vanish
-          console.error(`PowerOf2ImageLoader: the image "${url}" did not load, and load() was given no onErrorCallback`, event);
+          console.error(
+            `PowerOf2ImageLoader: the image ${describeValue(url)} did not load, and load() was given no onErrorCallback`,
+            event,
+          );
         }),
     );
   }

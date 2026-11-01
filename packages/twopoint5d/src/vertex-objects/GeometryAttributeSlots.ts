@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {BufferAttribute, BufferGeometry, InterleavedBufferAttribute} from 'three/webgpu';
 import {expectDefined} from '../utils/expectDefined.js';
 import type {BufferLike} from './types.js';
@@ -98,7 +99,7 @@ export class GeometryAttributeSlots {
       if (held < 0) continue;
 
       const wasOnTop = held === claims.length - 1;
-      const released = expectDefined(claims.splice(held, 1)[0], `the claim of route on slot "${attrName}"`);
+      const released = expectDefined(claims.splice(held, 1)[0], `the claim of route on slot ${describeValue(attrName)}`);
       if (!wasOnTop) continue;
 
       if (claims.length === 0) {
@@ -107,7 +108,10 @@ export class GeometryAttributeSlots {
         this.#slots.delete(attrName);
         changed.push({attrName, vacated: released.attr});
       } else {
-        geometry.setAttribute(attrName, expectDefined(claims[claims.length - 1], `the topmost claim of slot "${attrName}"`).attr);
+        geometry.setAttribute(
+          attrName,
+          expectDefined(claims[claims.length - 1], `the topmost claim of slot ${describeValue(attrName)}`).attr,
+        );
         changed.push({attrName});
       }
     }
@@ -137,7 +141,10 @@ export class GeometryAttributeSlots {
         this.#everHeld.delete(attrName);
       } else {
         // the claim underneath keeps its name held: it was there before the attempt
-        geometry.setAttribute(attrName, expectDefined(claims[claims.length - 1], `the topmost claim of slot "${attrName}"`).attr);
+        geometry.setAttribute(
+          attrName,
+          expectDefined(claims[claims.length - 1], `the topmost claim of slot ${describeValue(attrName)}`).attr,
+        );
       }
     }
   }

@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {VOBufferPool} from './VOBufferPool.js';
 import {VOUtils} from './VOUtils.js';
@@ -38,13 +39,13 @@ function unknownSortKeyError(name: string, layouts: ReadonlyMap<string, ValuePro
   const names = [...layouts.keys()];
   if (names.length === 0) {
     return new Error(
-      `VertexObjectPool#sortBy(): "${name}" is no value property of the vertex objects of this pool, which have none — hand in a key function (vo) => number`,
+      `VertexObjectPool#sortBy(): ${describeValue(name)} is no value property of the vertex objects of this pool, which have none — hand in a key function (vo) => number`,
     );
   }
-  const listed = names.slice(0, LISTED_VALUE_PROPERTIES);
+  const listed = names.slice(0, LISTED_VALUE_PROPERTIES).map(describeValue);
   if (names.length > LISTED_VALUE_PROPERTIES) listed.push('…');
   return new Error(
-    `VertexObjectPool#sortBy(): "${name}" is no value property of the vertex objects of this pool — name one of ${listed.join(', ')}, or hand in a key function (vo) => number`,
+    `VertexObjectPool#sortBy(): ${describeValue(name)} is no value property of the vertex objects of this pool — name one of ${listed.join(', ')}, or hand in a key function (vo) => number`,
   );
 }
 

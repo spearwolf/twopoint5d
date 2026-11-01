@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {VertexAttributeDescriptor} from './VertexAttributeDescriptor.js';
 import {vertexObjectProperties} from './vertexObjectProperties.js';
 
@@ -21,7 +22,7 @@ export function vertexObjectPropertyNames(
 ): VertexObjectPropertyName[] {
   const names: VertexObjectPropertyName[] = vertexObjectProperties(attributes, vertexCount).map((p) => ({
     name: p.name,
-    origin: `attribute "${p.attribute.name}"`,
+    origin: `attribute ${describeValue(p.attribute.name)}`,
   }));
 
   for (const [key, value] of Object.entries(methods ?? {})) {

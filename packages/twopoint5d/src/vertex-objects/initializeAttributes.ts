@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {BufferGeometry, TypedArray as ThreeTypedArray} from 'three/webgpu';
 import {
   BufferAttribute,
@@ -51,7 +52,7 @@ function initializeRoute(
     // buffer name that has a buffer has its attributes, and an attribute name has its descriptor
     const attributes = expectDefined(
       pool.buffer.bufferNameAttributes.get(buffer.bufferName),
-      `the attributes of buffer "${buffer.bufferName}"`,
+      `the attributes of buffer ${describeValue(buffer.bufferName)}`,
     );
     // a buffer of one attribute with padding behind it goes the interleaved way as well: a
     // BufferAttribute of the padded itemSize would show the shader the padding as a component, one
@@ -71,7 +72,7 @@ function initializeRoute(
       for (const bufAttr of attributes) {
         const attrDesc = expectDefined(
           descriptor.attributes.get(bufAttr.attributeName),
-          `the descriptor of attribute "${bufAttr.attributeName}"`,
+          `the descriptor of attribute ${describeValue(bufAttr.attributeName)}`,
         );
         const attr = new InterleavedBufferAttribute(interleavedBuffer, attrDesc.size, bufAttr.offset, attrDesc.normalizedData);
         attr.name = bufAttr.attributeName;
@@ -79,10 +80,10 @@ function initializeRoute(
         slots.claim(attrDesc.name, buffers, attr);
       }
     } else {
-      const bufAttr = expectDefined(attributes[0], `the sole attribute of buffer "${buffer.bufferName}"`);
+      const bufAttr = expectDefined(attributes[0], `the sole attribute of buffer ${describeValue(buffer.bufferName)}`);
       const attrDesc = expectDefined(
         descriptor.attributes.get(bufAttr.attributeName),
-        `the descriptor of attribute "${bufAttr.attributeName}"`,
+        `the descriptor of attribute ${describeValue(bufAttr.attributeName)}`,
       );
       const attr = builders.bufferAttribute(asThreeTypedArray(buffer.typedArray!), buffer.itemSize, attrDesc.normalizedData);
       attr.setUsage(toDrawUsage(buffer.usageType));

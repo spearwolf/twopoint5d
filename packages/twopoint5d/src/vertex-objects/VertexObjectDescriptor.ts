@@ -161,11 +161,13 @@ export class VertexObjectDescriptor {
       // for an attribute that declares neither — a fallback this descriptor does not allow
       const raw = this.description.attributes[attr.name] as {size?: number; components?: readonly string[]};
       if (raw.size == null && raw.components == null) {
-        throw new RangeError(`VertexObjectDescriptor: attribute "${attr.name}" declares neither a size nor components`);
+        throw new RangeError(
+          `VertexObjectDescriptor: attribute ${describeValue(attr.name)} declares neither a size nor components`,
+        );
       }
       if (!isPositiveInteger(attr.size)) {
         throw new RangeError(
-          `VertexObjectDescriptor: attribute "${attr.name}" needs a size of at least 1 (a positive integer size or at least one component), got ${describeValue(attr.size)}`,
+          `VertexObjectDescriptor: attribute ${describeValue(attr.name)} needs a size of at least 1 (a positive integer size or at least one component), got ${describeValue(attr.size)}`,
         );
       }
     }
@@ -174,7 +176,7 @@ export class VertexObjectDescriptor {
       const raw = this.description.attributes[attr.name] as {size?: number; components?: readonly string[]};
       if (raw.size != null && raw.components != null && raw.components.length > raw.size) {
         throw new RangeError(
-          `VertexObjectDescriptor: attribute "${attr.name}" declares ${raw.components.length} components for a size of ${raw.size}`,
+          `VertexObjectDescriptor: attribute ${describeValue(attr.name)} declares ${raw.components.length} components for a size of ${raw.size}`,
         );
       }
     }
@@ -192,7 +194,9 @@ export class VertexObjectDescriptor {
     for (const {name, origin} of vertexObjectPropertyNames(this.attributes.values(), this.vertexCount, this.methods)) {
       const first = this.#propertyOrigins.get(name);
       if (first != null) {
-        throw new Error(`VertexObjectDescriptor: the vertex object property "${name}" comes from both ${first} and ${origin}`);
+        throw new Error(
+          `VertexObjectDescriptor: the vertex object property ${describeValue(name)} comes from both ${first} and ${origin}`,
+        );
       }
       this.#propertyOrigins.set(name, origin);
     }
@@ -204,13 +208,13 @@ export class VertexObjectDescriptor {
     for (const attr of this.attributes.values()) {
       if (attr.size > 4) {
         throw new RangeError(
-          `VertexObjectDescriptor: attribute "${attr.name}" in buffer "${attr.bufferName}" has a size of ${attr.size}, and a WebGPU vertex format holds at most 4 values`,
+          `VertexObjectDescriptor: attribute ${describeValue(attr.name)} in buffer ${describeValue(attr.bufferName)} has a size of ${attr.size}, and a WebGPU vertex format holds at most 4 values`,
         );
       }
     }
 
     for (const attr of this.attributes.values()) {
-      const where = `attribute "${attr.name}" in buffer "${attr.bufferName}"`;
+      const where = `attribute ${describeValue(attr.name)} in buffer ${describeValue(attr.bufferName)}`;
       const {dataType, size} = attr;
       if (typesWithoutVertexFormat.has(dataType)) {
         throw new TypeError(`VertexObjectDescriptor: ${where} is of type ${dataType}, for which WebGPU has no vertex format`);
@@ -255,7 +259,7 @@ export class VertexObjectDescriptor {
         attr.usageType !== first.usageType
       ) {
         throw new TypeError(
-          `VertexObjectDescriptor: buffer "${attr.bufferName}" holds attribute "${first.name}" (${summary(first)}) and attribute "${attr.name}" (${summary(attr)}); every attribute of a buffer has to agree on type, normalized and usage`,
+          `VertexObjectDescriptor: buffer ${describeValue(attr.bufferName)} holds attribute ${describeValue(first.name)} (${summary(first)}) and attribute ${describeValue(attr.name)} (${summary(attr)}); every attribute of a buffer has to agree on type, normalized and usage`,
         );
       }
     }
@@ -285,7 +289,7 @@ export class VertexObjectDescriptor {
           const origin = this.#propertyOrigins.get(name);
           if (origin != null) {
             throw new Error(
-              `VertexObjectDescriptor: the vertex object property "${name}" from ${origin} would shadow a property of the basePrototype`,
+              `VertexObjectDescriptor: the vertex object property ${describeValue(name)} from ${origin} would shadow a property of the basePrototype`,
             );
           }
         }

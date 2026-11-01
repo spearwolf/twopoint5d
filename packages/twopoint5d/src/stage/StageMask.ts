@@ -202,7 +202,7 @@ export class StageMask {
       throw new TypeError(`${subject}: stage must be a Stage2D, got ${describeStage(stage)}`);
     }
     if (stage.isDisposed) {
-      throw new Error(`${subject} cannot take the stage "${stage.name}": that stage has been disposed`);
+      throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage has been disposed`);
     }
     if ((scene as Partial<Object3D> | null | undefined)?.isObject3D !== true) {
       throw new TypeError(
@@ -222,11 +222,11 @@ export class StageMask {
     const subject = 'new StageMask()';
     const {source, invert, scale} = readMaskOptions(subject, options, true);
     if ((stage as {isDisposed?: unknown} | undefined)?.isDisposed === true) {
-      throw new Error(`${subject} cannot take the stage "${stage.name}": that stage has been disposed`);
+      throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage has been disposed`);
     }
     if (stage instanceof ClearStage) {
       throw new TypeError(
-        `${subject} cannot take the stage "${stage.name}": a ClearStage draws no picture to read a coverage from`,
+        `${subject} cannot take the stage ${describeValue(stage.name)}: a ClearStage draws no picture to read a coverage from`,
       );
     }
     if (typeof (stage as Partial<IRenderable> | undefined)?.renderTo !== 'function') {

@@ -1,3 +1,4 @@
+import {describeValue} from '../../utils/describeValue.js';
 import type {AsepriteFrameSlice} from '../../texture/AsepriteJson.js';
 import type {TextureAtlasFrame} from '../../texture/TextureAtlas.js';
 import {isFiniteNumber} from '../../utils/isFiniteNumber.js';
@@ -36,14 +37,14 @@ export function untrimmedSizeOf(frame: TextureAtlasFrame<unknown>, target: [numb
   return target;
 }
 
-const namesOf = (slices: Record<string, unknown>): string => Object.keys(slices).join(', ') || '(none)';
+const namesOf = (slices: Record<string, unknown>): string => Object.keys(slices).map(describeValue).join(', ') || '(none)';
 
 // the refusal of several slices that carry the field — out of sliceOf(): a closure over its locals
 // would make V8 build a context for them on every call
 function ambiguous(slices: Record<string, unknown>, field: SliceWanted['field'], where: string): Error {
   const holders = Object.keys(slices).filter((key) => (slices[key] as AsepriteFrameSlice)[field] != null);
   return new Error(
-    `${where}: the slices ${holders.map((key) => `"${key}"`).join(', ')} of the frame have a ${field} — name one: ${where}(frame, "${holders[0]}")`,
+    `${where}: the slices ${holders.map(describeValue).join(', ')} of the frame have a ${field} — name one: ${where}(frame, ${describeValue(holders[0])})`,
   );
 }
 
@@ -70,9 +71,10 @@ export function sliceOf(
   if (name !== undefined) {
     // own keys only: a member of Object.prototype such as "constructor" is no slice
     const slice = Object.hasOwn(slices, name) ? (slices[name] as AsepriteFrameSlice | undefined) : undefined;
-    if (slice == null) throw new Error(`${where}: the frame carries no slice "${name}" — its slices are: ${namesOf(slices)}`);
+    if (slice == null)
+      throw new Error(`${where}: the frame carries no slice ${describeValue(name)} — its slices are: ${namesOf(slices)}`);
     if (slice[field] == null)
-      throw new Error(`${where}: the slice "${name}" has no ${field} — ${wanted.named}, or ${wanted.fix}`);
+      throw new Error(`${where}: the slice ${describeValue(name)} has no ${field} — ${wanted.named}, or ${wanted.fix}`);
     return slice;
   }
   let found: AsepriteFrameSlice | undefined;

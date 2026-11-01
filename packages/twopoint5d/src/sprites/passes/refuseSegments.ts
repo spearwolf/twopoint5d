@@ -1,3 +1,4 @@
+import {describeValue} from '../../utils/describeValue.js';
 import {isSegmentPlacement} from '../features/segmentChecks.js';
 import type {SpriteKindShape} from '../SpriteFeature.js';
 
@@ -12,6 +13,6 @@ export const refuseSegments =
     const segment = features.find(isSegmentPlacement);
     if (segment == null) return;
     throw new Error(
-      `it ${does}, and of a segment of "${segment.name}" it would draw the quad of the caps at the start — take ${instead}`,
+      `it ${does}, and of a segment of ${describeValue(segment.name)} it would draw the quad of the caps at the start — take ${instead}`,
     );
   };

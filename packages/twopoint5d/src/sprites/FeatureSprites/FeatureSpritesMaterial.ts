@@ -92,7 +92,7 @@ export function checkPlacementStandIn(
 ): void {
   if (feature.placement == null) {
     throw new TypeError(
-      `${where}: feature "${feature.name}" contributes no placement stage and cannot stand in for "${current.name}"`,
+      `${where}: feature ${describeValue(feature.name)} contributes no placement stage and cannot stand in for ${describeValue(current.name)}`,
     );
   }
   if (feature === start) return;
@@ -101,7 +101,7 @@ export function checkPlacementStandIn(
   );
   if (extra.length > 0) {
     throw new TypeError(
-      `${where}: feature "${feature.name}" brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for "${current.name}"`,
+      `${where}: feature ${describeValue(feature.name)} brings ${extra.join(', ')} besides its placement stage; the sprites were built without them, so it cannot stand in for ${describeValue(current.name)}`,
     );
   }
   // the sprites are built from the kind alone, so the kind's features are the yardstick, not the ones a material folds
@@ -109,7 +109,7 @@ export function checkPlacementStandIn(
   for (const required of feature.requires ?? []) {
     if (!held.has(required)) {
       throw new TypeError(
-        `${where}: feature "${feature.name}" requires feature "${required}", which the sprite kind does not hold`,
+        `${where}: feature ${describeValue(feature.name)} requires feature ${describeValue(required)}, which the sprite kind does not hold`,
       );
     }
   }
@@ -117,7 +117,7 @@ export function checkPlacementStandIn(
   runCheckKind(
     feature,
     {base: kind.base, features: kind.features.map((held) => (held === kindPlacement ? feature : held))},
-    `${where}: feature "${feature.name}"`,
+    `${where}: feature ${describeValue(feature.name)}`,
   );
 }
 
@@ -206,7 +206,8 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
     this.pass = pass;
     // a pass is checked and folded before anything is built, so that its refusal leaves nothing behind
     this.#features = pass == null ? kind.features : passFeatures(kind, pass, WHERE);
-    this.#pipeline = pass == null ? kind.pipeline : buildSpritePipeline(this.#features, `${WHERE}: pass "${pass.name}"`);
+    this.#pipeline =
+      pass == null ? kind.pipeline : buildSpritePipeline(this.#features, `${WHERE}: pass ${describeValue(pass.name)}`);
     this.#attributeNames = new Set([
       ...Object.keys(kind.description.attributes),
       ...Object.keys(kind.base.description.attributes),
@@ -229,7 +230,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
     try {
       for (const feature of this.#features) {
         if (!this.resources.declares(feature)) {
-          throw new TypeError(`${WHERE}: the resources handed in lack what feature "${feature.name}" declares`);
+          throw new TypeError(`${WHERE}: the resources handed in lack what feature ${describeValue(feature.name)} declares`);
         }
       }
 
@@ -342,16 +343,16 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   }
 
   #frameContext(feature: SpriteFeature, scope: GraphScope): SpriteFrameContext {
-    const where = `${WHERE}: feature "${feature.name}"`;
+    const where = `${WHERE}: feature ${describeValue(feature.name)}`;
     const ownTexture = (textureName: string) => {
       if (feature.textures?.[textureName] == null) {
-        throw new Error(`${where} reads the texture "${textureName}", which it does not declare`);
+        throw new Error(`${where} reads the texture ${describeValue(textureName)}, which it does not declare`);
       }
     };
     return {
       attribute: <T extends string>(attributeName: string) => {
         if (!this.#attributeNames.has(attributeName)) {
-          throw new Error(`${where} reads the attribute "${attributeName}", which the sprite kind does not hold`);
+          throw new Error(`${where} reads the attribute ${describeValue(attributeName)}, which the sprite kind does not hold`);
         }
         return attribute<T>(attributeName);
       },
@@ -369,7 +370,9 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
       textureSize: (textureName) => {
         const declaring = this.#features.find(({textures}) => textures != null && Object.hasOwn(textures, textureName));
         if (declaring == null) {
-          throw new Error(`${where} reads the size of the texture "${textureName}", which no feature of these sprites declares`);
+          throw new Error(
+            `${where} reads the size of the texture ${describeValue(textureName)}, which no feature of these sprites declares`,
+          );
         }
         // a texture that needs its image counts as set once the image has measures, which the uniform
         // holds; and the uniform is (0, 0) for a texture of another feature that is unset — a tracked
@@ -388,7 +391,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         const declaring = this.#features.find(({textures}) => textures != null && Object.hasOwn(textures, textureName));
         if (declaring == null) {
           throw new Error(
-            `${where} reads the color space of the texture "${textureName}", which no feature of these sprites declares`,
+            `${where} reads the color space of the texture ${describeValue(textureName)}, which no feature of these sprites declares`,
           );
         }
         // shapeOf() is the tracked read: the shape key carries the colour space, so a texture in another

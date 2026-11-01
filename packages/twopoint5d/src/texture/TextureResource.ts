@@ -222,8 +222,8 @@ const SUBTYPES_BUILT_BY_TYPE: Record<TextureResourceType, readonly TextureResour
 // all — and this is the error it is skipped with.
 const wrongAnimationDataError = (resource: TextureResource, animation: string, shape: string | undefined): Error =>
   new Error(
-    `TextureResource: animation "${animation}" of resource "${resource.id}" carries ${shape ?? 'no known'} data, ` +
-      `which a "${resource.type}" resource cannot use`,
+    `TextureResource: animation ${describeValue(animation)} of resource ${describeValue(resource.id)} carries ${shape ?? 'no known'} data, ` +
+      `which a ${describeValue(resource.type)} resource cannot use`,
   );
 
 // Only the shape of resource a property belongs to carries the signal behind it. TypeScript refuses
@@ -233,7 +233,9 @@ const wrongAnimationDataError = (resource: TextureResource, animation: string, s
 // throw this instead.
 const wrongShapeError = (resource: TextureResource, property: string): TypeError => {
   const article = /^[aeiou]/.test(resource.type) ? 'an' : 'a';
-  return new TypeError(`TextureResource "${resource.id}" is ${article} "${resource.type}" resource and has no "${property}"`);
+  return new TypeError(
+    `TextureResource ${describeValue(resource.id)} is ${article} ${describeValue(resource.type)} resource and has no ${describeValue(property)}`,
+  );
 };
 
 // An atlas resource takes the name of its image from its json. Writing that name from
@@ -244,7 +246,7 @@ const wrongShapeError = (resource: TextureResource, property: string): TypeError
 // create an own property the resource never reads, the setter on the prototype throws this.
 const derivedImageUrlError = (resource: TextureResource): TypeError =>
   new TypeError(
-    `TextureResource "${resource.id}" is an "atlas" resource and takes its "imageUrl" from the atlas json ` +
+    `TextureResource ${describeValue(resource.id)} is an "atlas" resource and takes its "imageUrl" from the atlas json ` +
       `— write "overrideImageUrl" instead`,
   );
 
@@ -732,7 +734,7 @@ export abstract class TextureResource {
 
     throwCollected(
       errors,
-      `TextureResource#dispose(): listeners of the dispose events of resource "${this.id}" and of its texture threw`,
+      `TextureResource#dispose(): listeners of the dispose events of resource ${describeValue(this.id)} and of its texture threw`,
     );
   }
 
@@ -1294,7 +1296,7 @@ export class TileSetTextureResource extends TextureResource {
         const {tileIds} = data as {tileIds: unknown};
         if (!Array.isArray(tileIds)) {
           throw new Error(
-            `TextureResource: animation "${name}" of resource "${this.id}" carries tileIds of ${describeValue(tileIds)} ` +
+            `TextureResource: animation ${describeValue(name)} of resource ${describeValue(this.id)} carries tileIds of ${describeValue(tileIds)} ` +
               `— tileIds is an array of tile ids`,
           );
         }
@@ -1603,7 +1605,9 @@ export class AtlasTextureResource extends TextureResource {
           context.fail('atlasImage', {
             source: 'atlas',
             url,
-            error: new Error(`TextureResource: the response of "${url}" names no image and no overrideImageUrl was given`),
+            error: new Error(
+              `TextureResource: the response of ${describeValue(url)} names no image and no overrideImageUrl was given`,
+            ),
           });
           return;
         }
@@ -1670,7 +1674,7 @@ export class AtlasTextureResource extends TextureResource {
           const meta: unknown = atlasJson.meta;
           if (!isObject(meta)) {
             throw new TypeError(
-              `TextureResource: the atlasJson of resource "${this.id}" has a meta of ${describeValue(meta)} — an atlas json carries its meta as an object {image, size}`,
+              `TextureResource: the atlasJson of resource ${describeValue(this.id)} has a meta of ${describeValue(meta)} — an atlas json carries its meta as an object {image, size}`,
             );
           }
           const adapter = atlasAdapterSignal.value ?? (this[atlasAdapterPicker] ?? pickBuiltInAtlasAdapter)(atlasJson);
@@ -1679,12 +1683,12 @@ export class AtlasTextureResource extends TextureResource {
           const answered = (typeof result === 'object' && result !== null ? result : {}) as Partial<AtlasAdapterResultShape>;
           if (!(answered.atlas instanceof TextureAtlas)) {
             throw new Error(
-              `TextureResource: the atlas adapter of resource "${this.id}" answered no atlas — an adapter answers {atlas, animations?}`,
+              `TextureResource: the atlas adapter of resource ${describeValue(this.id)} answered no atlas — an adapter answers {atlas, animations?}`,
             );
           }
           if (answered.animations !== undefined && !(answered.animations instanceof FrameBasedAnimations)) {
             throw new Error(
-              `TextureResource: the atlas adapter of resource "${this.id}" answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none`,
+              `TextureResource: the atlas adapter of resource ${describeValue(this.id)} answered animations that are no FrameBasedAnimations — an adapter answers a FrameBasedAnimations or none`,
             );
           }
           atlas = answered.atlas;

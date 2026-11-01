@@ -149,7 +149,7 @@ export class StageRenderOrder {
       if (count > 1) {
         // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
-          `StageRenderer: ${count} stages are named "${name}" and renderOrder=${describeValue(this.#value)} cannot tell them apart; they render in the order they were added. Set unique names on your stages.`,
+          `StageRenderer: ${count} stages are named ${describeValue(name)} and renderOrder=${describeValue(this.#value)} cannot tell them apart; they render in the order they were added. Set unique names on your stages.`,
         );
       }
     }

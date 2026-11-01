@@ -375,7 +375,7 @@ export function matte(options: MatteOptions): StageTransitionEffect {
     throw new TypeError(`matte: mask must be a StageMask, got ${describeValue(mask)}`);
   }
   if (mask.isDisposed) {
-    throw new Error(`matte: the mask on "${mask.stage.name}" has been disposed`);
+    throw new Error(`matte: the mask on ${describeValue(mask.stage.name)} has been disposed`);
   }
   const mode = opts.mode ?? 'coverage';
   if (mode !== 'coverage' && mode !== 'threshold') {

@@ -157,7 +157,7 @@ interface ItemRefusal {
 
 const refusalOf = (id: string, phrase: string): ItemRefusal => ({
   phrase,
-  error: new Error(`TextureStore: item "${id}" ${phrase}`),
+  error: new Error(`TextureStore: item ${describeValue(id)} ${phrase}`),
 });
 
 // What #checkItems() makes of an item: why it builds nothing, or the type it builds, the known
@@ -197,15 +197,15 @@ const TYPE_SPECIFIC_FIELDS = [
 // last parse() refused, it says why and carries the error of that parse error as its cause
 const noResourceError = (id: string, refusal?: ItemRefusal): Error =>
   refusal
-    ? new Error(`TextureStore: no resource with id "${id}" — its item ${refusal.phrase}`, {cause: refusal.error})
-    : new Error(`TextureStore: no resource with id "${id}" — check your TextureStoreData.items keys.`);
+    ? new Error(`TextureStore: no resource with id ${describeValue(id)} — its item ${refusal.phrase}`, {cause: refusal.error})
+    : new Error(`TextureStore: no resource with id ${describeValue(id)} — check your TextureStoreData.items keys.`);
 
 // one message for every promise that is cut short, naming the class and the state
 const disposedError = (what: string): Error => new Error(`TextureStore: ${what} was cancelled: this store has been disposed`);
 
 // one message for a promise whose resource was disposed directly while it waited on it
 const resourceDisposedError = (what: string, id: string): Error =>
-  new Error(`TextureStore: ${what} was cancelled: the resource "${id}" has been disposed`);
+  new Error(`TextureStore: ${what} was cancelled: the resource ${describeValue(id)} has been disposed`);
 
 const hrefOf = (url: string | URL): string => (typeof url === 'string' ? url : url.href);
 
@@ -214,14 +214,16 @@ const hrefOf = (url: string | URL): string => (typeof url === 'string' ? url : u
 // that is at fault — an item without a source has no url of its own —, or the url of the catalog
 // for what belongs to it as a whole
 const loadFailedError = (source: string, what: string | URL | undefined, cause: unknown): Error =>
-  new Error(`TextureStore: load failed at the ${source} step${what != null ? `: "${hrefOf(what)}"` : ''}`, {cause});
+  new Error(`TextureStore: load failed at the ${source} step${what != null ? `: ${describeValue(hrefOf(what))}` : ''}`, {cause});
 
 // one message for a getAsync() whose resource reported a failure that keeps a value it asks for
 // from arriving, naming the step that failed and the url it failed on, if there is one
 const resourceFailedError = (what: string, failure: TextureResourceLoadFailure): Error => {
   const {source, error} = failure;
   const url = 'url' in failure ? failure.url : undefined;
-  return new Error(`TextureStore: ${what} failed at the ${source} step${url != null ? `: "${url}"` : ''}`, {cause: error});
+  return new Error(`TextureStore: ${what} failed at the ${source} step${url != null ? `: ${describeValue(url)}` : ''}`, {
+    cause: error,
+  });
 };
 
 const articleOf = (type: string): string => (/^[aeiou]/.test(type) ? 'an' : 'a');
@@ -234,14 +236,14 @@ const outOfReachError = (what: string, resource: TextureResource, subTypes: read
   const byType = resource[subTypesOutOfReach](subTypes, 'type');
   if (byType.length) {
     return new Error(
-      `TextureStore: ${what} cannot resolve: "${id}" is ${articleOf(type)} "${type}" resource, which never builds ${byType.join(', ')}`,
+      `TextureStore: ${what} cannot resolve: ${describeValue(id)} is ${articleOf(type)} ${describeValue(type)} resource, which never builds ${byType.join(', ')}`,
     );
   }
   if (type === 'tileset') {
-    return new Error(`TextureStore: ${what} cannot resolve: "${id}" carries no frameBasedAnimations data`);
+    return new Error(`TextureStore: ${what} cannot resolve: ${describeValue(id)} carries no frameBasedAnimations data`);
   }
   return new Error(
-    `TextureStore: ${what} cannot resolve: "${id}" carries no frameBasedAnimations data, and its atlas adapter read none out of its json`,
+    `TextureStore: ${what} cannot resolve: ${describeValue(id)} carries no frameBasedAnimations data, and its atlas adapter read none out of its json`,
   );
 };
 
@@ -583,13 +585,13 @@ export class TextureStore {
     }
     if (typeof adapter !== 'function') {
       throw new TypeError(
-        `TextureStore: registerAtlasAdapter() got an adapter for "${name}" that is no function — an adapter is (json, parentCoords) => {atlas, animations?}`,
+        `TextureStore: registerAtlasAdapter() got an adapter for ${describeValue(name)} that is no function — an adapter is (json, parentCoords) => {atlas, animations?}`,
       );
     }
     const app: unknown = options?.app;
     if (app !== undefined && !(app instanceof RegExp)) {
       throw new TypeError(
-        `TextureStore: registerAtlasAdapter() got an app for "${name}" that is no RegExp — app is matched against meta.app of the json, as /aseprite/i`,
+        `TextureStore: registerAtlasAdapter() got an app for ${describeValue(name)} that is no RegExp — app is matched against meta.app of the json, as /aseprite/i`,
       );
     }
     if (this.#disposed) return;
@@ -1015,7 +1017,9 @@ export class TextureStore {
       if ('refused' in checked) continue;
       const existing = this.#resources.get(id);
       if (existing && existing.type !== checked.type) {
-        conflicts.push(`"${id}" is ${articleOf(existing.type)} "${existing.type}" resource and cannot become "${checked.type}"`);
+        conflicts.push(
+          `${describeValue(id)} is ${articleOf(existing.type)} ${describeValue(existing.type)} resource and cannot become ${describeValue(checked.type)}`,
+        );
       }
     }
 
@@ -1046,11 +1050,11 @@ export class TextureStore {
       item.atlasAdapter !== undefined &&
       !this.#atlasAdapters.some(({name}) => name === item.atlasAdapter)
     ) {
-      const known = this.#atlasAdapters.map(({name}) => name).join(', ');
+      const known = this.#atlasAdapters.map(({name}) => describeValue(name)).join(', ');
       return {
         refused: refusalOf(
           id,
-          `names the atlasAdapter "${item.atlasAdapter}", which this store does not know — known: ${known}; register it with registerAtlasAdapter() before parse()`,
+          `names the atlasAdapter ${describeValue(item.atlasAdapter)}, which this store does not know — known: ${known}; register it with registerAtlasAdapter() before parse()`,
         ),
       };
     }
@@ -1061,7 +1065,7 @@ export class TextureStore {
     if (leftOut.length) {
       notes.push(
         new Error(
-          `TextureStore: item "${id}" builds ${articleOf(type)} "${type}" resource, which reads no ${leftOut.join(', ')} — left out`,
+          `TextureStore: item ${describeValue(id)} builds ${articleOf(type)} ${describeValue(type)} resource, which reads no ${leftOut.join(', ')} — left out`,
         ),
       );
     }
@@ -1071,7 +1075,7 @@ export class TextureStore {
     if (type === 'tileset' && !item.imageUrl) {
       notes.push(
         new Error(
-          `TextureStore: item "${id}" builds a "tileset" resource without an imageUrl — it loads no image, and a getAsync() of its texture or tile set waits until an imageUrl is written to the resource`,
+          `TextureStore: item ${describeValue(id)} builds a "tileset" resource without an imageUrl — it loads no image, and a getAsync() of its texture or tile set waits until an imageUrl is written to the resource`,
         ),
       );
     }
@@ -1082,7 +1086,7 @@ export class TextureStore {
       if (unknown.length) {
         notes.push(
           new Error(
-            `TextureStore: item "${id}" names ${listCatalogValues(unknown)} in texture, which no TextureFactory knows — left out`,
+            `TextureStore: item ${describeValue(id)} names ${listCatalogValues(unknown)} in texture, which no TextureFactory knows — left out`,
           ),
         );
       }
@@ -1129,7 +1133,7 @@ export class TextureStore {
     try {
       batch(() => {
         for (const [id, item] of Object.entries(data.items)) {
-          const checked = expectDefined(items.get(id), `the checked item "${id}"`);
+          const checked = expectDefined(items.get(id), `the checked item ${describeValue(id)}`);
           const existing = this.#resources.get(id);
 
           // the fields of a refused item are never read: `tileSet: 5` would pass for a tile set.
@@ -1365,7 +1369,7 @@ export class TextureStore {
       if (never.length) {
         // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
-          `TextureStore: on(${describeValue(id)}, ${describeValue(type)}) is never called for "${id}": it is ${articleOf(resource.type)} "${resource.type}" resource, which never builds ${never.join(', ')}`,
+          `TextureStore: on(${describeValue(id)}, ${describeValue(type)}) is never called for ${describeValue(id)}: it is ${articleOf(resource.type)} ${describeValue(resource.type)} resource, which never builds ${never.join(', ')}`,
         );
       }
     }

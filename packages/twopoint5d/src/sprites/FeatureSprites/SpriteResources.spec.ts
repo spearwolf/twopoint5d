@@ -74,16 +74,16 @@ describe('SpriteResources', () => {
 
   test('refuses an unknown uniform or texture name, naming the declared ones', () => {
     expect(() => new SpriteResources([anim], {uniforms: {tme: 0}})).toThrow(
-      'SpriteResources: no feature declares the uniform "tme"; declared: time, light',
+      'SpriteResources: no feature declares the uniform "tme"; declared: "time", "light"',
     );
     expect(() => new SpriteResources([color], {textures: {colormap: new Texture()}})).toThrow(
-      'SpriteResources: no feature declares the texture "colormap"; declared: colorMap',
+      'SpriteResources: no feature declares the texture "colormap"; declared: "colorMap"',
     );
     const resources = new SpriteResources([anim, color]);
     expect(() => resources.setTexture('colormap', new Texture())).toThrow(
-      'no feature declares the texture "colormap"; declared: animsMap, colorMap',
+      'no feature declares the texture "colormap"; declared: "animsMap", "colorMap"',
     );
-    expect(() => resources.setUniform('tme', 1)).toThrow('no feature declares the uniform "tme"; declared: time, light');
+    expect(() => resources.setUniform('tme', 1)).toThrow('no feature declares the uniform "tme"; declared: "time", "light"');
     expect(() => resources.uniform('tme', 'feature "x"')).toThrow(
       'feature "x" reads the uniform "tme", which no feature of these sprites declares',
     );
@@ -210,7 +210,7 @@ describe('SpriteResources', () => {
     const effects = getEffectsCount();
 
     expect(() => new SpriteResources([anim, color], {textures: {colormap: new Texture()}})).toThrow(
-      'SpriteResources: no feature declares the texture "colormap"; declared: animsMap, colorMap',
+      'SpriteResources: no feature declares the texture "colormap"; declared: "animsMap", "colorMap"',
     );
 
     expect(getSignalsCount()).toBe(signals);
@@ -341,11 +341,11 @@ describe('SpriteResources', () => {
       resources.dispose();
 
       expect(() => resources.setTexture('colormap', new Texture())).toThrow(
-        'no feature declares the texture "colormap"; declared: animsMap, colorMap',
+        'no feature declares the texture "colormap"; declared: "animsMap", "colorMap"',
       );
       expect(() => resources.touchTexture('colormap')).toThrow('no feature declares the texture "colormap"');
       expect(() => resources.getTexture('colormap')).toThrow('no feature declares the texture "colormap"');
-      expect(() => resources.setUniform('tme', 1)).toThrow('no feature declares the uniform "tme"; declared: time, light');
+      expect(() => resources.setUniform('tme', 1)).toThrow('no feature declares the uniform "tme"; declared: "time", "light"');
     });
 
     test('is safe to call twice', () => {

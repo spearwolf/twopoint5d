@@ -78,7 +78,7 @@ function descriptionOf(
   for (const name of [...(attributeUsage.dynamic ?? []), ...(attributeUsage.stream ?? []), ...(attributeUsage.static ?? [])]) {
     if (!known.includes(name)) {
       throw new Error(
-        `${WHERE}: attributeUsage names "${name}", which is neither an attribute nor a usage word of the sprite kind; it knows ${known.join(', ')}`,
+        `${WHERE}: attributeUsage names ${describeValue(name)}, which is neither an attribute nor a usage word of the sprite kind; it knows ${known.map(describeValue).join(', ')}`,
       );
     }
   }

@@ -1843,6 +1843,15 @@ describe('StageRenderer', () => {
       expect([b.width, b.height]).toEqual([10, 10]);
     });
 
+    it('escapes a quote in the name of a stage it cannot take', () => {
+      const a = new StageRenderer();
+      a.name = 'a"b';
+      const b = new StageRenderer();
+      a.add(b);
+
+      expect(() => b.add(a)).toThrow('StageRenderer#add() cannot take the stage "a\\"b": that stage holds this renderer');
+    });
+
     it('add() and parent refuse a renderer that holds it two levels up', () => {
       const host = makeHost();
       const a = new StageRenderer(host);

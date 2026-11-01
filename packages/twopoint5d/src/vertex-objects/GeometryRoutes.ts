@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {AttributeRoute} from './GeometryAttributeSlots.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 import type {VertexObjectPool} from './VertexObjectPool.js';
@@ -127,7 +128,7 @@ export class GeometryRoutes {
    */
   attach(route: GeometryRoute & {name: string; group: 'instanced'}): void {
     if (this.#attached.has(route.name)) {
-      throw new Error(`GeometryRoutes#attach(): the name "${route.name}" already has a route — detach it first`);
+      throw new Error(`GeometryRoutes#attach(): the name ${describeValue(route.name)} already has a route — detach it first`);
     }
 
     // no attribute of this route has reached the gpu yet, and a static buffer uploads only when

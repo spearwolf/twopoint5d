@@ -164,7 +164,7 @@ describe('VertexObjectPool#sortBy()', () => {
         );
       }
       expect(() => pool.sortBy('depth' as VOSortKeyName<Thing>)).toThrow(
-        /name one of x, y, z, rotation, r, g, b, layer, h0, h1, weight, or hand in a key function/,
+        /name one of "x", "y", "z", "rotation", "r", "g", "b", "layer", "h0", "h1", "weight", or hand in a key function/,
       );
       // nothing moved
       expect(idsInSlotOrder(pool)).toEqual([0, 1]);
@@ -177,7 +177,7 @@ describe('VertexObjectPool#sortBy()', () => {
       pool.createVO();
       pool.createVO();
       expect(() => pool.sortBy('nope')).toThrow(
-        /name one of c00, c01, c02, c03, c10, c11, c12, c13, c20, c21, c22, c23, …, or hand in/,
+        /name one of "c00", "c01", "c02", "c03", "c10", "c11", "c12", "c13", "c20", "c21", "c22", "c23", …, or hand in/,
       );
       pool.dispose();
     });

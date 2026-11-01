@@ -31,7 +31,7 @@ const REFUSED: readonly (readonly [feature: string, exported: string])[] = [
 function checkSegmentKind(kind: SpriteKindShape): void {
   const held = REFUSED.filter(([name]) => kind.features.some((feature) => feature.name === name));
   if (held.length > 0) {
-    const names = held.map(([name]) => `"${name}"`).join(' and ');
+    const names = held.map(([name]) => describeValue(name)).join(' and ');
     const exports = held.map(([, exported]) => exported).join(' and ');
     throw new Error(
       `a segment lies along its ends, so it cannot follow the local ${held.length > 1 ? 'stages' : 'stage'} of ${names} — move the ends instead, and take ${exports} out of the kind`,

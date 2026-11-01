@@ -187,7 +187,7 @@ export const NineSlice = defineFeature<NineSliceApi>({
   checkKind: (kind) => {
     if (kind.base !== gridBase({columns: 3, rows: 3})) {
       throw new Error(
-        `needs the base gridBase({columns: 3, rows: 3}), not "${kind.base.name}" — build the kind on it: defineSprite({base: gridBase({columns: 3, rows: 3}), features})`,
+        `needs the base gridBase({columns: 3, rows: 3}), not ${describeValue(kind.base.name)} — build the kind on it: defineSprite({base: gridBase({columns: 3, rows: 3}), features})`,
       );
     }
     if (!kind.features.some(({textures}) => textures != null && Object.hasOwn(textures, 'colorMap'))) {

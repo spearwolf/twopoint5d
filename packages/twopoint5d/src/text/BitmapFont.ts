@@ -231,7 +231,7 @@ export class BitmapFont {
     }
     if (pageCount > 1) {
       throw new Error(
-        `${WHERE}: the font "${face}" has ${pageCount} pages — writeText() draws out of one texture; export the font onto one page (BMFont: a larger texture)`,
+        `${WHERE}: the font ${describeValue(face)} has ${pageCount} pages — writeText() draws out of one texture; export the font onto one page (BMFont: a larger texture)`,
       );
     }
 

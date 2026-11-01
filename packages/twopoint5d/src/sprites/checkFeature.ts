@@ -32,13 +32,13 @@ export function checkFeature(feature: unknown, where: string): asserts feature i
   if (attributes != null) {
     if (!isRecord(attributes)) {
       throw new TypeError(
-        `${where}: the attributes of feature "${name}" are no record of attribute descriptions, got ${describeValue(attributes)}`,
+        `${where}: the attributes of feature ${describeValue(name)} are no record of attribute descriptions, got ${describeValue(attributes)}`,
       );
     }
     for (const [key, value] of Object.entries(attributes)) {
       if (!isRecord(value)) {
         throw new TypeError(
-          `${where}: the attribute "${key}" of feature "${name}" is no attribute description, got ${describeValue(value)}`,
+          `${where}: the attribute ${describeValue(key)} of feature ${describeValue(name)} is no attribute description, got ${describeValue(value)}`,
         );
       }
     }
@@ -46,59 +46,65 @@ export function checkFeature(feature: unknown, where: string): asserts feature i
   if (usageAliases != null) {
     if (!isRecord(usageAliases)) {
       throw new TypeError(
-        `${where}: the usageAliases of feature "${name}" are no record of attribute name lists, got ${describeValue(usageAliases)}`,
+        `${where}: the usageAliases of feature ${describeValue(name)} are no record of attribute name lists, got ${describeValue(usageAliases)}`,
       );
     }
     for (const [word, value] of Object.entries(usageAliases)) {
       if (!isStringList(value)) {
         throw new TypeError(
-          `${where}: the usage alias "${word}" of feature "${name}" is no list of attribute names, got ${describeValue(value)}`,
+          `${where}: the usage alias ${describeValue(word)} of feature ${describeValue(name)} is no list of attribute names, got ${describeValue(value)}`,
         );
       }
     }
   }
   if (methods != null) {
     if (!isRecord(methods)) {
-      throw new TypeError(`${where}: the methods of feature "${name}" are no record of functions, got ${describeValue(methods)}`);
+      throw new TypeError(
+        `${where}: the methods of feature ${describeValue(name)} are no record of functions, got ${describeValue(methods)}`,
+      );
     }
     for (const [key, value] of Object.entries(methods)) {
       if (typeof value !== 'function') {
-        throw new TypeError(`${where}: the method "${key}" of feature "${name}" is no function, got ${describeValue(value)}`);
+        throw new TypeError(
+          `${where}: the method ${describeValue(key)} of feature ${describeValue(name)} is no function, got ${describeValue(value)}`,
+        );
       }
     }
   }
   if (initialize != null && typeof initialize !== 'function') {
-    throw new TypeError(`${where}: the initialize of feature "${name}" is no function, got ${describeValue(initialize)}`);
+    throw new TypeError(
+      `${where}: the initialize of feature ${describeValue(name)} is no function, got ${describeValue(initialize)}`,
+    );
   }
   // the declarations in it are checked by collectSpriteDeclarations(), against those of the other features
   if (uniforms != null && !isRecord(uniforms)) {
     throw new TypeError(
-      `${where}: the uniforms of feature "${name}" are no record of uniform declarations, got ${describeValue(uniforms)}`,
+      `${where}: the uniforms of feature ${describeValue(name)} are no record of uniform declarations, got ${describeValue(uniforms)}`,
     );
   }
   if (textures != null) {
     if (!isRecord(textures)) {
       throw new TypeError(
-        `${where}: the textures of feature "${name}" are no record of texture declarations, got ${describeValue(textures)}`,
+        `${where}: the textures of feature ${describeValue(name)} are no record of texture declarations, got ${describeValue(textures)}`,
       );
     }
     for (const [key, value] of Object.entries(textures)) {
       if (!isRecord(value) || (value['needsImage'] !== undefined && typeof value['needsImage'] !== 'boolean')) {
         throw new TypeError(
-          `${where}: the texture "${key}" of feature "${name}" is declared with ${describeValue(value)}; a texture takes {} or {needsImage: true}`,
+          `${where}: the texture ${describeValue(key)} of feature ${describeValue(name)} is declared with ${describeValue(value)}; a texture takes {} or {needsImage: true}`,
         );
       }
     }
   }
   if (nearestTextures != null && !isStringList(nearestTextures)) {
     throw new TypeError(
-      `${where}: the nearestTextures of feature "${name}" is no list of texture names, got ${describeValue(nearestTextures)}`,
+      `${where}: the nearestTextures of feature ${describeValue(name)} is no list of texture names, got ${describeValue(nearestTextures)}`,
     );
   }
   for (const slot of FUNCTION_SLOTS) {
     const value = feature[slot];
     if (value != null && typeof value !== 'function') {
-      throw new TypeError(`${where}: the ${slot} of feature "${name}" is no function, got ${describeValue(value)}`);
+      throw new TypeError(`${where}: the ${slot} of feature ${describeValue(name)} is no function, got ${describeValue(value)}`);
     }
   }
   for (const slot of STAGE_SLOTS) {
@@ -106,29 +112,31 @@ export function checkFeature(feature: unknown, where: string): asserts feature i
     if (stage == null) continue;
     if (!isRecord(stage)) {
       throw new TypeError(
-        `${where}: the ${slot} stage of feature "${name}" is no {order, transform}, got ${describeValue(stage)}`,
+        `${where}: the ${slot} stage of feature ${describeValue(name)} is no {order, transform}, got ${describeValue(stage)}`,
       );
     }
     if (!Number.isFinite(stage['order'])) {
       throw new TypeError(
-        `${where}: the ${slot} stage of feature "${name}" needs a finite order, got ${describeValue(stage['order'])}`,
+        `${where}: the ${slot} stage of feature ${describeValue(name)} needs a finite order, got ${describeValue(stage['order'])}`,
       );
     }
     if (typeof stage['transform'] !== 'function') {
       throw new TypeError(
-        `${where}: the ${slot} stage of feature "${name}" needs a transform function, got ${describeValue(stage['transform'])}`,
+        `${where}: the ${slot} stage of feature ${describeValue(name)} needs a transform function, got ${describeValue(stage['transform'])}`,
       );
     }
   }
   if (requires != null) {
     if (!isStringList(requires)) {
       throw new TypeError(
-        `${where}: the requires of feature "${name}" is no list of feature names, got ${describeValue(requires)}`,
+        `${where}: the requires of feature ${describeValue(name)} is no list of feature names, got ${describeValue(requires)}`,
       );
     }
-    if (requires.includes(name)) throw new TypeError(`${where}: feature "${name}" requires itself`);
+    if (requires.includes(name)) throw new TypeError(`${where}: feature ${describeValue(name)} requires itself`);
   }
   if (checkKind != null && typeof checkKind !== 'function') {
-    throw new TypeError(`${where}: the checkKind of feature "${name}" is no function, got ${describeValue(checkKind)}`);
+    throw new TypeError(
+      `${where}: the checkKind of feature ${describeValue(name)} is no function, got ${describeValue(checkKind)}`,
+    );
   }
 }

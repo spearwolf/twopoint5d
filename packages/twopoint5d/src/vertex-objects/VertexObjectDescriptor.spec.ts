@@ -316,6 +316,12 @@ describe('VertexObjectDescriptor', () => {
       );
     });
 
+    test('escapes a line break in the name of an attribute without a size', () => {
+      expect(build({attributes: {'p\nos': {type: 'float32'} as VertexAttributeDescription}})).toThrow(
+        'VertexObjectDescriptor: attribute "p\\nos" declares neither a size nor components',
+      );
+    });
+
     test('a method named like a generated accessor', () => {
       expect(build({attributes: {pos}, methods: {setPos() {}}})).toThrow(
         'VertexObjectDescriptor: the vertex object property "setPos" comes from both attribute "pos" and methods',

@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {emitStrict, type EventizedObject, eventize, isEventized, off, on} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
 import {
@@ -334,7 +335,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     if (parent?.isDisposed === true) {
       throw new Error(
         parent instanceof StageRenderer
-          ? `StageRenderer#parent cannot take the renderer "${parent.name}": that renderer has been disposed`
+          ? `StageRenderer#parent cannot take the renderer ${describeValue(parent.name)}: that renderer has been disposed`
           : 'StageRenderer#parent cannot take the host: that host has been disposed',
       );
     }
@@ -936,7 +937,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #refuseStageWithoutPassNode(refusal: string): void {
     const bare = this.#stages.find((item) => !hasAsPassNode(item.stage));
-    if (bare) throw new TypeError(`${refusal}: the stage "${bare.stage.name}" ${NO_PASS_NODE}`);
+    if (bare) throw new TypeError(`${refusal}: the stage ${describeValue(bare.stage.name)} ${NO_PASS_NODE}`);
   }
 
   /**
@@ -995,7 +996,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         this.#warnedAboutPipelineChild = true;
         // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
-          `StageRenderer "${this.name}" has no pipeline and draws the renderer "${child.name}", which runs a pipeline of its own, into one target with other stages: the quad of that pipeline covers every pixel of the target without blending, and what the stages before it drew there is lost. Give the outer renderer the pipeline — a RootRenderPipeline composes every child —, or give "${child.name}" an outputRenderTarget of its own.`,
+          `StageRenderer ${describeValue(this.name)} has no pipeline and draws the renderer ${describeValue(child.name)}, which runs a pipeline of its own, into one target with other stages: the quad of that pipeline covers every pixel of the target without blending, and what the stages before it drew there is lost. Give the outer renderer the pipeline — a RootRenderPipeline composes every child —, or give ${describeValue(child.name)} an outputRenderTarget of its own.`,
         );
         return;
       }
@@ -1257,7 +1258,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #getStagePass(stageItem: StageItem, renderer: WebGPURenderer): Node {
     const stage = stageItem.stage;
     if (!hasAsPassNode(stage)) {
-      throw new TypeError(`StageRenderer#renderTo() cannot compose the stage "${stage.name}": that stage ${NO_PASS_NODE}`);
+      throw new TypeError(
+        `StageRenderer#renderTo() cannot compose the stage ${describeValue(stage.name)}: that stage ${NO_PASS_NODE}`,
+      );
     }
     return stage.asPassNode(renderer);
   }
@@ -1505,7 +1508,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     // a disposed stage never announces its end again: listed, it would stay in here for good
     if ((stage as {isDisposed?: unknown}).isDisposed === true) {
-      throw new Error(`StageRenderer#add() cannot take the stage "${stage.name}": that stage has been disposed`);
+      throw new Error(`StageRenderer#add() cannot take the stage ${describeValue(stage.name)}: that stage has been disposed`);
     }
 
     // a renderer that is this one, or holds it further up, would draw itself without end: every
@@ -1515,8 +1518,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         if (holder === stage) {
           throw new Error(
             holder === this
-              ? `StageRenderer#add() cannot take the stage "${stage.name}": that stage is this renderer`
-              : `StageRenderer#add() cannot take the stage "${stage.name}": that stage holds this renderer`,
+              ? `StageRenderer#add() cannot take the stage ${describeValue(stage.name)}: that stage is this renderer`
+              : `StageRenderer#add() cannot take the stage ${describeValue(stage.name)}: that stage holds this renderer`,
           );
         }
       }
@@ -1525,7 +1528,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // every stage of a composing renderer hands in its pass node: refused here, the stage would
     // make every frame throw from the rebuild of the output node
     if (this.#renderMode() === 'composed' && !hasAsPassNode(stage)) {
-      throw new TypeError(`StageRenderer#add() cannot take the stage "${stage.name}": that stage ${NO_PASS_NODE}`);
+      throw new TypeError(`StageRenderer#add() cannot take the stage ${describeValue(stage.name)}: that stage ${NO_PASS_NODE}`);
     }
 
     const item: StageItemRecord = {stage, width: 0, height: 0, pixelRatio: 1};

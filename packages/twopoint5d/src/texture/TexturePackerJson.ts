@@ -126,7 +126,7 @@ export class TexturePackerJson {
         throw new TypeError(
           isArray
             ? `TexturePackerJson: the frame ${index} of the "JSON Array" frames is ${describeValue(frameData)} — a frame of the json is an object`
-            : `TexturePackerJson: the frame "${name as string}" is ${describeValue(frameData)} — a frame of the json is an object`,
+            : `TexturePackerJson: the frame ${describeValue(name)} is ${describeValue(frameData)} — a frame of the json is an object`,
         );
       }
       // only a frame of the "JSON Array" format can miss its name: a key of the "JSON Hash" format is a string
@@ -136,22 +136,22 @@ export class TexturePackerJson {
         );
       }
       if (names.has(name)) {
-        throw new Error(`TexturePackerJson: the frame name "${name}" appears more than once in the json`);
+        throw new Error(`TexturePackerJson: the frame name ${describeValue(name)} appears more than once in the json`);
       }
       if (target.frameId(name) !== undefined) {
-        throw new Error(`TexturePackerJson: the frame name "${name}" is already taken in the target atlas`);
+        throw new Error(`TexturePackerJson: the frame name ${describeValue(name)} is already taken in the target atlas`);
       }
       names.add(name);
 
       const {frame} = frameData;
       if (!isObject(frame)) {
         throw new TypeError(
-          `TexturePackerJson: the frame "${name}" has a frame of ${describeValue(frame)} — its area in the image is an object {x, y, w, h}`,
+          `TexturePackerJson: the frame ${describeValue(name)} has a frame of ${describeValue(frame)} — its area in the image is an object {x, y, w, h}`,
         );
       }
       for (const key of FRAME_KEYS) {
         // 0 is taken: a packer may write an area of 0 for a sprite that is transparent all over
-        assertFiniteAtLeast(frame[key], 'TexturePackerJson', `the ${key} of the frame "${name}"`, 0);
+        assertFiniteAtLeast(frame[key], 'TexturePackerJson', `the ${key} of the frame ${describeValue(name)}`, 0);
       }
       // what the add() below reads of a frame is checked now
       checked.push([name, frameData as D]);

@@ -114,7 +114,7 @@ describe('FeatureSpritesGeometry', () => {
 
   test('refuses an attributeUsage word that is neither an attribute nor a usage word of the kind', () => {
     expect(() => new FeatureSpritesGeometry(kind, {capacity: 1, attributeUsage: {dynamic: ['positon']}})).toThrow(
-      'FeatureSpritesGeometry: attributeUsage names "positon", which is neither an attribute nor a usage word of the sprite kind; it knows instancePosition, quadSize, rotation, texCoords, texFlipDiagonal, texTrim, color, position, size',
+      'FeatureSpritesGeometry: attributeUsage names "positon", which is neither an attribute nor a usage word of the sprite kind; it knows "instancePosition", "quadSize", "rotation", "texCoords", "texFlipDiagonal", "texTrim", "color", "position", "size"',
     );
   });
 

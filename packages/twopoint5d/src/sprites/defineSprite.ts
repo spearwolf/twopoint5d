@@ -89,16 +89,16 @@ function assertSpriteBase(base: SpriteBase): void {
   const {attributes, basePrototype} = base.description;
   if (sizeOf(attributes['position']) !== 3) {
     throw new TypeError(
-      `${WHERE}: the base "${base.name}" needs a position attribute of 3 values — the vertex in the local quad space`,
+      `${WHERE}: the base ${describeValue(base.name)} needs a position attribute of 3 values — the vertex in the local quad space`,
     );
   }
   if (sizeOf(attributes['uv']) !== 2) {
     throw new TypeError(
-      `${WHERE}: the base "${base.name}" needs a uv attribute of 2 values — where the vertex lies on the untrimmed sprite`,
+      `${WHERE}: the base ${describeValue(base.name)} needs a uv attribute of 2 values — where the vertex lies on the untrimmed sprite`,
     );
   }
   if (typeof (basePrototype as {make?: unknown} | null | undefined)?.make !== 'function') {
-    throw new TypeError(`${WHERE}: the base "${base.name}" needs a make() on the basePrototype of its description`);
+    throw new TypeError(`${WHERE}: the base ${describeValue(base.name)} needs a make() on the basePrototype of its description`);
   }
 }
 
@@ -109,8 +109,8 @@ function assertFeatureNames(base: SpriteBase, features: readonly SpriteFeature[]
     if (first != null) {
       // the forms of one factory — wave() — share a name: the check of the first may say what to do
       // about a second, before the refusal that only names the name
-      runCheckKind(first, {base, features}, `${WHERE}: feature "${feature.name}"`);
-      throw new Error(`${WHERE}: two features are named "${feature.name}"`);
+      runCheckKind(first, {base, features}, `${WHERE}: feature ${describeValue(feature.name)}`);
+      throw new Error(`${WHERE}: two features are named ${describeValue(feature.name)}`);
     }
     names.set(feature.name, feature);
   }
@@ -118,7 +118,7 @@ function assertFeatureNames(base: SpriteBase, features: readonly SpriteFeature[]
     for (const required of feature.requires ?? []) {
       if (!names.has(required)) {
         throw new Error(
-          `${WHERE}: feature "${feature.name}" requires feature "${required}", which this sprite kind does not hold`,
+          `${WHERE}: feature ${describeValue(feature.name)} requires feature ${describeValue(required)}, which this sprite kind does not hold`,
         );
       }
     }
@@ -135,12 +135,14 @@ function mergeAttributes(features: readonly SpriteFeature[], base: SpriteBase) {
     for (const name of Object.keys(own)) {
       if (name in base.description.attributes) {
         throw new Error(
-          `${WHERE}: feature "${feature.name}" declares the attribute "${name}", which the base "${base.name}" holds already`,
+          `${WHERE}: feature ${describeValue(feature.name)} declares the attribute ${describeValue(name)}, which the base ${describeValue(base.name)} holds already`,
         );
       }
       const owner = attributeOwners.get(name);
       if (owner != null)
-        throw new Error(`${WHERE}: features "${owner}" and "${feature.name}" both declare the attribute "${name}"`);
+        throw new Error(
+          `${WHERE}: features ${describeValue(owner)} and ${describeValue(feature.name)} both declare the attribute ${describeValue(name)}`,
+        );
       attributeOwners.set(name, feature.name);
     }
 
@@ -149,9 +151,13 @@ function mergeAttributes(features: readonly SpriteFeature[], base: SpriteBase) {
     for (const {name} of vertexObjectPropertyNames(descriptors, 1, feature.methods)) {
       const owner = propertyOwners.get(name);
       if (owner === feature.name)
-        throw new Error(`${WHERE}: feature "${feature.name}" gives the sprite the property "${name}" twice`);
+        throw new Error(
+          `${WHERE}: feature ${describeValue(feature.name)} gives the sprite the property ${describeValue(name)} twice`,
+        );
       if (owner != null)
-        throw new Error(`${WHERE}: features "${owner}" and "${feature.name}" both give the sprite the property "${name}"`);
+        throw new Error(
+          `${WHERE}: features ${describeValue(owner)} and ${describeValue(feature.name)} both give the sprite the property ${describeValue(name)}`,
+        );
       propertyOwners.set(name, feature.name);
     }
 
@@ -177,15 +183,19 @@ function mergeUsageAliases(features: readonly SpriteFeature[], attributeOwners: 
       const attributeOwner = attributeOwners.get(word);
       if (attributeOwner != null && attributeOwner !== feature.name && !declaresWord(attributeOwner, word)) {
         throw new Error(
-          `${WHERE}: feature "${feature.name}" declares the usage alias "${word}", which is an attribute of feature "${attributeOwner}"`,
+          `${WHERE}: feature ${describeValue(feature.name)} declares the usage alias ${describeValue(word)}, which is an attribute of feature ${describeValue(attributeOwner)}`,
         );
       }
       const owner = owners.get(word);
       if (owner != null && attributeOwner == null)
-        throw new Error(`${WHERE}: features "${owner}" and "${feature.name}" both declare the usage alias "${word}"`);
+        throw new Error(
+          `${WHERE}: features ${describeValue(owner)} and ${describeValue(feature.name)} both declare the usage alias ${describeValue(word)}`,
+        );
       for (const target of targets) {
         if (feature.attributes?.[target] == null) {
-          throw new Error(`${WHERE}: feature "${feature.name}" aliases "${word}" to "${target}", which it does not declare`);
+          throw new Error(
+            `${WHERE}: feature ${describeValue(feature.name)} aliases ${describeValue(word)} to ${describeValue(target)}, which it does not declare`,
+          );
         }
       }
       owners.set(word, feature.name);
@@ -219,7 +229,7 @@ function checkLayout(
     try {
       new VertexObjectDescriptor({attributes: feature.attributes});
     } catch (error) {
-      throw new Error(`${WHERE}: feature "${feature.name}": ${(error as Error).message}`, {cause: error});
+      throw new Error(`${WHERE}: feature ${describeValue(feature.name)}: ${(error as Error).message}`, {cause: error});
     }
   }
   try {
@@ -229,8 +239,8 @@ function checkLayout(
   } catch (error) {
     const message = (error as Error).message;
     const involved = [...attributeOwners]
-      .filter(([attribute]) => message.includes(`"${attribute}"`))
-      .map(([attribute, feature]) => `attribute "${attribute}" of feature "${feature}"`)
+      .filter(([attribute]) => message.includes(describeValue(attribute)))
+      .map(([attribute, feature]) => `attribute ${describeValue(attribute)} of feature ${describeValue(feature)}`)
       .join(', ');
     throw new Error(`${WHERE}: the features do not fit into one sprite — ${involved}: ${message}`, {cause: error});
   }
@@ -276,7 +286,7 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
   }
   if (pipeline.placement.textures != null) {
     throw new Error(
-      `${WHERE}: feature "${pipeline.placement.name}" contributes the placement and declares textures; the placement runs always and cannot wait for a texture`,
+      `${WHERE}: feature ${describeValue(pipeline.placement.name)} contributes the placement and declares textures; the placement runs always and cannot wait for a texture`,
     );
   }
 
@@ -293,7 +303,7 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
   );
   checkLayout(description, features, attributeOwners);
 
-  for (const feature of features) runCheckKind(feature, {base, features}, `${WHERE}: feature "${feature.name}"`);
+  for (const feature of features) runCheckKind(feature, {base, features}, `${WHERE}: feature ${describeValue(feature.name)}`);
 
   const kind = Object.freeze({base, features, description, usageAliases, pipeline});
   spriteKinds.add(kind);

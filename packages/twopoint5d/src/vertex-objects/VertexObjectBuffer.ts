@@ -449,7 +449,7 @@ export class VertexObjectBuffer {
         throw other.#released
           ? releasedSourceError('copy()')
           : new Error(
-              `VertexObjectBuffer#copy() finds no buffer named "${buf.bufferName}" in the source: ` +
+              `VertexObjectBuffer#copy() finds no buffer named ${describeValue(buf.bufferName)} in the source: ` +
                 'both buffers have to be built from the same vertex object description',
             );
       }
@@ -458,13 +458,13 @@ export class VertexObjectBuffer {
       // source counts its elements by another one — which no length can tell apart
       if (source.itemSize !== buf.itemSize) {
         throw new RangeError(
-          `VertexObjectBuffer#copy(): buffer "${buf.bufferName}" takes ${source.itemSize} elements per vertex in the ` +
+          `VertexObjectBuffer#copy(): buffer ${describeValue(buf.bufferName)} takes ${source.itemSize} elements per vertex in the ` +
             `source and ${buf.itemSize} here: both buffers have to be built from the same vertex object description`,
         );
       }
       if (source.dataType !== buf.dataType) {
         throw new TypeError(
-          `VertexObjectBuffer#copy(): buffer "${buf.bufferName}" is of data type ${source.dataType} in the source and ` +
+          `VertexObjectBuffer#copy(): buffer ${describeValue(buf.bufferName)} is of data type ${source.dataType} in the source and ` +
             `${buf.dataType} here: both buffers have to be built from the same vertex object description`,
         );
       }
@@ -474,7 +474,7 @@ export class VertexObjectBuffer {
       const targetLength = buf.typedArray!.length;
       if (offset + sourceLength > targetLength) {
         throw new RangeError(
-          `VertexObjectBuffer#copy(): buffer "${buf.bufferName}" takes ${sourceLength} elements at offset ${offset}, ` +
+          `VertexObjectBuffer#copy(): buffer ${describeValue(buf.bufferName)} takes ${sourceLength} elements at offset ${offset}, ` +
             `which does not fit its ${targetLength}`,
         );
       }
@@ -516,7 +516,7 @@ export class VertexObjectBuffer {
       // should not be sent looking for a dispose() that never happened
       throw this.#released
         ? releasedError('copyArray()')
-        : new Error(`VertexObjectBuffer#copyArray() does not know a buffer named "${bufferName}"`);
+        : new Error(`VertexObjectBuffer#copyArray() does not know a buffer named ${describeValue(bufferName)}`);
     }
     // as many objects as the source fills, rounded up: a source that ends inside an object still
     // wrote into that object
@@ -524,7 +524,7 @@ export class VertexObjectBuffer {
     assertWholeNumber(targetObjectOffset, 'VertexObjectBuffer#copyArray()', 'targetObjectOffset', 0);
     if (targetObjectOffset + objCount > this.capacity) {
       throw new RangeError(
-        `VertexObjectBuffer#copyArray(): buffer "${bufferName}" takes ${objCount} objects at offset ${targetObjectOffset}, which does not fit a buffer of ${this.capacity}`,
+        `VertexObjectBuffer#copyArray(): buffer ${describeValue(bufferName)} takes ${objCount} objects at offset ${targetObjectOffset}, which does not fit a buffer of ${this.capacity}`,
       );
     }
 

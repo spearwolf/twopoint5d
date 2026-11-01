@@ -422,7 +422,7 @@ describe('AsepriteJson', () => {
       const data = sheet(2, {frameTags: [{name: 'idle', from: 0, to: 1, direction: 'forward'}]});
 
       expect(() => AsepriteJson.parse(data, {playback: {kick: 'once'}})).toThrow(
-        'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: idle',
+        'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: "idle"',
       );
     });
 
@@ -581,6 +581,12 @@ describe('AsepriteJson', () => {
         expect(() =>
           AsepriteJson.parse(slicesOf(slice({}, {bounds: {x: -3, y: -3, w: 0, h: 0}, pivot: {x: -9, y: 99}}))),
         ).not.toThrow();
+      });
+
+      test('escapes a quote in the name two slices share', () => {
+        expect(() => AsepriteJson.parse(slicesOf(slice({name: 'a"b'}), slice({name: 'a"b'})))).toThrow(
+          'two slices are named "a\\"b" — rename one of them in Aseprite',
+        );
       });
 
       test.each([

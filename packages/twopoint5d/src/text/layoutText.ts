@@ -107,7 +107,7 @@ const resolveOptions = (where: string, font: BitmapFont, options: TextLayoutOpti
     }
     fallback = font.glyph(char);
     if (fallback === undefined) {
-      throw new Error(`${where}: the fallback ${describeValue(char)} is no glyph of the font "${font.face}"`);
+      throw new Error(`${where}: the fallback ${describeValue(char)} is no glyph of the font ${describeValue(font.face)}`);
     }
   }
   return {

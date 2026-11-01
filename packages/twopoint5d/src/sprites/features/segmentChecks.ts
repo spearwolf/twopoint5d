@@ -1,3 +1,4 @@
+import {describeValue} from '../../utils/describeValue.js';
 import type {SpriteKindShape} from '../SpriteFeature.js';
 
 // the names segmentPlacement() gives its forms: `segmentPlacement`, `segmentPlacement+xz`,
@@ -23,6 +24,6 @@ export function refuseNineSliceOnSegments(kind: SpriteKindShape): void {
   const segment = kind.features.find(isSegmentPlacement);
   if (segment == null) return;
   throw new Error(
-    `"${NINE_SLICE}" sets its border in the local quad, and a segment of "${segment.name}" holds only its caps there — the border would land inside the segment. For a bar with fixed ends, lay a nine-slice panel with FlatPlacement, turn it with Rotation and stretch it with setSize(length, thickness), or draw the ends as sprites of their own at the ends of the segment`,
+    `${describeValue(NINE_SLICE)} sets its border in the local quad, and a segment of ${describeValue(segment.name)} holds only its caps there — the border would land inside the segment. For a bar with fixed ends, lay a nine-slice panel with FlatPlacement, turn it with Rotation and stretch it with setSize(length, thickness), or draw the ends as sprites of their own at the ends of the segment`,
   );
 }

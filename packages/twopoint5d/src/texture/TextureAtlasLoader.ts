@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {FileLoader} from 'three/webgpu';
 import {isAtlasJsonResponse} from './isAtlasJsonResponse.js';
 import {resolveRelativeUrl} from './resolveRelativeUrl.js';
@@ -82,7 +83,7 @@ export class TextureAtlasLoader {
         const jsonUrl = (this.fileLoader.path ?? '') + url;
 
         if (!isAtlasJsonResponse(jsonData)) {
-          onErrorCallback?.(new Error(`TextureAtlasLoader: the response of "${jsonUrl}" is no texture atlas json`));
+          onErrorCallback?.(new Error(`TextureAtlasLoader: the response of ${describeValue(jsonUrl)} is no texture atlas json`));
           return;
         }
 
@@ -91,7 +92,9 @@ export class TextureAtlasLoader {
           (typeof jsonData.meta.image === 'string' ? resolveRelativeUrl(jsonData.meta.image, jsonUrl) : undefined);
         if (typeof imageUrl !== 'string') {
           onErrorCallback?.(
-            new Error(`TextureAtlasLoader: the response of "${jsonUrl}" names no image and no overrideImageUrl was given`),
+            new Error(
+              `TextureAtlasLoader: the response of ${describeValue(jsonUrl)} names no image and no overrideImageUrl was given`,
+            ),
           );
           return;
         }

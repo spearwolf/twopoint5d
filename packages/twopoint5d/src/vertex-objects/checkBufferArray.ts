@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import {typedArrayOf} from './createTypedArray.js';
 import type {VertexAttributeDataType} from './types.js';
 
@@ -31,13 +32,15 @@ export function checkBufferArray(
   // built by a constructor of its own and would fail an instanceof against this one
   const actual = describeArray(array);
   if (actual !== expected) {
-    throw new TypeError(`${owner}: buffer "${bufferName}" holds ${dataType} data and takes a ${expected}, got ${actual}`);
+    throw new TypeError(
+      `${owner}: buffer ${describeValue(bufferName)} holds ${dataType} data and takes a ${expected}, got ${actual}`,
+    );
   }
 
   const {length} = array as ArrayLike<number>;
   if (lengthRule === 'exact' ? length !== layoutLength : length > layoutLength) {
     throw new RangeError(
-      `${owner}: buffer "${bufferName}" takes ${lengthRule === 'exact' ? 'exactly' : 'at most'} ${layoutLength} elements (capacity × vertexCount × itemSize), got ${length}`,
+      `${owner}: buffer ${describeValue(bufferName)} takes ${lengthRule === 'exact' ? 'exactly' : 'at most'} ${layoutLength} elements (capacity × vertexCount × itemSize), got ${length}`,
     );
   }
 }

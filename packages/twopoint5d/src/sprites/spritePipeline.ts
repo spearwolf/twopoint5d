@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {SpriteFeature} from './SpriteFeature.js';
 
 /**
@@ -28,7 +29,7 @@ type OrderedSlot = 'frameStage' | 'uv' | 'local' | 'mesh' | 'color';
 const single = (features: readonly SpriteFeature[], slot: SingleSlot, where: string): SpriteFeature | undefined => {
   const holders = features.filter((feature) => feature[slot] != null);
   if (holders.length > 1) {
-    const names = holders.map((feature) => `"${feature.name}"`).join(' and ');
+    const names = holders.map((feature) => describeValue(feature.name)).join(' and ');
     throw new Error(`${where}: features ${names} each contribute a ${slot} stage; a sprite takes at most one`);
   }
   return holders[0];

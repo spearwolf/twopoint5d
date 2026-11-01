@@ -75,7 +75,7 @@ The two types go into `types.ts`, which the module exports as `export type *`.
   vertex; `x0` … `z3` on four). Anything else — a getter or a method of the `basePrototype` or of
   `methods`, a `set…`/`get…` method, an unknown name — is refused:
 
-  > ``VertexObjectPool#sortBy(): "depth" is no value property of the vertex objects of this pool — name one of x, y, z, rotation, or hand in a key function (vo) => number``
+  > ``VertexObjectPool#sortBy(): "depth" is no value property of the vertex objects of this pool — name one of "x", "y", "z", "rotation", or hand in a key function (vo) => number``
 
   (the list is the value properties of the description, in its order, at most 12, then `…`).
 - **A key function** is called once per slot in use, in slot order, before anything moves. A slot

@@ -3513,7 +3513,7 @@ describe('TextureResource', () => {
       expect(errors.map(({source, error}) => [source, error.message])).toEqual([
         [
           'texture',
-          'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: blink',
+          'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: "blink"',
         ],
       ]);
       resource.dispose();

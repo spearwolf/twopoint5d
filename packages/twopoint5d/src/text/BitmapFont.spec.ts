@@ -434,6 +434,16 @@ describe('BitmapFont', () => {
       );
     });
 
+    test('escapes a quote in the face of a font of more than one page', () => {
+      const data = tinyFont();
+      data.info = {face: 'ti"ny', size: 4};
+      data.pages.push('tiny_1.png');
+
+      expect(() => new BitmapFont(data)).toThrow(
+        'BitmapFont: the font "ti\\"ny" has 2 pages — writeText() draws out of one texture; export the font onto one page (BMFont: a larger texture)',
+      );
+    });
+
     test.each([
       [
         'an id that is no whole number',

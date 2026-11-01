@@ -1265,6 +1265,15 @@ describe('TextureStore', () => {
       expect(() => lease.release()).not.toThrow();
     });
 
+    test('escapes a quote in the id of a resource it does not hold', async () => {
+      const store = new TextureStore();
+      store.parse({items: {a: {imageUrl: 'a.png'}}});
+
+      await expect(store.getAsync('mis"sing', 'texture')).rejects.toThrow(
+        'TextureStore: no resource with id "mis\\"sing" — check your TextureStoreData.items keys.',
+      );
+    });
+
     test('acquireAsync() rejects as getAsync() does, its messages naming acquireAsync()', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(() => new Promise<HTMLImageElement>(() => {}));
       const store = new TextureStore();
@@ -4122,7 +4131,7 @@ describe('TextureStore', () => {
         [
           'parse',
           'fighter',
-          'TextureStore: item "fighter" names the atlasAdapter "asprite", which this store does not know — known: texturepacker, aseprite; register it with registerAtlasAdapter() before parse()',
+          'TextureStore: item "fighter" names the atlasAdapter "asprite", which this store does not know — known: "texturepacker", "aseprite"; register it with registerAtlasAdapter() before parse()',
         ],
       ]);
       store.dispose();
@@ -4223,7 +4232,7 @@ describe('TextureStore', () => {
       expect(failures.map(({source, error}) => [source, error.message])).toEqual([
         [
           'texture',
-          'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: blink',
+          'AsepriteJson: parse() got a playback for the tag "kick", which the sheet does not carry — its tags are: "blink"',
         ],
       ]);
       expect(resource.atlas).toBeUndefined();

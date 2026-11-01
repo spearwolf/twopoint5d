@@ -82,7 +82,7 @@ export class FeatureSpritesPass<Api extends object = object> extends Mesh {
     this.name = `twopoint5d.FeatureSprites.${pass.name}`;
     this.frustumCulled = false;
     this.renderOrder = pass.renderOrder ?? 0;
-    const where = `FeatureSprites: the visible of pass "${pass.name}"`;
+    const where = `FeatureSprites: the visible of pass ${describeValue(pass.name)}`;
     this.#where = where;
     this.#uniform = (name) => material.resources.uniform(resolvedUniformName(pass, name), where);
   }
@@ -209,7 +209,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
     if (material.kind !== kind) throw new TypeError(`${WHERE}: the material handed in was built for another sprite kind`);
     if (material.pass != null) {
       throw new TypeError(
-        `${WHERE}: the material handed in was built for pass "${material.pass.name}" — hand in a material built without a pass, or leave out the material and give the sprites the pass in passes`,
+        `${WHERE}: the material handed in was built for pass ${describeValue(material.pass.name)} — hand in a material built without a pass, or leave out the material and give the sprites the pass in passes`,
       );
     }
     const given = definedKeys(materialParameters);
@@ -225,7 +225,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
   const passNames = new Set<string>();
   for (const pass of passes) {
     checkPass(pass, WHERE);
-    if (passNames.has(pass.name)) throw new TypeError(`${WHERE}: two passes are named "${pass.name}"`);
+    if (passNames.has(pass.name)) throw new TypeError(`${WHERE}: two passes are named ${describeValue(pass.name)}`);
     passNames.add(pass.name);
     passFeatures(kind, pass, WHERE);
     // the sprites may start with another placement than the one of the kind, and every pass draws next to it
@@ -460,7 +460,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
       this.#notedGrowth = true;
       // biome-ignore lint/suspicious/noConsole: the note to the developer is the point
       console.info(
-        `FeatureSprites "${this.name}": the pool was full at ${capacity} sprites and grew to ${larger} — a frame hitch: a new geometry, every sprite copied over and every attribute uploaded anew. Where this many sprites are the rule, start with new FeatureSprites(kind, {capacity: ${larger}, grow: true}). This note is shown once per FeatureSprites.`,
+        `FeatureSprites ${describeValue(this.name)}: the pool was full at ${capacity} sprites and grew to ${larger} — a frame hitch: a new geometry, every sprite copied over and every attribute uploaded anew. Where this many sprites are the rule, start with new FeatureSprites(kind, {capacity: ${larger}, grow: true}). This note is shown once per FeatureSprites.`,
       );
     }
     return grown;
@@ -477,7 +477,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
         : `Build the FeatureSpritesGeometry in the geometry slot with a larger capacity — new FeatureSpritesGeometry(kind, {capacity: ${larger}})`;
     // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
-      `FeatureSprites "${this.name}": the pool is full — all ${capacity} sprites are in use, so createSprite() answers undefined. ${fix} — or free the sprites no longer drawn with freeSprite(). This warning is shown once per FeatureSprites.`,
+      `FeatureSprites ${describeValue(this.name)}: the pool is full — all ${capacity} sprites are in use, so createSprite() answers undefined. ${fix} — or free the sprites no longer drawn with freeSprite(). This warning is shown once per FeatureSprites.`,
     );
   }
 
@@ -631,7 +631,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
   bindUniform(name: string, source: SpriteUniformSource): void {
     if (source == null || typeof source.write !== 'function' || (source.type !== 'vec3' && source.type !== 'vec4')) {
       throw new TypeError(
-        `${WHERE}: bindUniform("${name}") takes a source with a type of vec3 or vec4 and a write(), got ${describeValue(source)}`,
+        `${WHERE}: bindUniform(${describeValue(name)}) takes a source with a type of vec3 or vec4 and a write(), got ${describeValue(source)}`,
       );
     }
     const material = this.#material;
@@ -640,7 +640,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     // an own entry only: a name such as "constructor" is no uniform
     const node = Object.hasOwn(material.uniforms, name) ? material.uniforms[name] : undefined;
     if (node == null) {
-      throw new TypeError(`${WHERE}: no feature of these sprites or their passes declares the uniform "${name}"`);
+      throw new TypeError(`${WHERE}: no feature of these sprites or their passes declares the uniform ${describeValue(name)}`);
     }
     const {value} = node;
     let binding: UniformBinding;
@@ -648,7 +648,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
     else if (source.type === 'vec4' && value instanceof Vector4) binding = {type: 'vec4', name, source, vector: value};
     else
       throw new TypeError(
-        `${WHERE}: the uniform "${name}" is a ${typeOfUniform(node)}, and the source bound to it writes a ${source.type}`,
+        `${WHERE}: the uniform ${describeValue(name)} is a ${typeOfUniform(node)}, and the source bound to it writes a ${source.type}`,
       );
     const at = this.#bindings.findIndex((bound) => bound.name === name);
     if (at === -1) this.#bindings.push(binding);
@@ -710,7 +710,7 @@ export class FeatureSprites<Api extends object = object> extends VertexObjects<F
           if (binding.type === 'vec3') binding.source.write(binding.vector, worldToSprites);
           else binding.source.write(binding.vector, worldToSprites);
         } catch (error) {
-          (errors ??= []).push(callerError(`${WHERE}: the source bound to the uniform "${binding.name}"`, error));
+          (errors ??= []).push(callerError(`${WHERE}: the source bound to the uniform ${describeValue(binding.name)}`, error));
         }
       }
     }

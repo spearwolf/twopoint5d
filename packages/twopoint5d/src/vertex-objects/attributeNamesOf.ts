@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {VOBufferPool} from './VOBufferPool.js';
 import {expectDefined} from '../utils/expectDefined.js';
 
@@ -14,12 +15,12 @@ export function attributeNamesOf(pool: VOBufferPool): string[] {
     // buffer name that has a buffer has its attributes, and an attribute name has its descriptor
     const attributes = expectDefined(
       pool.buffer.bufferNameAttributes.get(buffer.bufferName),
-      `the attributes of buffer "${buffer.bufferName}"`,
+      `the attributes of buffer ${describeValue(buffer.bufferName)}`,
     );
     for (const bufAttr of attributes) {
       const attrDesc = expectDefined(
         pool.descriptor.attributes.get(bufAttr.attributeName),
-        `the descriptor of attribute "${bufAttr.attributeName}"`,
+        `the descriptor of attribute ${describeValue(bufAttr.attributeName)}`,
       );
       attrNames.push(attrDesc.name);
     }

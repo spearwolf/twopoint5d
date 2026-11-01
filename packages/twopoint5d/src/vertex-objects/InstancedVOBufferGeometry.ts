@@ -1,3 +1,4 @@
+import {describeValue} from '../utils/describeValue.js';
 import type {BufferAttribute, InterleavedBufferAttribute} from 'three/webgpu';
 import {BufferGeometry, InstancedBufferGeometry} from 'three/webgpu';
 import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
@@ -283,7 +284,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
   ): VertexObjectPool<VOType> {
     if (this.#disposed) {
       throw new Error(
-        `InstancedVOBufferGeometry#attachInstancedPool("${name}") is not available: this geometry has been disposed`,
+        `InstancedVOBufferGeometry#attachInstancedPool(${describeValue(name)}) is not available: this geometry has been disposed`,
       );
     }
 
@@ -310,7 +311,7 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     // and the route would come up empty
     if (extraPool.isDisposed) {
       throw new Error(
-        `InstancedVOBufferGeometry#attachInstancedPool("${name}"): this pool has been disposed and holds no ` +
+        `InstancedVOBufferGeometry#attachInstancedPool(${describeValue(name)}): this pool has been disposed and holds no ` +
           'buffers to build attributes on. Attach a live pool, or leave the name free.',
       );
     }
@@ -321,11 +322,11 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
     // refused instead of leaking it
     const taken = this.#slots.everHeld(attributeNamesOf(extraPool));
     if (taken.length > 0) {
-      const slots = taken.map((attrName) => `"${attrName}"`).join(', ');
+      const slots = taken.map(describeValue).join(', ');
       // the pool was built for this call alone, and a refused call leaves nothing behind
       if (ownsPool) extraPool.dispose();
       throw new Error(
-        `InstancedVOBufferGeometry#attachInstancedPool("${name}"): this geometry has already had an attribute in the slot ${slots}. ` +
+        `InstancedVOBufferGeometry#attachInstancedPool(${describeValue(name)}): this geometry has already had an attribute in the slot ${slots}. ` +
           'An attribute slot belongs to one route for the life of the geometry — give this pool attribute names of its own, ' +
           'or build a new geometry.',
       );

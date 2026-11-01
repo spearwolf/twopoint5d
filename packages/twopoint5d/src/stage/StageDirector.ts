@@ -237,7 +237,7 @@ function masksOf(subject: string, effect: StageTransitionEffect): readonly Stage
   if (masks === undefined) return NO_MASKS;
   if (!Array.isArray(masks) || !masks.every((mask) => mask instanceof StageMask)) {
     throw new TypeError(
-      `${subject}: the masks of the effect "${effect.name}" must be an array of StageMask, got ${describeValue(masks)}`,
+      `${subject}: the masks of the effect ${describeValue(effect.name)} must be an array of StageMask, got ${describeValue(masks)}`,
     );
   }
   return masks.length === 0 ? NO_MASKS : Object.freeze([...(masks as StageMask[])]);
@@ -394,7 +394,7 @@ function parsePrecompileOptions(
     }
     if (stage === director) throw new Error(`${subject}: layers[${i}] is this director`);
     if ((stage as {isDisposed?: unknown}).isDisposed === true) {
-      throw new Error(`${subject}: layers[${i}] "${(stage as IStage).name}" has been disposed`);
+      throw new Error(`${subject}: layers[${i}] ${describeValue((stage as IStage).name)} has been disposed`);
     }
   });
   if (nested !== undefined && typeof nested !== 'boolean') {
@@ -685,7 +685,7 @@ export class StageDirector extends StageRenderer {
     masksOf(subject, options.effect);
     if (this.#ignoresChanges()) return this.#cancelledHandle(undefined, stage);
     if (this.#slotWithEnd(stage))
-      throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
+      throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage is in the stack already`);
     this.#refuseMaskStageAsLayer(subject, stage);
     const mask = this.#checkMask(subject, opts?.mask, stage);
     const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => t.from === stage || t.to === stage);
@@ -741,7 +741,7 @@ export class StageDirector extends StageRenderer {
       // a listener of an end that disposed the director leaves nothing to change: no layer joins
       if (!this.#ignoresChanges()) {
         if (this.#slotWithEnd(stage)) {
-          throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
+          throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage is in the stack already`);
         }
         this.#refuseDrivenMasks(subject, effectMasks);
         // only now: a run that ended with nothing has taken its slot out, and `at` counts the stack
@@ -793,7 +793,7 @@ export class StageDirector extends StageRenderer {
    */
   #hide(subject: string, stage: IStage, options: ParsedOptions, runBelow: boolean): StageTransition {
     const slot = this.#slotWithEnd(stage);
-    if (!slot) throw new Error(`${subject} cannot hide the stage "${stage.name}": that stage is not in the stack`);
+    if (!slot) throw new Error(`${subject} cannot hide the stage ${describeValue(stage.name)}: that stage is not in the stack`);
     const running = slot.run?.transition;
     const effectMasks = this.#checkEffectMasks(subject, options, undefined, (t) => t === running);
     this.#checkScales(subject, effectMasks);
@@ -806,7 +806,9 @@ export class StageDirector extends StageRenderer {
       // a listener of the end that disposed the director leaves nothing to change
       ignored = this.#ignoresChanges();
       if (!ignored && (!this.#slots.includes(slot) || slot.layer?.stage !== stage)) {
-        throw new Error(`${subject} cannot hide the stage "${stage.name}": a listener of OnStageTransitionEnd changed its slot`);
+        throw new Error(
+          `${subject} cannot hide the stage ${describeValue(stage.name)}: a listener of OnStageTransitionEnd changed its slot`,
+        );
       }
       if (!ignored) this.#refuseDrivenMasks(subject, effectMasks);
     } catch (error) {
@@ -847,9 +849,9 @@ export class StageDirector extends StageRenderer {
     masksOf(subject, options.effect);
     if (this.#ignoresChanges()) return this.#cancelledHandle(from, to);
     const slot = this.#slotWithEnd(from);
-    if (!slot) throw new Error(`${subject} cannot replace the stage "${from.name}": that stage is not in the stack`);
+    if (!slot) throw new Error(`${subject} cannot replace the stage ${describeValue(from.name)}: that stage is not in the stack`);
     if (from === to || this.#slotWithEnd(to)) {
-      throw new Error(`${subject} cannot take the stage "${to.name}": that stage is in the stack already`);
+      throw new Error(`${subject} cannot take the stage ${describeValue(to.name)}: that stage is in the stack already`);
     }
     this.#refuseMaskStageAsLayer(subject, to);
     // a mask is busy only after the runs this call ends anyway: the run of the slot and those with `to`
@@ -868,11 +870,11 @@ export class StageDirector extends StageRenderer {
       if (!this.#ignoresChanges()) {
         if (!this.#slots.includes(slot) || slot.layer?.stage !== from) {
           throw new Error(
-            `${subject} cannot replace the stage "${from.name}": a listener of OnStageTransitionEnd changed its slot`,
+            `${subject} cannot replace the stage ${describeValue(from.name)}: a listener of OnStageTransitionEnd changed its slot`,
           );
         }
         if (this.#slotWithEnd(to)) {
-          throw new Error(`${subject} cannot take the stage "${to.name}": that stage is in the stack already`);
+          throw new Error(`${subject} cannot take the stage ${describeValue(to.name)}: that stage is in the stack already`);
         }
         this.#refuseDrivenMasks(subject, effectMasks);
         toLayer = this.#join(subject, to, errors);
@@ -912,7 +914,7 @@ export class StageDirector extends StageRenderer {
     masksOf(subject, options.effect);
     if (this.#ignoresChanges()) return this.#cancelledHandle(undefined, stage);
     if (this.#slotWithEnd(stage))
-      throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is in the stack already`);
+      throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage is in the stack already`);
     this.#refuseMaskStageAsLayer(subject, stage);
     const mask = this.#checkMask(subject, opts?.mask, stage);
     this.#slotIndexAt(subject, opts?.at);
@@ -1031,7 +1033,7 @@ export class StageDirector extends StageRenderer {
     if (!Array.isArray(stages)) throw new TypeError(`${subject}: the stages must be an array, got ${describeValue(stages)}`);
     const seen = new Set<IStage>();
     for (const stage of stages) {
-      if (seen.has(stage)) throw new Error(`${subject} cannot take the stage "${stage.name}" twice`);
+      if (seen.has(stage)) throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)} twice`);
       this.#refuseStage(subject, stage);
       seen.add(stage);
     }
@@ -1115,7 +1117,7 @@ export class StageDirector extends StageRenderer {
     maskOption(subject, mask);
     if (this.#ignoresChanges()) return this;
     const slot = this.#slotWithEnd(stage);
-    if (!slot) throw new Error(`${subject} cannot mask the stage "${stage.name}": that stage is not in the stack`);
+    if (!slot) throw new Error(`${subject} cannot mask the stage ${describeValue(stage.name)}: that stage is not in the stack`);
     this.#checkMask(subject, mask);
     this.#checkScales(subject, [mask]);
     const errors: unknown[] = [];
@@ -1160,7 +1162,9 @@ export class StageDirector extends StageRenderer {
     if (this.isDisposed) return this;
     const layer = this.#layers.get(stage);
     if (!layer) {
-      throw new Error(`${subject} cannot find the stage "${stage.name}": that stage is no layer or mask of this director`);
+      throw new Error(
+        `${subject} cannot find the stage ${describeValue(stage.name)}: that stage is no layer or mask of this director`,
+      );
     }
     layer.frozen = frozen;
     // a state set by hand is the caller's: the director lifts no freeze of its own over it — neither
@@ -1545,7 +1549,7 @@ export class StageDirector extends StageRenderer {
     const owner = maskOwners.get(stage);
     if (owner === undefined) return;
     throw new Error(
-      `${subject} cannot take the stage "${stage.name}": that stage is a mask of ${owner === this ? 'this' : 'another'} director`,
+      `${subject} cannot take the stage ${describeValue(stage.name)}: that stage is a mask of ${owner === this ? 'this' : 'another'} director`,
     );
   }
 
@@ -1556,11 +1560,11 @@ export class StageDirector extends StageRenderer {
   #refuseStage(subject: string, stage: IStage): void {
     // a value that is no object gets as far as the check of renderTo(), which names it
     if ((stage as {isDisposed?: unknown} | undefined)?.isDisposed === true) {
-      throw new Error(`${subject} cannot take the stage "${stage.name}": that stage has been disposed`);
+      throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage has been disposed`);
     }
     if (stage instanceof ClearStage) {
       throw new TypeError(
-        `${subject} cannot take the stage "${stage.name}": a ClearStage clears nothing between layers, each of which draws into a target of its own`,
+        `${subject} cannot take the stage ${describeValue(stage.name)}: a ClearStage clears nothing between layers, each of which draws into a target of its own`,
       );
     }
     if (typeof (stage as Partial<IRenderable> | undefined)?.renderTo !== 'function') {
@@ -1569,7 +1573,7 @@ export class StageDirector extends StageRenderer {
       );
     }
     const hold = this.#holdRefusal(stage);
-    if (hold) throw new Error(`${subject} cannot take the stage "${stage.name}": ${hold}`);
+    if (hold) throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: ${hold}`);
   }
 
   /**
@@ -1579,7 +1583,7 @@ export class StageDirector extends StageRenderer {
   #refuseDrivenMasks(subject: string, masks: readonly StageMask[]): void {
     for (const mask of masks) {
       if (StageMaskInternals.drivenBy(mask) !== undefined) {
-        throw new Error(`${subject}: the mask "${mask.stage.name}" drives a transition already`);
+        throw new Error(`${subject}: the mask ${describeValue(mask.stage.name)} drives a transition already`);
       }
     }
   }
@@ -1603,7 +1607,7 @@ export class StageDirector extends StageRenderer {
       throw new TypeError(`${subject}: mask must be a StageMask, got ${describeValue(mask)}`);
     }
     const stage = mask.stage;
-    const refusal = (reason: string) => new Error(`${subject} cannot take the mask on "${stage.name}": ${reason}`);
+    const refusal = (reason: string) => new Error(`${subject} cannot take the mask on ${describeValue(stage.name)}: ${reason}`);
     if (mask.isDisposed) throw refusal('that mask has been disposed');
     if ((stage as {isDisposed?: unknown}).isDisposed === true) throw refusal('that stage has been disposed');
     const hold = this.#holdRefusal(stage);
@@ -1636,7 +1640,7 @@ export class StageDirector extends StageRenderer {
     for (const mask of masks) {
       const driver = StageMaskInternals.drivenBy(mask);
       if (driver !== undefined && !ends(driver)) {
-        throw new Error(`${subject}: the mask "${mask.stage.name}" drives a transition already`);
+        throw new Error(`${subject}: the mask ${describeValue(mask.stage.name)} drives a transition already`);
       }
     }
     return masks;
@@ -1653,7 +1657,7 @@ export class StageDirector extends StageRenderer {
       const mask = masks[i];
       if (!mask) continue;
       const refusal = (reason: string) =>
-        new Error(`${subject} cannot take the mask on "${mask.stage.name}": ${reason}, and a stage has one target`);
+        new Error(`${subject} cannot take the mask on ${describeValue(mask.stage.name)}: ${reason}, and a stage has one target`);
       const known = this.#layers.get(mask.stage);
       if (known?.role === 'mask' && known.scale !== mask.scale) {
         throw refusal(`that stage is drawn as a mask at a scale of ${known.scale} already`);
@@ -1780,11 +1784,13 @@ export class StageDirector extends StageRenderer {
     const known = this.#layers.get(stage);
     if (known) {
       if (known.role !== role) {
-        throw new Error(`${subject} cannot take the stage "${stage.name}": that stage is a ${known.role} of this director`);
+        throw new Error(
+          `${subject} cannot take the stage ${describeValue(stage.name)}: that stage is a ${known.role} of this director`,
+        );
       }
       if (known.scale !== scale) {
         throw new Error(
-          `${subject} cannot take the mask on "${stage.name}": that stage is drawn as a mask at a scale of ${known.scale} already, and a stage has one target`,
+          `${subject} cannot take the mask on ${describeValue(stage.name)}: that stage is drawn as a mask at a scale of ${known.scale} already, and a stage has one target`,
         );
       }
       return known;
@@ -2348,8 +2354,10 @@ export class StageDirector extends StageRenderer {
           mask: (mask) => {
             const position = effectMasks.indexOf(mask);
             if (position === -1 || !stages) {
-              const named = mask instanceof StageMask ? `the mask on "${mask.stage.name}"` : describeValue(mask);
-              throw new Error(`StageTransitionInput#mask(): the effect "${effect.name}" did not name ${named} in its masks`);
+              const named = mask instanceof StageMask ? `the mask on ${describeValue(mask.stage.name)}` : describeValue(mask);
+              throw new Error(
+                `StageTransitionInput#mask(): the effect ${describeValue(effect.name)} did not name ${named} in its masks`,
+              );
             }
             return maskSource(maskNodes[stages[position]!]!, mask);
           },
