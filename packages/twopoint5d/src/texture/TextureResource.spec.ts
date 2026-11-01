@@ -1589,7 +1589,7 @@ describe('TextureResource', () => {
       return {resource, errors, fetchMock, loadAsync};
     };
 
-    test('an atlasJson written from outside whose meta is no object names no image', async () => {
+    test('an atlasJson written from outside whose meta is no object names no image and is reported once', async () => {
       const {resource, errors, fetchMock} = await loadedAtlasResource();
       const texture = asStub(resource.texture)!;
 
@@ -1604,13 +1604,21 @@ describe('TextureResource', () => {
       expect(resource.frameBasedAnimations).toBeUndefined();
       expect(resource.texture).toBeUndefined();
       expect(texture.disposed).toBe(true);
-      expect(errors).toEqual([]);
+      expect(errors).toEqual([
+        {
+          source: 'texture',
+          id: 'sprites',
+          error: new TypeError(
+            'TextureResource: the atlasJson of resource "sprites" has a meta of undefined — an atlas json carries its meta as an object {image, size}',
+          ),
+        },
+      ]);
 
       resource.dispose();
       fetchMock.mockRestore();
     });
 
-    test('an atlasJson written from outside whose meta.image is no string loads no image', async () => {
+    test('an atlasJson written from outside whose meta.image is no string loads no image and is reported once', async () => {
       const {resource, errors, fetchMock, loadAsync} = await loadedAtlasResource();
 
       resource.atlasJson = {...atlasJson, meta: {...atlasJson.meta, image: 42}} as never;
@@ -1620,7 +1628,50 @@ describe('TextureResource', () => {
       expect(resource.imageUrl).toBeUndefined();
       expect(resource.atlas).toBeUndefined();
       expect(resource.texture).toBeUndefined();
+      expect(errors).toEqual([
+        {
+          source: 'texture',
+          id: 'sprites',
+          error: new TypeError(
+            'TextureResource: the atlasJson of resource "sprites" has a meta.image of 42 — an atlas json names its image by url, as a string',
+          ),
+        },
+      ]);
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('beside an overrideImageUrl, an atlasJson written from outside whose meta.image is no string builds its atlas from the image of the override and is not reported', async () => {
+      const {resource, errors, fetchMock} = await loadedAtlasResource();
+      resource.overrideImageUrl = 'hero.png';
+      await flushMicrotasks();
+
+      resource.atlasJson = {...atlasJson, meta: {...atlasJson.meta, image: 42}} as never;
+      await flushMicrotasks();
+
+      expect(resource.atlas).toBeDefined();
+      expect(asStub(resource.texture)!.tag).toBe('hero.png');
       expect(errors).toEqual([]);
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('an overrideImageUrl written after an atlasJson whose meta.image is no string builds the atlas, and the report goes out once', async () => {
+      const {resource, errors, fetchMock} = await loadedAtlasResource();
+
+      resource.atlasJson = {...atlasJson, meta: {...atlasJson.meta, image: 42}} as never;
+      await flushMicrotasks();
+      expect(errors).toHaveLength(1);
+      expect(resource.atlas).toBeUndefined();
+
+      resource.overrideImageUrl = 'hero.png';
+      await flushMicrotasks();
+
+      expect(resource.atlas).toBeDefined();
+      expect(asStub(resource.texture)!.tag).toBe('hero.png');
+      expect(errors).toHaveLength(1);
 
       resource.dispose();
       fetchMock.mockRestore();

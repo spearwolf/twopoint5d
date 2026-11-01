@@ -330,9 +330,11 @@ export class AsepriteJson {
    * Refused, with the tag named: a range outside the frames or running backwards, an unknown
    * direction, a repeat that is no whole number of 0 or more, two tags of one name, a tag that
    * plays more than `FrameBasedAnimations.MaxFramesWithDurations` frames of differing durations, a
-   * tag that plays more than `FrameBasedAnimations.MaxTextureSize` frames at all — a repeat no data
-   * texture holds —, a playback that is none of `'loop'`, `'once'` and `'pingpong'`, and a playback
-   * for a tag the sheet does not carry. Refused as well: a frame name twice in the layout "Array";
+   * tag that plays more than `FrameBasedAnimations.MaxTextureSize` frames at all — through its
+   * repeat, or over a range that long, with a playback of its own as well —, a playback that is
+   * none of `'loop'`, `'once'` and `'pingpong'`, and a playback for a tag the sheet does not carry.
+   * Either refusal of too many frames advises a lower `repeat` only where one pass of the tag fits,
+   * and a split of the tag otherwise. Refused as well: a frame name twice in the layout "Array";
    * a frame — in a tag or outside every tag — without a duration above zero, with a `RangeError`
    * naming the frame; a frame or a frame tag that is no object, and `meta.frameTags` that is no
    * list, with a `TypeError`; and what `TexturePackerJson.parse()` refuses of a frame and of
@@ -452,19 +454,20 @@ export class AsepriteJson {
           `AsepriteJson: parse() got a playback of ${describeValue(override)} for the tag ${describeValue(tag.name)} — a playback is 'loop', 'once' or 'pingpong'`,
         );
       }
-      if (override !== undefined) {
-        overrides.set(tag.name, override);
-      } else {
-        // counted, not built: framesOfTag() would otherwise lay out every frame of a repeat before
-        // anything refused it. A ping-pong pass after the first leaves out the frame it turns on
-        const n = tag.to - tag.from + 1;
-        const isPingpong = tag.direction === 'pingpong' || tag.direction === 'pingpong_reverse';
-        const count = repeat === 0 ? n : isPingpong ? n + (repeat - 1) * (n - 1) : repeat * n;
-        if (count > FrameBasedAnimations.MaxTextureSize) {
-          throw new Error(
-            `AsepriteJson: the tag ${describeValue(tag.name)} plays ${count} frames with a repeat of ${describeValue(tag.repeat)} — an animation holds at most ${FrameBasedAnimations.MaxTextureSize} frames, more fit into no data texture; lower its repeat`,
-          );
-        }
+      const n = tag.to - tag.from + 1;
+      if (override !== undefined) overrides.set(tag.name, override);
+      // counted, not built: framesOfTag() would otherwise lay out every frame of a repeat before
+      // anything refused it. A playback of its own leaves the repeat out and plays one pass; a
+      // ping-pong pass after the first leaves out the frame it turns on
+      const isPingpong = tag.direction === 'pingpong' || tag.direction === 'pingpong_reverse';
+      const count = override !== undefined || repeat === 0 ? n : isPingpong ? n + (repeat - 1) * (n - 1) : repeat * n;
+      if (count > FrameBasedAnimations.MaxTextureSize) {
+        // the advice follows the cause: a lower repeat helps only where one pass of the tag fits
+        throw new Error(
+          n <= FrameBasedAnimations.MaxTextureSize
+            ? `AsepriteJson: the tag ${describeValue(tag.name)} plays ${count} frames with a repeat of ${describeValue(tag.repeat)} — an animation holds at most ${FrameBasedAnimations.MaxTextureSize} frames, more fit into no data texture; lower its repeat`
+            : `AsepriteJson: the tag ${describeValue(tag.name)} spans ${n} frames — an animation holds at most ${FrameBasedAnimations.MaxTextureSize} frames, more fit into no data texture; split it into shorter tags`,
+        );
       }
     }
     for (const tag of frameTags) {
@@ -472,8 +475,11 @@ export class AsepriteJson {
       const durations = indices.map((index) => entries[index]![1].duration / 1000);
       const even = durations.every((duration) => duration === durations[0]);
       if (!even && indices.length > FrameBasedAnimations.MaxFramesWithDurations) {
+        const n = tag.to - tag.from + 1;
         throw new Error(
-          `AsepriteJson: the tag ${describeValue(tag.name)} plays ${indices.length} frames with their own durations — an animation with per-frame durations holds at most ${FrameBasedAnimations.MaxFramesWithDurations} frames; lower its repeat`,
+          n <= FrameBasedAnimations.MaxFramesWithDurations
+            ? `AsepriteJson: the tag ${describeValue(tag.name)} plays ${indices.length} frames with their own durations — an animation with per-frame durations holds at most ${FrameBasedAnimations.MaxFramesWithDurations} frames; lower its repeat`
+            : `AsepriteJson: the tag ${describeValue(tag.name)} spans ${n} frames with their own durations — an animation with per-frame durations holds at most ${FrameBasedAnimations.MaxFramesWithDurations} frames; give its frames one duration or split it into shorter tags`,
         );
       }
       plans.push({

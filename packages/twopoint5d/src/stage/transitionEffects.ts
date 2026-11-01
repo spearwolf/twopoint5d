@@ -500,5 +500,5 @@ export function createTransitionNode(
       throw new Error(NO_MASKS_WITHOUT_DIRECTOR);
     },
   });
-  return {node, progress: p as Node<'float'>};
+  return {node, progress: p};
 }

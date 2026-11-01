@@ -735,6 +735,9 @@ describe('VertexObjectPool', () => {
       pool.createVO()!;
       const buffersData = pool.toBuffersData({copy: true});
       const valuesBefore = [...pool.buffer.buffers.values()].map(({typedArray}) => Array.from(typedArray!));
+      // values the pool does not hold: a write before the refusal would show in its buffers
+      expect(valuesBefore.flat()).not.toContain(7);
+      for (const array of Object.values(buffersData.buffers)) array.fill(7);
 
       const write = () => pool.fromBuffersData({...buffersData, usedCount: undefined as unknown as number});
 
@@ -747,6 +750,7 @@ describe('VertexObjectPool', () => {
       const build = () => new VertexObjectPool(descriptor, {capacity: 2, buffers: {}} as unknown as VertexObjectBuffersData);
 
       expect(build).toThrow(RangeError);
+      expect(build).toThrow('VOBufferPool#usedCount must be a whole number, Infinity or -Infinity, got undefined');
     });
 
     test('usedCount clamps Infinity to the capacity and -Infinity to 0', () => {

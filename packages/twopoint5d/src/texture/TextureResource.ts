@@ -193,18 +193,20 @@ const disposeCaught = (texture: Texture | undefined): {error: unknown} | undefin
 // priority is what keeps the promise once those three lines are ever reordered.
 const DERIVED_FROM_IMAGE_PRIORITY = 100;
 
-type LoadStep = 'image' | 'atlasFetch' | 'atlasImage' | 'tileSet' | 'atlasParse';
+type LoadStep = 'image' | 'atlasFetch' | 'atlasImage' | 'tileSet' | 'atlasJson' | 'atlasParse';
 
 const ALL_SUBTYPES: readonly TextureResourceSubType[] = Object.values(TextureResourceSubtypes);
 
 // what a step that ended in a failure keeps from arriving: an image, an atlas json or a
 // texture that is not there takes everything with it, while a tile set or an atlas json
-// that is refused leaves the texture and the coordinates of the image standing
+// that is refused leaves the texture and the coordinates of the image standing — and so does
+// an atlas json that cannot be read at all, beside the image an override supplies
 const SUBTYPES_HELD_BACK_BY_STEP: Record<LoadStep, readonly TextureResourceSubType[]> = {
   image: ALL_SUBTYPES,
   atlasFetch: ALL_SUBTYPES,
   atlasImage: ALL_SUBTYPES,
   tileSet: ['tileSet', 'atlas', 'frameBasedAnimations'],
+  atlasJson: ['atlas', 'frameBasedAnimations'],
   atlasParse: ['atlas', 'frameBasedAnimations'],
 };
 
@@ -257,6 +259,30 @@ const imageNamedBy = (json: TexturePackerJsonData): string | undefined => {
   if (!isObject(meta)) return undefined;
   const image = meta['image'];
   return typeof image === 'string' ? image : undefined;
+};
+
+// What of a json written from outside cannot be read at all — it is typed, not checked. A `meta`
+// that is no object is answered whatever stands beside it; a `meta.image` that is set but is no
+// string only while no override takes its place, since beside one it is not read. A json without
+// `meta.image` names no image and is no error
+const unreadableAtlasJsonError = (
+  id: string,
+  json: TexturePackerJsonData,
+  overrideImageUrl: string | undefined,
+): TypeError | undefined => {
+  const meta: unknown = json.meta;
+  if (!isObject(meta)) {
+    return new TypeError(
+      `TextureResource: the atlasJson of resource ${describeValue(id)} has a meta of ${describeValue(meta)} — an atlas json carries its meta as an object {image, size}`,
+    );
+  }
+  const image = meta['image'];
+  if (overrideImageUrl == null && image !== undefined && typeof image !== 'string') {
+    return new TypeError(
+      `TextureResource: the atlasJson of resource ${describeValue(id)} has a meta.image of ${describeValue(image)} — an atlas json names its image by url, as a string`,
+    );
+  }
+  return undefined;
 };
 
 // a resource on its own picks among the built-in adapters by `meta.app`
@@ -349,6 +375,8 @@ export interface TextureResource extends EventizedObject {}
  * - An atlas resource whose json names no image — a `meta` that is no object or a `meta.image` that
  *   is no string names none —, with no `overrideImageUrl` to fall back on — never set, or cleared
  *   again —, has no `imageUrl` either and does the same; a json it fetched is taken back with it.
+ *   A `meta` that is no object is reported as an `error` with `source: 'texture'`, and so is a
+ *   `meta.image` that is set but is no string; a json without `meta.image` is not.
  * - An atlas resource whose `atlasUrl` is cleared takes the json fetched from it back, and with it
  *   the `imageUrl`, the `imageCoords`, the `texture` — released —, the `atlas` and the
  *   `frameBasedAnimations`, as a cleared `imageUrl` does on an image or a tile set resource; an
@@ -1404,9 +1432,11 @@ export class AtlasTextureResource extends TextureResource {
    * - A json that its atlas adapter cannot read — or an adapter that answers no `TextureAtlas`, or
    *   animations that are no `FrameBasedAnimations` — takes both back as well and is reported as an
    *   `error` with `source: 'texture'` once the image it names is there; writing it does not throw.
-   * - A json whose `meta` is no object, or whose `meta.image` is no string, names no image: without
-   *   an `overrideImageUrl` it is treated as a json that names none; beside one, a `meta` that is no
-   *   object is reported as a json its adapter cannot read.
+   * - A json whose `meta` is no object is reported as an `error` with `source: 'texture'` once it
+   *   is written, beside an `overrideImageUrl` as well, and builds no atlas. A `meta.image` that is
+   *   set but is no string is reported the same way while no `overrideImageUrl` stands beside it,
+   *   which takes its place unread. Without an `overrideImageUrl` either names no image, as a json
+   *   without `meta.image` does — which is not reported.
    * - The animations an adapter reads out of the json — the frame tags of an Aseprite json — are the
    *   `frameBasedAnimations` of the resource, and the entries of `frameBasedAnimationsData` are added
    *   to a copy of them; an entry named like one of them is skipped and reported.
@@ -1624,12 +1654,19 @@ export class AtlasTextureResource extends TextureResource {
       {attach: this},
     );
 
+    // A json that cannot be read is reported here: this effect runs once per write of the json or
+    // of the override, while the atlas effect also runs for every new image and would report the
+    // same json again
     createEffect(
       () => {
-        if (this.atlasJson) {
+        context.clearFailure('atlasJson');
+        const atlasJson = this.atlasJson;
+        if (atlasJson) {
           // straight onto the signal: on this shape of resource `imageUrl` is what the
           // json says, and has no setter
-          context.imageUrl.set(this.overrideImageUrl ?? imageNamedBy(this.atlasJson));
+          context.imageUrl.set(this.overrideImageUrl ?? imageNamedBy(atlasJson));
+          const error = unreadableAtlasJsonError(this.id, atlasJson, this.overrideImageUrl);
+          if (error) context.fail('atlasJson', {source: 'texture', id: this.id, error});
         }
       },
       [atlasJsonSignal, overrideImageUrlSignal],
@@ -1653,6 +1690,12 @@ export class AtlasTextureResource extends TextureResource {
           takeBack();
           return;
         }
+        // reported by the effect that derives `imageUrl`, once per json; an adapter would read
+        // `meta.app` of it
+        if (!isObject(atlasJson.meta)) {
+          takeBack();
+          return;
+        }
         const imageCoords = this.imageCoords;
         if (!imageCoords) {
           // without an image nothing is built from one
@@ -1669,14 +1712,6 @@ export class AtlasTextureResource extends TextureResource {
         let atlas: TextureAtlas;
         let adapterAnimations: FrameBasedAnimations | undefined;
         try {
-          // before the pick of the adapter, which reads `meta.app`: a json written from outside is
-          // typed, not checked
-          const meta: unknown = atlasJson.meta;
-          if (!isObject(meta)) {
-            throw new TypeError(
-              `TextureResource: the atlasJson of resource ${describeValue(this.id)} has a meta of ${describeValue(meta)} — an atlas json carries its meta as an object {image, size}`,
-            );
-          }
           const adapter = atlasAdapterSignal.value ?? (this[atlasAdapterPicker] ?? pickBuiltInAtlasAdapter)(atlasJson);
           const playback = playbackSignal.value;
           const result: unknown = adapter(atlasJson, imageCoords, playback === undefined ? {} : {playback});

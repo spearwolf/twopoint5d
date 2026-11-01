@@ -2707,6 +2707,42 @@ describe('TextureStore', () => {
       store.dispose();
     });
 
+    test('a getAsync() of the atlas rejects once an atlasJson whose meta.image is no string is written to its resource, and one asked after an overrideImageUrl resolves', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', {status: 404}));
+      let resolveImage!: (image: HTMLImageElement) => void;
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        () =>
+          new Promise<HTMLImageElement>((resolve) => {
+            resolveImage = resolve;
+          }),
+      );
+
+      const store = new TextureStore(makeRendererStub());
+      store.parse({defaultTextureClasses: [], items: {a: {atlasUrl: 'atlas.json'}}});
+      const resource = ofShape(await store.whenResource('a'), 'atlas');
+
+      resource.atlasJson = {
+        frames: {f0: {frame: {x: 0, y: 0, w: 10, h: 10}}},
+        meta: {image: 42, size: {w: 100, h: 50}},
+      } as never;
+      const refused = await settleWithin(store.getAsync('a', 'atlas'));
+
+      expect(messageOf(refused)).toBe('TextureStore: getAsync("a", "atlas") failed at the texture step');
+      expect(((refused as Error).cause as Error).message).toBe(
+        'TextureResource: the atlasJson of resource "a" has a meta.image of 42 — an atlas json names its image by url, as a string',
+      );
+
+      resource.overrideImageUrl = 'a.png';
+      const atlas = store.getAsync('a', 'atlas');
+      resolveImage({width: 100, height: 50} as unknown as HTMLImageElement);
+      const settled = await settleWithin(atlas);
+
+      expect(settled).toBeDefined();
+      expect(messageOf(settled)).toBe(resource.atlas);
+
+      store.dispose();
+    });
+
     test('a getAsync() after an atlasJson written over a fetch still in flight is not rejected when that fetch fails', async () => {
       // pays no heed to its signal: the 404 below reaches the resource even after an abort
       let answer!: (response: Response) => void;

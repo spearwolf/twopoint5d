@@ -380,12 +380,14 @@ they differ. Every frame carries its duration, and Aseprite writes one above 0 f
 without it, in a tag or not, is refused with a `RangeError` naming it, before the first frame goes
 into the atlas. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its
 frames played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1
-is a one-shot. A tag whose repeat plays more than `FrameBasedAnimations.MaxTextureSize` (8192)
-frames is refused, naming the tag, before the first frame goes into the atlas — more fit into no
-data texture. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code
-instead. It reads its own keys only — an inherited one such as `constructor` names no tag —, and a
-value that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the
-first frame goes into the atlas: a refused sheet leaves `options.target` as it was.
+is a one-shot. A tag that plays more than `FrameBasedAnimations.MaxTextureSize` (8192) frames —
+through its repeat, or because it spans that many itself, with a playback of its own as well — is
+refused, naming the tag, before the first frame goes into the atlas — more fit into no data
+texture. The message advises a lower repeat where one pass of the tag fits, and a split into
+shorter tags where it does not. `parse(json, {playback: {kick: 'once'}})` names the playback of a
+tag from code instead. It reads its own keys only — an inherited one such as `constructor` names no
+tag —, and a value that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag,
+before the first frame goes into the atlas: a refused sheet leaves `options.target` as it was.
 
 A json that Aseprite does not write that way — without `frames` or `meta`, a frame of the layout
 "Array" without a `filename`, a tag or a slice without a `name`, slice keys, `bounds`, `center` or

@@ -219,6 +219,35 @@ describe('DisplayFullscreen', () => {
       expect(String(warn.mock.calls[0]?.[0])).toContain('user gesture');
     });
 
+    it('a fullscreenerror the browser fires beside the refusal of a request is not heard as a second refusal: the request resolves false, emits nothing and warns once', async () => {
+      // the stub lets nothing bubble up, so the event goes to the target and to the document
+      defaultTarget.requestFullscreen.mockImplementation(() => {
+        defaultTarget.dispatch('fullscreenerror');
+        doc.dispatch('fullscreenerror');
+        return Promise.reject(new TypeError('Permissions check failed'));
+      });
+      const fs = make();
+
+      await expect(fs.request()).resolves.toBe(false);
+
+      expect(emitted).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('a fullscreenerror of another element changes nothing: no event, no warning', async () => {
+      const fs = make();
+      await fs.request();
+      const count = emitted.length;
+
+      doc.dispatch('fullscreenerror');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fs.isActive).toBe(true);
+      expect(emitted).toHaveLength(count);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
     it('a request that throws synchronously resolves false as well', async () => {
       defaultTarget.requestFullscreen.mockImplementation(() => {
         throw new TypeError('not allowed');
@@ -1283,6 +1312,38 @@ describe('DisplayFullscreen', () => {
       expect(fs.isArmed).toBe(true);
       expect(emitted.at(-1)).toMatchObject({isActive: false, isArmed: true});
     });
+
+    it.each(['grants', 'refuses'] as const)(
+      'onLandscape = true beside a request() the browser refuses arms nothing while a request() the page calls on that refusal is under way, and the answer of that request decides (the browser %s it)',
+      async (answer) => {
+        orientation.type = 'landscape-primary';
+        const first = answerLater(defaultTarget);
+        const second = answerLater(defaultTarget);
+        const fs = make();
+        let again: Promise<boolean> | undefined;
+        // attached before the setter attaches its arming: it runs first once the refusal is in
+        const requested = fs.request().then((active) => {
+          if (!active) again = fs.request();
+          return active;
+        });
+        fs.onLandscape = true;
+
+        first.refuse();
+        await expect(requested).resolves.toBe(false);
+        await flush();
+        // the deferred arming found the page's request under way and left it to its answer
+        expect(fs.isArmed).toBe(false);
+        expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+
+        if (answer === 'grants') second.grant();
+        else second.refuse();
+        await expect(again).resolves.toBe(answer === 'grants');
+        await flush();
+        expect(fs.isArmed).toBe(false);
+        expect(emitted.some((props) => props.isArmed)).toBe(false);
+      },
+    );
 
     it('onLandscape = true while an exit() is under way arms once the exit is through', async () => {
       orientation.type = 'landscape-primary';

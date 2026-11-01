@@ -358,8 +358,9 @@ export class DisplayFullscreen {
    * fullscreen, a turn asks nothing and arms nothing: a request would pull the target over it.
    *
    * Switched on while the browser is still answering a request or an exit, it arms once that answer
-   * is in — where the screen is still landscape, the target out of fullscreen and no other element
-   * in fullscreen.
+   * is in — where the screen is still landscape, the target out of fullscreen, no other element
+   * in fullscreen and no newer request or exit under way: a `request()` of the page called on that
+   * answer decides with its own, and its refusal arms nothing.
    *
    * After {@link Display.dispose} a write changes nothing; the getter answers the last value.
    */

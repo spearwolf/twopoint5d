@@ -461,6 +461,57 @@ describe('AsepriteJson', () => {
       );
     });
 
+    test.each([
+      ['without a repeat', {}, undefined],
+      ['with a repeat of 1', {repeat: '1'}, undefined],
+      ['with a repeat of 2', {repeat: '2'}, undefined],
+      ['with a playback of its own', {}, {playback: {a: 'loop' as const}}],
+    ])(
+      'refuses a tag that spans more frames than a data texture holds, whatever its repeat, and advises to split it (%s)',
+      (_, repeat, options) => {
+        const target = new TextureAtlas<never>();
+        const data = sheet(8193, {frameTags: [{name: 'a', from: 0, to: 8192, direction: 'forward', ...repeat}]});
+
+        expect(() => AsepriteJson.parse(data, {...options, target: target as never})).toThrow(
+          new Error(
+            'AsepriteJson: the tag "a" spans 8193 frames — an animation holds at most 8192 frames, more fit into no data texture; split it into shorter tags',
+          ),
+        );
+        expect(target.size).toBe(0);
+      },
+    );
+
+    test('refuses a tag that spans more frames with their own durations than an animation holds, and advises one duration or a split', () => {
+      const data = sheet(
+        8192,
+        {frameTags: [{name: 'a', from: 0, to: 8191, direction: 'forward'}]},
+        Array.from({length: 8192}, (_, i) => (i % 2 ? 100 : 50)),
+      );
+
+      expect(() => AsepriteJson.parse(data)).toThrow(
+        new Error(
+          'AsepriteJson: the tag "a" spans 8192 frames with their own durations — an animation with per-frame durations holds at most 8191 frames; give its frames one duration or split it into shorter tags',
+        ),
+      );
+    });
+
+    test('takes a repeat that plays 8191 frames with their own durations', () => {
+      // a ping-pong over three frames: 3 + 4094 · 2 = 8191
+      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'pingpong', repeat: '4095'}]}, [50, 100, 50]);
+
+      expect(AsepriteJson.parse(data)[2].animation('a').frameCount).toBe(8191);
+    });
+
+    test('refuses a repeat over 8192 frames with their own durations for the data texture first', () => {
+      const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward', repeat: '4097'}]}, [50, 100]);
+
+      expect(() => AsepriteJson.parse(data)).toThrow(
+        new Error(
+          'AsepriteJson: the tag "a" plays 8194 frames with a repeat of "4097" — an animation holds at most 8192 frames, more fit into no data texture; lower its repeat',
+        ),
+      );
+    });
+
     test('a tag refused for its repeat leaves the target atlas as it was', () => {
       const target = new TextureAtlas<never>();
       const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward', repeat: '4096'}]}, [50, 100]);
