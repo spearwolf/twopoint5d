@@ -266,6 +266,19 @@ describe('TexturePackerJson.parse()', () => {
     );
   });
 
+  test.each([
+    [undefined, 'undefined'],
+    ['x', '"x"'],
+  ])('refuses a meta that is %j, with parentCoords as well', (meta, shown) => {
+    const message = `TexturePackerJson: the json has a meta of ${shown} — a texture atlas json carries its meta as an object {image, size}`;
+    const data = {frames: {a: {frame: {x: 0, y: 0, w: 8, h: 8}}}, meta} as unknown as TexturePackerJsonData;
+    const target = new TextureAtlas();
+
+    expect(() => TexturePackerJson.parse(data, new TextureCoords(0, 0, 16, 16), target)).toThrow(new TypeError(message));
+    expect(target.size).toBe(0);
+    expect(() => TexturePackerJson.parse(data)).toThrow(new TypeError(message));
+  });
+
   test('takes a frame of no area', () => {
     const [atlas] = TexturePackerJson.parse({
       frames: {empty: {frame: {x: 4, y: 4, w: 0, h: 8}}},

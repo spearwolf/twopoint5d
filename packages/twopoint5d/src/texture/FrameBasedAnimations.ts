@@ -2,12 +2,13 @@ import type {WebGPURenderer} from 'three/webgpu';
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
+import {isObject} from '../utils/isObject.js';
 import {isAnimationPlayback} from './animationPlayback.js';
 import {writeFrameTexels} from './frameTexels.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
 import {isTextureSize, readMaxTextureSize} from './readMaxTextureSize.js';
 import {TextureAtlas, type TextureAtlasFrame} from './TextureAtlas.js';
-import type {TextureCoords} from './TextureCoords.js';
+import {TextureCoords} from './TextureCoords.js';
 import {TileSet} from './TileSet.js';
 
 /**
@@ -176,9 +177,10 @@ interface ResolvedTiming {
  * @param timing Either a duration number or AnimationTimingOptions object
  * @param frameCount Number of frames (required when using frameRate or durations)
  * @param name The name of the animation, for the error
- * @throws Error if neither duration, frameRate nor durations is provided, for timing that gives more
- *   than one of `duration`, `frameRate` and `durations`, for durations that do not give each frame a
- *   duration above zero, and for a playback that is none of the three
+ * @throws Error for timing that is neither a number nor an object, if neither duration, frameRate nor
+ *   durations is provided, for timing that gives more than one of `duration`, `frameRate` and
+ *   `durations`, for durations that do not give each frame a duration above zero, and for a playback
+ *   that is none of the three
  */
 const resolveTiming = (
   timing: number | AnimationTimingOptions,
@@ -187,6 +189,15 @@ const resolveTiming = (
 ): ResolvedTiming => {
   if (typeof timing === 'number') {
     return {duration: timing, durations: undefined, playback: 'loop'};
+  }
+
+  // a catalog is json: timing of null, a string or a list would otherwise fail below with a raw
+  // TypeError that names neither the timing nor the animation
+  const value: unknown = timing;
+  if (!isObject(value) || Array.isArray(value)) {
+    throw new Error(
+      `FrameBasedAnimations: add() got timing of ${describeValue(value)} for the animation ${animNameInError(name)} — timing is a duration in seconds or an object {duration | frameRate | durations, playback?}`,
+    );
   }
 
   // a catalog is json, so the playback is checked rather than trusted to the type; absent is
@@ -391,11 +402,12 @@ export class FrameBasedAnimations {
    * zero — zero being a still image. A set of frames that comes out empty, an atlas query that
    * matches nothing among them, and a duration that is negative, `NaN` or infinite are each
    * refused with an error naming the case, as are a `frameRate` that is not a number above zero,
-   * timing that carries neither a `duration` nor a `frameRate`, and timing that gives more than one
-   * of `duration`, `frameRate` and `durations`.
+   * timing that is neither a number nor an object, timing that carries neither a `duration` nor a
+   * `frameRate`, and timing that gives more than one of `duration`, `frameRate` and `durations`.
    *
    * What picks the frames is refused as well when it cannot pick any: a tile id that is no whole
-   * number, naming its index; a `firstTileId` that is no whole number; a `tileCount` that is no
+   * number, naming its index; a frame of a list that is no `TextureCoords`, naming its index; a
+   * `firstTileId` that is no whole number; a `tileCount` that is no
    * whole number from 1 to {@link FrameBasedAnimations.MaxTextureSize} — more frames fit into no
    * data texture; and a `frameNameQuery` that is neither a string nor a `RegExp`. Tile ids and a
    * `firstTileId` may be negative, the tile set wraps them. `firstTileId` and `tileCount` are
@@ -448,9 +460,19 @@ export class FrameBasedAnimations {
     let atlasFrames: TextureAtlasFrame<unknown>[] | undefined;
 
     if (Array.isArray(args[2])) {
+      const list = args[2];
+      // a frame that is no TextureCoords would be taken here and fail only at the bake, without the
+      // animation or the index named
+      (list as readonly unknown[]).forEach((frame, index) => {
+        if (!(frame instanceof TextureCoords)) {
+          throw new Error(
+            `FrameBasedAnimations: add() got a frame of ${describeValue(frame)} at index ${index} for the animation ${animNameInError(name)} — a frame of a list is a TextureCoords`,
+          );
+        }
+      });
       // the caller keeps its array and may change it later; the checks below and the bake see what
       // was registered, so the animation gets a copy
-      frames = args[2].slice();
+      frames = list.slice();
     } else if (args[2] instanceof TextureAtlas && Array.isArray(args[3])) {
       // a list of names picks the frames in its order, a name as often as it is named: the frames
       // of an Aseprite tag are a range of frames, not a pattern of names, and a reversed tag runs

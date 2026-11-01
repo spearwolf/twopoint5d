@@ -87,7 +87,8 @@ export interface AsepriteJsonData {
 
 /**
  * The key of a slice in force at one frame. All in pixels of the untrimmed frame (`sourceSize`),
- * counted from its top left.
+ * counted from its top left. Frozen, and a copy of the key in force: the frames a key is in force at
+ * share one object.
  */
 export interface AsepriteFrameSlice {
   /** Where the slice lies in the frame. */
@@ -174,6 +175,8 @@ const framesOfTag = (tag: AsepriteFrameTag, playbackOverride: AnimationPlayback 
 
   const repeat = repeatOf(tag);
   if (repeat === 0) return {indices: pass, playback: (isPingpong ? 'pingpong' : 'loop') as AnimationPlayback};
+  // a ping-pong pass over one frame adds nothing after the first: the frame it turns on is left out
+  if (isPingpong && pass.length === 1) return {indices: pass, playback: 'once' as AnimationPlayback};
 
   const indices: number[] = [];
   let current = pass;
@@ -266,8 +269,24 @@ const assertSlices = (slices: unknown): void => {
   }
 };
 
-// the key of every slice in force at the frame `index`: the last key at or before it
-const slicesAt = (slices: readonly AsepriteSlice[], index: number): Record<string, AsepriteFrameSlice> => {
+// the fields assertSlices() checked and nothing else of the json, copied and frozen: a frame shares no
+// object with the json handed in
+const frozenRect = ({x, y, w, h}: AsepriteRect): AsepriteRect => Object.freeze({x, y, w, h});
+
+const frozenSlice = ({bounds, center, pivot}: AsepriteSliceKey): AsepriteFrameSlice =>
+  Object.freeze({
+    bounds: frozenRect(bounds),
+    ...(center ? {center: frozenRect(center)} : {}),
+    ...(pivot ? {pivot: Object.freeze({x: pivot.x, y: pivot.y})} : {}),
+  });
+
+// the key of every slice in force at the frame `index`: the last key at or before it. `frozen` holds the copy
+// of each key made so far, so the frames a key is in force at share one object
+const slicesAt = (
+  slices: readonly AsepriteSlice[],
+  index: number,
+  frozen: Map<AsepriteSliceKey, AsepriteFrameSlice>,
+): Record<string, AsepriteFrameSlice> => {
   const inForce: Record<string, AsepriteFrameSlice> = {};
   for (const slice of slices) {
     let key: AsepriteSliceKey | undefined;
@@ -275,8 +294,12 @@ const slicesAt = (slices: readonly AsepriteSlice[], index: number): Record<strin
       if (candidate.frame <= index && (key === undefined || candidate.frame >= key.frame)) key = candidate;
     }
     if (key === undefined) continue;
-    const {bounds, center, pivot} = key;
-    inForce[slice.name] = Object.freeze({bounds, ...(center ? {center} : {}), ...(pivot ? {pivot} : {})});
+    let copy = frozen.get(key);
+    if (copy === undefined) {
+      copy = frozenSlice(key);
+      frozen.set(key, copy);
+    }
+    inForce[slice.name] = copy;
   }
   return inForce;
 };
@@ -292,7 +315,7 @@ export class AsepriteJson {
    * drawn as `TexturePackerJson` draws it. Every frame's `data` is a copy of its json entry with its
    * `index` — its position in `frames` — and the `slices` in force at it, each the last key of the
    * slice at or before the frame; a frame before the first key of a slice carries none of it. The
-   * json handed in is left as it is.
+   * json handed in is left as it is, and shares no slice with the atlas.
    *
    * The frame indices of a tag — `from`, `to` — and of a slice key are positions in `frames`, as
    * Aseprite's default export writes them, one entry per frame of the sprite: a sheet exported with
@@ -309,7 +332,8 @@ export class AsepriteJson {
    * Refused, with the tag named: a range outside the frames or running backwards, an unknown
    * direction, a repeat that is no whole number of 0 or more, two tags of one name, a tag that
    * plays more than `FrameBasedAnimations.MaxFramesWithDurations` frames of differing durations, a
-   * playback that is none of `'loop'`, `'once'` and `'pingpong'`, and a playback for a tag the
+   * tag that plays more than `FrameBasedAnimations.MaxTextureSize` frames at all — a repeat no data
+   * texture holds —, a playback that is none of `'loop'`, `'once'` and `'pingpong'`, and a playback for a tag the
    * sheet does not carry. Refused as well: a frame name twice in the layout "Array"; a frame — in a
    * tag or outside every tag — without a duration above zero, with a `RangeError` naming the frame;
    * a frame or a frame tag that is no object, and `meta.frameTags` that is no list, with a
@@ -422,14 +446,28 @@ export class AsepriteJson {
           `AsepriteJson: the tag "${tag.name}" has the direction ${describeValue(tag.direction)} — Aseprite's directions are forward, reverse, pingpong and pingpong_reverse`,
         );
       }
-      repeatOf(tag);
+      // checked for every tag, one with a playback of its own as well
+      const repeat = repeatOf(tag);
       const override = playbackOf(options, tag.name);
       if (override !== undefined && !isAnimationPlayback(override)) {
         throw new Error(
           `AsepriteJson: parse() got a playback of ${describeValue(override)} for the tag "${tag.name}" — a playback is 'loop', 'once' or 'pingpong'`,
         );
       }
-      if (override !== undefined) overrides.set(tag.name, override);
+      if (override !== undefined) {
+        overrides.set(tag.name, override);
+      } else {
+        // counted, not built: framesOfTag() would otherwise lay out every frame of a repeat before
+        // anything refused it. A ping-pong pass after the first leaves out the frame it turns on
+        const n = tag.to - tag.from + 1;
+        const isPingpong = tag.direction === 'pingpong' || tag.direction === 'pingpong_reverse';
+        const count = repeat === 0 ? n : isPingpong ? n + (repeat - 1) * (n - 1) : repeat * n;
+        if (count > FrameBasedAnimations.MaxTextureSize) {
+          throw new Error(
+            `AsepriteJson: the tag "${tag.name}" plays ${count} frames with a repeat of ${describeValue(tag.repeat)} — an animation holds at most ${FrameBasedAnimations.MaxTextureSize} frames, more fit into no data texture; lower its repeat`,
+          );
+        }
+      }
     }
     for (const tag of frameTags) {
       const {indices, playback} = framesOfTag(tag, overrides.get(tag.name));
@@ -457,8 +495,9 @@ export class AsepriteJson {
 
     // the json entries stay as they are: every frame gets a copy with its index and its slices
     const frames: Record<string, AsepriteFrameData> = {};
+    const frozenSlices = new Map<AsepriteSliceKey, AsepriteFrameSlice>();
     entries.forEach(([name, frameData], index) => {
-      frames[name] = {...frameData, index, slices: Object.freeze(slicesAt(slices as AsepriteSlice[], index))};
+      frames[name] = {...frameData, index, slices: Object.freeze(slicesAt(slices as AsepriteSlice[], index, frozenSlices))};
     });
     // TexturePackerJson refuses a name twice in the json or taken in the target before it adds a frame
     const [atlas] = TexturePackerJson.parse(

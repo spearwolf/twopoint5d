@@ -214,6 +214,124 @@ describe('TextureResource', () => {
     });
   });
 
+  describe('a released texture whose dispose listener throws', () => {
+    // every image is 8 x 8 and tagged with the url it was loaded from
+    const stubImagesByUrl = () =>
+      vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async (url: string) => ({width: 8, height: 8, tag: url}) as unknown as HTMLImageElement);
+
+    // three dispatches the dispose event of a texture inside its dispose(): a listener that throws
+    // makes that call throw once the texture is released
+    const throwOnDispose = (texture: StubTexture, error: Error) => {
+      texture.dispose = function (this: StubTexture) {
+        this.disposed = true;
+        throw error;
+      };
+    };
+
+    const collect = (resource: TextureResource) => {
+      const errors: TextureResourceErrorEvent[] = [];
+      on(resource, 'error', (event: TextureResourceErrorEvent) => errors.push(event));
+      return errors;
+    };
+
+    const watchUnhandledRejections = () => {
+      const rejections: unknown[] = [];
+      const listener = (reason: unknown) => rejections.push(reason);
+      process.on('unhandledRejection', listener);
+      return {rejections, stop: () => process.off('unhandledRejection', listener)};
+    };
+
+    test('reports a dispose listener of the texture a new image replaces that throws, after the throw of a subscriber of the new texture', async () => {
+      stubImagesByUrl();
+      const {factory, textures} = makeTextureFactory();
+      const unhandled = watchUnhandledRejections();
+
+      const resource = TextureResource.fromImage('rx', 'a.png');
+      resource.activate();
+      const errors = collect(resource);
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      const subscriberError = new Error('a subscriber of the new texture');
+      const disposeError = new Error('a dispose listener of the texture replaced');
+      throwOnDispose(textures[0]!, disposeError);
+      on(resource, 'texture', (texture: StubTexture) => {
+        if (texture.tag === 'b.png') throw subscriberError;
+      });
+
+      resource.imageUrl = 'b.png';
+      await flushMicrotasks();
+      await flushMicrotasks();
+      unhandled.stop();
+
+      expect(errors).toEqual([
+        {source: 'texture', id: 'rx', error: subscriberError},
+        {source: 'texture', id: 'rx', error: disposeError},
+      ]);
+      expect(unhandled.rejections).toEqual([]);
+      expect(asStub(resource.texture)).toBe(textures[1]);
+      expect(textures[0]!.disposed).toBe(true);
+      expect(textures[1]!.disposed).toBe(false);
+
+      resource.dispose();
+    });
+
+    test('reports a dispose listener that throws of the texture a run without a factory takes back', async () => {
+      stubImagesByUrl();
+      const {factory, textures} = makeTextureFactory();
+      const unhandled = watchUnhandledRejections();
+
+      const resource = TextureResource.fromImage('rx', 'a.png');
+      resource.activate();
+      const errors = collect(resource);
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      const disposeError = new Error('a dispose listener of the texture taken back');
+      throwOnDispose(textures[0]!, disposeError);
+      resource.textureFactory = undefined;
+      resource.imageUrl = 'b.png';
+      await flushMicrotasks();
+      await flushMicrotasks();
+      unhandled.stop();
+
+      expect(errors).toEqual([{source: 'texture', id: 'rx', error: disposeError}]);
+      expect(unhandled.rejections).toEqual([]);
+      expect(resource.texture).toBeUndefined();
+      expect(resource.imageCoords).toBeDefined();
+      expect(textures[0]!.disposed).toBe(true);
+
+      resource.dispose();
+    });
+
+    test('reports a dispose listener that throws of the texture a cleared imageUrl takes back', async () => {
+      stubImagesByUrl();
+      const {factory, textures} = makeTextureFactory();
+
+      const resource = TextureResource.fromImage('rx', 'a.png');
+      resource.activate();
+      const errors = collect(resource);
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+
+      const disposeError = new Error('a dispose listener of the texture taken back');
+      throwOnDispose(textures[0]!, disposeError);
+
+      expect(() => {
+        resource.imageUrl = undefined;
+      }).not.toThrow();
+
+      expect(errors).toEqual([{source: 'texture', id: 'rx', error: disposeError}]);
+      expect(resource.texture).toBeUndefined();
+      expect(resource.imageCoords).toBeUndefined();
+      expect(textures[0]!.disposed).toBe(true);
+
+      resource.dispose();
+    });
+  });
+
   describe('a subscriber that throws keeps no value from the others', () => {
     test('a subscriber of the texture that throws leaves the texture to every other subscriber and to the retained event', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
@@ -1449,9 +1567,9 @@ describe('TextureResource', () => {
     // an atlas resource loaded until its atlas and its animations stand
     const loadedAtlasResource = async () => {
       const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
-      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
-        async (url: string) => ({width: 16, height: 16, tag: url}) as unknown as HTMLImageElement,
-      );
+      const loadAsync = vi
+        .spyOn(ImageLoader.prototype, 'loadAsync')
+        .mockImplementation(async (url: string) => ({width: 16, height: 16, tag: url}) as unknown as HTMLImageElement);
       const {factory} = makeTextureFactory();
 
       const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
@@ -1468,8 +1586,117 @@ describe('TextureResource', () => {
       const errors: Array<{source: string; id?: string; error: unknown}> = [];
       on(resource, 'error', (payload: {source: string; id?: string; error: unknown}) => errors.push(payload));
 
-      return {resource, errors, fetchMock};
+      return {resource, errors, fetchMock, loadAsync};
     };
+
+    test('an atlasJson written from outside whose meta is no object names no image', async () => {
+      const {resource, errors, fetchMock} = await loadedAtlasResource();
+      const texture = asStub(resource.texture)!;
+
+      expect(() => {
+        resource.atlasJson = {...atlasJson, meta: undefined} as never;
+      }).not.toThrow();
+      await flushMicrotasks();
+
+      expect(resource.imageUrl).toBeUndefined();
+      expect(resource.imageCoords).toBeUndefined();
+      expect(resource.atlas).toBeUndefined();
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      expect(resource.texture).toBeUndefined();
+      expect(texture.disposed).toBe(true);
+      expect(errors).toEqual([]);
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('an atlasJson written from outside whose meta.image is no string loads no image', async () => {
+      const {resource, errors, fetchMock, loadAsync} = await loadedAtlasResource();
+
+      resource.atlasJson = {...atlasJson, meta: {...atlasJson.meta, image: 42}} as never;
+      await flushMicrotasks();
+
+      expect(loadAsync.mock.calls.map(([url]) => url)).not.toContain(42);
+      expect(resource.imageUrl).toBeUndefined();
+      expect(resource.atlas).toBeUndefined();
+      expect(resource.texture).toBeUndefined();
+      expect(errors).toEqual([]);
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('beside an overrideImageUrl, an atlasJson written from outside whose meta is no object is reported once as a json its adapter cannot read', async () => {
+      const {resource, errors, fetchMock} = await loadedAtlasResource();
+      resource.overrideImageUrl = 'hero.png';
+      await flushMicrotasks();
+      expect(asStub(resource.texture)!.tag).toBe('hero.png');
+      expect(resource.atlas).toBeDefined();
+
+      resource.atlasJson = {...atlasJson, meta: undefined} as never;
+      await flushMicrotasks();
+
+      expect(errors).toEqual([
+        {
+          source: 'texture',
+          id: 'sprites',
+          error: new TypeError(
+            'TextureResource: the atlasJson of resource "sprites" has a meta of undefined — an atlas json carries its meta as an object {image, size}',
+          ),
+        },
+      ]);
+      expect(asStub(resource.texture)!.tag).toBe('hero.png');
+      expect(resource.atlas).toBeUndefined();
+      expect(resource.frameBasedAnimations).toBeUndefined();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('a cleared atlasUrl takes back the json fetched from it, its image, texture, atlas and animations, and releases the texture', async () => {
+      const {resource, errors, fetchMock} = await loadedAtlasResource();
+      const texture = asStub(resource.texture)!;
+      expect(resource.atlasJson).toBeDefined();
+
+      resource.atlasUrl = undefined;
+      await flushMicrotasks();
+
+      expect(resource.atlasJson).toBeUndefined();
+      expect(resource.imageUrl).toBeUndefined();
+      expect(resource.imageCoords).toBeUndefined();
+      expect(resource.texture).toBeUndefined();
+      expect(resource.atlas).toBeUndefined();
+      expect(resource.frameBasedAnimations).toBeUndefined();
+      expect(texture.disposed).toBe(true);
+      expect(errors).toEqual([]);
+
+      const atlasSpy = vi.fn();
+      on(resource, 'atlas', atlasSpy);
+      expect(atlasSpy).not.toHaveBeenCalled();
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
+    test('a cleared atlasUrl leaves an atlasJson written from outside standing', async () => {
+      const {resource, errors, fetchMock} = await loadedAtlasResource();
+      const {atlas, texture, frameBasedAnimations} = resource;
+
+      resource.atlasJson = resource.atlasJson!;
+      resource.atlasUrl = undefined;
+      await flushMicrotasks();
+
+      expect(resource.atlasJson).toBeDefined();
+      expect(resource.imageUrl).toBeDefined();
+      expect(resource.atlas).toBe(atlas);
+      expect(resource.texture).toBe(texture);
+      expect(resource.frameBasedAnimations).toBe(frameBasedAnimations);
+      expect(asStub(texture)!.disposed).toBe(false);
+      expect(errors).toEqual([]);
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
 
     test('clearing the atlasJson takes the atlas and its animations back and keeps the texture', async () => {
       const {resource, errors, fetchMock} = await loadedAtlasResource();

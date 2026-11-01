@@ -63,8 +63,8 @@ export class TexturePackerJson {
    *
    * @throws {TypeError} if the json is no object, its `frames` are neither an object nor a list, a
    * frame is no object, its `frame` is no object, a frame of the "JSON Array" format has a
-   * `filename` that is no string, or — without `parentCoords` — the json has no `meta.size`; the
-   * `target` stays as it was.
+   * `filename` that is no string, the json has a `meta` that is no object, or — without
+   * `parentCoords` — no `meta.size`; the `target` stays as it was.
    * @throws {RangeError} if an `x`, `y`, `w` or `h` of a `frame` is no finite number of 0 or more,
    * or — without `parentCoords` — the `w` or `h` of `meta.size` is no finite number above 0; the
    * `target` stays as it was.
@@ -90,8 +90,17 @@ export class TexturePackerJson {
       );
     }
 
+    // the meta comes back to the caller typed as an object, so it is checked with parentCoords as well;
+    // meta.image is left to the caller, an atlas resource may name the image itself
+    const meta: unknown = data.meta;
+    if (!isObject(meta)) {
+      throw new TypeError(
+        `TexturePackerJson: the json has a meta of ${describeValue(meta)} — a texture atlas json carries its meta as an object {image, size}`,
+      );
+    }
+
     if (parentCoords === undefined) {
-      const size: unknown = isObject(data.meta) ? data.meta.size : undefined;
+      const size: unknown = meta['size'];
       if (!isObject(size)) {
         throw new TypeError(
           `TexturePackerJson: the json has a meta.size of ${describeValue(size)} — without parentCoords the frames are laid out in meta.size, an object {w, h}`,

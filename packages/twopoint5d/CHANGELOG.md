@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageRenderTargetPool#acquire()` refuses a `width` or `height` that is not a whole number of 1 or more and a `samples` that is not a whole number of 0 or more with a `RangeError`, before it lends, resizes or releases a target
 - a `StageRenderer` without a pipeline warns once on the console when it draws a nested renderer with a pipeline of its own and without an `outputRenderTarget` beside other stages into one target — the combination the stages guide calls not supported
 - `Stage2D#asPassNode()` hands the same node back for the life of the stage: a new `scene` or `camera` goes into it as it is assigned, so a node handed out before follows it, and a `StageRenderer` that composes the stage keeps its output node — a new camera, a change of the projection or a new scene builds neither a pass node nor a shader. A composing `StageRenderer` rebuilds its output node after `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged` only for a stage that hands a new pass node
+- change `AtlasTextureResource#atlasUrl`: clearing it takes back the json fetched from it and, with it, `imageUrl`, `imageCoords`, `texture` (released), `atlas` and `frameBasedAnimations`, as clearing `imageUrl` does on an image or a tile set resource; an `atlasJson` written from outside stays (**BREAKING**). See the Migration Guide
 
 ### Deprecated
 
@@ -59,8 +60,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Stage2D` keeps `needsUpdate` set when `updateViewRect()` or `getViewRect()` of its projection throws, so the next `updateFrame()` tries the update again, as its documentation says
 - a `StageRenderer` that joins a `Display` — or another host that hands its current size to a new subscriber — takes that size once it has joined: a stage that refuses it makes `attach()` or the `parent` assignment throw that error, and a listener of that resize that disposes the renderer or attaches it elsewhere leaves no subscription behind at the host
+- `AsepriteJson.parse()` refuses a tag whose repeat plays more than `FrameBasedAnimations.MaxTextureSize` frames — more fit into no data texture —, naming the tag, the frames and the repeat, before it lays out a frame list and before the first frame reaches `options.target`; a ping-pong over one frame plays that frame once, whatever its repeat
+- the slices of a frame of `AsepriteJson.parse()` are frozen copies of their key, one object per key, shared by every frame the key is in force at: the json handed in shares no object with the atlas
+- `TexturePackerJson.parse()` refuses a `meta` that is no object with a `TypeError`, with `parentCoords` as well, before the first frame reaches the `target`
+- `FrameBasedAnimations#add()` refuses timing that is neither a number nor an object — `null`, a string, a boolean, an array — and a frame of a list that is no `TextureCoords`, naming its index, each with the name of the animation and before a name of the counter is spent
+- `PowerOf2ImageLoader#load()` without an `onErrorCallback` writes an image that does not load and a padding that fails to the console
+- `AtlasTextureResource` reads `meta` and `meta.image` of an `atlasJson` written from outside without a raw throw: a `meta` that is no object or a `meta.image` that is no string names no image, and beside an `overrideImageUrl` a `meta` that is no object is reported as an `error` with `source: 'texture'`
+- a `TextureResource` reports a listener of the `dispose` event of a texture it lets go of — one a new image replaced, or one taken back with its image — that throws as an `error` event with `source: 'texture'`, after an error of the publish it goes with, each as an event of its own
 
 ### Migration Guide
+
+#### Clearing `atlasUrl` takes the atlas back
+
+An atlas resource whose `atlasUrl` is cleared takes back the json fetched from it, the image, the texture, the atlas and the animations. To keep them, write the json from outside before clearing the url.
+
+**Before**
+
+```ts
+resource.atlasUrl = undefined; // the atlas and the texture stayed
+```
+
+**After**
+
+```ts
+resource.atlasJson = resource.atlasJson; // a json written from outside has no url
+resource.atlasUrl = undefined;
+```
 
 #### `IProjection#getViewRect()` answers `offsetX` and `offsetY`
 

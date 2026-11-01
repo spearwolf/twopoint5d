@@ -379,7 +379,9 @@ they differ. Every frame carries its duration, and Aseprite writes one above 0 f
 without it, in a tag or not, is refused with a `RangeError` naming it, before the first frame goes
 into the atlas. A tag with a `repeat` of `r` (Aseprite's "Repeat" field) is a `'once'` over its
 frames played `r` times, a ping-pong counting each direction as one pass: a tag `kick` with repeat 1
-is a one-shot. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code
+is a one-shot. A tag whose repeat plays more than `FrameBasedAnimations.MaxTextureSize` (8192)
+frames is refused, naming the tag, before the first frame goes into the atlas — more fit into no
+data texture. `parse(json, {playback: {kick: 'once'}})` names the playback of a tag from code
 instead. It reads its own keys only — an inherited one such as `constructor` names no tag —, and a
 value that is none of `'loop'`, `'once'` and `'pingpong'` is refused, naming the tag, before the
 first frame goes into the atlas: a refused sheet leaves `options.target` as it was.
@@ -417,7 +419,8 @@ Export the sheet without "Split Layers" and "Split Tags": the frame indices of a
 in the frame list, one entry per frame of the sprite. Every frame's `data` keeps its json entry and
 adds `index` and `slices` — the key of each slice in force at that frame, `{bounds, center?,
 pivot?}` in pixels of the untrimmed frame, `center` and `pivot` relative to `bounds` as Aseprite
-writes them.
+writes them. The slices are frozen copies of their keys, one object per key, shared by every frame
+the key is in force at; the json keeps its own.
 
 `isAsepriteFrameData(data)` tells that data from any other and narrows it to `AsepriteFrameData`:
 `true` for an object with a `frame` object, a `duration` above 0, a whole `index` of 0 or more and

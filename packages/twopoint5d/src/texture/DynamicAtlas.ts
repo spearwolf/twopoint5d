@@ -175,7 +175,7 @@ export class DynamicAtlas {
   // set by the first upload(): from then on add(), redraw() and remove() leave the texture to the next upload()
   #regionUploads = false;
   // the cells changed since the last upload(), each once
-  readonly #dirty: FrameRect[] = [];
+  readonly #dirty = new Set<FrameRect>();
   #staging: Staging | undefined;
   readonly #srcRegion = new Box2();
   readonly #dstPosition = new Vector2();
@@ -448,7 +448,7 @@ export class DynamicAtlas {
     this.#atlas = new TextureAtlas();
     this.#cells = new Map();
     this.#markTextures();
-    this.#dirty.length = 0;
+    this.#dirty.clear();
   }
 
   /**
@@ -474,7 +474,7 @@ export class DynamicAtlas {
       return;
     }
     const dirty = this.#dirty;
-    if (dirty.length === 0) return;
+    if (dirty.size === 0) return;
 
     const e = this.extrude;
     let needW = 0;
@@ -485,9 +485,9 @@ export class DynamicAtlas {
     }
     const stageW = Math.max(needW, this.#staging?.canvas.width ?? 0);
     const stageH = Math.max(needH, this.#staging?.canvas.height ?? 0);
-    if (dirty.length * stageW * stageH >= WHOLE_UPLOAD_SHARE * this.width * this.height) {
+    if (dirty.size * stageW * stageH >= WHOLE_UPLOAD_SHARE * this.width * this.height) {
       this.#markTextures();
-      dirty.length = 0;
+      dirty.clear();
       return;
     }
 
@@ -526,7 +526,7 @@ export class DynamicAtlas {
       this.#markTextures();
       throw error;
     } finally {
-      dirty.length = 0;
+      dirty.clear();
     }
   }
 
@@ -548,7 +548,7 @@ export class DynamicAtlas {
       this.#canvas.height = 0;
     }
     this.#dropStaging();
-    this.#dirty.length = 0;
+    this.#dirty.clear();
   }
 
   #assertAlive(member: string): void {
@@ -746,8 +746,8 @@ export class DynamicAtlas {
   #changed(rect: FrameRect): void {
     if (!this.#regionUploads) {
       this.#markTextures();
-    } else if (!this.#dirty.includes(rect)) {
-      this.#dirty.push(rect);
+    } else {
+      this.#dirty.add(rect);
     }
   }
 

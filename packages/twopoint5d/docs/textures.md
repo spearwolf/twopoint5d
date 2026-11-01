@@ -557,8 +557,12 @@ if (level.type === 'tileset') {
 
 An `AtlasTextureResource` takes `atlasUrl`, `overrideImageUrl`, `atlasAdapter`, `playback`,
 `frameBasedAnimationsData` and `atlasJson` — a json already at hand, in place of a fetch. Its
-`imageUrl` is read-only: it comes from the json. Every shape takes `textureClasses`. TypeScript
-refuses a setter of another shape, and in JavaScript it throws.
+`imageUrl` is read-only: it comes from the json. Clearing its `atlasUrl` takes the json fetched
+from it back, and with it the image, the texture — released —, the atlas and the animations, as
+clearing `imageUrl` does on the other shapes; a json written from outside has no url and stays, so
+`resource.atlasJson = resource.atlasJson` before `resource.atlasUrl = undefined` keeps what it built.
+Every shape takes `textureClasses`. TypeScript refuses a setter of another shape, and in JavaScript
+it throws.
 
 A resource disposed directly leaves its store: the next `parse()` that names its id builds a new
 one, and `on()` follows it.

@@ -135,6 +135,42 @@ describe('FrameBasedAnimations', () => {
       );
     });
 
+    test.each([
+      [null, 'null'],
+      ['1', '"1"'],
+      [true, 'true'],
+      [[0.5], '[0.5]'],
+    ])('refuses timing that is neither a number nor an object, naming it and the animation: %j', (timing, shown) => {
+      const animations = new FrameBasedAnimations();
+      const frames = [new TextureCoords(0, 0, 32, 32)];
+
+      expect(() => animations.add('walk', timing as never, frames)).toThrow(
+        new Error(
+          `FrameBasedAnimations: add() got timing of ${shown} for the animation "walk" — timing is a duration in seconds or an object {duration | frameRate | durations, playback?}`,
+        ),
+      );
+      expect(animations.hasAnimation('walk')).toBe(false);
+    });
+
+    test.each([
+      ['undefined at index 1', () => [new TextureCoords(0, 0, 32, 32), undefined], 'undefined at index 1'],
+      ['a plain object at index 0', () => [{x: 0}], '{x: 0} at index 0'],
+    ])('refuses a frame of a list that is no TextureCoords, naming its index and the animation: %s', (_, list, shown) => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('walk', 1, list() as never)).toThrow(
+        new Error(
+          `FrameBasedAnimations: add() got a frame of ${shown} for the animation "walk" — a frame of a list is a TextureCoords`,
+        ),
+      );
+      expect(() => animations.add(undefined, 1, list() as never)).toThrow(
+        `at index ${shown.endsWith('1') ? 1 : 0} for the animation (no name)`,
+      );
+      expect(animations.hasAnimation('walk')).toBe(false);
+      expect(animations.add(undefined, 1, [new TextureCoords(0, 0, 32, 32)])).toBe(0);
+      expect(animations.hasAnimation('anim_0')).toBe(true);
+    });
+
     test('an add refused for its frames spends no name of the counter', () => {
       const animations = new FrameBasedAnimations();
 

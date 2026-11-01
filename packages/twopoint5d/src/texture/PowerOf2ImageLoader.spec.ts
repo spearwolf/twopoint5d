@@ -5,6 +5,7 @@ import {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
 describe('PowerOf2ImageLoader', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   // hands the test the callback the underlying loader is given, so the test fires the `load`
@@ -86,6 +87,75 @@ describe('PowerOf2ImageLoader', () => {
     }) as unknown as ImageLoader['load']);
 
     await expect(new PowerOf2ImageLoader().loadAsync('missing.png')).rejects.toBe(failure);
+  });
+
+  describe('without an onErrorCallback', () => {
+    // a loader set through the setter, which hands the test the callbacks load() gives it
+    const fakeLoader = () => {
+      const calls: {onLoad: (img: unknown) => void; onError: ((event: unknown) => void) | undefined}[] = [];
+      const loader = {
+        load: (_url: string, onLoad: (img: unknown) => void, _onProgress: unknown, onError?: (event: unknown) => void) => {
+          calls.push({onLoad, onError});
+        },
+      };
+      return {loader: loader as unknown as ImageLoader, calls};
+    };
+
+    test('writes a padding that fails to the console without an onErrorCallback', () => {
+      vi.stubGlobal('document', {createElement: () => ({getContext: () => null})});
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const {loader, calls} = fakeLoader();
+      const imageLoader = new PowerOf2ImageLoader();
+      imageLoader.imageLoader = loader;
+      const onLoad = vi.fn();
+
+      imageLoader.load('odd.png', onLoad);
+      calls[0]!.onLoad({width: 3, height: 5});
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        'PowerOf2ImageLoader: the image "odd.png" could not be padded to a power of 2, and load() was given no onErrorCallback',
+        expect.objectContaining({message: expect.stringMatching(/no 2d context/)}),
+      );
+      expect(onLoad).not.toHaveBeenCalled();
+    });
+
+    test('writes an image that does not load to the console without an onErrorCallback', () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const {loader, calls} = fakeLoader();
+      const imageLoader = new PowerOf2ImageLoader();
+      imageLoader.imageLoader = loader;
+      const onLoad = vi.fn();
+      const event = new Error('404');
+
+      imageLoader.load('missing.png', onLoad);
+      calls[0]!.onError?.(event);
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalledWith(
+        'PowerOf2ImageLoader: the image "missing.png" did not load, and load() was given no onErrorCallback',
+        event,
+      );
+      expect(onLoad).not.toHaveBeenCalled();
+    });
+
+    test('with an onErrorCallback, both failures go to it and the console stays quiet', () => {
+      vi.stubGlobal('document', {createElement: () => ({getContext: () => null})});
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const {loader, calls} = fakeLoader();
+      const imageLoader = new PowerOf2ImageLoader();
+      imageLoader.imageLoader = loader;
+      const onError = vi.fn();
+      const event = new Error('404');
+
+      imageLoader.load('odd.png', vi.fn(), onError);
+      calls[0]!.onLoad({width: 3, height: 5});
+      calls[0]!.onError?.(event);
+
+      expect(onError).toHaveBeenCalledTimes(2);
+      expect(onError).toHaveBeenLastCalledWith(event);
+      expect(consoleError).not.toHaveBeenCalled();
+    });
   });
 
   test('a throw of the load callback is no failure of the load', () => {

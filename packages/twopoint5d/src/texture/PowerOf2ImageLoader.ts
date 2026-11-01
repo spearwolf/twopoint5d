@@ -36,7 +36,16 @@ export class PowerOf2ImageLoader {
     this.#imageLoader = loader;
   }
 
+  /**
+   * Loads the image of `url` and calls `onLoadCallback` with the image — or, when its sides are no
+   * powers of 2, a canvas it is drawn onto whose sides are — and the `texCoords` of the image in it.
+   * A failure goes to `onErrorCallback`. Without `onErrorCallback`, a failure — an image that does
+   * not load, a padding that fails — is written to the console, and `onLoadCallback` is not called.
+   */
   load(url: string, onLoadCallback: PowerOf2ImageLoadCallback, onErrorCallback?: PowerOf2ImageLoadErrorCallback): void {
+    // a failure without a callback goes to the console rather than nowhere. It is not thrown: a throw
+    // out of the load callback would skip the other callbacks three's ImageLoader holds for the same
+    // image, and its manager.itemEnd()
     this.imageLoader.load(
       url,
       (img: HTMLImageElement) => {
@@ -71,14 +80,26 @@ export class PowerOf2ImageLoader {
             };
           }
         } catch (error) {
-          onErrorCallback?.(error);
+          if (onErrorCallback) {
+            onErrorCallback(error);
+          } else {
+            // biome-ignore lint/suspicious/noConsole: load() was given no onErrorCallback, and the failure must not vanish
+            console.error(
+              `PowerOf2ImageLoader: the image "${url}" could not be padded to a power of 2, and load() was given no onErrorCallback`,
+              error,
+            );
+          }
           return;
         }
 
         onLoadCallback(result);
       },
       undefined,
-      onErrorCallback,
+      onErrorCallback ??
+        ((event) => {
+          // biome-ignore lint/suspicious/noConsole: load() was given no onErrorCallback, and the failure must not vanish
+          console.error(`PowerOf2ImageLoader: the image "${url}" did not load, and load() was given no onErrorCallback`, event);
+        }),
     );
   }
 

@@ -124,6 +124,36 @@ describe('AsepriteJson', () => {
       expect(atlas.frame(frameName(15))!.data!.slices['hitbox']!.pivot).toEqual({x: 6, y: 14});
     });
 
+    test('the slices of a frame are frozen copies of their key, one object for every frame the key is in force at', () => {
+      // a spec module runs in strict mode: a write to a frozen object throws
+      const data = fixture('fighter-hash.json');
+      const before = JSON.stringify(data);
+      const [hitboxKey, laterHitboxKey] = data.meta.slices![0]!.keys;
+      const [panelKey] = data.meta.slices![1]!.keys;
+
+      const [atlas] = AsepriteJson.parse(data);
+
+      const hitbox = atlas.frame(frameName(3))!.data!.slices['hitbox']!;
+      const panel = atlas.frame(frameName(3))!.data!.slices['panel']!;
+      expect(hitbox.bounds).not.toBe(hitboxKey!.bounds);
+      expect(hitbox.pivot).not.toBe(hitboxKey!.pivot);
+      expect(panel.bounds).not.toBe(panelKey!.bounds);
+      expect(panel.center).not.toBe(panelKey!.center);
+      expect([hitbox, hitbox.bounds, hitbox.pivot, panel, panel.bounds, panel.center].every(Object.isFrozen)).toBe(true);
+
+      expect(atlas.frame(frameName(0))!.data!.slices['hitbox']).toBe(hitbox);
+      expect(atlas.frame(frameName(7))!.data!.slices['hitbox']).toBe(hitbox);
+      expect(atlas.frame(frameName(15))!.data!.slices['panel']).toBe(panel);
+      expect(atlas.frame(frameName(8))!.data!.slices['hitbox']).not.toBe(hitbox);
+      expect(atlas.frame(frameName(8))!.data!.slices['hitbox']!.bounds).not.toBe(laterHitboxKey!.bounds);
+
+      expect(() => {
+        (hitbox.bounds as {x: number}).x = 99;
+      }).toThrow(TypeError);
+      expect(hitbox.bounds.x).toBe(4);
+      expect(JSON.stringify(data)).toBe(before);
+    });
+
     test('the json handed in is left as it was', () => {
       const data = fixture('fighter-hash.json');
       const before = JSON.stringify(data);
@@ -167,6 +197,22 @@ describe('AsepriteJson', () => {
       const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'pingpong_reverse', repeat: '2'}]});
 
       expect(framesOf(data, 'a')).toEqual(['f2', 'f1', 'f0', 'f1', 'f2']);
+    });
+
+    test('a ping-pong over one frame plays that frame once whatever its repeat', () => {
+      const data = sheet(2, {frameTags: [{name: 'a', from: 1, to: 1, direction: 'pingpong', repeat: '1000000000'}]});
+
+      const {frameCount, playback} = AsepriteJson.parse(data)[2].animation('a');
+
+      expect({frameCount, playback}).toEqual({frameCount: 1, playback: 'once'});
+    });
+
+    test('a playback of its own leaves the repeat of a tag out, however high it is', () => {
+      const data = sheet(2, {frameTags: [{name: 't', from: 0, to: 1, direction: 'forward', repeat: '1000000000'}]});
+
+      const {frameCount, playback} = AsepriteJson.parse(data, {playback: {t: 'loop'}})[2].animation('t');
+
+      expect({frameCount, playback}).toEqual({frameCount: 2, playback: 'loop'});
     });
 
     test('a repeat of 0 plays forever', () => {
@@ -377,25 +423,55 @@ describe('AsepriteJson', () => {
     });
 
     test('refuses a tag whose repeat plays more frames with their own durations than an animation holds', () => {
-      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'forward', repeat: '3000'}]}, [50, 100, 150]);
+      // 8192 frames: as many as a data texture holds, one more than per-frame durations take
+      const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward', repeat: '4096'}]}, [50, 100]);
 
       expect(() => AsepriteJson.parse(data)).toThrow(
-        'AsepriteJson: the tag "a" plays 9000 frames with their own durations — an animation with per-frame durations holds at most 8191 frames; lower its repeat',
+        'AsepriteJson: the tag "a" plays 8192 frames with their own durations — an animation with per-frame durations holds at most 8191 frames; lower its repeat',
       );
     });
 
     test('a tag refused for its repeat leaves the target atlas as it was', () => {
       const target = new TextureAtlas<never>();
-      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'forward', repeat: '3000'}]}, [50, 100, 150]);
+      const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward', repeat: '4096'}]}, [50, 100]);
 
       expect(() => AsepriteJson.parse(data, {target: target as never})).toThrow();
       expect(target.size).toBe(0);
     });
 
     test('a repeat of even durations holds as many frames as a data texture takes', () => {
-      const data = sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'forward', repeat: '3000'}]});
+      const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward', repeat: '4096'}]});
 
-      expect(AsepriteJson.parse(data)[2].animation('a').frameCount).toBe(9000);
+      expect(AsepriteJson.parse(data)[2].animation('a').frameCount).toBe(8192);
+    });
+
+    test('refuses a tag whose repeat plays more frames than a data texture holds', () => {
+      const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward', repeat: '5000'}]});
+
+      expect(() => AsepriteJson.parse(data)).toThrow(
+        new Error(
+          'AsepriteJson: the tag "a" plays 10000 frames with a repeat of "5000" — an animation holds at most 8192 frames, more fit into no data texture; lower its repeat',
+        ),
+      );
+    });
+
+    test('a ping-pong repeat counts the frame it turns on once against the frames a data texture holds', () => {
+      const tag = (repeat: string) => sheet(3, {frameTags: [{name: 'a', from: 0, to: 2, direction: 'pingpong', repeat}]});
+
+      expect(() => AsepriteJson.parse(tag('4096'))).toThrow(
+        'AsepriteJson: the tag "a" plays 8193 frames with a repeat of "4096" — an animation holds at most 8192 frames, more fit into no data texture; lower its repeat',
+      );
+      expect(AsepriteJson.parse(tag('4095'))[2].animation('a').frameCount).toBe(8191);
+    });
+
+    test('a tag refused for playing more frames than a data texture holds leaves the target atlas as it was', () => {
+      const target = new TextureAtlas<never>();
+      const data = sheet(2, {frameTags: [{name: 'a', from: 0, to: 1, direction: 'forward', repeat: 5000}]});
+
+      expect(() => AsepriteJson.parse(data, {target: target as never})).toThrow(
+        'AsepriteJson: the tag "a" plays 10000 frames with a repeat of 5000 —',
+      );
+      expect(target.size).toBe(0);
     });
 
     describe('the shape of the json', () => {
