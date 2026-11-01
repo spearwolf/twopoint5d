@@ -10,10 +10,8 @@ import {
 } from '@spearwolf/twopoint5d';
 import {
   abs,
-  dot,
   exp,
   float,
-  fract,
   mix,
   mx_noise_float,
   positionLocal,
@@ -29,24 +27,20 @@ import {
 import {
   AdditiveBlending,
   type Blending,
-  CustomBlending,
-  DstColorFactor,
   Group,
   LinearFilter,
   LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
-  type Node,
-  OneFactor,
   PlaneGeometry,
   RepeatWrapping,
   SRGBColorSpace,
   type Texture,
   TextureLoader,
   type WebGPURenderer,
-  ZeroFactor,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {additive, hash21, multiply, randomAt, SeededRandom} from './helpers';
 
 const DIR = 'stage-masks/found-footage';
 /** the atlas and the ground have 2 texels per unit */
@@ -57,6 +51,10 @@ export const VIEW_HEIGHT = 540;
 const HALF_H = VIEW_HEIGHT / 2;
 /** A row of the forest repeats every this many units — wider than any window at 540 units tall. */
 const PERIOD = 2800;
+/** how often the picture jumps while the signal is lost, per second: a clock of its own */
+const JUMP_RATE = 20;
+/** the seed of the jumps, apart from the one of the clock */
+const JUMP_SEED = 103;
 /** how fast the camera operator walks, in units per second */
 const WALK_SPEED = 36;
 /** the ground strip, in units */
@@ -70,8 +68,6 @@ export const makeFootageStage = (name: string) => {
   stage.name = name;
   return stage;
 };
-
-type FloatNode = Node<'float'>;
 
 /** Night shot: the camcorder sees in a green that goes white where its infrared lamp hits. */
 const NIGHT = [0.7, 1, 0.76] as const;
@@ -106,15 +102,13 @@ export class FootageClock {
 
   #nextGlitch = 11;
   #glitchLeft = 0;
-  #seed = 31;
+  readonly #random = new SeededRandom(31);
 
   random(): number {
-    this.#seed = (this.#seed * 16807) % 2147483647;
-    return this.#seed / 2147483647;
+    return this.#random.next();
   }
 
-  update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number): void {
     const t = (this.time.value += dt);
     this.tape += dt;
     this.walk.value += WALK_SPEED * dt;
@@ -130,13 +124,14 @@ export class FootageClock {
     this.#nextGlitch -= dt;
     if (this.#nextGlitch <= 0) {
       this.#glitchLeft = 1.6;
-      this.#nextGlitch = 13 + this.random() * 6;
+      // `+=`: the overhang of the frame stays in the schedule, so no date drifts by a frame
+      this.#nextGlitch += 13 + this.random() * 6;
     }
     if (this.#glitchLeft > 0) {
       this.#glitchLeft -= dt;
       // the picture rolls and jumps while the signal is gone
       this.glitch.value = 0.75 + 0.25 * Math.abs(Math.sin(t * 41));
-      this.swayY += (this.random() - 0.5) * 26;
+      this.swayY += (randomAt(JUMP_SEED, Math.floor(t * JUMP_RATE)) - 0.5) * 26;
       this.signalLost = true;
       if (this.#glitchLeft <= 0) {
         // when the picture comes back the figure stands somewhere else — just as far away
@@ -220,15 +215,6 @@ interface RowSpec {
   blending?: Blending;
 }
 
-/** A small deterministic random for the layout of the rows, the same on every run. */
-const scatter = (seed: number) => {
-  let s = seed;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return s / 2147483647;
-  };
-};
-
 /**
  * One row of the forest at one depth: sprites spread over a period of {@link PERIOD} units that
  * repeats, each wrapped back to the other side as the walk carries it out of the period.
@@ -244,7 +230,7 @@ class ParallaxRow {
     seed: number,
     extra?: {frame: string; x0: number; scale: number; light: number},
   ) {
-    const random = scatter(seed);
+    const random = new SeededRandom(seed);
     const capacity = spec.count + (extra ? 1 : 0);
     this.mesh = new FeatureSprites(TexturedSpriteKind, {
       capacity,
@@ -252,7 +238,6 @@ class ParallaxRow {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      attributeUsage: {dynamic: ['position']},
       ...(spec.blending === undefined ? {} : {blending: spec.blending}),
     });
     this.mesh.name = spec.name;
@@ -271,10 +256,10 @@ class ParallaxRow {
     // spread evenly with a jitter, so no two trunks of a row stand on top of each other
     const step = PERIOD / spec.count;
     for (let i = 0; i < spec.count; i++) {
-      const frameName = spec.frames[Math.floor(random() * spec.frames.length)]!;
-      const scale = spec.scale[0] + random() * (spec.scale[1] - spec.scale[0]);
-      const light = spec.light * (0.85 + random() * 0.3);
-      place(frameName, i * step + (random() - 0.5) * step * 0.7, scale, light, spec.mirror === true && i % 2 === 1);
+      const frameName = spec.frames[Math.floor(random.next() * spec.frames.length)]!;
+      const scale = spec.scale[0] + random.next() * (spec.scale[1] - spec.scale[0]);
+      const light = spec.light * (0.85 + random.next() * 0.3);
+      place(frameName, i * step + (random.next() - 0.5) * step * 0.7, scale, light, spec.mirror === true && i % 2 === 1);
     }
     if (extra) place(extra.frame, extra.x0, extra.scale, extra.light, false);
     this.update(0);
@@ -297,42 +282,6 @@ class ParallaxRow {
     this.mesh.dispose();
   }
 }
-
-/** Multiplies what lies below by its rgb and leaves the alpha alone: the camera's light falloff. */
-function multiply(material: MeshBasicNodeMaterial): MeshBasicNodeMaterial {
-  material.transparent = true;
-  material.blending = CustomBlending;
-  material.blendSrc = DstColorFactor;
-  material.blendDst = ZeroFactor;
-  material.blendSrcAlpha = ZeroFactor;
-  material.blendDstAlpha = OneFactor;
-  material.depthTest = false;
-  material.depthWrite = false;
-  return material;
-}
-
-/** Adds its rgb as light and leaves the alpha alone. */
-function additive(material: MeshBasicNodeMaterial): MeshBasicNodeMaterial {
-  material.transparent = true;
-  material.blending = CustomBlending;
-  material.blendSrc = OneFactor;
-  material.blendDst = OneFactor;
-  material.blendSrcAlpha = ZeroFactor;
-  material.blendDstAlpha = OneFactor;
-  material.depthTest = false;
-  material.depthWrite = false;
-  return material;
-}
-
-/**
- * A hash in 0 … 1 of a 2D cell, without `sin()` (Dave Hoskins' "hash without sine"): a `sin()` of
- * large screen coordinates leaves diagonal stripes in the grain on some GPUs.
- */
-export const hash21 = (p: Node<'vec2'>): FloatNode => {
-  const p3 = fract(vec3(p.x, p.y, p.x).mul(0.1031));
-  const q = p3.add(dot(p3, p3.yzx.add(33.33)));
-  return fract(q.x.add(q.y).mul(q.z));
-};
 
 /**
  * The level: a birch wood at night on a camcorder's night shot, seen from the side while the camera
@@ -402,7 +351,6 @@ export class ForestLevel {
         transparent: true,
         depthTest: false,
         depthWrite: false,
-        attributeUsage: {dynamic: ['position']},
       });
       this.#figure.name = 'figure';
       this.#figureSprite = this.#figure.createSprite()!;
@@ -420,7 +368,7 @@ export class ForestLevel {
         depthTest: false,
         depthWrite: false,
         blending: AdditiveBlending,
-        attributeUsage: {dynamic: ['position', 'color']},
+        attributeUsage: {dynamic: ['color']},
       });
       this.#eyes.name = 'eyeshine';
       this.#eyesSprite = this.#eyes.createSprite()!;

@@ -35,7 +35,7 @@ import {
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
 import {makeSonarStage} from './Sonar';
-import {InkRandom} from './InkWell';
+import {SeededRandom} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
 const DIR = 'stage-masks/matte-threshold';
@@ -153,7 +153,7 @@ export class TrenchView {
     beam.colorNode = vec4(vec3(1, 0.93, 0.78), clamp(cone.mul(dust.mul(0.1).add(0.06)).mul(this.#gain), 0, 1));
     this.#add('floodlight beam', beam, 3);
 
-    const rng = new InkRandom(name.length * 977 + 5);
+    const rng = new SeededRandom(name.length * 977 + 5);
     for (let i = 0; i < SNOW; i++) {
       this.#specks.push({x: rng.range(-520, 520), y: rng.range(-300, 300), near: rng.next() ** 2, phase: rng.range(0, 6.28)});
       const blob = this.#snow.add(0, 0, 1, 0)!;
@@ -179,7 +179,7 @@ export class TrenchView {
     this.#placeSnow();
     this.#glows.update();
 
-    on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.update(Math.min(deltaTime, 0.1)));
+    on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.update(deltaTime));
   }
 
   #add(name: string, material: MeshBasicNodeMaterial, order: number): void {
@@ -277,7 +277,7 @@ export class ThingView extends TrenchView {
   readonly #eyes: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #eyeStates: EyeState[] = [];
   readonly #parasites: SoftBlobs;
-  readonly #rng = new InkRandom(6661);
+  readonly #rng = new SeededRandom(6661);
   readonly #frameW: number;
   #awake = 0;
 

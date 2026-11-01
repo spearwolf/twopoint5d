@@ -12,7 +12,6 @@ import {
   exp,
   float,
   floor,
-  fract,
   fwidth,
   length,
   max,
@@ -29,6 +28,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import {hash21, SeededRandom} from './helpers';
 import {AdditiveBlending, Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, Scene} from 'three/webgpu';
 import {
   FRAME,
@@ -127,8 +127,8 @@ export class Moor {
     const elevation = sp.y.sub(GROUND_Y).div(-SKY_Z);
     let sky: Node<'vec3'> = mix(HORIZON, ZENITH, smoothstep(0, 0.32, elevation));
     const cell = floor(sp.div(70));
-    const h1 = fract(sin(cell.x.mul(127.1).add(cell.y.mul(311.7))).mul(43758.55));
-    const h2 = fract(sin(cell.x.mul(269.5).add(cell.y.mul(183.3))).mul(43758.55));
+    const h1 = hash21(cell);
+    const h2 = hash21(cell.add(vec2(17.3, 5.1)));
     const starAt = cell.add(vec2(h1, h2).mul(0.8).add(0.1)).mul(70);
     const starR = max(fwidth(sp.x).mul(0.9), 5);
     const star = exp(pow(length(sp.sub(starAt)).div(starR), float(2)).negate())
@@ -234,17 +234,13 @@ export class Moor {
     props.push({frame: 'stone-a', x: 170, z: -520, scale: 1.2});
     props.push({frame: 'stone-b', x: 215, z: -560, scale: 1.1});
     props.push({frame: 'stone-b', x: -330, z: -1350, scale: 1.3});
-    let seed = 20231031;
-    const random = () => {
-      seed = (seed * 16807) % 2147483647;
-      return seed / 2147483647;
-    };
+    const random = new SeededRandom(20231031);
     for (let i = 0; i < 150; i++) {
-      const z = -60 - random() ** 1.6 * 1700;
+      const z = -60 - random.next() ** 1.6 * 1700;
       const spread = 120 + -z * 0.9;
-      let x = (random() * 2 - 1) * spread;
+      let x = (random.next() * 2 - 1) * spread;
       if (Math.abs(x - pathX(z)) < 30) x += x > pathX(z) ? 40 : -40;
-      props.push({frame: `heather-${'abc'[i % 3]}`, x, z, scale: 0.6 + random() * 0.8});
+      props.push({frame: `heather-${'abc'[i % 3]}`, x, z, scale: 0.6 + random.next() * 0.8});
     }
     props.sort((a, b) => a.z - b.z);
     for (let b = 0; b <= MIST_BANKS.length; b++) {
@@ -421,21 +417,17 @@ export class Glaze {
     this.stage.scene.add(this.#oval);
 
     this.#motes = spritePool(assets, MOTES, 'dust', {blending: AdditiveBlending, depthTest: false});
-    let seed = 777;
-    const random = () => {
-      seed = (seed * 16807) % 2147483647;
-      return seed / 2147483647;
-    };
+    const random = new SeededRandom(777);
     for (let i = 0; i < MOTES; i++) {
       const sprite = this.#motes.createSprite()!;
       setFrame(sprite, assets, 'glow', 3, 3);
       this.#moteState.push({
         sprite,
-        x: (random() * 2 - 1) * (HALL.halfWidth - 20),
-        y: HALL.floor + 30 + random() * 300,
-        z: random() * 800,
-        phase: random() * 10,
-        size: 1.6 + random() * 2.4,
+        x: (random.next() * 2 - 1) * (HALL.halfWidth - 20),
+        y: HALL.floor + 30 + random.next() * 300,
+        z: random.next() * 800,
+        phase: random.next() * 10,
+        size: 1.6 + random.next() * 2.4,
       });
     }
     this.stage.scene.add(this.#motes);
@@ -444,12 +436,11 @@ export class Glaze {
     on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
   }
 
-  #update(deltaTime: number): void {
+  #update(dt: number): void {
     const state = this.#state;
     const camera = this.stage.camera;
     if (camera) camera.position.copy(state.camera);
     this.#oval.position.set(PORTAL.x, PORTAL.y, state.portalZ + 0.8);
-    const dt = Math.min(deltaTime, 0.1);
     const t = state.time;
     // the motes live in the 800 units in front of the camera, wrapping round as it walks
     const near = state.camera.z - 30;

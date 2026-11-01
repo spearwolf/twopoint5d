@@ -18,6 +18,7 @@ import {
   vec4,
 } from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type UniformNode, Vector4} from 'three/webgpu';
+import {SeededRandom} from './helpers';
 import {SoftBlobs} from './SoftBlobs';
 
 /** the view of both scenes and of the ink, in units, shown with `fit: 'cover'` */
@@ -37,24 +38,6 @@ export const makeInkStage = (name: string) => {
   stage.name = name;
   return stage;
 };
-
-/** A tiny deterministic random source, so a seeded run of the ink looks the same every time. */
-export class InkRandom {
-  #state: number;
-  constructor(seed: number) {
-    this.#state = seed >>> 0;
-  }
-  next(): number {
-    this.#state = (this.#state + 0x6d2b79f5) >>> 0;
-    let t = this.#state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }
-  range(min: number, max: number): number {
-    return min + (max - min) * this.next();
-  }
-}
 
 interface Drop {
   seed: number;
@@ -81,20 +64,20 @@ export class InkBlotLayout {
    * updates only while a transition runs, the wet edge in every frame, and two clocks would drift
    * apart and slide the rim off the edge of the matte.
    */
-  readonly time = uniform(0) as unknown as UniformNode<'float', number>;
+  readonly time = uniform(0);
   readonly drops: Drop[] = [];
-  readonly #rng: InkRandom;
+  readonly #rng: SeededRandom;
 
   constructor(seed: number) {
-    this.#rng = new InkRandom(seed);
-    for (let i = 0; i < SEEDS; i++) this.seeds.push(uniform(new Vector4()) as unknown as UniformNode<'vec4', Vector4>);
+    this.#rng = new SeededRandom(seed);
+    for (let i = 0; i < SEEDS; i++) this.seeds.push(uniform(new Vector4()));
     for (let i = 0; i < DROPS; i++) this.drops.push({seed: 0, x: 0, y: 0, distance: 0, radius: 0});
     this.scatter();
   }
 
   /** Advances the clock of the ink: once per frame, by the page. */
   advance(deltaTime: number): void {
-    this.time.value += Math.min(deltaTime, 0.1);
+    this.time.value += deltaTime;
   }
 
   /** A new layout: the first blot near the middle, the others spread over the view, later and later. */

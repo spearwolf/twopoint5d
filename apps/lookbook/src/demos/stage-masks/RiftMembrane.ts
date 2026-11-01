@@ -1,16 +1,8 @@
 import {on} from '@spearwolf/eventize';
 import {OnStageUpdateFrame, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
 import {abs, exp, float, length, max, mx_noise_float, positionWorld, pow, smoothstep, uniform, vec3, vec4} from 'three/tsl';
-import {
-  CustomBlending,
-  Mesh,
-  MeshBasicNodeMaterial,
-  type Node,
-  OneFactor,
-  PlaneGeometry,
-  Vector2,
-  ZeroFactor,
-} from 'three/webgpu';
+import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, Vector2} from 'three/webgpu';
+import {additive, SeededRandom} from './helpers';
 import {SoftBlobs} from './SoftBlobs';
 
 /** The view every stage of the demo lays itself out in, in units; `cover` fills any window. */
@@ -65,11 +57,10 @@ export class RiftState {
   #stutter = 0;
   #nextStutter = 4;
   /** a small deterministic random, so the preview card is the same each run */
-  #seed = 7;
+  readonly #random = new SeededRandom(7);
 
   random(): number {
-    this.#seed = (this.#seed * 16807) % 2147483647;
-    return this.#seed / 2147483647;
+    return this.#random.next();
   }
 
   get x(): number {
@@ -80,8 +71,7 @@ export class RiftState {
     return this.center.value.y;
   }
 
-  update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number): void {
     const t = (this.time.value += dt);
     const {input} = this;
     const goal = this.#goal;
@@ -246,19 +236,6 @@ export class RiftMembrane {
     this.#spores.dispose();
     this.stage.dispose();
   }
-}
-
-/** Purely additive: rgb onto what lies below, the alpha of the layer left as it is. */
-export function additive(material: MeshBasicNodeMaterial): MeshBasicNodeMaterial {
-  material.transparent = true;
-  material.blending = CustomBlending;
-  material.blendSrc = OneFactor;
-  material.blendDst = OneFactor;
-  material.blendSrcAlpha = ZeroFactor;
-  material.blendDstAlpha = OneFactor;
-  material.depthTest = false;
-  material.depthWrite = false;
-  return material;
 }
 
 /**

@@ -393,8 +393,7 @@ export class DungeonScreen extends Group {
    * Moves everything that moves, then uploads what changed — the meshes, and the cells of the atlas its
    * labels redraw. Once per frame, before rendering.
    */
-  update(deltaTime: number, renderer: WebGPURenderer): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number, renderer: WebGPURenderer): void {
     this.#time += dt;
     if (this.#scale > 0) {
       this.#animateDialog(dt);

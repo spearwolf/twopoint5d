@@ -1,4 +1,5 @@
 import {Vector2, Vector3} from 'three/webgpu';
+import {randomAt, SeededRandom, smoothstepCpu} from './helpers';
 
 /** What `assets-src/stage-masks/flashlight/` writes into `layout.json`. */
 export interface CrawlLayout {
@@ -49,11 +50,10 @@ export interface CrawlInput {
 const PLAYER_SPEED = 120;
 const AIM_SPEED = 1.6;
 const CAMERA_LEAD = 150;
-
-const smoothstep = (e0: number, e1: number, x: number): number => {
-  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
-};
+/** how often the stuttering battery may switch, per second: a clock of its own, so every frame rate shows the same stutter */
+const STUTTER_RATE = 20;
+/** the seed of the stutter, apart from the one that times the flicker */
+const STUTTER_SEED = 101;
 
 /**
  * The state of the crawlspace on the CPU: the player, where the flashlight points, the camera both
@@ -92,7 +92,8 @@ export class CrawlRig {
 
   #nextFlicker = 7;
   #flickerUntil = 0;
-  #seed = 1;
+  /** the flicker's timing, the same on every run */
+  readonly #random = new SeededRandom(1);
 
   constructor(layout: CrawlLayout) {
     this.layout = layout;
@@ -100,14 +101,7 @@ export class CrawlRig {
     this.#place();
   }
 
-  #random(): number {
-    // a small LCG: the same flicker on every run
-    this.#seed = (this.#seed * 1664525 + 1013904223) >>> 0;
-    return this.#seed / 4294967296;
-  }
-
-  update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number): void {
     this.time += dt;
     const {input, player, layout} = this;
 
@@ -154,15 +148,18 @@ export class CrawlRig {
     this.camera.x += (tx - this.camera.x) * follow;
     this.camera.y += (ty - this.camera.y) * follow;
 
-    // the battery: a stutter now and then, out for a moment, back
-    if (this.flicker && this.time >= this.#nextFlicker) {
-      this.#flickerUntil = this.time + 0.9 + this.#random() * 0.8;
-      this.#nextFlicker = this.#flickerUntil + 8 + this.#random() * 9;
+    // the battery: a stutter now and then, out for a moment, back — timed from when the flicker
+    // was due and not from the frame that noticed it, so every frame rate keeps the same schedule;
+    // switched off, the next flicker waits and comes at once when it is switched on again
+    if (!this.flicker) this.#nextFlicker = Math.max(this.#nextFlicker, this.time);
+    else if (this.time >= this.#nextFlicker) {
+      this.#flickerUntil = this.#nextFlicker + 0.9 + this.#random.next() * 0.8;
+      this.#nextFlicker = this.#flickerUntil + 8 + this.#random.next() * 9;
     }
     if (this.flicker && this.time < this.#flickerUntil) {
       const left = this.#flickerUntil - this.time;
       // a few hard stutters, and the last half second all but out
-      this.power = left < 0.5 ? 0.04 : this.#random() > 0.45 ? 1 : 0.15;
+      this.power = left < 0.5 ? 0.04 : randomAt(STUTTER_SEED, Math.floor(this.time * STUTTER_RATE)) > 0.45 ? 1 : 0.15;
     } else {
       this.power += (1 - this.power) * (1 - Math.exp(-dt * 12));
     }
@@ -192,8 +189,8 @@ export class CrawlRig {
     const r = Math.hypot(vx, vy);
     const c = (vx * this.dir.x + vy * this.dir.y) / Math.max(r, 1e-3);
     const cone =
-      smoothstep(Math.cos(this.halfAngle), Math.cos(this.halfAngle * 0.55), c) *
-      (1 - smoothstep(this.reach * REACH_FADE, this.reach, r));
+      smoothstepCpu(Math.cos(this.halfAngle), Math.cos(this.halfAngle * 0.55), c) *
+      (1 - smoothstepCpu(this.reach * REACH_FADE, this.reach, r));
     const spill = Math.exp(-((r / SPILL) ** 2));
     return Math.min(1, cone + spill * 0.95);
   }
@@ -205,7 +202,7 @@ export class CrawlRig {
     if (down < -vent.hh) return 0;
     const along = q.x - vent.x + down * VENT_LEAN;
     const w = vent.hw * (1 + down / 400);
-    return (1 - smoothstep(w * 0.7, w, Math.abs(along))) * (1 - smoothstep(VENT_DEPTH * 0.6, VENT_DEPTH, down));
+    return (1 - smoothstepCpu(w * 0.7, w, Math.abs(along))) * (1 - smoothstepCpu(VENT_DEPTH * 0.6, VENT_DEPTH, down));
   }
 
   readonly #q = new Vector2();

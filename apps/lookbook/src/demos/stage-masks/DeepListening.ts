@@ -48,7 +48,8 @@ import {
   ZeroFactor,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {additive, makeRiftStage, type RiftState, WORLD} from './RiftMembrane';
+import {additive, SeededRandom} from './helpers';
+import {makeRiftStage, type RiftState, WORLD} from './RiftMembrane';
 
 const DIR = 'stage-masks/rift';
 /** the room images and the atlas have 2 texels per unit */
@@ -152,7 +153,7 @@ const spritePool = (assets: DeepAssets, capacity: number, name: string, blending
     transparent: true,
     depthTest: false,
     depthWrite: false,
-    attributeUsage: {dynamic: ['size', 'color', 'rotation']},
+    attributeUsage: {dynamic: ['size', 'color']},
     ...(blending === undefined ? {} : {blending}),
   });
   pool.name = name;
@@ -328,15 +329,6 @@ interface Mote {
   size: number;
 }
 
-/** A small deterministic random for the scatter of particles. */
-const scatter = (seed: number) => {
-  let s = seed;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return s / 2147483647;
-  };
-};
-
 /**
  * The world: the control room of the station at night. The sky behind the window with the red light
  * of the dish blinking and a satellite crossing; the room; the reels turning; three amber scopes
@@ -386,7 +378,7 @@ export class ListeningRoom {
 
     // every glow of the room is one sprite of one additive pool: lamps on the racks, the beacon, the
     // satellite, the dust in the light of the desk lamp
-    const random = scatter(1234);
+    const random = new SeededRandom(1234);
     const MOTES = 46;
     this.#glows = spritePool(assets, 7 + MOTES, 'glows', AdditiveBlending);
     const glowBehind = spritePool(assets, 2, 'sky glows', AdditiveBlending);
@@ -409,19 +401,19 @@ export class ListeningRoom {
       const sprite = this.#glows.createSprite()!;
       setFrame(sprite, assets.atlas, 'glow', 0.32);
       sprite.setPosition(x, y, 0);
-      this.#leds.push({sprite, period, duty: 0.5 + random() * 0.3, r, g, b});
+      this.#leds.push({sprite, period, duty: 0.5 + random.next() * 0.3, r, g, b});
     }
     for (let i = 0; i < MOTES; i++) {
       const sprite = this.#glows.createSprite()!;
       setFrame(sprite, assets.atlas, 'glow', 1);
       this.#motes.push({
         sprite,
-        x: 40 + random() * 230,
-        y: -76 + random() * 150,
-        vx: (random() - 0.5) * 4,
-        vy: (random() - 0.4) * 3,
-        phase: random() * 10,
-        size: 2 + random() * 3,
+        x: 40 + random.next() * 230,
+        y: -76 + random.next() * 150,
+        vx: (random.next() - 0.5) * 4,
+        vy: (random.next() - 0.4) * 3,
+        phase: random.next() * 10,
+        size: 2 + random.next() * 3,
       });
     }
 
@@ -437,7 +429,7 @@ export class ListeningRoom {
   }
 
   #update(deltaTime: number): void {
-    const t = (this.time.value += Math.min(deltaTime, 0.1));
+    const t = (this.time.value += deltaTime);
     const rift = this.#rift;
     for (let i = 0; i < REELS.length; i++) this.#reelSprites[i]!.rotation = t * REELS[i]!.speed;
     for (let i = 0; i < SCOPES.length; i++) this.#agitation[i]!.value = nearness(rift, SCOPES[i]!.x, SCOPES[i]!.y);
@@ -515,7 +507,7 @@ export class DrownedRoom {
   constructor(assets: DeepAssets, rift: RiftState) {
     this.#rift = rift;
     const t = this.time;
-    const random = scatter(4321);
+    const random = new SeededRandom(4321);
 
     const deep = texturedPlane(assets.deep, BACKDROP, 'deep');
     deep.renderOrder = 0;
@@ -529,8 +521,8 @@ export class DrownedRoom {
     this.#leviathan.setColorValues(0.8, 0.9, 0.9, 0.92);
     for (let i = 0; i < 3; i++) {
       const sprite = far.createSprite()!;
-      setFrame(sprite, assets.atlas, 'fish', 0.7 + random() * 0.5);
-      this.#fish.push({sprite, speed: 14 + random() * 16, y: 20 + random() * 170, offset: random() * 500});
+      setFrame(sprite, assets.atlas, 'fish', 0.7 + random.next() * 0.5);
+      this.#fish.push({sprite, speed: 14 + random.next() * 16, y: 20 + random.next() * 170, offset: random.next() * 500});
     }
 
     // the jellyfish where the dish stood: its arms sway below its bell, which pulses
@@ -610,11 +602,11 @@ export class DrownedRoom {
       this.#bubbles.push({
         sprite,
         x,
-        y: FLOOR_Y + random() * 440,
+        y: FLOOR_Y + random.next() * 440,
         vx: x,
-        vy: 22 + random() * 26,
-        phase: random() * 10,
-        size: 4 + random() * 6,
+        vy: 22 + random.next() * 26,
+        phase: random.next() * 10,
+        size: 4 + random.next() * 6,
       });
     }
     const snow = spritePool(assets, 70, 'marine snow', AdditiveBlending);
@@ -624,12 +616,12 @@ export class DrownedRoom {
       setFrame(sprite, assets.atlas, 'glow');
       this.#snow.push({
         sprite,
-        x: WORLD.left + random() * (WORLD.right - WORLD.left),
-        y: WORLD.bottom + random() * (WORLD.top - WORLD.bottom),
-        vx: (random() - 0.5) * 3,
-        vy: -(2 + random() * 5),
-        phase: random() * 10,
-        size: 2 + random() * 4,
+        x: WORLD.left + random.next() * (WORLD.right - WORLD.left),
+        y: WORLD.bottom + random.next() * (WORLD.top - WORLD.bottom),
+        vx: (random.next() - 0.5) * 3,
+        vy: -(2 + random.next() * 5),
+        phase: random.next() * 10,
+        size: 2 + random.next() * 4,
       });
     }
     this.#pools.push(far, near, reels, bubbles, snow);
@@ -663,8 +655,7 @@ export class DrownedRoom {
     on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
   }
 
-  #update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  #update(dt: number): void {
     const t = (this.time.value += dt);
     const rift = this.#rift;
     for (let i = 0; i < REELS.length; i++) this.#reelSprites[i]!.rotation = t * REELS[i]!.speed * 0.35;
@@ -754,7 +745,7 @@ export class TvSnow {
     this.#plane.name = 'static';
     this.stage.scene.add(this.#plane);
     on(this.stage, OnStageUpdateFrame, ({deltaTime}) => {
-      this.time.value += Math.min(deltaTime, 0.1);
+      this.time.value += deltaTime;
     });
   }
 

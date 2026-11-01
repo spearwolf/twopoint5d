@@ -1,5 +1,6 @@
 import type {StageMaskCoverageSource} from '@spearwolf/twopoint5d';
 import {Color, Vector4} from 'three/webgpu';
+import {SeededRandom} from './helpers';
 
 /** The view every stage of the demo lays itself out in, in units; `cover` fills any window. */
 export const VIEW_WIDTH = 960;
@@ -61,18 +62,6 @@ const TORCH_RADIUS = 125;
 const BEAM_RADIUS = 120;
 const BEAM_REACH = 85;
 
-/** A small seeded generator: the flicker of the dying lamp is the same on every run. */
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** What the keyboard and the pointer ask of the player. */
 export interface RigInput {
   left: boolean;
@@ -114,7 +103,8 @@ export class WardRig {
   pendantX: number = LAMPS[1].x;
   pendantY: number = LAMPS[1].y;
 
-  readonly #random = mulberry32(307);
+  /** A small seeded generator: the flicker of the dying lamp is the same on every run. */
+  readonly #random = new SeededRandom(307);
   // the dying lamp: when its next fit starts, how long it lasts, and a long dark now and then
   #fitAt = 2;
   #fitEnd = 0;
@@ -141,9 +131,9 @@ export class WardRig {
 
     // the right lamp is dying: steady for a while, then a fit of stutter, sometimes a long dark
     if (t >= this.#fitAt) {
-      this.#fitEnd = t + 0.4 + this.#random() * 0.9;
-      if (this.#random() < 0.3) this.#darkEnd = this.#fitEnd + 0.8 + this.#random() * 1.4;
-      this.#fitAt = Math.max(this.#fitEnd, this.#darkEnd) + 2.5 + this.#random() * 4.5;
+      this.#fitEnd = t + 0.4 + this.#random.next() * 0.9;
+      if (this.#random.next() < 0.3) this.#darkEnd = this.#fitEnd + 0.8 + this.#random.next() * 1.4;
+      this.#fitAt = Math.max(this.#fitEnd, this.#darkEnd) + 2.5 + this.#random.next() * 4.5;
     }
     if (t < this.#fitEnd) {
       // a stutter at about 12 Hz, never quite regular

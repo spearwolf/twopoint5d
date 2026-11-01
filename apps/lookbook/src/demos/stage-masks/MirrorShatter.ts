@@ -18,11 +18,10 @@ import {
   Shape,
   ShapeGeometry,
   SphereGeometry,
-  type UniformNode,
   Vector3,
   type WebGPURenderer,
 } from 'three/webgpu';
-import {InkRandom} from './InkWell';
+import {SeededRandom} from './helpers';
 import {type MirrorLayout, VIEW_HEIGHT, VIEW_WIDTH} from './MirrorBathroom';
 
 /** the distance of the mask's camera from the plane of the wall, in units */
@@ -164,17 +163,17 @@ export class MirrorShatter {
   readonly scene3d = new Stage2D();
   readonly camera = new PerspectiveCamera(30, VIEW_WIDTH / VIEW_HEIGHT, 1, 20000);
   /** how much of the bloom is added: 0 switches it off without a rebuild of the pipeline */
-  readonly bloomStrength = uniform(1.4) as unknown as UniformNode<'float', number>;
+  readonly bloomStrength = uniform(1.4);
   /** the progress the poses follow, also as a uniform for the shaders of the scene */
-  readonly progress = uniform(0) as unknown as UniformNode<'float', number>;
+  readonly progress = uniform(0);
 
   readonly #shatter = new Group();
   readonly #ouroboros = new Group();
   readonly #shards: Shard[] = [];
   readonly #panes: Pane[] = [];
   readonly #spinner = new Group();
-  readonly #eyeOpen = uniform(0) as unknown as UniformNode<'float', number>;
-  readonly #pupil = uniform(0.2) as unknown as UniformNode<'float', number>;
+  readonly #eyeOpen = uniform(0);
+  readonly #pupil = uniform(0.2);
   readonly #ringCentre: Point;
   readonly #geometries: BufferGeometry[] = [];
   readonly #materials: MeshBasicNodeMaterial[] = [];
@@ -201,7 +200,7 @@ export class MirrorShatter {
       : [(glass.left + glass.right) / 2, (glass.bottom + glass.top) / 2];
     this.#ringCentre = [(glass.left + glass.right) / 2, (glass.bottom + glass.top) / 2];
 
-    const rng = new InkRandom(seed);
+    const rng = new SeededRandom(seed);
     this.#buildShatter(glass, impact, rng);
     this.#buildOuroboros(rng);
     this.setScene('shatter');
@@ -237,12 +236,13 @@ export class MirrorShatter {
     this.#pipeline = pipeline;
     this.stage.pipeline = pipeline;
     this.stage.buildOutputNode = ([scenePass]) => {
+      // the renderer hands its passes as `Node`; the pass is the vec4 picture of a Stage2D
       const picture = scenePass as Node<'vec4'>;
       // only what is bright blooms: the glints of the glass, not its shaded faces
-      const glow = bloom(picture, this.bloomStrength as unknown as number, 0.6, 0.55);
+      const glow = bloom(picture, this.bloomStrength, 0.6, 0.55);
       this.#glow?.dispose();
       this.#glow = glow;
-      return vec4(picture.rgb.add((glow as unknown as Node<'vec4'>).rgb), picture.a);
+      return vec4(picture.rgb.add(glow.rgb), picture.a);
     };
   }
 
@@ -299,7 +299,7 @@ export class MirrorShatter {
     return material;
   }
 
-  #buildShatter(glass: MirrorLayout['glass'], impact: Point, rng: InkRandom): void {
+  #buildShatter(glass: MirrorLayout['glass'], impact: Point, rng: SeededRandom): void {
     const surface = this.#glass();
 
     // the sites of the shards: rings around the impact, closer together near it, so the shards are
@@ -422,7 +422,7 @@ export class MirrorShatter {
     }
   }
 
-  #buildOuroboros(rng: InkRandom): void {
+  #buildOuroboros(rng: SeededRandom): void {
     const surface = this.#glass();
 
     // the snake: a tube along the circle, a thread at the tail, thick at the head, scales along its back

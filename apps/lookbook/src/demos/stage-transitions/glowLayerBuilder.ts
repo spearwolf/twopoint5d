@@ -7,8 +7,6 @@ export interface GlowLayerBuilder extends StageRendererBuildOutputNode {
   dispose(): void;
 }
 
-type Vec4 = Node<'vec4'> & {add(other: Node): Node<'vec4'>; rgb: Node<'vec3'>; a: Node<'float'>};
-
 /**
  * A bloom for a layer of a `StageDirector`. `bloom()` of three.js answers an alpha of 1, and a layer
  * whose every pixel is opaque hides the layers below it: this builder adds the glow to the color as
@@ -18,13 +16,15 @@ type Vec4 = Node<'vec4'> & {add(other: Node): Node<'vec4'>; rgb: Node<'vec3'>; a
 export function createGlowLayerBuilder(strength: number, radius: number, threshold: number): GlowLayerBuilder {
   let last: ReturnType<typeof bloom> | undefined;
   const builder = ((passes: Node[]): Node => {
-    let composed = passes[0] as Vec4;
-    for (let i = 1; i < passes.length; i++) composed = composed.add(passes[i]!) as Vec4;
+    // the renderer hands its passes as `Node`; each is the vec4 picture of a Stage2D
+    const pictures = passes as Node<'vec4'>[];
+    let composed: Node<'vec4'> = pictures[0]!;
+    for (let i = 1; i < pictures.length; i++) composed = composed.add(pictures[i]!);
     const glow = bloom(composed, strength, radius, threshold);
-    const output = vec4(composed.rgb.add((glow as unknown as Vec4).rgb), composed.a);
+    const output = vec4(composed.rgb.add(glow.rgb), composed.a);
     last?.dispose();
     last = glow;
-    return output as unknown as Node;
+    return output;
   }) as GlowLayerBuilder;
   builder.dispose = () => {
     last?.dispose();

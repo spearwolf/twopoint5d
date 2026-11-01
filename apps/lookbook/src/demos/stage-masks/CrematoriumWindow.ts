@@ -2,23 +2,18 @@ import {on} from '@spearwolf/eventize';
 import {OnStageUpdateFrame, OrthographicProjection, Stage2D, StageMask} from '@spearwolf/twopoint5d';
 import {clamp, exp, float, length, mx_noise_float, positionWorld, smoothstep, uniform, vec2, vec3, vec4} from 'three/tsl';
 import {
-  AddEquation,
-  CustomBlending,
   LinearFilter,
   LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
-  OneFactor,
   PlaneGeometry,
   SRGBColorSpace,
   type Texture,
   TextureLoader,
-  type UniformNode,
   type WebGPURenderer,
-  ZeroFactor,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {InkRandom} from './InkWell';
+import {additive, SeededRandom, smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
 const DIR = 'stage-masks/heat-haze';
@@ -112,12 +107,12 @@ interface Flake {
 export class CrematoriumView {
   readonly stage: Stage2D;
   readonly variant: CrematoriumVariant;
-  readonly #time = uniform(0) as unknown as UniformNode<'float', number>;
+  readonly #time = uniform(0);
   readonly #meshes: Mesh[] = [];
   readonly #flakes = new SoftBlobs({capacity: FLAKES + EMBERS, name: 'weather'});
   readonly #glows = new SoftBlobs({capacity: 2, name: 'sodium lamp'});
   readonly #list: Flake[] = [];
-  readonly #rng: InkRandom;
+  readonly #rng: SeededRandom;
   readonly #bounds: Box;
   #clock = 0;
 
@@ -131,7 +126,7 @@ export class CrematoriumView {
     this.#add('outside', back, outside, 0);
 
     // the weather behind the glass: it draws under the room, so the wall hides it but at the glass
-    this.#rng = new InkRandom(variant === 'snow' ? 1301 : 1302);
+    this.#rng = new SeededRandom(variant === 'snow' ? 1301 : 1302);
     for (let i = 0; i < FLAKES + EMBERS; i++) {
       const ember = variant === 'ash' && i >= FLAKES;
       if (variant === 'snow' && i >= FLAKES) break;
@@ -184,17 +179,7 @@ export class CrematoriumView {
       .mul(float(1).sub(smoothstep(150, 230, d)));
     // added as light, and the alpha left as it is: an additive blend would add up the alpha as well,
     // and a picture with an alpha above 1 shows the plane as a box once a transition samples it
-    const furnace = new MeshBasicNodeMaterial({
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      blending: CustomBlending,
-      blendEquation: AddEquation,
-      blendSrc: OneFactor,
-      blendDst: OneFactor,
-      blendSrcAlpha: ZeroFactor,
-      blendDstAlpha: OneFactor,
-    });
+    const furnace = additive(new MeshBasicNodeMaterial());
     furnace.colorNode = vec4(vec3(1, 0.42, 0.12).mul(clamp(glow, 0, 1)), 1);
     this.#add('furnace glow', furnace, {left: -320, right: 320, bottom: world.bottom, top: glass.sill + 140}, 4);
 
@@ -202,7 +187,7 @@ export class CrematoriumView {
     this.#flakes.update();
     this.#glows.update();
 
-    on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(Math.min(deltaTime, 0.1)));
+    on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
   }
 
   #add(name: string, material: MeshBasicNodeMaterial, box: Box, order: number): void {
@@ -306,7 +291,7 @@ export class HeatColumn {
   readonly mask = new StageMask(this.stage);
   readonly #blobs = new SoftBlobs({capacity: PLUMES, name: 'heat plumes'});
   readonly #plumes: Plume[] = [];
-  readonly #rng = new InkRandom(7177);
+  readonly #rng = new SeededRandom(7177);
   readonly #vent: {x: number; y: number};
 
   constructor(layout: CrematoriumLayout) {
@@ -332,7 +317,7 @@ export class HeatColumn {
     // precompile() draws the stage before its first update: the pool uploads now
     this.#place(0);
     on(this.stage, OnStageUpdateFrame, ({deltaTime}) => {
-      this.#advance(Math.min(deltaTime, 0.1));
+      this.#advance(deltaTime);
       this.#place(this.mask.progress);
     });
   }
@@ -364,9 +349,9 @@ export class HeatColumn {
     // the column: as wide as the vent at the start, the whole view at the end
     const width = 14 + 620 * progress ** 2.2;
     const grow = 1 + 1.3 * progress;
-    const strength = smooth(0, 0.1, progress) * (0.3 + 0.7 * progress ** 1.5);
+    const strength = smoothstepCpu(0, 0.1, progress) * (0.3 + 0.7 * progress ** 1.5);
     // late in the transition the plumes keep their strength to the top, so the heat closes up
-    const hold = smooth(0.55, 0.95, progress);
+    const hold = smoothstepCpu(0.55, 0.95, progress);
     const plumes = this.#plumes;
     for (let i = 0; i < plumes.length; i++) {
       const plume = plumes[i]!;
@@ -381,7 +366,7 @@ export class HeatColumn {
       blob.y = this.#vent.y + h;
       // late in the transition the plumes swell at the vent too, so the bottom of the view closes
       blob.radius = (plume.r0 + h * 0.15) * grow + 120 * progress ** 3;
-      const envelope = smooth(0, 0.1, a) * (1 - smooth(0.65, 1, a));
+      const envelope = smoothstepCpu(0, 0.1, a) * (1 - smoothstepCpu(0.65, 1, a));
       blob.intensity = strength * (envelope + (1 - envelope) * hold);
     }
     this.#blobs.update();
@@ -398,9 +383,4 @@ function tint(blob: SoftBlob, r: number, g: number, b: number): void {
   blob.r = r;
   blob.g = g;
   blob.b = b;
-}
-
-function smooth(e0: number, e1: number, x: number): number {
-  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return t * t * (3 - 2 * t);
 }

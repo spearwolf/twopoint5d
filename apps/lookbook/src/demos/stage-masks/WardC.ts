@@ -26,6 +26,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 import {
   type Box,
@@ -585,7 +586,7 @@ export class WardDeep {
       w.y += (ty - w.y) * follow;
 
       // seen only at the rim: where the level is all but gone, never in the dark nor in the light
-      const want = smoothstep01(0.004, 0.05, coverage) * (1 - smoothstep01(0.16, 0.4, coverage));
+      const want = smoothstepCpu(0.004, 0.05, coverage) * (1 - smoothstepCpu(0.16, 0.4, coverage));
       w.alpha += (want - w.alpha) * (1 - Math.exp(-deltaTime * (want > w.alpha ? 5 : 8)));
       if (t > w.blinkAt + 0.16) w.blinkAt = t + 2.5 + ((i * 1.618 * t) % 4);
       const blink = t > w.blinkAt ? 0.1 : 1;
@@ -603,12 +604,6 @@ export class WardDeep {
     this.#eyes.dispose();
     this.stage.dispose();
   }
-}
-
-/** smoothstep on the CPU, `e0 < e1` */
-function smoothstep01(e0: number, e1: number, x: number): number {
-  const s = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
-  return s * s * (3 - 2 * s);
 }
 
 interface Ring {

@@ -185,7 +185,7 @@ export const spritePool = (assets: PortalAssets, capacity: number, name: string,
     transparent: true,
     depthTest: true,
     depthWrite: false,
-    attributeUsage: {dynamic: ['position', 'size', 'color', 'rotation']},
+    attributeUsage: {dynamic: ['size', 'color']},
     ...options,
   });
   pool.name = name;
@@ -263,8 +263,7 @@ export class PortalState {
     return {near: this.portalZ + MIN_DISTANCE + 10, far: Math.min(MAX_CAMERA_Z - 40, this.portalZ + 1100)};
   }
 
-  update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number): void {
     this.time += dt;
     const input = this.input;
 

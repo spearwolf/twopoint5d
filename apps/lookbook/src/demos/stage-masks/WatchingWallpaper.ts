@@ -370,21 +370,22 @@ export class WatchingWallpaper {
    * needs `invalidateOutputNode()` and the renderer builds the node again.
    */
   createOutputNodeBuilder(options: () => {source: StageMaskCoverageSource; invert: boolean}): StageRendererBuildOutputNode {
-    type Vec4 = Node<'vec4'> & {rgb: Node<'vec3'> & {mul(o: unknown): Node<'vec3'>}; a: Node<'float'>};
-    return ([room, haunted, glow]: Node[]): Node => {
+    return (passes: Node[]): Node => {
+      // the renderer hands its passes as `Node`; each is the vec4 picture of a Stage2D
+      const [room, haunted, glow] = passes as Node<'vec4'>[];
       const {source, invert} = options();
       // the haunted wall, where the glows cover it
-      const masked = createMaskNode(haunted!, glow!, {source, invert}) as unknown as Vec4;
+      const masked = createMaskNode(haunted!, glow!, {source, invert});
       // premultiplied `over`: the masked haunted wall on the ordinary one
-      const composed = masked.rgb.add((room as unknown as Vec4).rgb.mul(float(1).sub(masked.a)));
+      const composed = masked.rgb.add(room!.rgb.mul(float(1).sub(masked.a)));
       // the light of the glows, in their own colour, on everything: a candle lights the wall it
       // reveals, and with `invert` it lights the ordinary wall that only shows where it burns
-      const light = (glow as unknown as Vec4).rgb.mul(LIGHT_GAIN).add(vec3(AMBIENT, AMBIENT * 0.95, AMBIENT * 1.08));
+      const light = glow!.rgb.mul(LIGHT_GAIN).add(vec3(AMBIENT, AMBIENT * 0.95, AMBIENT * 1.08));
       const fromCentre = length(uv().sub(0.5).mul(vec2(1, 0.75)));
       // full brightness out to 0.2 from the centre, down to 0.45 at 0.62; smoothstep's edges stay in
       // ascending order, which GLSL and WGSL both require
       const vignette = mix(float(1), float(0.45), smoothstep(0.2, 0.62, fromCentre));
-      return vec4(composed.mul(light).mul(vignette), 1) as unknown as Node;
+      return vec4(composed.mul(light).mul(vignette), 1);
     };
   }
 

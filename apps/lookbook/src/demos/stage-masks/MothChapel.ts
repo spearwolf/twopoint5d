@@ -48,6 +48,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {SeededRandom, smoothstepCpu} from './helpers';
 
 const DIR = 'stage-masks/frozen';
 
@@ -199,7 +200,7 @@ const TURNS = [
 ];
 const TURN_BACK = 37;
 
-const ease = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+const ease = (t: number) => smoothstepCpu(0, 1, t);
 
 /**
  * The clock of the séance, shared by every stage: the time, the flicker of each candle, how far
@@ -226,7 +227,7 @@ export class SeanceClock {
   readonly #marks: Record<string, [number, number]>;
   readonly #rest: [number, number];
   readonly #lens: {x: number; y: number};
-  #seed = 17;
+  readonly #random = new SeededRandom(17);
 
   constructor(layout: RoomJson, lights: number) {
     for (let i = 0; i < lights; i++) this.flicker.push(uniform(1));
@@ -239,12 +240,10 @@ export class SeanceClock {
   }
 
   random(): number {
-    this.#seed = (this.#seed * 16807) % 2147483647;
-    return this.#seed / 2147483647;
+    return this.#random.next();
   }
 
-  update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number): void {
     const t = (this.time.value += dt);
     this.round = (this.round + dt) % ROUND;
     const r = this.round;
@@ -630,6 +629,14 @@ export class GlassTint {
 
 /** how many moths flutter at the window */
 const MOTHS = 7;
+/** how often a flying moth settles on the stone, per second: once in 25 s on average */
+const SETTLE_RATE = 0.04;
+
+/**
+ * The seconds of flight until the next rest, drawn once per flight: the same rate as a throw per
+ * frame with `dt * SETTLE_RATE`, but independent of the frame rate.
+ */
+const flightOf = (clock: SeanceClock): number => -Math.log(1 - clock.random()) / SETTLE_RATE;
 
 interface Moth {
   mesh: Mesh;
@@ -644,6 +651,8 @@ interface Moth {
   flap: number;
   /** while above 0 it rests on the stone, its wings slow */
   rest: number;
+  /** seconds of flight before it next settles */
+  flight: number;
 }
 
 /**
@@ -729,10 +738,13 @@ export class ChapelWall {
         phase: clock.random() * 100,
         flap: 14 + clock.random() * 10,
         rest: clock.random() < 0.3 ? 2 + clock.random() * 6 : 0,
+        flight: 0,
       };
       this.#moths.push(moth);
       this.#add(mesh, 'moth', moth.cx, moth.cy, 2);
     }
+    // drawn after every moth is placed: the flights take no draw from the layout
+    for (const moth of this.#moths) moth.flight = flightOf(clock);
 
     on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
     this.#update(0);
@@ -746,9 +758,8 @@ export class ChapelWall {
     this.stage.scene.add(mesh);
   }
 
-  #update(deltaTime: number): void {
+  #update(dt: number): void {
     const clock = this.#clock;
-    const dt = Math.min(deltaTime, 0.1);
     const t = clock.time.value;
     for (let i = 0; i < this.#moths.length; i++) {
       const m = this.#moths[i]!;
@@ -768,7 +779,11 @@ export class ChapelWall {
         m.mesh.position.set(x, y, 0);
         if (dt > 0) m.mesh.rotation.z = Math.atan2(dy, dx) - Math.PI / 2 + Math.sin(t * 3 + i) * 0.3;
         m.mesh.scale.x = 0.2 + 0.8 * Math.abs(Math.cos(t * m.flap + i));
-        if (clock.random() < dt * 0.04) m.rest = 2 + clock.random() * 5;
+        m.flight -= dt;
+        if (m.flight <= 0) {
+          m.rest = 2 + clock.random() * 5;
+          m.flight = flightOf(clock);
+        }
       }
       // the nearer the glass, the warmer the light on its wings
       const near = Math.max(0, Math.min(1, 1 - (Math.hypot(m.mesh.position.x, m.mesh.position.y) - 280) / 260));

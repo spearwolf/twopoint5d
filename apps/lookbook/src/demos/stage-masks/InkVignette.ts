@@ -100,9 +100,8 @@ export class InkVignette {
     return draws;
   }
 
-  #update(deltaTime: number): void {
+  #update(dt: number): void {
     const clock = this.#clock;
-    const dt = Math.min(deltaTime, 0.1);
     const hw = this.stage.width > 0 ? this.stage.width / 2 : 480;
     const hh = VIEW_HEIGHT / 2;
     this.#halfSize.value.set(hw, hh);

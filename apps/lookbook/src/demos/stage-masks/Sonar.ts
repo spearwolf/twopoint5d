@@ -23,7 +23,7 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type UniformNode, Vector3, Vector4} from 'three/webgpu';
+import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, Vector3, Vector4} from 'three/webgpu';
 
 /** the view of both scenes, of the mask stage and of the HUD, in units, shown with `fit: 'cover'` */
 export const VIEW_WIDTH = 960;
@@ -65,7 +65,7 @@ export class SonarField {
   /** the clock of the sonar, in seconds: the page advances it, the mask stage does not own it */
   readonly time = uniform(0);
   /** the share of each kind in the picture: one is 1 and eases over when the kind changes */
-  readonly weights = uniform(new Vector3(1, 0, 0)) as unknown as UniformNode<'vec3', Vector3>;
+  readonly weights = uniform(new Vector3(1, 0, 0));
   readonly #origin: Node<'vec2'>;
   readonly #target = new Vector3(1, 0, 0);
   #kind: SonarKind = 'sonar sweep';
@@ -85,8 +85,7 @@ export class SonarField {
   }
 
   /** Advances the clock and eases the weights towards the kind, in about half a second. */
-  update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number): void {
     this.time.value += dt;
     this.weights.value.lerp(this.#target, 1 - Math.exp(-dt * 8));
   }
@@ -170,7 +169,7 @@ export class SonarHud {
   running = false;
 
   readonly #active = uniform(0);
-  readonly #view = uniform(new Vector4(0, 0, VIEW_WIDTH, VIEW_HEIGHT)) as unknown as UniformNode<'vec4', Vector4>;
+  readonly #view = uniform(new Vector4(0, 0, VIEW_WIDTH, VIEW_HEIGHT));
   readonly #canvas: HTMLCanvasElement;
   #overlay: Mesh | undefined;
   #inset: Mesh | undefined;
@@ -257,8 +256,7 @@ export class SonarHud {
     this.stage.scene.add(this.#inset);
   }
 
-  #update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  #update(dt: number): void {
     this.#active.value += ((this.running ? 1 : 0) - this.#active.value) * (1 - Math.exp(-dt * 6));
     const inset = this.#inset;
     const projection = this.stage.projection as OrthographicProjection | undefined;

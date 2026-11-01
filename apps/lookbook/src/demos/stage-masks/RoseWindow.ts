@@ -180,9 +180,8 @@ export class RoseWindow {
   }
 
   /** Moves the panes. Called by the demo once per frame, whether the director draws this stage or not. */
-  update(deltaTime: number): void {
+  update(dt: number): void {
     if (!this.#moving) return;
-    const dt = Math.min(deltaTime, 0.1);
     const t = this.#clock.time.value;
     let moving = false;
     for (let i = 0; i < this.panes.length; i++) {

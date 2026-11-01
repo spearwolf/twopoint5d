@@ -1,6 +1,6 @@
 import {on} from '@spearwolf/eventize';
 import {OnStageUpdateFrame, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
-import {exp, float, fract, positionWorld, screenCoordinate, sin, smoothstep, texture, uniform, vec2, vec3, vec4} from 'three/tsl';
+import {exp, float, positionWorld, screenCoordinate, sin, smoothstep, texture, uniform, vec2, vec3, vec4} from 'three/tsl';
 import {
   LinearFilter,
   LinearMipmapLinearFilter,
@@ -11,10 +11,10 @@ import {
   SRGBColorSpace,
   type Texture,
   TextureLoader,
-  type UniformNode,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {hash21} from './helpers';
 
 const DIR = 'stage-masks/matte-3d';
 
@@ -89,8 +89,8 @@ const hum = (t: number, seed: number) =>
 export class MirrorScene {
   readonly stage: Stage2D;
   readonly kind: 'bathroom' | 'reflection';
-  readonly #time = uniform(0) as unknown as UniformNode<'float', number>;
-  readonly #lamps = uniform(1) as unknown as UniformNode<'float', number>;
+  readonly #time = uniform(0);
+  readonly #lamps = uniform(1);
   readonly #mesh: Mesh;
 
   constructor(assets: MirrorAssets, kind: 'bathroom' | 'reflection') {
@@ -133,7 +133,7 @@ export class MirrorScene {
     // the grain of a dark room, finer than a pixel of the picture
     const sc = screenCoordinate.xy;
     const frame = t.mul(24).floor();
-    const grain = fract(sin(sc.x.mul(12.9898).add(sc.y.mul(78.233)).add(frame.mul(3.7))).mul(43758.5453));
+    const grain = hash21(sc.add(vec2(frame.mul(1.37), frame.mul(7.11))));
     color = color.add(grain.sub(0.5).mul(0.025));
 
     const material = new MeshBasicNodeMaterial({depthTest: false, depthWrite: false});
@@ -146,7 +146,7 @@ export class MirrorScene {
   }
 
   #update(deltaTime: number): void {
-    const t = (this.#time.value += Math.min(deltaTime, 0.1));
+    const t = (this.#time.value += deltaTime);
     if (this.kind === 'bathroom') {
       this.#lamps.value = 0.85 + 0.15 * hum(t, 1.3);
     } else {

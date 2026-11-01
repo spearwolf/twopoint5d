@@ -144,9 +144,9 @@ export class SpiritPlate extends PlaneStage {
  * as one even while a panel takes its mask off and on.
  */
 export class FogClock {
-  readonly time = uniform(0) as unknown as UniformNode<'float', number>;
+  readonly time = uniform(0);
   /** 0 the soft fog, 1 the hard-edged ectoplasm, any value between a blend of the two */
-  readonly hard = uniform(0) as unknown as UniformNode<'float', number>;
+  readonly hard = uniform(0);
 }
 
 /**
@@ -161,7 +161,7 @@ export class EctoplasmFog extends PlaneStage {
    * anti-aliasing one screen pixel wide at any scale — a true hard edge in the target, the way a
    * sprite with a crisp silhouette would draw it.
    */
-  readonly #scale = uniform(1) as unknown as UniformNode<'float', number>;
+  readonly #scale = uniform(1);
 
   constructor(layout: SeanceLayout, panel: number, clock: FogClock) {
     super(`ectoplasm ${panel + 1}`);

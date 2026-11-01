@@ -202,7 +202,7 @@ import {description, title} from './_stage-masks-resolution.json';
     display.onRenderFrame(({deltaTime}) => {
       if (!settings.drift) return;
       // one clock for the three fogs, written outside every mask stage
-      time += Math.min(deltaTime, 0.1);
+      time += deltaTime;
       clock.time.value = time;
     });
 

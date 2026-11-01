@@ -48,7 +48,10 @@ const RIPPLE_X = [37.1, 14.7] as const;
  *
  * - **It bends both pictures.** The slope of the coverage — sampled 8 px away on the card of the
  *   lookbook (a fixed share of the picture's height, so at any pixel ratio) — is the gradient of the hot air's density, and the uv is pushed along it: refraction, strongest
- *   at the edges of the plumes, where the coverage changes fastest. A ripple whose phase is the
+ *   at the edges of the plumes, where the coverage changes fastest. The four points stay inside
+ *   the picture — the coverage of a mask is 0 outside `[0, 1]`, and a point beyond the edge would
+ *   read a rim the heat does not have —, so at the edge the slope is taken on the one side; whoever
+ *   takes the slope of a coverage in an effect of their own needs the same. A ripple whose phase is the
  *   coverage itself adds the fine shimmer; it crawls as the plumes rise, with no clock of its own.
  * - **It is the share of `to`.** Where the heat is dense the new world shows through it.
  *
@@ -57,7 +60,7 @@ const RIPPLE_X = [37.1, 14.7] as const;
  * the last fifth so that what the heat never reached does not jump.
  */
 export function heatHaze({mask, strength = 1}: HeatHazeOptions): HeatHazeEffect {
-  const strengthNode = uniform(strength) as unknown as UniformNode<'float', number>;
+  const strengthNode = uniform(strength);
   return {
     name: 'heat-haze',
     masks: [mask],
@@ -68,15 +71,22 @@ export function heatHaze({mask, strength = 1}: HeatHazeOptions): HeatHazeEffect 
 
       // the width of the picture in picture heights: x and y in the same units on the screen
       const wide = resolution.x.div(resolution.y);
-      // the coverage here and at four points SLOPE_STEP away (8 px on the card): the difference
-      // over twice that distance is the slope of the air, in coverage per picture height
+      // the coverage here and at four points SLOPE_STEP away (8 px on the card), held inside the
+      // picture: outside [0, 1] the coverage of a mask is 0, and a point beyond the edge would read
+      // a rim the heat does not have. The difference over the distance between the two points is
+      // the slope of the air, in coverage per picture height — over twice SLOPE_STEP inside, and at
+      // the edge on the one side that lies in the picture
       const dx = vec2(float(SLOPE_STEP).div(wide), 0);
       const dy = vec2(0, SLOPE_STEP);
       const c = heat.coverage(uv);
+      const xPlus = clamp(uv.add(dx), 0, 1);
+      const xMinus = clamp(uv.sub(dx), 0, 1);
+      const yPlus = clamp(uv.add(dy), 0, 1);
+      const yMinus = clamp(uv.sub(dy), 0, 1);
       const slope = vec2(
-        heat.coverage(uv.add(dx)).sub(heat.coverage(uv.sub(dx))),
-        heat.coverage(uv.add(dy)).sub(heat.coverage(uv.sub(dy))),
-      ).div(2 * SLOPE_STEP);
+        heat.coverage(xPlus).sub(heat.coverage(xMinus)).div(xPlus.x.sub(xMinus.x).mul(wide)),
+        heat.coverage(yPlus).sub(heat.coverage(yMinus)).div(yPlus.y.sub(yMinus.y)),
+      );
 
       // the heat's edge: 1 where the coverage is a half, 0 in clear air and in the dense core
       const edge = c.mul(float(1).sub(c)).mul(4);

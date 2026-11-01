@@ -516,7 +516,7 @@ export class CrawlDark {
       depthTest: false,
       depthWrite: false,
       blending: AdditiveBlending,
-      attributeUsage: {dynamic: ['size', 'color', 'position']},
+      attributeUsage: {dynamic: ['size', 'color']},
     });
     this.#eyes.renderOrder = 1;
     this.stage.scene.add(this.#eyes);

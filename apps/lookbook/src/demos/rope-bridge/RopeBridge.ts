@@ -413,8 +413,7 @@ export class RopeBridge {
     weight.active = true;
   }
 
-  update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  update(dt: number): void {
     this.#time += dt;
     this.#sim.update(dt);
 

@@ -10,7 +10,6 @@ import {
   abs,
   exp,
   float,
-  fract,
   mx_noise_float,
   positionWorld,
   screenCoordinate,
@@ -33,11 +32,11 @@ import {
   SRGBColorSpace,
   type Texture,
   TextureLoader,
-  type UniformNode,
   Vector2,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {hash21} from './helpers';
 import {makeInkStage} from './InkWell';
 import {SoftBlobs} from './SoftBlobs';
 
@@ -185,11 +184,9 @@ export class TitleCard {
     const film = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
     const frame = t.mul(24).floor();
     const sc = screenCoordinate.xy;
-    const grain = fract(sin(sc.x.mul(12.9898).add(sc.y.mul(78.233)).add(frame.mul(3.7))).mul(43758.5453));
-    const scratchX = fract(sin(frame.mul(0.37)).mul(1731.3))
-      .mul(WORLD_W)
-      .add(WORLD.left);
-    const scratchOn = smoothstep(0.82, 0.86, fract(sin(frame.mul(1.13)).mul(911.7)));
+    const grain = hash21(sc.add(vec2(frame.mul(1.37), frame.mul(7.11))));
+    const scratchX = hash21(vec2(frame, 3.7)).mul(WORLD_W).add(WORLD.left);
+    const scratchOn = smoothstep(0.82, 0.86, hash21(vec2(frame, 11.9)));
     const scratch = float(1)
       .sub(smoothstep(0.2, 1.1, abs(p.x.sub(scratchX))))
       .mul(scratchOn);
@@ -203,7 +200,7 @@ export class TitleCard {
   }
 
   #update(deltaTime: number): void {
-    const t = (this.#time.value += Math.min(deltaTime, 0.1));
+    const t = (this.#time.value += deltaTime);
     // the projector's lamp: a gentle unsteadiness, and a dip now and then
     const dip = Math.sin(t * 0.7) > 0.97 ? 0.85 : 1;
     this.#flicker.value = (0.96 + 0.04 * Math.sin(t * 37) * Math.sin(t * 13.3)) * dip;
@@ -232,7 +229,7 @@ export class DrownedHall {
   pointer: {x: number; y: number} | undefined;
 
   readonly #time = uniform(0);
-  readonly #lantern = uniform(new Vector2(-200, -40)) as unknown as UniformNode<'vec2', Vector2>;
+  readonly #lantern = uniform(new Vector2(-200, -40));
   readonly #lanternGain = uniform(1);
   readonly #wall: Mesh;
   readonly #eyes: FeatureSpritesOf<typeof TexturedSpriteKind>;
@@ -325,7 +322,7 @@ export class DrownedHall {
       transparent: true,
       depthTest: false,
       depthWrite: false,
-      attributeUsage: {dynamic: ['position', 'color']},
+      attributeUsage: {dynamic: ['color']},
     });
     this.#eyes.name = 'eyeballs';
     this.#eyes.renderOrder = 0;
@@ -366,8 +363,7 @@ export class DrownedHall {
     on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
   }
 
-  #update(deltaTime: number): void {
-    const dt = Math.min(deltaTime, 0.1);
+  #update(dt: number): void {
     const t = (this.#time.value += dt);
     // the lantern wades slowly up and down the hall, bobbing with each step — or goes where the pointer is
     const tx = this.pointer ? this.pointer.x : Math.sin(t * 0.11) * 330 + Math.sin(t * 0.27) * 80;

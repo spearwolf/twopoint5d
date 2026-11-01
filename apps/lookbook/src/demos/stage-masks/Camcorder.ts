@@ -27,7 +27,8 @@ import {
   PlaneGeometry,
   SRGBColorSpace,
 } from 'three/webgpu';
-import {type FootageClock, hash21, makeFootageStage, VIEW_HEIGHT} from './FoundFootage';
+import {type FootageClock, makeFootageStage, VIEW_HEIGHT} from './FoundFootage';
+import {hash21} from './helpers';
 
 /** canvas pixels per unit of the HUD: sharp up to a window 1620 px tall */
 const DENSITY = 3;
