@@ -48,6 +48,7 @@ import {description, title} from './_ui-panels.json';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
+  import {fetchText} from '~demos/utils/fetchAsset';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
   // the preview screenshot waits until the windows are open and the first line is typed out
@@ -90,15 +91,19 @@ import {description, title} from './_ui-panels.json';
       {baseUrl: assetsUrl('ui-panels/')},
     );
 
+    // a load that fails lets go of the store; onDemoInit() shows the error
     const [[kit, kitTexture], [icons, iconsTexture], [fontTexture], fnt, fontImage, portraits] = await Promise.all([
       store.getAsync('kit', ['atlas', 'texture']),
       store.getAsync('icons', ['atlas', 'texture']),
       store.getAsync('font', ['texture']),
-      fetch(assetsUrl('ui-panels/pixel-8.fnt')).then((response) => response.text()),
+      fetchText('ui-panels', assetsUrl('ui-panels/pixel-8.fnt')),
       // the page once more as an image: the labels of the DynamicAtlas are drawn from it on the CPU
       loadImage(assetsUrl('ui-panels/pixel-8.png')),
       Promise.all(PARTY.map(async ({id}) => [id, await loadImage(assetsUrl(`ui-panels/portraits/${id}.png`))] as const)),
-    ]);
+    ]).catch((error: unknown) => {
+      store.dispose();
+      throw error;
+    });
 
     // a dispose() while the assets loaded has gone out already: nothing is built
     if (display.isDisposed) {

@@ -3,8 +3,11 @@ import {
   FeatureSprites,
   type FeatureSpritesOf,
   OnStageUpdateFrame,
+  type TextureAtlas,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {
   abs,
@@ -34,21 +37,17 @@ import {
   AdditiveBlending,
   type Blending,
   CustomBlending,
-  LinearFilter,
-  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
   type Node,
   PlaneGeometry,
-  SRGBColorSpace,
   SrcAlphaFactor,
   type Texture,
-  TextureLoader,
   type WebGPURenderer,
   ZeroFactor,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {additive, SeededRandom} from './helpers';
+import {additive, atlasFrame, SeededRandom, setPlaneUvToFrame} from './helpers';
 import {makeRiftStage, type RiftState, WORLD} from './RiftMembrane';
 
 const DIR = 'stage-masks/rift';
@@ -83,67 +82,57 @@ const KELP = [
   {x: 585, h: 290, frame: 'kelp-c'},
 ] as const;
 
-interface AtlasJson {
-  frames: Record<string, {frame: {x: number; y: number; w: number; h: number}}>;
-  meta: {size: {w: number; h: number}};
-}
-
 export interface DeepAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   roomNight: Texture;
   roomDrowned: Texture;
   sky: Texture;
   deep: Texture;
   sprites: Texture;
-  atlas: AtlasJson;
+  atlas: TextureAtlas;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/rift/`). */
+const catalog: TextureStoreData = {
+  // in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    roomNight: {imageUrl: 'room-night.webp'},
+    roomDrowned: {imageUrl: 'room-drowned.webp'},
+    sky: {imageUrl: 'sky.webp'},
+    deep: {imageUrl: 'deep.webp'},
+    // the frames of an atlas count t from the top: it is read upright
+    sprites: {atlasUrl: 'sprites.json', texture: ['no-flipy']},
+  },
+};
+
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/rift/`). The store of the answer
+ * holds the textures; a load that fails disposes the store it built.
+ */
 export async function loadDeepAssets(renderer: WebGPURenderer): Promise<DeepAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [roomNight, roomDrowned, sky, deep, sprites, atlas] = await Promise.all([
-    load('room-night.webp'),
-    load('room-drowned.webp'),
-    load('sky.webp'),
-    load('deep.webp'),
-    load('sprites.png'),
-    fetch(assetsUrl(`${DIR}/sprites.json`)).then((response) => response.json() as Promise<AtlasJson>),
-  ]);
-  // an atlas of the library's sprites is read upright, t from the top
-  sprites.flipY = false;
-  return {roomNight, roomDrowned, sky, deep, sprites, atlas};
-}
-
-export function disposeDeepAssets(assets: DeepAssets): void {
-  assets.roomNight.dispose();
-  assets.roomDrowned.dispose();
-  assets.sky.dispose();
-  assets.deep.dispose();
-  assets.sprites.dispose();
-}
-
-/** The rectangle of a frame of the atlas in uv, t from the top: the atlas is uploaded upright. */
-function frameUv(atlas: AtlasJson, name: string) {
-  const entry = atlas.frames[name];
-  if (!entry) throw new Error(`DeepListening: the atlas has no frame "${name}"`);
-  const {x, y, w, h} = entry.frame;
-  const {w: aw, h: ah} = atlas.meta.size;
-  return {u: x / aw, v: y / ah, uw: w / aw, vh: h / ah, w: w / TEXELS_PER_UNIT, h: h / TEXELS_PER_UNIT};
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [roomNight, roomDrowned, sky, deep, [atlas, sprites]] = await Promise.all([
+      store.getAsync('roomNight', 'texture'),
+      store.getAsync('roomDrowned', 'texture'),
+      store.getAsync('sky', 'texture'),
+      store.getAsync('deep', 'texture'),
+      store.getAsync('sprites', ['atlas', 'texture']),
+    ]);
+    return {store, roomNight, roomDrowned, sky, deep, sprites, atlas};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 /** Puts a frame of the atlas on a sprite at the size it was drawn, times `scale`. */
-function setFrame(sprite: TexturedSprite, atlas: AtlasJson, name: string, scale = 1): void {
-  const f = frameUv(atlas, name);
-  sprite.setTexCoords(f.u, f.v, f.uw, f.vh);
-  sprite.setSize(f.w * scale, f.h * scale);
+function setFrame(sprite: TexturedSprite, atlas: TextureAtlas, name: string, scale = 1): void {
+  const frame = atlasFrame(atlas, 'DeepListening', name);
+  sprite.setFrame(frame);
+  sprite.setSize((frame.coords.width / TEXELS_PER_UNIT) * scale, (frame.coords.height / TEXELS_PER_UNIT) * scale);
 }
 
 const spritePool = (assets: DeepAssets, capacity: number, name: string, blending?: Blending) => {
@@ -186,14 +175,12 @@ function swayingPlane(
     tint: [number, number, number];
   },
 ): Mesh {
-  const f = frameUv(assets.atlas, frame);
-  const scale = opts.height / f.h;
-  const w = f.w * scale;
+  const {coords} = atlasFrame(assets.atlas, 'DeepListening', frame);
+  const scale = opts.height / (coords.height / TEXELS_PER_UNIT);
+  const w = (coords.width / TEXELS_PER_UNIT) * scale;
   const h = opts.height;
   const geometry = new PlaneGeometry(w, h, 1, 24);
-  const uvs = geometry.getAttribute('uv');
-  // the plane's v runs up from its bottom edge, the atlas' t down from the top of the frame
-  for (let i = 0; i < uvs.count; i++) uvs.setXY(i, f.u + uvs.getX(i) * f.uw, f.v + (1 - uvs.getY(i)) * f.vh);
+  setPlaneUvToFrame(geometry, coords);
   // 0 at the anchor, 1 at the free end
   const along = opts.anchor === 'bottom' ? positionLocal.y.div(h).add(0.5) : float(0.5).sub(positionLocal.y.div(h));
   const t = opts.time;
@@ -541,8 +528,8 @@ export class DrownedRoom {
     near.renderOrder = 3;
     this.#bell = near.createSprite()!;
     setFrame(this.#bell, assets.atlas, 'jelly-bell');
-    const bell = frameUv(assets.atlas, 'jelly-bell');
-    this.#bellSize = {w: bell.w, h: bell.h};
+    const bell = atlasFrame(assets.atlas, 'DeepListening', 'jelly-bell').coords;
+    this.#bellSize = {w: bell.width / TEXELS_PER_UNIT, h: bell.height / TEXELS_PER_UNIT};
 
     const room = texturedPlane(assets.roomDrowned, WORLD, 'room');
     room.renderOrder = 4;

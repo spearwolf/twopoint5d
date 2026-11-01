@@ -17,7 +17,7 @@ import {description, title} from './_stage-masks-without-director.json';
   import {Display, type StageMaskCoverageSource, StageRenderer} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color, RenderPipeline} from 'three/webgpu';
-  import {disposeWallpaperAssets, loadWallpaperAssets, WatchingWallpaper} from '~demos/stage-masks/WatchingWallpaper';
+  import {loadWallpaperAssets, WatchingWallpaper} from '~demos/stage-masks/WatchingWallpaper';
   import {onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
@@ -38,7 +38,7 @@ import {description, title} from './_stage-masks-without-director.json';
   onDemoInit(display, 'stage-masks-without-director', async ({renderer}) => {
     const assets = await loadWallpaperAssets(renderer);
     if (display.isDisposed) {
-      disposeWallpaperAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -79,7 +79,7 @@ import {description, title} from './_stage-masks-without-director.json';
       sr.dispose();
       pipeline.dispose();
       wall.dispose();
-      disposeWallpaperAssets(assets);
+      assets.store.dispose();
     });
   });
 

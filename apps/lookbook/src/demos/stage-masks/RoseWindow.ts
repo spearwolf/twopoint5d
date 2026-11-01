@@ -55,8 +55,8 @@ export class RoseWindow {
 
   constructor(assets: ChapelAssets, clock: SeanceClock) {
     this.#clock = clock;
-    const {window} = assets;
-    const e = window.extent;
+    const {rose} = assets;
+    const e = rose.extent;
 
     const q = uv();
     const glass = texture(assets.glass, q);
@@ -70,7 +70,7 @@ export class RoseWindow {
     this.#material = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
     this.#material.colorNode = vec4(glass.r, float(0), glass.b, glass.a.mul(mine));
 
-    for (const info of window.panes) {
+    for (const info of rose.panes) {
       const mesh = new Mesh(paneGeometry(info, e), this.#material);
       mesh.name = `pane ${info.id} (${info.ring} ${info.part})`;
       mesh.position.set(info.cx, info.cy, 0);

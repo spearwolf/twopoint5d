@@ -24,7 +24,6 @@ import {description, title} from './_stage-masks-flashlight.json';
     CrawlFlashlight,
     CrawlLevel,
     type CrawlProjection,
-    disposeCrawlAssets,
     loadCrawlAssets,
     makeLightNodes,
     makeProjection,
@@ -58,7 +57,7 @@ import {description, title} from './_stage-masks-flashlight.json';
   onDemoInit(display, 'stage-masks-flashlight', async ({renderer}) => {
     const assets = await loadCrawlAssets(renderer);
     if (display.isDisposed) {
-      disposeCrawlAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -209,7 +208,7 @@ import {description, title} from './_stage-masks-flashlight.json';
       flashlight.dispose();
       level.dispose();
       dark.dispose();
-      disposeCrawlAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

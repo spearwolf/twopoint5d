@@ -18,15 +18,7 @@ import {description, title} from './_stage-masks-frozen.json';
   import {Display, OnStageUpdateFrame, StageDirector, type StageDirectorShape, StageMask} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
-  import {
-    ChapelVoid,
-    ChapelWall,
-    disposeChapelAssets,
-    GlassTint,
-    loadChapelAssets,
-    SeanceClock,
-    SeanceRoom,
-  } from '~demos/stage-masks/MothChapel';
+  import {ChapelVoid, ChapelWall, GlassTint, loadChapelAssets, SeanceClock, SeanceRoom} from '~demos/stage-masks/MothChapel';
   import {RoseWindow} from '~demos/stage-masks/RoseWindow';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
@@ -46,7 +38,7 @@ import {description, title} from './_stage-masks-frozen.json';
   onDemoInit(display, 'stage-masks-frozen', async ({renderer}) => {
     const assets = await loadChapelAssets(renderer);
     if (display.isDisposed) {
-      disposeChapelAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -178,7 +170,7 @@ import {description, title} from './_stage-masks-frozen.json';
       amber.dispose();
       room.dispose();
       dark.dispose();
-      disposeChapelAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

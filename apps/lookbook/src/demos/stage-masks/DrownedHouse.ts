@@ -5,6 +5,8 @@ import {
   OnStageUpdateFrame,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {
   abs,
@@ -22,20 +24,9 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import {
-  LinearFilter,
-  LinearMipmapLinearFilter,
-  Mesh,
-  MeshBasicNodeMaterial,
-  type Node,
-  PlaneGeometry,
-  SRGBColorSpace,
-  type Texture,
-  TextureLoader,
-  Vector2,
-  type WebGPURenderer,
-} from 'three/webgpu';
+import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type Texture, Vector2, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
 import {hash21} from './helpers';
 import {makeInkStage} from './InkWell';
 import {SoftBlobs} from './SoftBlobs';
@@ -71,6 +62,8 @@ interface Layout {
 }
 
 export interface DrownedHouseAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   house: Texture;
   title: Texture;
   prompt: Texture;
@@ -79,35 +72,39 @@ export interface DrownedHouseAssets {
   layout: Layout;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/matte-ink/`). */
-export async function loadDrownedHouseAssets(renderer: WebGPURenderer): Promise<DrownedHouseAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [house, title, prompt, hall, eyes, layout] = await Promise.all([
-    load('house.webp'),
-    load('title.webp'),
-    load('prompt.webp'),
-    load('hall.webp'),
-    load('eyes.png'),
-    fetch(assetsUrl(`${DIR}/layout.json`)).then((response) => response.json() as Promise<Layout>),
-  ]);
-  return {house, title, prompt, hall, eyes, layout};
-}
+// in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+const catalog: TextureStoreData = {
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    house: {imageUrl: 'house.webp'},
+    title: {imageUrl: 'title.webp'},
+    prompt: {imageUrl: 'prompt.webp'},
+    hall: {imageUrl: 'hall.webp'},
+    eyes: {imageUrl: 'eyes.png'},
+  },
+};
 
-export function disposeDrownedHouseAssets(assets: DrownedHouseAssets): void {
-  assets.house.dispose();
-  assets.title.dispose();
-  assets.prompt.dispose();
-  assets.hall.dispose();
-  assets.eyes.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/matte-ink/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadDrownedHouseAssets(renderer: WebGPURenderer): Promise<DrownedHouseAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [house, title, prompt, hall, eyes, layout] = await Promise.all([
+      store.getAsync('house', 'texture'),
+      store.getAsync('title', 'texture'),
+      store.getAsync('prompt', 'texture'),
+      store.getAsync('hall', 'texture'),
+      store.getAsync('eyes', 'texture'),
+      fetchJson<Layout>('DrownedHouse', assetsUrl(`${DIR}/layout.json`)),
+    ]);
+    return {store, house, title, prompt, hall, eyes, layout};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 /** The uv of a scene image (flipped on upload, so v runs from the bottom) at a point in units. */

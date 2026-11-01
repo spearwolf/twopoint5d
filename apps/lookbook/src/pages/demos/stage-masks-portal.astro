@@ -19,15 +19,7 @@ import {description, title} from './_stage-masks-portal.json';
   import GUI from 'lil-gui';
   import {Color, type PerspectiveCamera} from 'three/webgpu';
   import {Glaze, Moor, PortalCanvas} from '~demos/stage-masks/PaintedMoor';
-  import {
-    disposePortalAssets,
-    FRAME,
-    Hallway,
-    loadPortalAssets,
-    MAX_CAMERA_Z,
-    MIN_DISTANCE,
-    PortalState,
-  } from '~demos/stage-masks/PaintingHallway';
+  import {FRAME, Hallway, loadPortalAssets, MAX_CAMERA_Z, MIN_DISTANCE, PortalState} from '~demos/stage-masks/PaintingHallway';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
   import {deferPreview} from '~demos/utils/demoPreview';
@@ -48,7 +40,7 @@ import {description, title} from './_stage-masks-portal.json';
   onDemoInit(display, 'stage-masks-portal', async ({renderer}) => {
     const assets = await loadPortalAssets(renderer);
     if (display.isDisposed) {
-      disposePortalAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -218,7 +210,7 @@ import {description, title} from './_stage-masks-portal.json';
       glaze.dispose();
       moor.dispose();
       hallway.dispose();
-      disposePortalAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

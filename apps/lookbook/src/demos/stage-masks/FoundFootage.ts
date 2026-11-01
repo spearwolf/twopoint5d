@@ -5,8 +5,11 @@ import {
   OnStageUpdateFrame,
   OrthographicProjection,
   Stage2D,
+  type TextureAtlas,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {
   abs,
@@ -28,19 +31,14 @@ import {
   AdditiveBlending,
   type Blending,
   Group,
-  LinearFilter,
-  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
   PlaneGeometry,
-  RepeatWrapping,
-  SRGBColorSpace,
   type Texture,
-  TextureLoader,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {additive, hash21, multiply, randomAt, SeededRandom} from './helpers';
+import {additive, atlasFrame, hash21, multiply, randomAt, SeededRandom, setMirroredFrame} from './helpers';
 
 const DIR = 'stage-masks/found-footage';
 /** the atlas and the ground have 2 texels per unit */
@@ -144,52 +142,42 @@ export class FootageClock {
   }
 }
 
-interface AtlasJson {
-  frames: Record<string, {frame: {x: number; y: number; w: number; h: number}}>;
-  meta: {size: {w: number; h: number}};
-}
-
 export interface FootageAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   sprites: Texture;
   ground: Texture;
-  atlas: AtlasJson;
+  atlas: TextureAtlas;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/found-footage/`). */
+const catalog: TextureStoreData = {
+  // in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    // the frames of an atlas count t from the top: it is read upright
+    sprites: {atlasUrl: 'sprites.json', texture: ['no-flipy']},
+    // the ground repeats along the walk
+    ground: {imageUrl: 'ground.webp', texture: ['repeat-s']},
+  },
+};
+
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/found-footage/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
 export async function loadFootageAssets(renderer: WebGPURenderer): Promise<FootageAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [sprites, ground, atlas] = await Promise.all([
-    load('sprites.webp'),
-    load('ground.webp'),
-    fetch(assetsUrl(`${DIR}/sprites.json`)).then((response) => response.json() as Promise<AtlasJson>),
-  ]);
-  // an atlas of the library's sprites is read upright, t from the top
-  sprites.flipY = false;
-  ground.wrapS = RepeatWrapping;
-  return {sprites, ground, atlas};
-}
-
-export function disposeFootageAssets(assets: FootageAssets): void {
-  assets.sprites.dispose();
-  assets.ground.dispose();
-}
-
-/** The rectangle of a frame of the atlas in uv (t from the top: the atlas is uploaded upright) and its size in units. */
-function frameOf(atlas: AtlasJson, name: string) {
-  const entry = atlas.frames[name];
-  if (!entry) throw new Error(`FoundFootage: the atlas has no frame "${name}"`);
-  const {x, y, w, h} = entry.frame;
-  const {w: aw, h: ah} = atlas.meta.size;
-  return {u: x / aw, v: y / ah, uw: w / aw, vh: h / ah, w: w / TEXELS_PER_UNIT, h: h / TEXELS_PER_UNIT};
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [[atlas, sprites], ground] = await Promise.all([
+      store.getAsync('sprites', ['atlas', 'texture']),
+      store.getAsync('ground', 'texture'),
+    ]);
+    return {store, sprites, ground, atlas};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 /** A sprite of a parallax row: where it stands in the row's period and how it is placed. */
@@ -245,12 +233,14 @@ class ParallaxRow {
 
     const place = (frameName: string, x0: number, scale: number, light: number, mirror: boolean) => {
       const sprite = this.mesh.createSprite()!;
-      const f = frameOf(assets.atlas, frameName);
-      if (mirror) sprite.setTexCoords(f.u + f.uw, f.v, -f.uw, f.vh);
-      else sprite.setTexCoords(f.u, f.v, f.uw, f.vh);
-      sprite.setSize(f.w * scale, f.h * scale);
+      const frame = atlasFrame(assets.atlas, 'FoundFootage', frameName);
+      if (mirror) setMirroredFrame(sprite, frame);
+      else sprite.setFrame(frame);
+      const w = (frame.coords.width / TEXELS_PER_UNIT) * scale;
+      const h = (frame.coords.height / TEXELS_PER_UNIT) * scale;
+      sprite.setSize(w, h);
       sprite.setColorValues(NIGHT[0] * light, NIGHT[1] * light, NIGHT[2] * light, 1);
-      this.#sprites.push({sprite, x0, y: spec.baseY + (f.h * scale) / 2});
+      this.#sprites.push({sprite, x0, y: spec.baseY + h / 2});
     };
 
     // spread evenly with a jitter, so no two trunks of a row stand on top of each other
@@ -343,8 +333,8 @@ export class ForestLevel {
 
     // the figure: in the fog between the far trees, as far away as ever, eyes catching the lamp
     {
-      const f = frameOf(assets.atlas, 'figure');
-      this.#figureH = f.h * FIGURE_SCALE;
+      const figure = atlasFrame(assets.atlas, 'FoundFootage', 'figure');
+      this.#figureH = (figure.coords.height / TEXELS_PER_UNIT) * FIGURE_SCALE;
       this.#figure = new FeatureSprites(TexturedSpriteKind, {
         capacity: 1,
         textures: {colorMap: assets.sprites},
@@ -354,13 +344,13 @@ export class ForestLevel {
       });
       this.#figure.name = 'figure';
       this.#figureSprite = this.#figure.createSprite()!;
-      this.#figureSprite.setTexCoords(f.u, f.v, f.uw, f.vh);
-      this.#figureSprite.setSize(f.w * FIGURE_SCALE, this.#figureH);
+      this.#figureSprite.setFrame(figure);
+      this.#figureSprite.setSize((figure.coords.width / TEXELS_PER_UNIT) * FIGURE_SCALE, this.#figureH);
       this.#figureSprite.setColorValues(NIGHT[0] * 0.5, NIGHT[1] * 0.5, NIGHT[2] * 0.5, 1);
       this.#figure.renderOrder = order++;
       this.#world.add(this.#figure);
 
-      const e = frameOf(assets.atlas, 'eyeshine');
+      const eyeshine = atlasFrame(assets.atlas, 'FoundFootage', 'eyeshine');
       this.#eyes = new FeatureSprites(TexturedSpriteKind, {
         capacity: 1,
         textures: {colorMap: assets.sprites},
@@ -372,8 +362,11 @@ export class ForestLevel {
       });
       this.#eyes.name = 'eyeshine';
       this.#eyesSprite = this.#eyes.createSprite()!;
-      this.#eyesSprite.setTexCoords(e.u, e.v, e.uw, e.vh);
-      this.#eyesSprite.setSize(e.w * FIGURE_SCALE, e.h * FIGURE_SCALE);
+      this.#eyesSprite.setFrame(eyeshine);
+      this.#eyesSprite.setSize(
+        (eyeshine.coords.width / TEXELS_PER_UNIT) * FIGURE_SCALE,
+        (eyeshine.coords.height / TEXELS_PER_UNIT) * FIGURE_SCALE,
+      );
       this.#eyes.renderOrder = order++;
       this.#world.add(this.#eyes);
     }

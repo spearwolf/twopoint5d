@@ -1,18 +1,16 @@
 import {on} from '@spearwolf/eventize';
-import {OnStageUpdateFrame, OrthographicProjection, Stage2D, StageMask} from '@spearwolf/twopoint5d';
-import {clamp, exp, float, length, mx_noise_float, positionWorld, smoothstep, uniform, vec2, vec3, vec4} from 'three/tsl';
 import {
-  LinearFilter,
-  LinearMipmapLinearFilter,
-  Mesh,
-  MeshBasicNodeMaterial,
-  PlaneGeometry,
-  SRGBColorSpace,
-  type Texture,
-  TextureLoader,
-  type WebGPURenderer,
-} from 'three/webgpu';
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageMask,
+  TextureStore,
+  type TextureStoreData,
+} from '@spearwolf/twopoint5d';
+import {clamp, exp, float, length, mx_noise_float, positionWorld, smoothstep, uniform, vec2, vec3, vec4} from 'three/tsl';
+import {Mesh, MeshBasicNodeMaterial, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
 import {additive, SeededRandom, smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
@@ -47,35 +45,44 @@ export interface CrematoriumLayout {
 export type CrematoriumVariant = 'snow' | 'ash';
 
 export interface CrematoriumAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   outside: Record<CrematoriumVariant, Texture>;
   room: Record<CrematoriumVariant, Texture>;
   layout: CrematoriumLayout;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/heat-haze/`). */
-export async function loadCrematoriumAssets(renderer: WebGPURenderer): Promise<CrematoriumAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [outsideSnow, outsideAsh, roomSnow, roomAsh, layout] = await Promise.all([
-    load('outside-snow.webp'),
-    load('outside-ash.webp'),
-    load('room-snow.webp'),
-    load('room-ash.webp'),
-    fetch(assetsUrl(`${DIR}/layout.json`)).then((response) => response.json() as Promise<CrematoriumLayout>),
-  ]);
-  return {outside: {snow: outsideSnow, ash: outsideAsh}, room: {snow: roomSnow, ash: roomAsh}, layout};
-}
+// in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+const catalog: TextureStoreData = {
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    outsideSnow: {imageUrl: 'outside-snow.webp'},
+    outsideAsh: {imageUrl: 'outside-ash.webp'},
+    roomSnow: {imageUrl: 'room-snow.webp'},
+    roomAsh: {imageUrl: 'room-ash.webp'},
+  },
+};
 
-export function disposeCrematoriumAssets(assets: CrematoriumAssets): void {
-  for (const tex of [assets.outside.snow, assets.outside.ash, assets.room.snow, assets.room.ash]) tex.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/heat-haze/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadCrematoriumAssets(renderer: WebGPURenderer): Promise<CrematoriumAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [outsideSnow, outsideAsh, roomSnow, roomAsh, layout] = await Promise.all([
+      store.getAsync('outsideSnow', 'texture'),
+      store.getAsync('outsideAsh', 'texture'),
+      store.getAsync('roomSnow', 'texture'),
+      store.getAsync('roomAsh', 'texture'),
+      fetchJson<CrematoriumLayout>('CrematoriumWindow', assetsUrl(`${DIR}/layout.json`)),
+    ]);
+    return {store, outside: {snow: outsideSnow, ash: outsideAsh}, room: {snow: roomSnow, ash: roomAsh}, layout};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 const makeStage = (name: string) => {

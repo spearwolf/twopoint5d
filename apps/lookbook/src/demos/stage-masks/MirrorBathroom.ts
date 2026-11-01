@@ -1,19 +1,9 @@
 import {on} from '@spearwolf/eventize';
-import {OnStageUpdateFrame, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
+import {OnStageUpdateFrame, OrthographicProjection, Stage2D, TextureStore, type TextureStoreData} from '@spearwolf/twopoint5d';
 import {exp, float, positionWorld, screenCoordinate, sin, smoothstep, texture, uniform, vec2, vec3, vec4} from 'three/tsl';
-import {
-  LinearFilter,
-  LinearMipmapLinearFilter,
-  Mesh,
-  MeshBasicNodeMaterial,
-  type Node,
-  PlaneGeometry,
-  SRGBColorSpace,
-  type Texture,
-  TextureLoader,
-  type WebGPURenderer,
-} from 'three/webgpu';
+import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
 import {hash21} from './helpers';
 
 const DIR = 'stage-masks/matte-3d';
@@ -34,34 +24,40 @@ export interface MirrorLayout {
 }
 
 export interface MirrorAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   bathroom: Texture;
   reflection: Texture;
   layout: MirrorLayout;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/matte-3d/`). */
-export async function loadMirrorAssets(renderer: WebGPURenderer): Promise<MirrorAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [bathroom, reflection, layout] = await Promise.all([
-    load('bathroom.webp'),
-    load('reflection.webp'),
-    fetch(assetsUrl(`${DIR}/layout.json`)).then((response) => response.json() as Promise<MirrorLayout>),
-  ]);
-  return {bathroom, reflection, layout};
-}
+// in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+const catalog: TextureStoreData = {
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    bathroom: {imageUrl: 'bathroom.webp'},
+    reflection: {imageUrl: 'reflection.webp'},
+  },
+};
 
-export function disposeMirrorAssets(assets: MirrorAssets): void {
-  assets.bathroom.dispose();
-  assets.reflection.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/matte-3d/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadMirrorAssets(renderer: WebGPURenderer): Promise<MirrorAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [bathroom, reflection, layout] = await Promise.all([
+      store.getAsync('bathroom', 'texture'),
+      store.getAsync('reflection', 'texture'),
+      fetchJson<MirrorLayout>('MirrorBathroom', assetsUrl(`${DIR}/layout.json`)),
+    ]);
+    return {store, bathroom, reflection, layout};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 export const makeMirrorStage = (name: string) => {

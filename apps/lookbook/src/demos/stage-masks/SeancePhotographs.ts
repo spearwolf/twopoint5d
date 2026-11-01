@@ -1,21 +1,18 @@
-import {OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
+import {OrthographicProjection, Stage2D, TextureStore, type TextureStoreData} from '@spearwolf/twopoint5d';
 import {abs, clamp, exp, float, fwidth, max, mix, mx_noise_float, sin, smoothstep, uniform, uv, vec2, vec3} from 'three/tsl';
 import {
   FloatType,
   HalfFloatType,
-  LinearFilter,
-  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
   PlaneGeometry,
-  SRGBColorSpace,
   type Texture,
   type TextureDataType,
-  TextureLoader,
   type UniformNode,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
 
 const DIR = 'stage-masks/resolution';
 
@@ -42,37 +39,43 @@ export interface SeanceLayout {
 }
 
 export interface SeanceAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   wall: Texture;
   living: Texture;
   spirit: Texture;
   layout: SeanceLayout;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/resolution/`). */
-export async function loadSeanceAssets(renderer: WebGPURenderer): Promise<SeanceAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [wall, living, spirit, layout] = await Promise.all([
-    load('wall.webp'),
-    load('living.webp'),
-    load('spirit.webp'),
-    fetch(assetsUrl(`${DIR}/layout.json`)).then((response) => response.json() as Promise<SeanceLayout>),
-  ]);
-  return {wall, living, spirit, layout};
-}
+// in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+const catalog: TextureStoreData = {
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    wall: {imageUrl: 'wall.webp'},
+    living: {imageUrl: 'living.webp'},
+    spirit: {imageUrl: 'spirit.webp'},
+  },
+};
 
-export function disposeSeanceAssets(assets: SeanceAssets): void {
-  assets.wall.dispose();
-  assets.living.dispose();
-  assets.spirit.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/resolution/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadSeanceAssets(renderer: WebGPURenderer): Promise<SeanceAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [wall, living, spirit, layout] = await Promise.all([
+      store.getAsync('wall', 'texture'),
+      store.getAsync('living', 'texture'),
+      store.getAsync('spirit', 'texture'),
+      fetchJson<SeanceLayout>('SeancePhotographs', assetsUrl(`${DIR}/layout.json`)),
+    ]);
+    return {store, wall, living, spirit, layout};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 const makeStage = (name: string) => {

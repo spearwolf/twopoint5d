@@ -26,7 +26,6 @@ import {description, title} from './_stage-masks-spotlight.json';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
   import {
-    disposeWardAssets,
     LAUNDROMAT,
     loadWardAssets,
     makeLightNodes,
@@ -62,7 +61,7 @@ import {description, title} from './_stage-masks-spotlight.json';
   onDemoInit(display, 'stage-masks-spotlight', async ({renderer}) => {
     const assets = await loadWardAssets(renderer);
     if (display.isDisposed) {
-      disposeWardAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -248,7 +247,7 @@ import {description, title} from './_stage-masks-spotlight.json';
       laundromat.dispose();
       player.dispose();
       fog.dispose();
-      disposeWardAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

@@ -1,5 +1,14 @@
+import type {TextureAtlas, TextureAtlasFrame, TextureCoords, TexturedSprite} from '@spearwolf/twopoint5d';
 import {dot, fract, vec3} from 'three/tsl';
-import {CustomBlending, DstColorFactor, type MeshBasicNodeMaterial, type Node, OneFactor, ZeroFactor} from 'three/webgpu';
+import {
+  type BufferGeometry,
+  CustomBlending,
+  DstColorFactor,
+  type MeshBasicNodeMaterial,
+  type Node,
+  OneFactor,
+  ZeroFactor,
+} from 'three/webgpu';
 
 /**
  * The helpers the scenes of the stage mask demos have in common. A scene imports from this
@@ -86,4 +95,34 @@ export function additive(material: MeshBasicNodeMaterial): MeshBasicNodeMaterial
   material.depthTest = false;
   material.depthWrite = false;
   return material;
+}
+
+/**
+ * The frame `name` of `atlas`; a frame the atlas lacks throws, with `subject` — the module of the
+ * scene — as the first word of the message.
+ */
+export function atlasFrame(atlas: TextureAtlas, subject: string, name: string): TextureAtlasFrame {
+  const frame = atlas.frame(name);
+  if (!frame) throw new Error(`${subject}: the atlas has no frame "${name}"`);
+  return frame;
+}
+
+/** Puts `frame` on `sprite`, mirrored left to right: the tex coords start at its right edge and run back. */
+export function setMirroredFrame(sprite: TexturedSprite, frame: TextureAtlasFrame): void {
+  sprite.setFrame(frame);
+  const [s, t, u, v] = frame.coords.getTexCoords();
+  sprite.setTexCoords(s + u, t, -u, v);
+}
+
+/**
+ * Writes the `uv` of a `PlaneGeometry` — of any number of segments, as the plane built it, 0 … 1
+ * over the plane — so that the plane shows `coords` upright. The plane counts v up from its bottom
+ * edge; the atlas is read with `flipY = false` and counts t down from the top of the image, so the
+ * top of the plane gets the top of the frame.
+ */
+export function setPlaneUvToFrame(geometry: BufferGeometry, coords: TextureCoords): void {
+  const [s, t, u, v] = coords.getTexCoords();
+  const uv = geometry.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, s + uv.getX(i) * u, t + (1 - uv.getY(i)) * v);
+  uv.needsUpdate = true;
 }

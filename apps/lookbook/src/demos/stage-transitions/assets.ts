@@ -1,6 +1,7 @@
 import {BitmapFont, type TextureAtlas, TextureStore, type TextureStoreData} from '@spearwolf/twopoint5d';
 import {CanvasTexture, SRGBColorSpace, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchText} from '~demos/utils/fetchAsset';
 
 /** The size of the view every layer of the two demos lays itself out in, in units. */
 export const VIEW_WIDTH = 640;
@@ -30,8 +31,7 @@ const catalog: TextureStoreData = {
 };
 
 async function loadFont(name: string): Promise<BitmapFont> {
-  const response = await fetch(assetsUrl(`sine-scroller/${name}.fnt`));
-  const [font] = BitmapFont.parse(await response.text());
+  const [font] = BitmapFont.parse(await fetchText('loadStageTransitionAssets', assetsUrl(`sine-scroller/${name}.fnt`)));
   return font;
 }
 
@@ -52,18 +52,26 @@ export function makeDotTexture(): Texture {
   return texture;
 }
 
-/** Loads what the two demos draw with. The store holds the textures; dispose it with the demo. */
+/**
+ * Loads what the two demos draw with. The store holds the textures; dispose it with the demo. A
+ * load that fails disposes the store it built before the error reaches the caller.
+ */
 export async function loadStageTransitionAssets(
   renderer: WebGPURenderer,
 ): Promise<{store: TextureStore; assets: StageTransitionAssets}> {
   const store = new TextureStore(renderer);
-  store.parse(catalog, {baseUrl: assetsUrl('')});
-  const [chromeFont, pixelFont, [chromePage], [pixelPage], [ships, shipsTexture]] = await Promise.all([
-    loadFont('chrome-32'),
-    loadFont('pixel-8'),
-    store.getAsync('chromePage', ['texture']),
-    store.getAsync('pixelPage', ['texture']),
-    store.getAsync('ships', ['atlas', 'texture']),
-  ]);
-  return {store, assets: {chromeFont, chromePage, pixelFont, pixelPage, ships, shipsTexture, dot: makeDotTexture()}};
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl('')});
+    const [chromeFont, pixelFont, [chromePage], [pixelPage], [ships, shipsTexture]] = await Promise.all([
+      loadFont('chrome-32'),
+      loadFont('pixel-8'),
+      store.getAsync('chromePage', ['texture']),
+      store.getAsync('pixelPage', ['texture']),
+      store.getAsync('ships', ['atlas', 'texture']),
+    ]);
+    return {store, assets: {chromeFont, chromePage, pixelFont, pixelPage, ships, shipsTexture, dot: makeDotTexture()}};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }

@@ -7,8 +7,11 @@ import {
   ParallaxProjection,
   Stage2D,
   type StageUpdateFrameProps,
+  type TextureAtlas,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {
   abs,
@@ -31,22 +34,18 @@ import {
 } from 'three/tsl';
 import {
   AdditiveBlending,
-  BufferAttribute,
-  LinearFilter,
-  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
   type Node,
   PlaneGeometry,
   Scene,
-  SRGBColorSpace,
   type Texture,
-  TextureLoader,
   Vector2,
   Vector3,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
 import {
   BACK_Z,
   type CrawlLayout,
@@ -57,6 +56,7 @@ import {
   VENT_DEPTH,
   VENT_LEAN,
 } from './CrawlRig';
+import {atlasFrame, setPlaneUvToFrame} from './helpers';
 
 const DIR = 'stage-masks/flashlight';
 
@@ -66,46 +66,53 @@ export const VIEW_HEIGHT = 540;
 
 export type CrawlProjection = 'parallax' | 'orthographic';
 
-interface AtlasJson {
-  frames: Record<string, {frame: {x: number; y: number; w: number; h: number}}>;
-  meta: {size: {w: number; h: number}};
-}
-
 export interface CrawlAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   layout: CrawlLayout;
   layers: Record<'back' | 'mid' | 'play', Texture[]>;
   sprites: Texture;
-  atlas: AtlasJson;
+  atlas: TextureAtlas;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/flashlight/`). */
-export async function loadCrawlAssets(renderer: WebGPURenderer): Promise<CrawlAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
+/**
+ * The catalog of the demo, built after its layout, which names the tiles of the painted layers: one
+ * item per file, so a tile two layers share is one texture.
+ */
+function crawlCatalog(layout: CrawlLayout): TextureStoreData {
+  const tiles = [...layout.layers.back.images, ...layout.layers.mid.images, ...layout.layers.play.images];
+  return {
+    // in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+    defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+    items: {
+      ...Object.fromEntries(tiles.map((name) => [name, {imageUrl: name}])),
+      // the frames of an atlas count t from the top: it is read upright
+      sprites: {atlasUrl: 'sprites.json', texture: ['no-flipy']},
+    },
   };
-  const [layout, atlas] = await Promise.all([
-    fetch(assetsUrl(`${DIR}/layout.json`)).then((r) => r.json() as Promise<CrawlLayout>),
-    fetch(assetsUrl(`${DIR}/sprites.json`)).then((r) => r.json() as Promise<AtlasJson>),
-  ]);
-  const [back, mid, play, sprites] = await Promise.all([
-    Promise.all(layout.layers.back.images.map(load)),
-    Promise.all(layout.layers.mid.images.map(load)),
-    Promise.all(layout.layers.play.images.map(load)),
-    load('sprites.webp'),
-  ]);
-  return {layout, layers: {back, mid, play}, sprites, atlas};
 }
 
-export function disposeCrawlAssets(assets: CrawlAssets): void {
-  for (const list of Object.values(assets.layers)) for (const tex of list) tex.dispose();
-  assets.sprites.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/flashlight/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadCrawlAssets(renderer: WebGPURenderer): Promise<CrawlAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    const layout = await fetchJson<CrawlLayout>('Crawlspace', assetsUrl(`${DIR}/layout.json`));
+    store.parse(crawlCatalog(layout), {baseUrl: assetsUrl(`${DIR}/`)});
+    const tiles = (names: string[]) => Promise.all(names.map((name) => store.getAsync(name, 'texture')));
+    const [back, mid, play, [atlas, sprites]] = await Promise.all([
+      tiles(layout.layers.back.images),
+      tiles(layout.layers.mid.images),
+      tiles(layout.layers.play.images),
+      store.getAsync('sprites', ['atlas', 'texture']),
+    ]);
+    return {store, layout, layers: {back, mid, play}, sprites, atlas};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 /** The projection of both stages; one specs object serves either kind. */
@@ -214,27 +221,14 @@ function litMaterial(map: Texture, nodes: CrawlLightNodes, vent: CrawlLayout['ve
 }
 
 /** A plane of `w` × `h` units showing a frame of the atlas. */
-function frameGeometry(atlas: AtlasJson, name: string, w: number, h: number): PlaneGeometry {
-  const entry = atlas.frames[name];
-  if (!entry) throw new Error(`Crawlspace: the atlas has no frame "${name}"`);
-  const {x, y, w: fw, h: fh} = entry.frame;
-  const {w: aw, h: ah} = atlas.meta.size;
+function frameGeometry(atlas: TextureAtlas, name: string, w: number, h: number): PlaneGeometry {
   const geometry = new PlaneGeometry(w, h);
-  // the texture is flipped on upload, so its v runs from the bottom of the image
-  const u0 = x / aw;
-  const u1 = (x + fw) / aw;
-  const v0 = (ah - y - fh) / ah;
-  const v1 = (ah - y) / ah;
-  geometry.setAttribute('uv', new BufferAttribute(new Float32Array([u0, v1, u1, v1, u0, v0, u1, v0]), 2));
+  setPlaneUvToFrame(geometry, atlasFrame(atlas, 'Crawlspace', name).coords);
   return geometry;
 }
 
-function setSpriteFrame(sprite: TexturedSprite, atlas: AtlasJson, name: string, w: number, h: number): void {
-  const entry = atlas.frames[name];
-  if (!entry) throw new Error(`Crawlspace: the atlas has no frame "${name}"`);
-  const {x, y, w: fw, h: fh} = entry.frame;
-  const {w: aw, h: ah} = atlas.meta.size;
-  sprite.setTexCoords(x / aw, (ah - y - fh) / ah, fw / aw, fh / ah);
+function setSpriteFrame(sprite: TexturedSprite, atlas: TextureAtlas, name: string, w: number, h: number): void {
+  sprite.setFrame(atlasFrame(atlas, 'Crawlspace', name));
   sprite.setSize(w, h);
 }
 

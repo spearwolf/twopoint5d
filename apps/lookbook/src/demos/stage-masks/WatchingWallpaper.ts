@@ -11,25 +11,13 @@ import {
   type StageUpdateFrameProps,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {float, length, mix, smoothstep, uv, vec2, vec3, vec4} from 'three/tsl';
-import {
-  ClampToEdgeWrapping,
-  Color,
-  LinearFilter,
-  LinearMipmapLinearFilter,
-  Mesh,
-  MeshBasicMaterial,
-  type Node,
-  PlaneGeometry,
-  RepeatWrapping,
-  SRGBColorSpace,
-  type Texture,
-  TextureLoader,
-  type WebGPURenderer,
-  type Wrapping,
-} from 'three/webgpu';
+import {Color, Mesh, MeshBasicMaterial, type Node, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
 /** The view every stage of the demo lays itself out in, in units; `cover` fills any window. */
@@ -67,6 +55,8 @@ interface EyesJson {
 }
 
 export interface WallpaperAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   plain: Texture;
   haunted: Texture;
   wainscotPlain: Texture;
@@ -77,38 +67,39 @@ export interface WallpaperAssets {
 
 const DIR = 'stage-masks/without-director';
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/without-director/`). */
-export async function loadWallpaperAssets(renderer: WebGPURenderer): Promise<WallpaperAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string, wrapT: Wrapping = RepeatWrapping) => {
-    const texture = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    texture.colorSpace = SRGBColorSpace;
-    texture.wrapS = RepeatWrapping;
-    texture.wrapT = wrapT;
-    texture.magFilter = LinearFilter;
-    texture.minFilter = LinearMipmapLinearFilter;
-    texture.anisotropy = anisotropy;
-    return texture;
-  };
-  const [plain, haunted, wainscotPlain, wainscotHaunted, eyeParts, eyes] = await Promise.all([
-    load('wallpaper-plain.webp'),
-    load('wallpaper-haunted.webp'),
-    load('wainscot-plain.webp', ClampToEdgeWrapping),
-    load('wainscot-haunted.webp', ClampToEdgeWrapping),
-    load('eye-parts.png', ClampToEdgeWrapping),
-    fetch(assetsUrl(`${DIR}/eyes.json`)).then((response) => response.json() as Promise<EyesJson>),
-  ]);
-  eyeParts.wrapS = ClampToEdgeWrapping;
-  return {plain, haunted, wainscotPlain, wainscotHaunted, eyeParts, eyes};
-}
+// in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+const catalog: TextureStoreData = {
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    plain: {imageUrl: 'wallpaper-plain.webp', texture: ['repeat']},
+    haunted: {imageUrl: 'wallpaper-haunted.webp', texture: ['repeat']},
+    wainscotPlain: {imageUrl: 'wainscot-plain.webp', texture: ['repeat-s']},
+    wainscotHaunted: {imageUrl: 'wainscot-haunted.webp', texture: ['repeat-s']},
+    eyeParts: {imageUrl: 'eye-parts.png'},
+  },
+};
 
-export function disposeWallpaperAssets(assets: WallpaperAssets): void {
-  assets.plain.dispose();
-  assets.haunted.dispose();
-  assets.wainscotPlain.dispose();
-  assets.wainscotHaunted.dispose();
-  assets.eyeParts.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/without-director/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadWallpaperAssets(renderer: WebGPURenderer): Promise<WallpaperAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [plain, haunted, wainscotPlain, wainscotHaunted, eyeParts, eyes] = await Promise.all([
+      store.getAsync('plain', 'texture'),
+      store.getAsync('haunted', 'texture'),
+      store.getAsync('wainscotPlain', 'texture'),
+      store.getAsync('wainscotHaunted', 'texture'),
+      store.getAsync('eyeParts', 'texture'),
+      fetchJson<EyesJson>('WatchingWallpaper', assetsUrl(`${DIR}/eyes.json`)),
+    ]);
+    return {store, plain, haunted, wainscotPlain, wainscotHaunted, eyeParts, eyes};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 const makeStage = (name: string) => {
@@ -392,7 +383,7 @@ export class WatchingWallpaper {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      // the textures are the assets', released by disposeWallpaperAssets()
+      // the textures are the assets', released with their store
       (mesh.material as MeshBasicMaterial).dispose();
     }
     this.#eyeSprites.dispose();

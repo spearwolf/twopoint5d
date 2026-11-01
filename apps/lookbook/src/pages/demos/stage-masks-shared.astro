@@ -19,7 +19,7 @@ import {description, title} from './_stage-masks-shared.json';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
   import {CamcorderHud, VhsNoise} from '~demos/stage-masks/Camcorder';
-  import {disposeFootageAssets, FootageClock, ForestLevel, loadFootageAssets, RotLayer} from '~demos/stage-masks/FoundFootage';
+  import {FootageClock, ForestLevel, loadFootageAssets, RotLayer} from '~demos/stage-masks/FoundFootage';
   import {InkVignette} from '~demos/stage-masks/InkVignette';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
@@ -45,7 +45,7 @@ import {description, title} from './_stage-masks-shared.json';
   onDemoInit(display, 'stage-masks-shared', async ({renderer}) => {
     const assets = await loadFootageAssets(renderer);
     if (display.isDisposed) {
-      disposeFootageAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -144,7 +144,7 @@ import {description, title} from './_stage-masks-shared.json';
       forest.dispose();
       vhs.dispose();
       hud.dispose();
-      disposeFootageAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

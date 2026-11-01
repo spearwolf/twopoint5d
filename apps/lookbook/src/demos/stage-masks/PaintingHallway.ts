@@ -5,8 +5,11 @@ import {
   OnStageUpdateFrame,
   ParallaxProjection,
   Stage2D,
+  type TextureAtlas,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {
   abs,
@@ -32,23 +35,19 @@ import {
 } from 'three/tsl';
 import {
   AdditiveBlending,
-  ClampToEdgeWrapping,
   Group,
-  LinearFilter,
-  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
   type Node,
   PlaneGeometry,
-  RepeatWrapping,
-  SRGBColorSpace,
   type Texture,
-  TextureLoader,
   type UniformNode,
   Vector3,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
+import {atlasFrame, setMirroredFrame} from './helpers';
 
 const DIR = 'stage-masks/portal';
 
@@ -101,73 +100,65 @@ const DOORS = [
 /** the door whose room is lit: a line of light under it, and something that walks in there */
 const LIT_DOOR = 1;
 
-interface AtlasJson {
-  frames: Record<string, {frame: {x: number; y: number; w: number; h: number}}>;
-  meta: {size: {w: number; h: number}};
-}
-
 interface LayoutJson {
   door: {w: number; h: number; frames: Record<string, {x: number; y: number; w: number; h: number}>};
   sprites: Record<string, {w: number; h: number}>;
 }
 
 export interface PortalAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   wall: Texture;
   floor: Texture;
   doors: Texture;
   frame: Texture;
   sprites: Texture;
-  atlas: AtlasJson;
+  atlas: TextureAtlas;
   layout: LayoutJson;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/portal/`). */
-export async function loadPortalAssets(renderer: WebGPURenderer): Promise<PortalAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [wall, floor, doors, frame, sprites, atlas, layout] = await Promise.all([
-    load('wall.webp'),
-    load('floor.webp'),
-    load('doors.webp'),
-    load('frame.webp'),
-    load('sprites.png'),
-    fetch(assetsUrl(`${DIR}/sprites.json`)).then((response) => response.json() as Promise<AtlasJson>),
-    fetch(assetsUrl(`${DIR}/layout.json`)).then((response) => response.json() as Promise<LayoutJson>),
-  ]);
-  // the walls and the floor repeat along the hallway, which runs along their u (walls) and v (floor)
-  wall.wrapS = RepeatWrapping;
-  wall.wrapT = ClampToEdgeWrapping;
-  floor.wrapS = ClampToEdgeWrapping;
-  floor.wrapT = RepeatWrapping;
-  // an atlas of the library's sprites is read upright, t from the top
-  sprites.flipY = false;
-  return {wall, floor, doors, frame, sprites, atlas, layout};
-}
+const catalog: TextureStoreData = {
+  // in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    // the walls and the floor repeat along the hallway, which runs along their u (walls) and v (floor)
+    wall: {imageUrl: 'wall.webp', texture: ['repeat-s']},
+    floor: {imageUrl: 'floor.webp', texture: ['repeat-t']},
+    doors: {imageUrl: 'doors.webp'},
+    frame: {imageUrl: 'frame.webp'},
+    // the frames of an atlas count t from the top: it is read upright
+    sprites: {atlasUrl: 'sprites.json', texture: ['no-flipy']},
+  },
+};
 
-export function disposePortalAssets(assets: PortalAssets): void {
-  assets.wall.dispose();
-  assets.floor.dispose();
-  assets.doors.dispose();
-  assets.frame.dispose();
-  assets.sprites.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/portal/`). The store of the answer
+ * holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadPortalAssets(renderer: WebGPURenderer): Promise<PortalAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [wall, floor, doors, frame, [atlas, sprites], layout] = await Promise.all([
+      store.getAsync('wall', 'texture'),
+      store.getAsync('floor', 'texture'),
+      store.getAsync('doors', 'texture'),
+      store.getAsync('frame', 'texture'),
+      store.getAsync('sprites', ['atlas', 'texture']),
+      fetchJson<LayoutJson>('PaintingHallway', assetsUrl(`${DIR}/layout.json`)),
+    ]);
+    return {store, wall, floor, doors, frame, sprites, atlas, layout};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 /** Puts a frame of the atlas on a sprite at `w` × `h` units; `flip` mirrors it left to right. */
 export function setFrame(sprite: TexturedSprite, assets: PortalAssets, name: string, w: number, h: number, flip = false): void {
-  const entry = assets.atlas.frames[name];
-  if (!entry) throw new Error(`PaintingHallway: the atlas has no frame "${name}"`);
-  const {x, y, w: fw, h: fh} = entry.frame;
-  const {w: aw, h: ah} = assets.atlas.meta.size;
-  if (flip) sprite.setTexCoords((x + fw) / aw, y / ah, -fw / aw, fh / ah);
-  else sprite.setTexCoords(x / aw, y / ah, fw / aw, fh / ah);
+  const frame = atlasFrame(assets.atlas, 'PaintingHallway', name);
+  if (flip) setMirroredFrame(sprite, frame);
+  else sprite.setFrame(frame);
   sprite.setSize(w, h);
 }
 

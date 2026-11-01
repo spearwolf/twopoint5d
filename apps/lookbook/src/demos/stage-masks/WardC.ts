@@ -6,27 +6,26 @@ import {
   OrthographicProjection,
   Stage2D,
   type StageUpdateFrameProps,
+  type TextureAtlas,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {abs, clamp, exp, float, length, mx_noise_float, positionWorld, smoothstep, texture, uniform, vec3, vec4} from 'three/tsl';
 import {
   AdditiveBlending,
   type Blending,
   Color,
-  LinearFilter,
-  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
   type Node,
   PlaneGeometry,
-  SRGBColorSpace,
   type Texture,
-  TextureLoader,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {smoothstepCpu} from './helpers';
+import {atlasFrame, smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 import {
   type Box,
@@ -44,57 +43,54 @@ const DIR = 'stage-masks/spotlight';
 /** the level images and the atlas have 2 texels per unit */
 const TEXELS_PER_UNIT = 2;
 
-interface AtlasJson {
-  frames: Record<string, {frame: {x: number; y: number; w: number; h: number}}>;
-  meta: {size: {w: number; h: number}};
-}
-
 export interface WardAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   wardC: Texture;
   laundromat: Texture;
   sprites: Texture;
-  atlas: AtlasJson;
+  atlas: TextureAtlas;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/spotlight/`). */
+const catalog: TextureStoreData = {
+  // in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    wardC: {imageUrl: 'ward-c.webp'},
+    laundromat: {imageUrl: 'laundromat.webp'},
+    // the frames of an atlas count t from the top: it is read upright
+    sprites: {atlasUrl: 'sprites.json', texture: ['no-flipy']},
+  },
+};
+
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/spotlight/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
 export async function loadWardAssets(renderer: WebGPURenderer): Promise<WardAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [wardC, laundromat, sprites, atlas] = await Promise.all([
-    load('ward-c.webp'),
-    load('laundromat.webp'),
-    load('sprites.png'),
-    fetch(assetsUrl(`${DIR}/sprites.json`)).then((response) => response.json() as Promise<AtlasJson>),
-  ]);
-  return {wardC, laundromat, sprites, atlas};
-}
-
-export function disposeWardAssets(assets: WardAssets): void {
-  assets.wardC.dispose();
-  assets.laundromat.dispose();
-  assets.sprites.dispose();
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [wardC, laundromat, [atlas, sprites]] = await Promise.all([
+      store.getAsync('wardC', 'texture'),
+      store.getAsync('laundromat', 'texture'),
+      store.getAsync('sprites', ['atlas', 'texture']),
+    ]);
+    return {store, wardC, laundromat, sprites, atlas};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 /**
  * Puts a frame of the atlas on a sprite, at the size it was drawn (2 texels per unit) times `scale`.
  * Answers the size in units.
  */
-function setFrame(sprite: TexturedSprite, atlas: AtlasJson, name: string, scale = 1): {w: number; h: number} {
-  const entry = atlas.frames[name];
-  if (!entry) throw new Error(`WardC: the atlas has no frame "${name}"`);
-  const {x, y, w, h} = entry.frame;
-  const {w: aw, h: ah} = atlas.meta.size;
-  // the texture is flipped on upload, so its v runs from the bottom of the image
-  sprite.setTexCoords(x / aw, (ah - y - h) / ah, w / aw, h / ah);
-  const size = {w: (w / TEXELS_PER_UNIT) * scale, h: (h / TEXELS_PER_UNIT) * scale};
+function setFrame(sprite: TexturedSprite, atlas: TextureAtlas, name: string, scale = 1): {w: number; h: number} {
+  const frame = atlasFrame(atlas, 'WardC', name);
+  sprite.setFrame(frame);
+  const size = {w: (frame.coords.width / TEXELS_PER_UNIT) * scale, h: (frame.coords.height / TEXELS_PER_UNIT) * scale};
   sprite.setSize(size.w, size.h);
   return size;
 }

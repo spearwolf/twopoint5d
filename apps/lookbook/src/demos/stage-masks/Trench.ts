@@ -5,6 +5,8 @@ import {
   OnStageUpdateFrame,
   type TexturedSprite,
   TexturedSpriteKind,
+  TextureStore,
+  type TextureStoreData,
 } from '@spearwolf/twopoint5d';
 import {
   clamp,
@@ -21,19 +23,9 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import {
-  LinearFilter,
-  LinearMipmapLinearFilter,
-  Mesh,
-  MeshBasicNodeMaterial,
-  type Node,
-  PlaneGeometry,
-  SRGBColorSpace,
-  type Texture,
-  TextureLoader,
-  type WebGPURenderer,
-} from 'three/webgpu';
+import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type Texture, type WebGPURenderer} from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {fetchJson} from '~demos/utils/fetchAsset';
 import {makeSonarStage} from './Sonar';
 import {SeededRandom} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
@@ -61,37 +53,43 @@ export interface TrenchLayout {
 }
 
 export interface TrenchAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   survey: Texture;
   thing: Texture;
   eyes: Texture;
   layout: TrenchLayout;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/matte-threshold/`). */
-export async function loadTrenchAssets(renderer: WebGPURenderer): Promise<TrenchAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    tex.colorSpace = SRGBColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const [survey, thing, eyes, layout] = await Promise.all([
-    load('survey.webp'),
-    load('thing.webp'),
-    load('eyes.png'),
-    fetch(assetsUrl(`${DIR}/layout.json`)).then((response) => response.json() as Promise<TrenchLayout>),
-  ]);
-  return {survey, thing, eyes, layout};
-}
+// in colour, at the anisotropy of the renderer, flipped on upload as three loads an image
+const catalog: TextureStoreData = {
+  defaultTextureClasses: ['srgb', 'anisotropy', 'flipy'],
+  items: {
+    survey: {imageUrl: 'survey.webp'},
+    thing: {imageUrl: 'thing.webp'},
+    eyes: {imageUrl: 'eyes.png'},
+  },
+};
 
-export function disposeTrenchAssets(assets: TrenchAssets): void {
-  assets.survey.dispose();
-  assets.thing.dispose();
-  assets.eyes.dispose();
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/matte-threshold/`). The store of the
+ * answer holds the textures; a load that fails disposes the store it built.
+ */
+export async function loadTrenchAssets(renderer: WebGPURenderer): Promise<TrenchAssets> {
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [survey, thing, eyes, layout] = await Promise.all([
+      store.getAsync('survey', 'texture'),
+      store.getAsync('thing', 'texture'),
+      store.getAsync('eyes', 'texture'),
+      fetchJson<TrenchLayout>('Trench', assetsUrl(`${DIR}/layout.json`)),
+    ]);
+    return {store, survey, thing, eyes, layout};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 /** The uv of a scene image (flipped on upload, so v runs from the bottom) at a point in units. */

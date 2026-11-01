@@ -46,7 +46,6 @@ import {description, title} from './_stage-masks-resolution.json';
   import {
     bytesPerTexel,
     DEPTH_BYTES_PER_TEXEL,
-    disposeSeanceAssets,
     EctoplasmFog,
     FogClock,
     loadSeanceAssets,
@@ -92,7 +91,7 @@ import {description, title} from './_stage-masks-resolution.json';
   onDemoInit(display, 'stage-masks-resolution', async ({renderer}) => {
     const assets = await loadSeanceAssets(renderer);
     if (display.isDisposed) {
-      disposeSeanceAssets(assets);
+      assets.store.dispose();
       return;
     }
     const {layout} = assets;
@@ -278,7 +277,7 @@ import {description, title} from './_stage-masks-resolution.json';
       for (const fog of fogs) fog.dispose();
       for (const plate of plates) plate.dispose();
       room.dispose();
-      disposeSeanceAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

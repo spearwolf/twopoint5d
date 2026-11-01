@@ -25,7 +25,7 @@ import {description, title} from './_stage-masks-rift.json';
   } from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
-  import {disposeDeepAssets, DrownedRoom, ListeningRoom, loadDeepAssets, TvSnow} from '~demos/stage-masks/DeepListening';
+  import {DrownedRoom, ListeningRoom, loadDeepAssets, TvSnow} from '~demos/stage-masks/DeepListening';
   import {RiftMembrane, RiftRim, type RiftInput, RiftState} from '~demos/stage-masks/RiftMembrane';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
@@ -51,7 +51,7 @@ import {description, title} from './_stage-masks-rift.json';
   onDemoInit(display, 'stage-masks-rift', async ({renderer}) => {
     const assets = await loadDeepAssets(renderer);
     if (display.isDisposed) {
-      disposeDeepAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -218,7 +218,7 @@ import {description, title} from './_stage-masks-rift.json';
       world.dispose();
       other.dispose();
       rim.dispose();
-      disposeDeepAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

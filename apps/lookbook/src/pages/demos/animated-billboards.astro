@@ -43,10 +43,9 @@ import {description, title} from './_animated-billboards.json';
     lightOf,
     planeOf,
   } from '@spearwolf/twopoint5d';
-  import {DirectionalLight, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, TextureLoader} from 'three/webgpu';
+  import {DirectionalLight, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
-  import assetsUrl from '~demos/utils/assetsUrl';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
@@ -97,8 +96,7 @@ import {description, title} from './_animated-billboards.json';
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('BouncingSprites', bouncingSprites);
 
-    const blueGroundTexture = await new TextureLoader().loadAsync(assetsUrl('blue-ground-2048x.webp'));
-    blueGroundTexture.colorSpace = SRGBColorSpace;
+    const blueGroundTexture = await store.getAsync('blueGround', 'texture');
 
     const planeGeometry = new PlaneGeometry(400, 400);
     const planeMaterial = new MeshBasicMaterial({

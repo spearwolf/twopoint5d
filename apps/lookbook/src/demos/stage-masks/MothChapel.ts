@@ -1,5 +1,12 @@
 import {on} from '@spearwolf/eventize';
-import {OnStageUpdateFrame, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
+import {
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  type TextureAtlas,
+  TextureStore,
+  type TextureStoreData,
+} from '@spearwolf/twopoint5d';
 import {
   abs,
   asin,
@@ -32,23 +39,18 @@ import {
 } from 'three/tsl';
 import {
   AdditiveBlending,
-  LinearFilter,
-  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicNodeMaterial,
   type Node,
-  NearestFilter,
-  NoColorSpace,
   PlaneGeometry,
-  SRGBColorSpace,
   type Texture,
-  TextureLoader,
   type UniformNode,
   Vector3,
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {SeededRandom, smoothstepCpu} from './helpers';
+import {fetchJson} from '~demos/utils/fetchAsset';
+import {atlasFrame, SeededRandom, smoothstepCpu} from './helpers';
 
 const DIR = 'stage-masks/frozen';
 
@@ -86,7 +88,7 @@ export interface PaneInfo {
   area: number;
 }
 
-interface WindowJson {
+interface RoseWindowJson {
   texelsPerUnit: number;
   extent: number;
   stoneRadius: number;
@@ -113,71 +115,86 @@ interface RoomJson {
   lights: {x: number; y: number; z: number; power: number}[];
 }
 
-interface AtlasJson {
-  frames: Record<string, {frame: {x: number; y: number; w: number; h: number}}>;
-  meta: {size: {w: number; h: number}};
-  faceMap: {width: number; height: number; wrap: number};
+/** How the face maps lie in the atlas: what `assets-src/stage-masks/frozen/` writes beside the frames of `sprites.json`. */
+interface FaceMap {
+  width: number;
+  height: number;
+  wrap: number;
 }
 
 export interface ChapelAssets {
+  /** holds the textures; dispose it with the demo */
+  store: TextureStore;
   glass: Texture;
   panes: Texture;
   frame: Texture;
   room: Texture;
   sprites: Texture;
-  window: WindowJson;
+  rose: RoseWindowJson;
   layout: RoomJson;
-  atlas: AtlasJson;
+  atlas: TextureAtlas;
+  faceMap: FaceMap;
 }
 
-/** Loads the generated art of the demo (`assets-src/stage-masks/frozen/`). */
+// every image of the demo is read upright, t from the top, as the library reads its atlases: the
+// seed of the texture factory has flipY false, so the catalog names no default classes. Without a
+// colour class an image keeps the NoColorSpace of a new texture: the glass and the ids of the panes
+// are data, not colours
+const catalog: TextureStoreData = {
+  items: {
+    glass: {imageUrl: 'glass.webp', texture: ['anisotropy']},
+    // the ids of the panes are numbers, not colours: never blended, and without an anisotropy
+    // class the texture has none
+    panes: {imageUrl: 'panes.png', texture: ['nearest']},
+    frame: {imageUrl: 'frame.webp', texture: ['srgb', 'anisotropy']},
+    room: {imageUrl: 'room.webp', texture: ['srgb', 'anisotropy']},
+    sprites: {atlasUrl: 'sprites.json', texture: ['srgb', 'anisotropy']},
+  },
+};
+
+const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+/** The `faceMap` of the json of the atlas, refused unless it carries a width, a height and a wrap. */
+function readFaceMap(json: unknown): FaceMap {
+  if (typeof json === 'object' && json !== null && 'faceMap' in json) {
+    const {faceMap} = json;
+    if (typeof faceMap === 'object' && faceMap !== null && 'width' in faceMap && 'height' in faceMap && 'wrap' in faceMap) {
+      const {width, height, wrap} = faceMap;
+      if (isFiniteNumber(width) && isFiniteNumber(height) && isFiniteNumber(wrap)) return {width, height, wrap};
+    }
+  }
+  throw new Error('MothChapel: sprites.json carries no faceMap with a width, a height and a wrap');
+}
+
+/**
+ * Loads the generated art of the demo (`assets-src/stage-masks/frozen/`). The store of the answer
+ * holds the textures; a load that fails disposes the store it built.
+ */
 export async function loadChapelAssets(renderer: WebGPURenderer): Promise<ChapelAssets> {
-  const loader = new TextureLoader();
-  const anisotropy = renderer.getMaxAnisotropy();
-  const load = async (name: string, colour: boolean) => {
-    const tex = await loader.loadAsync(assetsUrl(`${DIR}/${name}`));
-    // every image of the demo is read upright, t from the top, as the library reads its atlases
-    tex.flipY = false;
-    tex.colorSpace = colour ? SRGBColorSpace : NoColorSpace;
-    tex.magFilter = LinearFilter;
-    tex.minFilter = LinearMipmapLinearFilter;
-    tex.anisotropy = anisotropy;
-    return tex;
-  };
-  const json = <T>(name: string) => fetch(assetsUrl(`${DIR}/${name}`)).then((response) => response.json() as Promise<T>);
-  const [glass, panes, frame, room, sprites, window, layout, atlas] = await Promise.all([
-    load('glass.webp', false),
-    load('panes.png', false),
-    load('frame.webp', true),
-    load('room.webp', true),
-    load('sprites.webp', true),
-    json<WindowJson>('window.json'),
-    json<RoomJson>('room.json'),
-    json<AtlasJson>('sprites.json'),
-  ]);
-  // the ids of the panes are numbers, not colours: never blended, never mipmapped
-  panes.magFilter = NearestFilter;
-  panes.minFilter = NearestFilter;
-  panes.generateMipmaps = false;
-  panes.anisotropy = 1;
-  return {glass, panes, frame, room, sprites, window, layout, atlas};
-}
-
-export function disposeChapelAssets(assets: ChapelAssets): void {
-  assets.glass.dispose();
-  assets.panes.dispose();
-  assets.frame.dispose();
-  assets.room.dispose();
-  assets.sprites.dispose();
-}
-
-/** The rectangle of a frame of the atlas in uv, t from the top (the atlas is uploaded upright). */
-function frameOf(atlas: AtlasJson, name: string) {
-  const entry = atlas.frames[name];
-  if (!entry) throw new Error(`MothChapel: the atlas has no frame "${name}"`);
-  const {x, y, w, h} = entry.frame;
-  const {w: aw, h: ah} = atlas.meta.size;
-  return {u: x / aw, v: y / ah, uw: w / aw, vh: h / ah, w, h};
+  const store = new TextureStore(renderer);
+  try {
+    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
+    const [glass, panes, frame, room, [atlas, sprites], rose, layout] = await Promise.all([
+      store.getAsync('glass', 'texture'),
+      store.getAsync('panes', 'texture'),
+      store.getAsync('frame', 'texture'),
+      store.getAsync('room', 'texture'),
+      store.getAsync('sprites', ['atlas', 'texture']),
+      fetchJson<RoseWindowJson>('MothChapel', assetsUrl(`${DIR}/window.json`)),
+      fetchJson<RoomJson>('MothChapel', assetsUrl(`${DIR}/room.json`)),
+    ]);
+    // No texture class writes generateMipmaps: under WebGPU a sampler with NearestFilter would read
+    // mip levels all the same and mix the ids of neighbouring panes. The store of this scene builds
+    // the texture exactly once — neither its renderer nor its classes change —, so the value stays
+    panes.generateMipmaps = false;
+    // the face maps lie beside the frames in the json of the atlas
+    const resource = await store.whenResource('sprites');
+    const faceMap = readFaceMap('atlasJson' in resource ? resource.atlasJson : undefined);
+    return {store, glass, panes, frame, room, sprites, rose, layout, atlas, faceMap};
+  } catch (error) {
+    store.dispose();
+    throw error;
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -418,8 +435,8 @@ class Head {
     this.yaw.value = spec.yaw;
     this.pitch.value = spec.pitch;
 
-    const f = frameOf(assets.atlas, spec.face);
-    const map = assets.atlas.faceMap;
+    const f = atlasFrame(assets.atlas, 'MothChapel', spec.face).coords;
+    const map = assets.faceMap;
     const p = uv().mul(2).sub(1);
     const r2 = dot(p, p);
     const z = sqrt(max(float(0), float(1).sub(r2)));
@@ -436,8 +453,8 @@ class Head {
     const lat = asin(clamp(hy, -1, 1));
     const fu = lon.div(Math.PI * 2).add(0.5);
     const fv = clamp(float(0.5).sub(lat.div(Math.PI)), 0.5 / map.height, 1 - 0.5 / map.height);
-    const su = float(f.u).add(fu.mul(map.width).add(map.wrap).div(f.w).mul(f.uw));
-    const sv = float(f.v).add(fv.mul(f.vh));
+    const su = float(f.s).add(fu.mul(map.width).add(map.wrap).div(f.width).mul(f.u));
+    const sv = float(f.t).add(fv.mul(f.v));
     const skin = texture(assets.sprites, vec2(su, sv));
 
     // light: the candles from where they stand, a cold rim from the window, the dark under the chin
@@ -517,12 +534,12 @@ export class SeanceRoom {
     });
 
     // the planchette
-    const f = frameOf(assets.atlas, 'planchette');
+    const f = atlasFrame(assets.atlas, 'MothChapel', 'planchette').coords;
     const plMaterial = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
-    const pl = texture(assets.sprites, vec2(float(f.u).add(uv().x.mul(f.uw)), float(f.v).add(float(1).sub(uv().y).mul(f.vh))));
+    const pl = texture(assets.sprites, vec2(float(f.s).add(uv().x.mul(f.u)), float(f.t).add(float(1).sub(uv().y).mul(f.v))));
     // lit by the candles round the board, and by the ectoplasm above it
     plMaterial.colorNode = vec4(pl.rgb.mul(clock.glow.mul(0.6).add(0.55).add(clock.ecto.mul(0.25))), pl.a);
-    this.#planchette = new Mesh(new PlaneGeometry(f.w / 2, f.h / 2), plMaterial);
+    this.#planchette = new Mesh(new PlaneGeometry(f.width / 2, f.height / 2), plMaterial);
     this.#add(this.#planchette, 'planchette', clock.planchetteX, clock.planchetteY, 3);
 
     // the heads, lit from the middle of the candles on the table
@@ -667,7 +684,7 @@ export class ChapelWall {
 
   constructor(assets: ChapelAssets, clock: SeanceClock) {
     this.#clock = clock;
-    const stoneR = assets.window.stoneRadius;
+    const stoneR = assets.rose.stoneRadius;
     const p = positionWorld.xy;
     const r = length(p);
 
@@ -719,13 +736,13 @@ export class ChapelWall {
 
     // moths
     for (let i = 0; i < MOTHS; i++) {
-      const f = frameOf(assets.atlas, i % 3 === 0 ? 'moth-dusk' : 'moth-pale');
+      const f = atlasFrame(assets.atlas, 'MothChapel', i % 3 === 0 ? 'moth-dusk' : 'moth-pale').coords;
       const tint = uniform(new Vector3(1, 1, 1));
       const material = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
-      const m = texture(assets.sprites, vec2(float(f.u).add(uv().x.mul(f.uw)), float(f.v).add(float(1).sub(uv().y).mul(f.vh))));
+      const m = texture(assets.sprites, vec2(float(f.s).add(uv().x.mul(f.u)), float(f.t).add(float(1).sub(uv().y).mul(f.v))));
       material.colorNode = vec4(m.rgb.mul(tint), m.a);
       const size = 0.42 + clock.random() * 0.18;
-      const mesh = new Mesh(new PlaneGeometry(f.w * size, f.h * size), material);
+      const mesh = new Mesh(new PlaneGeometry(f.width * size, f.height * size), material);
       const a = clock.random() * Math.PI * 2;
       const moth: Moth = {
         mesh,

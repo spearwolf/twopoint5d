@@ -17,12 +17,7 @@ import {description, title} from './_stage-masks-heat-haze.json';
   import {Display, StageDirector, type StageTransitionEasing} from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
-  import {
-    CrematoriumView,
-    disposeCrematoriumAssets,
-    HeatColumn,
-    loadCrematoriumAssets,
-  } from '~demos/stage-masks/CrematoriumWindow';
+  import {CrematoriumView, HeatColumn, loadCrematoriumAssets} from '~demos/stage-masks/CrematoriumWindow';
   import {heatHaze} from '~demos/stage-masks/heatHaze';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
@@ -53,7 +48,7 @@ import {description, title} from './_stage-masks-heat-haze.json';
   onDemoInit(display, 'stage-masks-heat-haze', async ({renderer}) => {
     const assets = await loadCrematoriumAssets(renderer);
     if (display.isDisposed) {
-      disposeCrematoriumAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -125,7 +120,7 @@ import {description, title} from './_stage-masks-heat-haze.json';
       heat.dispose();
       snow.dispose();
       ash.dispose();
-      disposeCrematoriumAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

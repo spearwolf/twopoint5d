@@ -53,7 +53,7 @@ import {description, title} from './_stage-masks-matte-threshold.json';
   import {Color} from 'three/webgpu';
   import {SONAR_KINDS, SonarField, SonarHud, type SonarKind, SonarMaskStage} from '~demos/stage-masks/Sonar';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
-  import {disposeTrenchAssets, loadTrenchAssets, ThingView, TrenchView} from '~demos/stage-masks/Trench';
+  import {loadTrenchAssets, ThingView, TrenchView} from '~demos/stage-masks/Trench';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
@@ -89,7 +89,7 @@ import {description, title} from './_stage-masks-matte-threshold.json';
   onDemoInit(display, 'stage-masks-matte-threshold', async ({renderer}) => {
     const assets = await loadTrenchAssets(renderer);
     if (display.isDisposed) {
-      disposeTrenchAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -228,7 +228,7 @@ import {description, title} from './_stage-masks-matte-threshold.json';
       hud.dispose();
       survey.dispose();
       thing.dispose();
-      disposeTrenchAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

@@ -67,6 +67,12 @@ together.
    from the same file, which logs a failure and lets the page go on. A keyboard shortcut
    asks `ignoredKey(event)` from `src/demos/utils/demoKeys.ts` first, so a key in a field
    of lil-gui, or one that presses its buttons, stays there.
+
+   The images and atlases of a demo load through a `TextureStore` — the catalog
+   `public/assets/textures.json` through `loadTextureCatalog()`, or a catalog of its own like
+   the scenes under `src/demos/stage-masks/` —, and a JSON or text file beside them through
+   `fetchJson()`/`fetchText()` from `src/demos/utils/fetchAsset.ts`, which name the file and
+   the status when it fails; a loader that fails disposes the store it built.
 3. Add `src/pages/demos/_<name>.json` next to it. The leading underscore keeps Astro from
    turning it into a route, while `import.meta.glob('../../pages/demos/*.json')` in
    `src/demos/utils/loadMetadataForDemos.ts` still picks it up. `title` and `url` are

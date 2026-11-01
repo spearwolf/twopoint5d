@@ -24,7 +24,7 @@ import {description, title} from './_stage-masks-matte-3d.json';
   } from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
-  import {disposeMirrorAssets, loadMirrorAssets, MirrorScene} from '~demos/stage-masks/MirrorBathroom';
+  import {loadMirrorAssets, MirrorScene} from '~demos/stage-masks/MirrorBathroom';
   import {type MirrorMaskScene, MirrorShatter} from '~demos/stage-masks/MirrorShatter';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
@@ -61,7 +61,7 @@ import {description, title} from './_stage-masks-matte-3d.json';
   onDemoInit(display, 'stage-masks-matte-3d', async ({renderer}) => {
     const assets = await loadMirrorAssets(renderer);
     if (display.isDisposed) {
-      disposeMirrorAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -167,7 +167,7 @@ import {description, title} from './_stage-masks-matte-3d.json';
       shatter.dispose();
       bathroom.dispose();
       reflection.dispose();
-      disposeMirrorAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;

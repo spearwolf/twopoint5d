@@ -9,6 +9,10 @@
       "tileSet": {"tileWidth": 128, "tileHeight": 128},
       "texture": ["nearest", "srgb"]
     },
+    "blueGround": {
+      "imageUrl": "blue-ground-2048x.webp",
+      "texture": ["srgb", "flipy"]
+    },
     "boomerCeiling": {
       "imageUrl": "boomer-shooter-corridor/ceiling.png",
       "texture": ["mag-nearest", "flipy", "srgb", "anisotropy", "repeat"]

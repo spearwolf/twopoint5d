@@ -24,7 +24,7 @@ import {description, title} from './_stage-masks-matte-ink.json';
   } from '@spearwolf/twopoint5d';
   import GUI from 'lil-gui';
   import {Color} from 'three/webgpu';
-  import {disposeDrownedHouseAssets, DrownedHall, loadDrownedHouseAssets, TitleCard} from '~demos/stage-masks/DrownedHouse';
+  import {DrownedHall, loadDrownedHouseAssets, TitleCard} from '~demos/stage-masks/DrownedHouse';
   import {InkBlotLayout, InkBlots, WetEdge} from '~demos/stage-masks/InkWell';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
@@ -56,7 +56,7 @@ import {description, title} from './_stage-masks-matte-ink.json';
   onDemoInit(display, 'stage-masks-matte-ink', async ({renderer}) => {
     const assets = await loadDrownedHouseAssets(renderer);
     if (display.isDisposed) {
-      disposeDrownedHouseAssets(assets);
+      assets.store.dispose();
       return;
     }
 
@@ -158,7 +158,7 @@ import {description, title} from './_stage-masks-matte-ink.json';
       edge.dispose();
       title.dispose();
       hall.dispose();
-      disposeDrownedHouseAssets(assets);
+      assets.store.dispose();
     });
 
     await precompiled;
