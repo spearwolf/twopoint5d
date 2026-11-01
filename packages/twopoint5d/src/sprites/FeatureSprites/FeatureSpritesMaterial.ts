@@ -353,8 +353,9 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         if (!this.#attributeNames.has(attributeName)) {
           throw new Error(`${where} reads the attribute "${attributeName}", which the sprite kind does not hold`);
         }
-        return attribute(attributeName) as unknown as Node<T>;
+        return attribute<T>(attributeName);
       },
+      // the resources hold the union `SpriteUniformNode`; the context promises the `Node<T>` the feature names
       uniform: <T extends string>(uniformName: string) => this.resources.uniform(uniformName, where) as unknown as Node<T>,
       sample: (textureName, uv) => {
         ownTexture(textureName);
@@ -362,7 +363,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         // effect hands it every later texture of the same kind
         const node = texture(this.resources.peekTexture(textureName)!, uv);
         this.#samples[scope].push({name: textureName, node});
-        return node as unknown as Node<'vec4'>;
+        return node;
       },
       // the size of a texture of another feature as well: a stage that reads it does not wait for it
       textureSize: (textureName) => {
@@ -374,14 +375,14 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
         // holds; and the uniform is (0, 0) for a texture of another feature that is unset — a tracked
         // read of its shape, so that setting it builds the graph anew
         if (declaring.textures![textureName]!.needsImage === true || this.resources.shapeOf(textureName) === undefined) {
-          return this.resources.textureSize(textureName) as unknown as Node<'vec2'>;
+          return this.resources.textureSize(textureName);
         }
         // the size of the texture the shader binds, read on the gpu: it follows an image that arrives
         // or changes after the texture was set, and a texture of the same kind through the value effect
         const node = texture(this.resources.peekTexture(textureName)!);
         this.#samples[scope].push({name: textureName, node});
-        // a uvec2, which vec2() converts
-        return vec2(textureSizeOf(node) as unknown as Node<'vec2'>) as unknown as Node<'vec2'>;
+        // a uvec2 that @types/three types as a plain Node, which no vec2() overload takes; vec2() converts it
+        return vec2(textureSizeOf(node) as unknown as Node<'vec2'>);
       },
       colorSpace: (textureName) => {
         const declaring = this.#features.find(({textures}) => textures != null && Object.hasOwn(textures, textureName));

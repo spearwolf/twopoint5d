@@ -115,12 +115,9 @@ export class AtlasFrameTable {
     return this.#node;
   }
 
-  /**
-   * @internal The `vec4` at `index` of the array. The element of a uniform array is typed as an
-   * `ArrayElementNode`, which three's TSL types do not let pass as a `Node<'vec4'>`; the cast lives here.
-   */
+  /** @internal The `vec4` at `index` of the array. */
   element(index: Node<'int'>): Node<'vec4'> {
-    return this.#node.element(index) as unknown as Node<'vec4'>;
+    return this.#node.element(index);
   }
 }
 

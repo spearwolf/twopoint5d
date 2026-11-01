@@ -147,8 +147,9 @@ export interface IStageAfterSceneChanged {
 // ------------------------------------------------------------
 
 /**
- * Emitted once by `dispose()` of a `Stage2D` and of a `StageRenderer`, with the stage itself,
- * before the stage stops listening. A `StageRenderer` listens for it on every eventized stage it
+ * Emitted once by `dispose()` of a `Stage2D`, of a `StageRenderer` — a `StageDirector` is one — and
+ * of the mask stage `StageMask.inWorldOf()` builds, with the stage itself, before the stage stops
+ * listening. A `StageRenderer` listens for it on every eventized stage it
  * holds and takes that stage out; a stage of your own that emits it from its `dispose()` gets the
  * same treatment.
  *

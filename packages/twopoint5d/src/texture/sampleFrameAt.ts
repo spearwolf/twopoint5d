@@ -65,32 +65,32 @@ export function sampleFrameAt(
   // as an if/else and declares a value the graph reads more than once in the branch that builds it
   // first, so a value that both branches, and the mask after them, read stays unassigned in the other
   // branch. Chromium and Firefox read such a variable as 0, WebKit's WebGL 2 reads garbage
-  const swapped = <T extends Node<'vec2'>>(value: T) => mix(value, value.yx, flipDiagonal) as unknown as Node<'vec2'>;
+  const swapped = <T extends Node<'vec2'>>(value: T) => mix(value, value.yx, flipDiagonal);
 
   const wrapAxis = (value: Node<'float'>, axis: AtlasFrameWrap) => (axis === 'repeat' ? fract(value) : clamp(value, 0, 1));
-  const wrapped = vec2(wrapAxis(position.x, wrapU), wrapAxis(position.y, wrapV)) as unknown as Node<'vec2'>;
+  const wrapped = vec2(wrapAxis(position.x, wrapU), wrapAxis(position.y, wrapV));
 
   // the position inside the area the frame covers, and how far the tex coords move per unit of position
   let inside: Node<'vec2'> = wrapped;
-  let extent: Node<'vec2'> = texCoords.zw as unknown as Node<'vec2'>;
+  let extent: Node<'vec2'> = texCoords.zw;
   let covered: Node<'float'> | undefined;
   if (options.trim === 'mask') {
     const {margins} = options;
     const area = sub(sub(vec2(1, 1), margins.xy), margins.zw);
     const local = div(sub(wrapped, margins.xy), area);
-    covered = step(0, local.x).mul(step(local.x, 1)).mul(step(0, local.y)).mul(step(local.y, 1)) as unknown as Node<'float'>;
-    inside = clamp(local, 0, 1) as unknown as Node<'vec2'>;
-    extent = div(texCoords.zw, area) as unknown as Node<'vec2'>;
+    covered = step(0, local.x).mul(step(local.x, 1)).mul(step(0, local.y)).mul(step(local.y, 1));
+    inside = clamp(local, 0, 1);
+    extent = div(texCoords.zw, area);
   }
   if (options.inset > 0) {
     const edge = min(div(options.inset, drawnTexels), 0.5);
-    inside = clamp(inside, edge, sub(1, edge)) as unknown as Node<'vec2'>;
+    inside = clamp(inside, edge, sub(1, edge));
   }
 
-  const st = texCoords.xy.add(inside.mul(texCoords.zw)) as unknown as Node<'vec2'>;
-  const gradX = swapped(dFdx(position).mul(extent) as unknown as Node<'vec2'>);
-  const gradY = swapped(dFdy(position).mul(extent) as unknown as Node<'vec2'>);
+  const st = texCoords.xy.add(inside.mul(texCoords.zw));
+  const gradX = swapped(dFdx(position).mul(extent));
+  const gradY = swapped(dFdy(position).mul(extent));
   const color = lookup(swapped(st), gradX, gradY);
 
-  return covered ? (color.mul(covered) as unknown as Node<'vec4'>) : color;
+  return covered ? color.mul(covered) : color;
 }

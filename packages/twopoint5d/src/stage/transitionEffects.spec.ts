@@ -2,6 +2,7 @@ import {texture, uniform, uv, vec2} from 'three/tsl';
 import {Color, DataTexture, type Node, type TextureNode} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 import {
+  cellHash,
   createTransitionNode,
   crossfade,
   dipToColor,
@@ -17,6 +18,7 @@ import {
   wipe,
 } from './transitionEffects.js';
 import {StageMask} from './StageMask.js';
+import {evaluateNode, nodesOf} from '../testing/spriteGraph.js';
 
 const tex = () => new DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
 
@@ -55,6 +57,34 @@ describe('transition effects', () => {
     expect((node as {isNode?: boolean}).isNode).toBe(true);
     // a description: every call builds new nodes
     expect(effect.build(input())).not.toBe(node);
+  });
+
+  it('dissolve builds its noise without sin()', () => {
+    const methods = [...nodesOf(dissolve({scale: 4}).build(input()))].map((node) => (node as {method?: string}).method);
+
+    expect(methods).not.toContain('sin');
+  });
+
+  it('cellHash answers a value in 0 … 1 spread over the range, at the cells of a 4K picture as well', () => {
+    for (const [x0, y0] of [
+      [0, 0],
+      [3776, 2096],
+    ] as const) {
+      const tenths = new Array<number>(10).fill(0);
+      for (let y = 0; y < 64; y++) {
+        for (let x = 0; x < 64; x++) {
+          const value = evaluateNode(cellHash(vec2(x0 + x, y0 + y))) as number;
+          expect(value, `the cell (${x0 + x}, ${y0 + y})`).toBeGreaterThanOrEqual(0);
+          expect(value, `the cell (${x0 + x}, ${y0 + y})`).toBeLessThan(1);
+          tenths[Math.floor(value * 10)]!++;
+        }
+      }
+      for (const [tenth, count] of tenths.entries()) {
+        const share = count / (64 * 64);
+        expect(share, `the tenth ${tenth} of the block at (${x0}, ${y0})`).toBeGreaterThanOrEqual(0.05);
+        expect(share, `the tenth ${tenth} of the block at (${x0}, ${y0})`).toBeLessThanOrEqual(0.15);
+      }
+    }
   });
 
   it('refuses options it cannot take, naming the effect', () => {

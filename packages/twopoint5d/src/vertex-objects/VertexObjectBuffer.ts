@@ -107,6 +107,14 @@ function releasedError(method: string): Error {
   return new Error(`VertexObjectBuffer#${method} is not available: the pool behind this buffer has been disposed`);
 }
 
+// the source of a copy is the released one, not the buffer that is asked to copy: a message about
+// "this buffer" would send the caller to the wrong pool
+function releasedSourceError(method: string): Error {
+  return new Error(
+    `VertexObjectBuffer#${method}: the source buffer holds no typed array any more — the pool behind it has been disposed`,
+  );
+}
+
 /**
  * The typed arrays themselves, together with the layout that maps an attribute to its slice of
  * them. It belongs to the side without an object type although its name carries the long prefix:
@@ -439,7 +447,7 @@ export class VertexObjectBuffer {
         // a name without a buffer means two different things, and a caller whose two buffers
         // were built from different descriptions should not be sent looking for a dispose()
         throw other.#released
-          ? releasedError('copy()')
+          ? releasedSourceError('copy()')
           : new Error(
               `VertexObjectBuffer#copy() finds no buffer named "${buf.bufferName}" in the source: ` +
                 'both buffers have to be built from the same vertex object description',

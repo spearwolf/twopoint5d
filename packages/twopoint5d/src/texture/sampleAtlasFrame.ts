@@ -111,23 +111,23 @@ export function sampleAtlasFrame(
   const margins = table.element(first.add(2).toInt());
   // 1 for a frame with FLIP_DIAGONAL, 0 otherwise — exactly, as the table writes it: sampleFrameAt()
   // swaps the axes by mix() with it
-  const flipDiagonal = measures.z as unknown as Node<'float'>;
+  const flipDiagonal = measures.z;
 
   // the uv in the convention of TextureCoords, v counted downwards; continuous, before the wrap
-  const position = (origin === 'bottom-left' ? vec2(uv.x, sub(1, uv.y)) : uv) as unknown as Node<'vec2'>;
+  const position = origin === 'bottom-left' ? vec2(uv.x, sub(1, uv.y)) : uv;
   // gradients matter only where a mip level is picked, so they are taken nowhere else
   const mipmapped = MIPMAP_FILTERS.includes(map.minFilter);
 
   return sampleFrameAt(
     (st, gradX, gradY) => {
       const sample = texture(map, st);
-      return (mipmapped ? sample.grad(gradX, gradY) : sample) as unknown as Node<'vec4'>;
+      return mipmapped ? sample.grad(gradX, gradY) : sample;
     },
     {
       texCoords,
       flipDiagonal,
       // the texels of the frame as it is drawn: under the diagonal flip it is `height` wide and `width` high
-      drawnTexels: mix(measures.xy, measures.yx, flipDiagonal) as unknown as Node<'vec2'>,
+      drawnTexels: mix(measures.xy, measures.yx, flipDiagonal),
     },
     position,
     trim === 'mask' ? {wrap: [wrapU, wrapV], trim, margins, inset} : {wrap: [wrapU, wrapV], trim, inset},

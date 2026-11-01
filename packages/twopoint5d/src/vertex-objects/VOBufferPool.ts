@@ -123,9 +123,9 @@ export class VOBufferPool {
   }
 
   /**
-   * Takes every integer, clamped to `0` … {@link capacity}; `Infinity` and `-Infinity` are
-   * clamped the same way. Throws a `RangeError` for `NaN` and for a fraction, which name no
-   * slot — on a disposed pool as well.
+   * Takes every whole number, clamped to `0` … {@link capacity}; `Infinity` and `-Infinity` are
+   * clamped the same way. Throws a `RangeError` for `NaN`, for a fraction and for a value that is
+   * no number — `undefined`, a string —, none of which names a slot — on a disposed pool as well.
    *
    * A lower value gives up the slots above it: on a `VertexObjectPool` every vertex object
    * sitting in one of them is let go of, as `VertexObjectPool#freeVO` would, and every
@@ -136,9 +136,9 @@ export class VOBufferPool {
    * goes on answering `0`.
    */
   set usedCount(value: number) {
-    // ±Infinity is clamped like any other value out of range; a fraction or NaN names no slot
-    if (Number.isNaN(value) || (Number.isFinite(value) && !Number.isInteger(value))) {
-      throw new RangeError(`VOBufferPool#usedCount must be an integer, got ${describeValue(value)}`);
+    // ±Infinity is clamped like any other value out of range; a fraction, NaN or a value that is no number names no slot
+    if (typeof value !== 'number' || Number.isNaN(value) || (Number.isFinite(value) && !Number.isInteger(value))) {
+      throw new RangeError(`VOBufferPool#usedCount must be a whole number, Infinity or -Infinity, got ${describeValue(value)}`);
     }
     if (this.#disposed) return;
     const previous = this.#usedCount;

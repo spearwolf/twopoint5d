@@ -11,16 +11,16 @@ import {
   mix,
   screenSize,
   select,
-  sin,
   smoothstep,
   step,
   texture,
   uniform,
   uv,
   vec2,
+  vec3,
   vec4,
 } from 'three/tsl';
-import {Color, type Node, type Texture, type TextureNode, type UniformNode} from 'three/webgpu';
+import {Color, type Node, type Texture, type TextureNode} from 'three/webgpu';
 import {assertFinite} from '../utils/assertFinite.js';
 import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
@@ -286,6 +286,17 @@ export interface DissolveOptions {
   softness?: number;
 }
 
+/**
+ * A hash in 0 … 1 of a cell, without `sin()` — Dave Hoskins' "hash without sine": a `sin()` of
+ * the cells of a large picture, past 10⁵ radians at 4K, leaves diagonal stripes on some GPUs.
+ * @internal
+ */
+export function cellHash(cell: Node<'vec2'>): Node<'float'> {
+  const p3 = fract(vec3(cell.x, cell.y, cell.x).mul(0.1031));
+  const q = p3.add(dot(p3, p3.yzx.add(33.33)));
+  return fract(q.x.add(q.y).mul(q.z));
+}
+
 /** A noise per cell decides when the cell switches. */
 export function dissolve(options?: DissolveOptions): StageTransitionEffect {
   const opts = optionsOf('dissolve', options, '{scale?, softness?}');
@@ -295,7 +306,7 @@ export function dissolve(options?: DissolveOptions): StageTransitionEffect {
     name: 'dissolve',
     build: ({from, to, progress, uv, resolution}) => {
       const cell = floor(uv.mul(resolution).div(scale));
-      const noise = fract(sin(dot(cell, vec2(12.9898, 78.233))).mul(43758.5453));
+      const noise = cellHash(cell);
       return mix(from.sample(uv), to.sample(uv), switched(noise, progress, softness));
     },
   };
@@ -477,14 +488,14 @@ export function createTransitionNode(
     throw new TypeError(`createTransitionNode: effect must be a StageTransitionEffect, got ${describeValue(effect)}`);
   }
   if (effect.masks?.length) throw new Error(NO_MASKS_WITHOUT_DIRECTOR);
-  const p = progress ?? (uniform(0) as unknown as UniformNode<'float', number>);
+  const p = progress ?? uniform(0);
   const node = effect.build({
     from: sourceOf(from, 'from'),
     to: sourceOf(to, 'to'),
-    progress: p as Node<'float'>,
+    progress: p,
     uv: uv(),
     // the drawing buffer as the fragment sees it; a director hands in a uniform of its own
-    resolution: screenSize as unknown as Node<'vec2'>,
+    resolution: screenSize,
     mask: () => {
       throw new Error(NO_MASKS_WITHOUT_DIRECTOR);
     },

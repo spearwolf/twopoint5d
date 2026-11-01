@@ -913,6 +913,9 @@ describe('VertexObjectBuffer', () => {
       const run = () => target.copy(source);
       expect(run, 'the message names the class and the method').toThrow(/VertexObjectBuffer#copy\(\)/);
       expect(run, 'the message names the state').toThrow(/disposed/);
+      expect(run, 'the message names the source').toThrow(
+        'VertexObjectBuffer#copy(): the source buffer holds no typed array any more — the pool behind it has been disposed',
+      );
     });
 
     test('copy() from a buffer of another description says so instead', () => {

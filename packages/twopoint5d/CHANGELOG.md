@@ -89,6 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `writeText()` and `rewriteText()` take a kind whose `InstancePosition`, `QuadSize` or `AtlasFrame` is a copy, judged by name
 - a refused string in an error message is quoted with its quotes, backslashes, control chars, line and paragraph separators and lone surrogates escaped as in a JSON string, so it stays on one line and ends at its closing quote
 - `AsepriteJson.parse()` keeps a frame and a slice named `__proto__`
+- `VOBufferPool#usedCount`, and with it `VertexObjectPool#usedCount`, throws its `RangeError` for a value that is no number — `undefined`, `null`, a string — as it does for `NaN` and a fraction, on a disposed pool and from buffers data handed to `fromBuffersData()` or to the constructor as well; the message reads `VOBufferPool#usedCount must be a whole number, Infinity or -Infinity, got …`
+- `VertexObjectBuffer#copy()` from the buffer of a disposed pool names the source: `VertexObjectBuffer#copy(): the source buffer holds no typed array any more — the pool behind it has been disposed`
 
 ### Migration Guide
 

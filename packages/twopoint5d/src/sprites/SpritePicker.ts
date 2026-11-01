@@ -10,7 +10,6 @@ import {
   Mesh,
   type MRTNode,
   NoBlending,
-  type Node,
   type Object3D,
   type Renderer,
   RenderTarget,
@@ -402,7 +401,7 @@ export class SpritePicker {
   }
 
   #build(sprites: FeatureSprites, material: FeatureSpritesMaterial): PickEntry {
-    const meshNumber = uniform(0) as unknown as UniformNode<'float', number>;
+    const meshNumber = uniform(0);
     const pickMaterial = new FeatureSpritesMaterial(sprites.kind, {
       name: 'twopoint5d.SpritePicker',
       resources: material.resources,
@@ -414,7 +413,7 @@ export class SpritePicker {
     });
     // three writes the output node after the color node, the opacity and the alpha test have run: a
     // fragment the alpha test of the sprite drops is dropped here too, and no stage can change the id
-    pickMaterial.outputNode = vec4(add(float(instanceIndex), 1), meshNumber, 0, 1) as unknown as Node;
+    pickMaterial.outputNode = vec4(add(float(instanceIndex), 1), meshNumber, 0, 1);
 
     const geometry = sprites.geometry!;
     const mesh = new Mesh(geometry, pickMaterial);

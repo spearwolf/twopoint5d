@@ -145,7 +145,7 @@ export class StageMask {
    * mask stage whose materials animate on the GPU. The mask owns it; it holds no GPU memory of its
    * own. Written by the director, read by the caller.
    */
-  readonly progressNode: UniformNode<'float', number> = uniform(0) as unknown as UniformNode<'float', number>;
+  readonly progressNode: UniformNode<'float', number> = uniform(0);
 
   #isDisposed = false;
   #ownsStage = false;

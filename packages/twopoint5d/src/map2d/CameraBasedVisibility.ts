@@ -349,24 +349,24 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * wants to keep the value takes a copy.
    */
   readonly planeCoords2D = new Vector2();
-  #centerPoint2D = new Vector2();
+  readonly #centerPoint2D = new Vector2();
 
   /**
    * The world matrix of the map node the last recomputation was given, an output that the next
    * one writes over in place; whoever wants to keep the value takes a copy.
    */
   readonly matrixWorld = new Matrix4();
-  #matrixWorldInverse = new Matrix4();
+  readonly #matrixWorldInverse = new Matrix4();
 
   readonly #cameraFrustum = new Frustum();
 
-  #tileBoxMatrix = new Matrix4();
+  readonly #tileBoxMatrix = new Matrix4();
   // `matrixWorld` after `#tileBoxMatrix`, formed once per recomputation: one transform takes a
   // tile from where its box is built into world space
   readonly #tileWorldMatrix = new Matrix4();
   // the translation of `#tileBoxMatrix`, which is all it does, for the box that stays in the
   // local space of the map node
-  #tileBoxOffset = new Vector3();
+  readonly #tileBoxOffset = new Vector3();
   // the offset of the grid, handed to `makeTranslation()` as a vector — see the note on doubles at
   // the top of the module
   readonly #planeOffset = new Vector3();

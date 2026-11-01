@@ -2301,7 +2301,7 @@ export class StageDirector extends StageRenderer {
     const placeholders: Texture[] = [];
     const textureNode = (): TextureNode => {
       const placeholder = this.#placeholder(renderer, textureNodes.length);
-      const node = texture(placeholder) as unknown as TextureNode;
+      const node = texture(placeholder);
       textureNodes.push(node);
       placeholders.push(placeholder);
       return node;
@@ -2317,7 +2317,7 @@ export class StageDirector extends StageRenderer {
       kinds,
       (slot, index, {stage, source, invert}) => {
         const maskNode = (maskNodes[stage] ??= textureNode());
-        coverageOf[slot] = coverages[index] ??= maskCoverage(maskNode.sample(at) as unknown as Node<'vec4'>, source, invert);
+        coverageOf[slot] = coverages[index] ??= maskCoverage(maskNode.sample(at), source, invert);
       },
       (slot, position, _index, {stage}) => {
         maskNodes[stage] ??= textureNode();
@@ -2329,20 +2329,20 @@ export class StageDirector extends StageRenderer {
       return coverage ? (color.mul(coverage) as Node<'vec4'>) : color;
     };
 
-    let out = this.#clearUniform as unknown as Node<'vec4'>;
+    let out: Node<'vec4'> = this.#clearUniform;
     for (let index = 0; index < kinds.length; index++) {
       const {effect, effectMasks} = kinds[index]!;
       if (effect) {
         const from = textureNode();
         const to = textureNode();
-        const progress = uniform(0) as unknown as UniformNode<'float', number>;
+        const progress = uniform(0);
         const stages = effectMaskStages[index];
         const effectNode = effect.build({
           from: textureSource(from),
           to: textureSource(to),
-          progress: progress as unknown as Node<'float'>,
+          progress,
           uv: at,
-          resolution: this.#resolution as unknown as Node<'vec2'>,
+          resolution: this.#resolution,
           mask: (mask) => {
             const position = effectMasks.indexOf(mask);
             if (position === -1 || !stages) {
@@ -2357,7 +2357,7 @@ export class StageDirector extends StageRenderer {
       } else {
         const layer = textureNode();
         slots.push({layer});
-        out = over(masked(index, layer as unknown as Node<'vec4'>), out);
+        out = over(masked(index, layer), out);
       }
     }
     return {pipeline: new RootRenderPipeline(renderer), slots, maskNodes, outputNode: out, textureNodes, placeholders};

@@ -105,8 +105,9 @@ const farEdge = (chunks: IDataChunk2D[], key: 'right' | 'bottom'): number => {
 };
 
 /**
- * A node is either a leaf without children or has exactly four children
- * corresponding to the celestial directions (quadrants).
+ * A node is either a leaf without children or is split by `subdivide()` into the four quadrants
+ * of the celestial directions, each of which holds a child node or `null` where no chunk lies — a
+ * node split along one axis has two children at most.
  *
  * Each node can contain any amount of 2d data matrices (chunks).
  * Each chunk is positioned in a right-hand coordinate system on the XY plane.

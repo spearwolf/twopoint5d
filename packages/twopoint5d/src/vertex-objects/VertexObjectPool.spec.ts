@@ -8,7 +8,7 @@ import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 import {voBuffer, voIndex, voInitialize} from './constants.js';
-import type {BufferLike, VO, VOAttrGetter, VOAttrSetter, VertexObjectDescription} from './types.js';
+import type {BufferLike, VO, VOAttrGetter, VOAttrSetter, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 interface MyVertexObject {
   setFoo: VOAttrSetter;
@@ -698,13 +698,55 @@ describe('VertexObjectPool', () => {
       pool.usedCount = 3;
 
       expect(() => (pool.usedCount = NaN)).toThrow(RangeError);
-      expect(() => (pool.usedCount = 1.5)).toThrow(/VOBufferPool#usedCount must be an integer, got 1.5/);
+      expect(() => (pool.usedCount = 1.5)).toThrow(
+        /VOBufferPool#usedCount must be a whole number, Infinity or -Infinity, got 1.5/,
+      );
       expect(pool.usedCount, 'the count stays where it was').toBe(3);
 
       pool.dispose();
 
       expect(() => (pool.usedCount = NaN), 'a disposed pool turns invalid input away all the same').toThrow(RangeError);
       expect(pool.usedCount).toBe(0);
+    });
+
+    test('usedCount refuses a value that is no number, and the count stays where it was', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 10);
+      pool.usedCount = 3;
+
+      expect(() => (pool.usedCount = undefined as unknown as number)).toThrow(RangeError);
+      expect(() => (pool.usedCount = undefined as unknown as number)).toThrow(
+        'VOBufferPool#usedCount must be a whole number, Infinity or -Infinity, got undefined',
+      );
+      expect(() => (pool.usedCount = null as unknown as number)).toThrow(RangeError);
+      expect(() => (pool.usedCount = '3' as unknown as number)).toThrow(RangeError);
+      expect(() => (pool.usedCount = {} as unknown as number)).toThrow(RangeError);
+      expect(pool.usedCount, 'the count stays where it was').toBe(3);
+
+      pool.dispose();
+
+      expect(() => (pool.usedCount = undefined as unknown as number), 'a disposed pool turns it away all the same').toThrow(
+        RangeError,
+      );
+    });
+
+    test('fromBuffersData() refuses buffers data whose usedCount is no number, and leaves the pool as it was', () => {
+      const pool = new VertexObjectPool<MyVertexObject>(descriptor, 4);
+      pool.createVO()!;
+      pool.createVO()!;
+      const buffersData = pool.toBuffersData({copy: true});
+      const valuesBefore = [...pool.buffer.buffers.values()].map(({typedArray}) => Array.from(typedArray!));
+
+      const write = () => pool.fromBuffersData({...buffersData, usedCount: undefined as unknown as number});
+
+      expect(write).toThrow(RangeError);
+      expect(pool.usedCount).toBe(2);
+      expect([...pool.buffer.buffers.values()].map(({typedArray}) => Array.from(typedArray!))).toEqual(valuesBefore);
+    });
+
+    test('the constructor refuses buffers data whose usedCount is no number', () => {
+      const build = () => new VertexObjectPool(descriptor, {capacity: 2, buffers: {}} as unknown as VertexObjectBuffersData);
+
+      expect(build).toThrow(RangeError);
     });
 
     test('usedCount clamps Infinity to the capacity and -Infinity to 0', () => {

@@ -1956,7 +1956,8 @@ announces its end under that one name.
 | --- | --- | --- |
 | `StageRenderer` | `OnStageAdded`, `OnStageRemoved` | at the parent, with `{stage, renderer}` |
 | `StageRenderer` | `OnAddToParent`, `OnRemoveFromParent` | at the child, when its `parent` changes |
-| `StageRenderer`, `Stage2D` | `OnStageDispose` | once, from `dispose()` |
+| `StageRenderer`, `Stage2D`, the stage `StageMask.inWorldOf()` builds | `OnStageDispose` | once, from `dispose()` |
+| `StageDirector` | `OnStageTransitionStart`, `OnStageTransitionEnd` | `{director, transition}`: the first frame of a transition after its delay, and the frame or the call that ends it; both at once for a change without a transition — see [The transition](#the-transition) |
 | `Stage2D` | `OnStageResize` | a new view: `{stage, width, height}` |
 | `Stage2D` | `OnStageFirstFrame` | the first frame with a camera; kept for late subscribers |
 | `Stage2D` | `OnStageUpdateFrame` | every frame with a camera: `{stage, now, deltaTime, frameNo}` |

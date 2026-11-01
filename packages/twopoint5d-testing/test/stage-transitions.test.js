@@ -6,6 +6,7 @@ import {
   StageDirector,
   StageRenderer,
   crossfade,
+  dissolve,
   fade,
   lumaMask,
   slide,
@@ -137,6 +138,31 @@ describe('StageDirector — transitions on the GPU', () => {
     const row = (fromTop) => (topDown ? fromTop : SIZE - 1 - fromTop);
     expect(isNearColor(rgbAt(pixels, SIZE, 32, row(8)), [255, 0, 0]), 'the upper half still shows from').to.be.true;
     expect(isNearColor(rgbAt(pixels, SIZE, 32, row(56)), [0, 255, 0]), 'the lower half shows to').to.be.true;
+  });
+
+  it('dissolve() switches about half of the picture at progress 0.5, at the cells of a 4K picture as well', async () => {
+    const red = layer('red', '#f00');
+    const green = layer('green', '#0f0');
+    director.setStack([red.stage]);
+
+    // at 64 pixels a scale of 1 / 64 makes the cells run to 4096 along each axis
+    for (const scale of [1, 1 / 64]) {
+      const t = director.replace(red.stage, green.stage, {effect: dissolve({scale, softness: 0}), manual: true});
+      t.progress = 0.5;
+      const pixels = await draw();
+      let switched = 0;
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const rgb = rgbAt(pixels, SIZE, x, y);
+          const isGreen = isNearColor(rgb, [0, 255, 0]);
+          expect(isGreen || isNearColor(rgb, [255, 0, 0]), `the pixel (${x}, ${y}) at scale ${scale} is red or green`).to.be.true;
+          if (isGreen) switched++;
+        }
+      }
+      const share = switched / (SIZE * SIZE);
+      expect(share, `the green share at scale ${scale}`).to.be.within(0.4, 0.6);
+      t.cancel();
+    }
   });
 
   it('slide() "left" pushes from out to the left and to in from the right', async () => {
