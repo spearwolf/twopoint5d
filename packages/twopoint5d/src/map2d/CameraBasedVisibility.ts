@@ -10,7 +10,16 @@ import {convexTileHull, forEachTileWithinConvexHull, type TilePoint} from './con
 import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
-import {KeptTiles, NearestFirstHeap} from './tileDistanceHeaps.js';
+import {
+  NearestFirstTileSearch,
+  VIEW_DEPTH,
+  VIEW_FRUSTUM_BOX_SCALE,
+  VIEW_FRUSTUM_HEIGHT_MAX,
+  VIEW_FRUSTUM_HEIGHT_MIN,
+  VIEW_MAX_VISIBLE_TILES,
+  VIEW_SCALARS,
+  writeTileBox,
+} from './NearestFirstTileSearch.js';
 import {type PooledTileBox, TileSlotPool} from './TileSlotPool.js';
 import type {IMap2DTileCoords, IMap2DVisibilitor, IMap2DVisibleTiles} from './types.js';
 
@@ -62,8 +71,8 @@ export interface TileBox {
 // or answered by one, is boxed — an allocation per call —, and which calls get inlined shifts with
 // the code around them. So on this path a double does not cross a call: it travels in the field of
 // an object — the query rectangle, the vectors of a slot —, and a small helper that would take or
-// answer one is written out where it is needed. `hot-path-allocations.spec.ts` holds the class to
-// it.
+// answer one is written out where it is needed. `hot-path-allocations.spec.ts` holds the class and
+// its search, `NearestFirstTileSearch.ts`, to it.
 
 const _v = new Vector3();
 const _m = new Matrix4();
@@ -71,17 +80,6 @@ const _m = new Matrix4();
 // the plane of the map in the local space of the map node; never handed out, so nothing outside
 // this module can move it
 const MAP_PLANE = new Plane(new Vector3(0, 1, 0), 0);
-
-const NEIGHBOR_DX_DY: ReadonlyArray<readonly [number, number]> = [
-  [0, -1],
-  [1, 0],
-  [0, 1],
-  [-1, 0],
-  [-1, -1],
-  [1, -1],
-  [1, 1],
-  [-1, 1],
-];
 
 /**
  * The points of the near plane of the view frustum a ray is cast through, in _normalized
@@ -145,17 +143,6 @@ const newTilePoint = (): [number, number] => [0, 0];
 const SEEN_DEPTH = 0;
 const SEEN_FRUSTUM_BOX_SCALE = 1;
 const SEEN_MAX_VISIBLE_TILES = 2;
-
-// where `CameraBasedVisibility` keeps what the search compares against at the limit, see
-// `#searchCanStop()`
-const SEARCH_STOP_HEIGHT_SQ = 0;
-const SEARCH_STOP_FOOTPRINT_DIAGONAL = 1;
-const SEARCH_STOP_DISTANCE_SQ = 2;
-
-// where `CameraBasedVisibility` keeps the height range of the view frustum along the normal of
-// the map plane, in the local space of the map node, for the recomputation that runs
-const FRUSTUM_HEIGHT_MIN = 0;
-const FRUSTUM_HEIGHT_MAX = 1;
 
 /** The objects the dependency gate of {@link CameraBasedVisibility} compares. */
 interface CameraDependencies {
@@ -312,7 +299,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
   camera?: PerspectiveCamera | OrthographicCamera;
 
-  #cameraWorldPosition = new Vector3();
+  readonly #cameraWorldPosition = new Vector3();
 
   /**
    * The map plane in world space, an output of the last recomputation that the next one writes
@@ -371,12 +358,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   readonly matrixWorld = new Matrix4();
   #matrixWorldInverse = new Matrix4();
 
-  #cameraFrustum = new Frustum();
+  readonly #cameraFrustum = new Frustum();
 
   #tileBoxMatrix = new Matrix4();
   // `matrixWorld` after `#tileBoxMatrix`, formed once per recomputation: one transform takes a
   // tile from where its box is built into world space
-  #tileWorldMatrix = new Matrix4();
+  readonly #tileWorldMatrix = new Matrix4();
   // the translation of `#tileBoxMatrix`, which is all it does, for the box that stays in the
   // local space of the map node
   #tileBoxOffset = new Vector3();
@@ -464,22 +451,24 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     return this.#serial;
   }
 
-  // The tiles found and not yet taken, nearest first, so the search runs from the camera outwards
-  // and a cut at the limit leaves out the furthest — see `NearestFirstHeap`.
-  readonly #frontier = new NearestFirstHeap<PooledTileBox>();
-  // The visible tiles the search keeps, a heap with the furthest on top from `maxVisibleTiles` of
-  // them on — see `KeptTiles`.
-  readonly #kept = new KeptTiles<PooledTileBox>();
-  // What `#searchCanStop()` compares against, at the `SEARCH_STOP_…` indices: the height of the
-  // camera above the plane squared and the diagonal of the footprint of a frustum box — the same
-  // for every tile of one recomputation, written once the search holds `maxVisibleTiles` tiles —
-  // and the stop distance squared, written again each time another tile becomes the furthest kept
-  // one. A typed array for the reason `#seenScalars` is one.
-  readonly #searchStop = new Float64Array(3);
-  // The lowest and the highest point of the view frustum along the normal of the map plane, in the
-  // local space of the map node, at the `FRUSTUM_HEIGHT_…` indices: what the frustum boxes are cut
-  // to. Written by every recomputation. A typed array for the reason `#seenScalars` is one.
-  readonly #frustumHeight = new Float64Array(2);
+  // `depth`, `frustumBoxScale` and `maxVisibleTiles` as the running recomputation reads them,
+  // and the height range of the view frustum along the normal of the map plane, in the local
+  // space of the map node — what the frustum boxes are cut to —, at the `VIEW_…` indices of
+  // `NearestFirstTileSearch.ts`. `#findVisibleTiles()` writes the first three before the search,
+  // `#findPointsOnPlaneThatAreInViewFrustum()` the height range. A typed array for the reason
+  // `#seenScalars` is one.
+  readonly #viewScalars = new Float64Array(VIEW_SCALARS);
+
+  // The nearest-first search, over objects this class writes in place for every recomputation —
+  // declared after them, so that the initializer reads them and not `undefined`.
+  readonly #search = new NearestFirstTileSearch({
+    pool: this.#pool,
+    tileWorldMatrix: this.#tileWorldMatrix,
+    cameraWorldPosition: this.#cameraWorldPosition,
+    planeWorld: this.planeWorld,
+    cameraFrustum: this.#cameraFrustum,
+    scalars: this.#viewScalars,
+  });
   readonly #hullPoints: TilePoint[] = [];
   readonly #hull: TilePoint[] = [];
 
@@ -524,7 +513,7 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   readonly #queryTiles: TilesWithinCoords = createTilesWithinCoords();
 
   // the visitor of `forEachTileWithinConvexHull()`, bound once
-  readonly #enqueueHullTile = (x: number, y: number): void => this.#enqueue(this.#pool.acquire(x, y), true);
+  readonly #enqueueHullTile = (x: number, y: number): void => this.#search.enqueue(this.#pool.acquire(x, y), true);
 
   constructor(camera?: PerspectiveCamera | OrthographicCamera) {
     this.camera = camera;
@@ -761,9 +750,9 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     truncateArray(this.#pointsOnPlane);
 
-    const frustumHeight = this.#frustumHeight;
-    frustumHeight[FRUSTUM_HEIGHT_MIN] = Infinity;
-    frustumHeight[FRUSTUM_HEIGHT_MAX] = -Infinity;
+    const scalars = this.#viewScalars;
+    scalars[VIEW_FRUSTUM_HEIGHT_MIN] = Infinity;
+    scalars[VIEW_FRUSTUM_HEIGHT_MAX] = -Infinity;
 
     for (let i = 0; i < FRUSTUM_PROBES_NDC.length; ++i) {
       // The loop bound is `FRUSTUM_PROBES_NDC.length`. Read by index: a tuple destructured costs an
@@ -796,8 +785,8 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
    * Widens the height range of the view frustum by a point of it, given in world space. The range
    * is kept in the local space of the map node, along its y axis — the normal of the map plane.
    * The translation of `#tileBoxMatrix` moves along x and z alone, so the range holds in the space
-   * `#setBox()` builds the boxes in as well. A point in and nothing out — see the note on doubles at
-   * the top of the module.
+   * `writeTileBox()` builds the boxes in as well. A point in and nothing out — see the note on
+   * doubles at the top of the module.
    */
   #widenFrustumHeight(point: Vector3): void {
     // the y of `point.applyMatrix4(#matrixWorldInverse)`, written out: through `applyMatrix4()`,
@@ -807,18 +796,19 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     const e = this.#matrixWorldInverse.elements;
     const {x, y, z} = point;
     const height = (e[1]! * x + e[5]! * y + e[9]! * z + e[13]!) / (e[3]! * x + e[7]! * y + e[11]! * z + e[15]!);
-    const frustumHeight = this.#frustumHeight;
-    if (height < frustumHeight[FRUSTUM_HEIGHT_MIN]!) frustumHeight[FRUSTUM_HEIGHT_MIN] = height;
-    if (height > frustumHeight[FRUSTUM_HEIGHT_MAX]!) frustumHeight[FRUSTUM_HEIGHT_MAX] = height;
+    const scalars = this.#viewScalars;
+    if (height < scalars[VIEW_FRUSTUM_HEIGHT_MIN]!) scalars[VIEW_FRUSTUM_HEIGHT_MIN] = height;
+    if (height > scalars[VIEW_FRUSTUM_HEIGHT_MAX]!) scalars[VIEW_FRUSTUM_HEIGHT_MAX] = height;
   }
 
   #findVisibleTiles(previousTiles: IMap2DTileCoords[], hitCount: number, changed: boolean): IMap2DVisibleTiles {
     // what a slot took part in during this recomputation carries this stamp
     const stamp = this.#serial;
+    const search = this.#search;
 
     // Reset reusable working buffers. What is left in the frontier is what a cut at the limit did
     // not take.
-    this.#frontier.clear();
+    search.begin(stamp);
     truncateArray(this.#visibles);
 
     // Every tile of `previousTiles` gets its slot and the stamp that says so. In a frame loop
@@ -837,6 +827,12 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
 
     // Reached only from behind the `if (!this.camera)` guard in `computeVisibleTiles()`.
     makeCameraFrustum(this.camera!, this.#cameraFrustum);
+
+    // the scalars the search and `writeTileBox()` read, as they stand for this recomputation
+    const scalars = this.#viewScalars;
+    scalars[VIEW_DEPTH] = this.#depth;
+    scalars[VIEW_FRUSTUM_BOX_SCALE] = this.#frustumBoxScale;
+    scalars[VIEW_MAX_VISIBLE_TILES] = this.#maxVisibleTiles;
 
     const translate = this.#scratchTranslate.setFromMatrixPosition(this.matrixWorld);
 
@@ -870,56 +866,15 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
         for (let tx = 0; tx < around.columns; tx++) {
           const tile = this.#pool.acquire(around.tileLeft + tx, around.tileTop + ty);
           tile.probeStamp = stamp;
-          this.#enqueue(tile, false);
+          search.enqueue(tile, false);
         }
       }
     }
 
-    // Nearest first. Once `maxVisibleTiles` tiles are kept, a visible tile nearer than the
-    // furthest of them takes its place, and the search goes on as long as the frontier can still
-    // lead to such a tile — see `#searchCanStop()`.
-    const limit = this.#maxVisibleTiles;
-    const kept = this.#kept;
-    let capped = false;
-    while (this.#frontier.length > 0) {
-      if (kept.length >= limit && this.#searchCanStop(this.#frontier.peek())) break;
+    // Nearest first, and at most `maxVisibleTiles` tiles kept — see `NearestFirstTileSearch`.
+    if (search.run()) this.#warnCapped();
 
-      const tile = this.#frontier.pop();
-      this.#updateFrustumBox(tile);
-      if (!tile.insideProbeHull && !this.#cameraFrustum.intersectsBox(tile.frustumBox)) continue;
-
-      if (kept.length < limit) {
-        kept.add(tile);
-        if (kept.length === limit) {
-          kept.heapify();
-          this.#beginSearchStop();
-        }
-      } else {
-        // a visible tile goes: this one, or the furthest kept one it takes the place of
-        capped = true;
-        if (tile.distanceToCamera < kept.furthest.distanceToCamera) {
-          kept.replaceFurthest(tile);
-          this.#updateSearchStop();
-        }
-      }
-      // expanded either way: a tile left out can still be the way to a nearer one
-      this.#pushNeighbors(tile);
-    }
-
-    // A search that stopped at the distance leaves tiles in the frontier. The limit cut the view
-    // only if one of them is visible — a rest that would fail the test does not count.
-    if (!capped && kept.length >= limit) {
-      while (this.#frontier.length > 0) {
-        const tile = this.#frontier.pop();
-        this.#updateFrustumBox(tile);
-        if (tile.insideProbeHull || this.#cameraFrustum.intersectsBox(tile.frustumBox)) {
-          capped = true;
-          break;
-        }
-      }
-    }
-    if (capped) this.#warnCapped();
-
+    const kept = search.kept;
     kept.sortNearestFirst();
 
     // `primary` is a statement about this recomputation and a slot outlives it, so it is
@@ -1055,164 +1010,13 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
   }
 
   /**
-   * Puts a tile into the frontier, unless it has been there in this recomputation already. The
-   * mark is set here, on the way in, so that a tile enters the frontier exactly once.
-   */
-  #enqueue(tile: PooledTileBox, insideProbeHull: boolean): void {
-    const stamp = this.#serial;
-    if (tile.visitedStamp === stamp) return;
-    tile.visitedStamp = stamp;
-
-    tile.insideProbeHull = insideProbeHull;
-    this.#prepareTile(tile);
-    this.#frontier.push(tile);
-  }
-
-  /**
-   * The center of the tile in world space and its distance to the camera — what the frontier
-   * orders by —, in the shape of this frame.
-   */
-  #prepareTile(tile: PooledTileBox): void {
-    const coords = tile.coords;
-    // field by field, and `distanceTo()` written out — see the note on doubles at the top of the
-    // module
-    const center = tile.centerWorld;
-    center.x = coords.left + coords.width / 2;
-    center.y = 0;
-    center.z = coords.top + coords.height / 2;
-    center.applyMatrix4(this.#tileWorldMatrix);
-
-    const camera = this.#cameraWorldPosition;
-    const dx = center.x - camera.x;
-    const dy = center.y - camera.y;
-    const dz = center.z - camera.z;
-    tile.distanceToCamera = Math.sqrt(dx * dx + dy * dy + dz * dz);
-  }
-
-  /**
-   * The box the frustum test reads, for every tile taken off the frontier — those of the hull
-   * too, whose box the visibility helpers draw. Expects `#prepareTile()` to have run on it.
-   */
-  #updateFrustumBox(tile: PooledTileBox): void {
-    // the same box two transforms in a row give: `#tileBoxMatrix` only translates, and a box
-    // that is moved stays exact
-    this.#setBox(tile.frustumBox, tile.coords, true).applyMatrix4(this.#tileWorldMatrix);
-  }
-
-  /**
-   * Writes what stays the same for the rest of the recomputation once the search holds
-   * `maxVisibleTiles` tiles — the height of the camera above the plane and the diagonal of the
-   * footprint of a frustum box — and then the stop distance for the furthest kept tile. Expects the
-   * kept tiles to be a heap.
-   */
-  #beginSearchStop(): void {
-    const stop = this.#searchStop;
-    // `planeWorld.distanceToPoint()` written out — see the note on doubles at the top of the module
-    const {normal, constant} = this.planeWorld;
-    const camera = this.#cameraWorldPosition;
-    const height = normal.x * camera.x + normal.y * camera.y + normal.z * camera.z + constant;
-    stop[SEARCH_STOP_HEIGHT_SQ] = height * height;
-    // The footprint of a frustum box on the map plane, in world space: the x and the z edge of the
-    // box taken through the linear part of `#tileWorldMatrix`, which is that of `matrixWorld`.
-    // Every tile of one recomputation has the same size; the search calls this once it holds
-    // maxVisibleTiles tiles, at least one
-    const e = this.#tileWorldMatrix.elements;
-    const coords = this.#kept.furthest.coords;
-    const scale = this.#frustumBoxScale;
-    const edgeX = coords.width * scale;
-    const edgeZ = coords.height * scale;
-    const ax = e[0]! * edgeX;
-    const ay = e[1]! * edgeX;
-    const az = e[2]! * edgeX;
-    const bx = e[8]! * edgeZ;
-    const by = e[9]! * edgeZ;
-    const bz = e[10]! * edgeZ;
-    // the footprint is a parallelogram; its longer diagonal is the one to hold against. Compared
-    // and not through `Math.max()` — see the note on doubles at the top of the module
-    const sx = ax + bx;
-    const sy = ay + by;
-    const sz = az + bz;
-    const dx = ax - bx;
-    const dy = ay - by;
-    const dz = az - bz;
-    const sumSq = sx * sx + sy * sy + sz * sz;
-    const differenceSq = dx * dx + dy * dy + dz * dz;
-    stop[SEARCH_STOP_FOOTPRINT_DIAGONAL] = Math.sqrt(Math.max(sumSq, differenceSq));
-    this.#updateSearchStop();
-  }
-
-  /** Writes the stop distance squared for the furthest kept tile, the top of the heap. */
-  #updateSearchStop(): void {
-    const stop = this.#searchStop;
-    // fixed indices of an array of three, and a heap of at least one tile
-    const heightSq = stop[SEARCH_STOP_HEIGHT_SQ]!;
-    const furthestKept = this.#kept.furthest.distanceToCamera;
-    const rho = Math.sqrt(Math.max(furthestKept * furthestKept - heightSq, 0)) + stop[SEARCH_STOP_FOOTPRINT_DIAGONAL]!;
-    stop[SEARCH_STOP_DISTANCE_SQ] = heightSq + rho * rho;
-  }
-
-  /**
-   * Whether the search stops before `next`, the nearest tile in the frontier, once
-   * `maxVisibleTiles` tiles are kept: past the distance worked out for the furthest kept tile, the
-   * top of the heap, in `#beginSearchStop()` and `#updateSearchStop()`, no tile in the frontier leads
-   * to a visible tile nearer than that one.
-   *
-   * The center of a tile lies on the map plane, so its distance to the camera is
-   * `√(h² + ρ²)` — `h` the height of the camera above the plane, `ρ` how far the center lies from
-   * the point of the plane below the camera. Take a kept tile and a visible tile nearer than the
-   * furthest kept one, and a point of each frustum box inside the frustum. The straight line
-   * between the two points stays inside the frustum, which is convex, and inside the slab the
-   * frustum boxes fill; each tile it passes over has the point above it inside its box, so it is
-   * visible, and one after the other these tiles are neighbours. Along the line, `ρ` of the point
-   * below it is at most the larger of its two ends, and a point of a frustum box lies at most half
-   * the diagonal of its footprint away from the center of its tile. So `ρ` of every tile on the
-   * way is at most `ρ` of the furthest kept tile plus the diagonal of a footprint, and the search,
-   * which takes the tiles in the order of their distance, reaches each of them before it stops.
-   *
-   * The argument holds for every tile whose frustum box meets the frustum.
-   * `Frustum#intersectsBox()` tests a box against the six planes one by one and also takes a box
-   * that passes by an edge or a corner of the frustum without meeting it; such a tile, taken as
-   * visible and nearer than the furthest kept one, can be left out for a tile further away. How
-   * many boxes pass that way grows with their height against the tile size — see {@link depth} —;
-   * the boxes reach no higher and no lower than the frustum.
-   *
-   * The height of the frustum boxes does not enter the margin, though it is why a margin is
-   * needed at all: a tile whose box reaches into the frustum from below the lower edge of the
-   * view can lie behind tiles a little further out than the furthest kept one. The footprint is
-   * the parallelogram the x and the z edge of a frustum box span through the world matrix, and
-   * its longer diagonal is the margin, however the map node is turned. The argument needs a
-   * `frustumBoxScale` of at least 1 — its setter refuses less —, so that the boxes of
-   * neighbouring tiles leave no gap.
-   *
-   * Besides the boxes `intersectsBox()` lets through past an edge, two cases lie outside the
-   * argument:
-   *
-   * - On a map node turned by anything other than a quarter turn about an axis of the world, the
-   *   box in world space — the axis-aligned box around the turned frustum box, which the frustum
-   *   test reads — reaches beyond the turned box. A tile that is visible only through that can be
-   *   left out for one further away.
-   * - A world matrix with shear — a parent node scaled unevenly under a rotation — tips the local
-   *   y axis out of the normal of the plane, and the margin leaves out that share of the height of
-   *   a box.
-   *
-   * A tile in and a boolean out: the distance it is held against lies in `#searchStop`, see the
-   * note on doubles at the top of the module.
-   */
-  #searchCanStop(next: PooledTileBox): boolean {
-    const distance = next.distanceToCamera;
-    // both sides squared: both are at least 0, so the order stays, and no square root is taken.
-    // A fixed index of an array of three
-    return distance * distance > this.#searchStop[SEARCH_STOP_DISTANCE_SQ]!;
-  }
-
-  /**
-   * Places a tile the search kept, and sorts it into `reuseTiles` or `createTiles`. Expects
-   * `#prepareTile()` to have run on it.
+   * Places a tile the search kept, and sorts it into `reuseTiles` or `createTiles`. Expects the
+   * search to have kept it.
    */
   #placeTile(tile: PooledTileBox, reuseTiles: IMap2DTileCoords[], createTiles: IMap2DTileCoords[]): void {
     const coords = tile.coords;
 
-    this.#setBox(tile.box, coords, false).translate(this.#tileBoxOffset);
+    writeTileBox(tile.box, coords, this.#viewScalars, false).translate(this.#tileBoxOffset);
 
     // the one allocation of a tile that enters the view: the shell the caller keeps
     if (tile.map2dTile === undefined) {
@@ -1232,19 +1036,6 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     }
   }
 
-  /**
-   * Puts the eight neighbours of a tile into the frontier. The table answers one that was visited
-   * already with its slot, and `#enqueue()` passes it by.
-   */
-  #pushNeighbors(tile: TileBox): void {
-    for (let i = 0; i < NEIGHBOR_DX_DY.length; ++i) {
-      // The loop bound is `NEIGHBOR_DX_DY.length`. Read by index: a tuple destructured costs an
-      // allocation wherever the compiler leaves the iteration in place
-      const offset = NEIGHBOR_DX_DY[i]!;
-      this.#enqueue(this.#pool.acquire(tile.x + offset[0], tile.y + offset[1]), false);
-    }
-  }
-
   #warnCapped(): void {
     if (this.#warnedCapped) return;
     this.#warnedCapped = true;
@@ -1260,40 +1051,5 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     _v.sub(this.planeOrigin).applyMatrix4(this.#matrixWorldInverse);
 
     target.set(_v.x, _v.z);
-  }
-
-  /**
-   * The box of a tile, `depth` high, in the space its coordinates are in — with the margin of
-   * `frustumBoxScale` for the box the frustum is tested against, that box cut to the height range
-   * of the view frustum. A flag and not the scale itself, and the corners field by field — see the
-   * note on doubles at the top of the module.
-   */
-  #setBox(target: Box3, {top, left, width, height}: TilesWithinCoords, forFrustum: boolean): Box3 {
-    const scale = forFrustum ? this.#frustumBoxScale : 1;
-    const sw = (width * scale - width) / 2;
-    const sh = (height * scale - height) / 2;
-    let ground = this.#depth * -0.5 * scale;
-    let ceiling = this.#depth * 0.5 * scale;
-    if (forFrustum) {
-      // no point of the frustum lies beyond this height, so the part of the box beyond it meets
-      // none — and a box higher than that passes the side planes of a tilted view far outside it.
-      // The range never turns inside out: a box for the frustum is built only in a recomputation
-      // in which a probe met the plane, and that point lies on a probe's line, so the lowest point
-      // lies at 0 or below and the highest at 0 or above. Compared and not through
-      // `Math.max()`/`Math.min()` — see the note on doubles at the top of the module
-      const frustumHeight = this.#frustumHeight;
-      const lowest = frustumHeight[FRUSTUM_HEIGHT_MIN]!;
-      const highest = frustumHeight[FRUSTUM_HEIGHT_MAX]!;
-      if (ground < lowest) ground = lowest;
-      if (ceiling > highest) ceiling = highest;
-    }
-    const {min, max} = target;
-    min.x = left - sw;
-    min.y = ground;
-    min.z = top - sh;
-    max.x = left + width + sw;
-    max.y = ceiling;
-    max.z = top + height + sh;
-    return target;
   }
 }
