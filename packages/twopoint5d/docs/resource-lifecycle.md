@@ -257,6 +257,14 @@ dispose(): void {
   this.#stopSizeWatch();
   this.#stopVisibilityWatch();
   try {
+    // while the canvas is still there to name the default target, and before the release
+    // lets go of the renderer: a fullscreen this display entered is left first. A step of
+    // the teardown that throws holds up none of the steps after it
+    this.#fullscreen?.dispose();
+  } catch (error) {
+    errors.push(error);
+  }
+  try {
     // the listeners are still attached here: this event is what tells them to let go,
     // and off(this) below is what makes it the last event this display ever emits.
     // Every listener hears it, even behind one that throws
@@ -282,12 +290,12 @@ dispose(): void {
 
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1) {
-    // neither goes missing: the error of the pause, and the one of the dispose event
-    // after it
+    // none goes missing, in the order of the teardown: the error of the pause, the one of
+    // the fullscreen, and the one of the dispose event
     throw new AggregateError(
       errors,
-      'Display#dispose(): a listener of pause threw, and a listener of dispose threw',
-      {cause: errors[1]},
+      'Display#dispose(): more than one step of the teardown threw',
+      {cause: errors.at(-1)},
     );
   }
 }

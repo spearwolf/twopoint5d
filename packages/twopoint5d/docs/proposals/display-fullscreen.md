@@ -134,9 +134,9 @@ beyond the size source rule of §5.
 export class DisplayFullscreen {
   readonly display: Display;
 
-  /** The browser offers native fullscreen here: `fullscreenEnabled` of the document, and `requestFullscreen` on the target. */
+  /** The browser offers native fullscreen here: `fullscreenEnabled` of the document, and `requestFullscreen` on the target — the unprefixed API alone. */
   get isSupported(): boolean;
-  /** A `request()` can succeed: `isSupported`, or `fallback` is `'pseudo'`. What a fullscreen button shows itself by. */
+  /** A `request()` can succeed: `isSupported`, or `fallback` is `'pseudo'`; `false` after `dispose()`. What a fullscreen button shows itself by. */
   get isAvailable(): boolean;
 
   /** The target is in fullscreen right now, native or pseudo, by this controller or by anyone. */
@@ -145,6 +145,8 @@ export class DisplayFullscreen {
   get mode(): FullscreenMode | undefined;
   /** `onLandscape` waits for a tap to enter fullscreen, §6.2. A page can show a hint by it. */
   get isArmed(): boolean;
+  /** The display that built the controller is disposed, §9. */
+  get isDisposed(): boolean;
 
   // the options of §3.1, writable at any time; a new `element` takes effect with the next request,
   // a fullscreen in progress stays on the element it entered with
@@ -178,7 +180,34 @@ no renderer; a `request()` before `start()` works.
 `isActive` in native mode is `element.getRootNode().fullscreenElement === element` (§2.6): the
 target is the top fullscreen element of its root. A fullscreen that another element of the page
 stacks on top of the target makes `isActive` `false` until it is left again; `exit()` does not pop
-a fullscreen that is not the target's.
+a fullscreen that is not the target's. While the target is still in the fullscreen stack under
+that element — `:fullscreen` matches it, or the fullscreen element of its root lies inside it —
+the controller keeps who entered it and its lock of §6.4 — a lock the browser grants only while
+the element lies on top holds as well. Holding the target counts as active for §6: a turn to
+landscape asks nothing and arms nothing, and neither does `onLandscape = true`, since a request
+would pull the target over the element. Once the target is on top again, the fullscreen is the
+controller's own as before, for `exitOnPortrait` and for `dispose()`. A turn to portrait while the
+element lies on top leaves nothing (`exit()` does not pop it) and is not evaluated again once the
+stack is down: the controller keeps no record of turns it could not act on, and the next turn
+sideways and back acts as usual.
+
+Calls that overlap with an answer of the browser still to come follow one rule: **the last call of
+the page wins.** The browser answers one native call of the controller at a time — a request until
+its promise settles, an exit until its promise settles, the fullscreen element still set until the
+browser is through. What is asked meanwhile is noted on that call as what follows it, in the other
+direction: an `exit()` while a request is pending leaves once the browser grants it, and a
+`request()` while an exit is under way asks the browser again once the exit is through instead of
+answering `true` for a fullscreen about to end. A call in the direction of the one under way joins
+it and takes back what is noted: a second `request()` shares the pending request and takes back an
+`exit()` before it, a second `exit()` shares the exit and takes back a `request()` before it.
+`toggle()` goes by the state the page was last told through the event — not active while a request
+is pending, active while an exit is under way — and acts as `request()` or `exit()` would then. The
+calls of one overlap share one promise; it resolves once, with `isActive` when the controller has
+done what the last call asked, as far as the browser granted it. A turn of §6 gives way to the
+page (§6.3).
+
+Each entry point sets the whole state first and emits once, last: a listener that calls back into
+the controller finds the request it heard about settled, and its call joins the overlap.
 
 ### 3.3 The event
 
@@ -204,6 +233,14 @@ so a button attached later hears the state it has to show. The state always come
 `fullscreenchange` event of the target's document, never from what a call of this controller
 expected: a fullscreen the browser refused emits nothing.
 
+The display sends it with `emitSafe()`. The event goes out of promise continuations
+(`request()`, `exit()`), of DOM handlers (`fullscreenchange`, the turn, the armed tap, Escape) and
+of `dispose()` — none has a caller the error of a listener would belong to, and a promise that
+never rejects cannot carry it. A listener that throws is reported by eventize through
+`console.warn`; every listener after it hears the event, the retained value is written, and
+neither the state of the controller nor a promise of its calls changes. The host of the controller
+states this as the contract of its `emit()`: it never throws.
+
 ### 3.4 Refusal
 
 `request()` resolves with `false` instead of rejecting. A rejection would turn every
@@ -213,8 +250,8 @@ once per page, through `console.warn`, after the pattern of the warning about
 `Display.MaxResolution`:
 
 - a refused native request: the message names the user activation and the synchronous call (§2.1);
-- a request where `isAvailable` is `false`: the message names the iframe attribute, the iPhone, and
-  `fallback: 'pseudo'`.
+- a request where `isAvailable` is `false`: the message names the iframe attribute, the iPhone, a
+  browser without the unprefixed API (Safari before 16.4), and `fallback: 'pseudo'`.
 
 A request while already active resolves with `true` and changes nothing.
 
@@ -309,8 +346,14 @@ Every turn to landscape, with the gate of §6.1 open and the target not active:
 2. **Arm.** Where native fullscreen refuses, the controller arms: `isArmed` turns `true`, the event
    goes out, and a listener waits on the target for the next `pointerup` of a non-mouse pointer or
    `click` — in the capture phase, passive, without `preventDefault()`, so the tap reaches the game
-   as well. That tap calls `request()` synchronously in its handler and disarms, whether the
-   request succeeds or not.
+   as well. That tap disarms and calls `request()` synchronously in its handler, before the event
+   of the disarming goes out. Where the browser refuses the tap as well, the controller arms again
+   for the next one — as long as the screen is still landscape, the target not active and the user
+   has not left in landscape (§6.3).
+
+The answer of every request of §6 is held against the state of the controller once the calls that
+overlap with it (§3.2) are through: a refusal after `dispose()` arms nothing, and neither does one
+while a newer request or an exit is under way — the answer of that one decides.
 
 A page that loads in landscape arms at construction and does not try at once: no turn has
 happened, and nothing grants an exemption. `onLandscape` set to `true` later does the same.
@@ -322,14 +365,32 @@ construction.
 ### 6.3 Leaving
 
 - **The turn back.** A turn to portrait disarms. With `exitOnPortrait` (the default), it also leaves
-  a fullscreen that `onLandscape` entered. A fullscreen the app entered through `request()` — a
-  button pressed while in portrait — stays.
+  a fullscreen that `onLandscape` entered, and a request of `onLandscape` still pending leaves what
+  the browser grants. A fullscreen the app entered through `request()` — a button pressed while in
+  portrait — stays: whoever asked for a fullscreen decides, so one a `request()` of the page carries
+  stays as well when it shares a request of `onLandscape` — the turn's, or the armed tap's under the
+  click of a button —, and so does one `onLandscape` has entered once the page calls `request()` on
+  it. The exit this turn starts is no refusal of the user: it does not hold off the
+  arming. An exit the browser refuses leaves the target on top and is not asked again in portrait.
+- **Turns that overlap with the answers of the browser.** The rule of §3.2 holds, and a turn gives way
+  to the page: it is no call of the page, it notes the exit of a turn to portrait on a pending
+  request only where the page has noted none, and a turn back to landscape before the browser answers
+  takes back that exit of the turn, never one the page asked for. A turn to landscape while an exit
+  is under way waits for it; once it is through, the controller evaluates the turn anew — it enters
+  again, or arms where the browser refuses —, unless an `exit()` of the page came after the turn. A
+  `request()` of the page noted on that exit goes to the browser first, and the turn shares it.
 - **The user leaves.** Where the user leaves a fullscreen that `onLandscape` entered — Escape, the
   back gesture, the browser's own control, an exit button of the page — while the screen is still
-  landscape, the controller does
-  not arm again until the screen has turned to portrait and back. A page that throws the user back
-  into fullscreen at the next tap after they left it is a trap; this rule is the reason the feature
-  can be on by default in a game.
+  landscape, the controller does not arm again until the screen has turned to portrait and back. For
+  an `exit()` of the page the screen at the call decides, not the screen once the browser answers —
+  also for one that joins the exit of the turn to portrait or a pending request of the turn or of the
+  armed tap: called in landscape it holds off the arming, whatever the browser answers; called in
+  portrait it does not, however quickly the screen turns back. Until the browser has answered, the
+  hold is noted on the call under way and belongs to the `exit()`: a `request()` of the page after
+  it takes it back with the exit, and a turn to portrait lifts it, as a turn after the answer would.
+  A page that throws the user back into
+  fullscreen at the next tap after they left it is a trap; this rule is the reason the feature can
+  be on by default in a game.
 - **Switched off.** `onLandscape = false` disarms and takes the listeners down. A fullscreen in
   progress stays.
 
@@ -422,12 +483,26 @@ The CHANGELOG lists the attribute value and the static under "Deprecated", one l
   arming of §6.2 for a page that starts in landscape.
 - **`styleSheetRoot`.** A new root gets the pseudo rules as well, where this display has installed
   them — the same as `#installRules()` does for the other rules.
-- **`dispose()`.** Where the target of this display is in fullscreen and this controller entered it,
+- **`dispose()`.** The controller marks itself disposed first, takes its whole state down and emits
+  one event last, for all of it: a listener of that event and every late answer of the browser find
+  it disposed, and a host that throws — only the stub of a spec can — throws once nothing is left
+  standing. Where the target of this display is in fullscreen and this controller entered it,
   `dispose()` leaves it: `exitFullscreen()` with its promise caught, or the classes of §7 released;
-  a lock of §6.4 is undone. A fullscreen someone else entered stays. All listeners come off —
-  `fullscreenchange`, orientation, query, the armed tap, Escape. The canvas handed back by
-  `#giveBackCallersCanvas()` carries no class of this module. After `dispose()`, `display.fullscreen`
-  throws.
+  a lock of §6.4 is undone. A fullscreen someone else entered stays, and so does one stacked on the
+  target (§3.2): `exitFullscreen()` would pop the element on top, a video or a dialog of the app,
+  not the target. A request still pending is not forgotten: its answer leaves the fullscreen the
+  browser grants after the dispose and resolves `false`, and a lock granted after the dispose is
+  undone. All listeners come off — `fullscreenchange`, orientation, query, the armed tap, Escape.
+  The canvas handed back by `#giveBackCallersCanvas()` carries no class of this module.
+  `Display#dispose()` runs this step in a `try` of its own and collects a throw with those of the
+  pause and the dispose event.
+- **After `dispose()`.** `display.fullscreen` throws; a reference held from before stays usable.
+  `request()`, `exit()` and `toggle()` resolve `false` and call nothing, and so does a call still
+  open at the dispose. `isDisposed` is `true`. `isActive` and `mode` keep reading the document —
+  the state of the page is no resource of the controller —, `isSupported` keeps reading the
+  browser, `isAvailable` and `isArmed` are `false`. `element` answers the element the controller
+  had at the dispose; a write to it, to `navigationUI`, `fallback` or `onLandscape` changes
+  nothing, and `orientationLock` and `exitOnPortrait` take a value and warn nothing.
 - **Several displays on a page.** Each has its own controller and target. In native mode two
   displays that share a target see the same `isActive` — the browser holds the state — and whichever
   calls `exit()` leaves it for both. The pseudo mode is the state of one controller: no module-wide
@@ -496,13 +571,52 @@ that runs without a real turn of a screen.
   takes the listeners down;
 - §7: used only where `isSupported` is `false`; classes on and off; Escape leaves; a turn enters
   without arming;
-- `dispose()` leaves only a fullscreen this controller entered, and leaves no listener behind.
+- `dispose()` leaves only a fullscreen this controller entered, and leaves no listener behind;
+  a host whose `emit()` throws finds the pseudo mode left and every listener down, the armed one
+  included; a request pending at the dispose is left once the browser grants it and resolves
+  `false`; a lock pending at the dispose is undone; an exit under way at the dispose is not asked
+  for twice; `isDisposed`, `isAvailable` and the setters after the dispose;
+- overlapping calls, a table over every sequence of up to three calls of `request()`, `exit()` and
+  `toggle()` from a pending request and from an exit under way — a `request()` after the exit held
+  back behind it —, each with the browser granting and refusing: the fullscreen ends where the last
+  call asks, every promise resolves once with that end, and the browser is asked as often as that
+  takes; two requests share one; a listener of the change a granted request causes finds it
+  settled; a listener told active by a `fullscreenchange` during `requestFullscreen()` leaves with its
+  `toggle()`;
+- §6 and overlapping answers: a turn to portrait while the request of a turn is pending leaves
+  what the browser grants; a turn back to landscape during the exit of the turn to portrait enters
+  again, or arms; an `exit()` of the page in landscape still holds off arming; a refused armed tap
+  arms again; a refusal after `dispose()` arms nothing; the armed tap asks the browser before it
+  emits; a turn to portrait and back before the browser answers keeps what it grants — an `exit()`
+  of the page while the request is pending still leaves it, and the turn lifts its hold on the
+  arming; an `exit()` of the page in landscape during the exit of the turn to portrait leaves for
+  good, asks nothing and arms nothing; an `exit()` during
+  the request of a turn or of the armed tap holds off arming when the browser refuses; the late
+  answer of an earlier request arms nothing beside a newer one; an `exitFullscreen()` that throws or
+  rejects on the turn to portrait is asked once; an `exit()` of the page in portrait during the exit
+  of the turn or the request of a turn is no refusal — a quick turn back enters again or arms —, one
+  in landscape is, granted or refused; a `request()` of the page during the exit of the turn or the
+  request of a turn makes the fullscreen the page's own, and the next turn to portrait leaves
+  nothing; a `toggle()` under the armed tap does the same, and so does a `request()` on a fullscreen
+  or a pseudo mode `onLandscape` has entered; a table over an `exit()` of the page in landscape
+  during the request of a turn and during the exit of a fullscreen the turn entered, alone, followed
+  by a `request()`, or by a turn to portrait and back, granted and refused: the `exit()` alone holds
+  off the arming, a `request()` after it takes the hold back with it — a refused request of the turn
+  arms, and a half turn asks again —, and the turn lifts it;
+- a fullscreen stacked on the target: `isActive` is `false` while it holds, the lock stays — one
+  still pending as well —, and the target is the controller's own again once it is left — for
+  `dispose()` and for the turn to portrait; a turn to landscape and `onLandscape = true` while it
+  holds ask nothing and arm nothing.
 
 `Display.spec.ts` gains the size source rule of §5: a canvas in fullscreen with a parent as size
 source measures the fullscreen element; so does a canvas that is its own size source, inside a
 fullscreen parent; a size source inside the fullscreen element and `resize-to="window"` stay as they
 are; `resizeToCallback` still wins; a `fullscreenchange` marks the
-size dirty.
+size dirty. A `resizeTo` callback may read `display.fullscreen` in the first measurement of the
+constructor. Behind a listener of `onFullscreenChange` that throws, `request()`, `toggle()` and the
+`exit()` of the pseudo mode resolve as they would without it, and `dispose()` runs to its end; a
+fullscreen step of `dispose()` that throws lands in its `AggregateError` between the pause and the
+dispose event.
 
 ### 13.2 Browser (`packages/twopoint5d-testing/test/display-fullscreen.test.js`)
 
@@ -513,6 +627,9 @@ A native request needs a trusted gesture, which a script cannot make. The runner
   the size of the viewport of the headless browser after the next frame;
 - the canvas as target with its parent as size source: the buffer follows the canvas (§5);
 - `exit()` and the event;
+- an element inside the target that goes fullscreen stacks on it: the controller reports
+  `isActive: false` while it holds and `true` once the target is on top again, and `dispose()` then
+  leaves the target (§3.2, §9);
 - the pseudo mode, forced by a target in an iframe without `allow="fullscreen"`: the box covers the
   viewport, the buffer follows it.
 

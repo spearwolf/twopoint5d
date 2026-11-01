@@ -1,5 +1,6 @@
 import {
   emit,
+  emitSafe,
   emitStrict,
   type EventizedObject,
   eventize,
@@ -1068,6 +1069,42 @@ export class Display {
       this.resizeToElement = resizeToElement ?? this.resizeToElement;
       this.resizeToAttributeEl = resizeToAttributeEl ?? canvas;
 
+      // Before the first measurement: a resizeTo callback gets the display with it and may read
+      // display.fullscreen, and the measurement knows a fullscreen that holds the canvas already.
+      // Both need no more than the renderer, the document and the window, which stand here
+      const doc = this.#doc;
+
+      // the size source follows a fullscreen the app enters on its own as well
+      doc.addEventListener('fullscreenchange', this.#onFullscreenChange);
+      this.#updateContainingFullscreen();
+
+      this.#fullscreen = new DisplayFullscreen(
+        this,
+        {
+          doc,
+          view: this.#view,
+          // the element around the canvas: the host of a container this display built, else the
+          // parent of the canvas as it is now
+          defaultElement: () => this.#ownContainer?.parentElement ?? this.canvas.parentElement ?? this.canvas,
+          emit: (props) => {
+            // a request or an exit resolves before the browser fires fullscreenchange, and the
+            // controller reports the state it read when its promise settled: the size source
+            // follows it then, before a listener of the event measures
+            this.#updateContainingFullscreen();
+            // emitSafe(): the event goes out of promise continuations, DOM handlers and dispose(),
+            // and none of them has a caller the error would belong to. A listener that throws is
+            // reported on the console by eventize, and every listener after it hears the event
+            emitSafe(this, OnDisplayFullscreenChange, props);
+          },
+          pseudoTargetChanged: (target) => {
+            this.#pseudoTarget = target;
+            this.#updateContainingFullscreen();
+          },
+          styleSheetRoot: () => this.#styleSheetRoot,
+        },
+        fullscreen,
+      );
+
       this.#startSizeWatch();
       this.resize();
 
@@ -1125,7 +1162,6 @@ export class Display {
         },
       });
 
-      const doc = this.#doc;
       const onDocVisibilityChange = () => {
         this.#stateMachine.documentIsVisible = !doc.hidden;
       };
@@ -1134,34 +1170,6 @@ export class Display {
       this.#onDocVisibilityChange = onDocVisibilityChange;
 
       onDocVisibilityChange();
-
-      // the size source follows a fullscreen the app enters on its own as well
-      doc.addEventListener('fullscreenchange', this.#onFullscreenChange);
-      this.#updateContainingFullscreen();
-
-      this.#fullscreen = new DisplayFullscreen(
-        this,
-        {
-          doc,
-          view: this.#view,
-          // the element around the canvas: the host of a container this display built, else the
-          // parent of the canvas as it is now
-          defaultElement: () => this.#ownContainer?.parentElement ?? this.canvas.parentElement ?? this.canvas,
-          emit: (props) => {
-            // a request or an exit resolves before the browser fires fullscreenchange, and the
-            // controller reports the state it read when its promise settled: the size source
-            // follows it then, before a listener of the event measures
-            this.#updateContainingFullscreen();
-            emit(this, OnDisplayFullscreenChange, props);
-          },
-          pseudoTargetChanged: (target) => {
-            this.#pseudoTarget = target;
-            this.#updateContainingFullscreen();
-          },
-          styleSheetRoot: () => this.#styleSheetRoot,
-        },
-        fullscreen,
-      );
 
       if (pauseOutsideViewport && typeof IntersectionObserver !== 'undefined') {
         const observer = new IntersectionObserver((entries) => {
@@ -1956,7 +1964,8 @@ export class Display {
    * Tears the display down.
    *
    * Before it returns, `dispose()` stops the frame loop, takes the `visibilitychange` listener and
-   * the observer of {@link DisplayParameters.pauseOutsideViewport} down, fires `OnDisplayDispose`,
+   * the observer of {@link DisplayParameters.pauseOutsideViewport} down, leaves a fullscreen this
+   * display entered or has asked for (see {@link Display.fullscreen}), fires `OnDisplayDispose`,
    * drops every listener, gives up {@link Display.renderer} and takes a container this display
    * built out of the DOM, with the canvas in it. The renderer itself is released after the return,
    * with `renderer.dispose()`: once its init is through and the GPU has run the work submitted to
@@ -1986,10 +1995,10 @@ export class Display {
    * Every listener of `OnDisplayPause` — a running display pauses first — and of
    * `OnDisplayDispose` hears its event, even behind one that throws, and a listener that throws
    * does not stop the teardown: `dispose()` runs to its end and then throws the error, or an
-   * `AggregateError` when more than one listener of the same event throws. When listeners of
-   * both events throw, the `AggregateError` carries the error of the pause and that of the
-   * dispose event, in this order. The display is disposed either way, and a second call does
-   * nothing.
+   * `AggregateError` when more than one listener of the same event throws. When more than one
+   * step of the teardown throws, the `AggregateError` carries their errors in the order of the
+   * teardown: that of the pause, that of leaving the fullscreen, and that of the dispose event.
+   * The display is disposed either way, and a second call does nothing.
    *
    * A `dispose()` while the renderer is still initializing waits for that init instead of
    * cutting it short. An init that fails leaves nothing to release but the `webglcontextlost`
@@ -2013,9 +2022,14 @@ export class Display {
     this.frameLoop.stop(this);
     this.#stopSizeWatch();
     this.#stopVisibilityWatch();
-    // while the canvas is still there to name the default target, and before the release lets go
-    // of the renderer: a fullscreen this display entered is left first
-    this.#fullscreen?.dispose();
+    try {
+      // while the canvas is still there to name the default target, and before the release lets go
+      // of the renderer: a fullscreen this display entered is left first. A step of the teardown
+      // that throws holds up none of the steps after it
+      this.#fullscreen?.dispose();
+    } catch (error) {
+      errors.push(error);
+    }
     try {
       // the listeners are still attached here: this event is what tells them to let go,
       // and off(this) below is what makes it the last event this display ever emits. Every
@@ -2041,9 +2055,10 @@ export class Display {
 
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) {
-      // neither goes missing: the error of the pause, and the one of the dispose event after it
-      throw new AggregateError(errors, 'Display#dispose(): a listener of pause threw, and a listener of dispose threw', {
-        cause: errors[1],
+      // none goes missing, in the order of the teardown: the error of the pause, the one of the
+      // fullscreen, and the one of the dispose event
+      throw new AggregateError(errors, 'Display#dispose(): more than one step of the teardown threw', {
+        cause: errors.at(-1),
       });
     }
   }
@@ -2198,7 +2213,10 @@ export class Display {
    * Subscribes `listener` to `OnDisplayFullscreenChange`: the target of {@link Display.fullscreen}
    * entered or left fullscreen, or `onLandscape` armed or disarmed.
    *
-   * The event is retained, so a listener attached later hears the state it has to show.
+   * The event is retained, so a listener attached later hears the state it has to show. Every
+   * listener hears it, even behind one that throws; a listener that throws is reported on the
+   * console and changes neither the fullscreen nor a promise of `request()`, `exit()` or
+   * `toggle()`.
    */
   readonly onFullscreenChange = (listener: DisplayEventListener<DisplayFullscreenChangeProps>): UnsubscribeFunc =>
     on(this, OnDisplayFullscreenChange, listener);

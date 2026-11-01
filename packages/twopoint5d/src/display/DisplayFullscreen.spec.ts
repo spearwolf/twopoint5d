@@ -57,6 +57,9 @@ interface TargetStub extends EventTargetStub {
   classList: {add: Mock; remove: Mock};
   getRootNode: () => {fullscreenElement: unknown};
   requestFullscreen: Mock<(options?: unknown) => Promise<void>>;
+  // what a fullscreen stacked on the target is read by: `:fullscreen` and the element on top inside it
+  matches: Mock<(selector: string) => boolean>;
+  contains: Mock<(other: unknown) => boolean>;
 }
 
 let doc: DocStub;
@@ -99,7 +102,57 @@ function makeTarget(name: string, root: {fullscreenElement: unknown} = doc): Tar
     fireFullscreenChange(stub);
     return Promise.resolve();
   });
+  stub.matches = vi.fn(() => false);
+  stub.contains = vi.fn(() => false);
   return stub;
+}
+
+/**
+ * A request of `target` the browser answers when the test says so: `grant()` makes the target the
+ * fullscreen element, fires fullscreenchange and resolves; `refuse()` rejects. With `fire: false`
+ * the grant fires nothing, as a browser that fires the event only in a later rendering update.
+ */
+function answerLater(target: TargetStub, {fire = true}: {fire?: boolean} = {}) {
+  const answer = {grant: () => {}, refuse: () => {}};
+  target.requestFullscreen.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        answer.grant = () => {
+          if (fire) fireFullscreenChange(target);
+          else doc.fullscreenElement = target;
+          resolve();
+        };
+        answer.refuse = () => reject(new TypeError('no gesture'));
+      }),
+  );
+  return answer;
+}
+
+/** An exit the browser finishes when the test says so: `finish()` leaves and resolves. */
+function exitLater() {
+  const exit = {finish: () => {}};
+  doc.exitFullscreen.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        exit.finish = () => {
+          fireFullscreenChange(null);
+          resolve();
+        };
+      }),
+  );
+  return exit;
+}
+
+/**
+ * An element inside `target` goes fullscreen, a video or a dialog of the app: it lies on top, and
+ * the target stays in the fullscreen stack below it.
+ */
+function stackOn(target: TargetStub): TargetStub {
+  const child = makeTarget('child');
+  target.matches.mockImplementation((selector) => selector === ':fullscreen');
+  target.contains.mockImplementation((other) => other === child);
+  fireFullscreenChange(child);
+  return child;
 }
 
 function make(options?: DisplayFullscreenOptions): DisplayFullscreen {
@@ -109,6 +162,20 @@ function make(options?: DisplayFullscreenOptions): DisplayFullscreen {
 }
 
 const asElement = (target: TargetStub) => target as unknown as HTMLElement;
+
+// lets every reaction to a settled answer of the browser run: they are microtasks
+const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/** What a promise has come to by the next task: its value, `'rejected'`, or `'unsettled'`. */
+function outcomeOf(promise: Promise<boolean>): Promise<boolean | 'rejected' | 'unsettled'> {
+  return Promise.race([
+    promise.then(
+      (value) => value,
+      () => 'rejected' as const,
+    ),
+    nextTask().then(() => 'unsettled' as const),
+  ]);
+}
 
 describe('DisplayFullscreen', () => {
   beforeEach(() => {
@@ -189,6 +256,21 @@ describe('DisplayFullscreen', () => {
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0]?.[0])).toContain('allow="fullscreen"');
       expect(String(warn.mock.calls[0]?.[0])).toContain("fallback = 'pseudo'");
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('unprefixed Fullscreen API'));
+    });
+
+    it('two request() calls while the browser has not answered share one request', async () => {
+      const answer = answerLater(defaultTarget);
+      const fs = make();
+
+      const first = fs.request();
+      const second = fs.request();
+      answer.grant();
+
+      expect(second).toBe(first);
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      await expect(first).resolves.toBe(true);
+      await expect(second).resolves.toBe(true);
     });
 
     it('a request while active resolves true and calls nothing', async () => {
@@ -233,6 +315,24 @@ describe('DisplayFullscreen', () => {
       const fs = make();
       await expect(fs.toggle()).resolves.toBe(true);
       await expect(fs.toggle()).resolves.toBe(false);
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    it('a listener of the change a granted request causes finds the request settled: its toggle() leaves', async () => {
+      // the browser fires fullscreenchange after the promise: the change goes out from the answer
+      const answer = answerLater(defaultTarget, {fire: false});
+      const fs = make();
+      let toggled: Promise<boolean> | undefined;
+      host.emit = (props) => {
+        emitted.push(props);
+        if (props.isActive && toggled == null) toggled = fs.toggle();
+      };
+
+      const requested = fs.request();
+      answer.grant();
+
+      await expect(requested).resolves.toBe(false);
+      await expect(toggled).resolves.toBe(false);
       expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
     });
   });
@@ -310,6 +410,51 @@ describe('DisplayFullscreen', () => {
       expect(next.requestFullscreen).toHaveBeenCalledTimes(1);
       expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
     });
+
+    it("a fullscreen stacked on the target: isActive is false while it holds, and the target is the controller's own again once it is left", async () => {
+      const orientation = {type: 'portrait-primary', lock: vi.fn(() => Promise.resolve()), unlock: vi.fn()};
+      view.screen = {orientation};
+      const fs = make({orientationLock: 'landscape'});
+      await fs.request();
+      await Promise.resolve();
+      expect(orientation.lock).toHaveBeenCalledTimes(1);
+
+      stackOn(defaultTarget);
+
+      expect(fs.isActive).toBe(false);
+      expect(emitted.at(-1)).toMatchObject({isActive: false});
+      expect(orientation.unlock).not.toHaveBeenCalled();
+
+      fireFullscreenChange(defaultTarget);
+      expect(fs.isActive).toBe(true);
+
+      fs.dispose();
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(orientation.unlock).toHaveBeenCalledTimes(1);
+    });
+
+    it('a lock still pending when a fullscreen stacks on the target holds once the browser grants it', async () => {
+      let grantLock: () => void = () => {};
+      const orientation = {
+        type: 'portrait-primary',
+        lock: vi.fn(() => new Promise<void>((resolve) => (grantLock = resolve))),
+        unlock: vi.fn(),
+      };
+      view.screen = {orientation};
+      const fs = make({orientationLock: 'landscape'});
+      await fs.request();
+
+      stackOn(defaultTarget);
+      grantLock();
+      await Promise.resolve();
+
+      expect(orientation.unlock).not.toHaveBeenCalled();
+      expect(fs.exitOnPortrait, 'the lock holds').toBe(false);
+
+      fireFullscreenChange(defaultTarget);
+      fs.dispose();
+      expect(orientation.unlock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('exit()', () => {
@@ -328,6 +473,174 @@ describe('DisplayFullscreen', () => {
 
       await expect(fs.exit()).resolves.toBe(false);
       expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(false);
+    });
+
+    it('request() while an exit is under way asks the browser again once the exit is through', async () => {
+      const fs = make();
+      await fs.request();
+      const exit = exitLater();
+
+      const exited = fs.exit();
+      const requested = fs.request();
+      await Promise.resolve();
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+
+      exit.finish();
+
+      // both calls resolve with the end the last one asked for
+      await expect(exited).resolves.toBe(true);
+      await expect(requested).resolves.toBe(true);
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('exit() while a request is pending leaves once the browser has granted it', async () => {
+      const answer = answerLater(defaultTarget);
+      const fs = make();
+
+      const requested = fs.request();
+      const exited = fs.exit();
+      await Promise.resolve();
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+
+      answer.grant();
+
+      await expect(exited).resolves.toBe(false);
+      await expect(requested).resolves.toBe(false);
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(false);
+    });
+
+    it('toggle() and exit() while an exit is under way answer with that exit', async () => {
+      const fs = make();
+      await fs.request();
+      const exit = exitLater();
+
+      const first = fs.exit();
+      const toggled = fs.toggle();
+      const second = fs.exit();
+      exit.finish();
+
+      await expect(first).resolves.toBe(false);
+      await expect(toggled).resolves.toBe(false);
+      await expect(second).resolves.toBe(false);
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('overlapping calls: the last call of the page wins', () => {
+    type Call = 'request' | 'exit' | 'toggle';
+    type Start = 'a request is open' | 'an exit is under way';
+    const CALLS: Call[] = ['request', 'exit', 'toggle'];
+    // every follow-up of up to two calls; after an exit, one that starts with request() is held
+    // back behind the exit
+    const FOLLOW_UPS: Call[][] = [
+      [],
+      ...CALLS.map((call) => [call]),
+      ...CALLS.flatMap((first) => CALLS.map((second) => [first, second])),
+    ];
+
+    // The rule the rows are made of. While the browser is still answering, a toggle() goes by the
+    // state the page was last told — not active while a request is open, active while an exit is
+    // under way —, and the last call says where the fullscreen ends, as far as the browser grants it.
+    // Every promise resolves once, with isActive at that end
+    function endsIn(start: Start, calls: Call[]): boolean {
+      const last = calls.at(-1);
+      return last === 'request' || (last === 'toggle' && start === 'a request is open');
+    }
+
+    interface Row {
+      name: string;
+      start: Start;
+      calls: Call[];
+      grants: boolean;
+      active: boolean;
+      requests: number;
+      exits: number;
+    }
+
+    const rows: Row[] = (['a request is open', 'an exit is under way'] as Start[]).flatMap((start) =>
+      FOLLOW_UPS.flatMap((followUps) =>
+        [true, false].map((grants): Row => {
+          const calls: Call[] = [start === 'a request is open' ? 'request' : 'exit', ...followUps];
+          const enters = endsIn(start, calls);
+          const active = enters && grants;
+          // an exit under way follows a granted request(); one held back behind it asks the browser again
+          const requests = start === 'a request is open' ? 1 : enters ? 2 : 1;
+          const exits = start === 'a request is open' ? (grants && !enters ? 1 : 0) : 1;
+          const answer =
+            start === 'a request is open'
+              ? grants
+                ? 'grants it'
+                : 'refuses it'
+              : grants
+                ? 'grants a request'
+                : 'refuses a request';
+          return {
+            name: `${start}: ${calls.map((call) => `${call}()`).join(' → ')}, the browser ${answer} → ${active ? 'active' : 'not active'}`,
+            start,
+            calls,
+            grants,
+            active,
+            requests,
+            exits,
+          };
+        }),
+      ),
+    );
+
+    // a loop rather than it.each: it.each cuts an interpolated name at 40 characters
+    for (const {name, start, calls, grants, active, requests, exits} of rows)
+      it(name, async () => {
+        const fs = make();
+        let answer: ReturnType<typeof answerLater> | undefined;
+        let exit: ReturnType<typeof exitLater> | undefined;
+        if (start === 'a request is open') {
+          answer = answerLater(defaultTarget);
+        } else {
+          await fs.request();
+          exit = exitLater();
+          if (!grants) defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+        }
+
+        const promises = calls.map((call) => fs[call]());
+        if (answer != null) {
+          if (grants) answer.grant();
+          else answer.refuse();
+        }
+        exit?.finish();
+        await nextTask();
+
+        expect(await Promise.all(promises.map(outcomeOf))).toEqual(calls.map(() => active));
+        expect(fs.isActive).toBe(active);
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(requests);
+        expect(doc.exitFullscreen).toHaveBeenCalledTimes(exits);
+        expect(emitted.at(-1)?.isActive ?? false).toBe(active);
+      });
+
+    it('a listener of the event during requestFullscreen() was told active: its toggle() leaves once the browser has granted', async () => {
+      // a browser that fires fullscreenchange before the promise of requestFullscreen() settles
+      let resolveRequest: () => void = () => {};
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => {
+        fireFullscreenChange(defaultTarget);
+        return new Promise<void>((resolve) => (resolveRequest = resolve));
+      });
+      const fs = make();
+      let toggled: Promise<boolean> | undefined;
+      host.emit = (props) => {
+        emitted.push(props);
+        if (props.isActive && toggled == null) toggled = fs.toggle();
+      };
+
+      const requested = fs.request();
+      expect(toggled).toBeDefined();
+      resolveRequest();
+      await nextTask();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      await expect(requested).resolves.toBe(false);
+      await expect(toggled).resolves.toBe(false);
       expect(fs.isActive).toBe(false);
     });
   });
@@ -366,6 +679,102 @@ describe('DisplayFullscreen', () => {
 
       await expect(fs.request()).resolves.toBe(false);
       expect(defaultTarget.requestFullscreen).not.toHaveBeenCalled();
+    });
+
+    it('dispose() takes everything down before its one event: a host whose emit throws finds the pseudo mode left and no listener left', async () => {
+      doc.fullscreenEnabled = false;
+      const fs = make({fallback: 'pseudo'});
+      await fs.request();
+      const error = new Error('emit fails on purpose');
+      host.emit = () => {
+        throw error;
+      };
+
+      expect(() => fs.dispose()).toThrow(error);
+
+      expect(doc.listenerCount('keydown')).toBe(0);
+      expect(doc.listenerCount('fullscreenchange')).toBe(0);
+      expect(fs.mode).toBeUndefined();
+      expect(fs.isDisposed).toBe(true);
+      expect(() => fs.dispose()).not.toThrow();
+    });
+
+    it('dispose() while a request is pending: the controller leaves the fullscreen the browser grants afterwards, and the request resolves false', async () => {
+      const orientation = {type: 'portrait-primary', lock: vi.fn(() => Promise.resolve()), unlock: vi.fn()};
+      view.screen = {orientation};
+      const answer = answerLater(defaultTarget);
+      const fs = make({orientationLock: 'landscape'});
+
+      const requested = fs.request();
+      fs.dispose();
+      answer.grant();
+
+      await expect(requested).resolves.toBe(false);
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(orientation.lock).not.toHaveBeenCalled();
+    });
+
+    it('dispose() while a lock is pending: the lock is undone once the browser grants it', async () => {
+      let grantLock: () => void = () => {};
+      const orientation = {
+        type: 'portrait-primary',
+        lock: vi.fn(() => new Promise<void>((resolve) => (grantLock = resolve))),
+        unlock: vi.fn(),
+      };
+      view.screen = {orientation};
+      const fs = make({orientationLock: 'landscape'});
+      await fs.request();
+      expect(orientation.lock).toHaveBeenCalledTimes(1);
+
+      fs.dispose();
+      grantLock();
+      await Promise.resolve();
+
+      expect(orientation.unlock).toHaveBeenCalledTimes(1);
+      expect(fs.exitOnPortrait).toBe(true);
+    });
+
+    it('dispose() while an exit is under way leaves nothing a second time', async () => {
+      const fs = make();
+      await fs.request();
+      const exit = exitLater();
+
+      const exited = fs.exit();
+      fs.dispose();
+      exit.finish();
+
+      await expect(exited).resolves.toBe(false);
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    it('isDisposed is false until dispose() and true after', () => {
+      const fs = make();
+      expect(fs.isDisposed).toBe(false);
+
+      fs.dispose();
+
+      expect(fs.isDisposed).toBe(true);
+    });
+
+    it('isAvailable answers false after dispose()', () => {
+      const fs = make({fallback: 'pseudo'});
+      expect(fs.isAvailable).toBe(true);
+
+      fs.dispose();
+
+      expect(fs.isAvailable).toBe(false);
+      expect(fs.isSupported).toBe(true);
+    });
+
+    it('exit() and toggle() after dispose() resolve false and call nothing', async () => {
+      const fs = make();
+      fireFullscreenChange(defaultTarget);
+      fs.dispose();
+
+      await expect(fs.exit()).resolves.toBe(false);
+      await expect(fs.toggle()).resolves.toBe(false);
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+      expect(fs.isActive).toBe(true);
     });
   });
   describe('orientationLock', () => {
@@ -621,7 +1030,7 @@ describe('DisplayFullscreen', () => {
       expect(fs.isArmed).toBe(false);
     });
 
-    it('a toggle() while the request of the armed tap is pending returns that request', async () => {
+    it("a toggle() while the request of the armed tap is pending joins that request, and the fullscreen is the page's own", async () => {
       defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
       let grant: () => void = () => {};
       defaultTarget.requestFullscreen.mockImplementationOnce(
@@ -645,10 +1054,12 @@ describe('DisplayFullscreen', () => {
       await expect(toggled).resolves.toBe(true);
       expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
 
-      // entered by onLandscape: the turn back leaves it
+      // the button of the page carries the request: the fullscreen is the page's own, and the turn
+      // back leaves it standing, as it would without the armed tap
       turn('portrait-primary');
       await flush();
-      expect(fs.isActive).toBe(false);
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+      expect(fs.isActive).toBe(true);
     });
 
     it('the user leaving in landscape holds off arming until portrait and back', async () => {
@@ -818,6 +1229,609 @@ describe('DisplayFullscreen', () => {
 
       expect(landscapeQuery.listenerCount('change')).toBe(0);
     });
+
+    it('dispose() of an armed controller takes the orientation and tap listeners down before its one event', () => {
+      orientation.type = 'landscape-primary';
+      const fs = make({onLandscape: true});
+      expect(fs.isArmed).toBe(true);
+      const error = new Error('emit fails on purpose');
+      host.emit = () => {
+        throw error;
+      };
+
+      expect(() => fs.dispose()).toThrow(error);
+
+      expect(orientation.listenerCount('change')).toBe(0);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+      expect(defaultTarget.listenerCount('click')).toBe(0);
+      expect(doc.listenerCount('fullscreenchange')).toBe(0);
+      expect(fs.isDisposed).toBe(true);
+    });
+
+    it('a turn to portrait while the request of a turn is pending leaves once the browser grants it', async () => {
+      const answer = answerLater(defaultTarget);
+      const fs = make({onLandscape: true});
+
+      turn('landscape-primary');
+      turn('portrait-primary');
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+      answer.grant();
+      await flush();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(false);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('a turn back to landscape while the exit of the turn to portrait is under way enters again once the exit is through', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      expect(fs.isActive).toBe(true);
+      const exit = exitLater();
+
+      turn('portrait-primary');
+      turn('landscape-primary');
+      exit.finish();
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('a turn back to landscape while the exit of the turn to portrait is under way arms where the browser refuses the turn', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      const exit = exitLater();
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+
+      turn('portrait-primary');
+      turn('landscape-primary');
+      exit.finish();
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isActive).toBe(false);
+      expect(fs.isArmed).toBe(true);
+    });
+
+    it('an exit() of the page while the exit of the turn to portrait is under way leaves for good: no new request, no arming', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      const exit = exitLater();
+      // a request after the exit stays unanswered, as one a browser has not granted yet
+      answerLater(defaultTarget);
+
+      turn('portrait-primary');
+      turn('landscape-primary');
+      // the exit button of the page, before the browser is through with the exit of the turn
+      const exited = fs.exit();
+      exit.finish();
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      await expect(exited).resolves.toBe(false);
+      expect(fs.isActive).toBe(false);
+      expect(fs.isArmed).toBe(false);
+
+      // the user has left in landscape: the other landscape asks nothing either
+      turn('landscape-secondary');
+      await flush();
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('an exit() of the page in landscape still holds off the arming', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      // the exit button of the page
+      await fs.exit();
+      turn('landscape-secondary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    describe('whether an exit() of the page is a refusal is decided where the screen is at the call', () => {
+      const refuseNext = () =>
+        defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+
+      it.each([
+        {grants: true, active: true, armed: false},
+        {grants: false, active: false, armed: true},
+      ])(
+        'in portrait during the exit of the turn to portrait, and a quick turn back: no refusal, the turn back asks again once the exit is through (the browser grants: $grants)',
+        async ({grants, active, armed}) => {
+          const fs = make({onLandscape: true});
+          turn('landscape-primary');
+          await flush();
+          const exit = exitLater();
+          if (!grants) refuseNext();
+
+          turn('portrait-primary');
+          const exited = fs.exit();
+          turn('landscape-primary');
+          exit.finish();
+          await flush();
+
+          await expect(exited).resolves.toBe(false);
+          expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+          expect(fs.isActive).toBe(active);
+          expect(fs.isArmed).toBe(armed);
+        },
+      );
+
+      it.each([{grants: true}, {grants: false}])(
+        'in portrait while the request of a turn is pending, and a quick turn back: no refusal, the display arms once the browser has answered (the browser grants: $grants)',
+        async ({grants}) => {
+          const answer = answerLater(defaultTarget);
+          const fs = make({onLandscape: true});
+
+          turn('landscape-primary');
+          turn('portrait-primary');
+          const exited = fs.exit();
+          turn('landscape-primary');
+          if (grants) answer.grant();
+          else answer.refuse();
+          await flush();
+
+          await expect(exited).resolves.toBe(false);
+          expect(doc.exitFullscreen).toHaveBeenCalledTimes(grants ? 1 : 0);
+          expect(fs.isActive).toBe(false);
+          expect(fs.isArmed).toBe(true);
+        },
+      );
+
+      it.each([{grants: true}, {grants: false}])(
+        'in landscape while the request of a turn is pending: a refusal, however the browser answers (the browser grants: $grants)',
+        async ({grants}) => {
+          const answer = answerLater(defaultTarget);
+          const fs = make({onLandscape: true});
+
+          turn('landscape-primary');
+          const exited = fs.exit();
+          if (grants) answer.grant();
+          else answer.refuse();
+          await flush();
+          turn('landscape-secondary');
+          await flush();
+
+          await expect(exited).resolves.toBe(false);
+          expect(fs.isActive).toBe(false);
+          expect(fs.isArmed).toBe(false);
+          expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+        },
+      );
+
+      it('in landscape during the exit of the turn to portrait, after the turn back: a refusal', async () => {
+        const fs = make({onLandscape: true});
+        turn('landscape-primary');
+        await flush();
+        const exit = exitLater();
+
+        turn('portrait-primary');
+        turn('landscape-primary');
+        const exited = fs.exit();
+        exit.finish();
+        await flush();
+        turn('landscape-secondary');
+        await flush();
+
+        await expect(exited).resolves.toBe(false);
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+        expect(fs.isActive).toBe(false);
+        expect(fs.isArmed).toBe(false);
+      });
+    });
+
+    describe('the refusal an exit() of the page sets in landscape belongs to that call: the last call wins', () => {
+      type Step = 'exit' | 'request' | 'portrait and back';
+      const refuseNext = () =>
+        defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+      type Branch = 'the request of a turn is pending' | 'the exit of a fullscreen the turn entered is under way';
+
+      interface Row {
+        branch: Branch;
+        steps: Step[];
+        grants: boolean;
+        active: boolean;
+        armed: boolean;
+        // what the calls of the page resolve with, where it is not the end: a turn evaluated anew once
+        // the exit is through is a turn of its own, after the calls of the page
+        resolves?: boolean;
+        // a half turn to the other landscape asks the browser again: nothing holds off the arming.
+        // Not asked of a fullscreen of onLandscape that stays, which a leave in landscape would refuse
+        halfTurnAsks?: boolean;
+      }
+
+      const PENDING: Branch = 'the request of a turn is pending';
+      const EXITING: Branch = 'the exit of a fullscreen the turn entered is under way';
+      const rows: Row[] = [
+        // the last call is the exit(): the refusal stands, granted or not
+        {branch: PENDING, steps: ['exit'], grants: true, active: false, armed: false, halfTurnAsks: false},
+        {branch: PENDING, steps: ['exit'], grants: false, active: false, armed: false, halfTurnAsks: false},
+        {branch: EXITING, steps: ['exit'], grants: true, active: false, armed: false, halfTurnAsks: false},
+        {branch: EXITING, steps: ['exit'], grants: false, active: false, armed: false, halfTurnAsks: false},
+        // a request() after it takes the refusal back with the exit
+        {branch: PENDING, steps: ['exit', 'request'], grants: true, active: true, armed: false, halfTurnAsks: true},
+        {branch: PENDING, steps: ['exit', 'request'], grants: false, active: false, armed: true, halfTurnAsks: true},
+        {branch: EXITING, steps: ['exit', 'request'], grants: true, active: true, armed: false, halfTurnAsks: true},
+        {branch: EXITING, steps: ['exit', 'request'], grants: false, active: false, armed: false, halfTurnAsks: true},
+        // a turn to portrait and back before the browser answers lifts it, as it would after the answer
+        {branch: PENDING, steps: ['exit', 'portrait and back'], grants: true, active: false, armed: true, halfTurnAsks: true},
+        {branch: PENDING, steps: ['exit', 'portrait and back'], grants: false, active: false, armed: true, halfTurnAsks: true},
+        {branch: EXITING, steps: ['exit', 'portrait and back'], grants: true, active: true, armed: false, resolves: false},
+        {branch: EXITING, steps: ['exit', 'portrait and back'], grants: false, active: false, armed: true, halfTurnAsks: true},
+      ];
+
+      for (const {branch, steps, grants, active, armed, resolves = active, halfTurnAsks} of rows) {
+        const answered =
+          branch === PENDING ? (grants ? 'grants it' : 'refuses it') : grants ? 'grants a request' : 'refuses a request';
+        const name = `${branch}: ${steps.join(' → ')} in landscape, the browser ${answered} → ${active ? 'active' : 'not active'}, ${armed ? 'armed' : 'not armed'}${halfTurnAsks == null ? '' : halfTurnAsks ? ', a half turn asks again' : ', a half turn asks nothing'}`;
+        it(name, async () => {
+          let answer: ReturnType<typeof answerLater> | undefined;
+          let exit: ReturnType<typeof exitLater> | undefined;
+          if (branch === PENDING) answer = answerLater(defaultTarget);
+          const fs = make({onLandscape: true});
+          turn('landscape-primary');
+          if (branch === EXITING) {
+            await flush();
+            expect(fs.isActive).toBe(true);
+            exit = exitLater();
+            if (!grants) refuseNext();
+          }
+
+          const promises: Promise<boolean>[] = [];
+          for (const step of steps) {
+            if (step === 'exit') promises.push(fs.exit());
+            else if (step === 'request') promises.push(fs.request());
+            else {
+              turn('portrait-primary');
+              turn('landscape-primary');
+            }
+          }
+          if (answer != null) {
+            if (grants) answer.grant();
+            else answer.refuse();
+          }
+          exit?.finish();
+          await flush();
+
+          expect(await Promise.all(promises.map(outcomeOf))).toEqual(promises.map(() => resolves));
+          expect(fs.isActive).toBe(active);
+          expect(fs.isArmed).toBe(armed);
+
+          if (halfTurnAsks == null) return;
+          // the user leaves a fullscreen of the page — no refusal —, then turns the phone half round
+          if (fs.isActive) fireFullscreenChange(null);
+          const asked = defaultTarget.requestFullscreen.mock.calls.length;
+          turn('landscape-secondary');
+          await flush();
+          expect(defaultTarget.requestFullscreen.mock.calls.length > asked).toBe(halfTurnAsks);
+        });
+      }
+    });
+
+    describe('a fullscreen a request() of the page carries is the page’s own', () => {
+      it('a request() during the exit of the turn to portrait, and a quick turn back: the turn shares the request, and the next turn to portrait leaves nothing', async () => {
+        const fs = make({onLandscape: true});
+        turn('landscape-primary');
+        await flush();
+        const exit = exitLater();
+
+        turn('portrait-primary');
+        const requested = fs.request();
+        turn('landscape-primary');
+        exit.finish();
+        await flush();
+
+        await expect(requested).resolves.toBe(true);
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+        expect(fs.isActive).toBe(true);
+
+        turn('portrait-primary');
+        await flush();
+        expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+        expect(fs.isActive).toBe(true);
+      });
+
+      it('a request() while the request of a turn is pending: the next turn to portrait leaves nothing', async () => {
+        const answer = answerLater(defaultTarget);
+        const fs = make({onLandscape: true});
+
+        turn('landscape-primary');
+        const requested = fs.request();
+        answer.grant();
+        await flush();
+        expect(fs.isActive).toBe(true);
+
+        turn('portrait-primary');
+        await flush();
+
+        await expect(requested).resolves.toBe(true);
+        expect(doc.exitFullscreen).not.toHaveBeenCalled();
+        expect(fs.isActive).toBe(true);
+      });
+
+      it('a request() on a fullscreen onLandscape has entered makes it the page’s own: the next turn to portrait leaves nothing', async () => {
+        const fs = make({onLandscape: true});
+        turn('landscape-primary');
+        await flush();
+        expect(fs.isActive).toBe(true);
+
+        await expect(fs.request()).resolves.toBe(true);
+        turn('portrait-primary');
+        await flush();
+
+        expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+        expect(doc.exitFullscreen).not.toHaveBeenCalled();
+        expect(fs.isActive).toBe(true);
+      });
+
+      it('a request() after a turn to portrait while the request of a turn is pending keeps what the browser grants', async () => {
+        const answer = answerLater(defaultTarget);
+        const fs = make({onLandscape: true});
+
+        turn('landscape-primary');
+        turn('portrait-primary');
+        const requested = fs.request();
+        answer.grant();
+        await flush();
+
+        await expect(requested).resolves.toBe(true);
+        expect(doc.exitFullscreen).not.toHaveBeenCalled();
+        expect(fs.isActive).toBe(true);
+      });
+    });
+
+    it('an armed tap the browser refuses arms again', async () => {
+      defaultTarget.requestFullscreen.mockImplementation(() => Promise.reject(new TypeError('no gesture')));
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      expect(fs.isArmed).toBe(true);
+
+      tap();
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isArmed).toBe(true);
+      expect(emitted.at(-1)).toMatchObject({isActive: false, isArmed: true});
+    });
+
+    it('a refusal that arrives after dispose() arms nothing', async () => {
+      const answer = answerLater(defaultTarget);
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+
+      fs.dispose();
+      answer.refuse();
+      await flush();
+
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+      expect(defaultTarget.listenerCount('click')).toBe(0);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('the armed tap asks the browser before it emits', async () => {
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+      make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      // the request of the tap stays unanswered: the event of the disarming is the one the tap emits
+      answerLater(defaultTarget);
+      const emitOfHost = host.emit;
+      host.emit = () => {
+        throw new Error('emit fails on purpose');
+      };
+
+      try {
+        tap();
+      } catch {
+        // the throw of the host, which only a stub can make
+      }
+      host.emit = emitOfHost;
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+    });
+
+    it('a fullscreen stacked on one onLandscape entered: the turn to portrait leaves it once the stack is down', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+
+      stackOn(defaultTarget);
+      expect(fs.isActive).toBe(false);
+      fireFullscreenChange(defaultTarget);
+
+      turn('portrait-primary');
+      await flush();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(false);
+    });
+
+    it('a turn to landscape while a fullscreen is stacked on the target asks nothing and arms nothing', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      stackOn(defaultTarget);
+      defaultTarget.requestFullscreen.mockImplementation(() => Promise.reject(new TypeError('no gesture')));
+
+      turn('portrait-primary');
+      turn('landscape-primary');
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isArmed).toBe(false);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+    });
+
+    it('onLandscape = true while a fullscreen is stacked on the target arms nothing', async () => {
+      orientation.type = 'landscape-primary';
+      const fs = make();
+      await fs.request();
+      stackOn(defaultTarget);
+
+      fs.onLandscape = true;
+
+      expect(fs.isArmed).toBe(false);
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    it('a turn to portrait and back while the request of a turn is pending keeps what the browser grants', async () => {
+      const answer = answerLater(defaultTarget);
+      const fs = make({onLandscape: true});
+
+      turn('landscape-primary');
+      turn('portrait-primary');
+      turn('landscape-primary');
+      answer.grant();
+      await flush();
+
+      expect(doc.exitFullscreen).not.toHaveBeenCalled();
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(true);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('an exit() while a request is pending survives a turn to portrait and back, which lifts its refusal', async () => {
+      const answer = answerLater(defaultTarget);
+      const fs = make({onLandscape: true});
+
+      turn('landscape-primary');
+      // the exit button of the page, before the browser has answered the request of the turn
+      const exited = fs.exit();
+      turn('portrait-primary');
+      turn('landscape-primary');
+      answer.grant();
+      await flush();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      await expect(exited).resolves.toBe(false);
+      expect(fs.isActive).toBe(false);
+      // the turn to portrait and back after the exit() has lifted its refusal, as it would after the
+      // answer: the turn back arms
+      expect(fs.isArmed).toBe(true);
+    });
+
+    it('an exit() while the request of a turn is pending holds off the arming when the browser refuses the request', async () => {
+      const answer = answerLater(defaultTarget);
+      const fs = make({onLandscape: true});
+
+      turn('landscape-primary');
+      // the exit button of the page, before the browser has answered the request of the turn
+      const exited = fs.exit();
+      answer.refuse();
+      await flush();
+
+      await expect(exited).resolves.toBe(false);
+      expect(fs.isArmed).toBe(false);
+      expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+    });
+
+    it('an exit() while the request of the armed tap is pending holds off the arming when the browser refuses the tap', async () => {
+      defaultTarget.requestFullscreen.mockImplementationOnce(() => Promise.reject(new TypeError('no gesture')));
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      expect(fs.isArmed).toBe(true);
+      const answer = answerLater(defaultTarget);
+
+      tap();
+      const exited = fs.exit();
+      answer.refuse();
+      await flush();
+
+      await expect(exited).resolves.toBe(false);
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isArmed).toBe(false);
+    });
+
+    it('the late answer of an earlier request arms nothing beside a newer request', async () => {
+      const first = answerLater(defaultTarget);
+      const second = answerLater(defaultTarget);
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      turn('portrait-primary');
+      const exit = exitLater();
+      first.grant();
+      await flush();
+      expect(doc.exitFullscreen, 'the turn to portrait leaves what the first request got').toHaveBeenCalledTimes(1);
+
+      // back to landscape while that exit is under way: once it is through, the second request goes out
+      turn('landscape-primary');
+      exit.finish();
+      await flush();
+
+      expect(defaultTarget.requestFullscreen).toHaveBeenCalledTimes(2);
+      expect(fs.isArmed).toBe(false);
+
+      second.grant();
+      await flush();
+
+      expect(fs.isActive).toBe(true);
+      expect(fs.isArmed).toBe(false);
+      expect(emitted.at(-1)).toMatchObject({isActive: true, isArmed: false});
+    });
+
+    it('an exitFullscreen() that throws at once on the turn to portrait leaves the controller standing', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      doc.exitFullscreen.mockImplementation(() => {
+        throw new TypeError('not now');
+      });
+
+      expect(() => turn('portrait-primary')).not.toThrow();
+      await flush();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('an exitFullscreen() the browser refuses on the turn to portrait is asked once', async () => {
+      const fs = make({onLandscape: true});
+      turn('landscape-primary');
+      await flush();
+      doc.exitFullscreen.mockImplementation(() => Promise.reject(new TypeError('not now')));
+
+      turn('portrait-primary');
+      await flush();
+
+      expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(fs.isActive).toBe(true);
+    });
+
+    it('after dispose() orientationLock and exitOnPortrait take values and warn nothing', () => {
+      const fs = make({onLandscape: true});
+      fs.dispose();
+
+      fs.exitOnPortrait = true;
+      fs.orientationLock = 'landscape';
+      fs.orientationLock = 'portrait';
+
+      expect(fs.exitOnPortrait).toBe(true);
+      expect(fs.orientationLock).toBe('portrait');
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('after dispose() a write to onLandscape changes nothing', () => {
+      orientation.type = 'landscape-primary';
+      const fs = make();
+      fs.dispose();
+
+      fs.onLandscape = true;
+
+      expect(fs.onLandscape).toBe(false);
+      expect(fs.isArmed).toBe(false);
+      expect(orientation.listenerCount('change')).toBe(0);
+    });
   });
   describe('pseudo fullscreen', () => {
     const PSEUDO_CSS =
@@ -976,6 +1990,17 @@ describe('DisplayFullscreen', () => {
         turn('portrait-primary');
 
         expect(fs.isActive).toBe(false);
+      });
+
+      it('a request() on the pseudo mode onLandscape has entered makes it the page’s own: the turn back leaves nothing', async () => {
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+        turn('landscape-primary');
+        expect(fs.mode).toBe('pseudo');
+
+        await expect(fs.request()).resolves.toBe(true);
+        turn('portrait-primary');
+
+        expect(fs.mode).toBe('pseudo');
       });
 
       it('Escape in landscape holds off re-entering until portrait and back', () => {

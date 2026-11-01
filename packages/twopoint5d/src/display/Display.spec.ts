@@ -2190,6 +2190,34 @@ describe('Display', () => {
       await settle();
       expect(renderer.dispose).toHaveBeenCalledTimes(1);
     });
+
+    it('a fullscreen step that throws does not hold up the teardown: its error comes between the one of the pause and the one of the dispose event', async () => {
+      const {display, renderer} = makeDisplay();
+      await display.start();
+
+      const pauseError = new Error('pause listener fails on purpose');
+      const fullscreenError = new Error('the fullscreen fails on purpose');
+      const disposeError = new Error('dispose listener fails on purpose');
+      on(display, OnDisplayPause, () => {
+        throw pauseError;
+      });
+      on(display, OnDisplayDispose, () => {
+        throw disposeError;
+      });
+      vi.spyOn(DisplayFullscreen.prototype, 'dispose').mockImplementationOnce(() => {
+        throw fullscreenError;
+      });
+
+      const thrown = catchError(() => display.dispose());
+
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([pauseError, fullscreenError, disposeError]);
+      expect((thrown as AggregateError).cause).toBe(disposeError);
+      expect(getSubscriptionCount(display)).toBe(0);
+
+      await settle();
+      expect(renderer.dispose).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('constructor', () => {
@@ -2211,6 +2239,13 @@ describe('Display', () => {
 
       expect(display.adaptiveResolution!.targetFps).toBe(90);
       expect(display.adaptiveResolution!.minScale).toBe(0.25);
+    });
+
+    it('a resizeTo callback that reads display.fullscreen lets the constructor run through', () => {
+      const {display} = makeDisplay({resizeTo: (d) => (d.fullscreen.isActive ? [1, 1] : [300, 150])});
+
+      expect(display.width).toBe(300);
+      expect(display.height).toBe(150);
     });
 
     it('releases a renderer it has taken over when the constructor fails after taking it', async () => {
@@ -2876,6 +2911,80 @@ describe('Display', () => {
       display.dispose();
 
       expect(order[0]).toBe('exitFullscreen');
+    });
+
+    // eventize reports the throw of a listener that emitSafe() isolates with a console.warn line
+    // that shows up in the test output. It is not asserted: eventize binds console.warn when it
+    // loads, so a spy set here never sees the call (as in the specs of TextureStore)
+    describe('a fullscreen listener that throws', () => {
+      const thrower = () => {
+        throw new Error('fullscreen listener fails on purpose');
+      };
+
+      it('a fullscreen listener that throws: request() resolves true, toggle() leaves, and the next request() asks the browser again', async () => {
+        doc.fullscreenEnabled = true;
+        doc.exitFullscreen = vi.fn(() => {
+          fireFullscreenChange(null);
+          return Promise.resolve();
+        });
+        const {display, canvas} = makeDisplay();
+        const parent = {
+          getRootNode: () => doc,
+          requestFullscreen: vi.fn(() => {
+            fireFullscreenChange(parent);
+            return Promise.resolve();
+          }),
+        };
+        inDocument(canvas, parent);
+        const heard: boolean[] = [];
+        display.onFullscreenChange(thrower);
+        display.onFullscreenChange((props) => {
+          heard.push(props.isActive);
+        });
+
+        await expect(display.fullscreen.request()).resolves.toBe(true);
+        await expect(display.fullscreen.toggle()).resolves.toBe(false);
+        expect(doc.exitFullscreen).toHaveBeenCalledTimes(1);
+        await expect(display.fullscreen.request()).resolves.toBe(true);
+
+        expect(parent.requestFullscreen).toHaveBeenCalledTimes(2);
+        expect(heard).toEqual([true, false, true]);
+      });
+
+      it('exit() in the pseudo mode resolves false behind a fullscreen listener that throws', async () => {
+        doc.fullscreenEnabled = false;
+        const {display, canvas} = makeDisplay({fullscreen: {fallback: 'pseudo'}});
+        inDocument(canvas, {getRootNode: () => doc, classList: {add: vi.fn(), remove: vi.fn()}});
+        await display.fullscreen.request();
+        display.onFullscreenChange(thrower);
+
+        let exited: Promise<boolean> | undefined;
+        expect(() => {
+          exited = display.fullscreen.exit();
+        }).not.toThrow();
+        await expect(exited).resolves.toBe(false);
+        expect(display.fullscreen.isActive).toBe(false);
+      });
+
+      it('dispose() runs to its end behind a fullscreen listener that throws while the pseudo mode holds', async () => {
+        doc.fullscreenEnabled = false;
+        const {display, canvas, renderer} = makeDisplay({fullscreen: {fallback: 'pseudo'}});
+        inDocument(canvas, {getRootNode: () => doc, classList: {add: vi.fn(), remove: vi.fn()}});
+        await display.fullscreen.request();
+        display.onFullscreenChange(thrower);
+        const disposed: Display[] = [];
+        display.onDispose((d) => {
+          disposed.push(d);
+        });
+
+        expect(() => display.dispose()).not.toThrow();
+
+        expect(disposed).toEqual([display]);
+        expect(display.isDisposed).toBe(true);
+        expect(getSubscriptionCount(display)).toBe(0);
+        await settle();
+        expect(renderer.dispose).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

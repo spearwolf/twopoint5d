@@ -25,6 +25,60 @@ async function requestWithClick(display) {
   return /** @type {Promise<boolean>} */ (requested);
 }
 
+/**
+ * Resolves on the first `fullscreenchange` of the document after which `element` is the
+ * fullscreen element, or rejects after two seconds. An event still queued from an earlier change
+ * arrives first and is passed over.
+ *
+ * @param {Element | null} element
+ * @returns {Promise<void>}
+ */
+function whenFullscreenElementIs(element) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      document.removeEventListener('fullscreenchange', onChange);
+      reject(new Error(`the fullscreen element did not become ${element == null ? 'null' : element.nodeName} within 2 s`));
+    }, 2000);
+    function onChange() {
+      if (document.fullscreenElement !== element) return;
+      clearTimeout(timeout);
+      document.removeEventListener('fullscreenchange', onChange);
+      resolve();
+    }
+    document.addEventListener('fullscreenchange', onChange);
+  });
+}
+
+/**
+ * Resolves on the next `OnDisplayFullscreenChange` of `display` that reports `isActive`, or
+ * rejects after two seconds. The event goes out once the controller has read a `fullscreenchange`,
+ * so it shows what the controller saw — `isActive` of the controller reads the document anew at
+ * every call and shows nothing of that. The retained event a new listener hears at once is passed
+ * over.
+ *
+ * @param {Display} display
+ * @param {boolean} isActive
+ * @returns {Promise<void>}
+ */
+function whenControllerReports(display, isActive) {
+  return new Promise((resolve, reject) => {
+    let live = false;
+    /** @type {() => void} */
+    let unsubscribe = () => {};
+    const timeout = setTimeout(() => {
+      unsubscribe();
+      reject(new Error(`the controller did not report isActive: ${isActive} within 2 s`));
+    }, 2000);
+    unsubscribe = display.onFullscreenChange((props) => {
+      if (!live || props.isActive !== isActive) return;
+      clearTimeout(timeout);
+      unsubscribe();
+      resolve();
+    });
+    live = true;
+  });
+}
+
 describe('Display#fullscreen', () => {
   /** @type {Display | undefined} */
   let display;
@@ -147,6 +201,48 @@ describe('Display#fullscreen', () => {
       expect(document.fullscreenElement).to.equal(null);
       expect(display.fullscreen.isActive).to.equal(false);
       expect(events.at(-1)).to.include({isActive: false});
+    });
+
+    it('a fullscreen an element inside the target stacks on it: isActive is false while it holds, and dispose() leaves the target once it is on top again', async () => {
+      const host = makeContainer();
+      const inner = document.createElement('div');
+      host.appendChild(inner);
+      elements.push(host);
+      display = new Display(host);
+      expect(await requestWithClick(display)).to.equal(true);
+
+      // a second trusted click: the video or the dialog of the app goes fullscreen inside the target.
+      // The controller has to have read the stack before the dispose below, and its event says so
+      const stackSeen = whenControllerReports(display, false);
+      /** @type {Promise<void> | undefined} */
+      let stacked;
+      document.addEventListener(
+        'click',
+        () => {
+          stacked = inner.requestFullscreen();
+        },
+        {once: true},
+      );
+      await sendMouse({type: 'click', position: [10, 10]});
+      expect(stacked, 'the click reached the handler').to.not.equal(undefined);
+      await stacked;
+      await stackSeen;
+
+      expect(document.fullscreenElement, 'the inner element lies on top').to.equal(inner);
+      expect(display.fullscreen.isActive).to.equal(false);
+
+      const backSeen = whenControllerReports(display, true);
+      await document.exitFullscreen();
+      await backSeen;
+      expect(document.fullscreenElement, 'the target is on top again').to.equal(host);
+      expect(display.fullscreen.isActive).to.equal(true);
+
+      const left = whenFullscreenElementIs(null);
+      display.dispose();
+      display = undefined;
+      await left;
+
+      expect(document.fullscreenElement).to.equal(null);
     });
   });
 

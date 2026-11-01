@@ -468,9 +468,19 @@ and, on Android, the navigation bar. `request()`, `exit()` and `toggle()` never 
 resolves with `isActive` afterwards, `false` where the browser refused. A refusal is told once per
 page on the console — almost always a call that did not come straight from a click, a key or a
 tap. Anything awaited before the call — a fetch, a timeout, the renderer — loses the gesture.
+Calls made while the browser is still answering an earlier one do not race: the last call wins. An
+`exit()` before the browser has granted a `request()` ends outside the fullscreen, a `request()`
+while it is still being left ends inside, `toggle()` goes by what the event last told the page, and
+every call of such a burst resolves with the state it ends in.
 
 The event `OnDisplayFullscreenChange` is retained: a button attached later hears the state it has
-to show.
+to show. Every listener hears it, even behind one that throws; a listener that throws is reported
+on the console and changes neither the fullscreen nor what the three calls resolve with.
+
+After `display.dispose()` the three calls resolve `false` and do nothing, and so does a call still
+open when the display is disposed; a fullscreen the browser grants after the dispose is left again.
+A component that holds on to `display.fullscreen` asks `isDisposed` first, and `isAvailable` is
+`false` from then on.
 
 ### Fullscreen when the phone turns sideways
 
@@ -499,8 +509,14 @@ tablet does the same as a phone.
 
 Whoever leaves the fullscreen while the phone is still sideways — Escape, the back gesture, a button
 of the page — stays out of it until the phone has turned upright and back. A fullscreen the page
-entered with `request()` stays when the phone turns upright; `exitOnPortrait: false` keeps the one
-of `onLandscape` as well.
+entered with `request()` stays when the phone turns upright, and so does one the display entered
+sideways once the page has called `request()` on it; `exitOnPortrait: false` keeps the one of
+`onLandscape` as well.
+
+Where the browser refuses the tap as well, the display stays armed for the next one. A phone turned
+sideways again while the fullscreen is still being left enters it again once that is through, or
+arms where the browser wants a tap. Neither happens after an `exit()` the page has called while
+sideways in the meantime: that counts as leaving.
 
 A game that only plays sideways locks the screen:
 
@@ -525,8 +541,10 @@ the display warns once and does not lock.
 
 `isSupported` says whether the browser offers fullscreen for elements here. It does not in an
 iframe without `allow="fullscreen"`, and not on the iPhone: Safari there keeps fullscreen for
-videos and offers neither `requestFullscreen` nor `fullscreenEnabled` (iOS 27). There,
-`fallback: 'pseudo'` lets the target cover the viewport through CSS:
+videos and offers neither `requestFullscreen` nor `fullscreenEnabled` (iOS 27). It reads the
+unprefixed Fullscreen API alone, so it is `false` as well in a browser that knows only the prefixed
+one — Safari on the Mac and the iPad before 16.4. There, `fallback: 'pseudo'` lets the target cover
+the viewport through CSS:
 
 ```ts check
 import {Display} from '@spearwolf/twopoint5d';
@@ -574,6 +592,13 @@ A canvas that measures itself and shares its parent with other elements gets the
 parent in fullscreen, not its position: elements in front of it push it partly off the screen.
 `resize-to="window"` on the canvas, or a display built in a host element of its own, avoids that.
 Leaving the fullscreen gives the canvas back the size it had.
+
+A video or a dialog inside the target that goes fullscreen itself lies on top of it: `isActive` is
+`false` while it holds, the lock stays, and `onLandscape` neither asks for the target nor arms —
+the target would cover the video. Once it is left, the fullscreen is the display's again, as
+before: `exitOnPortrait` acts on the next turn, and `dispose()` leaves it. A turn while the video
+lies on top is not caught up afterwards: a phone turned upright meanwhile keeps the fullscreen
+until it turns sideways and back.
 
 `resize-to="fullscreen"` is an old name of `resize-to="window"`: it means the window and has
 nothing to do with the fullscreen of the browser. It still works and warns once per page; write
@@ -625,9 +650,10 @@ The options go into `fullscreen: {…}` of the constructor; each is a property o
 
 | read or call | answers |
 | --- | --- |
-| `request()`, `exit()`, `toggle()` | enter, leave, switch; each resolves with `isActive` and never rejects |
+| `request()`, `exit()`, `toggle()` | enter, leave, switch; each resolves with `isActive` and never rejects; `false` after `dispose()` |
 | `isSupported` | the browser offers fullscreen for elements here |
-| `isAvailable` | a request can succeed: `isSupported`, or the pseudo fallback |
+| `isAvailable` | a request can succeed: `isSupported`, or the pseudo fallback; `false` after `dispose()` |
+| `isDisposed` | the display is disposed; the calls resolve `false` |
 | `isActive`, `mode` | in fullscreen right now, `'native'` or `'pseudo'` |
 | `isArmed` | `onLandscape` waits for a tap |
 | `display.onFullscreenChange(listener)` | every change of `isActive`, `mode` and `isArmed`; retained |
