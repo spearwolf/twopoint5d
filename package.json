@@ -40,14 +40,14 @@
     "lookbook:generate-previews": "pnpm nx run lookbook:build && node scripts/lookbook/generateDemoPreviews.mjs"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
+    "@biomejs/biome": "2.6.6",
     "@types/node": "catalog:",
     "@typescript/typescript6": "^6.0.2",
     "esbuild": "^0.28.2",
-    "nx": "24.0.1",
+    "nx": "24.0.5",
     "playwright": "catalog:",
     "rimraf": "catalog:",
-    "semver": "^7.8.5",
+    "semver": "^7.8.6",
     "typescript": "catalog:",
     "yaml": "^2.9.1"
   }
