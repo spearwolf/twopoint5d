@@ -19,8 +19,8 @@ catalogs:
       specifier: ~0.187.0
       version: 0.187.0
     playwright:
-      specifier: ^1.64.1
-      version: 1.64.1
+      specifier: ^1.65.0
+      version: 1.65.0
     rimraf:
       specifier: ^6.1.3
       version: 6.1.3
@@ -56,7 +56,7 @@ importers:
         version: 24.0.1
       playwright:
         specifier: 'catalog:'
-        version: 1.64.1
+        version: 1.65.0
       rimraf:
         specifier: 'catalog:'
         version: 6.1.3
@@ -203,7 +203,7 @@ importers:
         version: 6.3.0
       playwright:
         specifier: 'catalog:'
-        version: 1.64.1
+        version: 1.65.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -3245,13 +3245,13 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
-  playwright-core@1.64.1:
-    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
+  playwright-core@1.65.0:
+    resolution: {integrity: sha512-vNSKgH6YqtN7cdT/L334zo0a+YwkrpicyrHJlWWPIm/Q+Nn2SWInil01oT0mbu96U4GgoRtCYQD9CzJQgju+lA==}
     engines: {node: '>=20'}
     hasBin: true
 
-  playwright@1.64.1:
-    resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
+  playwright@1.65.0:
+    resolution: {integrity: sha512-F3AMWcR44qMBt4kq+6Kb6mX7bjGXshktKFOPULd7reED6ZJWevjbNRqysP7q+AATE9kdPEZBibex1BYsvpVoeA==}
     engines: {node: '>=20'}
     hasBin: true
 
@@ -5572,7 +5572,7 @@ snapshots:
     dependencies:
       '@web/test-runner-core': 1.0.0
       '@web/test-runner-coverage-v8': 1.0.0
-      playwright: 1.64.1
+      playwright: 1.65.0
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -7077,11 +7077,11 @@ snapshots:
 
   picomatch@4.0.7: {}
 
-  playwright-core@1.64.1: {}
+  playwright-core@1.65.0: {}
 
-  playwright@1.64.1:
+  playwright@1.65.0:
     dependencies:
-      playwright-core: 1.64.1
+      playwright-core: 1.65.0
 
   portfinder@1.0.38:
     dependencies:
