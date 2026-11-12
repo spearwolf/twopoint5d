@@ -12,8 +12,8 @@ catalog:
   '@spearwolf/signalize': ^1.0.0
   '@types/node': ^24.19.2
   '@types/three': ~0.187.0
-  playwright: ^1.64.1
-  rimraf: ^6.1.3
+  playwright: ^1.65.0
+  rimraf: ^6.1.4
   three: ~0.187.0
   typescript: ^7.0.2
 
@@ -41,6 +41,16 @@ overrides:
   # calls glob() and globSync() alone, which glob 14 keeps as they were. Drop this entry once the
   # rimraf in the catalog depends on glob >=14.0.2 itself.
   'rimraf>glob': ^14.0.2
+
+packageExtensions:
+  # @astrojs/astro2tsx pins @emnapi/core 1.11.3 but leaves the @emnapi/runtime peer of its
+  # @napi-rs/wasm-runtime open, and pnpm fills it with the 2.0.0-beta.2 that rolldown 1.3.0
+  # pins. That runtime does not fit core 1.x, astro2tsx fails to load and `astro check`
+  # reports @astrojs/check as missing. Drop this entry once astro2tsx declares the runtime
+  # itself.
+  '@astrojs/astro2tsx@0.1.3':
+    dependencies:
+      '@emnapi/runtime': 1.11.3
 
 # Advisories that no update and no override can answer. pnpm audit leaves them out, and with it
 # the audit step of CI and the audit filter of the deploy (docs/architecture.md §5). Each entry

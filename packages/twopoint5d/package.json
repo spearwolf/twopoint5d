@@ -63,12 +63,12 @@
     "@types/node": "catalog:",
     "@types/sinon": "^22.0.2",
     "@types/three": "catalog:",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "publint": "^0.3.25",
     "rimraf": "catalog:",
     "sinon": "^22.1.0",
     "typescript": "catalog:",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "peerDependencies": {
     "@spearwolf/eventize": "catalog:",
