@@ -153,6 +153,28 @@ const firefoxWebGL2 = backendLauncher('firefox', 'WebGL2', {
 const webkitWebGL2 = backendLauncher('webkit', 'WebGL2', {});
 
 /**
+ * The server command `page-screenshot`, which `pageScreenshot()` in test/helpers/fixtures.js sends:
+ * a screenshot of the page of the session, or of the `clip` of it in CSS pixels, as a PNG in
+ * base64. It is the one way a test reads what the compositor shows: a read of the canvas from the
+ * page reads the drawing buffer, which a frame that drew nothing has not presented.
+ *
+ * @returns {import('@web/test-runner').TestRunnerPlugin}
+ */
+function pageScreenshotPlugin() {
+  return {
+    name: 'page-screenshot',
+    async executeCommand({command, payload, session}) {
+      if (command !== 'page-screenshot') return undefined;
+      // every launcher of this config is a Playwright launcher
+      const launcher = /** @type {import('@web/test-runner-playwright').PlaywrightLauncher} */ (session.browser);
+      const clip = /** @type {{clip?: {x: number, y: number, width: number, height: number}} | undefined} */ (payload)?.clip;
+      const png = await launcher.getPage(session.id).screenshot({type: 'png', clip});
+      return png.toString('base64');
+    },
+  };
+}
+
+/**
  * Lists every skipped test at the end of a run, by launcher — on CI as well, where the progress
  * report and its count are off — so a test that skips where it ought to run shows in the log of a
  * green run.
@@ -209,7 +231,7 @@ export default {
   // (`CI` is set by GitHub Actions) those blocks would only lengthen the log.
   reporters: [defaultReporter({reportTestResults: true, reportTestProgress: !process.env.CI}), skippedTestsReporter()],
   filterBrowserLogs: ({type, args}) => !(type === 'warn' && args[0] === WEBGL2_FALLBACK_WARNING),
-  plugins: [esbuildPlugin({target: 'auto'})],
+  plugins: [esbuildPlugin({target: 'auto'}), pageScreenshotPlugin()],
   // Every test file that renders runs under all four launchers; the files of RENDERER_FREE_FILES
   // run under three. Which backend a browser would pick on its own depends on the machine —
   // headless Chromium has no WebGPU without a flag, headless Firefox has no adapter at all, and

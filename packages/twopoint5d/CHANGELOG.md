@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- add `FramePacer`, drawing on demand for a renderer driven from a frame handler: the frame loop runs on, and `shouldDraw(frame, busy?)` answers once per frame whether the picture has to be drawn anew — for a pending report, or for `busy`. Reports are `invalidate()`, `report(motion)` and the answers of the frame steps registered through `onFrame(step, stage?)`; a draw takes every pending report, a new pacer draws its first frame, and the pacer invalidates on the resize and the restart of a source that has them. A step that throws leaves the steps behind it running and draws the frame. And the types `FramePacerSource` — a `Display` is one — and `FramePacerOptions` (see "Drawing on demand" in `docs/display.md`)
+- add `Motion` and `FrameStep`, the contract a building block that moves something answers in: `false`, `undefined` or nothing for a picture that did not change, `true` for one that did, and `'steady'` for an animation that never ends, which a `FramePacer` draws at `steadyFps` frames a second (default `FramePacer.DefaultSteadyFps`, 30) — every n-th frame, n measured from the `rawDeltaTime` of the frames and moved only by a measurement that lasts 30 frames, so 60 Hz draws every 2nd, 120 Hz every 4th, 144 and 165 Hz every 5th frame, and `maxFps: 30` every frame
+- add the `live` option of `FramePacer`: the answer of a step registered with a stage counts only while `live(stage)` answers `true`, for a layer that keeps its picture behind an overlay; the type of the stage is the type parameter of `FramePacer` and `FramePacerOptions`
+- add `untilSettled()`, a function with one frame of memory for a frame step that sets a pose from the clock: `true` while its argument is `true`, and once more in the frame it turns `false`, so the end pose of a motion is drawn
+- add `FramePacer#frames` and `FramePacer#draws`, the frames asked about and the frames drawn, and `FramePacer#dispose()` with `isDisposed`: it gives the subscriptions back to the source, which stays the caller's; afterwards `shouldDraw()` answers `true` for every frame, `report()` and `invalidate()` do nothing and `onFrame()` throws
+
 ## [0.25.0] - 2026-11-01
 
 This release brings the `StageDirector`, a stack of stages that changes through transitions —

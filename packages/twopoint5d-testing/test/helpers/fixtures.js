@@ -1,5 +1,6 @@
 /** @import {Display, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
 /** @import {WebGPURenderer} from 'three/webgpu' */
+import {executeServerCommand} from '@web/test-runner-commands';
 import {expect} from 'chai';
 import {
   FeatureSprites,
@@ -617,6 +618,35 @@ export async function renderToPixels(renderer, scene, camera, target) {
 export function rgbAt(pixels, size, x, y) {
   const i = (y * size + x) * 4;
   return [pixels[i], pixels[i + 1], pixels[i + 2]];
+}
+
+/**
+ * A screenshot of the page, or of the `clip` of it in CSS pixels: what the compositor shows, as
+ * the `ImageData` of a canvas — four bytes per pixel, the first row at the top. The pages of the
+ * launchers have a `devicePixelRatio` of 1, so a CSS pixel is a pixel of the screenshot.
+ *
+ * A read of a canvas from the page — `drawImage()`, `readPixels()`, a read-back of a target —
+ * reads the drawing buffer or a target, never the picture a frame that drew nothing has left on
+ * the screen. The server command behind this is `page-screenshot` in web-test-runner.config.js.
+ *
+ * @param {{x: number, y: number, width: number, height: number}} [clip]
+ * @returns {Promise<ImageData>}
+ */
+export async function pageScreenshot(clip) {
+  const base64 = /** @type {string} */ (await executeServerCommand('page-screenshot', {clip}));
+  const png = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+  // the bytes as the PNG has them: no conversion into the color space of the page, no premultiply
+  const bitmap = await createImageBitmap(png, {colorSpaceConversion: 'none', premultiplyAlpha: 'none'});
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d', {willReadFrequently: true});
+    ctx.drawImage(bitmap, 0, 0);
+    return ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
 }
 
 /** Whether every channel of `rgb` lies within `tolerance` of the one in `expected`. */

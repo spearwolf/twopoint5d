@@ -1992,6 +1992,10 @@ display.start();
 Pick one of the two ways: a renderer with a host that you also draw from a frame handler draws
 every frame twice.
 
+A frame handler of your own is also where a scene that mostly stands still stops drawing the same
+picture again: a `FramePacer` tells it which frames to draw — see
+[drawing on demand](display.md#drawing-on-demand).
+
 ### A host of your own
 
 A host is anything with the `onResize` and `onRenderFrame` of a `Display` — the frame loop of an

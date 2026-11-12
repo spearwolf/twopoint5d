@@ -6,10 +6,12 @@ export {Display, type DisplayEventListener} from './Display.js';
 export {DisplayFullscreen} from './DisplayFullscreen.js';
 export {FixedFrameLoop, type FixedFrameLoopRenderProps, type FixedFrameLoopTickProps} from './FixedFrameLoop.js';
 export {FrameLoop} from './FrameLoop.js';
+export {FramePacer, type FramePacerOptions, type FramePacerSource, type FrameStep, type Motion} from './FramePacer.js';
 export {isWebGLRenderer} from './isWebGLRenderer.js';
 export {isWebGPURenderer} from './isWebGPURenderer.js';
 export {Stylesheets} from './Stylesheets.js';
 export {getContentAreaSize} from './styleUtils.js';
+export {untilSettled} from './untilSettled.js';
 export type {
   CreateRendererParameters,
   DisplayEventProps,

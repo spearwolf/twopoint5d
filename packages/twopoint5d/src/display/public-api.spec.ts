@@ -10,10 +10,12 @@ describe('display public API', () => {
       'DisplayFullscreen',
       'FixedFrameLoop',
       'FrameLoop',
+      'FramePacer',
       'Stylesheets',
       'getContentAreaSize',
       'isWebGLRenderer',
       'isWebGPURenderer',
+      'untilSettled',
     ]);
   });
 });

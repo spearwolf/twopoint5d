@@ -219,6 +219,11 @@ explicit instruction.
   The browser tests share their fixtures through
   `packages/twopoint5d-testing/test/helpers/fixtures.js`; a helper that a second test
   file needs goes there, not into both.
+  A browser test that asserts what the canvas shows on the screen — the picture a frame
+  that drew nothing has left there — reads it through `pageScreenshot()` of the fixtures,
+  a screenshot Playwright takes of the page: `drawImage()`, `readPixels()` and a
+  read-back of a target read the drawing buffer or the target, not what the compositor
+  shows.
 - **Code blocks in Markdown.** A plain `ts` code block is an excerpt and nothing checks
   it. A block that stands on its own — imports everything it uses, declares everything
   it names — carries `ts check` as its info string, and `pnpm typecheck` compiles it as

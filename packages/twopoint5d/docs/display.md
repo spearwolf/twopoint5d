@@ -20,6 +20,7 @@ setting follows, then the reference: how each setting works and how they play to
 - [A fast display: adaptive resolution](#a-fast-display-adaptive-resolution)
 - [A premium display: every device pixel](#a-premium-display-every-device-pixel)
 - [Fullscreen](#fullscreen)
+- [Drawing on demand](#drawing-on-demand)
 - [Cheat sheet](#cheat-sheet)
 - [Reference](#reference)
 
@@ -645,6 +646,234 @@ removal of the alias it is renamed to `CssRulesPrefixWindow`, and the class to
 | sideways only | `{onLandscape: true, orientationLock: 'landscape', fallback: 'pseudo'}` |
 | keep the navigation bar of Android | `{navigationUI: 'show'}` |
 
+## Drawing on demand
+
+A display draws every frame — also the ten thousandth frame of a title screen on which nothing
+moves. A `FramePacer` takes the draw out of the frames that would show the same picture again.
+The frame loop runs on: `updateFrame()`, transitions and your own per-frame code keep pace with
+the clock. What becomes conditional is the draw, and a canvas that is not drawn to keeps the
+picture of the frame before.
+
+![36 frames of a screen at 60 Hz. The frame loop runs in every one of them. Drawn are the first
+frame, one frame after a click that called invalidate(), every frame while a door opens and one
+more for its end pose, and every second frame while a fire burns that answers 'steady'; in the
+stretches between nothing is drawn: 16 of 36 frames](images/display/display-drawing-on-demand.svg)
+
+A point-and-click game measured it on Chromium, under WebGPU and under WebGL 2: on a title screen
+that stands still the CPU share of the page fell to a tenth, with no frame drawn; in a room with a
+fire that burns on, it fell by a quarter, at 30 frames drawn a second instead of 60.
+
+The pacer is for a renderer you draw yourself, from a frame handler — a `StageRenderer` or a
+`StageDirector` without a host, see
+[driving the frame loop yourself](stages.md#driving-the-frame-loop-yourself). A renderer with a
+host draws every frame by itself and asks no pacer.
+
+### A scene that stands still
+
+```ts check
+import {Display, FramePacer, OrthographicProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+import {Color} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+const sr = new StageRenderer().setClearColor(new Color('#102030')).add(stage); // no host
+
+const frames = new FramePacer(display);
+
+display.onRenderFrame((frame) => {
+  sr.resize(frame.width, frame.height, frame.pixelRatio);
+  sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo); // every frame
+  if (frames.shouldDraw(frame)) sr.renderTo(frame.renderer); // only when the picture changed
+});
+
+// something changed the picture outside the frame loop: the next frame draws
+document.querySelector('#next-room')!.addEventListener('click', () => {
+  // … swap a texture, move a sprite, show another scene …
+  frames.invalidate();
+});
+
+display.start();
+
+export {display, frames, stage};
+```
+
+The frame handler asks `shouldDraw(frame)` once per frame and draws when it answers `true`. Three
+things make it answer `true` here:
+
+- **the first frame** — a new pacer starts with a draw pending;
+- **a resize, and the restart after a pause** — a resize clears the canvas, and a display back
+  from a hidden tab may have lost its picture. The pacer hears both from the display by itself;
+- **`invalidate()`** — your word that something changed. One call draws one frame, however many
+  calls come in before it; a call during a frame that was already drawn draws the next one.
+
+Everything else is a frame that costs the frame loop and nothing more.
+
+### A motion that ends
+
+Code that moves something over several frames registers as a **frame step**: a function the pacer
+runs once per frame, whose answer says whether it changed the picture.
+
+```ts check
+import {Display, FramePacer, OrthographicProjection, Stage2D, StageRenderer, untilSettled} from '@spearwolf/twopoint5d';
+import {Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
+
+const canvas = document.querySelector('canvas')!;
+const display = new Display(canvas);
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+const door = new Mesh(new PlaneGeometry(80, 160), new MeshBasicMaterial({color: '#a0522d'}));
+stage.scene.add(door);
+const sr = new StageRenderer().add(stage);
+
+const frames = new FramePacer(display);
+
+display.onRenderFrame((frame) => {
+  sr.resize(frame.width, frame.height, frame.pixelRatio);
+  sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+  if (frames.shouldDraw(frame)) sr.renderTo(frame.renderer);
+});
+
+// a click opens the door within 0.4 seconds
+let openedAt = Number.POSITIVE_INFINITY;
+canvas.addEventListener('click', () => {
+  openedAt = display.now;
+});
+
+const settled = untilSettled();
+
+frames.onFrame(({now}) => {
+  const t = Math.min(1, Math.max(0, (now - openedAt) / 0.4));
+  door.rotation.y = (t * Math.PI) / 2;
+  // true while the door swings, and once more for the frame that wrote its end pose
+  return settled(t > 0 && t < 1);
+});
+
+display.start();
+
+export {display, frames};
+```
+
+A step answers a `Motion`:
+
+| answer | meaning | drawn |
+| --- | --- | --- |
+| `false`, `undefined`, no `return` | nothing it shows has changed | nothing |
+| `true` | it moved something visible | the next frame |
+| `'steady'` | it animates on and on | 30 frames a second, see [below](#an-animation-that-never-ends) |
+
+The answers of a frame add up to the highest of them: one step that moved draws the frame.
+
+**The end of a motion is the frame after it.** A step that sets a pose from the clock knows
+whether its motion still runs — and in the frame the motion comes to rest it writes the end pose
+and answers "not moving". Left at that, the end pose would never be drawn, and the door would stand
+a hair short of open until something else moves. `untilSettled()` hands out a function that
+remembers one frame: `true` while its argument is `true`, and once more in the frame it turns
+`false`. Every motion gets one of its own.
+
+`onFrame()` returns the unsubscribe of the step. Steps run in the order they were registered, and
+what one of them throws reaches the frame loop after all of them have run.
+
+### An animation that never ends
+
+A fire, a pendulum, a meadow that sways: there is no frame in which nothing changes. Such a step
+answers `'steady'`, and the pacer draws it at 30 frames a second while nothing asks for more:
+
+```ts
+frames.onFrame(({now}) => {
+  fire.setUniform('time', now); // AnimatedFrames and wave() play by this uniform
+  return 'steady';
+});
+```
+
+30 frames a second are 30 on every screen: the pacer measures the pace of the frames and draws
+every second frame at 60 Hz, every fourth at 120 Hz — [the steady stride](#the-steady-stride) has
+the table. As soon as something answers `true`, the frame is drawn at once, fire included, and
+the full frame rate lasts as long as the motion does. `steadyFps` picks another rate:
+`new FramePacer(display, {steadyFps: 20})`.
+
+### A layer behind an overlay
+
+A `StageDirector` freezes the layers under a pause menu: they keep their last picture and are
+drawn from it. What moves in a frozen layer does not reach the canvas, so its steps must not ask
+for frames. Register such a step with its stage, and tell the pacer which stages are live:
+
+```ts check
+import {Display, FramePacer, type IStage, OrthographicProjection, Stage2D, StageDirector} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!);
+const level = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+const pauseMenu = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+
+const director = new StageDirector(); // no host
+const frames = new FramePacer(display, {live: (stage: IStage) => !director.isFrozen(stage)});
+
+display.onRenderFrame((frame) => {
+  // read before updateFrame(): the frame a transition ends in still draws
+  const transitioning = director.transitions.length > 0;
+  director.resize(frame.width, frame.height, frame.pixelRatio);
+  director.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+  if (frames.shouldDraw(frame, transitioning)) director.renderTo(frame.renderer);
+});
+
+// the torches of the level: drawn at 30 frames a second, and not at all under the menu
+frames.onFrame(() => 'steady', level);
+
+director.show(level);
+frames.invalidate();
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (director.has(pauseMenu)) {
+    director.pop();
+  } else {
+    director.push(pauseMenu, {below: 'freeze'});
+  }
+  // a change of the stack without a transition is a change of the picture
+  frames.invalidate();
+});
+
+display.start();
+
+export {display, frames};
+```
+
+The second argument of `shouldDraw()` is `busy`: `true` draws the frame whatever the reports say.
+It is for what the frame handler knows without a step — here, a transition that runs. The step of
+a stage that is not live runs on, so its state keeps pace with the clock; only its answer counts
+for nothing. `report()` and `invalidate()` name no stage and always count.
+
+### Pitfalls of drawing on demand
+
+A piece of code that forgets to report throws nothing: its part of the picture just stands still.
+These are the places where that happens.
+
+- **An animation on the GPU.** `AnimatedFrames` and `wave()` play by the uniform `time`, and a
+  write to a uniform changes the picture without moving anything on the CPU. The step that writes
+  `time` answers `'steady'` — or `true`, for the full frame rate. Without it the sprites freeze
+  on the frame they were drawn with last.
+- **A step reports what it writes itself.** A step that reads state set elsewhere and writes it
+  into the scene in its own frame answers `true` for that frame. An `invalidate()` at the place the
+  state was set may draw the frame before the step has written into it, and nothing draws the
+  frame after.
+- **Loading.** A texture that arrives changes the picture. Call `invalidate()` when a load is
+  through — after `await store.getAsync(…)`, in the `onLoad` of a loader.
+- **Changes outside a step** — `scene.add()`, a `show()` or `hide()` of a director without a
+  transition, a new clear color, a new pipeline: each goes with an `invalidate()`.
+- **`shouldDraw()` once per frame.** It counts the frame and measures the pace of the frames; a
+  second call in the same frame counts a frame that was none.
+- **`adaptiveResolution`** measures what a frame costs, and takes every frame for a drawn one: a
+  frame that drew nothing has no cost to measure. Leave it off beside a pacer.
+- **A post-process that reads the frame before** — a temporal anti-aliasing, a feedback, a motion
+  blur — needs every frame: draw it with `busy`.
+
+`frames.frames` and `frames.draws` count the frames asked about and the frames drawn. They show a
+forgotten report in a test — a room that stands still draws nothing, a click draws one frame — and
+on a debug overlay.
+
+After `frames.dispose()` the pacer has given its subscriptions back to the display, and
+`shouldDraw()` answers `true` for every frame: a frame handler that outlives its pacer draws
+continuously rather than never. `onFrame()` throws from then on, `report()` and `invalidate()` do
+nothing. The display stays yours.
+
 ## Cheat sheet
 
 ### The settings of the display
@@ -690,6 +919,22 @@ The options go into `fullscreen: {…}` of the constructor; each is a property o
 | `isArmed` | `onLandscape` waits for a tap; never while the target or another element is in fullscreen |
 | `display.onFullscreenChange(listener)` | every change of `isActive`, `mode` and `isArmed`, with those three, the `display` and the `element` in fullscreen or to request; retained |
 
+### Drawing on demand
+
+A `FramePacer` beside a renderer drawn from a frame handler:
+
+| call or read | what it does |
+| --- | --- |
+| `new FramePacer(display, {steadyFps?, live?})` | subscribes to the frames, the resize and the restart of the display; `steadyFps` defaults to `30` (`FramePacer.DefaultSteadyFps`), `live(stage)` tells which stages are drawn live |
+| `shouldDraw(frame, busy?)` | asked once per frame, before the draw: `true` when a report is pending or `busy` is `true`. A draw takes every pending report |
+| `onFrame(step, stage?)` | runs `step(frame)` every frame and takes its answer as a report; with a `stage`, only while `live(stage)`. Returns the unsubscribe |
+| `report(motion)` | a report from outside a step: `true`, `'steady'`, or nothing |
+| `invalidate()` | the next frame draws; the same as `report(true)` |
+| `untilSettled()` | a function for a step: `true` while its argument is, and once more as it turns `false` |
+| `frames`, `draws` | the frames asked about, and those drawn |
+| `steadyFps` | the rate `'steady'` draws at |
+| `dispose()`, `isDisposed` | gives the subscriptions back; afterwards `shouldDraw()` answers `true` |
+
 ### The fit of a projection
 
 `OrthographicProjection` and `ParallaxProjection` take the same fit:
@@ -727,6 +972,8 @@ The options go into `fullscreen: {…}` of the constructor; each is a property o
 | projection `pixelZoom` without `pixelSnap` | uneven texels at a fractional ratio, and the pixels of a full buffer |
 | `resolutionScale` above `1` + `maxPixels` | supersampling up to the budget |
 | `antialias` + pixel art | cost without effect |
+| `FramePacer` + `maxFps` | the steady stride follows the frames the display emits: under `maxFps: 30`, `'steady'` draws every frame |
+| `FramePacer` + `adaptiveResolution` | **no**: the controller measures every frame as a drawn one |
 
 ### The pixel ratio, put together
 
@@ -893,6 +1140,36 @@ display.adaptiveResolution; // adaptive: the controller that holds the display
 
 export {adaptive};
 ```
+
+### The steady stride
+
+`'steady'` draws every n-th frame. The pacer measures the gap between two frames — by the
+`rawDeltaTime` of the frame, so by the frames the display emits, `maxFps` included — as a moving
+average, and picks the stride that comes closest to `steadyFps` without falling more than a quarter
+of a frame short of it:
+
+| screen | stride at `steadyFps: 30` | drawn per second |
+| --- | --- | --- |
+| 60 Hz | every 2nd frame | 30 |
+| 75 Hz | every 2nd | 37.5 |
+| 90 Hz | every 3rd | 30 |
+| 100 Hz | every 3rd | 33.3 |
+| 120 Hz | every 4th | 30 |
+| 144 Hz | every 5th | 28.8 |
+| 165 Hz | every 5th | 33 |
+| 240 Hz | every 8th | 30 |
+| `maxFps: 30`, or a screen below 30 Hz | every frame | as many as there are |
+
+A stride that stands holds on: it moves only once 30 frames in a row have measured another one,
+so neither the jitter of single frames nor a few dropped frames flip an animation between two
+rates — 144 Hz lies close to the edge between every 4th and every 5th frame. A new pace of the
+frames — another screen, a new `maxFps` — reaches its stride within a second or two. A gap of a
+quarter second and more — a hidden tab, a breakpoint — is no frame rate and measures nothing, and
+until the first gap is measured `'steady'` draws every frame.
+
+A `'steady'` that comes in after a still stretch draws with the next frame, and one that was
+answered once and never again still draws once: the last state of an animation that stopped
+reaches the canvas.
 
 ### Pipelines
 

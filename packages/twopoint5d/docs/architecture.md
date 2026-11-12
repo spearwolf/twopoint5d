@@ -177,7 +177,11 @@ in back as the display found it — is an internal module, `src/display/canvasHa
 display builds from its `fullscreen` option: the browser's native fullscreen on the element
 around the canvas or another target, fullscreen when a phone turns sideways (`onLandscape`)
 and a pseudo fullscreen through CSS as the opt-in `fallback`; `Display#dispose()` leaves a
-fullscreen the display entered before it lets go of the renderer.
+fullscreen the display entered before it lets go of the renderer. A `FramePacer` decides frame by
+frame whether a renderer driven by hand has to draw: it runs frame steps on the frames of a
+display, takes their answers — a `Motion` — and what `invalidate()` says as reports, and answers
+`shouldDraw()` once per frame; `'steady'` draws at a stride measured from the pace of the frames.
+It imports neither three.js nor the stage layer, which builds on it.
 
 ### `stage/`
 
