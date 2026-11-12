@@ -3,7 +3,7 @@ import type {Node, WebGPURenderer} from 'three/webgpu';
 /**
  * Contributes a TSL node that represents this object's rendered contribution
  * to a parent `RenderPipeline`. Implemented by `Stage2D` (returns a `pass()`
- * node) and `StageRenderer` (returns a `texture()` node sampling the
+ * node, or the output node of its post-process) and `StageRenderer` (returns a `texture()` node sampling the
  * renderer's pass-target).
  *
  * The node belongs to the provider, not to the caller. A provider that builds a resource for
@@ -13,8 +13,8 @@ import type {Node, WebGPURenderer} from 'three/webgpu';
  * builds here in the same way.
  *
  * A composing `StageRenderer` asks an eventized provider for its node again after it announced
- * `OnStageAfterCameraChanged` or `OnStageAfterSceneChanged`, and rebuilds its output node only for
- * a node that differs from the one it composed.
+ * `OnStageAfterCameraChanged`, `OnStageAfterSceneChanged` or `OnStageAfterPostProcessChanged`, and
+ * rebuilds its output node only for a node that differs from the one it composed.
  */
 export interface IPassProvider {
   asPassNode(renderer: WebGPURenderer): Node;

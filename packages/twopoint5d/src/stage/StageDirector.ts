@@ -15,7 +15,13 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
-import {OnStageDispose, OnStageTransitionEnd, OnStageTransitionStart, type StageTransitionProps} from '../events.js';
+import {
+  OnStageAfterPostProcessChanged,
+  OnStageDispose,
+  OnStageTransitionEnd,
+  OnStageTransitionStart,
+  type StageTransitionProps,
+} from '../events.js';
 import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
@@ -1140,7 +1146,8 @@ export class StageDirector extends StageRenderer {
 
   /**
    * Freezes the layer or mask stage `stage`: it is neither updated nor drawn, and its last picture
-   * stays. A state set by hand is the caller's: the end of a transition and the `pop()` or
+   * stays — until the size of the director changes or the stage gets a new `postProcess`, which
+   * each draw it once more, without an update. A state set by hand is the caller's: the end of a transition and the `pop()` or
    * `setStack()` after a `push()` with `below: 'freeze'` leave it as it is. After `dispose()` it does
    * nothing; a stage argument that is no object is refused all the same.
    */
@@ -1328,7 +1335,14 @@ export class StageDirector extends StageRenderer {
       for (let j = 0; j < masks.length; j++) StageMaskInternals.followProgressNode(masks[j]!, run.transition);
     }
     this.#updateClearUniform(renderer);
-    super.renderToCurrentTarget(renderer);
+    try {
+      super.renderToCurrentTarget(renderer);
+    } catch (error) {
+      // a draw that ended early may have cleared the target of a frozen layer and not drawn it —
+      // a post-process whose build() threw —: every frozen layer draws once more with the next frame
+      for (const layer of this.#layers.values()) if (layer.frozen) layer.needsPicture = true;
+      throw error;
+    }
     // the draw of the director goes first, and what the effects threw as the director let go of
     // their shapes comes after it. Under a parent that composes, this is the parent's preparation of
     // its layers: the error ends the draw of the parent there, and the layers behind the director
@@ -1835,11 +1849,19 @@ export class StageDirector extends StageRenderer {
     const layer: Layer = {stage, role, uses: 0, scale, renderer, wrapped, frozen: false, needsPicture: true};
     // the stage keeps its logical size — the director resizes it as any layer —, only its pass target shrinks
     if (scale !== 1) StageRendererInternals.setPassTargetScale(renderer, scale);
-    // a wrapped stage that is disposed leaves its wrapper; the director lets go of the layer with it
     if (wrapped && isEventized(stage)) {
-      layer.unsubscribe = on(stage, OnStageDispose, () => {
+      // a wrapped stage that is disposed leaves its wrapper; the director lets go of the layer with it
+      const unsubscribeDispose = on(stage, OnStageDispose, () => {
         if (this.#layers.get(stage) === layer) this.remove(stage);
       });
+      // a new post-process is a new picture: a frozen layer draws once with it, without an update
+      const unsubscribePostProcess = on(stage, OnStageAfterPostProcessChanged, () => {
+        layer.needsPicture = true;
+      });
+      layer.unsubscribe = () => {
+        unsubscribeDispose();
+        unsubscribePostProcess();
+      };
     }
     this.#layers.set(stage, layer);
     this.#byRenderer.set(renderer, layer);

@@ -17,6 +17,7 @@ import {
   OnRemoveFromParent,
   OnStageAdded,
   OnStageAfterCameraChanged,
+  OnStageAfterPostProcessChanged,
   OnStageAfterSceneChanged,
   OnStageDispose,
   OnStageRemoved,
@@ -47,6 +48,10 @@ const hasAsPassNode = (s: unknown): s is IPassProvider => typeof (s as IPassProv
 // recognized by its `isStage2D` flag, so this module needs no runtime import of Stage2D
 const isStage2DWithoutCamera = (s: IStage): boolean =>
   (s as Partial<Stage2D>).isStage2D === true && (s as Stage2D).camera == null;
+
+// a Stage2D that draws through a pipeline of its own, by the same flag
+const isStage2DWithPostProcess = (s: IStage): boolean =>
+  (s as Partial<Stage2D>).isStage2D === true && (s as Stage2D).postProcess !== undefined;
 
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
 
@@ -973,9 +978,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /** Plain mode: clear (if requested), then render stages into the current target. */
   #renderStagesInline(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
-    // a child with a pipeline alone is the one writer of the target; beside a second stage its quad
-    // covers what the others drew
-    if (!this.#warnedAboutPipelineChild && stages.length > 1) this.#warnAboutPipelineChild(stages);
+    // a child with a pipeline, or a stage with a post-process, alone is the one writer of the
+    // target; beside a second stage its quad covers what the others drew
+    if (!this.#warnedAboutPipelineChild && stages.length > 1) this.#warnAboutPipelineChild(stages, true);
     if (this.clear) this.#applyClear(renderer);
     this.#drawStages(renderer, stages);
   }
@@ -983,20 +988,33 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #warnedAboutPipelineChild = false;
 
   /**
-   * Warns once, for the first nested renderer among `stages` that runs a pipeline of its own and
-   * draws into the target of this renderer — one without an `outputRenderTarget`. An
-   * `outputRenderTarget` of this renderer changes nothing: the quad covers whatever target this
-   * renderer draws into.
+   * Warns once, for the first stage among `stages` that draws through a pipeline of its own into
+   * the target of this renderer: a `Stage2D` with a `postProcess`, and with `nestedRenderers` a
+   * nested renderer with a pipeline and without an `outputRenderTarget`. An `outputRenderTarget`
+   * of this renderer changes nothing: the quad covers whatever target this renderer draws into.
    */
-  #warnAboutPipelineChild(stages: ReadonlyArray<StageItem>): void {
+  #warnAboutPipelineChild(stages: ReadonlyArray<StageItem>, nestedRenderers: boolean): void {
     // indexed, as in #canCompose(): this runs in every frame until it has warned
     for (let i = 0; i < stages.length; i++) {
       const child = stages[i]!.stage;
-      if (child instanceof StageRenderer && child.#renderMode() !== 'plain' && child.outputRenderTarget == null) {
+      if (
+        nestedRenderers &&
+        child instanceof StageRenderer &&
+        child.#renderMode() !== 'plain' &&
+        child.outputRenderTarget == null
+      ) {
         this.#warnedAboutPipelineChild = true;
         // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
           `StageRenderer ${describeValue(this.name)} has no pipeline and draws the renderer ${describeValue(child.name)}, which runs a pipeline of its own, into one target with other stages: the quad of that pipeline covers every pixel of the target without blending, and what the stages before it drew there is lost. Give the outer renderer the pipeline — a RootRenderPipeline composes every child —, or give ${describeValue(child.name)} an outputRenderTarget of its own.`,
+        );
+        return;
+      }
+      if (isStage2DWithPostProcess(child)) {
+        this.#warnedAboutPipelineChild = true;
+        // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+        console.warn(
+          `StageRenderer ${describeValue(this.name)} draws the stage ${describeValue(child.name)}, which runs a post-process, into one target with other stages: the pipeline of that stage clears the target and covers every pixel of it, and what the stages before it drew there is lost. Compose the stages — a RootRenderPipeline as the pipeline of the renderer does —, or show them as layers of a StageDirector.`,
         );
         return;
       }
@@ -1057,6 +1075,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #renderPipelineSimple(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     const pipeline = this.#pipeline!;
+    // the stages share the internal target: a stage with a post-process clears what the stages
+    // before it drew there, as under a renderer without a pipeline
+    if (!this.#warnedAboutPipelineChild && stages.length > 1) this.#warnAboutPipelineChild(stages, false);
     // borrowed before the try: an acquire() that throws has lent nothing
     const rt = this.#targets.acquireInternalTarget(renderer, this.width, this.height);
     try {
@@ -1131,8 +1152,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     }
     this.#prerenderNestedRenderers(renderer, stages);
     if (!this.#outputDirty && this.#passesToCheck) {
+      // the flag goes once every stage has answered: a stage that throws from asPassNode() — a
+      // post-process whose build() fails — is asked again by the next frame
+      const changed = this.#composedPassesChanged(renderer, stages);
       this.#passesToCheck = false;
-      if (this.#composedPassesChanged(renderer, stages)) this.#outputDirty = true;
+      if (changed) this.#outputDirty = true;
     }
     if (this.#outputDirty) this.#rebuildComposedOutputNode(renderer, stages);
     this.#clearBeforePipeline(renderer);
@@ -1558,12 +1582,16 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
     if (isEventized(stage)) {
       // a stage that announces a new camera or scene can hand a new pass node — a Stage2D keeps
-      // its node and writes both into it —, so the next composing frame asks and rebuilds only for
-      // another node. The whole-picture mode does not read the flag: its node samples the internal
-      // target and holds neither scene nor camera
-      const unsubscribeChanges = on(stage, [OnStageAfterCameraChanged, OnStageAfterSceneChanged], () => {
-        this.#passesToCheck = true;
-      });
+      // its node and writes both into it —, and one that announces a new post-process does: the
+      // next composing frame asks and rebuilds only for another node. The whole-picture mode does
+      // not read the flag: its node samples the internal target and holds neither scene nor camera
+      const unsubscribeChanges = on(
+        stage,
+        [OnStageAfterCameraChanged, OnStageAfterSceneChanged, OnStageAfterPostProcessChanged],
+        () => {
+          this.#passesToCheck = true;
+        },
+      );
       // a disposed stage has no pass node left to give: the renderer lets go of it on the spot
       const unsubscribeDispose = on(stage, OnStageDispose, () => {
         this.remove(stage);

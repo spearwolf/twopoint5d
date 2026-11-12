@@ -3,22 +3,26 @@ import {pass} from 'three/tsl';
 import {type Camera, type Node, type PassNode, Scene, type WebGPURenderer} from 'three/webgpu';
 import {
   OnStageAfterCameraChanged,
+  OnStageAfterPostProcessChanged,
   OnStageAfterSceneChanged,
   OnStageDispose,
   OnStageFirstFrame,
   OnStageResize,
   OnStageUpdateFrame,
   type StageAfterCameraChangedArgs,
+  type StageAfterPostProcessChangedArgs,
   type StageAfterSceneChangedArgs,
   type StageResizeProps,
   type StageUpdateFrameProps,
 } from '../events.js';
+import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IProjection} from './IProjection.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
+import {type StagePostProcess, StagePostProcessRun} from './StagePostProcess.js';
 
 const FRAMES_WITHOUT_CAMERA_BEFORE_WARNING = 100;
 
@@ -67,6 +71,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     this.#scene = scene;
     // after dispose() there is no node left to write into
     if (this.#passNode != null) this.#passNode.scene = scene;
+    this.#postProcessRun?.setScene(scene);
 
     if (this.#disposed) return;
 
@@ -234,7 +239,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       // its next frame on. A camera that goes away leaves it the one it had — without a camera
       // the node is not drawn — and the next one goes into it
       const camera = this.camera;
-      if (camera != null && this.#passNode != null) this.#passNode.camera = camera;
+      if (camera != null) {
+        if (this.#passNode != null) this.#passNode.camera = camera;
+        this.#postProcessRun?.setCamera(camera);
+      }
       const args: StageAfterCameraChangedArgs = [this, prevCamera];
       try {
         emitStrict(this, OnStageAfterCameraChanged, ...args);
@@ -462,30 +470,110 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     emit(this, OnStageUpdateFrame, props);
   }
 
+  #postProcess?: StagePostProcess;
+  #postProcessRun?: StagePostProcessRun;
+
   /**
-   * Render this stage's scene with its camera. No-op until the stage has a camera (until the first
-   * `resize()` with an area has created it from the projection, or one is assigned), and on a
-   * disposed stage.
+   * A post-process of this stage: the stage draws the output node its `build()` answers over the
+   * scene pass, wherever it is drawn — by {@link renderTo} through a pipeline of the stage, by
+   * {@link asPassNode} as the node a composing renderer takes. `undefined`, the default, draws the
+   * scene as it is. See "An effect on one stage" in `docs/stages.md`.
+   *
+   * The object belongs to the caller and may serve several stages: the stage calls its `build()`
+   * once, before the first draw that needs the node, and never disposes it. An assignment of
+   * another value lets go of what the previous one built — the functions the build registered
+   * through `onDispose()` run, its pass and the pipeline of the stage are disposed — and emits
+   * `OnStageAfterPostProcessChanged` with the post-process it replaced. Every listener hears the
+   * event, also behind one that throws; the stage has taken the new value by then, and the error
+   * reaches the caller afterwards, together with what the releases threw — one unchanged, several
+   * as an `AggregateError`. An assignment of the object the stage has already changes nothing; to
+   * build again, assign another object. A `build()` that assigns `postProcess` or disposes the
+   * stage is refused: the draw that asked for the node throws, and nothing of that build stays.
+   *
+   * A value that is neither `undefined` nor an object with a `build()` method is refused with a
+   * `TypeError`, and the stage keeps what it has. After {@link dispose} a write does nothing.
+   */
+  get postProcess(): StagePostProcess | undefined {
+    return this.#postProcess;
+  }
+
+  set postProcess(postProcess: StagePostProcess | undefined) {
+    if (this.#disposed) return;
+
+    if (postProcess !== undefined && typeof (postProcess as Partial<StagePostProcess> | null)?.build !== 'function') {
+      throw new TypeError(
+        `Stage2D#postProcess must be a StagePostProcess with a build() method or undefined, got ${describeValue(postProcess)}`,
+      );
+    }
+
+    const prevPostProcess = this.#postProcess;
+    if (prevPostProcess === postProcess) return;
+
+    // the new value stands before anything foreign runs: a release of the previous build that
+    // assigns again, or disposes the stage, finds the stage as this call leaves it
+    const prevRun = this.#postProcessRun;
+    this.#postProcess = postProcess;
+    this.#postProcessRun = postProcess !== undefined ? new StagePostProcessRun(postProcess) : undefined;
+
+    const errors: unknown[] = [];
+    prevRun?.dispose(errors);
+
+    // the pass node of the stage is not drawn while a post-process stays: three.js allocates its
+    // memory again on the first draw after it
+    if (postProcess !== undefined) {
+      try {
+        this.#passNode?.renderTarget.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+
+    const args: StageAfterPostProcessChangedArgs = [this, prevPostProcess];
+    try {
+      emitStrict(this, OnStageAfterPostProcessChanged, ...args);
+    } catch (error) {
+      errors.push(error);
+    }
+    throwCollected(
+      errors,
+      'Stage2D#postProcess: more than one of the releases of the previous post-process and the listeners of OnStageAfterPostProcessChanged threw',
+    );
+  }
+
+  /**
+   * Render this stage's scene with its camera — through its {@link postProcess}, if it has one:
+   * the stage then runs a pipeline of its own over the output node, which covers every pixel of
+   * the current target. Into a render target the pipeline writes linear, as a plain draw does; on
+   * the canvas it applies the tone mapping and the output color space of the renderer. No-op until
+   * the stage has a camera (until the first `resize()` with an area has created it from the
+   * projection, or one is assigned), and on a disposed stage.
    */
   renderTo(renderer: WebGPURenderer): void {
     if (this.#disposed) return;
 
-    if (this.camera) {
-      renderer.render(this.scene, this.camera);
+    const {camera} = this;
+    if (!camera) return;
+
+    if (this.#postProcessRun !== undefined) {
+      this.#postProcessRun.render(renderer, this, this.scene, camera);
+    } else {
+      renderer.render(this.scene, camera);
     }
   }
 
   #passNode?: PassNode;
 
   /**
-   * Return a TSL `pass(scene, camera)` node for use inside a parent
-   * `RenderPipeline`. Requires `camera` — a `resize()` with an area, or an assigned camera.
+   * Return the node of this stage for use inside a parent `RenderPipeline`: a TSL
+   * `pass(scene, camera)` node, or the output node of its {@link postProcess}, built over a pass of
+   * its own on the first call. Requires `camera` — a `resize()` with an area, or an assigned camera.
    *
-   * The same node comes back for the life of the stage: a new scene or camera goes into it as it
-   * is assigned and applies from its next draw, so a renderer that composes this stage keeps its
-   * graph and builds no shader for it. A camera that goes away leaves the node with the camera it
-   * had. A stage added to two `StageRenderer`s hands both the very same node — one node that
-   * renders its scene once per frame, and two readers of that one result.
+   * The same node comes back for as long as `postProcess` stays — for the life of a stage without
+   * one: a new scene or camera goes into the pass as it is assigned and applies from its next draw,
+   * so a renderer that composes this stage keeps its graph and builds no shader for it. A camera
+   * that goes away leaves the node with the camera it had. A stage added to two `StageRenderer`s
+   * hands both the very same node — one node that renders its scene once per frame, and two
+   * readers of that one result.
    *
    * The node belongs to the stage and is released by {@link dispose}. Throws on a disposed
    * stage, which builds no further node.
@@ -503,6 +591,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       );
     }
 
+    if (this.#postProcessRun !== undefined) return this.#postProcessRun.outputNode(this, scene, camera);
+
     // one node for the life of the stage: the setters of scene and camera write into it
     this.#passNode ??= pass(scene, camera);
     return this.#passNode;
@@ -510,7 +600,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   /**
    * Releases the GPU memory of the render target of the pass node {@link asPassNode} built — color
-   * and depth. The node stays, and with it every `texture()` node on it and the pipeline built on
+   * and depth —, and of the pass of a {@link postProcess}. The node stays, and with it every `texture()` node on it and the pipeline built on
    * it; three.js allocates the memory again on the next draw of the node, so this is safe for a
    * stage two renderers share. Does nothing without a pass node, and after {@link dispose}. A
    * `StageRenderer` calls it as soon as it no longer composes this stage.
@@ -520,6 +610,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     // dispose() releases the node and its render target right after
     if (this.#disposed) return;
     this.#passNode?.renderTarget.dispose();
+    this.#postProcessRun?.releaseMemory();
   }
 
   #disposePassNode(): void {
@@ -535,11 +626,12 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * Release the pass node this stage built for itself, and with it the render target behind it.
-   * Call when this stage is no longer needed.
+   * Release the pass node this stage built for itself, and with it the render target behind it,
+   * and what its {@link postProcess} built: the functions the build registered run, its pass and
+   * the pipeline of the stage are disposed. Call when this stage is no longer needed.
    *
-   * The {@link scene}, the {@link camera} and the {@link projection} belong to the caller and are
-   * left as they are — a `THREE.Scene` has nothing to release, whatever hangs in it was put there
+   * The {@link scene}, the {@link camera}, the {@link projection} and the `postProcess` object
+   * belong to the caller and are left as they are — a `THREE.Scene` has nothing to release, whatever hangs in it was put there
    * by whoever built it, and a camera has no `dispose()` either, the one the projection created as
    * little as one assigned here.
    *
@@ -548,9 +640,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    *
    * Afterwards `isDisposed` is `true` and {@link asPassNode} throws an error naming the
    * class and the state. `renderTo()`, `updateFrame()`, `resize()`, `updateProjection()`
-   * and a write to `projection` or `camera` do nothing, and so does a further
+   * and a write to `projection`, `camera` or `postProcess` do nothing, and so does a further
    * `dispose()`. The plain state no longer drives anything, and `dispose()` resets none
-   * of it: `scene`, `camera`, `projection`, `containerWidth`, `containerHeight`,
+   * of it: `scene`, `camera`, `projection`, `postProcess`, `containerWidth`, `containerHeight`,
    * `width`, `height`, `name`, `needsUpdate` and `isFirstFrame` answer with the values
    * the stage was left with. Of these, `scene`, `name`, `needsUpdate` and `isFirstFrame`
    * still take new ones. A write to `scene` goes through and has no effect, since the
@@ -561,7 +653,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * listener of `OnStageDispose` that throws does not hold up the teardown: every
    * subscriber hears the event, the instance is torn down completely, and the error
    * reaches the caller afterwards — one unchanged, several as an `AggregateError`. An
-   * error from releasing the pass node reaches the caller as well, by the same rule.
+   * error from a release of the post-process or from releasing the pass node reaches the caller
+   * as well, by the same rule.
    */
   dispose(): void {
     if (this.#disposed) return;
@@ -579,6 +672,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     off(this);
 
+    // the property keeps the value it was left with; what it built goes
+    this.#postProcessRun?.dispose(errors);
+    this.#postProcessRun = undefined;
+
     try {
       this.#disposePassNode();
     } catch (error) {
@@ -586,6 +683,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
 
     // the errors stand in the order of the teardown above, which is no promise to the caller
-    throwCollected(errors, 'Stage2D#dispose(): a listener of the dispose event threw, and so did the release of the pass node');
+    throwCollected(
+      errors,
+      'Stage2D#dispose(): more than one of the listeners of the dispose event, the releases of the post-process and the release of the pass node threw',
+    );
   }
 }

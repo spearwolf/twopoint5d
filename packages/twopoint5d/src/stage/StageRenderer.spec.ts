@@ -9,6 +9,7 @@ import {
   NoToneMapping,
   OrthographicCamera,
   PerspectiveCamera,
+  RenderPipeline,
   RenderTarget,
   Scene,
   SRGBColorSpace,
@@ -68,6 +69,7 @@ interface RendererMock {
   render: Mock;
   setRenderTarget: Mock;
   getRenderTarget: Mock;
+  getOutputRenderTarget: Mock;
   getPixelRatio: Mock;
   samples: number;
   getOutputBufferType: Mock;
@@ -93,6 +95,7 @@ function createRendererMock(): RendererMock {
     render: vi.fn(),
     setRenderTarget: vi.fn(),
     getRenderTarget: vi.fn(),
+    getOutputRenderTarget: vi.fn(() => null),
     getPixelRatio: vi.fn(() => 1),
     samples: 4,
     // not the three.js default: the type of the internal targets has to come from the renderer
@@ -2053,6 +2056,86 @@ describe('StageRenderer', () => {
     });
   });
 
+  describe('a stage with a post-process beside other stages in one target', () => {
+    let warn: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // the pipeline of the stage does not draw here
+      vi.spyOn(RenderPipeline.prototype, 'render').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    const WARNING =
+      'StageRenderer "root" draws the stage "room", which runs a post-process, into one target with other stages: the pipeline of that stage clears the target and covers every pixel of it, and what the stages before it drew there is lost. Compose the stages — a RootRenderPipeline as the pipeline of the renderer does —, or show them as layers of a StageDirector.';
+
+    function makeTree({withSibling = true, postProcess = true} = {}) {
+      const root = new StageRenderer();
+      root.name = 'root';
+      if (withSibling) root.add(new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100})));
+      const room = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 100}));
+      room.name = 'room';
+      if (postProcess) room.postProcess = {build: ({pass}) => pass};
+      root.add(room);
+      root.resize(100, 50);
+      return {root, room};
+    }
+
+    const drawTwice = (root: StageRenderer) => {
+      root.renderTo(renderer as any);
+      root.renderTo(renderer as any);
+    };
+
+    it('warns once when it draws such a stage beside another stage', () => {
+      const {root} = makeTree();
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('warns for a post-process that comes after the first frames', () => {
+      const {root, room} = makeTree({postProcess: false});
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+
+      room.postProcess = {build: ({pass}) => pass};
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('does not warn for such a stage alone', () => {
+      const {root} = makeTree({withSibling: false});
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not warn in the composed mode', () => {
+      const {root} = makeTree();
+      root.pipeline = fakeRootPipeline() as any;
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('warns once in the whole-picture mode as well: the stages share the internal target', () => {
+      const {root} = makeTree();
+      root.pipeline = makePipelineMock() as any;
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('does not warn in the whole-picture mode for such a stage alone', () => {
+      const {root} = makeTree({withSibling: false});
+      root.pipeline = makePipelineMock() as any;
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
   describe('the whole-picture mode: a pipeline that samples the internal target', () => {
     function makePipelineMock() {
       return {
@@ -2877,6 +2960,61 @@ describe('StageRenderer', () => {
       expect(buildOutputNode).toHaveBeenCalledTimes(1);
       expect(pipeline.needsUpdate).toBe(false);
       expect(buildOutputNode.mock.calls[0]![0][0].scene).toBe(scene);
+    });
+
+    it('builds its output node again for a Stage2D with a new post-process, and again once it is taken away', () => {
+      const {sr, stage, buildOutputNode, pipeline} = makeComposedSetup();
+      sr.resize(100, 100);
+      renderFirstFrame(sr, pipeline);
+      const plain = buildOutputNode.mock.calls[0]![0][0];
+
+      let built: unknown;
+      stage.postProcess = {
+        build: ({pass}) => {
+          built = pass;
+          return pass;
+        },
+      };
+      sr.renderTo(renderer as any);
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      expect(buildOutputNode).toHaveBeenLastCalledWith([built]);
+      expect(built, 'a pass of its own').not.toBe(plain);
+      expect(pipeline.outputNode).toBe(built);
+
+      stage.postProcess = undefined;
+      sr.renderTo(renderer as any);
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(3);
+      expect(buildOutputNode).toHaveBeenLastCalledWith([plain]);
+    });
+
+    it('asks a Stage2D for its node again in the frame after the build of its post-process threw', () => {
+      const {sr, stage, buildOutputNode, pipeline} = makeComposedSetup();
+      sr.resize(100, 100);
+      renderFirstFrame(sr, pipeline);
+      const boom = new Error('build');
+      let fail = true;
+      let built: unknown;
+      stage.postProcess = {
+        build: ({pass}) => {
+          if (fail) throw boom;
+          built = pass;
+          return pass;
+        },
+      };
+
+      expect(() => sr.renderTo(renderer as any)).toThrow(boom);
+      expect(buildOutputNode, 'nothing composed in the frame that threw').toHaveBeenCalledTimes(1);
+
+      fail = false;
+      sr.renderTo(renderer as any);
+
+      expect(buildOutputNode).toHaveBeenCalledTimes(2);
+      expect(buildOutputNode).toHaveBeenLastCalledWith([built]);
+      expect(pipeline.outputNode).toBe(built);
     });
 
     // the listener sits ahead of the one the renderer places in add(), and throws for every change

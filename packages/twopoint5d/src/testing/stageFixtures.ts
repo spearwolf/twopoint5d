@@ -25,6 +25,7 @@ export interface RendererSurface {
   render(scene: unknown, camera: unknown): unknown;
   setRenderTarget(target: unknown): void;
   getRenderTarget(): unknown;
+  getOutputRenderTarget(): unknown;
   getPixelRatio(): number;
   getOutputBufferType(): TextureDataType;
   init(): Promise<unknown>;
@@ -49,6 +50,7 @@ export function createRendererMock() {
     render: vi.fn<RendererSurface['render']>(),
     setRenderTarget: vi.fn<RendererSurface['setRenderTarget']>(),
     getRenderTarget: vi.fn<RendererSurface['getRenderTarget']>(),
+    getOutputRenderTarget: vi.fn<RendererSurface['getOutputRenderTarget']>(() => null),
     getPixelRatio: vi.fn<RendererSurface['getPixelRatio']>(() => 1),
     samples: 0,
     getOutputBufferType: vi.fn<RendererSurface['getOutputBufferType']>(() => FloatType),
@@ -99,6 +101,7 @@ export function createPlainRenderer() {
       target = rt;
     },
     getRenderTarget: () => target,
+    getOutputRenderTarget: () => null,
     getPixelRatio: () => 1,
     getOutputBufferType: () => FloatType,
     init: async () => {},

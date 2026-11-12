@@ -1,9 +1,10 @@
-import {on, once} from '@spearwolf/eventize';
+import {emit, eventize, getSubscriptionCount, on, once} from '@spearwolf/eventize';
 import {ACESFilmicToneMapping, Color, FloatType, NoToneMapping, RenderPipeline, RenderTarget, SRGBColorSpace} from 'three/webgpu';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {
   OnAddToParent,
   OnStageAdded,
+  OnStageAfterPostProcessChanged,
   OnStageRemoved,
   OnStageTransitionEnd,
   OnStageTransitionStart,
@@ -416,6 +417,51 @@ describe('StageDirector', () => {
       director.run(a);
       draw();
       expect(a.renderTo).toHaveBeenCalledTimes(3);
+    });
+
+    it('a frozen layer draws once more after its stage announced a new post-process, without an update', () => {
+      const room = eventize(fakeStage('room'));
+      director.setStack([room]);
+      director.freeze(room);
+      draw();
+      draw();
+      expect(room.renderTo).toHaveBeenCalledTimes(1);
+      room.updateFrame.mockClear();
+
+      emit(room, OnStageAfterPostProcessChanged, room, undefined);
+      draw();
+      draw();
+
+      expect(room.renderTo).toHaveBeenCalledTimes(2);
+      expect(room.updateFrame, 'still frozen').not.toHaveBeenCalled();
+      expect(director.isFrozen(room)).toBe(true);
+    });
+
+    it('a frozen layer whose draw threw draws again with the next frame', () => {
+      const room = eventize(fakeStage('room'));
+      director.setStack([room]);
+      director.freeze(room);
+      draw();
+      const boom = new Error('draw');
+      room.renderTo.mockImplementationOnce(() => {
+        throw boom;
+      });
+      emit(room, OnStageAfterPostProcessChanged, room, undefined);
+
+      expect(draw).toThrow(boom);
+      draw();
+      draw();
+
+      expect(room.renderTo, 'the first picture, the draw that threw, and the one after it').toHaveBeenCalledTimes(3);
+    });
+
+    it('a layer that left the stack no longer follows the post-process of its stage', () => {
+      const room = eventize(fakeStage('room'));
+      director.setStack([room]);
+      draw();
+      director.setStack([a]);
+
+      expect(getSubscriptionCount(room)).toBe(0);
     });
   });
 

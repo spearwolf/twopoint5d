@@ -119,5 +119,6 @@ scheduled, and each item would get a proposal of its own before it is built.
 | [`stage-transitions.md`](stage-transitions.md) | `StageDirector` — a stack of stage layers changed through transitions, and the transition effects in TSL |
 | [`stage-masks.md`](stage-masks.md) | `StageMask` — a stage whose picture masks a slot of a `StageDirector`, `matte()` transitions through a living stage, stencil and masks in 3D |
 | [`drawing-on-demand.md`](drawing-on-demand.md) | `FramePacer` — a frame is drawn only when the picture changed: the frame-step contract, the steady stride, the director option, the verify mode |
+| [`stage-post-process.md`](stage-post-process.md) | `Stage2D#postProcess` — an effect on one stage, drawn with the stage as a layer of a director, under a composing renderer or alone |
 
 A new proposal is a file of its own here, named after its subject, with a row in this table.

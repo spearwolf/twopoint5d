@@ -509,6 +509,16 @@ Renderers with a pipeline each, nested under a composing parent, are **nested pi
 effect per layer, composed once at the top. Under a composing pipeline — the composed mode and
 nested pipelines — every stage has to provide a pass node.
 
+An effect that belongs to one stage needs no renderer of its own: a `Stage2D` takes it as
+`postProcess` and draws with it wherever it is drawn — see
+[an effect on one stage](#an-effect-on-one-stage).
+
+| the effect is on | set as | reach for it when |
+| --- | --- | --- |
+| the whole picture | `pipeline` of the root renderer | one look for everything on the canvas |
+| one stage | `postProcess` of the `Stage2D` | a layer of a `StageDirector` has a look of its own, or gets one for a while |
+| a group of stages | `pipeline` of a nested renderer | several stages share one effect, composed at the top |
+
 Two notes on the types in the examples. `Display.renderer` is `WebGPURenderer | undefined` —
 `dispose()` takes it away — so a display that is up asserts it with `!`. And `buildOutputNode`
 receives its passes as plain `Node`s: neither the `Node<'vec4'>` that `bloom()` asks for nor the
@@ -607,14 +617,16 @@ one whenever the other rebuilds.
 What the passes are:
 
 - a `Stage2D` gives `pass(scene, camera)`, one node for the life of the stage: a new scene or
-  camera goes into that node, and the composition stays;
+  camera goes into that node, and the composition stays. With a
+  [`postProcess`](#an-effect-on-one-stage) it gives the node of that post-process instead;
 - a nested `StageRenderer` gives a `texture()` node of a target of its own, which the parent
   clears and draws the child into before its pipeline runs.
 
 `buildOutputNode` runs again on the next frame after a stage was added or removed, after a change
 of `renderOrder`, after a stage was renamed while `renderOrder` lists names, after a new
-`pipeline` or `buildOutputNode`, after a stage of your own handed a new node following its
-`OnStageAfterCameraChanged` or `OnStageAfterSceneChanged`, and after `invalidateOutputNode()`.
+`pipeline` or `buildOutputNode`, after a new `postProcess` of a `Stage2D`, after a stage of your
+own handed a new node following its `OnStageAfterCameraChanged`, `OnStageAfterSceneChanged` or
+`OnStageAfterPostProcessChanged`, and after `invalidateOutputNode()`.
 While the renderer has no size, or a `Stage2D` it composes has no camera yet, it draws nothing.
 Without any stage it draws its own clear and calls neither the callback nor the pipeline.
 
@@ -668,6 +680,151 @@ root.pipeline = new RootRenderPipeline(display.renderer!);
 A `buildOutputNode` you set still wins over the additive default; the composition itself is
 `RootRenderPipeline.buildOutputNode(passes)`, for a callback of your own to build on.
 
+### An effect on one stage
+
+A `Stage2D` takes a post-process of its own as `postProcess`: a function from the scene pass of
+the stage to the picture the stage draws. The look is then a property of the stage, and whatever
+holds the stage — a `StageDirector`, a transition, a mask, a composing renderer — gets the
+processed picture without knowing of it.
+
+#### A layer with a look of its own
+
+```ts check
+import {Display, iris, OrthographicProjection, Stage2D, StageDirector, type StagePostProcess} from '@spearwolf/twopoint5d';
+import {bloom} from 'three/examples/jsm/tsl/display/BloomNode.js';
+import {vec4} from 'three/tsl';
+
+const display = new Display(document.getElementById('canvas')!);
+const director = new StageDirector(display);
+
+const glowing: StagePostProcess = {
+  build: ({pass, onDispose}) => {
+    const glow = bloom(pass, 1.2, 0.6);
+    // what the build made on the GPU: the stage releases it when it lets go of the node
+    onDispose(() => glow.dispose());
+    // the alpha of the layer stays, the glow adds to its color
+    return vec4(pass.rgb.add(glow.rgb), pass.a);
+  },
+};
+
+const title = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+const level = new Stage2D(new OrthographicProjection('xy|bottom-left'));
+level.postProcess = glowing;
+
+director.show(title);
+// the transition mixes the glowing picture of the level
+director.replace(title, level, {effect: iris(), duration: 1});
+```
+
+`build()` gets the scene pass of the stage and answers the node the stage draws instead: a color
+with premultiplied alpha, as the pass gives it. Any TSL node will do — a swizzle, a color grade,
+one of the effect nodes of three.js.
+
+#### A blur behind a menu
+
+A post-process comes and goes with an assignment. The game below a pause menu blurs while the
+menu is up:
+
+```ts
+import {gaussianBlur} from 'three/examples/jsm/tsl/display/GaussianBlurNode.js';
+
+const blurred: StagePostProcess = {
+  build: ({pass, onDispose}) => {
+    const blur = gaussianBlur(pass, null, 4);
+    onDispose(() => blur.dispose());
+    return blur;
+  },
+};
+
+game.postProcess = blurred;
+director.push(menu, {effect: fade(), duration: 0.3, below: 'freeze'});
+
+// the menu closes
+director.pop({effect: fade(), duration: 0.3}).finished.then(() => {
+  game.postProcess = undefined;
+});
+```
+
+The assignment lets go of what the previous post-process built, and the next draw builds the new
+one — a shader build, so a look that comes back often is better kept on a stage of its own. A
+frozen layer of a director draws once more with its new post-process, without an update: the game
+below the menu stands still and blurs all the same.
+
+#### One look on several stages
+
+A `StagePostProcess` is a description. It keeps nothing of a build, so one object serves every
+stage it is assigned to, and each stage gets nodes of its own:
+
+```ts
+hall.postProcess = glowing;
+cellar.postProcess = glowing;
+```
+
+#### More than the color: MRT
+
+The pass `build()` gets is made for that build alone, so it is free to configure — an MRT with
+the normals for an outline, say. Nothing of it stays on the stage once the post-process goes.
+
+```ts
+import {mrt, normalView, output} from 'three/tsl';
+
+const inked: StagePostProcess = {
+  build: ({pass}) => {
+    pass.setMRT(mrt({output, normal: normalView}));
+    const color = pass.getTextureNode('output');
+    const normal = pass.getTextureNode('normal');
+    return inkEdges(color, normal); // a TSL function of your own
+  },
+};
+```
+
+#### Where it draws
+
+| the stage is | supported |
+| --- | --- |
+| a layer of a `StageDirector`, or the stage of a `StageMask` | yes |
+| a stage of a composing renderer — a `RootRenderPipeline`, a `buildOutputNode` | yes |
+| the only stage of a renderer without a pipeline, or with a pipeline on the whole picture | yes; its picture replaces the clear of the renderer |
+| one of several stages of such a renderer | no — see [one writer per canvas](#one-writer-per-canvas) |
+
+The stage draws through a pipeline of its own wherever a renderer calls its `renderTo()`, and that
+pipeline clears its target and covers every pixel of it. A layer of a director has a target to
+itself; beside other stages in a renderer without a pipeline, or in the internal target of the
+whole-picture mode, what they drew is lost, and the renderer warns once. Compose the stages with
+a `RootRenderPipeline`, or make them layers of a `StageDirector`.
+
+The lookbook demo *stage post-process: the etching* runs a director with a post-processed room
+below a caption without one, and an iris between two rooms that share one look.
+
+#### Reference
+
+- **`build(input)`** runs once per assignment, before the first draw that needs the node; a stage
+  that is never drawn builds nothing. `input.stage` is the stage, `input.pass` its scene pass —
+  a `PassNode` of three.js —, `input.onDispose(release)` registers a release.
+- **Scene and camera.** A new `scene` or `camera` of the stage goes into the pass; nothing is
+  built again. A `build()` that reads the camera itself reads `input.stage.camera` once: after a
+  new camera, assign a new post-process.
+- **Building again.** An assignment of the object the stage has already changes nothing. For new
+  options, assign a new object.
+- **The picture.** Where the scene draws nothing, the picture is transparent: the pass clears to
+  transparent black. An effect that answers an alpha of 1 everywhere — the `bloom()` of three.js
+  does — makes the stage opaque; keep the alpha of the pass, as in the first recipe.
+- **Color.** Into a render target the stage writes linear, as it does without a post-process; on
+  the canvas its pipeline applies the tone mapping and the output color space of the renderer.
+  Either way the transform applies once.
+- **Resolution.** The pass has the size of the drawing buffer, as every pass of a pipeline has —
+  also on the stage of a [mask at a share of the resolution](#a-mask-at-a-share-of-the-resolution),
+  where only the target of the mask shrinks; `pass.setResolutionScale()` in `build()` brings the
+  pass down with it.
+- **`precompile()`** of a director builds the post-process of every stage in its `layers` — see
+  [no hitch on the first transition](#no-hitch-on-the-first-transition).
+- **Errors.** A `build()` that throws, or answers no node, leaves the stage without a node; the
+  error comes out of the draw, and the next draw asks again. A `build()` that assigns
+  `postProcess` or disposes the stage is refused the same way. A `postProcess` that is neither
+  `undefined` nor an object with a `build()` method is refused with a `TypeError`.
+- **`OnStageAfterPostProcessChanged`** goes out after every assignment of another value, with the
+  stage and the post-process it replaced.
+
 ### Nested pipelines: an effect per layer
 
 Nested pipelines put the pieces together: a child renderer with a pipeline of its own renders its layer
@@ -707,7 +864,10 @@ two is lost, under WebGPU and under WebGL 2 alike. Two patterns are stable:
    The outer pipeline makes the one draw to the canvas.
 2. **No mixed writers.** A root without a pipeline whose children write to the canvas, some through
    a pipeline and some plain, is not supported. A renderer without a pipeline that draws such a
-   child beside other stages warns once on the console.
+   child beside other stages warns once on the console. A `Stage2D` with a
+   [`postProcess`](#an-effect-on-one-stage) is such a writer wherever a renderer draws it into a
+   target it shares with other stages — without a pipeline, and in the whole-picture mode — and
+   gets a warning of its own.
 
 ### What a pipeline costs
 
@@ -829,8 +989,8 @@ cannot be named ahead: give it an effect of its own to compile it ahead.
 promise with a `TypeError`. A director disposed while the call runs ends the work there, and the
 promise resolves — also when a compile it waits for fails after the dispose.
 
-The shapes cover the composition of the director. A layer builds its own materials and pipelines on
-its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
+The shapes cover the composition of the director. A layer builds its own materials and pipelines,
+and a `Stage2D` its `postProcess`, on its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and
 their first frame in the stack builds nothing. That draw is no frame of the stage: it sends no
 `OnStageUpdateFrame`, so sprites that wait for that event for their first `update()` draw no
 instance there, and their material builds all the same. A stage that is not in the stack yet takes
@@ -905,8 +1065,9 @@ below show through wherever it draws nothing.
 
 A layer is any stage. A `StageRenderer` is the layer itself: its stages, its clear, its order and
 its pipeline apply as under every composing parent, and it may be a `StageDirector` too. Any other
-stage — a `Stage2D`, a stage of your own — goes into a `StageRenderer` the director builds for it
-and disposes when the stage leaves the stack. Every layer draws into a target of its own that the
+stage — a `Stage2D`, with or without a [`postProcess`](#an-effect-on-one-stage), a stage of your
+own — goes into a `StageRenderer` the director builds for it and disposes when the stage leaves
+the stack. Every layer draws into a target of its own that the
 director clears to transparent black every frame.
 
 A layer leaves the director's stages as it leaves the stack and joins them again, at the size of
@@ -916,9 +1077,10 @@ the director, when it comes back; a layer that leaves releases the GPU memory of
 
 Every layer in a slot updates and draws every frame, unless it is **frozen**: then it is neither
 updated nor drawn, and the composition samples the last picture it drew. Freezing costs nothing —
-no draw, no copy. A frozen layer whose size changes draws once at the new size, without an update,
-and so does every frozen layer when the director draws with a renderer other than the one it drew
-or precompiled with last.
+no draw, no copy. A frozen layer whose size changes draws once at the new size, without an update;
+so does a frozen `Stage2D` that gets a new [`postProcess`](#an-effect-on-one-stage), and every
+frozen layer when the director draws with a renderer other than the one it drew or precompiled
+with last.
 
 | where | option | `'run'` | `'freeze'` |
 | --- | --- | --- | --- |
@@ -2040,6 +2202,7 @@ no event of another kind. The one exception: `OnStageDispose` and `OnCanvas2DSta
 | `Stage2D` | `OnStageUpdateFrame` | every frame with a camera: `{stage, now, deltaTime, frameNo}` |
 | `Stage2D` | `OnStageAfterCameraChanged` | a new camera, with the stage and the camera it replaced |
 | `Stage2D` | `OnStageAfterSceneChanged` | a new `scene`, with the stage and the scene it replaced |
+| `Stage2D` | `OnStageAfterPostProcessChanged` | a new `postProcess`, with the stage and the post-process it replaced |
 | `Canvas2DStage` | `OnCanvas2DStageResize` | from `render()`, when the canvas has a new size, the first `render()` included |
 | `Canvas2DStage` | `OnCanvas2DStageRender` | from every `render()`, before the upload: draw here |
 | `Canvas2DStage` | `OnCanvas2DStageDispose` | once, from `dispose()` |
@@ -2052,8 +2215,8 @@ A listener that throws:
 - in `OnStageUpdateFrame` or `OnCanvas2DStageRender` ends the frame for the listeners behind it;
   a throw in `OnCanvas2DStageRender` also keeps the canvas from being uploaded and drawn;
 - in every other event, does not cut the call short: every listener hears the event, the call
-  that sent it runs to its end — the stage has its new camera, scene or size, the renderer its
-  new stage or holder — and the error reaches the caller afterwards, one unchanged, several as an
+  that sent it runs to its end — the stage has its new camera, scene, post-process or size, the
+  renderer its new stage or holder — and the error reaches the caller afterwards, one unchanged, several as an
   `AggregateError`.
 
 One exception to the second rule: a `Stage2D` applies a pending `needsUpdate` at the start of its
@@ -2070,7 +2233,7 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 
 | | releases in `dispose()` | leaves to you |
 | --- | --- | --- |
-| `Stage2D` | its pass node and the render target behind it | the scene, the camera, the projection |
+| `Stage2D` | its pass node and the render target behind it; what its `postProcess` built, through the releases the build registered | the scene, the camera, the projection, the `postProcess` object |
 | `StageRenderer` | the render targets it built for itself; it leaves its holder and drops its stages | the stages, `pipeline`, `outputRenderTarget`, `internalTargetPool`, a builder in `buildOutputNode` |
 | `Canvas2DStage` | the sprite material and textures it built, its `StageRenderer` and its `Stage2D` | the `WebGPURenderer`, a canvas handed in, a material you set on the sprite |
 | `StageRenderTargetPool` | every target back in the pool, every lent one as it comes back | — |
@@ -2096,7 +2259,7 @@ pipeline.dispose();
 - After `dispose()` a `StageRenderer` neither draws nor clears, `asPassNode()` throws, and a write
   to `pipeline`, `buildOutputNode` or `internalTargetPool` is ignored; another renderer refuses it
   as a child or a parent. A disposed `Stage2D` ignores `resize()`, `updateFrame()`, `renderTo()` and
-  writes to `projection` and `camera`, and `asPassNode()` throws.
+  writes to `projection`, `camera` and `postProcess`, and `asPassNode()` throws.
 - After `dispose()` every change of a `StageDirector` answers a cancelled `StageTransition` —
   `setStack()` and `setMask()` the director —, invalid arguments are refused as before, a write to
   `pipeline`, `buildOutputNode` and `renderOrder` is ignored, and `precompile()` resolves at once.
@@ -2122,7 +2285,15 @@ pipeline.dispose();
   without a pipeline and to the whole-picture mode.
 - **Mixed writers on the canvas.** One pipeline at the top composes everything — see
   [one writer per canvas](#one-writer-per-canvas); a root without a pipeline warns once when it
-  draws a child with a pipeline beside other stages.
+  draws a child with a pipeline, or a stage with a `postProcess`, beside other stages, and a
+  renderer in the whole-picture mode for such a stage.
+- **A clear color that is gone.** A stage with a `postProcess`, alone under a renderer without a
+  pipeline, covers the clear of that renderer with its picture, which is transparent where its
+  scene draws nothing. Give the scene a background, or let a `StageDirector` draw the stage: it
+  composes over its clear color.
+- **A post-process that keeps state.** One that holds the nodes of its last build in a closure
+  breaks on the second stage it is assigned to. Make what a build needs inside `build()`, and
+  release it through `onDispose()`.
 - **Disposing a stage a renderer still holds.** A stage of your own without `OnStageDispose` goes
   out with `remove(stage)` first. A renderer that still lists it keeps its released pass node in
   the composition and throws on its next rebuild, in the middle of the frame loop. A `Stage2D`
@@ -2130,8 +2301,9 @@ pipeline.dispose();
 - **One builder for two renderers.** Each rebuild of one releases the bloom of the other. One
   builder per renderer.
 - **A layer that hides the stack below.** An effect that writes an alpha of 1 everywhere — the
-  `bloom()` of three.js does — makes its layer opaque in a `StageDirector`. Keep the alpha of the
-  layer and add the glow to its color: `vec4(composed.rgb.add(glow.rgb), composed.a)`.
+  `bloom()` of three.js does — makes its layer opaque in a `StageDirector`, in a pipeline of a
+  renderer as in a `postProcess` of a stage. Keep the alpha of the layer and add the glow to its
+  color: `vec4(composed.rgb.add(glow.rgb), composed.a)`.
 - **A stage that is a layer and a mask.** A director refuses it either way round, and so does a
   second director for a mask stage; give the mask its own stage.
 - **Two scales on one mask stage.** A stage has one pass target, so a second mask on it with
@@ -2151,7 +2323,8 @@ pipeline.dispose();
 | class | role |
 | --- | --- |
 | `Display` | owns the `WebGPURenderer` and its canvas, drives the frame loop, measures the size — [display](display.md) |
-| `Stage2D` | a `THREE.Scene` and a camera built by a projection; `IStage + IRenderable + IPassProvider` |
+| `Stage2D` | a `THREE.Scene` and a camera built by a projection; `IStage + IRenderable + IPassProvider`; `postProcess` gives it an effect of its own |
+| `StagePostProcess` | the effect of one stage: `build({stage, pass, onDispose})` answers the node the stage draws |
 | `StageRenderer` | a list of stages with order, clear and optional pipeline; a stage itself, so it nests |
 | `OrthographicProjection` | a view without depth: everything as large as on the plane |
 | `ParallaxProjection` | a view with depth: `getScaleFactor()`, `getParallaxFactor()` |
@@ -2187,6 +2360,7 @@ pipeline.dispose();
 | whole picture | `pipeline` = a `RenderPipeline`, no `buildOutputNode` | all stages into one internal target, the pipeline on its texture |
 | composed | `pipeline` + `buildOutputNode`, or a `RootRenderPipeline` | one pass per stage, composed in TSL |
 | nested pipelines | nested renderers with a pipeline each, under a composing parent | an effect per layer, composed once at the top |
+| an effect on one stage | `postProcess` of a `Stage2D` | the stage with its effect: as a layer of a director, under a composing pipeline, or alone in its renderer |
 | a stack of layers | a `StageDirector` | every layer into a target of its own, the slots composed bottom to top with their transitions |
 
 ### The defaults

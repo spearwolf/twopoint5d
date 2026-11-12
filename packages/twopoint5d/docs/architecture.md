@@ -188,7 +188,9 @@ It imports neither three.js nor the stage layer, which builds on it.
 `Stage2D` is a scene plus a projection; `IProjection` implementations
 (`OrthographicProjection`, `ParallaxProjection`, with `ProjectionPlane` and
 `fitIntoRectangle` doing the geometry) decide how world units map to the viewport when
-the canvas resizes. `StageRenderer` composes several stages into one frame, and
+the canvas resizes. A `postProcess` gives a stage an effect of its own: a `StagePostProcess`
+builds the node the stage draws over its scene pass, as a layer of a director, under a composing
+renderer or alone. `StageRenderer` composes several stages into one frame, and
 `RootRenderPipeline` / `IPassProvider` wire in post-processing passes. `ClearStage` clears
 buffers between sibling stages, the depth buffer unless told otherwise, and a
 `StageRenderTargetPool` lends the internal target of the whole-picture mode to the

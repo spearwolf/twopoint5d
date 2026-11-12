@@ -27,6 +27,7 @@ export type {
 export {StageDirector} from './StageDirector.js';
 export type {StageMaskCoverageSource, StageMaskOptions} from './StageMask.js';
 export {StageMask} from './StageMask.js';
+export type {StagePostProcess, StagePostProcessInput} from './StagePostProcess.js';
 export * from './StageRenderer.js';
 export * from './StageRenderTargetPool.js';
 export type {StageTransitionEasing, StageTransitionState} from './StageTransition.js';

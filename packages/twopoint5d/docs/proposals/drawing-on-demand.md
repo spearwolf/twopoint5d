@@ -400,8 +400,9 @@ const release = director.frames.hold(); // busy until released
 - **The director invalidates by itself** for everything it knows about: a running transition
   (busy, the frame it ends in included), `show`/`hide`/`replace`/`push`/`pop`/`setStack`,
   `setMask` and a change of a mask, `freeze`/`run`, `add`/`remove`, `setClearColor`, a change of
-  the pipeline, of `buildOutputNode` or of the post-process of a stage, `resize`, the restart of
-  the display, a new renderer.
+  the pipeline, of `buildOutputNode` or of the post-process of a stage
+  (`OnStageAfterPostProcessChanged`, see [`stage-post-process.md`](stage-post-process.md) §3.3),
+  `resize`, the restart of the display, a new renderer.
 - **`live(stage)` is the freeze state**: a step registered for a frozen layer draws nothing.
 - **`hold()`** on the pacer, ref-counted, returns its release: the busy phases of the app — a
   camera move, a stage being prepared — without a flag threaded into the frame handler.

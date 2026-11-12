@@ -5,6 +5,7 @@ import type {DisplayEventProps, DisplayFullscreenChangeProps} from './display/ty
 import type {Canvas2DStage} from './stage/Canvas2DStage.js';
 import type {IStage} from './stage/IStage.js';
 import type {StageDirector} from './stage/StageDirector.js';
+import type {StagePostProcess} from './stage/StagePostProcess.js';
 import type {StageRenderer} from './stage/StageRenderer.js';
 import type {StageTransition} from './stage/StageTransition.js';
 
@@ -142,6 +143,19 @@ export type StageAfterSceneChangedArgs = [stage: IStage, prevScene: Scene];
 
 export interface IStageAfterSceneChanged {
   [OnStageAfterSceneChanged](...args: StageAfterSceneChangedArgs): void;
+}
+
+/**
+ * Emitted by a `Stage2D` after an assignment to `postProcess` of another value than it had, with
+ * the stage and the post-process it replaced — `undefined` for a stage that had none. The stage
+ * has let go of what the previous one built by then; the new one builds with the next draw.
+ */
+export const OnStageAfterPostProcessChanged = 'stageAfterPostProcessChanged';
+
+export type StageAfterPostProcessChangedArgs = [stage: IStage, prevPostProcess: StagePostProcess | undefined];
+
+export interface IStageAfterPostProcessChanged {
+  [OnStageAfterPostProcessChanged](...args: StageAfterPostProcessChangedArgs): void;
 }
 
 // ------------------------------------------------------------
