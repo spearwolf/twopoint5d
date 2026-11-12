@@ -1,0 +1,161 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-post-process-etching.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui></demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #07060a;
+  }
+</style>
+
+<script>
+  import {
+    Display,
+    iris,
+    StageDirector,
+    type StageDirectorShape,
+    type StagePostProcess,
+    type StageTransition,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import {Caption} from '~demos/stage-post-process/Caption';
+  import {glassCenterUv, InkedRoom, loadRoomAssets} from '~demos/stage-post-process/InkedRoom';
+  import {etching, nightVision} from '~demos/stage-post-process/looks';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  const preview = deferPreview();
+
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+
+  // the director is the one renderer of the display: it draws every layer into a target of its own
+  // and composes the stack in one pipeline, bottom to top, over its clear color
+  const director = new StageDirector(display).setClearColor(new Color('#07060a'), 1);
+  // the director lets go of its layers; each layer goes in the onDispose() of the init
+  display.onDispose(() => director.dispose());
+
+  // one object per look, made once: a post-process is a description and keeps nothing of a build,
+  // so each of them serves both rooms
+  const looks: Record<string, StagePostProcess | undefined> = {
+    etching: etching(),
+    'night vision': nightVision(),
+    'as rendered': undefined,
+  };
+  const lookNames = Object.keys(looks);
+  const settings = {look: lookNames[0]!, duration: 1.6};
+
+  const titles = {
+    bathroom: 'Plate IV — The Bathroom, at Night',
+    reflection: 'Plate V — The Other Side of the Glass',
+  };
+
+  onDemoInit(display, 'stage-post-process-etching', async ({renderer}) => {
+    const assets = await loadRoomAssets(renderer);
+    // a dispose() while the assets loaded has gone out already: nothing is built
+    if (display.isDisposed) {
+      assets.store.dispose();
+      return;
+    }
+
+    const bathroom = new InkedRoom(assets, 'bathroom');
+    const reflection = new InkedRoom(assets, 'reflection');
+    const caption = new Caption();
+    let shown = bathroom;
+
+    // the look is a property of the stage: the director, the iris and the caption above know
+    // nothing of it. An assignment lets go of what the look before built
+    const applyLook = () => {
+      const look = looks[settings.look];
+      bathroom.stage.postProcess = look;
+      reflection.stage.postProcess = look;
+      caption.write(titles[shown.kind], settings.look);
+    };
+    applyLook();
+
+    // the room below, the caption on top: a layer without a post-process stays as it is drawn
+    director.setStack([bathroom.stage, caption.stage]);
+
+    // the circle opens where the mirror hangs, on the picture of each room with its look
+    const throughTheGlass = iris({center: glassCenterUv(assets.layout), softness: 0.05});
+    let turning: StageTransition | undefined;
+    const turn = () => {
+      if (turning?.state === 'pending' || turning?.state === 'running') return;
+      const from = shown;
+      shown = shown === bathroom ? reflection : bathroom;
+      turning = director.replace(from.stage, shown.stage, {
+        effect: throughTheGlass,
+        duration: settings.duration,
+        easing: 'ease-in-out',
+      });
+      caption.write(titles[shown.kind], settings.look);
+    };
+
+    const setLook = (name: string) => {
+      settings.look = name;
+      applyLook();
+      lookController.updateDisplay();
+    };
+
+    const listeners = new AbortController();
+    const {signal} = listeners;
+    // a key in a field or on a button of the gui stays there
+    window.addEventListener(
+      'keydown',
+      (event: KeyboardEvent) => {
+        if (ignoredKey(event) || event.repeat) return;
+        if (event.code === 'Space' || event.code === 'Enter') {
+          turn();
+          event.preventDefault();
+        } else if (/^Digit[1-9]$/.test(event.code)) {
+          const name = lookNames[Number(event.code.slice(5)) - 1];
+          if (name !== undefined) setLook(name);
+        }
+      },
+      {signal},
+    );
+    canvas.addEventListener('click', turn, {signal});
+
+    // the two shapes the stack takes — the room below the caption, and the iris below it — and the
+    // room that waits: drawn once off screen, so its look is built before the first turn
+    const shapes: StageDirectorShape[] = [
+      ['layer', 'layer'],
+      [throughTheGlass, 'layer'],
+    ];
+    const precompiled = catchPrecompile(
+      'stage-post-process-etching',
+      director.precompile(renderer, shapes, {layers: [reflection.stage]}),
+    );
+
+    const gui = new GUI({container: getDemoUi(), title: 'an effect on one stage'});
+    const lookController = gui.add(settings, 'look', lookNames).name('look (1, 2, 3)').onChange(applyLook);
+    gui.add(settings, 'duration', 0.3, 4, 0.1).name('iris duration');
+    gui.add({turn}, 'turn').name('through the glass (space)');
+
+    display.onDispose(() => {
+      listeners.abort();
+      gui.destroy();
+      bathroom.dispose();
+      reflection.dispose();
+      caption.dispose();
+      assets.store.dispose();
+    });
+
+    await precompiled;
+    if (display.isDisposed) return;
+    preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

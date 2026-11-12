@@ -1,0 +1,18 @@
+{
+  "title": "stage post-process: the etching",
+  "shortDescription": "A bathroom at night, drawn as an etching: the look is a post-process on the stage itself. An iris opens through the mirror onto the other side, etched as well, and the caption on top keeps its colors — an effect on one stage, under a StageDirector",
+  "description": "A `StageDirector` with two layers. **The room**: a bathroom at night, a picture Blender rendered, on a `Stage2D` with the hum of its lamps in its brightness. **The caption**: a plate under the picture, a `Stage2D` of its own on top.\n\nThe look of the room is `stage.postProcess`, a `StagePostProcess`: `build({pass})` gets the scene pass of the stage and answers the node the stage draws instead. *etching* finds the outline where the brightness of the picture changes, and lays hatching over it that grows denser with every step into the dark — one set of lines, a second across it, a third, then solid ink — on paper. *night vision* puts the brightness on a green phosphor, with scan lines, a grain that crawls and a dark rim. *as rendered* is `postProcess = undefined`: the picture as Blender left it.\n\nThe look is a property of the **stage**, so nothing else knows of it. *through the glass* (Space, or a click) is `director.replace(room, otherSide, {effect: iris({center})})`: the circle opens where the mirror hangs, onto the same room as the world inside the glass, and the transition mixes two processed pictures. The caption above has no post-process and keeps its red seal and its sharp type under every look. Both rooms take **one** post-process object — it is a description and keeps nothing of a build, so each stage gets nodes of its own. `director.precompile()` draws the room that waits once off screen, which builds its look before the first turn; picking another look builds its shader in that frame.\n\nThe pictures are the art of *stage masks: matte 3d*. See [An effect on one stage](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#an-effect-on-one-stage).",
+  "url": "/demos/stage-post-process-etching",
+  "tags": [
+    "StagePostProcess",
+    "Stage2D",
+    "StageDirector",
+    "StageTransition",
+    "OrthographicProjection",
+    "TextureStore",
+    "iris",
+    "post-processing",
+    "transitions",
+    "vanilla"
+  ]
+}
