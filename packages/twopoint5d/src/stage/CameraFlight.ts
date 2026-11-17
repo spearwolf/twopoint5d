@@ -344,8 +344,9 @@ export class Flight implements CameraFlight {
 
     const progress = this.#progress;
     progress[0] = this.transition.progress;
-    // the camera of the other kind at the ends of the transition alone, wherever the easing stands
-    this.#change.underWay = progress[0]! > 0 && progress[0]! < 1;
+    // the camera of the other kind at the ends of the transition alone, read before any easing: the
+    // transition's own may overshoot and reach 0 or 1 early, as the easing of the flight may
+    this.#change.underWay = StageTransitionInternals.isUnderWay(this.transition);
     // clamped to [0, 1]: an easing that overshoots carries the blend past neither end
     applyEasingInPlace(this.#easing, progress);
     const e = progress[0]!;

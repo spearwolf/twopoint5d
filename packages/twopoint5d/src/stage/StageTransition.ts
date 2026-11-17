@@ -58,6 +58,12 @@ export const StageTransitionInternals = {} as {
   keptOf(transition: StageTransition): 'from' | 'to' | undefined;
   /** Whether the director of a running transition has frozen the layer of `stage`; `false` once it is over. */
   isFrozen(transition: StageTransition, stage: IStage): boolean;
+  /**
+   * Whether the transition stands between its ends before its easing: its elapsed time lies inside
+   * `(0, duration)`, or the progress of a manual one inside `(0, 1)`. An easing that overshoots
+   * reaches 0 or 1 early, this does not.
+   */
+  isUnderWay(transition: StageTransition): boolean;
 };
 
 /**
@@ -111,6 +117,10 @@ export class StageTransition {
     StageTransitionInternals.settle = (transition, state, keep) => transition.#settle(state, keep);
     StageTransitionInternals.keptOf = (transition) => transition.#kept;
     StageTransitionInternals.isFrozen = (transition, stage) => transition.#host?.isFrozen(stage) === true;
+    StageTransitionInternals.isUnderWay = (transition) =>
+      transition.manual || !(transition.duration > 0)
+        ? transition.#progress > 0 && transition.#progress < 1
+        : transition.#elapsed > 0 && transition.#elapsed < transition.duration;
   }
 
   /** Made by a `StageDirector` alone: every change of its stack answers one. */

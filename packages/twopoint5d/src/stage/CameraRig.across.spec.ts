@@ -9,7 +9,7 @@ import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D} from './Stage2D.js';
 import {StageDirector} from './StageDirector.js';
-import type {StageTransition} from './StageTransition.js';
+import type {StageTransition, StageTransitionEasing} from './StageTransition.js';
 
 type Kind = 'parallax' | 'orthographic';
 
@@ -39,7 +39,7 @@ let frameNo = 0;
 
 /**
  * A director that shows `a`, and a transition from `a` to `b`: manual, unless `duration` is given,
- * when it runs linearly. `before` puts the rigs where the flight finds them.
+ * when it runs with `easing`, linear by default. `before` puts the rigs where the flight finds them.
  */
 const setup = (
   options: {
@@ -47,6 +47,7 @@ const setup = (
     to?: Kind;
     duration?: number;
     outgoing?: 'run' | 'freeze';
+    easing?: StageTransitionEasing;
     before?: (s: Omit<Setup, 'transition'>) => void;
   } = {},
 ): Setup => {
@@ -62,7 +63,7 @@ const setup = (
     b,
     options.duration === undefined
       ? {manual: true, outgoing: options.outgoing}
-      : {duration: options.duration, easing: 'linear', outgoing: options.outgoing},
+      : {duration: options.duration, easing: options.easing ?? 'linear', outgoing: options.outgoing},
   );
   return {director, a, b, rigA, rigB, transition, frame};
 };
@@ -286,6 +287,25 @@ describe('CameraRig.across()', () => {
       s.transition.progress = 1;
       s.frame();
       expect(stateOf(s.rigB.camera)).toEqual(before);
+    });
+
+    it('swaps the kind once, at the end, under a transition whose easing overshoots', () => {
+      // back-out: past 1 from about 0.41 of the duration on, back at 1 at its end
+      const backOut = (t: number) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
+      const s = setup({to: 'orthographic', duration: 1, easing: backOut});
+      CameraRig.across(s.transition);
+      const kinds: string[] = [];
+      let overshot = false;
+      for (let i = 0; i < 20; i++) {
+        s.frame(0.1);
+        if (s.transition.state !== 'running') break;
+        overshot ||= s.transition.progress > 1;
+        kinds.push(s.rigB.camera.type);
+      }
+      expect(overshot).toBe(true);
+      expect(kinds).not.toContain('OrthographicCamera');
+      s.frame();
+      expect(s.rigB.camera.type).toBe('OrthographicCamera');
     });
 
     it('scales a focus through the anchors', () => {
