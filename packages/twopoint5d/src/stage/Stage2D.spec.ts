@@ -1208,7 +1208,7 @@ describe('Stage2D', () => {
       expect(caught).toBeInstanceOf(AggregateError);
       expect((caught as AggregateError).errors).toEqual([cameraFailure, resizeFailure]);
       expect((caught as AggregateError).message).toBe(
-        'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
+        'Stage2D#resize(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
       );
       expect(stage.camera).toBeDefined();
       expect([stage.containerWidth, stage.containerHeight]).toEqual([800, 600]);
@@ -1240,7 +1240,7 @@ describe('Stage2D', () => {
       expect(caught).toBeInstanceOf(AggregateError);
       expect((caught as AggregateError).errors).toEqual([placedFailure, resizeFailure]);
       expect((caught as AggregateError).message).toBe(
-        'Stage2D#updateProjection(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
+        'Stage2D#updateProjection(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
       );
       expect([stage.width, stage.height]).toEqual([640, 480]);
     });
@@ -1662,6 +1662,65 @@ describe('Stage2D', () => {
       expect([stage.containerWidth, stage.containerHeight]).toEqual([640, 640]);
       expect([stage.width, stage.height]).toEqual([640, 640]);
       expect(stage.camera).toBe(driver.camera);
+    });
+
+    it('a compose() that throws in a resize() leaves the stage the new container, view and camera, and the size announced', () => {
+      const {stage, log, driver} = createStage();
+      Stage2DInternals.attachDriver(stage, driver);
+      const failure = new Error('compose failed');
+      const compose = driver.compose.bind(driver);
+      vi.spyOn(driver, 'compose').mockImplementation(() => {
+        compose();
+        throw failure;
+      });
+
+      log.length = 0;
+      expect(() => stage.resize(640, 640)).toThrow(failure);
+
+      expect(log, 'the size is announced after compose()').toEqual(['placeBase', 'placed', 'compose', 'resize']);
+      expect([stage.containerWidth, stage.containerHeight]).toEqual([640, 640]);
+      expect([stage.width, stage.height]).toEqual([640, 640]);
+      expect(stage.needsUpdate).toBe(false);
+    });
+
+    it('a compose() and a listener of OnStageCameraPlaced that throw in a resize() come out as one AggregateError', () => {
+      const {stage, driver} = createStage();
+      Stage2DInternals.attachDriver(stage, driver);
+      const listenerFailure = new Error('the listener failed');
+      const composeFailure = new Error('compose failed');
+      on(stage, OnStageCameraPlaced, () => {
+        throw listenerFailure;
+      });
+      vi.spyOn(driver, 'compose').mockImplementation(() => {
+        throw composeFailure;
+      });
+
+      let caught: unknown;
+      try {
+        stage.resize(640, 640);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([listenerFailure, composeFailure]);
+      expect([stage.containerWidth, stage.containerHeight]).toEqual([640, 640]);
+    });
+
+    it('a compose() that throws in the placement of needsPlacement() ends the frame', () => {
+      const {stage, log, driver} = createStage();
+      Stage2DInternals.attachDriver(stage, driver);
+      stage.projection!.needsPlacement = () => true;
+      const failure = new Error('compose failed');
+      vi.spyOn(driver, 'compose').mockImplementation(() => {
+        log.push('compose');
+        throw failure;
+      });
+
+      log.length = 0;
+      expect(() => stage.updateFrame(1, 0.016, 1)).toThrow(failure);
+
+      expect(log).toEqual(['placeBase', 'placed', 'compose']);
     });
 
     it('a projection that refuses the base leaves the stage the size it had', () => {

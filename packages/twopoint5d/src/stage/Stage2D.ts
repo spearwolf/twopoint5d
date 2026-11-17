@@ -40,10 +40,6 @@ import {type StagePostProcess, StagePostProcessRun} from './StagePostProcess.js'
 
 const FRAMES_WITHOUT_CAMERA_BEFORE_WARNING = 100;
 
-// what the announcement of a placement answers when no listener threw: a placement in every frame
-// hands its error on without an array to collect it in
-const NO_ERROR: unique symbol = Symbol('no error');
-
 // one message for every member that refuses to answer once the stage is gone, so the class
 // and the state are always in the text a caller reads out of a foreign stack
 function disposedError(member: string): Error {
@@ -217,7 +213,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       }
       throwCollected(
         errors,
-        'Stage2D#projection: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the new projection threw',
+        'Stage2D#projection: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the new projection threw',
       );
     }
   }
@@ -276,7 +272,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the projection threw',
+      'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the projection threw',
     );
   }
 
@@ -324,7 +320,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'Stage2DInternals.attachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the projection threw',
+      'Stage2DInternals.attachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the projection threw',
     );
   }
 
@@ -363,7 +359,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'Stage2DInternals.detachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the projection threw',
+      'Stage2DInternals.detachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the projection threw',
     );
   }
 
@@ -440,7 +436,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
         // a listener that throws finds the container, the view and the camera taken
         throwCollected(
           errors,
-          'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
+          'Stage2D#resize(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
         );
       }
     }
@@ -455,7 +451,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
       throwCollected(
         errors,
-        'Stage2D#updateProjection(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
+        'Stage2D#updateProjection(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
       );
     }
   }
@@ -524,8 +520,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       }, errors);
     }
 
-    const thrown = this.#announcePlacement(placed, projection, driver);
-    if (thrown !== NO_ERROR) errors.push(thrown);
+    this.#announcePlacement(placed, projection, driver, errors);
 
     if (prevWidth !== w || prevHeight !== h) {
       const props: StageResizeProps = {
@@ -544,9 +539,16 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   #cameraPlacedProps?: StageCameraPlacedProps;
 
   // emits OnStageCameraPlaced with the camera `projection` placed, then lets `driver` compose over
-  // what the listeners made of it, also behind one that threw. Answers what they threw, NO_ERROR
-  // for nothing, and allocates nothing after the first call: one props object per stage, rewritten
-  #announcePlacement(camera: Camera, projection: IProjection, driver: StageCameraDriver | undefined): unknown {
+  // what the listeners made of it, also behind one that threw. What the listeners and compose()
+  // throw goes into `errors` — an array made on the first error where the caller hands none — and
+  // the array comes back: the placement happens after the state stands, so neither undoes it. One
+  // props object per stage, rewritten
+  #announcePlacement(
+    camera: Camera,
+    projection: IProjection,
+    driver: StageCameraDriver | undefined,
+    errors: unknown[] | undefined,
+  ): unknown[] | undefined {
     let props = this.#cameraPlacedProps;
     if (props === undefined) {
       props = this.#cameraPlacedProps = {stage: this, camera, projection};
@@ -555,15 +557,20 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       props.projection = projection;
     }
 
-    let thrown: unknown = NO_ERROR;
     try {
       emitStrict(this, OnStageCameraPlaced, props);
     } catch (error) {
-      thrown = error;
+      (errors ??= []).push(error);
     }
     // a listener that let go of the driver leaves it nothing to compose
-    if (driver != null && driver === this.#driver) driver.compose();
-    return thrown;
+    if (driver != null && driver === this.#driver) {
+      try {
+        driver.compose();
+      } catch (error) {
+        (errors ??= []).push(error);
+      }
+    }
+    return errors;
   }
 
   // the placement of IProjection#needsPlacement(): the container and the specs are as they were,
@@ -576,8 +583,13 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     } else {
       projection.updateCamera(camera);
     }
-    const thrown = this.#announcePlacement(placed, projection, driver);
-    if (thrown !== NO_ERROR) throw thrown;
+    const errors = this.#announcePlacement(placed, projection, driver, undefined);
+    if (errors !== undefined) {
+      throwCollected(
+        errors,
+        'Stage2D#updateFrame(): more than one of the listeners of OnStageCameraPlaced and the camera driver threw',
+      );
+    }
   }
 
   isFirstFrame = true;
