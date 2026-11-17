@@ -284,7 +284,8 @@ export class CameraRig {
   #holding = false;
   #holdingTurn = false;
   readonly #held = createShot();
-  // the shot a track or a camera shows, as an object that follows them takes it (#shownShot())
+  // the shot a track, a camera or a move to a projection shows, as an object that follows them
+  // takes it (#shownShot())
   readonly #shown = createShot();
   // the look the rig shows: the one of the target, or of look() since
   readonly #look = createLook();
@@ -433,13 +434,14 @@ export class CameraRig {
    * Puts the camera on `target` at once; it ends a running move, whose promise resolves, and lets go
    * of a target the rig followed. The target brings its own look — the `look` of the pose, 0 where it
    * gives none, the orientation of a camera —; an `Object3D` keeps the look, the zoom and the
-   * distance of the current pose — of the shot a track, a camera or {@link cancel} shows, where the
-   * rig stands on one, its look then the rest's turned by {@link look}. A pose object the caller
-   * keeps and rewrites may be handed in every frame: the rig reads it in the call and allocates
-   * nothing. A projection is assigned to the stage at once, and the camera stands on its rest. A
-   * camera or an `Object3D` locks the rig on: it follows the target from here on, as after the
-   * arrival of {@link moveTo}, so there is no need to hand it in every frame — a call with a camera
-   * builds a `CameraProjection` and allocates. A camera of the other kind needs no focus here.
+   * distance of the current pose — of the shot a track, a camera, a move to a projection or
+   * {@link cancel} shows, where the rig stands on one, its look then the rest's turned by
+   * {@link look}. A pose object the caller keeps and rewrites may be handed in every frame: the rig
+   * reads it in the call and allocates nothing. A projection is assigned to the stage at once, and
+   * the camera stands on its rest. A camera or an `Object3D` locks the rig on: it follows the target
+   * from here on, as after the arrival of {@link moveTo}, so there is no need to hand it in every
+   * frame — a call with a camera builds a `CameraProjection` and allocates. A camera of the other
+   * kind needs no focus here.
    *
    * @throws {TypeError} for a camera that is neither a `PerspectiveCamera` nor an
    * `OrthographicCamera`, and for a pose of another shape.
@@ -492,9 +494,9 @@ export class CameraRig {
    * Any other `Object3D` as the target: the camera moves to the world position of the object,
    * carried into the frame — under a plane, its foot on the plane —, plus `offset`; the look, the
    * zoom and the distance stay those of the current pose, unless `offset` names a distance — after
-   * a track or a camera those of the shot it shows, its look the rest's turned by {@link look}. The
-   * object is met where it stands in each frame, and on arrival the rig locks on to it: the camera
-   * sticks to it, or trails it by `smooth`, critically damped.
+   * a track, a camera or on the way to a projection those of the shot it shows, its look the
+   * rest's turned by {@link look}. The object is met where it stands in each frame, and on arrival
+   * the rig locks on to it: the camera sticks to it, or trails it by `smooth`, critically damped.
    *
    * A lock-on holds until the next `moveTo()`, a {@link jump}, {@link cancel} or {@link dispose}.
    *
@@ -1509,11 +1511,12 @@ export class CameraRig {
   }
 
   // the shot an object as the next target keeps the zoom and the distance of where the pose of the
-  // rig does not hold them: the one cancel() holds, and the one a track or a camera shows — the
-  // pose of the rig is the empty one there. Undefined where the pose holds them, and without a view
+  // rig does not hold them: the one cancel() holds, and the one a track, a camera or a move to a
+  // projection shows — the pose of the rig is the empty one there. Undefined where the pose holds
+  // them, and without a view
   #shownShot(): CameraShot | undefined {
     if (this.#holding) return this.#held;
-    if (!this.#hasRest || (this.#track === undefined && !(this.#follows && this.#targetProjection !== undefined))) {
+    if (!this.#hasRest || (this.#track === undefined && this.#targetProjection === undefined)) {
       return undefined;
     }
     const shown = this.#shown;

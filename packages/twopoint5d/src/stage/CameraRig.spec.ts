@@ -1338,6 +1338,30 @@ describe('CameraRig', () => {
       expect(rig.camera.quaternion.angleTo(rest.quaternion), 'the look of the rest').toBeCloseTo(0, 12);
     });
 
+    it('keeps the zoom and the distance of the shot a move to a projection shows on its way', () => {
+      const {stage, rig} = makeRig();
+      const rest = stage.projection!.createCamera() as PerspectiveCamera;
+      rig.jump({position: [0, 0, 300], zoom: 2});
+      frame(stage);
+      void rig.moveTo(makeProjection('parallax'), 1);
+      rig.step(0.5);
+      frame(stage);
+      const lens = lensOf(rig.camera as PerspectiveCamera);
+      const distance = rig.camera.position.z;
+      expect(lens, 'a zoom between the two ends').not.toBeCloseTo(lensOf(rest), 3);
+      expect(lens, 'a zoom between the two ends').not.toBeCloseTo(lensOf(rest) / 2, 3);
+
+      const player = new Object3D();
+      player.position.set(-30, 60, 0);
+      void rig.moveTo(player, 0);
+      frame(stage);
+      const [x, y, z] = rig.camera.position.toArray();
+      expect(x).toBeCloseTo(-30, 9);
+      expect(y).toBeCloseTo(60, 9);
+      expect(z, 'the distance shown on the way').toBeCloseTo(distance, 9);
+      expect(lensOf(rig.camera as PerspectiveCamera), 'the zoom shown on the way').toBeCloseTo(lens, 12);
+    });
+
     it('locks on: sticks to an object that moves, and step() answers false for one that stands', () => {
       const {stage, rig} = makeRig();
       const player = new Object3D();

@@ -804,9 +804,9 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
 - `look`, `zoom` and the lift stay the rig's; a drag-look works while following. An object brings
   no look of its own, so a drag-look holds across `moveTo(chest)` and back to the player, where a
   pose or a camera would reset it (§3.3). Under a `cancel()` the zoom and distance are those of the
-  shot it holds, and after a track or a camera — whose pose of the rig is the empty one — those of
-  the shot it shows, its look dropped for the rest's turned by `look()` (`readObjectPose()` in
-  `src/stage/cameraTarget.ts`).
+  shot it holds, and after a track or a camera, or on the way to a projection — whose pose of the
+  rig is the empty one — those of the shot it shows, its look dropped for the rest's turned by
+  `look()` (`readObjectPose()` in `src/stage/cameraTarget.ts`).
 - The move blends to the position the object has in each frame, so a move back to a player who keeps
   walking meets the player, not the place the player stood at when the move began.
 - Once locked on, `smooth` lets the camera trail the object, critically damped; `0` sticks to it.

@@ -1059,9 +1059,9 @@ export async function showChest() {
   `[x, y, distance]` with a distance from the plane, which an orthographic camera ignores. Without
   a distance the camera keeps the one it had.
 - The look, the zoom and the lift stay as they are: an object brings no viewpoint of its own, and a
-  drag-look works while following. After a track or a camera the zoom and the distance are those of
-  the shot it shows, and the look goes back to the rest's, turned by `look()`: the orientation of a
-  key or of the camera does not carry over.
+  drag-look works while following. After a track or a camera, and on the way to a projection, the
+  zoom and the distance are those of the shot it shows, and the look goes back to the rest's,
+  turned by `look()`: the orientation of a key or of the camera does not carry over.
 - The move meets the object where it is in each frame, so the way back from the chest ends on the
   player, who kept walking — not on the place the player stood when the move began.
 - Once locked on, the camera sticks to the object; with `smooth` — a time constant in seconds — it
