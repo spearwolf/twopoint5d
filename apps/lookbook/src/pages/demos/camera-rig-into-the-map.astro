@@ -446,9 +446,7 @@ import {description, title} from './_camera-rig-into-the-map.json';
     // camera of the other kind, so that neither the first crossfade nor the swap of a lens change
     // builds a shader in the frame of the click
     await catchPrecompile(DEMO, director.precompile(renderer, [['layer'], [fade]], {layers: [room]}));
-    // one after the other: two compiles of three.js on one renderer at once trip over each other
-    await catchPrecompile(DEMO, mapRig.precompile(renderer));
-    await catchPrecompile(DEMO, roomRig.precompile(renderer));
+    await Promise.all([catchPrecompile(DEMO, mapRig.precompile(renderer)), catchPrecompile(DEMO, roomRig.precompile(renderer))]);
     if (display.isDisposed) return;
 
     if (isPreview) {

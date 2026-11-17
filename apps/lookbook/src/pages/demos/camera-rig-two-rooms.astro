@@ -170,11 +170,10 @@ import {description, title} from './_camera-rig-two-rooms.json';
 
     const fly = (t: number, smooth: number) => {
       if (!onTrack) {
-        // a new track starts at 0. The room the camera stands in is shown at once — a step of no
-        // time takes the progress without a glide —, so the glide below starts from there
+        // the first lerp() of a track is shown at once: the room the camera stands in, so that the
+        // glide below starts from there
         rig.track(keys);
         rig.lerp(room);
-        rig.step(0);
         onTrack = true;
         yaw = 0;
         pitch = 0;
