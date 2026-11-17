@@ -45,7 +45,10 @@ const makeRig = (kind: 'parallax' | 'orthographic' = 'parallax') => {
 
 const bytesPerCall = async (round: () => void) => (await measureSettledBytes(round)) / CALLS;
 
-describe('CameraRig on the hot path', () => {
+// The cases run in the order they are written, and the order matters: the feedback V8 collected in
+// the cases before shapes the code it runs a case with. The direct needsPlacement() after the cases
+// that follow cameras of both kinds is the one that caught the 16 bytes of §4.2 of the proposal.
+describe('CameraRig on the hot path, in the order of its cases: later cases run with the feedback of earlier ones', () => {
   test.each<[string, Easing]>([
     ['ease-in-out', 'ease-in-out'],
     ['ease-in', 'ease-in'],
@@ -308,6 +311,25 @@ describe('CameraRig on the hot path', () => {
     expect(rig.busy).toBe(true);
     expect(rig.camera).toBeInstanceOf(kind === 'perspective' ? PerspectiveCamera : OrthographicCamera);
     expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  // After the cases that follow cameras of both kinds, with the feedback of both: asked from the rig,
+  // this call cost 16 bytes for a source that stood, which the rig avoids by placing instead of asking
+  // (#followTarget() of CameraRig.ts). Asked directly, it allocates nothing — a regression of
+  // CameraProjection#needsPlacement() itself shows here.
+  test('CameraProjection: needsPlacement() of a source that stands, after the rig followed cameras of both kinds, allocates nothing', async () => {
+    const {source} = makeSource(new PerspectiveCamera(50, 16 / 9, 0.5, 500));
+    const projection = new CameraProjection(source);
+    projection.updateViewRect(801, 601);
+    const camera = projection.createCamera();
+    let placed = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) if (projection.needsPlacement(camera)) placed++;
+    });
+
+    expect(placed).toBe(0);
     expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
 
