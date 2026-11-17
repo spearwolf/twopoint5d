@@ -213,7 +213,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       }
       throwCollected(
         errors,
-        'Stage2D#projection: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the new projection threw',
+        'Stage2D#projection: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the CameraRig of the stage and the new projection threw',
       );
     }
   }
@@ -272,7 +272,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the projection threw',
+      'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the CameraRig of the stage and the projection threw',
     );
   }
 
@@ -302,7 +302,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   #attachDriver(driver: StageCameraDriver): void {
     if (this.#disposed) throw new Error('Stage2DInternals.attachDriver(): the stage has been disposed');
-    if (this.#driver != null) throw new Error('Stage2DInternals.attachDriver(): the stage has a camera driver already');
+    if (this.#driver != null) throw new Error('Stage2DInternals.attachDriver(): the stage has a CameraRig already');
 
     const errors: unknown[] = [];
     this.#updateCamera(() => {
@@ -320,7 +320,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'Stage2DInternals.attachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the projection threw',
+      'Stage2DInternals.attachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the CameraRig of the stage and the projection threw',
     );
   }
 
@@ -339,7 +339,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       this.#cameraUserOverride = undefined;
       // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
-        `Stage2D ${describeValue(this.name)}: the camera assigned to stage.camera, a ${describeThreeValue(assigned, 'isObject3D')}, is of another kind than its projection builds; the stage drops it as its camera driver lets go, and draws with a camera of the projection`,
+        `Stage2D ${describeValue(this.name)}: the camera assigned to stage.camera, a ${describeThreeValue(assigned, 'isObject3D')}, is of another kind than its projection builds; the stage drops it as its CameraRig lets go, and draws with a camera of the projection`,
       );
     }
 
@@ -359,7 +359,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'Stage2DInternals.detachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the camera driver and the projection threw',
+      'Stage2DInternals.detachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the CameraRig of the stage and the projection threw',
     );
   }
 
@@ -436,7 +436,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
         // a listener that throws finds the container, the view and the camera taken
         throwCollected(
           errors,
-          'Stage2D#resize(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
+          'Stage2D#resize(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the CameraRig of the stage threw',
         );
       }
     }
@@ -451,7 +451,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
       throwCollected(
         errors,
-        'Stage2D#updateProjection(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
+        'Stage2D#updateProjection(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the CameraRig of the stage threw',
       );
     }
   }
@@ -588,7 +588,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     if (errors !== undefined) {
       throwCollected(
         errors,
-        'Stage2D#updateFrame(): more than one of the listeners of OnStageCameraPlaced and the camera driver threw',
+        'Stage2D#updateFrame(): more than one of the listeners of OnStageCameraPlaced and the CameraRig of the stage threw',
       );
     }
   }

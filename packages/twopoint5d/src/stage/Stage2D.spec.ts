@@ -1208,7 +1208,7 @@ describe('Stage2D', () => {
       expect(caught).toBeInstanceOf(AggregateError);
       expect((caught as AggregateError).errors).toEqual([cameraFailure, resizeFailure]);
       expect((caught as AggregateError).message).toBe(
-        'Stage2D#resize(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
+        'Stage2D#resize(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the CameraRig of the stage threw',
       );
       expect(stage.camera).toBeDefined();
       expect([stage.containerWidth, stage.containerHeight]).toEqual([800, 600]);
@@ -1240,7 +1240,7 @@ describe('Stage2D', () => {
       expect(caught).toBeInstanceOf(AggregateError);
       expect((caught as AggregateError).errors).toEqual([placedFailure, resizeFailure]);
       expect((caught as AggregateError).message).toBe(
-        'Stage2D#updateProjection(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the camera driver threw',
+        'Stage2D#updateProjection(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the CameraRig of the stage threw',
       );
       expect([stage.width, stage.height]).toEqual([640, 480]);
     });
