@@ -2,7 +2,7 @@
 // demos from the sources in this directory into `apps/lookbook/public/assets/<demo>/`.
 //
 // Needs no network and no ComfyUI: painted sources are committed under `<demo>/raw/`. Blender runs
-// headless for the demo that renders 3D views (`--skip-render` reuses its render cache). No build
+// headless for the demos that render or bake a 3D scene (`--skip-render` reuses their cache). No build
 // or check of the repo runs this script; a change to an asset is a commit of the generator and of
 // its output together. README.md in this directory documents every output.
 import {execFileSync} from 'node:child_process';
@@ -23,6 +23,7 @@ const DEMOS = [
   'ui-panels',
   'boomer-shooter-corridor',
   'stage-masks',
+  'camera-rig-two-rooms',
 ];
 
 function parseArgs() {

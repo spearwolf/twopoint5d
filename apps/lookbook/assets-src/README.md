@@ -22,9 +22,9 @@ generator and its output together. The output is the same, byte for byte, on eve
 same versions of Node, sharp and Blender.
 
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
-committed raw images and to resize, and for `boomer-shooter-corridor` and `stage-masks` (its
-`matte-3d`) Blender on the PATH (tested with 5.2 LTS, falls back to `/usr/bin/blender`), run
-headless with `-b --factory-startup`. No
+committed raw images and to resize, and for `boomer-shooter-corridor`, `stage-masks` (its
+`matte-3d`) and `camera-rig-two-rooms` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
+back to `/usr/bin/blender`), run headless with `-b --factory-startup`. No
 network, no ComfyUI: images painted with ComfyUI are curated sources committed under
 `<demo>/raw/` next to a `source.json` that records prompt, seed, workflow and settings.
 
@@ -673,3 +673,57 @@ it out per pixel at run time.
 | `living.webp` | 560 × 760, straight alpha | the living plate, 280 × 380 units: a widow in mourning black (a widow's cap, a lace collar with a jet brooch, a bell of black silk, her hands folded over a handkerchief) in a tall carved chair with buttoned upholstery, a table with a fringed cloth, a vase of lilies and a small portrait of a man at the left, a painted backdrop of a fluted column, a balustrade and a velvet drape, a floral carpet. Lit from a skylight at the upper left, toned in warm albumen sepia, a lens vignette, grain, foxing and silvering at the rim. The arched window is the alpha, anti-aliased |
 | `spirit.webp` | 560 × 760, straight alpha | the spirit plate, the same studio and the same pose: the studio sunk into a cold blue-black, a veiled figure standing behind the chair (its head at (−10, 134) from the middle of the plate, hollows under the veil where the eyes and the mouth are, the veil falling behind the chair and thinning out), its long pale hands on her shoulders, ectoplasm falling from her lips into her lap, a glow around all of it and a mist hanging in the plate, the highlights the green of ectoplasm. Same alpha as the living plate |
 | `layout.json` | | `texelsPerUnit`, `wall` (the frame of `wall.webp`), `photo` (`w`, `h`, `arch`), `panels` (the middle of each photograph), `mat`, `frame` (their widths) and `plaque` (`dy` below the photograph's middle, `w`, `h`), in units |
+
+## camera-rig-two-rooms
+
+"The Night Shift", the asset of the demo `camera-rig-two-rooms`, from
+`camera-rig-two-rooms/generate.mjs` and `blender_observatory.py`. Not drawn but **built and baked**:
+Blender builds two rooms of an abandoned observatory from primitives and procedural materials,
+lights them, and Cycles bakes their light — direct and indirect diffuse light and emission, no
+glossy light, since that depends on the view — into one texture over one UV atlas of the whole
+scene; OpenImageDenoise cleans the bake, guided by a baked albedo, and AgX (Medium High Contrast)
+tone-maps it to 8 bits. Every mesh is joined into one, with one material whose texture goes straight
+into the output: the exporter writes it as `KHR_materials_unlit`, so the picture is the same under
+WebGPU and WebGL 2 and the scene needs no light in three.js. Cycles bakes on a GPU when it finds one
+and on the CPU otherwise, with a fixed seed; as with `matte-3d`, a GPU bake is not the same byte for
+byte on every run, and two runs differ by up to 8 levels in a few texels of the baked texture (a
+mean of 0.03 of 255). The `.glb` lands in `camera-rig-two-rooms/.render-cache/` (ignored by git)
+beside the baked PNG, and `--skip-render` reuses it. The generator checks the cameras, the clip and
+the unlit material before it copies the file.
+
+| file | size | what |
+| --- | --- | --- |
+| `two-rooms.glb` | about 1.2 MB | one mesh `observatory` (about 32 000 vertices, positions and one UV set, no normals), one unlit material with a 4096 × 4096 WebP (`EXT_texture_webp`, required), three perspective cameras, one animation |
+
+Units are metres, y up (Blender's z up, turned by the exporter); north is −z, east +x. **The control
+room** spans x from −5 to 0 and z from −2.1 to 2.1, 2.7 high: green institutional paint below a dark
+band, a sick cream above it, faded mint and cream linoleum, acoustic ceiling tiles; a long desk
+under the north wall with two beige terminals glowing green, a keyboard, papers, a mug and a desk
+lamp in a pool of amber; a swivel chair pushed back and turned away; a filing cabinet with a drawer
+open and a dead plant on it; a star chart and a clock stopped at 3:17 on the west wall; a radiator
+under a window whose venetian blinds cut the moonlight into stripes across the floor; one
+fluorescent tube still burning dim and cold, the other dead but for a glow at one end. **The door**,
+1 × 2.1 m in the east wall at z = 0, has a steel frame through both walls, a steel leaf with a
+porthole swung wide into the control room, and a plate above it, "DOME · KEEP DARK". **The dome** is
+a drum of radius 3.6 m and 2.3 m high under a half sphere, its axis at x = 4: painted steel panels
+gone to rust, wooden floorboards, a rail and ribs; a slit open to the south over the zenith, the
+moonlight falling through it onto the floor and the pier; a refractor on a fork mount on a concrete
+pier, aimed out of the slit; a red safelight in a wire cage beside the door; a stepladder at the
+eyepiece, a stool, a table with the open logbook and a red torch, a rolled chart and a cable on the
+floor. Outside is nothing: the clear colour of the stage shows through the window and the slit.
+
+**Cameras** — all three perspective, 16:9 (`aspectRatio` 1.778), `znear` 0.05, `zfar` 40, found by
+the name of their node (`gltf.scene.getObjectByName()`):
+
+| node | yfov | where |
+| --- | --- | --- |
+| `camera_control_room` | 58.7° | in the south-west corner of the control room at eye height, looking north-east over the chair to the desk and the open door, the dome red beyond it |
+| `camera_dome` | 64.7° | in the south-east of the dome, looking north-west past the telescope to the moonlit floor, the safelight and the door back to the control room |
+| `camera_flight` | 49.4° | animated by the clip below; at rest it stands where the clip starts |
+
+**Clip** — `through_the_door`, 7 s (168 frames at 24 fps, sampled per frame), translation and
+rotation of `camera_flight` alone: from beside `camera_control_room` past the desk, through the door
+at x = 0 at about 4 s, round the north side of the pier while it looks up along the moonlight to
+the slit, and out to beside `camera_dome`, looking as it does. The demo plays it paused and scrubs
+it through a key of a `CameraRig` track.
+

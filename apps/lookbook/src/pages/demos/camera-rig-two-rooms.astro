@@ -1,0 +1,280 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_camera-rig-two-rooms.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <div class="help fixed bottom-4 left-4">click: the other room · drag: look · wheel: through the door · L: lift</div>
+    <aside class="logbook" aria-hidden="true">
+      <h2>Observing log — night of 16/17 Nov</h2>
+      <p>03:17 &nbsp;Slit open, sky clear, seeing 2/5. The clock in the control room stopped again.</p>
+      <p>03:24 &nbsp;Red light only. Someone has left the door to the dome open. I did not.</p>
+    </aside>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #05070d;
+    color: #c9d6c8;
+  }
+  canvas {
+    cursor: grab;
+    touch-action: none;
+  }
+  canvas:active {
+    cursor: grabbing;
+  }
+  .help {
+    font-family: monospace;
+    font-size: 95%;
+    padding: 0.4em 0.7em;
+    background: rgba(5 7 13 / 70%);
+    border: 1px solid rgba(110 255 150 / 30%);
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  /* the dialog the lift clears the picture for: over the lower part of the screen */
+  .logbook {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    width: min(42rem, 100% - 2rem);
+    height: 30%;
+    padding: 1.2rem 1.6rem;
+    font-family: 'Courier New', monospace;
+    color: #e7dcc0;
+    background: rgba(18 14 10 / 88%);
+    border: 1px solid rgba(231 220 192 / 25%);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    transform: translate(-50%, 100%);
+    transition: transform 0.5s ease-in-out;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .logbook.open {
+    transform: translate(-50%, 0);
+  }
+  .logbook h2 {
+    color: #ff5a3a;
+    font-size: 1rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 0.8rem;
+  }
+  .logbook p {
+    margin-bottom: 0.5rem;
+  }
+</style>
+
+<script>
+  import {CameraProjection, CameraRig, type CameraTrackKey, Display, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+  import {AnimationMixer, Color, Mesh, PerspectiveCamera, type Texture} from 'three/webgpu';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the time of the walk from one room to the other, in seconds
+  const TRAVEL = 1.8;
+  // the time the lift takes to clear the dialog, and the share of the picture it lifts by
+  const LIFT_SECONDS = 0.5;
+  const LIFT = 0.3;
+  // the glide of the wheel along the flight, a time constant in seconds
+  const SMOOTH = 0.25;
+  // how far one pixel of the wheel goes along the flight
+  const WHEEL_STEP = 0.0005;
+  // a drag of more pixels than this is a look, not a click
+  const CLICK_SLOP = 6;
+  const LOOK_SPEED = 0.004;
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  // the slats of the blinds and the edges of the furniture are thin: they get MSAA
+  const display = new Display(canvas, {antialias: true});
+
+  const settings = {lift: false, flight: 0};
+
+  onDemoInit(display, 'camera-rig-two-rooms', async () => {
+    const gltf = await new GLTFLoader().loadAsync(assetsUrl('camera-rig-two-rooms/two-rooms.glb'));
+    const camera = (name: string) => {
+      const found = gltf.scene.getObjectByName(name);
+      if (!(found instanceof PerspectiveCamera)) throw new Error(`two-rooms.glb has no perspective camera named ${name}`);
+      return found;
+    };
+    const controlRoom = camera('camera_control_room');
+    const dome = camera('camera_dome');
+    const flyCamera = camera('camera_flight');
+    const clip = gltf.animations.find(({name}) => name === 'through_the_door');
+    if (clip === undefined) throw new Error('two-rooms.glb has no clip named through_the_door');
+
+    // the light of the rooms is baked into their texture: the material is unlit, and the scene needs
+    // no light of its own
+    const freeAsset = () =>
+      gltf.scene.traverse((object) => {
+        if (!(object instanceof Mesh)) return;
+        object.geometry.dispose();
+        for (const material of [object.material].flat()) {
+          (material.map as Texture | null)?.dispose();
+          material.dispose();
+        }
+      });
+    if (display.isDisposed) {
+      freeAsset();
+      return;
+    }
+
+    // the stage looks through the camera of the control room, fitted as Blender framed it: all of
+    // its frame, with more above and below on a narrow screen
+    const stage = new Stage2D(new CameraProjection(controlRoom));
+    stage.scene.add(gltf.scene);
+    const stageRenderer = new StageRenderer(display).setClearColor(new Color('#05070d'), 1).add(stage);
+    const rig = new CameraRig(stage);
+    display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
+
+    // the flight through the door: playing and paused, the wheel sets its time, not the clock
+    const mixer = new AnimationMixer(gltf.scene);
+    const flight = mixer.clipAction(clip);
+    flight.play().paused = true;
+
+    const rooms = [controlRoom, dome];
+    const keys: CameraTrackKey[] = [
+      {at: 0, shot: controlRoom},
+      {at: 0.12, until: 0.88, shot: flyCamera, clip: flight, ease: 'ease-in-out'},
+      {at: 1, shot: dome, ease: 'ease-in-out'},
+    ];
+
+    // the room the camera stands in, or walks to; on the track the one it is nearer
+    let room = 0;
+    let onTrack = false;
+    let yaw = 0;
+    let pitch = 0;
+
+    const travel = () => {
+      room = 1 - room;
+      onTrack = false;
+      // the next room brings its own look: the drag starts from straight ahead again
+      yaw = 0;
+      pitch = 0;
+      settings.flight = room;
+      flightController.updateDisplay();
+      // carried to the camera of the other room, then locked on to it
+      void rig.moveTo(rooms[room]!, TRAVEL);
+    };
+
+    const fly = (t: number, smooth: number) => {
+      if (!onTrack) {
+        // a new track starts at 0. The room the camera stands in is shown at once — a step of no
+        // time takes the progress without a glide —, so the glide below starts from there
+        rig.track(keys);
+        rig.lerp(room);
+        rig.step(0);
+        onTrack = true;
+        yaw = 0;
+        pitch = 0;
+      }
+      settings.flight = Math.min(1, Math.max(0, t));
+      room = settings.flight < 0.5 ? 0 : 1;
+      rig.lerp(settings.flight, {smooth});
+      flightController.updateDisplay();
+    };
+
+    const setLift = (lift: boolean) => {
+      settings.lift = lift;
+      liftController.updateDisplay();
+      document.querySelector('.logbook')?.classList.toggle('open', lift);
+      // the picture moves up through the view offset of the camera, without turning it
+      rig.reframe(lift ? {lift: LIFT} : {}, LIFT_SECONDS);
+    };
+
+    const listeners = new AbortController();
+    const {signal} = listeners;
+
+    let down: {x: number; y: number; moved: boolean} | undefined;
+    canvas.addEventListener(
+      'pointerdown',
+      (event: PointerEvent) => {
+        if (event.button !== 0) return;
+        down = {x: event.clientX, y: event.clientY, moved: false};
+        canvas.setPointerCapture(event.pointerId);
+      },
+      {signal},
+    );
+    canvas.addEventListener(
+      'pointermove',
+      (event: PointerEvent) => {
+        if (down === undefined) return;
+        if (!down.moved && Math.hypot(event.clientX - down.x, event.clientY - down.y) < CLICK_SLOP) return;
+        down.moved = true;
+        // a look on top of the room, the move or the whole track, until the next target
+        yaw -= event.movementX * LOOK_SPEED;
+        pitch = Math.max(-1.2, Math.min(1.2, pitch - event.movementY * LOOK_SPEED));
+        rig.look({yaw, pitch});
+      },
+      {signal},
+    );
+    canvas.addEventListener(
+      'pointerup',
+      () => {
+        if (down !== undefined && !down.moved) travel();
+        down = undefined;
+      },
+      {signal},
+    );
+    canvas.addEventListener('pointercancel', () => (down = undefined), {signal});
+    canvas.addEventListener(
+      'wheel',
+      (event: WheelEvent) => {
+        event.preventDefault();
+        const pixels = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * 16 : event.deltaY;
+        fly((onTrack ? settings.flight : room) + pixels * WHEEL_STEP, SMOOTH);
+      },
+      {signal, passive: false},
+    );
+    window.addEventListener(
+      'keydown',
+      (event: KeyboardEvent) => {
+        if (ignoredKey(event) || event.repeat) return;
+        if (event.code === 'Space' || event.code === 'Enter') {
+          travel();
+          event.preventDefault();
+        } else if (event.code === 'KeyL') {
+          setLift(!settings.lift);
+        }
+      },
+      {signal},
+    );
+
+    const gui = new GUI({container: getDemoUi(), title: 'camera rig: two rooms'});
+    gui.add({travel}, 'travel').name('the other room (click, space)');
+    const liftController = gui.add(settings, 'lift').name('lift for the log (L)').onChange(setLift);
+    const flightController = gui
+      .add(settings, 'flight', 0, 1, 0.001)
+      .name('through the door (wheel)')
+      .decimals(3)
+      .onChange((t: number) => fly(t, SMOOTH));
+
+    display.onDispose(() => {
+      listeners.abort();
+      gui.destroy();
+      rig.dispose();
+      stageRenderer.dispose();
+      stage.dispose();
+      mixer.stopAllAction();
+      mixer.uncacheRoot(gltf.scene);
+      freeAsset();
+    });
+
+    preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display});
+</script>

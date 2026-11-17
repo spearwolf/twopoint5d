@@ -108,7 +108,16 @@
     {
       "name": "Display, Stage and Projections",
       "tagId": "display-stage-projections",
-      "includeTags": ["Display", "OrthographicProjection", "ParallaxProjection", "Stage2D", "StageRenderer", "Canvas2DStage"]
+      "includeTags": [
+        "Display",
+        "OrthographicProjection",
+        "ParallaxProjection",
+        "CameraProjection",
+        "CameraRig",
+        "Stage2D",
+        "StageRenderer",
+        "Canvas2DStage"
+      ]
     },
     {
       "name": "Post-processing",
