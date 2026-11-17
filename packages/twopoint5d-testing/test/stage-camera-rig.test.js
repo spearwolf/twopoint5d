@@ -6,7 +6,9 @@ import {
   OrthographicProjection,
   ParallaxProjection,
   Stage2D,
+  StageDirector,
   StageRenderer,
+  crossfade,
 } from '@spearwolf/twopoint5d';
 import {Color, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry} from 'three/webgpu';
 import {
@@ -348,4 +350,115 @@ describe('CameraProjection — the authored frame in the container', () => {
       });
     }
   }
+});
+
+describe('CameraRig.across() — a flight across a crossfade', () => {
+  /** @type {Display | undefined} */
+  let display;
+  /** @type {HTMLElement | undefined} */
+  let host;
+  /** @type {StageDirector | undefined} */
+  let director;
+
+  beforeEach(async () => {
+    host = makeContainer({width: SIZE, height: SIZE});
+    display = new Display(host);
+    await display.start();
+  });
+
+  afterEach(() => {
+    director?.dispose();
+    director = undefined;
+    disposeKept();
+    disposeDisplay(display);
+    display = undefined;
+    host?.remove();
+    host = undefined;
+  });
+
+  // the red marker of `from` is centred on the screen at rest, the green one of `to` 12 pixels
+  // right of the centre; the camera of `to` ends 16 units right of its rest, which puts the green
+  // marker 4 pixels left of the centre. The two worlds share their coordinates: halfway the shared
+  // viewpoint stands 8 units right, so the red marker shows 8 pixels left of the centre, the green
+  // one 4 pixels right of it
+  const MARKER = 8;
+  const RED_AT = SIZE / 2;
+  const GREEN_AT = SIZE / 2 + 12;
+  const END = 16;
+
+  /** A director on the display, over opaque black, showing `from`, and a manual crossfade to `to`. */
+  function makeFlight() {
+    const from = makeFilledStage('from', '#f00', {
+      rect: {x: RED_AT - MARKER / 2, y: SIZE / 2 - MARKER / 2, width: MARKER, height: MARKER},
+      size: SIZE,
+    });
+    const to = makeFilledStage('to', '#0f0', {
+      rect: {x: GREEN_AT - MARKER / 2, y: SIZE / 2 - MARKER / 2, width: MARKER, height: MARKER},
+      size: SIZE,
+    });
+    keep(new CameraRig(from.stage));
+    keep(new CameraRig(to.stage));
+    director = new StageDirector(display).setClearColor(new Color('#000'), 1);
+    director.show(from.stage);
+    const transition = director.replace(from.stage, to.stage, {effect: crossfade(), manual: true});
+    const flight = CameraRig.across(transition, {to: {position: [END, 0]}});
+    return {transition, flight};
+  }
+
+  /** The picture on the screen once the frames have drawn the progress. */
+  async function picture() {
+    for (let i = 0; i < 4; i++) await display.nextFrame();
+    return pageScreenshot({x: 0, y: 0, width: SIZE, height: SIZE});
+  }
+
+  /**
+   * The centroid of `channel` along x — weighted by its value, so that the coverage of an edge
+   * pixel counts by its share —, and the sum of its values; the other channels must stay dark there.
+   *
+   * @param {ImageData} image
+   * @param {number} channel
+   */
+  function marker(image, channel) {
+    let sum = 0;
+    let x = 0;
+    for (let py = 0; py < image.height; py++) {
+      for (let px = 0; px < image.width; px++) {
+        const value = image.data[(py * image.width + px) * 4 + channel];
+        if (value < 16) continue;
+        sum += value;
+        x += (px + 0.5) * value;
+      }
+    }
+    return {sum, x: sum > 0 ? x / sum : Number.NaN};
+  }
+
+  it('shows the picture of from at progress 0, the one of to at 1, and halfway the markers of both where the shared viewpoint puts them', async () => {
+    const {transition, flight} = makeFlight();
+
+    transition.progress = 0;
+    const atStart = await picture();
+    const redAtStart = marker(atStart, 0);
+    expect(marker(atStart, 1).sum, 'no green at the start').to.equal(0);
+    expect(redAtStart.x, 'the red marker of from at rest').to.be.closeTo(RED_AT, 0.01);
+    expect(redAtStart.sum, 'the red marker whole').to.be.closeTo(MARKER * MARKER * 255, MARKER * 4);
+
+    transition.progress = 0.5;
+    const halfway = await picture();
+    expect(marker(halfway, 0).x, 'the red marker, seen from the shared viewpoint').to.be.closeTo(RED_AT - END / 2, 0.01);
+    expect(marker(halfway, 1).x, 'the green marker, seen from the shared viewpoint').to.be.closeTo(GREEN_AT - END / 2, 0.01);
+    expect(marker(halfway, 0).sum, 'the red marker half faded').to.be.lessThan(redAtStart.sum);
+
+    transition.progress = 1;
+    const atEnd = await picture();
+    expect(marker(atEnd, 0).sum, 'no red at the end').to.equal(0);
+    expect(marker(atEnd, 1).x, 'the green marker where the target of to puts it').to.be.closeTo(GREEN_AT - END, 0.01);
+
+    // the end of the flight is the picture to shows on its own target
+    transition.complete();
+    await flight.finished;
+    const after = await picture();
+    const {lit, differing} = diffPixels(atEnd.data, after.data);
+    expect(lit, 'the green marker is drawn').to.be.greaterThan(MARKER * MARKER - 1);
+    expect(differing, 'the picture at progress 1 is the one to holds afterwards').to.equal(0);
+  });
 });

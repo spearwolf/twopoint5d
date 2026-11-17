@@ -1,3 +1,4 @@
+export type {CameraFlight, CameraFlightOptions} from './CameraFlight.js';
 export type {CameraPose} from './cameraPose.js';
 export type {CameraProjectionFit, CameraProjectionSpecs} from './CameraProjection.js';
 export {CameraProjection} from './CameraProjection.js';

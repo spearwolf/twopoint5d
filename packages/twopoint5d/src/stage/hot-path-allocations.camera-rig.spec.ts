@@ -3,6 +3,7 @@ import {
   AnimationClip,
   AnimationMixer,
   Group,
+  Object3D,
   OrthographicCamera,
   PerspectiveCamera,
   Vector3,
@@ -18,6 +19,7 @@ import {CameraRig} from './CameraRig.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D} from './Stage2D.js';
+import {StageDirector} from './StageDirector.js';
 
 // a call that allocates anything costs 16 B at least; the allocation-free paths below measure a
 // small fraction of a byte per call, the noise of a round spread over its calls
@@ -424,6 +426,70 @@ describe('CameraRig on the hot path', () => {
 
     expect(rig.busy, 'the glide never settles').toBe(true);
     expect(updates, 'the clip was scrubbed').toBeGreaterThan(CALLS);
+    expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  // A flight across a manual transition of a director, as a scroll drives one: both rigs step,
+  // write and compose in every round, the progress copied from a table of constants, so that the
+  // blend runs through the whole flight and both of its ends. The look lies on top of the flight,
+  // and anchors — turned, scaled evenly and moved in every round — carry the shot between the
+  // worlds. A lens change stays inside its ends: there both rigs swap the kind of their camera,
+  // which the stage announces, and an announcement allocates, as the swap of a lens change on one
+  // stage does.
+  //
+  // The write of the progress is the caller's, and so is what it costs: in a round this large V8
+  // may leave the setter of the transition un-inlined, and a fraction the round loads from an array
+  // of doubles is boxed for the call — 16 bytes per round, charged to the round itself by the
+  // sampling heap profiler, none to the rigs. So the tables hold their numbers as tagged elements,
+  // heap numbers that exist already, which the round hands the setter as they are.
+  const taggedTable = (values: readonly number[]): readonly number[] => {
+    const table: unknown[] = [''];
+    table.pop();
+    table.push(...values);
+    return table as number[];
+  };
+  const FLIGHT_PROGRESSES = taggedTable([0, 0.125, 0.875, 0.375, 1, 0.625, 0.0625, 0.9375]);
+  const LENS_CHANGE_PROGRESSES = taggedTable([0.5, 0.125, 0.875, 0.375, 0.25, 0.625, 0.0625, 0.9375]);
+  const ANCHOR_XS = [0, 12.5, -40.25, 3.75, 100.5, -0.125, 64, -7.5];
+
+  test.each<[string, 'parallax' | 'orthographic', readonly number[]]>([
+    ['between two parallax projections', 'parallax', FLIGHT_PROGRESSES],
+    ['with a lens change into an orthographic projection', 'orthographic', LENS_CHANGE_PROGRESSES],
+  ])('step(), write() and compose() of both rigs during a flight %s allocate nothing', async (_name, toKind, progresses) => {
+    const director = new StageDirector();
+    director.resize(801, 601);
+    const from = makeRig();
+    const to = makeRig(toKind);
+    from.jump({position: [40, -30, 500], look: {yaw: 0.25, pitch: 0}});
+    to.jump({position: [-120, 60], zoom: 1.5});
+    director.show(from.stage);
+    const transition = director.replace(from.stage, to.stage, {manual: true});
+    director.updateFrame(0, 0, 0);
+    const marker = new Object3D();
+    marker.position.set(100, 20, 0);
+    const origin = new Object3D();
+    origin.rotation.z = 0.5;
+    origin.scale.setScalar(2);
+    CameraRig.across(transition, {anchors: [marker, origin], focus: 400});
+    from.look({yaw: 0.125, pitch: 0.0625});
+    let moved = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) {
+        const k = i & 7;
+        transition.progress = progresses[k]!;
+        origin.position.x = ANCHOR_XS[k]!;
+        if (from.step(1)) moved++;
+        to.step(1);
+        from.write();
+        to.write();
+        from.compose();
+        to.compose();
+      }
+    });
+
+    expect(from.busy && to.busy, 'the flight is still under way').toBe(true);
     expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
     expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });

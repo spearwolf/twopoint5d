@@ -594,8 +594,10 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
   both go back to the state they had, as the picture jumps back to `from`.
 - **A frozen layer** shows a still picture and no flight: the rig warns once, naming the stage, when
   a layer of the flight is frozen.
-- Nothing in the director changes: the flight reads the transition, and the module `stage` keeps no
-  reference from the director to the rig.
+- The director keeps no reference to the rig. The flight reads the transition, which answers two
+  internal questions through its host, the director: whether a layer is frozen, and which source a
+  finished or cancelled transition kept in its slot (`StageTransitionInternals.isFrozen()` and
+  `keptOf()`, not exported).
 
 ### 4.8 Allocations
 

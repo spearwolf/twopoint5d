@@ -15,7 +15,7 @@ import {ClearStage} from './ClearStage.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
-import type {StageTransition} from './StageTransition.js';
+import {type StageTransition, StageTransitionInternals} from './StageTransition.js';
 import {crossfade, wipe} from './transitionEffects.js';
 
 describe('StageDirector', () => {
@@ -1271,6 +1271,63 @@ describe('StageDirector', () => {
       expect(renderer.outputColorSpace).toBe(SRGBColorSpace);
       expect(renderer.xr.enabled).toBe(false);
       expect(renderer.render).toBe(render);
+    });
+  });
+
+  describe('what a transition answers through its host', () => {
+    it('records the source each way of ending left in the slot', () => {
+      director.setStack([a]);
+      const finished = director.replace(a, b, {duration: 1});
+      expect(StageTransitionInternals.keptOf(finished)).toBeUndefined();
+      frame();
+      frame(1);
+      expect(finished.state).toBe('finished');
+      expect(StageTransitionInternals.keptOf(finished)).toBe('to');
+
+      const toStart = director.replace(b, a, {duration: 1});
+      toStart.cancel('start');
+      expect(StageTransitionInternals.keptOf(toStart)).toBe('from');
+
+      const toEnd = director.replace(b, a, {duration: 1});
+      frame();
+      frame(0.5);
+      toEnd.cancel('end');
+      expect(toEnd.state).toBe('cancelled');
+      expect(StageTransitionInternals.keptOf(toEnd)).toBe('to');
+
+      const back = director.replace(a, b, {duration: 1, easing: 'linear'});
+      frame();
+      frame(0.5);
+      back.reverse();
+      frame(0.5);
+      expect(back.state).toBe('cancelled');
+      expect(StageTransitionInternals.keptOf(back)).toBe('from');
+
+      const completed = director.replace(a, c, {duration: 1});
+      completed.complete();
+      expect(StageTransitionInternals.keptOf(completed)).toBe('to');
+
+      expect(StageTransitionInternals.keptOf(director.show(b))).toBe('to');
+
+      const disposed = director.replace(c, a, {duration: 1});
+      director.dispose();
+      expect(disposed.state).toBe('cancelled');
+      expect(StageTransitionInternals.keptOf(disposed)).toBe('from');
+      expect(StageTransitionInternals.keptOf(director.show(a))).toBe('from');
+    });
+
+    it('answers whether a layer is frozen while the transition runs, and false once it is over', () => {
+      director.setStack([a]);
+      const t = director.replace(a, b, {duration: 1, outgoing: 'freeze'});
+      expect(StageTransitionInternals.isFrozen(t, a)).toBe(true);
+      expect(StageTransitionInternals.isFrozen(t, b)).toBe(false);
+      director.freeze(b);
+      expect(StageTransitionInternals.isFrozen(t, b)).toBe(true);
+      director.run(b);
+      t.complete();
+      expect(StageTransitionInternals.isFrozen(t, a)).toBe(false);
+      director.freeze(b);
+      expect(StageTransitionInternals.isFrozen(t, b)).toBe(false);
     });
   });
 

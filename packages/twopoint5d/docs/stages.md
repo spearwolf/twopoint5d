@@ -843,6 +843,135 @@ display.start();
   a running move, whose promise resolves, and lets go of a camera or an object the rig was locked on
   to; `cancel()` leaves a track alone. A `moveTo()` starts from the shot the track shows.
 
+#### A flight across a transition
+
+A `StageDirector` blends one stage into the next; `CameraRig.across(transition)` flies the camera
+through that blend. A map turns into the city it marks: as the crossfade runs, the camera dives from
+the map toward the marker of the city and comes out in the city's own world, at the viewpoint it
+holds there. Both stages draw their own scene from one shared viewpoint, and the director blends
+their pictures.
+
+```ts check
+import {
+  CameraRig,
+  crossfade,
+  Display,
+  OrthographicProjection,
+  ParallaxProjection,
+  Stage2D,
+  StageDirector,
+} from '@spearwolf/twopoint5d';
+import {Object3D} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const map = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 1600, height: 900}));
+const city = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+const mapRig = new CameraRig(map);
+const cityRig = new CameraRig(city);
+
+// the same place in two worlds: the marker of the city on the map, drawn at a fiftieth of the
+// city's size, and the origin of the city in its own world
+const cityMarker = new Object3D();
+cityMarker.position.set(420, 180, 0);
+cityMarker.scale.setScalar(1 / 50);
+map.scene.add(cityMarker);
+const cityOrigin = new Object3D();
+city.scene.add(cityOrigin);
+
+const director = new StageDirector(display);
+director.show(map);
+display.onRenderFrame(({deltaTime}) => {
+  mapRig.step(deltaTime);
+  cityRig.step(deltaTime);
+});
+display.start();
+
+export async function enterCity() {
+  const transition = director.replace(map, city, {effect: crossfade(), duration: 1.2});
+  const flight = CameraRig.across(transition, {
+    to: {position: [0, 80, 700], look: {yaw: 0, pitch: -0.2}},
+    anchors: [cityMarker, cityOrigin],
+  });
+  await flight.finished; // the city rig holds the viewpoint from here on
+}
+```
+
+- There is one blended shot, in the world of `from`: from the shot the rig of `from` shows when the
+  flight starts to the target of `to`, at the progress of the transition. The camera of `from` shows
+  it; the camera of `to` shows it carried through the anchors into the world of `to`. At progress 0
+  `from` shows its own picture unchanged, at 1 `to` stands exactly on its target.
+- `to` is any target of `jump()`: a pose in the frame of the projection of `to`, a camera, an
+  `Object3D`, or a projection, which the rig of `to` assigns to its stage once it takes over.
+  Without `to` the flight ends on the shot the rig of `to` holds when it starts.
+- `anchors` are two objects whose world frames are the same place, the first in the world of `from`,
+  the second in the world of `to`; without them the two worlds share their coordinates. They are
+  read in every frame, so an anchor may move. Their translation, rotation and scale carry the shot:
+  a scale carries the position, near and far, the focus and the height of an orthographic view. The
+  scale must be even on the three axes, and the anchors must not mirror each other.
+- The progress is the transition's, eased once more by `easing` (`'linear'` by default: the
+  transition's own easing alone). `reverse()` flies the camera back.
+- A flight between a perspective and an orthographic side is a [lens
+  change](#perspective-into-orthographic) on both rigs alike, with the projection plane of each side
+  as its focus, or `focus` — a distance in the world of `from` — where a side has none.
+- Each stage needs a rig of its own, stepped as before. `across()` ends a running `moveTo()` of
+  either rig where it stands, and its promise resolves. A lock-on, a track and a damped `lerp()`
+  stay, their clocks stopped. During the flight `look()` on either rig turns the shared view of both;
+  `jump()`, `moveTo()`, `track()` and `lerp()` are refused, and `cancel()` does nothing.
+- The end follows the transition, noticed by its state in the frame of each stage — no frame draws
+  in between. Finished, or cancelled with `to` in its slot (`cancel('end')`): the rig of `to` holds
+  its target, the look of the flight added to the target's, and the rig of `from` goes back to the
+  state it had, out of sight, so that a way back finds it as it was. Cancelled with `from` in its
+  slot — `cancel()`, `reverse()` back to the start, a director disposed —: both rigs go back. A rig
+  disposed during the flight ends it, and the other goes back. `flight.finished` resolves then, and
+  never rejects.
+- A frozen layer shows a still picture, not the flight: the flight warns once, naming the stage.
+
+A scroll drives picture and camera with one number. A manual transition takes its progress by hand,
+and the flight follows it:
+
+```ts check
+import {
+  CameraRig,
+  crossfade,
+  Display,
+  OrthographicProjection,
+  ParallaxProjection,
+  Stage2D,
+  StageDirector,
+} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!);
+const map = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 1600, height: 900}));
+const city = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+new CameraRig(map);
+const cityRig = new CameraRig(city);
+cityRig.jump({position: [0, 80, 700]});
+
+const director = new StageDirector(display);
+director.show(map);
+display.start();
+
+const transition = director.replace(map, city, {effect: crossfade(), manual: true});
+CameraRig.across(transition);
+
+// the section of the page that scrolls from the map into the city
+const section = document.querySelector('#into-the-city')!;
+window.addEventListener(
+  'scroll',
+  () => {
+    const {top, height} = section.getBoundingClientRect();
+    transition.progress = -top / Math.max(1, height - window.innerHeight);
+  },
+  {passive: true},
+);
+
+// once the reader moves on, the city stays: the rig of the city holds the end of the flight
+export const leaveSection = () => transition.complete();
+```
+
+A manual transition clamps its progress to `[0, 1]` and stays until `complete()` or `cancel()`;
+scrolled back up, the flight flies back with it.
+
 #### A camera that follows, with a rig
 
 A rig writes its camera in every frame, so a write to `stage.camera` of your own lasts one frame.
@@ -998,7 +1127,7 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | --- | --- |
 | `new CameraRig(stage, {pitchLimit?, easing?})` | attaches to a `Stage2D` with a projection; one rig per stage |
 | `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection` and during a lens change, an `OrthographicCamera` under an `OrthographicProjection`, the kind of the source under a `CameraProjection` |
-| `busy` | `true` while a move runs, while the camera trails an object by `smooth`, while a damped `lerp()` has yet to settle, and while a lock-on or a key of the track moved the camera in the last step |
+| `busy` | `true` while a move runs, while the camera trails an object by `smooth`, while a damped `lerp()` has yet to settle, while a lock-on or a key of the track moved the camera in the last step, and during a flight |
 | `jump(target)` | at once; ends a running move; locks on to a camera or an object |
 | `moveTo(target, seconds, {easing?, offset?, smooth?, focus?, depth?})` | eased; a promise that resolves when the move ends, however it ends; locks on to a camera or an object on arrival; `offset` and `smooth` for an object, `focus` and `depth` for a lens change |
 | `look({yaw, pitch})` | the look of the current viewpoint; the new end of a running move |
@@ -1008,7 +1137,8 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | `lerp(t, {smooth?})` | the progress along the track, clamped to `[0, 1]`; shown by the next step, or approached in a glide |
 | `step(deltaSeconds)` | advances the clocks; answers a `Motion`; assigns a projection on arrival |
 | `precompile(renderer)` | compiles the scene, and the pass of its `postProcess`, with the camera of the other kind |
-| `dispose()`, `isDisposed` | detaches; the stage takes back its camera, a running move resolves |
+| `dispose()`, `isDisposed` | detaches; the stage takes back its camera, a running move resolves; ends a flight, the other rig goes back |
+| `CameraRig.across(transition, {to?, anchors?, easing?, focus?})` | a flight across a transition of a `StageDirector`, between the rigs of its two stages; answers `{transition, finished}` |
 
 - A target is, in the order the rig asks: a camera — a `PerspectiveCamera` or an
   `OrthographicCamera` —, any other `Object3D`, a projection — a `CameraProjection` among them —,
@@ -1024,7 +1154,11 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
   `until` that is not a finite number from 0 to 1, an `until` before its `at`, keys out of order, a
   `clip` that is not an `AnimationAction` or whose key has no camera as its shot, and a lens change
   between two keys where one of them has no plane; `lerp()` refuses a `t` that is not a finite
-  number and a rig without a track.
+  number and a rig without a track. During a flight `jump()`, `moveTo()`, `track()` and `lerp()`
+  are refused. `CameraRig.across()` refuses what is no `StageTransition`, a transition that is over
+  or from or to nothing, a stage without a rig, a rig in a flight already, `anchors` that are not a
+  pair of `Object3D`, scaled unevenly or mirrored, a `focus` that is not a finite number above 0,
+  a target as `jump()` refuses it, and a lens change without a `focus` where a side has no plane.
 - After `dispose()` every method but `dispose()` throws. A stage disposed under the rig stops its
   writes: `step()` answers `false`, and `rig.dispose()` still works. The stage stays yours: the rig
   never disposes it.
@@ -2985,7 +3119,7 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 | `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects and the texture nodes of its masks; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()`, the mask stages, the `StageMask` objects an effect names |
 | `StageMask` | lets go of its stage, leaves its slots and ends the transitions naming it as cancelled; the stage `StageMask.inWorldOf()` built | a stage handed in, which stays undisposed; the `scene` and the world stage of `inWorldOf()` |
 | `Display` | its `WebGPURenderer` | a canvas handed in |
-| `CameraRig` | detaches from the stage, which takes back its camera; ends a running move, whose promise resolves, and a lock-on, keeping no reference to its target | the stage, which a disposed rig leaves undisposed — and a disposed stage disposes no rig —, and a camera or an `Object3D` it moved to or followed |
+| `CameraRig` | detaches from the stage, which takes back its camera; ends a running move, whose promise resolves, and a lock-on, keeping no reference to its target; ends a flight, whose other rig goes back to its state | the stage, which a disposed rig leaves undisposed — and a disposed stage disposes no rig —, a camera or an `Object3D` it moved to or followed, and the transition and the anchors of a flight |
 | `CameraProjection` | nothing; it has no `dispose()` | its source camera |
 
 The order of a teardown: the renderer first, then what it used.
@@ -3025,6 +3159,9 @@ pipeline.dispose();
 - **A camera that ignores your writes.** A stage with a `CameraRig` draws with the camera of the
   rig, which writes it in every frame: a write to `stage.camera` holds for one frame. Move the
   camera through the rig — see [moving the camera](#moving-the-camera).
+- **A flight that stands still.** A flight across a transition whose `outgoing` or `incoming` is
+  `'freeze'` shows a still picture on that layer, not the flight: a frozen layer is neither updated
+  nor drawn. The flight warns once, naming the stage; let both layers run.
 - **A post-process that reads depth, under a lens change.** A `CameraRig` that moves between a
   perspective and an orthographic projection swaps the kind of the camera, and with it the way the
   depth is stored. Linearize it for the kind of `stage.camera` — see
@@ -3086,7 +3223,7 @@ pipeline.dispose();
 | `ParallaxProjection` | a view with depth: `getScaleFactor()`, `getParallaxFactor()` |
 | `CameraProjection` | a view through a camera of your own — of a `.glb` —, its frame fitted `'contain'` or `'cover'`, followed when it moves |
 | `ProjectionPlane` | the plane a camera looks at, four descriptions or a plane of your own |
-| `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `step()`, `precompile()` — to a `CameraPose` in the frame of the projection, to another projection, as a dolly zoom where the kind changes, and to a camera or an `Object3D`, which it locks on to and follows |
+| `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `step()`, `precompile()` — to a `CameraPose` in the frame of the projection, to another projection, as a dolly zoom where the kind changes, and to a camera or an `Object3D`, which it locks on to and follows; `CameraRig.across()` flies it through a transition of a `StageDirector` |
 | `ClearStage` | clears depth (by default), color or stencil between two stages |
 | `Canvas2DStage` | a 2D canvas on a sprite in a stage of its own |
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |
@@ -3129,7 +3266,7 @@ pipeline.dispose();
 | `distanceToProjectionPlane` | `100` orthographic, `300` parallax |
 | `near`, `far` | `0.1`, `100000` |
 | `CameraProjection` | `fit`: `'contain'`; `aspect`, `near`, `far`: the source's |
-| `CameraRig` | `pitchLimit`: 85° (`Math.PI * 85 / 180`), `easing`: `'ease-in-out'`; for an `Object3D` target `offset`: `[0, 0]` at the distance of the current pose, `smooth`: `0`; a camera target fitted `'contain'` |
+| `CameraRig` | `pitchLimit`: 85° (`Math.PI * 85 / 180`), `easing`: `'ease-in-out'`; for an `Object3D` target `offset`: `[0, 0]` at the distance of the current pose, `smooth`: `0`; a camera target fitted `'contain'`; `CameraRig.across()`: `easing` `'linear'`, `to` the shot the rig of `to` holds, no anchors — the two worlds share their coordinates |
 | `CameraMoveOptions` | `focus`: the distance to the projection plane, `depth`: the visible height at the focus plane |
 | `CameraPose` | the rest's: `position` and its distance, `look` `{yaw: 0, pitch: 0}`, `zoom` `1` |
 | `StageRenderer#clear` | `false` |

@@ -560,6 +560,7 @@ export class StageDirector extends StageRenderer {
         'StageTransition: more than one listener of OnStageTransitionEnd, OnStageRemoved and OnRemoveFromParent threw',
       );
     },
+    isFrozen: (stage) => this.#layers.get(stage)?.frozen === true,
   };
 
   readonly #compose: StageRendererBuildOutputNode = (passes) => this.#fillShape(passes);
@@ -2067,7 +2068,7 @@ export class StageDirector extends StageRenderer {
       this.#slotsChanged();
       StageTransitionInternals.advance(transition, 0);
       this.#emitInto(OnStageTransitionStart, transition, errors);
-      StageTransitionInternals.settle(transition, 'finished');
+      StageTransitionInternals.settle(transition, 'finished', 'to');
       this.#emitInto(OnStageTransitionEnd, transition, errors);
       return transition;
     }
@@ -2127,7 +2128,7 @@ export class StageDirector extends StageRenderer {
     this.#unuseMasks(run.masks, errors);
     this.#slotsChanged();
 
-    StageTransitionInternals.settle(run.transition, state);
+    StageTransitionInternals.settle(run.transition, state, keep);
     this.#emitInto(OnStageTransitionEnd, run.transition, errors);
   }
 
@@ -2155,7 +2156,7 @@ export class StageDirector extends StageRenderer {
       {from, to, effect: DEFAULT_EFFECT, duration: 0, delay: 0, easing: easingOf('', 'linear'), manual: false},
       undefined,
     );
-    StageTransitionInternals.settle(transition, 'cancelled');
+    StageTransitionInternals.settle(transition, 'cancelled', 'from');
     return transition;
   }
 

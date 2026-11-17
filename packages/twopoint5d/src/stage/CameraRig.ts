@@ -16,6 +16,15 @@ import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import {applyEasingInPlace, type Easing, type EasingSpec, easingOf} from '../utils/easing.js';
 import {throwCollected} from '../utils/throwCollected.js';
+import {
+  type CameraFlight,
+  type CameraFlightOptions,
+  type Flight,
+  type FlightEnd,
+  type FlightRole,
+  type FlightSide,
+  startFlight,
+} from './CameraFlight.js';
 import {type CameraPose, copyPoseValues, createPoseValues, type PoseValues, readLook, readPose} from './cameraPose.js';
 import {CameraProjection} from './CameraProjection.js';
 import {createRest, type Rest, readFrame, readRest} from './cameraRest.js';
@@ -34,6 +43,8 @@ import {
   createLook,
   createObjectFollow,
   kindOf,
+  type Look,
+  type ObjectFollow,
   kindOfTarget,
   readObjectGoal,
   readObjectPose,
@@ -49,6 +60,7 @@ import {blendLensChangeAtProgress, createLensChange} from './lensChange.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D, Stage2DInternals} from './Stage2D.js';
+import type {StageTransition} from './StageTransition.js';
 
 /**
  * What a `CameraRig` travels to, asked in this order:
@@ -154,6 +166,28 @@ const refuseKind = (camera: Camera): never => {
 
 const EMPTY_POSE = createPoseValues();
 
+const FLIGHT_REFUSAL = 'the rig takes part in a flight across a transition (CameraRig.across()) until the transition is over';
+
+// the state the rig of `to` goes back to where a flight that brought a target of its own ends with
+// `from` in the slot
+interface SavedState {
+  pose: PoseValues;
+  yaw: number;
+  pitch: number;
+  holding: boolean;
+  holdingTurn: boolean;
+  held: CameraShot;
+  track: CameraTrack | undefined;
+  targetProjection: IProjection | undefined;
+  assigns: boolean;
+  targetRest: Rest;
+  targetPlaced: boolean;
+  follows: boolean;
+  follow: ObjectFollow;
+  focus: number;
+  depth: number;
+}
+
 // the rig is the camera driver of its stage; it does not name StageCameraDriver, which stays out of
 // the published declarations, and Stage2DInternals.attachDriver(stage, this) holds it to that contract
 
@@ -253,6 +287,13 @@ export class CameraRig {
   // the shot of the last step(); no step has one, so the first one answers true
   readonly #stepped = Object.assign(createShot(), {lens: Number.NaN});
 
+  // a flight across a transition the rig takes part in, its side of it, the face it shows the
+  // flight, and the state it goes back to where the flight brought it a target of its own
+  #flight?: Flight;
+  #flightRole: FlightRole = 'from';
+  #side?: FlightSide;
+  #saved?: SavedState;
+
   #disposed = false;
 
   /**
@@ -335,12 +376,18 @@ export class CameraRig {
   /**
    * `true` while a move is under way, while the camera trails an `Object3D` by `smooth`, while the
    * shown progress of a track has yet to reach the one {@link lerp} asked for, and while locked on to
-   * a camera or an object — or on a track — when the last {@link step} moved the camera after it;
-   * `false` after {@link dispose}.
+   * a camera or an object — or on a track — when the last {@link step} moved the camera after it,
+   * and while the rig takes part in a flight across a transition; `false` after {@link dispose}.
    */
   get busy(): boolean {
     const track = this.#track;
-    return this.#moving || this.#follow.trailing || this.#followMoved || (track !== undefined && track.shown !== track.asked);
+    return (
+      this.#flight !== undefined ||
+      this.#moving ||
+      this.#follow.trailing ||
+      this.#followMoved ||
+      (track !== undefined && track.shown !== track.asked)
+    );
   }
 
   /** `true` once {@link dispose} has run. */
@@ -366,6 +413,7 @@ export class CameraRig {
   jump(target: CameraTarget): void {
     const subject = 'CameraRig#jump()';
     this.#assertAlive(subject);
+    this.#assertGrounded(subject);
     const kind = this.#readTarget(subject, target, this.#nextPose, undefined);
     const camera = kind === 'camera' ? new CameraProjection(target as PerspectiveCamera | OrthographicCamera) : undefined;
     let targetRest: Rest | undefined;
@@ -425,6 +473,7 @@ export class CameraRig {
   moveTo(target: CameraTarget, seconds: number, options?: CameraMoveOptions): Promise<void> {
     const subject = 'CameraRig#moveTo()';
     this.#assertAlive(subject);
+    this.#assertGrounded(subject);
     assertFiniteAtLeast(seconds, subject, 'seconds', 0);
     const easing = this.#readMoveOptions(subject, options);
     const kind = this.#readTarget(subject, target, this.#nextPose, options);
@@ -506,6 +555,19 @@ export class CameraRig {
     this.#assertAlive(subject);
     const values = this.#nextPose;
     readLook(subject, look, this.#isOrthographic(this.#targetProjection ?? this.#stage.projection), values);
+    const flight = this.#flight;
+    if (flight !== undefined) {
+      // on top of the flight, both rigs alike; the rig keeps its own look to go back to
+      const flightLook = this.#keyLook;
+      flightLook.yaw = values.yaw;
+      const limit = this.#pitchLimit;
+      let pitch = values.pitch;
+      if (pitch > limit) pitch = limit;
+      else if (pitch < -limit) pitch = -limit;
+      flightLook.pitch = pitch;
+      flight.look(flightLook);
+      return;
+    }
     this.#look.yaw = values.yaw;
     this.#look.pitch = values.pitch;
     this.#clampPitch();
@@ -550,12 +612,17 @@ export class CameraRig {
    * Ends a running move where it stands, and lets go of a camera or an `Object3D` the rig is locked
    * on to: the camera holds that shot — its lens as a factor on the fit — until the next target, and
    * a {@link look} turns it about the rest. A projection the move ran to is not assigned. The promise
-   * of the move resolves. Does nothing while the camera stands on a pose or a projection, and leaves
-   * a track alone.
+   * of the move resolves. Does nothing while the camera stands on a pose or a projection, and during
+   * a flight across a transition, whose shot is the transition's; leaves a track alone.
    */
   cancel(): void {
     this.#assertAlive('CameraRig#cancel()');
-    if (!this.#moving && !this.#follows) return;
+    if ((!this.#moving && !this.#follows) || this.#flight !== undefined) return;
+    this.#hold();
+  }
+
+  // ends a move where it stands and lets go of its target: the camera holds that shot
+  #hold(): void {
     if (this.#hasRest) {
       this.#resolveRelative(this.#held);
       this.#holding = true;
@@ -595,6 +662,7 @@ export class CameraRig {
   track(keysOrFrom: readonly CameraTrackKey[] | CameraTarget, ...to: CameraTarget[]): void {
     const subject = 'CameraRig#track()';
     this.#assertAlive(subject);
+    this.#assertGrounded(subject);
     const projection = this.#stage.projection!;
     const keys =
       to.length > 0
@@ -634,6 +702,9 @@ export class CameraRig {
   lerp(t: number, options?: CameraLerpOptions): void {
     const subject = 'CameraRig#lerp()';
     this.#assertAlive(subject);
+    // the check of a flight inline, its refusal alone a call: one call more on its way keeps V8 from
+    // inlining lerp(), and the progress its caller hands it is boxed (the allocation spec)
+    if (this.#flight !== undefined) this.#assertGrounded(subject);
     const track = this.#track;
     if (track === undefined) throw new Error(`${subject}: the rig has no track; set one with track() first`);
     // the checks inline rather than through assertFinite(): a progress is a fraction, and a fraction
@@ -685,6 +756,10 @@ export class CameraRig {
       );
     }
 
+    // a flight notices the end of its transition here and in the frame of the stage; while it runs,
+    // the clocks of a track and of a trailing stand, as the state the rig goes back to
+    this.#flight?.check();
+    const flying = this.#flight !== undefined;
     if (this.#lifting) {
       this.#liftElapsed += deltaSeconds;
       if (this.#liftElapsed >= this.#liftDuration) {
@@ -699,7 +774,7 @@ export class CameraRig {
     // whether the step moved the progress of a track
     let progressed = false;
     const track = this.#track;
-    if (track !== undefined) {
+    if (track !== undefined && !flying) {
       const shown = track.shown;
       // a field rather than an argument: a fraction handed to a call that V8 does not inline is boxed
       track.delta = deltaSeconds;
@@ -713,7 +788,7 @@ export class CameraRig {
       return false;
     }
     const follow = this.#follow;
-    if (follow.object !== undefined && !this.#moving && follow.smooth > 0) {
+    if (follow.object !== undefined && !this.#moving && follow.smooth > 0 && !flying) {
       // a field rather than an argument: a fraction handed to a call that V8 does not inline is boxed
       follow.delta = deltaSeconds;
       trailObject(follow, this.#rest);
@@ -724,7 +799,7 @@ export class CameraRig {
       return false;
     }
     copyShot(this.#current, this.#stepped);
-    this.#followMoved = (this.#follows && !this.#moving) || (track !== undefined && !progressed);
+    this.#followMoved = !flying && ((this.#follows && !this.#moving) || (track !== undefined && !progressed));
     return true;
   }
 
@@ -789,11 +864,27 @@ export class CameraRig {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    const flight = this.#flight;
+    // the other rig of a flight goes back to its state, and the flight is over; what that throws
+    // comes out of this call once the rig is down
+    let dropError: unknown;
+    let dropped = true;
+    if (flight !== undefined) {
+      this.#flight = undefined;
+      this.#saved = undefined;
+      try {
+        flight.drop(this.#side!);
+      } catch (error) {
+        dropped = false;
+        dropError = error;
+      }
+    }
     this.#release();
     this.#endMove();
     this.#lifting = false;
     // a stage that went on to another rig keeps it
     if (Stage2DInternals.driverOf(this.#stage) === this) Stage2DInternals.detachDriver(this.#stage);
+    if (!dropped) throw dropError;
   }
 
   /**
@@ -850,7 +941,9 @@ export class CameraRig {
    * @internal
    */
   write(): void {
-    if (!this.#hasRest || this.#disposed || this.#stage.isDisposed) return;
+    if (this.#disposed) return;
+    this.#flight?.check();
+    if (!this.#hasRest || this.#stage.isDisposed) return;
     this.#writeNow();
   }
 
@@ -903,8 +996,15 @@ export class CameraRig {
     if (out.kind === rest.kind) out.zoom = rest.lens / out.lens;
   }
 
-  // the shot the rig shows with the clocks where they stand, into `out`
+  // the shot the rig shows with the clocks where they stand, into `out`: the one of a flight, or its
+  // own. The flight branches off at the top and the body stays as it is: split into a call of its
+  // own, the track of a page that scrolls measures a heap number per frame (the allocation spec)
   #resolve(out: CameraShot): void {
+    const flight = this.#flight;
+    if (flight !== undefined) {
+      this.#resolveFlight(flight, out);
+      return;
+    }
     this.#writeBase = undefined;
     const track = this.#track;
     if (track !== undefined) {
@@ -943,6 +1043,24 @@ export class CameraRig {
     }
     this.#updateLift();
     out.lift = this.#liftShown;
+  }
+
+  // the shot of the flight the rig takes part in, with the lift of the rig
+  #resolveFlight(flight: Flight, out: CameraShot): void {
+    if (!flight.resolve(this.#flightRole, out)) this.#writeBase = undefined;
+    this.#updateLift();
+    out.lift = this.#liftShown;
+  }
+
+  // the shot of the rig's own state, as if it took part in no flight, into `out`
+  #resolveOwn(out: CameraShot): void {
+    const flight = this.#flight;
+    this.#flight = undefined;
+    try {
+      this.#resolve(out);
+    } finally {
+      this.#flight = flight;
+    }
   }
 
   // the distances of the two ends of a lens change to their focus planes — to the projection plane
@@ -1300,5 +1418,178 @@ export class CameraRig {
 
   #assertAlive(subject: string): void {
     if (this.#disposed) throw new Error(`${subject}: the rig has been disposed`);
+  }
+
+  #assertGrounded(subject: string): void {
+    if (this.#flight !== undefined) throw new Error(`${subject}: ${FLIGHT_REFUSAL}`);
+  }
+
+  /**
+   * Flies the camera through `transition` of a `StageDirector`, from the stage it leaves into the
+   * stage it brings; each needs a `CameraRig`, which keeps being stepped as before. During the
+   * transition there is one blended shot, in the world of `from`: from the shot the rig of `from`
+   * shows now to the target of `to` — `options.to`, or the shot the rig of `to` holds —, at the
+   * progress of the transition, eased by `options.easing`. The camera of `from` shows it, the camera
+   * of `to` shows it carried through `options.anchors` into the world of `to`: at progress 0 `from`
+   * shows its own picture, at 1 `to` stands exactly on its target. A manual transition flies the
+   * camera by the `progress` it is given, and `reverse()` flies it back. A lens change across the
+   * flight runs as the dolly zoom of {@link moveTo}, on both rigs alike.
+   *
+   * A running move of either rig ends where it stands, and its promise resolves; a lock-on, a track
+   * and a damped lerp stand with their clocks stopped, as the state the rig goes back to. During the
+   * flight {@link look} lies on top of it, on both rigs; {@link jump}, {@link moveTo}, {@link track}
+   * and {@link lerp} are refused. The rigs notice the end of the transition in their step and in the
+   * frame of their stage, by its state: where it finished or left `to` in its slot, the rig of `to`
+   * holds its target — a projection assigned to its stage, the look of the flight added to the
+   * target's — and the rig of `from` goes back to the state it had; where it left `from`, both go
+   * back. A rig disposed during the flight ends it, and the other goes back to its state. A frozen
+   * layer of the flight shows a still picture: the flight warns once.
+   *
+   * @throws {TypeError} for a `transition` that is not a `StageTransition`, `options` that are not an
+   * object, `anchors` that are not a pair of `Object3D`, an `easing` that is not one, and a target
+   * as {@link jump} refuses it.
+   * @throws {RangeError} for a `focus` that is not a finite number above 0, anchors scaled unevenly
+   * or mirrored against each other, and the numbers of a target pose as {@link jump} refuses them.
+   * @throws {Error} for a transition that is over, from or to nothing, a stage without a rig, a rig
+   * that takes part in a flight already, and a lens change without a focus where a side has no
+   * projection plane.
+   */
+  static across(transition: StageTransition, options?: CameraFlightOptions): CameraFlight {
+    return startFlight(transition, options, (stage) => {
+      const driver = stage instanceof Stage2D ? Stage2DInternals.driverOf(stage) : undefined;
+      return driver instanceof CameraRig && !driver.#disposed ? driver.#flightSide() : undefined;
+    });
+  }
+
+  // the face the rig shows a flight, made once
+  #flightSide(): FlightSide {
+    this.#side ??= {
+      stage: this.#stage,
+      rest: this.#rest,
+      inFlight: () => this.#flight !== undefined,
+      hasRest: () => this.#hasRest,
+      targetRest: () => (this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest),
+      resolveOwn: (out) => this.#resolveOwn(out),
+      resolveStart: (out) => {
+        this.#resolveOwn(out);
+        if (out.kind === this.#rest.kind) out.zoom = this.#rest.lens / out.lens;
+      },
+      containerInto: (change) => {
+        change.containerSize = this.#containerSize;
+      },
+      readEnd: (subject, target) => this.#readFlightEnd(subject, target),
+      join: (flight, role, target) => {
+        if (this.#moving) this.#hold();
+        if (target !== undefined) this.#takeFlightTarget(target);
+        this.#flight = flight;
+        this.#flightRole = role;
+      },
+      leave: (take, look) => this.#leaveFlight(take, look),
+    };
+    return this.#side;
+  }
+
+  // the lens of `target`, or of the shot the rig shows, and whether its frame has a plane
+  #readFlightEnd(subject: string, target: CameraTarget | undefined): FlightEnd {
+    const projection = this.#stage.projection!;
+    if (target === undefined) {
+      if (!this.#hasRest) {
+        return {kind: this.#kindOfProjection(projection), hasPlane: projection.projectionPlane != null, camera: false};
+      }
+      const shot = createShot();
+      this.#resolveOwn(shot);
+      const rest = this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest;
+      return {kind: shot.kind, hasPlane: rest.hasPlane, camera: false};
+    }
+    const kind = this.#readTarget(subject, target, this.#nextPose, undefined);
+    if (kind === 'camera') return {kind: kindOf(target as Camera)!, hasPlane: false, camera: true};
+    if (kind === 'projection') {
+      const own = target as IProjection;
+      return {kind: this.#kindOfProjection(own), hasPlane: own.projectionPlane != null, camera: false};
+    }
+    const stageKind = this.#hasRest ? this.#rest.kind : this.#kindOfProjection(projection);
+    return {kind: stageKind, hasPlane: projection.projectionPlane != null, camera: false};
+  }
+
+  // the target of a flight, taken by the rig of `to` as moveTo() takes one — a projection assigned
+  // once the rig takes over —, the state it had kept to go back to
+  #takeFlightTarget(target: CameraTarget): void {
+    const subject = 'CameraRig.across()';
+    const kind = this.#readTarget(subject, target, this.#nextPose, undefined);
+    const projection =
+      kind === 'projection'
+        ? (target as IProjection)
+        : kind === 'camera'
+          ? new CameraProjection(target as PerspectiveCamera | OrthographicCamera)
+          : undefined;
+    let targetRest: Rest | undefined;
+    if (projection !== undefined && this.#hasRest) {
+      targetRest = createRest();
+      this.#placeTarget(projection, targetRest);
+    }
+    const saved: SavedState = {
+      pose: copyPoseValues(this.#pose, createPoseValues()),
+      yaw: this.#look.yaw,
+      pitch: this.#look.pitch,
+      holding: this.#holding,
+      holdingTurn: this.#holdingTurn,
+      held: copyShot(this.#held, createShot()),
+      track: this.#track,
+      targetProjection: this.#targetProjection,
+      assigns: this.#assigns,
+      targetRest: this.#targetRest,
+      targetPlaced: this.#targetPlaced,
+      follows: this.#follows,
+      follow: Object.assign(createObjectFollow(), this.#follow),
+      focus: this.#focus,
+      depth: this.#depth,
+    };
+    this.#release();
+    copyPoseValues(this.#nextPose, this.#pose);
+    this.#holding = false;
+    if (kind !== 'object') this.#takeLookOfPose();
+    this.#focus = Number.NaN;
+    this.#depth = Number.NaN;
+    this.#takeTarget(kind, target, projection, targetRest, undefined);
+    this.#saved = saved;
+  }
+
+  // the end of a flight for this rig: with `take` it holds its target, the look of the flight added;
+  // otherwise it goes back to the state it had
+  #leaveFlight(take: boolean, look: Look): void {
+    this.#flight = undefined;
+    const saved = this.#saved;
+    this.#saved = undefined;
+    if (take) {
+      if (look.yaw !== 0 || look.pitch !== 0) {
+        this.#look.yaw += look.yaw;
+        this.#look.pitch += look.pitch;
+        this.#clampPitch();
+        this.#holdingTurn = false;
+      }
+      this.#arrive();
+      return;
+    }
+    if (saved === undefined) return;
+    copyPoseValues(saved.pose, this.#pose);
+    this.#look.yaw = saved.yaw;
+    this.#look.pitch = saved.pitch;
+    this.#holding = saved.holding;
+    this.#holdingTurn = saved.holdingTurn;
+    copyShot(saved.held, this.#held);
+    this.#track = saved.track;
+    this.#targetProjection = saved.targetProjection;
+    this.#assigns = saved.assigns;
+    this.#targetRest = saved.targetRest;
+    this.#targetPlaced = saved.targetPlaced;
+    this.#follows = saved.follows;
+    Object.assign(this.#follow, saved.follow);
+    this.#focus = saved.focus;
+    this.#depth = saved.depth;
+    // the container may have changed while the flight ran
+    if (saved.targetProjection !== undefined && this.#hasRest && !this.#stage.isDisposed) {
+      this.#placeTarget(saved.targetProjection, this.#targetRest);
+      this.#targetPlaced = true;
+    }
   }
 }

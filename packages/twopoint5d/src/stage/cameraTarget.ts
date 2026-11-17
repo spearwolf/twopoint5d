@@ -233,12 +233,21 @@ const turn = new Quaternion();
  */
 export function writeTurn(rest: Rest, look: Look, out: Quaternion): void {
   out.copy(rest.quaternion);
+  applyLook(rest.up, look, out);
+}
+
+/**
+ * Turns `out` by `look`: the yaw about `up`, in the world — premultiplied —, then the pitch about
+ * the right axis of the camera, in its own space — multiplied. A look of 0 leaves `out` as it is.
+ * Allocates nothing.
+ * @internal
+ */
+export function applyLook(up: Vector3, look: Look, out: Quaternion): void {
   const slot = turnSlot;
   const yaw = look.yaw;
   if (yaw !== 0) {
     const half = yaw / 2;
     const sin = Math.sin(half);
-    const up = rest.up;
     slot[0] = up.x * sin;
     slot[1] = up.y * sin;
     slot[2] = up.z * sin;

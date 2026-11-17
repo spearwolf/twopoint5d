@@ -18,9 +18,14 @@ export type StageTransitionEasingSpec = EasingSpec;
 /** How one frame moved a transition, as `StageDirector#updateFrame()` acts on it. @internal */
 export type StageTransitionStep = 'none' | 'started' | 'reached-end' | 'reached-start';
 
-/** What a `StageDirector` does when a transition is ended from its handle. @internal */
+/**
+ * What a `StageDirector` does when a transition is ended from its handle, and what it answers about
+ * the layers of a running one. @internal
+ */
 export interface StageTransitionHost {
   end(transition: StageTransition, keep: 'from' | 'to', state: 'finished' | 'cancelled'): void;
+  /** Whether the layer of `stage` is frozen. */
+  isFrozen(stage: IStage): boolean;
 }
 
 /** @internal */
@@ -47,7 +52,12 @@ let pendingHost: StageTransitionHost | undefined;
 export const StageTransitionInternals = {} as {
   create(init: StageTransitionInit, host: StageTransitionHost | undefined): StageTransition;
   advance(transition: StageTransition, deltaTime: number): StageTransitionStep;
-  settle(transition: StageTransition, state: 'finished' | 'cancelled'): void;
+  /** Ends `transition` as `state`, with the source `keep` in its slot. */
+  settle(transition: StageTransition, state: 'finished' | 'cancelled', keep: 'from' | 'to'): void;
+  /** The source a transition that is over left in its slot; `undefined` while it runs. */
+  keptOf(transition: StageTransition): 'from' | 'to' | undefined;
+  /** Whether the director of a running transition has frozen the layer of `stage`; `false` once it is over. */
+  isFrozen(transition: StageTransition, stage: IStage): boolean;
 };
 
 /**
@@ -81,6 +91,7 @@ export class StageTransition {
   #seenFrame = false;
   #direction = 1;
   #progress = 0;
+  #kept: 'from' | 'to' | undefined;
 
   readonly #finished: Promise<StageTransition>;
   #resolve!: (transition: StageTransition) => void;
@@ -97,7 +108,9 @@ export class StageTransition {
       }
     };
     StageTransitionInternals.advance = (transition, deltaTime) => transition.#advance(deltaTime);
-    StageTransitionInternals.settle = (transition, state) => transition.#settle(state);
+    StageTransitionInternals.settle = (transition, state, keep) => transition.#settle(state, keep);
+    StageTransitionInternals.keptOf = (transition) => transition.#kept;
+    StageTransitionInternals.isFrozen = (transition, stage) => transition.#host?.isFrozen(stage) === true;
   }
 
   /** Made by a `StageDirector` alone: every change of its stack answers one. */
@@ -222,9 +235,10 @@ export class StageTransition {
     return 'none';
   }
 
-  #settle(state: 'finished' | 'cancelled'): void {
+  #settle(state: 'finished' | 'cancelled', keep: 'from' | 'to'): void {
     if (this.isOver) return;
     this.#state = state;
+    this.#kept = keep;
     if (state === 'finished') {
       this.#elapsed = this.duration;
       this.#progress = 1;
