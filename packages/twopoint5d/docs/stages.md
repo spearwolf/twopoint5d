@@ -654,7 +654,8 @@ camera of the other kind ahead — for the target the stage draws into, and for 
 of its first draw, or of [`StageDirector#precompile()`](#no-hitch-on-the-first-transition) with the
 stage in `layers`. It takes a `WebGPURenderer` under either backend and rejects a `WebGLRenderer`.
 Calls on one renderer run one after the other, of one rig or of several, each with its own result,
-so the rigs of a director can precompile with `Promise.all()`.
+so the rigs of a director can precompile with `Promise.all()`. `StageDirector#precompile()` does not
+share that queue: await it before or after the compiles of the rigs, not alongside them.
 
 A `postProcess` that reads depth sees the depth of either kind of camera: a perspective one stores it
 non-linearly, an orthographic one linearly. Linearize it for the kind of `stage.camera`, or rebuild

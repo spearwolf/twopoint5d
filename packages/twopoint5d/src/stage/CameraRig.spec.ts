@@ -1809,6 +1809,43 @@ describe('CameraRig', () => {
         expect(camera.position.x).toBe(200);
         expect(action.enabled && action.paused, 'neither played nor stopped').toBe(true);
       });
+
+      it('scrubs the clip in the frame of the stage, so that a first lerp() into its key shows it before any step', () => {
+        const {stage, rig} = makeRig();
+        const {camera, action} = animatedCamera();
+        rig.track([
+          {at: 0, shot: {position: [0, 0]}},
+          {at: 0.2, until: 0.6, shot: camera, clip: action},
+          {at: 1, shot: {position: [0, 0]}},
+        ]);
+        frame(stage);
+
+        rig.lerp(0.4, {smooth: 0.5});
+        frame(stage);
+        expect(action.time, 'the mapped time, before any step').toBeCloseTo(1, 12);
+        expect(camera.position.x).toBeCloseTo(100, 9);
+        expectShowsAs(rig.camera, fittedTo(camera, stage));
+
+        // the step finds the clip at its time already
+        const update = vi.spyOn(action.getMixer(), 'update');
+        expect(rig.step(1 / 60), 'the shot the frame showed').toBe(true);
+        expect(update).not.toHaveBeenCalled();
+        frame(stage);
+        expectShowsAs(rig.camera, fittedTo(camera, stage));
+
+        // a disposed stage writes nothing, and scrubs nothing either
+        rig.track([
+          {at: 0, shot: {position: [0, 0]}},
+          {at: 0.2, until: 0.6, shot: camera, clip: action},
+          {at: 1, shot: {position: [0, 0]}},
+        ]);
+        stage.dispose();
+        rig.lerp(0.25);
+        rig.write();
+        rig.compose();
+        expect(update).not.toHaveBeenCalled();
+        expect(action.time).toBeCloseTo(1, 12);
+      });
     });
 
     describe('smooth', () => {

@@ -996,6 +996,11 @@ export class CameraRig {
   // writes the shot of the frame with the camera of its kind; a swap is written before the stage
   // announces it, so its listeners find the camera placed
   #writeNow(): void {
+    // the clips of a track at the shown progress, which the first lerp() sets without a step; a clip
+    // whose time stands is skipped, so the scrub of the step costs nothing more. A flight stops the
+    // clocks of the track
+    const track = this.#track;
+    if (track !== undefined && this.#flight === undefined) scrubTrackClips(track);
     const shot = this.#current;
     this.#resolve(shot);
     const camera = shot.kind === 'perspective' ? this.#perspective : this.#orthographic;
