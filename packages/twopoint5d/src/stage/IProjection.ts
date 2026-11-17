@@ -90,7 +90,9 @@ export interface IProjection {
    * something that moves. `Stage2D#updateFrame()` asks it in every frame with a camera and a view,
    * and places the camera through {@link updateCamera} when it answers `true`, without
    * {@link updateViewRect} and {@link getViewRect}. A projection without it is placed only when the
-   * view changes. It is asked in every frame, so it should allocate nothing itself.
+   * view changes. It is asked in every frame, so it — and {@link updateCamera} on that path —
+   * should allocate nothing: the stage's own code of the placement allocates nothing, and the emit of
+   * `OnStageCameraPlaced` costs what every event emit costs.
    */
   needsPlacement?(camera: Camera): boolean;
 }

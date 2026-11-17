@@ -542,7 +542,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   // what the listeners made of it, also behind one that threw. What the listeners and compose()
   // throw goes into `errors` — an array made on the first error where the caller hands none — and
   // the array comes back: the placement happens after the state stands, so neither undoes it. One
-  // props object per stage, rewritten
+  // props object per stage, rewritten: the code of the placement allocates nothing on a path without
+  // an error, and the emit costs what every eventize emit costs, as OnStageUpdateFrame does
   #announcePlacement(
     camera: Camera,
     projection: IProjection,

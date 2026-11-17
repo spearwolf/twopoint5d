@@ -440,9 +440,10 @@ projection ──places──▶ base camera ──OnStageCameraPlaced──▶ 
   to the scene are listeners here, and every pose and move of the rig runs relative to them. Without
   a rig the listener changes `stage.camera` right after the projection placed it, which is the
   place for such a change on any stage. The stage keeps one props object per instance and rewrites
-  it, as for `OnStageUpdateFrame`, so a placement in every frame — a `CameraProjection` with an
-  animated source — allocates nothing. Every listener hears it; what one throws reaches the caller
-  of the placement afterwards, as for `OnStageResize`.
+  it, as for `OnStageUpdateFrame`, so the stage's own code of a placement in every frame — a
+  `CameraProjection` with an animated source — allocates nothing; the emit itself costs what every
+  eventize emit costs, as `OnStageUpdateFrame` does today. Every listener hears it; what one throws
+  reaches the caller of the placement afterwards, as for `OnStageResize`.
 - **After the rig: `OnStageUpdateFrame`.** The rig writes just before it (§3.4), so a listener there
   sees the camera of this frame and may write over it — a camera shake, a clamp of the final
   camera to the edges of a level. By the rule below, such a write holds for that frame's draw and
@@ -601,9 +602,13 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
 `step()` — a move, a lock-on, a damped lerp, a track, a flight —, the write in the frame of the
 stage, `lerp()`, `look()` while moving, `jump()` with a pose object the caller keeps, the placement
 of a `CameraProjection` and its `needsPlacement()` allocate nothing: the rig writes
-into shots, vectors, quaternions and matrices it owns. Held by
-`src/stage/hot-path-allocations.camera-rig.spec.ts`. The placement of a planar base on a resize and
-the start of a move may allocate.
+into shots, vectors, quaternions and matrices it owns. "Allocates nothing" holds for the library's
+own code on the path — the rig's `step()`, `write()` and `compose()`, `needsPlacement()` and
+`updateCamera()` of `CameraProjection`; the events a `Stage2D` emits on it, `OnStageCameraPlaced`
+and `OnStageUpdateFrame`, cost what every eventize emit costs. Held by
+`src/stage/hot-path-allocations.camera-rig.spec.ts`, which calls those methods directly rather than
+`stage.updateFrame()`. The placement of a planar base on a resize and the start of a move may
+allocate.
 
 ### 4.9 The shared easings
 

@@ -2118,7 +2118,9 @@ a projection that does not shift its frustum answers `0` for both. `projectionPl
 `updateCamera()` throw only where the projection needs the plane. A projection that follows
 something that moves implements `needsPlacement(camera)`: the stage asks it in every frame with a
 camera and a view, and places the camera through `updateCamera()` when it answers `true`, without
-a call of `updateViewRect()` or `getViewRect()`.
+a call of `updateViewRect()` or `getViewRect()`. The stage's own code of that placement allocates
+nothing, and neither should `needsPlacement()` and `updateCamera()`; the emit of
+`OnStageCameraPlaced` costs what every event costs, as `OnStageUpdateFrame` does in every frame.
 
 A subclass of `StageRenderer` has protected hooks. `renderToCurrentTarget(renderer)` is the one
 draw of a renderer, called by its own `renderTo()` and by a parent that composes it into its pass
