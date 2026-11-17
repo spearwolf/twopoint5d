@@ -126,6 +126,11 @@ export class StagePostProcessRun {
     return node;
   }
 
+  /** The scene pass of the build that stands; `undefined` before the first build and after a release. */
+  get pass(): PassNode | undefined {
+    return this.#pass;
+  }
+
   /** A new scene of the stage, for the pass of a build that stands. */
   setScene(scene: Scene): void {
     if (this.#pass !== undefined) this.#pass.scene = scene;

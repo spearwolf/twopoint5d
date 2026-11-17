@@ -450,6 +450,77 @@ dialog.addEventListener('close', () => rig.reframe({}, 0.3));
 
 The lift is a framing, not a viewpoint: a `jump()` or a `moveTo()` keeps it.
 
+#### Switching projections
+
+A projection is a target as well. `rig.moveTo(projection, seconds)` moves the camera to the rest of
+that projection — the placement it gives a camera for the container of the stage — and assigns it
+to `stage.projection` on arrival. The picture does not jump there: the camera already stands where
+the new projection places it. `rig.jump(projection)` assigns it at once; `cancel()` on the way
+leaves the stage with the projection it had.
+
+```ts
+// a closer framing of the same plane, as a move
+await rig.moveTo(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320, height: 180}), 0.6);
+```
+
+#### Perspective into orthographic
+
+A move to a projection of the other kind — an `OrthographicProjection` from a `ParallaxProjection`,
+or back — is a lens change. The rig runs it as a dolly zoom: the projection plane keeps its size on
+the screen while the camera backs off and its field of view narrows, so the depth of the scene
+flattens out until nothing of the parallax is left. There the rig swaps its `PerspectiveCamera` for
+its `OrthographicCamera`, and the stage announces the swap through `OnStageAfterCameraChanged`. The
+way back swaps first and backs in. A level that turns from a diorama into its map, and back:
+
+```ts check
+import {CameraRig, Display, OrthographicProjection, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!);
+const diorama = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360});
+const map = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360});
+const stage = new Stage2D(diorama);
+const rig = new CameraRig(stage);
+display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
+new StageRenderer(display).add(stage);
+
+await display.start();
+// the materials of the scene for an orthographic camera too, so the swap builds no shader
+await rig.precompile(display.renderer!);
+
+let flat = false;
+document.querySelector('#map')!.addEventListener('click', async () => {
+  flat = !flat;
+  // the scenery reaches 120 units in front of and behind the plane
+  await rig.moveTo(flat ? map : diorama, 1.2, {depth: 120});
+  // arrived: stage.projection is the map, or the diorama again
+});
+```
+
+- The rig swaps where the parallax across `depth` units in front of and behind the plane stays below
+  half a pixel of the container, so the swap frame looks like the frame before it. `depth` defaults
+  to the visible height of the plane — a bounding box of the scene says little, since sprites are
+  placed in the shader. Name the depth of your scenery where it is deeper or flatter than that.
+- The camera backs off to at most 1000 times the visible height: further away, the precision of the
+  view matrix shows. A scene so deep that this cap comes first swaps with a step above half a pixel.
+  The move does not fail — the step just shows.
+- The plane that keeps its size is the projection plane. A projection without one — one of your own
+  — needs `{focus}`, the distance from the camera to the plane that is to keep its size; without it
+  a lens change is refused with an `Error`.
+- During the change `rig.camera` is a `PerspectiveCamera`, also on the way out of an orthographic
+  projection; at the end it is the camera of the kind the new projection builds.
+- A `look()` while the move runs into an orthographic projection is refused, as under one.
+
+**No hitch on the swap.** three.js builds the materials of a scene for each kind of camera, so the
+first frame after a swap may build shaders. `rig.precompile(renderer)` compiles the scene with the
+camera of the other kind ahead — for the target the stage draws into, and for the scene pass of its
+`postProcess`, which it builds as its first draw would. The kind the stage draws with now is the job
+of its first draw, or of [`StageDirector#precompile()`](#no-hitch-on-the-first-transition) with the
+stage in `layers`. It takes a `WebGPURenderer` under either backend and rejects a `WebGLRenderer`.
+
+A `postProcess` that reads depth sees the depth of either kind of camera: a perspective one stores it
+non-linearly, an orthographic one linearly. Linearize it for the kind of `stage.camera`, or rebuild
+the post-process when `OnStageAfterCameraChanged` announces the swap.
+
 #### A camera that follows, with a rig
 
 A rig writes its camera in every frame, so a write to `stage.camera` of your own lasts one frame.
@@ -550,23 +621,25 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | member | |
 | --- | --- |
 | `new CameraRig(stage, {pitchLimit?, easing?})` | attaches to a `Stage2D` with a projection; one rig per stage |
-| `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection`, an `OrthographicCamera` under an `OrthographicProjection` |
+| `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection` and during a lens change, an `OrthographicCamera` under an `OrthographicProjection` |
 | `busy` | `true` while a move runs |
 | `jump(target)` | at once; ends a running move |
-| `moveTo(target, seconds, {easing?})` | eased; a promise that resolves when the move ends, however it ends |
+| `moveTo(target, seconds, {easing?, focus?, depth?})` | eased; a promise that resolves when the move ends, however it ends; `focus` and `depth` for a lens change |
 | `look({yaw, pitch})` | the look of the current viewpoint; the new end of a running move |
 | `reframe({lift?}, seconds?)` | the lift, a share of the picture height; on a clock of its own |
 | `cancel()` | ends a move where it stands |
-| `step(deltaSeconds)` | advances the clocks; answers a `Motion` |
+| `step(deltaSeconds)` | advances the clocks; answers a `Motion`; assigns a projection on arrival |
+| `precompile(renderer)` | compiles the scene, and the pass of its `postProcess`, with the camera of the other kind |
 | `dispose()`, `isDisposed` | detaches; the stage takes back its camera, a running move resolves |
 
-- A target is a `CameraPose`. The type `CameraTarget` names cameras, projections and other
+- A target is a `CameraPose` or a projection. The type `CameraTarget` names cameras and other
   `Object3D`s as well; this version refuses them with a `TypeError`. `CameraMoveOptions` declares
-  `offset`, `smooth`, `focus` and `depth` for them, and checks them already.
+  `offset` and `smooth` for them, and checks them already.
 - Refused, with the call as the subject of the message: a stage that is not a `Stage2D`, has no
   projection, has a rig already or is disposed; a `pitchLimit` outside `(0, π/2]`; a pose with a
   number that is not finite, a `zoom` that is not above 0, a `look` under an orthographic
-  projection; `seconds` that is not a finite number of 0 or more.
+  projection; `seconds` that is not a finite number of 0 or more; a `focus` or a `depth` that is not
+  a finite number above 0; a lens change without a `focus` where a projection has no plane.
 - After `dispose()` every method but `dispose()` throws. A stage disposed under the rig stops its
   writes: `step()` answers `false`, and `rig.dispose()` still works. The stage stays yours: the rig
   never disposes it.
@@ -2566,6 +2639,10 @@ pipeline.dispose();
 - **A camera that ignores your writes.** A stage with a `CameraRig` draws with the camera of the
   rig, which writes it in every frame: a write to `stage.camera` holds for one frame. Move the
   camera through the rig — see [moving the camera](#moving-the-camera).
+- **A post-process that reads depth, under a lens change.** A `CameraRig` that moves between a
+  perspective and an orthographic projection swaps the kind of the camera, and with it the way the
+  depth is stored. Linearize it for the kind of `stage.camera` — see
+  [perspective into orthographic](#perspective-into-orthographic).
 - **Specs written, nothing happens.** A write to the specs needs `stage.needsUpdate = true`.
 - **Clipped layers under an orthographic projection.** The camera sits `distanceToProjectionPlane`
   in front of the plane; a layer closer to it than `near` is not drawn.
@@ -2619,7 +2696,7 @@ pipeline.dispose();
 | `OrthographicProjection` | a view without depth: everything as large as on the plane |
 | `ParallaxProjection` | a view with depth: `getScaleFactor()`, `getParallaxFactor()` |
 | `ProjectionPlane` | the plane a camera looks at, four descriptions or a plane of your own |
-| `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `step()` — to a `CameraPose` in the frame of the projection |
+| `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `step()`, `precompile()` — to a `CameraPose` in the frame of the projection, or to another projection, as a dolly zoom where the kind changes |
 | `ClearStage` | clears depth (by default), color or stencil between two stages |
 | `Canvas2DStage` | a 2D canvas on a sprite in a stage of its own |
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |
@@ -2662,6 +2739,7 @@ pipeline.dispose();
 | `distanceToProjectionPlane` | `100` orthographic, `300` parallax |
 | `near`, `far` | `0.1`, `100000` |
 | `CameraRig` | `pitchLimit`: 85° (`Math.PI * 85 / 180`), `easing`: `'ease-in-out'` |
+| `CameraMoveOptions` | `focus`: the distance to the projection plane, `depth`: the visible height at the focus plane |
 | `CameraPose` | the rest's: `position` and its distance, `look` `{yaw: 0, pitch: 0}`, `zoom` `1` |
 | `StageRenderer#clear` | `false` |
 | `StageRenderer#clearAlpha` | `1` |

@@ -61,8 +61,9 @@ export function perspectiveLens(fov: number): number {
  * `a`: the position, near, far and lift linearly, the orientation by a slerp that takes the short
  * way, the lens linearly — a perspective one in `tan(fov / 2)`, an orthographic one in the height of
  * its view —, and the zoom so that it stays the factor of the blended lens on the blended base lens.
- * `e` of 0 or below answers `a`, of 1 or above `b`, exactly. The kind is `a`'s until the end.
- * Allocates nothing.
+ * `e` of 0 or below answers `a`, of 1 or above `b`, exactly. For two shots of one kind; a move
+ * between the kinds goes through `blendLensChangeAtProgress()`, and a blend of two kinds here keeps
+ * `a`'s kind until the end. Allocates nothing.
  * @internal
  */
 export function blendShots(a: CameraShot, b: CameraShot, e: number, target: CameraShot): CameraShot {
@@ -179,7 +180,10 @@ function viewOf<C extends PerspectiveCamera | OrthographicCamera>(camera: C): Vi
  * —; an orthographic camera takes the frustum of an orthographic base, which carries the offset of
  * `pixelSnap` itself, and zooms it by the lens. The lift goes on top as a view offset. A lens equal
  * to the base lens takes the field of view or the zoom of the base as it is, so a shot at the rest
- * writes the very camera the projection placed. Allocates nothing once the camera has a view object.
+ * writes the very camera the projection placed. Over a base of the other kind — the perspective
+ * camera of a lens change on a stage that still has its orthographic projection — the camera takes
+ * a field of view from the lens, or a frustum of the height of the lens and of `aspect`, around its
+ * axis. Allocates nothing once the camera has a view object.
  * @internal
  */
 export function writeShot(shot: CameraShot, base: Camera, camera: Camera, aspect: number): void {

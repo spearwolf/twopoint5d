@@ -57,6 +57,8 @@ function disposedError(member: string): Error {
  *   announces and places it. On a disposed stage it lets go of the driver and nothing else.
  * - `announceCamera()`: the driver has swapped its camera; the stage takes and announces the new one.
  * - `driverOf()`: the driver attached to the stage.
+ * - `scenePassesOf()`: the scene passes the stage has built — the one of `asPassNode()`, the one of
+ *   its post-process —, so that a driver compiles them with a camera of the other kind.
  * @internal
  */
 export const Stage2DInternals = {} as {
@@ -64,6 +66,7 @@ export const Stage2DInternals = {} as {
   detachDriver(stage: Stage2D): void;
   announceCamera(stage: Stage2D): void;
   driverOf(stage: Stage2D): StageCameraDriver | undefined;
+  scenePassesOf(stage: Stage2D): PassNode[];
 };
 
 export interface Stage2D extends EventizedObject {}
@@ -86,6 +89,13 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     Stage2DInternals.detachDriver = (stage) => stage.#detachDriver();
     Stage2DInternals.announceCamera = (stage) => stage.#announceDriverCamera();
     Stage2DInternals.driverOf = (stage) => stage.#driver;
+    Stage2DInternals.scenePassesOf = (stage) => {
+      const passes: PassNode[] = [];
+      if (stage.#passNode != null) passes.push(stage.#passNode);
+      const postProcessPass = stage.#postProcessRun?.pass;
+      if (postProcessPass !== undefined) passes.push(postProcessPass);
+      return passes;
+    };
   }
 
   #scene: Scene;

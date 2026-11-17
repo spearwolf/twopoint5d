@@ -1,6 +1,8 @@
-import {Vector3} from 'three/webgpu';
+import {on} from '@spearwolf/eventize';
+import {OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
+import {OnStageAfterCameraChanged} from '../events.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {Easing} from '../utils/easing.js';
 import {CameraRig} from './CameraRig.js';
@@ -17,11 +19,13 @@ const CALLS = 1000;
 // rounds hand the rig whole numbers and constants alone (AGENTS.md), and the move never arrives
 const LONG_MOVE = 1e9;
 
+const makeProjection = (kind: 'parallax' | 'orthographic') =>
+  kind === 'parallax'
+    ? new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, pixelSnap: true})
+    : new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640, pixelSnap: true});
+
 const makeRig = (kind: 'parallax' | 'orthographic' = 'parallax') => {
-  const projection =
-    kind === 'parallax'
-      ? new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, pixelSnap: true})
-      : new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640, pixelSnap: true});
+  const projection = makeProjection(kind);
   const stage = new Stage2D(projection);
   // an odd size: pixelSnap gives the base a view offset, which the rig copies in every write
   stage.resize(801, 601);
@@ -51,6 +55,38 @@ describe('CameraRig on the hot path', () => {
     });
 
     expect(rig.busy, 'the move is still under way').toBe(true);
+    expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  // A lens change runs as a perspective camera over the base of the projection the stage has: out
+  // of an orthographic projection the rig has swapped its camera by the first step — in the warm-up
+  // round —, and compose() and write() keep the swapped camera over the orthographic base. The swap
+  // itself is announced once, by the stage, and the arrival assigns the projection: both allocate,
+  // as the start of a move and a placement may.
+  test.each<['parallax' | 'orthographic', 'parallax' | 'orthographic']>([
+    ['parallax', 'orthographic'],
+    ['orthographic', 'parallax'],
+  ])('step(), write() and compose() through a lens change out of a %s projection allocate nothing', async (from, to) => {
+    const rig = makeRig(from);
+    const changed: unknown[] = [];
+    on(rig.stage, OnStageAfterCameraChanged, (_stage: unknown, previous: unknown) => changed.push(previous));
+    void rig.moveTo(makeProjection(to), LONG_MOVE, {depth: 40, easing: 'linear'});
+    let moved = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) {
+        if (rig.step(1)) moved++;
+        rig.write();
+        rig.compose();
+      }
+    });
+
+    expect(rig.busy, 'the lens change is still under way').toBe(true);
+    expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+    expect(changed, 'swapped once, out of an orthographic projection alone').toEqual(
+      from === 'orthographic' ? [expect.any(OrthographicCamera)] : [],
+    );
     expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
     expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
