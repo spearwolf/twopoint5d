@@ -1208,12 +1208,41 @@ describe('Stage2D', () => {
       expect(caught).toBeInstanceOf(AggregateError);
       expect((caught as AggregateError).errors).toEqual([cameraFailure, resizeFailure]);
       expect((caught as AggregateError).message).toBe(
-        'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged and OnStageResize threw',
+        'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
       );
       expect(stage.camera).toBeDefined();
       expect([stage.containerWidth, stage.containerHeight]).toEqual([800, 600]);
       expect([stage.width, stage.height]).toEqual([640, 480]);
       expect(stage.needsUpdate).toBe(false);
+    });
+
+    it('a placement listener and a resize listener that throw in updateProjection() come out as one AggregateError', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(800, 600);
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+      const placedFailure = new Error('the placement listener failed');
+      const resizeFailure = new Error('the resize listener failed');
+      on(stage, OnStageCameraPlaced, () => {
+        throw placedFailure;
+      });
+      on(stage, OnStageResize, () => {
+        throw resizeFailure;
+      });
+      (stage.projection as ParallaxProjection).viewSpecs = {fit: 'contain', width: 640};
+
+      let caught: unknown;
+      try {
+        stage.updateProjection(true);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(AggregateError);
+      expect((caught as AggregateError).errors).toEqual([placedFailure, resizeFailure]);
+      expect((caught as AggregateError).message).toBe(
+        'Stage2D#updateProjection(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
+      );
+      expect([stage.width, stage.height]).toEqual([640, 480]);
     });
 
     it('a scene listener that throws leaves the stage with the new scene and every listener heard it', () => {

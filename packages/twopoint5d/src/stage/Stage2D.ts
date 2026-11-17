@@ -217,7 +217,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       }
       throwCollected(
         errors,
-        'Stage2D#projection: more than one of the listeners of OnStageAfterCameraChanged and OnStageResize and the new projection threw',
+        'Stage2D#projection: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the new projection threw',
       );
     }
   }
@@ -276,7 +276,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
     throwCollected(
       errors,
-      'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged and OnStageResize and the projection threw',
+      'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the projection threw',
     );
   }
 
@@ -438,7 +438,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
           throw error;
         }
         // a listener that throws finds the container, the view and the camera taken
-        throwCollected(errors, 'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged and OnStageResize threw');
+        throwCollected(
+          errors,
+          'Stage2D#resize(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
+        );
       }
     }
   }
@@ -452,7 +455,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
       throwCollected(
         errors,
-        'Stage2D#updateProjection(): more than one listener of OnStageAfterCameraChanged and OnStageResize threw',
+        'Stage2D#updateProjection(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
       );
     }
   }

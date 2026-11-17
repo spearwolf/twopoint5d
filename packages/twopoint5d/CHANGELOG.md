@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Stage2D#asPassNode()` hands the same node for as long as `postProcess` stays, which is the life of a stage without one; `Stage2D#releasePassNodeMemory()` releases the render target of the pass of a post-process as well
 - the `AggregateError` of `Stage2D#dispose()` reads `Stage2D#dispose(): more than one of the listeners of the dispose event, the releases of the post-process and the release of the pass node threw`
 - the contract of `IProjection`: `projectionPlane` may be `undefined` for a projection that places its camera without one, and `createCamera()` and `updateCamera()` throw without a plane only where the projection needs one — `OrthographicProjection` and `ParallaxProjection` throw as before
+- the `AggregateError` of `Stage2D#resize()`, `Stage2D#updateProjection()` and of an assignment to `Stage2D#projection` or `Stage2D#camera` names `OnStageCameraPlaced` among the events whose listeners threw, as in `Stage2D#resize(): more than one listener of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw`
 
 ## [0.25.0] - 2026-11-01
 
