@@ -2,6 +2,7 @@ import {Matrix4, type Object3D, Quaternion, Vector3} from 'three/webgpu';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
+import {throwCollected} from '../utils/throwCollected.js';
 import {applyEasingInPlace, type Easing, type EasingSpec, easingOf} from '../utils/easing.js';
 import type {CameraTarget} from './CameraRig.js';
 import type {Rest} from './cameraRest.js';
@@ -28,7 +29,11 @@ export interface CameraFlightOptions {
    * an orthographic view. Default: the two worlds share their coordinates.
    */
   anchors?: readonly [Object3D, Object3D];
-  /** An easing over the progress of the transition. Default `'linear'`: the transition's own easing alone. */
+  /**
+   * An easing over the progress of the transition. Default `'linear'`: the transition's own easing
+   * alone. Its answer is clamped to `[0, 1]`, and a lens change across the flight swaps the kind of
+   * the cameras at the ends of the transition alone.
+   */
   easing?: Easing;
   /**
    * The distance of the focus plane of a lens change across the flight — perspective on one side,
@@ -339,12 +344,16 @@ export class Flight implements CameraFlight {
 
     const progress = this.#progress;
     progress[0] = this.transition.progress;
+    // the camera of the other kind at the ends of the transition alone, wherever the easing stands
+    this.#change.underWay = progress[0]! > 0 && progress[0]! < 1;
+    // clamped to [0, 1]: an easing that overshoots carries the blend past neither end
     applyEasingInPlace(this.#easing, progress);
     const e = progress[0]!;
     const look = this.#look;
     const turned = look.yaw !== 0 || look.pitch !== 0;
-    // the look lies on a perspective blend alone: an orthographic camera takes no look other than 0
-    if (role === 'to' && e >= 1 && (!turned || end.kind === 'orthographic')) {
+    // the look lies on a perspective blend alone: an orthographic camera takes no look other than 0.
+    // Under way the end is the blend's, which an easing that reaches 1 early leaves in perspective
+    if (role === 'to' && e >= 1 && !this.#change.underWay && (!turned || end.kind === 'orthographic')) {
       copyShot(end, out);
       return true;
     }
@@ -366,14 +375,23 @@ export class Flight implements CameraFlight {
     return false;
   }
 
+  // each rig leaves, also behind one that threw — the rig of `to` never stays in a flight that is
+  // over —, and what they threw comes out once both have left
   #finish(take: boolean): void {
     this.#over = true;
+    const errors: unknown[] = [];
     try {
       this.#from.leave(false, this.#look);
-      this.#to.leave(take, this.#look);
-    } finally {
-      this.#settle();
+    } catch (error) {
+      errors.push(error);
     }
+    try {
+      this.#to.leave(take, this.#look);
+    } catch (error) {
+      errors.push(error);
+    }
+    this.#settle();
+    throwCollected(errors, 'CameraRig.across(): both rigs threw as they left the flight');
   }
 
   // M and its inverse, read from the anchors where they stand now. Allocates nothing

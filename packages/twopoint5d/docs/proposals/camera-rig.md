@@ -19,8 +19,10 @@ Where the build left the first draft:
 - the example of a flight starts it with `director.replace()` (§3.5) — a `show()` comes from
   nothing, and a flight needs a stage on both sides;
 - a `look` is refused under every orthographic camera, a `CameraProjection` with an orthographic
-  source among them, and during a move into an orthographic projection (§3.2, §4.4) — such a
-  camera has nothing to turn the look into;
+  source among them, during a move into an orthographic projection, and on a track while it shows
+  an orthographic shot (§3.2, §4.4, §4.6) — such a camera has nothing to turn the look into; a look
+  the rig kept from before an orthographic projection was assigned to the stage, and the look of
+  the rig over the orthographic keys of a track, are left off the camera;
 - `CameraProjection` serves one stage per instance (§3.6): it remembers its last placement to
   answer `needsPlacement()`, and a second stage would find the first one's; a `Stage2D` builds its
   own camera anew where the source changes its kind (§3.6), since the projection refuses a
@@ -60,7 +62,8 @@ Where the build left the first draft:
 - the transition answers the flight two internal questions through its host, the director —
   whether a layer is frozen, which source it kept (§4.7) —; the draft had the director unchanged;
 - a flight ends at the first call to either rig after its transition is over, not only in the
-  next frame (§4.7), so a listener of `OnStageTransitionEnd` can chain the next move;
+  next frame (§4.7), so a listener of `OnStageTransitionEnd` can chain the next move; `busy` alone
+  leaves the end to the next call, since the end may throw;
 - the look of a flight turns a perspective shot alone (§4.7): an orthographic side keeps the look of
   its target;
 - the build took eleven steps instead of eight, with the guide growing in each, and split the rig
@@ -690,7 +693,9 @@ takes back (§6).
 ### 4.3 Blending
 
 The rig blends in world space, from the shot the camera showed when the move started to the
-target as it resolves in this frame, at the eased progress `e`:
+target as it resolves in this frame, at the eased progress `e`, which the rig clamps to `[0, 1]` on
+every blend — a move, a stretch of a track, a flight, the lift —, so that an easing that overshoots
+carries no blend past its ends:
 
 - position linearly; orientation by quaternion slerp, which takes the short way — a move from 350°
   to 10° turns 20°, not 340° (point 2 of the issue);
@@ -734,7 +739,10 @@ zoom** instead:
   the guide names it. With the default depth `h` the cap comes first on a container whose larger
   side passes about 1000 units — the step there is about `M / 1998` pixels, 0.96 on a container
   1920 wide.
-- Every frame between the ends is a perspective shot; the ends are exact copies of the two shots.
+- Every frame between the ends is a perspective shot — between the ends of the move, not of its
+  eased progress: where an easing reaches 0 or 1 on the way, the blend shows the perspective shot at
+  the swap (`LensChange#underWay`), so the kind swaps once —; the ends are exact copies of the two
+  shots.
   A move into the orthographic lens swaps in the frame of its arrival; the way back swaps at the
   first frame past its start and backs in from `d_swap`. The math is
   `blendLensChangeAtProgress()` in `src/stage/lensChange.ts`; `lensChangeStep()` gives the step for
@@ -796,7 +804,9 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
 - `look`, `zoom` and the lift stay the rig's; a drag-look works while following. An object brings
   no look of its own, so a drag-look holds across `moveTo(chest)` and back to the player, where a
   pose or a camera would reset it (§3.3). Under a `cancel()` the zoom and distance are those of the
-  shot it holds (`readObjectPose()` in `src/stage/cameraTarget.ts`).
+  shot it holds, and after a track or a camera — whose pose of the rig is the empty one — those of
+  the shot it shows, its look dropped for the rest's turned by `look()` (`readObjectPose()` in
+  `src/stage/cameraTarget.ts`).
 - The move blends to the position the object has in each frame, so a move back to a player who keeps
   walking meets the player, not the place the player stood at when the move began.
 - Once locked on, `smooth` lets the camera trail the object, critically damped; `0` sticks to it.
@@ -875,13 +885,16 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
   `true`.
 - The rigs notice the end of the transition in the frame of their stage, by its `state`, not by
   the `finished` promise, which settles a microtask late and could leave a draw in between:
-  `Flight#check()` runs in `step()` and in `write()`. It runs as well first thing in `busy`,
-  `look()`, `cancel()`, the refusals of `jump()`, `moveTo()`, `track()` and `lerp()`, and
-  `across()`, so a flight whose transition is over ends at the first call to either rig — a
-  listener of `OnStageTransitionEnd` can move the camera or chain the next flight. A getter with
-  that side effect does only what the next frame would have done. `transition.finished` is the
-  backstop for a transition after which no frame draws, a director disposed; what the end throws
-  there — a listener as the stage of `to` takes a projection — goes out as an unhandled rejection.
+  `Flight#check()` runs in `step()` and in `write()`. It runs as well first thing in `look()`,
+  `cancel()`, the refusals of `jump()`, `moveTo()`, `track()` and `lerp()`, and `across()`, so a
+  flight whose transition is over ends at the first call to either rig — a listener of
+  `OnStageTransitionEnd` can move the camera or chain the next flight. `busy` does not end it: the
+  end may throw what a listener of the stage of `to` throws as it takes a projection, and a getter
+  throws nothing, so `busy` answers `false` for a flight whose transition is over and leaves the
+  end to the next call or frame. Each rig leaves, also behind one that threw, and what both threw
+  comes out once both have left. `transition.finished` is the backstop for a transition after which
+  no frame draws, a director disposed; what the end throws there goes out as an unhandled
+  rejection.
 - In every frame, from the transition's `progress` and the easing of the flight: the start is the
   shot the rig of `from` showed when the flight began; the end is the target of `to`, resolved in
   the world of `to` and carried into the world of `from` through `M⁻¹`, with

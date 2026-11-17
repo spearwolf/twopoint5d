@@ -519,7 +519,8 @@ display.start();
 
 - `rig.jump(pose)` puts the camera there at once; `rig.moveTo(pose, seconds)` moves it there in
   `seconds`, eased by `'ease-in-out'` — or by `{easing: 'linear' | 'ease-in' | 'ease-out' | fn}`
-  as the third argument, or by the `easing` option of the rig.
+  as the third argument, or by the `easing` option of the rig. The answer of an easing is clamped
+  to `[0, 1]`, for every easing of the rig: a curve that overshoots stops at the ends.
 - `position` is a tuple — `[x, y]` keeps the distance of the rest, `[x, y, distance]` sets it — or
   anything with `x`, `y` and an optional `z`, such as a `Vector3`.
 - `zoom` is a factor on the field of view of the fit: `2` shows half the height. It stays a factor
@@ -529,7 +530,9 @@ display.start();
   turns left —, then `pitch` about the right axis of the camera — positive looks up.
 - Under an `OrthographicProjection` a pose takes `x`, `y` and `zoom`. The distance is ignored, since
   it changes nothing an orthographic camera shows — one list of viewpoints serves both kinds of
-  projection —, and a `look` other than 0 is refused.
+  projection —, and a `look` other than 0 is refused. An orthographic camera shows no look at all:
+  a look the rig kept from before an orthographic projection was assigned to `stage.projection` is
+  left off it.
 
 The promise of `moveTo()` resolves on arrival, and also when the move ends otherwise — `rig.cancel()`,
 which leaves the camera where it stands, a `jump()`, a `moveTo()` that overtakes it and starts where
@@ -644,7 +647,8 @@ document.querySelector('#map')!.addEventListener('click', async () => {
   `CameraProjection`, or one of your own — needs `{focus}`, the distance from the camera to the plane that is to keep its size; without it
   a lens change is refused with an `Error`.
 - During the change `rig.camera` is a `PerspectiveCamera`, also on the way out of an orthographic
-  projection; at the end it is the camera of the kind the new projection builds.
+  projection and where an easing that overshoots reaches 1 before the move does; at the end it is
+  the camera of the kind the new projection builds. The kind swaps once.
 - A `look()` while the move runs into an orthographic projection is refused, as under one.
 
 **No hitch on the swap.** three.js builds the materials of a scene for each kind of camera, so the
@@ -845,7 +849,9 @@ display.start();
   action: keep it playing and paused, as above. The update is three's, and at a time that is not a
   whole number of seconds it allocates a number for each keyframe track of the clip; the rig itself allocates
   nothing on its way.
-- Each key brings its own look; a `look()` lies on top of the whole track until the next target.
+- Each key brings its own look; a `look()` lies on top of the whole track until the next target —
+  on its perspective shots: an orthographic key shows no look, and `look()` is refused while the
+  track shows one.
 - A stretch between a perspective and an orthographic key is a [lens
   change](#perspective-into-orthographic), with the projection plane as its focus. A track names no
   focus, so a key without a plane on one end of such a stretch — a camera, a projection or a stage
@@ -920,7 +926,9 @@ export async function enterCity() {
   a scale carries the position, near and far, the focus and the height of an orthographic view. The
   scale must be even on the three axes, and the anchors must not mirror each other.
 - The progress is the transition's, eased once more by `easing` (`'linear'` by default: the
-  transition's own easing alone). `reverse()` flies the camera back.
+  transition's own easing alone), its answer clamped to `[0, 1]`. A lens change across the flight
+  swaps the kind of the cameras at the ends of the transition alone. `reverse()` flies the camera
+  back.
 - A flight between a perspective and an orthographic side is a [lens
   change](#perspective-into-orthographic) on both rigs alike, with the projection plane of each side
   as its focus, or `focus` — a distance in the world of `from` — where a side has none.
@@ -938,7 +946,10 @@ export async function enterCity() {
   state it had, out of sight, so that a way back finds it as it was. Cancelled with `from` in its
   slot — `cancel()`, `reverse()` back to the start, a director disposed —: both rigs go back. A rig
   disposed during the flight ends it, and the other goes back. `flight.finished` resolves then, and
-  never rejects.
+  never rejects. What a rig throws as it leaves — a listener of the stage of `to` as it takes a
+  projection — comes out of the call or the frame that noticed the end, after both rigs have left;
+  `busy` answers `false` once the transition is over and leaves the end to them, so it throws
+  nothing.
 - A frozen layer shows a still picture, not the flight: the flight warns once, naming the stage.
 
 A scroll drives picture and camera with one number. A manual transition takes its progress by hand,
@@ -1038,7 +1049,9 @@ export async function showChest() {
   `[x, y, distance]` with a distance from the plane, which an orthographic camera ignores. Without
   a distance the camera keeps the one it had.
 - The look, the zoom and the lift stay as they are: an object brings no viewpoint of its own, and a
-  drag-look works while following.
+  drag-look works while following. After a track or a camera the zoom and the distance are those of
+  the shot it shows, and the look goes back to the rest's, turned by `look()`: the orientation of a
+  key or of the camera does not carry over.
 - The move meets the object where it is in each frame, so the way back from the chest ends on the
   player, who kept walking — not on the place the player stood when the move began.
 - Once locked on, the camera sticks to the object; with `smooth` — a time constant in seconds — it
@@ -1147,7 +1160,7 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | --- | --- |
 | `new CameraRig(stage, {pitchLimit?, easing?})` | attaches to a `Stage2D` with a projection; one rig per stage |
 | `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection` and during a lens change, an `OrthographicCamera` under an `OrthographicProjection`, the kind of the source under a `CameraProjection` |
-| `busy` | `true` while a move runs, while the camera trails an object by `smooth`, while a damped `lerp()` has yet to settle, while a lock-on or a key of the track moved the camera in the last step, and during a flight |
+| `busy` | `true` while a move runs, while the camera trails an object by `smooth`, while a damped `lerp()` has yet to settle, while a lock-on or a key of the track moved the camera in the last step, and during a flight whose transition is not over; it throws nothing |
 | `jump(target)` | at once; ends a running move; locks on to a camera or an object |
 | `moveTo(target, seconds, {easing?, offset?, smooth?, focus?, depth?})` | eased; a promise that resolves when the move ends, however it ends; locks on to a camera or an object on arrival; `offset` and `smooth` for an object, `focus` and `depth` for a lens change |
 | `look({yaw, pitch})` | the look of the current viewpoint; the new end of a running move |
@@ -1170,11 +1183,12 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
   `seconds` that is not a finite number of 0 or more; an `offset` that is not a tuple of 2 or 3
   finite numbers; a `smooth` that is not a finite number of 0 or more; a `focus` or a `depth` that
   is not a finite number above 0; a lens change without a `focus` where a projection or the camera
-  of the target has no plane. `track()` refuses keys that are not a non-empty array, an `at` or an
-  `until` that is not a finite number from 0 to 1, an `until` before its `at`, keys out of order, a
-  `clip` that is not an `AnimationAction` or whose key has no camera as its shot, and a lens change
-  between two keys where one of them has no plane; `lerp()` refuses a `t` that is not a finite
-  number and a rig without a track. During a flight `jump()`, `moveTo()`, `track()` and `lerp()`
+  of the target has no plane; a stage whose projection was taken away under the rig, where
+  `moveTo()`, `track()` or `CameraRig.across()` needs it. `track()` refuses keys that are not a
+  non-empty array, an `at` or an `until` that is not a finite number from 0 to 1, an `until` before
+  its `at`, keys out of order, a `clip` that is not an `AnimationAction` or whose key has no camera
+  as its shot, and a lens change between two keys where one of them has no plane; `lerp()` refuses
+  a `t` that is not a finite number and a rig without a track. During a flight `jump()`, `moveTo()`, `track()` and `lerp()`
   are refused. `CameraRig.across()` refuses what is no `StageTransition`, a transition that is over
   or from or to nothing, a stage without a rig, a rig in a flight already, `anchors` that are not a
   pair of `Object3D`, scaled unevenly or mirrored, a `focus` that is not a finite number above 0,

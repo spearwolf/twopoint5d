@@ -53,6 +53,9 @@ const directionOf = (camera: Camera) => camera.getWorldDirection(new Vector3());
 /** `tan(fov / 2)` of a perspective camera. */
 const lensOf = (camera: PerspectiveCamera) => Math.tan((camera.fov * DEG) / 2);
 
+/** An easing that overshoots: past 1 on its way, from about ½ of the time, and back at 1 at the end. */
+const backOut = (t: number) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
+
 /** Whether `promise` has settled once the queue of microtasks and one task have run. */
 const hasSettled = async (promise: Promise<unknown>) => {
   let settled = false;
@@ -443,6 +446,41 @@ describe('CameraRig', () => {
     });
   });
 
+  describe('an orthographic camera', () => {
+    it('takes no look the rig kept from before a projection of its kind was assigned to the stage', () => {
+      const {stage, rig} = makeRig();
+      rig.look({yaw: 0.3, pitch: 0.1});
+      const ortho = makeProjection('orthographic');
+      stage.projection = ortho;
+      expect(rig.camera).toBeInstanceOf(OrthographicCamera);
+      expectPlacedAs(rig.camera, ortho.createCamera());
+    });
+
+    it('takes no look on an orthographic key of a track, and look() is judged by the shot the track shows', () => {
+      const {stage, rig} = makeRig();
+      const ortho = makeProjection('orthographic');
+      rig.track({}, ortho);
+      frame(stage);
+      rig.look({yaw: 0.2, pitch: 0});
+      rig.lerp(1);
+      rig.step(1 / 60);
+      frame(stage);
+      expect(rig.camera).toBeInstanceOf(OrthographicCamera);
+      ortho.updateViewRect(stage.containerWidth, stage.containerHeight);
+      expectPlacedAs(rig.camera, ortho.createCamera());
+      expect(() => rig.look({yaw: 0.1, pitch: 0}), 'an orthographic shot').toThrow(RangeError);
+
+      // perspective keys on an orthographic stage take a look
+      const {stage: flat, rig: flatRig} = makeRig('orthographic');
+      flatRig.track(makeProjection('parallax'), makeProjection('parallax'));
+      frame(flat);
+      flatRig.look({yaw: 0.2, pitch: 0});
+      frame(flat);
+      expect(flatRig.camera).toBeInstanceOf(PerspectiveCamera);
+      expect(-directionOf(flatRig.camera).x).toBeCloseTo(Math.sin(0.2), 12);
+    });
+  });
+
   describe('moveTo()', () => {
     it.each<[string, Parameters<CameraRig['moveTo']>[2], number]>([
       ["'ease-in-out' by default", undefined, 100 * 4 * 0.25 ** 3],
@@ -619,6 +657,20 @@ describe('CameraRig', () => {
       rig.step(0.5);
       frame(stage);
       expect(new Vector3(0, 0, 0).project(rig.camera).y).toBeCloseTo(1, 12);
+    });
+
+    it('stays within its ends under an easing that overshoots, which is clamped to [0, 1]', () => {
+      const stage = makeStage();
+      const rig = new CameraRig(stage, {easing: backOut});
+      rig.reframe({lift: 0.5}, 1);
+      let highest = 0;
+      for (let i = 0; i < 10; i++) {
+        rig.step(0.1);
+        frame(stage);
+        // a lift of ½ puts the point the camera looks at at 1
+        highest = Math.max(highest, new Vector3(0, 0, 0).project(rig.camera).y);
+      }
+      expect(highest).toBeCloseTo(1, 12);
     });
 
     it('leaves a running move running', async () => {
@@ -913,6 +965,20 @@ describe('CameraRig', () => {
       expect(rig.busy).toBe(false);
       frame(stage);
       expect(rig.camera.position.x).toBe(5);
+    });
+
+    it('track() and moveTo() refuse a stage whose projection was taken away', () => {
+      const {stage, rig} = makeRig();
+      stage.projection = undefined;
+      expect(() => rig.track({}, {})).toThrow(new Error('CameraRig#track(): the stage has no projection'));
+      expect(() => rig.moveTo(makeProjection('orthographic'), 1)).toThrow(
+        new Error('CameraRig#moveTo(): the stage has no projection'),
+      );
+      // a stage that never had a view
+      const blank = new Stage2D(makeProjection('parallax'));
+      const blankRig = new CameraRig(blank);
+      blank.projection = undefined;
+      expect(() => blankRig.moveTo({}, 1)).toThrow(new Error('CameraRig#moveTo(): the stage has no projection'));
     });
 
     it('jump() refuses a look under an OrthographicProjection', () => {
@@ -1230,6 +1296,48 @@ describe('CameraRig', () => {
       expect(directionOf(rig.camera).y).toBeCloseTo(Math.sin(0.1), 12);
     });
 
+    it('keeps the zoom and the distance of the shot a camera lock-on shows, its look the rest turned by look()', () => {
+      const {stage, rig} = makeRig();
+      const rest = stage.projection!.createCamera() as PerspectiveCamera;
+      const source = new PerspectiveCamera(30, 4 / 3, 0.5, 2000);
+      source.position.set(20, 10, 500);
+      source.rotation.y = 0.3;
+      rig.jump(source);
+      rig.look({yaw: 0.2, pitch: 0});
+      frame(stage);
+      const lens = lensOf(rig.camera as PerspectiveCamera);
+      expect(lens).not.toBeCloseTo(lensOf(rest), 3);
+
+      const player = new Object3D();
+      player.position.set(-30, 60, 0);
+      void rig.moveTo(player, 0);
+      frame(stage);
+      const [x, y, z] = rig.camera.position.toArray();
+      expect(x).toBeCloseTo(-30, 9);
+      expect(y).toBeCloseTo(60, 9);
+      expect(z, 'the distance of the camera').toBeCloseTo(500, 9);
+      expect(lensOf(rig.camera as PerspectiveCamera), 'the zoom of the camera').toBeCloseTo(lens, 12);
+      expect(-directionOf(rig.camera).x, 'the rest turned by look()').toBeCloseTo(Math.sin(0.2), 12);
+    });
+
+    it('keeps the zoom and the distance of the shot a track shows, its look the rest turned by look()', () => {
+      const {stage, rig} = makeRig();
+      const rest = stage.projection!.createCamera() as PerspectiveCamera;
+      rig.track([{at: 0, shot: {position: [10, 20, 200], zoom: 2, look: {yaw: 0.4, pitch: 0}}}]);
+      frame(stage);
+
+      const player = new Object3D();
+      player.position.set(-30, 60, 0);
+      void rig.moveTo(player, 0);
+      frame(stage);
+      const [x, y, z] = rig.camera.position.toArray();
+      expect(x).toBeCloseTo(-30, 9);
+      expect(y).toBeCloseTo(60, 9);
+      expect(z, 'the distance of the track').toBeCloseTo(200, 9);
+      expect(lensOf(rig.camera as PerspectiveCamera), 'the zoom of the track').toBeCloseTo(lensOf(rest) / 2, 12);
+      expect(rig.camera.quaternion.angleTo(rest.quaternion), 'the look of the rest').toBeCloseTo(0, 12);
+    });
+
     it('locks on: sticks to an object that moves, and step() answers false for one that stands', () => {
       const {stage, rig} = makeRig();
       const player = new Object3D();
@@ -1492,6 +1600,30 @@ describe('CameraRig', () => {
       expect(step).toBeLessThan(0.5);
       // the plane itself does not move
       expect(shiftBetween(before, after, stage, 0)).toBeLessThan(1e-6);
+    });
+
+    it('swaps the kind once under an easing that overshoots, which is clamped to [0, 1], in either direction', () => {
+      for (const [from, to] of [
+        ['parallax', 'orthographic'],
+        ['orthographic', 'parallax'],
+      ] as const) {
+        const {stage, rig} = makeRig(from);
+        const changed = vi.fn();
+        on(stage, OnStageAfterCameraChanged, changed);
+        void rig.moveTo(makeProjection(to), 1, {easing: backOut});
+        const kinds: string[] = [];
+        for (let i = 0; i < 16; i++) {
+          rig.step(1 / 16);
+          frame(stage);
+          kinds.push(rig.camera.type);
+        }
+        expect(changed, `${from} into ${to}`).toHaveBeenCalledTimes(1);
+        expect(
+          kinds.slice(0, -1).every((kind) => kind === 'PerspectiveCamera'),
+          `${from} into ${to}: under way`,
+        ).toBe(true);
+        expect(kinds.at(-1)).toBe(to === 'orthographic' ? 'OrthographicCamera' : 'PerspectiveCamera');
+      }
     });
 
     it('takes the visible height as the depth by default', () => {

@@ -49,7 +49,9 @@ export function applyEasing(spec: EasingSpec, t: number): number {
 }
 
 /**
- * {@link applyEasing} of the progress in `slot[0]`, written back into the slot. For a hot path that
+ * {@link applyEasing} of the progress in `slot[0]`, clamped to `[0, 1]` and written back into the
+ * slot: the eased progress of a blend of the camera rig, which an easing that overshoots — a back
+ * or an elastic curve of the caller — must not carry past the ends of the blend. For a hot path that
  * keeps its fractions out of the arguments and the answers of calls: V8 boxes a fraction it hands to
  * a call it does not inline, and one such a call answers, while a typed array holds one as it is.
  * The named easings are worked out on the slot, as {@link applyEasing} works them out; a function of
@@ -58,15 +60,17 @@ export function applyEasing(spec: EasingSpec, t: number): number {
  */
 export function applyEasingInPlace(spec: EasingSpec, slot: Float64Array): void {
   const t = slot[0]!;
+  let e = t;
   if (typeof spec === 'function') {
-    slot[0] = spec(t);
+    e = spec(t);
   } else if (spec === 1) {
-    slot[0] = t * t * t;
+    e = t * t * t;
   } else if (spec === 2) {
     const u = 1 - t;
-    slot[0] = 1 - u * u * u;
+    e = 1 - u * u * u;
   } else if (spec === 3) {
     const u = 2 - 2 * t;
-    slot[0] = t < 0.5 ? 4 * t * t * t : 1 - (u * u * u) / 2;
+    e = t < 0.5 ? 4 * t * t * t : 1 - (u * u * u) / 2;
   }
+  slot[0] = Math.min(1, Math.max(0, e));
 }

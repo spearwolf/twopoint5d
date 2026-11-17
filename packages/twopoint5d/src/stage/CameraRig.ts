@@ -78,12 +78,19 @@ export type CameraTarget = CameraPose | PerspectiveCamera | OrthographicCamera |
 export interface CameraRigOptions {
   /** The largest pitch up or down, in radians, above 0 and up to `Math.PI / 2`. Default 85° (`Math.PI * 85 / 180`). */
   pitchLimit?: number;
-  /** The easing of `moveTo()` where the call names none, and of `reframe()`. Default `'ease-in-out'`. */
+  /**
+   * The easing of `moveTo()` where the call names none, and of `reframe()`. Default `'ease-in-out'`.
+   * Its answer is clamped to `[0, 1]`: a curve that overshoots stops at the ends.
+   */
   easing?: Easing;
 }
 
 export interface CameraMoveOptions {
-  /** The easing of this move. Default: the easing of the rig, `'ease-in-out'` unless its options name another. */
+  /**
+   * The easing of this move. Default: the easing of the rig, `'ease-in-out'` unless its options name
+   * another. Its answer is clamped to `[0, 1]`: a curve that overshoots stops at the ends, and a lens
+   * change swaps the kind of the camera once, on arrival.
+   */
   easing?: Easing;
   /**
    * For an `Object3D` target: where the camera stands relative to the object, on the axes of the
@@ -105,8 +112,10 @@ export interface CameraMoveOptions {
   focus?: number;
   /**
    * The depth of the scene in front of and behind the focus plane, for the same move: the camera
-   * swaps its kind where the parallax across it stays below half a pixel. Default: the visible
-   * height at the focus plane.
+   * swaps its kind where the parallax across it stays below half a pixel, at a distance of at most
+   * 1000 times the visible height. Default: the visible height at the focus plane — which reaches
+   * that cap first on a container whose larger side passes about 1000 units, and swaps there with a
+   * step of up to about a pixel: about 0.96 of one on a container 1920 wide.
    */
   depth?: number;
 }
@@ -138,7 +147,7 @@ export interface CameraTrackKey {
    * keeps playing and paused (`action.play().paused = true`).
    */
   clip?: AnimationAction;
-  /** The easing of the stretch that arrives at this key. Default `'linear'`. */
+  /** The easing of the stretch that arrives at this key. Default `'linear'`. Its answer is clamped to `[0, 1]`. */
   ease?: Easing;
 }
 
@@ -211,8 +220,10 @@ interface SavedState {
 
 /**
  * Moves the camera of a `Stage2D`: it resolves targets — poses in the frame of the projection,
- * other projections — into shots, blends them, and writes the result into a camera of its own, which
- * the stage draws with while the rig is attached. The projection keeps its job: it fits the view
+ * other projections, cameras and other `Object3D`s, which it locks on to — into shots, blends them
+ * in moves and along tracks, flies them across the transitions of a `StageDirector`
+ * ({@link CameraRig.across}), and writes the result into a camera of its own, which the stage draws
+ * with while the rig is attached. The projection keeps its job: it fits the view
  * into the container and places a base camera of the rig's, the rest every pose is given relative
  * to; a resize, a new fit and a new projection re-frame the pose by themselves. A move between a
  * perspective and an orthographic lens runs as a dolly zoom.
@@ -273,6 +284,8 @@ export class CameraRig {
   #holding = false;
   #holdingTurn = false;
   readonly #held = createShot();
+  // the shot a track or a camera shows, as an object that follows them takes it (#shownShot())
+  readonly #shown = createShot();
   // the look the rig shows: the one of the target, or of look() since
   readonly #look = createLook();
 
@@ -395,14 +408,15 @@ export class CameraRig {
    * `true` while a move is under way, while the camera trails an `Object3D` by `smooth`, while the
    * shown progress of a track has yet to reach the one {@link lerp} asked for, and while locked on to
    * a camera or an object — or on a track — when the last {@link step} moved the camera after it,
-   * and while the rig takes part in a flight across a transition — a flight whose transition is over
-   * ends here; `false` after {@link dispose}.
+   * and while the rig takes part in a flight across a transition whose transition is not over;
+   * `false` after {@link dispose}. It throws nothing: the end of a flight whose transition is over is
+   * left to the next call or frame, since it may throw what a listener of the stage throws.
    */
   get busy(): boolean {
-    this.#flight?.check();
+    const flight = this.#flight;
     const track = this.#track;
     return (
-      this.#flight !== undefined ||
+      (flight !== undefined && !flight.transition.isOver) ||
       this.#moving ||
       this.#follow.trailing ||
       this.#followMoved ||
@@ -419,16 +433,19 @@ export class CameraRig {
    * Puts the camera on `target` at once; it ends a running move, whose promise resolves, and lets go
    * of a target the rig followed. The target brings its own look — the `look` of the pose, 0 where it
    * gives none, the orientation of a camera —; an `Object3D` keeps the look, the zoom and the
-   * distance of the current pose. A pose object the caller keeps and rewrites may be handed in every
-   * frame: the rig reads it in the call and allocates nothing. A projection is assigned to the stage
-   * at once, and the camera stands on its rest. A camera or an `Object3D` locks the rig on: it
-   * follows the target from here on, as after the arrival of {@link moveTo}; a camera of the other
-   * kind needs no focus here.
+   * distance of the current pose — of the shot a track, a camera or {@link cancel} shows, where the
+   * rig stands on one, its look then the rest's turned by {@link look}. A pose object the caller
+   * keeps and rewrites may be handed in every frame: the rig reads it in the call and allocates
+   * nothing. A projection is assigned to the stage at once, and the camera stands on its rest. A
+   * camera or an `Object3D` locks the rig on: it follows the target from here on, as after the
+   * arrival of {@link moveTo}, so there is no need to hand it in every frame — a call with a camera
+   * builds a `CameraProjection` and allocates. A camera of the other kind needs no focus here.
    *
    * @throws {TypeError} for a camera that is neither a `PerspectiveCamera` nor an
    * `OrthographicCamera`, and for a pose of another shape.
    * @throws {RangeError} for a number of the pose that is not finite, a `zoom` that is not above 0
    * and a `look` other than 0 under a projection with an orthographic camera.
+   * @throws {Error} during a flight across a transition (`CameraRig.across()`).
    */
   jump(target: CameraTarget): void {
     const subject = 'CameraRig#jump()';
@@ -474,7 +491,8 @@ export class CameraRig {
    *
    * Any other `Object3D` as the target: the camera moves to the world position of the object,
    * carried into the frame — under a plane, its foot on the plane —, plus `offset`; the look, the
-   * zoom and the distance stay those of the current pose, unless `offset` names a distance. The
+   * zoom and the distance stay those of the current pose, unless `offset` names a distance — after
+   * a track or a camera those of the shot it shows, its look the rest's turned by {@link look}. The
    * object is met where it stands in each frame, and on arrival the rig locks on to it: the camera
    * sticks to it, or trails it by `smooth`, critically damped.
    *
@@ -488,7 +506,8 @@ export class CameraRig {
    * `seconds` that is not a finite number of 0 or more, an `easing` that is not one, and an option
    * of {@link CameraMoveOptions} that is not a number of its kind.
    * @throws {Error} for a lens change without a focus where a projection or the camera of the target
-   * has no plane; and what the projection of the target throws as the rig places its rest.
+   * has no plane, a stage whose projection was taken away, and during a flight across a transition
+   * (`CameraRig.across()`); and what the projection of the target throws as the rig places its rest.
    */
   moveTo(target: CameraTarget, seconds: number, options?: CameraMoveOptions): Promise<void> {
     const subject = 'CameraRig#moveTo()';
@@ -503,7 +522,6 @@ export class CameraRig {
         : kind === 'camera'
           ? new CameraProjection(target as PerspectiveCamera | OrthographicCamera)
           : undefined;
-    const stageProjection = this.#stage.projection!;
 
     // a lens change needs the distance of its focus plane: the projection plane, or the option
     const targetKind =
@@ -511,14 +529,17 @@ export class CameraRig {
         ? this.#kindOfProjection(projection)
         : this.#hasRest
           ? this.#rest.kind
-          : this.#kindOfProjection(stageProjection);
+          : this.#kindOfProjection(this.#projectionOf(subject));
     if (kindOf(this.#camera) !== targetKind && options?.focus === undefined) {
       if (kind === 'camera') {
         throw new Error(
           `${subject}: a lens change between a perspective and an orthographic camera needs a focus: a camera as the target has no projectionPlane, and the move names no focus`,
         );
       }
-      if (stageProjection.projectionPlane == null || (projection !== undefined && projection.projectionPlane == null)) {
+      if (
+        this.#projectionOf(subject).projectionPlane == null ||
+        (projection !== undefined && projection.projectionPlane == null)
+      ) {
         throw new Error(
           `${subject}: a lens change between a perspective and an orthographic camera needs a focus: the projection has no projectionPlane, and the move names no focus`,
         );
@@ -566,9 +587,12 @@ export class CameraRig {
    * of a running move while it moves, which bends to it. The pitch is clamped to `pitchLimit`. A
    * look holds until the next target. Allocates nothing.
    *
+   * An orthographic camera shows no look: on a track the look lies on its perspective shots alone.
+   *
    * @throws {TypeError} for a `look` that is not an object with `yaw` and `pitch`.
    * @throws {RangeError} for a yaw or a pitch that is not finite, and for a look other than 0 under
-   * an `OrthographicProjection` — the one of the stage, or the one a move runs to.
+   * an `OrthographicProjection` — the one of the stage, or the one a move runs to — and on a track
+   * while it shows an orthographic shot.
    */
   look(look: {yaw: number; pitch: number}): void {
     const subject = 'CameraRig#look()';
@@ -576,7 +600,7 @@ export class CameraRig {
     // a flight whose transition is over ends here, so that the look goes to the rig, not to the flight
     this.#flight?.check();
     const values = this.#nextPose;
-    readLook(subject, look, this.#isOrthographic(this.#targetProjection ?? this.#stage.projection), values);
+    readLook(subject, look, this.#refusesLook(), values);
     const flight = this.#flight;
     if (flight !== undefined) {
       // on top of the flight, both rigs alike; the rig keeps its own look to go back to
@@ -663,7 +687,8 @@ export class CameraRig {
    * keys at 0 and 1.
    *
    * Every key is resolved anew in every frame, so a key on a camera or an `Object3D` follows it. A
-   * key brings its own look; a {@link look} lies on top of the whole track until the next target. A
+   * key brings its own look; a {@link look} lies on top of the perspective shots of the track until
+   * the next target, and an orthographic key shows none. A
    * stretch between keys of the two kinds of lens runs as the lens change of {@link moveTo}, with
    * the projection plane of each end as its focus. A projection as a key is shown, not assigned to
    * the stage.
@@ -678,7 +703,8 @@ export class CameraRig {
    * `until` before its `at`, keys out of order — a key that starts before the one before it ends —,
    * and the numbers of a pose as {@link jump} refuses them.
    * @throws {Error} for a stretch between a perspective and an orthographic lens where one of its
-   * keys has no projection plane: a camera, or a projection or a stage without one.
+   * keys has no projection plane: a camera, or a projection or a stage without one; for a stage
+   * whose projection was taken away; and during a flight across a transition (`CameraRig.across()`).
    */
   track(keys: readonly CameraTrackKey[]): void;
   track(from: CameraTarget, to: CameraTarget): void;
@@ -686,7 +712,7 @@ export class CameraRig {
     const subject = 'CameraRig#track()';
     this.#assertAlive(subject);
     this.#assertGrounded(subject);
-    const projection = this.#stage.projection!;
+    const projection = this.#projectionOf(subject);
     const keys =
       to.length > 0
         ? [
@@ -722,7 +748,8 @@ export class CameraRig {
    * @throws {RangeError} for a `t` that is not a finite number, and a `smooth` that is not a finite
    * number of 0 or more.
    * @throws {TypeError} for `options` that is not an object.
-   * @throws {Error} on a rig without a track.
+   * @throws {Error} on a rig without a track, and during a flight across a transition
+   * (`CameraRig.across()`).
    */
   lerp(t: number, options?: CameraLerpOptions): void {
     const subject = 'CameraRig#lerp()';
@@ -763,7 +790,8 @@ export class CameraRig {
   /**
    * Advances the clocks of the rig — a move, a reframe, the trailing of an `Object3D` by `smooth`,
    * the progress of a track, damped by `smooth`, and the clips it scrubs — by `deltaSeconds` and
-   * resolves the shot of the frame, a camera or an object the rig is locked on to where it stands now. Answers the `Motion` of drawing on demand: `true` when that shot differs
+   * resolves the shot of the frame, a camera or an object the rig is locked on to where it stands
+   * now. Answers the `Motion` of drawing on demand: `true` when that shot differs
    * from the one the step before resolved, `false` otherwise — also for a target that stands —, and
    * `false` on a stage without a view or one that has been disposed. A move that arrives resolves
    * its promise here, and a move to a projection assigns it to the stage here. As a frame step:
@@ -911,26 +939,33 @@ export class CameraRig {
     if (this.#disposed) return;
     this.#disposed = true;
     const flight = this.#flight;
-    // the other rig of a flight goes back to its state, and the flight is over; what that throws
-    // comes out of this call once the rig is down
-    let dropError: unknown;
-    let dropped = true;
+    // the other rig of a flight goes back to its state, and the flight is over; what that throws,
+    // and what the detach throws, come out of this call once the rig is down
+    const errors: unknown[] = [];
     if (flight !== undefined) {
       this.#flight = undefined;
       this.#saved = undefined;
       try {
         flight.drop(this.#side!);
       } catch (error) {
-        dropped = false;
-        dropError = error;
+        errors.push(error);
       }
     }
     this.#release();
     this.#endMove();
     this.#lifting = false;
     // a stage that went on to another rig keeps it
-    if (Stage2DInternals.driverOf(this.#stage) === this) Stage2DInternals.detachDriver(this.#stage);
-    if (!dropped) throw dropError;
+    if (Stage2DInternals.driverOf(this.#stage) === this) {
+      try {
+        Stage2DInternals.detachDriver(this.#stage);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    throwCollected(
+      errors,
+      'CameraRig#dispose(): the other rig of the flight threw as it went back to its state, and so did the detach from the stage',
+    );
   }
 
   /**
@@ -1077,6 +1112,7 @@ export class CameraRig {
       if (from.kind === rest.kind) from.lens = rest.lens / from.zoom;
       const t = this.#elapsed / this.#duration;
       blendProgress[0] = Math.min(t, 1);
+      // clamped to [0, 1]: an easing that overshoots carries the blend past neither end
       applyEasingInPlace(this.#moveEasing, blendProgress);
       if (from.kind === to.kind) {
         blendShotsAtProgress(from, to, out);
@@ -1087,6 +1123,8 @@ export class CameraRig {
           this.#rest,
           this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest,
         );
+        // the camera of the other kind at the start and on arrival alone, wherever the easing stands
+        this.#lensChange.underWay = t > 0 && t < 1;
         blendLensChangeAtProgress(from, to, this.#lensChange, out);
       }
     } else {
@@ -1166,6 +1204,9 @@ export class CameraRig {
     else writePosePosition(rest, pose, out.position);
 
     if (holding && this.#holdingTurn) out.quaternion.copy(held.quaternion);
+    // an orthographic camera takes no look other than 0, also one the rig kept from a projection of
+    // the other kind assigned to the stage since
+    else if (rest.kind === 'orthographic') out.quaternion.copy(rest.quaternion);
     else writeTurn(rest, this.#look, out.quaternion);
 
     if (holding) {
@@ -1206,25 +1247,17 @@ export class CameraRig {
       blendShotsAtProgress(a.shot, b.shot, out);
     } else {
       this.#prepareLensChange(a.shot, b.shot, restA, restB);
+      // a stretch lies between its keys, which show the shots of their own kind
+      this.#lensChange.underWay = true;
       blendLensChangeAtProgress(a.shot, b.shot, this.#lensChange, out);
     }
   }
 
   // the shot of `key` in this frame, into its shot, and the rest it resolved against: a pose and an
   // object on the rest of the stage, a projection and a camera on the rest of their own. The look is
-  // the key's plus the rig's, its pitch clamped
+  // the key's plus the rig's, its pitch clamped, and 0 on an orthographic rest
   #resolveKey(key: TrackKey): Rest {
     const pose = key.pose;
-    const look = this.#keyLook;
-    look.yaw = this.#look.yaw;
-    look.pitch = this.#look.pitch;
-    if (pose.hasLook) {
-      look.yaw += pose.yaw;
-      look.pitch += pose.pitch;
-      const limit = this.#pitchLimit;
-      if (look.pitch > limit) look.pitch = limit;
-      else if (look.pitch < -limit) look.pitch = -limit;
-    }
     let rest = this.#rest;
     const follow = key.follow;
     if (follow !== undefined) {
@@ -1233,6 +1266,21 @@ export class CameraRig {
       pose.y = follow.goalY;
     } else if (key.projection !== undefined) {
       rest = this.#placeKey(key, key.projection);
+    }
+    const look = this.#keyLook;
+    if (rest.kind === 'orthographic') {
+      look.yaw = 0;
+      look.pitch = 0;
+    } else {
+      look.yaw = this.#look.yaw;
+      look.pitch = this.#look.pitch;
+      if (pose.hasLook) {
+        look.yaw += pose.yaw;
+        look.pitch += pose.pitch;
+        const limit = this.#pitchLimit;
+        if (look.pitch > limit) look.pitch = limit;
+        else if (look.pitch < -limit) look.pitch = -limit;
+      }
     }
     resolvePoseShot(rest, pose, look, key.shot);
     return rest;
@@ -1429,6 +1477,18 @@ export class CameraRig {
     return created as PerspectiveCamera | OrthographicCamera;
   }
 
+  // whether look() refuses a look other than 0: on a track by the shot it shows — a key of either
+  // kind, or the perspective camera of a lens change between them —, otherwise by the projection
+  // of the target or of the stage
+  #refusesLook(): boolean {
+    if (this.#track !== undefined && this.#flight === undefined && this.#hasRest) {
+      const shown = this.#shown;
+      this.#resolve(shown);
+      return shown.kind === 'orthographic';
+    }
+    return this.#isOrthographic(this.#targetProjection ?? this.#stage.projection);
+  }
+
   #isOrthographic(projection: IProjection | undefined): boolean {
     if (projection instanceof OrthographicProjection) return true;
     if (projection instanceof ParallaxProjection || projection === undefined) return false;
@@ -1443,10 +1503,22 @@ export class CameraRig {
   #readTarget(subject: string, target: unknown, out: PoseValues, options: CameraMoveOptions | undefined): TargetKind {
     const kind = kindOfTarget(subject, target);
     if (kind === 'pose') readPose(subject, target, this.#isOrthographic(this.#stage.projection), out);
-    else if (kind === 'object') {
-      readObjectPose(this.#pose, this.#holding ? this.#held : undefined, this.#rest, options?.offset, out);
-    } else copyPoseValues(EMPTY_POSE, out);
+    else if (kind === 'object') readObjectPose(this.#pose, this.#shownShot(), this.#rest, options?.offset, out);
+    else copyPoseValues(EMPTY_POSE, out);
     return kind;
+  }
+
+  // the shot an object as the next target keeps the zoom and the distance of where the pose of the
+  // rig does not hold them: the one cancel() holds, and the one a track or a camera shows — the
+  // pose of the rig is the empty one there. Undefined where the pose holds them, and without a view
+  #shownShot(): CameraShot | undefined {
+    if (this.#holding) return this.#held;
+    if (!this.#hasRest || (this.#track === undefined && !(this.#follows && this.#targetProjection !== undefined))) {
+      return undefined;
+    }
+    const shown = this.#shown;
+    this.#resolveRelative(shown);
+    return shown;
   }
 
   #readMoveOptions(subject: string, options: CameraMoveOptions | undefined): EasingSpec {
@@ -1465,6 +1537,13 @@ export class CameraRig {
     if (focus !== undefined) assertPositiveFinite(focus, subject, 'focus');
     if (depth !== undefined) assertPositiveFinite(depth, subject, 'depth');
     return easing === undefined ? this.#easing : easingOf(subject, easing);
+  }
+
+  // the projection of the stage, or the refusal of `subject` where it was taken away under the rig
+  #projectionOf(subject: string): IProjection {
+    const projection = this.#stage.projection;
+    if (projection == null) throw new Error(`${subject}: the stage has no projection`);
+    return projection;
   }
 
   #assertAlive(subject: string): void {
@@ -1505,9 +1584,9 @@ export class CameraRig {
    * as {@link jump} refuses it.
    * @throws {RangeError} for a `focus` that is not a finite number above 0, anchors scaled unevenly
    * or mirrored against each other, and the numbers of a target pose as {@link jump} refuses them.
-   * @throws {Error} for a transition that is over, from or to nothing, a stage without a rig, a rig
-   * that takes part in a flight already, and a lens change without a focus where a side has no
-   * projection plane.
+   * @throws {Error} for a transition that is over, from or to nothing, a stage without a rig or
+   * whose projection was taken away under its rig, a rig that takes part in a flight already, and a
+   * lens change without a focus where a side has no projection plane.
    */
   static across(transition: StageTransition, options?: CameraFlightOptions): CameraFlight {
     return startFlight(transition, options, (stage) => {
@@ -1549,7 +1628,8 @@ export class CameraRig {
 
   // the lens of `target`, or of the shot the rig shows, and whether its frame has a plane
   #readFlightEnd(subject: string, target: CameraTarget | undefined): FlightEnd {
-    const projection = this.#stage.projection!;
+    const projection = this.#stage.projection;
+    if (projection == null) throw new Error(`${subject}: the stage ${describeValue(this.#stage.name)} has no projection`);
     if (target === undefined) {
       if (!this.#hasRest) {
         return {kind: this.#kindOfProjection(projection), hasPlane: projection.projectionPlane != null, camera: false};

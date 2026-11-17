@@ -21,15 +21,31 @@ describe('easing', () => {
     });
   }
 
-  test('applyEasingInPlace() writes what applyEasing() answers into the slot, for every easing', () => {
+  test('applyEasingInPlace() writes what applyEasing() answers into the slot, clamped to [0, 1], for every easing', () => {
     const slot = new Float64Array(1);
-    for (const easing of [...Object.keys(curves), (t: number) => t * 2] as Easing[]) {
+    for (const easing of [...Object.keys(curves), (t: number) => t * 2 - 0.5] as Easing[]) {
       const spec = easingOf('test', easing);
       for (const t of [...STEPS, 0.1, 0.49, 0.51, 0.9]) {
         slot[0] = t;
         applyEasingInPlace(spec, slot);
-        expect(slot[0]).toBe(applyEasing(spec, t));
+        expect(slot[0]).toBe(Math.min(1, Math.max(0, applyEasing(spec, t))));
       }
+    }
+  });
+
+  test('applyEasingInPlace() clamps an easing that overshoots to [0, 1]', () => {
+    const slot = new Float64Array(1);
+    const spec = easingOf('test', (t: number) => t * 2 - 0.5);
+    for (const [t, expected] of [
+      [0, 0],
+      [0.125, 0],
+      [0.5, 0.5],
+      [0.875, 1],
+      [1, 1],
+    ]) {
+      slot[0] = t!;
+      applyEasingInPlace(spec, slot);
+      expect(slot[0], `at ${t}`).toBe(expected);
     }
   });
 

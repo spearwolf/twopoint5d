@@ -21,6 +21,12 @@ export interface LensChange {
   depth: number;
   /** In: the larger side of the container, in its units — what half a pixel is measured in. */
   containerSize: number;
+  /**
+   * In: whether the blend is under way — its progress before the easing lies inside `(0, 1)` —:
+   * then it shows the perspective camera at every eased progress, 0 and 1 included, so that an
+   * easing that reaches an end before the blend does swaps no kind and back.
+   */
+  underWay: boolean;
   /** Out: the distance from the focus plane at which the perspective camera meets the orthographic one. */
   swapDistance: number;
   /** Out: the parallax there across the depth, in units of the container — the step of the swap. */
@@ -30,7 +36,15 @@ export interface LensChange {
 /** @internal */
 export function createLensChange(): LensChange {
   // fractions from the start, so that V8 keeps the fields as doubles
-  return {focusA: 0.5, focusB: 0.5, depth: Number.NaN, containerSize: 0.5, swapDistance: 0.5, swapStep: 0.5};
+  return {
+    focusA: 0.5,
+    focusB: 0.5,
+    depth: Number.NaN,
+    containerSize: 0.5,
+    underWay: false,
+    swapDistance: 0.5,
+    swapStep: 0.5,
+  };
 }
 
 /**
@@ -57,16 +71,25 @@ const quaternionSlot = new Float64Array(4);
  * reaches the orthographic end where the parallax across `depth` in front of and behind the focus
  * plane stays below half a unit of the container, at a distance capped at
  * {@link LENS_CHANGE_DISTANCE_CAP} times `h`: `out` is the perspective shot there for every progress
- * inside `(0, 1)`, `a` at 0 and below, `b` at 1 and above, exactly. Position and orientation blend
+ * inside `(0, 1)`, `a` at 0 and below, `b` at 1 and above, exactly — while the blend is
+ * `change.underWay`, the perspective shot at 0 and 1 as well, the limit of the ones inside, and the
+ * progress is taken as clamped to `[0, 1]` then. Position and orientation blend
  * as `blendShotsAtProgress()` blends them, about the focus points of the two ends. `out` may be `a`.
  *
  * Writes the swap distance and its step into `change`. Allocates nothing.
  * @internal
  */
 export function blendLensChangeAtProgress(a: CameraShot, b: CameraShot, change: LensChange, out: CameraShot): CameraShot {
-  const e = blendProgress[0]!;
-  if (e <= 0) return copyShot(a, out);
-  if (e >= 1) return copyShot(b, out);
+  let e = blendProgress[0]!;
+  if (change.underWay) {
+    // the formulas below hold at 0 and at 1 as well, where they give the perspective shot of the end
+    if (e < 0) e = 0;
+    else if (e > 1) e = 1;
+  } else if (e <= 0) {
+    return copyShot(a, out);
+  } else if (e >= 1) {
+    return copyShot(b, out);
+  }
   const f = 1 - e;
 
   const perspectiveA = a.kind === 'perspective';

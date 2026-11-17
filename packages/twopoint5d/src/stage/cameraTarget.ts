@@ -47,24 +47,25 @@ export function kindOfTarget(subject: string, target: unknown): TargetKind {
 
 /**
  * The pose of an `Object3D` target into `out`: the zoom and the distance of `current`, the pose of
- * the rig — or of `held`, the shot `cancel()` holds, where there is one, against `rest` —, the
- * distance of `offset` where it names one, and a place the object gives in every frame. Its look is
- * the one of the rig, which it keeps. Allocates nothing.
+ * the rig — or of `shown`, where there is one, against `rest`: the shot `cancel()` holds, or the one
+ * a track or a camera shows, whose look the object drops —, the distance of `offset` where it names
+ * one, and a place the object gives in every frame. Its look is the one of the rig, which it keeps.
+ * Allocates nothing.
  * @internal
  */
 export function readObjectPose(
   current: PoseValues,
-  held: CameraShot | undefined,
+  shown: CameraShot | undefined,
   rest: Rest,
   offset: readonly number[] | undefined,
   out: PoseValues,
 ): void {
   copyPoseValues(current, out);
-  if (held !== undefined) {
-    const p = held.position;
+  if (shown !== undefined) {
+    const p = shown.position;
     const o = rest.origin;
     const n = rest.normal;
-    out.zoom = held.kind === rest.kind ? held.zoom : 1;
+    out.zoom = shown.kind === rest.kind ? shown.zoom : 1;
     out.hasDistance = rest.hasPlane;
     out.distance = (p.x - o.x) * n.x + (p.y - o.y) * n.y + (p.z - o.z) * n.z;
   }

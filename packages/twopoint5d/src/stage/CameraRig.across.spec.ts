@@ -1,7 +1,9 @@
 import {on} from '@spearwolf/eventize';
-import {Matrix4, Object3D, OrthographicCamera, type PerspectiveCamera, Quaternion, Vector3} from 'three/webgpu';
+import {Matrix4, Object3D, OrthographicCamera, PerspectiveCamera, Quaternion, Vector3} from 'three/webgpu';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {OnStageTransitionEnd} from '../events.js';
+import {OnStageAfterCameraChanged, OnStageCameraPlaced, OnStageTransitionEnd} from '../events.js';
+import {Flight, type FlightSide} from './CameraFlight.js';
+import {CameraProjection} from './CameraProjection.js';
 import {CameraRig, type CameraTarget} from './CameraRig.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
@@ -562,6 +564,78 @@ describe('CameraRig.across()', () => {
     });
   });
 
+  describe('errors at the end of a flight', () => {
+    it('dispose() throws what the other rig throws as it goes back, and what the detach from the stage throws, both', () => {
+      const source = new PerspectiveCamera(40, 4 / 3, 0.5, 2000);
+      source.position.set(0, 0, 500);
+      const s = setup({before: ({rigB}) => rigB.jump(source)});
+      s.frame();
+      CameraRig.across(s.transition, {to: {position: [0, 0, 900]}});
+      s.transition.progress = 0.5;
+      s.frame();
+      // the rig of to goes back onto the CameraProjection of the camera it was locked on to
+      const placeError = new Error('the projection of to');
+      vi.spyOn(CameraProjection.prototype, 'updateViewRect').mockImplementation(() => {
+        throw placeError;
+      });
+      const detachError = new Error('a listener of from');
+      on(s.a, OnStageAfterCameraChanged, () => {
+        throw detachError;
+      });
+      let thrown: unknown;
+      try {
+        s.rigA.dispose();
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([placeError, detachError]);
+      expect(s.rigA.isDisposed).toBe(true);
+    });
+
+    it('lets the rig of to leave a flight whose rig of from threw as it left, and throws what both threw', async () => {
+      const s = setup();
+      s.frame();
+      const leaveFrom = vi.fn(() => {
+        throw new Error('from');
+      });
+      const leaveTo = vi.fn(() => {
+        throw new Error('to');
+      });
+      const side = (stage: Stage2D, leave: () => void) => ({stage, leave}) as unknown as FlightSide;
+      const flight = new Flight(s.transition, side(s.a, leaveFrom), side(s.b, leaveTo), 0, Number.NaN, undefined);
+      s.transition.complete();
+      let thrown: unknown;
+      try {
+        flight.check();
+      } catch (error) {
+        thrown = error;
+      }
+      expect(leaveFrom).toHaveBeenCalledTimes(1);
+      expect(leaveTo).toHaveBeenCalledTimes(1);
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors.map((error: Error) => error.message)).toEqual(['from', 'to']);
+      expect(await hasSettled(flight.finished)).toBe(true);
+    });
+
+    it('busy answers false for a flight whose transition is over and throws nothing; the next call ends the flight', () => {
+      const s = setup();
+      s.frame();
+      CameraRig.across(s.transition, {to: makeProjection('parallax')});
+      s.transition.progress = 0.5;
+      s.frame();
+      const placed = new Error('a listener of to');
+      on(s.b, OnStageCameraPlaced, () => {
+        throw placed;
+      });
+      s.transition.complete();
+      expect(() => s.rigB.busy).not.toThrow();
+      expect(s.rigB.busy).toBe(false);
+      expect(() => s.rigB.step(0)).toThrow(placed);
+      expect(() => s.rigB.jump({})).not.toThrow();
+    });
+  });
+
   describe('a frozen layer', () => {
     it('warns once per flight, naming the stage', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -604,8 +678,7 @@ describe('CameraRig.across()', () => {
     it('a listener of OnStageTransitionEnd jumps a rig and chains the next flight', () => {
       const s = setup();
       s.frame();
-      const {stage: c, rig: rigC} = makeRig('c');
-      void rigC;
+      const {stage: c} = makeRig('c');
       CameraRig.across(s.transition, {to: {position: [0, 0, 800]}});
       s.transition.progress = 0.5;
       s.frame();
@@ -697,6 +770,15 @@ describe('CameraRig.across()', () => {
       expect(() => CameraRig.across(s.transition)).toThrow(
         'CameraRig.across(): the CameraRig of the stage "a" takes part in a flight already',
       );
+    });
+
+    it('refuses a stage whose projection was taken away under its rig', () => {
+      const s = setup();
+      s.b.projection = undefined;
+      expect(() => CameraRig.across(s.transition, {to: {}})).toThrow(
+        new Error('CameraRig.across(): the stage "b" has no projection'),
+      );
+      expect(() => CameraRig.across(s.transition)).toThrow(new Error('CameraRig.across(): the stage "b" has no projection'));
     });
 
     it('refuses a lens change without a focus where a side has no plane', () => {
