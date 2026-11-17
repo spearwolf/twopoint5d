@@ -1,9 +1,19 @@
 import {on} from '@spearwolf/eventize';
-import {type Camera, Object3D, OrthographicCamera, PerspectiveCamera, Vector3, type WebGPURenderer} from 'three/webgpu';
+import {
+  Camera,
+  Group,
+  Object3D,
+  OrthographicCamera,
+  PerspectiveCamera,
+  Quaternion,
+  Vector3,
+  type WebGPURenderer,
+} from 'three/webgpu';
 import {describe, expect, it, vi} from 'vitest';
 import {FramePacer, type FramePacerSource} from '../display/FramePacer.js';
 import type {DisplayEventProps} from '../display/types.js';
 import {OnStageAfterCameraChanged, OnStageCameraPlaced, OnStageUpdateFrame} from '../events.js';
+import {CameraProjection} from './CameraProjection.js';
 import {CameraRig} from './CameraRig.js';
 import type {IProjection} from './IProjection.js';
 import type {ProjectionPlaneDescription} from './ProjectionPlane.js';
@@ -160,6 +170,40 @@ const shiftBetween = (a: Camera, b: Camera, stage: Stage2D, depth: number) => {
 
 /** The visible height of a perspective camera at the plane z = 0 it looks straight at. */
 const heightAtPlane = (camera: PerspectiveCamera) => 2 * camera.position.z * Math.tan((camera.fov * DEG) / 2);
+
+/**
+ * `camera` as the source a glTF asset would bring: under a parent that is moved, turned and scaled,
+ * so that its world pose differs from its local one, and turned itself.
+ */
+const inParent = <C extends PerspectiveCamera | OrthographicCamera>(camera: C) => {
+  const parent = new Group();
+  parent.position.set(20, 10, 40);
+  parent.rotation.set(0, 0.3, 0);
+  parent.scale.setScalar(2);
+  parent.add(camera);
+  camera.position.set(5, 30, 100);
+  camera.rotation.set(-0.2, 0.1, 0);
+  return {parent, camera};
+};
+
+/** The camera a `CameraProjection` of `source` with the default fit places for the container of `stage`. */
+const fittedTo = (source: PerspectiveCamera | OrthographicCamera, stage: Stage2D) => {
+  const projection = new CameraProjection(source);
+  projection.updateViewRect(stage.containerWidth, stage.containerHeight);
+  const camera = projection.createCamera();
+  camera.updateMatrixWorld();
+  return camera;
+};
+
+/** Expects `camera` to show what `reference` shows: the same pose and the same projection, to rounding. */
+const expectShowsAs = (camera: Camera, reference: Camera) => {
+  camera.updateMatrixWorld();
+  reference.updateMatrixWorld();
+  for (let i = 0; i < 16; i++) {
+    expect(camera.matrixWorld.elements[i], `matrixWorld[${i}]`).toBeCloseTo(reference.matrixWorld.elements[i]!, 9);
+    expect(camera.projectionMatrix.elements[i], `projectionMatrix[${i}]`).toBeCloseTo(reference.projectionMatrix.elements[i]!, 9);
+  }
+};
 
 describe('CameraRig', () => {
   describe('on a stage', () => {
@@ -780,18 +824,34 @@ describe('CameraRig', () => {
       expect(stage.camera).toBe(camera);
     });
 
-    it.each<[string, () => unknown]>([
-      ['a camera', () => new PerspectiveCamera()],
-      ['an Object3D', () => new Object3D()],
-    ])('jump() and moveTo() refuse %s as a target, until a later version takes one', (_what, make) => {
-      const {rig} = makeRig();
-      const target = make() as Object3D;
+    it('jump() and moveTo() refuse a camera that is neither a PerspectiveCamera nor an OrthographicCamera', () => {
+      const {stage, rig} = makeRig();
+      rig.jump({position: [5, 0]});
+      const target = new Camera() as unknown as PerspectiveCamera;
       expect(() => rig.jump(target)).toThrow(
-        new TypeError(`CameraRig#jump(): a target of this kind is not supported yet, got ${target.type}`),
+        new TypeError('CameraRig#jump(): a camera as a target must be a PerspectiveCamera or an OrthographicCamera, got Camera'),
       );
       expect(() => rig.moveTo(target, 1)).toThrow(
-        new TypeError(`CameraRig#moveTo(): a target of this kind is not supported yet, got ${target.type}`),
+        new TypeError(
+          'CameraRig#moveTo(): a camera as a target must be a PerspectiveCamera or an OrthographicCamera, got Camera',
+        ),
       );
+      expect(rig.busy).toBe(false);
+      frame(stage);
+      expect(rig.camera.position.x).toBe(5);
+    });
+
+    it('moveTo() refuses a lens change to a camera of the other kind without a focus', () => {
+      const {stage, rig} = makeRig();
+      const source = new OrthographicCamera(-160, 160, 90, -90, 0.5, 500);
+      expect(() => rig.moveTo(source, 1)).toThrow(
+        new Error(
+          'CameraRig#moveTo(): a lens change between a perspective and an orthographic camera needs a focus: a camera as the target has no projectionPlane, and the move names no focus',
+        ),
+      );
+      expect(rig.busy).toBe(false);
+      frame(stage);
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
     });
 
     it('moveTo() refuses a lens change where the projection has no plane and the move names no focus', () => {
@@ -956,6 +1016,405 @@ describe('CameraRig', () => {
       expect(stage.projection).toBe(target);
       frame(stage);
       expectPlacedAs(rig.camera, target.createCamera());
+    });
+  });
+
+  describe('a camera as a target', () => {
+    it('lands a move on the world pose of the camera and its lens, fitted as a CameraProjection fits it, and assigns no projection', async () => {
+      const {stage, rig} = makeRig();
+      const parallax = stage.projection!;
+      const {camera: source} = inParent(new PerspectiveCamera(40, 16 / 9, 0.5, 500));
+      const rest = parallax.createCamera();
+      const moved = rig.moveTo(source, 1, {easing: 'linear'});
+
+      rig.step(0.5);
+      frame(stage);
+      const world = source.getWorldPosition(new Vector3());
+      expect(rig.camera.position.x).toBeCloseTo((rest.position.x + world.x) / 2, 9);
+      expect(rig.camera.position.z).toBeCloseTo((rest.position.z + world.z) / 2, 9);
+
+      rig.step(0.5);
+      expect(await hasSettled(moved)).toBe(true);
+      frame(stage);
+      expect(stage.projection).toBe(parallax);
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+      const fitted = fittedTo(source, stage);
+      // a container of 4:3 under a frame of 16:9: contain widens the lens
+      expect(lensOf(fitted as PerspectiveCamera)).toBeCloseTo((Math.tan(20 * DEG) * (16 / 9)) / (4 / 3), 12);
+      expectShowsAs(rig.camera, fitted);
+      // the scale of the parent is left out
+      expect(rig.camera.matrixWorld.getMaxScaleOnAxis()).toBeCloseTo(1, 12);
+    });
+
+    it('jump() puts the camera on it at once', () => {
+      const {stage, rig} = makeRig();
+      const {camera: source} = inParent(new PerspectiveCamera(40, 16 / 9, 0.5, 500));
+      rig.jump(source);
+      frame(stage);
+      expectShowsAs(rig.camera, fittedTo(source, stage));
+    });
+
+    it('locks on: follows a source moved between frames, and step() answers false for one that stands', () => {
+      const {stage, rig} = makeRig();
+      const source = new PerspectiveCamera(40, 16 / 9, 0.5, 500);
+      source.position.set(0, 0, 500);
+      void rig.moveTo(source, 1);
+      rig.step(1);
+      expect(rig.step(1 / 60), 'a source that stands').toBe(false);
+      expect(rig.busy).toBe(false);
+
+      source.position.x = 30;
+      expect(rig.step(1 / 60), 'a source that moved').toBe(true);
+      expect(rig.busy, 'a lock-on to a camera that moves').toBe(true);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([30, 0, 500]);
+      expect(rig.step(1 / 60)).toBe(false);
+      expect(rig.busy).toBe(false);
+
+      // a parent that moves, and a lens an animation changes
+      const parent = new Group();
+      parent.add(source);
+      parent.position.y = 12;
+      expect(rig.step(1 / 60)).toBe(true);
+      source.fov = 30;
+      expect(rig.step(1 / 60)).toBe(true);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([30, 12, 500]);
+      expect(lensOf(rig.camera as PerspectiveCamera)).toBeCloseTo((Math.tan(15 * DEG) * (16 / 9)) / (4 / 3), 12);
+      expect(rig.step(1 / 60)).toBe(false);
+    });
+
+    it('lays a drag-look on top of a followed camera, until the next target', () => {
+      const {stage, rig} = makeRig();
+      const {camera: source} = inParent(new PerspectiveCamera(40, 16 / 9, 0.5, 500));
+      rig.jump(source);
+      rig.look({yaw: 0.4, pitch: 0});
+      const up = new Vector3(0, 1, 0);
+
+      for (const turn of [0, 0.25]) {
+        source.rotation.y = turn;
+        rig.step(1 / 60);
+        frame(stage);
+        const expected = source.getWorldDirection(new Vector3()).applyAxisAngle(up, 0.4);
+        const direction = directionOf(rig.camera);
+        expect(direction.x).toBeCloseTo(expected.x, 9);
+        expect(direction.y).toBeCloseTo(expected.y, 9);
+        expect(direction.z).toBeCloseTo(expected.z, 9);
+        expect(rig.camera.position.distanceTo(source.getWorldPosition(new Vector3()))).toBeCloseTo(0, 9);
+      }
+
+      // the next camera brings its own look: its orientation
+      rig.jump(source);
+      frame(stage);
+      expectShowsAs(rig.camera, fittedTo(source, stage));
+    });
+
+    it('moves to a camera of the other kind as a lens change with a focus, and a jump needs none', () => {
+      const {stage, rig} = makeRig();
+      const parallax = stage.projection!;
+      const source = new OrthographicCamera(-160, 160, 90, -90, 0.5, 500);
+      source.position.set(40, 20, 200);
+      void rig.moveTo(source, 1, {focus: 200, easing: 'linear'});
+      rig.step(0.5);
+      frame(stage);
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+
+      rig.step(0.5);
+      frame(stage);
+      expect(stage.projection).toBe(parallax);
+      expect(rig.camera).toBeInstanceOf(OrthographicCamera);
+      expectShowsAs(rig.camera, fittedTo(source, stage));
+      expect(() => rig.look({yaw: 0.1, pitch: 0})).toThrow(RangeError);
+
+      // a jump to a perspective camera from there needs no focus either
+      const perspective = new PerspectiveCamera(40, 16 / 9, 0.5, 500);
+      rig.jump(perspective);
+      frame(stage);
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+      expectShowsAs(rig.camera, fittedTo(perspective, stage));
+    });
+
+    it('resolves a CameraProjection whose source moves anew in every frame of a move to it', () => {
+      const {stage, rig} = makeRig();
+      const source = new PerspectiveCamera(40, 16 / 9, 0.5, 500);
+      source.position.set(0, 0, 500);
+      const target = new CameraProjection(source);
+      void rig.moveTo(target, 1, {easing: 'linear'});
+      rig.step(0.5);
+      source.position.x = 200;
+      frame(stage);
+      // halfway between the rest and the source where it stands now
+      expect(rig.camera.position.x).toBeCloseTo(100, 9);
+      expect(rig.camera.position.z).toBeCloseTo(400, 9);
+
+      source.position.x = 300;
+      rig.step(0.5);
+      expect(stage.projection).toBe(target);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([300, 0, 500]);
+    });
+  });
+
+  describe('an Object3D as a target', () => {
+    for (const [plane, foot] of [
+      ['xy|bottom-left', (w: Vector3) => [w.x, w.y, 300]],
+      ['xz|top-left', (w: Vector3) => [w.x, 300, w.z]],
+    ] as const) {
+      it(`puts the camera over the foot of the object on the plane ${plane}, its orientation and scale ignored`, () => {
+        const {stage, rig} = makeRig('parallax', plane);
+        const rest = stage.projection!.createCamera() as PerspectiveCamera;
+        const parent = new Group();
+        parent.position.set(40, 30, -20);
+        parent.rotation.set(0.4, 0.7, 0.2);
+        parent.scale.setScalar(3);
+        const player = new Object3D();
+        player.position.set(10, -5, 25);
+        player.rotation.set(0.3, 0.5, 0.2);
+        player.scale.set(2, 0.5, 4);
+        parent.add(player);
+
+        rig.jump(player);
+        frame(stage);
+        const expected = foot(player.getWorldPosition(new Vector3()));
+        for (let i = 0; i < 3; i++) expect(rig.camera.position.getComponent(i)).toBeCloseTo(expected[i]!, 9);
+        expect(rig.camera.quaternion.angleTo(rest.quaternion)).toBeCloseTo(0, 12);
+        expect(lensOf(rig.camera as PerspectiveCamera)).toBeCloseTo(lensOf(rest), 12);
+      });
+    }
+
+    it('puts the camera at the offset from the object: x and y, and a distance where it names one', () => {
+      const {stage, rig} = makeRig();
+      const player = new Object3D();
+      player.position.set(100, 50, 30);
+
+      void rig.moveTo(player, 0, {offset: [0, 40]});
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([100, 90, 300]);
+
+      void rig.moveTo(player, 0, {offset: [-10, 40, 150]});
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([90, 90, 150]);
+    });
+
+    it('ignores the distance of the offset under an OrthographicProjection', () => {
+      const {stage, rig} = makeRig('orthographic');
+      const player = new Object3D();
+      player.position.set(100, 50, 30);
+      void rig.moveTo(player, 0, {offset: [5, 40, 150]});
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([105, 90, 100]);
+    });
+
+    it('keeps the zoom, the look and the distance of the current pose', () => {
+      const {stage, rig} = makeRig();
+      const rest = stage.projection!.createCamera() as PerspectiveCamera;
+      rig.jump({position: [0, 0, 200], zoom: 2, look: {yaw: 0.2, pitch: 0}});
+      const player = new Object3D();
+      player.position.set(-30, 60, 0);
+      void rig.moveTo(player, 0);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([-30, 60, 200]);
+      expect(lensOf(rig.camera as PerspectiveCamera)).toBeCloseTo(lensOf(rest) / 2, 12);
+      expect(-directionOf(rig.camera).x).toBeCloseTo(Math.sin(0.2), 12);
+
+      // a drag-look holds while following
+      rig.look({yaw: -0.3, pitch: 0.1});
+      player.position.x = 10;
+      rig.step(1 / 60);
+      frame(stage);
+      expect(rig.camera.position.x).toBe(10);
+      expect(directionOf(rig.camera).y).toBeCloseTo(Math.sin(0.1), 12);
+    });
+
+    it('locks on: sticks to an object that moves, and step() answers false for one that stands', () => {
+      const {stage, rig} = makeRig();
+      const player = new Object3D();
+      void rig.moveTo(player, 0.5, {offset: [0, 40]});
+      rig.step(0.5);
+      expect(rig.step(1 / 60), 'an object that stands').toBe(false);
+      expect(rig.busy).toBe(false);
+
+      player.position.x = 7;
+      expect(rig.step(1 / 60)).toBe(true);
+      expect(rig.busy).toBe(true);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([7, 40, 300]);
+      expect(rig.step(1 / 60)).toBe(false);
+      expect(rig.busy).toBe(false);
+    });
+
+    it('meets an object that kept moving on a move back to it', () => {
+      const {stage, rig} = makeRig();
+      const player = new Object3D();
+      const chest = new Object3D();
+      chest.position.set(300, 100, 0);
+      rig.jump(player);
+
+      void rig.moveTo(chest, 1, {easing: 'linear'});
+      rig.step(1);
+      player.position.set(-50, 20, 0);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([300, 100, 300]);
+
+      void rig.moveTo(player, 1, {easing: 'linear'});
+      rig.step(0.5);
+      player.position.x = -100;
+      frame(stage);
+      expect(rig.camera.position.x).toBeCloseTo((300 - 100) / 2, 9);
+      expect(rig.camera.position.y).toBeCloseTo((100 + 20) / 2, 9);
+
+      player.position.x = -150;
+      rig.step(0.5);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([-150, 20, 300]);
+      player.position.x = -160;
+      rig.step(1 / 60);
+      frame(stage);
+      expect(rig.camera.position.x).toBe(-160);
+    });
+
+    it('trails the object by smooth once locked on, critically damped, and settles', () => {
+      const {stage, rig} = makeRig();
+      const player = new Object3D();
+      void rig.moveTo(player, 0, {smooth: 0.2});
+      expect(rig.step(1 / 60), 'the arrival').toBe(true);
+      expect(rig.step(1 / 60), 'an object that stands').toBe(false);
+      expect(rig.busy).toBe(false);
+
+      player.position.x = 100;
+      expect(rig.step(0.2)).toBe(true);
+      frame(stage);
+      // after one time constant a critically damped spring from rest has closed 1 - 2/e of the gap
+      expect(rig.camera.position.x).toBeCloseTo(100 * (1 - 2 / Math.E), 9);
+      expect(rig.busy).toBe(true);
+
+      let frames = 0;
+      let furthest = 0;
+      while (rig.busy && frames < 600) {
+        rig.step(1 / 60);
+        frame(stage);
+        furthest = Math.max(furthest, rig.camera.position.x);
+        frames++;
+      }
+      expect(rig.busy, 'settled').toBe(false);
+      expect(frames).toBeGreaterThan(30);
+      expect(furthest, 'no overshoot').toBeLessThanOrEqual(100);
+      expect(rig.camera.position.x).toBe(100);
+      expect(rig.step(1 / 60), 'an object that stands').toBe(false);
+    });
+
+    it('sticks to the object during the move and starts to trail on arrival, without a jump', () => {
+      const {stage, rig} = makeRig();
+      const player = new Object3D();
+      player.position.x = 50;
+      void rig.moveTo(player, 1, {smooth: 0.5, easing: 'linear'});
+      rig.step(0.5);
+      player.position.x = 80;
+      frame(stage);
+      expect(rig.camera.position.x).toBeCloseTo(40, 9);
+      rig.step(0.5);
+      frame(stage);
+      expect(rig.camera.position.x).toBe(80);
+      rig.step(1 / 60);
+      frame(stage);
+      expect(rig.camera.position.x).toBe(80);
+    });
+
+    it('takes a camera as a camera, and any other Object3D as an object, before a projection and a pose', () => {
+      const {stage, rig} = makeRig();
+      const projection = stage.projection!;
+
+      // a camera with the methods of a projection is a camera: the rig locks on, and assigns nothing
+      const camera = Object.assign(new PerspectiveCamera(40, 4 / 3, 0.5, 500), {updateViewRect() {}});
+      camera.position.set(10, 0, 400);
+      rig.jump(camera);
+      frame(stage);
+      expect(stage.projection).toBe(projection);
+      expect(rig.camera.position.toArray()).toEqual([10, 0, 400]);
+
+      // an Object3D with the methods of a projection and the zoom of a pose is an object: its place alone counts
+      const object = Object.assign(new Object3D(), {updateViewRect() {}, zoom: 2});
+      object.position.set(20, 5, 0);
+      rig.jump({});
+      rig.jump(object);
+      frame(stage);
+      expect(stage.projection).toBe(projection);
+      expect(rig.camera.position.toArray()).toEqual([20, 5, 300]);
+      expect(lensOf(rig.camera as PerspectiveCamera)).toBeCloseTo(lensOf(projection.createCamera() as PerspectiveCamera), 12);
+
+      // a projection with the fields of a pose is a projection
+      const next = Object.assign(makeProjection('parallax', 'xy|bottom-left', {distanceToProjectionPlane: 500}), {
+        position: [99, 99],
+      });
+      rig.jump(next);
+      expect(stage.projection).toBe(next);
+    });
+
+    it('refuses a look under an OrthographicProjection while following', () => {
+      const {rig} = makeRig('orthographic');
+      rig.jump(new Object3D());
+      expect(() => rig.look({yaw: 0.1, pitch: 0})).toThrow(RangeError);
+    });
+  });
+
+  describe('a lock-on', () => {
+    const targets: [string, () => {target: Object3D; move: () => void}][] = [
+      [
+        'a camera',
+        () => {
+          const target = new PerspectiveCamera(40, 16 / 9, 0.5, 500);
+          target.position.set(0, 0, 500);
+          return {target, move: () => void (target.position.x += 50)};
+        },
+      ],
+      [
+        'an Object3D',
+        () => {
+          const target = new Object3D();
+          return {target, move: () => void (target.position.x += 50)};
+        },
+      ],
+    ];
+    const ends: [string, (rig: CameraRig) => unknown][] = [
+      ['a moveTo()', (rig) => rig.moveTo({position: [3, 4]}, 0)],
+      ['a jump()', (rig) => rig.jump({position: [3, 4]})],
+      ['cancel()', (rig) => rig.cancel()],
+      ['dispose()', (rig) => rig.dispose()],
+    ];
+    for (const [what, make] of targets) {
+      for (const [end, call] of ends) {
+        it(`to ${what} is released by ${end}`, () => {
+          const {stage, rig} = makeRig();
+          const {target, move} = make();
+          rig.jump(target);
+          rig.step(1 / 60);
+          frame(stage);
+          const before = rig.camera.position.clone();
+
+          call(rig);
+          if (!rig.isDisposed) rig.step(1 / 60);
+          frame(stage);
+          const released = stage.camera!.position.clone();
+          if (end === 'cancel()') expect(released.toArray(), 'held where it stood').toEqual(before.toArray());
+
+          move();
+          if (!rig.isDisposed) {
+            expect(rig.step(1 / 60)).toBe(false);
+            expect(rig.busy).toBe(false);
+          }
+          frame(stage);
+          expect(stage.camera!.position.toArray()).toEqual(released.toArray());
+        });
+      }
+    }
+
+    it('keeps the rig on the target with a quaternion of unit length', () => {
+      const {stage, rig} = makeRig();
+      const {camera: source} = inParent(new PerspectiveCamera(40, 16 / 9, 0.5, 500));
+      rig.jump(source);
+      frame(stage);
+      expect(rig.camera.quaternion.length()).toBeCloseTo(1, 12);
+      expect(rig.camera.quaternion.angleTo(source.getWorldQuaternion(new Quaternion()))).toBeCloseTo(0, 9);
     });
   });
 

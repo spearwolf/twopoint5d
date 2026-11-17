@@ -262,6 +262,81 @@ describe('CameraRig on the hot path', () => {
     expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
 
+  // A camera target, resolved in every frame: through the move to it, and locked on after it. A
+  // CameraProjection as the target of a move is resolved the same way. Its case comes after the
+  // orthographic one on purpose: with the feedback of both kinds of camera, a step that asked the
+  // projection through needsPlacement() for a source that stood cost 16 bytes.
+  test.each<
+    [
+      'a move to a moving camera' | 'a lock-on onto a moving camera' | 'a move to a CameraProjection of a moving camera',
+      'perspective' | 'orthographic',
+    ]
+  >([
+    ['a move to a moving camera', 'perspective'],
+    ['a lock-on onto a moving camera', 'perspective'],
+    ['a lock-on onto a moving camera', 'orthographic'],
+    ['a move to a CameraProjection of a moving camera', 'perspective'],
+  ])('step(), write() and compose() during %s (%s) allocate nothing', async (what, kind) => {
+    const {parent, source} = makeSource(
+      kind === 'perspective' ? new PerspectiveCamera(50, 16 / 9, 0.5, 500) : new OrthographicCamera(-8, 8, 4.5, -4.5, 0.5, 500),
+    );
+    const rig = makeRig();
+    if (what === 'a move to a moving camera') void rig.moveTo(source, LONG_MOVE);
+    else if (what === 'a move to a CameraProjection of a moving camera') void rig.moveTo(new CameraProjection(source), LONG_MOVE);
+    else rig.jump(source);
+    let moved = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) {
+        moveSource(parent, source, i);
+        if (rig.step(1)) moved++;
+        rig.write();
+        rig.compose();
+      }
+    });
+
+    expect(rig.busy).toBe(true);
+    expect(rig.camera).toBeInstanceOf(kind === 'perspective' ? PerspectiveCamera : OrthographicCamera);
+    expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  // An Object3D the rig follows — a player under a parent, moved from the tables of constants: through
+  // the move to it, stuck to it after it, and trailing it by smooth, which never settles here since the
+  // player moves on in every step.
+  test.each<['a move to a moving object' | 'a lock-on onto a moving object' | 'a lock-on onto a moving object with smooth']>([
+    ['a move to a moving object'],
+    ['a lock-on onto a moving object'],
+    ['a lock-on onto a moving object with smooth'],
+  ])('step(), write() and compose() during %s allocate nothing', async (what) => {
+    const parent = new Group();
+    parent.position.set(10, 20, 30);
+    parent.rotation.set(0, 0, 0.25);
+    const player = new Group();
+    parent.add(player);
+    const rig = makeRig();
+    rig.jump({position: [0, 0, 200.5], zoom: 1.5});
+    if (what === 'a move to a moving object') void rig.moveTo(player, LONG_MOVE, {offset: [0, 40]});
+    else void rig.moveTo(player, 0, {offset: [0.5, 40.25, 150.75], smooth: what.endsWith('smooth') ? 0.25 : 0});
+    let moved = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) {
+        const k = i & 7;
+        player.position.x = XS[k]!;
+        player.position.y = YS[k]!;
+        parent.position.x = DISTANCES[k]!;
+        if (rig.step(1)) moved++;
+        rig.write();
+        rig.compose();
+      }
+    });
+
+    expect(rig.busy).toBe(true);
+    expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
   test('CameraProjection: the placement of a moving source under a rig — placeBase(), compose(), write() — allocates nothing', async () => {
     const {parent, source} = makeSource(new PerspectiveCamera(50, 16 / 9, 0.5, 500));
     const projection = new CameraProjection(source);

@@ -30,6 +30,15 @@ import {
   writeAspect,
   writeShotAtAspect,
 } from './cameraShot.js';
+import {
+  createObjectFollow,
+  kindOf,
+  kindOfTarget,
+  readObjectGoal,
+  readObjectPose,
+  type TargetKind,
+  trailObject,
+} from './cameraTarget.js';
 import type {IProjection} from './IProjection.js';
 import {blendLensChangeAtProgress, createLensChange} from './lensChange.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
@@ -37,9 +46,15 @@ import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D, Stage2DInternals} from './Stage2D.js';
 
 /**
- * What a `CameraRig` travels to: a {@link CameraPose} in the frame of the projection of its stage,
- * or an `IProjection`, whose rest the rig moves to and which it assigns to the stage on arrival.
- * Cameras and other `Object3D`s are refused by this version of the rig.
+ * What a `CameraRig` travels to, asked in this order:
+ *
+ * - a camera — a `PerspectiveCamera` or an `OrthographicCamera`, of three.js or of a loaded `.glb`:
+ *   its world pose and its lens, fitted into the container as a `CameraProjection` with the default
+ *   fit fits it. The rig locks on to it on arrival and follows it;
+ * - any other `Object3D` — a player, a point of interest: its world position alone, carried into
+ *   the frame, plus the `offset` of the move; the rig locks on to it on arrival and follows it;
+ * - an `IProjection`, whose rest the rig moves to and which it assigns to the stage on arrival;
+ * - a {@link CameraPose} in the frame of the projection of the stage.
  */
 export type CameraTarget = CameraPose | PerspectiveCamera | OrthographicCamera | IProjection | Object3D;
 
@@ -55,12 +70,14 @@ export interface CameraMoveOptions {
   easing?: Easing;
   /**
    * For an `Object3D` target: where the camera stands relative to the object, on the axes of the
-   * frame — x and y, and optionally a distance. Default `[0, 0]`. Checked, and not used by a pose.
+   * frame — x and y, and optionally a distance from the plane, which an orthographic camera ignores.
+   * Default `[0, 0]`, at the distance of the current pose. Checked, and ignored by other targets.
    */
   offset?: readonly [number, number] | readonly [number, number, number];
   /**
    * For an `Object3D` target: a time constant in seconds by which the camera trails the object once
-   * locked on, critically damped. Default `0`. Checked, and not used by a pose.
+   * locked on, critically damped; it settles where the gap falls below `1e-4`. Default `0`: it sticks
+   * to the object. Checked, and ignored by other targets.
    */
   smooth?: number;
   /**
@@ -87,12 +104,6 @@ const liftProgress = new Float64Array(1);
 // the turn of a look, as a quaternion handed to fromArray(): setFromAxisAngle() takes the angle as
 // an argument
 const turnSlot = new Float64Array(4);
-
-const kindOf = (camera: Camera): CameraShotKind | undefined => {
-  if ((camera as PerspectiveCamera).isPerspectiveCamera === true) return 'perspective';
-  if ((camera as OrthographicCamera).isOrthographicCamera === true) return 'orthographic';
-  return undefined;
-};
 
 const refuseKind = (camera: Camera): never => {
   throw new TypeError(
@@ -141,13 +152,22 @@ export class CameraRig {
   readonly #probedKinds = new WeakMap<IProjection, CameraShotKind>();
   #probe?: {projection: IProjection; camera: PerspectiveCamera | OrthographicCamera};
 
-  // the projection a move travels to, and its rest, placed for the container of the stage
+  // the projection whose rest the target resolves on, placed for the container of the stage: the
+  // one a move travels to, which the arrival assigns to the stage, or the CameraProjection of a
+  // camera target, which it does not
   #targetProjection?: IProjection;
+  #assigns = false;
   #targetRest = createRest();
   #targetPlaced = false;
   #targetWidth = 0;
   #targetHeight = 0;
   #targetPixelRatio = 0;
+
+  // a camera or an Object3D as the target: the rig locks on to it once the move arrives, and resolves
+  // it in every frame; `#followMoved` holds whether the last step() moved the camera after it
+  #follows = false;
+  #followMoved = false;
+  readonly #follow = createObjectFollow();
 
   // a lens change: the focus and the depth the move names, NaN where it names none
   readonly #lensChange = createLensChange();
@@ -266,9 +286,13 @@ export class CameraRig {
     return this.#camera;
   }
 
-  /** `true` while a move is under way; `false` after {@link dispose}. */
+  /**
+   * `true` while a move is under way, while the camera trails an `Object3D` by `smooth`, and while
+   * locked on to a camera or an object, when the last {@link step} moved the camera after it; `false`
+   * after {@link dispose}.
+   */
   get busy(): boolean {
-    return this.#moving;
+    return this.#moving || this.#follow.trailing || this.#followMoved;
   }
 
   /** `true` once {@link dispose} has run. */
@@ -277,25 +301,37 @@ export class CameraRig {
   }
 
   /**
-   * Puts the camera on `target` at once; it ends a running move, whose promise resolves. The target
-   * brings its own look — the `look` of the pose, 0 where it gives none. A pose object the caller
-   * keeps and rewrites may be handed in every frame: the rig reads it in the call and allocates
-   * nothing. A projection is assigned to the stage at once, and the camera stands on its rest.
+   * Puts the camera on `target` at once; it ends a running move, whose promise resolves, and lets go
+   * of a target the rig followed. The target brings its own look — the `look` of the pose, 0 where it
+   * gives none, the orientation of a camera —; an `Object3D` keeps the look, the zoom and the
+   * distance of the current pose. A pose object the caller keeps and rewrites may be handed in every
+   * frame: the rig reads it in the call and allocates nothing. A projection is assigned to the stage
+   * at once, and the camera stands on its rest. A camera or an `Object3D` locks the rig on: it
+   * follows the target from here on, as after the arrival of {@link moveTo}; a camera of the other
+   * kind needs no focus here.
    *
-   * @throws {TypeError} for a target of a kind this version does not take — a camera, an
-   * `Object3D` — and for a pose of another shape.
+   * @throws {TypeError} for a camera that is neither a `PerspectiveCamera` nor an
+   * `OrthographicCamera`, and for a pose of another shape.
    * @throws {RangeError} for a number of the pose that is not finite, a `zoom` that is not above 0
    * and a `look` other than 0 under a projection with an orthographic camera.
    */
   jump(target: CameraTarget): void {
     const subject = 'CameraRig#jump()';
     this.#assertAlive(subject);
-    const projection = this.#readTarget(subject, target, this.#pose);
-    this.#targetProjection = undefined;
+    const kind = this.#readTarget(subject, target, this.#nextPose, undefined);
+    const camera = kind === 'camera' ? new CameraProjection(target as PerspectiveCamera | OrthographicCamera) : undefined;
+    let targetRest: Rest | undefined;
+    if (camera !== undefined && this.#hasRest) {
+      targetRest = createRest();
+      this.#placeTarget(camera, targetRest);
+    }
     this.#endMove();
+    this.#release();
     this.#holding = false;
-    this.#takeLookOfPose();
-    if (projection !== undefined) this.#stage.projection = projection;
+    copyPoseValues(this.#nextPose, this.#pose);
+    if (kind !== 'object') this.#takeLookOfPose();
+    this.#takeTarget(kind, target, camera, targetRest, undefined);
+    if (kind === 'projection') this.#stage.projection = target as IProjection;
   }
 
   /**
@@ -306,11 +342,27 @@ export class CameraRig {
    *
    * A projection as the target: the camera moves to its rest — the placement it gives a camera for
    * the container of the stage —, and the rig assigns it to `stage.projection` on arrival, where
-   * nothing jumps. A projection of the other kind — orthographic from perspective, or back — makes
-   * the move a lens change, a dolly zoom: the focus plane keeps its size on the screen while the
-   * camera backs off and its lens narrows, and the camera swaps its kind where the parallax across
-   * `depth` stays below half a pixel, at a distance of at most 1000 times the visible height. The
-   * focus plane is the projection plane; without one, `focus` names its distance.
+   * nothing jumps. A projection whose rest moves — a `CameraProjection` with an animated source — is
+   * met where it stands in each frame. A projection of the other kind — orthographic from
+   * perspective, or back — makes the move a lens change, a dolly zoom: the focus plane keeps its
+   * size on the screen while the camera backs off and its lens narrows, and the camera swaps its
+   * kind where the parallax across `depth` stays below half a pixel, at a distance of at most 1000
+   * times the visible height. The focus plane is the projection plane; without one, `focus` names
+   * its distance.
+   *
+   * A camera as the target: the camera moves to its world pose and its lens, fitted into the
+   * container as a `CameraProjection` with the default fit (`'contain'`) fits it, and the rig locks
+   * on to it on arrival: it reads the camera in every frame and follows an animation that moves it
+   * or changes its lens; a {@link look} lies on top. No projection is assigned. A camera of the other
+   * kind is a lens change, which needs `focus`, since a camera has no projection plane.
+   *
+   * Any other `Object3D` as the target: the camera moves to the world position of the object,
+   * carried into the frame — under a plane, its foot on the plane —, plus `offset`; the look, the
+   * zoom and the distance stay those of the current pose, unless `offset` names a distance. The
+   * object is met where it stands in each frame, and on arrival the rig locks on to it: the camera
+   * sticks to it, or trails it by `smooth`, critically damped.
+   *
+   * A lock-on holds until the next `moveTo()`, a {@link jump}, {@link cancel} or {@link dispose}.
    *
    * The promise resolves on arrival, and also when the move ends otherwise — {@link cancel}, a
    * {@link jump}, an overtaking `moveTo()`, {@link dispose} —, so code that awaits the camera is
@@ -319,15 +371,21 @@ export class CameraRig {
    * @throws {TypeError} and {@link RangeError} for a target as {@link jump} refuses it, for
    * `seconds` that is not a finite number of 0 or more, an `easing` that is not one, and an option
    * of {@link CameraMoveOptions} that is not a number of its kind.
-   * @throws {Error} for a lens change without a focus where a projection has no plane; and what the
-   * projection of the target throws as the rig places its rest.
+   * @throws {Error} for a lens change without a focus where a projection or the camera of the target
+   * has no plane; and what the projection of the target throws as the rig places its rest.
    */
   moveTo(target: CameraTarget, seconds: number, options?: CameraMoveOptions): Promise<void> {
     const subject = 'CameraRig#moveTo()';
     this.#assertAlive(subject);
     assertFiniteAtLeast(seconds, subject, 'seconds', 0);
     const easing = this.#readMoveOptions(subject, options);
-    const projection = this.#readTarget(subject, target, this.#nextPose);
+    const kind = this.#readTarget(subject, target, this.#nextPose, options);
+    const projection =
+      kind === 'projection'
+        ? (target as IProjection)
+        : kind === 'camera'
+          ? new CameraProjection(target as PerspectiveCamera | OrthographicCamera)
+          : undefined;
     const stageProjection = this.#stage.projection!;
 
     // a lens change needs the distance of its focus plane: the projection plane, or the option
@@ -338,6 +396,11 @@ export class CameraRig {
           ? this.#rest.kind
           : this.#kindOfProjection(stageProjection);
     if (kindOf(this.#camera) !== targetKind && options?.focus === undefined) {
+      if (kind === 'camera') {
+        throw new Error(
+          `${subject}: a lens change between a perspective and an orthographic camera needs a focus: a camera as the target has no projectionPlane, and the move names no focus`,
+        );
+      }
       if (stageProjection.projectionPlane == null || (projection !== undefined && projection.projectionPlane == null)) {
         throw new Error(
           `${subject}: a lens change between a perspective and an orthographic camera needs a focus: the projection has no projectionPlane, and the move names no focus`,
@@ -357,14 +420,13 @@ export class CameraRig {
     const fromReady = this.#hasRest;
     if (fromReady) this.#resolveRelative(this.#from);
     this.#endMove();
+    this.#release();
     copyPoseValues(this.#nextPose, this.#pose);
     this.#holding = false;
-    this.#takeLookOfPose();
+    if (kind !== 'object') this.#takeLookOfPose();
     this.#focus = options?.focus ?? Number.NaN;
     this.#depth = options?.depth ?? Number.NaN;
-    this.#targetProjection = projection;
-    if (targetRest !== undefined) this.#targetRest = targetRest;
-    this.#targetPlaced = targetRest !== undefined;
+    this.#takeTarget(kind, target, projection, targetRest, options);
 
     if (seconds === 0) {
       this.#arrive();
@@ -437,28 +499,30 @@ export class CameraRig {
   }
 
   /**
-   * Ends a running move where it stands: the camera holds that shot — its lens as a factor on the fit
-   * — until the next target, and a {@link look} turns it about the rest. A projection the move ran
-   * to is not assigned. The promise of the move resolves. Does nothing while the camera stands.
+   * Ends a running move where it stands, and lets go of a camera or an `Object3D` the rig is locked
+   * on to: the camera holds that shot — its lens as a factor on the fit — until the next target, and
+   * a {@link look} turns it about the rest. A projection the move ran to is not assigned. The promise
+   * of the move resolves. Does nothing while the camera stands on a pose or a projection.
    */
   cancel(): void {
     this.#assertAlive('CameraRig#cancel()');
-    if (!this.#moving) return;
+    if (!this.#moving && !this.#follows) return;
     if (this.#hasRest) {
       this.#resolveRelative(this.#held);
       this.#holding = true;
       this.#holdingTurn = true;
     }
-    this.#targetProjection = undefined;
+    this.#release();
     this.#endMove();
   }
 
   /**
-   * Advances the clocks of the rig — a move, a reframe — by `deltaSeconds` and resolves the shot of
-   * the frame. Answers the `Motion` of drawing on demand: `true` when that shot differs from the one
-   * the step before resolved, `false` otherwise, and `false` on a stage without a view or one that
-   * has been disposed. A move that arrives resolves its promise here, and a move to a projection
-   * assigns it to the stage here. As a frame step:
+   * Advances the clocks of the rig — a move, a reframe, the trailing of an `Object3D` by `smooth` —
+   * by `deltaSeconds` and resolves the shot of the frame, a camera or an object the rig is locked on
+   * to where it stands now. Answers the `Motion` of drawing on demand: `true` when that shot differs
+   * from the one the step before resolved, `false` otherwise — also for a target that stands —, and
+   * `false` on a stage without a view or one that has been disposed. A move that arrives resolves
+   * its promise here, and a move to a projection assigns it to the stage here. As a frame step:
    * `pacer.onFrame((frame) => rig.step(frame.deltaTime), stage)`. The camera itself is written in
    * the frame of the stage, so the order of `step()` and `updateFrame()` does not matter.
    * Allocates nothing but on the arrival at a projection.
@@ -487,10 +551,23 @@ export class CameraRig {
       if (this.#elapsed >= this.#duration) this.#arrive();
     }
 
-    if (!this.#hasRest || this.#stage.isDisposed) return false;
+    if (!this.#hasRest || this.#stage.isDisposed) {
+      this.#followMoved = false;
+      return false;
+    }
+    const follow = this.#follow;
+    if (follow.object !== undefined && !this.#moving && follow.smooth > 0) {
+      // a field rather than an argument: a fraction handed to a call that V8 does not inline is boxed
+      follow.delta = deltaSeconds;
+      trailObject(follow, this.#rest);
+    }
     this.#resolve(this.#current);
-    if (shotsEqual(this.#current, this.#stepped)) return false;
+    if (shotsEqual(this.#current, this.#stepped)) {
+      this.#followMoved = false;
+      return false;
+    }
     copyShot(this.#current, this.#stepped);
+    this.#followMoved = this.#follows && !this.#moving;
     return true;
   }
 
@@ -547,14 +624,15 @@ export class CameraRig {
   /**
    * Detaches the rig from the stage, which goes back to the camera it had — one assigned to
    * `stage.camera`, or the projection's — and places it. A running move ends, and its promise
-   * resolves. The stage stays the caller's. Afterwards every method but `dispose()` throws; `stage`,
+   * resolves; a lock-on ends, and the rig keeps no reference to its target. The stage stays the
+   * caller's. Afterwards every method but `dispose()` throws; `stage`,
    * `camera` and `busy` answer what they held. A second call does nothing. What a listener of the
    * stage throws while it takes its camera back comes out of this call once the rig is down.
    */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
-    this.#targetProjection = undefined;
+    this.#release();
     this.#endMove();
     this.#lifting = false;
     // a stage that went on to another rig keeps it
@@ -564,7 +642,8 @@ export class CameraRig {
   /**
    * Lets `projection` place the base camera of the rig and answers it; called by the stage. The base
    * is of the kind the projection builds and is never drawn with. The rest of a projection a move
-   * runs to follows the container here. Not for use outside the stage.
+   * runs to follows the container here, and the placement of the stage where it is that very
+   * projection. Not for use outside the stage.
    * @internal
    */
   placeBase(projection: IProjection): Camera {
@@ -580,7 +659,8 @@ export class CameraRig {
     const target = this.#targetProjection;
     if (
       target !== undefined &&
-      (!this.#targetPlaced ||
+      (target === projection ||
+        !this.#targetPlaced ||
         width !== this.#targetWidth ||
         height !== this.#targetHeight ||
         pixelRatio !== this.#targetPixelRatio)
@@ -724,10 +804,23 @@ export class CameraRig {
   }
 
   // the target as it resolves against the rest of this frame, into `out`: the rest of the stage, or
-  // the rest of the projection a move runs to
+  // the rest of the projection a move runs to or the camera the rig follows, where it stands now
   #resolveTarget(out: CameraShot): void {
+    this.#followTarget();
     const rest = this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest;
     const pose = this.#pose;
+    const follow = this.#follow;
+    if (follow.object !== undefined) {
+      // the place the trailing has reached once locked on with smooth, otherwise the object's own
+      if (follow.started && follow.smooth > 0 && !this.#moving) {
+        pose.x = follow.x;
+        pose.y = follow.y;
+      } else {
+        readObjectGoal(follow, rest);
+        pose.x = follow.goalX;
+        pose.y = follow.goalY;
+      }
+    }
     const held = this.#held;
     const holding = this.#holding;
     const p = out.position;
@@ -832,12 +925,70 @@ export class CameraRig {
   }
 
   // the end of a move: a projection it ran to becomes the projection of the stage, whose rest the
-  // camera stands on — the same pose, `{}` with the look, over a base placed alike
+  // camera stands on — the same pose, `{}` with the look, over a base placed alike. A camera or an
+  // object the move ran to stays the target: the rig is locked on to it from here on
   #arrive(): void {
-    const projection = this.#targetProjection;
-    this.#targetProjection = undefined;
+    const projection = this.#assigns ? this.#targetProjection : undefined;
+    if (projection !== undefined) {
+      this.#targetProjection = undefined;
+      this.#assigns = false;
+    }
     this.#endMove();
     if (projection !== undefined && this.#stage.projection !== projection) this.#stage.projection = projection;
+  }
+
+  // the target read by #readTarget(), made the one of the rig: a projection to move to, the
+  // CameraProjection of a camera — fitted as one with the default fit fits it —, or an object to
+  // follow; `targetRest` is the rest of the projection, placed already where the stage has a view
+  #takeTarget(
+    kind: TargetKind,
+    target: unknown,
+    projection: IProjection | undefined,
+    targetRest: Rest | undefined,
+    options: CameraMoveOptions | undefined,
+  ): void {
+    this.#targetProjection = projection;
+    this.#assigns = kind === 'projection' && projection !== undefined;
+    if (targetRest !== undefined) this.#targetRest = targetRest;
+    this.#targetPlaced = targetRest !== undefined;
+    this.#follows = kind === 'camera' || kind === 'object';
+    if (kind === 'object') {
+      const follow = this.#follow;
+      const offset = options?.offset;
+      follow.object = target as Object3D;
+      follow.offsetX = offset === undefined ? 0 : offset[0];
+      follow.offsetY = offset === undefined ? 0 : offset[1];
+      follow.smooth = options?.smooth ?? 0;
+      follow.started = false;
+      follow.trailing = false;
+    }
+  }
+
+  // lets go of the target a move ran to or the rig followed; the rig keeps no reference to it
+  #release(): void {
+    this.#targetProjection = undefined;
+    this.#assigns = false;
+    this.#follows = false;
+    this.#followMoved = false;
+    const follow = this.#follow;
+    follow.object = undefined;
+    follow.trailing = false;
+  }
+
+  // a projection of the target whose rest may move — one with needsPlacement(), a CameraProjection
+  // with an animated source, the one of a camera target among them — placed anew in every
+  // resolve, with its source read through updateWorldMatrix(true, false); step() compares the shots
+  // afterwards. Placed rather than asked through needsPlacement() first: once the rig has followed
+  // cameras of both kinds, that call from here costs 16 bytes where it answers false — measured by
+  // the allocation spec, under V8's inlining of the moment —, and the placement costs none. The
+  // projection of the stage is the stage's to place
+  #followTarget(): void {
+    const target = this.#targetProjection;
+    if (target === undefined || !this.#targetPlaced || target === this.#stage.projection) return;
+    if (target.needsPlacement === undefined) return;
+    const rest = this.#targetRest;
+    this.#placeRest(target, rest);
+    readRest(rest);
   }
 
   // the base of `rest`, placed by `projection`: kept while it is of the kind the projection builds
@@ -910,21 +1061,15 @@ export class CameraRig {
     return this.#hasRest && this.#rest.kind === 'orthographic';
   }
 
-  // a projection target answers itself and leaves the pose empty; a pose is read into `out`
-  #readTarget(subject: string, target: unknown, out: PoseValues): IProjection | undefined {
-    if (typeof target === 'object' && target !== null) {
-      if ((target as Partial<Object3D>).isObject3D === true) {
-        throw new TypeError(
-          `${subject}: a target of this kind is not supported yet, got ${describeThreeValue(target, 'isObject3D')}`,
-        );
-      }
-      if (typeof (target as Partial<IProjection>).updateViewRect === 'function') {
-        copyPoseValues(EMPTY_POSE, out);
-        return target as IProjection;
-      }
-    }
-    readPose(subject, target, this.#isOrthographic(this.#stage.projection), out);
-    return undefined;
+  // the kind of the target, and its pose into `out`: a pose as it reads, the pose an object keeps of
+  // the current one, and the empty pose of a camera and a projection. Changes nothing of the rig
+  #readTarget(subject: string, target: unknown, out: PoseValues, options: CameraMoveOptions | undefined): TargetKind {
+    const kind = kindOfTarget(subject, target);
+    if (kind === 'pose') readPose(subject, target, this.#isOrthographic(this.#stage.projection), out);
+    else if (kind === 'object') {
+      readObjectPose(this.#pose, this.#holding ? this.#held : undefined, this.#rest, options?.offset, out);
+    } else copyPoseValues(EMPTY_POSE, out);
+    return kind;
   }
 
   #readMoveOptions(subject: string, options: CameraMoveOptions | undefined): EasingSpec {
