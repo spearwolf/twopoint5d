@@ -1,4 +1,4 @@
-import type {Camera} from 'three/webgpu';
+import type {Box3, Camera} from 'three/webgpu';
 import {PerspectiveCamera, Vector2} from 'three/webgpu';
 
 import {describeThreeValue} from '../utils/describeThreeValue.js';
@@ -7,6 +7,7 @@ import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IProjection, ProjectionViewRect} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {fitIntoRectangle, type ProjectionFitSpecs} from './fitIntoRectangle.js';
+import {type FramingOptions, framingSetup} from './framing.js';
 import {wholeUnitOffset} from './wholeUnitOffset.js';
 
 // the camera values for specs that leave one out or give one no camera can be built from
@@ -69,6 +70,24 @@ export class ParallaxProjection implements IProjection {
 
   #aspect!: number;
   #fovy!: number;
+
+  /**
+   * A projection that frames `box` from one of its sides: the projection plane lies in the face of
+   * the box toward the camera, with its origin in the middle of that face, and the view is that
+   * face grown by `margin` on every edge, fitted `'contain'` into the container. Everything behind
+   * the face appears smaller, so the whole box lies in the view. The other specs —
+   * `pixelSnap`, `distanceToProjectionPlane`, `near`, `far` — pass through; the result is an ordinary
+   * projection, pixel-exact on the face.
+   *
+   * @param box - The box to frame; not empty, with an area on the face toward `options.side`.
+   * @param options - The `side` the camera looks from, the `margin` (a share, default `0`) and the specs.
+   * @throws {TypeError} for a `box` that is no `THREE.Box3` or a `side` that is none of the six.
+   * @throws {RangeError} for an empty box, a face without area or a `margin` that is not a finite number of 0 or more.
+   */
+  static framing(box: Box3, options: FramingOptions<ParallaxProjectionSpecs>): ParallaxProjection {
+    const {projectionPlane, specs} = framingSetup<ParallaxProjectionSpecs>('ParallaxProjection.framing()', box, options);
+    return new ParallaxProjection(projectionPlane, specs);
+  }
 
   /**
    * @param projectionPlane - The plane the camera looks at.

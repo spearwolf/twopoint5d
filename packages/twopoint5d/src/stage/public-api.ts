@@ -6,6 +6,7 @@ export {CameraRig} from './CameraRig.js';
 export * from './Canvas2DStage.js';
 export * from './ClearStage.js';
 export * from './fitIntoRectangle.js';
+export type {FramingOptions, FramingSide} from './framing.js';
 export type * from './IPassProvider.js';
 export type * from './IProjection.js';
 export type * from './IRenderable.js';

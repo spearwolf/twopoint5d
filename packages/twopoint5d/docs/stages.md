@@ -162,6 +162,36 @@ the plane, `getOrigin()`, `getRight()` and `getForward()` give the origin and th
 An `OrthographicProjection` or a `ParallaxProjection` without a plane builds no camera —
 `createCamera()` and `updateCamera()` throw an error that says which field to set.
 
+### Framing a box
+
+To show a box of scenery — a room, a diorama, a level — from one side, hand it to `framing()` and
+name the side the camera looks from:
+
+```ts check
+import {Box3, Vector3} from 'three/webgpu';
+import {ParallaxProjection, Stage2D} from '@spearwolf/twopoint5d';
+
+const room = new Box3(new Vector3(-400, 0, -300), new Vector3(400, 300, 300));
+
+// from +z, looking along -z; the face of the box toward the camera, and a tenth more on every edge
+const projection = ParallaxProjection.framing(room, {side: 'front', margin: 0.1});
+const stage = new Stage2D(projection);
+```
+
+`OrthographicProjection.framing()` takes the same arguments. The sides are `'front'` (from `+z`),
+`'back'` (from `-z`), `'right'` (from `+x`), `'left'` (from `-x`), `'top'` (from `+y`, looking down)
+and `'bottom'`; up on the screen is `+y`, except for `'top'` (`-z`) and `'bottom'` (`+z`).
+
+The projection plane lies in the face of the box toward the camera, and the view is that face
+grown by `margin` — a share of its width and height on every edge, `0` by default — fitted
+`'contain'`: the whole face is in view on a container of any shape. Whatever lies behind the face
+appears smaller under a parallax projection, so the whole box is in view as well. The other specs
+pass through — `pixelSnap`, `distanceToProjectionPlane`, `near` and `far` —; a `fit`, `width` or
+`height` is replaced. The result is an ordinary projection, pixel-exact on the face.
+
+An empty box, a face without an area toward the side, an unknown side and a `margin` that is
+negative or not a number are refused.
+
 ### Fitting the view
 
 `OrthographicProjection` and `ParallaxProjection` take the same fit. The examples assume a
