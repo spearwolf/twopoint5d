@@ -53,6 +53,13 @@ export interface CameraTrack {
   velocity: number;
   /** The time constant of the spring, in seconds; 0 for none. */
   smooth: number;
+  /**
+   * Whether `lerp()` has asked for a progress since `track()`: the first one sets `shown` at once, so
+   * that the track does not glide in from 0.
+   */
+  lerped: boolean;
+  /** The shown progress of the last `step()`, which tells whether a step moved it. */
+  stepped: number;
   /** In: the time of the step the spring advances by. */
   delta: number;
   /** Out of {@link locateTrack}: the key the progress lies in, or the one a stretch leaves. */
@@ -205,7 +212,19 @@ export function readTrack(subject: string, keys: unknown, reader: TrackReader): 
     );
   }
 
-  return {keys: read, asked: 0, shown: 0, velocity: 0, smooth: 0.5, delta: 0.5, index: 0, next: -1, share: 0.5};
+  return {
+    keys: read,
+    asked: 0,
+    shown: 0,
+    velocity: 0,
+    smooth: 0.5,
+    lerped: false,
+    stepped: 0,
+    delta: 0.5,
+    index: 0,
+    next: -1,
+    share: 0.5,
+  };
 }
 
 // the spring has reached the asked progress where the gap falls below this: |q - p| < 1e-4

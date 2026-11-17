@@ -477,6 +477,10 @@ themselves; there is nothing to call after `OnStageResize`.
 While the rig is attached, the stage draws with the camera of the rig: `stage.camera` answers it.
 `rig.dispose()` gives the stage its camera back.
 
+The lookbook demo *camera rig: two rooms* moves a rig through the cameras of a `.glb`: a click walks
+to the camera of the other room, a drag looks around, the wheel runs a track along a camera
+animated in Blender, and a lift clears the picture for a dialog.
+
 #### Viewpoints
 
 A viewpoint is a `CameraPose`, given in the frame of the projection: `x` and `y` on the projection
@@ -649,6 +653,8 @@ camera of the other kind ahead — for the target the stage draws into, and for 
 `postProcess`, which it builds as its first draw would. The kind the stage draws with now is the job
 of its first draw, or of [`StageDirector#precompile()`](#no-hitch-on-the-first-transition) with the
 stage in `layers`. It takes a `WebGPURenderer` under either backend and rejects a `WebGLRenderer`.
+Calls on one renderer run one after the other, of one rig or of several, each with its own result,
+so the rigs of a director can precompile with `Promise.all()`.
 
 A `postProcess` that reads depth sees the depth of either kind of camera: a perspective one stores it
 non-linearly, an orthographic one linearly. Linearize it for the kind of `stage.camera`, or rebuild
@@ -827,6 +833,10 @@ display.start();
   in seconds — the shown progress approaches it, critically damped, and settles once it is closer
   than `1e-4`; a new `t` on the way keeps the speed of the glide. `busy` is `true` until it settled,
   and `rig.step()` answers `false` again from there, so a page that stopped scrolling costs no draw.
+- The first `lerp()` after `track()` jumps, `{smooth}` or not: it sets the shown progress at once,
+  and the next frame shows it, before any `step()` — so a track set up halfway down a page does not
+  glide in from 0. `{smooth}` glides from there on, with every later `lerp()`. A track without any
+  `lerp()` shows progress 0.
 - `clip` belongs to a key whose shot is a camera: the progress from `at` to `until` maps onto
   `0 … clip.getClip().duration`, before the key onto the start of the clip, after it onto its end.
   The rig sets `clip.time` and calls `clip.getMixer().update(0)`, which applies the other actions of
@@ -975,6 +985,11 @@ export const leaveSection = () => transition.complete();
 
 A manual transition clamps its progress to `[0, 1]` and stays until `complete()` or `cancel()`;
 scrolled back up, the flight flies back with it.
+
+The lookbook demo *camera rig: into the map* flies from a survey sheet on an orthographic stage
+through its marker into the diorama of the place it marks, on a perspective one, and back out
+again: a lens change on both rigs, its anchors the marker on the sheet and the origin of the
+diorama.
 
 #### A camera that follows, with a rig
 
@@ -1138,9 +1153,9 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | `reframe({lift?}, seconds?)` | the lift, a share of the picture height; on a clock of its own |
 | `cancel()` | ends a move or a lock-on where it stands; leaves a track alone |
 | `track(keys)`, `track(from, to)` | a track of keys `{at, shot, until?, clip?, ease?}`, starting at 0; ends a move and a lock-on |
-| `lerp(t, {smooth?})` | the progress along the track, clamped to `[0, 1]`; shown by the next step, or approached in a glide |
+| `lerp(t, {smooth?})` | the progress along the track, clamped to `[0, 1]`; shown by the next step, or approached in a glide — the first after `track()` always jumps |
 | `step(deltaSeconds)` | advances the clocks; answers a `Motion`; assigns a projection on arrival |
-| `precompile(renderer)` | compiles the scene, and the pass of its `postProcess`, with the camera of the other kind |
+| `precompile(renderer)` | compiles the scene, and the pass of its `postProcess`, with the camera of the other kind; calls on one renderer run one after the other |
 | `dispose()`, `isDisposed` | detaches; the stage takes back its camera, a running move resolves; ends a flight, the other rig goes back |
 | `CameraRig.across(transition, {to?, anchors?, easing?, focus?})` | a flight across a transition of a `StageDirector`, between the rigs of its two stages; answers `{transition, finished}` |
 

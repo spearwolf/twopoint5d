@@ -1674,6 +1674,8 @@ describe('CameraRig', () => {
     it('shows a new progress from the next step(), and step() answers true only when the shot changed', () => {
       const {stage, rig} = makeRig();
       rig.track({position: [0, 0]}, {position: [100, 0]});
+      // the first lerp() of a track is shown at once
+      rig.lerp(0);
       rig.step(1 / 60);
       expect(rig.step(1 / 60), 'a track that stands').toBe(false);
 
@@ -1810,9 +1812,50 @@ describe('CameraRig', () => {
     });
 
     describe('smooth', () => {
+      it('takes the progress of the first lerp() after track() at once, and glides from the next one on', () => {
+        const {stage, rig} = makeRig();
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.step(1);
+        frame(stage);
+        expect(rig.camera.position.x, 'a track without lerp() shows 0').toBe(0);
+
+        rig.lerp(0.5, {smooth: 0.5});
+        frame(stage);
+        expect(rig.camera.position.x, 'in the frame of the stage before any step').toBeCloseTo(50, 12);
+        expect(rig.step(1 / 60)).toBe(true);
+        frame(stage);
+        expect(rig.camera.position.x, 'no glide from 0').toBeCloseTo(50, 12);
+        expect(rig.busy).toBe(false);
+        expect(rig.step(1 / 60)).toBe(false);
+
+        // from rest, with no velocity left of the jump: p = q − (q − p₀)(1 + ωt)e^(−ωt)
+        rig.lerp(1, {smooth: 0.5});
+        rig.step(0.5);
+        frame(stage);
+        expect(rig.camera.position.x).toBeCloseTo(100 - 50 * 2 * Math.exp(-1), 9);
+
+        // a new track: its first lerp() jumps again
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.lerp(0.25, {smooth: 0.5});
+        rig.step(0);
+        frame(stage);
+        expect(rig.camera.position.x).toBeCloseTo(25, 12);
+        expect(rig.busy).toBe(false);
+
+        // a second lerp() before the next step glides, from the progress of the first
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.lerp(0.5);
+        rig.lerp(1, {smooth: 0.5});
+        rig.step(0.5);
+        frame(stage);
+        expect(rig.camera.position.x).toBeCloseTo(100 - 50 * 2 * Math.exp(-1), 9);
+      });
+
       it('lets the shown progress approach the asked one, critically damped, and settles below 1e-4', () => {
         const {stage, rig} = makeRig();
         rig.track({position: [0, 0]}, {position: [100, 0]});
+        // the first lerp() of a track jumps
+        rig.lerp(0);
         rig.step(1 / 60);
 
         rig.lerp(1, {smooth: 0.5});
@@ -1844,6 +1887,7 @@ describe('CameraRig', () => {
       it('keeps its velocity when the asked progress changes on the way, and a lerp() without smooth jumps', () => {
         const {stage, rig} = makeRig();
         rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.lerp(0);
         rig.lerp(1, {smooth: 0.2});
         rig.step(0.1);
         frame(stage);
@@ -1870,8 +1914,10 @@ describe('CameraRig', () => {
       ])('%s ends it, and lerp() is refused afterwards', (_what, end) => {
         const {stage, rig} = makeRig();
         rig.track({position: [0, 0]}, {position: [100, 0]});
+        lerpTo(stage, rig, 0);
         rig.lerp(1, {smooth: 0.5});
         rig.step(0.1);
+        expect(rig.busy, 'gliding').toBe(true);
         end(rig);
         expect(rig.busy).toBe(false);
         rig.step(1);
@@ -2152,6 +2198,53 @@ describe('CameraRig', () => {
       // the pass draws with the camera of the stage again, and the renderer has its target back
       expect(pass!.camera).toBe(rig.camera);
       expect(renderer.getRenderTarget()).toBeNull();
+    });
+
+    it('runs the calls on one renderer one after the other, and on another renderer alongside', async () => {
+      const map = makeRig('parallax');
+      const room = makeRig('orthographic');
+      const {renderer} = makeRenderer();
+      const compile = vi.mocked(renderer.compileAsync);
+      let release!: () => void;
+      compile.mockImplementationOnce(() => new Promise<void>((resolve) => void (release = resolve)));
+
+      const first = map.rig.precompile(renderer);
+      const second = room.rig.precompile(renderer);
+      const other = makeRenderer();
+      const alongside = room.rig.precompile(other.renderer);
+      expect(await hasSettled(alongside), 'another renderer does not wait').toBe(true);
+      expect(other.calls).toHaveLength(1);
+      expect(await hasSettled(second)).toBe(false);
+      expect(compile, 'the second compile waits for the first').toHaveBeenCalledTimes(1);
+      expect(compile.mock.calls[0]![0]).toBe(map.stage.scene);
+
+      release();
+      await expect(first).resolves.toBeUndefined();
+      await expect(second).resolves.toBeUndefined();
+      expect(compile).toHaveBeenCalledTimes(2);
+      expect(compile.mock.calls[1]![0]).toBe(room.stage.scene);
+      expect(compile.mock.calls[1]![1]).toBeInstanceOf(PerspectiveCamera);
+    });
+
+    it('runs the next call on a renderer after one that rejected, each with its own result', async () => {
+      const map = makeRig('parallax');
+      const room = makeRig('orthographic');
+      const {renderer} = makeRenderer();
+      const compile = vi.mocked(renderer.compileAsync);
+      const failure = new Error('compile failed');
+      compile.mockImplementationOnce(async () => {
+        throw failure;
+      });
+
+      const first = map.rig.precompile(renderer);
+      const second = room.rig.precompile(renderer);
+      await expect(first).rejects.toBe(failure);
+      await expect(second).resolves.toBeUndefined();
+      expect(compile).toHaveBeenCalledTimes(2);
+      expect(compile.mock.calls[1]![0]).toBe(room.stage.scene);
+      // and the queue goes on after both
+      await expect(map.rig.precompile(renderer)).resolves.toBeUndefined();
+      expect(compile).toHaveBeenCalledTimes(3);
     });
 
     it('is refused for a WebGLRenderer and on a disposed rig', async () => {

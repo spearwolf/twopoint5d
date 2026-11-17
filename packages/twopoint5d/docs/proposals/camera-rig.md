@@ -527,7 +527,10 @@ kind assigns `stage.projection` at the end (§4.2).
 the first frame after a swap may compile. `rig.precompile(renderer)` compiles the scene of the
 stage and its `postProcess` with the camera of the other kind as well — the rig's part of
 `StageDirector#precompile()`, which compiles with the camera the stage has. A `postProcess` that
-reads depth handles both kinds itself, and the guide names that in its pitfalls.
+reads depth handles both kinds itself, and the guide names that in its pitfalls. Calls on one
+renderer queue behind each other in a module-level `WeakMap` from renderer to the settling of the
+last call, since two `compileAsync()` of three.js on one renderer trip over each other; a rejection
+stays its caller's and the next call still runs.
 
 ### 4.5 Locking on to a camera
 
@@ -570,7 +573,9 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
   spec against three's mixer before the build relies on it.
 - **`smooth`**: the shown progress `p` follows the asked progress `q` as a critically damped spring
   with the time constant `smooth`; it settles when `|q - p|` falls below `1e-4`, and `busy` answers
-  `false` from there.
+  `false` from there. The first `lerp()` after `track()` jumps — it sets `p` to its `q` at once,
+  at rest, whatever its `smooth`, before the next step, since the stage may write its frame first —,
+  so a track does not glide in from 0, and `smooth` glides from there with every later `lerp()`.
 
 ### 4.7 A flight across stages
 

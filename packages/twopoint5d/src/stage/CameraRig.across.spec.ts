@@ -329,6 +329,8 @@ describe('CameraRig.across()', () => {
       const s = setup({
         before: ({rigA, a}) => {
           rigA.track({position: [0, 0, 400]}, {position: [400, 0, 400]});
+          // the first lerp() of a track jumps; the second glides
+          rigA.lerp(0);
           rigA.lerp(1, {smooth: 0.5});
           rigA.step(0.25);
           a.updateFrame(0, 0, 0);

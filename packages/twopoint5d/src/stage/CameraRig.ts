@@ -147,6 +147,7 @@ export interface CameraLerpOptions {
   /**
    * A time constant in seconds: the shown progress approaches the asked one, critically damped, and
    * settles where the gap falls below `1e-4`. Default `0`: the next `step()` shows the asked progress.
+   * The first `lerp()` after `track()` ignores it and shows its progress at once.
    */
   smooth?: number;
 }
@@ -164,7 +165,24 @@ const refuseKind = (camera: Camera): never => {
   );
 };
 
+// the refusals of lerp(), out of its body: the messages it builds would leave V8 too little room to
+// inline it, and the progress its caller hands it would be boxed (the allocation spec). Only the
+// refusal makes the call
+function refuseLerp(name: 't' | 'options' | 'smooth', value: unknown): never {
+  const subject = 'CameraRig#lerp()';
+  if (name === 'options') throw new TypeError(`${subject}: options must be an object, got ${describeValue(value)}`);
+  throw new RangeError(
+    name === 't'
+      ? `${subject}: t must be a finite number, got ${describeValue(value)}`
+      : `${subject}: smooth must be a finite number of 0 or more, got ${describeValue(value)}`,
+  );
+}
+
 const EMPTY_POSE = createPoseValues();
+
+// the last precompile() of any rig on each renderer, settled once it is over, rejected or not
+const precompiling = new WeakMap<WebGPURenderer, Promise<void>>();
+const noop = (): void => {};
 
 const FLIGHT_REFUSAL = 'the rig takes part in a flight across a transition (CameraRig.across()) until the transition is over';
 
@@ -697,7 +715,9 @@ export class CameraRig {
    * Sets the progress along the track, clamped to `[0, 1]`. Without `smooth` the next {@link step}
    * shows it; with `smooth` — a time constant in seconds — the shown progress approaches it,
    * critically damped, so that the ticks of a mouse wheel become a glide; a new progress asked on the
-   * way keeps the speed the glide has. Allocates nothing.
+   * way keeps the speed the glide has. The first `lerp()` after {@link track} jumps, `smooth` or not:
+   * it sets the shown progress at once — the next frame of the stage shows it, before any step —,
+   * and `smooth` glides from there with every later call. Allocates nothing.
    *
    * @throws {RangeError} for a `t` that is not a finite number, and a `smooth` that is not a finite
    * number of 0 or more.
@@ -714,19 +734,13 @@ export class CameraRig {
     if (track === undefined) throw new Error(`${subject}: the rig has no track; set one with track() first`);
     // the checks inline rather than through assertFinite(): a progress is a fraction, and a fraction
     // handed to a call that V8 does not inline is boxed
-    if (typeof t !== 'number' || !(t > Number.NEGATIVE_INFINITY && t < Number.POSITIVE_INFINITY)) {
-      throw new RangeError(`${subject}: t must be a finite number, got ${describeValue(t)}`);
-    }
+    if (typeof t !== 'number' || !(t > Number.NEGATIVE_INFINITY && t < Number.POSITIVE_INFINITY)) refuseLerp('t', t);
     let smooth = 0;
     if (options !== undefined) {
-      if (typeof options !== 'object' || options === null) {
-        throw new TypeError(`${subject}: options must be an object, got ${describeValue(options)}`);
-      }
+      if (typeof options !== 'object' || options === null) refuseLerp('options', options);
       const value = options.smooth;
       if (value !== undefined) {
-        if (typeof value !== 'number' || !(value >= 0 && value < Number.POSITIVE_INFINITY)) {
-          throw new RangeError(`${subject}: smooth must be a finite number of 0 or more, got ${describeValue(value)}`);
-        }
+        if (typeof value !== 'number' || !(value >= 0 && value < Number.POSITIVE_INFINITY)) refuseLerp('smooth', value);
         smooth = value;
       }
     }
@@ -734,6 +748,14 @@ export class CameraRig {
     let asked = t;
     if (asked < 0) asked = 0;
     else if (asked > 1) asked = 1;
+    // the first progress of a track is shown at once, smooth or not — before the next step, since the
+    // stage may write its frame first —, so that it does not glide in from 0; a smooth lerp() after
+    // it glides from there
+    if (!track.lerped) {
+      track.lerped = true;
+      track.shown = asked;
+      track.velocity = 0;
+    }
     track.asked = asked;
     track.smooth = smooth;
   }
@@ -780,12 +802,13 @@ export class CameraRig {
     let progressed = false;
     const track = this.#track;
     if (track !== undefined && !flying) {
-      const shown = track.shown;
       // a field rather than an argument: a fraction handed to a call that V8 does not inline is boxed
       track.delta = deltaSeconds;
       advanceTrack(track);
       scrubTrackClips(track);
-      progressed = track.shown !== shown;
+      // against the progress of the last step, since the first lerp() of a track moves it itself
+      progressed = track.shown !== track.stepped;
+      track.stepped = track.shown;
     }
 
     if (!this.#hasRest || this.#stage.isDisposed) {
@@ -818,6 +841,10 @@ export class CameraRig {
    * view the rig shows now. The compile with the camera the stage has is the job of the first draw,
    * or of `StageDirector#precompile()`.
    *
+   * Calls on one renderer — of this rig or of another — run one after the other, each with its own
+   * result: a call waits until the ones before it on that renderer have settled, resolved or
+   * rejected, so `Promise.all()` over the rigs of a director is safe.
+   *
    * Resolves at once on a stage without a view or one that has been disposed. A `postProcess` that
    * reads depth compiles here with the other kind as well, and has to handle both itself.
    *
@@ -831,8 +858,22 @@ export class CameraRig {
     if (isWebGLRenderer(renderer)) {
       throw new TypeError(`${subject}: a WebGLRenderer is not supported — compile with a WebGPURenderer`);
     }
+    // behind the calls that run on this renderer already: two compiles of three.js at once on one
+    // renderer trip over each other. The queue holds the settling of each call, not its result, so
+    // that a rejection stays the caller's and the next call still runs
+    const previous = precompiling.get(renderer);
+    const run = previous === undefined ? this.#precompile(renderer) : previous.then(() => this.#precompile(renderer));
+    const settled = run.then(noop, noop);
+    precompiling.set(renderer, settled);
+    void settled.then(() => {
+      if (precompiling.get(renderer) === settled) precompiling.delete(renderer);
+    });
+    return run;
+  }
+
+  async #precompile(renderer: WebGPURenderer): Promise<void> {
     const stage = this.#stage;
-    if (stage.isDisposed || !this.#hasRest) return;
+    if (this.#disposed || stage.isDisposed || !this.#hasRest) return;
     if (!renderer.initialized) await renderer.init();
     if (this.#disposed || stage.isDisposed) return;
 
