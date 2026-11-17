@@ -1,37 +1,19 @@
 import {describeValue} from '../utils/describeValue.js';
+import {applyEasing, type Easing, type EasingSpec} from '../utils/easing.js';
 import type {IStage} from './IStage.js';
 import type {StageTransitionEffect} from './transitionEffects.js';
 
 /** A named easing of a transition, or a function from the linear progress `0…1` to the eased one. */
-export type StageTransitionEasing = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | ((t: number) => number);
+export type StageTransitionEasing = Easing;
 
 /** Where a transition stands: before its first frame, between its first and its last, or over. */
 export type StageTransitionState = 'pending' | 'running' | 'finished' | 'cancelled';
 
-const EASING_NAMES = ['linear', 'ease-in', 'ease-out', 'ease-in-out'] as const;
-
 /**
- * An easing as a transition keeps it: the index of a named one in `EASING_NAMES`, or the function of
- * the caller.
+ * An easing as a transition keeps it: the index of a named one, or the function of the caller.
  * @internal
  */
-export type StageTransitionEasingSpec = number | ((t: number) => number);
-
-/**
- * The easing an option names, or the function it is. Throws a `TypeError` naming `subject` for
- * anything else.
- * @internal
- */
-export function easingOf(subject: string, easing: unknown): StageTransitionEasingSpec {
-  if (typeof easing === 'function') return easing as (t: number) => number;
-  const index = typeof easing === 'string' ? EASING_NAMES.indexOf(easing as (typeof EASING_NAMES)[number]) : -1;
-  if (index === -1) {
-    throw new TypeError(
-      `${subject}: easing must be 'linear', 'ease-in', 'ease-out', 'ease-in-out' or a function, got ${describeValue(easing)}`,
-    );
-  }
-  return index;
-}
+export type StageTransitionEasingSpec = EasingSpec;
 
 /** How one frame moved a transition, as `StageDirector#updateFrame()` acts on it. @internal */
 export type StageTransitionStep = 'none' | 'started' | 'reached-end' | 'reached-start';
@@ -236,25 +218,7 @@ export class StageTransition {
       return 'reached-start';
     }
     this.#elapsed = elapsed;
-    // The named easings are cubic and worked out here, in place, as products: a double handed to a
-    // call that V8 does not inline is boxed, and so is one that `**` hands to the runtime, and the
-    // frame of a transition with a named easing allocates nothing. A function of the caller is
-    // called as it is.
-    const t = elapsed / this.duration;
-    const easing = this.#easing;
-    if (typeof easing === 'function') {
-      this.#progress = easing(t);
-    } else if (easing === 1) {
-      this.#progress = t * t * t;
-    } else if (easing === 2) {
-      const u = 1 - t;
-      this.#progress = 1 - u * u * u;
-    } else if (easing === 3) {
-      const u = 2 - 2 * t;
-      this.#progress = t < 0.5 ? 4 * t * t * t : 1 - (u * u * u) / 2;
-    } else {
-      this.#progress = t;
-    }
+    this.#progress = applyEasing(this.#easing, elapsed / this.duration);
     return 'none';
   }
 

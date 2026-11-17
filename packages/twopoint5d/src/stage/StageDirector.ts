@@ -25,6 +25,7 @@ import {
 import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {describeValue} from '../utils/describeValue.js';
+import {easingOf} from '../utils/easing.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {ClearStage} from './ClearStage.js';
 import type {IRenderable} from './IRenderable.js';
@@ -35,7 +36,6 @@ import {StageMask, type StageMaskCoverageSource, StageMaskInternals} from './Sta
 import {type StageItem, StageRenderer, type StageRendererBuildOutputNode, type StageRendererParentType} from './StageRenderer.js';
 import {StageRendererInternals} from './StageRendererTargets.js';
 import {
-  easingOf,
   type StageTransition,
   type StageTransitionEasing,
   type StageTransitionEasingSpec,
