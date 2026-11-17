@@ -915,11 +915,15 @@ export async function enterCity() {
   as its focus, or `focus` — a distance in the world of `from` — where a side has none.
 - Each stage needs a rig of its own, stepped as before. `across()` ends a running `moveTo()` of
   either rig where it stands, and its promise resolves. A lock-on, a track and a damped `lerp()`
-  stay, their clocks stopped. During the flight `look()` on either rig turns the shared view of both;
+  stay, their clocks stopped. During the flight `look()` on either rig turns the shared view of both
+  where it is a perspective one — a rig on an orthographic stage refuses a look, and an orthographic
+  shot of the flight shows none —;
   `jump()`, `moveTo()`, `track()` and `lerp()` are refused, and `cancel()` does nothing.
 - The end follows the transition, noticed by its state in the frame of each stage — no frame draws
-  in between. Finished, or cancelled with `to` in its slot (`cancel('end')`): the rig of `to` holds
-  its target, the look of the flight added to the target's, and the rig of `from` goes back to the
+  in between —, and at once by a call to either rig after `complete()` or `cancel()`, a listener of
+  `OnStageTransitionEnd` included. Finished, or cancelled with `to` in its slot (`cancel('end')`):
+  the rig of `to` holds its target, the look of the flight added to the target's where the camera of
+  `to` is a perspective one, and the rig of `from` goes back to the
   state it had, out of sight, so that a way back finds it as it was. Cancelled with `from` in its
   slot — `cancel()`, `reverse()` back to the start, a director disposed —: both rigs go back. A rig
   disposed during the flight ends it, and the other goes back. `flight.finished` resolves then, and

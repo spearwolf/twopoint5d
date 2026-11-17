@@ -1,5 +1,7 @@
+import {on} from '@spearwolf/eventize';
 import {Matrix4, Object3D, OrthographicCamera, type PerspectiveCamera, Quaternion, Vector3} from 'three/webgpu';
 import {afterEach, describe, expect, it, vi} from 'vitest';
+import {OnStageTransitionEnd} from '../events.js';
 import {CameraRig, type CameraTarget} from './CameraRig.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
@@ -569,6 +571,83 @@ describe('CameraRig.across()', () => {
       expect(warn).toHaveBeenCalledWith(
         'CameraRig.across(): the layer of the stage "a" is frozen: it shows a still picture, not the flight',
       );
+    });
+  });
+
+  describe('an end that no frame has seen yet', () => {
+    it('complete() lets both rigs go at once: jump() works, busy is false, look() turns the rig itself', async () => {
+      const s = setup();
+      s.frame();
+      const flight = CameraRig.across(s.transition, {to: {position: [0, 0, 800]}});
+      s.transition.progress = 0.5;
+      s.frame();
+      s.transition.complete();
+      expect(s.rigA.busy).toBe(false);
+      expect(() => s.rigB.jump({position: [10, 10, 500]})).not.toThrow();
+      expect(() => s.rigA.moveTo({}, 1)).not.toThrow();
+      expect(await hasSettled(flight.finished)).toBe(true);
+    });
+
+    it('cancel() lets look() go to the rig, not to a flight that is over', () => {
+      const s = setup();
+      s.frame();
+      CameraRig.across(s.transition);
+      s.transition.cancel();
+      s.rigA.look({yaw: 0.3, pitch: 0});
+      s.a.updateFrame(0, 0, 0);
+      const turned = directionOf(s.rigA.camera);
+      expect(turned.x).toBeLessThan(-0.2);
+    });
+
+    it('a listener of OnStageTransitionEnd jumps a rig and chains the next flight', () => {
+      const s = setup();
+      s.frame();
+      const {stage: c, rig: rigC} = makeRig('c');
+      void rigC;
+      CameraRig.across(s.transition, {to: {position: [0, 0, 800]}});
+      s.transition.progress = 0.5;
+      s.frame();
+      let next: ReturnType<typeof CameraRig.across> | undefined;
+      const errors: unknown[] = [];
+      on(s.director, OnStageTransitionEnd, ({transition}: {transition: StageTransition}) => {
+        if (transition !== s.transition) return;
+        try {
+          s.rigA.jump({position: [5, 5, 400]});
+          next = CameraRig.across(s.director.replace(s.b, c, {manual: true}));
+        } catch (error) {
+          errors.push(error);
+        }
+      });
+      s.transition.complete();
+      expect(errors).toEqual([]);
+      expect(next).toBeDefined();
+      expect(() => s.rigB.jump({})).toThrow(/takes part in a flight/);
+    });
+  });
+
+  describe('a look over a flight into an orthographic stage', () => {
+    it('lies on the perspective blend alone, and stays off the orthographic camera of to once it takes over', () => {
+      const s = setup({to: 'orthographic'});
+      s.frame();
+      const ownB = stateOf(s.rigB.camera);
+      CameraRig.across(s.transition);
+      expect(() => s.rigB.look({yaw: 0.2, pitch: 0})).toThrow(/orthographic projection takes no look/);
+      s.transition.progress = 0.5;
+      s.frame();
+      const straight = directionOf(s.rigA.camera);
+      s.rigA.look({yaw: 0.2, pitch: 0});
+      s.frame();
+      expect(directionOf(s.rigA.camera).angleTo(straight), 'turned on the perspective blend').toBeGreaterThan(0.1);
+
+      s.transition.progress = 1;
+      s.frame();
+      expect(stateOf(s.rigB.camera), 'to stands unturned on its orthographic rest').toEqual(ownB);
+      expect(s.rigA.camera.type).toBe('OrthographicCamera');
+      expect(s.rigA.camera.quaternion.toArray()).toEqual(s.rigB.camera.quaternion.toArray());
+
+      s.transition.complete();
+      s.b.updateFrame(0, 0, 0);
+      expect(stateOf(s.rigB.camera), 'the look of the flight stays off the orthographic camera').toEqual(ownB);
     });
   });
 

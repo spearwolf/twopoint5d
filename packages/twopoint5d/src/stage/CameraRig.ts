@@ -377,9 +377,11 @@ export class CameraRig {
    * `true` while a move is under way, while the camera trails an `Object3D` by `smooth`, while the
    * shown progress of a track has yet to reach the one {@link lerp} asked for, and while locked on to
    * a camera or an object — or on a track — when the last {@link step} moved the camera after it,
-   * and while the rig takes part in a flight across a transition; `false` after {@link dispose}.
+   * and while the rig takes part in a flight across a transition — a flight whose transition is over
+   * ends here; `false` after {@link dispose}.
    */
   get busy(): boolean {
+    this.#flight?.check();
     const track = this.#track;
     return (
       this.#flight !== undefined ||
@@ -553,6 +555,8 @@ export class CameraRig {
   look(look: {yaw: number; pitch: number}): void {
     const subject = 'CameraRig#look()';
     this.#assertAlive(subject);
+    // a flight whose transition is over ends here, so that the look goes to the rig, not to the flight
+    this.#flight?.check();
     const values = this.#nextPose;
     readLook(subject, look, this.#isOrthographic(this.#targetProjection ?? this.#stage.projection), values);
     const flight = this.#flight;
@@ -617,6 +621,7 @@ export class CameraRig {
    */
   cancel(): void {
     this.#assertAlive('CameraRig#cancel()');
+    this.#flight?.check();
     if ((!this.#moving && !this.#follows) || this.#flight !== undefined) return;
     this.#hold();
   }
@@ -1420,7 +1425,11 @@ export class CameraRig {
     if (this.#disposed) throw new Error(`${subject}: the rig has been disposed`);
   }
 
+  // refuses a call during a flight; a flight whose transition is over — complete() or cancel() of
+  // the transition, settled before any frame of a stage — ends here first, so that a call right after
+  // the end, or from a listener of OnStageTransitionEnd, finds the rig on the ground
   #assertGrounded(subject: string): void {
+    this.#flight?.check();
     if (this.#flight !== undefined) throw new Error(`${subject}: ${FLIGHT_REFUSAL}`);
   }
 
@@ -1466,7 +1475,10 @@ export class CameraRig {
     this.#side ??= {
       stage: this.#stage,
       rest: this.#rest,
-      inFlight: () => this.#flight !== undefined,
+      inFlight: () => {
+        this.#flight?.check();
+        return this.#flight !== undefined;
+      },
       hasRest: () => this.#hasRest,
       targetRest: () => (this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest),
       resolveOwn: (out) => this.#resolveOwn(out),
@@ -1479,8 +1491,8 @@ export class CameraRig {
       },
       readEnd: (subject, target) => this.#readFlightEnd(subject, target),
       join: (flight, role, target) => {
-        if (this.#moving) this.#hold();
         if (target !== undefined) this.#takeFlightTarget(target);
+        else if (this.#moving) this.#hold();
         this.#flight = flight;
         this.#flightRole = role;
       },
@@ -1527,6 +1539,12 @@ export class CameraRig {
       targetRest = createRest();
       this.#placeTarget(projection, targetRest);
     }
+    // a running move ends where it stands once what may throw has passed; an object then keeps the
+    // zoom and the distance of the shot the move stood at
+    if (this.#moving) {
+      this.#hold();
+      if (kind === 'object') this.#readTarget(subject, target, this.#nextPose, undefined);
+    }
     const saved: SavedState = {
       pose: copyPoseValues(this.#pose, createPoseValues()),
       yaw: this.#look.yaw,
@@ -1561,7 +1579,9 @@ export class CameraRig {
     const saved = this.#saved;
     this.#saved = undefined;
     if (take) {
-      if (look.yaw !== 0 || look.pitch !== 0) {
+      // the look of the flight goes on with the target, but not onto an orthographic camera, which
+      // takes no look other than 0
+      if ((look.yaw !== 0 || look.pitch !== 0) && !this.#isOrthographic(this.#targetProjection ?? this.#stage.projection)) {
         this.#look.yaw += look.yaw;
         this.#look.pitch += look.pitch;
         this.#clampPitch();

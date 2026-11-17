@@ -151,7 +151,7 @@ export function startFlight(
 
   const flight = new Flight(transition, from, to, easing, focus ?? Number.NaN, anchors);
   // `to` first: what the projection of its target throws as the rig places it refuses the flight
-  // before anything has changed
+  // before anything has changed — a running move of either rig ends only after that
   to.join(flight, 'to', target);
   from.join(flight, 'from', undefined);
   flight.check();
@@ -343,7 +343,8 @@ export class Flight implements CameraFlight {
     const e = progress[0]!;
     const look = this.#look;
     const turned = look.yaw !== 0 || look.pitch !== 0;
-    if (role === 'to' && e >= 1 && !turned) {
+    // the look lies on a perspective blend alone: an orthographic camera takes no look other than 0
+    if (role === 'to' && e >= 1 && (!turned || end.kind === 'orthographic')) {
       copyShot(end, out);
       return true;
     }
@@ -358,7 +359,7 @@ export class Flight implements CameraFlight {
       this.#prepareLensChange(start, endFrom, end);
       blendLensChangeAtProgress(start, endFrom, this.#change, blend);
     }
-    if (turned) applyLook(restA.up, look, blend.quaternion);
+    if (turned && blend.kind === 'perspective') applyLook(restA.up, look, blend.quaternion);
 
     if (role === 'from') copyShot(blend, out);
     else this.#carry(blend, false, out);
