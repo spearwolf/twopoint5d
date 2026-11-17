@@ -379,9 +379,50 @@ display.start();
   nor an `OrthographicCamera`, an `aspect` that is not a finite number above 0, a `fit` other than
   `'contain'` and `'cover'` — in the constructor, and in the next placement for specs written since.
 
-A `FramePacer` that draws on demand does not see a source move. The frame step that moves it — the
-`update()` of an `AnimationMixer` — answers `true` while it plays; under a `CameraRig`, `rig.step()`
-answers `true` in the frames the source moved.
+A `FramePacer` that draws on demand does not see a source move: the frame step that moves it reports
+the motion itself. `mixer.update()` answers the mixer, not a `Motion`, so the step answers whether an
+action still runs — and, through `untilSettled()`, once more for the frame of its end pose:
+
+```ts check
+import {CameraProjection, Display, FramePacer, Stage2D, StageRenderer, untilSettled} from '@spearwolf/twopoint5d';
+import {AnimationClip, AnimationMixer, LoopOnce, PerspectiveCamera, VectorKeyframeTrack} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const camera = new PerspectiveCamera(40, 16 / 9, 0.1, 100);
+const stage = new Stage2D(new CameraProjection(camera));
+const sr = new StageRenderer().add(stage); // no host
+
+// a dolly of the camera along x, played once and held at its end
+const clip = new AnimationClip('dolly', 2, [new VectorKeyframeTrack('.position', [0, 2], [0, 2, 12, 6, 2, 12])]);
+const mixer = new AnimationMixer(camera);
+const dolly = mixer.clipAction(clip).setLoop(LoopOnce, 1);
+dolly.clampWhenFinished = true;
+
+const frames = new FramePacer(display);
+const settled = untilSettled();
+
+frames.onFrame((frame) => {
+  mixer.update(frame.deltaTime);
+  // true while the dolly runs, and once more for the frame that wrote its end pose
+  return settled(dolly.isRunning());
+}, stage);
+
+display.onRenderFrame((frame) => {
+  sr.resize(frame.width, frame.height, frame.pixelRatio);
+  sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+  if (frames.shouldDraw(frame)) sr.renderTo(frame.renderer);
+});
+
+document.querySelector('#dolly')!.addEventListener('click', () => void dolly.reset().play());
+
+display.start();
+```
+
+The pacer is made before the frame handler that updates the stage, so its steps run before the
+stage's `updateFrame()`, which places the camera of the moved source in the same frame. Under a
+`CameraRig`, `rig.step()` answers `true` once the stage has placed the moved source — so as a step
+of the pacer from the frame after the source moved until the frame after it stopped. Keep the step of the animation beside it, so that the frame in which the source
+starts to move is drawn as well.
 
 ### A camera of your own
 
