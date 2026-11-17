@@ -1,21 +1,33 @@
 import {emit, getSubscriptionCount, on, once} from '@spearwolf/eventize';
 import {getEffectsCount, getSignalsCount} from '@spearwolf/signalize';
 import {createSandbox} from 'sinon';
-import {Object3D, OrthographicCamera, type PassNode, PerspectiveCamera, Scene, type WebGPURenderer} from 'three/webgpu';
+import {
+  type Camera,
+  Object3D,
+  OrthographicCamera,
+  type PassNode,
+  PerspectiveCamera,
+  Scene,
+  type WebGPURenderer,
+} from 'three/webgpu';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   type IStageDispose,
   OnStageAfterCameraChanged,
   OnStageAfterSceneChanged,
+  OnStageCameraPlaced,
   OnStageDispose,
   OnStageFirstFrame,
   OnStageResize,
   OnStageUpdateFrame,
+  type StageCameraPlacedProps,
   type StageResizeProps,
 } from '../events.js';
+import type {IProjection} from './IProjection.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
-import {Stage2D} from './Stage2D.js';
+import {Stage2D, Stage2DInternals} from './Stage2D.js';
+import type {StageCameraDriver} from './StageCameraDriver.js';
 
 // asPassNode() does not read the renderer it is handed, and no test here has a real one
 const noRenderer = {} as WebGPURenderer;
@@ -1220,6 +1232,423 @@ describe('Stage2D', () => {
 
       expect(stage.scene).toBe(next);
       expect(second).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('OnStageCameraPlaced', () => {
+    it('carries stage.camera after every placement on a stage without a driver', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      const stage = new Stage2D(projection);
+      const placed: Camera[] = [];
+      const props: StageCameraPlacedProps[] = [];
+      on(stage, OnStageCameraPlaced, (p: StageCameraPlacedProps) => {
+        props.push(p);
+        placed.push(p.camera);
+        expect(p.stage).toBe(stage);
+        expect(p.projection).toBe(stage.projection);
+        expect(p.camera, 'the camera the stage draws with').toBe(stage.camera);
+      });
+
+      stage.resize(800, 600);
+      const created = stage.camera;
+      expect(placed, 'the camera the first resize() created').toEqual([created]);
+
+      stage.updateProjection(true);
+      expect(placed).toHaveLength(2);
+
+      const assigned = new PerspectiveCamera();
+      stage.camera = assigned;
+      expect(placed, 'an assignment places nothing by itself').toHaveLength(2);
+      stage.resize(640, 480);
+      expect(placed[2]).toBe(assigned);
+
+      stage.camera = undefined;
+      stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 320});
+      expect(placed).toHaveLength(4);
+      expect(placed[3]).toBe(stage.camera);
+
+      expect(new Set(props).size, 'one props object per stage, rewritten').toBe(1);
+    });
+
+    it('goes out when an assignment of undefined hands back to a camera the projection creates', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.camera = new PerspectiveCamera();
+      stage.resize(800, 600);
+      const placed = vi.fn();
+      on(stage, OnStageCameraPlaced, placed);
+
+      stage.camera = undefined;
+
+      expect(placed).toHaveBeenCalledTimes(1);
+      expect(placed.mock.calls[0]![0].camera).toBe(stage.camera);
+    });
+
+    it('lets a listener change the camera the projection placed', () => {
+      const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      on(stage, OnStageCameraPlaced, ({camera}: StageCameraPlacedProps) => {
+        camera.rotateX(0.1);
+      });
+
+      stage.resize(800, 600);
+
+      const untilted = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      untilted.resize(800, 600);
+      expect(stage.camera!.quaternion.angleTo(untilted.camera!.quaternion)).toBeCloseTo(0.1);
+      expect(stage.camera!.position.equals(untilted.camera!.position)).toBe(true);
+    });
+  });
+
+  describe('a camera driver', () => {
+    // a driver that records its calls into the log the listeners of the stage write into too
+    class FakeDriver implements StageCameraDriver {
+      camera: Camera;
+      base?: Camera;
+      // the rotation about x of the base camera, as compose() found it
+      composedTilt: number[] = [];
+
+      constructor(
+        readonly log: string[],
+        camera: Camera = new PerspectiveCamera(),
+      ) {
+        this.camera = camera;
+      }
+
+      placeBase(projection: IProjection): Camera {
+        this.log.push('placeBase');
+        if (this.base == null || projection instanceof OrthographicProjection !== isOrthographic(this.base)) {
+          this.base = projection.createCamera();
+        } else {
+          projection.updateCamera(this.base);
+        }
+        return this.base;
+      }
+
+      compose(): void {
+        this.log.push('compose');
+        this.composedTilt.push(this.base!.rotation.x);
+      }
+
+      write(): void {
+        this.log.push('write');
+      }
+    }
+
+    const isOrthographic = (camera: Camera) => (camera as OrthographicCamera).isOrthographicCamera === true;
+
+    const createStage = (projection: IProjection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640})) => {
+      const stage = new Stage2D(projection);
+      stage.resize(800, 600);
+      const log: string[] = [];
+      on(stage, OnStageCameraPlaced, () => log.push('placed'));
+      on(stage, OnStageResize, () => log.push('resize'));
+      on(stage, OnStageUpdateFrame, () => log.push('frame'));
+      return {stage, log, driver: new FakeDriver(log)};
+    };
+
+    it('stage.camera answers the camera of the driver before an assigned one and the projection one', () => {
+      const {stage, driver} = createStage();
+      const projectionCamera = stage.camera;
+      const assigned = new PerspectiveCamera();
+      stage.camera = assigned;
+
+      Stage2DInternals.attachDriver(stage, driver);
+      expect(stage.camera).toBe(driver.camera);
+      expect(Stage2DInternals.driverOf(stage)).toBe(driver);
+
+      // an assignment while the driver is attached is kept for after
+      const later = new PerspectiveCamera();
+      stage.camera = later;
+      expect(stage.camera).toBe(driver.camera);
+      stage.camera = undefined;
+      expect(stage.camera).toBe(driver.camera);
+      stage.camera = later;
+
+      Stage2DInternals.detachDriver(stage);
+      expect(Stage2DInternals.driverOf(stage)).toBeUndefined();
+      expect(stage.camera).toBe(later);
+      stage.camera = undefined;
+      expect(stage.camera).toBe(projectionCamera);
+    });
+
+    it('places on attach: placeBase(), then the event, then compose()', () => {
+      const {stage, log, driver} = createStage();
+      const placed = vi.fn();
+      on(stage, OnStageCameraPlaced, placed);
+
+      Stage2DInternals.attachDriver(stage, driver);
+
+      expect(log).toEqual(['placeBase', 'placed', 'compose']);
+      expect(placed.mock.calls[0]![0]).toMatchObject({stage, camera: driver.base, projection: stage.projection});
+    });
+
+    it('hands every placement to placeBase(), then the event, then compose()', () => {
+      const {stage, log, driver} = createStage();
+      Stage2DInternals.attachDriver(stage, driver);
+      const projection = stage.projection!;
+      const updateCamera = vi.spyOn(projection, 'updateCamera');
+      const placed = vi.fn();
+      on(stage, OnStageCameraPlaced, placed);
+
+      log.length = 0;
+      stage.resize(640, 640);
+      expect(log, 'resize()').toEqual(['placeBase', 'placed', 'compose', 'resize']);
+
+      log.length = 0;
+      stage.updateProjection(true);
+      expect(log, 'updateProjection(true)').toEqual(['placeBase', 'placed', 'compose']);
+
+      log.length = 0;
+      stage.needsUpdate = true;
+      stage.updateFrame(1, 0.016, 1);
+      expect(log, 'needsUpdate in updateFrame()').toEqual(['placeBase', 'placed', 'compose', 'write', 'frame']);
+
+      log.length = 0;
+      const next = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 320});
+      stage.projection = next;
+      expect(log, 'a new projection').toEqual(['placeBase', 'placed', 'compose', 'resize']);
+      expect(isOrthographic(driver.base!), 'the base of the kind of the new projection').toBe(true);
+
+      for (const [{camera}] of placed.mock.calls as [StageCameraPlacedProps][]) {
+        expect(camera, 'the base camera of the driver').toBe(driver.base);
+        expect(camera).not.toBe(stage.camera);
+      }
+      expect(updateCamera).toHaveBeenCalled();
+      expect(
+        updateCamera.mock.calls.some(([camera]) => camera === driver.camera),
+        'the camera the stage draws with is never placed',
+      ).toBe(false);
+    });
+
+    it('composes over what a listener of OnStageCameraPlaced changed', () => {
+      const {stage, driver} = createStage();
+      on(stage, OnStageCameraPlaced, ({camera}: StageCameraPlacedProps) => {
+        camera.rotateX(0.25);
+      });
+
+      Stage2DInternals.attachDriver(stage, driver);
+      stage.resize(640, 480);
+
+      expect(driver.composedTilt).toHaveLength(2);
+      for (const tilt of driver.composedTilt) expect(tilt).toBeCloseTo(0.25);
+    });
+
+    it('writes the camera in every frame, before OnStageUpdateFrame', () => {
+      const {stage, log, driver} = createStage();
+      Stage2DInternals.attachDriver(stage, driver);
+      const first: string[] = [];
+      on(stage, OnStageFirstFrame, () => first.push(log.at(-1)!));
+
+      log.length = 0;
+      stage.updateFrame(1, 0.016, 1);
+      stage.updateFrame(2, 0.016, 2);
+
+      expect(log).toEqual(['write', 'frame', 'write', 'frame']);
+      expect(first, 'the first frame comes after the write as well').toEqual(['write']);
+    });
+
+    describe('needsPlacement()', () => {
+      it('places in updateFrame() without updateViewRect() when it answers true', () => {
+        const {stage, log, driver} = createStage();
+        Stage2DInternals.attachDriver(stage, driver);
+        const projection = stage.projection!;
+        const needsPlacement = vi.fn(() => true);
+        projection.needsPlacement = needsPlacement;
+        const updateViewRect = vi.spyOn(projection, 'updateViewRect');
+        const getViewRect = vi.spyOn(projection, 'getViewRect');
+
+        log.length = 0;
+        stage.updateFrame(1, 0.016, 1);
+
+        expect(log).toEqual(['placeBase', 'placed', 'compose', 'write', 'frame']);
+        expect(needsPlacement).toHaveBeenCalledWith(stage.camera);
+        expect(updateViewRect).not.toHaveBeenCalled();
+        expect(getViewRect).not.toHaveBeenCalled();
+      });
+
+      it('places nothing in updateFrame() when it answers false', () => {
+        const {stage, log, driver} = createStage();
+        Stage2DInternals.attachDriver(stage, driver);
+        stage.projection!.needsPlacement = () => false;
+
+        log.length = 0;
+        stage.updateFrame(1, 0.016, 1);
+
+        expect(log).toEqual(['write', 'frame']);
+      });
+
+      it('places stage.camera through the projection on a stage without a driver', () => {
+        const {stage, log} = createStage();
+        const projection = stage.projection!;
+        projection.needsPlacement = () => true;
+        const updateCamera = vi.spyOn(projection, 'updateCamera');
+        const updateViewRect = vi.spyOn(projection, 'updateViewRect');
+        const placed = vi.fn();
+        on(stage, OnStageCameraPlaced, placed);
+
+        log.length = 0;
+        stage.updateFrame(1, 0.016, 1);
+
+        expect(log).toEqual(['placed', 'frame']);
+        expect(updateCamera).toHaveBeenCalledWith(stage.camera);
+        expect(updateViewRect).not.toHaveBeenCalled();
+        expect(placed.mock.calls[0]![0].camera).toBe(stage.camera);
+      });
+
+      it('a listener of OnStageCameraPlaced that throws in it ends the frame after compose()', () => {
+        const {stage, log, driver} = createStage();
+        Stage2DInternals.attachDriver(stage, driver);
+        stage.projection!.needsPlacement = () => true;
+        const failure = new Error('the listener failed');
+        on(stage, OnStageCameraPlaced, () => {
+          throw failure;
+        });
+
+        log.length = 0;
+        expect(() => stage.updateFrame(1, 0.016, 1)).toThrow(failure);
+
+        expect(log).toEqual(['placeBase', 'placed', 'compose']);
+      });
+    });
+
+    it('announces the camera of the driver on attach, on announceCamera() and on detach', () => {
+      const {stage, driver} = createStage();
+      const projectionCamera = stage.camera;
+      const changed = vi.fn();
+      on(stage, OnStageAfterCameraChanged, changed);
+
+      Stage2DInternals.attachDriver(stage, driver);
+      expect(changed).toHaveBeenCalledTimes(1);
+      expect(changed).toHaveBeenLastCalledWith(stage, projectionCamera);
+
+      const before = driver.camera;
+      driver.camera = new OrthographicCamera();
+      Stage2DInternals.announceCamera(stage);
+      expect(changed).toHaveBeenCalledTimes(2);
+      expect(changed).toHaveBeenLastCalledWith(stage, before);
+      expect(stage.camera).toBe(driver.camera);
+
+      // nothing swapped, nothing to announce
+      Stage2DInternals.announceCamera(stage);
+      expect(changed).toHaveBeenCalledTimes(2);
+
+      const last = driver.camera;
+      Stage2DInternals.detachDriver(stage);
+      expect(changed).toHaveBeenCalledTimes(3);
+      expect(changed).toHaveBeenLastCalledWith(stage, last);
+      expect(stage.camera).toBe(projectionCamera);
+    });
+
+    it('a pass node follows the camera of the driver', () => {
+      const {stage, driver} = createStage();
+      const node = stage.asPassNode(noRenderer) as PassNode;
+
+      Stage2DInternals.attachDriver(stage, driver);
+      expect(node.camera).toBe(driver.camera);
+
+      driver.camera = new PerspectiveCamera();
+      Stage2DInternals.announceCamera(stage);
+      expect(node.camera).toBe(driver.camera);
+
+      Stage2DInternals.detachDriver(stage);
+      expect(node.camera).toBe(stage.camera);
+    });
+
+    it('places the camera it takes back on detach', () => {
+      const {stage, driver} = createStage();
+      const assigned = new PerspectiveCamera();
+      stage.camera = assigned;
+      Stage2DInternals.attachDriver(stage, driver);
+      stage.resize(640, 640);
+
+      Stage2DInternals.detachDriver(stage);
+
+      expect(stage.camera).toBe(assigned);
+      expect(assigned.aspect, 'placed for the container of the resize under the driver').toBe(1);
+    });
+
+    it('takes back an assigned camera of the kind the projection builds', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const {stage, driver} = createStage(new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+        const assigned = new OrthographicCamera();
+        stage.camera = assigned;
+        Stage2DInternals.attachDriver(stage, driver);
+        stage.projection = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 320});
+
+        Stage2DInternals.detachDriver(stage);
+
+        expect(stage.camera).toBe(assigned);
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('drops an assigned camera of another kind than the projection builds, with a warning', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const {stage, driver} = createStage(new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+        stage.name = 'map';
+        const assigned = new OrthographicCamera();
+        stage.camera = assigned;
+        Stage2DInternals.attachDriver(stage, driver);
+        stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+        const changed = vi.fn();
+        on(stage, OnStageAfterCameraChanged, changed);
+
+        expect(() => Stage2DInternals.detachDriver(stage)).not.toThrow();
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0]![0]).toMatch(/^Stage2D "map": /);
+        expect(warn.mock.calls[0]![0]).toContain('OrthographicCamera');
+        expect(stage.camera).toBeInstanceOf(PerspectiveCamera);
+        expect(changed, 'the camera the projection built is announced').toHaveBeenLastCalledWith(stage, undefined);
+
+        // the assignment is gone: a new driver and its detach leave the projection camera in place
+        const camera = stage.camera;
+        Stage2DInternals.attachDriver(stage, new FakeDriver([]));
+        Stage2DInternals.detachDriver(stage);
+        expect(stage.camera).toBe(camera);
+        expect(warn).toHaveBeenCalledTimes(1);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('a listener of OnStageCameraPlaced that throws in a resize() leaves the driver composed and every listener heard', () => {
+      const {stage, log, driver} = createStage();
+      Stage2DInternals.attachDriver(stage, driver);
+      const failure = new Error('the listener failed');
+      on(stage, OnStageCameraPlaced, () => {
+        throw failure;
+      });
+      const second = vi.fn();
+      on(stage, OnStageCameraPlaced, second);
+
+      log.length = 0;
+      expect(() => stage.resize(640, 640)).toThrow(failure);
+
+      expect(log, 'the driver composes, the size is announced').toEqual(['placeBase', 'placed', 'compose', 'resize']);
+      expect(second, 'the listener behind the one that throws').toHaveBeenCalledTimes(1);
+      expect([stage.containerWidth, stage.containerHeight]).toEqual([640, 640]);
+      expect([stage.width, stage.height]).toEqual([640, 640]);
+      expect(stage.camera).toBe(driver.camera);
+    });
+
+    it('a projection that refuses the base leaves the stage the size it had', () => {
+      const {stage, log, driver} = createStage();
+      Stage2DInternals.attachDriver(stage, driver);
+      const refusal = new Error('the projection refused');
+      vi.spyOn(driver, 'placeBase').mockImplementation(() => {
+        throw refusal;
+      });
+
+      log.length = 0;
+      expect(() => stage.resize(640, 640)).toThrow(refusal);
+
+      expect(log).toEqual([]);
+      expect([stage.containerWidth, stage.containerHeight]).toEqual([800, 600]);
+      expect([stage.width, stage.height]).toEqual([640, 480]);
     });
   });
 

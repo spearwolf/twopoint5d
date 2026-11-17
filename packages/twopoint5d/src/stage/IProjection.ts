@@ -46,8 +46,10 @@ export interface IProjection {
   getViewRect(): ProjectionViewRect;
 
   /**
-   * The plane the camera looks at. {@link createCamera} and {@link updateCamera} need it: without
-   * one, both throw.
+   * The plane the camera looks at. A projection that aims its camera at it — `ParallaxProjection`
+   * and `OrthographicProjection` — needs it in {@link createCamera} and {@link updateCamera}, and
+   * both throw without one; a projection that places its camera by other means may answer
+   * `undefined`.
    */
   get projectionPlane(): ProjectionPlane | undefined;
   /**
@@ -65,8 +67,8 @@ export interface IProjection {
    * area, aimed at the projection plane and placed at its distance. `Stage2D` asks for one once it
    * has a view and no camera.
    *
-   * @throws {Error} if the projection has no {@link projectionPlane}, with a message that names the
-   * class, the method and the field to set.
+   * @throws {Error} if the projection needs a {@link projectionPlane} and has none, with a message
+   * that names the class, the method and the field to set.
    */
   createCamera(): Camera;
 
@@ -77,8 +79,18 @@ export interface IProjection {
    *
    * @throws {TypeError} if `camera` is not of the kind {@link createCamera} builds, checked before
    * the projection plane.
-   * @throws {Error} if the projection has no {@link projectionPlane}, with a message that names the
-   * class, the method and the field to set.
+   * @throws {Error} if the projection needs a {@link projectionPlane} and has none, with a message
+   * that names the class, the method and the field to set.
    */
   updateCamera(camera: Camera): void;
+
+  /**
+   * Optional. Answers `true` when the projection would place `camera` — the camera the stage draws
+   * with — anew although neither the container nor the specs changed, as a projection that follows
+   * something that moves. `Stage2D#updateFrame()` asks it in every frame with a camera and a view,
+   * and places the camera through {@link updateCamera} when it answers `true`, without
+   * {@link updateViewRect} and {@link getViewRect}. A projection without it is placed only when the
+   * view changes. It is asked in every frame: it allocates nothing.
+   */
+  needsPlacement?(camera: Camera): boolean;
 }

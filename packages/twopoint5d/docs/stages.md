@@ -155,8 +155,8 @@ const projection = new OrthographicProjection(plane, {fit: 'fill'});
 A `ProjectionPlane` also answers where a point of the view lies in the world:
 `plane.getPoint(x, y)` takes `x` to the right and `y` up on the screen and gives the point on
 the plane, `getOrigin()`, `getRight()` and `getForward()` give the origin and the directions.
-A projection without a plane builds no camera — `createCamera()` and `updateCamera()` throw an
-error that says which field to set.
+An `OrthographicProjection` or a `ParallaxProjection` without a plane builds no camera —
+`createCamera()` and `updateCamera()` throw an error that says which field to set.
 
 ### Fitting the view
 
@@ -2113,7 +2113,12 @@ A projection of your own for a `Stage2D` implements `IProjection`. Its
 buffer per unit of it, `1` where the ratio is left out, and its `getViewRect()` answers
 `{width, height, pixelRatioX, pixelRatioY, offsetX, offsetY}` as a new object on every call. The
 offsets say how far the middle of the view lies right of and above the point the camera looks at;
-a projection that does not shift its frustum answers `0` for both.
+a projection that does not shift its frustum answers `0` for both. `projectionPlane` may be
+`undefined` for a projection that places its camera without one; `createCamera()` and
+`updateCamera()` throw only where the projection needs the plane. A projection that follows
+something that moves implements `needsPlacement(camera)`: the stage asks it in every frame with a
+camera and a view, and places the camera through `updateCamera()` when it answers `true`, without
+a call of `updateViewRect()` — so it allocates nothing.
 
 A subclass of `StageRenderer` has protected hooks. `renderToCurrentTarget(renderer)` is the one
 draw of a renderer, called by its own `renderTo()` and by a parent that composes it into its pass
@@ -2198,6 +2203,7 @@ no event of another kind. The one exception: `OnStageDispose` and `OnCanvas2DSta
 | `StageRenderer`, `Stage2D`, the stage `StageMask.inWorldOf()` builds | `OnStageDispose` | once, from `dispose()` |
 | `StageDirector` | `OnStageTransitionStart`, `OnStageTransitionEnd` | `{director, transition}`: the first frame of a transition after its delay, and the frame or the call that ends it; both at once for a change without a transition — see [The transition](#the-transition) |
 | `Stage2D` | `OnStageResize` | a new view: `{stage, width, height}` |
+| `Stage2D` | `OnStageCameraPlaced` | after every placement of the camera by the projection: `{stage, camera, projection}`; a listener may change `camera` |
 | `Stage2D` | `OnStageFirstFrame` | the first frame with a camera; kept for late subscribers |
 | `Stage2D` | `OnStageUpdateFrame` | every frame with a camera: `{stage, now, deltaTime, frameNo}` |
 | `Stage2D` | `OnStageAfterCameraChanged` | a new camera, with the stage and the camera it replaced |
@@ -2208,7 +2214,36 @@ no event of another kind. The one exception: `OnStageDispose` and `OnCanvas2DSta
 | `Canvas2DStage` | `OnCanvas2DStageDispose` | once, from `dispose()` |
 
 `OnStageUpdateFrame` hands every frame the same props object, rewritten: copy what you need to
-keep.
+keep. So does `OnStageCameraPlaced` for every placement.
+
+`OnStageCameraPlaced` is the place for a change to the camera that holds whatever the projection
+does: the stage emits it each time the projection has placed the camera — on a resize, after
+`needsUpdate`, on a new projection, on an assignment to `camera` — and the camera has the change
+before anything is drawn or announced after it. A rest at an angle, rather than straight onto the
+plane, is one listener:
+
+```ts check
+import {on} from '@spearwolf/eventize';
+import {Display, OnStageCameraPlaced, ParallaxProjection, Stage2D, type StageCameraPlacedProps, StageRenderer} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!);
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+new StageRenderer(display).add(stage);
+
+const TILT = (15 * Math.PI) / 180;
+
+on(stage, OnStageCameraPlaced, ({camera}: StageCameraPlacedProps) => {
+  // the projection has just aimed the camera straight at the plane: turn it about its own right
+  // axis, so it looks up the plane at an angle
+  camera.rotateX(TILT);
+});
+
+display.start();
+```
+
+The camera keeps its position and its lens; only its direction changes, so the middle of the view
+moves up the plane and what lies further up appears smaller. The next placement aims the camera
+straight again, and the listener tilts it again.
 
 A listener that throws:
 
@@ -2220,7 +2255,8 @@ A listener that throws:
   `AggregateError`.
 
 One exception to the second rule: a `Stage2D` applies a pending `needsUpdate` at the start of its
-`updateFrame()`, and a listener of `OnStageAfterCameraChanged` or `OnStageResize` that throws
+`updateFrame()`, and a placement its projection asks for through `needsPlacement()`, and a
+listener of `OnStageAfterCameraChanged`, `OnStageCameraPlaced` or `OnStageResize` that throws
 there ends the frame. The new camera and size stand and every listener has heard of them, but
 neither `OnStageFirstFrame` nor `OnStageUpdateFrame` goes out in that frame, and the error comes
 out of `updateFrame()`. A `StageRenderer` on a host then updates none of the stages behind it and
@@ -2349,7 +2385,7 @@ pipeline.dispose();
 | `IStage` | `name`, `resize(w, h, pixelRatio?)`, `updateFrame(now, dt, frameNo)` | anything a `StageRenderer` sizes and ticks |
 | `IRenderable` | `renderTo(renderer)` | anything a `StageRenderer` draws |
 | `IPassProvider` | `asPassNode(renderer)` | a stage under a composing pipeline |
-| `IProjection` | `updateViewRect(w, h, pixelRatio?)`, `getViewRect()` with `offsetX` and `offsetY`, `projectionPlane`, `getScaleFactor()`, `createCamera()`, `updateCamera()` | a projection of your own for a `Stage2D` |
+| `IProjection` | `updateViewRect(w, h, pixelRatio?)`, `getViewRect()` with `offsetX` and `offsetY`, `projectionPlane`, `getScaleFactor()`, `createCamera()`, `updateCamera()`, `needsPlacement?(camera)` | a projection of your own for a `Stage2D` |
 | `IStageRendererHost` | `onResize`, `onRenderFrame`, `isDisposed?` | the frame loop that drives a `StageRenderer` |
 
 ### The modes

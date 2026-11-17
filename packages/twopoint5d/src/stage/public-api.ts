@@ -13,7 +13,7 @@ export * from './outputNodeBuilders.js';
 export * from './ParallaxProjection.js';
 export * from './ProjectionPlane.js';
 export * from './RootRenderPipeline.js';
-export * from './Stage2D.js';
+export {Stage2D} from './Stage2D.js';
 export type {
   StageDirectorLayer,
   StageDirectorShape,

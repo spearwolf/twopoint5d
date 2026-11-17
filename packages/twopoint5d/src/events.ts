@@ -3,6 +3,7 @@ import type {PanControl2D} from './controls/PanControl2D.js';
 import type {Display} from './display/Display.js';
 import type {DisplayEventProps, DisplayFullscreenChangeProps} from './display/types.js';
 import type {Canvas2DStage} from './stage/Canvas2DStage.js';
+import type {IProjection} from './stage/IProjection.js';
 import type {IStage} from './stage/IStage.js';
 import type {StageDirector} from './stage/StageDirector.js';
 import type {StagePostProcess} from './stage/StagePostProcess.js';
@@ -128,6 +129,31 @@ export interface IStageUpdateFrame {
 }
 
 // ------------------------------------------------------------
+
+/**
+ * Emitted by a `Stage2D` after every placement of a camera by its projection — in `resize()`,
+ * `updateProjection()`, an assignment to `projection` or `camera`, and the placement
+ * `updateFrame()` makes when `IProjection#needsPlacement()` answers `true` —, with the camera the
+ * projection placed. A listener may change that camera: a tilted rest, a near and far fitted to
+ * the scene. Every listener hears it, also behind one that throws; the error reaches the caller of
+ * the placement afterwards, as for {@link OnStageResize}.
+ */
+export const OnStageCameraPlaced = 'stageCameraPlaced';
+
+/**
+ * A `Stage2D` hands every `OnStageCameraPlaced` the same object, rewritten before each emit: the
+ * values hold for the call they arrive in, and whoever needs one of them later copies it.
+ */
+export interface StageCameraPlacedProps {
+  stage: IStage;
+  /** The camera the projection just placed. A listener may change it. */
+  camera: Camera;
+  projection: IProjection;
+}
+
+export interface IStageCameraPlaced {
+  [OnStageCameraPlaced](props: StageCameraPlacedProps): void;
+}
 
 export const OnStageAfterCameraChanged = 'stageAfterCameraChanged';
 
