@@ -351,8 +351,8 @@ The point the camera looks at comes from the camera itself, so the recipe holds 
 `ParallaxProjection`, with one limit: the result is the point on the projection plane under the
 pointer, and a layer in front of or behind the plane lies elsewhere.
 
-On a stage with a `CameraRig`, the recipe holds at the rest only — a viewpoint anywhere along the
-plane, at the distance of the projection, without `zoom`, `look` or lift. Another distance under a
+On a stage with a `CameraRig`, the recipe holds for a viewpoint anywhere along the plane at the
+distance of the projection, without `zoom`, `look` or lift. Another distance under a
 `ParallaxProjection`, a zoom, a turned camera and a lifted picture each put the pointer elsewhere.
 
 ### Looking through a camera: `CameraProjection`
@@ -451,8 +451,8 @@ display.start();
 The pacer is made before the frame handler that updates the stage, so its steps run before the
 stage's `updateFrame()`, which places the camera of the moved source in the same frame. Under a
 `CameraRig`, `rig.step()` answers `true` once the stage has placed the moved source — so as a step
-of the pacer from the frame after the source moved until the frame after it stopped. Keep the step of the animation beside it, so that the frame in which the source
-starts to move is drawn as well.
+of the pacer from the frame after the source moved until the frame after it stopped. Keep the step
+of the animation beside it, so that the frame in which the source starts to move is drawn as well.
 
 ### A camera of your own
 
@@ -460,8 +460,12 @@ starts to move is drawn as well.
 it — frustum or field of view, `near`, `far`, direction and distance — every time it computes
 the view, so it has to be of the kind the projection builds: an `OrthographicCamera` for an
 `OrthographicProjection`, a `PerspectiveCamera` for a `ParallaxProjection`, the kind of the source
-for a `CameraProjection`; any other kind is refused with a `TypeError` at the next placement. `stage.camera = undefined` hands back to the
-camera of the projection.
+for a `CameraProjection`; any other kind is refused with a `TypeError` at the next placement.
+`stage.camera = undefined` hands back to the camera of the projection.
+
+On a stage with a `CameraRig` the stage draws with the camera of the rig. An assignment to
+`stage.camera` there is kept, not drawn with: it counts again once the rig goes, with
+`rig.dispose()`.
 
 A camera you place entirely yourself goes on a stage without a projection: `new Stage2D()`,
 then `stage.camera = myCamera`. Such a stage keeps `width` and `height` at `0`.
@@ -642,10 +646,12 @@ document.querySelector('#map')!.addEventListener('click', async () => {
   placed in the shader. Name the depth of your scenery where it is deeper or flatter than that.
 - The camera backs off to at most 1000 times the visible height: further away, the precision of the
   view matrix shows. A scene so deep that this cap comes first swaps with a step above half a pixel.
-  The move does not fail — the step just shows.
+  The move does not fail — the step just shows. With the default `depth` the cap comes first on a
+  container whose larger side passes about 1000 units: a container 1920 wide swaps with a step of
+  about one pixel, 0.96 of one. Name a flatter `depth` where that shows.
 - The plane that keeps its size is the projection plane. A projection without one — a
-  `CameraProjection`, or one of your own — needs `{focus}`, the distance from the camera to the plane that is to keep its size; without it
-  a lens change is refused with an `Error`.
+  `CameraProjection`, or one of your own — needs `{focus}`, the distance from the camera to the
+  plane that is to keep its size; without it a lens change is refused with an `Error`.
 - During the change `rig.camera` is a `PerspectiveCamera`, also on the way out of an orthographic
   projection and where an easing that overshoots reaches 1 before the move does; at the end it is
   the camera of the kind the new projection builds. The kind swaps once.
@@ -653,7 +659,8 @@ document.querySelector('#map')!.addEventListener('click', async () => {
 
 **No hitch on the swap.** three.js builds the materials of a scene for each kind of camera, so the
 first frame after a swap may build shaders. `rig.precompile(renderer)` compiles the scene with the
-camera of the other kind ahead — for the target the stage draws into, and for the scene pass of its
+camera of the other kind ahead — for the current target of the renderer, as `renderTo()` draws into
+it, and for the scene pass of its
 `postProcess`, which it builds as its first draw would. The kind the stage draws with now is the job
 of its first draw, or of [`StageDirector#precompile()`](#no-hitch-on-the-first-transition) with the
 stage in `layers`. It takes a `WebGPURenderer` under either backend and rejects a `WebGLRenderer`.
@@ -847,8 +854,8 @@ display.start();
   The rig sets `clip.time` and calls `clip.getMixer().update(0)`, which applies the other actions of
   that mixer along with it, so one clip can scrub a whole scene. The rig neither plays nor stops the
   action: keep it playing and paused, as above. The update is three's, and at a time that is not a
-  whole number of seconds it allocates a number for each keyframe track of the clip; the rig itself allocates
-  nothing on its way.
+  whole number of seconds it allocates a number for each keyframe track of the clip; the rig itself
+  allocates nothing on its way.
 - Each key brings its own look; a `look()` lies on top of the whole track until the next target —
   on its perspective shots: an orthographic key shows no look, and `look()` is refused while the
   track shows one.
@@ -935,21 +942,23 @@ export async function enterCity() {
 - Each stage needs a rig of its own, stepped as before. `across()` ends a running `moveTo()` of
   either rig where it stands, and its promise resolves. A lock-on, a track and a damped `lerp()`
   stay, their clocks stopped. During the flight `look()` on either rig turns the shared view of both
-  where it is a perspective one — a rig on an orthographic stage refuses a look, and an orthographic
-  shot of the flight shows none —;
-  `jump()`, `moveTo()`, `track()` and `lerp()` are refused, and `cancel()` does nothing.
+  where it is a perspective one: a rig on an orthographic stage refuses a look, and an orthographic
+  shot of the flight shows none. `jump()`, `moveTo()`, `track()` and `lerp()` are refused, and
+  `cancel()` does nothing.
 - The end follows the transition, noticed by its state in the frame of each stage — no frame draws
   in between —, and at once by a call to either rig after `complete()` or `cancel()`, a listener of
   `OnStageTransitionEnd` included. Finished, or cancelled with `to` in its slot (`cancel('end')`):
   the rig of `to` holds its target, the look of the flight added to the target's where the camera of
-  `to` is a perspective one, and the rig of `from` goes back to the
-  state it had, out of sight, so that a way back finds it as it was. Cancelled with `from` in its
-  slot — `cancel()`, `reverse()` back to the start, a director disposed —: both rigs go back. A rig
-  disposed during the flight ends it, and the other goes back. `flight.finished` resolves then, and
-  never rejects. What a rig throws as it leaves — a listener of the stage of `to` as it takes a
-  projection — comes out of the call or the frame that noticed the end, after both rigs have left;
-  `busy` answers `false` once the transition is over and leaves the end to them, so it throws
-  nothing.
+  `to` is a perspective one, and the rig of `from` goes back to the state it had, out of sight, so
+  that a way back finds it as it was. The look carries over exactly where the anchors keep the up
+  axis of one world on the other's and the sum stays within the `pitchLimit` of the rig of `to`,
+  which clamps it as it takes over; otherwise the takeover shows a small step. Cancelled with
+  `from` in its slot — `cancel()`, `reverse()` back to the start, a director disposed —: both rigs
+  go back. A rig disposed during the flight ends it, and the other goes back. `flight.finished`
+  resolves then, and never rejects. What a rig throws as it leaves — a listener of the stage of `to`
+  as it takes a projection — comes out of the call or the frame that noticed the end, after both
+  rigs have left; `busy` answers `false` once the transition is over and leaves the end to them, so
+  it throws nothing.
 - A frozen layer shows a still picture, not the flight: the flight warns once, naming the stage.
 
 A scroll drives picture and camera with one number. A manual transition takes its progress by hand,
@@ -1005,10 +1014,11 @@ diorama.
 
 #### A camera that follows, with a rig
 
-A rig writes its camera in every frame, so a write to `stage.camera` of your own lasts one frame.
-A camera that follows a player goes through the rig: any `Object3D` is a target — the anchor your
-game moves its player by, a chest, a door. `rig.moveTo(player, seconds)` moves the camera over the
-player and locks on to it; a pan to a point of interest and back is two more calls.
+A rig writes its camera in every frame, so a write into `rig.camera` of your own lasts one frame,
+and an assignment to `stage.camera` is kept until the rig goes. A camera that follows a player goes
+through the rig: any `Object3D` is a target — the anchor your game moves its player by, a chest, a
+door. `rig.moveTo(player, seconds)` moves the camera over the player and locks on to it; a pan to a
+point of interest and back is two more calls.
 
 ```ts check
 import {CameraRig, Display, OrthographicProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
@@ -1102,7 +1112,10 @@ projection ──places──▶ base camera ──OnStageCameraPlaced──▶ 
 - **After the rig: `OnStageUpdateFrame`.** The rig writes the camera just before the stage emits
   it, so a listener sees the camera of this frame and may change it for this frame's draw. The rig
   never reads its camera back: the next frame starts from the state of the rig again, and nothing
-  of such a change leaks into a move. A camera shake is one listener:
+  of such a change leaks into a move. In every frame the rig rewrites the position, the
+  quaternion, `near`, `far`, the lens — `fov`, `aspect` and `zoom`, or the frustum and `zoom` —,
+  the view offset and the matrices; a field it leaves alone — `filmOffset`, `filmGauge`, `focus`,
+  `up` — keeps what a listener set, beyond the frame. A camera shake is one listener:
 
 ```ts check
 import {on} from '@spearwolf/eventize';
@@ -1143,8 +1156,9 @@ display.start();
 `rig.step(deltaSeconds)` answers a `Motion`: `true` when the camera of the frame differs from the
 one of the step before — during a move, a lift, the glide of a damped `lerp()`, after a `jump()`, a
 `look()`, a `lerp()` or a resize, and in the frames a camera or an object the rig is locked on to,
-or a key of its track, moved —, `false` while it stands. As a frame step of a `FramePacer` (see "Drawing on demand" in
-[display](display.md#a-camera-that-moves)), a camera that stands costs no draw:
+or a key of its track, moved —, `false` while it stands. As a frame step of a `FramePacer` (see
+"Drawing on demand" in [display](display.md#a-camera-that-moves)), a camera that stands costs no
+draw:
 
 ```ts
 frames.onFrame((frame) => rig.step(frame.deltaTime), stage);
@@ -1165,7 +1179,7 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | `moveTo(target, seconds, {easing?, offset?, smooth?, focus?, depth?})` | eased; a promise that resolves when the move ends, however it ends; locks on to a camera or an object on arrival; `offset` and `smooth` for an object, `focus` and `depth` for a lens change |
 | `look({yaw, pitch})` | the look of the current viewpoint; the new end of a running move |
 | `reframe({lift?}, seconds?)` | the lift, a share of the picture height; on a clock of its own |
-| `cancel()` | ends a move or a lock-on where it stands; leaves a track alone |
+| `cancel()` | ends a move or a lock-on where it stands; leaves a track alone; does nothing during a flight |
 | `track(keys)`, `track(from, to)` | a track of keys `{at, shot, until?, clip?, ease?}`, starting at 0; ends a move and a lock-on |
 | `lerp(t, {smooth?})` | the progress along the track, clamped to `[0, 1]`; shown by the next step, or approached in a glide — the first after `track()` always jumps |
 | `step(deltaSeconds)` | advances the clocks; answers a `Motion`; assigns a projection on arrival |
@@ -3094,8 +3108,10 @@ keep. So does `OnStageCameraPlaced` for every placement.
 
 `OnStageCameraPlaced` is the place for a change to the camera that holds whatever the projection
 does: the stage emits it each time the projection has placed the camera — on a resize, after
-`needsUpdate`, on a new projection, on an assignment to `camera` — and the camera has the change
-before anything is drawn or announced after it. A rest at an angle, rather than straight onto the
+`needsUpdate`, on a new projection, on an assignment to `camera`, and in an `updateFrame()` where
+the projection answers `true` to `needsPlacement()` — and the camera has the change before
+anything is drawn or announced after it. A camera the projection creates is announced through
+`OnStageAfterCameraChanged` first, and placed — with `OnStageCameraPlaced` — right after. A rest at an angle, rather than straight onto the
 plane, is one listener:
 
 ```ts check
@@ -3191,8 +3207,9 @@ pipeline.dispose();
 - **The camera jumps back.** The projection places the camera on every resize; moves of your own
   go into `OnStageUpdateFrame` — see [a camera that follows](#a-camera-that-follows).
 - **A camera that ignores your writes.** A stage with a `CameraRig` draws with the camera of the
-  rig, which writes it in every frame: a write to `stage.camera` holds for one frame. Move the
-  camera through the rig — see [moving the camera](#moving-the-camera).
+  rig, which writes it in every frame: a write into `rig.camera` holds for one frame, and an
+  assignment to `stage.camera` is kept, not drawn with, until the rig goes. Move the camera through
+  the rig — see [moving the camera](#moving-the-camera).
 - **A flight that stands still.** A flight across a transition whose `outgoing` or `incoming` is
   `'freeze'` shows a still picture on that layer, not the flight: a frozen layer is neither updated
   nor drawn. The flight warns once, naming the stage; let both layers run.
@@ -3257,7 +3274,7 @@ pipeline.dispose();
 | `ParallaxProjection` | a view with depth: `getScaleFactor()`, `getParallaxFactor()` |
 | `CameraProjection` | a view through a camera of your own — of a `.glb` —, its frame fitted `'contain'` or `'cover'`, followed when it moves |
 | `ProjectionPlane` | the plane a camera looks at, four descriptions or a plane of your own |
-| `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `step()`, `precompile()` — to a `CameraPose` in the frame of the projection, to another projection, as a dolly zoom where the kind changes, and to a camera or an `Object3D`, which it locks on to and follows; `CameraRig.across()` flies it through a transition of a `StageDirector` |
+| `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `track()`, `lerp()`, `step()`, `precompile()` — to a `CameraPose` in the frame of the projection, to another projection, as a dolly zoom where the kind changes, and to a camera or an `Object3D`, which it locks on to and follows, and along a track of keys whose progress `lerp()` sets; `CameraRig.across()` flies it through a transition of a `StageDirector` |
 | `ClearStage` | clears depth (by default), color or stencil between two stages |
 | `Canvas2DStage` | a 2D canvas on a sprite in a stage of its own |
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |

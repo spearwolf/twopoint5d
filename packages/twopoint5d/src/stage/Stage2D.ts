@@ -260,6 +260,11 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * the stage replaces the camera the projection built with a new one at that placement; a camera
    * assigned here is refused by the projection instead.
    *
+   * While a `CameraRig` is attached, this answers the camera of the rig, and the stage draws with
+   * it: a camera assigned here is kept, not drawn with, and counts again once the rig goes with
+   * `rig.dispose()`. A write into the camera of the rig lasts one frame, since the rig writes it in
+   * every frame.
+   *
    * The pass node of {@link asPassNode} renders through a new camera from its next draw, and a
    * renderer that composes this stage keeps its output node. Every change of the camera emits
    * `OnStageAfterCameraChanged` with the camera it replaced.
@@ -603,7 +608,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   }
 
   // the placement of IProjection#needsPlacement(): the container and the specs are as they were,
-  // so neither updateViewRect() nor getViewRect() — which answers a new object — is called
+  // so neither updateViewRect() nor getViewRect() — which answers a new object — is called; but for
+  // a camera of the kind the projection no longer builds, which is built and placed anew through
+  // #updateProjection(), as on a resize
   #placeWithoutView(projection: IProjection, camera: Camera): void {
     const driver = this.#driver;
     if (driver == null && this.#outgrown(projection, camera)) {

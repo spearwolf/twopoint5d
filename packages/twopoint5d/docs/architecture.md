@@ -19,14 +19,13 @@ of `public-api.ts` files _is_ the package's API contract:
 - `display/`, `texture/`, `map2d/` (with `chunk-quad-tree/`) and `sprites/` name their
   exports one by one, because their files export for their neighbours as well: a new
   export of such a file stays internal until it is listed. `stage/` and `text/` do the
-  same for those of their files that export internals — `Stage2D.ts`,
-  `CameraFlight.ts`, `CameraProjection.ts`, `cameraPose.ts`, `framing.ts`,
-  `StageDirector.ts`, `StageMask.ts`, `StageTransition.ts`, `transitionEffects.ts` and
-  `maskNodes.ts` in `stage/`, `layoutText.ts` in `text/` — and re-export the rest whole;
-  the other internal files of the camera rig (`cameraShot.ts`, `cameraRest.ts`,
-  `cameraTarget.ts`, `cameraTrack.ts`, `lensChange.ts`, `StageCameraDriver.ts`) are not
-  re-exported at all. A helper listed
-  only because an earlier release published it carries `@deprecated`.
+  same for those of their files that export internals — `Stage2D.ts`, `CameraFlight.ts`,
+  `CameraProjection.ts`, `cameraPose.ts`, `framing.ts`, `StageDirector.ts`,
+  `StageMask.ts`, `StageTransition.ts`, `transitionEffects.ts` and `maskNodes.ts` in
+  `stage/`, `layoutText.ts` in `text/` — and re-export the rest whole; the other
+  internal files of the camera rig (`cameraShot.ts`, `cameraRest.ts`, `cameraTarget.ts`,
+  `cameraTrack.ts`, `lensChange.ts`, `StageCameraDriver.ts`) are not re-exported at all.
+  A helper listed only because an earlier release published it carries `@deprecated`.
 - A new public symbol is not published until it is added to its module's
   `public-api.ts`. `pnpm checkNameableTypes` fails the build when a published
   declaration references a type that consumers cannot name — usually the symptom of a
