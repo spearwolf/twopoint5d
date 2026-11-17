@@ -67,7 +67,7 @@ describe('cameraPose', () => {
     it('takes a look of 0 under an orthographic projection, and refuses any other', () => {
       expect(read({look: {yaw: 0, pitch: 0}}, true)).toMatchObject({yaw: 0, pitch: 0});
       expect(() => read({look: {yaw: 0.1, pitch: 0}}, true)).toThrow(
-        new RangeError('CameraRig#jump(): an OrthographicProjection takes no look other than 0, got {yaw: 0.1, pitch: 0}'),
+        new RangeError('CameraRig#jump(): an orthographic projection takes no look other than 0, got {yaw: 0.1, pitch: 0}'),
       );
     });
 
@@ -152,7 +152,7 @@ describe('cameraPose', () => {
       readLook('CameraRig#look()', {yaw: 1, pitch: 0.5}, false, out);
       expect(out).toMatchObject({hasLook: true, yaw: 1, pitch: 0.5});
       expect(() => readLook('CameraRig#look()', {yaw: 0, pitch: 0.5}, true, out)).toThrow(
-        new RangeError('CameraRig#look(): an OrthographicProjection takes no look other than 0, got {yaw: 0, pitch: 0.5}'),
+        new RangeError('CameraRig#look(): an orthographic projection takes no look other than 0, got {yaw: 0, pitch: 0.5}'),
       );
       expect(() => readLook('CameraRig#look()', undefined, false, out)).toThrow(
         new TypeError('CameraRig#look(): look must be an object with yaw and pitch, got undefined'),

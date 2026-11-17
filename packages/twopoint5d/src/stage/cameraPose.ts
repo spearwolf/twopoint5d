@@ -84,7 +84,7 @@ function refuseLookShape(subject: string, look: unknown): never {
 }
 
 function refuseOrthographicLook(subject: string, look: unknown): never {
-  throw new RangeError(`${subject}: an OrthographicProjection takes no look other than 0, got ${describeValue(look)}`);
+  throw new RangeError(`${subject}: an orthographic projection takes no look other than 0, got ${describeValue(look)}`);
 }
 
 /**

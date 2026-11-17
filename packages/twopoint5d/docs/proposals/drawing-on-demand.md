@@ -414,7 +414,7 @@ const release = director.frames.hold(); // busy until released
 - **`live(stage)` is the freeze state**: a step registered for a frozen layer draws nothing.
 - **`hold()`** on the pacer, ref-counted, returns its release: the busy phases of the app — a
   camera move, a stage being prepared — without a flag threaded into the frame handler.
-- **The placement of a `CameraProjection`** (planned, see [`camera-rig.md`](camera-rig.md) §3.6)
+- **The placement of a `CameraProjection`** (see [`camera-rig.md`](camera-rig.md) §3.6)
   is a source of invalidation. A source camera that is animated moves the stage camera without a
   rig, in the frame in which `IProjection#needsPlacement()` answers `true` (§3.8 there), and
   nothing reports that to a pacer. The director integration invalidates for such a placement of the

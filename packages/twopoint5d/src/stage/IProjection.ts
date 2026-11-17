@@ -64,8 +64,9 @@ export interface IProjection {
 
   /**
    * Builds a new camera with the setup of the last {@link updateViewRect} that gave a view with an
-   * area, aimed at the projection plane and placed at its distance. `Stage2D` asks for one once it
-   * has a view and no camera.
+   * area, aimed at the projection plane and placed at its distance — or placed by other means, as a
+   * `CameraProjection` places it where its source stands. `Stage2D` asks for one once it has a view
+   * and no camera, and again when the kind of camera the projection builds has changed.
    *
    * @throws {Error} if the projection needs a {@link projectionPlane} and has none, with a message
    * that names the class, the method and the field to set.

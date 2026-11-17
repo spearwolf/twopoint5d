@@ -1,10 +1,11 @@
 import {on} from '@spearwolf/eventize';
-import {OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
+import {Group, OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {OnStageAfterCameraChanged} from '../events.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {Easing} from '../utils/easing.js';
+import {CameraProjection} from './CameraProjection.js';
 import {CameraRig} from './CameraRig.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
@@ -185,6 +186,105 @@ describe('CameraRig on the hot path', () => {
     });
 
     expect(rig.busy).toBe(true);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  // A source an animation moves: its position, the one of its parent and its lens, copied from
+  // these tables of constants, so that the round works out no fraction itself (AGENTS.md). The
+  // calls are measured directly — needsPlacement() and updateCamera() of the projection, placeBase(),
+  // compose() and write() of a rig —: the events a Stage2D emits on the path cost what every eventize
+  // emit costs, and are not the projection's to remove.
+  const FOVS = [50.5, 38.25, 61.125, 44.75, 72.5, 33.375, 55.0625, 47.25];
+  const ORTHO_ZOOMS = [1.25, 0.75, 2.5, 1.125, 0.5, 3.75, 1.5, 0.875];
+
+  const makeSource = <C extends PerspectiveCamera | OrthographicCamera>(source: C) => {
+    const parent = new Group();
+    parent.position.set(10, 20, 30);
+    parent.rotation.set(0, 0.25, 0);
+    parent.add(source);
+    return {parent, source};
+  };
+
+  const moveSource = (parent: Group, source: PerspectiveCamera | OrthographicCamera, i: number) => {
+    const k = i & 7;
+    source.position.x = XS[k]!;
+    source.position.y = YS[k]!;
+    source.position.z = DISTANCES[k]!;
+    parent.position.x = YS[k]!;
+    if ((source as PerspectiveCamera).isPerspectiveCamera) (source as PerspectiveCamera).fov = FOVS[k]!;
+    else source.zoom = ORTHO_ZOOMS[k]!;
+  };
+
+  test.each<['perspective' | 'orthographic', 'contain' | 'cover']>([
+    ['perspective', 'contain'],
+    ['perspective', 'cover'],
+    ['orthographic', 'contain'],
+    ['orthographic', 'cover'],
+  ])(
+    'CameraProjection: needsPlacement() and updateCamera() of a moving %s source under %s allocate nothing',
+    async (kind, fit) => {
+      const {parent, source} = makeSource(
+        kind === 'perspective' ? new PerspectiveCamera(50, 16 / 9, 0.5, 500) : new OrthographicCamera(-8, 8, 4.5, -4.5, 0.5, 500),
+      );
+      const projection = new CameraProjection(source, {fit});
+      // narrower than 16:9, so that contain widens the lens and cover keeps it, and the other way round
+      projection.updateViewRect(801, 601);
+      const camera = projection.createCamera();
+      let placed = 0;
+
+      const bytes = await bytesPerCall(() => {
+        for (let i = 0; i < CALLS; i++) {
+          moveSource(parent, source, i);
+          if (projection.needsPlacement(camera)) {
+            projection.updateCamera(camera);
+            placed++;
+          }
+        }
+      });
+
+      expect(placed, 'the source moved in every call').toBeGreaterThanOrEqual(CALLS);
+      expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    },
+  );
+
+  test('CameraProjection: needsPlacement() of a source that stands allocates nothing', async () => {
+    const {source} = makeSource(new PerspectiveCamera(50, 16 / 9, 0.5, 500));
+    const projection = new CameraProjection(source);
+    projection.updateViewRect(801, 601);
+    const camera = projection.createCamera();
+    let placed = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) if (projection.needsPlacement(camera)) placed++;
+    });
+
+    expect(placed).toBe(0);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  test('CameraProjection: the placement of a moving source under a rig — placeBase(), compose(), write() — allocates nothing', async () => {
+    const {parent, source} = makeSource(new PerspectiveCamera(50, 16 / 9, 0.5, 500));
+    const projection = new CameraProjection(source);
+    const stage = new Stage2D(projection);
+    stage.resize(801, 601);
+    const rig = new CameraRig(stage);
+    void rig.moveTo({position: [3, -2], zoom: 2}, LONG_MOVE);
+    let moved = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) {
+        moveSource(parent, source, i);
+        if (projection.needsPlacement(rig.camera)) {
+          rig.placeBase(projection);
+          rig.compose();
+        }
+        if (rig.step(1)) moved++;
+        rig.write();
+      }
+    });
+
+    expect(rig.busy).toBe(true);
+    expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
     expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
 });

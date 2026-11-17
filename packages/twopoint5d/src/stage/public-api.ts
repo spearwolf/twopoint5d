@@ -1,4 +1,6 @@
 export type {CameraPose} from './cameraPose.js';
+export type {CameraProjectionFit, CameraProjectionSpecs} from './CameraProjection.js';
+export {CameraProjection} from './CameraProjection.js';
 export type {CameraMoveOptions, CameraRigOptions, CameraTarget} from './CameraRig.js';
 export {CameraRig} from './CameraRig.js';
 export * from './Canvas2DStage.js';

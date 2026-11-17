@@ -95,6 +95,10 @@ new ParallaxProjection(plane, specs);
 - `specs` — how the view fits into the container, see [fitting the view](#fitting-the-view),
   plus where the camera sits: `distanceToProjectionPlane`, `near` and `far`.
 
+A third projection has no plane: `new CameraProjection(camera, specs)` looks through a camera of
+your own — of a loaded `.glb`, or one you animate — and fits the frame it was authored for into the
+container, see [looking through a camera](#looking-through-a-camera-cameraprojection).
+
 ### Orthographic or parallax
 
 | | `OrthographicProjection` | `ParallaxProjection` |
@@ -321,13 +325,71 @@ On a stage with a `CameraRig`, the recipe holds at the rest only — a viewpoint
 plane, at the distance of the projection, without `zoom`, `look` or lift. Another distance under a
 `ParallaxProjection`, a zoom, a turned camera and a lifted picture each put the pointer elsewhere.
 
+### Looking through a camera: `CameraProjection`
+
+A 3D scene comes with its cameras: the viewpoints of a `.glb`, a camera a script or an animation
+moves. `CameraProjection` lets a stage look through one of them. The stage builds a camera of the
+kind of the source — a `PerspectiveCamera` or an `OrthographicCamera` — and places it at the world
+pose of the source, with its lens, fitted into the container:
+
+```ts check
+import {CameraProjection, Display, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+import {BoxGeometry, Mesh, MeshNormalMaterial, PerspectiveCamera} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+
+// authored for 16:9: a phone held upright shows all of it, with more above and below
+const camera = new PerspectiveCamera(40, 16 / 9, 0.1, 100);
+camera.position.set(0, 3, 12);
+camera.lookAt(0, 1, 0);
+
+const stage = new Stage2D(new CameraProjection(camera, {fit: 'contain'}));
+stage.scene.add(new Mesh(new BoxGeometry(2, 2, 2), new MeshNormalMaterial()));
+new StageRenderer(display).add(stage);
+
+display.onRenderFrame(({now}) => {
+  // the camera of the stage follows: the projection sees that its source moved
+  camera.position.x = Math.sin(now) * 4;
+  camera.lookAt(0, 1, 0);
+});
+
+display.start();
+```
+
+| spec | default | |
+| --- | --- | --- |
+| `fit` | `'contain'` | `'contain'` shows all of the frame: the side of the container narrower than the frame keeps its authored extent, the other side shows more. `'cover'` fills the container: the frame is cut where it sticks out |
+| `aspect` | `aspect` of a perspective source (glTF's `aspectRatio`), the frustum of an orthographic one | the aspect the frame was authored for, a finite number above 0 |
+| `near`, `far` | the source's | a value no camera of that kind can be built from counts as not given |
+
+- The source is **read, never written**: its pose, lens and view offset stay as they are, and
+  several stages may look through one camera — with a projection each, since a projection
+  remembers what it placed last. The pose is its world pose, its parents included, without the
+  scale; the view offset and the film offset of the source are not carried over.
+- **A source that moves** — itself, a parent, its field of view or zoom — moves the camera of the
+  stage in the next frame: the stage asks the projection in every `updateFrame()` and places the
+  camera when the source changed. Nothing to call; a source that stands costs nothing.
+- **No plane.** `getViewRect()` answers the container, one view unit per container unit; `width`
+  and `height` of the stage are the container's. `getScaleFactor(d)` is `focus / d`, with the
+  `focus` of a perspective source — three's default `10`, since glTF carries none —, and `1` for an
+  orthographic one. [From the pointer to the plane](#from-the-pointer-to-the-plane) does not apply.
+- **Another source**: `projection.source = otherCamera` takes effect in the next frame. One of the
+  other kind gives the stage a camera of that kind, announced through `OnStageAfterCameraChanged`.
+- Refused, with `CameraProjection` as the subject: a source that is neither a `PerspectiveCamera`
+  nor an `OrthographicCamera`, an `aspect` that is not a finite number above 0, a `fit` other than
+  `'contain'` and `'cover'` — in the constructor, and in the next placement for specs written since.
+
+A `FramePacer` that draws on demand does not see a source move. The frame step that moves it — the
+`update()` of an `AnimationMixer` — answers `true` while it plays; under a `CameraRig`, `rig.step()`
+answers `true` in the frames the source moved.
+
 ### A camera of your own
 
 `stage.camera = myCamera` replaces the camera the projection built. The projection keeps placing
 it — frustum or field of view, `near`, `far`, direction and distance — every time it computes
 the view, so it has to be of the kind the projection builds: an `OrthographicCamera` for an
-`OrthographicProjection`, a `PerspectiveCamera` for a `ParallaxProjection`; any other kind is
-refused with a `TypeError` at the next placement. `stage.camera = undefined` hands back to the
+`OrthographicProjection`, a `PerspectiveCamera` for a `ParallaxProjection`, the kind of the source
+for a `CameraProjection`; any other kind is refused with a `TypeError` at the next placement. `stage.camera = undefined` hands back to the
 camera of the projection.
 
 A camera you place entirely yourself goes on a stage without a projection: `new Stage2D()`,
@@ -503,8 +565,8 @@ document.querySelector('#map')!.addEventListener('click', async () => {
 - The camera backs off to at most 1000 times the visible height: further away, the precision of the
   view matrix shows. A scene so deep that this cap comes first swaps with a step above half a pixel.
   The move does not fail — the step just shows.
-- The plane that keeps its size is the projection plane. A projection without one — one of your own
-  — needs `{focus}`, the distance from the camera to the plane that is to keep its size; without it
+- The plane that keeps its size is the projection plane. A projection without one — a
+  `CameraProjection`, or one of your own — needs `{focus}`, the distance from the camera to the plane that is to keep its size; without it
   a lens change is refused with an `Error`.
 - During the change `rig.camera` is a `PerspectiveCamera`, also on the way out of an orthographic
   projection; at the end it is the camera of the kind the new projection builds.
@@ -520,6 +582,57 @@ stage in `layers`. It takes a `WebGPURenderer` under either backend and rejects 
 A `postProcess` that reads depth sees the depth of either kind of camera: a perspective one stores it
 non-linearly, an orthographic one linearly. Linearize it for the kind of `stage.camera`, or rebuild
 the post-process when `OnStageAfterCameraChanged` announces the swap.
+
+#### A 3D scene through the cameras of a `.glb`
+
+The cameras a `.glb` brings are viewpoints authored in Blender: a `CameraProjection` looks through
+the first one, and a move to a `CameraProjection` of the next one carries the camera through the
+scene to it. Under a `CameraProjection` the frame of the rig is the world, and the rest is the shot
+of the source. An animation of the asset that moves a camera moves the picture with it.
+
+```ts check
+import {CameraProjection, CameraRig, Display, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {AnimationMixer, type OrthographicCamera, type PerspectiveCamera} from 'three/webgpu';
+
+const canvas = document.querySelector('canvas')!;
+const display = new Display(canvas);
+
+const gltf = await new GLTFLoader().loadAsync('/assets/rooms.glb');
+const cameras = gltf.cameras as (PerspectiveCamera | OrthographicCamera)[];
+// one projection per viewpoint, each fitted as the stage shows it
+const viewpoints = cameras.map((camera) => new CameraProjection(camera, {fit: 'cover'}));
+
+const stage = new Stage2D(viewpoints[0]);
+stage.scene.add(gltf.scene);
+const rig = new CameraRig(stage);
+new StageRenderer(display).add(stage);
+
+const mixer = new AnimationMixer(gltf.scene);
+for (const clip of gltf.animations) mixer.clipAction(clip).play();
+
+display.onRenderFrame(({deltaTime}) => {
+  mixer.update(deltaTime);
+  rig.step(deltaTime);
+});
+
+let room = 0;
+canvas.addEventListener('click', async () => {
+  room = (room + 1) % viewpoints.length;
+  // on arrival the stage looks through the camera of the next room
+  await rig.moveTo(viewpoints[room]!, 1.2);
+});
+
+display.start();
+```
+
+- The scene of the asset goes into the stage, so the cameras sit in its graph; the projection reads
+  their world pose, the nodes above them included.
+- A move between two perspective cameras blends position, orientation and field of view. Between a
+  perspective and an orthographic camera it is a lens change, which needs `{focus}` here — the
+  distance to the plane that is to keep its size —, since a `CameraProjection` has no plane.
+- A pose under a `CameraProjection` is given in world axes, relative to the source:
+  `{position: [x, y]}` moves the camera along the world's x and y from where the source stands.
 
 #### A camera that follows, with a rig
 
@@ -621,7 +734,7 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | member | |
 | --- | --- |
 | `new CameraRig(stage, {pitchLimit?, easing?})` | attaches to a `Stage2D` with a projection; one rig per stage |
-| `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection` and during a lens change, an `OrthographicCamera` under an `OrthographicProjection` |
+| `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection` and during a lens change, an `OrthographicCamera` under an `OrthographicProjection`, the kind of the source under a `CameraProjection` |
 | `busy` | `true` while a move runs |
 | `jump(target)` | at once; ends a running move |
 | `moveTo(target, seconds, {easing?, focus?, depth?})` | eased; a promise that resolves when the move ends, however it ends; `focus` and `depth` for a lens change |
@@ -632,7 +745,8 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | `precompile(renderer)` | compiles the scene, and the pass of its `postProcess`, with the camera of the other kind |
 | `dispose()`, `isDisposed` | detaches; the stage takes back its camera, a running move resolves |
 
-- A target is a `CameraPose` or a projection. The type `CameraTarget` names cameras and other
+- A target is a `CameraPose` or a projection — a `CameraProjection` among them, a move to another
+  camera. The type `CameraTarget` names cameras and other
   `Object3D`s as well; this version refuses them with a `TypeError`. `CameraMoveOptions` declares
   `offset` and `smooth` for them, and checks them already.
 - Refused, with the call as the subject of the message: a stage that is not a `Stage2D`, has no
@@ -2601,6 +2715,7 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 | `StageMask` | lets go of its stage, leaves its slots and ends the transitions naming it as cancelled; the stage `StageMask.inWorldOf()` built | a stage handed in, which stays undisposed; the `scene` and the world stage of `inWorldOf()` |
 | `Display` | its `WebGPURenderer` | a canvas handed in |
 | `CameraRig` | detaches from the stage, which takes back its camera; ends a running move, whose promise resolves | the stage, which a disposed rig leaves undisposed — and a disposed stage disposes no rig |
+| `CameraProjection` | nothing; it has no `dispose()` | its source camera |
 
 The order of a teardown: the renderer first, then what it used.
 
@@ -2643,6 +2758,9 @@ pipeline.dispose();
   perspective and an orthographic projection swaps the kind of the camera, and with it the way the
   depth is stored. Linearize it for the kind of `stage.camera` — see
   [perspective into orthographic](#perspective-into-orthographic).
+- **One `CameraProjection` on two stages.** It remembers what it placed last, so the second stage
+  finds the source placed and does not follow it. Give each stage a projection of its own; they may
+  share the source camera.
 - **Specs written, nothing happens.** A write to the specs needs `stage.needsUpdate = true`.
 - **Clipped layers under an orthographic projection.** The camera sits `distanceToProjectionPlane`
   in front of the plane; a layer closer to it than `near` is not drawn.
@@ -2695,6 +2813,7 @@ pipeline.dispose();
 | `StageRenderer` | a list of stages with order, clear and optional pipeline; a stage itself, so it nests |
 | `OrthographicProjection` | a view without depth: everything as large as on the plane |
 | `ParallaxProjection` | a view with depth: `getScaleFactor()`, `getParallaxFactor()` |
+| `CameraProjection` | a view through a camera of your own — of a `.glb` —, its frame fitted `'contain'` or `'cover'`, followed when it moves |
 | `ProjectionPlane` | the plane a camera looks at, four descriptions or a plane of your own |
 | `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `step()`, `precompile()` — to a `CameraPose` in the frame of the projection, or to another projection, as a dolly zoom where the kind changes |
 | `ClearStage` | clears depth (by default), color or stencil between two stages |
@@ -2738,6 +2857,7 @@ pipeline.dispose();
 | projection specs | `{fit: 'fill'}` |
 | `distanceToProjectionPlane` | `100` orthographic, `300` parallax |
 | `near`, `far` | `0.1`, `100000` |
+| `CameraProjection` | `fit`: `'contain'`; `aspect`, `near`, `far`: the source's |
 | `CameraRig` | `pitchLimit`: 85° (`Math.PI * 85 / 180`), `easing`: `'ease-in-out'` |
 | `CameraMoveOptions` | `focus`: the distance to the projection plane, `depth`: the visible height at the focus plane |
 | `CameraPose` | the rest's: `position` and its distance, `look` `{yaw: 0, pitch: 0}`, `zoom` `1` |

@@ -17,6 +17,8 @@ import {describeValue} from '../utils/describeValue.js';
 import {applyEasingInPlace, type Easing, type EasingSpec, easingOf} from '../utils/easing.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {type CameraPose, copyPoseValues, createPoseValues, type PoseValues, readLook, readPose} from './cameraPose.js';
+import {CameraProjection} from './CameraProjection.js';
+import {createRest, type Rest, readFrame, readRest} from './cameraRest.js';
 import {
   blendProgress,
   blendShotsAtProgress,
@@ -86,8 +88,6 @@ const liftProgress = new Float64Array(1);
 // an argument
 const turnSlot = new Float64Array(4);
 
-const RAD_PER_DEG = Math.PI / 180;
-
 const kindOf = (camera: Camera): CameraShotKind | undefined => {
   if ((camera as PerspectiveCamera).isPerspectiveCamera === true) return 'perspective';
   if ((camera as OrthographicCamera).isOrthographicCamera === true) return 'orthographic';
@@ -98,88 +98,6 @@ const refuseKind = (camera: Camera): never => {
   throw new TypeError(
     `CameraRig: the projection builds a ${describeThreeValue(camera, 'isObject3D')}, not a PerspectiveCamera or an OrthographicCamera`,
   );
-};
-
-/**
- * The rest of a projection, as a base camera it placed gives it: the frame poses are given in — the
- * projection plane, or the world without one —, the placement and the lens.
- */
-interface Rest {
-  base: PerspectiveCamera | OrthographicCamera | undefined;
-  kind: CameraShotKind;
-  hasPlane: boolean;
-  readonly origin: Vector3;
-  readonly right: Vector3;
-  readonly up: Vector3;
-  readonly normal: Vector3;
-  readonly position: Vector3;
-  readonly quaternion: Quaternion;
-  /** The distance of the base from the plane, along its normal. */
-  distance: number;
-  /** `tan(fov / 2)` after the zoom, or the height of the view. */
-  lens: number;
-  near: number;
-  far: number;
-  aspect: number;
-}
-
-const createRest = (): Rest => ({
-  base: undefined,
-  kind: 'perspective',
-  hasPlane: false,
-  origin: new Vector3(),
-  right: new Vector3(1, 0, 0),
-  up: new Vector3(0, 1, 0),
-  normal: new Vector3(0, 0, 1),
-  position: new Vector3(),
-  quaternion: new Quaternion(),
-  // fractions from the start, so that V8 keeps the fields as doubles
-  distance: 0.5,
-  lens: 0.5,
-  near: 0.1,
-  far: 100000.5,
-  aspect: 1.5,
-});
-
-// the frame of `projection` into `rest`: its plane, or the world for a projection without one
-const readFrame = (projection: IProjection, rest: Rest): void => {
-  const plane = projection.projectionPlane;
-  if (plane != null) {
-    plane.getOrigin(rest.origin);
-    plane.getRight(rest.right).normalize();
-    rest.up.copy(plane.up).normalize();
-    rest.normal.copy(plane.plane.normal).normalize();
-    rest.hasPlane = true;
-  } else {
-    rest.origin.set(0, 0, 0);
-    rest.right.set(1, 0, 0);
-    rest.up.set(0, 1, 0);
-    rest.normal.set(0, 0, 1);
-    rest.hasPlane = false;
-  }
-};
-
-// the placement and the lens of the base of `rest` into `rest`. Allocates nothing
-const readRest = (rest: Rest): void => {
-  const base = rest.base!;
-  const p = rest.position.copy(base.position);
-  rest.quaternion.copy(base.quaternion);
-  const o = rest.origin;
-  const n = rest.normal;
-  rest.distance = (p.x - o.x) * n.x + (p.y - o.y) * n.y + (p.z - o.z) * n.z;
-  // the lens — tan(fov / 2) after the zoom, or the height of the view —, inline: a call that V8
-  // does not inline boxes the fraction it answers
-  if (rest.kind === 'perspective') {
-    const perspective = base as PerspectiveCamera;
-    rest.lens = Math.tan((perspective.fov * RAD_PER_DEG) / 2) / perspective.zoom;
-    rest.aspect = perspective.aspect;
-  } else {
-    const ortho = base as OrthographicCamera;
-    rest.lens = (ortho.top - ortho.bottom) / ortho.zoom;
-    rest.aspect = (ortho.right - ortho.left) / (ortho.top - ortho.bottom);
-  }
-  rest.near = base.near;
-  rest.far = base.far;
 };
 
 const EMPTY_POSE = createPoseValues();
@@ -274,9 +192,9 @@ export class CameraRig {
   /**
    * Attaches the rig to `stage`, which draws with the camera of the rig from now on: a
    * `PerspectiveCamera` under a `ParallaxProjection`, an `OrthographicCamera` under an
-   * `OrthographicProjection`. The rig starts at the rest of the projection — the placement the
-   * projection gives a camera by itself —, and places its camera right away if the stage has a
-   * view.
+   * `OrthographicProjection`, and a camera of the kind of its source under a `CameraProjection`.
+   * The rig starts at the rest of the projection — the placement the projection gives a camera by
+   * itself —, and places its camera right away if the stage has a view.
    *
    * @throws {TypeError} for a `stage` that is not a `Stage2D`, an `easing` that is not one.
    * @throws {RangeError} for a `pitchLimit` that is not a finite number above 0 and of
@@ -338,9 +256,10 @@ export class CameraRig {
 
   /**
    * The camera the stage draws with while the rig is attached: a `PerspectiveCamera` under a
-   * `ParallaxProjection`, an `OrthographicCamera` under an `OrthographicProjection`, and a
-   * `PerspectiveCamera` while a lens change runs between the two. A swap of the kind — by a new
-   * projection, by a lens change — is announced by the stage through `OnStageAfterCameraChanged`.
+   * `ParallaxProjection`, an `OrthographicCamera` under an `OrthographicProjection`, one of the kind
+   * of its source under a `CameraProjection`, and a `PerspectiveCamera` while a lens change runs
+   * between the two kinds. A swap of the kind — by a new projection, by a lens change, by a source of
+   * the other kind — is announced by the stage through `OnStageAfterCameraChanged`.
    * After {@link dispose} it answers the camera it was left with.
    */
   get camera(): PerspectiveCamera | OrthographicCamera {
@@ -366,7 +285,7 @@ export class CameraRig {
    * @throws {TypeError} for a target of a kind this version does not take — a camera, an
    * `Object3D` — and for a pose of another shape.
    * @throws {RangeError} for a number of the pose that is not finite, a `zoom` that is not above 0
-   * and a `look` other than 0 under an `OrthographicProjection`.
+   * and a `look` other than 0 under a projection with an orthographic camera.
    */
   jump(target: CameraTarget): void {
     const subject = 'CameraRig#jump()';
@@ -928,8 +847,10 @@ export class CameraRig {
     if (base !== undefined && rest.kind === kind) {
       projection.updateCamera(base);
     } else {
-      rest.base = this.#createBase(projection, kind);
-      rest.kind = kind;
+      const created = this.#createBase(projection, kind);
+      rest.base = created;
+      // the kind the camera has: a projection of a class of its own may build another one by now
+      rest.kind = kindOf(created)!;
     }
     readFrame(projection, rest);
   }
@@ -948,11 +869,13 @@ export class CameraRig {
     this.#targetPixelRatio = pixelRatio;
   }
 
-  // the kind of camera `projection` builds: known for the planar projections, found out once by a
-  // createCamera() for a projection of another class
+  // the kind of camera `projection` builds: known for the planar projections, the kind of the source
+  // for a CameraProjection — asked anew each time, since its source may change —, and found out once
+  // by a createCamera() for a projection of another class
   #kindOfProjection(projection: IProjection): CameraShotKind {
     if (projection instanceof ParallaxProjection) return 'perspective';
     if (projection instanceof OrthographicProjection) return 'orthographic';
+    if (projection instanceof CameraProjection) return kindOf(projection.source)!;
     const known = this.#probedKinds.get(projection);
     if (known !== undefined) return known;
     const camera = projection.createCamera();
@@ -971,13 +894,17 @@ export class CameraRig {
       return probe.camera;
     }
     const created = projection.createCamera();
-    if (kindOf(created) !== kind) refuseKind(created);
+    const createdKind = kindOf(created) ?? refuseKind(created);
+    // a projection of a class of its own that builds the other kind by now: the kind found out
+    // before is stale, and the camera it builds now tells the new one
+    if (createdKind !== kind && this.#probedKinds.has(projection)) this.#probedKinds.set(projection, createdKind);
     return created as PerspectiveCamera | OrthographicCamera;
   }
 
   #isOrthographic(projection: IProjection | undefined): boolean {
     if (projection instanceof OrthographicProjection) return true;
     if (projection instanceof ParallaxProjection || projection === undefined) return false;
+    if (projection instanceof CameraProjection) return kindOf(projection.source) === 'orthographic';
     const known = this.#probedKinds.get(projection);
     if (known !== undefined) return known === 'orthographic';
     return this.#hasRest && this.#rest.kind === 'orthographic';

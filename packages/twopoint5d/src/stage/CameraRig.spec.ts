@@ -391,7 +391,7 @@ describe('CameraRig', () => {
       const {rig} = makeRig('orthographic');
       rig.look({yaw: 0, pitch: 0});
       expect(() => rig.look({yaw: 0.1, pitch: 0})).toThrow(
-        new RangeError('CameraRig#look(): an OrthographicProjection takes no look other than 0, got {yaw: 0.1, pitch: 0}'),
+        new RangeError('CameraRig#look(): an orthographic projection takes no look other than 0, got {yaw: 0.1, pitch: 0}'),
       );
     });
   });
@@ -854,7 +854,7 @@ describe('CameraRig', () => {
     it('jump() refuses a look under an OrthographicProjection', () => {
       const {rig} = makeRig('orthographic');
       expect(() => rig.jump({look: {yaw: 0, pitch: 0.2}})).toThrow(
-        new RangeError('CameraRig#jump(): an OrthographicProjection takes no look other than 0, got {yaw: 0, pitch: 0.2}'),
+        new RangeError('CameraRig#jump(): an orthographic projection takes no look other than 0, got {yaw: 0, pitch: 0.2}'),
       );
     });
 
@@ -1121,7 +1121,7 @@ describe('CameraRig', () => {
       const {rig} = makeRig('parallax');
       void rig.moveTo(makeProjection('orthographic'), 1);
       expect(() => rig.look({yaw: 0.2, pitch: 0})).toThrow(
-        new RangeError('CameraRig#look(): an OrthographicProjection takes no look other than 0, got {yaw: 0.2, pitch: 0}'),
+        new RangeError('CameraRig#look(): an orthographic projection takes no look other than 0, got {yaw: 0.2, pitch: 0}'),
       );
     });
   });
@@ -1148,6 +1148,40 @@ describe('CameraRig', () => {
       for (const [camera] of perspective.updateCamera.mock.calls) expect(camera).toBeInstanceOf(PerspectiveCamera);
       frame(stage);
       expectPlacedAs(rig.camera, perspective.createCamera());
+    });
+  });
+
+  describe('the kind of a projection of a class of its own', () => {
+    it('follows the camera the projection builds now, where the kind found out before is stale', () => {
+      const {stage, rig} = makeRig('parallax');
+      const perspective = customProjection('perspective');
+      const orthographic = customProjection('orthographic');
+      let current: IProjection = perspective;
+      const switching = {
+        projectionPlane: undefined,
+        updateViewRect(width: number, height: number) {
+          perspective.updateViewRect(width, height);
+          orthographic.updateViewRect(width, height);
+        },
+        getViewRect: () => current.getViewRect(),
+        getScaleFactor: () => 1,
+        createCamera: () => current.createCamera(),
+        updateCamera: (camera: Camera) => current.updateCamera(camera),
+      } satisfies IProjection;
+
+      // the rig finds out a perspective kind on the way to it
+      void rig.moveTo(switching, 1);
+      rig.cancel();
+
+      current = orthographic;
+      expect(() => void rig.moveTo(switching, 1, {focus: 300})).not.toThrow();
+      expect(() => rig.look({yaw: 0.1, pitch: 0}), 'the move runs into an orthographic lens').toThrow(RangeError);
+
+      rig.step(1);
+      expect(stage.projection).toBe(switching);
+      frame(stage);
+      expect(rig.camera).toBeInstanceOf(OrthographicCamera);
+      expectPlacedAs(rig.camera, orthographic.createCamera());
     });
   });
 

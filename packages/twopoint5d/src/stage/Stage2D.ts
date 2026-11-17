@@ -29,6 +29,7 @@ import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {throwCollected} from '../utils/throwCollected.js';
+import {CameraProjection} from './CameraProjection.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IProjection} from './IProjection.js';
 import type {IRenderable} from './IRenderable.js';
@@ -254,7 +255,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * assignment itself leaves the camera where it is; the next of these calls places it. A stage
    * whose camera you place yourself gets no projection. `updateFrame()` places the camera as well
    * when the projection answers `true` to `needsPlacement()`. After every placement the stage emits
-   * `OnStageCameraPlaced` with the camera, where a listener may change it.
+   * `OnStageCameraPlaced` with the camera, where a listener may change it. Where the projection builds
+   * a camera of another kind by then — a `CameraProjection` whose source is of the other kind now —,
+   * the stage replaces the camera the projection built with a new one at that placement; a camera
+   * assigned here is refused by the projection instead.
    *
    * The pass node of {@link asPassNode} renders through a new camera from its next draw, and a
    * renderer that composes this stage keeps its output node. Every change of the camera emits
@@ -383,14 +387,27 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     throwCollected(errors, 'Stage2DInternals.announceCamera(): more than one listener of OnStageAfterCameraChanged threw');
   }
 
-  // whether `projection` places `camera`: each planar projection places the kind it builds, and a
-  // projection of another class is trusted with any camera
+  // whether `projection` places `camera`: each planar projection places the kind it builds, a
+  // CameraProjection the kind of its source, and a projection of another class is trusted with any
+  // camera
   static #buildsKindOf(projection: IProjection | undefined, camera: Camera): boolean {
     if (projection instanceof ParallaxProjection) return (camera as Partial<PerspectiveCamera>).isPerspectiveCamera === true;
     if (projection instanceof OrthographicProjection) {
       return (camera as Partial<OrthographicCamera>).isOrthographicCamera === true;
     }
+    if (projection instanceof CameraProjection) {
+      return (projection.source as Partial<PerspectiveCamera>).isPerspectiveCamera === true
+        ? (camera as Partial<PerspectiveCamera>).isPerspectiveCamera === true
+        : (camera as Partial<OrthographicCamera>).isOrthographicCamera === true;
+    }
     return true;
+  }
+
+  // whether `camera` is the camera of the projection, built for a kind the projection no longer
+  // builds — the source of a CameraProjection that changed its kind: the projection builds a new one.
+  // A camera assigned to stage.camera is the caller's, and the projection refuses it instead
+  #outgrown(projection: IProjection, camera: Camera): boolean {
+    return camera === this.#cameraFromProjection && !Stage2D.#buildsKindOf(projection, camera);
   }
 
   constructor(projection?: IProjection, scene?: Scene) {
@@ -504,10 +521,11 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
     try {
       // a driver lets the projection place a base camera of its own and composes over it
+      const camera = this.camera;
       if (driver != null) {
         placed = driver.placeBase(projection);
-      } else if (this.camera != null) {
-        placed = this.camera;
+      } else if (camera != null && !this.#outgrown(projection, camera)) {
+        placed = camera;
         projection.updateCamera(placed);
       } else {
         placed = created = projection.createCamera();
@@ -588,6 +606,16 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   // so neither updateViewRect() nor getViewRect() — which answers a new object — is called
   #placeWithoutView(projection: IProjection, camera: Camera): void {
     const driver = this.#driver;
+    if (driver == null && this.#outgrown(projection, camera)) {
+      // a camera of the other kind is a new camera, built, announced and placed as on a resize
+      const errors: unknown[] = [];
+      this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
+      throwCollected(
+        errors,
+        'Stage2D#updateFrame(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize threw',
+      );
+      return;
+    }
     let placed = camera;
     if (driver != null) {
       placed = driver.placeBase(projection);
