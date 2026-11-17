@@ -1,0 +1,17 @@
+{
+  "title": "camera rig: into the map",
+  "shortDescription": "A survey sheet of a strange basin on an orthographic stage and the place it marks as a diorama on a perspective one: a click on the marker crossfades the director into the diorama while the camera dives through the sheet into it, a lens change on both rigs; the way back flies out again, and a follow mode trails the field party across the map",
+  "description": "Two stages under a `StageDirector`. **The map** is an `OrthographicProjection` of sheet 7 of a basin survey from 1974 — contours, a dry salt lake, the dashed route of the field party, and in red pencil the notes of a survey that went wrong: around station 4 the contours close into perfect circles. **The place** is station 4 itself, a `.glb` made in Blender — a hut with a lit window, a radio mast, a floodlight on a perfectly round hole —, its light baked into one texture, seen through its camera with a `CameraProjection` ([Looking through a camera](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#looking-through-a-camera-cameraprojection)). Each stage has a `CameraRig`.\n\n**A click on the red circle** is `director.replace(map, room, {effect: crossfade(), duration: 2.6})` and `CameraRig.across(transition, {anchors: [marker, origin], focus})`: one shot for both stages, from the view of the map down through the marker into the camera of the diorama. The anchors are the same place in two worlds — the marker on the sheet, turned so that up out of the paper is up in the diorama and scaled by six map units a metre, and the origin of the diorama —, and the flight carries position, orientation and the height of the view through them. From the orthographic map into the perspective diorama it is a lens change on both rigs, a dolly zoom, its focus the distance of the camera to the hole ([A flight across a transition](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#a-flight-across-a-transition)). **Back to the map** flies the other way, to the shot the rig of the map held. **F** follows the field party: `rig.moveTo({position, zoom: 2.6}, 0.9)` closes in over its token, then `rig.moveTo(token, 0.5, {smooth: 0.35})` locks on and trails it along the route ([A camera that follows, with a rig](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stages.md#a-camera-that-follows-with-a-rig)); a flight into the diorama and back finds the lock-on as it was.",
+  "url": "/demos/camera-rig-into-the-map",
+  "tags": [
+    "CameraRig",
+    "CameraProjection",
+    "StageDirector",
+    "crossfade",
+    "OrthographicProjection",
+    "Stage2D",
+    "Display",
+    "vanilla",
+    "demo"
+  ]
+}

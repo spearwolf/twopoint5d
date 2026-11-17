@@ -24,6 +24,7 @@ const DEMOS = [
   'boomer-shooter-corridor',
   'stage-masks',
   'camera-rig-two-rooms',
+  'camera-rig-into-the-map',
 ];
 
 function parseArgs() {

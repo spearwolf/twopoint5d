@@ -1,0 +1,469 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_camera-rig-into-the-map.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <div class="help fixed bottom-4 left-4">
+      click the red circle: into station 4 · Esc: back to the map · F: follow the field party
+    </div>
+    <button class="back" type="button" hidden>← back to the map</button>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #0c1322;
+    color: #e6dabd;
+  }
+  canvas {
+    touch-action: none;
+  }
+  canvas.over-marker {
+    cursor: pointer;
+  }
+  .help {
+    font-family: monospace;
+    font-size: 95%;
+    padding: 0.4em 0.7em;
+    background: rgba(12 19 34 / 75%);
+    border: 1px solid rgba(230 218 189 / 30%);
+    border-radius: 4px;
+    pointer-events: none;
+  }
+  .back {
+    position: fixed;
+    left: 50%;
+    bottom: 4.5rem;
+    transform: translateX(-50%);
+    padding: 0.55em 1.2em;
+    font-family: monospace;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    color: #e6dabd;
+    background: rgba(12 19 34 / 80%);
+    border: 1px solid #b1281d;
+    border-radius: 4px;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .back:hover {
+    background: rgba(177 40 29 / 35%);
+  }
+  .back[hidden] {
+    display: none;
+  }
+</style>
+
+<script>
+  import {
+    type CameraFlight,
+    CameraProjection,
+    CameraRig,
+    crossfade,
+    Display,
+    OrthographicProjection,
+    Stage2D,
+    StageDirector,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+  import {
+    AdditiveBlending,
+    CanvasTexture,
+    CircleGeometry,
+    Color,
+    Group,
+    Mesh,
+    MeshBasicMaterial,
+    Object3D,
+    PerspectiveCamera,
+    Plane,
+    PlaneGeometry,
+    Raycaster,
+    RingGeometry,
+    Sprite,
+    SpriteMaterial,
+    SRGBColorSpace,
+    type Texture,
+    TextureLoader,
+    Vector2,
+    Vector3,
+  } from 'three/webgpu';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {jsonList, jsonNumber, jsonObject, jsonTuple} from '~demos/utils/checkJson';
+  import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {ignoredKey} from '~demos/utils/demoKeys';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {fetchJson} from '~demos/utils/fetchAsset';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  const DEMO = 'camera-rig-into-the-map';
+  // the void around the sheet and around the diorama
+  const VOID = '#0c1322';
+  // the time of the crossfade, and so of the flight across it, in seconds
+  const FLIGHT = 2.6;
+  // follow mode: how close the camera goes, the move there, and how far it trails the token
+  const FOLLOW_ZOOM = 2.6;
+  const FOLLOW_MOVE = 0.9;
+  const FOLLOW_SMOOTH = 0.35;
+  // the field party walks its route at this many map units a second
+  const WALK = 34;
+  // a click this close to station 4 — in map units — counts as a click on its marker
+  const MARKER_RADIUS = 56;
+  // a drag of more pixels than this is no click
+  const CLICK_SLOP = 6;
+  // the frame of the flight the preview image holds
+  const PREVIEW_PROGRESS = 0.94;
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+
+  const checkMap = jsonObject({
+    width: jsonNumber,
+    height: jsonNumber,
+    station: jsonObject({x: jsonNumber, y: jsonNumber, unitsPerMetre: jsonNumber}),
+    route: jsonList(jsonTuple(jsonNumber, jsonNumber)),
+  });
+
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas, {antialias: true});
+  const director = new StageDirector(display).setClearColor(new Color(VOID), 1);
+  // made once: the director keeps one graph for it, both ways
+  const fade = crossfade();
+
+  const settings = {follow: false};
+
+  onDemoInit(display, DEMO, async ({renderer}) => {
+    const [layout, sheet, gltf] = await Promise.all([
+      fetchJson(DEMO, assetsUrl(`${DEMO}/survey-map.json`), checkMap),
+      new TextureLoader().loadAsync(assetsUrl(`${DEMO}/survey-map.webp`)),
+      new GLTFLoader().loadAsync(assetsUrl(`${DEMO}/station.glb`)),
+    ]);
+    // the light of the diorama is baked into its texture: the material is unlit, and the scene
+    // needs no light of its own
+    const freeAsset = () => {
+      sheet.dispose();
+      gltf.scene.traverse((object) => {
+        if (!(object instanceof Mesh)) return;
+        object.geometry.dispose();
+        for (const material of [object.material].flat()) {
+          (material.map as Texture | null)?.dispose();
+          material.dispose();
+        }
+      });
+    };
+    if (display.isDisposed) {
+      freeAsset();
+      return;
+    }
+    const stationCamera = gltf.scene.getObjectByName('camera_station');
+    const lampAnchor = gltf.scene.getObjectByName('mast_lamp');
+    if (!(stationCamera instanceof PerspectiveCamera) || lampAnchor === undefined) {
+      freeAsset();
+      throw new Error(`${DEMO}: station.glb has no perspective camera camera_station or no node mast_lamp`);
+    }
+    const {station} = layout;
+
+    // --- the map: an orthographic stage, the whole sheet in view --------------------------------
+    const map = new Stage2D(
+      new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: layout.width, height: layout.height}),
+    );
+    map.name = 'map';
+    sheet.colorSpace = SRGBColorSpace;
+    sheet.anisotropy = 8;
+    const sheetGeometry = new PlaneGeometry(layout.width, layout.height);
+    const sheetMaterial = new MeshBasicMaterial({map: sheet});
+    map.scene.add(new Mesh(sheetGeometry, sheetMaterial));
+
+    // the marker over station 4: a red ring that breathes
+    const markerGeometry = new RingGeometry(MARKER_RADIUS - 6, MARKER_RADIUS - 2, 72);
+    const markerMaterial = new MeshBasicMaterial({color: '#d0301f', transparent: true});
+    const marker = new Mesh(markerGeometry, markerMaterial);
+    marker.position.set(station.x, station.y, 1);
+    map.scene.add(marker);
+
+    // the token of the field party, walking the dashed route: a disc with a wedge for its heading
+    const tokenParts = {
+      rim: new CircleGeometry(12, 40),
+      disc: new CircleGeometry(9.5, 40),
+      wedge: new CircleGeometry(6, 3),
+      paper: new MeshBasicMaterial({color: '#f3ead2'}),
+      red: new MeshBasicMaterial({color: '#b1281d'}),
+      ink: new MeshBasicMaterial({color: '#1d1a17'}),
+    };
+    const token = new Group();
+    const rim = new Mesh(tokenParts.rim, tokenParts.ink);
+    const disc = new Mesh(tokenParts.disc, tokenParts.red);
+    disc.position.z = 0.1;
+    const wedge = new Mesh(tokenParts.wedge, tokenParts.paper);
+    wedge.position.set(2.5, 0, 0.2);
+    token.add(rim, disc, wedge);
+    token.position.z = 2;
+    map.scene.add(token);
+
+    // --- the place: a perspective stage that looks through the camera of the .glb ---------------
+    const room = new Stage2D(new CameraProjection(stationCamera));
+    room.name = 'station 4';
+    room.scene.add(gltf.scene);
+
+    // the red lamp on the mast blinks: a glow over the baked one
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = glowCanvas.height = 64;
+    const g = glowCanvas.getContext('2d')!;
+    const gradient = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(255 255 255 / 100%)');
+    gradient.addColorStop(0.25, 'rgba(255 120 100 / 60%)');
+    gradient.addColorStop(1, 'rgba(255 40 20 / 0%)');
+    g.fillStyle = gradient;
+    g.fillRect(0, 0, 64, 64);
+    const glowTexture = new CanvasTexture(glowCanvas);
+    glowTexture.colorSpace = SRGBColorSpace;
+    const glowMaterial = new SpriteMaterial({
+      map: glowTexture,
+      color: '#ff3a24',
+      blending: AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    });
+    const glow = new Sprite(glowMaterial);
+    glow.scale.setScalar(0.9);
+    lampAnchor.add(glow);
+
+    // --- the same place in two worlds: the anchors of the flight ---------------------------------
+    // the marker in the world of the map: up out of the sheet is up in the diorama, north stays
+    // north, and a metre of the diorama takes `unitsPerMetre` map units
+    const markerAnchor = new Object3D();
+    markerAnchor.position.set(station.x, station.y, 0);
+    markerAnchor.rotation.x = Math.PI / 2;
+    markerAnchor.scale.setScalar(station.unitsPerMetre);
+    map.scene.add(markerAnchor);
+    // the origin of the diorama, the middle of the hole
+    const stationOrigin = new Object3D();
+    room.scene.add(stationOrigin);
+    // the plane that keeps its size through the lens change on the side of the camera: the distance
+    // of the camera to the hole, in metres
+    stationCamera.updateWorldMatrix(true, false);
+    const focus = stationCamera.getWorldPosition(new Vector3()).length();
+
+    const mapRig = new CameraRig(map);
+    const roomRig = new CameraRig(room);
+    director.setStack([map]);
+
+    // --- the walk ----------------------------------------------------------------------------------
+    const route = layout.route;
+    const lengths = [0];
+    for (let i = 1; i <= route.length; i++) {
+      const [ax, ay] = route[i - 1]!;
+      const [bx, by] = route[i % route.length]!;
+      lengths.push(lengths[i - 1]! + Math.hypot(bx - ax, by - ay));
+    }
+    const total = lengths[route.length]!;
+    let walked = 0;
+    let segment = 0;
+    const walk = (deltaTime: number) => {
+      walked = (walked + WALK * deltaTime) % total;
+      if (walked < lengths[segment]!) segment = 0;
+      while (lengths[segment + 1]! < walked) segment++;
+      const [ax, ay] = route[segment]!;
+      const [bx, by] = route[(segment + 1) % route.length]!;
+      const t = (walked - lengths[segment]!) / (lengths[segment + 1]! - lengths[segment]!);
+      token.position.x = ax + (bx - ax) * t;
+      token.position.y = ay + (by - ay) * t;
+      token.rotation.z = Math.atan2(by - ay, bx - ax);
+    };
+    walk(0);
+
+    let now = 0;
+    display.onRenderFrame(({deltaTime}) => {
+      now += deltaTime;
+      walk(deltaTime);
+      const breath = 0.5 + 0.5 * Math.sin(now * 3);
+      markerMaterial.opacity = 0.45 + 0.5 * breath;
+      marker.scale.setScalar(1 + 0.06 * breath);
+      // a short flash every 1.6 seconds, as an obstruction light does
+      glowMaterial.opacity = now % 1.6 < 0.35 ? 1 : 0.12;
+      mapRig.step(deltaTime);
+      roomRig.step(deltaTime);
+    });
+
+    // --- into the place, and out ------------------------------------------------------------------
+    let place: 'map' | 'room' = 'map';
+    let flight: CameraFlight | undefined;
+    // what the rig of the map has arrived at: the whole sheet, or locked on to the token; nothing
+    // while a move runs, or after a flight ended one on the way
+    let reached: 'sheet' | 'token' | undefined = 'sheet';
+    let followRound = 0;
+
+    const backButton = document.querySelector<HTMLButtonElement>('.back')!;
+    const showUi = () => {
+      backButton.hidden = place !== 'room' || flight !== undefined;
+      enterController.enable(place === 'map' && flight === undefined);
+      leaveController.enable(place === 'room' && flight === undefined);
+    };
+
+    // a move of the rig resolves on arrival, and also when a flight or a newer move ends it: it
+    // counts only while its round is the last and the map is still on screen
+    const holds = (round: number) => round === followRound && place === 'map' && flight === undefined;
+
+    const follow = async () => {
+      const want = settings.follow ? 'token' : 'sheet';
+      if (place !== 'map' || flight !== undefined || reached === want) return;
+      const round = ++followRound;
+      reached = undefined;
+      if (want === 'sheet') {
+        await mapRig.moveTo({}, FOLLOW_MOVE);
+        if (holds(round)) reached = 'sheet';
+        return;
+      }
+      // closer in, over the token, then locked on to it, trailing a little
+      await mapRig.moveTo({position: [token.position.x, token.position.y], zoom: FOLLOW_ZOOM}, FOLLOW_MOVE);
+      if (!holds(round)) return;
+      await mapRig.moveTo(token, 0.5, {smooth: FOLLOW_SMOOTH});
+      // locked on: the lock-on outlasts a flight, the rig goes back to it out of sight
+      if (holds(round)) reached = 'token';
+    };
+
+    const fly = (start: () => CameraFlight, to: typeof place) => {
+      place = to;
+      flight = start();
+      showUi();
+      void flight.finished.then(() => {
+        if (display.isDisposed) return;
+        flight = undefined;
+        showUi();
+        if (place === 'map') void follow();
+      });
+    };
+
+    const enter = () => {
+      if (place !== 'map' || flight !== undefined) return;
+      fly(() => {
+        const transition = director.replace(map, room, {effect: fade, duration: FLIGHT, easing: 'ease-in-out'});
+        // from the shot of the map to the camera of the diorama, through the marker; a lens change
+        // on both rigs, its focus on the side of the diorama given in the world of the map
+        return CameraRig.across(transition, {anchors: [markerAnchor, stationOrigin], focus: focus * station.unitsPerMetre});
+      }, 'room');
+    };
+
+    const leave = () => {
+      if (place !== 'room' || flight !== undefined) return;
+      fly(() => {
+        const transition = director.replace(room, map, {effect: fade, duration: FLIGHT, easing: 'ease-in-out'});
+        // back out to the shot the rig of the map holds — the whole sheet, or the token it follows
+        return CameraRig.across(transition, {anchors: [stationOrigin, markerAnchor], focus});
+      }, 'map');
+    };
+
+    // --- input ----------------------------------------------------------------------------------
+    const raycaster = new Raycaster();
+    const pointer = new Vector2();
+    const sheetPlane = new Plane(new Vector3(0, 0, 1), 0);
+    const hit = new Vector3();
+    const onMarker = (event: PointerEvent) => {
+      if (place !== 'map' || flight !== undefined || map.camera === undefined) return false;
+      pointer.set((event.offsetX / canvas.clientWidth) * 2 - 1, 1 - (event.offsetY / canvas.clientHeight) * 2);
+      // through the camera the rig draws with: it holds under the zoom of the follow mode as well
+      map.camera.updateMatrixWorld();
+      raycaster.setFromCamera(pointer, map.camera);
+      if (raycaster.ray.intersectPlane(sheetPlane, hit) === null) return false;
+      return Math.hypot(hit.x - station.x, hit.y - station.y) < MARKER_RADIUS;
+    };
+
+    const listeners = new AbortController();
+    const {signal} = listeners;
+    let down: {x: number; y: number} | undefined;
+    canvas.addEventListener(
+      'pointerdown',
+      (event: PointerEvent) => {
+        if (event.button === 0) down = {x: event.clientX, y: event.clientY};
+      },
+      {signal},
+    );
+    canvas.addEventListener('pointermove', (event: PointerEvent) => canvas.classList.toggle('over-marker', onMarker(event)), {
+      signal,
+    });
+    canvas.addEventListener(
+      'pointerup',
+      (event: PointerEvent) => {
+        const click = down !== undefined && Math.hypot(event.clientX - down.x, event.clientY - down.y) < CLICK_SLOP;
+        down = undefined;
+        if (click && onMarker(event)) {
+          canvas.classList.remove('over-marker');
+          enter();
+        }
+      },
+      {signal},
+    );
+    backButton.addEventListener('click', leave, {signal});
+    window.addEventListener(
+      'keydown',
+      (event: KeyboardEvent) => {
+        if (ignoredKey(event) || event.repeat) return;
+        if (event.code === 'Enter' || event.code === 'Space') {
+          enter();
+          event.preventDefault();
+        } else if (event.code === 'Escape' || event.code === 'Backspace') {
+          leave();
+        } else if (event.code === 'KeyF') {
+          settings.follow = !settings.follow;
+          followController.updateDisplay();
+          void follow();
+        }
+      },
+      {signal},
+    );
+
+    const gui = new GUI({container: getDemoUi(), title: 'camera rig: into the map'});
+    const enterController = gui.add({enter}, 'enter').name('into station 4 (click, enter)');
+    const leaveController = gui.add({leave}, 'leave').name('back to the map (esc)');
+    const followController = gui
+      .add(settings, 'follow')
+      .name('follow the field party (F)')
+      .onChange(() => void follow());
+    showUi();
+
+    display.onDispose(() => {
+      listeners.abort();
+      gui.destroy();
+      mapRig.dispose();
+      roomRig.dispose();
+      director.dispose();
+      map.dispose();
+      room.dispose();
+      sheetGeometry.dispose();
+      sheetMaterial.dispose();
+      markerGeometry.dispose();
+      markerMaterial.dispose();
+      for (const part of Object.values(tokenParts)) part.dispose();
+      glowMaterial.dispose();
+      glowTexture.dispose();
+      freeAsset();
+    });
+
+    // the shapes of the stack and the diorama, drawn once off screen; then each scene with the
+    // camera of the other kind, so that neither the first crossfade nor the swap of a lens change
+    // builds a shader in the frame of the click
+    await catchPrecompile(DEMO, director.precompile(renderer, [['layer'], [fade]], {layers: [room]}));
+    // one after the other: two compiles of three.js on one renderer at once trip over each other
+    await catchPrecompile(DEMO, mapRig.precompile(renderer));
+    await catchPrecompile(DEMO, roomRig.precompile(renderer));
+    if (display.isDisposed) return;
+
+    if (isPreview) {
+      // the card shows the diorama rising out of its symbol: a transition driven by hand, held near
+      // its end, and the flight follows its progress
+      place = 'room';
+      const transition = director.replace(map, room, {effect: fade, manual: true});
+      flight = CameraRig.across(transition, {anchors: [markerAnchor, stationOrigin], focus: focus * station.unitsPerMetre});
+      transition.progress = PREVIEW_PROGRESS;
+      showUi();
+    }
+    preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, director});
+</script>

@@ -23,7 +23,7 @@ same versions of Node, sharp and Blender.
 
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
 committed raw images and to resize, and for `boomer-shooter-corridor`, `stage-masks` (its
-`matte-3d`) and `camera-rig-two-rooms` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
+`matte-3d`), `camera-rig-two-rooms` and `camera-rig-into-the-map` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
 back to `/usr/bin/blender`), run headless with `-b --factory-startup`. No
 network, no ComfyUI: images painted with ComfyUI are curated sources committed under
 `<demo>/raw/` next to a `source.json` that records prompt, seed, workflow and settings.
@@ -726,4 +726,61 @@ rotation of `camera_flight` alone: from beside `camera_control_room` past the de
 at x = 0 at about 4 s, round the north side of the pier while it looks up along the moonlight to
 the slit, and out to beside `camera_dome`, looking as it does. The demo plays it paused and scrubs
 it through a key of a `CameraRig` track.
+
+## camera-rig-into-the-map
+
+"Station 4", the assets of the demo `camera-rig-into-the-map`, from
+`camera-rig-into-the-map/generate.mjs` and `blender_survey.py`: a sheet of a field survey of a dry
+basin and the place it marks, both **built in Blender** in one run. The map is flat ink on paper,
+rendered top down with Cycles through an orthographic camera (64 samples, the view transform
+*Standard*, so the colours land as written): a ground mesh carries the hill shade and the tints as a
+colour attribute that multiplies an aged paper, and contours (marching squares over a height field
+of value noise), hatching, symbols and text are meshes and text objects of their own above it, in
+Blender's bundled DejaVu Sans Mono and Inter. sharp turns the PNG into a WebP (quality 88). The
+diorama is built, lit and baked as `camera-rig-two-rooms` is — one mesh, one unlit material, the
+light of Cycles baked into one 4096 × 4096 texture, denoised and tone-mapped by AgX (Medium High
+Contrast) —, and so it shares its exception: a GPU bake is not the same byte for byte on every run.
+Neither is the GPU render of the map, by a level of 1 in a handful of pixels.
+The render cache is `camera-rig-into-the-map/.render-cache/` (ignored by git), and `--skip-render`
+reuses it. The generator checks the camera, the node of the lamp, the unlit material, the size of
+the sheet and of its picture before it writes the files.
+
+| file | size | what |
+| --- | --- | --- |
+| `survey-map.webp` | 3200 × 1800, opaque | the sheet, two pixels per map unit |
+| `survey-map.json` | | `width`, `height` (1600, 900: the sheet in map units), `station` (`x`, `y` of station 4 on the sheet, and `unitsPerMetre`, 6: how many map units a metre of the diorama takes there), `route` (412 points `[x, y]` 8 units apart, a closed loop) |
+| `station.glb` | about 1.1 MB | one mesh `station` (about 25 000 vertices, positions and one UV set, no normals), one unlit material with a 4096 × 4096 WebP (`EXT_texture_webp`, required), one perspective camera, one empty, no animation |
+
+**The map** is in map units, x to the right and y up, its origin in the middle of the sheet; one
+unit is 10 m of the basin, so the grid of 100 units is a kilometre. *Basin survey · sheet 7*, 1974:
+contours every 10 m in sepia, every fifth heavier; a dry salt lake in the west (hatched, its shore
+dashed in blue), the dry bed of Shale Creek running into it, Long Ridge across the middle, scrub as
+little green circles, three trig stations, a track from the south edge to station 4, the grid with
+its numbers, a title block with a scale bar and a north arrow, a coffee ring, the folds of the
+sheet. The dashed red route of the field party is `route` in the JSON, with its four camps.
+**Station 4** lies at `station`, in the middle of *the Hollow*: inside 150 units of it the height is
+a function of the distance alone, so the contours there are circles drawn with a compass. The symbol
+of the station is the diorama seen from above at `unitsPerMetre` — the hut, the black disc of the
+hole, the ring of stakes — and the red pencil of the last survey rings it: "ST.4 — last contact
+03:12", "contours close", "no echo from the hole", "compass drifts 40° here". The ring of small
+crosses around the Hollow is dead trees.
+
+**The diorama** is in metres, y up (Blender's z up, turned by the exporter), north −z and east +x,
+its origin the middle of the hole at ground level, so that it lies on the symbol on the sheet when
+the marker of the map is turned by +90° about x and scaled by `unitsPerMetre`. A plug of the basin
+10 × 10 m, cut 2.6 m deep with its strata showing — topsoil, ochre clay, a pale band of ash, grey
+shale —, its top sinking toward a perfectly round hole of radius 1.45 m that goes black within a
+metre and gives off a faint cold light far below. Round the hole bare, bleached ground and a ring
+of fourteen survey stakes at 2.5 m with orange tape, one span torn; a theodolite on its tripod aimed
+at the hole; an empty folding chair facing it; a sign "STATION 4 · KEEP CLEAR". North-west of it a
+prefab hut of corrugated metal (3 × 2 m, its middle at x = −2.9, z = −2.5), its window lit, its door
+ajar onto a pool of light; a generator with its cables to the hut, to a floodlight on a pole that
+lights the hole cold white, and one over the rim into the hole; oil drums, a crate, rocks, five dead
+trees, and in the west a lattice mast with a red lamp on top. Outside is nothing: the clear colour
+of the stage shows round the plug.
+
+| node | what |
+| --- | --- |
+| `camera_station` | perspective, 16:9 (`aspectRatio` 1.778), `yfov` 42.6°, `znear` 0.05, `zfar` 80; 21 m from the origin in the south-east, looking down onto the plug, all of it in the frame with the mast |
+| `mast_lamp` | an empty in the red lamp on top of the mast, at (−4.1, 6.58, 0.7), for a glow of the demo's own |
 
