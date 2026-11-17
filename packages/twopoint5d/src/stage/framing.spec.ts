@@ -114,12 +114,16 @@ describe.each(Object.entries(FACTORIES))('%s.framing()', (_name, framing) => {
 
   it('refuses a box without a face toward the side', () => {
     const flat = new Box3(new Vector3(0, 0, 0), new Vector3(10, 0, 10));
-    expect(() => framing(flat, {side: 'right'})).toThrow(/framing\(\): /);
+    expect(() => framing(flat, {side: 'right'})).toThrow(
+      /framing\(\): the face of the box toward "right" has no area, got 10 x 0$/,
+    );
     expect(() => framing(flat, {side: 'top'})).not.toThrow();
   });
 
   it('refuses an unknown side', () => {
-    expect(() => framing(makeBox(), {side: 'up' as FramingSide})).toThrow(/framing\(\): side must be .*"up"/);
+    expect(() => framing(makeBox(), {side: 'up' as FramingSide})).toThrow(
+      /framing\(\): side must be 'front', 'back', 'right', 'left', 'top' or 'bottom', got "up"$/,
+    );
   });
 
   it('refuses a negative margin or one that is not a number', () => {

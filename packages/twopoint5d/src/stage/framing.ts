@@ -41,7 +41,8 @@ const SIDES: Record<FramingSide, readonly [Vector3, Vector3, 'x' | 'y' | 'z', 'x
   bottom: [new Vector3(0, -1, 0), new Vector3(0, 0, 1), 'x', 'z'],
 };
 
-const SIDE_NAMES = Object.keys(SIDES) as FramingSide[];
+// the choices as text of the message: they are the library's vocabulary, not names
+const SIDE_CHOICES = "'front', 'back', 'right', 'left', 'top' or 'bottom'";
 
 /**
  * A projection plane whose origin is a point of its own — the middle of a face — instead of the
@@ -89,9 +90,7 @@ export function framingSetup<Specs>(
   const {side, margin = 0, ...specs} = options ?? ({} as FramingOptions<Specs>);
 
   if (!Object.hasOwn(SIDES, side)) {
-    throw new TypeError(
-      `${subject}: side must be ${SIDE_NAMES.map((name) => describeValue(name)).join(', ')}, got ${describeValue(side)}`,
-    );
+    throw new TypeError(`${subject}: side must be ${SIDE_CHOICES}, got ${describeValue(side)}`);
   }
   assertFiniteAtLeast(margin, subject, 'margin', 0);
   if (box.isEmpty()) {
@@ -103,7 +102,9 @@ export function framingSetup<Specs>(
   const width = size[rightAxis];
   const height = size[upAxis];
   if (!(width > 0 && height > 0)) {
-    throw new RangeError(`${subject}: the face of the box toward ${describeValue(side)} has no area, got ${width} x ${height}`);
+    throw new RangeError(
+      `${subject}: the face of the box toward ${describeValue(side)} has no area, got ${describeValue(width)} x ${describeValue(height)}`,
+    );
   }
 
   // the middle of the face toward the camera: the middle of the box, moved out to the side
