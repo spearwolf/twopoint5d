@@ -47,3 +47,26 @@ export function applyEasing(spec: EasingSpec, t: number): number {
   }
   return t;
 }
+
+/**
+ * {@link applyEasing} of the progress in `slot[0]`, written back into the slot. For a hot path that
+ * keeps its fractions out of the arguments and the answers of calls: V8 boxes a fraction it hands to
+ * a call it does not inline, and one such a call answers, while a typed array holds one as it is.
+ * The named easings are worked out on the slot, as {@link applyEasing} works them out; a function of
+ * the caller is called with the progress.
+ * @internal
+ */
+export function applyEasingInPlace(spec: EasingSpec, slot: Float64Array): void {
+  const t = slot[0]!;
+  if (typeof spec === 'function') {
+    slot[0] = spec(t);
+  } else if (spec === 1) {
+    slot[0] = t * t * t;
+  } else if (spec === 2) {
+    const u = 1 - t;
+    slot[0] = 1 - u * u * u;
+  } else if (spec === 3) {
+    const u = 2 - 2 * t;
+    slot[0] = t < 0.5 ? 4 * t * t * t : 1 - (u * u * u) / 2;
+  }
+}

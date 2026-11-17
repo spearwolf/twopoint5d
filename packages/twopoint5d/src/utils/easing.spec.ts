@@ -1,6 +1,6 @@
 import {describe, expect, test} from 'vitest';
 import type {StageTransitionEasing, StageTransitionEasingSpec} from '../stage/StageTransition.js';
-import {applyEasing, type Easing, type EasingSpec, easingOf} from './easing.js';
+import {applyEasing, applyEasingInPlace, type Easing, type EasingSpec, easingOf} from './easing.js';
 
 const STEPS = [0, 0.25, 0.5, 0.75, 1];
 
@@ -20,6 +20,18 @@ describe('easing', () => {
       }
     });
   }
+
+  test('applyEasingInPlace() writes what applyEasing() answers into the slot, for every easing', () => {
+    const slot = new Float64Array(1);
+    for (const easing of [...Object.keys(curves), (t: number) => t * 2] as Easing[]) {
+      const spec = easingOf('test', easing);
+      for (const t of [...STEPS, 0.1, 0.49, 0.51, 0.9]) {
+        slot[0] = t;
+        applyEasingInPlace(spec, slot);
+        expect(slot[0]).toBe(applyEasing(spec, t));
+      }
+    }
+  });
 
   test('a function passes through, as it is', () => {
     const fn = (t: number) => t * 2;

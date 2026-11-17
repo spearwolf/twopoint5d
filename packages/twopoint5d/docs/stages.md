@@ -259,6 +259,10 @@ The camera keeps its distance and direction; only the coordinates along the plan
 the `xz` planes these are `x` and `z`. Under `pixelSnap`, move it by whole units to keep the
 texels whole — the lookbook *platformer* rounds its camera to whole pixels of the art.
 
+On a stage with a `CameraRig`, the rig writes the camera in every frame, and a move of your own
+lasts that frame: follow the player through the rig instead — see
+[a camera that follows, with a rig](#a-camera-that-follows-with-a-rig).
+
 ### Depth under a parallax projection
 
 Under a `ParallaxProjection` everything that is not on the projection plane appears scaled and
@@ -313,6 +317,10 @@ The point the camera looks at comes from the camera itself, so the recipe holds 
 `ParallaxProjection`, with one limit: the result is the point on the projection plane under the
 pointer, and a layer in front of or behind the plane lies elsewhere.
 
+On a stage with a `CameraRig`, the recipe holds at the rest only — a viewpoint anywhere along the
+plane, at the distance of the projection, without `zoom`, `look` or lift. Another distance under a
+`ParallaxProjection`, a zoom, a turned camera and a lifted picture each put the pointer elsewhere.
+
 ### A camera of your own
 
 `stage.camera = myCamera` replaces the camera the projection built. The projection keeps placing
@@ -324,6 +332,246 @@ camera of the projection.
 
 A camera you place entirely yourself goes on a stage without a projection: `new Stage2D()`,
 then `stage.camera = myCamera`. Such a stage keeps `width` and `height` at `0`.
+
+### Moving the camera
+
+A `CameraRig` moves the camera of a `Stage2D`: to a viewpoint at once or in an eased move, with a
+look around and a lift of the picture. The projection keeps its job — it fits the view into the
+container and gives the rest, the placement it gives a camera by itself —, and the rig composes its
+pose over that rest. A resize, a turned phone, a new fit or a new projection re-frame the pose by
+themselves; there is nothing to call after `OnStageResize`.
+
+While the rig is attached, the stage draws with the camera of the rig: `stage.camera` answers it.
+`rig.dispose()` gives the stage its camera back.
+
+#### Viewpoints
+
+A viewpoint is a `CameraPose`, given in the frame of the projection: `x` and `y` on the projection
+plane, then the distance from it. For an `'xy|bottom-left'` plane through the origin these are world
+coordinates, so viewpoints authored in a 3D tool carry over as they are. A field left out is the
+rest's, so `{}` is the projection's own placement, pixel-exact.
+
+```ts check
+import {type CameraPose, CameraRig, Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const canvas = document.querySelector('canvas')!;
+const display = new Display(canvas);
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+
+const rig = new CameraRig(stage);
+// the clocks of the rig run on the time of the display, so a paused display pauses the camera
+display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
+
+new StageRenderer(display).add(stage);
+
+const viewpoints: CameraPose[] = [
+  {}, // the rest
+  {position: [320, 0], zoom: 1.5}, // to the right, and closer in
+  {position: [-200, 80, 150], look: {yaw: 0.3, pitch: -0.1}}, // up the left, at half the distance, turned
+];
+
+let next = 0;
+canvas.addEventListener('click', async () => {
+  next = (next + 1) % viewpoints.length;
+  await rig.moveTo(viewpoints[next]!, 0.8);
+  // here the camera stands: arrived, or the move ended otherwise
+});
+
+display.start();
+```
+
+- `rig.jump(pose)` puts the camera there at once; `rig.moveTo(pose, seconds)` moves it there in
+  `seconds`, eased by `'ease-in-out'` — or by `{easing: 'linear' | 'ease-in' | 'ease-out' | fn}`
+  as the third argument, or by the `easing` option of the rig.
+- `position` is a tuple — `[x, y]` keeps the distance of the rest, `[x, y, distance]` sets it — or
+  anything with `x`, `y` and an optional `z`, such as a `Vector3`.
+- `zoom` is a factor on the field of view of the fit: `2` shows half the height. It stays a factor
+  through a resize. A viewpoint made with an absolute field of view converts once:
+  `zoom = tan(fitFov / 2) / tan(fov / 2)`.
+- `look` turns the camera from the rest, in radians: `yaw` about the up axis of the plane — positive
+  turns left —, then `pitch` about the right axis of the camera — positive looks up.
+- Under an `OrthographicProjection` a pose takes `x`, `y` and `zoom`. The distance is ignored, since
+  it changes nothing an orthographic camera shows — one list of viewpoints serves both kinds of
+  projection —, and a `look` other than 0 is refused.
+
+The promise of `moveTo()` resolves on arrival, and also when the move ends otherwise — `rig.cancel()`,
+which leaves the camera where it stands, a `jump()`, a `moveTo()` that overtakes it and starts where
+it stands, `rig.dispose()`. It never rejects, so an input gate that awaits it needs no `try`. A
+resize during the move re-frames both its ends.
+
+#### Looking around
+
+`rig.look({yaw, pitch})` sets the look of the current viewpoint: at once while the camera stands, as
+the new end of the move while it moves, which bends to it. The pitch stops at `pitchLimit`, 85° up or
+down unless the options of the rig name another. The next viewpoint brings its own look — the `look`
+of its pose, straight ahead without one —, so a drag-look starts again from there:
+
+```ts check
+import {CameraRig, Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const canvas = document.querySelector('canvas')!;
+const display = new Display(canvas);
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+const rig = new CameraRig(stage, {pitchLimit: Math.PI / 4});
+display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
+new StageRenderer(display).add(stage);
+
+let yaw = 0;
+let pitch = 0;
+
+canvas.addEventListener('pointermove', (event) => {
+  if (event.buttons !== 1) return;
+  yaw -= event.movementX * 0.005;
+  pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, pitch - event.movementY * 0.005));
+  rig.look({yaw, pitch});
+});
+
+canvas.addEventListener('dblclick', () => {
+  // a new viewpoint, straight ahead: the drag starts from 0 again
+  yaw = 0;
+  pitch = 0;
+  void rig.moveTo({position: [0, 0]}, 0.6);
+});
+
+display.start();
+```
+
+#### Lifting the picture over a dialog
+
+On a phone held sideways, a dialog over the lower half of the screen covers what the camera looks at.
+`rig.reframe({lift})` moves the picture up by a share of its height, through the view offset of the
+camera, without turning it; `rig.reframe({})` takes the lift back. With `seconds` the lift blends on
+a clock of its own, eased as the rig eases its moves, and a running move keeps running:
+
+```ts
+dialog.addEventListener('open', () => rig.reframe({lift: 0.25}, 0.3));
+dialog.addEventListener('close', () => rig.reframe({}, 0.3));
+```
+
+The lift is a framing, not a viewpoint: a `jump()` or a `moveTo()` keeps it.
+
+#### A camera that follows, with a rig
+
+A rig writes its camera in every frame, so a write to `stage.camera` of your own lasts one frame.
+A camera that follows a player goes through the rig: a pose object you keep, rewritten and handed to
+`jump()` in every frame. The rig reads it in the call and allocates nothing.
+
+```ts check
+import {CameraRig, Display, OrthographicProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!);
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'cover', height: 360}));
+const rig = new CameraRig(stage);
+new StageRenderer(display).add(stage);
+
+const player = {x: 0, y: 0};
+const pose = {position: [0, 0] as [number, number]};
+
+display.onRenderFrame(({deltaTime}) => {
+  pose.position[0] = player.x;
+  pose.position[1] = player.y;
+  rig.jump(pose);
+  rig.step(deltaTime);
+});
+
+display.start();
+```
+
+A `jump()` ends a running move: a cutscene that pans away with `moveTo()` stops the `jump()` of
+every frame until its promise resolves.
+
+#### Before and after the rig
+
+Two events let code of your own into the path of the camera:
+
+```text
+projection ──places──▶ base camera ──OnStageCameraPlaced──▶ rig composes ──▶ stage.camera ──OnStageUpdateFrame──▶ draw
+```
+
+- **Before the rig: `OnStageCameraPlaced`.** With a rig attached, the camera a listener receives is
+  the base the rig composes over. A listener that tilts it — the rest at an angle in
+  [Events](#events) — gives the rig a tilted rest, and every pose and move runs relative to it.
+- **After the rig: `OnStageUpdateFrame`.** The rig writes the camera just before the stage emits
+  it, so a listener sees the camera of this frame and may change it for this frame's draw. The rig
+  never reads its camera back: the next frame starts from the state of the rig again, and nothing
+  of such a change leaks into a move. A camera shake is one listener:
+
+```ts check
+import {on} from '@spearwolf/eventize';
+import {
+  CameraRig,
+  Display,
+  OnStageUpdateFrame,
+  ParallaxProjection,
+  Stage2D,
+  type StageUpdateFrameProps,
+  StageRenderer,
+} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!);
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+const rig = new CameraRig(stage);
+display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
+new StageRenderer(display).add(stage);
+
+let shakeUntil = 0;
+export const shake = (seconds: number) => {
+  shakeUntil = display.now + seconds;
+};
+
+on(stage, OnStageUpdateFrame, ({now}: StageUpdateFrameProps) => {
+  if (now >= shakeUntil) return;
+  // for this frame alone: the rig writes its own camera again in the next one
+  const strength = 4 * (shakeUntil - now);
+  rig.camera.position.x += Math.sin(now * 91) * strength;
+  rig.camera.position.y += Math.cos(now * 77) * strength;
+});
+
+display.start();
+```
+
+#### Drawing on demand
+
+`rig.step(deltaSeconds)` answers a `Motion`: `true` when the camera of the frame differs from the
+one of the step before — during a move, a lift, after a `jump()`, a `look()` or a resize —, `false`
+while it stands. As a frame step of a `FramePacer` (see "Drawing on demand" in
+[display](display.md)), a camera that stands costs no draw:
+
+```ts
+frames.onFrame((frame) => rig.step(frame.deltaTime), stage);
+```
+
+The camera itself is written in the frame of the stage, just before `OnStageUpdateFrame`, so it does
+not matter whether `step()` runs before or after the stage's `updateFrame()`. A stage that is not
+drawn is not written to, and its next draw shows the state the clocks of the rig have reached.
+
+#### Reference
+
+| member | |
+| --- | --- |
+| `new CameraRig(stage, {pitchLimit?, easing?})` | attaches to a `Stage2D` with a projection; one rig per stage |
+| `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection`, an `OrthographicCamera` under an `OrthographicProjection` |
+| `busy` | `true` while a move runs |
+| `jump(target)` | at once; ends a running move |
+| `moveTo(target, seconds, {easing?})` | eased; a promise that resolves when the move ends, however it ends |
+| `look({yaw, pitch})` | the look of the current viewpoint; the new end of a running move |
+| `reframe({lift?}, seconds?)` | the lift, a share of the picture height; on a clock of its own |
+| `cancel()` | ends a move where it stands |
+| `step(deltaSeconds)` | advances the clocks; answers a `Motion` |
+| `dispose()`, `isDisposed` | detaches; the stage takes back its camera, a running move resolves |
+
+- A target is a `CameraPose`. The type `CameraTarget` names cameras, projections and other
+  `Object3D`s as well; this version refuses them with a `TypeError`. `CameraMoveOptions` declares
+  `offset`, `smooth`, `focus` and `depth` for them, and checks them already.
+- Refused, with the call as the subject of the message: a stage that is not a `Stage2D`, has no
+  projection, has a rig already or is disposed; a `pitchLimit` outside `(0, π/2]`; a pose with a
+  number that is not finite, a `zoom` that is not above 0, a `look` under an orthographic
+  projection; `seconds` that is not a finite number of 0 or more.
+- After `dispose()` every method but `dispose()` throws. A stage disposed under the rig stops its
+  writes: `step()` answers `false`, and `rig.dispose()` still works. The stage stays yours: the rig
+  never disposes it.
+- Pixel-exact only at the rest — `zoom` 1, no `look`, no lift, the distance of the projection. A
+  move away from it and back lands on the exact picture again.
 
 ### When the stage draws nothing
 
@@ -2279,6 +2527,7 @@ releases. The general rules are in [resource lifecycle](resource-lifecycle.md).
 | `StageDirector` | as a `StageRenderer`, and the pipelines it built, the renderers it wrapped stages in, the nodes of its effects and the texture nodes of its masks; it ends every running transition as cancelled | the stages, the effects, a mask of `lumaMask()`, the mask stages, the `StageMask` objects an effect names |
 | `StageMask` | lets go of its stage, leaves its slots and ends the transitions naming it as cancelled; the stage `StageMask.inWorldOf()` built | a stage handed in, which stays undisposed; the `scene` and the world stage of `inWorldOf()` |
 | `Display` | its `WebGPURenderer` | a canvas handed in |
+| `CameraRig` | detaches from the stage, which takes back its camera; ends a running move, whose promise resolves | the stage, which a disposed rig leaves undisposed — and a disposed stage disposes no rig |
 
 The order of a teardown: the renderer first, then what it used.
 
@@ -2314,6 +2563,9 @@ pipeline.dispose();
   camera of the old one; a camera you assigned stays, and the new projection places it.
 - **The camera jumps back.** The projection places the camera on every resize; moves of your own
   go into `OnStageUpdateFrame` — see [a camera that follows](#a-camera-that-follows).
+- **A camera that ignores your writes.** A stage with a `CameraRig` draws with the camera of the
+  rig, which writes it in every frame: a write to `stage.camera` holds for one frame. Move the
+  camera through the rig — see [moving the camera](#moving-the-camera).
 - **Specs written, nothing happens.** A write to the specs needs `stage.needsUpdate = true`.
 - **Clipped layers under an orthographic projection.** The camera sits `distanceToProjectionPlane`
   in front of the plane; a layer closer to it than `near` is not drawn.
@@ -2367,6 +2619,7 @@ pipeline.dispose();
 | `OrthographicProjection` | a view without depth: everything as large as on the plane |
 | `ParallaxProjection` | a view with depth: `getScaleFactor()`, `getParallaxFactor()` |
 | `ProjectionPlane` | the plane a camera looks at, four descriptions or a plane of your own |
+| `CameraRig` | moves the camera of a `Stage2D`: `jump()`, `moveTo()`, `look()`, `reframe()`, `cancel()`, `step()` — to a `CameraPose` in the frame of the projection |
 | `ClearStage` | clears depth (by default), color or stencil between two stages |
 | `Canvas2DStage` | a 2D canvas on a sprite in a stage of its own |
 | `RootRenderPipeline` | a `RenderPipeline` that adds up the passes of the stages |
@@ -2408,6 +2661,8 @@ pipeline.dispose();
 | projection specs | `{fit: 'fill'}` |
 | `distanceToProjectionPlane` | `100` orthographic, `300` parallax |
 | `near`, `far` | `0.1`, `100000` |
+| `CameraRig` | `pitchLimit`: 85° (`Math.PI * 85 / 180`), `easing`: `'ease-in-out'` |
+| `CameraPose` | the rest's: `position` and its distance, `look` `{yaw: 0, pitch: 0}`, `zoom` `1` |
 | `StageRenderer#clear` | `false` |
 | `StageRenderer#clearAlpha` | `1` |
 | `clearColorBuffer`, `clearDepthBuffer`, `clearStencilBuffer` | `true` |
