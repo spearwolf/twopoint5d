@@ -772,6 +772,48 @@ remembers one frame: `true` while its argument is `true`, and once more in the f
 `onFrame()` returns the unsubscribe of the step. Steps run in the order they were registered, and
 what one of them throws reaches the frame loop after all of them have run.
 
+### A camera that moves
+
+The `step()` of a [`CameraRig`](stages.md#moving-the-camera) is a frame step as it stands: it
+advances the clocks of the camera and answers `true` while the camera of the frame differs from the
+one before — during a move, and in the frame the move arrives — and `false` while the camera stands.
+A camera that stands costs no draw, and the end pose of a move is drawn without an `untilSettled()`:
+the frame that writes it is a frame that answers `true`.
+
+```ts check
+import {CameraRig, Display, FramePacer, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+
+const canvas = document.querySelector('canvas')!;
+const display = new Display(canvas);
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+const sr = new StageRenderer().add(stage); // no host
+
+const rig = new CameraRig(stage);
+const frames = new FramePacer(display);
+
+// the rig takes its time from the frame, so a paused display pauses the camera
+frames.onFrame((frame) => rig.step(frame.deltaTime), stage);
+
+display.onRenderFrame((frame) => {
+  sr.resize(frame.width, frame.height, frame.pixelRatio);
+  sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+  if (frames.shouldDraw(frame)) sr.renderTo(frame.renderer);
+});
+
+// a click flies the camera to the right: every frame of the flight is drawn, the arrival included
+canvas.addEventListener('click', () => {
+  void rig.moveTo({position: [320, 0], zoom: 1.5}, 0.8);
+});
+
+display.start();
+
+export {display, frames, rig};
+```
+
+The camera is written in the frame of the stage, so it does not matter whether `step()` runs before
+or after `updateFrame()`. Register the step with its `stage` when the pacer knows which stages are
+[live](#a-layer-behind-an-overlay): the camera of a frozen layer then asks for no frames.
+
 ### An animation that never ends
 
 A fire, a pendulum, a meadow that sways: there is no frame in which nothing changes. Such a step

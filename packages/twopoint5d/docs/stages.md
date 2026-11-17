@@ -535,7 +535,7 @@ display.start();
 `rig.step(deltaSeconds)` answers a `Motion`: `true` when the camera of the frame differs from the
 one of the step before — during a move, a lift, after a `jump()`, a `look()` or a resize —, `false`
 while it stands. As a frame step of a `FramePacer` (see "Drawing on demand" in
-[display](display.md)), a camera that stands costs no draw:
+[display](display.md#a-camera-that-moves)), a camera that stands costs no draw:
 
 ```ts
 frames.onFrame((frame) => rig.step(frame.deltaTime), stage);

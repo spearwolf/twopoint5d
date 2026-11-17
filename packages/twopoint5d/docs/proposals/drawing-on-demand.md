@@ -92,6 +92,14 @@ in: the `step()` of a camera rig answers whether the camera moved, a particle em
 `'steady'` while it is busy, a set of animated layers answers whether one of them changed. A block
 ships an adapter of this shape and needs to know nothing else of the pacer.
 
+The `CameraRig` is the first block that does (`src/stage/CameraRig.ts`, proposal
+[`camera-rig.md`](camera-rig.md) §3.4): `pacer.onFrame((frame) => rig.step(frame.deltaTime), stage)`.
+Its `step()` answers `true` in every frame whose resolved shot differs from the one written before,
+the frame a move arrives in included, so it needs no `untilSettled()`; the write itself happens in
+`Stage2D#updateFrame()`, not in the step, so a stage the pacer does not draw is not written to. The
+guide has it under "A camera that moves" in [`display.md`](../display.md); a Vitest case of
+`src/stage/CameraRig.spec.ts` holds it against a real `FramePacer`.
+
 ### 3.3 A report draws the next frame that asks
 
 A report — the answer of a step, `report()`, `invalidate()` — stays pending until the next
@@ -406,6 +414,11 @@ const release = director.frames.hold(); // busy until released
 - **`live(stage)` is the freeze state**: a step registered for a frozen layer draws nothing.
 - **`hold()`** on the pacer, ref-counted, returns its release: the busy phases of the app — a
   camera move, a stage being prepared — without a flag threaded into the frame handler.
+- **The placement of a `CameraProjection`** (planned, see [`camera-rig.md`](camera-rig.md) §3.6)
+  is a source of invalidation. A source camera that is animated moves the stage camera without a
+  rig, in the frame in which `IProjection#needsPlacement()` answers `true` (§3.8 there), and
+  nothing reports that to a pacer. The director integration invalidates for such a placement of the
+  stages it draws, as it does for a rig's `step()` answering `true` through the frame step.
 - **Texture loading of the library** (`TextureStore`, `TextureFactory`) invalidates on load.
 - **`OnStageUpdateFrame`** listeners change the scene and cannot report today. Open (§14).
 
