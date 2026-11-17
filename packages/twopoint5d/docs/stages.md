@@ -743,6 +743,76 @@ document.querySelector('#leave')!.addEventListener('click', () => void rig.moveT
 - The camera is read with `updateWorldMatrix(true, false)` and never written; the scale of its
   parents is left out.
 
+#### A page that scrolls through a scene
+
+A track lays shots along a progress from 0 to 1, and `rig.lerp(t)` sets where the camera stands on
+it. A page that scrolls through a scene hands it the scroll position: at the top the viewpoint of
+the stage, through the middle of the page the flight made in Blender — its clip scrubbed by the
+scroll, forward and back —, at the bottom a close look at the room behind the door. `smooth` turns
+the ticks of a mouse wheel into a glide.
+
+```ts check
+import {CameraRig, type CameraTrackKey, Display, ParallaxProjection, Stage2D, StageRenderer} from '@spearwolf/twopoint5d';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {AnimationMixer, type PerspectiveCamera} from 'three/webgpu';
+
+const display = new Display(document.querySelector('canvas')!);
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+const rig = new CameraRig(stage);
+new StageRenderer(display).add(stage);
+
+const gltf = await new GLTFLoader().loadAsync('/assets/fly-through.glb');
+stage.scene.add(gltf.scene);
+const flyCamera = gltf.cameras[0] as PerspectiveCamera;
+// the flight through the door: playing, and paused — the scroll sets its time, not the clock
+const flight = new AnimationMixer(gltf.scene).clipAction(gltf.animations[0]!);
+flight.play().paused = true;
+
+const keys: CameraTrackKey[] = [
+  // the top of the page: the viewpoint of the stage
+  {at: 0, shot: {}},
+  // from a third of the page to two thirds: the camera of the flight, its clip from start to end
+  {at: 0.3, until: 0.7, shot: flyCamera, clip: flight, ease: 'ease-in-out'},
+  // the bottom of the page: the room behind the door, looked at from close by
+  {at: 1, shot: {position: [120, 40, 180], look: {yaw: 0.3, pitch: -0.1}}, ease: 'ease-out'},
+];
+rig.track(keys);
+
+const scrolled = () => window.scrollY / Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+rig.lerp(scrolled());
+window.addEventListener('scroll', () => rig.lerp(scrolled(), {smooth: 0.15}), {passive: true});
+
+display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
+display.start();
+```
+
+- Inside a key — from its `at` to its `until`, which defaults to `at` — the camera holds the shot of
+  the key. Between two keys it blends from one to the other at the share of the stretch, eased by
+  the `ease` of the key it arrives at (`'linear'` by default). Before the first key it holds the
+  first, after the last the last. `rig.track(from, to)` is the track of two keys at 0 and 1.
+- A key is any target: a pose, a camera, any other `Object3D` — its foot on the plane, at the
+  distance and the zoom of the rest — or a projection, whose rest the camera shows without the rig
+  assigning it. Every key is resolved in every frame, so a key on a camera that moves follows it.
+- `lerp(t)` clamps `t` to `[0, 1]`, and the next `step()` shows it. With `{smooth}` — a time constant
+  in seconds — the shown progress approaches it, critically damped, and settles once it is closer
+  than `1e-4`; a new `t` on the way keeps the speed of the glide. `busy` is `true` until it settled,
+  and `rig.step()` answers `false` again from there, so a page that stopped scrolling costs no draw.
+- `clip` belongs to a key whose shot is a camera: the progress from `at` to `until` maps onto
+  `0 … clip.getClip().duration`, before the key onto the start of the clip, after it onto its end.
+  The rig sets `clip.time` and calls `clip.getMixer().update(0)`, which applies the other actions of
+  that mixer along with it, so one clip can scrub a whole scene. The rig neither plays nor stops the
+  action: keep it playing and paused, as above. The update is three's, and at a time that is not a
+  whole number of seconds it allocates a number for each keyframe track of the clip; the rig itself allocates
+  nothing on its way.
+- Each key brings its own look; a `look()` lies on top of the whole track until the next target.
+- A stretch between a perspective and an orthographic key is a [lens
+  change](#perspective-into-orthographic), with the projection plane as its focus. A track names no
+  focus, so a key without a plane on one end of such a stretch — a camera, a projection or a stage
+  without one — is refused.
+- The track stays until the next `track()`, `jump()`, `moveTo()` or `rig.dispose()`. `track()` ends
+  a running move, whose promise resolves, and lets go of a camera or an object the rig was locked on
+  to; `cancel()` leaves a track alone. A `moveTo()` starts from the shot the track shows.
+
 #### A camera that follows, with a rig
 
 A rig writes its camera in every frame, so a write to `stage.camera` of your own lasts one frame.
@@ -879,8 +949,9 @@ display.start();
 #### Drawing on demand
 
 `rig.step(deltaSeconds)` answers a `Motion`: `true` when the camera of the frame differs from the
-one of the step before — during a move, a lift, after a `jump()`, a `look()` or a resize, and in the
-frames a camera or an object the rig is locked on to moved —, `false` while it stands. As a frame step of a `FramePacer` (see "Drawing on demand" in
+one of the step before — during a move, a lift, the glide of a damped `lerp()`, after a `jump()`, a
+`look()`, a `lerp()` or a resize, and in the frames a camera or an object the rig is locked on to,
+or a key of its track, moved —, `false` while it stands. As a frame step of a `FramePacer` (see "Drawing on demand" in
 [display](display.md#a-camera-that-moves)), a camera that stands costs no draw:
 
 ```ts
@@ -897,12 +968,14 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
 | --- | --- |
 | `new CameraRig(stage, {pitchLimit?, easing?})` | attaches to a `Stage2D` with a projection; one rig per stage |
 | `stage`, `camera` | the stage, and the camera it draws with: a `PerspectiveCamera` under a `ParallaxProjection` and during a lens change, an `OrthographicCamera` under an `OrthographicProjection`, the kind of the source under a `CameraProjection` |
-| `busy` | `true` while a move runs, while the camera trails an object by `smooth`, and while a lock-on moved the camera in the last step |
+| `busy` | `true` while a move runs, while the camera trails an object by `smooth`, while a damped `lerp()` has yet to settle, and while a lock-on or a key of the track moved the camera in the last step |
 | `jump(target)` | at once; ends a running move; locks on to a camera or an object |
 | `moveTo(target, seconds, {easing?, offset?, smooth?, focus?, depth?})` | eased; a promise that resolves when the move ends, however it ends; locks on to a camera or an object on arrival; `offset` and `smooth` for an object, `focus` and `depth` for a lens change |
 | `look({yaw, pitch})` | the look of the current viewpoint; the new end of a running move |
 | `reframe({lift?}, seconds?)` | the lift, a share of the picture height; on a clock of its own |
-| `cancel()` | ends a move or a lock-on where it stands |
+| `cancel()` | ends a move or a lock-on where it stands; leaves a track alone |
+| `track(keys)`, `track(from, to)` | a track of keys `{at, shot, until?, clip?, ease?}`, starting at 0; ends a move and a lock-on |
+| `lerp(t, {smooth?})` | the progress along the track, clamped to `[0, 1]`; shown by the next step, or approached in a glide |
 | `step(deltaSeconds)` | advances the clocks; answers a `Motion`; assigns a projection on arrival |
 | `precompile(renderer)` | compiles the scene, and the pass of its `postProcess`, with the camera of the other kind |
 | `dispose()`, `isDisposed` | detaches; the stage takes back its camera, a running move resolves |
@@ -917,7 +990,11 @@ drawn is not written to, and its next draw shows the state the clocks of the rig
   `seconds` that is not a finite number of 0 or more; an `offset` that is not a tuple of 2 or 3
   finite numbers; a `smooth` that is not a finite number of 0 or more; a `focus` or a `depth` that
   is not a finite number above 0; a lens change without a `focus` where a projection or the camera
-  of the target has no plane.
+  of the target has no plane. `track()` refuses keys that are not a non-empty array, an `at` or an
+  `until` that is not a finite number from 0 to 1, an `until` before its `at`, keys out of order, a
+  `clip` that is not an `AnimationAction` or whose key has no camera as its shot, and a lens change
+  between two keys where one of them has no plane; `lerp()` refuses a `t` that is not a finite
+  number and a rig without a track.
 - After `dispose()` every method but `dispose()` throws. A stage disposed under the rig stops its
   writes: `step()` answers `false`, and `rig.dispose()` still works. The stage stays yours: the rig
   never disposes it.

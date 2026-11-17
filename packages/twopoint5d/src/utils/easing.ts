@@ -13,16 +13,16 @@ const EASING_NAMES = ['linear', 'ease-in', 'ease-out', 'ease-in-out'] as const;
 export type EasingSpec = number | ((t: number) => number);
 
 /**
- * The easing an option names, or the function it is. Throws a `TypeError` naming `subject` for
- * anything else.
+ * The easing an option names, or the function it is. Throws a `TypeError` naming `subject` and the
+ * option, `name`, for anything else.
  * @internal
  */
-export function easingOf(subject: string, easing: unknown): EasingSpec {
+export function easingOf(subject: string, easing: unknown, name = 'easing'): EasingSpec {
   if (typeof easing === 'function') return easing as (t: number) => number;
   const index = typeof easing === 'string' ? EASING_NAMES.indexOf(easing as (typeof EASING_NAMES)[number]) : -1;
   if (index === -1) {
     throw new TypeError(
-      `${subject}: easing must be 'linear', 'ease-in', 'ease-out', 'ease-in-out' or a function, got ${describeValue(easing)}`,
+      `${subject}: ${name} must be 'linear', 'ease-in', 'ease-out', 'ease-in-out' or a function, got ${describeValue(easing)}`,
     );
   }
   return index;

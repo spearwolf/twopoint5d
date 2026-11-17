@@ -73,14 +73,14 @@ function refuseNumber(subject: string, name: string, value: unknown, what = 'a f
   throw new RangeError(`${subject}: ${name} must be ${what}, got ${describeValue(value)}`);
 }
 
-function refusePosition(subject: string, position: unknown): never {
+function refusePosition(subject: string, position: unknown, at = ''): never {
   throw new TypeError(
-    `${subject}: position must be a tuple of 2 or 3 numbers or an object with x, y and an optional z, got ${describeValue(position)}`,
+    `${subject}: ${at}position must be a tuple of 2 or 3 numbers or an object with x, y and an optional z, got ${describeValue(position)}`,
   );
 }
 
-function refuseLookShape(subject: string, look: unknown): never {
-  throw new TypeError(`${subject}: look must be an object with yaw and pitch, got ${describeValue(look)}`);
+function refuseLookShape(subject: string, look: unknown, at = ''): never {
+  throw new TypeError(`${subject}: ${at}look must be an object with yaw and pitch, got ${describeValue(look)}`);
 }
 
 function refuseOrthographicLook(subject: string, look: unknown): never {
@@ -92,13 +92,17 @@ function refuseOrthographicLook(subject: string, look: unknown): never {
  * position of another shape or with a number that is not finite, a look that is not an object of
  * two finite numbers or is not 0 under an orthographic projection, a zoom that is not a finite number
  * above 0. `out` is written only once the whole pose has passed. Under an orthographic projection a
- * distance is checked and then ignored. Allocates nothing.
+ * distance is checked and then ignored. A refusal names the pose `target`, and its fields bare; with
+ * `path` — the place of the pose in an argument, as `keys[1].shot` — it names both by that path.
+ * Allocates nothing.
  * @internal
  */
-export function readPose(subject: string, pose: unknown, orthographic: boolean, out: PoseValues): void {
+export function readPose(subject: string, pose: unknown, orthographic: boolean, out: PoseValues, path?: string): void {
+  // the prefix of the name of a field
+  const at = path === undefined ? '' : `${path}.`;
   if (typeof pose !== 'object' || pose === null) {
     throw new TypeError(
-      `${subject}: target must be a CameraPose, a camera, a projection or an Object3D, got ${describeValue(pose)}`,
+      `${subject}: ${path ?? 'target'} must be a CameraPose, a camera, a projection or an Object3D, got ${describeValue(pose)}`,
     );
   }
   const {position, look, zoom} = pose as CameraPose;
@@ -112,30 +116,30 @@ export function readPose(subject: string, pose: unknown, orthographic: boolean, 
     hasPosition = true;
     if (Array.isArray(position)) {
       const length = position.length;
-      if (length !== 2 && length !== 3) refusePosition(subject, position);
+      if (length !== 2 && length !== 3) refusePosition(subject, position, at);
       x = position[0];
       y = position[1];
-      if (!Number.isFinite(x)) refuseNumber(subject, 'position[0]', x);
-      if (!Number.isFinite(y)) refuseNumber(subject, 'position[1]', y);
+      if (!Number.isFinite(x)) refuseNumber(subject, `${at}position[0]`, x);
+      if (!Number.isFinite(y)) refuseNumber(subject, `${at}position[1]`, y);
       if (length === 3) {
         distance = position[2];
-        if (!Number.isFinite(distance)) refuseNumber(subject, 'position[2]', distance);
+        if (!Number.isFinite(distance)) refuseNumber(subject, `${at}position[2]`, distance);
         hasDistance = true;
       }
     } else if (typeof position === 'object' && position !== null) {
       const p = position as {x: number; y: number; z?: number};
       x = p.x;
       y = p.y;
-      if (!Number.isFinite(x)) refuseNumber(subject, 'position.x', x);
-      if (!Number.isFinite(y)) refuseNumber(subject, 'position.y', y);
+      if (!Number.isFinite(x)) refuseNumber(subject, `${at}position.x`, x);
+      if (!Number.isFinite(y)) refuseNumber(subject, `${at}position.y`, y);
       const z = p.z;
       if (z !== undefined) {
-        if (!Number.isFinite(z)) refuseNumber(subject, 'position.z', z);
+        if (!Number.isFinite(z)) refuseNumber(subject, `${at}position.z`, z);
         distance = z;
         hasDistance = true;
       }
     } else {
-      refusePosition(subject, position);
+      refusePosition(subject, position, at);
     }
   }
 
@@ -143,18 +147,18 @@ export function readPose(subject: string, pose: unknown, orthographic: boolean, 
   let yaw = 0;
   let pitch = 0;
   if (look !== undefined) {
-    if (typeof look !== 'object' || look === null) refuseLookShape(subject, look);
+    if (typeof look !== 'object' || look === null) refuseLookShape(subject, look, at);
     yaw = look.yaw;
     pitch = look.pitch;
-    if (!Number.isFinite(yaw)) refuseNumber(subject, 'look.yaw', yaw);
-    if (!Number.isFinite(pitch)) refuseNumber(subject, 'look.pitch', pitch);
+    if (!Number.isFinite(yaw)) refuseNumber(subject, `${at}look.yaw`, yaw);
+    if (!Number.isFinite(pitch)) refuseNumber(subject, `${at}look.pitch`, pitch);
     if (orthographic && (yaw !== 0 || pitch !== 0)) refuseOrthographicLook(subject, look);
     hasLook = true;
   }
 
   let factor = 1;
   if (zoom !== undefined) {
-    if (!(Number.isFinite(zoom) && zoom > 0)) refuseNumber(subject, 'zoom', zoom, 'a finite number above 0');
+    if (!(Number.isFinite(zoom) && zoom > 0)) refuseNumber(subject, `${at}zoom`, zoom, 'a finite number above 0');
     factor = zoom;
   }
 

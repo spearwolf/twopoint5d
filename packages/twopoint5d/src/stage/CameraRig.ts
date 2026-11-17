@@ -1,9 +1,9 @@
 import {
+  type AnimationAction,
   type Camera,
   type Object3D,
   OrthographicCamera,
   PerspectiveCamera,
-  Quaternion,
   Vector3,
   type WebGPURenderer,
 } from 'three/webgpu';
@@ -31,14 +31,19 @@ import {
   writeShotAtAspect,
 } from './cameraShot.js';
 import {
+  createLook,
   createObjectFollow,
   kindOf,
   kindOfTarget,
   readObjectGoal,
   readObjectPose,
+  resolvePoseShot,
   type TargetKind,
   trailObject,
+  writePosePosition,
+  writeTurn,
 } from './cameraTarget.js';
+import {advanceTrack, type CameraTrack, locateTrack, readTrack, scrubTrackClips, type TrackKey} from './cameraTrack.js';
 import type {IProjection} from './IProjection.js';
 import {blendLensChangeAtProgress, createLensChange} from './lensChange.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
@@ -94,6 +99,46 @@ export interface CameraMoveOptions {
   depth?: number;
 }
 
+/**
+ * A key of a track of a `CameraRig` (`rig.track(keys)`): a place on the track and the shot the
+ * camera shows there.
+ */
+export interface CameraTrackKey {
+  /** The place of the key on the track, from 0 to 1; the keys go in order. */
+  at: number;
+  /**
+   * The shot of the key, resolved anew in every frame: a pose in the frame of the projection of the
+   * stage, a camera — fitted as a `CameraProjection` with the default fit fits it —, any other
+   * `Object3D` — its foot on the plane, at the distance and the zoom of the rest —, or a projection,
+   * whose rest the camera shows without the rig assigning it to the stage.
+   */
+  shot: CameraTarget;
+  /**
+   * Where the key ends, from `at` to 1: between `at` and `until` the camera holds the shot — and
+   * follows a camera that moves. Default `at`.
+   */
+  until?: number;
+  /**
+   * A clip the rig scrubs between `at` and `until`, for a key whose shot is a camera: the progress
+   * there maps onto `0 … clip.getClip().duration`, before the key onto the start, after it onto the
+   * end. The rig sets `clip.time` and applies it through `clip.getMixer().update(0)`, which applies
+   * the other actions of that mixer as well; it neither plays nor stops the action, which the caller
+   * keeps playing and paused (`action.play().paused = true`).
+   */
+  clip?: AnimationAction;
+  /** The easing of the stretch that arrives at this key. Default `'linear'`. */
+  ease?: Easing;
+}
+
+/** The options of `CameraRig#lerp()`. */
+export interface CameraLerpOptions {
+  /**
+   * A time constant in seconds: the shown progress approaches the asked one, critically damped, and
+   * settles where the gap falls below `1e-4`. Default `0`: the next `step()` shows the asked progress.
+   */
+  smooth?: number;
+}
+
 const DEFAULT_PITCH_LIMIT = (Math.PI * 85) / 180;
 
 // V8 boxes a fraction handed to a call it does not inline, and one such a call answers; a fraction
@@ -101,10 +146,6 @@ const DEFAULT_PITCH_LIMIT = (Math.PI * 85) / 180;
 // the progress of a move goes through `blendProgress` into the blend, the one of the lift through
 // `liftProgress`, each eased in place, and the aspect through `writeAspect` into the write.
 const liftProgress = new Float64Array(1);
-// the turn of a look, as a quaternion handed to fromArray(): setFromAxisAngle() takes the angle as
-// an argument
-const turnSlot = new Float64Array(4);
-
 const refuseKind = (camera: Camera): never => {
   throw new TypeError(
     `CameraRig: the projection builds a ${describeThreeValue(camera, 'isObject3D')}, not a PerspectiveCamera or an OrthographicCamera`,
@@ -180,8 +221,14 @@ export class CameraRig {
   #holding = false;
   #holdingTurn = false;
   readonly #held = createShot();
-  #yaw = 0;
-  #pitch = 0;
+  // the look the rig shows: the one of the target, or of look() since
+  readonly #look = createLook();
+
+  // a track: its keys and its progress; a key resolves with its own look plus the one of the rig, and
+  // a shot that one key alone gives is written over the base of that key
+  #track?: CameraTrack;
+  readonly #keyLook = createLook();
+  #writeBase?: Camera;
 
   // the move: from the shot the camera showed at its start, its lens kept as a zoom on the base
   #moving = false;
@@ -205,7 +252,6 @@ export class CameraRig {
   readonly #current = createShot();
   // the shot of the last step(); no step has one, so the first one answers true
   readonly #stepped = Object.assign(createShot(), {lens: Number.NaN});
-  readonly #turn = new Quaternion();
 
   #disposed = false;
 
@@ -287,12 +333,14 @@ export class CameraRig {
   }
 
   /**
-   * `true` while a move is under way, while the camera trails an `Object3D` by `smooth`, and while
-   * locked on to a camera or an object, when the last {@link step} moved the camera after it; `false`
-   * after {@link dispose}.
+   * `true` while a move is under way, while the camera trails an `Object3D` by `smooth`, while the
+   * shown progress of a track has yet to reach the one {@link lerp} asked for, and while locked on to
+   * a camera or an object — or on a track — when the last {@link step} moved the camera after it;
+   * `false` after {@link dispose}.
    */
   get busy(): boolean {
-    return this.#moving || this.#follow.trailing || this.#followMoved;
+    const track = this.#track;
+    return this.#moving || this.#follow.trailing || this.#followMoved || (track !== undefined && track.shown !== track.asked);
   }
 
   /** `true` once {@link dispose} has run. */
@@ -458,8 +506,8 @@ export class CameraRig {
     this.#assertAlive(subject);
     const values = this.#nextPose;
     readLook(subject, look, this.#isOrthographic(this.#targetProjection ?? this.#stage.projection), values);
-    this.#yaw = values.yaw;
-    this.#pitch = values.pitch;
+    this.#look.yaw = values.yaw;
+    this.#look.pitch = values.pitch;
     this.#clampPitch();
     // a shot held by cancel() takes the look from here on, about its rest
     this.#holdingTurn = false;
@@ -502,7 +550,8 @@ export class CameraRig {
    * Ends a running move where it stands, and lets go of a camera or an `Object3D` the rig is locked
    * on to: the camera holds that shot — its lens as a factor on the fit — until the next target, and
    * a {@link look} turns it about the rest. A projection the move ran to is not assigned. The promise
-   * of the move resolves. Does nothing while the camera stands on a pose or a projection.
+   * of the move resolves. Does nothing while the camera stands on a pose or a projection, and leaves
+   * a track alone.
    */
   cancel(): void {
     this.#assertAlive('CameraRig#cancel()');
@@ -517,9 +566,106 @@ export class CameraRig {
   }
 
   /**
-   * Advances the clocks of the rig — a move, a reframe, the trailing of an `Object3D` by `smooth` —
-   * by `deltaSeconds` and resolves the shot of the frame, a camera or an object the rig is locked on
-   * to where it stands now. Answers the `Motion` of drawing on demand: `true` when that shot differs
+   * Sets a track: the camera shows the shot of a key inside its span — from `at` to `until` —, and
+   * between two keys a blend of their shots at the share of the stretch, eased by the `ease` of the
+   * key it arrives at; before the first key the first, after the last the last. {@link lerp} sets
+   * the progress along it; a new track starts at 0, at once. `track(from, to)` is the track of two
+   * keys at 0 and 1.
+   *
+   * Every key is resolved anew in every frame, so a key on a camera or an `Object3D` follows it. A
+   * key brings its own look; a {@link look} lies on top of the whole track until the next target. A
+   * stretch between keys of the two kinds of lens runs as the lens change of {@link moveTo}, with
+   * the projection plane of each end as its focus. A projection as a key is shown, not assigned to
+   * the stage.
+   *
+   * The track ends a running move, whose promise resolves, and lets go of a target the rig followed.
+   * It stays until the next `track()`, {@link jump}, {@link moveTo} or {@link dispose}.
+   *
+   * @throws {TypeError} for keys that are not a non-empty array of objects, a `clip` that is not an
+   * `AnimationAction` or whose key has no camera as its shot, an `ease` that is not an easing, and a
+   * shot as {@link jump} refuses it.
+   * @throws {RangeError} for an `at` or an `until` that is not a finite number from 0 to 1, an
+   * `until` before its `at`, keys out of order — a key that starts before the one before it ends —,
+   * and the numbers of a pose as {@link jump} refuses them.
+   * @throws {Error} for a stretch between a perspective and an orthographic lens where one of its
+   * keys has no projection plane: a camera, or a projection or a stage without one.
+   */
+  track(keys: readonly CameraTrackKey[]): void;
+  track(from: CameraTarget, to: CameraTarget): void;
+  track(keysOrFrom: readonly CameraTrackKey[] | CameraTarget, ...to: CameraTarget[]): void {
+    const subject = 'CameraRig#track()';
+    this.#assertAlive(subject);
+    const projection = this.#stage.projection!;
+    const keys =
+      to.length > 0
+        ? [
+            {at: 0, shot: keysOrFrom},
+            {at: 1, shot: to[0]},
+          ]
+        : keysOrFrom;
+    const track = readTrack(subject, keys, {
+      kindOfProjection: (p) => this.#kindOfProjection(p),
+      stageKind: this.#hasRest ? this.#rest.kind : this.#kindOfProjection(projection),
+      stageHasPlane: projection.projectionPlane != null,
+      orthographic: this.#isOrthographic(projection),
+    });
+
+    this.#endMove();
+    this.#release();
+    this.#holding = false;
+    copyPoseValues(EMPTY_POSE, this.#pose);
+    this.#takeLookOfPose();
+    this.#focus = Number.NaN;
+    this.#depth = Number.NaN;
+    this.#track = track;
+  }
+
+  /**
+   * Sets the progress along the track, clamped to `[0, 1]`. Without `smooth` the next {@link step}
+   * shows it; with `smooth` — a time constant in seconds — the shown progress approaches it,
+   * critically damped, so that the ticks of a mouse wheel become a glide; a new progress asked on the
+   * way keeps the speed the glide has. Allocates nothing.
+   *
+   * @throws {RangeError} for a `t` that is not a finite number, and a `smooth` that is not a finite
+   * number of 0 or more.
+   * @throws {TypeError} for `options` that is not an object.
+   * @throws {Error} on a rig without a track.
+   */
+  lerp(t: number, options?: CameraLerpOptions): void {
+    const subject = 'CameraRig#lerp()';
+    this.#assertAlive(subject);
+    const track = this.#track;
+    if (track === undefined) throw new Error(`${subject}: the rig has no track; set one with track() first`);
+    // the checks inline rather than through assertFinite(): a progress is a fraction, and a fraction
+    // handed to a call that V8 does not inline is boxed
+    if (typeof t !== 'number' || !(t > Number.NEGATIVE_INFINITY && t < Number.POSITIVE_INFINITY)) {
+      throw new RangeError(`${subject}: t must be a finite number, got ${describeValue(t)}`);
+    }
+    let smooth = 0;
+    if (options !== undefined) {
+      if (typeof options !== 'object' || options === null) {
+        throw new TypeError(`${subject}: options must be an object, got ${describeValue(options)}`);
+      }
+      const value = options.smooth;
+      if (value !== undefined) {
+        if (typeof value !== 'number' || !(value >= 0 && value < Number.POSITIVE_INFINITY)) {
+          throw new RangeError(`${subject}: smooth must be a finite number of 0 or more, got ${describeValue(value)}`);
+        }
+        smooth = value;
+      }
+    }
+    // clamped in place, as #clampPitch() clamps: no call takes the fraction
+    let asked = t;
+    if (asked < 0) asked = 0;
+    else if (asked > 1) asked = 1;
+    track.asked = asked;
+    track.smooth = smooth;
+  }
+
+  /**
+   * Advances the clocks of the rig — a move, a reframe, the trailing of an `Object3D` by `smooth`,
+   * the progress of a track, damped by `smooth`, and the clips it scrubs — by `deltaSeconds` and
+   * resolves the shot of the frame, a camera or an object the rig is locked on to where it stands now. Answers the `Motion` of drawing on demand: `true` when that shot differs
    * from the one the step before resolved, `false` otherwise — also for a target that stands —, and
    * `false` on a stage without a view or one that has been disposed. A move that arrives resolves
    * its promise here, and a move to a projection assigns it to the stage here. As a frame step:
@@ -550,6 +696,17 @@ export class CameraRig {
       this.#elapsed += deltaSeconds;
       if (this.#elapsed >= this.#duration) this.#arrive();
     }
+    // whether the step moved the progress of a track
+    let progressed = false;
+    const track = this.#track;
+    if (track !== undefined) {
+      const shown = track.shown;
+      // a field rather than an argument: a fraction handed to a call that V8 does not inline is boxed
+      track.delta = deltaSeconds;
+      advanceTrack(track);
+      scrubTrackClips(track);
+      progressed = track.shown !== shown;
+    }
 
     if (!this.#hasRest || this.#stage.isDisposed) {
       this.#followMoved = false;
@@ -567,7 +724,7 @@ export class CameraRig {
       return false;
     }
     copyShot(this.#current, this.#stepped);
-    this.#followMoved = this.#follows && !this.#moving;
+    this.#followMoved = (this.#follows && !this.#moving) || (track !== undefined && !progressed);
     return true;
   }
 
@@ -704,7 +861,7 @@ export class CameraRig {
     this.#resolve(shot);
     const camera = shot.kind === 'perspective' ? this.#perspective : this.#orthographic;
     writeAspect[0] = this.#rest.aspect;
-    writeShotAtAspect(shot, this.#rest.base!, camera);
+    writeShotAtAspect(shot, this.#writeBase ?? this.#rest.base!, camera);
     if (camera !== this.#camera) {
       this.#camera = camera;
       Stage2DInternals.announceCamera(this.#stage);
@@ -748,6 +905,14 @@ export class CameraRig {
 
   // the shot the rig shows with the clocks where they stand, into `out`
   #resolve(out: CameraShot): void {
+    this.#writeBase = undefined;
+    const track = this.#track;
+    if (track !== undefined) {
+      this.#resolveTrack(track, out);
+      this.#updateLift();
+      out.lift = this.#liftShown;
+      return;
+    }
     const to = this.#to;
     this.#resolveTarget(to);
     if (this.#moving) {
@@ -765,7 +930,12 @@ export class CameraRig {
       if (from.kind === to.kind) {
         blendShotsAtProgress(from, to, out);
       } else {
-        this.#prepareLensChange(from, to);
+        this.#prepareLensChange(
+          from,
+          to,
+          this.#rest,
+          this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest,
+        );
         blendLensChangeAtProgress(from, to, this.#lensChange, out);
       }
     } else {
@@ -776,13 +946,12 @@ export class CameraRig {
   }
 
   // the distances of the two ends of a lens change to their focus planes — to the projection plane
-  // where its frame has one, otherwise the focus of the move —, the depth and the container, into the
-  // lens change. Inline: a call that V8 does not inline boxes the fraction it answers
-  #prepareLensChange(from: CameraShot, to: CameraShot): void {
+  // where the frame of the rest of that end has one, otherwise the focus of the move —, the depth and
+  // the container, into the lens change. Inline: a call that V8 does not inline boxes the fraction it
+  // answers
+  #prepareLensChange(from: CameraShot, to: CameraShot, restA: Rest, restB: Rest): void {
     const change = this.#lensChange;
     const focus = this.#focus;
-    const restA = this.#rest;
-    const restB = this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : restA;
 
     let p = from.position;
     let o = restA.origin;
@@ -823,53 +992,12 @@ export class CameraRig {
     }
     const held = this.#held;
     const holding = this.#holding;
-    const p = out.position;
 
-    if (holding) {
-      p.copy(held.position);
-    } else if (pose.hasPosition) {
-      // relative to the rest: x and y along the axes of the plane, the distance along its normal
-      const along = pose.hasDistance && rest.kind === 'perspective' ? pose.distance - rest.distance : 0;
-      const r = rest.right;
-      const u = rest.up;
-      const n = rest.normal;
-      const x = pose.x;
-      const y = pose.y;
-      const at = rest.position;
-      p.x = at.x + r.x * x + u.x * y + n.x * along;
-      p.y = at.y + r.y * x + u.y * y + n.y * along;
-      p.z = at.z + r.z * x + u.z * y + n.z * along;
-    } else {
-      p.copy(rest.position);
-    }
+    if (holding) out.position.copy(held.position);
+    else writePosePosition(rest, pose, out.position);
 
-    const q = out.quaternion;
-    if (holding && this.#holdingTurn) {
-      q.copy(held.quaternion);
-    } else {
-      q.copy(rest.quaternion);
-      const turn = turnSlot;
-      if (this.#yaw !== 0) {
-        // about the up axis of the frame, in the world: premultiplied
-        const half = this.#yaw / 2;
-        const sin = Math.sin(half);
-        const up = rest.up;
-        turn[0] = up.x * sin;
-        turn[1] = up.y * sin;
-        turn[2] = up.z * sin;
-        turn[3] = Math.cos(half);
-        q.premultiply(this.#turn.fromArray(turn));
-      }
-      if (this.#pitch !== 0) {
-        // about the right axis of the camera, in its own space: multiplied
-        const half = this.#pitch / 2;
-        turn[0] = Math.sin(half);
-        turn[1] = 0;
-        turn[2] = 0;
-        turn[3] = Math.cos(half);
-        q.multiply(this.#turn.fromArray(turn));
-      }
-    }
+    if (holding && this.#holdingTurn) out.quaternion.copy(held.quaternion);
+    else writeTurn(rest, this.#look, out.quaternion);
 
     if (holding) {
       // a held shot of the other kind — a lens change cancelled on its way — keeps its own lens
@@ -889,6 +1017,82 @@ export class CameraRig {
     out.lift = 0;
   }
 
+  // the shot of the track at its shown progress, into `out`: the shot of a key, or the blend of two —
+  // a lens change between keys of the two kinds —, each resolved in this frame
+  #resolveTrack(track: CameraTrack, out: CameraShot): void {
+    locateTrack(track);
+    const keys = track.keys;
+    const a = keys[track.index]!;
+    const restA = this.#resolveKey(a);
+    if (track.next < 0) {
+      copyShot(a.shot, out);
+      // the shot of one key alone over the base its projection placed: pixel-exact on its rest
+      if (restA !== this.#rest) this.#writeBase = restA.base;
+      return;
+    }
+    const b = keys[track.next]!;
+    const restB = this.#resolveKey(b);
+    blendProgress[0] = track.share;
+    if (a.shot.kind === b.shot.kind) {
+      blendShotsAtProgress(a.shot, b.shot, out);
+    } else {
+      this.#prepareLensChange(a.shot, b.shot, restA, restB);
+      blendLensChangeAtProgress(a.shot, b.shot, this.#lensChange, out);
+    }
+  }
+
+  // the shot of `key` in this frame, into its shot, and the rest it resolved against: a pose and an
+  // object on the rest of the stage, a projection and a camera on the rest of their own. The look is
+  // the key's plus the rig's, its pitch clamped
+  #resolveKey(key: TrackKey): Rest {
+    const pose = key.pose;
+    const look = this.#keyLook;
+    look.yaw = this.#look.yaw;
+    look.pitch = this.#look.pitch;
+    if (pose.hasLook) {
+      look.yaw += pose.yaw;
+      look.pitch += pose.pitch;
+      const limit = this.#pitchLimit;
+      if (look.pitch > limit) look.pitch = limit;
+      else if (look.pitch < -limit) look.pitch = -limit;
+    }
+    let rest = this.#rest;
+    const follow = key.follow;
+    if (follow !== undefined) {
+      readObjectGoal(follow, rest);
+      pose.x = follow.goalX;
+      pose.y = follow.goalY;
+    } else if (key.projection !== undefined) {
+      rest = this.#placeKey(key, key.projection);
+    }
+    resolvePoseShot(rest, pose, look, key.shot);
+    return rest;
+  }
+
+  // the rest of the projection of `key`, placed for the container of the stage — anew where the
+  // container changed, and in every frame for a projection whose rest may move, as #followTarget()
+  // places it —; the rest of the stage where it is the projection of the stage
+  #placeKey(key: TrackKey, projection: IProjection): Rest {
+    const stage = this.#stage;
+    if (projection === stage.projection) return this.#rest;
+    const rest = key.rest;
+    const width = stage.containerWidth;
+    const height = stage.containerHeight;
+    const pixelRatio = stage.containerPixelRatio;
+    if (!key.placed || width !== key.width || height !== key.height || pixelRatio !== key.pixelRatio) {
+      projection.updateViewRect(width, height, pixelRatio);
+      key.placed = true;
+      key.width = width;
+      key.height = height;
+      key.pixelRatio = pixelRatio;
+    } else if (projection.needsPlacement === undefined) {
+      return rest;
+    }
+    this.#placeRest(projection, rest);
+    readRest(rest);
+    return rest;
+  }
+
   // the lift the clock of reframe() has reached, into #liftShown
   #updateLift(): void {
     if (!this.#lifting) {
@@ -903,17 +1107,18 @@ export class CameraRig {
 
   #takeLookOfPose(): void {
     const pose = this.#pose;
-    this.#yaw = pose.hasLook ? pose.yaw : 0;
-    this.#pitch = pose.hasLook ? pose.pitch : 0;
+    this.#look.yaw = pose.hasLook ? pose.yaw : 0;
+    this.#look.pitch = pose.hasLook ? pose.pitch : 0;
     this.#clampPitch();
   }
 
   // in place, on the field: a fraction handed across a call or answered by one may be boxed
   #clampPitch(): void {
     const limit = this.#pitchLimit;
-    const pitch = this.#pitch;
-    if (pitch > limit) this.#pitch = limit;
-    else if (pitch < -limit) this.#pitch = -limit;
+    const look = this.#look;
+    const pitch = look.pitch;
+    if (pitch > limit) look.pitch = limit;
+    else if (pitch < -limit) look.pitch = -limit;
   }
 
   #endMove(): void {
@@ -964,8 +1169,11 @@ export class CameraRig {
     }
   }
 
-  // lets go of the target a move ran to or the rig followed; the rig keeps no reference to it
+  // lets go of the target a move ran to or the rig followed, and of a track; the rig keeps no
+  // reference to either
   #release(): void {
+    this.#track = undefined;
+    this.#writeBase = undefined;
     this.#targetProjection = undefined;
     this.#assigns = false;
     this.#follows = false;

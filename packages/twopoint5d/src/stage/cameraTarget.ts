@@ -1,4 +1,11 @@
-import type {Camera, Object3D, OrthographicCamera, PerspectiveCamera} from 'three/webgpu';
+import {
+  type Camera,
+  type Object3D,
+  type OrthographicCamera,
+  type PerspectiveCamera,
+  Quaternion,
+  type Vector3,
+} from 'three/webgpu';
 import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {copyPoseValues, type PoseValues} from './cameraPose.js';
 import type {CameraShot, CameraShotKind} from './cameraShot.js';
@@ -192,4 +199,100 @@ export function trailObject(follow: ObjectFollow, rest: Rest): void {
   } else {
     follow.trailing = true;
   }
+}
+
+/**
+ * A look of a `CameraRig`, in radians, relative to the orientation of a rest: yaw about the up axis
+ * of the frame, then pitch about the right axis of the camera.
+ * @internal
+ */
+export interface Look {
+  yaw: number;
+  pitch: number;
+}
+
+/** A look of 0. @internal */
+export function createLook(): Look {
+  // fractions from the start, so that V8 keeps the fields as doubles
+  const look = {yaw: 0.5, pitch: 0.5};
+  look.yaw = 0;
+  look.pitch = 0;
+  return look;
+}
+
+// the turn of a look, as a quaternion handed to fromArray(): setFromAxisAngle() takes the angle as
+// an argument, and a fraction handed to a call that V8 does not inline is boxed
+const turnSlot = new Float64Array(4);
+const turn = new Quaternion();
+
+/**
+ * The orientation of `rest` turned by `look` into `out`: the yaw about the up axis of the frame, in
+ * the world — premultiplied —, then the pitch about the right axis of the camera, in its own space
+ * — multiplied. Allocates nothing.
+ * @internal
+ */
+export function writeTurn(rest: Rest, look: Look, out: Quaternion): void {
+  out.copy(rest.quaternion);
+  const slot = turnSlot;
+  const yaw = look.yaw;
+  if (yaw !== 0) {
+    const half = yaw / 2;
+    const sin = Math.sin(half);
+    const up = rest.up;
+    slot[0] = up.x * sin;
+    slot[1] = up.y * sin;
+    slot[2] = up.z * sin;
+    slot[3] = Math.cos(half);
+    out.premultiply(turn.fromArray(slot));
+  }
+  const pitch = look.pitch;
+  if (pitch !== 0) {
+    const half = pitch / 2;
+    slot[0] = Math.sin(half);
+    slot[1] = 0;
+    slot[2] = 0;
+    slot[3] = Math.cos(half);
+    out.multiply(turn.fromArray(slot));
+  }
+}
+
+/**
+ * The position of `pose` against `rest` into `out`: x and y along the axes of the frame, the
+ * distance along its normal, relative to the position of the rest; the rest's own where the pose
+ * names none. An orthographic rest leaves the distance out. Allocates nothing.
+ * @internal
+ */
+export function writePosePosition(rest: Rest, pose: PoseValues, out: Vector3): void {
+  if (!pose.hasPosition) {
+    out.copy(rest.position);
+    return;
+  }
+  const along = pose.hasDistance && rest.kind === 'perspective' ? pose.distance - rest.distance : 0;
+  const r = rest.right;
+  const u = rest.up;
+  const n = rest.normal;
+  const x = pose.x;
+  const y = pose.y;
+  const at = rest.position;
+  out.x = at.x + r.x * x + u.x * y + n.x * along;
+  out.y = at.y + r.y * x + u.y * y + n.y * along;
+  out.z = at.z + r.z * x + u.z * y + n.z * along;
+}
+
+/**
+ * The shot of `pose` against `rest` into `out`: its position, the orientation of the rest turned by
+ * `look`, the lens of the rest divided by the zoom of the pose, near and far of the rest, no lift.
+ * The look of the pose is not read: the caller hands the one it shows in `look`. Allocates nothing.
+ * @internal
+ */
+export function resolvePoseShot(rest: Rest, pose: PoseValues, look: Look, out: CameraShot): void {
+  writePosePosition(rest, pose, out.position);
+  writeTurn(rest, look, out.quaternion);
+  const zoom = pose.zoom;
+  out.kind = rest.kind;
+  out.zoom = zoom;
+  out.lens = rest.lens / zoom;
+  out.near = rest.near;
+  out.far = rest.far;
+  out.lift = 0;
 }

@@ -1,5 +1,7 @@
 import {on} from '@spearwolf/eventize';
 import {
+  AnimationClip,
+  AnimationMixer,
   Camera,
   Group,
   Object3D,
@@ -7,6 +9,7 @@ import {
   PerspectiveCamera,
   Quaternion,
   Vector3,
+  VectorKeyframeTrack,
   type WebGPURenderer,
 } from 'three/webgpu';
 import {describe, expect, it, vi} from 'vitest';
@@ -14,7 +17,7 @@ import {FramePacer, type FramePacerSource} from '../display/FramePacer.js';
 import type {DisplayEventProps} from '../display/types.js';
 import {OnStageAfterCameraChanged, OnStageCameraPlaced, OnStageUpdateFrame} from '../events.js';
 import {CameraProjection} from './CameraProjection.js';
-import {CameraRig} from './CameraRig.js';
+import {CameraRig, type CameraTrackKey} from './CameraRig.js';
 import type {IProjection} from './IProjection.js';
 import type {ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
@@ -545,6 +548,7 @@ describe('CameraRig', () => {
       ['cancel()', (rig) => rig.cancel()],
       ['jump()', (rig) => rig.jump({})],
       ['an overtaking moveTo()', (rig) => rig.moveTo({}, 1)],
+      ['track()', (rig) => rig.track({}, {position: [5, 0]})],
       ['dispose()', (rig) => rig.dispose()],
     ])('%s resolves the promise of the move, which never rejects', async (_what, end) => {
       const {rig} = makeRig();
@@ -1379,6 +1383,7 @@ describe('CameraRig', () => {
       ['a moveTo()', (rig) => rig.moveTo({position: [3, 4]}, 0)],
       ['a jump()', (rig) => rig.jump({position: [3, 4]})],
       ['cancel()', (rig) => rig.cancel()],
+      ['a track()', (rig) => rig.track({position: [3, 4]}, {position: [3, 4]})],
       ['dispose()', (rig) => rig.dispose()],
     ];
     for (const [what, make] of targets) {
@@ -1582,6 +1587,445 @@ describe('CameraRig', () => {
       expect(() => rig.look({yaw: 0.2, pitch: 0})).toThrow(
         new RangeError('CameraRig#look(): an orthographic projection takes no look other than 0, got {yaw: 0.2, pitch: 0}'),
       );
+    });
+  });
+
+  describe('a track', () => {
+    /** Steps the rig to the progress `t` without smooth and draws the frame. */
+    const lerpTo = (stage: Stage2D, rig: CameraRig, t: number) => {
+      rig.lerp(t);
+      rig.step(1 / 60);
+      frame(stage);
+    };
+
+    /** A camera an AnimationMixer moves along x from 0 to 200 at z 500, within two seconds; its action enabled and paused. */
+    const animatedCamera = () => {
+      const camera = new PerspectiveCamera(40, 4 / 3, 0.5, 2000);
+      camera.position.set(0, 0, 500);
+      const mixer = new AnimationMixer(camera);
+      const action = mixer.clipAction(
+        new AnimationClip('fly', 2, [new VectorKeyframeTrack('.position', [0, 2], [0, 0, 500, 200, 0, 500])]),
+      );
+      action.play().paused = true;
+      return {camera, action};
+    };
+
+    it('shows the shot of a key inside it, and between two keys the blend at the eased share of the key it arrives at', () => {
+      const {stage, rig} = makeRig();
+      rig.track([
+        {at: 0, until: 0.2, shot: {position: [0, 0]}},
+        {at: 0.6, shot: {position: [100, 0]}, ease: 'ease-in'},
+        {at: 1, shot: {position: [100, 100]}},
+      ]);
+      const at = () => rig.camera.position.toArray().map((v) => Math.round(v * 1e9) / 1e9);
+
+      lerpTo(stage, rig, 0.1);
+      expect(at(), 'inside the first key').toEqual([0, 0, 300]);
+      lerpTo(stage, rig, 0.2);
+      expect(at(), 'at its end').toEqual([0, 0, 300]);
+      // half the stretch from 0.2 to 0.6, eased in: 0.5³
+      lerpTo(stage, rig, 0.4);
+      expect(at()).toEqual([12.5, 0, 300]);
+      lerpTo(stage, rig, 0.6);
+      expect(at(), 'on the second key').toEqual([100, 0, 300]);
+      // half the stretch from 0.6 to 1, linear
+      lerpTo(stage, rig, 0.8);
+      expect(at()).toEqual([100, 50, 300]);
+      lerpTo(stage, rig, 1);
+      expect(at()).toEqual([100, 100, 300]);
+    });
+
+    it('clamps the progress to [0, 1], and holds the first key before it and the last one after it', () => {
+      const {stage, rig} = makeRig();
+      rig.track([
+        {at: 0.25, shot: {position: [10, 0]}},
+        {at: 0.75, shot: {position: [20, 0]}},
+      ]);
+      lerpTo(stage, rig, 0.1);
+      expect(rig.camera.position.x).toBe(10);
+      lerpTo(stage, rig, -5);
+      expect(rig.camera.position.x).toBe(10);
+      lerpTo(stage, rig, 0.9);
+      expect(rig.camera.position.x).toBe(20);
+      lerpTo(stage, rig, 7);
+      expect(rig.camera.position.x).toBe(20);
+      lerpTo(stage, rig, 0.5);
+      expect(rig.camera.position.x).toBeCloseTo(15, 12);
+    });
+
+    it('track(from, to) is the track of two keys at 0 and 1, and starts on the first at once', () => {
+      const {stage, rig} = makeRig();
+      void rig.moveTo({position: [-50, 0]}, 1);
+      rig.step(0.5);
+      rig.track({position: [0, 0], zoom: 2}, {position: [40, 0, 200]});
+      expect(rig.busy).toBe(false);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([0, 0, 300]);
+      expect(lensOf(rig.camera as PerspectiveCamera)).toBeCloseTo(
+        lensOf(stage.projection!.createCamera() as PerspectiveCamera) / 2,
+        12,
+      );
+
+      lerpTo(stage, rig, 0.5);
+      expect(rig.camera.position.x).toBeCloseTo(20, 12);
+      expect(rig.camera.position.z).toBeCloseTo(250, 12);
+    });
+
+    it('shows a new progress from the next step(), and step() answers true only when the shot changed', () => {
+      const {stage, rig} = makeRig();
+      rig.track({position: [0, 0]}, {position: [100, 0]});
+      rig.step(1 / 60);
+      expect(rig.step(1 / 60), 'a track that stands').toBe(false);
+
+      rig.lerp(0.5);
+      frame(stage);
+      expect(rig.camera.position.x, 'before the step').toBe(0);
+      expect(rig.step(1 / 60)).toBe(true);
+      frame(stage);
+      expect(rig.camera.position.x).toBeCloseTo(50, 12);
+      expect(rig.step(1 / 60)).toBe(false);
+      rig.lerp(0.5);
+      expect(rig.step(1 / 60), 'the same progress again').toBe(false);
+      expect(rig.busy).toBe(false);
+    });
+
+    it('resolves the shot of each key anew in every frame: a key on a camera or an object follows it', () => {
+      const {stage, rig} = makeRig();
+      const source = new PerspectiveCamera(40, 4 / 3, 0.5, 2000);
+      source.position.set(0, 0, 500);
+      const player = new Object3D();
+      rig.track([
+        {at: 0, shot: source},
+        {at: 1, shot: player},
+      ]);
+      rig.step(1 / 60);
+      frame(stage);
+      expectShowsAs(rig.camera, fittedTo(source, stage));
+
+      source.position.x = 30;
+      expect(rig.step(1 / 60), 'a key camera that moved').toBe(true);
+      expect(rig.busy, 'the camera moved after a key').toBe(true);
+      frame(stage);
+      expectShowsAs(rig.camera, fittedTo(source, stage));
+      expect(rig.step(1 / 60)).toBe(false);
+      expect(rig.busy).toBe(false);
+
+      // the object as a position on the plane, at the distance and the zoom of the rest
+      lerpTo(stage, rig, 1);
+      player.position.set(70, -20, 45);
+      expect(rig.step(1 / 60)).toBe(true);
+      frame(stage);
+      const rest = stage.projection!.createCamera();
+      rest.position.set(70, -20, 300);
+      expectPlacedAs(rig.camera, rest);
+    });
+
+    it('takes the look of each key, and a look() lies on top of the track until the next target', () => {
+      const {stage, rig} = makeRig();
+      rig.look({yaw: 0.4, pitch: 0});
+      rig.track({look: {yaw: 0.2, pitch: 0}}, {look: {yaw: -0.2, pitch: 0}});
+      rig.step(1 / 60);
+      frame(stage);
+      expect(-directionOf(rig.camera).x, 'the track brings its own look').toBeCloseTo(Math.sin(0.2), 12);
+
+      rig.look({yaw: 0.1, pitch: 0.05});
+      frame(stage);
+      expect(-directionOf(rig.camera).x).toBeCloseTo(Math.sin(0.3) * Math.cos(0.05), 12);
+      expect(directionOf(rig.camera).y).toBeCloseTo(Math.sin(0.05), 12);
+      lerpTo(stage, rig, 1);
+      expect(-directionOf(rig.camera).x).toBeCloseTo(Math.sin(-0.1) * Math.cos(0.05), 12);
+    });
+
+    it('a stretch between keys of different lenses runs the lens change, and assigns no projection', () => {
+      const {stage, rig} = makeRig();
+      const parallax = stage.projection!;
+      const ortho = makeProjection('orthographic');
+      rig.track({}, ortho);
+
+      lerpTo(stage, rig, 0);
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+      expectPlacedAs(rig.camera, parallax.createCamera());
+
+      lerpTo(stage, rig, 0.5);
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+      // the dolly zoom backs the camera off while the plane keeps its size
+      expect(rig.camera.position.z).toBeGreaterThan(300);
+      expect(heightAtPlane(rig.camera as PerspectiveCamera)).toBeCloseTo(stage.height, 6);
+
+      lerpTo(stage, rig, 1);
+      expect(rig.camera).toBeInstanceOf(OrthographicCamera);
+      ortho.updateViewRect(stage.containerWidth, stage.containerHeight);
+      expectPlacedAs(rig.camera, ortho.createCamera());
+      expect(stage.projection).toBe(parallax);
+
+      lerpTo(stage, rig, 0);
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+      expectPlacedAs(rig.camera, parallax.createCamera());
+    });
+
+    it('re-frames the keys on a resize', () => {
+      const {stage, rig} = makeRig();
+      const ortho = makeProjection('orthographic');
+      rig.track({position: [0, 0]}, ortho);
+      lerpTo(stage, rig, 1);
+      stage.resize(500, 700);
+      frame(stage);
+      ortho.updateViewRect(500, 700);
+      expectPlacedAs(rig.camera, ortho.createCamera());
+    });
+
+    describe('a clip', () => {
+      it('maps the span of its key onto 0 … the duration of the clip, and the camera stands where the clip puts it', () => {
+        const {stage, rig} = makeRig();
+        const {camera, action} = animatedCamera();
+        rig.track([
+          {at: 0, shot: {position: [0, 0]}},
+          {at: 0.2, until: 0.6, shot: camera, clip: action},
+          {at: 1, shot: {position: [0, 0]}},
+        ]);
+
+        lerpTo(stage, rig, 0.4);
+        expect(action.time).toBeCloseTo(1, 12);
+        expect(camera.position.x).toBeCloseTo(100, 9);
+        expectShowsAs(rig.camera, fittedTo(camera, stage));
+
+        lerpTo(stage, rig, 0.25);
+        expect(action.time).toBeCloseTo(0.25, 12);
+        expectShowsAs(rig.camera, fittedTo(camera, stage));
+
+        lerpTo(stage, rig, 0.6);
+        expect(action.time).toBe(2);
+        expect(camera.position.x).toBe(200);
+        expectShowsAs(rig.camera, fittedTo(camera, stage));
+
+        // before its key the clip stands at its start, after it at its end
+        lerpTo(stage, rig, 0.1);
+        expect(action.time).toBe(0);
+        expect(camera.position.x).toBe(0);
+        lerpTo(stage, rig, 0.9);
+        expect(action.time).toBe(2);
+        expect(camera.position.x).toBe(200);
+        expect(action.enabled && action.paused, 'neither played nor stopped').toBe(true);
+      });
+    });
+
+    describe('smooth', () => {
+      it('lets the shown progress approach the asked one, critically damped, and settles below 1e-4', () => {
+        const {stage, rig} = makeRig();
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.step(1 / 60);
+
+        rig.lerp(1, {smooth: 0.5});
+        expect(rig.busy).toBe(true);
+        expect(rig.step(0.5)).toBe(true);
+        frame(stage);
+        // p = q − (q − p₀)(1 + ωt)e^(−ωt), ω = 1 / smooth
+        expect(rig.camera.position.x).toBeCloseTo(100 * (1 - 2 * Math.exp(-1)), 9);
+
+        let last = rig.camera.position.x;
+        let steps = 0;
+        while (rig.busy && steps < 1000) {
+          expect(rig.step(1 / 60)).toBe(true);
+          frame(stage);
+          const x = rig.camera.position.x;
+          expect(x, 'no overshoot').toBeGreaterThanOrEqual(last);
+          expect(x).toBeLessThanOrEqual(100);
+          last = x;
+          steps++;
+        }
+        expect(rig.busy).toBe(false);
+        expect(rig.camera.position.x, 'settled on the asked progress').toBe(100);
+        expect(rig.step(1 / 60)).toBe(false);
+        // (1 + ωt)·e^(−ωt) falls below 1e-4 at ωt ≈ 11.8: at 5.9 s, 5.4 s after the first step
+        expect(steps).toBeGreaterThan(310);
+        expect(steps).toBeLessThan(335);
+      });
+
+      it('keeps its velocity when the asked progress changes on the way, and a lerp() without smooth jumps', () => {
+        const {stage, rig} = makeRig();
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.lerp(1, {smooth: 0.2});
+        rig.step(0.1);
+        frame(stage);
+        const x = rig.camera.position.x;
+        // asked back below it: the velocity it has carries it up a little further first
+        rig.lerp(0, {smooth: 0.2});
+        rig.step(1 / 120);
+        frame(stage);
+        expect(rig.camera.position.x, 'still on its way up').toBeGreaterThan(x);
+
+        rig.lerp(0.25);
+        expect(rig.busy).toBe(true);
+        rig.step(0);
+        frame(stage);
+        expect(rig.camera.position.x).toBeCloseTo(25, 12);
+        expect(rig.busy).toBe(false);
+      });
+    });
+
+    describe('the end of a track', () => {
+      it.each<[string, (rig: CameraRig) => unknown]>([
+        ['jump()', (rig) => rig.jump({position: [7, 0]})],
+        ['moveTo()', (rig) => rig.moveTo({position: [7, 0]}, 0)],
+      ])('%s ends it, and lerp() is refused afterwards', (_what, end) => {
+        const {stage, rig} = makeRig();
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.lerp(1, {smooth: 0.5});
+        rig.step(0.1);
+        end(rig);
+        expect(rig.busy).toBe(false);
+        rig.step(1);
+        frame(stage);
+        expect(rig.camera.position.x).toBe(7);
+        expect(() => rig.lerp(0.5)).toThrow(new Error('CameraRig#lerp(): the rig has no track; set one with track() first'));
+      });
+
+      it('a moveTo() starts from the shot the track shows', () => {
+        const {stage, rig} = makeRig();
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        lerpTo(stage, rig, 0.5);
+        void rig.moveTo({position: [50, 80]}, 1, {easing: 'linear'});
+        rig.step(0.5);
+        frame(stage);
+        expect(rig.camera.position.x).toBeCloseTo(50, 12);
+        expect(rig.camera.position.y).toBeCloseTo(40, 12);
+      });
+
+      it('cancel() leaves a track alone', () => {
+        const {stage, rig} = makeRig();
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        rig.cancel();
+        lerpTo(stage, rig, 0.5);
+        expect(rig.camera.position.x).toBeCloseTo(50, 12);
+      });
+    });
+
+    describe('refusals', () => {
+      it('track() refuses keys out of order, an at or until outside [0, 1], an until before its at, and changes nothing then', () => {
+        const {stage, rig} = makeRig();
+        rig.track({position: [0, 0]}, {position: [100, 0]});
+        lerpTo(stage, rig, 0.5);
+        const camera = new PerspectiveCamera();
+        const cases: [unknown, Error][] = [
+          [[], new TypeError('CameraRig#track(): keys must be a non-empty array of CameraTrackKey, got []')],
+          ['keys', new TypeError('CameraRig#track(): keys must be a non-empty array of CameraTrackKey, got "keys"')],
+          [[null], new TypeError('CameraRig#track(): keys[0] must be an object with at and shot, got null')],
+          [[{at: -0.1, shot: {}}], new RangeError('CameraRig#track(): keys[0].at must be a finite number from 0 to 1, got -0.1')],
+          [
+            [{at: Number.NaN, shot: {}}],
+            new RangeError('CameraRig#track(): keys[0].at must be a finite number from 0 to 1, got NaN'),
+          ],
+          [
+            [{at: 0.5, until: 1.5, shot: {}}],
+            new RangeError('CameraRig#track(): keys[0].until must be a finite number from 0 to 1, got 1.5'),
+          ],
+          [
+            [{at: 0.5, until: 0.25, shot: {}}],
+            new RangeError('CameraRig#track(): keys[0].until must be of its at, 0.5, or more, got 0.25'),
+          ],
+          [
+            [
+              {at: 0, until: 0.6, shot: {}},
+              {at: 0.4, shot: {}},
+            ],
+            new RangeError(
+              'CameraRig#track(): the keys must go in order: keys[1].at must be of 0.6 or more, where keys[0] ends, got 0.4',
+            ),
+          ],
+          [
+            [{at: 0, shot: {position: [0, 0]}, clip: {}}],
+            new TypeError('CameraRig#track(): keys[0].clip must be an AnimationAction, got {}'),
+          ],
+          [
+            [{at: 0, shot: {position: [0, 0]}, clip: animatedCamera().action}],
+            new TypeError('CameraRig#track(): keys[0].clip needs a camera as the shot of its key, got {position: [0, 0]}'),
+          ],
+          [
+            [{at: 0, shot: {}, ease: 'bounce'}],
+            new TypeError(
+              "CameraRig#track(): keys[0].ease must be 'linear', 'ease-in', 'ease-out', 'ease-in-out' or a function, got \"bounce\"",
+            ),
+          ],
+          [
+            [{at: 0, shot: {zoom: 0}}],
+            new RangeError('CameraRig#track(): keys[0].shot.zoom must be a finite number above 0, got 0'),
+          ],
+          [
+            [{at: 0, shot: 5}],
+            new TypeError('CameraRig#track(): keys[0].shot must be a CameraPose, a camera, a projection or an Object3D, got 5'),
+          ],
+          [
+            [{at: 0, shot: new Camera()}],
+            new TypeError(
+              'CameraRig#track(): keys[0].shot must be a PerspectiveCamera or an OrthographicCamera where it is a camera, got Camera',
+            ),
+          ],
+          [
+            [
+              {at: 0, shot: {}},
+              {at: 1, shot: new OrthographicCamera(-160, 160, 90, -90, 0.5, 500)},
+            ],
+            new Error(
+              'CameraRig#track(): the stretch from keys[0] to keys[1] is a lens change between a perspective and an orthographic camera, which needs a focus: a camera as the target has no projectionPlane, and a track names no focus',
+            ),
+          ],
+        ];
+        for (const [keys, error] of cases) expect(() => rig.track(keys as CameraTrackKey[])).toThrow(error);
+        expect(() => rig.track({position: [0, 0, Number.NaN]}, camera)).toThrow(
+          new RangeError('CameraRig#track(): keys[0].shot.position[2] must be a finite number, got NaN'),
+        );
+
+        rig.step(1);
+        frame(stage);
+        expect(rig.camera.position.x, 'the track it had').toBeCloseTo(50, 12);
+      });
+
+      it('track() refuses a lens change where the stage has no plane', () => {
+        const stage = new Stage2D(planelessProjection());
+        stage.resize(800, 600);
+        const rig = new CameraRig(stage);
+        expect(() => rig.track({}, makeProjection('orthographic'))).toThrow(
+          new Error(
+            'CameraRig#track(): the stretch from keys[0] to keys[1] is a lens change between a perspective and an orthographic camera, which needs a focus: the projection has no projectionPlane, and a track names no focus',
+          ),
+        );
+        // keys of one kind need none
+        expect(() => rig.track({}, {position: [10, 0]})).not.toThrow();
+      });
+
+      it('track() refuses a look of a key under an OrthographicProjection', () => {
+        const {rig} = makeRig('orthographic');
+        expect(() => rig.track({}, {look: {yaw: 0.1, pitch: 0}})).toThrow(
+          new RangeError('CameraRig#track(): an orthographic projection takes no look other than 0, got {yaw: 0.1, pitch: 0}'),
+        );
+      });
+
+      it('lerp() refuses a t or a smooth that is not a finite number, and a rig without a track', () => {
+        const {rig} = makeRig();
+        expect(() => rig.lerp(0.5)).toThrow(new Error('CameraRig#lerp(): the rig has no track; set one with track() first'));
+        rig.track({}, {position: [10, 0]});
+        expect(() => rig.lerp(Number.NaN)).toThrow(new RangeError('CameraRig#lerp(): t must be a finite number, got NaN'));
+        expect(() => rig.lerp('0.5' as unknown as number)).toThrow(
+          new RangeError('CameraRig#lerp(): t must be a finite number, got "0.5"'),
+        );
+        expect(() => rig.lerp(0.5, {smooth: -1})).toThrow(
+          new RangeError('CameraRig#lerp(): smooth must be a finite number of 0 or more, got -1'),
+        );
+        expect(() => rig.lerp(0.5, {smooth: Number.POSITIVE_INFINITY})).toThrow(
+          new RangeError('CameraRig#lerp(): smooth must be a finite number of 0 or more, got Infinity'),
+        );
+        expect(() => rig.lerp(0.5, null as unknown as {smooth: number})).toThrow(
+          new TypeError('CameraRig#lerp(): options must be an object, got null'),
+        );
+        expect(rig.busy).toBe(false);
+      });
+
+      it('track() and lerp() throw on a disposed rig', () => {
+        const {rig} = makeRig();
+        rig.dispose();
+        expect(() => rig.track({}, {})).toThrow(new Error('CameraRig#track(): the rig has been disposed'));
+        expect(() => rig.lerp(0)).toThrow(new Error('CameraRig#lerp(): the rig has been disposed'));
+      });
     });
   });
 

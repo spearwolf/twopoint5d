@@ -1,5 +1,13 @@
 import {on} from '@spearwolf/eventize';
-import {Group, OrthographicCamera, PerspectiveCamera, Vector3} from 'three/webgpu';
+import {
+  AnimationClip,
+  AnimationMixer,
+  Group,
+  OrthographicCamera,
+  PerspectiveCamera,
+  Vector3,
+  VectorKeyframeTrack,
+} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {OnStageAfterCameraChanged} from '../events.js';
@@ -359,6 +367,63 @@ describe('CameraRig on the hot path', () => {
     });
 
     expect(rig.busy).toBe(true);
+    expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  // A page that scrolls through a scene: a track of a pose, a camera an AnimationMixer flies — its
+  // clip scrubbed through the span of its key — and another pose, its progress asked by a damped
+  // lerp() in every round. The progress is copied from this table of constants and asked anew
+  // before the glide settles: with smooth 0.125 a step of a second closes all but a few thousandths
+  // of the gap, so the shown progress runs through both stretches and the span of the clip, and it
+  // never settles, since the asked progress moves by a quarter or more from one round to the next.
+  //
+  // The rig sets the time of the clip and calls `getMixer().update(0)`; what that call costs is
+  // three's, as an eventize emit is eventize's (§4.8 of the proposal): AnimationMixer#update() hands
+  // the time of the clip to each of its interpolants, and V8 boxes it there where it is a fraction —
+  // 16 bytes per keyframe track and update, measured with the mixer alone, none with a whole time.
+  // So the round stands in for the update of the mixer of the clip: it counts the calls and moves the
+  // camera from the tables of constants, as the clip would. It measures the rig's own path — the
+  // progress, the stretch, the time it works out and writes into the action, the call, the camera
+  // the key places. That the update puts the camera where the clip says is held by
+  // `CameraRig.spec.ts`, and that a paused action applies its time by `animationMixer.spec.ts`.
+  const PROGRESSES = [0.125, 0.875, 0.375, 0.625, 0.0625, 0.9375, 0.25, 0.75];
+  const SMOOTH = {smooth: 0.125};
+
+  test('step(), write() and compose() with a damped lerp() on a track with a clip allocate nothing', async () => {
+    const camera = new PerspectiveCamera(40, 16 / 9, 0.5, 2000);
+    const mixer = new AnimationMixer(camera);
+    const action = mixer.clipAction(
+      new AnimationClip('fly', 2, [new VectorKeyframeTrack('.position', [0, 1, 2], [0, 0, 500, 120, 40, 450, 200, 0, 400])]),
+    );
+    action.play().paused = true;
+    let updates = 0;
+    mixer.update = () => {
+      const k = updates++ & 7;
+      camera.position.x = XS[k]!;
+      camera.position.y = YS[k]!;
+      camera.position.z = DISTANCES[k]!;
+      return mixer;
+    };
+    const rig = makeRig();
+    rig.track([
+      {at: 0, shot: {position: [0, 0], zoom: 1.5}},
+      {at: 0.25, until: 0.75, shot: camera, clip: action, ease: 'ease-in-out'},
+      {at: 1, shot: {position: [100, 50, 200]}, ease: 'ease-out'},
+    ]);
+    let moved = 0;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) {
+        rig.lerp(PROGRESSES[i & 7]!, SMOOTH);
+        if (rig.step(1)) moved++;
+        rig.write();
+        rig.compose();
+      }
+    });
+
+    expect(rig.busy, 'the glide never settles').toBe(true);
+    expect(updates, 'the clip was scrubbed').toBeGreaterThan(CALLS);
     expect(moved, 'every step moved the camera').toBeGreaterThan(CALLS);
     expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
