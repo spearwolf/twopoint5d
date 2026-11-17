@@ -19,9 +19,13 @@ of `public-api.ts` files _is_ the package's API contract:
 - `display/`, `texture/`, `map2d/` (with `chunk-quad-tree/`) and `sprites/` name their
   exports one by one, because their files export for their neighbours as well: a new
   export of such a file stays internal until it is listed. `stage/` and `text/` do the
-  same for those of their files that export internals — `StageDirector.ts`,
-  `StageMask.ts`, `StageTransition.ts`, `transitionEffects.ts` and `maskNodes.ts` in
-  `stage/`, `layoutText.ts` in `text/` — and re-export the rest whole. A helper listed
+  same for those of their files that export internals — `Stage2D.ts`,
+  `CameraFlight.ts`, `CameraProjection.ts`, `cameraPose.ts`, `framing.ts`,
+  `StageDirector.ts`, `StageMask.ts`, `StageTransition.ts`, `transitionEffects.ts` and
+  `maskNodes.ts` in `stage/`, `layoutText.ts` in `text/` — and re-export the rest whole;
+  the other internal files of the camera rig (`cameraShot.ts`, `cameraRest.ts`,
+  `cameraTarget.ts`, `cameraTrack.ts`, `lensChange.ts`, `StageCameraDriver.ts`) are not
+  re-exported at all. A helper listed
   only because an earlier release published it carries `@deprecated`.
 - A new public symbol is not published until it is added to its module's
   `public-api.ts`. `pnpm checkNameableTypes` fails the build when a published
@@ -188,7 +192,35 @@ It imports neither three.js nor the stage layer, which builds on it.
 `Stage2D` is a scene plus a projection; `IProjection` implementations
 (`OrthographicProjection`, `ParallaxProjection`, with `ProjectionPlane` and
 `fitIntoRectangle` doing the geometry) decide how world units map to the viewport when
-the canvas resizes. A `postProcess` gives a stage an effect of its own: a `StagePostProcess`
+the canvas resizes. `framing()` on the two builds one that frames a `Box3` from a side, its
+plane in the face of the box (`framing.ts`). `CameraProjection` looks through a camera of
+one's own — of a `.glb` — and fits its frame into the container; it has no plane, and its
+optional `needsPlacement()` lets `Stage2D#updateFrame()` place the camera again in a frame
+in which the source moved. A stage emits `OnStageCameraPlaced` after every placement of its
+camera by the projection.
+
+`CameraRig` moves the camera of a stage: to a pose in the frame of the projection, to
+another projection, to a camera or an `Object3D` it then locks on to, along a track set by
+`lerp()`, and between a perspective and an orthographic lens as a dolly zoom; its `step()` is
+a frame step that answers a `Motion`. It takes over the camera through an internal driver
+hook, `StageCameraDriver` and `Stage2DInternals` in `Stage2D.ts`: while a rig is attached,
+`stage.camera` is the rig's, and the stage hands each placement to it — the projection
+places a base camera of the rig (`placeBase()`), `OnStageCameraPlaced` goes out, the rig
+composes its shot over that base (`compose()`), and it writes its camera in every
+`updateFrame()` before `OnStageUpdateFrame` (`write()`). The rig is the only writer of its
+camera it listens to: it keeps its state in fields and never reads the camera back. Its
+parts are internal files beside `CameraRig.ts` — `cameraPose.ts` (reading a pose),
+`cameraShot.ts` (the resolved camera state, its blend and its write), `cameraRest.ts` (the
+rest and the frame a projection gives), `cameraTarget.ts` (cameras and objects as
+targets), `cameraTrack.ts` (tracks), `lensChange.ts` (the dolly zoom) —, all of them free
+of allocations on the frame path, which `hot-path-allocations.camera-rig.spec.ts` holds
+them to. `CameraRig.across()` flies the cameras of two rigs through a transition of a
+`StageDirector` (`CameraFlight.ts`): the flight reads the transition, which answers whether
+a layer is frozen and which source it kept through `StageTransitionInternals` and its host,
+so the director keeps no reference to a rig. The proposal is
+[`proposals/camera-rig.md`](./proposals/camera-rig.md).
+
+A `postProcess` gives a stage an effect of its own: a `StagePostProcess`
 builds the node the stage draws over its scene pass, as a layer of a director, under a composing
 renderer or alone. `StageRenderer` composes several stages into one frame, and
 `RootRenderPipeline` / `IPassProvider` wire in post-processing passes. `ClearStage` clears
