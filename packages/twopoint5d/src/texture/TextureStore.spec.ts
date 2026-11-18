@@ -1015,55 +1015,6 @@ describe('TextureStore', () => {
     });
   });
 
-  describe('the deprecated get()', () => {
-    test('resolves as getAsync() does', async () => {
-      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
-        async () => ({width: 2, height: 2}) as unknown as HTMLImageElement,
-      );
-      const store = new TextureStore();
-      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
-      store.onResource('a', (resource) => {
-        resource.textureFactory = {create: () => ({name: 'a', dispose() {}})} as never;
-      });
-
-      const [viaGet, viaGetAsync] = await Promise.all([store.get('a', 'texture'), store.getAsync('a', 'texture')]);
-
-      expect(viaGet).toBeDefined();
-      expect(viaGet).toBe(viaGetAsync);
-
-      store.dispose();
-    });
-
-    test('rejects with messages that name get()', async () => {
-      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockRejectedValue(new Error('404'));
-      const store = new TextureStore(makeRendererStub());
-      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
-
-      await expect(store.get('a', 'texture')).rejects.toThrow(
-        'TextureStore: get("a", "texture") failed at the image step: "a.png"',
-      );
-
-      const ac = new AbortController();
-      ac.abort();
-      await expect(store.get('a', 'texture', {signal: ac.signal})).rejects.toThrow(
-        'TextureStore: get("a", "texture") aborted before subscription',
-      );
-
-      // a store that has not parsed yet keeps the get() waiting until the signal aborts
-      const waiting = new TextureStore();
-      const pending = new AbortController();
-      const aborted = waiting.get('b', 'texture', {signal: pending.signal});
-      pending.abort();
-      await expect(aborted).rejects.toThrow('TextureStore: get("b", "texture") aborted');
-      waiting.dispose();
-
-      store.dispose();
-      await expect(store.get('a', 'texture')).rejects.toThrow(
-        'TextureStore: get("a", "texture") was cancelled: this store has been disposed',
-      );
-    });
-  });
-
   describe('acquireAsync() holds what getAsync() only lends', () => {
     const loadImages = () =>
       vi

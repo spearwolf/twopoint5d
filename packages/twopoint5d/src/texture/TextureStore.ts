@@ -49,12 +49,9 @@ export type TextureResourceSubTypeMap = {
 };
 
 /**
- * Helper type to recursively map a tuple of TextureResourceSubType to their corresponding types.
- *
- * @deprecated A step of {@link MapSubTypes}, not a name to use outside the library. It stays exported until
- *   a breaking release.
+ * A step of {@link MapSubTypes}: maps a tuple of subtypes to the tuple of their values.
  */
-export type MapTuple<T extends readonly TextureResourceSubType[]> = T extends readonly [
+type MapTuple<T extends readonly TextureResourceSubType[]> = T extends readonly [
   infer First extends TextureResourceSubType,
   ...infer Rest extends TextureResourceSubType[],
 ]
@@ -62,15 +59,11 @@ export type MapTuple<T extends readonly TextureResourceSubType[]> = T extends re
   : [];
 
 /**
- * Maps an array of TextureResourceSubType to a tuple of their corresponding types.
- * For single types, returns the mapped type directly.
- *
- * @deprecated A helper of the signatures of {@link TextureStore}, not a name to use: name the value of one
- *   subtype as `TextureResourceSubTypeMap['atlas']`, and the values of a list as a tuple of them,
- *   `[TextureResourceSubTypeMap['atlas'], TextureResourceSubTypeMap['texture']]`. It stays exported until a
- *   breaking release.
+ * Maps a subtype to its value, and a list of subtypes to the tuple of their values: the helper of the
+ * signatures of {@link TextureStore}, not exported. Name the value of one subtype as
+ * `TextureResourceSubTypeMap['atlas']`, and the values of a list as a tuple of them.
  */
-export type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (keyof TextureResourceSubTypeMap)[]> =
+type MapSubTypes<T extends keyof TextureResourceSubTypeMap | readonly (keyof TextureResourceSubTypeMap)[]> =
   T extends keyof TextureResourceSubTypeMap
     ? TextureResourceSubTypeMap[T]
     : T extends readonly TextureResourceSubType[]
@@ -92,7 +85,7 @@ export type TextureStoreErrorEvent =
  *
  * - `Ready` (retained): fires once per `parse()` call after all signals have settled.
  *   Payload: the `TextureStore` instance. Every listener hears it and the retained value is
- *   written, even behind one that throws. A `whenReady()`, `whenResource()`, `getAsync()`, `get()`,
+ *   written, even behind one that throws. A `whenReady()`, `whenResource()`, `getAsync()`,
  *   `acquireAsync()` or `on()` that a listener starts hears this `ready`, behind the last listener.
  * - `RendererChanged` (retained): fires whenever `renderer` is reassigned (incl. `undefined`).
  *   Payload: the new `WebGPURenderer | undefined`. Every listener hears it and the retained
@@ -343,14 +336,6 @@ export interface TextureStore extends EventizedObject {}
  * build. Every image is fetched once, however many resources name it. Every resource builds
  * its own texture and keeps it; a caller only borrows it, and {@link TextureStore.acquireAsync}
  * holds the resource for as long as the caller needs it.
- *
- * The four callback loaders — `TextureImageLoader`, `TileSetLoader`, `TextureAtlasLoader`
- * and `PowerOf2ImageLoader` — are the older way and deprecated, and the same image comes out
- * of them differently. A loader pads an image whose sides are no powers of 2 onto a canvas
- * whose sides are, hands out its coordinates as a child of that canvas and starts from the
- * texture class `nearest`; the store loads the image as it is, its `imageCoords` are the root
- * of the image, and it starts from no texture class. The texture of a loader belongs to its
- * caller.
  */
 export class TextureStore {
   /**
@@ -777,7 +762,7 @@ export class TextureStore {
    * A listener of `ready`, `resource:<id>` or `error` that throws changes nothing of the parse:
    * every listener hears its event, eventize reports the throw on the console, and `parse()` goes
    * on and returns as usual. What a listener of `ready` starts — `whenReady()`, `whenResource()`,
-   * `getAsync()`, `get()`, `acquireAsync()`, `on()` — hears that `ready` behind the last listener
+   * `getAsync()`, `acquireAsync()`, `on()` — hears that `ready` behind the last listener
    * of it, ahead of the `resource:<id>` events; should one of them throw as it hears it, the throw
    * is reported on the console as well, and `parse()` goes on. Nor does a subscriber of a resource
    * — of {@link TextureStore.on} among them — that throws while the values are written: every
@@ -1348,27 +1333,11 @@ export class TextureStore {
     return this.#getOnce('acquireAsync', id, type, options, true);
   }
 
-  /**
-   * Resolve with the value (or tuple of values) of the given subtype(s) as soon as the
-   * resource `id` has them, as {@link TextureStore.getAsync} does; its messages name `get()`.
-   *
-   * @deprecated Use {@link TextureStore.getAsync}: it answers once, as a promise, where a
-   *   `get()` of a `Map` answers right away. It stays as an alias until a breaking release
-   *   removes it.
-   */
-  get<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
-    id: string,
-    type: T,
-    options?: {signal?: AbortSignal},
-  ): Promise<MapSubTypes<T>> {
-    return this.#getOnce('get', id, type, options, false);
-  }
-
-  // the body of getAsync(), of its alias and of acquireAsync(); every message names the method the
-  // caller wrote, so that it leads back to the line it came from. With `asLease` the promise
+  // the body of getAsync() and of acquireAsync(); every message names the method the caller
+  // wrote, so that it leads back to the line it came from. With `asLease` the promise
   // resolves with a lease that holds the resource the value came from
   #getOnce<const T extends TextureResourceSubType | readonly TextureResourceSubType[], H extends boolean>(
-    method: 'get' | 'getAsync' | 'acquireAsync',
+    method: 'getAsync' | 'acquireAsync',
     id: string,
     type: T,
     options: {signal?: AbortSignal} | undefined,

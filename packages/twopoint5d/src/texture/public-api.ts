@@ -46,12 +46,6 @@ export {
 } from './FrameBasedAnimations.js';
 export {FrameTable, frameTable, type FrameTableBakeOptions, type FrameTableEntry} from './FrameTable.js';
 export {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
-export {
-  type ImageWithTexCoords,
-  type PowerOf2ImageLoadCallback,
-  PowerOf2ImageLoader,
-  type PowerOf2ImageLoadErrorCallback,
-} from './PowerOf2ImageLoader.js';
 export {type AtlasFrameWrap, sampleAtlasFrame, type SampleAtlasFrameOptions} from './sampleAtlasFrame.js';
 export {
   type NamedTextureAtlasArgs,
@@ -61,13 +55,6 @@ export {
   type TextureAtlasFrameData,
   type TextureAtlasFrameName,
 } from './TextureAtlas.js';
-export {
-  type TextureAtlasData,
-  type TextureAtlasLoadCallback,
-  TextureAtlasLoader,
-  type TextureAtlasLoadErrorCallback,
-  type TextureAtlasLoadOptions,
-} from './TextureAtlasLoader.js';
 export {TextureCoords} from './TextureCoords.js';
 export {
   isTextureOptionClass,
@@ -76,12 +63,6 @@ export {
   type TextureOptionClasses,
   type TextureOptions,
 } from './TextureFactory.js';
-export {
-  type TextureImage,
-  type TextureImageLoadCallback,
-  TextureImageLoader,
-  type TextureImageLoadErrorCallback,
-} from './TextureImageLoader.js';
 export {
   type TexturePackerArrayFrameData,
   type TexturePackerFrameData,
@@ -102,8 +83,6 @@ export {
   TileSetTextureResource,
 } from './TextureResource.js';
 export {
-  type MapSubTypes,
-  type MapTuple,
   type TextureResourceSubTypeMap,
   TextureStore,
   type TextureStoreErrorEvent,
@@ -113,7 +92,6 @@ export {
   type TextureStoreParseOptions,
 } from './TextureStore.js';
 export {TileSet, type TileSetOptions} from './TileSet.js';
-export {type TileSetData, type TileSetLoadCallback, TileSetLoader, type TileSetLoadErrorCallback} from './TileSetLoader.js';
 export type {
   FrameBasedAnimationsData,
   FrameBasedAnimationsDataByAtlas,

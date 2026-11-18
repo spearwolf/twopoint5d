@@ -50,13 +50,9 @@ const POINTERCANCEL = 'pointercancel';
 type KeyedSpeedField = 'speedNorth' | 'speedSouth' | 'speedEast' | 'speedWest';
 
 const DEFAULT_KEYS = ['KeyW', 'KeyS', 'KeyA', 'KeyD'] as const;
-const DEFAULT_KEY_CODES = [87, 83, 65, 68] as const;
 
-// the speed field each of the four keys drives, in the order keys and keyCodes list them
+// the speed field each of the four keys drives, in the order keys lists them
 const KEYED_SPEED_FIELDS: readonly KeyedSpeedField[] = ['speedNorth', 'speedSouth', 'speedWest', 'speedEast'];
-
-const holdsDefault = (values: readonly unknown[], defaults: readonly unknown[]): boolean =>
-  values.length === defaults.length && values.every((value, index) => value === defaults[index]);
 
 // the rule name is taken from the cursor value, so that controls with different cursors get
 // rules of their own. Every character outside [a-zA-Z0-9-] is written as _<hex>_ — "_" as well —
@@ -158,24 +154,6 @@ export interface PanControl2DOptions {
   keys?: [string, string, string, string];
 
   /**
-   * Key codes in this order:
-   * 1. up
-   * 2. down
-   * 3. left
-   * 4. right
-   *
-   * Default is `[87, 83, 65, 68]`.
-   *
-   * @deprecated Use {@link PanControl2DOptions.keys}. `KeyboardEvent.keyCode` depends on the
-   * keyboard layout. As long as `keyCodes` holds anything other than `[87, 83, 65, 68]` and
-   * `keys` holds its default, the control compares `event.keyCode` with `keyCodes` instead of
-   * `event.code` with `keys`.
-   *
-   * The control works on a copy of the array.
-   */
-  keyCodes?: [number, number, number, number];
-
-  /**
    * The target the `pointerdown` that starts a pan is listened for on. Default is `document`: a
    * press anywhere on the page starts a pan. Name the canvas, or an element around it, and a press
    * elsewhere starts none. The `pointermove`, `pointerup` and `pointercancel` of a drag are
@@ -208,8 +186,8 @@ export class PanControl2D extends InputControlBase {
   #releasedPanX = 0;
   #releasedPanY = 0;
 
-  // the field name a key currently holds up, not the key that raised it — keys and keyCodes are
-  // public and writable, and what a key held down gives back is the field it moved
+  // the field name a key currently holds up, not the key that raised it —
+  // keys can be rebound while a key is down, and what a key held down gives back is the field it moved
   #keyedSpeeds = new Set<KeyedSpeedField>();
 
   // Assigned in the constructor through the `cursorPanStyle` setter.
@@ -250,14 +228,6 @@ export class PanControl2D extends InputControlBase {
     }
     this.#keys = value;
   }
-
-  /**
-   * The key codes for up, down, left and right.
-   *
-   * @deprecated Use {@link PanControl2D.keys}. See {@link PanControl2DOptions.keyCodes} for when
-   * these still decide.
-   */
-  keyCodes: [number, number, number, number];
 
   #pointerDisabled = false;
   #keyboardDisabled = false;
@@ -374,10 +344,6 @@ export class PanControl2D extends InputControlBase {
     // an option the setter refuses leaves the default standing
     if (this.#cursorPanClass == null) this.cursorPanStyle = 'none';
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
-
-    // A copy, because keyCodes is public and writable, and `keyCodes[0] = 38` rebinds in place: a
-    // rebinding on this control changes neither the options nor another control built from them
-    this.keyCodes = [...(options?.keyCodes ?? DEFAULT_KEY_CODES)] as [number, number, number, number];
 
     // before pointerDisabled below: the setter hangs the pointerdown listener on this target
     this.#pointerTarget = readOption(options, 'pointerTarget', document);
@@ -790,15 +756,7 @@ export class PanControl2D extends InputControlBase {
   }
 
   #speedFieldFor(event: KeyboardEvent): KeyedSpeedField | undefined {
-    // keyCodes is deprecated and only decides when a caller set it. That is read off the
-    // values, not a flag: the field is public and holds an array of its own, so a
-    // keyCodes[0] = 38 rebinds in place and has to keep working. Whoever sets keys to
-    // anything but its default gets keys, whatever keyCodes holds
-    const index =
-      holdsDefault(this.keys, DEFAULT_KEYS) && !holdsDefault(this.keyCodes, DEFAULT_KEY_CODES)
-        ? this.keyCodes.indexOf(event.keyCode)
-        : this.keys.indexOf(event.code);
-    return KEYED_SPEED_FIELDS[index];
+    return KEYED_SPEED_FIELDS[this.keys.indexOf(event.code)];
   }
 
   #releaseKeyedSpeeds(): void {
@@ -860,9 +818,8 @@ export class PanControl2D extends InputControlBase {
    * refused: a disposed control retains no more rules from a stylesheet that is not its
    * own.
    *
-   * `pixelsPerSecond`, `mouseButton`, `keys`, `keyCodes`, `keyboardDisabled`,
-   * `pointerDisabled`, `panView` and the four `speed…` fields still take values; they
-   * drive nothing.
+   * `pixelsPerSecond`, `mouseButton`, `keys`, `keyboardDisabled`, `pointerDisabled`,
+   * `panView` and the four `speed…` fields still take values; they drive nothing.
    *
    * A control that was hiding the cursor emits one last `OnPanControl2DRestoreCursor`
    * while its subscribers can still hear it; after that every listener on this control

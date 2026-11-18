@@ -33,6 +33,13 @@ const ACCEPTED = new Map([
           'and that union is everything a caller ever passes',
       ],
       [
+        'texture/TextureStore.d.ts:MapSubTypes',
+        'a helper of the signatures of `getAsync()`, `on()` and `acquireAsync()`, not a name to use: ' +
+          'a caller names the value of one subtype as `TextureResourceSubTypeMap[…]`, and the values of a ' +
+          'list as a tuple of them',
+      ],
+      ['texture/TextureStore.d.ts:MapTuple', 'a step of `MapSubTypes`, reached only through it'],
+      [
         'display/DisplayFullscreen.d.ts:DisplayFullscreenHost',
         'the seam between a Display and the DisplayFullscreen it builds: only the display constructs ' +
           'the controller, and a caller reaches it through `display.fullscreen`, never through `new`',

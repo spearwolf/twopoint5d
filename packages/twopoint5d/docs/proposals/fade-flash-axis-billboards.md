@@ -301,7 +301,7 @@ the export.
 same frame names and the same coords; `gem` and `hero` come out turned (`FLIP_DIAGONAL |
 FLIP_VERTICAL`, the area `h × w` in the sheet), `hero` with the trim margins `[2/9, 1/9, 3/9,
 2/9]`, `banner` upright and untrimmed; `prepareSpriteFrame()` of `hero`; `isAtlasJsonResponse()`
-accepts both, so `TextureAtlasLoader` and `TextureStore` take them.
+accepts both, so `TextureStore` takes them.
 
 **Browser** (`sprites-free-tex-packer.test.js`): the sheet loaded from the fixture, `gem` and
 `hero` drawn through `TexturedSpriteKind` + `setFrame()`, each cell of each sprite the color the

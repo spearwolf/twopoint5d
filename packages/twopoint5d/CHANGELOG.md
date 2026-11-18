@@ -70,6 +70,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureStore.load(url)` and `TextureStore#load(url, options)`, the deprecated names of `loadAsync()` (**BREAKING**). See the Migration Guide
 - `Map2DSpatialHashGrid.getKey()` and the type `Map2DSpatialHashGridKeyType`, deprecated (**BREAKING**). See the Migration Guide
 - the export of `base64toUint32Arr()`, deprecated (**BREAKING**). See the Migration Guide
+- `PowerOf2ImageLoader`, `TextureImageLoader`, `TextureAtlasLoader` and `TileSetLoader`, with `ImageWithTexCoords`, `TextureImage`, `TextureAtlasData`, `TextureAtlasLoadOptions`, `TileSetData` and their callback types, deprecated (**BREAKING**). See the Migration Guide
+- `TextureResource#load()` and `TextureStore#get()`, the deprecated names of `activate()` and `getAsync()` (**BREAKING**). See the Migration Guide
+- `TextureOptions#anisotrophy` and the texture classes `anisotrophy`, `anisotrophy-2`, `anisotrophy-4` and `no-anisotrophy`, deprecated: a catalog of a `TextureStore` that names one of them gets it reported as a class no `TextureFactory` knows (**BREAKING**). See the Migration Guide
+- the `keyCodes` option and the `PanControl2D#keyCodes` field, deprecated: the control pans by `keys` alone, compared with `event.code` (**BREAKING**). See the Migration Guide
+- the exports of the types `MapTuple` and `MapSubTypes`, deprecated (**BREAKING** for TypeScript). See the Migration Guide
 
 ### Fixed
 
@@ -83,7 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageDirector#precompile()` rejects with an `Error` when the render pipeline draws a shape without going through `renderer.render()`, which compiles nothing, and the next call builds that shape again (see "No hitch on the first transition" in `docs/stages.md`)
 - `new Stage2D()` takes its scene before its projection: a subclass that reads `scene` or `name` while the projection is set finds them
 - an `atlasJson` written to an `AtlasTextureResource` after its fetch answered and before the resource read the answer stays in place: the fetched json does not replace it, and the aborted fetch reports no error
-- `TextureImageLoader#load()` without an `onErrorCallback` reports a texture it could not build with `console.error`, as `PowerOf2ImageLoader#load()` does for its failures, and calls no `onLoadCallback`
 - `TextureAtlas` lets go of a frame name by binary search, so `DynamicAtlas#remove()` of many frames compares no element of the name list one by one
 - `defineSprite()` takes usage words, attributes and methods named like a member of `Object.prototype` — `constructor`, `toString`, `__proto__` — as words, attributes and methods of their own, a method `__proto__` on the sprite handle included, and refuses an alias to such a name that the feature declares no attribute for with `defineSprite: feature "…" aliases "…" to "toString", which it does not declare`
 - the frame context of a feature refuses a read of a texture named like a member of `Object.prototype`, such as `toString`, that the feature does not declare: `FeatureSpritesMaterial: feature "…" reads the texture "toString", which it does not declare`
@@ -143,6 +147,24 @@ new PanControl2D({keys: ['ArrowUp'] as unknown as [string, string, string, strin
 ```ts
 new PanControl2D({keys: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']});
 ```
+
+#### `PanControl2D#keyCodes` is gone
+
+**Before**
+
+```ts
+new PanControl2D({keyCodes: [38, 40, 37, 39]});
+control.keyCodes[0] = 38;
+```
+
+**After**
+
+```ts
+new PanControl2D({keys: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']});
+control.keys[0] = 'ArrowUp';
+```
+
+`keys` names the `KeyboardEvent.code` of a key, its position, whatever the layout labels it; a `keyCodes` passed in is not read.
 
 #### Map queries and tile patterns refuse what they dropped
 
@@ -228,6 +250,71 @@ factory.create(image, 'nearest', 'mag-nearest'); // name the narrow class in the
 
 Or build the factory without the narrow default.
 
+#### The texture loaders are gone
+
+**Before**
+
+```ts
+const {texture, texCoords} = await new TextureImageLoader().loadAsync('hero.png', ['nearest']);
+const {atlas} = await new TextureAtlasLoader().loadAsync('sheet.json', ['nearest']);
+const {tileSet} = await new TileSetLoader().loadAsync('tiles.png', {tileWidth: 16, tileHeight: 16}, ['nearest']);
+```
+
+**After**
+
+```ts
+const store = new TextureStore(renderer);
+store.parse({
+  defaultTextureClasses: ['nearest'],
+  items: {
+    hero: {imageUrl: 'hero.png'},
+    sheet: {atlasUrl: 'sheet.json'},
+    tiles: {imageUrl: 'tiles.png', tileSet: {tileWidth: 16, tileHeight: 16}},
+  },
+});
+const [texture, imageCoords] = await store.getAsync('hero', ['texture', 'imageCoords']);
+const atlas = await store.getAsync('sheet', 'atlas');
+const tileSet = await store.getAsync('tiles', 'tileSet');
+```
+
+A loader pads an image whose sides are no powers of 2 onto a canvas whose sides are, hands out its coordinates as a child of that canvas, starts from the texture class `nearest` and gives the texture to its caller to dispose. The store loads the image as it is, its `imageCoords` are the root of the image, it starts from no texture class — name `nearest` in the catalog where the loader gave it — and it keeps the texture (`acquireAsync()` holds it). `PowerOf2ImageLoader` built no texture; an image item with `getAsync(id, 'imageCoords')` takes its place, unpadded, and the padding to powers of 2 has no counterpart.
+
+#### `TextureResource#load()` and `TextureStore#get()` are gone
+
+**Before**
+
+```ts
+resource.load();
+const texture = await store.get('hero', 'texture');
+```
+
+**After**
+
+```ts
+resource.activate();
+const texture = await store.getAsync('hero', 'texture');
+```
+
+The messages of a refusal name `getAsync()`.
+
+#### The `anisotrophy` spelling is gone
+
+**Before**
+
+```ts
+new TextureFactory(renderer, ['anisotrophy-4'], {anisotrophy: 4});
+factory.getOptions(['no-anisotrophy']).anisotrophy; // 0
+```
+
+**After**
+
+```ts
+new TextureFactory(renderer, ['anisotropy-4'], {anisotropy: 4}); // the same values
+factory.getOptions(['no-anisotropy']).anisotropy; // 1, which three.js counts as none
+```
+
+A catalog renames the classes in `texture` and `defaultTextureClasses`; one that keeps them gets an `error` event from `parse()` and the class left out, and the static `TextureStore.loadAsync()` rejects.
+
 #### The deprecated exports of map2d are gone
 
 **Before**
@@ -250,6 +337,22 @@ class MyChunk extends DataIdsChunk2D {
 ```
 
 `base64toUint32Arr()` is the helper of `DataIdsChunk2D`; a subclass that overrides `prepareData()` decodes the ids through `super.prepareData()`.
+
+#### `MapTuple` and `MapSubTypes` are no longer exported
+
+**Before**
+
+```ts
+const values: MapSubTypes<['atlas', 'texture']> = await store.getAsync('hero', ['atlas', 'texture']);
+```
+
+**After**
+
+```ts
+const values: [TextureResourceSubTypeMap['atlas'], TextureResourceSubTypeMap['texture']] = await store.getAsync('hero', ['atlas', 'texture']);
+```
+
+Or leave the type to inference.
 
 #### A geometry handed a pool takes the capacity of the pool
 

@@ -2356,7 +2356,7 @@ describe('TextureResource', () => {
   });
 
   describe('the types of the shapes', () => {
-    test('the static factories answer the class of the shape, and activate() and load() answer the same', () => {
+    test('the static factories answer the class of the shape, and activate() answers the same', () => {
       const image = TextureResource.fromImage('hero', 'hero.png');
       const tiles = TextureResource.fromTileSet('tiles', 'tiles.png', {tileWidth: 16, tileHeight: 16});
       const atlas = TextureResource.fromAtlas('deco', 'deco.json');
@@ -2365,7 +2365,7 @@ describe('TextureResource', () => {
       expectTypeOf(tiles).toEqualTypeOf<TileSetTextureResource>();
       expectTypeOf(atlas).toEqualTypeOf<AtlasTextureResource>();
       expectTypeOf(image.activate()).toEqualTypeOf<ImageTextureResource>();
-      expectTypeOf(atlas.load()).toEqualTypeOf<AtlasTextureResource>();
+      expectTypeOf(atlas.activate()).toEqualTypeOf<AtlasTextureResource>();
       expect([image, tiles, atlas].map((resource) => resource instanceof TextureResource)).toEqual([true, true, true]);
 
       for (const resource of [image, tiles, atlas]) resource.dispose();
@@ -2573,7 +2573,7 @@ describe('TextureResource', () => {
       resource.dispose();
     });
 
-    test('load() is a deprecated alias of activate() and registers the effects once', () => {
+    test('activate() answers the resource and registers the effects once, however often it is called', () => {
       const baselineEffects = getEffectsCount();
 
       const once = TextureResource.fromTileSet('once', 'tiles.png', {tileWidth: 16, tileHeight: 16});
@@ -2583,9 +2583,9 @@ describe('TextureResource', () => {
       once.dispose();
 
       const resource = TextureResource.fromTileSet('t', 'tiles.png', {tileWidth: 16, tileHeight: 16});
-      expect(resource.load()).toBe(resource);
       expect(resource.activate()).toBe(resource);
-      expect(resource.load()).toBe(resource);
+      expect(resource.activate()).toBe(resource);
+      expect(resource.activate()).toBe(resource);
 
       expect(getEffectsCount() - baselineEffects).toBe(effectsOfOne);
 

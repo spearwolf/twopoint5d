@@ -893,15 +893,6 @@ export abstract class TextureResource {
   }
 
   /**
-   * @deprecated Use {@link TextureResource.activate}: it registers the effects of this resource
-   *   and loads nothing by itself. The old name stays as an alias until a breaking release
-   *   removes it.
-   */
-  load(): this {
-    return this.activate();
-  }
-
-  /**
    * Register the effects of the shape of this resource. {@link TextureResource.activate} calls it
    * once, after the image effect and before the fallback of the texture factory.
    *
@@ -1648,9 +1639,9 @@ export class AtlasTextureResource extends TextureResource {
           });
           return;
         }
-        // the resolved url goes into the published json, mirroring `TextureAtlasLoader`: `atlasJson`
-        // is typed as `TexturePackerJsonData`, whose `meta.image` is a `string`, so the resolved url
-        // has to land in the json itself rather than in a cast that would let the getter lie. The
+        // the resolved url goes into the published json: `atlasJson` is typed as
+        // `TexturePackerJsonData`, whose `meta.image` is a `string`, so the resolved url has to land
+        // in the json itself rather than in a cast that would let the getter lie. The
         // fetched json, without the override, stays in `#fetchedAtlasJson`, so an override that is
         // cleared again gives the image back to the one the json names. Written straight onto the
         // signal, because the public setter treats a write as a json from outside and drops the

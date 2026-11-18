@@ -43,7 +43,6 @@ describe('TextureFactory — anisotropic filtering against a real renderer', fun
     expect(texture.anisotropy, 'the anisotropy three.js will build the sampler with').to.equal(
       Math.min(4, Math.max(1, renderer.getMaxAnisotropy())),
     );
-    expect(texture).to.not.have.own.property('anisotrophy');
   });
 });
 

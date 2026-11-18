@@ -31,7 +31,6 @@ function makeControl(options?: PanControl2DOptions): PanControl2D {
 
 interface KeyInit {
   code?: string;
-  keyCode?: number;
   ctrlKey?: boolean;
   metaKey?: boolean;
   altKey?: boolean;
@@ -45,7 +44,6 @@ function keyEvent(type: 'keydown' | 'keyup', {origin, ...init}: KeyInit): Event 
   const event = new Event(type);
   Object.defineProperties(event, {
     code: {value: init.code ?? ''},
-    keyCode: {value: init.keyCode ?? 0},
     ctrlKey: {value: init.ctrlKey ?? false},
     metaKey: {value: init.metaKey ?? false},
     altKey: {value: init.altKey ?? false},
@@ -280,42 +278,19 @@ describe('PanControl2D', () => {
       expect(control.speedWest).toBe(100);
     });
 
-    it('keyCodes decide while keys holds its default', () => {
-      const control = makeControl({keyCodes: [38, 40, 37, 39]});
-
-      key('keydown', {code: 'KeyW', keyCode: 87});
-      expect(control.speedNorth).toBe(0);
-
-      key('keydown', {code: 'ArrowUp', keyCode: 38});
-      expect(control.speedNorth).toBe(100);
-    });
-
-    it('copies keys and keyCodes of the options: a rebinding in place on one control leaves the options and a second control built from them as they are', () => {
+    it('copies keys of the options: a rebinding in place on one control leaves the options and a second control built from them as they are', () => {
       const keys: [string, string, string, string] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-      const keyCodes: [number, number, number, number] = [38, 40, 37, 39];
-      const first = makeControl({keys, keyCodes});
-      const second = makeControl({keys, keyCodes});
+      const first = makeControl({keys});
+      const second = makeControl({keys});
 
       first.keys[2] = 'KeyJ';
-      first.keyCodes[0] = 73;
 
       expect(keys).toEqual(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
-      expect(keyCodes).toEqual([38, 40, 37, 39]);
       expect(second.keys).toEqual(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
       key('keydown', {code: 'ArrowLeft'});
       expect(second.speedWest).toBe(100);
       expect(first.speedWest).toBe(0);
-    });
-
-    it('keys win over keyCodes when both are set', () => {
-      const control = makeControl({keys: ['KeyI', 'KeyK', 'KeyJ', 'KeyL'], keyCodes: [38, 40, 37, 39]});
-
-      key('keydown', {code: 'ArrowUp', keyCode: 38});
-      expect(control.speedNorth).toBe(0);
-
-      key('keydown', {code: 'KeyI', keyCode: 73});
-      expect(control.speedNorth).toBe(100);
     });
 
     it('disableKeyboard keeps the keys out until keyboardDisabled is written false', () => {

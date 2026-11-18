@@ -14,10 +14,6 @@ to the caller: not disposed, not cleared, not modified. Handing a resource out d
 transfer it either; returning a pool from a getter keeps you the owner.
 
 **What a method builds for its caller and keeps no reference to belongs to the caller.**
-The loaders of the texture module —
-[`TextureImageLoader`](../src/texture/TextureImageLoader.ts),
-[`TileSetLoader`](../src/texture/TileSetLoader.ts),
-[`TextureAtlasLoader`](../src/texture/TextureAtlasLoader.ts) —,
 [`TextureFactory`](../src/texture/TextureFactory.ts)`#create()`, `#load()` and
 `#loadAsync()`, and
 [`FrameBasedAnimations`](../src/texture/FrameBasedAnimations.ts)`#bakeDataTexture()` and

@@ -72,8 +72,6 @@ item, so the json that names an image also says how it is read.
 | `repeat-t`, `mirror-t`, `clamp-t` | `wrapT` alone |
 
 `s` runs along the width of the image, `t` along its height, as three.js names them.
-`anisotrophy`, `anisotrophy-2`, `anisotrophy-4` and `no-anisotrophy` are deprecated spellings of
-the anisotropy classes.
 
 **Which classes a texture needs.**
 
@@ -748,25 +746,3 @@ and no texture is ever built.
 
 The events are retained: a listener that comes late still hears the current value. Without a store
 there is no image cache, no `getAsync()` and no `refCount` to hold it by — `dispose()` is up to you.
-
-## Deprecated names
-
-| deprecated | use |
-| --- | --- |
-| `store.get(id, subtypes)` | `store.getAsync(id, subtypes)` |
-| `resource.load()` | `resource.activate()` |
-| `MapSubTypes`, `MapTuple` | `TextureResourceSubTypeMap['atlas']`, or a tuple of them |
-| `TextureImageLoader`, `TileSetLoader`, `TextureAtlasLoader`, `PowerOf2ImageLoader` | a `TextureStore` |
-| the classes `anisotrophy`, `anisotrophy-2`, `anisotrophy-4`, `no-anisotrophy` | `anisotropy`, `anisotropy-2`, `anisotropy-4`, `no-anisotropy` |
-| `TextureOptions#anisotrophy`, counted from 0, where 0 is none — in `defaultOptions` and in what `getOptions()` answers | `TextureOptions#anisotropy`, counted as three.js counts it, from 1 |
-
-`TextureImageLoader`, `TileSetLoader` and `TextureAtlasLoader` differ from the store in what they
-hand out: they pad an image whose sides are no powers of 2 onto a canvas whose sides are, start from
-the texture class `nearest`, and give the texture to the caller to dispose. Moving to the store
-means naming the classes in the catalog — `nearest` among them, where the loader gave it — and
-leaving the disposal to the store.
-
-`PowerOf2ImageLoader` builds no texture at all: it hands out the padded image and its
-`TextureCoords`, `{imgEl, texCoords}`, and nothing of it needs disposing. In a store an image item
-takes its place, with `getAsync(id, 'imageCoords')` for the coordinates — of the image as it is,
-unpadded.

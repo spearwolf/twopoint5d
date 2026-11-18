@@ -36,11 +36,6 @@ export interface TextureOptions {
    * - A texture keeps what it was built with.
    */
   anisotropy: number;
-  /**
-   * @deprecated Use {@link TextureOptions.anisotropy}, which counts as three.js does. This one
-   *   counts from 0, where 0 is none, and stays until a breaking release removes it.
-   */
-  anisotrophy?: number;
   flipY: boolean;
   /**
    * Whether three.js builds the mip levels of the texture. No class of the factory's seed writes it: a
@@ -57,9 +52,8 @@ export interface TextureOptions {
   wrapT: Wrapping;
 }
 
-// The anisotropy classes write a raw value that `getOptions()` turns into both counts: 0 for
-// none, anything else capped at the maximum of the renderer. The `anisotrophy` names are
-// aliases and write the same values as the names they stand for.
+// The anisotropy classes write a raw value that `getOptions()` caps at the maximum of the
+// renderer and counts from 1 as three.js does; 0 is none.
 const TextureClasses = {
   anisotropy: {
     anisotropy: Infinity,
@@ -71,18 +65,6 @@ const TextureClasses = {
     anisotropy: 4,
   },
   'no-anisotropy': {
-    anisotropy: 0,
-  },
-  anisotrophy: {
-    anisotropy: Infinity,
-  },
-  'anisotrophy-2': {
-    anisotropy: 2,
-  },
-  'anisotrophy-4': {
-    anisotropy: 4,
-  },
-  'no-anisotrophy': {
     anisotropy: 0,
   },
   nearest: {
@@ -169,10 +151,6 @@ const TextureClasses = {
  * {@link TextureStore} the classes of an item behind its defaults: the later one overrules the one it
  * collides with on equal breadth, and a narrower default keeps the last word against a broader
  * class — a `mag-linear` default stands, even when the call or the item asks for `nearest`.
- *
- * `anisotrophy`, `anisotrophy-2`, `anisotrophy-4` and `no-anisotrophy` are deprecated aliases
- * of `anisotropy`, `anisotropy-2`, `anisotropy-4` and `no-anisotropy`, and stay in this union
- * until a breaking release removes them.
  */
 export type TextureOptionClasses = keyof typeof TextureClasses;
 
@@ -200,10 +178,6 @@ const TextureClassPriority: Record<TextureOptionClasses, number> = {
   'anisotropy-2': 500,
   'anisotropy-4': 500,
   'no-anisotropy': 500,
-  anisotrophy: 500,
-  'anisotrophy-2': 500,
-  'anisotrophy-4': 500,
-  'no-anisotrophy': 500,
 
   flipy: 500,
   'no-flipy': 500,
@@ -249,7 +223,8 @@ export class TextureFactory {
   // field, and getOptions() runs once per texture, not per frame
   readonly #maxAnisotropy: () => number;
   // the options the classes are applied on top of, with the raw value of the anisotropy
-  // classes under `anisotropy`; getOptions() turns it into the two counts it answers with
+  // classes under `anisotropy`; getOptions() caps it at the maximum of the renderer and counts
+  // it from 1 as three.js does
   readonly #seedOptions: Partial<TextureOptions>;
   // a copy, so an array the caller changes later leaves this factory as it was
   readonly #defaultClassNames: readonly TextureOptionClasses[];
@@ -283,12 +258,11 @@ export class TextureFactory {
     }
     // every factory starts from this seed; `defaultOptions` are laid over it, and a key they leave out
     // or give as `undefined` keeps the value of the seed
-    const {anisotrophy, ...given} = defaultOptions ?? {};
+    const given = defaultOptions ?? {};
     const defined = Object.fromEntries(
       Object.entries(given).filter(([, value]) => value !== undefined),
     ) as Partial<TextureOptions>;
-    // the deprecated key stands in for the one it names while that one is missing
-    this.#seedOptions = {flipY: false, ...defined, anisotropy: defined.anisotropy ?? anisotrophy ?? 0};
+    this.#seedOptions = {flipY: false, ...defined, anisotropy: defined.anisotropy ?? 0};
     this.#defaultClassNames = defaultClassNames.slice();
     this.textureLoader = new TextureLoader();
   }
@@ -296,19 +270,16 @@ export class TextureFactory {
   /**
    * The texture options the given classes add up to, sorted together with the default classes of
    * this factory, on top of its default options.
-   * The anisotropy comes in both counts: `anisotropy` as three.js counts it and as
-   * {@link TextureFactory.update} gives it to the texture, the deprecated `anisotrophy` from 0.
+   * `anisotropy` comes counted as three.js counts it, from 1, as {@link TextureFactory.update}
+   * gives it to the texture.
    *
    * A name that is no texture option class is skipped; `TextureStore#parse()` reports such a
    * name when a catalog carries it.
    */
   getOptions(classNames: readonly TextureOptionClasses[]): Partial<TextureOptions> {
     const options = this.#mergeOptions(classNames);
-    // one raw value, two counts: `anisotropy` is what update() gives the texture, and the
-    // deprecated `anisotrophy` counts from 0, where 0 is none
-    const anisotropy = Math.min(options.anisotropy ?? 0, this.#maxAnisotropy());
-    options.anisotropy = Math.max(1, anisotropy);
-    options.anisotrophy = anisotropy;
+    // the raw value of the classes, capped at the maximum of the renderer; three.js counts 1 as none
+    options.anisotropy = Math.max(1, Math.min(options.anisotropy ?? 0, this.#maxAnisotropy()));
     return options;
   }
 
@@ -351,10 +322,8 @@ export class TextureFactory {
   update(texture: Texture, ...classNames: Array<TextureOptionClasses>): Texture {
     const textureOptions = this.getOptions(classNames);
     const {anisotropy} = textureOptions;
-    // both keys stay out of the assignment: the deprecated one is no field of a texture, and
-    // the other is set once below
+    // `anisotropy` stays out of the assignment and is set once below
     delete textureOptions.anisotropy;
-    delete textureOptions.anisotrophy;
     Object.assign(texture, textureOptions);
     // three.js counts anisotropy from 1 (= no anisotropic filtering) and validates the
     // value when it builds the sampler; getOptions() answers it counted that way

@@ -146,10 +146,7 @@ until its lease is released. A resource is an `ImageTextureResource`, a `TileSet
 or an `AtlasTextureResource` by its shape, each with the inputs of that shape alone, on the base
 `TextureResource`; the store hands out their union, `AnyTextureResource`, which `type` narrows.
 `TexturePackerJson` reads the TexturePacker formats, JSON Hash and JSON Array, rotated frames
-included. The four `*Loader` classes are the older way and deprecated; they pad an image to
-power-of-two sides, hand out its coordinates as a child of the padded canvas and start from the
-texture class `nearest`, where the store loads the image as it is, with its coordinates at the root,
-and starts from no texture class. `FrameBasedAnimations` turns a sequence of atlas frames into the
+included. `FrameBasedAnimations` turns a sequence of atlas frames into the
 timing data the `AnimatedFrames` sprite feature reads. `AtlasFrameTable` lays frames of an atlas
 into a uniform array, and `sampleAtlasFrame()` samples one of them per fragment in a `NodeMaterial`
 of one's own — a repeated frame on a mesh — the first TSL of this layer. `DynamicAtlas` packs frames
