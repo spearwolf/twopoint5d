@@ -95,10 +95,10 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    */
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
-  // the scratch of sortBy(), sortByKeys() and prepareSortKeys(), built by the first sort, grown with
-  // the capacity and let go of by releaseSortScratch() and dispose(): the keys, the order of the slots and the merge scratch
-  // of the sort, the vertex objects on their way to a new slot, and one buffer for the copy of every
-  // attribute buffer with a view of it per data type
+  // the scratch of sortBy(), sortByKeys() and prepareSortKeys(), built by the first sort, grown
+  // with the capacity and let go of by releaseSortScratch() and dispose(): the keys, the order of
+  // the slots and the merge scratch of the sort, the vertex objects on their way to a new slot, and
+  // one buffer for the copy of every attribute buffer with a view of it per data type
   #sortKeys: Float64Array | undefined;
   #sortOrder: Uint32Array | undefined;
   #sortMerge: Uint32Array | undefined;
@@ -560,8 +560,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * {@link prepareSortKeys} has prepared keys again. Meant for a large pool that has sorted and
    * will not sort again soon — a pool sorted every frame keeps its scratch.
    *
-   * Does nothing on a pool that has not sorted and on a disposed pool. Called from the key function of
-   * a running {@link sortBy}, it makes that sort throw.
+   * Does nothing on a pool that has not sorted and on a disposed pool. Called from the key function
+   * of a running {@link sortBy}, it makes that sort throw.
    */
   releaseSortScratch(): void {
     this.#sortKeys = undefined;

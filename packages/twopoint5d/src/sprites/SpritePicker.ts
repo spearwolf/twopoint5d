@@ -393,8 +393,8 @@ export class SpritePicker {
     try {
       const groupOrder = readAncestry(sprites, camera.layers, applied);
       const {clipping} = entry;
-      // a mirror of a ClippingGroup that no longer clips the sprites leaves the chain, so that it hangs
-      // empty under none of the mirrors kept
+      // a mirror of a ClippingGroup that no longer clips the sprites leaves the chain, so that it
+      // hangs empty under none of the mirrors kept
       for (let i = 0; i < applied.length; i++) {
         if (clipping[i]?.source.deref() === applied[i]) continue;
         clipping[i]?.mirror.removeFromParent();
@@ -417,9 +417,9 @@ export class SpritePicker {
       if (entry.holder.parent !== parent) parent.add(entry.holder);
       entry.holder.renderOrder = groupOrder;
     } finally {
-      // the scratch lets go of the groups it was filled with: a group holds the sprites below it, and
-      // up to the next pick the scratch would hold a mesh dropped along with its group — also where a
-      // step of the placement throws
+      // the scratch lets go of the groups it was filled with: a group holds the sprites below it,
+      // and up to the next pick the scratch would hold a mesh dropped along with its group — also
+      // where a step of the placement throws
       applied.length = 0;
     }
   }
