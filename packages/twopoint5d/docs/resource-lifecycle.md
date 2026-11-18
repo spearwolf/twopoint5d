@@ -309,7 +309,7 @@ dispose(): void {
     errors.push(error);
   }
   this.frameLoop.stop(this);
-  this.#stopSizeWatch();
+  this.#sizer.stopWatch();
   this.#stopVisibilityWatch();
   try {
     // while the canvas is still there to name the default target, and before the release

@@ -116,8 +116,9 @@ type ExitBy = 'call' | 'portrait';
 // onLandscape gives way to the page: it notes an exit only where the page has noted nothing, and it
 // takes back only the exit of a turn.
 
-// a native request the browser has not answered yet
+// the phase 'requesting': a native request the browser has not answered yet
 interface PendingRequest {
+  readonly kind: 'requesting';
   element: HTMLElement;
   // a request() of the page that joins one of onLandscape makes what the browser grants the page's own
   by: EnteredBy;
@@ -132,9 +133,10 @@ interface PendingRequest {
   declines: boolean;
 }
 
-// a native exit until its promise settles. The fullscreen element stays set until the browser is
-// through, and the fullscreen ends right after
+// the phase 'exiting': a native exit until its promise settles. The fullscreen element stays set
+// until the browser is through, and the fullscreen ends right after
 interface PendingExit {
+  readonly kind: 'exiting';
   // the page asked to enter while the browser was leaving: once through, the controller asks again
   requestAfter: boolean;
   // a turn to landscape, or the armed tap, came while the browser was leaving: once through, the
@@ -153,14 +155,36 @@ interface Run {
   resolve(active: boolean): void;
 }
 
-// the pseudo mode as it was entered: what to take off again, and where its rules live
+// the phase 'pseudo': the pseudo mode as it was entered: what to take off again, and where its
+// rules live
 interface PseudoState {
+  readonly kind: 'pseudo';
   element: HTMLElement;
   className: string;
   root: HTMLElement | ShadowRoot;
   documentElement?: HTMLElement;
   rootClassName?: string;
   by: EnteredBy;
+}
+
+interface Idle {
+  readonly kind: 'idle';
+}
+const IDLE: Idle = {kind: 'idle'};
+
+// What the controller does of its own, one thing at a time — see §3.5 of the proposal
+// display-fullscreen.md: it waits ('idle'), the browser has not answered a request of it
+// ('requesting') or an exit of it ('exiting'), or it holds the pseudo mode ('pseudo'). The
+// pseudo mode is entered from 'idle' only; a call that comes while the browser answers is
+// noted on the call under way
+type FullscreenPhase = Idle | PendingRequest | PendingExit | PseudoState;
+
+// the native fullscreen of the target this controller has seen entered, kept until the target
+// leaves the fullscreen stack: the element it entered with, and who entered it — undefined for
+// a fullscreen someone else entered
+interface NativeHold {
+  readonly element: HTMLElement;
+  by: EnteredBy | undefined;
 }
 
 /**
@@ -239,16 +263,16 @@ export class DisplayFullscreen {
 
   #element?: HTMLElement;
 
-  // the element of a native fullscreen this controller has seen entered, kept until it is left:
-  // a new `element` takes effect with the next request
-  #activeElement?: HTMLElement;
-  // who entered #activeElement; undefined for a fullscreen someone else entered
-  #entered?: EnteredBy;
-  // a native request until its promise settles. A second request — the armed tap and the click of
-  // a button inside the target, one tap — joins it instead of asking again
-  #pending?: PendingRequest;
-  // a native exit until its promise settles. A second exit joins it; a request is noted on it
-  #pendingExit?: PendingExit;
+  // the native fullscreen of the target this controller has seen entered, kept until it is left:
+  // a new `element` takes effect with the next request. It stands beside every phase but 'pseudo':
+  // beside 'requesting' where the browser fires fullscreenchange before it answers, beside
+  // 'exiting' until the browser is through
+  #native?: NativeHold;
+  // what the controller does of its own. A native request until its promise settles: a second
+  // request — the armed tap and the click of a button inside the target, one tap — joins it instead
+  // of asking again. A native exit until its promise settles: a second exit joins it; a request is
+  // noted on it. The pseudo mode of this controller; no other display sees it
+  #phase: FullscreenPhase = IDLE;
   // the promise every call gets while the browser is answering, or something follows its answer
   #run?: Run;
 
@@ -267,7 +291,9 @@ export class DisplayFullscreen {
 
   // what onLandscape listens to for a turn: screen.orientation, else the media query
   #watchedOrientation?: EventTarget;
-  // the element whose next tap requests fullscreen while armed
+  // the element whose next tap requests fullscreen while armed — set only in 'idle' while no
+  // fullscreen holds; it stays beside 'requesting' where the page calls request() while armed, until
+  // the browser answers
   #armedElement?: HTMLElement;
   // the user left a fullscreen while the screen was landscape — the target's, whoever entered it, or
   // one of another element: no arming until the screen has turned to portrait and back. An exit() of
@@ -306,9 +332,6 @@ export class DisplayFullscreen {
     // a tap the browser does not count as a gesture: the next one may
     void answer.then((active) => this.#rearm(active));
   };
-
-  // the pseudo mode of this controller; no other display sees it
-  #pseudo?: PseudoState;
 
   #disposed = false;
 
@@ -378,7 +401,7 @@ export class DisplayFullscreen {
       // answering a request or an exit, its answer decides first: the arming is held against the state
       // once the run is through, as the answer of a request of onLandscape is
       if (this.#isLandscape() && this.#gateIsOpen()) {
-        if (this.#pending != null || this.#pendingExit != null) {
+        if (this.#answerAwaited()) {
           void this.#joinRun().then((active) => this.#rearm(active));
         } else if (!this.#fullscreenHolds()) {
           if (this.isSupported) this.#arm();
@@ -454,7 +477,7 @@ export class DisplayFullscreen {
    * the target in fullscreen. The pseudo mode is left by the dispose.
    */
   get isActive(): boolean {
-    return this.#pseudo != null || this.#nativeElement() != null;
+    return this.#phase.kind === 'pseudo' || this.#nativeElement() != null;
   }
 
   /**
@@ -464,7 +487,7 @@ export class DisplayFullscreen {
    * holds the target in fullscreen. The pseudo mode is left by the dispose.
    */
   get mode(): FullscreenMode | undefined {
-    if (this.#pseudo != null) return 'pseudo';
+    if (this.#phase.kind === 'pseudo') return 'pseudo';
     return this.#nativeElement() != null ? 'native' : undefined;
   }
 
@@ -542,14 +565,14 @@ export class DisplayFullscreen {
     if (this.#disposed) return Promise.resolve(false);
     // the page acts on what the last event told it: the state before an answer still to come, or —
     // for a listener of a fullscreenchange the browser fires before its answer — the one after it
-    const active = this.#pending != null || this.#pendingExit != null ? this.#emittedActive : this.isActive;
+    const active = this.#answerAwaited() ? this.#emittedActive : this.isActive;
     return active ? this.exit() : this.request();
   }
 
   /** @internal called by the `styleSheetRoot` setter of the display: an active pseudo mode takes its rule along */
   installRules(root: HTMLElement | ShadowRoot): void {
-    const pseudo = this.#pseudo;
-    if (pseudo == null || this.#disposed || root === pseudo.root) return;
+    const pseudo = this.#phase;
+    if (pseudo.kind !== 'pseudo' || this.#disposed || root === pseudo.root) return;
     // the class name does not depend on the root, so the target keeps its class
     Stylesheets.retainRule(DisplayFullscreen.CssRulesPrefixPseudo, PSEUDO_CSS, root);
     Stylesheets.releaseRule(DisplayFullscreen.CssRulesPrefixPseudo, pseudo.root);
@@ -570,12 +593,11 @@ export class DisplayFullscreen {
     // getters of a controller held past the dispose answer from the element it had
     this.#element ??= this.element;
 
-    // a request still open is not forgotten: its answer holds it, and leaves what the browser grants
-    this.#pending = undefined;
-    // an exit under way leaves already: a second exitFullscreen() could take off the next element
+    // a request still open is not forgotten: its answer holds it, and leaves what the browser grants.
+    // An exit under way leaves already: a second exitFullscreen() could take off the next element
     // of the stack as well. A request noted on it is dropped with it
-    const exiting = this.#pendingExit != null;
-    this.#pendingExit = undefined;
+    const exiting = this.#phase.kind === 'exiting';
+    if (this.#phase.kind === 'requesting' || exiting) this.#phase = IDLE;
     // every call still waiting: nothing follows the answers of the browser any more
     const run = this.#run;
     this.#run = undefined;
@@ -586,14 +608,13 @@ export class DisplayFullscreen {
 
     // only a fullscreen this controller entered, and only while the target lies on top: the app's
     // own stays, and so does one stacked on the target — exitFullscreen() would take that one off
-    if (!exiting && this.#entered != null && this.#nativeElement() != null) leaveQuietly(this.#host.doc);
+    if (!exiting && this.#native?.by != null && this.#nativeElement() != null) leaveQuietly(this.#host.doc);
 
     this.#unlock();
     this.#unwatchOrientation();
     this.#disarm();
     this.#host.doc.removeEventListener('fullscreenchange', this.#onFullscreenChange);
-    this.#activeElement = undefined;
-    this.#entered = undefined;
+    this.#native = undefined;
 
     this.#emitIfChanged();
   }
@@ -603,7 +624,8 @@ export class DisplayFullscreen {
   #nativeElement(): HTMLElement | undefined {
     // while a request is pending, the element asked for: a new `element` set meanwhile does not
     // make the controller miss the fullscreen it entered
-    const candidate = this.#activeElement ?? this.#pending?.element ?? this.element;
+    const phase = this.#phase;
+    const candidate = this.#native?.element ?? (phase.kind === 'requesting' ? phase.element : undefined) ?? this.element;
     return fullscreenElementOfRoot(candidate) === candidate ? candidate : undefined;
   }
 
@@ -612,7 +634,8 @@ export class DisplayFullscreen {
   #request(by: EnteredBy, warn = true): Promise<boolean> {
     if (this.#disposed) return Promise.resolve(false);
 
-    const open = this.#pending;
+    const phase = this.#phase;
+    const open = phase.kind === 'requesting' ? phase : undefined;
     if (open != null) {
       if (warn) open.warn = true;
       if (by === 'request') {
@@ -622,12 +645,12 @@ export class DisplayFullscreen {
         open.exitAfter = undefined;
         open.declines = false;
         open.by = 'request';
-        if (this.#activeElement === open.element && this.#entered != null) this.#entered = 'request';
+        if (this.#native?.element === open.element && this.#native.by != null) this.#native.by = 'request';
       }
       return this.#joinRun();
     }
 
-    const exit = this.#pendingExit;
+    const exit = phase.kind === 'exiting' ? phase : undefined;
     if (exit != null) {
       // the fullscreen element stays set until the browser is through, and the fullscreen ends
       // right after: answering true now would be wrong a moment later. The page's request is asked
@@ -644,10 +667,10 @@ export class DisplayFullscreen {
     if (by === 'request') {
       // whoever asked for a fullscreen decides: the page asks for the one onLandscape has entered,
       // and it is the page's own from now on — a turn to portrait leaves it standing. So it is while
-      // an element of the app lies on top of the target as well: #entered stays set as long as the
+      // an element of the app lies on top of the target as well: #native stays set as long as the
       // target is in the fullscreen stack, and the request below asks for the target again
-      if (this.#pseudo?.by === 'landscape') this.#pseudo.by = 'request';
-      else if (this.#entered === 'landscape') this.#entered = 'request';
+      if (phase.kind === 'pseudo' && phase.by === 'landscape') phase.by = 'request';
+      else if (this.#native?.by === 'landscape') this.#native.by = 'request';
     }
     if (this.isActive) return Promise.resolve(true);
 
@@ -663,14 +686,14 @@ export class DisplayFullscreen {
     // before the call: the fullscreenchange it causes, and a call of a listener of it, may come
     // before the call returns
     const run = this.#joinRun();
-    const request: PendingRequest = {element: this.element, by, warn, declines: false};
-    this.#pending = request;
+    const request: PendingRequest = {kind: 'requesting', element: this.element, by, warn, declines: false};
+    this.#phase = request;
     let answer: Promise<void>;
     try {
       // before any await: the gesture of the caller has to reach the browser
       answer = request.element.requestFullscreen({navigationUI: this.navigationUI});
     } catch {
-      this.#pending = undefined;
+      this.#phase = IDLE;
       // a listener of a fullscreenchange fired during the call may have disposed the controller
       if (request.warn && !this.#disposed) warnRefused();
       this.#endRun();
@@ -684,10 +707,10 @@ export class DisplayFullscreen {
           if (fullscreenElementOfRoot(request.element) === request.element) leaveQuietly(this.#host.doc);
           return;
         }
-        // #readState() reads who entered off #pending; the request is settled before the event, so
+        // #readState() reads who entered off the phase; the request is settled before the event, so
         // a listener that calls back finds it answered — and joins the run, which is still open
         this.#readState();
-        this.#pending = undefined;
+        this.#phase = IDLE;
         if (request.exitAfter != null) {
           // a call or a turn asked to leave while the browser was still answering: leave what it
           // granted, unless an element of the app has stacked on it meanwhile
@@ -699,7 +722,7 @@ export class DisplayFullscreen {
         this.#endRun();
       },
       () => {
-        this.#pending = undefined;
+        this.#phase = IDLE;
         if (this.#disposed) return;
         // the user left before the browser answered: the refusal noted at the call holds off the
         // arming that follows the end of the run, and takes down an arming that waits for a tap
@@ -716,7 +739,8 @@ export class DisplayFullscreen {
   #exit(by: ExitBy): Promise<boolean> {
     if (this.#disposed) return Promise.resolve(false);
 
-    if (this.#pseudo != null) {
+    const phase = this.#phase;
+    if (phase.kind === 'pseudo') {
       this.#leavePseudo();
       this.#emitIfChanged();
       return Promise.resolve(this.isActive);
@@ -728,7 +752,7 @@ export class DisplayFullscreen {
     // portrait lifts it, as one after the answer would
     const declines = by === 'call' && this.#onLandscape && this.#isLandscape();
 
-    const running = this.#pendingExit;
+    const running = phase.kind === 'exiting' ? phase : undefined;
     if (running != null) {
       // a second exit joins the one under way. The page's takes back a request() noted on it and a
       // turn that came before it: the last call wins
@@ -740,7 +764,7 @@ export class DisplayFullscreen {
       return this.#joinRun();
     }
 
-    const request = this.#pending;
+    const request = phase.kind === 'requesting' ? phase : undefined;
     if (request != null) {
       // once the browser has granted it, what it granted is left. A turn to portrait notes its exit
       // only where the page has noted none: a turn back takes back the exit of the turn, never the
@@ -762,13 +786,13 @@ export class DisplayFullscreen {
   // top and nothing else is under way
   #leaveNative(declines: boolean): void {
     // before the call: the fullscreenchange it causes may come before the call returns
-    const exit: PendingExit = {requestAfter: false, turnAfter: false, declines};
-    this.#pendingExit = exit;
+    const exit: PendingExit = {kind: 'exiting', requestAfter: false, turnAfter: false, declines};
+    this.#phase = exit;
     const settle = (): void => {
       // the dispose has resolved the run
       if (this.#disposed) return;
       this.#readState();
-      this.#pendingExit = undefined;
+      this.#phase = IDLE;
       // the refusal of the exit() of the page, unless a request() or a turn to portrait has taken it back
       if (exit.declines && this.#onLandscape) this.#decline();
       // the page asked to enter while the browser was leaving: ask now, still inside the run
@@ -785,6 +809,11 @@ export class DisplayFullscreen {
     } catch {
       settle();
     }
+  }
+
+  // the browser has not answered a request or an exit of this controller yet
+  #answerAwaited(): boolean {
+    return this.#phase.kind === 'requesting' || this.#phase.kind === 'exiting';
   }
 
   // the promise of the open run, or of a new one
@@ -804,7 +833,7 @@ export class DisplayFullscreen {
   // after an answer of the browser: the run ends once nothing follows any more
   #endRun(): void {
     const run = this.#run;
-    if (run == null || this.#pending != null || this.#pendingExit != null) return;
+    if (run == null || this.#answerAwaited()) return;
     this.#run = undefined;
     run.resolve(this.isActive);
   }
@@ -821,21 +850,20 @@ export class DisplayFullscreen {
     if (active != null) {
       // the target lies on top, whoever entered it: no tap is awaited
       this.#disarm();
-      if (this.#activeElement == null) {
-        this.#activeElement = active;
-        this.#entered = this.#pending?.by;
+      if (this.#native == null) {
+        const phase = this.#phase;
+        this.#native = {element: active, by: phase.kind === 'requesting' ? phase.by : undefined};
       }
-    } else if (this.#activeElement != null && !isInFullscreenStack(this.#activeElement)) {
+    } else if (this.#native != null && !isInFullscreenStack(this.#native.element)) {
       // the user left the fullscreen of the target, whoever entered it, while the screen still is
       // landscape — Escape, the back gesture, the browser's own control: a page that throws them back
       // in with the next tap is a trap. An exit of this controller has decided that at its call: an
       // exit() of the page where the screen was then, and the exit of the turn to portrait never — a
       // quick turn back would leave the page in landscape without a fullscreen and unarmed
-      if (this.#pendingExit == null && this.#onLandscape && this.#isLandscape()) {
+      if (this.#phase.kind !== 'exiting' && this.#onLandscape && this.#isLandscape()) {
         this.#decline();
       }
-      this.#activeElement = undefined;
-      this.#entered = undefined;
+      this.#native = undefined;
       this.#unlock();
     }
     // else a fullscreen stacked on the target, or none: the target keeps who entered it and its
@@ -848,7 +876,7 @@ export class DisplayFullscreen {
     } else if (
       this.#foreignHeld &&
       !this.#holdsTarget() &&
-      this.#pendingExit == null &&
+      this.#phase.kind !== 'exiting' &&
       this.#onLandscape &&
       this.#isLandscape()
     ) {
@@ -940,8 +968,8 @@ export class DisplayFullscreen {
     if (!this.#isLandscape()) {
       // portrait lifts a refusal, also one an exit() has noted on a request or an exit still under way
       this.#declined = false;
-      if (this.#pending != null) this.#pending.declines = false;
-      if (this.#pendingExit != null) this.#pendingExit.declines = false;
+      const phase = this.#phase;
+      if (phase.kind === 'requesting' || phase.kind === 'exiting') phase.declines = false;
       this.#disarm();
       if (this.#enteredBy() === 'landscape' && this.exitOnPortrait) void this.#exit('portrait');
       this.#emitIfChanged();
@@ -949,17 +977,24 @@ export class DisplayFullscreen {
     }
 
     // an exit is still under way: the turn is evaluated once it is through
-    const exit = this.#pendingExit;
-    if (exit != null) {
-      exit.turnAfter = true;
+    const phase = this.#phase;
+    if (phase.kind === 'exiting') {
+      phase.turnAfter = true;
       return;
     }
 
     // back in landscape before the browser has answered a request: the turn to portrait between
     // is taken back, and what the browser grants stays — unless the page has called exit() meanwhile
-    if (this.#pending?.exitAfter === 'portrait') this.#pending.exitAfter = undefined;
+    if (phase.kind === 'requesting' && phase.exitAfter === 'portrait') phase.exitAfter = undefined;
 
     if (this.#fullscreenHolds() || this.#declined || !this.#gateIsOpen()) return;
+
+    if (phase.kind === 'requesting') {
+      // a request is under way: the turn joins it, whatever isSupported answers by now — the
+      // pseudo mode is entered from 'idle' only
+      void this.#request('landscape', false).then((active) => this.#rearm(active));
+      return;
+    }
 
     if (!this.isSupported) {
       // the pseudo mode needs no gesture: the turn enters it, and nothing arms
@@ -982,8 +1017,7 @@ export class DisplayFullscreen {
       this.#isLandscape() &&
       !this.#fullscreenHolds() &&
       !this.#declined &&
-      this.#pending == null &&
-      this.#pendingExit == null
+      !this.#answerAwaited()
     ) {
       this.#arm();
     }
@@ -994,7 +1028,7 @@ export class DisplayFullscreen {
   // #fullscreenHolds() adds what this leaves out: another element in fullscreen while the
   // target is not in the stack
   #holdsTarget(): boolean {
-    return this.isActive || this.#activeElement != null;
+    return this.isActive || this.#native != null;
   }
 
   // Another element than the target is in fullscreen — a video or a dialog of the app that went
@@ -1021,9 +1055,12 @@ export class DisplayFullscreen {
 
   // a request still open counts: a turn to portrait leaves what the browser grants it
   #enteredBy(): EnteredBy | undefined {
-    return this.#pseudo?.by ?? this.#entered ?? this.#pending?.by;
+    const phase = this.#phase;
+    if (phase.kind === 'pseudo') return phase.by;
+    return this.#native?.by ?? (phase.kind === 'requesting' ? phase.by : undefined);
   }
 
+  // entered from 'idle' only: every caller has made sure no call is under way
   #enterPseudo(by: EnteredBy): void {
     const element = this.element;
     const root = this.#host.styleSheetRoot();
@@ -1031,7 +1068,7 @@ export class DisplayFullscreen {
 
     const className = Stylesheets.retainRule(DisplayFullscreen.CssRulesPrefixPseudo, PSEUDO_CSS, root);
     element.classList.add(className);
-    const pseudo: PseudoState = {element, className, root, by};
+    const pseudo: PseudoState = {kind: 'pseudo', element, className, root, by};
 
     // the root element sits in the document: its rule goes into the sheet of the document, whatever
     // shadow root the target's rule goes into
@@ -1042,7 +1079,7 @@ export class DisplayFullscreen {
     }
 
     this.#disarm();
-    this.#pseudo = pseudo;
+    this.#phase = pseudo;
     this.#host.doc.addEventListener('keydown', this.#onPseudoKey);
     this.#host.pseudoTargetChanged(element);
     this.#emitIfChanged();
@@ -1050,8 +1087,8 @@ export class DisplayFullscreen {
 
   // state alone: the caller emits once its whole change is made
   #leavePseudo(): void {
-    const pseudo = this.#pseudo;
-    if (pseudo == null) return;
+    const pseudo = this.#phase;
+    if (pseudo.kind !== 'pseudo') return;
 
     // as for the native mode: the user who leaves in landscape, whoever entered the pseudo mode, is
     // not thrown back in
@@ -1064,7 +1101,7 @@ export class DisplayFullscreen {
       Stylesheets.releaseRule(DisplayFullscreen.CssRulesPrefixPseudoRoot, pseudo.documentElement);
     }
 
-    this.#pseudo = undefined;
+    this.#phase = IDLE;
     this.#host.doc.removeEventListener('keydown', this.#onPseudoKey);
     this.#host.pseudoTargetChanged(undefined);
   }
@@ -1097,6 +1134,6 @@ export class DisplayFullscreen {
     this.#emittedActive = isActive;
     this.#emittedMode = mode;
     this.#emittedArmed = isArmed;
-    this.#host.emit({display: this.display, isActive, mode, isArmed, element: this.#activeElement ?? this.element});
+    this.#host.emit({display: this.display, isActive, mode, isArmed, element: this.#native?.element ?? this.element});
   }
 }

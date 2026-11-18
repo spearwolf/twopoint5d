@@ -129,8 +129,9 @@ interface DisplayParameters {
 ### 3.2 The controller
 
 `src/display/DisplayFullscreen.ts`, exported from `src/display/public-api.ts`. The display builds it
-in its constructor and keeps it for its life; `Display.ts` does not grow by the logic of §5 to §7
-beyond the size source rule of §5.
+in its constructor and keeps it for its life; the display does not grow by the logic of §5 to §7
+beyond the size source rule of §5, which lives with the rest of the measurement in the internal
+`DisplaySizer` (`src/display/DisplaySizer.ts`).
 
 ```ts
 export class DisplayFullscreen {
@@ -262,6 +263,56 @@ once per page, through `console.warn`, after the pattern of the warning about
   browser without the unprefixed API (Safari before 16.4), and `fallback: 'pseudo'`.
 
 A request while already active resolves with `true` and changes nothing.
+
+### 3.5 The states of the controller
+
+What the controller does of its own is one value, the phase (`#phase`), and it does one thing at a
+time: it waits, the browser has not answered a request or an exit of it, or it holds the pseudo
+mode. A call that comes while the browser answers is noted on the call under way. Beside the phase
+stand two axes — the native fullscreen of the target and the armed tap — and two memories — a
+refusal of the user and a fullscreen of another element —, and the calls of one overlap share a run.
+
+```text
+idle       ── request(), the armed tap, the try at once of a turn ───────────────────▶ requesting
+idle       ── request(), the armed tap, the try at once of a turn, or
+              onLandscape = true in landscape, where only the pseudo mode is there ──▶ pseudo
+idle       ── exit(), or a turn to portrait of a fullscreen onLandscape entered,
+              while the target lies on top ──────────────────────────────────────────▶ exiting
+requesting ── the answer: refused, or granted with no exit noted on it; dispose() ───▶ idle
+requesting ── granted, with an exit noted on it, while the target lies on top ───────▶ exiting
+exiting    ── the exit through or refused; dispose() ────────────────────────────────▶ idle
+pseudo     ── exit(), Escape, a turn to portrait of a pseudo mode onLandscape
+              entered, dispose() ────────────────────────────────────────────────────▶ idle
+```
+
+| phase | what the controller does | in | out |
+| --- | --- | --- | --- |
+| `'idle'` | waits; the target may be in native fullscreen all the same — by this controller or by anyone —, and `onLandscape` may wait for a tap | the start; the answer to a request with no exit noted on it; an exit through; a leave of the pseudo mode; `dispose()` | `request()`, the armed tap or the try at once of a turn → `'requesting'`, or → `'pseudo'` where only the pseudo mode is there; `exit()`, or a turn to portrait of a fullscreen `onLandscape` entered, while the target lies on top → `'exiting'`; `onLandscape = true` in landscape where only the pseudo mode is there → `'pseudo'` |
+| `'requesting'` | a native request the browser has not answered; it notes who asked to leave meanwhile (`exitAfter`), whether that leave was a refusal of the user (`declines`), and whether a refusal is told to the developer (`warn`) | a request asked of the browser in `'idle'` | the answer: refused → `'idle'`; granted → `'idle'`, or → `'exiting'` where an exit was noted on it and the target lies on top; `dispose()` → `'idle'` |
+| `'exiting'` | a native exit until its promise settles; it notes a `request()` of the page (`requestAfter`), a turn to landscape or the armed tap (`turnAfter`), and a refusal of the user (`declines`) | `exit()` or a turn to portrait while the target lies on top and no call is under way; a granted request with an exit noted on it | the exit through or refused → `'idle'`; a `request()` noted on it then asks as it does in `'idle'`, and a turn noted on it is evaluated as a turn in `'idle'`; `dispose()` → `'idle'` |
+| `'pseudo'` | holds the target over the viewport through CSS | a request — of the page, of a turn, of `onLandscape = true` in landscape — in `'idle'` where only the pseudo mode is there | `exit()`, Escape, a turn to portrait of a pseudo mode `onLandscape` entered, `dispose()` → `'idle'` |
+
+- **The native fullscreen of the target** (`#native`): the state of the document, not of the
+  controller. Set by the `fullscreenchange` — or the answer of a request — that shows the target on
+  top, with who entered it; kept while an element of the app is stacked on it (§3.2); cleared once
+  the target leaves the fullscreen stack. It stands beside `'idle'`, beside `'requesting'` where the
+  browser fires `fullscreenchange` before it answers, and beside `'exiting'` until the browser is
+  through. `isActive` is the phase `'pseudo'` or the target on top of its root.
+- **The armed tap** (`#armedElement`, §6.2): set only in `'idle'` while no fullscreen holds —
+  neither the target's nor another element's; taken down by any fullscreen, by the tap itself, by a
+  leave in landscape and by `onLandscape = false`. A `request()` of the page while armed — from a
+  button outside the target — moves to `'requesting'` and leaves the tap armed until the browser
+  answers.
+- **The refusal** (`#declined`, §6.3): a leave in landscape holds off the arming beside any phase
+  until the screen has turned to portrait; an `exit()` of the page notes it on the call under way
+  first (`declines`).
+- **A fullscreen of another element** (`#foreignHeld`): what the last `fullscreenchange` showed of
+  one, so that its end in landscape counts as a leave.
+- **The run**: the calls of one overlap share one promise; it resolves once the phase is back in
+  `'idle'` or `'pseudo'`.
+
+The pseudo mode is entered from `'idle'` only: a turn to landscape while a request is under way
+joins that request, whatever `isSupported` answers by then.
 
 ## 4. The target element
 
@@ -594,6 +645,8 @@ that runs without a real turn of a screen.
   target is out of fullscreen then; `onLandscape = false` takes the listeners down;
 - §7: used only where `isSupported` is `false`; classes on and off; Escape leaves; a turn enters
   without arming;
+- a turn to landscape while a request is under way joins that request and enters no pseudo mode
+  beside it;
 - `dispose()` leaves only a fullscreen this controller entered, and leaves no listener behind;
   a host whose `emit()` throws finds the pseudo mode left and every listener down, the armed one
   included; a request pending at the dispose is left once the browser grants it and resolves

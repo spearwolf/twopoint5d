@@ -176,7 +176,13 @@ predicts its steps with. The handover of a canvas between two displays — waiti
 of the one before, keeping its WebGL context lost but restorable, giving a canvas that was handed
 in back as the display found it — is an internal module, `src/display/canvasHandover.ts`, which
 `Display` enters at two places: `waitForCanvas()` before the init of its renderer and
-`releaseRenderer()` after `dispose()`. `display.fullscreen` is a `DisplayFullscreen` the
+`releaseRenderer()` after `dispose()`. How a display measures — the size watch, the size
+source, the rule of a fullscreen that contains the canvas, the bookkeeping of a canvas that
+measures itself under a zoom, and the drawing buffer it applies — is the internal class
+`DisplaySizer` in `src/display/DisplaySizer.ts`. `Display` keeps the public options and members of
+the resize model and asks the sizer at the start of each frame and in `resize()`. The hold of the
+animation loop of three while a display pauses is `AnimationLoopHold` in
+`src/display/AnimationLoopHold.ts`. `display.fullscreen` is a `DisplayFullscreen` the
 display builds from its `fullscreen` option: the browser's native fullscreen on the element
 around the canvas or another target, fullscreen when a phone turns sideways (`onLandscape`)
 and a pseudo fullscreen through CSS as the opt-in `fallback`; `Display#dispose()` leaves a
