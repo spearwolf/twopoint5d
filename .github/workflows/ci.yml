@@ -147,12 +147,19 @@ jobs:
 
       - name: Install the system libraries of the Playwright browsers
         # the cache holds the browsers, not the apt packages they link against. Each attempt
-        # is cut off after three minutes — it takes some twenty seconds when the mirrors answer
+        # is cut off after three minutes — it takes some twenty seconds when the mirrors answer.
+        # timeout ends pnpm, not the apt-get that Playwright started through sudo: left alive,
+        # it keeps the dpkg lock and the next attempt fails at once on it. So the leftover is
+        # stopped, the lock waited for and an interrupted dpkg run finished before the next
+        # attempt, which takes up the packages the earlier ones already fetched
         if: matrix.browsers && steps.playwright-cache.outputs.cache-hit == 'true'
         run: |
           for attempt in 1 2 3; do
             timeout 180 pnpm exec playwright install-deps chromium firefox webkit && exit 0
             echo "::warning::playwright install-deps failed or stalled (attempt $attempt of 3)"
+            sudo pkill -x apt-get || true
+            while pgrep -x apt-get > /dev/null || pgrep -x dpkg > /dev/null; do sleep 1; done
+            sudo dpkg --configure -a
           done
           exit 1
         timeout-minutes: 10
