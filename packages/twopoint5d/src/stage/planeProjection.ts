@@ -114,10 +114,12 @@ export class PlaneProjectionView {
     return this.#pixelSnap;
   }
 
+  /** The near plane of the camera, as the last `takeNearAndFar()` set it. */
   get near(): number {
     return this.#near;
   }
 
+  /** The far plane of the camera, as the last `takeNearAndFar()` set it. */
   get far(): number {
     return this.#far;
   }

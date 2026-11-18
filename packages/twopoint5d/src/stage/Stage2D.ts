@@ -744,10 +744,11 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   /**
    * Releases the GPU memory of the render target of the pass node {@link asPassNode} built — color
-   * and depth —, and of the pass of a {@link postProcess}. The node stays, and with it every `texture()` node on it and the pipeline built on
-   * it; three.js allocates the memory again on the next draw of the node, so this is safe for a
-   * stage two renderers share. Does nothing without a pass node, and after {@link dispose}. A
-   * `StageRenderer` calls it as soon as it no longer composes this stage.
+   * and depth —, and of the pass of a {@link postProcess}. The node stays, and with it every
+   * `texture()` node on it and the pipeline built on it; three.js allocates the memory again on the
+   * next draw of the node, so this is safe for a stage two renderers share. Does nothing without a
+   * pass node, and after {@link dispose}. A `StageRenderer` calls it as soon as it no longer
+   * composes this stage.
    */
   releasePassNodeMemory(): void {
     // a renderer that removes this stage on its OnStageDispose calls this while dispose() runs, and
@@ -775,9 +776,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * the pipeline of the stage are disposed. Call when this stage is no longer needed.
    *
    * The {@link scene}, the {@link camera}, the {@link projection} and the `postProcess` object
-   * belong to the caller and are left as they are — a `THREE.Scene` has nothing to release, whatever hangs in it was put there
-   * by whoever built it, and a camera has no `dispose()` either, the one the projection created as
-   * little as one assigned here.
+   * belong to the caller and are left as they are — a `THREE.Scene` has nothing to release,
+   * whatever hangs in it was put there by whoever built it, and a camera has no `dispose()` either,
+   * the one the projection created as little as one assigned here.
    *
    * Every `StageRenderer` that holds this stage takes it out itself on `OnStageDispose` below,
    * and its next frame composes without it.

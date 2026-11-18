@@ -64,13 +64,14 @@ together.
 
    An init that awaits goes through `src/demos/utils/demoInit.ts`: an `onInit` through
    `onDemoInit(display, '<name>', …)` — a `Display` does not wait for the promise of its
-   listener —, the callback of `display.start()` through `startDemo(display, '<name>', …)`,
-   which starts the display with it, since the rejection of `start()` names no demo. Both
-   show a failure under the name of the demo, in the console and over the canvas, and the
-   display runs all the same. A `director.precompile()` goes through `catchPrecompile('<name>', …)`
-   from the same file, which logs a failure and lets the page go on. A keyboard shortcut
-   asks `ignoredKey(event)` from `src/demos/utils/demoKeys.ts` first, so a key in a field
-   of lil-gui, or one that presses its buttons, stays there.
+   listener —, the callback of `display.start()` through
+   `startDemo(display, '<name>', …)`, which starts the display with it, since the
+   rejection of `start()` names no demo. Both show a failure under the name of the demo,
+   in the console and over the canvas, and the display runs all the same. A
+   `director.precompile()` goes through `catchPrecompile('<name>', …)` from the same file,
+   which logs a failure and lets the page go on. A keyboard shortcut asks
+   `ignoredKey(event)` from `src/demos/utils/demoKeys.ts` first, so a key in a field of
+   lil-gui, or one that presses its buttons, stays there.
 
    The images and atlases of a demo load through a `TextureStore` — the catalog
    `public/assets/textures.json` through `loadTextureCatalog()`, or a catalog of its own like

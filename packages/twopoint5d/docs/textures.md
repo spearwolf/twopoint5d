@@ -118,7 +118,9 @@ and applies texture classes to them.
 - `maxAnisotropyOrRenderer` is the anisotropy maximum, or the renderer that names it. A renderer is
   asked at the moment each texture is built; a WebGL backend names none before `init()`, and a
   texture built then gets no anisotropic filtering. Without it the maximum is 0: no anisotropy.
-- `defaultClassNames` line up ahead of the classes of each call and are sorted with them: a class of the call overrules a default of the same breadth, and a narrower default keeps the last word against a broader class of the call. Without them the default is `['nearest']`.
+- `defaultClassNames` line up ahead of the classes of each call and are sorted with them: a class of
+  the call overrules a default of the same breadth, and a narrower default keeps the last word
+  against a broader class of the call. Without them the default is `['nearest']`.
 - `defaultOptions` are raw `TextureOptions` laid under the classes, for the rare option no class
   names.
 
@@ -220,7 +222,9 @@ the whole image.
 
 A tile set holds at most `TileSet.MaxTiles` tiles, 2^20: a `tileCount` above it, and an image into
 which more tiles fit while no `tileCount` is given, are refused with a `RangeError`, as a
-`tileCount` is that does not fit into the image.
+`tileCount` is that does not fit into the image. A `firstId` is a whole number that keeps the ids of
+all tiles, up to `firstId + tileCount - 1`, within ±`Number.MAX_SAFE_INTEGER`; another is refused
+with a `RangeError` as well.
 
 The tile ids run row by row from the top left, starting at `firstId`. A tile set item builds a
 `tileSet`, the `atlas` of its tiles, the texture and — with `frameBasedAnimations` — animations over
@@ -404,8 +408,8 @@ await preloading;
 export const floor = await store.getAsync('floor', 'texture');
 ```
 
-A `whenResource(id)` or `onResource(id, callback)` hands out the resource without starting it; `resource.activate()` starts it
-by hand.
+A `whenResource(id)` or `onResource(id, callback)` hands out the resource without starting it;
+`resource.activate()` starts it by hand.
 
 A new renderer makes every resource build its texture anew and release the old one. The renderer
 stays yours: the store never disposes it.

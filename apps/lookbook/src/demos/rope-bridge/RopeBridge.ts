@@ -33,10 +33,10 @@ import {
   ShapeGeometry,
   type Texture,
 } from 'three/webgpu';
-import {crossing, duelAngles} from './SaberDuel';
-import {VerletRopes} from './VerletRopes';
 import {atlasFrame} from '~demos/utils/atlasFrame';
 import {SeededRandom} from '~demos/utils/seededRandom';
+import {crossing, duelAngles} from './SaberDuel';
+import {VerletRopes} from './VerletRopes';
 
 /** The textures out of the catalog: the atlas `rope-bridge/bridge.json` and the three cave layers. */
 export interface RopeBridgeAssets {
@@ -156,10 +156,10 @@ const BLADE_THICKNESS = 10;
 const MAX_WEIGHTS = 6;
 const WEIGHT_RADIUS = 20;
 const WEIGHT_LIFE = 8;
-const SPARK_SEED = 23;
 
 const SPARKS = 48;
 const SPARK_LIFE = 0.45;
+const SPARK_SEED = 23;
 const MOTES = 26;
 
 // the shades of the parts in the dark of the cave: multiplied into the art by `Tint`

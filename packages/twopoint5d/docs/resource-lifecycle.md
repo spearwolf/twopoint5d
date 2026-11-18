@@ -51,16 +51,15 @@ gets the lost context. The `domElement` of an adopted `WebGPURenderer` is not ta
 either, but it keeps what the display wrote on it: its classes, the `touch-action`
 attribute and the inline size do not go back. The renderer goes with the display, its
 canvas stays where the caller put it and carries the next display in the same way — a
-`Display` around a new
-`WebGPURenderer({canvas})` on it waits for the release and brings the WebGL context back. A
-`Display` constructor that throws after it has built or taken over its renderer leaves
-nothing behind — it releases the renderer, gives a canvas handed in back and takes its own
-container out, as `dispose()` would. The constructors of `VOBufferGeometry`,
-`VertexObjectGeometry`, `InstancedVOBufferGeometry` and `InstancedVertexObjectGeometry`,
-and `InstancedVOBufferGeometry#attachInstancedPool()`, do the same for the pools they
-build from a descriptor or a description: one that throws disposes them and leaves a pool
-handed in as it was — alive, and not counted as attached, so its `resize()` takes it
-again.
+`Display` around a new `WebGPURenderer({canvas})` on it waits for the release and brings
+the WebGL context back. A `Display` constructor that throws after it has built or taken
+over its renderer leaves nothing behind — it releases the renderer, gives a canvas handed
+in back and takes its own container out, as `dispose()` would. The constructors of
+`VOBufferGeometry`, `VertexObjectGeometry`, `InstancedVOBufferGeometry` and
+`InstancedVertexObjectGeometry`, and `InstancedVOBufferGeometry#attachInstancedPool()`, do
+the same for the pools they build from a descriptor or a description: one that throws
+disposes them and leaves a pool handed in as it was — alive, and not counted as attached,
+so its `resize()` takes it again.
 
 Reference implementation —
 [`VOBufferGeometry`](../src/vertex-objects/VOBufferGeometry.ts) marks what it built and

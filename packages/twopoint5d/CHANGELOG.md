@@ -64,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the index buffer of `VOBufferGeometry`, `VertexObjectGeometry`, `InstancedVOBufferGeometry` and `InstancedVertexObjectGeometry` is a `Uint16Array` as long as the pool that holds the indices has at most 65 535 vertices in all (`capacity × vertexCount`), and a `Uint32Array` beyond: half the memory and half the upload for every smaller pool, and no index ever reaches `0xFFFF`, the restart index of 16-bit indices (**BREAKING**). See the Migration Guide
 - `new VOBufferGeometry()`, `new VertexObjectGeometry()`, `new InstancedVOBufferGeometry()` and `new InstancedVertexObjectGeometry()` throw a `RangeError` when they are handed a pool together with a capacity other than its own — `new VertexObjectGeometry(): capacity must be the capacity of the pool handed in, 10, got 1000` —, and for a base pool when a base capacity follows that is not its own; a base pool without a base capacity is taken as it is. The check comes before anything else, and the pool is left alive and unattached (**BREAKING**). See the Migration Guide
 - `InstancedVOBufferGeometry#dispose()` empties the buffer and serial maps of a pool attached under a name, as it does those of the base and the instanced pool: a map read from `extraInstancedBuffers` or `extraInstancedBufferSerials` before `dispose()` is empty afterwards
+- `TextureAtlas` finds a frame name it lets go of by binary search over the ids of its named frames, so `DynamicAtlas#remove()` takes a logarithmic search per frame, not a linear one
 
 ### Removed
 
@@ -88,7 +89,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageDirector#precompile()` rejects with an `Error` when the render pipeline draws a shape without going through `renderer.render()`, which compiles nothing, and the next call builds that shape again (see "No hitch on the first transition" in `docs/stages.md`)
 - `new Stage2D()` takes its scene before its projection: a subclass that reads `scene` or `name` while the projection is set finds them
 - an `atlasJson` written to an `AtlasTextureResource` after its fetch answered and before the resource read the answer stays in place: the fetched json does not replace it, and the aborted fetch reports no error
-- `TextureAtlas` lets go of a frame name by binary search, so `DynamicAtlas#remove()` of many frames compares no element of the name list one by one
 - `defineSprite()` takes usage words, attributes and methods named like a member of `Object.prototype` — `constructor`, `toString`, `__proto__` — as words, attributes and methods of their own, a method `__proto__` on the sprite handle included, and refuses an alias to such a name that the feature declares no attribute for with `defineSprite: feature "…" aliases "…" to "toString", which it does not declare`
 - the frame context of a feature refuses a read of a texture named like a member of `Object.prototype`, such as `toString`, that the feature does not declare: `FeatureSpritesMaterial: feature "…" reads the texture "toString", which it does not declare`
 - `SpriteResources` holds a uniform named `__proto__` as a uniform of its own, and `uniforms` keeps `Object.prototype` as its prototype
@@ -118,7 +118,7 @@ if (fps > 0) loop.fps = fps;
 
 #### `PanControl2D#mouseButton` takes a whole number from 1 to 31
 
-A `0`, which turned panning with the mouse off, or a string from a config throws now.
+A `0` or a string from a config throws.
 
 **Before**
 
@@ -134,7 +134,7 @@ new PanControl2D({mouseButton: Number('1')});
 
 #### `PanControl2D#keys` takes four strings
 
-A list of another length, which lost a direction without a word, and a string throw now.
+A list of another length, or a string, throws.
 
 **Before**
 

@@ -278,7 +278,8 @@ idle       ── request(), the armed tap, the try at once of a turn, or
               onLandscape = true in landscape, where only the pseudo mode is there ──▶ pseudo
 idle       ── exit(), or a turn to portrait of a fullscreen onLandscape entered,
               while the target lies on top ──────────────────────────────────────────▶ exiting
-requesting ── the answer: refused, or granted with no exit noted on it; dispose() ───▶ idle
+requesting ── the answer: refused; granted, with no exit noted on it, or with one while
+              an element of the app lies on top of the target; dispose() ────────────▶ idle
 requesting ── granted, with an exit noted on it, while the target lies on top ───────▶ exiting
 exiting    ── the exit through or refused; dispose() ────────────────────────────────▶ idle
 pseudo     ── exit(), Escape, a turn to portrait of a pseudo mode onLandscape
@@ -287,7 +288,7 @@ pseudo     ── exit(), Escape, a turn to portrait of a pseudo mode onLandscap
 
 | phase | what the controller does | in | out |
 | --- | --- | --- | --- |
-| `'idle'` | waits; the target may be in native fullscreen all the same — by this controller or by anyone —, and `onLandscape` may wait for a tap | the start; the answer to a request with no exit noted on it; an exit through; a leave of the pseudo mode; `dispose()` | `request()`, the armed tap or the try at once of a turn → `'requesting'`, or → `'pseudo'` where only the pseudo mode is there; `exit()`, or a turn to portrait of a fullscreen `onLandscape` entered, while the target lies on top → `'exiting'`; `onLandscape = true` in landscape where only the pseudo mode is there → `'pseudo'` |
+| `'idle'` | waits; the target may be in native fullscreen all the same — by this controller or by anyone —, and `onLandscape` may wait for a tap | the start; the answer to a request, unless it is granted with an exit noted on it while the target lies on top; an exit through; a leave of the pseudo mode; `dispose()` | `request()`, the armed tap or the try at once of a turn → `'requesting'`, or → `'pseudo'` where only the pseudo mode is there; `exit()`, or a turn to portrait of a fullscreen `onLandscape` entered, while the target lies on top → `'exiting'`; `onLandscape = true` in landscape where only the pseudo mode is there → `'pseudo'` |
 | `'requesting'` | a native request the browser has not answered; it notes who asked to leave meanwhile (`exitAfter`), whether that leave was a refusal of the user (`declines`), and whether a refusal is told to the developer (`warn`) | a request asked of the browser in `'idle'` | the answer: refused → `'idle'`; granted → `'idle'`, or → `'exiting'` where an exit was noted on it and the target lies on top; `dispose()` → `'idle'` |
 | `'exiting'` | a native exit until its promise settles; it notes a `request()` of the page (`requestAfter`), a turn to landscape or the armed tap (`turnAfter`), and a refusal of the user (`declines`) | `exit()` or a turn to portrait while the target lies on top and no call is under way; a granted request with an exit noted on it | the exit through or refused → `'idle'`; a `request()` noted on it then asks as it does in `'idle'`, and a turn noted on it is evaluated as a turn in `'idle'`; `dispose()` → `'idle'` |
 | `'pseudo'` | holds the target over the viewport through CSS | a request — of the page, of a turn, of `onLandscape = true` in landscape — in `'idle'` where only the pseudo mode is there | `exit()`, Escape, a turn to portrait of a pseudo mode `onLandscape` entered, `dispose()` → `'idle'` |

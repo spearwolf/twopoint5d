@@ -194,14 +194,13 @@ It imports neither three.js nor the stage layer, which builds on it.
 `Stage2D` is a scene plus a projection; `IProjection` implementations
 (`OrthographicProjection`, `ParallaxProjection`, with `ProjectionPlane` and
 `fitIntoRectangle` doing the geometry) decide how world units map to the viewport when
-the canvas resizes. `framing()` on the two builds one that frames a `Box3` from a side, its
-plane in the face of the box (`framing.ts`). The two fit their view, take the near and the far
-plane of their camera and refuse a missing plane or a camera of the other kind through the
-internal `PlaneProjectionView` and the checks beside it in `src/stage/planeProjection.ts`.
-`CameraProjection` looks through a camera of
-one's own — of a `.glb` — and fits its frame into the container; it has no plane, and its
-optional `needsPlacement()` lets `Stage2D#updateFrame()` place the camera again in a frame
-in which the source moved. A stage emits `OnStageCameraPlaced` after every placement of its
+the canvas resizes. `framing()` on the two builds one that frames a `Box3` from a side, its plane in
+the face of the box (`framing.ts`). The two fit their view, take the near and the far plane of their
+camera and refuse a missing plane or a camera of the other kind through the internal
+`PlaneProjectionView` and the checks beside it in `src/stage/planeProjection.ts`. `CameraProjection`
+looks through a camera of one's own — of a `.glb` — and fits its frame into the container; it has no
+plane, and its optional `needsPlacement()` lets `Stage2D#updateFrame()` place the camera again in a
+frame in which the source moved. A stage emits `OnStageCameraPlaced` after every placement of its
 camera by the projection.
 
 `CameraRig` moves the camera of a stage: to a pose in the frame of the projection, to

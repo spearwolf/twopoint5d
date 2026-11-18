@@ -2970,11 +2970,11 @@ an `Emissive` feature and a selective bloom, which wait for a scene that needs t
   and `setPreparedFrame()` per sprite.
 - `sortBy()` by a name and `sortByViewDepth()` allocate nothing once their scratch is there —
   the first sort allocates it, and it grows only with the capacity. A kind that sorted once and
-  will not sort again for a long while gives it back with `sprites.spritePool?.releaseSortScratch()`. 10 000 sprites sort in about
-  0.1 ms when the order holds, 0.5 ms with ten of them out of line, 1.1 ms by the view depth under a
-  circling camera and 1.3 ms from a random order;
-  the upload after a sort that moved them is the larger price (see "Draw order: sorting the
-  sprites").
+  will not sort again for a long while gives it back with
+  `sprites.spritePool?.releaseSortScratch()`. 10 000 sprites sort in about 0.1 ms when the order
+  holds, 0.5 ms with ten of them out of line, 1.1 ms by the view depth under a circling camera and
+  1.3 ms from a random order; the upload after a sort that moved them is the larger price (see "Draw
+  order: sorting the sprites").
 - Under `grow: true` a `createSprite()` that finds room allocates the sprite and nothing else, and
   `update()` after a growth allocates nothing; the growth itself is the hitch, copying and uploading
   every sprite the mesh holds (see "FeatureSprites").

@@ -1321,7 +1321,8 @@ anything has moved.
 A `StageRenderer` hands its size and the pixel ratio of its host on to every stage, nested
 renderers included: `resize(width, height, pixelRatio)`. `root.width`, `root.height` and
 `root.pixelRatio` read what the renderer carries — `resize()` is the one way to set them —, the
-`width`, `height` and `pixelRatio` of an item of `root.stages` what that stage has taken. A stage refuses the size when its `resize()` throws:
+`width`, `height` and `pixelRatio` of an item of `root.stages` what that stage has taken. A stage
+refuses the size when its `resize()` throws:
 
 - in `add()`, the size comes first: a stage that refuses it is not added, and neither the
   renderer nor the previous holder of a child renderer has changed;
@@ -1888,8 +1889,8 @@ cannot be named ahead: give it an effect of its own to compile it ahead.
 `precompile()` takes a `WebGPURenderer`, under either backend; a `WebGLRenderer` rejects the
 promise with a `TypeError`. A render pipeline that draws without going through `renderer.render()`
 compiles nothing: the call rejects with an `Error` that says so, and the next call builds that shape
-again. A director disposed while the call runs ends the work there, and the
-promise resolves — also when a compile it waits for fails after the dispose.
+again. A director disposed while the call runs ends the work there, and the promise resolves — also
+when a compile it waits for fails after the dispose.
 
 The shapes cover the composition of the director. A layer builds its own materials and pipelines,
 and a `Stage2D` its `postProcess`, on its first draw; the stages in `layers` draw once, off screen, as the director draws a layer, and

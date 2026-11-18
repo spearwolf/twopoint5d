@@ -151,27 +151,27 @@ explicit instruction.
   feature's `checkKind` throws get theirs from `defineSprite()`.
 - **Invalid input is refused.** A value a public call or setter cannot use throws, in the
   words of the rule above, and the object keeps what it held; nothing is passed over or
-  replaced without a word. The one exception are the measures a layout may hand in anew with
-  every frame: `Display#pixelZoom`, `#maxPixelRatio`, `#maxPixels`, `#resolutionScale` and
-  `#maxDeltaTime`, `Chronometer#maxDeltaTime`, the options `maxPixelRatio` and `maxPixels` of
-  `new Display()`, and `pixelZoom`, `minPixelZoom` and `maxPixelZoom` of `fitIntoRectangle()`.
-  They count an invalid value — the `NaN` of a container 0 pixels wide while the page lays it
-  out, a negative one — as the value that leaves them without effect (`0`; `1` for
-  `resolutionScale` and the `pixelZoom` of `fitIntoRectangle()`; `minPixelZoom` and
-  `maxPixelZoom` do not apply), and their TSDoc says so: the frame is drawn with the fallback
-  instead of throwing in it. A new measure of that kind joins this list; every other input
-  throws.
+  replaced without a word. The one exception are the measures a layout may hand in anew
+  with every frame: `Display#pixelZoom`, `#maxPixelRatio`, `#maxPixels`,
+  `#resolutionScale` and `#maxDeltaTime`, `Chronometer#maxDeltaTime`, the options
+  `maxPixelRatio` and `maxPixels` of `new Display()`, and `pixelZoom`, `minPixelZoom` and
+  `maxPixelZoom` of `fitIntoRectangle()`. They count an invalid value — the `NaN` of a
+  container 0 pixels wide while the page lays it out, a negative one — as the value that
+  leaves them without effect (`0`; `1` for `resolutionScale` and the `pixelZoom` of
+  `fitIntoRectangle()`; `minPixelZoom` and `maxPixelZoom` do not apply), and their TSDoc
+  says so: the frame is drawn with the fallback instead of throwing in it. A new measure
+  of that kind joins this list; every other input throws.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. The catalog also holds every
   tool that more than one manifest names — `typescript` (7), `rimraf`, `@types/node`,
-  `playwright`, `vitest`, `@vitest/coverage-v8` —, likewise to be raised only there. The four are peer dependencies of
-  the library; `@types/three` is an optional one (only a TypeScript consumer
-  needs it). The catalog range lands verbatim in the published manifest,
-  and a 0.x minor of `three` breaks, so `three` stays on the tilde — and
-  every `three` bump is a release: until the library publishes, a consumer
-  on the newer `three` meets a peer conflict. The steps of a bump are in
-  [monorepo architecture §5](docs/architecture.md#5-shared-dependency-versions).
+  `playwright`, `vitest`, `@vitest/coverage-v8` —, likewise to be raised only there. The
+  four are peer dependencies of the library; `@types/three` is an optional one (only a
+  TypeScript consumer needs it). The catalog range lands verbatim in the published
+  manifest, and a 0.x minor of `three` breaks, so `three` stays on the tilde — and every
+  `three` bump is a release: until the library publishes, a consumer on the newer `three`
+  meets a peer conflict. The steps of a bump are in [monorepo architecture
+  §5](docs/architecture.md#5-shared-dependency-versions).
 - **Each package declares what it uses.** A workspace package lists every tool its scripts
   call and every package its code, specs, tests and configs import — type packages
   included — in its own `package.json`. The root lists only what the root scripts,
@@ -274,13 +274,14 @@ explicit instruction.
 Read a module's sources whole instead of grepping symbol by symbol: the pooled-buffer,
 signal and ownership plumbing only makes sense in one piece, and assembling it from grep
 hits is how wrong assumptions get in. Whole does not mean the whole directory, though.
-`controls`, `text` and `utils` hold about 1k lines each or less, and `cat src/<module>/*.ts`
-is one cheap call. The others are far larger — `stage` about 13k lines, `texture` about 9k,
-`display`, `map2d` and `sprites` about 7k each with their subdirectories, `vertex-objects`
-about 6k — and a `cat` over one of them buries the part you need. Read those one area at a
-time: a class together with the files beside it that it imports — in `stage` the camera rig,
-the director, the renderer, or `Stage2D` with its projections; in `texture` the store, a
-resource, the atlas loaders, or the frame-based animations.
+`controls`, `text` and `utils` hold about 1k lines each or less, and
+`cat src/<module>/*.ts` is one cheap call. The others are far larger — `stage` about 14k
+lines, `texture` about 9k, `display`, `map2d` and `sprites` about 7k each with their
+subdirectories, `vertex-objects` about 6k — and a `cat` over one of them buries the part
+you need. Read those one area at a time: a class together with the files beside it that it
+imports — in `stage` the camera rig, the director, the renderer, or `Stage2D` with its
+projections; in `texture` the store, a resource, the atlas loaders, or the frame-based
+animations.
 
 `@spearwolf/eventize` and `@spearwolf/signalize` are used heavily. The `using-eventize`
 and `using-signalize` skills carry the semantics that differ from other event and signal

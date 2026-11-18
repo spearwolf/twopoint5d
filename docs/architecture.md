@@ -261,9 +261,9 @@ backend of three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2`,
 `Firefox WebGL2` and `Webkit WebGL2`
 (`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter names a launcher
 after the capitalized product and the backend). Left to themselves the browsers would pick
-by machine — headless Chromium has `navigator.gpu` but finds no adapter without
-`--enable-unsafe-webgpu`, headless Firefox has no `navigator.gpu` at all (measured with
-Playwright 1.65.0 — Chromium 158, Firefox 159 — on Linux) —, so both would end up on
+by machine: headless Chromium has `navigator.gpu` but finds no adapter without
+`--enable-unsafe-webgpu`, and headless Firefox has no `navigator.gpu` at all (measured
+with Playwright 1.65.0, Chromium 158 and Firefox 159, on Linux). So both would end up on
 WebGL2, and WebGPU would go untested. Now an init script of each launcher sets the backend
 before the page loads: for WebGL2 it takes `navigator.gpu` away, and three falls back as
 it does for a user without WebGPU. Chromium WebGPU runs on SwiftShader, the software
@@ -273,11 +273,11 @@ adapter Chromium ships, with its compositor on SwiftShader as well
 take the canvas texture of a SwiftShader device, and Dawn drops the instance with every
 device of the page ("A valid external Instance reference no longer exists"). Linux x86_64
 needs all three, measured with Playwright 1.65.0: with none of them, or with
-`--use-angle=swiftshader` alone, a clear pass on the canvas is submitted, and two animation
-frames later the queue of the device rejects with that error; with all three the device stays.
-Measured with Playwright 1.63.0, macOS needs the first of them, and Linux on arm64 in
-Playwright's `v1.63.0-noble` image all three. WebKit runs under WebGL 2 alone: Playwright's
-WebKit offers no `navigator.gpu`.
+`--use-angle=swiftshader` alone, a clear pass on the canvas is submitted, and two
+animation frames later the queue of the device rejects with that error; with all three the
+device stays. Measured with Playwright 1.63.0, macOS needs the first of them, and Linux on
+arm64 in Playwright's `v1.63.0-noble` image all three. WebKit runs under WebGL 2 alone:
+Playwright's WebKit offers no `navigator.gpu`.
 
 three falls back to WebGL2 without a word when WebGPU fails its init, and every other
 test would then pass on the wrong backend. `test/renderer-backend.test.js` is the one
@@ -300,9 +300,10 @@ The last lines of a run are the block `Skipped tests:` of `skippedTestsReporter(
 launcher the number of skipped tests and their names, on CI as well, where the progress
 report and its count are off. `EXPECTED_SKIPS` in the config lists, per launcher, the tests
 that skip on purpose; a skip that the list does not name, or a listed test that ran or no
-longer exists, fails the run, and a new `this.skip()` needs its entry there. The Native tests of `test/display-fullscreen.test.js` have to run in every
-launcher: their `beforeEach` asserts `document.fullscreenEnabled`, so a launcher without
-the Fullscreen API fails there instead of passing the native path by unseen.
+longer exists, fails the run, and a new `this.skip()` needs its entry there. The Native
+tests of `test/display-fullscreen.test.js` have to run in every launcher: their
+`beforeEach` asserts `document.fullscreenEnabled`, so a launcher without the Fullscreen
+API fails there instead of passing the native path by unseen.
 
 The runner puts a logger into every page that writes each unhandled rejection into the
 "Browser logs" as "An error was thrown in a Promise outside a test", with its stack,
@@ -400,11 +401,11 @@ The logic of both scripts lives in `scripts/makePackageJson/` and
 `scripts/publishNpmPkg/`, next to its `node --test` specs; the scripts themselves only
 wire it up. Which of skip, publish and fail an answer of `npm show` means is
 `decidePublish()` in `scripts/publishNpmPkg/publishDecision.mjs`, whose spec goes through
-every answer; the arguments of `npm publish`, the dist-tag included, are `publishArguments()`
-in the same file, and its spec covers them; no spec starts the publish script itself. The refusal of those specifiers,
-`findUnpublishableSpecifiers`, lies in `scripts/publishNpmPkg/`, because the publish
-script holds it itself and imports nothing but Node's built-ins; `makePackageJson.mjs`
-imports it from there.
+every answer; the arguments of `npm publish`, the dist-tag included, are
+`publishArguments()` in the same file, and its spec covers them; no spec starts the
+publish script itself. The refusal of those specifiers, `findUnpublishableSpecifiers`,
+lies in `scripts/publishNpmPkg/`, because the publish script holds it itself and imports
+nothing but Node's built-ins; `makePackageJson.mjs` imports it from there.
 
 The publishable artifact is therefore `dist/`, not the source package directory.
 `publishNpmPkg` runs `checkPkgTypes`, `lintPkg` and `checkNameableTypes` first and then
@@ -415,23 +416,24 @@ is started in, into the package directory; the README is `README-pkg.md`, or `RE
 if there is none, and ships as `README.md`. A workspace `.npmrc` goes along if there is
 one, so that `npm show` and `npm publish` read the same one. A `-dev` version is skipped
 before any of this. A prerelease — a version with a `-` after its patch number, such as
-`1.0.0-beta.1` — is published under the dist-tag `next`, so `npm install
-@spearwolf/twopoint5d` without a version keeps installing the latest stable release; every
-other version goes out under npm's `latest`. `npm show` asks the registry from `publishConfig.registry` of the
-manifest, handed over as `npm_config_registry`, because that is the registry `npm publish`
-uploads to — it takes `publishConfig` over every config file and environment variable, and
-`npm show` reads none of it. `checkManifest` refuses a `publishConfig.registry` that is no
-http or https URL, and a manifest that still carries a specifier the build refuses — so a
-source package, or a `dist/` whose manifest still carries such a specifier, does not get
-as far as npm. `npm show` gets 60 s; a registry that does not answer in time ends the
-script with a line that says so, exit code 1, and a killed npm is never taken for a first
-publish. `npm publish` gets no time limit: one killed in the middle of the upload leaves
-an uncertain state, and the job as a whole is bounded by `timeout-minutes` in
-`deploy.yml`. `publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and
-exit code 1 on a missing directory, on a second one and on any other option — a misspelled
-`--dry-run` included — before it asks npm. npm is asked with `npm show .` in the package
-directory, so the name comes from the manifest that `npm publish` reads there and no value
-from it stands on a command line. npm runs without a shell; on Windows, where `npm` is an
+`1.0.0-beta.1` — is published under the dist-tag `next`, so
+`npm install @spearwolf/twopoint5d` without a version keeps installing the latest stable
+release; every other version goes out under npm's `latest`. `npm show` asks the registry
+from `publishConfig.registry` of the manifest, handed over as `npm_config_registry`,
+because that is the registry `npm publish` uploads to — it takes `publishConfig` over
+every config file and environment variable, and `npm show` reads none of it.
+`checkManifest` refuses a `publishConfig.registry` that is no http or https URL, and a
+manifest that still carries a specifier the build refuses — so a source package, or a
+`dist/` whose manifest still carries such a specifier, does not get as far as npm.
+`npm show` gets 60 s; a registry that does not answer in time ends the script with a line
+that says so, exit code 1, and a killed npm is never taken for a first publish.
+`npm publish` gets no time limit: one killed in the middle of the upload leaves an
+uncertain state, and the job as a whole is bounded by `timeout-minutes` in `deploy.yml`.
+`publishNpmPkg.mjs <package-dir> [--dry-run]` stops with a usage line and exit code 1 on a
+missing directory, on a second one and on any other option — a misspelled `--dry-run`
+included — before it asks npm. npm is asked with `npm show .` in the package directory, so
+the name comes from the manifest that `npm publish` reads there and no value from it
+stands on a command line. npm runs without a shell; on Windows, where `npm` is an
 `npm.cmd` that Node starts only through `cmd.exe`, it runs as a single string of literals,
 and an argument with any character besides letters, digits and `_ @ . / -` is refused on
 every platform. Every failure — a manifest that is unreadable, has no `name` or `version`
@@ -663,9 +665,9 @@ project directory, `checkPeerDependenciesOnly.mjs` against a throwaway manifest,
 `scripts/ci/auditInstalledDependencies.mjs` against throwaway reports, because their
 exit codes, their messages and the manifest the first one does not write are wiring that
 no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon
-as its arguments fit; `decidePublish()` carries its decision and `publishArguments()` its arguments, and their
-spec covers both. No
-spec runs `checkDocSnippets.mjs`, which reads git and the file system.
+as its arguments fit; `decidePublish()` carries its decision and `publishArguments()` its
+arguments, and their spec covers both. No spec runs `checkDocSnippets.mjs`, which reads
+git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.
 
