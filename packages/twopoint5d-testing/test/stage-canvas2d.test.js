@@ -1,7 +1,7 @@
 import {expect} from 'chai';
 import {Canvas2DStage, Display} from '@spearwolf/twopoint5d';
 import {RenderTarget} from 'three/webgpu';
-import {makeContainer, disposeDisplay, isNearColor, rgbAt} from './helpers/fixtures.js';
+import {makeContainer, disposeDisplay, isNearColor, rgbAt, readTargetPixels} from './helpers/fixtures.js';
 
 describe('Canvas2DStage — canvas on screen', () => {
   /** @type {Display | undefined} */
@@ -39,7 +39,6 @@ describe('Canvas2DStage — canvas on screen', () => {
     fill(canvas, '#ff0000');
 
     canvasStage = new Canvas2DStage(display.renderer, canvas);
-    // 64 pixels wide: rgbAt() reads the rows at that length
     target = new RenderTarget(64, 64);
     canvasStage.stageRenderer.outputRenderTarget = target;
     canvasStage.setContainerSize(64, 64);
@@ -60,7 +59,7 @@ describe('Canvas2DStage — canvas on screen', () => {
   }
 
   async function centerPixel() {
-    const pixels = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const pixels = await readTargetPixels(display.renderer, target);
     return rgbAt(pixels, 64, 32, 32);
   }
 
@@ -114,7 +113,7 @@ describe('Canvas2DStage — canvas on screen', () => {
     // 128 x 32 contained in the 64 x 64 container is a view of 128 x 128: the canvas lies across
     // the middle as a band 16 pixels high, and above and below it stays the red of the first
     // frame, since nothing clears the target
-    const pixels = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const pixels = await readTargetPixels(display.renderer, target);
     expect(isNearColor(rgbAt(pixels, 64, 32, 32), [0, 0, 255]), 'the middle of the band').to.be.true;
     expect(isNearColor(rgbAt(pixels, 64, 32, 2), [0, 0, 255]), 'a row near one edge').to.be.false;
     expect(isNearColor(rgbAt(pixels, 64, 32, 61), [0, 0, 255]), 'a row near the other edge').to.be.false;

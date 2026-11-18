@@ -11,6 +11,7 @@
       "inputs": [
         "{projectRoot}/test/**/*.js",
         "{projectRoot}/package.json",
+        "{projectRoot}/tsconfig.helpers.json",
         "sharedTsconfigs",
         "{workspaceRoot}/AGENTS.md",
         "{workspaceRoot}/CLAUDE.md",

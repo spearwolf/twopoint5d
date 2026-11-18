@@ -13,7 +13,7 @@
   "type": "module",
   "scripts": {
     "test": "pnpm web-test-runner",
-    "typecheck": "pnpm tsc -p tsconfig.json && node ../../scripts/checkDocSnippets.mjs"
+    "typecheck": "pnpm tsc -p tsconfig.json && pnpm tsc -p tsconfig.helpers.json && node ../../scripts/checkDocSnippets.mjs"
   },
   "dependencies": {
     "@spearwolf/eventize": "catalog:",

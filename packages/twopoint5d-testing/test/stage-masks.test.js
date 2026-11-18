@@ -23,9 +23,9 @@ import {
   makeFilledStage,
   readsTopDown,
   rgbAt,
+  readTargetPixels,
 } from './helpers/fixtures.js';
 
-// 64 pixels wide: rgbAt() reads the rows at that length
 const SIZE = 64;
 
 /** The 8-bit sRGB value of a linear channel, as the output transform of the pipeline writes it. */
@@ -53,7 +53,7 @@ describe('StageDirector — masked slots on the GPU', () => {
   async function draw() {
     director.updateFrame(0, 0, 0);
     director.renderTo(display.renderer);
-    return display.renderer.readRenderTargetPixelsAsync(target, 0, 0, SIZE, SIZE);
+    return readTargetPixels(display.renderer, target);
   }
 
   /**
@@ -260,7 +260,7 @@ describe('StageDirector — masked slots on the GPU', () => {
     sr.resize(SIZE, SIZE);
     sr.updateFrame(0, 0, 0);
     sr.renderTo(display.renderer);
-    const pixels = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, SIZE, SIZE);
+    const pixels = await readTargetPixels(display.renderer, target);
 
     // red·m on the black of the target; into a render target the pipeline writes the linear value, no output transform
     expect(isNearColor(rgbAt(pixels, SIZE, LEFT, 32), [0, 0, 0], 3), 'coverage 0').to.be.true;

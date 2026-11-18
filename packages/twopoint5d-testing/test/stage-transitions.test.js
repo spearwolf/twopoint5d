@@ -25,9 +25,9 @@ import {
   makeContainer,
   readsTopDown,
   rgbAt,
+  readTargetPixels,
 } from './helpers/fixtures.js';
 
-// 64 pixels wide: rgbAt() reads the rows at that length
 const SIZE = 64;
 
 /** The 8-bit sRGB value of a linear channel, as the output transform of the pipeline writes it. */
@@ -58,7 +58,7 @@ describe('StageDirector — transitions on the GPU', () => {
   async function draw() {
     director.updateFrame(0, 0, 0);
     director.renderTo(display.renderer);
-    return display.renderer.readRenderTargetPixelsAsync(target, 0, 0, SIZE, SIZE);
+    return readTargetPixels(display.renderer, target);
   }
 
   beforeEach(async () => {
@@ -113,7 +113,7 @@ describe('StageDirector — transitions on the GPU', () => {
 
       director.updateFrame(0, 0, 0);
       director.renderTo(second.renderer);
-      const pixels = await second.renderer.readRenderTargetPixelsAsync(target, 0, 0, SIZE, SIZE);
+      const pixels = await readTargetPixels(second.renderer, target);
       expect(isNearColor(rgbAt(pixels, SIZE, 32, 32), [half, half, 0], 3), 'the second renderer').to.be.true;
     } finally {
       disposeDisplay(second);

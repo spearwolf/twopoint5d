@@ -1,0 +1,8 @@
+// The fixtures every test file shares are checked once more, with noImplicitAny on: each helper
+// names the types of its parameters, so an argument out of its place fails the check. The test
+// files stay at the strictness of tsconfig.json.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {"noImplicitAny": true},
+  "include": ["test/helpers"]
+}

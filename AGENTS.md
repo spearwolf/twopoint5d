@@ -48,9 +48,11 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   `pnpm test`, `pnpm test:ci` and a single-file run measure nothing
 - `pnpm test:allocations` — the allocation specs (`src/**/hot-path-allocations*.spec.ts`)
   alone, without coverage: the Vitest project `allocations` in
-  `packages/twopoint5d/vite.config.ts`, 30 s per test. `pnpm test` runs them along with
-  the rest. The Nx hash of the Vitest targets includes `node --version`, so the cache
-  replays no measurement taken under another Node
+  `packages/twopoint5d/vite.config.ts`, 30 s per test. A case measures under the V8
+  feedback of the cases before it in its file, so a failure is reproduced with the whole
+  file, never with `-t`. `pnpm test` runs them along with the rest. The Nx hash of the
+  Vitest targets includes `node --version`, so the cache replays no measurement taken
+  under another Node
 - `pnpm bench` — the library's hot-path benchmarks (`src/**/*.bench.ts`) through
   `vitest bench`; the timings land in `packages/twopoint5d/bench-results/results.json`,
   which the nightly workflow `bench.yml` archives. Not part of `pnpm run ci` nor of the
@@ -217,7 +219,9 @@ explicit instruction.
   calls, as `src/sprites/hot-path-allocations.spec.ts` does for the sprite setters.
   The browser tests share their fixtures through
   `packages/twopoint5d-testing/test/helpers/fixtures.js`; a helper that a second test
-  file needs goes there, not into both.
+  file needs goes there, not into both. A helper there carries JSDoc types for its
+  parameters, because `tsconfig.helpers.json` checks the directory with `noImplicitAny`,
+  and a test reads a target back through `readTargetPixels()`.
   A browser test that asserts what the canvas shows on the screen — the picture a frame
   that drew nothing has left there — reads it through `pageScreenshot()` of the fixtures,
   a screenshot Playwright takes of the page: `drawImage()`, `readPixels()` and a

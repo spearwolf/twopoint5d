@@ -19,6 +19,7 @@ import {
   keep,
   release,
   rgbAt,
+  readTargetPixels,
 } from './helpers/fixtures.js';
 
 /** @import {PassNode} from 'three/webgpu' */
@@ -110,8 +111,7 @@ describe('StageRenderer — pipeline integration', () => {
   /**
    * A 50 x 50 orange square at the origin, drawn by a renderer on the display through a
    * `RenderPipeline` and a `buildOutputNode` that hands on the first pass. The renderer writes into
-   * a target of the size of the display, 320 pixels wide — a multiple of 64, so that rgbAt() reads
-   * its rows at that length — and `pixels()` reads it back.
+   * a target of the size of the display and `pixels()` reads it back.
    */
   async function makeComposedSquare() {
     host = makeContainer({width: 320, height: 200});
@@ -140,7 +140,7 @@ describe('StageRenderer — pipeline integration', () => {
     await display.nextFrame();
     await display.nextFrame();
 
-    const pixels = () => display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 320, 200);
+    const pixels = () => readTargetPixels(display.renderer, target);
     return {stage, built, pixels};
   }
 
@@ -401,7 +401,6 @@ describe('StageRenderer — pipeline integration', () => {
     display = new Display(host);
     await display.start();
 
-    // 64 pixels wide: rgbAt() reads the rows at that length
     const target = keep(new RenderTarget(64, 64));
     // no specs: 64 x 64 units on 64 x 64 pixels, the camera centred on the origin
     const stage = keep(new Stage2D(new OrthographicProjection('xy|bottom-left')));
@@ -423,11 +422,11 @@ describe('StageRenderer — pipeline integration', () => {
     root.resize(64, 64);
 
     root.renderTo(display.renderer);
-    const first = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const first = await readTargetPixels(display.renderer, target);
 
     mesh.position.x = 16;
     root.renderTo(display.renderer);
-    const second = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const second = await readTargetPixels(display.renderer, target);
 
     // pure green and black, so the color transform of the pipeline does not shift the result
     expect(isNearColor(rgbAt(first, 64, 16, 32), [0, 255, 0]), 'the content in the first frame').to.be.true;
@@ -440,7 +439,6 @@ describe('StageRenderer — pipeline integration', () => {
     display = new Display(host);
     await display.start();
 
-    // 64 pixels wide: rgbAt() reads the rows at that length
     const target = keep(new RenderTarget(64, 64));
     const root = new StageRenderer().setClearColor(new Color('#f00'), 1);
     const pipeline = keep(new RootRenderPipeline(display.renderer));
@@ -449,7 +447,7 @@ describe('StageRenderer — pipeline integration', () => {
     root.resize(64, 64);
 
     expect(() => root.renderTo(display.renderer), 'a frame without stages').not.to.throw();
-    const empty = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const empty = await readTargetPixels(display.renderer, target);
     // pure colors, so the color transform of the pipeline does not shift the result
     expect(isNearColor(rgbAt(empty, 64, 32, 32), [255, 0, 0]), 'the clear color without a stage').to.be.true;
 
@@ -463,7 +461,7 @@ describe('StageRenderer — pipeline integration', () => {
     root.add(stage);
 
     root.renderTo(display.renderer);
-    const joined = await display.renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const joined = await readTargetPixels(display.renderer, target);
     expect(isNearColor(rgbAt(joined, 64, 32, 32), [0, 255, 0]), 'the first stage that joined').to.be.true;
   });
 
@@ -537,7 +535,7 @@ describe('StageRenderer — pipeline integration', () => {
       makeBuild,
       async ({sr, target, renderer}) => {
         sr.renderTo(renderer);
-        pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+        pixels = await readTargetPixels(renderer, target);
       },
       color,
     );
@@ -628,7 +626,7 @@ describe('StageRenderer — pipeline integration', () => {
     }
 
     root.renderTo(renderer);
-    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const pixels = await readTargetPixels(renderer, target);
 
     return rgbAt(pixels, 64, 32, 32);
   }
@@ -702,8 +700,8 @@ describe('StageRenderer — pipeline integration', () => {
     a.sr.renderTo(renderer);
     b.sr.renderTo(renderer);
 
-    const pixelsA = await renderer.readRenderTargetPixelsAsync(a.target, 0, 0, 64, 64);
-    const pixelsB = await renderer.readRenderTargetPixelsAsync(b.target, 0, 0, 64, 64);
+    const pixelsA = await readTargetPixels(renderer, a.target);
+    const pixelsB = await readTargetPixels(renderer, b.target);
 
     const internalRT = a.seen[0];
     expect(internalRT, 'the stages draw into an internal target').to.exist;
@@ -753,7 +751,7 @@ describe('StageRenderer — pipeline integration', () => {
     root.resize(64, 64);
 
     root.renderTo(renderer);
-    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const pixels = await readTargetPixels(renderer, target);
 
     const rgb = rgbAt(pixels, 64, 48, 32);
     expect(isNearColor(rgb, [0, 0, 0]), `where no stage draws, got ${rgb}`).to.be.true;
@@ -783,11 +781,11 @@ describe('StageRenderer — pipeline integration', () => {
     root.resize(64, 64);
 
     root.renderTo(renderer);
-    const first = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const first = await readTargetPixels(renderer, target);
 
     mesh.position.x = 16;
     root.renderTo(renderer);
-    const second = await renderer.readRenderTargetPixelsAsync(target, 0, 0, 64, 64);
+    const second = await readTargetPixels(renderer, target);
 
     // pure green and black, so the color transform of the pipeline does not shift the result
     expect(isNearColor(rgbAt(first, 64, 16, 32), [0, 255, 0]), 'the content in the first frame').to.be.true;

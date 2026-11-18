@@ -3,9 +3,8 @@ import {Display, OrthographicProjection, ParallaxProjection, Stage2D} from '@spe
 import {Mesh, MeshBasicNodeMaterial, PlaneGeometry, RenderTarget} from 'three/webgpu';
 import {disposeDisplay, makeColorTexture, makeContainer, renderToPixels} from './helpers/fixtures.js';
 
-// The drawing buffer: 64 pixels wide, as the read-back needs (see rgbAt() in the fixtures), and an
-// odd 63 high, so that a frustum centred on the projection plane puts the edges of the texels half
-// a pixel off the edges of the pixels
+// The drawing buffer: 64 pixels wide and an odd 63 high, so that a frustum centred on the projection
+// plane puts the edges of the texels half a pixel off the edges of the pixels
 const BUFFER_WIDTH = 64;
 const BUFFER_HEIGHT = 63;
 

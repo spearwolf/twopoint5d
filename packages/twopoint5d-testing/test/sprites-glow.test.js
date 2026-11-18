@@ -9,7 +9,16 @@ import {
   TexturedSpriteKind,
 } from '@spearwolf/twopoint5d';
 import {Color, RenderPipeline, RenderTarget} from 'three/webgpu';
-import {disposeDisplay, disposeKept, isNearColor, keep, makeColorTexture, makeContainer, rgbAt} from './helpers/fixtures.js';
+import {
+  disposeDisplay,
+  disposeKept,
+  isNearColor,
+  keep,
+  makeColorTexture,
+  makeContainer,
+  rgbAt,
+  readTargetPixels,
+} from './helpers/fixtures.js';
 
 const TARGET_SIZE = 64;
 const CENTER = TARGET_SIZE / 2;
@@ -69,7 +78,7 @@ describe('sprites — glow: a tint above white and the bloom of the stage', func
     sr.outputRenderTarget = target;
     sr.resize(TARGET_SIZE, TARGET_SIZE);
     sr.renderTo(renderer);
-    const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, TARGET_SIZE, TARGET_SIZE);
+    const pixels = await readTargetPixels(renderer, target);
     return {center: rgbAt(pixels, TARGET_SIZE, CENTER, CENTER), probe: rgbAt(pixels, TARGET_SIZE, PROBE, CENTER)};
   }
 

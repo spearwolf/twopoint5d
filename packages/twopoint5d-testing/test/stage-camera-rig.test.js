@@ -33,18 +33,17 @@ describe('CameraRig — a lifted camera', () => {
   /** @type {HTMLElement | undefined} */
   let host;
   /** @type {StageRenderer[]} */
-  let renderers;
+  const renderers = [];
 
   beforeEach(async () => {
     host = makeContainer({width: SIZE, height: SIZE});
     display = new Display(host);
     await display.start();
-    renderers = [];
   });
 
   afterEach(() => {
     // the renderers let go first, then the rigs, the stages and what they used, the display last
-    for (const sr of renderers) sr.dispose();
+    for (const sr of renderers.splice(0)) sr.dispose();
     disposeKept();
     disposeDisplay(display);
     display = undefined;
@@ -106,17 +105,16 @@ describe('CameraRig — a lens change', () => {
   /** @type {HTMLElement | undefined} */
   let host;
   /** @type {StageRenderer[]} */
-  let renderers;
+  const renderers = [];
 
   beforeEach(async () => {
     host = makeContainer({width: SIZE, height: SIZE});
     display = new Display(host);
     await display.start();
-    renderers = [];
   });
 
   afterEach(() => {
-    for (const sr of renderers) sr.dispose();
+    for (const sr of renderers.splice(0)) sr.dispose();
     disposeKept();
     disposeDisplay(display);
     display = undefined;
@@ -222,10 +220,10 @@ describe('CameraProjection — the authored frame in the container', () => {
   /** @type {HTMLElement | undefined} */
   let host;
   /** @type {StageRenderer[]} */
-  let renderers;
+  const renderers = [];
 
   afterEach(() => {
-    for (const sr of renderers) sr.dispose();
+    for (const sr of renderers.splice(0)) sr.dispose();
     disposeKept();
     disposeDisplay(display);
     display = undefined;
@@ -260,7 +258,6 @@ describe('CameraProjection — the authored frame in the container', () => {
     host = makeContainer({width, height});
     display = new Display(host);
     await display.start();
-    renderers = [];
 
     const source = new PerspectiveCamera(FOV, ASPECT, 1, 1000);
     source.position.set(40, -25, 300);

@@ -13,12 +13,12 @@ import {
   makeFilledStage,
   pageScreenshot,
   rgbAt,
+  readTargetPixels,
 } from './helpers/fixtures.js';
 
 /** @import {StagePostProcess} from '@spearwolf/twopoint5d' */
 /** @import {Node, WebGPURenderer} from 'three/webgpu' */
 
-// 64 pixels wide: rgbAt() reads the rows at that length
 const SIZE = 64;
 
 /** The 8-bit sRGB value of a linear channel, as the output transform of a pipeline writes it. */
@@ -56,7 +56,7 @@ describe('Stage2D — a post-process on one stage', () => {
   /** @type {RenderTarget} */
   let target;
   /** @type {{dispose(): void}[]} */
-  let renderers;
+  const renderers = [];
 
   beforeEach(async () => {
     host = makeContainer({width: SIZE, height: SIZE});
@@ -64,12 +64,11 @@ describe('Stage2D — a post-process on one stage', () => {
     await display.start();
     renderer = display.renderer;
     target = keep(new RenderTarget(SIZE, SIZE));
-    renderers = [];
   });
 
   afterEach(() => {
     // the renderers let go first, then the stages and what they used, the display last
-    for (const sr of renderers) sr.dispose();
+    for (const sr of renderers.splice(0)) sr.dispose();
     disposeKept();
     disposeDisplay(display);
     display = undefined;
@@ -104,7 +103,7 @@ describe('Stage2D — a post-process on one stage', () => {
   async function draw(sr) {
     sr.updateFrame(0, 0, 0);
     sr.renderTo(renderer);
-    return renderer.readRenderTargetPixelsAsync(target, 0, 0, SIZE, SIZE);
+    return readTargetPixels(renderer, target);
   }
 
   const middle = (pixels) => rgbAt(pixels, SIZE, 32, 32);

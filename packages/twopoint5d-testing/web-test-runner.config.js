@@ -19,7 +19,7 @@ function backendLauncher(product, backend, launchOptions) {
     concurrency: 1,
     launchOptions,
     async createPage({context}) {
-      await context.addInitScript(pinBackend, backend);
+      await context.addInitScript(pinBackend, {product, backend});
       await context.addInitScript(takeExpectedRejections);
       return context.newPage();
     },
@@ -31,14 +31,20 @@ function backendLauncher(product, backend, launchOptions) {
 /**
  * Runs in the page before any of its scripts. It leaves the backend the tests expect in
  * `globalThis.twopoint5dTestBackend`, which `expectedBackend()` in test/helpers/fixtures.js
- * reads. For WebGL2 it takes `navigator.gpu` away, as a browser without WebGPU has none:
- * three's WebGPU backend then fails its init and the renderer falls back to WebGL2 — the
- * path a user without WebGPU takes, and not `forceWebGL`, which skips it.
+ * reads, and the browser with what its page offered in `globalThis.twopoint5dTestBrowser`, which
+ * `testBrowser()` there reads — `renderer-backend.test.js` holds WebKit to offering no WebGPU.
+ * For WebGL2 it takes `navigator.gpu` away, as a browser without WebGPU has none: three's WebGPU
+ * backend then fails its init and the renderer falls back to WebGL2 — the path a user without
+ * WebGPU takes, and not `forceWebGL`, which skips it.
  *
- * @param {Backend} backend
+ * @param {{product: 'chromium' | 'firefox' | 'webkit', backend: Backend}} pin
  */
-function pinBackend(backend) {
+function pinBackend({product, backend}) {
   Object.defineProperty(globalThis, 'twopoint5dTestBackend', {value: backend});
+  // before the delete below: whether the page had navigator.gpu to begin with
+  Object.defineProperty(globalThis, 'twopoint5dTestBrowser', {
+    value: Object.freeze({product, offersWebGPU: 'gpu' in Navigator.prototype}),
+  });
   if (backend === 'WebGL2') delete Navigator.prototype.gpu;
 }
 
@@ -88,6 +94,7 @@ const WEBGL2_FALLBACK_WARNING = 'THREE.WebGPURenderer: WebGPU is not available, 
 // leaves a page as a user's Chromium has it —, Firefox and WebKit.
 const RENDERER_FREE_FILES = [
   'test/display-fullscreen.test.js',
+  'test/harness-pixels.test.js',
   'test/harness-rejections.test.js',
   'test/pan-control-cursor.test.js',
   'test/pan-control-dispose.test.js',
@@ -148,8 +155,9 @@ const firefoxWebGL2 = backendLauncher('firefox', 'WebGL2', {
   },
 });
 
-// WebKit, the engine of Safari. Playwright 1.63.0 ships WebKit 26.6, whose pages have no
-// navigator.gpu (measured on macOS), so it renders under WebGL 2; it needs no flags.
+// WebKit, the engine of Safari. The WebKit that Playwright ships offers no navigator.gpu, so it
+// renders under WebGL 2 and needs no flags; renderer-backend.test.js fails as soon as a Playwright
+// release changes that.
 const webkitWebGL2 = backendLauncher('webkit', 'WebGL2', {});
 
 /**
@@ -174,10 +182,37 @@ function pageScreenshotPlugin() {
   };
 }
 
+// The tests that skip on purpose, by launcher, because what they test does not exist under that
+// launcher — each as the reporter writes it: `file › suite › … › test`. The reporter below holds a
+// run to this list and fails it on any difference, so a new `this.skip()` belongs here.
+/** @type {Record<string, string[]>} */
+const EXPECTED_SKIPS = {
+  [chromiumWebGPU.name]: [
+    'test/display-dispose.test.js › Display — the contract after dispose() › (a) releases what it built itself › the canvas that was handed in, for the display after it › a WebGL context that did not come back in time gets another restore from the next display on its canvas',
+    'test/display-dispose.test.js › Display — the contract after dispose() › (a) releases what it built itself › the canvas that was handed in, for the display after it › a WebGL context that does not come back holds the next display on its canvas up for a bounded time',
+    'test/display-dispose.test.js › Display — the contract after dispose() › (a) releases what it built itself › the canvas that was handed in, for the display after it › a canvas that was handed in keeps its WebGL context lost while no display follows',
+  ],
+  [chromiumWebGL2.name]: [
+    'test/display-dispose.test.js › Display — the contract after dispose() › (a) releases what it built itself › the renderer › releases the renderer only after the GPU has run the work submitted to it',
+  ],
+  [firefoxWebGL2.name]: [
+    'test/display-dispose.test.js › Display — the contract after dispose() › (a) releases what it built itself › the renderer › releases the renderer only after the GPU has run the work submitted to it',
+    'test/sprites-picking.test.js › sprites — picking › lets the geometry a growth replaced go, without another pick',
+    'test/vertex-objects-heap.test.js › vertex-objects — heap › does not leak geometries or heap across many create/render/dispose rounds',
+  ],
+  [webkitWebGL2.name]: [
+    'test/display-dispose.test.js › Display — the contract after dispose() › (a) releases what it built itself › the renderer › releases the renderer only after the GPU has run the work submitted to it',
+    'test/sprites-picking.test.js › sprites — picking › lets the geometry a growth replaced go, without another pick',
+    'test/vertex-objects-heap.test.js › vertex-objects — heap › does not leak geometries or heap across many create/render/dispose rounds',
+  ],
+};
+
 /**
  * Lists every skipped test at the end of a run, by launcher — on CI as well, where the progress
- * report and its count are off — so a test that skips where it ought to run shows in the log of a
- * green run.
+ * report and its count are off. It then holds the skips of each file that ran to `EXPECTED_SKIPS`
+ * and fails the run when a test skips that the list does not name, or a test the list names ran or
+ * no longer exists. A file that did not run — another group, `--files` — is not compared, and one
+ * that did not load fails the run on its own.
  *
  * @returns {import('@web/test-runner').Reporter}
  */
@@ -199,6 +234,10 @@ function skippedTestsReporter() {
     stop({sessions}) {
       /** @type {Map<string, string[]>} */
       const byLauncher = new Map();
+      /** @type {Map<string, string[]>} */
+      const deviations = new Map();
+      /** @param {string} name @param {string} line */
+      const deviate = (name, line) => deviations.set(name, [...(deviations.get(name) ?? []), line]);
       for (const session of sessions) {
         const name = session.browser.name;
         const skipped = byLauncher.get(name) ?? [];
@@ -209,6 +248,14 @@ function skippedTestsReporter() {
         const found = [];
         collect(session.testResults, [file], found);
         skipped.push(...found);
+
+        const expected = (EXPECTED_SKIPS[name] ?? []).filter((test) => test.startsWith(`${file} › `));
+        for (const test of found) {
+          if (!expected.includes(test)) deviate(name, `skipped, not in EXPECTED_SKIPS: ${test}`);
+        }
+        for (const test of expected) {
+          if (!found.includes(test)) deviate(name, `in EXPECTED_SKIPS, but it ran or no longer exists: ${test}`);
+        }
       }
       const lines = ['Skipped tests:'];
       for (const [name, skipped] of [...byLauncher].sort(([a], [b]) => a.localeCompare(b))) {
@@ -217,6 +264,22 @@ function skippedTestsReporter() {
       }
       // biome-ignore lint/suspicious/noConsole: a reporter writes to the log of the run
       console.log(lines.join('\n'));
+
+      if (deviations.size === 0) return;
+      const report = [];
+      for (const [name, found] of [...deviations].sort(([a], [b]) => a.localeCompare(b))) {
+        report.push(`  ${name}:`);
+        for (const line of found.sort()) report.push(`    ${line}`);
+      }
+      report.push('The run fails because its skips differ from EXPECTED_SKIPS in web-test-runner.config.js.');
+      // biome-ignore lint/suspicious/noConsole: a reporter writes to the log of the run
+      console.error(report.join('\n'));
+      // The runner ends after its reporters with process.exit(passed ? 0 : 1), and an explicit
+      // process.exit(0) overrides a process.exitCode set before it. A listener of 'exit' runs
+      // after that call, and the exit code it sets is the one the process ends with.
+      process.on('exit', () => {
+        process.exitCode = 1;
+      });
     },
   };
 }

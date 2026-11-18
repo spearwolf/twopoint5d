@@ -1,5 +1,5 @@
-/** @import {Display, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
-/** @import {WebGPURenderer} from 'three/webgpu' */
+/** @import {Display, IMap2DVisibilitor, TexturePackerJsonData, VertexObjectDescription} from '@spearwolf/twopoint5d' */
+/** @import {BufferAttribute, Camera, InterleavedBufferAttribute, RenderTarget, WebGPURenderer} from 'three/webgpu' */
 import {executeServerCommand} from '@web/test-runner-commands';
 import {expect} from 'chai';
 import {
@@ -50,6 +50,21 @@ export function expectedBackend() {
   return backend;
 }
 
+/**
+ * The browser this run happens in and whether its page offered WebGPU before the launcher pinned
+ * a backend — `navigator.gpu` is gone from a page pinned to WebGL2. web-test-runner.config.js
+ * records both before the page loads.
+ *
+ * @returns {{product: 'chromium' | 'firefox' | 'webkit', offersWebGPU: boolean}}
+ */
+export function testBrowser() {
+  const browser = Reflect.get(globalThis, 'twopoint5dTestBrowser');
+  if (browser === undefined || browser === null) {
+    throw new Error(`no browser recorded for this run (got ${browser}) — see web-test-runner.config.js`);
+  }
+  return browser;
+}
+
 // --- containers and displays ---
 
 /**
@@ -95,6 +110,7 @@ export function makeIframeDocument({width, height} = {}) {
 }
 
 // the errors a dispose() threw in the teardown of the running test, for the hook below
+/** @type {unknown[]} */
 const teardownErrors = [];
 
 /**
@@ -335,6 +351,9 @@ export function whenRejectionsReported() {
  * names another — is what the control sees as `event.target`. `isPrimary` is `true`
  * unless named otherwise: the first pointer of its type, which a second finger on a
  * touch screen is not.
+ *
+ * @param {string} type
+ * @param {{x?: number, y?: number, buttons?: number, pointerId?: number, pointerType?: string, isPrimary?: boolean, target?: EventTarget}} [options]
  */
 export function pointer(
   type,
@@ -359,6 +378,8 @@ export function pointer(
  * so that it reaches the listener of PanControl2D on `document` from inside a shadow
  * root as well; `init` names the key, usually by `code`.
  *
+ * @param {string} type
+ * @param {KeyboardEventInit} init
  * @param {EventTarget} [target]
  */
 export function key(type, init, target = document) {
@@ -375,14 +396,23 @@ export function makeState() {
 /**
  * The buffer behind an attribute — an interleaved attribute shares it with its siblings. It
  * carries the version that counts the uploads and the update ranges that steer them.
+ *
+ * @param {BufferAttribute | InterleavedBufferAttribute} attr
  */
 export function bufferOf(attr) {
-  return attr.isInterleavedBufferAttribute ? attr.data : attr;
+  return 'isInterleavedBufferAttribute' in attr ? attr.data : attr;
 }
 
-/** Reads an attribute back out of the gpu buffer three has uploaded it into. */
+/**
+ * Reads an attribute back out of the gpu buffer three has uploaded it into.
+ *
+ * @param {WebGPURenderer} renderer
+ * @param {BufferAttribute | InterleavedBufferAttribute} attr what `geometry.getAttribute()` answers
+ * @returns {Promise<number[]>}
+ */
 export async function readBack(renderer, attr) {
-  return Array.from(new Float32Array(await renderer.getArrayBufferAsync(attr)));
+  // the types of three take a BufferAttribute alone, whereas getAttribute() answers either kind
+  return Array.from(new Float32Array(await renderer.getArrayBufferAsync(/** @type {BufferAttribute} */ (attr))));
 }
 
 /** @type {VertexObjectDescription} */
@@ -407,7 +437,11 @@ export function makeCamera(x = 0) {
   return camera;
 }
 
-/** A map on the XZ ground plane, seen through `visibilitor`, without a loaded texture: the tile set builds its own atlas. */
+/**
+ * A map on the XZ ground plane, seen through `visibilitor`, without a loaded texture: the tile set builds its own atlas.
+ *
+ * @param {IMap2DVisibilitor} visibilitor
+ */
 export function makeMap(visibilitor) {
   const tileSet = new TileSet(new TextureCoords(0, 0, 256, 256), {tileWidth: 128, tileHeight: 128});
   const tileData = new RepeatingTilesProvider([
@@ -497,7 +531,12 @@ export function makeMipmappedChecker() {
   return texture;
 }
 
-/** How many lit pixels of a read-back target are neither red nor green: the seam of a mip level picked too small. */
+/**
+ * How many lit pixels of a read-back target are neither red nor green: the seam of a mip level picked too small.
+ *
+ * @param {ArrayLike<number>} pixels
+ * @returns {number}
+ */
 export function countMixed(pixels) {
   let mixed = 0;
   for (let i = 0; i < pixels.length; i += 4) {
@@ -562,6 +601,7 @@ export function makeTrimmedSheet() {
   const width = 8;
   const height = 4;
   const texels = Array.from({length: width * height}, () => [0, 0, 0, 0]);
+  /** @param {number} x @param {number} y @param {number[]} color */
   const put = (x, y, color) => {
     texels[y * width + x] = color;
   };
@@ -593,8 +633,35 @@ export function makeTrimmedSheet() {
 }
 
 /**
+ * Reads all of `target` back: four bytes per pixel — red, green, blue, alpha —, row after row
+ * with nothing between them, which is what rgbAt() and the other pixel helpers read. A read-back
+ * that holds anything else — a target of another format, rows a backend has padded — throws,
+ * so that a helper fails instead of reading the wrong pixel.
+ *
+ * @param {WebGPURenderer} renderer
+ * @param {RenderTarget} target
+ * @returns {Promise<Uint8Array>}
+ */
+export async function readTargetPixels(renderer, target) {
+  const pixels = await renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height);
+  const bytes = target.width * target.height * 4;
+  if (!(pixels instanceof Uint8Array) || pixels.length !== bytes) {
+    throw new Error(
+      `readTargetPixels(): the read-back of a target of ${target.width} × ${target.height} is a ${pixels.constructor.name} of ${pixels.length}, not the ${bytes} bytes of rows packed tightly at four bytes per pixel`,
+    );
+  }
+  return pixels;
+}
+
+/**
  * Renders `scene` through `camera` into `target` on an opaque black background and reads the
- * target back: four bytes per pixel, red, green, blue, alpha.
+ * target back through {@link readTargetPixels}: four bytes per pixel, red, green, blue, alpha.
+ *
+ * @param {WebGPURenderer} renderer
+ * @param {Scene} scene
+ * @param {Camera} camera
+ * @param {RenderTarget} target
+ * @returns {Promise<Uint8Array>}
  */
 export async function renderToPixels(renderer, scene, camera, target) {
   renderer.setClearColor(0x000000, 1);
@@ -604,16 +671,20 @@ export async function renderToPixels(renderer, scene, camera, target) {
   } finally {
     renderer.setRenderTarget(null);
   }
-  return renderer.readRenderTargetPixelsAsync(target, 0, 0, target.width, target.height);
+  return readTargetPixels(renderer, target);
 }
 
 /**
  * The `[r, g, b]` of the pixel at `x`, `y` of a read-back target `size` pixels wide.
  *
- * The pixels are read at a row length of `size * 4` bytes. WebGPU aligns every row it copies
- * out of a texture to 256 bytes, so that holds for a target 64 pixels wide, or a multiple of
- * it, and nothing else: at another width the rows come back padded and this reads the wrong
- * pixel without a word. Keep the targets of these tests at 64.
+ * The pixels are read at a row length of `size * 4` bytes, as tightly packed as
+ * {@link readTargetPixels} checks them.
+ *
+ * @param {ArrayLike<number>} pixels
+ * @param {number} size
+ * @param {number} x
+ * @param {number} y
+ * @returns {number[]}
  */
 export function rgbAt(pixels, size, x, y) {
   const i = (y * size + x) * 4;
@@ -649,12 +720,25 @@ export async function pageScreenshot(clip) {
   }
 }
 
-/** Whether every channel of `rgb` lies within `tolerance` of the one in `expected`. */
+/**
+ * Whether every channel of `rgb` lies within `tolerance` of the one in `expected`.
+ *
+ * @param {number[]} rgb
+ * @param {ArrayLike<number>} expected
+ * @param {number} [tolerance]
+ * @returns {boolean}
+ */
 export function isNearColor(rgb, expected, tolerance = 2) {
   return rgb.every((value, i) => Math.abs(value - expected[i]) <= tolerance);
 }
 
-/** How many pixels of a read-back target have the color `rgb`, within the tolerance of {@link isNearColor}. */
+/**
+ * How many pixels of a read-back target have the color `rgb`, within the tolerance of {@link isNearColor}.
+ *
+ * @param {ArrayLike<number>} pixels
+ * @param {number[]} rgb
+ * @returns {number}
+ */
 export function countColor(pixels, rgb) {
   let count = 0;
   for (let i = 0; i < pixels.length; i += 4) {
@@ -663,7 +747,13 @@ export function countColor(pixels, rgb) {
   return count;
 }
 
-/** Whether the pixel at byte offset `i` is brighter than the black clear color in any channel, by more than 16. */
+/**
+ * Whether the pixel at byte offset `i` is brighter than the black clear color in any channel, by more than 16.
+ *
+ * @param {ArrayLike<number>} pixels
+ * @param {number} i
+ * @returns {boolean}
+ */
 function isLitAt(pixels, i) {
   return pixels[i] > 16 || pixels[i + 1] > 16 || pixels[i + 2] > 16;
 }
@@ -716,6 +806,9 @@ export function diffPixels(a, b, tolerance = 2) {
  * stands upright on the XZ ground and faces `+z`. A world point `(x, y, z)` lands at
  * `(x, 0.6 y - 0.8 z)` of the view, in world units from its centre — the coordinates of
  * {@link compareWithModel}.
+ *
+ * @param {number} size
+ * @param {number} pixelsPerUnit
  */
 export function makeCameraAboveGround(size, pixelsPerUnit) {
   const half = size / pixelsPerUnit / 2;
@@ -729,22 +822,30 @@ export function makeCameraAboveGround(size, pixelsPerUnit) {
  * Whether `renderer` reads a target back from its top row down — WebGPU does, WebGL 2 reads from
  * the bottom up. A sprite above the middle of `target`, one unit a pixel, answers it.
  *
- * It reads the pixels at a row length of `target.width * 4` bytes and needs a target 64 pixels
- * wide, or a multiple of it — see {@link rgbAt}.
+ * It needs a square target, `target.width` pixels to a side. The probe sprites are released when
+ * the render throws as well.
+ *
+ * @param {WebGPURenderer} renderer
+ * @param {RenderTarget} target
+ * @returns {Promise<boolean>}
  */
 export async function readsTopDown(renderer, target) {
   const size = target.width;
   const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1});
-  const sprite = sprites.createSprite();
-  sprite.setSize(4, 4);
-  sprite.setPosition(0, size / 4, 0);
-  const scene = new Scene();
-  scene.add(sprites);
-  sprites.update();
-  const camera = new OrthographicCamera(-size / 2, size / 2, size / 2, -size / 2, 0.1, 100);
-  camera.position.z = 10;
-  const pixels = await renderToPixels(renderer, scene, camera, target);
-  sprites.dispose();
+  let pixels;
+  try {
+    const sprite = sprites.createSprite();
+    sprite.setSize(4, 4);
+    sprite.setPosition(0, size / 4, 0);
+    const scene = new Scene();
+    scene.add(sprites);
+    sprites.update();
+    const camera = new OrthographicCamera(-size / 2, size / 2, size / 2, -size / 2, 0.1, 100);
+    camera.position.z = 10;
+    pixels = await renderToPixels(renderer, scene, camera, target);
+  } finally {
+    sprites.dispose();
+  }
 
   const upperRow = size / 2 - size / 4;
   const upper = !isNearColor(rgbAt(pixels, size, size / 2, upperRow), [0, 0, 0]);
@@ -758,11 +859,23 @@ export async function readsTopDown(renderer, target) {
  * `(x, y)`, row by row from the top of the picture, on a target `size` pixels square drawn at
  * `pixelsPerUnit` pixels to the unit around the origin — `topDown` is the row order the backend read
  * the target back in (see {@link readsTopDown}).
+ *
+ * @param {ArrayLike<number>} pixels
+ * @param {number} size
+ * @param {number} pixelsPerUnit
+ * @param {boolean} topDown
+ * @param {number} x
+ * @param {number} y
+ * @param {number} columns
+ * @param {number} rows
+ * @returns {number[][][]}
  */
 export function cellColors(pixels, size, pixelsPerUnit, topDown, x, y, columns, rows) {
   const center = size / 2;
+  /** @type {number[][][]} */
   const colors = [];
   for (let row = 0; row < rows; row++) {
+    /** @type {number[][]} */
     const line = [];
     for (let column = 0; column < columns; column++) {
       const px = Math.floor(center + (x + column - (columns - 1) / 2) * pixelsPerUnit);
@@ -774,13 +887,27 @@ export function cellColors(pixels, size, pixelsPerUnit, topDown, x, y, columns, 
   return colors;
 }
 
-/** The cells of {@link cellColors} mirrored left for right. */
+/**
+ * The cells of {@link cellColors} mirrored left for right.
+ *
+ * @param {number[][][]} cells
+ */
 export const mirroredX = (cells) => cells.map((line) => [...line].reverse());
 
-/** The cells of {@link cellColors} mirrored upside down. */
+/**
+ * The cells of {@link cellColors} mirrored upside down.
+ *
+ * @param {number[][][]} cells
+ */
 export const mirroredY = (cells) => [...cells].reverse();
 
-/** Holds the cells of {@link cellColors} to `expected`, cell by cell; the reference has to light more than one cell. */
+/**
+ * Holds the cells of {@link cellColors} to `expected`, cell by cell; the reference has to light more than one cell.
+ *
+ * @param {number[][][]} actual
+ * @param {number[][][]} expected
+ * @param {string} what
+ */
 export function expectSameCells(actual, expected, what) {
   expect(
     expected.flat().filter((rgb) => !isNearColor(rgb, [0, 0, 0])),
@@ -788,7 +915,7 @@ export function expectSameCells(actual, expected, what) {
   ).to.have.length.above(1);
   actual.forEach((line, row) =>
     line.forEach((rgb, column) => {
-      expect(rgb, `${what}: cell (${column}, ${row}) against ${expected[row][column]}`).to.satisfy((c) =>
+      expect(rgb, `${what}: cell (${column}, ${row}) against ${expected[row][column]}`).to.satisfy((/** @type {number[]} */ c) =>
         isNearColor(c, expected[row][column]),
       );
     }),
@@ -805,8 +932,7 @@ export function expectSameCells(actual, expected, what) {
  * Answers how many pixels it checked, how many of those the model lights — where it answers
  * anything but `black` — and the ones that differ.
  *
- * It reads the pixels at a row length of `size * 4` bytes and needs a target 64 pixels wide, or a
- * multiple of it — see {@link rgbAt}.
+ * It needs a square target, `size` pixels to a side.
  *
  * @param {ArrayLike<number>} pixels
  * @param {{
@@ -821,9 +947,11 @@ export function expectSameCells(actual, expected, what) {
  */
 export function compareWithModel(pixels, {size, pixelsPerUnit, topDown, black, colorAt, edgeMargin = 0.75}) {
   const ring = Array.from({length: 16}, (_, i) => [Math.cos((i * Math.PI) / 8), Math.sin((i * Math.PI) / 8)]);
+  /** @param {number} px @param {number} py */
   const viewAt = (px, py) => colorAt((px - size / 2) / pixelsPerUnit, (size / 2 - py) / pixelsPerUnit);
   let checked = 0;
   let lit = 0;
+  /** @type {string[]} */
   const differing = [];
   for (let row = 0; row < size; row++) {
     for (let column = 0; column < size; column++) {
@@ -845,8 +973,11 @@ export function compareWithModel(pixels, {size, pixelsPerUnit, topDown, black, c
 /**
  * The width and height, in pixels, of the box around every pixel the sprite covered.
  *
- * It reads the pixels at a row length of `size * 4` bytes and needs a target 64 pixels wide,
- * or a multiple of it — see {@link rgbAt}.
+ * It needs a square target, `size` pixels to a side.
+ *
+ * @param {ArrayLike<number>} pixels
+ * @param {number} size
+ * @returns {{width: number, height: number}}
  */
 export function coveredBox(pixels, size) {
   let minX = Infinity;

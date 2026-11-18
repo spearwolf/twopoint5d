@@ -48,6 +48,8 @@ const bytesPerCall = async (round: () => void) => (await measureSettledBytes(rou
 // The cases run in the order they are written, and the order matters: the feedback V8 collected in
 // the cases before shapes the code it runs a case with. The direct needsPlacement() after the cases
 // that follow cameras of both kinds is the one that caught the 16 bytes of §4.2 of the proposal.
+// A failure is reproduced with the whole file (`pnpm test:allocations`), never with `-t` or a case
+// on its own.
 describe('CameraRig on the hot path, in the order of its cases: later cases run with the feedback of earlier ones', () => {
   test.each<[string, Easing]>([
     ['ease-in-out', 'ease-in-out'],

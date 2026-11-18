@@ -4,6 +4,7 @@
 // which is what the check is for. `types: ["mocha"]` keeps Node and Sinon globals out
 // of code that runs in the browser.
 // docs/architecture.md (§6) holds what `strictNullChecks` reports when it is switched on.
+// `test/helpers/` is checked once more under tsconfig.helpers.json, with `noImplicitAny` on.
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {

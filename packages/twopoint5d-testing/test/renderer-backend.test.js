@@ -1,6 +1,6 @@
 import {expect} from 'chai';
 import {Display} from '@spearwolf/twopoint5d';
-import {disposeDisplay, expectedBackend, makeContainer} from './helpers/fixtures.js';
+import {disposeDisplay, expectedBackend, makeContainer, testBrowser} from './helpers/fixtures.js';
 
 describe('renderer backend', function () {
   /** @type {Display | undefined} */
@@ -31,5 +31,13 @@ describe('renderer backend', function () {
     // three falls back to WebGL2 without a word when WebGPU fails its init. Every other test
     // would then pass on the wrong backend, and this is the one that says so
     expect(backend, 'three fell back from the pinned backend').to.equal(expectedBackend());
+  });
+
+  it('finds no WebGPU in WebKit, which runs under WebGL 2 alone for that reason', () => {
+    const {product, offersWebGPU} = testBrowser();
+    expect(
+      product === 'webkit' && offersWebGPU,
+      'WebKit offers WebGPU — it needs a WebKit launcher under WebGPU in web-test-runner.config.js',
+    ).to.equal(false);
   });
 });

@@ -273,7 +273,8 @@ test would then pass on the wrong backend. `test/renderer-backend.test.js` is th
 that fails then: it holds the backend three picked to the pinned one, read through
 `expectedBackend()` from `test/helpers/fixtures.js`, and writes
 `[renderer-backend] <WebGPU|WebGL2> on <browser>/<version>` into the "Browser logs" of
-each launcher.
+each launcher. The same file holds that WebKit offers no WebGPU, read through
+`testBrowser()`, and a Playwright update that changes that fails there.
 
 A file none of whose tests renders, reads a pixel back or asserts anything about the
 renderer or its backend runs once per engine instead: the files in `RENDERER_FREE_FILES`
@@ -286,8 +287,9 @@ render belongs into the list.
 
 The last lines of a run are the block `Skipped tests:` of `skippedTestsReporter()`: per
 launcher the number of skipped tests and their names, on CI as well, where the progress
-report and its count are off. A test that skips where it ought to run shows in the log of
-a green run. The Native tests of `test/display-fullscreen.test.js` have to run in every
+report and its count are off. `EXPECTED_SKIPS` in the config lists, per launcher, the tests
+that skip on purpose; a skip that the list does not name, or a listed test that ran or no
+longer exists, fails the run, and a new `this.skip()` needs its entry there. The Native tests of `test/display-fullscreen.test.js` have to run in every
 launcher: their `beforeEach` asserts `document.fullscreenEnabled`, so a launcher without
 the Fullscreen API fails there instead of passing the native path by unseen.
 
@@ -590,7 +592,9 @@ Two runners, deliberately in separate packages:
   engine, §3). `pnpm install` downloads no browsers; they come from
   `pnpm exec playwright install chromium firefox webkit`. The `*.test.js` files are
   type-checked with `checkJs` (`pnpm typecheck`); a fixture that needs a type gets it from
-  JSDoc — vertex object interfaces, descriptions. `strictNullChecks` stays off for the
+  JSDoc — vertex object interfaces, descriptions. The fixtures in `test/helpers/` are
+  checked a second time with `noImplicitAny` (`tsconfig.helpers.json`), so every helper
+  names the types of its parameters. `strictNullChecks` stays off for the
   browser tests. Switched on, TypeScript 7.0.2 reports 828 errors in 56 files of the suite
   (measured in October 2026): three in four are `'display' is possibly 'undefined'` and
   its kin — a fixture variable that a `beforeEach` assigns and an `afterEach` clears, an

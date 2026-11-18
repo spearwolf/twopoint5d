@@ -115,7 +115,6 @@ function expectPoolArrays(geometry) {
   }
 }
 
-// a width of 64 pixels keeps the rows rgbAt() reads unpadded
 const TARGET_SIZE = 64;
 
 describe('vertex-objects — gpu upload', function () {
