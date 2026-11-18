@@ -47,6 +47,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # three days give a compromised release of an action time to be found and pulled
+    # before it is proposed
+    cooldown:
+      default-days: 3
     groups:
+      # the publish job of deploy.yml runs checkout, setup-node and download-artifact with
+      # its OIDC token (npm Trusted Publishing): each of their updates comes as a pull
+      # request of its own, read on its own. The tag job, which may write, runs no action
       actions:
         patterns: ['*']
+        exclude-patterns:
+          - actions/checkout
+          - actions/setup-node
+          - actions/download-artifact

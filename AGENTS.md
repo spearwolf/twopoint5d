@@ -49,9 +49,8 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test:allocations` — the allocation specs (`src/**/hot-path-allocations*.spec.ts`)
   alone, without coverage: the Vitest project `allocations` in
   `packages/twopoint5d/vite.config.ts`, 30 s per test. `pnpm test` runs them along with
-  the rest. After an upgrade of Node — the one on your machine, or the line CI installs —
-  run them once as `pnpm test:allocations --skip-nx-cache`: the Nx hash of a task leaves
-  the Node version out, so the cache would replay a measurement taken under the old V8
+  the rest. The Nx hash of the Vitest targets includes `node --version`, so the cache
+  replays no measurement taken under another Node
 - `pnpm bench` — the library's hot-path benchmarks (`src/**/*.bench.ts`) through
   `vitest bench`; the timings land in `packages/twopoint5d/bench-results/results.json`,
   which the nightly workflow `bench.yml` archives. Not part of `pnpm run ci` nor of the
@@ -251,11 +250,16 @@ explicit instruction.
 
 ## Working on the library
 
-Read a module's sources whole instead of grepping symbol by symbol. The modules are
-small enough for it — `map2d` is the largest at roughly 3.4k lines, most stay under 2k,
-and `cat src/<module>/*.ts` is one cheap call. The pooled-buffer, signal and ownership
-plumbing only makes sense in one piece; assembling it from grep hits is how wrong
-assumptions get in.
+Read a module's sources whole instead of grepping symbol by symbol: the pooled-buffer,
+signal and ownership plumbing only makes sense in one piece, and assembling it from grep
+hits is how wrong assumptions get in. Whole does not mean the whole directory, though.
+`controls`, `text` and `utils` hold about 1k lines each or less, and `cat src/<module>/*.ts`
+is one cheap call. The others are far larger — `stage` about 13k lines, `texture` about 9k,
+`display`, `map2d` and `sprites` about 7k each with their subdirectories, `vertex-objects`
+about 6k — and a `cat` over one of them buries the part you need. Read those one area at a
+time: a class together with the files beside it that it imports — in `stage` the camera rig,
+the director, the renderer, or `Stage2D` with its projections; in `texture` the store, a
+resource, the atlas loaders, or the frame-based animations.
 
 `@spearwolf/eventize` and `@spearwolf/signalize` are used heavily. The `using-eventize`
 and `using-signalize` skills carry the semantics that differ from other event and signal

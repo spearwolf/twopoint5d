@@ -28,13 +28,17 @@ let manifest;
 try {
   manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 } catch (error) {
-  console.error(`cannot read ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `checkPeerDependenciesOnly: cannot read ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 }
 
 const found = findRuntimeDependencies(manifest);
 for (const {section, name} of found) {
-  console.error(`${manifestPath} declares ${section}.${name}; the library ships with peer dependencies only`);
+  console.error(
+    `checkPeerDependenciesOnly: ${manifestPath} declares ${section}.${name}; the library ships with peer dependencies only`,
+  );
 }
 
 const sources = fs
@@ -46,14 +50,18 @@ const sources = fs
     try {
       return {file, text: fs.readFileSync(filePath, 'utf8')};
     } catch (error) {
-      console.error(`cannot read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `checkPeerDependenciesOnly: cannot read ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       process.exit(1);
     }
   });
 
 const undeclared = findUndeclaredImports(sources, manifest.peerDependencies);
 for (const {file, specifier} of undeclared) {
-  console.error(`${path.join(packageDir, file)} imports ${specifier}; the library ships with peer dependencies only`);
+  console.error(
+    `checkPeerDependenciesOnly: ${path.join(packageDir, file)} imports ${specifier}; the library ships with peer dependencies only`,
+  );
 }
 if (found.length > 0 || undeclared.length > 0) {
   process.exit(1);

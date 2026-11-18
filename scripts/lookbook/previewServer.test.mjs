@@ -36,6 +36,7 @@ describe('startPreviewServer()', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'preview-server-'));
   const pidFile = path.join(dir, 'server.pid');
   const hangingPidFile = path.join(dir, 'hanging-server.pid');
+  const refusedPidFile = path.join(dir, 'refused-server.pid');
   let serverPid = 0;
 
   after(() => {
@@ -43,6 +44,10 @@ describe('startPreviewServer()', () => {
     if (fs.existsSync(hangingPidFile)) {
       const hangingPid = Number(fs.readFileSync(hangingPidFile, 'utf8'));
       if (hangingPid && isAlive(hangingPid)) process.kill(hangingPid, 'SIGKILL');
+    }
+    if (fs.existsSync(refusedPidFile)) {
+      const refusedPid = Number(fs.readFileSync(refusedPidFile, 'utf8'));
+      if (refusedPid && isAlive(refusedPid)) process.kill(refusedPid, 'SIGKILL');
     }
     fs.rmSync(dir, {recursive: true, force: true});
   });
@@ -75,6 +80,19 @@ describe('startPreviewServer()', () => {
     assert.equal(await exited, 130);
 
     assert.ok(await waitFor(() => !isAlive(serverPid), 3000), `the server (pid ${serverPid}) outlived the process`);
+  });
+
+  it('refuses to start a server on Windows, and spawns nothing', {timeout: 10_000}, async () => {
+    await assert.rejects(
+      startPreviewServer({
+        platform: 'win32',
+        command: process.execPath,
+        args: () => ['-e', STAND_IN, refusedPidFile],
+        startupTimeoutMs: 500,
+      }),
+      /Linux and macOS only/,
+    );
+    assert.ok(!fs.existsSync(refusedPidFile));
   });
 
   it('rejects with the command it cannot start instead of an unhandled error event', {timeout: 10_000}, async () => {

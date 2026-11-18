@@ -27,6 +27,10 @@ describe('parseArguments', () => {
     }
   });
 
+  it('a short option inside a group throws', () => {
+    assert.throws(() => parseArguments(['dist', '-nx']), /unknown option: -n/);
+  });
+
   it('a second package directory throws', () => {
     assert.throws(() => parseArguments(['dist', 'other']), /expected one <package-dir>, got 2: dist other/);
   });

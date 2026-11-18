@@ -14,12 +14,7 @@ export function resolveDependencies(dependenciesSection, context) {
       // as it is, and the manifest check refuses it
       if (typeof specifier !== 'string') {
         console.warn(
-          'oops.. dependency specifier is not a string:',
-          depName,
-          '->',
-          JSON.stringify(specifier),
-          'referenced from:',
-          context.referencedFrom,
+          `makePackageJson: ${context.referencedFrom} gives ${depName} the specifier ${JSON.stringify(specifier)}, which is no string`,
         );
         return;
       }
@@ -51,7 +46,9 @@ export function resolvePackageVersion(
 
     // a range from any other source is one pnpm never installed, so the specifier stays
     // and the manifest check refuses it
-    console.warn('oops.. package not found in workspace catalog:', catalogName, pkgName, 'referenced from:', referencedFrom);
+    console.warn(
+      `makePackageJson: the workspace catalog ${catalogName} has no entry for ${pkgName}, which ${referencedFrom} takes from it`,
+    );
     return undefined;
   }
 
@@ -64,12 +61,7 @@ export function resolvePackageVersion(
     // `workspace:<name>@<range>` names another package than its key, which this script
     // does not map
     console.warn(
-      'oops.. aliased workspace package is not supported:',
-      pkgName,
-      '->',
-      specifier,
-      'referenced from:',
-      referencedFrom,
+      `makePackageJson: ${referencedFrom} names ${pkgName} as ${specifier}, an aliased workspace package, which this script does not map`,
     );
     return undefined;
   }
@@ -81,14 +73,7 @@ export function resolvePackageVersion(
     if (range === '' || validRange(range) == null) {
       // anything else would go into the published manifest as a version range and
       // is none — the specifier stays and the manifest check refuses it
-      console.warn(
-        'oops.. workspace range is not a version range:',
-        pkgName,
-        '->',
-        specifier,
-        'referenced from:',
-        referencedFrom,
-      );
+      console.warn(`makePackageJson: ${referencedFrom} names ${pkgName} as ${specifier}, which holds no version range`);
       return undefined;
     }
     // the range ships as written: validRange only vouches for it, and its normalized form
@@ -109,12 +94,7 @@ export function resolvePackageVersion(
       pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
     } catch (error) {
       console.warn(
-        'oops.. cannot read workspace package:',
-        pkgName,
-        '->',
-        `${pkgJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
-        'referenced from:',
-        referencedFrom,
+        `makePackageJson: cannot read ${pkgJsonPath}, the workspace package ${pkgName} that ${referencedFrom} names: ${error instanceof Error ? error.message : String(error)}`,
       );
       return undefined;
     }
@@ -122,12 +102,7 @@ export function resolvePackageVersion(
     const version = typeof pkgJson?.version === 'string' ? pkgJson.version.replace(/-dev$/, '') : undefined;
     if (valid(version) == null) {
       console.warn(
-        'oops.. workspace package has no version semver can read:',
-        pkgName,
-        '->',
-        pkgJsonPath,
-        'referenced from:',
-        referencedFrom,
+        `makePackageJson: ${pkgJsonPath}, the workspace package ${pkgName} that ${referencedFrom} names, has no version semver can read`,
       );
       return undefined;
     }
@@ -143,6 +118,8 @@ export function resolvePackageVersion(
     return pkgVersion;
   }
 
-  console.warn('oops.. workspace package not found:', pkgName, '->', pkgNameWithoutScope, 'referenced from:', referencedFrom);
+  console.warn(
+    `makePackageJson: ${referencedFrom} names ${pkgName} as ${specifier}, and neither packages/${pkgNameWithoutScope} nor the root package.json provides it`,
+  );
   return undefined;
 }

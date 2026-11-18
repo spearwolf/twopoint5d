@@ -74,6 +74,9 @@
       "sharedTsconfigs",
       {
         "externalDependencies": ["vitest", "@vitest/coverage-v8", "three", "@spearwolf/eventize", "@spearwolf/signalize", "sinon"]
+      },
+      {
+        "runtime": "node --version"
       }
     ]
   },

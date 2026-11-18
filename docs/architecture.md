@@ -31,7 +31,9 @@ at least one tag.
 - `test` — depends on `^build`, cached. `namedInputs.vitestDefaults` lists what
   invalidates a Vitest run (config, `package.json`, the shared tsconfigs, the vitest
   binaries themselves, and the packages that specs and tested code load at runtime:
-  `three`, `@spearwolf/eventize`, `@spearwolf/signalize`, `sinon`). A spec that imports
+  `three`, `@spearwolf/eventize`, `@spearwolf/signalize`, `sinon`), and the Node
+  version (`{"runtime": "node --version"}`): the allocation specs measure what V8
+  allocates, and another V8 inlines differently. A spec that imports
   a package outside that list adds it there; otherwise a bump of that package leaves an
   old result standing in the cache. `test` measures no coverage, so a run over a single
   spec is not held to thresholds meant for the whole suite.
@@ -385,7 +387,8 @@ The logic of both scripts lives in `scripts/makePackageJson/` and
 `scripts/publishNpmPkg/`, next to its `node --test` specs; the scripts themselves only
 wire it up. Which of skip, publish and fail an answer of `npm show` means is
 `decidePublish()` in `scripts/publishNpmPkg/publishDecision.mjs`, whose spec goes through
-every answer; no spec starts the publish script itself. The refusal of those specifiers,
+every answer; the arguments of `npm publish`, the dist-tag included, are `publishArguments()`
+in the same file, and its spec covers them; no spec starts the publish script itself. The refusal of those specifiers,
 `findUnpublishableSpecifiers`, lies in `scripts/publishNpmPkg/`, because the publish
 script holds it itself and imports nothing but Node's built-ins; `makePackageJson.mjs`
 imports it from there.
@@ -398,7 +401,10 @@ publish. Before it asks npm anything, and so also for a version it then skips, i
 is started in, into the package directory; the README is `README-pkg.md`, or `README.md`
 if there is none, and ships as `README.md`. A workspace `.npmrc` goes along if there is
 one, so that `npm show` and `npm publish` read the same one. A `-dev` version is skipped
-before any of this. `npm show` asks the registry from `publishConfig.registry` of the
+before any of this. A prerelease — a version with a `-` after its patch number, such as
+`1.0.0-beta.1` — is published under the dist-tag `next`, so `npm install
+@spearwolf/twopoint5d` without a version keeps installing the latest stable release; every
+other version goes out under npm's `latest`. `npm show` asks the registry from `publishConfig.registry` of the
 manifest, handed over as `npm_config_registry`, because that is the registry `npm publish`
 uploads to — it takes `publishConfig` over every config file and environment variable, and
 `npm show` reads none of it. `checkManifest` refuses a `publishConfig.registry` that is no
@@ -638,7 +644,8 @@ project directory, `checkPeerDependenciesOnly.mjs` against a throwaway manifest,
 `scripts/ci/auditInstalledDependencies.mjs` against throwaway reports, because their
 exit codes, their messages and the manifest the first one does not write are wiring that
 no helper test sees. No spec runs `publishNpmPkg.mjs`, which queries the registry as soon
-as its arguments fit; `decidePublish()` carries its decision and its spec covers it. No
+as its arguments fit; `decidePublish()` carries its decision and `publishArguments()` its arguments, and their
+spec covers both. No
 spec runs `checkDocSnippets.mjs`, which reads git and the file system.
 
 `pnpm test:affected` uses the Nx graph and `defaultBase: main`.

@@ -21,6 +21,22 @@ export function isDevelopmentVersion(version) {
 }
 
 /**
+ * The arguments of `npm publish` for a version. A prerelease — a version with a `-` after
+ * its patch number, such as `1.0.0-beta.1` — goes out under the dist-tag `next`, so that an
+ * install without a version keeps resolving the latest stable release; npm gives every
+ * other version `latest`. A `-dev` version never gets here: `isDevelopmentVersion()` skips
+ * it first.
+ *
+ * @param {string} version the version in the manifest
+ * @param {{dryRun: boolean}} options
+ * @returns {string[]}
+ */
+export function publishArguments(version, {dryRun}) {
+  const prerelease = /^\d+\.\d+\.\d+-/.test(version);
+  return ['publish', '--access', 'public', ...(prerelease ? ['--tag', 'next'] : []), ...(dryRun ? ['--dry-run'] : [])];
+}
+
+/**
  * Which of skip, publish and fail an answer of `npm show . versions --json` means.
  *
  * @param {string} version the version in the manifest
@@ -46,7 +62,7 @@ export function decidePublish(version, {error, stdout, stderr}) {
   }
   // a killed npm has answered nothing, whatever it wrote before
   if (!error.killed && isNotPublishedError(stderr)) {
-    return {action: 'publish', message: 'oh it looks like this is the first time to publish the package'};
+    return {action: 'publish', message: 'npm knows no version of this package yet, this is its first publish'};
   }
   return {action: 'fail', message: describeShowFailure(error, stderr)};
 }

@@ -77,11 +77,19 @@ mention them here_ :wink:
 
 ## What's in this repository 👀
 
-_twopoint5d_ is a monorepo that contains the following javascript / typescript
-libraries:
+_twopoint5d_ is a pnpm + Nx monorepo:
 
-- [@spearwolf/twopoint5d](packages/twopoint5d) : is the "vanilla" core library and
-  relies on [three.js](https://threejs.org/) as a rendering framework
+- [@spearwolf/twopoint5d](packages/twopoint5d) — the library, the one package that is
+  published; it relies on [three.js](https://threejs.org/) as its rendering framework
+- [packages/twopoint5d-testing](packages/twopoint5d-testing) — the browser integration
+  tests, which render under WebGPU and under WebGL 2 in real browsers (`pnpm test:browser`)
+- [apps/lookbook](apps/lookbook) — an Astro showcase of the library and its live
+  documentation (`pnpm lookbook`)
+- [scripts](scripts) — the Node scripts of the publish pipeline, of CI and of the checks of
+  the repo (`pnpm test:scripts`)
+
+[AGENTS.md](AGENTS.md) lists the commands and the rules of the repo; `pnpm run ci` runs the
+whole gate.
 
 ## Usage
 

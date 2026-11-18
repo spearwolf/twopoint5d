@@ -117,7 +117,9 @@ the demo page. `pnpm lookbook:generate-previews` (from the repo root) writes the
 builds the lookbook, starts `astro preview` on a free port, opens each demo in
 Playwright's Chromium at 1000×700 — the `aspect-10/7` of the card — and saves a WebP
 screenshot. `scripts/lookbook/demoPreviews.test.mjs` (`pnpm test:scripts`) fails when a demo
-has no image, an image has no demo, or an image has another size.
+has no image, an image has no demo, or an image has another size. Starting `astro preview`
+itself needs Linux or macOS: the run ends it through its process group, which Windows lacks.
+On Windows start the lookbook yourself and pass its URL with `--url`.
 
 | Flag | Effect |
 | --- | --- |

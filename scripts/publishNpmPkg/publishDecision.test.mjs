@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import {describe, it} from 'node:test';
-import {decidePublish, describePublishFailure, isDevelopmentVersion} from './publishDecision.mjs';
+import {npmCommand} from './npmCommand.mjs';
+import {decidePublish, describePublishFailure, isDevelopmentVersion, publishArguments} from './publishDecision.mjs';
 
-const FIRST_PUBLISH = 'oh it looks like this is the first time to publish the package';
+const FIRST_PUBLISH = 'npm knows no version of this package yet, this is its first publish';
 
 describe('isDevelopmentVersion()', () => {
   it('marks a version that ends in -dev', () => {
@@ -111,5 +112,34 @@ describe('describePublishFailure()', () => {
       describePublishFailure(Object.assign(new Error('Command failed'), {status: null})),
       'npm publish failed: Command failed',
     );
+  });
+});
+
+describe('publishArguments()', () => {
+  it('publishes a release under the default dist-tag', () => {
+    assert.deepEqual(publishArguments('0.25.0', {dryRun: false}), ['publish', '--access', 'public']);
+  });
+
+  it('publishes a prerelease under the dist-tag next', () => {
+    assert.deepEqual(publishArguments('1.0.0-beta.1', {dryRun: false}), ['publish', '--access', 'public', '--tag', 'next']);
+  });
+
+  it('puts --dry-run behind the dist-tag', () => {
+    assert.deepEqual(publishArguments('1.0.0-rc.0', {dryRun: true}), [
+      'publish',
+      '--access',
+      'public',
+      '--tag',
+      'next',
+      '--dry-run',
+    ]);
+  });
+
+  it('takes build metadata for no prerelease', () => {
+    assert.deepEqual(publishArguments('1.0.0+build.7', {dryRun: false}), ['publish', '--access', 'public']);
+  });
+
+  it('hands npm only arguments that pass its character check', () => {
+    assert.doesNotThrow(() => npmCommand(publishArguments('1.0.0-beta.1', {dryRun: true})));
   });
 });

@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {checkManifest} from './publishNpmPkg/checkManifest.mjs';
 import {npmCommand} from './publishNpmPkg/npmCommand.mjs';
 import {USAGE, parseArguments} from './publishNpmPkg/parseArguments.mjs';
-import {decidePublish, describePublishFailure, isDevelopmentVersion} from './publishNpmPkg/publishDecision.mjs';
+import {decidePublish, describePublishFailure, isDevelopmentVersion, publishArguments} from './publishNpmPkg/publishDecision.mjs';
 import {NPM_SHOW_TIMEOUT_MS} from './publishNpmPkg/publishedVersions.mjs';
 import {registryEnvironment} from './publishNpmPkg/registryEnvironment.mjs';
 import {releaseFiles} from './publishNpmPkg/releaseFiles.mjs';
@@ -31,7 +31,7 @@ try {
   pkgJson = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   checkManifest(pkgJson);
 } catch (error) {
-  console.error(`cannot publish ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`publishNpmPkg: cannot publish ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }
 
@@ -43,7 +43,7 @@ console.log('packageJson: ---');
 console.dir(pkgJson);
 
 if (isDevelopmentVersion(pkgJson.version)) {
-  console.warn('skip publishing, version', pkgJson.version, 'is marked as a *development* version');
+  console.warn(`publishNpmPkg: skip publishing, version ${pkgJson.version} is marked as a development version`);
   process.exit(0);
 }
 
@@ -53,7 +53,7 @@ let files;
 try {
   files = releaseFiles({workspaceRoot, projectRoot, packageRoot});
 } catch (error) {
-  console.error(`cannot publish ${packageRoot}: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(`publishNpmPkg: cannot publish ${packageRoot}: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 }
 for (const {src, dst} of files) {
@@ -78,19 +78,19 @@ execFile(show.file, show.args, showOptions, (error, stdout, stderr) => {
     console.dir(decision.versions);
   }
   if (decision.action === 'skip') {
-    console.warn(decision.message);
+    console.warn(`publishNpmPkg: ${decision.message}`);
     process.exit(0);
   } else if (decision.action === 'publish') {
     if ('message' in decision) console.log(decision.message);
     publishPackage(packageRoot);
   } else {
-    console.error(decision.message);
+    console.error(`publishNpmPkg: ${decision.message}`);
     process.exit(1);
   }
 });
 
 function publishPackage(cwd, dryRun = DRY_RUN) {
-  const publish = npmCommand(['publish', '--access', 'public', ...(dryRun ? ['--dry-run'] : [])]);
+  const publish = npmCommand(publishArguments(pkgJson.version, {dryRun}));
   // npm writes straight to the console — the published version on success, the reason
   // on failure — so the message of our own names only the exit code
   try {
@@ -99,7 +99,7 @@ function publishPackage(cwd, dryRun = DRY_RUN) {
     // the try holds nothing but the call of execFileSync, which throws an Error with the
     // exit status
     const failure = /** @type {Error & {status?: number | null}} */ (error);
-    console.error(describePublishFailure(failure));
+    console.error(`publishNpmPkg: ${describePublishFailure(failure)}`);
     process.exit(1);
   }
 
@@ -110,7 +110,7 @@ function copyFile(src, dst) {
   try {
     fs.copyFileSync(src, dst);
   } catch (error) {
-    console.error(`cannot copy ${src} to ${dst}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`publishNpmPkg: cannot copy ${src} to ${dst}: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }

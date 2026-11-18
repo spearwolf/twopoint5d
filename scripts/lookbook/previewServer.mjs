@@ -26,16 +26,26 @@ function findFreePort() {
 }
 
 /**
- * @param {{command?: string, args?: (port: number) => string[], startupTimeoutMs?: number}} [server]
+ * @param {{command?: string, args?: (port: number) => string[], startupTimeoutMs?: number, platform?: string}} [server]
  *   what to start on the free port: astro preview of the lookbook, unless a spec hands in a
- *   stand-in; `startupTimeoutMs` is how long it may take to answer, which a spec shortens
+ *   stand-in; `startupTimeoutMs` is how long it may take to answer, which a spec shortens;
+ *   `platform` is a value of `process.platform`, which a spec hands in
  * @returns {Promise<{baseUrl: string, stop: () => void}>}
  */
 export async function startPreviewServer({
   command = 'pnpm',
   args = (port) => ['exec', 'astro', 'preview', '--ignore-lock', '--host', '127.0.0.1', '--port', String(port)],
   startupTimeoutMs = STARTUP_TIMEOUT_MS,
+  platform = process.platform,
 } = {}) {
+  // stop() ends the server through its process group, a negative pid to process.kill(),
+  // and Windows has no process groups: there the server would outlive the run. A lookbook
+  // started by hand and handed to the generator through --url works on every platform
+  if (platform === 'win32') {
+    throw new Error(
+      'astro preview is started on Linux and macOS only, where stop() ends it with its process group; on Windows start the lookbook yourself and pass its URL with --url',
+    );
+  }
   const port = await findFreePort();
   // --ignore-lock: without it Astro 7 refuses a second preview server next to one already
   // running, and moves the server into the background on its own when an AI agent runs the

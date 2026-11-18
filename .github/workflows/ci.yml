@@ -164,7 +164,8 @@ jobs:
           path: ${{ runner.temp }}/nx-cache
           # one cache per job: each saves what its own tasks produced, and two jobs of the
           # same commit would otherwise race for the same key. The Node line is part of the
-          # key because the Nx hash of a task leaves it out: the Node 26 job would otherwise
+          # key because the Nx hash of the build, the type checks and the package checks leaves
+          # it out (the Vitest targets hash `node --version`): the Node 26 job would otherwise
           # replay what the Node 24 job computed and check nothing
           key: nx-${{ runner.os }}-${{ matrix.task }}-node${{ matrix.node }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |

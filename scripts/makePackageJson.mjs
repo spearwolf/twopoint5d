@@ -18,7 +18,7 @@ function readInput(filePath, parse) {
   try {
     return parse(fs.readFileSync(filePath, 'utf8'));
   } catch (error) {
-    console.error(`cannot read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`makePackageJson: cannot read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }
@@ -62,7 +62,7 @@ removeDistPathPrefix(outPackageJson);
 const unpublishable = findUnpublishableSpecifiers(outPackageJson);
 if (unpublishable.length > 0) {
   for (const entry of unpublishable) {
-    console.error(`cannot publish ${inPackageJson.name}: ${describeUnpublishable(entry)}`);
+    console.error(`makePackageJson: cannot publish ${inPackageJson.name}: ${describeUnpublishable(entry)}`);
   }
   process.exit(1);
 }
@@ -73,13 +73,15 @@ const releasePackageJsonPath = path.resolve(distDir, 'package.json');
 // manifest would be a package without code, so the script does not create the
 // directory itself
 if (!fs.existsSync(distDir)) {
-  console.error(`cannot write ${releasePackageJsonPath}: ${distDir} does not exist, compile the package first`);
+  console.error(`makePackageJson: cannot write ${releasePackageJsonPath}: ${distDir} does not exist, compile the package first`);
   process.exit(1);
 }
 console.log('Write to', releasePackageJsonPath);
 try {
   fs.writeFileSync(releasePackageJsonPath, JSON.stringify(outPackageJson, null, 2));
 } catch (error) {
-  console.error(`cannot write ${releasePackageJsonPath}: ${error instanceof Error ? error.message : String(error)}`);
+  console.error(
+    `makePackageJson: cannot write ${releasePackageJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 }
