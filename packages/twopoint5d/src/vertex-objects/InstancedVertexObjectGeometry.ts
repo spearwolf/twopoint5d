@@ -4,6 +4,7 @@ import {InstancedVOBufferGeometry} from './InstancedVOBufferGeometry.js';
 import type {VertexObjectDescription, VO} from './types.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
+import {checkPoolCapacity} from './checkPoolCapacity.js';
 
 const asPool = <T>(
   pool: VertexObjectPool<T> | VertexObjectDescriptor | VertexObjectDescription,
@@ -23,6 +24,11 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
    * Builds the instanced pool and the base from a pool, a descriptor or a description each, or
    * takes the base from a `BufferGeometry`, as {@link InstancedVOBufferGeometry} does.
    *
+   * @throws a `RangeError` when the instanced source is a pool and the capacity is not its
+   *   capacity, and when the base source is a pool and a base capacity follows that is not its
+   *   capacity: a geometry takes its sizes from the pools it is handed, so the caller hands in
+   *   `pool.capacity`, or leaves the base capacity out. The check comes before anything else, and
+   *   the pools are left as they were.
    * @throws what the constructor of {@link InstancedVOBufferGeometry} throws. Whatever this
    *   constructor throws, a pool it built from a descriptor or description is disposed, and a
    *   pool handed in is left as it was.
@@ -37,6 +43,13 @@ export class InstancedVertexObjectGeometry<VOInstancedType extends VO, VOBaseTyp
           number?,
         ]
   ) {
+    if (args[0] instanceof VertexObjectPool) {
+      checkPoolCapacity('new InstancedVertexObjectGeometry()', 'capacity', 'the instanced pool', args[0], args[1]);
+    }
+    if (args[2] instanceof VertexObjectPool && args[3] !== undefined) {
+      checkPoolCapacity('new InstancedVertexObjectGeometry()', 'the base capacity', 'the base pool', args[2], args[3]);
+    }
+
     const instancedPool = asPool<VOInstancedType>(args[0], args[1]);
     const buildsInstanced = !(args[0] instanceof VertexObjectPool);
     const buildsBase = !(args[2] instanceof BufferGeometry) && !(args[2] instanceof VertexObjectPool);

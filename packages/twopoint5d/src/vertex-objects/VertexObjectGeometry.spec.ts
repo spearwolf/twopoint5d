@@ -163,6 +163,36 @@ describe('VertexObjectGeometry', () => {
     }
   });
 
+  test.each([
+    ['VOBufferGeometry', (pool: VertexObjectPool<VO>, capacity: number) => new VOBufferGeometry(pool, capacity)],
+    ['VertexObjectGeometry', (pool: VertexObjectPool<VO>, capacity: number) => new VertexObjectGeometry(pool, capacity)],
+  ])(
+    '%s refuses a capacity other than the one of the pool handed in, and leaves the pool alive and unattached',
+    (name, build) => {
+      const pool = new VertexObjectPool<VO>(descriptor, 10);
+
+      expect(() => build(pool, 1000)).toThrow(RangeError);
+      expect(() => build(pool, 1000)).toThrow(`new ${name}(): capacity must be the capacity of the pool handed in, 10, got 1000`);
+
+      expect(pool.isDisposed).toBe(false);
+      expect(pool.isAttachedToGeometry).toBe(false);
+    },
+  );
+
+  test('holds the indices of a pool of up to 65535 vertices in a Uint16Array, and of a larger one in a Uint32Array', () => {
+    // 4 vertices per object: 16383 objects are 65532 vertices, 16384 are 65536
+    const small = new VertexObjectGeometry(descriptor, 16383);
+    const large = new VertexObjectGeometry(descriptor, 16384);
+
+    expect(small.index!.array).toBeInstanceOf(Uint16Array);
+    expect(small.index!.array.at(-1)).toBe(65531);
+    expect(large.index!.array).toBeInstanceOf(Uint32Array);
+    expect(large.index!.array.at(-1)).toBe(65535);
+
+    small.dispose();
+    large.dispose();
+  });
+
   describe('a pool that has been disposed', () => {
     test('the constructor refuses it', () => {
       const pool = new VertexObjectPool<VO>(descriptor, 10);

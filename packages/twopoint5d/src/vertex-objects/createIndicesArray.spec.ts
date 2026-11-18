@@ -27,6 +27,20 @@ describe('createIndicesArray()', () => {
     ]);
   });
 
+  test('answers a Uint16Array up to 65535 vertices and a Uint32Array beyond', () => {
+    // 13107 objects of 5 vertices are 65535 vertices
+    const short = createIndicesArray([0, 1, 2, 3, 4], 13107, 5);
+    expect(short).toBeInstanceOf(Uint16Array);
+    expect(Array.from(short).reduce((a, b) => Math.max(a, b))).toBe(65534);
+    expect(Array.from(short.subarray(-5))).toEqual([65530, 65531, 65532, 65533, 65534]);
+
+    // 16384 objects of 4 vertices are 65536 vertices
+    const long = createIndicesArray([0, 2, 1, 0, 3, 2], 16384, 4);
+    expect(long).toBeInstanceOf(Uint32Array);
+    expect(Array.from(long).reduce((a, b) => Math.max(a, b))).toBe(65535);
+    expect(Array.from(long.subarray(-6))).toEqual([65532, 65534, 65533, 65532, 65535, 65534]);
+  });
+
   test('checks each index once, not once per object', () => {
     // restoreMocks takes back spies, not this mock, so its count is cleared by hand
     vi.mocked(expectDefined).mockClear();

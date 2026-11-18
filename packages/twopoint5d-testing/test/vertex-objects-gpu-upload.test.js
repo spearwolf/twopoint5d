@@ -1,7 +1,7 @@
 import {expect} from 'chai';
 import {Display, InstancedVertexObjectGeometry, VertexObjectGeometry, VertexObjects} from '@spearwolf/twopoint5d';
 import {attribute, float, vec3} from 'three/tsl';
-import {MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, RenderTarget, Scene} from 'three/webgpu';
+import {Color, MeshBasicMaterial, MeshBasicNodeMaterial, PerspectiveCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
   makeContainer,
   disposeDisplay,
@@ -343,9 +343,58 @@ describe('vertex-objects — gpu upload', function () {
     display.renderer.render(scene, camera);
     await display.nextFrame();
 
-    const indices = Array.from(new Uint32Array(await display.renderer.getArrayBufferAsync(geometry.index)));
+    // two objects of four vertices: the indices fit 16 bits
+    expect(geometry.index.array).to.be.instanceOf(Uint16Array);
+    const IndexArray = geometry.index.array instanceof Uint16Array ? Uint16Array : Uint32Array;
+    const indices = Array.from(new IndexArray(await display.renderer.getArrayBufferAsync(geometry.index)));
 
     expect(indices.slice(0, 6)).to.deep.equal([0, 1, 2, 4, 5, 6]);
+  });
+
+  it('draws the object behind vertex 65535 from a 32-bit index', async function () {
+    // 16384 objects of four vertices are 65536 vertices, one more than 16-bit indices name
+    /** @type {VertexObjectGeometry<QuadVO>} */
+    const geometry = new VertexObjectGeometry(quadDescription, 16384);
+    const mesh = new VertexObjects(geometry, keep(new MeshBasicMaterial({color: new Color('#0f0')})));
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+
+    // every slot in use, and only the last object, whose vertices are 65532 … 65535, covers the view
+    for (let i = 0; i < geometry.pool.capacity; i++) geometry.pool.createVO();
+    geometry.pool.getVO(geometry.pool.capacity - 1).setPosition([-10, -10, 0, 10, -10, 0, 10, 10, 0, -10, 10, 0]);
+    mesh.update();
+
+    expect(geometry.index.array).to.be.instanceOf(Uint32Array);
+
+    const target = keep(new RenderTarget(TARGET_SIZE, TARGET_SIZE));
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
+    const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+
+    expect(isNearColor(middle, [0, 255, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
+  });
+
+  it('draws an odd number of 16-bit indices', async function () {
+    // three 16-bit indices are 6 bytes, which three pads to 8 for the gpu buffer
+    /** @type {VertexObjectGeometry<QuadVO>} */
+    const geometry = new VertexObjectGeometry(
+      {vertexCount: 3, indices: [0, 1, 2], attributes: {position: {components: ['x', 'y', 'z'], type: 'float32'}}},
+      1,
+    );
+    const mesh = new VertexObjects(geometry, keep(new MeshBasicMaterial({color: new Color('#0f0')})));
+    mesh.frustumCulled = false;
+    scene.add(mesh);
+
+    geometry.pool.createVO().setPosition([-10, -10, 0, 10, -10, 0, 0, 10, 0]);
+    mesh.update();
+
+    expect(geometry.index.array).to.be.instanceOf(Uint16Array);
+    expect(geometry.index.array.length).to.equal(3);
+
+    const target = keep(new RenderTarget(TARGET_SIZE, TARGET_SIZE));
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
+    const middle = rgbAt(pixels, TARGET_SIZE, TARGET_SIZE / 2, TARGET_SIZE / 2);
+
+    expect(isNearColor(middle, [0, 255, 0]), `the pixel in the middle is [${middle}]`).to.equal(true);
   });
 
   it('two attributes that share a buffer upload the whole stride of every used vertex', async function () {

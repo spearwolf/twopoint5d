@@ -2,9 +2,15 @@ import {describe, expect, test} from 'vitest';
 
 import {measureAllocatedBytes} from '../testing/measureAllocatedBytes.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
-import type {TouchInstancedBuffersType} from './InstancedVOBufferGeometry.js';
 import {InstancedVertexObjectGeometry} from './InstancedVertexObjectGeometry.js';
-import type {TouchBuffersType, VO, VOAttrSetter, VOSortOptions, VertexObjectDescription} from './types.js';
+import type {
+  TouchBuffersType,
+  TouchInstancedBuffersType,
+  VO,
+  VOAttrSetter,
+  VOSortOptions,
+  VertexObjectDescription,
+} from './types.js';
 import {VertexObjectGeometry} from './VertexObjectGeometry.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
 

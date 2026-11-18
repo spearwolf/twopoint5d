@@ -512,6 +512,68 @@ describe('InstancedVertexObjectGeometry', () => {
     expect(tint.offset).toBe(0);
   });
 
+  test('holds the indices of a base pool of up to 65535 vertices in a Uint16Array, and of a larger one in a Uint32Array', () => {
+    // 4 vertices per object: 16383 objects are 65532 vertices, 16384 are 65536
+    const small = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor, 16383);
+    const large = new InstancedVertexObjectGeometry(instancedDescriptor, 1, baseDescriptor, 16384);
+
+    expect(small.index!.array).toBeInstanceOf(Uint16Array);
+    expect(small.index!.array.at(-1)).toBe(65531);
+    expect(large.index!.array).toBeInstanceOf(Uint32Array);
+    expect(large.index!.array.at(-1)).toBe(65535);
+
+    small.dispose();
+    large.dispose();
+  });
+
+  type BuildInstanced = (
+    instanced: VertexObjectPool<VO> | VertexObjectDescriptor,
+    capacity: number,
+    base: VertexObjectPool<VO> | VertexObjectDescriptor,
+    baseCapacity?: number,
+  ) => InstancedVOBufferGeometry;
+
+  describe.each<[string, BuildInstanced]>([
+    ['InstancedVOBufferGeometry', (...args) => new InstancedVOBufferGeometry(...args)],
+    ['InstancedVertexObjectGeometry', (...args) => new InstancedVertexObjectGeometry<VO, VO>(...args)],
+  ])('the capacities of the pools handed to new %s()', (name, buildGeometry) => {
+    test('refuses a capacity other than the one of the instanced pool handed in, and leaves the pool alive and unattached', () => {
+      const instancedPool = new VertexObjectPool<VO>(instancedDescriptor, 10);
+
+      const build = () => buildGeometry(instancedPool, 1000, baseDescriptor, 1);
+      expect(build).toThrow(RangeError);
+      expect(build).toThrow(`new ${name}(): capacity must be the capacity of the instanced pool handed in, 10, got 1000`);
+
+      expect(instancedPool.isDisposed).toBe(false);
+      expect(instancedPool.isAttachedToGeometry).toBe(false);
+    });
+
+    test('refuses a base capacity other than the one of the base pool handed in, and leaves both pools alive and unattached', () => {
+      const instancedPool = new VertexObjectPool<VO>(instancedDescriptor, 10);
+      const basePool = new VertexObjectPool<VO>(baseDescriptor, 1);
+
+      const build = () => buildGeometry(instancedPool, 10, basePool, 4);
+      expect(build).toThrow(RangeError);
+      expect(build).toThrow(`new ${name}(): the base capacity must be the capacity of the base pool handed in, 1, got 4`);
+
+      for (const pool of [instancedPool, basePool]) {
+        expect(pool.isDisposed).toBe(false);
+        expect(pool.isAttachedToGeometry).toBe(false);
+      }
+    });
+
+    test('takes a base pool without a base capacity', () => {
+      const basePool = new VertexObjectPool<VO>(baseDescriptor, 3);
+
+      const geometry = buildGeometry(instancedDescriptor, 10, basePool);
+
+      expect(geometry.basePool).toBe(basePool);
+      expect(basePool.isAttachedToGeometry).toBe(true);
+      geometry.dispose();
+      expect(basePool.isDisposed).toBe(false);
+    });
+  });
+
   describe('a pool that has been disposed', () => {
     test('the constructor refuses it as the instanced source', () => {
       const instancedPool = new VertexObjectPool<VO>(instancedDescriptor, 10);

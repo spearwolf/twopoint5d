@@ -663,6 +663,69 @@ describe('VertexObjectPool#sortByPreparedKeys()', () => {
   });
 });
 
+describe('VertexObjectPool#releaseSortScratch()', () => {
+  test('lets go of the keys, and prepareSortKeys() builds new ones', () => {
+    const {pool} = makeThings([2, 1, 0]);
+    const keys = pool.prepareSortKeys();
+
+    pool.releaseSortScratch();
+
+    const rebuilt = pool.prepareSortKeys();
+    expect(rebuilt).not.toBe(keys);
+    expect(rebuilt.length).toBe(3);
+    pool.dispose();
+  });
+
+  test('sortByPreparedKeys() throws after it until keys are prepared again', () => {
+    const {pool} = makeThings([0, 0]);
+    pool.prepareSortKeys().set([2, 1]);
+
+    pool.releaseSortScratch();
+
+    expect(() => pool.sortByPreparedKeys()).toThrow(
+      new Error(
+        'VertexObjectPool#sortByPreparedKeys(): no keys are prepared for the capacity of this pool — call prepareSortKeys() first',
+      ),
+    );
+    expect(idsInSlotOrder(pool)).toEqual([0, 1]);
+
+    pool.prepareSortKeys().set([2, 1]);
+    expect(pool.sortByPreparedKeys()).toBe(true);
+    expect(idsInSlotOrder(pool)).toEqual([1, 0]);
+    pool.dispose();
+  });
+
+  test('the next sort sorts as before', () => {
+    const keys = [3, 0.5, -1, 7, 2];
+    const released = makeThings(keys);
+    const kept = makeThings(keys);
+
+    released.pool.sortBy('x', {descending: true});
+    kept.pool.sortBy('x', {descending: true});
+    released.pool.releaseSortScratch();
+
+    expect(released.pool.sortBy('y')).toBe(true);
+    expect(kept.pool.sortBy('y')).toBe(true);
+    expect(idsInSlotOrder(released.pool)).toEqual(idsInSlotOrder(kept.pool));
+    expect(idsInSlotOrder(released.pool)).toEqual([2, 1, 4, 0, 3]);
+    released.things.forEach((thing, id) => expectThing(thing, id, keys[id]!));
+
+    released.pool.dispose();
+    kept.pool.dispose();
+  });
+
+  test('does nothing on a pool that has not sorted and on a disposed pool', () => {
+    const {pool} = makeThings([1, 0]);
+
+    expect(() => pool.releaseSortScratch()).not.toThrow();
+    expect(idsInSlotOrder(pool)).toEqual([0, 1]);
+
+    pool.sortBy('y');
+    pool.dispose();
+    expect(() => pool.releaseSortScratch()).not.toThrow();
+  });
+});
+
 function rangesOf(geometry: BufferGeometry, attrName: string): {start: number; count: number}[] {
   const attr = geometry.getAttribute(attrName) as BufferAttribute | InterleavedBufferAttribute;
   const buffer: BufferLike = (attr as InterleavedBufferAttribute).isInterleavedBufferAttribute

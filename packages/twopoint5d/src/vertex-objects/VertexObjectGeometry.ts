@@ -2,6 +2,7 @@ import type {VertexObjectDescription, VO} from './types.js';
 import {VOBufferGeometry} from './VOBufferGeometry.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {VertexObjectPool} from './VertexObjectPool.js';
+import {checkPoolCapacity} from './checkPoolCapacity.js';
 
 /**
  * A {@link VOBufferGeometry} over a {@link VertexObjectPool}`<VOType>`: the typed layer on top of
@@ -13,11 +14,18 @@ export class VertexObjectGeometry<VOType extends VO> extends VOBufferGeometry {
   /**
    * Builds the pool from a pool, a descriptor or a description, as {@link VOBufferGeometry} does.
    *
+   * @throws a `RangeError` when `source` is a pool and `capacity` is not its capacity: a geometry
+   *   takes its size from the pool it is handed, so the caller hands in `pool.capacity`. The check
+   *   comes before anything else, and the pool is left as it was.
    * @throws what the constructor of {@link VOBufferGeometry} throws. Whatever this constructor
    *   throws, a pool it built from a descriptor or description is disposed, and a pool handed in
    *   is left as it was.
    */
   constructor(source: VertexObjectPool<VOType> | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
+    if (source instanceof VertexObjectPool) {
+      checkPoolCapacity('new VertexObjectGeometry()', 'capacity', 'the pool', source, capacity);
+    }
+
     const buildsPool = !(source instanceof VertexObjectPool);
     const pool = buildsPool ? new VertexObjectPool<VOType>(source, capacity) : source;
     try {

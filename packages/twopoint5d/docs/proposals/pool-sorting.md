@@ -177,10 +177,15 @@ keeps it working; nothing in map2d sorts, and a map needs no order beyond the de
 On the first sort the pool allocates its scratch: the keys (`Float64Array`, capacity), the order and
 the merge scratch (two `Uint32Array`, capacity), a slot array for the handles (capacity), and one
 `ArrayBuffer` of the byte length of its largest buffer with a view per data type it holds. They grow
-only when the capacity has grown since; `dispose()` lets go of them. Every later call allocates
-nothing — held by an allocation spec in `src/vertex-objects/hot-path-allocations.spec.ts` (whole
-numbers and constants in the round; the fractional keys are written in the setup and read from the
-typed array).
+only when the capacity has grown since; `releaseSortScratch()` and `dispose()` let go of them. Every
+later call allocates nothing — held by an allocation spec in
+`src/vertex-objects/hot-path-allocations.spec.ts` (whole numbers and constants in the round; the
+fractional keys are written in the setup and read from the typed array).
+
+`releaseSortScratch()` is for a large pool that has sorted and will not sort again soon: the scratch
+holds more than its largest buffer. The next sort builds it anew and allocates on that one call, as
+the first does, and `sortByPreparedKeys()` throws until `prepareSortKeys()` has prepared keys again.
+A pool sorted every frame keeps its scratch.
 
 ## 3. On the sprites
 

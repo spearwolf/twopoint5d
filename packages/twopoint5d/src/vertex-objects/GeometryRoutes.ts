@@ -37,6 +37,13 @@ export type GeometryRoute = {
   firstAutoTouch?: boolean;
 };
 
+/** A route attached under a name: fed from a `VertexObjectPool`, always on the instanced half. */
+export type AttachedGeometryRoute = GeometryRoute & {
+  readonly name: string;
+  readonly group: 'instanced';
+  readonly pool: VertexObjectPool<unknown>;
+};
+
 /** A read-only view of `source` that answers with `project(value)` — one source, no second map to keep in step. */
 function projectValues<K, S, T>(source: ReadonlyMap<K, S>, project: (value: S) => T): ReadonlyMap<K, T> {
   // read afresh on every call, so the view answers for whatever `source` holds right now
@@ -85,7 +92,7 @@ function projectValues<K, S, T>(source: ReadonlyMap<K, S>, project: (value: S) =
  */
 export class GeometryRoutes {
   readonly #routes: GeometryRoute[] = [];
-  readonly #attached: Map<string, GeometryRoute> = new Map();
+  readonly #attached: Map<string, AttachedGeometryRoute> = new Map();
 
   /**
    * The unnamed routes, then the named ones in the order of their map: what every method that
@@ -94,12 +101,7 @@ export class GeometryRoutes {
   #all: GeometryRoute[] = [];
 
   /** The pools of the named routes, keyed by their name. */
-  readonly attachedPools: ReadonlyMap<string, VertexObjectPool<unknown>> = projectValues(
-    this.#attached,
-    // `attachInstancedPool()` takes either a VertexObjectPool or a descriptor it wraps in one
-    // itself, so the pool behind a name is always a VertexObjectPool
-    (route) => route.pool as VertexObjectPool<unknown>,
-  );
+  readonly attachedPools: ReadonlyMap<string, VertexObjectPool<unknown>> = projectValues(this.#attached, (route) => route.pool);
 
   /** The buffer maps of the named routes, keyed by their name. */
   readonly attachedBuffers: ReadonlyMap<string, ReadonlyMap<string, BufferLike>> = projectValues(
@@ -126,7 +128,7 @@ export class GeometryRoutes {
    * @throws when the name already has a route. `attachInstancedPool()`, the only caller, detaches
    * the name first — a name that reaches here already taken is an invariant broken elsewhere.
    */
-  attach(route: GeometryRoute & {name: string; group: 'instanced'}): void {
+  attach(route: AttachedGeometryRoute): void {
     if (this.#attached.has(route.name)) {
       throw new Error(`GeometryRoutes#attach(): the name ${describeValue(route.name)} already has a route — detach it first`);
     }
@@ -140,7 +142,7 @@ export class GeometryRoutes {
   }
 
   /** The named route, or `undefined` if the name is free. */
-  route(name: string): GeometryRoute | undefined {
+  route(name: string): AttachedGeometryRoute | undefined {
     return this.#attached.get(name);
   }
 
@@ -149,7 +151,7 @@ export class GeometryRoutes {
    *
    * @returns the route that was there, or `undefined`.
    */
-  detach(name: string): GeometryRoute | undefined {
+  detach(name: string): AttachedGeometryRoute | undefined {
     const route = this.#attached.get(name);
     if (route === undefined) return undefined;
 

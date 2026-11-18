@@ -35,7 +35,9 @@ interface VertexObjectDescription {
 - **`vertexCount`** — how many vertices one object is made of. Defaults to `1`.
 - **`indices`** — the draw order of the vertices of one object, as indices into its own
   vertices, `0` … `vertexCount - 1`. Every object of a pool is drawn by this one list; the
-  geometry repeats it per object with the offsets applied.
+  geometry repeats it per object with the offsets applied. The geometry holds the repeated
+  indices in a `Uint16Array` as long as the pool has at most 65 535 vertices in all
+  (`capacity × vertexCount`), and in a `Uint32Array` beyond.
 - **`attributes`** — the attributes of each vertex, keyed by the name the geometry and
   the shaders give them. Each attribute states its size in one of two ways:
   - `components: ['x', 'y', 'z']` — one name per value, and each name becomes a property;
@@ -274,6 +276,8 @@ pool.sortByKeys(keys); // keys[i] is the key of slot i
   keys out once and hand the same array to `sortByKeys()` of both.
 - The first sort allocates the scratch of the pool (keys, order, one copy of the largest buffer);
   every later one allocates nothing, and the scratch grows only with the capacity.
+  `releaseSortScratch()` lets go of it — for a large pool that has sorted and will not sort again
+  soon; the next sort builds it anew.
 
 ## Growing a pool
 
@@ -323,6 +327,9 @@ createDot();
 - **Refused**, before anything moves: a disposed pool on either side, the pool itself, a source on
   another descriptor (`new VertexObjectPool(source.descriptor, …)` is the fix), a pool with
   objects in use and one of a smaller capacity than the source.
+- **The capacity of a geometry** handed a pool is the pool's own:
+  `new VertexObjectGeometry(pool, pool.capacity)`. Any other capacity throws a `RangeError`, before
+  the geometry touches the pool.
 - `FeatureSprites` does all of it for `grow: true`, see `docs/sprites.md`, "FeatureSprites".
 
 ## Further

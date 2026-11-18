@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - a `TextureStore` without a renderer warns once on the console when an `on()`, `getAsync()` or `acquireAsync()` waits for a texture, naming the call (see "The renderer" in `docs/textures.md`)
 - `Map2DSpatialHashGrid#add()` and `#remove()` take the renderables as one list as well — `grid.add(list)`, one argument that is an array counts as the list —, for sets that a spread would run into the argument limit of the engine with; the list is read, neither copied nor kept, and `add()` checks every `aabb` of it before the first renderable moves (see "Renderables in a spatial hash grid" in `docs/map2d.md`)
 - `RectangularVisibilityArea#atLimit`: `'throw'` (the default) or `'cap'`, which keeps the tiles of a rectangle in the middle of an area over `maxVisibleTiles`, no more than that many, and warns once, as `CameraBasedVisibility` does at its limit; anything else throws a `TypeError` and the area keeps the value it had (see "A map in a rectangle" in `docs/map2d.md`)
+- `VertexObjectPool#releaseSortScratch()` lets go of the scratch the sorts of a pool have built — the keys, the order of the slots, the merge scratch, the slot array of the vertex objects and the copy of the largest buffer, which together hold more than that buffer —, for a large pool that has sorted and will not sort again soon; the next sort builds it anew and allocates on that one call, and `sortByPreparedKeys()` throws until `prepareSortKeys()` has prepared keys again. A no-op on a pool that has not sorted and on a disposed pool (see "Sorting a pool" in `src/vertex-objects/README.md` and "Performance" in `docs/sprites.md`)
 
 ### Changed
 
@@ -57,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureFactory` sorts its default classes together with the classes of each call, as `TextureStore` sorts its defaults with the classes of an item: a class of the call overrules a default of the same breadth, and a narrower default keeps the last word against a broader class of the call — `new TextureFactory(renderer, ['mag-linear']).create(image, 'nearest')` builds a texture with a linear `magFilter` (**BREAKING**). See the Migration Guide
 - `SpritePicker` holds the meshes it has drawn weakly: a mesh its owner drops without `dispose()` is collected, and once the engine reports that, the picker releases its pick mesh and pick material — at a time the engine chooses; up to then the pick mesh holds the geometry, the uniforms and the textures it reads, and disposing the mesh has them back at once (see "Picking: which sprite is under the pointer" in `docs/sprites.md`)
 - `Map2DSpatialHashGrid#clear()` takes the table of its cells back to the size it started with
+- the index buffer of `VOBufferGeometry`, `VertexObjectGeometry`, `InstancedVOBufferGeometry` and `InstancedVertexObjectGeometry` is a `Uint16Array` as long as the pool that holds the indices has at most 65 535 vertices in all (`capacity × vertexCount`), and a `Uint32Array` beyond: half the memory and half the upload for every smaller pool, and no index ever reaches `0xFFFF`, the restart index of 16-bit indices (**BREAKING**). See the Migration Guide
+- `new VOBufferGeometry()`, `new VertexObjectGeometry()`, `new InstancedVOBufferGeometry()` and `new InstancedVertexObjectGeometry()` throw a `RangeError` when they are handed a pool together with a capacity other than its own — `new VertexObjectGeometry(): capacity must be the capacity of the pool handed in, 10, got 1000` —, and for a base pool when a base capacity follows that is not its own; a base pool without a base capacity is taken as it is. The check comes before anything else, and the pool is left alive and unattached (**BREAKING**). See the Migration Guide
+- `InstancedVOBufferGeometry#dispose()` empties the buffer and serial maps of a pool attached under a name, as it does those of the base and the instanced pool: a map read from `extraInstancedBuffers` or `extraInstancedBufferSerials` before `dispose()` is empty afterwards
 
 ### Removed
 
@@ -224,6 +228,40 @@ class MyChunk extends DataIdsChunk2D {
 ```
 
 `base64toUint32Arr()` is the helper of `DataIdsChunk2D`; a subclass that overrides `prepareData()` decodes the ids through `super.prepareData()`.
+
+#### A geometry handed a pool takes the capacity of the pool
+
+Hand a geometry the capacity of the pool it is built on, `pool.capacity`; for the base pool of an instanced geometry, that capacity or none.
+
+**Before**
+
+```ts
+const geometry = new VertexObjectGeometry(pool, 1000); // a pool of 10 slots: 1000 went unread
+```
+
+**After**
+
+```ts
+const geometry = new VertexObjectGeometry(pool, pool.capacity);
+const instanced = new InstancedVertexObjectGeometry(instancedPool, instancedPool.capacity, basePool);
+```
+
+#### The index buffer of a vertex object geometry is 16 bit where it can be
+
+`geometry.index.array` is a `Uint16Array` for a pool of at most 65 535 vertices in all and a `Uint32Array` beyond. Read it as the typed array it is, or read the gpu buffer back in its type.
+
+**Before**
+
+```ts
+const indices = new Uint32Array(await renderer.getArrayBufferAsync(geometry.index));
+```
+
+**After**
+
+```ts
+const IndexArray = geometry.index.array instanceof Uint16Array ? Uint16Array : Uint32Array;
+const indices = new IndexArray(await renderer.getArrayBufferAsync(geometry.index));
+```
 
 ## [0.25.0] - 2026-11-01
 

@@ -4,7 +4,7 @@ import {VertexObjectBuffer} from './VertexObjectBuffer.js';
 import {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
 import {checkBufferArray} from './checkBufferArray.js';
 import {sharedVertexObjectDescriptor} from './sharedVertexObjectDescriptor.js';
-import type {VertexObjectBuffersData, VertexObjectDescription} from './types.js';
+import type {TypedArray, VertexObjectBuffersData, VertexObjectDescription} from './types.js';
 
 // one message for every method that refuses to work once the pool is gone, so the class, the
 // method and the state are always in the text a caller reads out of a foreign stack
@@ -269,8 +269,10 @@ export class VOBufferPool {
       capacity: this.capacity,
       usedCount: this.usedCount,
       buffers: Object.fromEntries(
-        // a buffer still in this map holds its array; `dispose()` empties the map in the same breath
-        Array.from(this.buffer.buffers.values()).map((buffer) => [
+        // a buffer still in this map holds its array; `dispose()` empties the map in the same breath.
+        // The explicit tuple type picks the typed `Object.fromEntries()` overload; without it the
+        // result is `any` and `buffers` is assigned unchecked
+        Array.from(this.buffer.buffers.values()).map((buffer): [string, TypedArray] => [
           buffer.bufferName,
           copy ? buffer.typedArray!.slice() : buffer.typedArray!,
         ]),

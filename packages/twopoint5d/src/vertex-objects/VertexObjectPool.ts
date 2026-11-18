@@ -90,7 +90,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
   onCreateVO?: (vo: VOType & VO) => (VOType & VO) | void;
 
   // the scratch of sortBy(), sortByKeys() and prepareSortKeys(), built by the first sort, grown with
-  // the capacity and let go of by dispose(): the keys, the order of the slots and the merge scratch
+  // the capacity and let go of by releaseSortScratch() and dispose(): the keys, the order of the slots and the merge scratch
   // of the sort, the vertex objects on their way to a new slot, and one buffer for the copy of every
   // attribute buffer with a view of it per data type
   #sortKeys: Float64Array | undefined;
@@ -371,12 +371,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       }
     }
     this.#voIndex.length = 0;
-    this.#sortKeys = undefined;
-    this.#sortOrder = undefined;
-    this.#sortMerge = undefined;
-    this.#sortVOs = [];
-    this.#sortScratch = undefined;
-    this.#sortScratchViews.clear();
+    this.releaseSortScratch();
     super.dispose();
   }
 
@@ -442,7 +437,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * both by the same keys with {@link sortByKeys}.
    *
    * The first sort allocates the scratch of the pool, which grows only with the capacity; every
-   * later one allocates nothing. Does nothing on a disposed pool.
+   * later one allocates nothing until {@link releaseSortScratch} lets go of it. Does nothing on a
+   * disposed pool.
    *
    * @returns whether a slot moved; `false` on a disposed pool and with fewer than two slots in use
    * @throws when `key` names no value property — the message lists the ones there are —, and when the
@@ -517,7 +513,7 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * The keys of the next sort: the scratch of this pool, made to fit the capacity. The caller writes
    * the key of slot `i` at index `i` for every slot below `usedCount` and calls
    * {@link sortByPreparedKeys} right after, before anything sorts this pool. Allocates only when the
-   * capacity has grown since the last sort.
+   * capacity has grown since the last sort, or {@link releaseSortScratch} has let go of the scratch.
    *
    * @internal
    */
@@ -544,6 +540,25 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
       );
     }
     return this.#sortByOwnKeys(n, options?.descending === true);
+  }
+
+  /**
+   * Lets go of the scratch the sorts of this pool have built: the keys, the order of the slots,
+   * the merge scratch, the slot array of the vertex objects and the copy of the largest buffer,
+   * which together hold more than that buffer itself. The next sort builds it again and allocates
+   * on that one call, as the first sort does; {@link sortByPreparedKeys} throws until
+   * {@link prepareSortKeys} has prepared keys again. Meant for a large pool that has sorted and
+   * will not sort again soon — a pool sorted every frame keeps its scratch.
+   *
+   * Does nothing on a pool that has not sorted and on a disposed pool.
+   */
+  releaseSortScratch(): void {
+    this.#sortKeys = undefined;
+    this.#sortOrder = undefined;
+    this.#sortMerge = undefined;
+    this.#sortVOs = [];
+    this.#sortScratch = undefined;
+    this.#sortScratchViews.clear();
   }
 
   /** The keys of the next sort, after the scratch of a sort has been made to fit the capacity. */

@@ -1195,6 +1195,22 @@ describe('vertex-buffers-geometry-updates', () => {
       expect(ownPool.isDisposed).toBe(true);
     });
 
+    test('dispose() empties the buffer and serial maps of a pool attached under a name, as it does those of the base and the instanced pool', () => {
+      const geometry = new InstancedVertexObjectGeometry<MyInstancedVO, MyBaseVO>(instancedDesc, 10, baseDesc, 1);
+      geometry.attachInstancedPool('extra', extraDesc);
+      const buffers = geometry.extraInstancedBuffers.get('extra')!;
+      const bufferSerials = geometry.extraInstancedBufferSerials.get('extra')!;
+      expect(buffers.size).toBeGreaterThan(0);
+      expect(bufferSerials.size).toBeGreaterThan(0);
+
+      geometry.dispose();
+
+      expect(buffers.size).toBe(0);
+      expect(bufferSerials.size).toBe(0);
+      expect(geometry.baseBuffers!.size).toBe(0);
+      expect(geometry.instancedBufferSerials.size).toBe(0);
+    });
+
     test('a pool handed in from outside stays untouched on a non-instanced geometry', () => {
       const pool = new VertexObjectPool<MyBaseVO>(baseDesc, 10);
       pool.createVO();

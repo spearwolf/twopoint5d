@@ -45,6 +45,12 @@ export type VertexAttributeUsageType = 'static' | 'dynamic' | 'stream';
 /** Selects which buffers a geometry uploads to the GPU, keyed by the usage type of their attributes. */
 export type TouchBuffersType = {[Type in VertexAttributeUsageType]?: boolean};
 
+/** Selects buffers of an instanced geometry by usage type, one half of the geometry at a time. */
+export type TouchInstancedBuffersType = {
+  base?: TouchBuffersType;
+  instanced?: TouchBuffersType;
+};
+
 /**
  * What every attribute description states about how its values are stored, whichever way it gives
  * its size. {@link VAComponentsDescription} and {@link VASizeDescription} extend it by that one

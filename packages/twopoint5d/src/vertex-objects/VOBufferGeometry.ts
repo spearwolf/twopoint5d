@@ -1,9 +1,8 @@
 import {BufferGeometry} from 'three/webgpu';
-import {GeometryAttributeSlots} from './GeometryAttributeSlots.js';
-import {GeometryPoolAttachments} from './GeometryPoolAttachments.js';
-import {GeometryRoutes} from './GeometryRoutes.js';
 import {VOBufferPool} from './VOBufferPool.js';
+import {VOGeometryPools, drawCountOf} from './VOGeometryPools.js';
 import type {VertexObjectDescriptor} from './VertexObjectDescriptor.js';
+import {checkPoolCapacity} from './checkPoolCapacity.js';
 import {initializeAttributes} from './initializeAttributes.js';
 import type {BufferLike, TouchBuffersType, VertexObjectDescription} from './types.js';
 
@@ -28,19 +27,20 @@ export class VOBufferGeometry extends BufferGeometry {
     return this.#bufferSerials;
   }
 
-  readonly #attachments = new GeometryPoolAttachments();
-  readonly #slots = new GeometryAttributeSlots();
-  readonly #routes = new GeometryRoutes();
-
-  #disposed = false;
+  readonly #pools = new VOGeometryPools();
 
   /**
+   * @throws a `RangeError` when `source` is a pool and `capacity` is not its capacity: a geometry
+   *   takes its size from the pool it is handed, so the caller hands in `pool.capacity`. The check
+   *   comes before anything else, and the pool is left as it was.
    * @throws when the pool handed in has been disposed and holds no buffers to build attributes
    *   on. The message names the class and the state, and no geometry comes into being. Whatever
    *   the constructor throws, a pool it built from a descriptor or description is disposed, and a
    *   pool handed in is left as it was — alive, and not counted as attached.
    */
   constructor(source: VOBufferPool | VertexObjectDescriptor | VertexObjectDescription, capacity: number) {
+    if (source instanceof VOBufferPool) checkPoolCapacity('new VOBufferGeometry()', 'capacity', 'the pool', source, capacity);
+
     // before super(), so that a geometry which cannot get its attributes never comes into being
     if (source instanceof VOBufferPool && source.isDisposed) {
       throw new Error(
@@ -50,26 +50,22 @@ export class VOBufferGeometry extends BufferGeometry {
     }
 
     super();
-    this.pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
     this.name = 'VOBufferGeometry';
-    if (!(source instanceof VOBufferPool)) {
-      this.declareOwnedPool(this.pool);
-    }
 
+    // held apart from the field, which the catch below may not read before it is assigned
+    let pool: VOBufferPool | undefined;
     try {
-      this.#attachments.attach(this.pool);
-      initializeAttributes(this, this.pool, this.#buffers, this.#bufferSerials, this.#slots);
+      pool = source instanceof VOBufferPool ? source : new VOBufferPool(source, capacity);
+      this.pool = pool;
+      if (!(source instanceof VOBufferPool)) {
+        this.declareOwnedPool(pool);
+      }
 
       // the route bundles the maps behind the read-only views, it does not copy them: this geometry
       // draws one pool and has no halves, so the route carries no group
-      this.#routes.add({pool: this.pool, buffers: this.#buffers, bufferSerials: this.#bufferSerials});
+      this.#pools.addRoute(this, {pool, buffers: this.#buffers, bufferSerials: this.#bufferSerials}, initializeAttributes);
     } catch (error) {
-      // a constructor that throws leaves nothing behind: a pool it built goes, and a pool handed
-      // in is no longer counted as attached
-      this.#attachments.detachAll();
-      if (this.#attachments.owns(this.pool)) {
-        this.pool.dispose();
-      }
+      this.#pools.abandon([pool]);
       throw error;
     }
   }
@@ -81,7 +77,7 @@ export class VOBufferGeometry extends BufferGeometry {
    * @internal
    */
   declareOwnedPool(pool: VOBufferPool): void {
-    this.#attachments.declareOwned(pool);
+    this.#pools.attachments.declareOwned(pool);
   }
 
   /**
@@ -100,35 +96,7 @@ export class VOBufferGeometry extends BufferGeometry {
    * this: its error reaches the caller once the geometry is down.
    */
   override dispose(): void {
-    if (this.#disposed) return;
-    this.#disposed = true;
-
-    try {
-      // the renderer reads the attributes of this geometry once more while it handles the
-      // dispose event, and reaches for the id of a slot before it checks that the slot is
-      // filled — so the event goes out while every slot is still there
-      super.dispose();
-    } finally {
-      // a listener of the dispose event that throws holds up none of the teardown: its error
-      // reaches the caller once the geometry is down, and a second dispose() has nothing left
-      // to do
-      this.#attachments.detachAll();
-
-      // an attribute left behind would still read from the pool arrays, and a geometry put back
-      // into a scene after dispose() would have the renderer build fresh gpu buffers from them
-      this.#slots.releaseRoute(this, this.#buffers);
-      this.setIndex(null);
-
-      if (this.#attachments.owns(this.pool)) {
-        this.pool.dispose();
-      }
-
-      this.#buffers.clear();
-      this.#bufferSerials.clear();
-      this.#attachments.clear();
-      // the resolved selection holds the very THREE.BufferAttributes this method is here to let go of
-      this.#routes.clear();
-    }
+    this.#pools.dispose(this, () => super.dispose());
   }
 
   /**
@@ -143,7 +111,7 @@ export class VOBufferGeometry extends BufferGeometry {
     // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
       // biome-ignore lint/complexity/noArguments: see the comment above the loop
-      this.#routes.touchAttribute(arguments[i] as string);
+      this.#pools.routes.touchAttribute(arguments[i] as string);
     }
   }
 
@@ -153,7 +121,7 @@ export class VOBufferGeometry extends BufferGeometry {
    * which leaves no route to mark.
    */
   touchBuffers(bufferTypes: TouchBuffersType): void {
-    this.#routes.touchByUsage(bufferTypes);
+    this.#pools.touchBuffers(bufferTypes);
   }
 
   /**
@@ -171,16 +139,7 @@ export class VOBufferGeometry extends BufferGeometry {
     // biome-ignore lint/complexity/noArguments: only the count is read, see the comment above the loop
     for (let i = 0; i < arguments.length; i++) {
       // biome-ignore lint/complexity/noArguments: see the comment above the loop
-      const arg = arguments[i] as string | TouchBuffersType;
-      if (typeof arg === 'string') {
-        this.#routes.touchAttribute(arg);
-      } else if ('base' in arg || 'instanced' in arg) {
-        // this geometry reaches one pool through one route, so usage types addressed to the half
-        // of an instanced geometry name nothing here and select nothing
-        continue;
-      } else {
-        this.#routes.touchByUsage(arg);
-      }
+      this.#pools.touch(arguments[i] as string | TouchBuffersType);
     }
   }
 
@@ -192,29 +151,9 @@ export class VOBufferGeometry extends BufferGeometry {
    * range taken from a pool that is still alive would name vertices this geometry no longer has.
    */
   update(): void {
-    if (this.#disposed) return;
+    if (this.#pools.isDisposed) return;
 
-    this.#updateDrawRange();
-
-    // before the uploads are synced: what is asked for here decides how wide each of them goes
-    this.#autoTouchAttributes();
-    this.#routes.syncUploads();
-
-    this.#routes.syncArrays();
-  }
-
-  #updateDrawRange() {
-    this.setDrawRange(
-      0,
-      this.pool.descriptor.hasIndices
-        ? this.pool.usedCount * this.pool.descriptor.indices.length
-        : this.pool.usedCount * this.pool.descriptor.vertexCount,
-    );
-  }
-
-  #autoTouchAttributes() {
-    if (this.pool.usedCount === 0) return;
-
-    this.#routes.autoTouch();
+    this.setDrawRange(0, drawCountOf(this.pool));
+    this.#pools.sync(this.pool.usedCount > 0);
   }
 }

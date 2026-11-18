@@ -1,5 +1,9 @@
 import {expectDefined} from '../utils/expectDefined.js';
 
+// a pool of at most 65 535 vertices names no index above 65 534, and so never 0xFFFF, the restart
+// index of 16-bit indices, which WebGL 2 applies on every draw and WebGPU on strips
+const MAX_16_BIT_VERTEX_COUNT = 0xffff;
+
 /**
  * Repeats `indices` once for each of `count` objects, the indices of object `i` shifted by
  * `i × stride`.
@@ -8,14 +12,17 @@ import {expectDefined} from '../utils/expectDefined.js';
  * object and those of the next in every attribute buffer. The descriptor makes sure every
  * index lies below it.
  *
+ * The answer is a `Uint16Array` as long as the `count × stride` vertices number at most 65 535,
+ * and a `Uint32Array` beyond.
+ *
  * An array of indices with a hole throws, naming the index it misses, before the first element
  * is written.
  */
-export function createIndicesArray(indices: readonly number[], count: number, stride: number): Uint32Array {
+export function createIndicesArray(indices: readonly number[], count: number, stride: number): Uint16Array | Uint32Array {
   // each index is checked once here rather than once per object in the loop below
   const local = Uint32Array.from(indices, (index, j) => expectDefined(index, `index ${j}`));
   const itemCount = local.length;
-  const arr = new Uint32Array(count * itemCount);
+  const arr = count * stride <= MAX_16_BIT_VERTEX_COUNT ? new Uint16Array(count * itemCount) : new Uint32Array(count * itemCount);
 
   for (let i = 0; i < count; i++) {
     for (let j = 0; j < itemCount; j++) {
