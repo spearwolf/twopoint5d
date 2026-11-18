@@ -13,7 +13,7 @@ pnpm workspaces (`pnpm-workspace.yaml`) define the packages, Nx (`nx.json` plus 
 | --- | --- | --- | --- |
 | `twopoint5d` | `packages/twopoint5d` | `ci`, `twopoint5d` | the published library |
 | `twopoint5d-testing` | `packages/twopoint5d-testing` | `browser`, `twopoint5d` | browser integration tests, under WebGPU and WebGL 2 |
-| `lookbook` | `apps/lookbook` | `app` | Astro showcase |
+| `lookbook` | `apps/lookbook` | `app`, `ci` | Astro showcase |
 | `scripts` | `scripts` | `scripts` | the Node scripts; as a project only their type check |
 
 `twopoint5d-testing` and `lookbook` both depend on the library through `workspace:*`, so
@@ -50,10 +50,15 @@ tens of thousands of hot-path calls; under V8 coverage those calls run some five
 slower, and on a shared CI runner a single test took anywhere from 3.5 to 6 seconds, so
 the default timeout of 5 seconds decided the verdict instead of the bytes.
 
-The library's `project.json` adds the target `coverage`, which no other project has:
-the project `specs` with `--coverage`, cached with the inputs of `test`. Its output is
+The library and the lookbook each add a target `coverage`. The library's runs the project
+`specs` with `--coverage`, cached with the inputs of `test`. Its output is
 `{projectRoot}/coverage`, which the CI workflow archives. Without the allocation specs
-the coverage still stays above every threshold.
+the coverage still stays above every threshold. The lookbook's runs through
+`apps/lookbook/vitest.config.ts` — Vitest reads that file, Astro does not; because
+`vitestDefaults` knows only `vite.config.*`, the lookbook's `test` and `coverage` name the
+file as an input themselves —, measures the logic modules its `coverage.include` names one
+by one and hangs on the library's build output through `^build`, as its specs import
+`@spearwolf/twopoint5d` from `dist/`. The CI workflow does not archive its output.
 
 It adds the target `allocations`, the project `allocations` without coverage, cached with
 the same inputs.
@@ -196,6 +201,8 @@ with SIGTERM, while a SIGINT to the pid of the lock alone stops nothing.
   gate: it runs every spec without coverage. The thresholds sit two points under the level
   measured when they were set, globally and per module: the measured percentage rounded
   down, minus two. A regression turns the gate red, a line that moves does not.
+  `test:coverage` runs the specs of the lookbook as well, against the thresholds in
+  `apps/lookbook/vitest.config.ts`, set by the same rule.
   `src/sprites/**` is the exception and stands at 100 % for statements, branches,
   functions and lines: the sprite module was rebuilt with complete coverage as a
   requirement, and a line without a test there is a regression, not noise.
@@ -476,9 +483,10 @@ anything.
 
 `three`, `@types/three`, `@spearwolf/eventize` and `@spearwolf/signalize` are pinned in
 the `catalog:` block of `pnpm-workspace.yaml`, and so is every tool that more than one
-manifest names: `typescript` (7), `rimraf`, `@types/node` and `playwright`. Individual
-`package.json` files reference them as `"catalog:"`, so a version bump happens in exactly
-one place and stays consistent across library, test harness and lookbook. In the library
+manifest names: `typescript` (7), `rimraf`, `@types/node`, `playwright`, `vitest` and
+`@vitest/coverage-v8`. Individual `package.json` files reference them as `"catalog:"`, so
+a version bump happens in exactly one place and stays consistent across library, test
+harness and lookbook. In the library
 the first four are `peerDependencies`; `@types/three` is an optional peer
 (`peerDependenciesMeta`), because only a TypeScript consumer needs it.
 
@@ -585,6 +593,9 @@ Two runners, deliberately in separate packages:
 
 - Vitest in `packages/twopoint5d` (tag `ci`) — unit and logic tests as `*.spec.ts` next
   to the source. No browser dependencies in the library package.
+- Vitest in `apps/lookbook` (tag `ci`) — the logic helpers of the demos as `*.spec.ts`
+  next to their module, under Node without a DOM. The demo pages themselves are left to
+  the preview generator.
 - `@web/test-runner` with Playwright Chromium, Firefox and WebKit in
   `packages/twopoint5d-testing` (tag `browser`) — `*.test.js` under `test/`, for anything
   that needs a real GPU context, every file that renders under WebGPU in Chromium and

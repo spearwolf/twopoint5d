@@ -45,6 +45,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {
   BACK_Z,
@@ -57,7 +58,7 @@ import {
   VENT_DEPTH,
   VENT_LEAN,
 } from './CrawlRig';
-import {atlasFrame, setPlaneUvToFrame} from './helpers';
+import {setPlaneUvToFrame} from './helpers';
 
 const DIR = 'stage-masks/flashlight';
 

@@ -10,12 +10,15 @@ import {
   TexturedSpriteKind,
 } from '@spearwolf/twopoint5d';
 import {Color, type Texture} from 'three/webgpu';
+import {SeededRandom} from '~demos/utils/seededRandom';
 import {VIEW_HEIGHT, VIEW_WIDTH} from './assets';
 
 const COUNT = 360;
 // wider than the view: under `cover` a wide window shows more of it
 const SPREAD_X = VIEW_WIDTH * 1.2;
 const SPREAD_Y = VIEW_HEIGHT * 1.2;
+/** the seed of the sky: the same stars on every run, and on every card the preview generator takes */
+const STAR_SEED = 3;
 
 interface Star {
   sprite: TexturedSprite;
@@ -34,6 +37,7 @@ export class Starfield {
   );
   readonly #sprites: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #stars: Star[] = [];
+  readonly #random = new SeededRandom(STAR_SEED);
 
   warp = 1;
   targetWarp = 1;
@@ -57,7 +61,7 @@ export class Starfield {
       // the whole dot texture
       sprite.setTexCoords(0, 0, 1, 1);
       sprite.setColor(tints[i % 3]!, 0.35 + depth * 0.65);
-      const star = {sprite, depth, x: (Math.random() - 0.5) * SPREAD_X, y: (Math.random() - 0.5) * SPREAD_Y};
+      const star = {sprite, depth, x: (this.#random.next() - 0.5) * SPREAD_X, y: (this.#random.next() - 0.5) * SPREAD_Y};
       sprite.setPosition(star.x, star.y, 0);
       this.#stars.push(star);
     }
@@ -73,7 +77,7 @@ export class Starfield {
       star.y -= fall * star.depth * star.depth * 2;
       if (star.y < -SPREAD_Y / 2) {
         star.y += SPREAD_Y;
-        star.x = (Math.random() - 0.5) * SPREAD_X;
+        star.x = (this.#random.next() - 0.5) * SPREAD_X;
       }
       // a fast fall draws the stars out to streaks
       const size = 2 + star.depth * 4;

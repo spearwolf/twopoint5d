@@ -21,7 +21,7 @@ import {
   Vector3,
   type WebGPURenderer,
 } from 'three/webgpu';
-import {SeededRandom} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
 import {type MirrorLayout, VIEW_HEIGHT, VIEW_WIDTH} from './MirrorBathroom';
 
 /** the distance of the mask's camera from the plane of the wall, in units */

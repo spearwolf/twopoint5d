@@ -25,7 +25,8 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {atlasFrame, smoothstepCpu} from './helpers';
+import {atlasFrame} from '~demos/utils/atlasFrame';
+import {smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 import {
   type Box,

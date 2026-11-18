@@ -13,6 +13,8 @@ import {
   TexturedSpriteKind,
 } from '@spearwolf/twopoint5d';
 import {Color, RenderPipeline, type WebGPURenderer} from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
+import {SeededRandom} from '~demos/utils/seededRandom';
 import {type StageTransitionAssets, VIEW_HEIGHT, VIEW_WIDTH} from './assets';
 import {createGlowLayerBuilder, type GlowLayerBuilder} from './glowLayerBuilder';
 
@@ -33,6 +35,8 @@ const FIRE_INTERVAL = 0.14;
 const BULLET_TINT = new Color(0.6, 2.4, 3.2);
 const HELP_COLOR = new Color('#9fb3d9');
 const SCORE_COLOR = new Color('#ffd166');
+/** the seed of the enemies: every page opens on the same wave; a new game draws on from it */
+const LEVEL_SEED = 5;
 
 interface Enemy {
   sprite: TexturedSprite;
@@ -72,6 +76,7 @@ export class GameLevel {
   readonly #bullets: Bullet[] = [];
   readonly #pipeline: RenderPipeline;
   readonly #glow: GlowLayerBuilder;
+  readonly #random = new SeededRandom(LEVEL_SEED);
 
   #x = 0;
   #y = -120;
@@ -108,15 +113,16 @@ export class GameLevel {
     this.world.scene.add(this.#shots, this.#ships);
 
     this.#player = this.#ships.createSprite()!;
-    this.#player.setFrame(assets.ships.frame('ship-00')!);
+    this.#player.setFrame(atlasFrame(assets.ships, 'GameLevel', 'ship-00'));
     this.#player.setSize(58, 58);
 
+    const enemyFrame = atlasFrame(assets.ships, 'GameLevel', 'ship-02');
     for (let i = 0; i < ENEMIES; i++) {
       const sprite = this.#ships.createSprite()!;
-      sprite.setFrame(assets.ships.frame('ship-02')!);
+      sprite.setFrame(enemyFrame);
       sprite.setSize(54, 51);
       sprite.rotation = Math.PI * 0.75;
-      const enemy = {sprite, x: 0, y: 0, phase: Math.random() * Math.PI * 2, speed: 0};
+      const enemy = {sprite, x: 0, y: 0, phase: this.#random.next() * Math.PI * 2, speed: 0};
       this.#respawn(enemy, this.#halfHeight + 40 + i * 70);
       this.#enemies.push(enemy);
     }
@@ -167,9 +173,9 @@ export class GameLevel {
   }
 
   #respawn(enemy: Enemy, y: number): void {
-    enemy.x = (Math.random() - 0.5) * (this.#halfWidth * 2 - 80);
+    enemy.x = (this.#random.next() - 0.5) * (this.#halfWidth * 2 - 80);
     enemy.y = y;
-    enemy.speed = 50 + Math.random() * 50;
+    enemy.speed = 50 + this.#random.next() * 50;
   }
 
   /** World units per CSS pixel of the HUD: the margins around the lookbook's bars are pixels. */

@@ -1,58 +1,22 @@
-import type {TextureAtlas, TextureAtlasFrame, TextureCoords, TexturedSprite} from '@spearwolf/twopoint5d';
+import type {TextureAtlasFrame, TextureCoords, TexturedSprite} from '@spearwolf/twopoint5d';
 import {dot, fract, vec3} from 'three/tsl';
 import {
+  type BufferAttribute,
   type BufferGeometry,
   CustomBlending,
   DstColorFactor,
+  type InterleavedBufferAttribute,
   type MeshBasicNodeMaterial,
   type Node,
   OneFactor,
   ZeroFactor,
 } from 'three/webgpu';
 
-// The helpers the scenes of the stage mask demos have in common. A scene imports from this
-// module, from `SoftBlobs.ts` (a building block, not a scene) and from the modules of its own
-// demo page, never from the module of another demo: a scene that someone takes as a template
-// brings nothing foreign with it.
-
-/** the step of the state of the generator */
-const STEP = 0x6d2b79f5;
-
-/** the mix of the state of the generator, as a value in [0, 1) */
-function mix32(state: number): number {
-  let t = state;
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}
-
-/** A small seeded generator (a 32-bit mulberry): a seeded scene lays out and flickers the same on every run. */
-export class SeededRandom {
-  #state: number;
-
-  constructor(seed: number) {
-    this.#state = seed >>> 0;
-  }
-
-  /** The next value, in [0, 1). */
-  next(): number {
-    this.#state = (this.#state + STEP) >>> 0;
-    return mix32(this.#state);
-  }
-
-  /** A value in [min, max), drawn with the next value of the generator. */
-  range(min: number, max: number): number {
-    return min + (max - min) * this.next();
-  }
-}
-
-/**
- * The value that the `index`-th call of `next()` of a `new SeededRandom(seed)` returns, counted
- * from 0, without the calls before it: a random that hangs on a time step
- * (`Math.floor(time * rate)`) and not on the frame, so every frame rate draws the same values at
- * the same time.
- */
-export const randomAt = (seed: number, index: number): number => mix32(((seed >>> 0) + Math.imul(index + 1, STEP)) >>> 0);
+// The helpers that every demo needs — the seeded random, the named atlas frame, the loading and
+// checking of the files — lie under `~demos/utils/`. This module holds what the scenes of the
+// stage mask demos share among themselves. A scene imports from it, from `SoftBlobs.ts` (a
+// building block, not a scene) and from the modules of its own demo page, never from the module
+// of another demo: a scene that someone takes as a template brings nothing foreign with it.
 
 /** smoothstep on the CPU, with the formula of GLSL and WGSL; `e0 < e1`. */
 export function smoothstepCpu(e0: number, e1: number, x: number): number {
@@ -96,16 +60,6 @@ export function additive(material: MeshBasicNodeMaterial): MeshBasicNodeMaterial
   return material;
 }
 
-/**
- * The frame `name` of `atlas`; a frame the atlas lacks throws, with `subject` — the module of the
- * scene — as the first word of the message.
- */
-export function atlasFrame(atlas: TextureAtlas, subject: string, name: string): TextureAtlasFrame {
-  const frame = atlas.frame(name);
-  if (!frame) throw new Error(`${subject}: the atlas has no frame "${name}"`);
-  return frame;
-}
-
 /** Puts `frame` on `sprite`, mirrored left to right: the tex coords start at its right edge and run back. */
 export function setMirroredFrame(sprite: TexturedSprite, frame: TextureAtlasFrame): void {
   sprite.setFrame(frame);
@@ -113,15 +67,29 @@ export function setMirroredFrame(sprite: TexturedSprite, frame: TextureAtlasFram
   sprite.setTexCoords(s + u, t, -u, v);
 }
 
+/** the uv of each plane as the plane built it, copied at the first call that maps it */
+const builtUv = new WeakMap<BufferAttribute | InterleavedBufferAttribute, Float32Array>();
+
 /**
  * Writes the `uv` of a `PlaneGeometry` — of any number of segments, as the plane built it, 0 … 1
  * over the plane — so that the plane shows `coords` upright. The plane counts v up from its bottom
  * edge; the atlas is read with `flipY = false` and counts t down from the top of the image, so the
- * top of the plane gets the top of the frame.
+ * top of the plane gets the top of the frame. A second call — the next frame of an animation —
+ * maps from the uv the plane was built with, not from the one the call before wrote.
  */
 export function setPlaneUvToFrame(geometry: BufferGeometry, coords: TextureCoords): void {
   const [s, t, u, v] = coords.getTexCoords();
   const uv = geometry.getAttribute('uv');
-  for (let i = 0; i < uv.count; i++) uv.setXY(i, s + uv.getX(i) * u, t + (1 - uv.getY(i)) * v);
+  // keyed by the attribute, not by the geometry: a uv attribute put in its place gets a copy of its own
+  let built = builtUv.get(uv);
+  if (!built) {
+    built = new Float32Array(uv.count * 2);
+    for (let i = 0; i < uv.count; i++) {
+      built[2 * i] = uv.getX(i);
+      built[2 * i + 1] = uv.getY(i);
+    }
+    builtUv.set(uv, built);
+  }
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, s + built[2 * i]! * u, t + (1 - built[2 * i + 1]!) * v);
   uv.needsUpdate = true;
 }

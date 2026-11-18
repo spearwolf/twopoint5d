@@ -1,6 +1,6 @@
 import type {StageMaskCoverageSource} from '@spearwolf/twopoint5d';
 import {Color, Vector4} from 'three/webgpu';
-import {SeededRandom} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
 
 /** The view every stage of the demo lays itself out in, in units; `cover` fills any window. */
 export const VIEW_WIDTH = 960;

@@ -15,7 +15,7 @@ export interface GlowLayerBuilder extends StageRendererBuildOutputNode {
  */
 export function createGlowLayerBuilder(strength: number, radius: number, threshold: number): GlowLayerBuilder {
   let last: ReturnType<typeof bloom> | undefined;
-  const builder = ((passes: Node[]): Node => {
+  const build = (passes: Node[]): Node => {
     // the renderer hands its passes as `Node`; each is the vec4 picture of a Stage2D
     const pictures = passes as Node<'vec4'>[];
     let composed: Node<'vec4'> = pictures[0]!;
@@ -25,10 +25,11 @@ export function createGlowLayerBuilder(strength: number, radius: number, thresho
     last?.dispose();
     last = glow;
     return output;
-  }) as GlowLayerBuilder;
-  builder.dispose = () => {
-    last?.dispose();
-    last = undefined;
   };
-  return builder;
+  return Object.assign(build, {
+    dispose(): void {
+      last?.dispose();
+      last = undefined;
+    },
+  });
 }

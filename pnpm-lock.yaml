@@ -18,6 +18,9 @@ catalogs:
     '@types/three':
       specifier: ~0.187.0
       version: 0.187.0
+    '@vitest/coverage-v8':
+      specifier: ^5.1.0
+      version: 5.1.0
     playwright:
       specifier: ^1.65.0
       version: 1.65.0
@@ -30,6 +33,9 @@ catalogs:
     typescript:
       specifier: ^7.0.2
       version: 7.0.2
+    vitest:
+      specifier: ^5.1.0
+      version: 5.1.0
 
 packageExtensionsChecksum: sha256-QRbB427jafr2uug/EWFsqEu7c3tQtQOSJcLU8vaXoEA=
 
@@ -110,12 +116,18 @@ importers:
       '@types/three':
         specifier: 'catalog:'
         version: 0.187.0
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.1.0(vitest@5.1.0)
       sharp:
         specifier: ^0.35.5
         version: 0.35.5(@types/node@24.19.2)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.1.0(@types/node@24.19.2)(@vitest/coverage-v8@5.1.0)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/twopoint5d:
     dependencies:
@@ -142,7 +154,7 @@ importers:
         specifier: 'catalog:'
         version: 0.187.0
       '@vitest/coverage-v8':
-        specifier: ^5.1.0
+        specifier: 'catalog:'
         version: 5.1.0(vitest@5.1.0)
       publint:
         specifier: ^0.3.25
@@ -157,7 +169,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2
       vitest:
-        specifier: ^5.1.0
+        specifier: 'catalog:'
         version: 5.1.0(@types/node@24.19.2)(@vitest/coverage-v8@5.1.0)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/twopoint5d-testing:

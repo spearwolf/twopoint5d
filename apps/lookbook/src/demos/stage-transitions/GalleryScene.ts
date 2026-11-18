@@ -11,6 +11,7 @@ import {
   writeText,
 } from '@spearwolf/twopoint5d';
 import {CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, RepeatWrapping, SRGBColorSpace, type Texture} from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {type StageTransitionAssets, VIEW_HEIGHT, VIEW_WIDTH} from './assets';
 
 export interface GallerySceneLook {
@@ -103,7 +104,7 @@ export class GalleryScene {
       textures: {colorMap: assets.shipsTexture},
       transparent: true,
     });
-    const frame = assets.ships.frame(look.ship)!;
+    const frame = atlasFrame(assets.ships, 'GalleryScene', look.ship);
     for (let i = 0; i < 5; i++) {
       const sprite = this.#ships.createSprite()!;
       sprite.setFrame(frame);

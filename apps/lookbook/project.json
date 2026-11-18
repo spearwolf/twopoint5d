@@ -1,6 +1,6 @@
 {
   "name": "lookbook",
-  "tags": ["app"],
+  "tags": ["app", "ci"],
   "root": "apps/lookbook",
   "targets": {
     "dev": {
@@ -28,6 +28,25 @@
     },
     "build": {
       "inputs": ["default", {"dependentTasksOutputFiles": "**/*", "transitive": true}]
+    },
+    "test": {
+      "inputs": [
+        "vitestDefaults",
+        "{projectRoot}/vitest.config.ts",
+        "{projectRoot}/src/**/*",
+        {"dependentTasksOutputFiles": "**/*", "transitive": true}
+      ]
+    },
+    "coverage": {
+      "dependsOn": ["^build"],
+      "cache": true,
+      "inputs": [
+        "vitestDefaults",
+        "{projectRoot}/vitest.config.ts",
+        "{projectRoot}/src/**/*",
+        {"dependentTasksOutputFiles": "**/*", "transitive": true}
+      ],
+      "outputs": ["{projectRoot}/coverage"]
     }
   }
 }

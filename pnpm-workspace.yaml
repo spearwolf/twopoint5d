@@ -12,10 +12,12 @@ catalog:
   '@spearwolf/signalize': ^1.0.0
   '@types/node': ^24.19.2
   '@types/three': ~0.187.0
+  '@vitest/coverage-v8': ^5.1.0
   playwright: ^1.65.0
   rimraf: ^6.1.4
   three: ~0.187.0
   typescript: ^7.0.2
+  vitest: ^5.1.0
 
 # pnpm resolves no version published less than a day ago: a compromised release is
 # usually found and pulled within hours. The own packages are exempt, so a release of

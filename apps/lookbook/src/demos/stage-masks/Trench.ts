@@ -27,7 +27,7 @@ import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type Texture, typ
 import assetsUrl from '~demos/utils/assetsUrl';
 import {jsonList, jsonNumber, jsonObject} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
-import {SeededRandom} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 import {makeSonarStage} from './Sonar';
 

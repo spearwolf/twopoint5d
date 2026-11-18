@@ -12,7 +12,8 @@ import {Mesh, MeshBasicNodeMaterial, PlaneGeometry, type Texture, type WebGPURen
 import assetsUrl from '~demos/utils/assetsUrl';
 import {jsonNumber, jsonObject} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
-import {additive, SeededRandom, smoothstepCpu} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
+import {additive, smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
 const DIR = 'stage-masks/heat-haze';

@@ -45,8 +45,7 @@ import {description, title} from './_stage-masks-frozen.json';
       return;
     }
 
-    const lamps = assets.layout.candles.length + assets.layout.stands.length;
-    const clock = new SeanceClock(assets.layout, lamps);
+    const clock = new SeanceClock(assets.layout);
     const dark = new ChapelVoid(clock);
     const room = new SeanceRoom(assets, clock);
     const amber = new GlassTint('amber glass', [0.7, 0.26, 0.025], 0.26, 3);

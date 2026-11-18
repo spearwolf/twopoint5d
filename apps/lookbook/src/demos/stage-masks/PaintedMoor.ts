@@ -29,7 +29,8 @@ import {
   vec4,
 } from 'three/tsl';
 import {AdditiveBlending, Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, Scene} from 'three/webgpu';
-import {hash21, SeededRandom} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
+import {hash21} from './helpers';
 import {
   FRAME,
   frameUnits,

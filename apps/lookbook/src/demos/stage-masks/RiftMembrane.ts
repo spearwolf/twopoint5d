@@ -2,7 +2,8 @@ import {on} from '@spearwolf/eventize';
 import {OnStageUpdateFrame, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
 import {abs, exp, float, length, max, mx_noise_float, positionWorld, pow, smoothstep, uniform, vec3, vec4} from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, Vector2} from 'three/webgpu';
-import {additive, SeededRandom} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
+import {additive} from './helpers';
 import {SoftBlobs} from './SoftBlobs';
 
 /** The view every stage of the demo lays itself out in, in units; `cover` fills any window. */

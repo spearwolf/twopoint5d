@@ -7,11 +7,20 @@
  */
 
 /**
- * Checks `value` and returns it as `T`, or throws a `TypeError` that reads `<where> must be
+ * Checks `value` and returns it as `T`, or throws a `JsonCheckError` that reads `<where> must be
  * <what>, got <value>`. `path` names where the value sits in the file: `''` for the root,
  * `eyes[1].x` for a field of an element of a list.
  */
 export type JsonCheck<T> = (value: unknown, path: string) => T;
+
+/**
+ * The refusal of a check: the value at a path of the file is not what the caller reads.
+ * `fetchJson()` reports it as a fault of the file; anything else a check throws, a `TypeError` of
+ * its own code included, is a fault of the check.
+ */
+export class JsonCheckError extends TypeError {
+  override name = 'JsonCheckError';
+}
 
 /** `the root`, or the path of a field. */
 const where = (path: string): string => (path === '' ? 'the root' : path);
@@ -24,7 +33,7 @@ function show(value: unknown): string {
 }
 
 function refuse(path: string, what: string, value: unknown): never {
-  throw new TypeError(`${where(path)} must be ${what}, got ${show(value)}`);
+  throw new JsonCheckError(`${where(path)} must be ${what}, got ${show(value)}`);
 }
 
 const fieldPath = (path: string, key: string): string => (path === '' ? key : `${path}.${key}`);

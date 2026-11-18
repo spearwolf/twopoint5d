@@ -28,6 +28,7 @@ node_modules
 /connect.lock
 /coverage
 packages/*/coverage
+apps/*/coverage
 packages/*/bench-results
 /libpeerconnection.log
 npm-debug.log

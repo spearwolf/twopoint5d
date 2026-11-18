@@ -46,9 +46,10 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {jsonNumber, jsonObject, jsonRecord} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
-import {atlasFrame, setMirroredFrame} from './helpers';
+import {setMirroredFrame} from './helpers';
 
 const DIR = 'stage-masks/portal';
 

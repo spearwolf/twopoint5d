@@ -44,8 +44,10 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
 - `pnpm test` — everything; `pnpm test:ci` — Vitest only, no browser;
   `pnpm test:browser` — Playwright only; `pnpm test:affected` — Nx affected graph
 - `pnpm test:coverage` — the library's Vitest suite once with coverage, held to the
-  thresholds in `packages/twopoint5d/vite.config.ts`, without the allocation specs;
-  `pnpm test`, `pnpm test:ci` and a single-file run measure nothing
+  thresholds in `packages/twopoint5d/vite.config.ts`, without the allocation specs, and
+  the specs of the lookbook's logic helpers, held to those in
+  `apps/lookbook/vitest.config.ts`; `pnpm test`, `pnpm test:ci` and a single-file run
+  measure nothing
 - `pnpm test:allocations` — the allocation specs (`src/**/hot-path-allocations*.spec.ts`)
   alone, without coverage: the Vitest project `allocations` in
   `packages/twopoint5d/vite.config.ts`, 30 s per test. A case measures under the V8
@@ -71,7 +73,8 @@ All from the repo root. Node `^24.16.0 || >=26.3.0` (no 25.x), pnpm `>=10.22.0` 
   asks Nx whether every tracked file under the library's `src/` is an input of its Vitest
   targets, and one that holds the publish script to Node's built-ins; the Nx project
   `scripts` has no `test` target, so `pnpm test` leaves them out
-- one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`
+- one Vitest file: `pnpm nx test twopoint5d -- src/path/to/file.spec.ts`, in the lookbook
+  `pnpm nx test lookbook -- src/demos/utils/checkJson.spec.ts`
 - `pnpm typecheck` — the library *including* its specs, which `pnpm build` skips, plus
   the lookbook's `.ts` and `.astro` files, the browser tests, the scripts under
   `scripts/` as JavaScript (`checkJs`), and every code block marked `ts check` in the
@@ -150,7 +153,7 @@ explicit instruction.
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. The catalog also holds every
   tool that more than one manifest names — `typescript` (7), `rimraf`, `@types/node`,
-  `playwright` —, likewise to be raised only there. The four are peer dependencies of
+  `playwright`, `vitest`, `@vitest/coverage-v8` —, likewise to be raised only there. The four are peer dependencies of
   the library; `@types/three` is an optional one (only a TypeScript consumer
   needs it). The catalog range lands verbatim in the published manifest,
   and a 0.x minor of `three` breaks, so `three` stays on the tilde — and
@@ -195,7 +198,9 @@ explicit instruction.
 - **`dispose()` and ownership** follow [the resource lifecycle
   rules](packages/twopoint5d/docs/resource-lifecycle.md). They are binding, not
   advisory.
-- **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) and `*.test.js` in
+- **Two test surfaces.** `*.spec.ts` next to the source (Vitest, logic) — in the library
+  and under `apps/lookbook/src/demos/`, where they hold the logic helpers of the lookbook
+  (the demo pages are left to the preview generator) — and `*.test.js` in
   `packages/twopoint5d-testing/test/` (real browsers, visual, every file that renders
   under WebGPU and under WebGL 2; a file none of whose tests renders runs once per engine
   and goes into `RENDERER_FREE_FILES` in `web-test-runner.config.js`). A change to

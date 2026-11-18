@@ -22,6 +22,7 @@ import {
   hash,
   length,
   max,
+  min,
   mix,
   mx_noise_float,
   positionWorld,
@@ -49,9 +50,11 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {jsonList, jsonNumber, jsonObject, jsonOneOf, jsonRecord, jsonString, jsonTuple} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
-import {atlasFrame, SeededRandom, smoothstepCpu} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
+import {smoothstepCpu} from './helpers';
 
 const DIR = 'stage-masks/frozen';
 
@@ -66,6 +69,8 @@ export const makeChapelStage = (name: string) => {
 
 type FloatNode = Node<'float'>;
 type Vec2Node = Node<'vec2'>;
+/** a plane with a node material: every mesh of the chapel */
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 
 /** the uv of a plane with the texture read upright (`flipY = false`: t from the top) */
 const uprightUv = (): Vec2Node => vec2(uv().x, float(1).sub(uv().y));
@@ -96,7 +101,7 @@ interface RoseWindowJson {
   panes: PaneInfo[];
 }
 
-interface HeadJson {
+export interface HeadJson {
   name: string;
   x: number;
   y: number;
@@ -106,7 +111,7 @@ interface HeadJson {
   pitch: number;
 }
 
-interface RoomJson {
+export interface RoomJson {
   extent: number;
   board: {x: number; y: number; w: number; h: number; marks: Record<string, [number, number]>};
   lens: {x: number; y: number};
@@ -278,7 +283,7 @@ export class SeanceClock {
   /** 0 … 1, how much ectoplasm rises from the board */
   readonly ecto = uniform(0);
   /** 0 … 1 per head, how far it has turned to the window */
-  readonly turn = [0, 0, 0, 0];
+  readonly turn = TURNS.map(() => 0);
   /** the planchette, in room units, and its turn */
   planchetteX = 0;
   planchetteY = 0;
@@ -286,14 +291,27 @@ export class SeanceClock {
   /** the seconds into the round */
   round = 0;
 
-  readonly #marks: Record<string, [number, number]>;
+  /** the mark of each letter of `SPELL`, in its order */
+  readonly #spell: readonly (readonly [number, number])[];
+  readonly #bye: readonly [number, number];
   readonly #rest: [number, number];
   readonly #lens: {x: number; y: number};
   readonly #random = new SeededRandom(17);
 
-  constructor(layout: RoomJson, lights: number) {
-    for (let i = 0; i < lights; i++) this.flicker.push(uniform(1));
-    this.#marks = layout.board.marks;
+  constructor(layout: RoomJson) {
+    if (layout.heads.length !== TURNS.length) {
+      throw new Error(`new SeanceClock(): room.json has ${layout.heads.length} heads, and the séance turns ${TURNS.length}`);
+    }
+    const markOf = (name: string): readonly [number, number] => {
+      const mark = layout.board.marks[name];
+      if (!mark) throw new Error(`new SeanceClock(): the board of room.json has no mark ${JSON.stringify(name)}`);
+      return mark;
+    };
+    this.#spell = SPELL.map(markOf);
+    this.#bye = markOf('GOOD BYE');
+    // one flicker per lamp, the candles first and then the stands: the order SeanceRoom lights them in
+    const lamps = layout.candles.length + layout.stands.length;
+    for (let i = 0; i < lamps; i++) this.flicker.push(uniform(1));
     this.#rest = [layout.board.x, layout.board.y - 4];
     this.#lens = layout.lens;
     // the room starts as the planchette reaches its last letters: something happens at once
@@ -326,7 +344,7 @@ export class SeanceClock {
     }
     this.glow.value = sum / Math.max(1, this.flicker.length);
 
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < TURNS.length; i++) {
       const turn = TURNS[i]!;
       const toWindow = ease((r - turn.start) / turn.take);
       const back = ease((r - TURN_BACK - i * 0.4) / 2.6);
@@ -347,8 +365,8 @@ export class SeanceClock {
     } else if (r < SPELL_END) {
       const step = Math.floor((r - SPELL_START) / SPELL_STEP);
       const f = (r - SPELL_START) / SPELL_STEP - step;
-      const from = step === 0 ? this.#rest : this.#markOf(SPELL[step - 1]!);
-      const to = this.#markOf(SPELL[step]!);
+      const from = step === 0 ? this.#rest : this.#spell[step - 1]!;
+      const to = this.#spell[step]!;
       // it glides in the first part of the step and rests on its letter in the second
       const k = ease(f / 0.55);
       // the second E: the planchette circles off its letter and back
@@ -357,13 +375,13 @@ export class SeanceClock {
       y = from[1] + (to[1] - from[1]) * k + loop;
     } else if (r < TURN_BACK) {
       // it stays on the last letter while they look at you
-      const last = this.#markOf(SPELL[SPELL.length - 1]!);
+      const last = this.#spell[SPELL.length - 1]!;
       x = last[0];
       y = last[1];
     } else {
       const k = ease((r - TURN_BACK) / 3);
-      const from = this.#markOf(SPELL[SPELL.length - 1]!);
-      const bye = this.#markOf('GOOD BYE');
+      const from = this.#spell[SPELL.length - 1]!;
+      const bye = this.#bye;
       const to = k < 0.5 ? bye : this.#rest;
       const kk = k < 0.5 ? k * 2 : (k - 0.5) * 2;
       const start = k < 0.5 ? from : bye;
@@ -375,12 +393,6 @@ export class SeanceClock {
     this.planchetteY = y - this.#lens.y + Math.sin(t * 5.9) * 0.25;
     this.planchetteRot = Math.sin(t * 0.7) * 0.06 + (x - this.#rest[0]) * -0.0018;
   }
-
-  #markOf(name: string): [number, number] {
-    const mark = this.#marks[name];
-    if (!mark) throw new Error(`SeanceClock: the board has no mark "${name}"`);
-    return mark;
-  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -390,7 +402,7 @@ export class SeanceClock {
 /** The bottom layer: the dark where no glass is — a cold violet void with a fog that drifts. */
 export class ChapelVoid {
   readonly stage = makeChapelStage('void');
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
 
   constructor(clock: SeanceClock) {
     const p = positionWorld.xy;
@@ -410,7 +422,7 @@ export class ChapelVoid {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.stage.dispose();
   }
 }
@@ -466,7 +478,7 @@ const HEAD_ASPECT = 0.86;
 
 /** A head on a quad: a sphere with a face map around it, turned by a yaw and a pitch, lit by the candles. */
 class Head {
-  readonly mesh: Mesh;
+  readonly mesh: PlaneMesh;
   readonly yaw = uniform(0);
   readonly pitch = uniform(0);
   readonly #rest: {yaw: number; pitch: number};
@@ -528,7 +540,7 @@ class Head {
 
   dispose(): void {
     this.mesh.geometry.dispose();
-    (this.mesh.material as MeshBasicNodeMaterial).dispose();
+    this.mesh.material.dispose();
   }
 }
 
@@ -540,9 +552,9 @@ class Head {
 export class SeanceRoom {
   readonly stage = makeChapelStage('seance');
   readonly #clock: SeanceClock;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #heads: Head[] = [];
-  readonly #planchette: Mesh;
+  readonly #planchette: PlaneMesh;
 
   constructor(assets: ChapelAssets, clock: SeanceClock) {
     this.#clock = clock;
@@ -552,6 +564,7 @@ export class SeanceRoom {
     // the room, its light breathing with the candles near it
     const p = positionWorld.xy;
     let flick: FloatNode = float(0);
+    // the clock holds one flicker per lamp of this layout
     const lamps = [...layout.candles, ...layout.stands];
     lamps.forEach((lamp, i) => {
       const d = length(p.sub(vec2(lamp.x, lamp.y)));
@@ -635,7 +648,7 @@ export class SeanceRoom {
     return material;
   }
 
-  #add(mesh: Mesh, name: string, x: number, y: number, order: number): void {
+  #add(mesh: PlaneMesh, name: string, x: number, y: number, order: number): void {
     mesh.name = name;
     mesh.position.set(x, y, 0);
     mesh.renderOrder = order;
@@ -647,13 +660,14 @@ export class SeanceRoom {
     const clock = this.#clock;
     this.#planchette.position.set(clock.planchetteX, clock.planchetteY, 0);
     this.#planchette.rotation.z = clock.planchetteRot;
+    // one head per head of room.json, as many as the clock turns: its constructor refuses another count
     for (let i = 0; i < this.#heads.length; i++) this.#heads[i]!.set(clock.turn[i]!);
   }
 
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     for (const head of this.#heads) head.dispose();
     this.stage.dispose();
@@ -666,7 +680,7 @@ export class SeanceRoom {
  */
 export class GlassTint {
   readonly stage: Stage2D;
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
 
   constructor(name: string, colour: [number, number, number], strength: number, seed: number) {
     this.stage = makeChapelStage(name);
@@ -684,7 +698,7 @@ export class GlassTint {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.stage.dispose();
   }
 }
@@ -701,7 +715,7 @@ const SETTLE_RATE = 0.04;
 const flightOf = (clock: SeanceClock): number => -Math.log(1 - clock.random()) / SETTLE_RATE;
 
 interface Moth {
-  mesh: Mesh;
+  mesh: PlaneMesh;
   tint: UniformNode<'vec3', Vector3>;
   /** where it circles, how wide, how fast */
   cx: number;
@@ -724,7 +738,7 @@ interface Moth {
 export class ChapelWall {
   readonly stage = makeChapelStage('wall');
   readonly #clock: SeanceClock;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #moths: Moth[] = [];
 
   constructor(assets: ChapelAssets, clock: SeanceClock) {
@@ -741,7 +755,7 @@ export class ChapelWall {
     const bx = floor(p.x.add(shift).div(span));
     const lx = fract(p.x.add(shift).div(span)).mul(span);
     const ly = fract(p.y.div(course)).mul(course);
-    const edge = min2(min2(lx, span.sub(lx)), min2(ly, course.sub(ly)));
+    const edge = min(min(lx, span.sub(lx)), min(ly, course.sub(ly)));
     const mortar = float(1).sub(smoothstep(1.1, 2.4, edge));
     const tone = hash(bx.mul(7.13).add(row.mul(3.71)))
       .mul(0.3)
@@ -812,7 +826,7 @@ export class ChapelWall {
     this.#update(0);
   }
 
-  #add(mesh: Mesh, name: string, x: number, y: number, order: number): void {
+  #add(mesh: PlaneMesh, name: string, x: number, y: number, order: number): void {
     mesh.name = name;
     mesh.position.set(x, y, 0);
     mesh.renderOrder = order;
@@ -857,15 +871,8 @@ export class ChapelWall {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.stage.dispose();
   }
 }
-
-/** the smaller of two float nodes */
-const min2 = (a: FloatNode, b: FloatNode): FloatNode =>
-  a
-    .add(b)
-    .sub(abs(a.sub(b)))
-    .mul(0.5);

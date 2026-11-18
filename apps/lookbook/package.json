@@ -12,6 +12,8 @@
     "typecheck": "pnpm run astro:check && pnpm run assets:check",
     "astro:check": "pnpm exec astro check",
     "assets:check": "pnpm exec tsc -p assets-src/tsconfig.json",
+    "test": "pnpm vitest --run",
+    "coverage": "pnpm vitest --run --coverage",
     "astro": "pnpm exec astro"
   },
   "dependencies": {
@@ -30,7 +32,9 @@
     "@astrojs/check": "^0.9.12",
     "@types/node": "catalog:",
     "@types/three": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "sharp": "^0.35.5",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "catalog:"
   }
 }

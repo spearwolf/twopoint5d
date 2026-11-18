@@ -18,7 +18,7 @@ import {
   vec4,
 } from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type UniformNode, Vector4} from 'three/webgpu';
-import {SeededRandom} from './helpers';
+import {SeededRandom} from '~demos/utils/seededRandom';
 import {SoftBlobs} from './SoftBlobs';
 
 /** the view of both scenes and of the ink, in units, shown with `fit: 'cover'` */

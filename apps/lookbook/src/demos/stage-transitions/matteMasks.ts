@@ -9,6 +9,7 @@ import {
   type StageUpdateFrameProps,
 } from '@spearwolf/twopoint5d';
 import {DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat} from 'three/webgpu';
+import {SeededRandom} from '~demos/utils/seededRandom';
 import {SoftBlobs} from '../stage-masks/SoftBlobs';
 import {VIEW_HEIGHT, VIEW_WIDTH} from './assets';
 
@@ -86,6 +87,8 @@ const NOISE_WIDTH = 32;
 const NOISE_HEIGHT = 18;
 /** how often the noise is drawn again, in seconds */
 const BOIL_EVERY = 0.12;
+/** the seed of the noise: it boils on with its time, and every page draws the same boils */
+const NOISE_SEED = 7;
 
 /**
  * A boiling gray noise for `matte()` in its `'threshold'` mode: the gray of a pixel is the progress
@@ -98,6 +101,7 @@ class BoilingNoise {
   readonly mask: StageMask;
   readonly #noise = new DataTexture(new Uint8Array(NOISE_WIDTH * NOISE_HEIGHT * 4), NOISE_WIDTH, NOISE_HEIGHT, RGBAFormat);
   readonly #plane = new Mesh(new PlaneGeometry(VIEW_WIDTH, VIEW_HEIGHT), new MeshBasicMaterial({map: this.#noise}));
+  readonly #random = new SeededRandom(NOISE_SEED);
   #clock = 0;
 
   constructor() {
@@ -120,7 +124,7 @@ class BoilingNoise {
   #boil(): void {
     const texels = this.#noise.image.data as Uint8Array;
     for (let i = 0; i < texels.length; i += 4) {
-      texels[i] = texels[i + 1] = texels[i + 2] = Math.random() * 255;
+      texels[i] = texels[i + 1] = texels[i + 2] = this.#random.next() * 255;
       texels[i + 3] = 255;
     }
     this.#noise.needsUpdate = true;

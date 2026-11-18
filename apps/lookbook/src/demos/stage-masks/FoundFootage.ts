@@ -38,7 +38,9 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {additive, atlasFrame, hash21, multiply, randomAt, SeededRandom, setMirroredFrame} from './helpers';
+import {atlasFrame} from '~demos/utils/atlasFrame';
+import {randomAt, SeededRandom} from '~demos/utils/seededRandom';
+import {additive, hash21, multiply, setMirroredFrame} from './helpers';
 
 const DIR = 'stage-masks/found-footage';
 /** the atlas and the ground have 2 texels per unit */

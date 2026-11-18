@@ -199,3 +199,11 @@ transitions, navigation is a plain page switch.
 lookbook and is part of the repo-wide `pnpm typecheck`. `pnpm nx build lookbook` builds
 the static site. The library is pulled in as `workspace:*`, so a change in
 `packages/twopoint5d` shows up here as soon as it's built.
+
+`pnpm nx test lookbook` runs the specs of the logic helpers under `src/demos/` — the
+seeded random, the json checks, the loading of the files, the rigs and the clocks of the
+stage mask demos — with Vitest, under Node without a DOM; the demo pages themselves are
+left to the preview generator. `pnpm nx run lookbook:coverage` runs them once with
+coverage, held to the thresholds in `vitest.config.ts`, and is part of the gate through
+`pnpm test:coverage`. The thresholds count only the modules that `coverage.include` names
+one by one: a new module with a spec goes into that list.

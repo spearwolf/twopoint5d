@@ -1,6 +1,7 @@
 import {Vector2, Vector3} from 'three/webgpu';
 import {jsonList, jsonNumber, jsonObject, jsonRecord, jsonString} from '~demos/utils/checkJson';
-import {randomAt, SeededRandom, smoothstepCpu} from './helpers';
+import {randomAt, SeededRandom} from '~demos/utils/seededRandom';
+import {smoothstepCpu} from './helpers';
 
 /** What `assets-src/stage-masks/flashlight/` writes into `layout.json`. */
 export interface CrawlLayout {
@@ -59,6 +60,8 @@ export const REACH_FADE = 0.5;
 export const VENT_LEAN = 0.45;
 /** How far below the vent the shaft fades out, in units. */
 export const VENT_DEPTH = 240;
+/** The middle of a player frame stands this far above the floor (the frame's ground line is 54 below it). */
+export const PLAYER_CENTER_ABOVE_FLOOR = 52;
 
 export interface CrawlInput {
   left: boolean;
@@ -138,7 +141,8 @@ export class CrawlRig {
       ? this.#aimAt.set(this.camera.x + input.pointer.x * this.view.x, this.camera.y + input.pointer.y * this.view.y)
       : undefined;
     if (aimAt) {
-      this.aim = Math.atan2(aimAt.y - this.lens.y, aimAt.x - (player.x + player.facing * 20));
+      // from the lens, as `#place()` puts it: the player has not moved yet in this update
+      this.aim = Math.atan2(aimAt.y - this.lens.y, aimAt.x - (player.x + player.facing * layout.lens.x));
     } else {
       const turn = (input.up ? 1 : 0) - (input.down ? 1 : 0);
       this.aim += turn * player.facing * AIM_SPEED * dt;
@@ -242,6 +246,3 @@ export class CrawlRig {
     return Math.max(flash, moon);
   }
 }
-
-/** The middle of a player frame stands this far above the floor (the frame's ground line is 54 below it). */
-export const PLAYER_CENTER_ABOVE_FLOOR = 52;

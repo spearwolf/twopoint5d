@@ -47,7 +47,9 @@ import {
   ZeroFactor,
 } from 'three/webgpu';
 import assetsUrl from '~demos/utils/assetsUrl';
-import {additive, atlasFrame, SeededRandom, setPlaneUvToFrame} from './helpers';
+import {atlasFrame} from '~demos/utils/atlasFrame';
+import {SeededRandom} from '~demos/utils/seededRandom';
+import {additive, setPlaneUvToFrame} from './helpers';
 import {makeRiftStage, type RiftState, WORLD} from './RiftMembrane';
 
 const DIR = 'stage-masks/rift';

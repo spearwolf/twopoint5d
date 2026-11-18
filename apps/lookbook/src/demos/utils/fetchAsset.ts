@@ -1,4 +1,4 @@
-import type {JsonCheck} from './checkJson';
+import {type JsonCheck, JsonCheckError} from './checkJson';
 
 /**
  * The text of the file at `url`. A failure names `subject` and the url: a fetch that cannot reach
@@ -27,12 +27,12 @@ export async function fetchText(subject: string, url: string): Promise<string> {
  * `<subject>: <url> is no JSON` and the `SyntaxError` as its `cause`.
  *
  * `check` holds the value to what the caller reads (see `checkJson.ts`); a value it refuses
- * rejects with `<subject>: <url> is not what <subject> reads: <message>` and the `TypeError` of
- * the check as its `cause`, and the message names the field that does not fit. Anything else a
- * check throws is a fault of the check, not of the file, and rejects as it is. The layout files of
- * the demos are written by the generators under `assets-src/`, committed with their demo, and
- * `assets-src/README.md` is their contract; what the library reads — the atlases — the
- * `TextureStore` checks itself.
+ * rejects with `<subject>: <url> is not what <subject> reads: <message>` and the `JsonCheckError`
+ * of the check as its `cause`, and the message names the field that does not fit. Anything else a
+ * check throws — a `TypeError` of its own code included — is a fault of the check, not of the
+ * file, and rejects as it is. The layout files of the demos are written by the generators under
+ * `assets-src/`, committed with their demo, and `assets-src/README.md` is their contract; what the
+ * library reads — the atlases — the `TextureStore` checks itself.
  */
 export async function fetchJson<T>(subject: string, url: string, check: JsonCheck<T>): Promise<T> {
   const text = await fetchText(subject, url);
@@ -45,9 +45,9 @@ export async function fetchJson<T>(subject: string, url: string, check: JsonChec
   try {
     return check(value, '');
   } catch (cause) {
-    // a check refuses with a TypeError (see `JsonCheck`); anything else is a fault of the check,
-    // not of the file, and passes on as it is
-    if (!(cause instanceof TypeError)) throw cause;
+    // a check refuses with a JsonCheckError (see `JsonCheck`); anything else, a TypeError of its
+    // own code included, is a fault of the check, not of the file, and passes on as it is
+    if (!(cause instanceof JsonCheckError)) throw cause;
     throw new Error(`${subject}: ${url} is not what ${subject} reads: ${cause.message}`, {cause});
   }
 }

@@ -12,6 +12,7 @@ import {
   writeText,
 } from '@spearwolf/twopoint5d';
 import {Color} from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {type StageTransitionAssets, VIEW_HEIGHT, VIEW_WIDTH} from './assets';
 
 const PROMPT_COLOR = new Color('#ffd166');
@@ -40,7 +41,7 @@ export class TitleMenu {
       transparent: true,
     });
     this.#ship = this.#ships.createSprite()!;
-    this.#ship.setFrame(assets.ships.frame('ship-01')!);
+    this.#ship.setFrame(atlasFrame(assets.ships, 'TitleMenu', 'ship-01'));
     this.#ship.setSize(150, 164);
 
     this.#chrome = new FeatureSprites(TexturedSpriteKind, {

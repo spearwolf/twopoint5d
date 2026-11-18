@@ -37,7 +37,11 @@ export interface TransitionCyclerOptions {
   progressName: string;
   /** called as a run begins, before `effect()` and `replace()` */
   onBegin?: (from: StageDirectorLayer, to: StageDirectorLayer) => void;
-  /** called as the run on the screen ends, before the readouts are written */
+  /**
+   * called as the run on the screen ends — by itself, by `cancel()`, or as the slider takes it over
+   * or a restart begins it anew —, before the next `onBegin` and before the readouts are written:
+   * every `onBegin` has its `onEnd`
+   */
   onEnd?: () => void;
   /** further shortcuts of the page by `KeyboardEvent.code`, beside Space, Enter and S */
   keys?: Readonly<Record<string, () => void>>;
@@ -88,12 +92,12 @@ export class TransitionCycler {
 
   /**
    * Follows `settings.scrub`: on, a run by the clock ends where it was going and one by hand
-   * begins at the slider; off, the run by hand ends at the end it is nearer to.
+   * begins at the slider; off, the run by hand ends at the end it is nearer to. The page hears
+   * `onEnd` of the run that ends.
    */
   setScrub(): void {
     if (this.#options.settings.scrub) {
-      this.#running?.cancel('end');
-      this.#running = undefined;
+      this.#cancelRunning('end');
       this.#begin(true);
     } else if (this.#running?.manual) {
       this.#running.cancel(this.#running.progress >= 0.5 ? 'end' : 'start');
@@ -103,12 +107,12 @@ export class TransitionCycler {
   /**
    * Begins a run by hand again with the options of the page as they are now, at the same place of
    * the slider and in the same direction: `cancel('start')` leaves `from` in the slot. A run by the
-   * clock keeps its options, the next one takes the new ones.
+   * clock keeps its options, the next one takes the new ones. The page hears `onEnd` of the run
+   * that ends.
    */
   restart(): void {
     if (!this.#running?.manual) return;
-    this.#running.cancel('start');
-    this.#running = undefined;
+    this.#cancelRunning('start');
     this.#begin(true);
   }
 
@@ -161,6 +165,19 @@ export class TransitionCycler {
       if (this.#hold <= 0) this.#begin(false);
     }
     this.#describe();
+  }
+
+  /**
+   * Ends the run on the screen by hand: it leaves the slot as `cancel(jumpTo)` sets it, and the page
+   * hears `onEnd` now, before the next run begins; its `finished` comes later and finds another run,
+   * or none, and calls no `onEnd` of its own.
+   */
+  #cancelRunning(jumpTo: 'start' | 'end'): void {
+    const running = this.#running;
+    if (!running) return;
+    running.cancel(jumpTo);
+    this.#running = undefined;
+    this.#options.onEnd?.();
   }
 
   #begin(manual: boolean): void {
