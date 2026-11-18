@@ -19,7 +19,7 @@ import {Color, Mesh, MeshBasicMaterial, type Node, PlaneGeometry, type Texture, 
 import assetsUrl from '~demos/utils/assetsUrl';
 import {jsonList, jsonNumber, jsonObject, jsonOneOf, jsonTuple} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
-import {type SoftBlob, SoftBlobs} from './SoftBlobs';
+import {type SoftBlob, SoftBlobs} from '~demos/utils/SoftBlobs';
 
 type PlaneMesh = Mesh<PlaneGeometry, MeshBasicMaterial>;
 

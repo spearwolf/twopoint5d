@@ -4,7 +4,7 @@ import {abs, exp, float, length, max, mx_noise_float, positionWorld, pow, smooth
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, Vector2} from 'three/webgpu';
 import {SeededRandom} from '~demos/utils/seededRandom';
 import {additive} from './helpers';
-import {SoftBlobs} from './SoftBlobs';
+import {SoftBlobs} from '~demos/utils/SoftBlobs';
 
 type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 

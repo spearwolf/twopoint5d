@@ -51,6 +51,12 @@ describe('SeanceClock', () => {
     );
   });
 
+  it('refuses a room without candles, as it is built', () => {
+    expect(() => new SeanceClock(room((layout) => (layout.candles = [])))).toThrow(
+      new Error('new SeanceClock(): room.json has no candles, and the heads are lit from their middle'),
+    );
+  });
+
   it('holds one flicker per candle and stand of the layout', () => {
     expect(new SeanceClock(room()).flicker.length).toBe(5);
   });

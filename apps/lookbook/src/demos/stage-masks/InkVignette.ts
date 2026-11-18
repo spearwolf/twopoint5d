@@ -3,7 +3,7 @@ import {OnStageUpdateFrame} from '@spearwolf/twopoint5d';
 import {abs, float, length, max, min, mx_noise_float, positionWorld, pow, smoothstep, uniform, vec2, vec3, vec4} from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, PlaneGeometry, Vector2} from 'three/webgpu';
 import {type FootageClock, makeFootageStage, VIEW_HEIGHT} from './FoundFootage';
-import {SoftBlobs} from './SoftBlobs';
+import {SoftBlobs} from '~demos/utils/SoftBlobs';
 
 type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 

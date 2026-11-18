@@ -10,7 +10,7 @@ import {
 } from '@spearwolf/twopoint5d';
 import {DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat} from 'three/webgpu';
 import {SeededRandom} from '~demos/utils/seededRandom';
-import {SoftBlobs} from '../stage-masks/SoftBlobs';
+import {SoftBlobs} from '~demos/utils/SoftBlobs';
 import {VIEW_HEIGHT, VIEW_WIDTH} from './assets';
 
 /** A mask stage over the same view as the pictures of the gallery, so the matte lines up with them. */
@@ -99,7 +99,8 @@ const NOISE_SEED = 7;
 class BoilingNoise {
   readonly stage = makeMaskStage('boiling noise');
   readonly mask: StageMask;
-  readonly #noise = new DataTexture(new Uint8Array(NOISE_WIDTH * NOISE_HEIGHT * 4), NOISE_WIDTH, NOISE_HEIGHT, RGBAFormat);
+  readonly #texels = new Uint8Array(NOISE_WIDTH * NOISE_HEIGHT * 4);
+  readonly #noise = new DataTexture(this.#texels, NOISE_WIDTH, NOISE_HEIGHT, RGBAFormat);
   readonly #plane = new Mesh(new PlaneGeometry(VIEW_WIDTH, VIEW_HEIGHT), new MeshBasicMaterial({map: this.#noise}));
   readonly #random = new SeededRandom(NOISE_SEED);
   #clock = 0;
@@ -122,7 +123,7 @@ class BoilingNoise {
   }
 
   #boil(): void {
-    const texels = this.#noise.image.data as Uint8Array;
+    const texels = this.#texels;
     for (let i = 0; i < texels.length; i += 4) {
       texels[i] = texels[i + 1] = texels[i + 2] = this.#random.next() * 255;
       texels[i + 3] = 255;

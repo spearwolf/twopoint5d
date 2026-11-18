@@ -55,6 +55,10 @@ export class SeanceClock {
     if (layout.heads.length !== TURNS.length) {
       throw new Error(`new SeanceClock(): room.json has ${layout.heads.length} heads, and the séance turns ${TURNS.length}`);
     }
+    // SeanceRoom lights the heads from the middle of the candles on the table: without a candle that middle is NaN
+    if (layout.candles.length === 0) {
+      throw new Error('new SeanceClock(): room.json has no candles, and the heads are lit from their middle');
+    }
     const markOf = (name: string): readonly [number, number] => {
       const mark = layout.board.marks[name];
       if (!mark) throw new Error(`new SeanceClock(): the board of room.json has no mark ${JSON.stringify(name)}`);

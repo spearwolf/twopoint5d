@@ -27,6 +27,7 @@ import {
   type Texture,
   Vector3,
 } from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {BALL_COLOURS, SHAPE_RADIUS, SHAPES, type Shape} from './shapes';
 
 /** The atlas of the balls and the texture of its image, out of the texture catalog. */
@@ -121,11 +122,7 @@ export class VectorBalls extends Group {
     super();
     this.name = 'vector-balls';
 
-    this.#frames = BALL_COLOURS.map((name) => {
-      const frame = atlas.frame(name);
-      if (frame == null) throw new Error(`vector-balls: the atlas has no frame "${name}"`);
-      return prepareSpriteFrame(frame);
-    });
+    this.#frames = BALL_COLOURS.map((name) => prepareSpriteFrame(atlasFrame(atlas, 'VectorBalls', name)));
 
     this.balls = new FeatureSprites(BallKind, {
       capacity: START_CAPACITY,

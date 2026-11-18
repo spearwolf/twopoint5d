@@ -16,11 +16,11 @@ import {
   ZeroFactor,
 } from 'three/webgpu';
 
-// The helpers that every demo needs — the seeded random, the named atlas frame, the loading and
-// checking of the files — lie under `~demos/utils/`. This module holds what the scenes of the
-// stage mask demos share among themselves. A scene imports from it, from `SoftBlobs.ts` (a
-// building block, not a scene) and from the modules of its own demo page, never from the module
-// of another demo: a scene that someone takes as a template brings nothing foreign with it.
+// The helpers that more than one demo needs — the seeded random, the named atlas frame, the
+// loading and checking of the files, the soft blobs of a mask stage — lie under `~demos/utils/`.
+// This module holds what the scenes of the stage mask demos share among themselves. A scene
+// imports from it, from `~demos/utils/` and from the modules of its own demo page, never from the
+// module of another demo: a scene that someone takes as a template brings nothing foreign with it.
 
 /** smoothstep on the CPU, with the formula of GLSL and WGSL; `e0 < e1`. */
 export function smoothstepCpu(e0: number, e1: number, x: number): number {

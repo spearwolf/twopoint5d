@@ -14,7 +14,7 @@ import {jsonNumber, jsonObject} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {SeededRandom} from '~demos/utils/seededRandom';
 import {additive, smoothstepCpu} from './helpers';
-import {type SoftBlob, SoftBlobs} from './SoftBlobs';
+import {type SoftBlob, SoftBlobs} from '~demos/utils/SoftBlobs';
 
 type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 

@@ -27,7 +27,7 @@ import {
 import assetsUrl from '~demos/utils/assetsUrl';
 import {atlasFrame} from '~demos/utils/atlasFrame';
 import {smoothstepCpu} from './helpers';
-import {type SoftBlob, SoftBlobs} from './SoftBlobs';
+import {type SoftBlob, SoftBlobs} from '~demos/utils/SoftBlobs';
 import {
   type Box,
   FLOOR_BOTTOM,

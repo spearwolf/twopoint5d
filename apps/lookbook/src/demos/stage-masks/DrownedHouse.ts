@@ -30,7 +30,7 @@ import {jsonList, jsonNumber, jsonObject, jsonString} from '~demos/utils/checkJs
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {hash21} from './helpers';
 import {makeInkStage} from './InkWell';
-import {SoftBlobs} from './SoftBlobs';
+import {SoftBlobs} from '~demos/utils/SoftBlobs';
 
 type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 

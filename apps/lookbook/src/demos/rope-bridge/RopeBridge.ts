@@ -35,6 +35,7 @@ import {
 } from 'three/webgpu';
 import {crossing, duelAngles} from './SaberDuel';
 import {VerletRopes} from './VerletRopes';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {SeededRandom} from '~demos/utils/seededRandom';
 
 /** The textures out of the catalog: the atlas `rope-bridge/bridge.json` and the three cave layers. */
@@ -461,9 +462,7 @@ export class RopeBridge {
   // ---------------------------------------------------------------------------------------------
 
   #frame(name: string): TextureAtlasFrame {
-    const frame = this.#assets.atlas.frame(name);
-    if (frame == null) throw new Error(`rope-bridge: the atlas has no frame "${name}"`);
-    return frame;
+    return atlasFrame(this.#assets.atlas, 'RopeBridge', name);
   }
 
   #link(a: number, b: number, frame: string, thickness: number, caps: number, shade: Link['shade']): void {

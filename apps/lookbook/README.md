@@ -84,14 +84,18 @@ together.
    builders, sprites, a picker, a lil-gui panel. `StageRenderer#dispose()` lets go of its stages
    without disposing them, so the page disposes them too; a texture a store lent goes with the
    store. What the page builds before `display.start()` is freed by an `onDispose()` right after
-   it is built, what the init builds after an `await` by one at the end of the init. Every
-   listener the page puts on the canvas, the window, the document or an element of its markup
-   comes off there as well — through the `signal` of an `AbortController` whose `abort()` the
-   `onDispose()` calls; the display drops the listeners of its own events itself. After every
-   `await` of its start the page asks `display.isDisposed` before it builds on, and frees what
-   the `await` handed it; a `then` that touches the page asks first as well. `platformer.astro`
-   and `rope-bridge.astro` show the pattern, and `PerspectiveOrbitDemo` frees its orbit controls
-   itself.
+   it is built. What the init builds after an `await` goes into a `DemoParts` from
+   `src/demos/utils/demoParts.ts`, made as soon as the init has asked `display.isDisposed`:
+   `parts.keep(part)` takes each part with a `dispose()` the moment it exists,
+   `parts.onDispose(release)` anything else, so a part that throws as it is built leaves
+   nothing behind that was built before it, and the display lets go of the parts in the
+   reverse order they were kept in. Every listener the page puts on the canvas, the window,
+   the document or an element of its markup comes off there as well — through the `signal`
+   of an `AbortController` whose `abort()` the `onDispose()` calls; the display drops the
+   listeners of its own events itself. After every `await` of its start the page asks
+   `display.isDisposed` before it builds on, and frees what the `await` handed it; a `then`
+   that touches the page asks first as well. `stage-masks-frozen.astro` shows the pattern,
+   and `PerspectiveOrbitDemo` frees its orbit controls itself.
 3. Add `src/pages/demos/_<name>.json` next to it. The leading underscore keeps Astro from
    turning it into a route, while `import.meta.glob('../../pages/demos/*.json')` in
    `src/demos/utils/loadMetadataForDemos.ts` still picks it up. `title` and `url` are

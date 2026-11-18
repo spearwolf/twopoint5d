@@ -22,6 +22,7 @@ export default defineConfig({
       include: [
         'src/demos/utils/atlasFrame.ts',
         'src/demos/utils/checkJson.ts',
+        'src/demos/utils/demoParts.ts',
         'src/demos/utils/disposeMaterial.ts',
         'src/demos/utils/fetchAsset.ts',
         'src/demos/utils/seededRandom.ts',

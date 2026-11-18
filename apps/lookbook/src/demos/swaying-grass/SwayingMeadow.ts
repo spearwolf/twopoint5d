@@ -32,6 +32,7 @@ import {
   type BufferGeometry,
   type Texture,
 } from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 
 /** The meadow atlas and the texture of its image, out of the texture catalog. */
 export interface MeadowAtlas {
@@ -278,11 +279,7 @@ export class SwayingMeadow extends Group {
   // where every plant grows. Tall plants stay away from the rim on the side the shadows fall to,
   // so that no shadow reaches past the floor into the air
   #growMeadow(atlas: TextureAtlas, random: () => number): Plant[] {
-    const frame = (name: string) => {
-      const found = atlas.frame(name);
-      if (found == null) throw new Error(`swaying-grass: the atlas has no frame "${name}"`);
-      return found;
-    };
+    const frame = (name: string) => atlasFrame(atlas, 'SwayingMeadow', name);
     const blades = ['blade-0', 'blade-1', 'blade-2', 'blade-3', 'blade-4', 'blade-5'].map(frame);
     const tufts = ['tuft-0', 'tuft-1', 'tuft-2'].map(frame);
     const reeds = ['reed-0', 'reed-1', 'reed-2'].map(frame);

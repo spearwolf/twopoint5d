@@ -19,7 +19,7 @@ import {
 } from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type UniformNode, Vector4} from 'three/webgpu';
 import {SeededRandom} from '~demos/utils/seededRandom';
-import {SoftBlobs} from './SoftBlobs';
+import {SoftBlobs} from '~demos/utils/SoftBlobs';
 
 type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 

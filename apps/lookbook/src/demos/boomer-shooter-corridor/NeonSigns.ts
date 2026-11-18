@@ -14,6 +14,7 @@ import {
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Texture} from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {SeededRandom} from '~demos/utils/seededRandom';
 import {CORRIDOR_HEIGHT, CORRIDOR_LENGTH, CORRIDOR_WIDTH, TILE} from './Corridor';
 
@@ -99,8 +100,8 @@ export class NeonSigns {
 
     for (const sign of SIGNS) {
       const sprite = sprites.createSprite();
-      const frame = atlas.frame(sign.frame);
-      if (sprite == null || frame == null) continue;
+      const frame = atlasFrame(atlas, 'NeonSigns', sign.frame);
+      if (sprite == null) continue;
       sprite.setFrame(frame);
       sprite.setSize(frame.coords.width * PX, frame.coords.height * PX);
       if (sign.wall === 0) {

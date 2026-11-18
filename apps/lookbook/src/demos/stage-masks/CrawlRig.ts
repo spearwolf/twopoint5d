@@ -125,6 +125,8 @@ export class CrawlRig {
   #flickerUntil = 0;
   /** the flicker's timing, the same on every run */
   readonly #random = new SeededRandom(1);
+  /** the point on each plane that {@link CrawlRig.coverageAt} reads, reused */
+  readonly #q = new Vector2();
 
   constructor(layout: CrawlLayout) {
     this.layout = layout;
@@ -236,8 +238,6 @@ export class CrawlRig {
     const w = vent.hw * (1 + down / 400);
     return (1 - smoothstepCpu(w * 0.7, w, Math.abs(along))) * (1 - smoothstepCpu(VENT_DEPTH * 0.6, VENT_DEPTH, down));
   }
-
-  readonly #q = new Vector2();
 
   /** What the mask covers where a thing at (x, y, z) is seen, as the mask stage draws it. */
   coverageAt(x: number, y: number, z: number): number {

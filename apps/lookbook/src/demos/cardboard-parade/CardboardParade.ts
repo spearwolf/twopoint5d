@@ -30,6 +30,7 @@ import {
   Quaternion,
   type Texture,
 } from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 import {CardboardBack} from './CardboardBack';
 
 /** The atlas of the cut-outs and the texture of its image, out of the texture catalog. */
@@ -159,11 +160,7 @@ export class CardboardParade extends Group {
     super();
     this.name = 'cardboard-parade';
 
-    const frame = (name: string) => {
-      const found = atlas.frame(name);
-      if (found == null) throw new Error(`cardboard-parade: the atlas has no frame "${name}"`);
-      return found;
-    };
+    const frame = (name: string) => atlasFrame(atlas, 'CardboardParade', name);
     this.#frames = Object.fromEntries(
       [
         'tree_round',

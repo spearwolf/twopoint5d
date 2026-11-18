@@ -24,6 +24,7 @@ import {description, title} from './_stage-masks-frozen.json';
   import {RoseWindow} from '~demos/stage-masks/RoseWindow';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -47,13 +48,17 @@ import {description, title} from './_stage-masks-frozen.json';
       return;
     }
 
+    // from here on each part goes with the display the moment it exists, also when a part after it throws as it is built
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
     const clock = new SeanceClock(assets.layout);
-    const dark = new ChapelVoid(clock);
-    const room = new SeanceRoom(assets, clock);
-    const amber = new GlassTint('amber glass', [0.7, 0.26, 0.025], 0.26, 3);
-    const violet = new GlassTint('violet glass', [0.09, 0.02, 0.2], 0.34, 9);
-    const wall = new ChapelWall(assets, clock);
-    const rose = new RoseWindow(assets, clock);
+    const dark = parts.keep(new ChapelVoid(clock));
+    const room = parts.keep(new SeanceRoom(assets, clock));
+    const amber = parts.keep(new GlassTint('amber glass', [0.7, 0.26, 0.025], 0.26, 3));
+    const violet = parts.keep(new GlassTint('violet glass', [0.09, 0.02, 0.2], 0.34, 9));
+    const wall = parts.keep(new ChapelWall(assets, clock));
+    const rose = parts.keep(new RoseWindow(assets, clock));
 
     // the bottom layer is updated first in every frame, frozen mask or not: the clock moves there, and
     // so do the panes of the rose — the mask scene lives on while its picture is frozen
@@ -67,9 +72,9 @@ import {description, title} from './_stage-masks-frozen.json';
     // through three masks, one per channel of its picture — and drawn once for all three
     const layers = [dark.stage, room.stage, amber.stage, violet.stage, wall.stage];
     director.setStack(layers);
-    const throughGlass = new StageMask(rose.stage, {source: 'alpha'});
-    const amberGlass = new StageMask(rose.stage, {source: 'red'});
-    const violetGlass = new StageMask(rose.stage, {source: 'blue'});
+    const throughGlass = parts.keep(new StageMask(rose.stage, {source: 'alpha'}));
+    const amberGlass = parts.keep(new StageMask(rose.stage, {source: 'red'}));
+    const violetGlass = parts.keep(new StageMask(rose.stage, {source: 'blue'}));
     director.setMask(room.stage, throughGlass);
     director.setMask(amber.stage, amberGlass);
     director.setMask(violet.stage, violetGlass);
@@ -135,9 +140,12 @@ import {description, title} from './_stage-masks-frozen.json';
       } else if (event.code === 'KeyS') scramble();
       else if (event.code === 'KeyM') mend();
     };
-    window.addEventListener('keydown', onKeyDown);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', onKeyDown, {signal: listening.signal});
 
     const gui = new GUI({container: getDemoUi(), title: 'The Moth Chapel'});
+    parts.onDispose(() => gui.destroy());
     gui.add(settings, 'mode', ['freeze', 'run']).name('mask stage (f)').onChange(apply).listen();
     gui.add({scramble}, 'scramble').name('scramble the mask scene (s)');
     gui.add({mend}, 'mend').name('mend the glass (m)');
@@ -159,21 +167,7 @@ import {description, title} from './_stage-masks-frozen.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      window.removeEventListener('keydown', onKeyDown);
-      gui.destroy();
-      throughGlass.dispose();
-      amberGlass.dispose();
-      violetGlass.dispose();
-      rose.dispose();
-      wall.dispose();
-      violet.dispose();
-      amber.dispose();
-      room.dispose();
-      dark.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;
