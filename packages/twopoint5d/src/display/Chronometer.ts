@@ -50,7 +50,7 @@ export class Chronometer {
    * background tabs, long GC pauses or breakpoints. {@link rawDeltaTime}
    * carries the delta before the cut.
    *
-   * Default is `0` (disabled).
+   * Default is `0` (disabled). A value that is not a positive finite number counts as `0`.
    */
   maxDeltaTime: number;
 

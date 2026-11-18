@@ -204,8 +204,10 @@ export class InstancedVOBufferGeometry extends InstancedBufferGeometry {
    *
    * A descriptor or description handed in here becomes a pool with the capacity of the
    * `.instancedPool` — **the reference instance count is derived from it.** An existing pool with
-   * a different capacity can still be attached; matching it to the `.instancedPool` is then the
-   * caller's responsibility.
+   * a different capacity is attached as it is — unlike the constructors, which refuse a pool whose
+   * capacity is not the one they are handed, because a geometry takes its sizes from the pools it
+   * is built on. Here the `.instancedPool` alone sets the instance count; matching the capacity of
+   * an attached pool to it is the caller's responsibility.
    *
    * An attribute slot of this geometry belongs to one route for the whole life of the geometry:
    * a pool whose attributes would take a slot this geometry has already had an attribute in is

@@ -4,6 +4,7 @@ import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
+import {isRecord} from '../utils/isRecord.js';
 import {isAnimationPlayback} from './animationPlayback.js';
 import {type AnimationPlayback, type AnimationTimingOptions, FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
@@ -125,8 +126,7 @@ export const isAsepriteFrameData = (data: unknown): data is AsepriteFrameData =>
     duration > 0 &&
     Number.isInteger(index) &&
     (index as number) >= 0 &&
-    isObject(slices) &&
-    !Array.isArray(slices)
+    isRecord(slices)
   );
 };
 

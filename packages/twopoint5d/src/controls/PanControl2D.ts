@@ -150,7 +150,8 @@ export interface PanControl2DOptions {
    * as well; its `keyup` still lets go of a key held before. When the window loses focus or the
    * page is hidden, the control lets go of every key held down.
    *
-   * The control works on a copy of the array.
+   * The control works on a copy of the array. An array of another length, or one with an element
+   * that is no string, makes the constructor throw a `TypeError` before the control holds anything.
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code
    */
@@ -213,6 +214,8 @@ export class PanControl2D extends InputControlBase {
 
   // Assigned in the constructor through the `cursorPanStyle` setter.
   #cursorPanStyle!: string;
+  // Assigned in the constructor through the `keys` setter.
+  #keys!: [string, string, string, string];
   #cursorPanClass?: string;
   // the rule this control currently holds at Stylesheets, given back when it moves on or is disposed
   #cursorPanRuleName?: string;
@@ -227,11 +230,26 @@ export class PanControl2D extends InputControlBase {
   #mouseButton = 1;
 
   /**
-   * The `KeyboardEvent.code` of the keys for up, down, left and right.
+   * The `KeyboardEvent.code` of the keys for up, down, left and right. The array is held as it is
+   * assigned, so a rebinding in place (`control.keys[0] = 'ArrowUp'`) takes effect. An array of
+   * another length, or one with an element that is no string, throws a `TypeError` and leaves the
+   * keys the control holds.
    *
    * @see {@link PanControl2DOptions.keys}
    */
-  keys: [string, string, string, string];
+  get keys(): [string, string, string, string] {
+    return this.#keys;
+  }
+
+  set keys(value: [string, string, string, string]) {
+    // three keys, or a fifth, would lose a direction without a word
+    if (!Array.isArray(value) || value.length !== 4 || !value.every((key) => typeof key === 'string')) {
+      throw new TypeError(
+        `PanControl2D: keys must be an array of four KeyboardEvent.code strings, for up, down, left and right, got ${describeValue(value)}`,
+      );
+    }
+    this.#keys = value;
+  }
 
   /**
    * The key codes for up, down, left and right.
@@ -341,6 +359,13 @@ export class PanControl2D extends InputControlBase {
     // throws while the control holds nothing yet
     this.mouseButton = readOption(options, 'mouseButton', 1);
 
+    // before the cursorPanStyle below, which retains a rule: keys the setter refuses throw while
+    // the control holds nothing yet. A copy of an array, so that a rebinding in place on this
+    // control reaches neither the options nor another control built from them; anything else goes
+    // to the setter as it is — a spread would make four keys of the string 'KeyW'
+    const keys: unknown = options?.keys ?? DEFAULT_KEYS;
+    this.keys = (Array.isArray(keys) ? [...keys] : keys) as [string, string, string, string];
+
     // before the cursorPanStyle below: the setter retains the rule, and it has to know by
     // then which root the rule belongs in
     this.#styleSheetRoot = readOption(options, 'styleSheetRoot', document.head);
@@ -350,10 +375,8 @@ export class PanControl2D extends InputControlBase {
     if (this.#cursorPanClass == null) this.cursorPanStyle = 'none';
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
 
-    // Copies, because keys and keyCodes are public and writable, and `keyCodes[0] = 38` rebinds in
-    // place: a rebinding on this control changes neither the options nor another control built
-    // from them
-    this.keys = [...(options?.keys ?? DEFAULT_KEYS)] as [string, string, string, string];
+    // A copy, because keyCodes is public and writable, and `keyCodes[0] = 38` rebinds in place: a
+    // rebinding on this control changes neither the options nor another control built from them
     this.keyCodes = [...(options?.keyCodes ?? DEFAULT_KEY_CODES)] as [number, number, number, number];
 
     // before pointerDisabled below: the setter hangs the pointerdown listener on this target

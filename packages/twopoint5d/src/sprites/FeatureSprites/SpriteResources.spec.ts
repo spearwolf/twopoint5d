@@ -56,7 +56,13 @@ describe('SpriteResources', () => {
     expect(resources.uniforms['time']!.value).toBe(1.5);
     expect(resources.uniforms['light']!.value).toEqual(new Vector3(1, 2, 3));
     expect(() => resources.setUniform('light', 1, 2)).toThrow(
-      'SpriteResources: the uniform "light" is a vec3 and takes 3 values',
+      new TypeError('SpriteResources: the uniform "light" is a vec3 and takes 3 values, got [1, 2]'),
+    );
+    expect(() => resources.setUniform('light', 1)).toThrow(
+      new TypeError('SpriteResources: the uniform "light" is a vec3 and takes 3 values, got 1'),
+    );
+    expect(() => resources.setUniform('light', 1, 2, 3, 4)).toThrow(
+      new TypeError('SpriteResources: the uniform "light" is a vec3 and takes 3 values, got [1, 2, 3, 4]'),
     );
     resources.dispose();
   });
@@ -98,7 +104,9 @@ describe('SpriteResources', () => {
   test('refuses more values than a float uniform takes', () => {
     const resources = new SpriteResources([anim]);
 
-    expect(() => resources.setUniform('time', 1, 2)).toThrow('SpriteResources: the uniform "time" is a float and takes 1 value');
+    expect(() => resources.setUniform('time', 1, 2)).toThrow(
+      new TypeError('SpriteResources: the uniform "time" is a float and takes 1 value, got [1, 2]'),
+    );
     expect(() => new SpriteResources([anim], {uniforms: {time: [1, 2]}})).toThrow(
       new TypeError('SpriteResources: the uniform "time" is a float and takes a finite number as its start value, got [1, 2]'),
     );

@@ -1,5 +1,5 @@
 import type {WebGPURenderer} from 'three/webgpu';
-import {describe, expect, test} from 'vitest';
+import {describe, expect, test, vi} from 'vitest';
 import {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
@@ -1137,6 +1137,43 @@ describe('FrameBasedAnimations', () => {
 
       expect(() => animations.add('walk', 1, makeTileSet(), firstTileId, 2)).toThrow(
         `FrameBasedAnimations: add() got a firstTileId of ${described} for the animation "walk" — a firstTileId is a whole number`,
+      );
+    });
+
+    test.each([
+      [2 ** 53 - 1, 3, '3 tiles from 9007199254740991'],
+      // the last id, 2 ** 53, is the first one beyond: firstTileId + tileCount alone rounds to a safe one
+      [2 ** 53 - 2, 3, '3 tiles from 9007199254740990'],
+      [2 ** 53, 2, '2 tiles from 9007199254740992'],
+      [-(2 ** 53), 2, '2 tiles from -9007199254740992'],
+    ])(
+      'refuses a tile range whose ids reach beyond ±Number.MAX_SAFE_INTEGER, and lays no frame of it: %#',
+      (firstTileId, tileCount, described) => {
+        const animations = new FrameBasedAnimations();
+        const tileSet = makeTileSet();
+        const original = tileSet.frame.bind(tileSet);
+        let calls = 0;
+        // the guard keeps a loop that does not end from filling the memory
+        const frame = vi.spyOn(tileSet, 'frame').mockImplementation((tileId: number) => {
+          calls++;
+          if (calls > tileCount) {
+            throw new Error('frame() was called more often than the range has tiles');
+          }
+          return original(tileId);
+        });
+
+        expect(() => animations.add('walk', 1, tileSet, firstTileId, tileCount)).toThrow(
+          `FrameBasedAnimations: add() got a tile range of ${described} for the animation "walk" — the ids of a tile range lie within ±Number.MAX_SAFE_INTEGER`,
+        );
+        expect(frame).not.toHaveBeenCalled();
+      },
+    );
+
+    test('refuses a tileId beyond ±Number.MAX_SAFE_INTEGER, naming its index', () => {
+      const animations = new FrameBasedAnimations();
+
+      expect(() => animations.add('walk', 1, makeTileSet(), [1, 2 ** 53])).toThrow(
+        'FrameBasedAnimations: add() got a tileId of 9007199254740992 at index 1 for the animation "walk" — a tileId lies within ±Number.MAX_SAFE_INTEGER',
       );
     });
 

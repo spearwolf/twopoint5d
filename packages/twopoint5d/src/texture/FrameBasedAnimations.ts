@@ -468,6 +468,11 @@ const framesOfTileIds = (tileSet: TileSet<unknown>, tileIds: readonly unknown[],
         `FrameBasedAnimations: add() got a tileId of ${describeValue(tileId)} at index ${index} for the animation ${animNameInError(name)} — a tileId is a whole number`,
       );
     }
+    if (!Number.isSafeInteger(tileId)) {
+      throw new Error(
+        `FrameBasedAnimations: add() got a tileId of ${describeValue(tileId)} at index ${index} for the animation ${animNameInError(name)} — a tileId lies within ±Number.MAX_SAFE_INTEGER`,
+      );
+    }
   });
   const atlasFrames = tileIds.map((tileId) => tileSet.frame(tileId as number));
   const frames = atlasFrames.map(({coords}) => coords);
@@ -499,9 +504,17 @@ const framesOfTileRange = (
   }
   const first = firstTileId ?? tileSet.firstId;
   const count: number = tileCount ?? tileSet.tileCount;
+  // beyond ±Number.MAX_SAFE_INTEGER a double stands for more than one integer: the ids of the
+  // range would repeat. The range is checked whatever it comes from — a firstTileId passed, or
+  // the first id of the tile set with a tileCount passed
+  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(first + (count - 1))) {
+    throw new Error(
+      `FrameBasedAnimations: add() got a tile range of ${describeValue(count)} tiles from ${describeValue(first)} for the animation ${animNameInError(name)} — the ids of a tile range lie within ±Number.MAX_SAFE_INTEGER`,
+    );
+  }
   const atlasFrames: TextureAtlasFrame<unknown>[] = [];
-  for (let tileId = first; tileId < first + count; tileId++) {
-    atlasFrames.push(tileSet.frame(tileId));
+  for (let i = 0; i < count; i++) {
+    atlasFrames.push(tileSet.frame(first + i));
   }
   const frames = atlasFrames.map(({coords}) => coords);
   return {frames, trims: untrimmed(frames), atlasFrames};
@@ -583,9 +596,12 @@ export class FrameBasedAnimations {
    * `frameRate`, and timing that gives more than one of `duration`, `frameRate` and `durations`.
    *
    * What picks the frames is refused as well when it cannot pick any: a tile id that is no whole
-   * number, naming its index; a frame of a list that is no `TextureCoords`, naming its index; a
-   * `firstTileId` that is no whole number; a `tileCount` that is no whole number from 1 to
-   * {@link FrameBasedAnimations.MaxTextureSize} — more frames fit into no data texture; and a
+   * number, naming its index; a tile id beyond ±`Number.MAX_SAFE_INTEGER`, naming its index; a
+   * frame of a list that is no `TextureCoords`, naming its index; a `firstTileId` that is no whole
+   * number; a `tileCount` that is no whole number from 1 to
+   * {@link FrameBasedAnimations.MaxTextureSize} — more frames fit into no data texture; a range of
+   * tiles — from `firstTileId`, or the first id of the tile set, `tileCount` of them — whose ids
+   * reach beyond ±`Number.MAX_SAFE_INTEGER`; and a
    * `frameNameQuery` that is neither a string nor a `RegExp`, or a string that is no valid regular
    * expression — a `SyntaxError` with the error of the `RegExp` as its `cause`. Tile ids and a
    * `firstTileId` may be negative, the tile set wraps them. `firstTileId` and `tileCount` are

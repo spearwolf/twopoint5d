@@ -83,6 +83,32 @@ describe('RepeatingTilesProvider', () => {
       ]);
     });
   });
+  describe('a pattern of another kind', () => {
+    test.each([
+      ['[1, 2]', [1, 2], 0, '1'],
+      ['[[1, 2], 3]', [[1, 2], 3], 1, '3'],
+    ])('refuses %s for a row that is no array, naming the row, and keeps its pattern', (_name, pattern, row, shown) => {
+      const tiles = new RepeatingTilesProvider([[1, 2]]);
+
+      expect(() => {
+        tiles.tileIds = pattern as never;
+      }).toThrow(
+        new TypeError(
+          `RepeatingTilesProvider: every row of a tile id pattern is an array of tile ids, but row ${row} is ${shown}`,
+        ),
+      );
+      expect(tiles.tileIds).toEqual([[1, 2]]);
+    });
+
+    test('refuses null for a pattern that is no array, and keeps its pattern', () => {
+      const tiles = new RepeatingTilesProvider([[1, 2]]);
+
+      expect(() => {
+        tiles.tileIds = null as never;
+      }).toThrow(new TypeError('RepeatingTilesProvider: a tile id pattern is an array of rows of tile ids, got null'));
+      expect(tiles.tileIds).toEqual([[1, 2]]);
+    });
+  });
   describe('tile ids', () => {
     test.each([
       ['1.5', [[1.5, NaN, -1]], 0, 0],

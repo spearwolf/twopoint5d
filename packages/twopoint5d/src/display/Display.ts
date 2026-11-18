@@ -1037,6 +1037,7 @@ export class Display {
    * it and follows the wall clock within its own `maxStepsPerFrame`.
    *
    * Defaults to `1 / 30` (~33ms). Set to `0` to disable the cap entirely.
+   * A value that is not a positive finite number counts as `0`.
    */
   get maxDeltaTime(): number {
     return this.#chronometer.maxDeltaTime;

@@ -135,8 +135,9 @@ export class TileSet<D = TextureAtlasFrameData> {
   /**
    * @throws {RangeError} if `tileWidth` or `tileHeight` is not a finite number above 0, if
    * `margin`, `padding` or `spacing` is not a finite number of 0 or more, if `tileCount` is not a
-   * whole number of 1 or more, if `firstId` is not a whole number, if the width or height of the
-   * `baseCoords` is not finite, if the first tile does not fit into the `baseCoords` with its
+   * whole number of 1 or more, if `firstId` is not a whole number, if `firstId` or the id of the last
+   * tile, `firstId + tileCount - 1`, lies beyond ±`Number.MAX_SAFE_INTEGER`, if the width or height of
+   * the `baseCoords` is not finite, if the first tile does not fit into the `baseCoords` with its
    * `margin` and `padding`, if the tiles of a `tileCount` do not all fit into the `baseCoords`, if
    * a `tileCount` lies above {@link TileSet.MaxTiles}, or if more than `MaxTiles` tiles fit without
    * a `tileCount`; the atlas handed in is then left as it was.
@@ -226,11 +227,22 @@ export class TileSet<D = TextureAtlasFrameData> {
   }
 
   /**
-   * @throws {RangeError} if `tileId` is not a whole number; a negative whole number is fine, the arithmetic wraps it around.
+   * @throws {RangeError} if `tileId` is not a whole number, or lies beyond ±`Number.MAX_SAFE_INTEGER`; a negative whole
+   * number is fine, the arithmetic wraps it around.
    */
   frameId(tileId: number): number {
-    assertWholeNumber(tileId, 'TileSet', 'tileId');
-    return ((((tileId - this.firstId) % this.tileCount) + this.tileCount) % this.tileCount) + this.firstFrameId;
+    // a tile id beyond ±Number.MAX_SAFE_INTEGER stands for more than one integer; the check of
+    // a whole number runs inside the failure branch alone and keeps its message
+    if (!Number.isSafeInteger(tileId)) {
+      assertWholeNumber(tileId, 'TileSet', 'tileId');
+      throw new RangeError(
+        `TileSet: tileId must be a whole number within ±Number.MAX_SAFE_INTEGER, got ${describeValue(tileId)}`,
+      );
+    }
+    const n = this.tileCount;
+    // each id is taken modulo n before the difference: tileId - firstId may reach twice
+    // Number.MAX_SAFE_INTEGER, where a double has no odd numbers left
+    return (((((tileId % n) - (this.firstId % n)) % n) + n) % n) + this.firstFrameId;
   }
 
   /** A `tileId` drawn at random from `firstId` to `lastId`, each as likely as any other. */
@@ -247,7 +259,8 @@ export class TileSet<D = TextureAtlasFrameData> {
   }
 
   /**
-   * @throws {RangeError} if `tileId` is not a whole number; a negative whole number is fine, the arithmetic wraps it around.
+   * @throws {RangeError} if `tileId` is not a whole number, or lies beyond ±`Number.MAX_SAFE_INTEGER`; a negative whole
+   * number is fine, the arithmetic wraps it around.
    */
   frame(tileId: number): TextureAtlasFrame<D> {
     // frameId() answers a whole number inside the range of the tiles, and the atlas holds a frame for each of them
@@ -336,6 +349,16 @@ export class TileSet<D = TextureAtlasFrameData> {
     );
 
     const tileCount = this.options.tileCount ?? fitting;
+
+    // the ids of the tiles are counted from firstId on and wrapped by frameId(): beyond
+    // ±Number.MAX_SAFE_INTEGER they would stand for more than one tile. The count is taken off
+    // before it is added: firstId + tileCount alone may round to a safe id on the way
+    assertOption(
+      Number.isSafeInteger(this.firstId) && Number.isSafeInteger(this.firstId + (tileCount - 1)),
+      'firstId',
+      'a whole number that keeps the ids of all tiles, up to firstId + tileCount - 1, within ±Number.MAX_SAFE_INTEGER',
+      this.firstId,
+    );
 
     // the tiles go into the atlas only once their number is checked, so a refused set leaves the
     // atlas handed in as it was; they fill the rows from the top left

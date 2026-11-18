@@ -52,16 +52,29 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
    * Takes a copy of every row of the pattern, so that what the caller changes on its arrays
    * afterwards does not reach the provider. Every row has the length of the first one, and there
    * is at least one; a pattern that breaks either rule throws an `Error` and leaves the pattern
-   * the provider had. Every tile id is a whole number from 0 to 4294967295, the range of a cell
+   * the provider had. A pattern that is no array, or that holds a row that is none, throws a
+   * `TypeError` naming the row, and leaves the pattern the provider had as well. Every tile id is a whole number from 0 to 4294967295, the range of a cell
    * of the `Uint32Array` {@link getTileIdsWithin} writes; a pattern with any other value throws a
    * `RangeError`, naming row, column and value, and leaves the pattern the provider had as well.
    */
   set tileIds(tileIds: readonly (readonly number[])[]) {
     // the whole pattern is checked before the first field is written: a refused pattern leaves
     // the provider with the one it had rather than half of a new one
+    if (!Array.isArray(tileIds)) {
+      throw new TypeError(
+        `RepeatingTilesProvider: a tile id pattern is an array of rows of tile ids, got ${describeValue(tileIds)}`,
+      );
+    }
     const rows = tileIds.length;
     if (rows === 0) {
       throw new Error('RepeatingTilesProvider: a tile id pattern needs at least one row');
+    }
+    for (let row = 0; row < rows; row++) {
+      if (!Array.isArray(tileIds[row])) {
+        throw new TypeError(
+          `RepeatingTilesProvider: every row of a tile id pattern is an array of tile ids, but row ${row} is ${describeValue(tileIds[row])}`,
+        );
+      }
     }
     const cols = tileIds[0]!.length;
     for (let row = 1; row < rows; row++) {

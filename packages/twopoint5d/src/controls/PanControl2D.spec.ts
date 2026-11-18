@@ -610,6 +610,37 @@ describe('PanControl2D', () => {
     });
   });
 
+  describe('keys that are not four strings', () => {
+    const wrongKeys: [string, unknown][] = [
+      ['["KeyW"]', ['KeyW']],
+      ['["KeyW", "KeyS", "KeyA", "KeyD", "KeyQ"]', ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyQ']],
+      ['["KeyW", "KeyS", "KeyA", 68]', ['KeyW', 'KeyS', 'KeyA', 68]],
+      ['"KeyW"', 'KeyW'],
+      ['{}', {}],
+    ];
+    const message = (written: string) =>
+      new TypeError(
+        `PanControl2D: keys must be an array of four KeyboardEvent.code strings, for up, down, left and right, got ${written}`,
+      );
+
+    it.each(wrongKeys)('refuses a keys option of %s before the control holds a cursor rule', (written, keys) => {
+      vi.mocked(Stylesheets.retainRule).mockClear();
+
+      expect(() => makeControl({keys: keys as never})).toThrow(message(written));
+      expect(Stylesheets.retainRule).not.toHaveBeenCalled();
+    });
+
+    it.each(wrongKeys)('refuses keys set to %s and keeps the array it holds', (written, keys) => {
+      const control = makeControl();
+      const held = control.keys;
+
+      expect(() => {
+        control.keys = keys as never;
+      }).toThrow(message(written));
+      expect(control.keys).toBe(held);
+    });
+  });
+
   describe('on…() shorthands', () => {
     it('onUpdate() hears where update() moved the view, until the function it returns takes it off', () => {
       const control = makeControl();

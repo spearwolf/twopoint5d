@@ -289,6 +289,25 @@ describe('TileSet', () => {
       expect(() => tiles.frame(tileId)).toThrow(message);
     });
 
+    test.each([
+      [2 ** 53, '9007199254740992'],
+      [-(2 ** 53), '-9007199254740992'],
+    ])('a tile id of %s beyond ±Number.MAX_SAFE_INTEGER is refused', (tileId, shown) => {
+      const error = new RangeError(`TileSet: tileId must be a whole number within ±Number.MAX_SAFE_INTEGER, got ${shown}`);
+
+      expect(() => tiles.frameId(tileId)).toThrow(error);
+      expect(() => tiles.frame(tileId)).toThrow(error);
+    });
+
+    test('answers the frame of a tile far from firstId exactly', () => {
+      const far = new TileSet(new TextureCoords(0, 0, 48, 16), {tileWidth: 16, tileHeight: 16, firstId: -(2 ** 53 - 1)});
+
+      expect(far.tileCount).toBe(3);
+      expect(far.frameId(2)).toBe(far.firstFrameId);
+      expect(far.frameId(-(2 ** 53 - 1))).toBe(far.firstFrameId);
+      expect(far.frameId(-(2 ** 53 - 1) + 1)).toBe(far.firstFrameId + 1);
+    });
+
     test('a negative whole tileId does not throw', () => {
       expect(() => tiles.frameId(-3)).not.toThrow();
       expect(() => tiles.frame(-3)).not.toThrow();
@@ -345,6 +364,20 @@ describe('TileSet', () => {
     ])('%s is refused', (_name, firstId, message) => {
       expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 16, firstId})).toThrow(RangeError);
       expect(() => new TileSet(base, {tileWidth: 16, tileHeight: 16, firstId})).toThrow(message);
+    });
+
+    test.each([
+      ['2 ** 53 - 2 with three tiles', 2 ** 53 - 2, '9007199254740990'],
+      ['2 ** 53', 2 ** 53, '9007199254740992'],
+    ])('a firstId of %s, whose tiles reach beyond ±Number.MAX_SAFE_INTEGER, is refused', (_name, firstId, shown) => {
+      const atlas = new TextureAtlas();
+
+      expect(() => new TileSet(atlas, base, {tileWidth: 16, tileHeight: 16, tileCount: 3, firstId})).toThrow(
+        new RangeError(
+          `TileSet: firstId must be a whole number that keeps the ids of all tiles, up to firstId + tileCount - 1, within ±Number.MAX_SAFE_INTEGER, got ${shown}`,
+        ),
+      );
+      expect(atlas.size).toBe(0);
     });
 
     test('a negative firstId is accepted', () => {

@@ -260,9 +260,10 @@ export class SpriteResources {
     }
   }
 
-  #shapeError(name: string, size: number): TypeError {
+  #shapeError(name: string, size: number, given: number, x: unknown, y: unknown, z: unknown, w: unknown): TypeError {
+    const got = given === 1 ? describeValue(x) : describeValue([x, y, z, w].slice(0, given));
     return new TypeError(
-      `${this.#where}: the uniform ${describeValue(name)} is a ${VECTOR_TYPES[size - 1]} and takes ${size} value${size === 1 ? '' : 's'}`,
+      `${this.#where}: the uniform ${describeValue(name)} is a ${VECTOR_TYPES[size - 1]} and takes ${size} value${size === 1 ? '' : 's'}, got ${got}`,
     );
   }
 
@@ -306,7 +307,7 @@ export class SpriteResources {
   setUniform(name: string, x: number, y?: number, z?: number, w?: number): void {
     const size = this.#assertUniform(name);
     const given = w !== undefined ? 4 : z !== undefined ? 3 : y !== undefined ? 2 : 1;
-    if (given !== size) throw this.#shapeError(name, size);
+    if (given !== size) throw this.#shapeError(name, size, given, x, y, z, w);
     // inline and without a helper: this runs every frame and allocates nothing — the list of the
     // components for the message is built in the error case alone
     if (

@@ -149,6 +149,18 @@ explicit instruction.
   through `describeThreeValue()` in `src/utils/`. A failure of `expectDefined()` reports a
   broken invariant of the library, not a refusal, and names no subject; the refusals a
   feature's `checkKind` throws get theirs from `defineSprite()`.
+- **Invalid input is refused.** A value a public call or setter cannot use throws, in the
+  words of the rule above, and the object keeps what it held; nothing is passed over or
+  replaced without a word. The one exception are the measures a layout may hand in anew with
+  every frame: `Display#pixelZoom`, `#maxPixelRatio`, `#maxPixels`, `#resolutionScale` and
+  `#maxDeltaTime`, `Chronometer#maxDeltaTime`, the options `maxPixelRatio` and `maxPixels` of
+  `new Display()`, and `pixelZoom`, `minPixelZoom` and `maxPixelZoom` of `fitIntoRectangle()`.
+  They count an invalid value — the `NaN` of a container 0 pixels wide while the page lays it
+  out, a negative one — as the value that leaves them without effect (`0`; `1` for
+  `resolutionScale` and the `pixelZoom` of `fitIntoRectangle()`; `minPixelZoom` and
+  `maxPixelZoom` do not apply), and their TSDoc says so: the frame is drawn with the fallback
+  instead of throwing in it. A new measure of that kind joins this list; every other input
+  throws.
 - **Shared dependency versions.** `three`, `@types/three`, `@spearwolf/eventize`,
   `@spearwolf/signalize` are pinned in the `catalog:` block of `pnpm-workspace.yaml`.
   Bump them there, never in an individual `package.json`. The catalog also holds every

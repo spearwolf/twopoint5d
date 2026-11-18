@@ -19,6 +19,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
+import {isRecord} from '../utils/isRecord.js';
 import {type OrderRef, NO_MASKS, masksOf, type Slot} from './directorSlots.js';
 import type {IStage} from './IStage.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
@@ -176,8 +177,8 @@ export function parseShapes(subject: string, shapes: unknown): ShapeKind[][] {
     return shape.map((slot: unknown, j): ShapeKind => {
       if (slot === 'layer') return LAYER_KIND;
       if (isEffect(slot)) return {effect: slot, mask: undefined, effectMasks: masksOf(subject, slot)};
-      if (slot !== null && typeof slot === 'object' && !Array.isArray(slot) && 'mask' in slot) {
-        const {effect, mask} = slot as {effect?: unknown; mask?: unknown};
+      if (isRecord(slot) && 'mask' in slot) {
+        const {effect, mask} = slot;
         if (!(mask instanceof StageMask)) {
           throw new TypeError(`${subject}: shapes[${i}][${j}].mask must be a StageMask, got ${describeValue(mask)}`);
         }

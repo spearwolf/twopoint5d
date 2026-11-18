@@ -48,10 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `new AdaptiveResolution()`, and the `adaptiveResolution` option of `Display`, throw a `RangeError` for a `targetFps`, `minScale` or `maxScale` that is given and no finite number above 0, before the controller takes the display over; `undefined` and `null` are the defaults, `60`, `0.5` and `1` (**BREAKING**). See the Migration Guide
 - `FixedFrameLoop#fps` and `FixedFrameLoop#maxStepsPerFrame` throw a `RangeError` for a value they cannot run with — a rate that is no finite number above 0, a bound that is no whole number of 1 or more — and the loop keeps what it has; `new FixedFrameLoop()` throws for such an option, and for such a `FixedFrameLoop.DefaultFps` or `FixedFrameLoop.DefaultMaxStepsPerFrame` where no option stands in for it, and builds no loop (**BREAKING**). See the Migration Guide
 - `PanControl2D#mouseButton` is an accessor and, like the option `mouseButton`, takes a whole number from 1 to 31, the bits of `MouseEvent.buttons` — several bits pan with each of their buttons; anything else throws a `RangeError` and the control keeps the value it holds (**BREAKING**). See the Migration Guide
+- `PanControl2D#keys` is an accessor and, like the option `keys`, takes an array of four strings, the `KeyboardEvent.code` of the keys for up, down, left and right; anything else throws a `TypeError` and the control keeps the keys it holds. The array is held as it is assigned, so a rebinding in place (`control.keys[0] = 'ArrowUp'`) takes effect (**BREAKING**). See the Migration Guide
 - `Map2DSpatialHashGrid#getTiles()` throws a `RangeError` for a `tileX` or `tileY` that is no finite number and for a query whose cells reach beyond ±`Number.MAX_SAFE_INTEGER`; `add()` and `findWithin()` throw one for an `aabb` whose cells lie beyond that range, `add()` before the first renderable moves (**BREAKING**). See the Migration Guide
 - `new RepeatingTilesProvider()` takes a tile id, a row of tile ids or an array of rows and passes each through the checks of the `tileIds` setter: a pattern such as `[[], [1, 2]]` throws the row-length `Error`, a row with a value that is no tile id a `RangeError`, and a value of any other kind a `TypeError`; no pattern, `null` and `[]` give a pattern without cells (**BREAKING**). See the Migration Guide
+- the `tileIds` setter of `RepeatingTilesProvider` throws a `TypeError` naming the row for a pattern with a row that is no array — `[1, 2]` —, and one for a pattern that is no array, and keeps the pattern it had
 - `parseAnchorPosition()` and `calculateAnchorOffset()` throw a `TypeError` for an `anchorPosition` that is none of the ten values of `AnchorPosition`, `''` included; `undefined` means `'center'` (**BREAKING**). See the Migration Guide
 - `SpriteResources#setUniform()` — and with it `setUniform()` of `FeatureSpritesMaterial` and `FeatureSprites` — throws a `TypeError` for a component that is no finite number, and the uniform keeps the value it holds (**BREAKING**). See the Migration Guide
+- the `TypeError` of `SpriteResources#setUniform()` — and of `setUniform()` of `FeatureSpritesMaterial` and `FeatureSprites` — for another count of values than the uniform takes names the values it got: `SpriteResources: the uniform "light" is a vec3 and takes 3 values, got [1, 2]`
 - `TextureAtlas#frameNames()` throws a `SyntaxError` that names the pattern for a string that is no valid regular expression, and `FrameBasedAnimations#add()` one that names the animation for such a `frameNameQuery`, both with the error of the `RegExp` as `cause`; a texture resource skips that entry of its catalog and reports it as an `error` event with `source: 'frameBasedAnimations'` (**BREAKING**). See the Migration Guide
 - `StageRenderer#width`, `#height` and `#pixelRatio` are read-only: `resize()` sets them, and a write throws a `TypeError` (**BREAKING**). See the Migration Guide
 - `StageRenderer#outputRenderTarget` is a get/set accessor pair: a subclass overrides it as an accessor, not as a field
@@ -85,6 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `defineSprite()` takes usage words, attributes and methods named like a member of `Object.prototype` — `constructor`, `toString`, `__proto__` — as words, attributes and methods of their own, a method `__proto__` on the sprite handle included, and refuses an alias to such a name that the feature declares no attribute for with `defineSprite: feature "…" aliases "…" to "toString", which it does not declare`
 - the frame context of a feature refuses a read of a texture named like a member of `Object.prototype`, such as `toString`, that the feature does not declare: `FeatureSpritesMaterial: feature "…" reads the texture "toString", which it does not declare`
 - `SpriteResources` holds a uniform named `__proto__` as a uniform of its own, and `uniforms` keeps `Object.prototype` as its prototype
+- `FrameBasedAnimations#add()` over a range of a `TileSet` ends for every `firstTileId`: a range whose ids reach beyond ±`Number.MAX_SAFE_INTEGER` is refused with an `Error` naming the animation, and so is a tile id of a list beyond it, naming its index
+- `TileSet#frameId()` and `TileSet#frame()` answer the frame of every tile id within ±`Number.MAX_SAFE_INTEGER` exactly, also far from `firstId`, and throw a `RangeError` for a tile id beyond it; `new TileSet()` throws one for a `firstId` whose tiles reach beyond it
 
 ### Migration Guide
 
@@ -120,6 +125,22 @@ new PanControl2D({mouseButton: '1' as unknown as number}); // panned with no but
 
 ```ts
 new PanControl2D({mouseButton: Number('1')});
+```
+
+#### `PanControl2D#keys` takes four strings
+
+A list of another length, which lost a direction without a word, and a string throw now.
+
+**Before**
+
+```ts
+new PanControl2D({keys: ['ArrowUp'] as unknown as [string, string, string, string]}); // panned up only
+```
+
+**After**
+
+```ts
+new PanControl2D({keys: ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']});
 ```
 
 #### Map queries and tile patterns refuse what they dropped
