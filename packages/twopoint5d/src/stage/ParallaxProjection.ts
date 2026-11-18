@@ -1,18 +1,14 @@
 import type {Box3, Camera} from 'three/webgpu';
-import {PerspectiveCamera, Vector2} from 'three/webgpu';
+import {PerspectiveCamera} from 'three/webgpu';
 
-import {describeThreeValue} from '../utils/describeThreeValue.js';
-import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IProjection, ProjectionViewRect} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
-import {fitIntoRectangle, type ProjectionFitSpecs} from './fitIntoRectangle.js';
+import type {ProjectionFitSpecs} from './fitIntoRectangle.js';
 import {type FramingOptions, framingSetup} from './framing.js';
-import {wholeUnitOffset} from './wholeUnitOffset.js';
+import {DEFAULT_NEAR, PlaneProjectionView, assertCameraKind, requireProjectionPlane} from './planeProjection.js';
 
-// the camera values for specs that leave one out or give one no camera can be built from
-const DEFAULT_NEAR = 0.1;
-const DEFAULT_FAR = 100000;
+// the distance of the camera for specs that leave it out or give one no camera can be placed at
 const DEFAULT_DISTANCE_TO_PROJECTION_PLANE = 300;
 
 /**
@@ -71,10 +67,7 @@ export class ParallaxProjection implements IProjection {
    */
   projectionPlane: ProjectionPlane | undefined;
 
-  #viewRect = new Vector2();
-  #pixelRatio = new Vector2();
-  #offset = new Vector2();
-  #pixelSnap = false;
+  readonly #view = new PlaneProjectionView();
 
   // the cameras this projection gave a view offset: without pixelSnap it clears theirs and leaves
   // the offset a caller set on a camera of their own alone
@@ -83,9 +76,6 @@ export class ParallaxProjection implements IProjection {
   // The fields below are assigned by the first `updateViewRect()` that gives a view with an area;
   // a camera built before that carries `NaN`.
   #halfHeight!: number;
-
-  #near!: number;
-  #far!: number;
 
   #distanceToProjectionPlane!: number;
 
@@ -136,59 +126,27 @@ export class ParallaxProjection implements IProjection {
    * `pixelSnap` alone; `1` where it is left out.
    */
   updateViewRect(width: number, height: number, pixelRatio = 1): void {
-    // a container without area has no aspect ratio to fit a view into, and a view without area
-    // none to build a camera from: the projection keeps the view, the pixel ratio and the camera
-    // values it has, the same rule Stage2D follows for its container
-    if (!isPositiveFinite(width) || !isPositiveFinite(height)) return;
+    if (!this.#view.fit(width, height, pixelRatio, this.viewSpecs)) return;
 
-    // specs that match no shape leave the target as it is, so it starts out as the current view
-    const viewRect = fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect.clone(), pixelRatio);
-    if (!isPositiveFinite(viewRect.width) || !isPositiveFinite(viewRect.height)) return;
-
-    this.#viewRect.copy(viewRect);
-
-    // under pixelSnap the window of the camera moves the left and the bottom edge of the view onto
-    // a whole unit of the projection plane; otherwise the view stands in the middle
-    this.#pixelSnap = 'pixelSnap' in this.viewSpecs && this.viewSpecs.pixelSnap === true;
-    if (this.#pixelSnap) {
-      this.#offset.set(wholeUnitOffset(this.#viewRect.width), wholeUnitOffset(this.#viewRect.height));
-    } else {
-      this.#offset.set(0, 0);
-    }
-
-    this.#halfHeight = this.#viewRect.height / 2;
-
-    this.#pixelRatio.set(width, height).divide(this.#viewRect);
+    this.#halfHeight = this.#view.height / 2;
 
     // a perspective camera divides by its near, by the depth from near to far and, for the field of
     // view below, by the distance: each needs a finite number above 0
     const {near, far, distanceToProjectionPlane} = this.viewSpecs;
 
-    this.#near = isPositiveFinite(near) ? near : DEFAULT_NEAR;
-    this.#far = isFiniteNumber(far) ? far : DEFAULT_FAR;
-    if (this.#far <= this.#near) {
-      this.#near = DEFAULT_NEAR;
-      this.#far = DEFAULT_FAR;
-    }
+    this.#view.takeNearAndFar(isPositiveFinite(near) ? near : DEFAULT_NEAR, far);
 
     this.#distanceToProjectionPlane = isPositiveFinite(distanceToProjectionPlane)
       ? distanceToProjectionPlane
       : DEFAULT_DISTANCE_TO_PROJECTION_PLANE;
 
-    this.#aspect = this.#viewRect.width / this.#viewRect.height;
+    this.#aspect = this.#view.width / this.#view.height;
 
     this.#fovy = (2 * Math.atan(this.#halfHeight / this.#distanceToProjectionPlane) * 180) / Math.PI;
   }
 
   getViewRect(): ProjectionViewRect {
-    return {
-      width: this.#viewRect.width,
-      height: this.#viewRect.height,
-      pixelRatioX: this.#pixelRatio.x,
-      pixelRatioY: this.#pixelRatio.y,
-      offsetX: this.#offset.x,
-      offsetY: this.#offset.y,
-    };
+    return this.#view.getViewRect();
   }
 
   /**
@@ -198,7 +156,7 @@ export class ParallaxProjection implements IProjection {
    * @throws {Error} if the projection has no {@link projectionPlane}.
    */
   createCamera(): PerspectiveCamera {
-    const projectionPlane = this.#requireProjectionPlane('createCamera()');
+    const projectionPlane = requireProjectionPlane('ParallaxProjection', 'createCamera()', this.projectionPlane);
     const camera = new PerspectiveCamera();
     this.#applyToCamera(camera, projectionPlane);
     return camera;
@@ -215,30 +173,16 @@ export class ParallaxProjection implements IProjection {
    * @throws {Error} if the projection has no {@link projectionPlane}.
    */
   updateCamera(camera: Camera): void {
-    if ((camera as PerspectiveCamera)?.isPerspectiveCamera !== true) {
-      throw new TypeError(
-        `ParallaxProjection: updateCamera() needs a PerspectiveCamera, got ${describeThreeValue(camera, 'isObject3D')}`,
-      );
-    }
-    const projectionPlane = this.#requireProjectionPlane('updateCamera()');
-    this.#applyToCamera(camera as PerspectiveCamera, projectionPlane);
-  }
-
-  #requireProjectionPlane(method: 'createCamera()' | 'updateCamera()'): ProjectionPlane {
-    if (this.projectionPlane == null) {
-      throw new Error(
-        `ParallaxProjection#${method} has no projectionPlane to aim the camera at: ` +
-          'set ParallaxProjection#projectionPlane or hand one to the constructor',
-      );
-    }
-    return this.projectionPlane;
+    assertCameraKind('ParallaxProjection', camera, 'isPerspectiveCamera');
+    const projectionPlane = requireProjectionPlane('ParallaxProjection', 'updateCamera()', this.projectionPlane);
+    this.#applyToCamera(camera, projectionPlane);
   }
 
   #applyToCamera(camera: PerspectiveCamera, projectionPlane: ProjectionPlane): void {
     camera.fov = this.#fovy;
     camera.aspect = this.#aspect;
-    camera.near = this.#near;
-    camera.far = this.#far;
+    camera.near = this.#view.near;
+    camera.far = this.#view.far;
 
     // applyRotation() multiplies onto the orientation the camera already carries: without this
     // reset a camera updated a second time would turn a second time
@@ -247,11 +191,11 @@ export class ParallaxProjection implements IProjection {
 
     camera.position.copy(projectionPlane.getPointByDistance(this.#distanceToProjectionPlane));
 
-    if (this.#pixelSnap) {
+    if (this.#view.pixelSnap) {
       // a full size of the view in units of the projection plane makes the offset count those
       // units as well: the window moves right by offsetX and up by offsetY on the plane
-      const {width, height} = this.#viewRect;
-      camera.setViewOffset(width, height, this.#offset.x, -this.#offset.y, width, height);
+      const {width, height, offsetX, offsetY} = this.#view;
+      camera.setViewOffset(width, height, offsetX, -offsetY, width, height);
       this.#offsetCameras.add(camera);
     } else if (this.#offsetCameras.delete(camera)) {
       camera.clearViewOffset();

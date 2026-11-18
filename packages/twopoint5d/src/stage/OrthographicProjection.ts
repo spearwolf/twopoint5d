@@ -1,18 +1,14 @@
 import type {Box3, Camera} from 'three/webgpu';
-import {OrthographicCamera, Vector2} from 'three/webgpu';
+import {OrthographicCamera} from 'three/webgpu';
 
-import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
-import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {IProjection, ProjectionViewRect} from './IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from './ProjectionPlane.js';
-import {fitIntoRectangle, type ProjectionFitSpecs} from './fitIntoRectangle.js';
+import type {ProjectionFitSpecs} from './fitIntoRectangle.js';
 import {type FramingOptions, framingSetup} from './framing.js';
-import {wholeUnitOffset} from './wholeUnitOffset.js';
+import {DEFAULT_NEAR, PlaneProjectionView, assertCameraKind, requireProjectionPlane} from './planeProjection.js';
 
-// the camera values for specs that leave one out or give one no camera can be built from
-const DEFAULT_NEAR = 0.1;
-const DEFAULT_FAR = 100000;
+// the distance of the camera for specs that leave it out or give one no camera can be placed at
 const DEFAULT_DISTANCE_TO_PROJECTION_PLANE = 100;
 
 /**
@@ -68,9 +64,7 @@ export class OrthographicProjection implements IProjection {
    */
   projectionPlane: ProjectionPlane | undefined;
 
-  #viewRect = new Vector2();
-  #pixelRatio = new Vector2();
-  #offset = new Vector2();
+  readonly #view = new PlaneProjectionView();
 
   // The fields below are assigned by the first `updateViewRect()` that gives a view with an area;
   // a camera built before that carries `NaN`.
@@ -78,9 +72,6 @@ export class OrthographicProjection implements IProjection {
   #right!: number;
   #top!: number;
   #bottom!: number;
-
-  #near!: number;
-  #far!: number;
 
   #distanceToProjectionPlane!: number;
 
@@ -128,44 +119,26 @@ export class OrthographicProjection implements IProjection {
    * `pixelSnap` alone; `1` where it is left out.
    */
   updateViewRect(width: number, height: number, pixelRatio = 1): void {
-    // a container without area has no aspect ratio to fit a view into, and a view without area
-    // none to build a camera from: the projection keeps the view, the pixel ratio and the camera
-    // values it has, the same rule Stage2D follows for its container
-    if (!isPositiveFinite(width) || !isPositiveFinite(height)) return;
-
-    // specs that match no shape leave the target as it is, so it starts out as the current view
-    const viewRect = fitIntoRectangle(new Vector2(width, height), this.viewSpecs, this.#viewRect.clone(), pixelRatio);
-    if (!isPositiveFinite(viewRect.width) || !isPositiveFinite(viewRect.height)) return;
-
-    this.#viewRect.copy(viewRect);
+    if (!this.#view.fit(width, height, pixelRatio, this.viewSpecs)) return;
 
     // under pixelSnap the left and the bottom edge lie on a whole unit, so that a texel edge at a
     // whole unit falls on a pixel edge of the buffer; otherwise the view stands in the middle
-    const {width: viewWidth, height: viewHeight} = this.#viewRect;
-    if ('pixelSnap' in this.viewSpecs && this.viewSpecs.pixelSnap === true) {
+    const {width: viewWidth, height: viewHeight} = this.#view;
+    if (this.#view.pixelSnap) {
       this.#left = -Math.floor(viewWidth / 2);
       this.#bottom = -Math.floor(viewHeight / 2);
-      this.#offset.set(wholeUnitOffset(viewWidth), wholeUnitOffset(viewHeight));
     } else {
       this.#left = -viewWidth / 2;
       this.#bottom = -viewHeight / 2;
-      this.#offset.set(0, 0);
     }
     this.#right = this.#left + viewWidth;
     this.#top = this.#bottom + viewHeight;
-
-    this.#pixelRatio.set(width, height).divide(this.#viewRect);
 
     // an orthographic camera divides by the depth from near to far; its near and the distance may be
     // 0 or below, but none of the three may be infinite or NaN
     const {near, far, distanceToProjectionPlane} = this.viewSpecs;
 
-    this.#near = isFiniteNumber(near) ? near : DEFAULT_NEAR;
-    this.#far = isFiniteNumber(far) ? far : DEFAULT_FAR;
-    if (this.#far <= this.#near) {
-      this.#near = DEFAULT_NEAR;
-      this.#far = DEFAULT_FAR;
-    }
+    this.#view.takeNearAndFar(isFiniteNumber(near) ? near : DEFAULT_NEAR, far);
 
     this.#distanceToProjectionPlane = isFiniteNumber(distanceToProjectionPlane)
       ? distanceToProjectionPlane
@@ -173,14 +146,7 @@ export class OrthographicProjection implements IProjection {
   }
 
   getViewRect(): ProjectionViewRect {
-    return {
-      width: this.#viewRect.width,
-      height: this.#viewRect.height,
-      pixelRatioX: this.#pixelRatio.x,
-      pixelRatioY: this.#pixelRatio.y,
-      offsetX: this.#offset.x,
-      offsetY: this.#offset.y,
-    };
+    return this.#view.getViewRect();
   }
 
   /**
@@ -190,7 +156,7 @@ export class OrthographicProjection implements IProjection {
    * @throws {Error} if the projection has no {@link projectionPlane}.
    */
   createCamera(): OrthographicCamera {
-    const projectionPlane = this.#requireProjectionPlane('createCamera()');
+    const projectionPlane = requireProjectionPlane('OrthographicProjection', 'createCamera()', this.projectionPlane);
     const camera = new OrthographicCamera();
     this.#applyToCamera(camera, projectionPlane);
     return camera;
@@ -205,23 +171,9 @@ export class OrthographicProjection implements IProjection {
    * @throws {Error} if the projection has no {@link projectionPlane}.
    */
   updateCamera(camera: Camera): void {
-    if ((camera as OrthographicCamera)?.isOrthographicCamera !== true) {
-      throw new TypeError(
-        `OrthographicProjection: updateCamera() needs an OrthographicCamera, got ${describeThreeValue(camera, 'isObject3D')}`,
-      );
-    }
-    const projectionPlane = this.#requireProjectionPlane('updateCamera()');
-    this.#applyToCamera(camera as OrthographicCamera, projectionPlane);
-  }
-
-  #requireProjectionPlane(method: 'createCamera()' | 'updateCamera()'): ProjectionPlane {
-    if (this.projectionPlane == null) {
-      throw new Error(
-        `OrthographicProjection#${method} has no projectionPlane to aim the camera at: ` +
-          'set OrthographicProjection#projectionPlane or hand one to the constructor',
-      );
-    }
-    return this.projectionPlane;
+    assertCameraKind('OrthographicProjection', camera, 'isOrthographicCamera');
+    const projectionPlane = requireProjectionPlane('OrthographicProjection', 'updateCamera()', this.projectionPlane);
+    this.#applyToCamera(camera, projectionPlane);
   }
 
   #applyToCamera(camera: OrthographicCamera, projectionPlane: ProjectionPlane): void {
@@ -229,8 +181,8 @@ export class OrthographicProjection implements IProjection {
     camera.right = this.#right;
     camera.top = this.#top;
     camera.bottom = this.#bottom;
-    camera.near = this.#near;
-    camera.far = this.#far;
+    camera.near = this.#view.near;
+    camera.far = this.#view.far;
 
     // applyRotation() multiplies onto the orientation the camera already carries: without this
     // reset a camera updated a second time would turn a second time
