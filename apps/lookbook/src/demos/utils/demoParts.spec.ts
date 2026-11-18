@@ -95,9 +95,10 @@ describe('DemoParts', () => {
       caught = thrown;
     }
     expect(caught).toBeInstanceOf(AggregateError);
-    expect((caught as AggregateError).message).toBe('DemoParts: 2 releases threw as the display was disposed');
+    if (!(caught instanceof AggregateError)) expect.unreachable();
+    expect(caught.message).toBe('DemoParts: 2 releases threw as the display was disposed');
     // the last kept goes first, so `first` is thrown first
-    expect((caught as AggregateError).errors).toEqual([first, second]);
+    expect(caught.errors).toEqual([first, second]);
   });
 
   it('refuses a display that is disposed already, and subscribes nothing', () => {

@@ -91,6 +91,11 @@ The two types go into `types.ts`, which the module exports as `export type *`.
 
   > `VertexObjectPool#sortBy(): the key function changed usedCount from 10 to 9 — create and free vertex objects before or after the sort, not inside the key function`
 
+  Nor may it call `releaseSortScratch()`: after the last key `sortBy()` checks that its keys are
+  still the scratch of the pool, and refuses otherwise:
+
+  > `VertexObjectPool#sortBy(): the key function let go of the scratch of the sort through releaseSortScratch() — call it before or after the sort, not inside the key function`
+
   A key function that returns a fractional value — or `-0`, which is no small integer either — may
   cost a heap number of 16 B per call where V8 does not inline it (the rule of `AGENTS.md`); the
   TSDoc says so and names the property form as the one that never does.

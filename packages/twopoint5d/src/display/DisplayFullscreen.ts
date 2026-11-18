@@ -381,7 +381,8 @@ export class DisplayFullscreen {
    * fullscreen, a turn asks nothing and arms nothing: a request would pull the target over it.
    *
    * Switched on while the browser is still answering a request or an exit, it arms once that answer
-   * is in — where the screen is still landscape, the target out of fullscreen, no other element
+   * is in — or enters the pseudo mode, where native fullscreen is no longer supported by then and
+   * `fallback` is `'pseudo'` — where the screen is still landscape, the target out of fullscreen, no other element
    * in fullscreen and no newer request or exit under way: a `request()` of the page called on that
    * answer decides with its own, and its refusal arms nothing.
    *
@@ -1007,7 +1008,8 @@ export class DisplayFullscreen {
   }
 
   // after a run of answers of the browser that onLandscape waits for — its own request, or
-  // onLandscape switched on while one was under way: a refusal arms, unless the controller is
+  // onLandscape switched on while one was under way: a refusal arms — or, where native fullscreen
+  // is gone by then, enters the pseudo mode as a turn in 'idle' does —, unless the controller is
   // disposed or anything has changed in the meantime — a newer request or an exit is under way, say
   #rearm(active: boolean): void {
     if (
@@ -1019,7 +1021,8 @@ export class DisplayFullscreen {
       !this.#declined &&
       !this.#answerAwaited()
     ) {
-      this.#arm();
+      if (this.isSupported) this.#arm();
+      else if (this.fallback === 'pseudo') this.#enterPseudo('landscape');
     }
   }
 

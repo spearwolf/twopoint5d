@@ -283,10 +283,12 @@ export class DisplaySizer {
     return params;
   }
 
-  // `fromFrame` is the call at the start of a frame: that one measures only when the size watch
-  // has seen a change, or on the poll path within resizePollIntervalMs. A call of your own
-  // always measures and leaves the timing of the frames alone
-  /** Answers whether this call emitted `OnDisplayResize`. */
+  /**
+   * Answers whether this call emitted `OnDisplayResize`. `fromFrame` is the call at the start of a
+   * frame: that one measures only when the size watch has seen a change, or on the poll path within
+   * `resizePollIntervalMs`. A call of your own always measures and leaves the timing of the frames
+   * alone.
+   */
   resize(fromFrame: boolean): boolean {
     this.#didEmitResize = false;
 
@@ -391,9 +393,11 @@ export class DisplaySizer {
     this.#sizeDirty = true;
   }
 
-  // Called by the display's dispose() directly, so a constructor that throws after startWatch()
-  // takes the watch down as well; the fullscreenchange listener of watchFullscreen() comes off with it
-  /** Takes the size watch and the fullscreenchange listener down. */
+  /**
+   * Takes the size watch and the fullscreenchange listener of `watchFullscreen()` down. The display's
+   * `dispose()` calls it directly, so a constructor that throws after `startWatch()` takes the watch
+   * down as well.
+   */
   stopWatch(): void {
     if (this.#sizeObserver != null) {
       this.#sizeObserver.disconnect();

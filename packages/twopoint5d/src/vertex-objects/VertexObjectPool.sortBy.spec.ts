@@ -714,6 +714,29 @@ describe('VertexObjectPool#releaseSortScratch()', () => {
     kept.pool.dispose();
   });
 
+  test('a call from the key function of a running sortBy() makes that sort throw, naming sortBy(), and moves nothing', () => {
+    const {pool} = makeThings([2, 1, 0]);
+    let released = false;
+    const key = (vo: Thing) => {
+      if (!released) {
+        released = true;
+        pool.releaseSortScratch();
+      }
+      return vo.x === 0 ? 2 : vo.x === 1 ? 1 : 0;
+    };
+
+    expect(() => pool.sortBy(key)).toThrow(
+      new Error(
+        'VertexObjectPool#sortBy(): the key function let go of the scratch of the sort through releaseSortScratch() — call it before or after the sort, not inside the key function',
+      ),
+    );
+    expect(idsInSlotOrder(pool)).toEqual([0, 1, 2]);
+
+    expect(pool.sortBy(key)).toBe(true);
+    expect(idsInSlotOrder(pool)).toEqual([2, 1, 0]);
+    pool.dispose();
+  });
+
   test('does nothing on a pool that has not sorted and on a disposed pool', () => {
     const {pool} = makeThings([1, 0]);
 

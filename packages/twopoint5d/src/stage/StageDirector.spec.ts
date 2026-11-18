@@ -1182,6 +1182,44 @@ describe('StageDirector', () => {
       );
       expect(director.stack).toEqual([]);
     });
+
+    it('keeps the AggregateError of the remove as one error beside the one of the dispose of the wrapper', () => {
+      const stage = new Stage2D();
+      stage.name = 'world';
+      director.setStack([stage]);
+      const wrapper = director.stages[0]!.stage;
+      const removed = new Error('stageRemoved');
+      const first = new Error('removeFromParent');
+      const second = new Error('dispose');
+      on(director, OnStageRemoved, () => {
+        throw removed;
+      });
+      on(wrapper, OnRemoveFromParent, () => {
+        throw first;
+      });
+      on(wrapper, OnStageDispose, () => {
+        throw second;
+      });
+      let thrown: unknown;
+      try {
+        director.remove(stage);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(AggregateError);
+      if (!(thrown instanceof AggregateError)) expect.unreachable();
+      expect(thrown.message).toBe(
+        'StageDirector: more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose threw as the director let go of the stage "world"',
+      );
+      expect(thrown.errors.length).toBe(2);
+      expect(thrown.errors[1]).toBe(second);
+      const inner: unknown = thrown.errors[0];
+      expect(inner).toBeInstanceOf(AggregateError);
+      if (!(inner instanceof AggregateError)) expect.unreachable();
+      expect(inner.message).toBe('StageRenderer#remove(): more than one listener of OnStageRemoved and OnRemoveFromParent threw');
+      expect(inner.errors).toEqual([removed, first]);
+      expect(director.stack).toEqual([]);
+    });
   });
 
   describe('listeners and stages that call back into the director', () => {

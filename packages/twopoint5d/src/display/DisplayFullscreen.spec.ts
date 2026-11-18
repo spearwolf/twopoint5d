@@ -2488,6 +2488,43 @@ describe('DisplayFullscreen', () => {
         await expect(requested).resolves.toBe(true);
         expect(fs.mode).toBe('native');
       });
+
+      it('a turn that joined a request the browser refuses enters the pseudo mode where native fullscreen is gone by then, and arms nothing', async () => {
+        doc.fullscreenEnabled = true;
+        const fs = make({fallback: 'pseudo', onLandscape: true});
+        const answer = answerLater(defaultTarget);
+        const requested = fs.request();
+
+        doc.fullscreenEnabled = false;
+        turn('landscape-primary');
+        expect(fs.mode).toBeUndefined();
+
+        answer.refuse();
+        expect(await outcomeOf(requested)).toBe(false);
+        await nextTask();
+
+        expect(fs.mode).toBe('pseudo');
+        expect(fs.isArmed).toBe(false);
+        expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+      });
+
+      it('a turn that joined a request the browser refuses arms nothing where native fullscreen is gone by then', async () => {
+        doc.fullscreenEnabled = true;
+        const fs = make({onLandscape: true});
+        const answer = answerLater(defaultTarget);
+        const requested = fs.request();
+
+        doc.fullscreenEnabled = false;
+        turn('landscape-primary');
+
+        answer.refuse();
+        expect(await outcomeOf(requested)).toBe(false);
+        await nextTask();
+
+        expect(fs.isArmed).toBe(false);
+        expect(fs.isActive).toBe(false);
+        expect(defaultTarget.listenerCount('pointerup')).toBe(0);
+      });
     });
   });
 });

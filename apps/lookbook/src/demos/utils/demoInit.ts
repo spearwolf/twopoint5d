@@ -6,7 +6,8 @@ import type {Display, DisplayEventProps} from '@spearwolf/twopoint5d';
  * that answered 404, a broken JSON — would reach nobody: the canvas stays in its clear color and
  * the GUI never appears. Here it is logged under the name of the demo and written over the canvas.
  * Under `?preview=1` the line over the canvas is hidden; the preview generator prints the console
- * line with its timeout instead.
+ * line with its timeout instead. A demo whose init `display.start()` awaits goes through
+ * {@link startDemo} instead.
  *
  * @param demo the name of the demo, its route, for the console and the line over the canvas
  * @returns what `display.onInit()` answers

@@ -71,7 +71,8 @@ export interface Slot {
 /**
  * Which slot and which of its sources an entry of `orderedStages` is — or, after every layer, which
  * of the distinct mask stages, counted by first appearance: the stages of the slot masks bottom-up,
- * then those of the running effects slot by slot, as `distinctMasks()` counts them.
+ * then those of the running effects slot by slot, as `distinctMasks()` in `DirectorShapeCache.ts`
+ * counts them.
  * @internal
  */
 export type OrderRef =

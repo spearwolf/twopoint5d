@@ -21,9 +21,9 @@ const hangingLoads = () => {
   return {loads, loadAsync};
 };
 
-const settleMicrotasks = async () => {
-  for (let i = 0; i < 8; i++) await Promise.resolve();
-};
+// a task runs once every microtask queued before it, and every one those queue, has run: the
+// releases and the clean-up of a failed load are through then, however long their chain
+const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 describe('SharedImageCache', () => {
   afterEach(() => {
@@ -47,7 +47,7 @@ describe('SharedImageCache', () => {
 
     cache.acquire('a.png').release();
     cache.acquire('a.png');
-    await settleMicrotasks();
+    await nextTask();
 
     expect(loadAsync).toHaveBeenCalledTimes(1);
   });
@@ -57,7 +57,7 @@ describe('SharedImageCache', () => {
     const cache = new SharedImageCache();
 
     cache.acquire('a.png').release();
-    await settleMicrotasks();
+    await nextTask();
     cache.acquire('a.png');
 
     expect(loadAsync).toHaveBeenCalledTimes(2);
@@ -70,7 +70,7 @@ describe('SharedImageCache', () => {
     const a = cache.acquire('a.png');
     loads[0]!.reject(new Error('404'));
     await expect(a.image).rejects.toThrow('404');
-    await settleMicrotasks();
+    await nextTask();
     cache.acquire('a.png');
 
     expect(loadAsync).toHaveBeenCalledTimes(2);
@@ -83,10 +83,10 @@ describe('SharedImageCache', () => {
     const a = cache.acquire('a.png');
     loads[0]!.reject(new Error('404'));
     await expect(a.image).rejects.toThrow('404');
-    await settleMicrotasks();
+    await nextTask();
     const b = cache.acquire('a.png');
     a.release();
-    await settleMicrotasks();
+    await nextTask();
     const c = cache.acquire('a.png');
 
     expect(loadAsync).toHaveBeenCalledTimes(2);
@@ -101,7 +101,7 @@ describe('SharedImageCache', () => {
     cache.acquire('a.png');
     a.release();
     a.release();
-    await settleMicrotasks();
+    await nextTask();
     cache.acquire('a.png');
 
     expect(loadAsync).toHaveBeenCalledTimes(1);
@@ -115,7 +115,7 @@ describe('SharedImageCache', () => {
     cache.clear();
     const b = cache.acquire('a.png');
     a.release();
-    await settleMicrotasks();
+    await nextTask();
     const c = cache.acquire('a.png');
 
     expect(loadAsync).toHaveBeenCalledTimes(2);

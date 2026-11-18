@@ -357,7 +357,8 @@ export class TextureStore {
    * takes its place, as in the instance method.
    *
    * The store it hands out has no renderer: it loads the images and builds coordinates, atlases,
-   * tile sets and animations, and a `getAsync(id, 'texture')` waits until `store.renderer` is set — once per store, the first subscription that waits for a texture warns on the console.
+   * tile sets and animations, and a `getAsync(id, 'texture')` waits until `store.renderer` is set —
+   * once per store, the first subscription that waits for a texture warns on the console.
    */
   static async loadAsync(url: string | URL, options?: TextureStoreLoadOptions): Promise<TextureStore> {
     const store = new TextureStore();
@@ -411,8 +412,8 @@ export class TextureStore {
    * The renderer this store builds its textures with, or `undefined` while none is set.
    *
    * Without a renderer the store loads its images and builds the coordinates, atlases, tile sets
-   * and animations of its resources all the same; only `texture` waits until one is set — once per store, the first subscription that waits for a
-   * texture warns on the console.
+   * and animations of its resources all the same; only `texture` waits until one is set — once per
+   * store, the first subscription that waits for a texture warns on the console.
    *
    * Answers `undefined` once {@link TextureStore.dispose} has run, whatever is written
    * to the setter afterwards.
@@ -1119,7 +1120,9 @@ export class TextureStore {
   /**
    * Subscribe to the given subtype(s) of the resource `id`, for as long as the returned
    * function is not called. The callback fires whenever the value — or, for several
-   * subtypes, every value of the tuple — is there.
+   * subtypes, every value of the tuple — is there. On a store without a renderer, `texture`
+   * waits until one is set, and the first call of this store that waits so writes a warning
+   * to the console.
    *
    * Only values that are there are delivered: a subtype that is cleared and announces it
    * does not reach the callback, and for several subtypes the callback waits until every
@@ -1133,7 +1136,7 @@ export class TextureStore {
    *
    * A resource that is disposed directly leaves the store, and the subscription follows the
    * resource the next `parse()` builds under the id. A subtype the type of the resource never
-   * builds is reported once on the console. On a store without a renderer, `texture` waits until one is set, and the first call of this store that waits so writes a warning to the console.
+   * builds is reported once on the console.
    *
    * On a disposed store this does nothing: the callback is never called, and the returned
    * unsubscribe function has nothing to take back.
@@ -1271,7 +1274,8 @@ export class TextureStore {
 
   /**
    * Resolve with the value (or tuple of values) of the given subtype(s) as soon as the
-   * resource `id` has them. On a store without a renderer, `texture` waits until one is set, and the first call of this store that waits so writes a warning to the console.
+   * resource `id` has them. On a store without a renderer, `texture` waits until one is set, and
+   * the first call of this store that waits so writes a warning to the console.
    *
    * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
    * call on a store that is already disposed is rejected right away. An id that is

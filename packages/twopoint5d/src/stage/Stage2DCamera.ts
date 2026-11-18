@@ -26,8 +26,15 @@ import type {StageCameraDriver} from './StageCameraDriver.js';
 export interface Stage2DCameraHost {
   /** Hands `camera` to the pass node of the stage and to the run of its post-process, where either exists. */
   takeCamera(camera: Camera): void;
-  /** Computes view and camera anew for the container of the last `resize()`; what the projection throws comes out, what a listener or the driver throws goes into `errors`. */
+  /**
+   * Computes view and camera anew for the container of the last `resize()`; what the projection
+   * throws comes out, what a listener or the driver throws goes into `errors`.
+   */
   updateProjection(errors: unknown[]): void;
+  /** Whether the stage is disposed, read past a subclass that overrides `isDisposed`. */
+  disposed(): boolean;
+  /** The projection the stage holds, read past a subclass that overrides the getter of `projection`. */
+  projection(): IProjection | undefined;
 }
 
 /** @internal */
@@ -116,7 +123,7 @@ export class Stage2DCamera {
   }
 
   attachDriver(driver: StageCameraDriver): void {
-    if (this.#stage.isDisposed) throw new Error('Stage2DInternals.attachDriver(): the stage has been disposed');
+    if (this.#host.disposed()) throw new Error('Stage2DInternals.attachDriver(): the stage has been disposed');
     if (this.#driver != null) throw new Error('Stage2DInternals.attachDriver(): the stage has a CameraRig already');
 
     const errors: unknown[] = [];
@@ -126,7 +133,7 @@ export class Stage2DCamera {
     }, errors);
     // the driver composes over a base the projection places for the view the stage has; a listener
     // of the camera change that let go of the driver, or disposed the stage, leaves nothing to place
-    if (this.#driver === driver && this.#stage.projection != null && !this.#stage.isDisposed) {
+    if (this.#driver === driver && this.#stage.projection != null && !this.#host.disposed()) {
       try {
         this.#host.updateProjection(errors);
       } catch (error) {
@@ -142,7 +149,7 @@ export class Stage2DCamera {
   detachDriver(): void {
     if (this.#driver == null) return;
     // a disposed stage lets go of the driver and keeps the camera it was left with
-    if (this.#stage.isDisposed) {
+    if (this.#host.disposed()) {
       this.#driver = undefined;
       return;
     }
@@ -150,7 +157,7 @@ export class Stage2DCamera {
     // the projection places the camera the stage takes back, and refuses one of a kind it does not
     // build: such a camera is dropped here, not at the next resize()
     const assigned = this.#cameraUserOverride;
-    if (assigned != null && !Stage2DCamera.#buildsKindOf(this.#stage.projection, assigned)) {
+    if (assigned != null && !Stage2DCamera.#buildsKindOf(this.#host.projection(), assigned)) {
       this.#cameraUserOverride = undefined;
       // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
       console.warn(
@@ -165,7 +172,7 @@ export class Stage2DCamera {
     }, errors);
     // the camera taken back was not placed while the driver was attached, and a stage without one
     // gets the camera of its projection
-    if (this.#stage.projection != null && !this.#stage.isDisposed) {
+    if (this.#stage.projection != null && !this.#host.disposed()) {
       try {
         this.#host.updateProjection(errors);
       } catch (error) {
@@ -180,7 +187,7 @@ export class Stage2DCamera {
 
   announceDriverCamera(): void {
     const driver = this.#driver;
-    if (driver == null || this.#stage.isDisposed) return;
+    if (driver == null || this.#host.disposed()) return;
     const errors: unknown[] = [];
     this.#updateCamera(() => {
       this.#driverCamera = driver.camera;
@@ -191,12 +198,13 @@ export class Stage2DCamera {
   // the change is made before anyone hears of it, and every listener hears it: what they throw
   // goes into `errors` for the public call to throw once its state stands
   #updateCamera(updateCallback: () => void, errors: unknown[]): void {
-    const prevCamera = this.current;
+    // the camera as stage.camera answers it, a getter a subclass may override
+    const prevCamera = this.#stage.camera;
     updateCallback();
-    if (prevCamera !== this.current) {
+    if (prevCamera !== this.#stage.camera) {
       // a camera that goes away leaves the pass node of the stage the one it had — without a camera
       // the node is not drawn — and the next one goes into it, see takeCamera() of the host in Stage2D
-      const camera = this.current;
+      const camera = this.#stage.camera;
       if (camera != null) {
         this.#host.takeCamera(camera);
       }

@@ -1370,7 +1370,8 @@ export class StageDirector extends StageRenderer {
   /**
    * Takes the layer out of the base and forgets it; a wrapper the director made is disposed.
    * What listeners throw on the way comes out afterwards — one unchanged, several as an
-   * `AggregateError`.
+   * `AggregateError`. Where several listeners throw on the remove from the base, their
+   * `AggregateError` is one error of it, beside the error of the dispose of a wrapper.
    */
   #release(layer: Layer): void {
     if (this.#layers.get(layer.stage) !== layer) return;
@@ -1612,7 +1613,8 @@ export class StageDirector extends StageRenderer {
     });
     // after every layer: the distinct mask stages of the slot masks, bottom-up, then those of the
     // running effects, slot by slot, each by its first appearance — they update after the layers
-    // whose camera they may read. distinctMasks() counts the texture nodes of a shape in this order
+    // whose camera they may read. distinctMasks() in DirectorShapeCache.ts counts the texture nodes
+    // of a shape in this order
     const masks: Layer[] = [];
     const addMask = (mask: StageMask): void => {
       const layer = this.#layers.get(mask.stage);

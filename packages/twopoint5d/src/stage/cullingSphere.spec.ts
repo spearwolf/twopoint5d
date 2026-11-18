@@ -1,4 +1,4 @@
-import {BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, Scene, Sphere} from 'three/webgpu';
+import {BoxGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, Scene, Sphere, Sprite} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 import {cullingSphereOf} from './cullingSphere.js';
 
@@ -23,6 +23,33 @@ describe('cullingSphereOf()', () => {
     inHiddenGroup.visible = false;
     inHiddenGroup.add(box());
     scene.add(unculled, hidden, inHiddenGroup);
+    expect(cullingSphereOf(scene, new Sphere()).isEmpty()).toBe(true);
+  });
+
+  it('takes the sphere three.js culls a sprite by, around its position and grown by its center', () => {
+    const scene = new Scene();
+    const sprite = new Sprite();
+    sprite.position.set(3, 0, 0);
+    scene.add(sprite);
+    const sphere = cullingSphereOf(scene, new Sphere());
+    expect(sphere.center.toArray()).toEqual([3, 0, 0]);
+    expect(sphere.radius).toBeCloseTo(Math.SQRT1_2, 12);
+
+    const other = new Scene();
+    const offCenter = new Sprite();
+    offCenter.center.set(0, 0);
+    offCenter.scale.set(2, 2, 1);
+    other.add(offCenter);
+    const grown = cullingSphereOf(other, new Sphere());
+    expect(grown.center.toArray()).toEqual([0, 0, 0]);
+    expect(grown.radius).toBeCloseTo(2 * (Math.SQRT1_2 + Math.SQRT1_2), 12);
+  });
+
+  it('leaves out a sprite three.js does not cull by its frustum', () => {
+    const scene = new Scene();
+    const sprite = new Sprite();
+    sprite.frustumCulled = false;
+    scene.add(sprite);
     expect(cullingSphereOf(scene, new Sphere()).isEmpty()).toBe(true);
   });
 

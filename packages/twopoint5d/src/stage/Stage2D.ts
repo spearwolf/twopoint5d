@@ -150,9 +150,11 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   /**
    * The width of the container the last `resize()` handed in, `0` until the first `resize()`. A
    * `resize()` takes the container also where its width or height is not a finite number above 0 —
-   * the view and the camera then stay as they are. A `resize()` whose projection throws leaves the
-   * container the stage had; one where only a listener throws has taken the new container. After
-   * {@link dispose} a `resize()` does nothing, and the value stays.
+   * the view and the camera then stay as they are. A `resize()` whose projection throws — as it fits
+   * the view, or as it places the camera, the base camera of a `CameraRig` included — leaves the
+   * container the stage had; one where only a listener throws, or the `CameraRig` as it composes
+   * its camera over the base, has taken the new container. After {@link dispose} a `resize()` does
+   * nothing, and the value stays.
    */
   get containerWidth(): number {
     return this.#containerWidth;
@@ -259,6 +261,8 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     updateProjection: (errors) => {
       this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
     },
+    disposed: () => this.#disposed,
+    projection: () => this.#projection,
   });
 
   /**

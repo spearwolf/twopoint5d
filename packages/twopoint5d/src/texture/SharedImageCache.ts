@@ -17,6 +17,12 @@ import type {ImageLease, TextureImageSource} from './internals.js';
 export class SharedImageCache implements TextureImageSource {
   #images = new Map<string, {image: Promise<HTMLImageElement>; refCount: number}>();
 
+  /**
+   * Leases the image of `url`: the first lease of a url starts its load, every later one shares it.
+   * `release()` gives the lease back once — a second call does nothing —, and the image is given up
+   * a microtask after its last lease came back. A load that fails is forgotten, so the next lease of
+   * its url loads anew.
+   */
   acquire(url: string): ImageLease {
     let entry = this.#images.get(url);
     if (!entry) {

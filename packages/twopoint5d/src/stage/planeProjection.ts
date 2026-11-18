@@ -14,8 +14,11 @@ import type {ProjectionPlane} from './ProjectionPlane.js';
 import {type ProjectionFitSpecs, fitIntoRectangle} from './fitIntoRectangle.js';
 import {wholeUnitOffset} from './wholeUnitOffset.js';
 
-// the camera values for specs that leave one out or give one no camera can be built from
-/** @internal */
+/**
+ * The near plane of the camera where the specs leave it out, or where their near and far plane
+ * leave no depth a camera can be built from; `DEFAULT_FAR` below is the far plane of both cases.
+ * @internal
+ */
 export const DEFAULT_NEAR = 0.1;
 const DEFAULT_FAR = 100000;
 
@@ -81,7 +84,8 @@ export class PlaneProjectionView {
   #offset = new Vector2();
   #pixelSnap = false;
 
-  // assigned by the first fit() that gives a view with an area, through takeNearAndFar(); a camera built before that carries none
+  // assigned by the first fit() that gives a view with an area, through takeNearAndFar(); a
+  // camera built before that carries none
   #near!: number;
   #far!: number;
 

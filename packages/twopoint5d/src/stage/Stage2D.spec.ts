@@ -1667,6 +1667,77 @@ describe('Stage2D', () => {
       }
     });
 
+    it('announces a change of camera by what stage.camera answers, also where a subclass overrides the getter', () => {
+      class Pinned extends Stage2D {
+        pinned?: Camera;
+
+        override get camera(): Camera | undefined {
+          return this.pinned ?? super.camera;
+        }
+
+        override set camera(camera: Camera | undefined) {
+          super.camera = camera;
+        }
+      }
+      const stage = new Pinned(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(800, 600);
+      stage.pinned = new PerspectiveCamera();
+      const changed = vi.fn();
+      on(stage, OnStageAfterCameraChanged, changed);
+
+      Stage2DInternals.attachDriver(stage, new FakeDriver([]));
+
+      expect(changed).not.toHaveBeenCalled();
+    });
+
+    it('takes a driver by whether the stage itself is disposed, also where a subclass overrides isDisposed', () => {
+      class Closing extends Stage2D {
+        closing = false;
+
+        override get isDisposed(): boolean {
+          return this.closing || super.isDisposed;
+        }
+      }
+      const stage = new Closing(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+      stage.resize(800, 600);
+      stage.closing = true;
+      const driver = new FakeDriver([]);
+
+      expect(() => Stage2DInternals.attachDriver(stage, driver)).not.toThrow();
+
+      expect(stage.camera).toBe(driver.camera);
+    });
+
+    it('drops an assigned camera by the projection the stage holds, also where a subclass answers another one', () => {
+      class Shown extends Stage2D {
+        shown?: IProjection;
+
+        override get projection(): IProjection | undefined {
+          return this.shown ?? super.projection;
+        }
+
+        override set projection(projection: IProjection | undefined) {
+          super.projection = projection;
+        }
+      }
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const stage = new Shown(new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640}));
+        stage.resize(800, 600);
+        stage.camera = new OrthographicCamera();
+        Stage2DInternals.attachDriver(stage, new FakeDriver([]));
+        stage.projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+        stage.shown = new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 640});
+
+        Stage2DInternals.detachDriver(stage);
+
+        // the stage holds the ParallaxProjection, which builds no OrthographicCamera
+        expect(warn).toHaveBeenCalledTimes(1);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('a listener of OnStageCameraPlaced that throws in a resize() leaves the driver composed and every listener heard', () => {
       const {stage, log, driver} = createStage();
       Stage2DInternals.attachDriver(stage, driver);

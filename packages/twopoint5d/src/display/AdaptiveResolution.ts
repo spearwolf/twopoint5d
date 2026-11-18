@@ -451,10 +451,10 @@ export class AdaptiveResolution {
     // a renderer that measured nothing for a while — one that drew nothing, a loading screen —
     // may measure later: the first valid measurement brings the controller back to gpu-time
     if (this.#tracksGpuTime()) this.#probeGpuTime();
+    // a frame a display renders while it is not running — paused, or not started yet — lies
+    // between no two animation frames of the page and says nothing about the pace; paused, its
+    // rawDeltaTime is 0
     if (this.display.isRunning) {
-      // a frame a display renders while it is not running — paused, or not started yet — lies
-      // between no two animation frames of the page and says nothing about the pace; paused, its
-      // rawDeltaTime is 0
       // The interval between the animation frames of the page before this frame: a frame maxFps
       // held back is no late frame. A frame the frame loop of the display did not run — a
       // renderFrame() of one's own — has nothing but its own delta. Read here and handed to no

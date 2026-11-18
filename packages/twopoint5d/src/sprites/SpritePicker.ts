@@ -390,34 +390,38 @@ export class SpritePicker {
    */
   #place(entry: PickEntry, sprites: FeatureSprites, camera: Camera): void {
     const applied = this.#clippingScratch;
-    const groupOrder = readAncestry(sprites, camera.layers, applied);
-    const {clipping} = entry;
-    // a mirror of a ClippingGroup that no longer clips the sprites leaves the chain, so that it hangs
-    // empty under none of the mirrors kept
-    for (let i = 0; i < applied.length; i++) {
-      if (clipping[i]?.source.deref() === applied[i]) continue;
-      clipping[i]?.mirror.removeFromParent();
-      clipping[i] = {source: new WeakRef(applied[i]!), mirror: makeChainLink(new ClippingGroup())};
-    }
-    for (let i = applied.length; i < clipping.length; i++) clipping[i]!.mirror.removeFromParent();
-    clipping.length = applied.length;
+    try {
+      const groupOrder = readAncestry(sprites, camera.layers, applied);
+      const {clipping} = entry;
+      // a mirror of a ClippingGroup that no longer clips the sprites leaves the chain, so that it hangs
+      // empty under none of the mirrors kept
+      for (let i = 0; i < applied.length; i++) {
+        if (clipping[i]?.source.deref() === applied[i]) continue;
+        clipping[i]?.mirror.removeFromParent();
+        clipping[i] = {source: new WeakRef(applied[i]!), mirror: makeChainLink(new ClippingGroup())};
+      }
+      for (let i = applied.length; i < clipping.length; i++) clipping[i]!.mirror.removeFromParent();
+      clipping.length = applied.length;
 
-    let parent: Object3D = this.#scene;
-    for (let i = 0; i < clipping.length; i++) {
-      // the group is alive: it lies above the sprites, readAncestry() has just found it there
-      const source = applied[i]!;
-      const {mirror} = clipping[i]!;
-      // the planes are shared, not copied — three reads them at every draw
-      mirror.clippingPlanes = source.clippingPlanes;
-      mirror.clipIntersection = source.clipIntersection;
-      if (mirror.parent !== parent) parent.add(mirror);
-      parent = mirror;
+      let parent: Object3D = this.#scene;
+      for (let i = 0; i < clipping.length; i++) {
+        // the group is alive: it lies above the sprites, readAncestry() has just found it there
+        const source = applied[i]!;
+        const {mirror} = clipping[i]!;
+        // the planes are shared, not copied — three reads them at every draw
+        mirror.clippingPlanes = source.clippingPlanes;
+        mirror.clipIntersection = source.clipIntersection;
+        if (mirror.parent !== parent) parent.add(mirror);
+        parent = mirror;
+      }
+      if (entry.holder.parent !== parent) parent.add(entry.holder);
+      entry.holder.renderOrder = groupOrder;
+    } finally {
+      // the scratch lets go of the groups it was filled with: a group holds the sprites below it, and
+      // up to the next pick the scratch would hold a mesh dropped along with its group — also where a
+      // step of the placement throws
+      applied.length = 0;
     }
-    if (entry.holder.parent !== parent) parent.add(entry.holder);
-    entry.holder.renderOrder = groupOrder;
-    // the scratch lets go of the groups it was filled with: a group holds the sprites below it, and
-    // up to the next pick the scratch would hold a mesh dropped along with its group
-    applied.length = 0;
   }
 
   #build(sprites: FeatureSprites, material: FeatureSpritesMaterial): PickEntry {

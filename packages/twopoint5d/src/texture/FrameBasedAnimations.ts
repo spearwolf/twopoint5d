@@ -604,9 +604,10 @@ export class FrameBasedAnimations {
    * reach beyond ±`Number.MAX_SAFE_INTEGER`; and a
    * `frameNameQuery` that is neither a string nor a `RegExp`, or a string that is no valid regular
    * expression — a `SyntaxError` with the error of the `RegExp` as its `cause`. Tile ids and a
-   * `firstTileId` may be negative, the tile set wraps them. `firstTileId` and `tileCount` are
-   * checked only when they are passed: their defaults come from the tile set, which may hold more
-   * tiles than `MaxTextureSize`.
+   * `firstTileId` may be negative, the tile set wraps them. The checks of `firstTileId` and
+   * `tileCount` as such run only when they are passed: their defaults come from the tile set, which
+   * may hold more tiles than `MaxTextureSize`. The range of their ids is checked whatever it comes
+   * from.
    *
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,

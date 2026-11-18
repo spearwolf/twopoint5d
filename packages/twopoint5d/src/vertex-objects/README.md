@@ -257,9 +257,9 @@ pool.sortByKeys(keys); // keys[i] is the key of slot i
   misspelt one does not compile; on a pool without a vertex object type any string compiles, and
   the sort refuses an unknown one with the names there are.
   A key function is called once per slot in use before anything moves, and must not create or free
-  objects of the pool; a fractional key it answers, or a `-0`, may cost a heap number of 16 B per
-  call where V8 does not inline it. `sortByKeys()` takes keys worked out in bulk, `keys[i]` for slot
-  `i`.
+  objects of the pool, nor call `releaseSortScratch()`; a fractional key it answers, or a `-0`, may
+  cost a heap number of 16 B per call where V8 does not inline it. `sortByKeys()` takes keys worked
+  out in bulk, `keys[i]` for slot `i`.
 - **The order** is stable — equal keys keep their slot order, so a sort every frame never swaps two
   objects of the same key back and forth — and ascending unless `descending`; a `NaN` key goes last
   either way, behind the infinities too.

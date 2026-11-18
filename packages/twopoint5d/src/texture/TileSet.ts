@@ -59,7 +59,10 @@ export interface TileSetOptions {
    */
   tileCount?: number;
 
-  /** The `tileId` of the first tile — a whole number. Defaults to 1. */
+  /**
+   * The `tileId` of the first tile — a whole number that keeps the ids of all tiles, up to
+   * `firstId + tileCount - 1`, within ±`Number.MAX_SAFE_INTEGER`. Defaults to 1.
+   */
   firstId?: number;
 }
 

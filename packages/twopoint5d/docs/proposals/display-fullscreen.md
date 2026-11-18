@@ -409,7 +409,9 @@ fullscreen (§3.2):
    as well. That tap disarms and calls `request()` synchronously in its handler, before the event
    of the disarming goes out. Where the browser refuses the tap as well, the controller arms again
    for the next one — as long as the screen is still landscape, the target not active, no other
-   element in fullscreen and the user has not left in landscape (§6.3).
+   element in fullscreen and the user has not left in landscape (§6.3). A refusal that finds native
+   fullscreen gone by then — `isSupported` answers `false` — arms nothing; with `fallback: 'pseudo'`
+   the controller enters the pseudo mode instead, as a turn in `'idle'` does.
 
 A fullscreen of the target disarms, whoever entered it — the armed tap, a `request()` of the page,
 the answer to a half turn from one landscape to the other, a request of someone else on the target,

@@ -49,6 +49,12 @@ function unknownSortKeyError(name: string, layouts: ReadonlyMap<string, ValuePro
   );
 }
 
+function keyFunctionReleasedScratchError(): Error {
+  return new Error(
+    'VertexObjectPool#sortBy(): the key function let go of the scratch of the sort through releaseSortScratch() — call it before or after the sort, not inside the key function',
+  );
+}
+
 function keyFunctionChangedPoolError(from: number, to: number): Error {
   if (from === to) {
     return new Error(
@@ -445,8 +451,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    *   key function creates or frees a vertex object of this pool — also when it does both and
    *   `usedCount` ends where it began —: the sort has moved nothing then, while what the key function
    *   did stands — a `freeVO()` has moved the last vertex object into the freed slot, as it always
-   *   does. A key function that throws — or an `onCreateVO` hook of a slot the sort materializes —
-   *   leaves the sort undone as well.
+   *   does. It throws, too, when the key function calls {@link releaseSortScratch}: the sort has
+   *   moved nothing then. A key function that throws — or an `onCreateVO` hook of a slot the sort
+   *   materializes — leaves the sort undone as well.
    */
   sortBy(key: VOSortKeyName<VOType> | VOSortKey<VOType>, options?: VOSortOptions): boolean {
     if (this.isDisposed) return false;
@@ -475,6 +482,9 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
         keys[i] = key(vos[i] ?? this.#createVO(i, false));
       }
       if (this.usedCount !== n || this.#slotChanges !== changes) throw keyFunctionChangedPoolError(n, this.usedCount);
+      // a key function that let go of the scratch — or built another — leaves the keys of this sort
+      // in an array the pool no longer holds
+      if (this.#sortKeys !== keys) throw keyFunctionReleasedScratchError();
     }
 
     return this.#sortByOwnKeys(n, options?.descending === true);
@@ -550,7 +560,8 @@ export class VertexObjectPool<VOType> extends VOBufferPool {
    * {@link prepareSortKeys} has prepared keys again. Meant for a large pool that has sorted and
    * will not sort again soon — a pool sorted every frame keeps its scratch.
    *
-   * Does nothing on a pool that has not sorted and on a disposed pool.
+   * Does nothing on a pool that has not sorted and on a disposed pool. Called from the key function of
+   * a running {@link sortBy}, it makes that sort throw.
    */
   releaseSortScratch(): void {
     this.#sortKeys = undefined;
