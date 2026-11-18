@@ -134,6 +134,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    */
   needsUpdate = false;
 
+  /** The name of the {@link scene}, `scene.name`; a write sets it there. */
   get name(): string {
     return this.#scene.name;
   }
@@ -146,10 +147,18 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   #containerHeight = 0;
   #containerPixelRatio = 1;
 
+  /**
+   * The width of the container the last `resize()` handed in, `0` until the first `resize()`. A
+   * `resize()` takes the container also where its width or height is not a finite number above 0 —
+   * the view and the camera then stay as they are. A `resize()` whose projection throws leaves the
+   * container the stage had; one where only a listener throws has taken the new container. After
+   * {@link dispose} a `resize()` does nothing, and the value stays.
+   */
   get containerWidth(): number {
     return this.#containerWidth;
   }
 
+  /** The height of the container the last `resize()` handed in, by the rules of {@link containerWidth}. */
   get containerHeight(): number {
     return this.#containerHeight;
   }
@@ -187,6 +196,23 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   #projection?: IProjection;
 
+  /**
+   * The projection that gives the view and the camera of this stage for its container; `undefined`
+   * leaves the stage without a view.
+   *
+   * Another projection drops the size of the previous one — {@link width} and {@link height} go to
+   * `0` — and its camera, announced as the camera it was, and then gives the view and the camera of
+   * the new one, if the container has an area and its specs give a view. Every listener hears its
+   * events, also behind one that throws, and the errors reach the caller afterwards — one
+   * unchanged, several as an `AggregateError` with the message "Stage2D#projection: more than one
+   * of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the
+   * CameraRig of the stage and the new projection threw". A listener that disposes the stage, or
+   * takes the projection away, while the camera of the previous one goes, keeps the new projection
+   * from giving its view and camera.
+   *
+   * An assignment of the projection the stage has changes nothing, and after {@link dispose} a write
+   * does nothing.
+   */
   get projection(): IProjection | undefined {
     return this.#projection;
   }
@@ -489,6 +515,11 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
   }
 
+  /**
+   * `true` until the first `updateFrame()` with a camera has sent `OnStageFirstFrame`, `false` from
+   * then on, also where its listeners threw. Set back to `true`, it makes the next `updateFrame()`
+   * with a camera send `OnStageFirstFrame` again.
+   */
   isFirstFrame = true;
 
   // one object per stage for OnStageUpdateFrame, rewritten in every frame; OnStageFirstFrame gets

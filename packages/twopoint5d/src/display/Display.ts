@@ -505,6 +505,11 @@ export class Display {
 
   #isFirstFrame = true;
 
+  /**
+   * `true` before the first frame and during the first one (`frameNo` 1), `false` from the second
+   * frame on: {@link Display.renderFrame} sets it at the start of every frame. A `renderFrame()`
+   * after {@link Display.dispose} does nothing and leaves it as it is.
+   */
   get isFirstFrame(): boolean {
     return this.#isFirstFrame;
   }
@@ -1325,6 +1330,12 @@ export class Display {
    * Does nothing after {@link Display.dispose}.
    */
   stop(): void {
+    if (this.#disposed) return;
+    this.#pauseByCaller();
+  }
+
+  // dispose() sets #disposed before it pauses the display, so it comes here past the guard of stop()
+  #pauseByCaller(): void {
     this.#pauseRequests += 1;
     this.#stateMachine.pausedByUser = true;
     this.#followPauseBeforeStart();
@@ -1387,7 +1398,7 @@ export class Display {
 
     try {
       // a running display pauses here, and every listener of OnDisplayPause hears it
-      this.stop();
+      this.#pauseByCaller();
     } catch (error) {
       errors.push(error);
     }
@@ -1504,7 +1515,7 @@ export class Display {
   }
 
   // every event gets props of its own, see getEventProps()
-  #emit = (eventName: string): void => {
+  readonly #emit = (eventName: string): void => {
     if (this.renderer != null) {
       emit(this, eventName, this.getEventProps());
     }

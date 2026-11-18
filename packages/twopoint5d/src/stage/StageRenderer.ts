@@ -201,8 +201,27 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   clearAlpha: number = 1;
 
+  /**
+   * Whether the own clear of this renderer clears the color buffer of its target while
+   * {@link clear} is `true`. Default `true`. With `false` the own clear leaves the color as it is
+   * and no longer counts as a clear of the whole target: where the renderer draws into a target
+   * nobody else clears — the internal target of the whole-picture mode, the pass target of a
+   * renderer nested in a composing one — that target is cleared to transparent black first.
+   */
   clearColorBuffer = true;
+
+  /**
+   * Whether the own clear of this renderer clears the depth buffer of its target while
+   * {@link clear} is `true`. Default `true`. With `false` the own clear no longer counts as a
+   * clear of the whole target, with the consequences {@link clearColorBuffer} names.
+   */
   clearDepthBuffer = true;
+
+  /**
+   * Whether the own clear of this renderer clears the stencil buffer of its target while
+   * {@link clear} is `true`. Default `true`. With `false` the own clear leaves the stencil as it
+   * is, and still counts as a clear of the whole target where it clears color and depth.
+   */
   clearStencilBuffer = true;
 
   /**

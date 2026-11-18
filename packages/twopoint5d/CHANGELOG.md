@@ -90,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpriteResources` holds a uniform named `__proto__` as a uniform of its own, and `uniforms` keeps `Object.prototype` as its prototype
 - `FrameBasedAnimations#add()` over a range of a `TileSet` ends for every `firstTileId`: a range whose ids reach beyond ±`Number.MAX_SAFE_INTEGER` is refused with an `Error` naming the animation, and so is a tile id of a list beyond it, naming its index
 - `TileSet#frameId()` and `TileSet#frame()` answer the frame of every tile id within ±`Number.MAX_SAFE_INTEGER` exactly, also far from `firstId`, and throw a `RangeError` for a tile id beyond it; `new TileSet()` throws one for a `firstId` whose tiles reach beyond it
+- a frame of `AdaptiveResolution` under `frame-pacing` allocates nothing wherever V8 inlines its calls or not: the delta of the frame, a fraction, is handed to no call that V8 would box it for, 16 bytes a frame
 
 ### Migration Guide
 

@@ -455,7 +455,11 @@ export class AdaptiveResolution {
       // a frame a display renders while it is not running — paused, or not started yet — lies
       // between no two animation frames of the page and says nothing about the pace; paused, its
       // rawDeltaTime is 0
-      this.#readRafInterval(rawDeltaTime, fromLoop);
+      // The interval between the animation frames of the page before this frame: a frame maxFps
+      // held back is no late frame. A frame the frame loop of the display did not run — a
+      // renderFrame() of one's own — has nothing but its own delta. Read here and handed to no
+      // method: rawDeltaTime is a fraction, and V8 boxes it at every call it leaves un-inlined
+      this.#pacingRafMs = fromLoop && loop.longestRafInterval > 0 ? loop.longestRafInterval : rawDeltaTime * 1000;
       this.#samplePacing();
     }
   };
@@ -558,14 +562,6 @@ export class AdaptiveResolution {
   }
 
   // --- frame-pacing ---
-
-  #readRafInterval(rawDeltaTime: number, fromLoop: boolean): void {
-    // The interval between the animation frames of the page before this frame: a frame maxFps held
-    // back is no late frame. A frame the frame loop of the display did not run — a renderFrame() of
-    // one's own — has nothing but its own delta
-    const loop = this.display.frameLoop;
-    this.#pacingRafMs = fromLoop && loop.longestRafInterval > 0 ? loop.longestRafInterval : rawDeltaTime * 1000;
-  }
 
   #samplePacing(): void {
     const rafMs = this.#pacingRafMs;

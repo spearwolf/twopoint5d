@@ -261,19 +261,23 @@ backend of three's `WebGPURenderer`: `Chromium WebGPU`, `Chromium WebGL2`,
 `Firefox WebGL2` and `Webkit WebGL2`
 (`packages/twopoint5d-testing/web-test-runner.config.js`; the reporter names a launcher
 after the capitalized product and the backend). Left to themselves the browsers would pick
-by machine — headless Chromium offers WebGPU only behind `--enable-unsafe-webgpu`,
-headless Firefox 155 finds no adapter — and measured with Playwright 1.63.0 both ended up
-on WebGL2, so WebGPU went untested. Now an init script of each launcher sets the backend
+by machine — headless Chromium has `navigator.gpu` but finds no adapter without
+`--enable-unsafe-webgpu`, headless Firefox has no `navigator.gpu` at all (measured with
+Playwright 1.65.0 — Chromium 158, Firefox 159 — on Linux) —, so both would end up on
+WebGL2, and WebGPU would go untested. Now an init script of each launcher sets the backend
 before the page loads: for WebGL2 it takes `navigator.gpu` away, and three falls back as
 it does for a user without WebGPU. Chromium WebGPU runs on SwiftShader, the software
 adapter Chromium ships, with its compositor on SwiftShader as well
 (`--use-angle=swiftshader`, and on Linux through Vulkan:
 `--enable-features=Vulkan --use-vulkan=swiftshader`). A compositor on anything else cannot
 take the canvas texture of a SwiftShader device, and Dawn drops the instance with every
-device of the page ("A valid external Instance reference no longer exists"). Measured with
-Playwright 1.63.0 on macOS and in its `v1.63.0-noble` image on arm64 and amd64: macOS
-needs the first flag, Linux all three. WebKit runs under WebGL 2 alone: Playwright's
-WebKit offers no `navigator.gpu` (measured with Playwright 1.63.0, WebKit 26.6, on macOS).
+device of the page ("A valid external Instance reference no longer exists"). Linux x86_64
+needs all three, measured with Playwright 1.65.0: with none of them, or with
+`--use-angle=swiftshader` alone, a clear pass on the canvas is submitted, and two animation
+frames later the queue of the device rejects with that error; with all three the device stays.
+Measured with Playwright 1.63.0, macOS needs the first of them, and Linux on arm64 in
+Playwright's `v1.63.0-noble` image all three. WebKit runs under WebGL 2 alone: Playwright's
+WebKit offers no `navigator.gpu`.
 
 three falls back to WebGL2 without a word when WebGPU fails its init, and every other
 test would then pass on the wrong backend. `test/renderer-backend.test.js` is the one

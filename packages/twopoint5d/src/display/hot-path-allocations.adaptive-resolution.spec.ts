@@ -1,9 +1,8 @@
-import {eventize, type UnsubscribeFunc} from '@spearwolf/eventize';
+import type {UnsubscribeFunc} from '@spearwolf/eventize';
 import {describe, expect, test, vi} from 'vitest';
 
+import {CALLS, GPU_MS, makeAdaptiveResolutionRound, noMeasurement} from '../testing/adaptiveResolutionRound.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
-import {AdaptiveResolution} from './AdaptiveResolution.js';
-import type {Display} from './Display.js';
 import type {DisplayEventProps} from './types.js';
 
 // The listener of OnDisplayRenderFrame the controller subscribes, caught as it subscribes: a round
@@ -26,52 +25,10 @@ vi.mock('@spearwolf/eventize', async (importOriginal) => {
 // a call that allocates anything costs 16 B at least; the allocation-free paths below
 // measure a small fraction of a byte per call, the noise of a round spread over its calls
 const BYTES_PER_CALL_LIMIT = 1;
-const CALLS = 1000;
-
-// a whole number: a round hands its calls no fraction it works out (AGENTS.md)
-const GPU_MS = 10;
-// answers synchronously, so the measurement and the window it fills fall inside the round; the
-// controller only calls then() on what resolveTimestampsAsync() answers
-// biome-ignore lint/suspicious/noThenProperty: a stand-in for the promise resolveTimestampsAsync() answers
-const measurement = {then: (onFulfilled: (ms: number) => void) => onFulfilled(GPU_MS)};
-// a renderer that measures nothing: three resolves no time for a frame that drew nothing
-// biome-ignore lint/suspicious/noThenProperty: a stand-in for the promise resolveTimestampsAsync() answers
-const noMeasurement = {then: (onFulfilled: (ms: number | undefined) => void) => onFulfilled(undefined)};
-
-/**
- * A controller on a display double that answers what the controller reads in a frame, and a
- * round of frames of the frame loop: every frame a new one, at the pace of 60 frames per second.
- */
-const makeRound = (timestamps: boolean, answer: typeof measurement | typeof noMeasurement = measurement) => {
-  const frameLoop = {frameNo: 0, longestRafInterval: 1000 / 60};
-  const display = eventize({
-    renderer: {
-      backend: {trackTimestamp: timestamps, hasTimestamp: timestamps},
-      resolveTimestampsAsync: () => answer,
-    },
-    resolutionScale: 1,
-    pixelZoom: 0,
-    isDisposed: false,
-    isRunning: true,
-    frameLoop,
-    pixelRatioAt: () => 1,
-  }) as unknown as Display;
-  const adaptive = new AdaptiveResolution(display);
-  expect(frameListeners.at(-1), 'the listener of the frame').toBeTypeOf('function');
-  const onFrame = frameListeners.at(-1)!;
-  const props = {rawDeltaTime: 1 / 60} as DisplayEventProps;
-  const round = () => {
-    for (let i = 0; i < CALLS; i++) {
-      frameLoop.frameNo += 1;
-      onFrame(props);
-    }
-  };
-  return {adaptive, round};
-};
 
 describe('AdaptiveResolution on the hot path', () => {
   test('a frame under gpu-time allocates nothing, the frames that judge a window included', async () => {
-    const {adaptive, round} = makeRound(true);
+    const {adaptive, round} = makeAdaptiveResolutionRound(frameListeners, true);
 
     const bytesPerCall = (await measureSettledBytes(round)) / CALLS;
 
@@ -84,7 +41,7 @@ describe('AdaptiveResolution on the hot path', () => {
   });
 
   test('a frame under frame-pacing allocates nothing, the frames that judge a window included', async () => {
-    const {adaptive, round} = makeRound(false);
+    const {adaptive, round} = makeAdaptiveResolutionRound(frameListeners, false);
 
     const bytesPerCall = (await measureSettledBytes(round)) / CALLS;
 
@@ -96,7 +53,7 @@ describe('AdaptiveResolution on the hot path', () => {
   });
 
   test('a frame under frame-pacing that still asks for GPU time allocates nothing', async () => {
-    const {adaptive, round} = makeRound(true, noMeasurement);
+    const {adaptive, round} = makeAdaptiveResolutionRound(frameListeners, true, noMeasurement);
     // the frames that settle, and the 60 without a measurement after which the controller goes
     // over to frame-pacing, and asks on for the GPU time from then on
     round();
