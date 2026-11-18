@@ -26,7 +26,12 @@ export type FrameStep = (frame: DisplayEventProps) => Motion | void;
  * `StageRenderer`. Each method subscribes a listener and hands back its unsubscribe.
  */
 export interface FramePacerSource {
-  /** Every frame; the pacer runs its steps from here. */
+  /**
+   * Every frame; the pacer runs its steps from here, unless {@link FramePacer.shouldDraw} has run
+   * them for the frame already. The pacer tells frames apart by their props object and its
+   * `frameNo`: a source hands every frame props of its own, or counts `frameNo` in the one it
+   * hands again.
+   */
   onRenderFrame(listener: (frame: DisplayEventProps) => unknown): () => void;
   /** A new size. A resize clears the canvas, so the pacer draws the next frame. */
   onResize?(listener: (frame: DisplayEventProps) => unknown): () => void;
@@ -83,6 +88,11 @@ interface StepRecord<TStage> {
  * {@link shouldDraw} once per frame and draws when it answers `true`; that draw takes every
  * pending report with it. A new pacer has a report pending, so the first frame draws.
  *
+ * The steps of a frame run before {@link shouldDraw} answers for it, whichever the source calls
+ * first — the subscription of the pacer or the frame handler that asks: what a step moves in a
+ * frame, that frame draws. Only a {@link report} or an {@link invalidate} after the ask draws in
+ * the next frame.
+ *
  * The pacer subscribes to its source in the constructor: to the frames, which run the steps, and
  * to the resize and the restart of a source that has them, which draw the next frame.
  * {@link dispose} gives the subscriptions back; the source stays the caller's.
@@ -105,6 +115,14 @@ export class FramePacer<TStage extends object = object> {
   // by index, and a splice under it would skip the step behind the one that left
   #running = false;
   #removedInRun = false;
+
+  // Which frame the steps last ran for, by its props and its frameNo: a source that hands one
+  // props object for every frame and counts frameNo stays told apart. The subscription marks the
+  // frames it ran the steps for, shouldDraw() those it ran them for ahead of the subscription
+  #ranFrame: DisplayEventProps | undefined = undefined;
+  #ranFrameNo: number | undefined = undefined;
+  #aheadFrame: DisplayEventProps | undefined = undefined;
+  #aheadFrameNo: number | undefined = undefined;
 
   // the pending reports; a new pacer starts with one, so the first frame draws
   #full = true;
@@ -151,7 +169,7 @@ export class FramePacer<TStage extends object = object> {
     this.#live = live ?? undefined;
 
     try {
-      this.#unsubscribes.push(source.onRenderFrame(this.#runSteps));
+      this.#unsubscribes.push(source.onRenderFrame(this.#onRenderFrame));
       if (typeof source.onResize === 'function') this.#unsubscribes.push(source.onResize(this.#onInvalidate));
       if (typeof source.onRestart === 'function') this.#unsubscribes.push(source.onRestart(this.#onInvalidate));
     } catch (error) {
@@ -193,9 +211,11 @@ export class FramePacer<TStage extends object = object> {
 
   /**
    * Runs `step` once per frame, with the props of the frame, and takes its answer as a report —
-   * see {@link Motion}. Steps run in the order they were registered, each of them also behind one
-   * that throws: the errors come out of the frame afterwards, one unchanged, several as an
-   * `AggregateError`, and such a frame draws.
+   * see {@link Motion}. The steps of a frame run before {@link shouldDraw} answers for it: from
+   * the subscription of the pacer, or from `shouldDraw()` where the frame handler asks first.
+   * Steps run in the order they were registered, each of them also behind one that throws: the
+   * errors come out afterwards — of the frame, or of `shouldDraw()` where it ran the steps —, one
+   * unchanged, several as an `AggregateError`, and such a frame draws.
    *
    * With a `stage`, the answer counts only while the `live` option answers `true` for it; the
    * step runs every frame either way, so its state keeps pace with the clock.
@@ -258,6 +278,12 @@ export class FramePacer<TStage extends object = object> {
    * Whether this frame has to be drawn. The frame handler asks once per frame, before it draws,
    * with the props of the frame, and draws on `true`.
    *
+   * The steps of the frame have run when it answers: where the subscription of the pacer has not
+   * run them yet — the frame handler subscribed before the pacer was built —, `shouldDraw()` runs
+   * them itself, and the subscription leaves them out for that frame. A second ask in the same
+   * frame runs nothing. A step that throws in a run `shouldDraw()` started makes it throw, as
+   * {@link onFrame} describes, and the next frame draws.
+   *
    * It answers `true` when a report is pending — at once for `true`, at the stride of
    * {@link steadyFps} for `'steady'` — or when `busy` is `true`, which is for what the caller
    * knows without a step: a transition that runs, a stage being prepared. A frame that draws takes
@@ -267,11 +293,24 @@ export class FramePacer<TStage extends object = object> {
    * `frame.rawDeltaTime` — by `deltaTime` in props without it — and draws every n-th frame, every
    * 2nd at 60 Hz, every 4th at 120 Hz. Until a gap is measured, `'steady'` draws every frame.
    *
-   * After {@link dispose} it answers `true` and counts nothing: a pacer that paces nothing lets
-   * every frame draw.
+   * After {@link dispose} it answers `true`, runs nothing and counts nothing: a pacer that paces
+   * nothing lets every frame draw.
    */
   shouldDraw(frame: DisplayEventProps, busy = false): boolean {
     if (this.#disposed) return true;
+
+    // the steps of this frame run before the answer, whichever of the frame handler and the
+    // subscription of the pacer the source calls first
+    if (
+      !(frame === this.#ranFrame && frame.frameNo === this.#ranFrameNo) &&
+      !(frame === this.#aheadFrame && frame.frameNo === this.#aheadFrameNo)
+    ) {
+      this.#aheadFrame = frame;
+      this.#aheadFrameNo = frame.frameNo;
+      this.#runSteps(frame);
+      // a step that disposed the pacer leaves it pacing nothing
+      if (this.#disposed) return true;
+    }
 
     this.#frames += 1;
     this.#measure(frame);
@@ -304,6 +343,8 @@ export class FramePacer<TStage extends object = object> {
     // an unsubscribe handed out before finds its record taken off already
     for (const record of this.#steps) record.removed = true;
     this.#steps.length = 0;
+    this.#ranFrame = undefined;
+    this.#aheadFrame = undefined;
 
     const errors: unknown[] = [];
     this.#unsubscribeAll(errors);
@@ -349,7 +390,19 @@ export class FramePacer<TStage extends object = object> {
     this.invalidate();
   };
 
-  readonly #runSteps = (frame: DisplayEventProps): void => {
+  // The clock of the steps, once per frame: it runs them unless shouldDraw() has run them for this
+  // frame already. Either way the frame counts as run from here on, and the mark of shouldDraw()
+  // goes: the next frame is a new one, even in the props object of this one
+  readonly #onRenderFrame = (frame: DisplayEventProps): void => {
+    const ahead = frame === this.#aheadFrame && frame.frameNo === this.#aheadFrameNo;
+    this.#aheadFrame = undefined;
+    // set before the run: a step that throws has had its run, and shouldDraw() starts no second one
+    this.#ranFrame = frame;
+    this.#ranFrameNo = frame.frameNo;
+    if (!ahead) this.#runSteps(frame);
+  };
+
+  #runSteps(frame: DisplayEventProps): void {
     const steps = this.#steps;
     // a step registered during the run first runs in the next frame
     const count = steps.length;
@@ -389,5 +442,5 @@ export class FramePacer<TStage extends object = object> {
       this.invalidate();
       throwCollected(errors, 'FramePacer: more than one frame step threw');
     }
-  };
+  }
 }

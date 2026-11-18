@@ -32,6 +32,7 @@ import {FrameLoop} from './FrameLoop.js';
 import {isWebGLRenderer} from './isWebGLRenderer.js';
 import {isWebGPURenderer} from './isWebGPURenderer.js';
 import {Stylesheets} from './Stylesheets.js';
+import {assertFiniteAtLeast} from '../utils/assertFiniteAtLeast.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {
@@ -901,8 +902,9 @@ export class Display {
   // back — see dispose().
   #ownContainer?: HTMLDivElement;
 
-  // The canvas handed to the constructor as its first argument. It is the caller's, and the
-  // release of the renderer hands it back able to carry the next display — see #releaseRenderer()
+  // The canvas that stays with the caller after dispose(): the one handed to the constructor as
+  // its first argument, or the domElement of an adopted renderer. The release of the renderer
+  // hands it on able to carry the next display — see #releaseRenderer()
   #callersCanvas?: HTMLCanvasElement;
 
   // What the canvas handed to the constructor looked like before this display wrote on it, kept
@@ -916,18 +918,23 @@ export class Display {
    * Create a display around a canvas, around a container element that gets a canvas of its own,
    * or around a `WebGPURenderer` that is already built.
    *
-   * A canvas handed in here stays the caller's. If a display disposed before this one is still
-   * releasing the renderer it had on that canvas, or left its WebGL context lost, the renderer of
-   * this display starts its init once that release is through and the context is back, or once
-   * the wait for the context has run out — see {@link Display.dispose}.
+   * A canvas handed in here stays the caller's.
    *
-   * A renderer handed in here is adopted, not borrowed: the display takes it and its
-   * `domElement` as its own. {@link Display.dispose} releases it with `renderer.dispose()`, once
-   * its init is through and the GPU has run the work submitted to it, or for two seconds at most,
-   * and goes on with a warning on the console after that; under WebGPU also once the page has
-   * drawn two more animation frames, or two more seconds have passed without one while the page
-   * is visible — a hidden page holds the release until it is visible again. A renderer that
-   * has to outlive this display therefore does not belong in here.
+   * A renderer handed in here is adopted, not borrowed: the renderer is the display's, and
+   * {@link Display.dispose} releases it with `renderer.dispose()`, once its init is through and
+   * the GPU has run the work submitted to it, or for two seconds at most, and goes on with a
+   * warning on the console after that; under WebGPU also once the page has drawn two more
+   * animation frames, or two more seconds have passed without one while the page is visible — a
+   * hidden page holds the release until it is visible again. A renderer that has to outlive this
+   * display therefore does not belong in here. Its `domElement` stays where the caller put it
+   * and keeps what the display wrote on it, and after the release it carries a new display —
+   * built around a new `WebGPURenderer` on it — as a canvas handed in does.
+   *
+   * If a display disposed before this one is still releasing the renderer it had on the canvas
+   * of this one — a canvas handed in, or the `domElement` of an adopted renderer —, or left its
+   * WebGL context lost, the renderer of this display starts its init once that release is
+   * through and the context is back, or once the wait for the context has run out — see
+   * {@link Display.dispose}.
    *
    * A constructor that throws after it has built or taken over the renderer — from a `resizeTo`
    * callback, say — gives everything back as {@link Display.dispose} would: the renderer is
@@ -960,6 +967,10 @@ export class Display {
       ...rendererOptions
     } = options ?? {};
 
+    // before the renderer is built: a constructor that refuses its options takes nothing over
+    // and builds nothing. 0 is no limit, and so is a maxFps left out
+    if (maxFps != null) assertFiniteAtLeast(maxFps, 'new Display()', 'maxFps', 0);
+
     // read with ?., so that a wrong first argument — a null, a number — fails below with the
     // TypeError that names what the constructor takes
     const firstNode = isWebGPURenderer(domElementOrRenderer)
@@ -983,6 +994,8 @@ export class Display {
     if (isWebGPURenderer(domElementOrRenderer)) {
       this.#renderer = domElementOrRenderer;
       this.resizeToElement = domElementOrRenderer.domElement;
+      // the renderer is the display's from here on, its canvas stays the caller's
+      this.#callersCanvas = domElementOrRenderer.domElement;
     } else if (isHTMLElement(domElementOrRenderer)) {
       let canvas: HTMLCanvasElement;
       let callersCanvasBefore: CanvasState | undefined;
@@ -1055,9 +1068,7 @@ export class Display {
     const canvasTaken = waitForCanvas(renderer.domElement);
     this.#waitForRenderer = canvasTaken != null ? canvasTaken.then(() => renderer.init()) : renderer.init();
 
-    // a maxFps that is no positive finite number is no limit — as adaptiveResolution reads it
-    // below —, and new FrameLoop() would refuse it only once the renderer is built
-    this.#frameLoop = new FrameLoop(isPositiveFinite(maxFps) ? maxFps : 0, this.#renderer);
+    this.#frameLoop = new FrameLoop(maxFps ?? 0, this.#renderer);
 
     // From here on a throw takes down what the constructor has built, as dispose() does: it
     // releases the renderer, gives a canvas handed in back and takes its own container out.
@@ -1114,7 +1125,7 @@ export class Display {
         // adaptiveResolution answers
         new AdaptiveResolution(this, {
           // a display held to a lower frame rate is held to that one
-          targetFps: isPositiveFinite(maxFps) && maxFps < 60 ? maxFps : undefined,
+          targetFps: maxFps != null && maxFps > 0 && maxFps < 60 ? maxFps : undefined,
           ...(adaptiveResolution === true ? null : adaptiveResolution),
         });
       }
@@ -1197,8 +1208,12 @@ export class Display {
 
       this.#waitForRenderer.catch((error) => {
         // a renderer that never comes up is what the caller has to hear about; left here it
-        // would be an unhandled rejection and the display would simply stay dark
-        emit(this, OnDisplayError, error, this);
+        // would be an unhandled rejection and the display would simply stay dark.
+        // emitSafe(): the event goes out of a promise continuation, which has no caller the
+        // error of a listener would belong to. A listener that throws is reported on the console
+        // by eventize, every listener after it hears the event, and the event is retained all
+        // the same
+        emitSafe(this, OnDisplayError, error, this);
       });
     } catch (error) {
       try {
@@ -1983,15 +1998,17 @@ export class Display {
    * and the `width` and `height` attributes of the drawing buffer return to what they were
    * before the constructor ran, and so does the `data-engine` attribute three marks it with.
    *
-   * That canvas is able to carry a new display. Under the WebGL backend the release gives up the
-   * context of that canvas, and a canvas keeps its one WebGL context for good, so the release
-   * keeps that context restorable and leaves it lost. Only a `Display` brings it
-   * back: a `WebGPURenderer` or a `getContext('webgl2')` of your own on that canvas gets the
-   * lost context. The next `Display` built on the same canvas — while the release runs or any
-   * time after — waits for the release, restores the context and then starts the init of its
-   * renderer. A context the browser has not brought back within two seconds ends the wait with
-   * a warning on the console; it stays lost and restorable, and the next `Display` built on the
-   * canvas tries again.
+   * That canvas, and the `domElement` of an adopted renderer, which stays where the caller put it
+   * and keeps what the display wrote on it, are able to carry a new display. Under the WebGL
+   * backend the release gives up the context of that canvas, and a canvas keeps its one WebGL
+   * context for good, so the release keeps that context restorable and leaves it lost. Only a
+   * `Display` brings it back: a `WebGPURenderer` or a `getContext('webgl2')` of your own on that
+   * canvas gets the lost context until a display is built around it. The next `Display` built on
+   * the same canvas — on the canvas itself, or around a new `WebGPURenderer` on it — while the
+   * release runs or any time after waits for the release, restores the context and then starts the
+   * init of its renderer. A context the browser has not brought back within two seconds ends the
+   * wait with a warning on the console; it stays lost and restorable, and the next `Display` built
+   * on the canvas tries again.
    *
    * Every listener of `OnDisplayPause` — a running display pauses first — and of
    * `OnDisplayDispose` hears its event, even behind one that throws, and a listener that throws
@@ -2205,7 +2222,9 @@ export class Display {
    * Subscribes `listener` to `OnDisplayError`: the renderer of this display did not come up,
    * and no frame is going to follow.
    *
-   * The event is retained, so a listener attached after the failure is told about it too.
+   * The event is retained, so a listener attached after the failure is told about it too. Every
+   * listener hears the error, also behind one that throws; a listener that throws is reported on
+   * the console by eventize.
    */
   readonly onError = (listener: (error: unknown, display: Display) => unknown): UnsubscribeFunc =>
     on(this, OnDisplayError, listener);

@@ -49,6 +49,27 @@ describe('SpriteResources', () => {
     resources.dispose();
   });
 
+  test('setUniform() refuses a component that is no finite number and keeps the value the uniform holds', () => {
+    const resources = new SpriteResources([anim]);
+    resources.setUniform('time', 2);
+    resources.setUniform('light', 1, 2, 3);
+
+    expect(() => resources.setUniform('light', 1, undefined, 3)).toThrow(
+      new TypeError('SpriteResources: the uniform "light" is a vec3 and takes 3 finite numbers, got [1, undefined, 3]'),
+    );
+    expect(() => resources.setUniform('light', 1, 2, Number.POSITIVE_INFINITY)).toThrow(
+      new TypeError('SpriteResources: the uniform "light" is a vec3 and takes 3 finite numbers, got [1, 2, Infinity]'),
+    );
+    expect(() => resources.setUniform('time', Number.NaN)).toThrow(
+      new TypeError('SpriteResources: the uniform "time" is a float and takes a finite number, got NaN'),
+    );
+    expect(() => resources.setUniform('time', '1' as unknown as number)).toThrow(TypeError);
+
+    expect(resources.uniforms['time']!.value).toBe(2);
+    expect(resources.uniforms['light']!.value).toEqual(new Vector3(1, 2, 3));
+    resources.dispose();
+  });
+
   test('holds a vec2 and a vec4 uniform, and takes start values for them', () => {
     const shaped = defineFeature({name: 'shaped', uniforms: {offset: [1, 2], tint: [1, 1, 1, 1]}});
     const resources = new SpriteResources([shaped], {uniforms: {tint: [0.5, 0.25, 0, 1]}});

@@ -52,7 +52,9 @@ const makePacer = (options?: ConstructorParameters<typeof FramePacer>[1]) => {
 /** A pacer whose first frame is drawn: nothing is pending. */
 const makeSettledPacer = (options?: ConstructorParameters<typeof FramePacer>[1]) => {
   const made = makePacer(options);
-  expect(made.pacer.shouldDraw(FRAME), 'the first frame').toBe(true);
+  // a frame of its own: shouldDraw() runs the steps of the frame it is asked about where the
+  // source has not, and the frames the test emits after it are new ones
+  expect(made.pacer.shouldDraw(frameAfter(1000 / 60)), 'the first frame').toBe(true);
   return made;
 };
 
@@ -626,7 +628,8 @@ describe('FramePacer', () => {
       const {source, emitFrame} = makeSource();
       const pacer = new FramePacer(source, {live: (layer: Layer) => !layer.frozen});
       const room: Layer = {name: 'room', frozen: true};
-      pacer.shouldDraw(FRAME);
+      // the first frame, in props of its own: the frame emitted below is the next one
+      pacer.shouldDraw(frameAfter(1000 / 60));
       pacer.onFrame(() => true, room);
       // @ts-expect-error a stage of this pacer is a Layer
       pacer.onFrame(() => true, {name: 'no layer'});
@@ -697,6 +700,98 @@ describe('FramePacer', () => {
       emitFrame();
 
       expect(step).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('the steps of a frame, before shouldDraw() answers for it', () => {
+    /** The props of the frame `frameNo`, an object of its own as a display hands out. */
+    const frameNumbered = (frameNo: number): DisplayEventProps =>
+      ({rawDeltaTime: 1 / 60, deltaTime: 1 / 60, frameNo}) as DisplayEventProps;
+
+    test('runs the steps of a frame before shouldDraw() answers, also for a pacer built after the frame handler subscribed', () => {
+      const {source, listeners} = makeSource();
+      const answers: boolean[] = [];
+      let pacer: FramePacer | undefined;
+      // the frame handler of the app subscribes first, and the pacer after it
+      source.onRenderFrame((frame) => {
+        answers.push(pacer!.shouldDraw(frame));
+      });
+      pacer = new FramePacer(source);
+      let moveIn = 0;
+      pacer.onFrame((frame) => frame.frameNo === moveIn);
+
+      const run = (frameNo: number) => {
+        const frame = frameNumbered(frameNo);
+        for (const listener of Array.from(listeners.frame)) listener(frame);
+      };
+      run(1);
+      run(2);
+      moveIn = 3;
+      run(3);
+      run(4);
+
+      // the first frame draws, the third draws what its step moved, in that very frame
+      expect(answers).toEqual([true, false, true, false]);
+    });
+
+    test.each([
+      ['the subscription', false],
+      ['shouldDraw()', true],
+    ])('runs the steps of a frame once, whichever asks first: %s', (_first, askFirst) => {
+      const {pacer, listeners} = makePacer();
+      const step = vi.fn(() => false);
+      pacer.onFrame(step);
+
+      for (let frameNo = 1; frameNo <= 3; frameNo++) {
+        const frame = frameNumbered(frameNo);
+        if (askFirst) pacer.shouldDraw(frame);
+        for (const listener of Array.from(listeners.frame)) listener(frame);
+        pacer.shouldDraw(frame);
+        if (!askFirst) pacer.shouldDraw(frame);
+      }
+
+      expect(step).toHaveBeenCalledTimes(3);
+    });
+
+    test('runs the steps in every frame for a source that hands one props object with a new frameNo', () => {
+      const {pacer, listeners} = makeSettledPacer();
+      const frame = frameNumbered(1);
+      const seen: number[] = [];
+      pacer.onFrame((props) => {
+        seen.push(props.frameNo);
+        return props.frameNo === 3;
+      });
+
+      const answers: boolean[] = [];
+      for (let frameNo = 2; frameNo <= 4; frameNo++) {
+        frame.frameNo = frameNo;
+        // the frame handler asks before the subscription of the pacer has run
+        answers.push(pacer.shouldDraw(frame));
+        for (const listener of Array.from(listeners.frame)) listener(frame);
+      }
+
+      expect(seen, 'the frames the step ran in').toEqual([2, 3, 4]);
+      expect(answers, 'the frames that draw').toEqual([false, true, false]);
+    });
+
+    test('a step that throws in a run shouldDraw() started makes shouldDraw() throw, and the next frame draws', () => {
+      const {pacer, listeners} = makeSettledPacer();
+      const error = new Error('the camera lost its target');
+      let fail = true;
+      pacer.onFrame(() => {
+        if (fail) throw error;
+        return false;
+      });
+
+      const first = frameNumbered(2);
+      expect(() => pacer.shouldDraw(first)).toThrow(error);
+      // the subscription of that frame finds its steps run, and runs them not again
+      expect(() => {
+        for (const listener of Array.from(listeners.frame)) listener(first);
+      }).not.toThrow();
+
+      fail = false;
+      expect(pacer.shouldDraw(frameNumbered(3)), 'the frame after the one that threw').toBe(true);
     });
   });
 

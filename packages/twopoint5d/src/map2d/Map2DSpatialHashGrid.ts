@@ -43,6 +43,32 @@ function assertFiniteAABB(aabb: AABB2, what: string): void {
   );
 }
 
+// Beyond ±Number.MAX_SAFE_INTEGER `x++` no longer counts on, so the loop over the cells of a
+// placement or a query would never end. Arithmetic only: add() and findWithin() run on hot paths,
+// and the message is built in the error case alone.
+function assertCellsInRange(within: TilesWithinCoords, aabb: AABB2, what: string): void {
+  const {tileLeft, tileTop, columns, rows} = within;
+  const right = tileLeft + columns;
+  const bottom = tileTop + rows;
+  const max = Number.MAX_SAFE_INTEGER;
+  if (
+    tileLeft >= -max &&
+    tileLeft <= max &&
+    tileTop >= -max &&
+    tileTop <= max &&
+    right >= -max &&
+    right <= max &&
+    bottom >= -max &&
+    bottom <= max
+  ) {
+    return;
+  }
+  const {left, top, width, height} = aabb;
+  throw new RangeError(
+    `Map2DSpatialHashGrid: ${what} reaches into cells beyond ±Number.MAX_SAFE_INTEGER, got left ${describeValue(left)}, top ${describeValue(top)}, width ${describeValue(width)}, height ${describeValue(height)}`,
+  );
+}
+
 /**
  * A spatial index over a grid of tiles: every renderable lies in the cells its `aabb` reaches
  * into when it is added, in one cell at the very least.
@@ -113,8 +139,8 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * lies, until it is added again (it then moves to the cells of its current `aabb`) or removed.
    *
    * Throws a `RangeError` for an `aabb` whose left, top, width or height is not a finite number,
-   * and for one that reaches into more than {@link maxCellsPerRenderable} cells, and then adds none
-   * of the renderables.
+   * for one that reaches into cells beyond ±`Number.MAX_SAFE_INTEGER` and for one that reaches into
+   * more than {@link maxCellsPerRenderable} cells, and then adds none of the renderables.
    */
   add(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
     // every aabb is checked before the first renderable moves, so that an add() that throws leaves
@@ -123,7 +149,9 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     const spans: number[] = [];
     for (const renderable of renderables) {
       assertFiniteAABB(renderable.aabb, 'the aabb of a renderable');
-      const {tileLeft, tileTop, columns, rows} = this.#cellsOf(renderable.aabb);
+      const within = this.#cellsOf(renderable.aabb);
+      assertCellsInRange(within, renderable.aabb, 'the aabb of a renderable');
+      const {tileLeft, tileTop, columns, rows} = within;
       if (columns * rows > this.#maxCellsPerRenderable) {
         throw new RangeError(
           `Map2DSpatialHashGrid: the aabb of a renderable reaches into ${columns * rows} cells, more than maxCellsPerRenderable (${this.#maxCellsPerRenderable}) — give the grid larger cells or raise maxCellsPerRenderable`,
@@ -234,13 +262,15 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * keeps one array and the query allocates nothing. The order of the renderables is not defined.
    * A query costs the cells of its rectangle or the cells the grid holds, whichever are fewer.
    *
-   * Throws a `RangeError` for an `aabb` whose left, top, width or height is not a finite number.
+   * Throws a `RangeError` for an `aabb` whose left, top, width or height is not a finite number,
+   * and for one that reaches into cells beyond ±`Number.MAX_SAFE_INTEGER`.
    */
   findWithin(aabb: AABB2): Set<Renderable> | undefined;
   findWithin(aabb: AABB2, out: Renderable[]): Renderable[];
   findWithin(aabb: AABB2, out?: Renderable[]): Set<Renderable> | Renderable[] | undefined {
     assertFiniteAABB(aabb, 'the aabb of findWithin()');
     const within = this.#cellsOf(aabb);
+    assertCellsInRange(within, aabb, 'the aabb of findWithin()');
     return out ? this.#collect(within, out) : this.#gather(within);
   }
 
@@ -253,7 +283,10 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * keeps one array and the query allocates nothing. The order of the renderables is not defined.
    * A query costs the cells of its rectangle or the cells the grid holds, whichever are fewer.
    *
-   * Throws a `RangeError` for a `width` or `height` that is not a finite number.
+   * Throws a `RangeError` for a `width` or `height` that is not a finite number, for a `tileX` or
+   * `tileY` that is not one, and for a query that reaches into cells beyond
+   * ±`Number.MAX_SAFE_INTEGER` — `tileX`, `tileY`, `tileX + width` and `tileY + height` all stay
+   * within.
    */
   getTiles(tileX: number, tileY: number, width?: number, height?: number): Set<Renderable> | undefined;
   getTiles(tileX: number, tileY: number, width: number, height: number, out: Renderable[]): Renderable[];
@@ -261,6 +294,28 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
     if (!Number.isFinite(width) || !Number.isFinite(height)) {
       throw new RangeError(
         `Map2DSpatialHashGrid: the width and height of getTiles() must be finite numbers, got width ${describeValue(width)}, height ${describeValue(height)}`,
+      );
+    }
+    // inline and arithmetic only, on the hot path of a caller that asks every frame: beyond
+    // ±Number.MAX_SAFE_INTEGER `x++` no longer counts on and the loop over the cells never ends,
+    // and NaN fails every one of the comparisons
+    const max = Number.MAX_SAFE_INTEGER;
+    const right = tileX + width;
+    const bottom = tileY + height;
+    if (
+      !(
+        tileX >= -max &&
+        tileX <= max &&
+        tileY >= -max &&
+        tileY <= max &&
+        right >= -max &&
+        right <= max &&
+        bottom >= -max &&
+        bottom <= max
+      )
+    ) {
+      throw new RangeError(
+        `Map2DSpatialHashGrid: the tileX and tileY of getTiles() must be finite numbers, and the cells of the query within ±Number.MAX_SAFE_INTEGER, got tileX ${describeValue(tileX)}, tileY ${describeValue(tileY)}, width ${describeValue(width)}, height ${describeValue(height)}`,
       );
     }
     const within = this.#within;

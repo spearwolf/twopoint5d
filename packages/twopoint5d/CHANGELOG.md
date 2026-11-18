@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - add `Easing`, the type of a named easing (`'linear'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'`) or a function from the linear progress `0…1` to the eased one, shared through `utils`; `StageTransitionEasing` stays as its alias
-- add `FramePacer`, drawing on demand for a renderer driven from a frame handler: the frame loop runs on, and `shouldDraw(frame, busy?)` answers once per frame whether the picture has to be drawn anew — for a pending report, or for `busy`. Reports are `invalidate()`, `report(motion)` and the answers of the frame steps registered through `onFrame(step, stage?)`; a draw takes every pending report, a new pacer draws its first frame, and the pacer invalidates on the resize and the restart of a source that has them. A step that throws leaves the steps behind it running and draws the frame. And the types `FramePacerSource` — a `Display` is one — and `FramePacerOptions` (see "Drawing on demand" in `docs/display.md`)
+- add `FramePacer`, drawing on demand for a renderer driven from a frame handler: the frame loop runs on, and `shouldDraw(frame, busy?)` answers once per frame whether the picture has to be drawn anew — for a pending report, or for `busy`. Reports are `invalidate()`, `report(motion)` and the answers of the frame steps registered through `onFrame(step, stage?)`; a draw takes every pending report, a new pacer draws its first frame, and the pacer invalidates on the resize and the restart of a source that has them. A step that throws leaves the steps behind it running and draws the frame. The steps of a frame run before `shouldDraw()` answers for it, whichever subscribed first — the pacer or the frame handler that asks: `shouldDraw()` runs them itself where the subscription of the pacer has not yet, once a frame, told apart by the props object and its `frameNo`, so what a step moves in a frame, that frame draws. And the types `FramePacerSource` — a `Display` is one — and `FramePacerOptions` (see "Drawing on demand" in `docs/display.md`)
 - add `Motion` and `FrameStep`, the contract a building block that moves something answers in: `false`, `undefined` or nothing for a picture that did not change, `true` for one that did, and `'steady'` for an animation that never ends, which a `FramePacer` draws at `steadyFps` frames a second (default `FramePacer.DefaultSteadyFps`, 30) — every n-th frame, n measured from the `rawDeltaTime` of the frames and moved only by a measurement that lasts 30 frames, so 60 Hz draws every 2nd, 120 Hz every 4th, 144 and 165 Hz every 5th frame, and `maxFps: 30` every frame
 - add the `live` option of `FramePacer`: the answer of a step registered with a stage counts only while `live(stage)` answers `true`, for a layer that keeps its picture behind an overlay; the type of the stage is the type parameter of `FramePacer` and `FramePacerOptions`
 - add `untilSettled()`, a function with one frame of memory for a frame step that sets a pose from the clock: `true` while its argument is `true`, and once more in the frame it turns `false`, so the end pose of a motion is drawn
@@ -39,6 +39,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the `AggregateError` of `Stage2D#dispose()` reads `Stage2D#dispose(): more than one of the listeners of the dispose event, the releases of the post-process and the release of the pass node threw`
 - the contract of `IProjection`: `projectionPlane` may be `undefined` for a projection that places its camera without one, and `createCamera()` and `updateCamera()` throw without a plane only where the projection needs one — `OrthographicProjection` and `ParallaxProjection` throw as before
 - the `AggregateError` of `Stage2D#resize()`, `Stage2D#updateProjection()` and of an assignment to `Stage2D#projection` or `Stage2D#camera` names `OnStageCameraPlaced` among the events whose listeners threw, and the CameraRig of the stage beside them, as in `Stage2D#resize(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the CameraRig of the stage threw`
+- `OnDisplayError` goes out through `emitSafe()`: every listener of `display.onError()` hears the error, also behind one that throws; a listener that throws is reported on the console by eventize, and the error leaves no unhandled rejection
+- `new Display()` throws a `RangeError` for a `maxFps` that is no finite number of 0 or more — `NaN`, a negative number, `Infinity` —, before it builds or takes over a renderer; without it, with `undefined`, `null` and `0` the display draws as many frames as the page gives it (**BREAKING**). See the Migration Guide
+- `new AdaptiveResolution()`, and the `adaptiveResolution` option of `Display`, throw a `RangeError` for a `targetFps`, `minScale` or `maxScale` that is given and no finite number above 0, before the controller takes the display over; `undefined` and `null` are the defaults, `60`, `0.5` and `1` (**BREAKING**). See the Migration Guide
+- `FixedFrameLoop#fps` and `FixedFrameLoop#maxStepsPerFrame` throw a `RangeError` for a value they cannot run with — a rate that is no finite number above 0, a bound that is no whole number of 1 or more — and the loop keeps what it has; `new FixedFrameLoop()` throws for such an option, and for such a `FixedFrameLoop.DefaultFps` or `FixedFrameLoop.DefaultMaxStepsPerFrame` where no option stands in for it, and builds no loop (**BREAKING**). See the Migration Guide
+- `PanControl2D#mouseButton` is an accessor and, like the option `mouseButton`, takes a whole number from 1 to 31, the bits of `MouseEvent.buttons` — several bits pan with each of their buttons; anything else throws a `RangeError` and the control keeps the value it holds (**BREAKING**). See the Migration Guide
+- `Map2DSpatialHashGrid#getTiles()` throws a `RangeError` for a `tileX` or `tileY` that is no finite number and for a query whose cells reach beyond ±`Number.MAX_SAFE_INTEGER`; `add()` and `findWithin()` throw one for an `aabb` whose cells lie beyond that range, `add()` before the first renderable moves (**BREAKING**). See the Migration Guide
+- `new RepeatingTilesProvider()` takes a tile id, a row of tile ids or an array of rows and passes each through the checks of the `tileIds` setter: a pattern such as `[[], [1, 2]]` throws the row-length `Error`, a row with a value that is no tile id a `RangeError`, and a value of any other kind a `TypeError`; no pattern, `null` and `[]` give a pattern without cells (**BREAKING**). See the Migration Guide
+- `parseAnchorPosition()` and `calculateAnchorOffset()` throw a `TypeError` for an `anchorPosition` that is none of the ten values of `AnchorPosition`, `''` included; `undefined` means `'center'` (**BREAKING**). See the Migration Guide
+- `SpriteResources#setUniform()` — and with it `setUniform()` of `FeatureSpritesMaterial` and `FeatureSprites` — throws a `TypeError` for a component that is no finite number, and the uniform keeps the value it holds (**BREAKING**). See the Migration Guide
+- `TextureAtlas#frameNames()` throws a `SyntaxError` that names the pattern for a string that is no valid regular expression, and `FrameBasedAnimations#add()` one that names the animation for such a `frameNameQuery`, both with the error of the `RegExp` as `cause`; a texture resource skips that entry of its catalog and reports it as an `error` event with `source: 'frameBasedAnimations'` (**BREAKING**). See the Migration Guide
+
+### Fixed
+
+- the canvas of a `WebGPURenderer` handed to `new Display()` carries a new `Display` after `display.dispose()`, as a canvas handed in does: a `Display` around a new `WebGPURenderer({canvas})` on it waits for the release of the old renderer and brings the WebGL context of the canvas back (see "The canvas after `dispose()`" in `docs/display.md`)
+- an `AdaptiveResolution` that went over to `frame-pacing` because its renderer resolved no GPU time for 60 frames — a loading screen that draws nothing — goes on asking for it and goes back to `gpu-time` with the first valid measurement (see "Adaptive resolution in detail" in `docs/display.md`)
+- `Chronometer#time` moves only by the `deltaTime` of `update()`: the span from the last time seen to `stop()` counts as lost, as the pause after it does, so `stop()` and `start()` leave `time` where the last `update()` put it, whether or not `update()` ran in the pause
+
+### Migration Guide
+
+#### Rates of the display module throw
+
+`maxFps` of `Display`, `targetFps`, `minScale` and `maxScale` of `AdaptiveResolution`, and `fps` and `maxStepsPerFrame` of `FixedFrameLoop` refuse a value they cannot run with. Leave the option out, or pass `undefined`, for its default; `maxFps: 0` stays no limit.
+
+**Before**
+
+```ts
+new Display(canvas, {maxFps: Number(config.fps)}); // NaN drew without a limit
+loop.fps = 0; // ignored, the loop kept its rate
+```
+
+**After**
+
+```ts
+new Display(canvas, {maxFps: Number.isFinite(Number(config.fps)) ? Number(config.fps) : undefined});
+if (fps > 0) loop.fps = fps;
+```
+
+#### `PanControl2D#mouseButton` takes a whole number from 1 to 31
+
+A `0`, which turned panning with the mouse off, or a string from a config throws now.
+
+**Before**
+
+```ts
+new PanControl2D({mouseButton: '1' as unknown as number}); // panned with no button
+```
+
+**After**
+
+```ts
+new PanControl2D({mouseButton: Number('1')});
+```
+
+#### Map queries and tile patterns refuse what they dropped
+
+`Map2DSpatialHashGrid#getTiles()` takes finite tile coordinates, and the cells of a query or of an `aabb` stay within ±`Number.MAX_SAFE_INTEGER`. `new RepeatingTilesProvider()` takes a pattern the `tileIds` setter takes: rows of equal length.
+
+**Before**
+
+```ts
+new RepeatingTilesProvider([[], [1, 2]]); // an empty map
+```
+
+**After**
+
+```ts
+new RepeatingTilesProvider([[1, 2]]);
+```
+
+#### `anchorPosition`, `setUniform()` and `frameNameQuery` refuse what they took
+
+An `anchorPosition` outside `AnchorPosition` throws instead of leaving the target as it was, a component of `setUniform()` that is no finite number throws instead of landing in the uniform, and a `frameNameQuery` that is no valid regular expression throws a `SyntaxError` that names the animation — from a catalog, an `error` event of the texture resource.
+
+**Before**
+
+```ts
+sprites.setUniform('offset', 1, undefined, 3); // undefined landed in the vec3
+```
+
+**After**
+
+```ts
+sprites.setUniform('offset', 1, 0, 3);
+```
 
 ## [0.25.0] - 2026-11-01
 

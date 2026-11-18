@@ -1,7 +1,13 @@
 import {Vector2} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
 
-import {calculateAnchorOffset, type FitIntoRectangleSpecs, fitIntoRectangle, parseAnchorPosition} from './fitIntoRectangle.js';
+import {
+  type AnchorPosition,
+  calculateAnchorOffset,
+  type FitIntoRectangleSpecs,
+  fitIntoRectangle,
+  parseAnchorPosition,
+} from './fitIntoRectangle.js';
 
 describe('fitIntoRectangle', () => {
   it('pixelZoom', () => {
@@ -100,6 +106,17 @@ describe('parseAnchorPosition', () => {
   it('should parse "bottom right"', () => {
     expect(parseAnchorPosition('bottom right')).toEqual(['bottom', 'right']);
   });
+
+  it('refuses an anchor position outside the list of AnchorPosition', () => {
+    expect(() => parseAnchorPosition('middle' as AnchorPosition)).toThrow(
+      new TypeError(
+        `parseAnchorPosition: anchorPosition must be 'top left', 'top center', 'top right', 'center left', 'center', 'center center', 'center right', 'bottom left', 'bottom center' or 'bottom right', got "middle"`,
+      ),
+    );
+    for (const value of ['', 'left top', 'top  left', null, 1]) {
+      expect(() => parseAnchorPosition(value as AnchorPosition), String(value)).toThrow(TypeError);
+    }
+  });
 });
 
 describe('calculateAnchorOffset', () => {
@@ -180,6 +197,17 @@ describe('calculateAnchorOffset', () => {
     expect(result).toBe(target);
     expect(target.x).toBe(0);
     expect(target.y).toBe(0);
+  });
+
+  it('refuses an anchor position outside the list of AnchorPosition and leaves the target as it is', () => {
+    const target = new Vector2(7, 9);
+
+    expect(() => calculateAnchorOffset(rect, view, 'middle' as AnchorPosition, target)).toThrow(
+      new TypeError(
+        `calculateAnchorOffset: anchorPosition must be 'top left', 'top center', 'top right', 'center left', 'center', 'center center', 'center right', 'bottom left', 'bottom center' or 'bottom right', got "middle"`,
+      ),
+    );
+    expect(target.toArray()).toEqual([7, 9]);
   });
 
   it('should handle negative differences (cover mode)', () => {

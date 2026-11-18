@@ -28,7 +28,9 @@ renderables.
 The usual map: the ground under a perspective camera that looks down at it. A tile id comes from
 the data provider, the frame of that id from the tile set, and the id `0` is a hole — no sprite.
 `RepeatingTilesProvider` takes ids that are whole numbers from 0 to 4294967295 — the range of the
-`Uint32Array` that `getTileIdsWithin()` writes — and refuses a pattern with any other value.
+`Uint32Array` that `getTileIdsWithin()` writes — and refuses a pattern with any other value. Its
+pattern is a tile id, a row of ids or an array of rows of one length; no pattern or `[]` is a
+pattern without cells, which answers `0` everywhere, and a value of any other kind throws.
 `getTileIdAt()` and `getTileIdsWithin()` take their coordinates and counts as whole numbers —
 the width and the height 0 or more — and throw a `RangeError` for anything else.
 
@@ -232,10 +234,11 @@ The grid remembers the cells of a renderable when it is added: a changed `aabb` 
 renderable where it lies until it is added again. An `aabb` that reaches into more than
 `maxCellsPerRenderable` cells — 65 536 unless set, and `Infinity` turns the limit off — throws a
 `RangeError` in `add()`, and none of the renderables of that call goes in: give the grid larger
-cells or raise the limit. A query costs the cells of its rectangle or the cells the grid holds,
-whichever are fewer, and hands out each renderable once, in no fixed order. `getTile()` hands out
-the set of the cell itself; whoever needs it past the next `add()`, `remove()` or `clear()` keeps a
-copy.
+cells or raise the limit. An `aabb` or a query that is no finite rectangle, or that reaches into
+cells beyond ±`Number.MAX_SAFE_INTEGER`, throws a `RangeError` as well. A query costs the cells of
+its rectangle or the cells the grid holds, whichever are fewer, and hands out each renderable once,
+in no fixed order. `getTile()` hands out the set of the cell itself; whoever needs it past the next
+`add()`, `remove()` or `clear()` keeps a copy.
 
 ## Defaults and how they play together
 

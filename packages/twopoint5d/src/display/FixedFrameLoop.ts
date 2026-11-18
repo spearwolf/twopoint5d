@@ -1,16 +1,13 @@
 import {emit, emitStrict, type EventizedObject, eventize, off, on, once, type UnsubscribeFunc} from '@spearwolf/eventize';
 import {OnDisplayDispose, OnDisplayRenderFrame} from '../events.js';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
+import {assertWholeNumber} from '../utils/assertWholeNumber.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import type {Display} from './Display.js';
 import type {DisplayEventProps} from './types.js';
 
 const OnTick = Symbol.for('twopoint5d:FixedFrameLoop.OnTick');
 const OnRender = Symbol.for('twopoint5d:FixedFrameLoop.OnRender');
-
-// what a loop starts with when neither its options nor the writable statics give a value it
-// can run with
-const BUILT_IN_FPS = 60;
-const BUILT_IN_MAX_STEPS_PER_FRAME = 5;
 
 /**
  * The props of every `OnTick`: a new object per tick, which a listener may keep — the loop
@@ -118,18 +115,18 @@ export class FixedFrameLoop {
   static readonly OnRender = OnRender;
 
   /**
-   * The rate a loop starts at when its options name none, or one it refuses. Read each time a
-   * loop is built; a value that is not finite or not greater than 0 is ignored there, and the
-   * loop starts at 60.
+   * The rate a loop starts at when its options name none, `60`. Read each time a loop is built
+   * without an `fps` option; a value that is no finite number above 0 makes that constructor
+   * throw a `RangeError`.
    */
-  static DefaultFps = BUILT_IN_FPS;
+  static DefaultFps = 60;
 
   /**
-   * The `maxStepsPerFrame` a loop starts with when its options name none, or one it refuses.
-   * Read each time a loop is built; a value that is not a whole number of 1 or more is ignored
-   * there, and the loop starts with 5.
+   * The `maxStepsPerFrame` a loop starts with when its options name none, `5`. Read each time a
+   * loop is built without a `maxStepsPerFrame` option; a value that is no whole number of 1 or
+   * more makes that constructor throw a `RangeError`.
    */
-  static DefaultMaxStepsPerFrame = BUILT_IN_MAX_STEPS_PER_FRAME;
+  static DefaultMaxStepsPerFrame = 5;
 
   /**
    * The display the loop ticks on, handed to the constructor. It stays the caller's, see
@@ -157,9 +154,9 @@ export class FixedFrameLoop {
    * is discarded (sim time stays consistent with the ticks that did
    * run; `alpha` drops back to ~0 on the next frame).
    *
-   * A value that is not a whole number of 1 or more is ignored, in the constructor as well as
-   * here; the constructor then keeps `DefaultMaxStepsPerFrame`, or 5 when that is such a value
-   * too.
+   * A whole number of 1 or more. Anything else throws a `RangeError`, and the loop keeps the
+   * bound it has; the constructor throws for such an option, or for such a
+   * `DefaultMaxStepsPerFrame` where no option stands in for it.
    */
   get maxStepsPerFrame(): number {
     return this.#maxStepsPerFrame;
@@ -169,23 +166,22 @@ export class FixedFrameLoop {
     // an unbounded value would take away the very guard this field is, one below 1 runs no
     // tick at all while discarding the backlog of every frame, and a fraction lets the check
     // `steps < maxStepsPerFrame` run one tick more than the bound says
-    if (!Number.isInteger(value) || value < 1) return;
-    this.#maxStepsPerFrame = value;
+    this.#maxStepsPerFrame = assertWholeNumber(value, 'FixedFrameLoop', 'maxStepsPerFrame', 1);
   }
 
   /**
    * Target simulation rate in frames per second.
    *
-   * A value that is not finite or not greater than 0 is ignored — in the constructor as well,
-   * where the loop then keeps `DefaultFps`, or 60 when that is such a value too.
+   * A finite number above 0. Anything else throws a `RangeError`, and the loop keeps the rate it
+   * has; the constructor throws for such an option, or for such a `DefaultFps` where no option
+   * stands in for it.
    */
   get fps(): number {
     return this.#fps;
   }
 
   set fps(value: number) {
-    if (!Number.isFinite(value) || value <= 0) return;
-    this.#fps = value;
+    this.#fps = assertPositiveFinite(value, 'FixedFrameLoop', 'fps');
     this.#fixedDelta = 1 / value;
   }
 
@@ -221,6 +217,10 @@ export class FixedFrameLoop {
    * @throws when the display handed in has been disposed and sends no more render frames for
    *   the loop to tick on. The message names the class and the state, and no loop comes into
    *   being.
+   * @throws {RangeError} for an `fps` that is no finite number above 0 and a `maxStepsPerFrame`
+   *   that is no whole number of 1 or more — in the options, or in
+   *   {@link FixedFrameLoop.DefaultFps} and {@link FixedFrameLoop.DefaultMaxStepsPerFrame} where
+   *   the options name none. No loop comes into being, and the display keeps its listeners.
    */
   constructor(display: Display, options?: {fps?: number; maxStepsPerFrame?: number}) {
     // before eventize(), so that a loop which can never be ticked never comes into being
@@ -231,19 +231,29 @@ export class FixedFrameLoop {
       );
     }
 
+    // before eventize() as well: a loop that cannot run at its rate never comes into being. A
+    // writable default gets the same check as an option, where it stands in for one
+    const fps =
+      options?.fps != null
+        ? assertPositiveFinite(options.fps, 'new FixedFrameLoop()', 'fps')
+        : assertPositiveFinite(FixedFrameLoop.DefaultFps, 'new FixedFrameLoop()', 'FixedFrameLoop.DefaultFps');
+    const maxStepsPerFrame =
+      options?.maxStepsPerFrame != null
+        ? assertWholeNumber(options.maxStepsPerFrame, 'new FixedFrameLoop()', 'maxStepsPerFrame', 1)
+        : assertWholeNumber(
+            FixedFrameLoop.DefaultMaxStepsPerFrame,
+            'new FixedFrameLoop()',
+            'FixedFrameLoop.DefaultMaxStepsPerFrame',
+            1,
+          );
+
     eventize(this);
 
     this.display = display;
 
-    // the built-in values first, then the writable defaults and the options through the setters,
-    // which refuse a rate the loop cannot run at — a default gets the same check as an option
-    this.#fps = BUILT_IN_FPS;
-    this.#fixedDelta = 1 / BUILT_IN_FPS;
-    this.#maxStepsPerFrame = BUILT_IN_MAX_STEPS_PER_FRAME;
-    this.fps = FixedFrameLoop.DefaultFps;
-    this.maxStepsPerFrame = FixedFrameLoop.DefaultMaxStepsPerFrame;
-    if (options?.fps != null) this.fps = options.fps;
-    if (options?.maxStepsPerFrame != null) this.maxStepsPerFrame = options.maxStepsPerFrame;
+    this.#fps = fps;
+    this.#fixedDelta = 1 / fps;
+    this.#maxStepsPerFrame = maxStepsPerFrame;
 
     on(display, OnDisplayRenderFrame, this as FixedFrameLoop);
     this.#unsubscribeFromDisplayDispose = once(display, OnDisplayDispose, () => this.dispose());
@@ -341,8 +351,8 @@ export class FixedFrameLoop {
    * reached. `display`, `tickTime`, `tickNo` and `alpha` keep the values the loop was left
    * with; nothing behind them was released. {@link reset} and a further `dispose()` do
    * nothing. `fps` and `maxStepsPerFrame` stay writable and keep their values until someone
-   * writes them: a write the setter accepts lands, `fps` recomputes `fixedDelta` with it, and no
-   * tick ever reads either one again.
+   * writes them: a write the setter accepts lands, one it refuses throws as on a live loop,
+   * `fps` recomputes `fixedDelta` with an accepted one, and no tick ever reads either one again.
    */
   dispose(): void {
     if (this.#disposed) return;

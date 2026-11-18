@@ -551,6 +551,42 @@ describe('PanControl2D', () => {
     });
   });
 
+  describe('a mouseButton that names no button', () => {
+    it.each([
+      ['0', 0],
+      ['32', 32],
+      ['1.5', 1.5],
+      ['"1"', '1'],
+    ])('refuses a mouseButton option of %s', (written, mouseButton) => {
+      expect(() => makeControl({mouseButton: mouseButton as number})).toThrow(
+        new RangeError(`PanControl2D: mouseButton must be a whole number from 1 to 31, got ${written}`),
+      );
+    });
+
+    it.each([
+      ['0', 0],
+      ['32', 32],
+      ['1.5', 1.5],
+      ['"1"', '1'],
+    ])('refuses mouseButton set to %s and keeps the one it holds', (written, mouseButton) => {
+      const control = makeControl({mouseButton: 2});
+
+      expect(() => {
+        control.mouseButton = mouseButton as number;
+      }).toThrow(new RangeError(`PanControl2D: mouseButton must be a whole number from 1 to 31, got ${written}`));
+      expect(control.mouseButton).toBe(2);
+    });
+
+    it('takes several buttons at once, and each of them pans', () => {
+      const control = makeControl({mouseButton: 3});
+      expect(control.mouseButton).toBe(3);
+
+      drag(2);
+      control.update(0);
+      expect(control.panView.x).toBe(-10);
+    });
+  });
+
   describe('on…() shorthands', () => {
     it('onUpdate() hears where update() moved the view, until the function it returns takes it off', () => {
       const control = makeControl();

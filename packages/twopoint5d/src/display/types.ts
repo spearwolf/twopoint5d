@@ -105,8 +105,9 @@ export interface DisplayParameters extends DisplayRendererParameters {
    * If the display supports fewer frames than specified here,
    * only as many frames as the display supports will be rendered.
    *
-   * Without it, with 0, or with anything but a positive finite number, the display draws as many
-   * frames as the page gives it.
+   * Without it, and with 0, the display draws as many frames as the page gives it. Anything but
+   * a finite number of 0 or more — `NaN`, a negative number, `Infinity` — makes the constructor
+   * throw a `RangeError` before it builds or takes over a renderer.
    */
   maxFps?: number;
 

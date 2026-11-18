@@ -30,7 +30,10 @@ export type FrameBasedAnimationsDataByAtlas = AnimationTimingOptions & {
    * Regular expression pattern to match frame names in the atlas.
    *
    * It is compiled into a `RegExp` and run against every frame name of the atlas, so a pattern
-   * that backtracks catastrophically stalls the page: take it only from a catalog you trust.
+   * that backtracks catastrophically stalls the page: take it only from a catalog you trust. A
+   * pattern that is no valid regular expression makes `FrameBasedAnimations#add()` throw a
+   * `SyntaxError` naming the animation; a resource skips that entry and reports it as an `error`
+   * event with `source: 'frameBasedAnimations'`.
    */
   frameNameQuery: string;
 };

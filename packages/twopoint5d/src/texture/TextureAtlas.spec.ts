@@ -177,6 +177,24 @@ describe('TextureAtlas', () => {
       expect(Array.isArray(names)).toBeTruthy();
       expect(names).toEqual(['foo', Bar, 'img_001', 'img_002']);
     });
+    test('refuses a string that is no valid regular expression, with the error of the RegExp as its cause', () => {
+      const atlas = new TextureAtlas();
+      atlas.add('walk.1', new TextureCoords());
+
+      let error: unknown;
+      try {
+        atlas.frameNames('walk[');
+      } catch (thrown) {
+        error = thrown;
+      }
+
+      expect(error).toBeInstanceOf(SyntaxError);
+      expect((error as SyntaxError).message).toMatch(
+        /^TextureAtlas#frameNames\(\): the pattern "walk\[" is no valid regular expression: \S/,
+      );
+      expect((error as SyntaxError).cause).toBeInstanceOf(SyntaxError);
+      expect((error as SyntaxError).message).toContain(((error as SyntaxError).cause as SyntaxError).message);
+    });
     describe('a RegExp with the g or the y flag', () => {
       const walkAtlas = () => {
         const atlas = new TextureAtlas();

@@ -1277,7 +1277,8 @@ Do not alternate such textures every frame.
 
 `uniforms` holds the uniform nodes of the features by name, and `setUniform(name, x, y?, z?, w?)`
 writes one: a number for a `float`, two to four for a `vec2` to `vec4`. A uniform is read at run
-time, so a write builds nothing and allocates nothing — call it every frame.
+time, so a write builds nothing and allocates nothing — call it every frame. A value that is no
+finite number throws a `TypeError`, and the uniform keeps the value it holds.
 
 Without an `alphaTest` or `alphaTestNode` the material drops every texel with an alpha of `0.001`
 or less; either of the two takes the place of that default.

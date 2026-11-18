@@ -2453,51 +2453,49 @@ describe('CameraRig', () => {
   });
 
   describe('as the frame step of a FramePacer', () => {
-    // the pacer subscribes before the handler asks, so a step reports into the frame it ran in, or
-    // after it: the handler that asks first draws what a step moved one frame later (§3.3 of the
-    // proposal drawing-on-demand.md)
+    // the steps of a frame run before shouldDraw() answers for it, whichever asks first: a frame
+    // draws what a step moved in it (§3.3 of the proposal drawing-on-demand.md)
     it.each([
-      {asks: 'after the steps', askFirst: false, extraDraws: 0},
-      {asks: 'before the steps', askFirst: true, extraDraws: 1},
-    ])(
-      'draws during a move and after it only for its end pose, and not while the camera stands (asks $asks)',
-      ({askFirst, extraDraws}) => {
-        const {stage, rig} = makeRig();
-        const listeners = new Set<(props: DisplayEventProps) => unknown>();
-        const source: FramePacerSource = {
-          onRenderFrame: (listener) => {
-            listeners.add(listener);
-            return () => {
-              listeners.delete(listener);
-            };
-          },
-        };
-        const pacer = new FramePacer(source);
-        pacer.onFrame((props) => rig.step(props.deltaTime), stage);
+      {asks: 'after the steps', askFirst: false},
+      {asks: 'before the steps', askFirst: true},
+    ])('draws during a move and after it only for its end pose, and not while the camera stands (asks $asks)', ({askFirst}) => {
+      const {stage, rig} = makeRig();
+      const listeners = new Set<(props: DisplayEventProps) => unknown>();
+      const source: FramePacerSource = {
+        onRenderFrame: (listener) => {
+          listeners.add(listener);
+          return () => {
+            listeners.delete(listener);
+          };
+        },
+      };
+      const pacer = new FramePacer(source);
+      pacer.onFrame((props) => rig.step(props.deltaTime), stage);
 
-        const props = {rawDeltaTime: 1 / 60, deltaTime: 1 / 60} as DisplayEventProps;
-        // what a frame handler does: update the stage, run the steps, ask the pacer, count the draw
-        const run = (frames: number) => {
-          const before = pacer.draws;
-          for (let i = 0; i < frames; i++) {
-            frame(stage);
-            if (askFirst) pacer.shouldDraw(props);
-            for (const listener of Array.from(listeners)) listener(props);
-            if (!askFirst) pacer.shouldDraw(props);
-          }
-          return pacer.draws - before;
-        };
+      // one props object for every frame, with a frameNo that counts, as a host may hand them out
+      const props = {rawDeltaTime: 1 / 60, deltaTime: 1 / 60, frameNo: 0} as DisplayEventProps;
+      // what a frame handler does: update the stage, run the steps, ask the pacer, count the draw
+      const run = (frames: number) => {
+        const before = pacer.draws;
+        for (let i = 0; i < frames; i++) {
+          props.frameNo += 1;
+          frame(stage);
+          if (askFirst) pacer.shouldDraw(props);
+          for (const listener of Array.from(listeners)) listener(props);
+          if (!askFirst) pacer.shouldDraw(props);
+        }
+        return pacer.draws - before;
+      };
 
-        run(2); // the first frame draws by itself, and the first step answers true
-        expect(run(30), 'a camera that stands').toBe(0);
+      run(2); // the first frame draws by itself, and the first step answers true
+      expect(run(30), 'a camera that stands').toBe(0);
 
-        void rig.moveTo({position: [100, 0]}, 0.24); // arrives in the 15th frame at 60 Hz
-        // a step reports into the frame of its own ask, or into the next one: the move starts to show a frame late
-        expect(run(15), 'during the move').toBe(15 - extraDraws);
-        expect(run(1), 'the frame of the end pose').toBe(extraDraws);
-        expect(run(30), 'the camera stands again').toBe(0);
-        expect(rig.camera.position.x).toBeCloseTo(100, 5);
-      },
-    );
+      void rig.moveTo({position: [100, 0]}, 0.24); // arrives in the 15th frame at 60 Hz
+      // every frame of the move draws, the one that reaches the end pose included
+      expect(run(15), 'during the move').toBe(15);
+      expect(run(1), 'the frame after the end pose').toBe(0);
+      expect(run(30), 'the camera stands again').toBe(0);
+      expect(rig.camera.position.x).toBeCloseTo(100, 5);
+    });
   });
 });

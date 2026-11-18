@@ -527,6 +527,77 @@ describe('Map2DSpatialHashGrid', () => {
     });
   });
 
+  // Beyond ±Number.MAX_SAFE_INTEGER `x++` no longer counts on, and the loop over the cells of a query
+  // or a placement would never end. The grids below hold one cell, so that a query of more cells
+  // walks the cells the grid holds and cannot hang should the check be missing; the timeout ends a
+  // test that hangs all the same.
+  describe('cells beyond ±Number.MAX_SAFE_INTEGER', () => {
+    test('getTiles() refuses a tileX or tileY that is not finite', {timeout: 2000}, () => {
+      const grid = new Map2DSpatialHashGrid(1, 1);
+      grid.add({aabb: new AABB2(0, 0, 1, 1)});
+
+      expect(() => grid.getTiles(NaN, 0)).toThrow(
+        new RangeError(
+          'Map2DSpatialHashGrid: the tileX and tileY of getTiles() must be finite numbers, and the cells of the query within ±Number.MAX_SAFE_INTEGER, got tileX NaN, tileY 0, width 1, height 1',
+        ),
+      );
+      expect(() => grid.getTiles(0, Infinity, 1, 1, [])).toThrow(RangeError);
+    });
+
+    test('getTiles() refuses a query that reaches into cells beyond ±Number.MAX_SAFE_INTEGER', {timeout: 2000}, () => {
+      const grid = new Map2DSpatialHashGrid(1, 1);
+      grid.add({aabb: new AABB2(0, 0, 1, 1)});
+
+      expect(() => grid.getTiles(2 ** 53, 0, 2, 1)).toThrow(
+        new RangeError(
+          `Map2DSpatialHashGrid: the tileX and tileY of getTiles() must be finite numbers, and the cells of the query within ±Number.MAX_SAFE_INTEGER, got tileX ${2 ** 53}, tileY 0, width 2, height 1`,
+        ),
+      );
+      expect(() => grid.getTiles(Number.MAX_SAFE_INTEGER, 0, 2, 1, [])).toThrow(RangeError);
+      expect(() => grid.getTiles(0, -(2 ** 53), 1, 1)).toThrow(RangeError);
+      expect(() => grid.getTiles(0, 0, 1, -(2 ** 53))).toThrow(RangeError);
+    });
+
+    test('getTiles() takes a query whose cells end at Number.MAX_SAFE_INTEGER', {timeout: 2000}, () => {
+      const grid = new Map2DSpatialHashGrid(1, 1);
+      grid.add({aabb: new AABB2(0, 0, 1, 1)});
+
+      expect(grid.getTiles(Number.MAX_SAFE_INTEGER - 2, 0, 2, 1)).toBeUndefined();
+      expect(grid.getTiles(-Number.MAX_SAFE_INTEGER, 0, 2, 1, [])).toEqual([]);
+    });
+
+    test('findWithin() refuses an aabb whose cells lie beyond ±Number.MAX_SAFE_INTEGER', {timeout: 2000}, () => {
+      const grid = new Map2DSpatialHashGrid(1, 1);
+      grid.add({aabb: new AABB2(0, 0, 1, 1)});
+
+      expect(() => grid.findWithin(new AABB2(2 ** 60, 0, 1, 1))).toThrow(
+        new RangeError(
+          `Map2DSpatialHashGrid: the aabb of findWithin() reaches into cells beyond ±Number.MAX_SAFE_INTEGER, got left ${2 ** 60}, top 0, width 1, height 1`,
+        ),
+      );
+      expect(() => grid.findWithin(new AABB2(0, -(2 ** 60), 1, 1), [])).toThrow(RangeError);
+    });
+
+    test('add() refuses an aabb whose cells lie beyond ±Number.MAX_SAFE_INTEGER and leaves the grid as it was', {
+      timeout: 2000,
+    }, () => {
+      const grid = new Map2DSpatialHashGrid(1, 1);
+      const held: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 1, 1)};
+      grid.add(held);
+
+      held.aabb.set(5, 5, 1, 1);
+      const refused: IMap2DRenderableArea = {aabb: new AABB2(2 ** 60, 0, 1, 1)};
+
+      expect(() => grid.add(held, refused)).toThrow(
+        new RangeError(
+          `Map2DSpatialHashGrid: the aabb of a renderable reaches into cells beyond ±Number.MAX_SAFE_INTEGER, got left ${2 ** 60}, top 0, width 1, height 1`,
+        ),
+      );
+      expect(grid.getTile(0, 0)?.has(held)).toBe(true);
+      expect(grid.size).toBe(1);
+    });
+  });
+
   test('getTile() hands out the set of a cell read-only (a type-level check)', () => {
     // the @ts-expect-error line carries the claim: `pnpm typecheck` fails as soon as getTile()
     // hands out a set that can be written to; Vitest checks nothing here. The function is never called.

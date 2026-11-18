@@ -409,9 +409,11 @@ export class FrameBasedAnimations {
    * number, naming its index; a frame of a list that is no `TextureCoords`, naming its index; a
    * `firstTileId` that is no whole number; a `tileCount` that is no whole number from 1 to
    * {@link FrameBasedAnimations.MaxTextureSize} — more frames fit into no data texture; and a
-   * `frameNameQuery` that is neither a string nor a `RegExp`. Tile ids and a `firstTileId` may be
-   * negative, the tile set wraps them. `firstTileId` and `tileCount` are checked only when they are
-   * passed: their defaults come from the tile set, which may hold more tiles than `MaxTextureSize`.
+   * `frameNameQuery` that is neither a string nor a `RegExp`, or a string that is no valid regular
+   * expression — a `SyntaxError` with the error of the `RegExp` as its `cause`. Tile ids and a
+   * `firstTileId` may be negative, the tile set wraps them. `firstTileId` and `tileCount` are
+   * checked only when they are passed: their defaults come from the tile set, which may hold more
+   * tiles than `MaxTextureSize`.
    *
    * A name is registered once; a second animation under the same name is refused with an
    * error. An animation added without a name is given one — `anim_0`, `anim_1`, and so on,
@@ -503,6 +505,18 @@ export class FrameBasedAnimations {
         throw new Error(
           `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation ${animNameInError(name)} — a frameNameQuery is a string or a RegExp`,
         );
+      }
+      // a string is compiled here before the atlas compiles it again, so that the error names the
+      // animation it belongs to — the one a catalog entry reports
+      if (typeof query === 'string') {
+        try {
+          new RegExp(query);
+        } catch (cause) {
+          throw new SyntaxError(
+            `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation ${animNameInError(name)} — it is no valid regular expression: ${(cause as Error).message}`,
+            {cause},
+          );
+        }
       }
       // from here the query is a pattern as a string, a RegExp or no query at all — both forms
       // of a pattern reach the atlas, whose `frameNames()` takes either

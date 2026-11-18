@@ -115,7 +115,8 @@ export type TextureResourceErrorEvent =
  *       that gives more than one of `duration`, `frameRate` and `durations`, a `frameRate` of 0,
  *       `tileIds` that are no array, a tile id, a `firstTileId` or a `tileCount`
  *       that `FrameBasedAnimations#add()` refuses, a `frameNameQuery` that is neither a string nor
- *       a `RegExp`;
+ *       a `RegExp`, or a string that is no valid regular expression — the `SyntaxError` names the
+ *       animation;
  *     - whose frames come out empty: a `frameNameQuery` that matches nothing or an empty list of
  *       `tileIds`.
  *   - A listener that throws takes the event from no other listener: eventize reports the throw on

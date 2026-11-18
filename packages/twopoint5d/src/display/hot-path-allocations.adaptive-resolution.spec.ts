@@ -34,17 +34,20 @@ const GPU_MS = 10;
 // controller only calls then() on what resolveTimestampsAsync() answers
 // biome-ignore lint/suspicious/noThenProperty: a stand-in for the promise resolveTimestampsAsync() answers
 const measurement = {then: (onFulfilled: (ms: number) => void) => onFulfilled(GPU_MS)};
+// a renderer that measures nothing: three resolves no time for a frame that drew nothing
+// biome-ignore lint/suspicious/noThenProperty: a stand-in for the promise resolveTimestampsAsync() answers
+const noMeasurement = {then: (onFulfilled: (ms: number | undefined) => void) => onFulfilled(undefined)};
 
 /**
  * A controller on a display double that answers what the controller reads in a frame, and a
  * round of frames of the frame loop: every frame a new one, at the pace of 60 frames per second.
  */
-const makeRound = (timestamps: boolean) => {
+const makeRound = (timestamps: boolean, answer: typeof measurement | typeof noMeasurement = measurement) => {
   const frameLoop = {frameNo: 0, longestRafInterval: 1000 / 60};
   const display = eventize({
     renderer: {
       backend: {trackTimestamp: timestamps, hasTimestamp: timestamps},
-      resolveTimestampsAsync: () => measurement,
+      resolveTimestampsAsync: () => answer,
     },
     resolutionScale: 1,
     pixelZoom: 0,
@@ -87,6 +90,21 @@ describe('AdaptiveResolution on the hot path', () => {
 
     expect(adaptive.method).toBe('frame-pacing');
     // clean frames: the tries up find no step beyond maxScale
+    expect(adaptive.scale).toBe(1);
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    adaptive.dispose();
+  });
+
+  test('a frame under frame-pacing that still asks for GPU time allocates nothing', async () => {
+    const {adaptive, round} = makeRound(true, noMeasurement);
+    // the frames that settle, and the 60 without a measurement after which the controller goes
+    // over to frame-pacing, and asks on for the GPU time from then on
+    round();
+    expect(adaptive.method, 'before the round').toBe('frame-pacing');
+
+    const bytesPerCall = (await measureSettledBytes(round)) / CALLS;
+
+    expect(adaptive.method).toBe('frame-pacing');
     expect(adaptive.scale).toBe(1);
     expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
     adaptive.dispose();

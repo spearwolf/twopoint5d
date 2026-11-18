@@ -596,6 +596,38 @@ describe('Display', () => {
       expect(errors).toEqual([failure]);
       expect(events).toEqual([]);
     });
+
+    it('lets every listener of OnDisplayError hear the error, also behind one that throws', async () => {
+      const failure = new Error('no adapter');
+      const thrown = new Error('a listener of the error event that throws');
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => {
+        unhandled.push(reason);
+      };
+      process.on('unhandledRejection', onUnhandled);
+      // eventize reports the listener that throws on the console
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const {display} = makeDisplay(undefined, () => Promise.reject(failure));
+        const heard: unknown[] = [];
+        display.onError(() => {
+          throw thrown;
+        });
+        display.onError((error) => {
+          heard.push(error);
+        });
+
+        await expect(display.start()).rejects.toBe(failure);
+        // a rejection nobody handles is reported once the microtasks of this task have run
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(heard, 'the listener behind the one that throws').toEqual([failure]);
+        expect(unhandled, 'unhandled rejections').toEqual([]);
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+        warn.mockRestore();
+      }
+    });
   });
 
   describe('frame loop', () => {
@@ -954,8 +986,8 @@ describe('Display', () => {
       expect(await renderFrames()).toBe(10);
     });
 
-    it('a maxFps that is no positive finite number gives the frame loop no limit', async () => {
-      const {display, frame} = makeDisplay({maxFps: -30});
+    it.each([0, undefined, null])('a maxFps of %s gives the frame loop no limit', async (maxFps) => {
+      const {display, frame} = makeDisplay({maxFps: maxFps as number | undefined});
       await display.start();
       let count = 0;
       on(display, OnDisplayRenderFrame, () => {
@@ -966,8 +998,25 @@ describe('Display', () => {
       }
 
       expect(count, 'every frame comes through').toBe(10);
-      expect(() => makeDisplay({maxFps: NaN}), 'NaN').not.toThrow();
-      expect(() => makeDisplay({maxFps: Infinity}), 'Infinity').not.toThrow();
+    });
+
+    it.each([NaN, -1, Infinity])('refuses a maxFps of %s with a RangeError, before it builds a renderer', (maxFps) => {
+      class StubElement {}
+      const canvas = Object.assign(new StubElement(), makeCanvas(), {
+        tagName: 'CANVAS',
+        style: {getPropertyValue: () => '', getPropertyPriority: () => ''},
+        ownerDocument: {...doc, defaultView: {HTMLElement: StubElement, devicePixelRatio: 1, performance}},
+      });
+      const createRenderer = vi.fn((_params: object) => makeRenderer().renderer as unknown as WebGPURenderer);
+
+      expect(
+        () =>
+          new Display(canvas as unknown as HTMLElement, {
+            maxFps,
+            createRenderer: createRenderer as unknown as DisplayParameters['createRenderer'],
+          }),
+      ).toThrow(new RangeError(`new Display(): maxFps must be a finite number of 0 or more, got ${maxFps}`));
+      expect(createRenderer).not.toHaveBeenCalled();
     });
 
     it('resizePollIntervalMs spaces out the measurements of the frames', async () => {

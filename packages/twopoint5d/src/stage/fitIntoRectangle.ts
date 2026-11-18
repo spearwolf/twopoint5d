@@ -1,5 +1,6 @@
 import {Vector2} from 'three/webgpu';
 
+import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {ceilWholePixels, floorWholePixels} from '../utils/wholePixels.js';
 
@@ -121,13 +122,52 @@ export type ProjectionFitSpecs = FitIntoRectangleSpecs extends infer Specs
     : never
   : never;
 
+// the ten values of AnchorPosition, as keys so that the type checks the list both ways: a value
+// missing here or one the type does not know fails to compile. Their order is the order of the
+// message below
+const ANCHOR_POSITIONS: Readonly<Record<AnchorPosition, true>> = {
+  'top left': true,
+  'top center': true,
+  'top right': true,
+  'center left': true,
+  center: true,
+  'center center': true,
+  'center right': true,
+  'bottom left': true,
+  'bottom center': true,
+  'bottom right': true,
+};
+
+// 'top left', 'top center', … or 'bottom right' — written once, the choices of a constant are
+// text of the message
+const ANCHOR_POSITION_CHOICES = (() => {
+  const quoted = Object.keys(ANCHOR_POSITIONS).map((value) => `'${value}'`);
+  return `${quoted.slice(0, -1).join(', ')} or ${quoted.at(-1)}`;
+})();
+
+// undefined is the default and passes; anything outside the ten values throws, so that a typo
+// does not leave the view where it was without a word
+function checkAnchorPosition(value: unknown, subject: string): asserts value is AnchorPosition | undefined {
+  if (value === undefined) return;
+  if (typeof value === 'string' && Object.hasOwn(ANCHOR_POSITIONS, value)) return;
+  throw new TypeError(`${subject}: anchorPosition must be ${ANCHOR_POSITION_CHOICES}, got ${describeValue(value)}`);
+}
+
 /**
  * Parses an anchor position string into separate X and Y components.
- * @param anchorPosition - The anchor position string (e.g., 'top center')
+ * @param anchorPosition - The anchor position string (e.g., 'top center'); `undefined` is
+ * `'center'`. A value that is none of the ten values of {@link AnchorPosition} throws a
+ * `TypeError`.
  * @returns A tuple of [anchorY, anchorX]
  */
 export function parseAnchorPosition(anchorPosition: AnchorPosition | undefined): [AnchorPositionY, AnchorPositionX] {
-  if (!anchorPosition || anchorPosition === 'center') {
+  checkAnchorPosition(anchorPosition, 'parseAnchorPosition');
+  return splitAnchorPosition(anchorPosition);
+}
+
+// the parse of a value checkAnchorPosition() let through
+function splitAnchorPosition(anchorPosition: AnchorPosition | undefined): [AnchorPositionY, AnchorPositionX] {
+  if (anchorPosition === undefined || anchorPosition === 'center') {
     return ['center', 'center'];
   }
 
@@ -141,7 +181,8 @@ export function parseAnchorPosition(anchorPosition: AnchorPosition | undefined):
  *
  * @param rect - The container dimensions
  * @param view - The calculated view dimensions
- * @param anchorPosition - The anchor position (defaults to 'center')
+ * @param anchorPosition - The anchor position (defaults to 'center'). A value that is none of the
+ * ten values of {@link AnchorPosition} throws a `TypeError` and leaves `target` as it is.
  * @param target - Optional target Vector2 to store the result
  * @returns The offset as a Vector2 (x, y)
  */
@@ -151,7 +192,9 @@ export function calculateAnchorOffset(
   anchorPosition?: AnchorPosition,
   target: Vector2 = new Vector2(),
 ): Vector2 {
-  const [anchorY, anchorX] = parseAnchorPosition(anchorPosition);
+  // checked here rather than in parseAnchorPosition(), so the message names the call the caller made
+  checkAnchorPosition(anchorPosition, 'calculateAnchorOffset');
+  const [anchorY, anchorX] = splitAnchorPosition(anchorPosition);
 
   const diffX = rect.width - view.width;
   const diffY = rect.height - view.height;

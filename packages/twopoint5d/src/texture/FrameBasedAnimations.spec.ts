@@ -1168,6 +1168,27 @@ describe('FrameBasedAnimations', () => {
       expect(() => animations.add('all', 1, tileSet)).not.toThrow();
     });
 
+    test('a frameNameQuery that is no valid regular expression is refused with the name of the animation and the error of the RegExp as its cause', () => {
+      const animations = new FrameBasedAnimations();
+      const atlas = new TextureAtlas();
+      atlas.add('walk.1', new TextureCoords(0, 0, 8, 8));
+
+      let error: unknown;
+      try {
+        animations.add('walk', 1, atlas, 'walk[');
+      } catch (thrown) {
+        error = thrown;
+      }
+
+      expect(error).toBeInstanceOf(SyntaxError);
+      expect((error as SyntaxError).message).toMatch(
+        /^FrameBasedAnimations: add\(\) got a frameNameQuery of "walk\[" for the animation "walk" — it is no valid regular expression: \S/,
+      );
+      expect((error as SyntaxError).cause).toBeInstanceOf(SyntaxError);
+      expect((error as SyntaxError).message).toContain(((error as SyntaxError).cause as SyntaxError).message);
+      expect(animations.hasAnimation('walk')).toBe(false);
+    });
+
     test('a frameNameQuery of 5 is refused instead of taking every frame of the atlas', () => {
       const animations = new FrameBasedAnimations();
       const atlas = new TextureAtlas();

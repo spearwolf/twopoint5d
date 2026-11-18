@@ -17,8 +17,8 @@ export class Chronometer {
   #timeStart: number;
 
   /**
-   * The latest time the chronometer has seen. The constructor and `reset()` set it; `update()`
-   * and `start()` only ever move it forward
+   * The latest time the chronometer has seen. The constructor and `reset()` set it; `update()`,
+   * `stop()` and `start()` only ever move it forward
    */
   #currentTime: number;
 
@@ -33,16 +33,10 @@ export class Chronometer {
   #lostTime: number;
 
   /**
-   * Time that `update()` has counted as lost since the most recent `stop()`; `start()` moves it
-   * into `#lostTime`
+   * Time counted as lost since the most recent `stop()` — by `stop()` itself and by the `update()`
+   * calls of the pause; `start()` moves it into `#lostTime`
    */
   #recentlyLostTime: number;
-
-  /**
-   * The time of the most recent `stop()`, never earlier than the latest time the chronometer had
-   * seen by then
-   */
-  #pausedAt: number;
 
   #isRunning: boolean;
 
@@ -110,7 +104,6 @@ export class Chronometer {
     this.#rawDeltaTime = 0;
     this.#lostTime = 0;
     this.#recentlyLostTime = 0;
-    this.#pausedAt = curTime;
     this.#isRunning = true;
     this.maxDeltaTime = maxDeltaTime;
   }
@@ -152,10 +145,11 @@ export class Chronometer {
   /**
    * Pause the chronometer.
    *
-   * The wall-clock timestamp is captured (defaulting to
-   * `performance.now() / 1000`) so that the matching {@link start} call
-   * can close the pause-gap in {@link lostTime} even when no `update()`
-   * is called during the pause.
+   * The span from the latest time the chronometer has seen — the last `update()`, or the
+   * constructor, `start()` or `reset()` where none followed — to `time` (defaulting to
+   * `performance.now() / 1000`) counts as lost, as the pause after it does: {@link lostTime} grows
+   * by it, and {@link time} stays where the last `update()` put it. Only the `deltaTime` of the
+   * `update()` calls moves {@link time}; neither `stop()` nor {@link start} does.
    *
    * A `time` before the latest one the chronometer has seen counts as that one: time does not
    * run backwards.
@@ -167,21 +161,23 @@ export class Chronometer {
   stop(time?: number): void {
     if (this.#isRunning) {
       this.#isRunning = false;
-      this.#recentlyLostTime = 0;
       // a time before the latest one the chronometer has seen counts as that one, as in
       // update() — time does not run backwards
-      this.#pausedAt = Math.max(getCurrentTime(time), this.#currentTime);
+      const at = Math.max(getCurrentTime(time), this.#currentTime);
+      this.#recentlyLostTime = at - this.#currentTime;
+      this.#currentTime = at;
     }
   }
 
   /**
    * Resume the chronometer.
    *
-   * The wall-clock gap since {@link stop} (minus anything already tracked
-   * via `update()` during the pause) is folded into {@link lostTime}, and
-   * the internal "current time" is advanced to `time`, so the next
-   * `update()` produces a normal small delta instead of swallowing the
-   * pause duration as a frame spike.
+   * The pause counts as lost: the span from the latest time the chronometer has seen — the
+   * {@link stop}, or the last `update()` of the pause — to `time` joins what `stop()` and the
+   * `update()` calls of the pause have counted in {@link lostTime}, and the internal "current
+   * time" is advanced to `time`, so the next `update()` produces a normal small delta instead of
+   * swallowing the pause duration as a frame spike. {@link time} stays where the last `update()`
+   * before the pause put it.
    *
    * A `time` before the latest one the chronometer has seen counts as that one: time does not
    * run backwards, and the "current time" is only ever advanced, never set back.
@@ -196,10 +192,9 @@ export class Chronometer {
       // a time before the latest one the chronometer has seen counts as that one, as in
       // update() — time does not run backwards
       const now = Math.max(getCurrentTime(time), this.#currentTime);
-      // Untracked pause duration: wall-clock elapsed since stop() minus
-      // whatever update() already booked into recentlyLostTime.
-      const gap = Math.max(0, now - this.#pausedAt - this.#recentlyLostTime);
-      this.#lostTime += this.#recentlyLostTime + gap;
+      // the span since the latest time seen in the pause — the stop() or an update() of the
+      // pause — has not been counted yet
+      this.#lostTime += this.#recentlyLostTime + (now - this.#currentTime);
       this.#recentlyLostTime = 0;
       this.#currentTime = now;
       this.#deltaTime = 0;
@@ -222,7 +217,6 @@ export class Chronometer {
     this.#rawDeltaTime = 0;
     this.#lostTime = 0;
     this.#recentlyLostTime = 0;
-    this.#pausedAt = curTime;
     this.#isRunning = true;
   }
 }

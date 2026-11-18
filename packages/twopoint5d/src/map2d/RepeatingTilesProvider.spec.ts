@@ -2,6 +2,8 @@ import {describe, expect, test} from 'vitest';
 import type {LimitToAxisType} from './RepeatingTilesProvider.js';
 import {RepeatingTilesProvider} from './RepeatingTilesProvider.js';
 
+const describeShape = (pattern: unknown): string => JSON.stringify(pattern) ?? String(pattern);
+
 describe('RepeatingTilesProvider', () => {
   describe('new', () => {
     test('without arguments', () => {
@@ -34,9 +36,32 @@ describe('RepeatingTilesProvider', () => {
       ]);
       expect(tiles.limitToAxis).toBe('none');
     });
-    test('a shape it does not recognize gets a pattern without cells', () => {
-      expect(new RepeatingTilesProvider([] as number[]).tileIds).toEqual([[]]);
-      expect(new RepeatingTilesProvider(['a'] as unknown as number[]).tileIds).toEqual([[]]);
+    test('no pattern and an empty array get a pattern without cells, which answers 0', () => {
+      for (const pattern of [undefined, null, []] as unknown as number[][]) {
+        const tiles = new RepeatingTilesProvider(pattern);
+        expect(tiles.tileIds, describeShape(pattern)).toEqual([[]]);
+        expect(tiles.getTileIdAt(0, 0), describeShape(pattern)).toBe(0);
+      }
+    });
+    test('an array of rows goes through the checks of the tileIds setter', () => {
+      expect(() => new RepeatingTilesProvider([[], [1, 2]])).toThrow(
+        new Error('RepeatingTilesProvider: every row of a tile id pattern has the same length, but row 1 has 2 instead of 0'),
+      );
+    });
+    test('any other array is one row, and goes through the checks of the tileIds setter', () => {
+      expect(() => new RepeatingTilesProvider(['x'] as unknown as number[])).toThrow(
+        new RangeError('RepeatingTilesProvider: a tile id is a whole number from 0 to 4294967295, but row 0, column 0 holds "x"'),
+      );
+    });
+    test('refuses a pattern that is no tile id, no row of tile ids and no array of such rows', () => {
+      for (const pattern of ['abc', {}, true]) {
+        expect(() => new RepeatingTilesProvider(pattern as unknown as number), describeShape(pattern)).toThrow(TypeError);
+      }
+      expect(() => new RepeatingTilesProvider('abc' as unknown as number)).toThrow(
+        new TypeError(
+          'RepeatingTilesProvider: a tile id pattern is a tile id, a row of tile ids or an array of such rows, got "abc"',
+        ),
+      );
     });
     test('with limitToAxis', () => {
       expect(new RepeatingTilesProvider(1, 'horizontal').limitToAxis).toBe('horizontal');

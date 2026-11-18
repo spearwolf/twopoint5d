@@ -121,12 +121,15 @@ export interface PanControl2DOptions {
   speed?: number;
 
   /**
-   * Mouse button for panning. Default is 1.
+   * Mouse button for panning, as a bit of `MouseEvent.buttons`. Default is 1.
    * - `1` left button
    * - `2` right button
    * - `4` middle button
    * - `8` 4th button, typical 'back'
    * - `16` 5th button, typical 'forward'
+   *
+   * Several bits pan with each of their buttons: `3` pans with the left and the right one. A value
+   * that is no whole number from 1 to 31 throws a `RangeError`.
    *
    * @see https://developer.mozilla.org/en-US/docs/Web/API/MouseEvent/buttons
    */
@@ -221,7 +224,7 @@ export class PanControl2D extends InputControlBase {
 
   readonly #pointerTarget: EventTarget;
 
-  mouseButton: number;
+  #mouseButton = 1;
 
   /**
    * The `KeyboardEvent.code` of the keys for up, down, left and right.
@@ -305,6 +308,24 @@ export class PanControl2D extends InputControlBase {
     this.#speedWest = assertFinite(value, 'PanControl2D', 'speedWest');
   }
 
+  /**
+   * The mouse buttons that pan, as bits of `MouseEvent.buttons` — the option `mouseButton`. Several
+   * bits pan with each of their buttons. A value that is no whole number from 1 to 31 throws a
+   * `RangeError` and leaves the one it holds.
+   */
+  get mouseButton(): number {
+    return this.#mouseButton;
+  }
+
+  set mouseButton(value: number) {
+    // 31 holds the five bits MouseEvent.buttons has; 0 or a bit beyond them would silently turn
+    // panning with the mouse off
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 31) {
+      throw new RangeError(`PanControl2D: mouseButton must be a whole number from 1 to 31, got ${describeValue(value)}`);
+    }
+    this.#mouseButton = value;
+  }
+
   constructor(options?: PanControl2DOptions) {
     super();
     eventize(this);
@@ -312,6 +333,9 @@ export class PanControl2D extends InputControlBase {
     this.panView = options?.state;
 
     this.pixelsPerSecond = assertFinite(readOption(options, 'speed', 100), 'PanControl2D', 'speed');
+    // before the cursorPanStyle below, which retains a rule: a mouseButton the setter refuses
+    // throws while the control holds nothing yet
+    this.mouseButton = readOption(options, 'mouseButton', 1);
 
     // before the cursorPanStyle below: the setter retains the rule, and it has to know by
     // then which root the rule belongs in
@@ -322,7 +346,6 @@ export class PanControl2D extends InputControlBase {
     if (this.#cursorPanClass == null) this.cursorPanStyle = 'none';
     this.#cursorStylesTarget = readOption(options, 'cursorStylesTarget', document.body);
 
-    this.mouseButton = readOption(options, 'mouseButton', 1);
     // Copies, because keys and keyCodes are public and writable, and `keyCodes[0] = 38` rebinds in
     // place: a rebinding on this control changes neither the options nor another control built
     // from them
@@ -575,7 +598,7 @@ export class PanControl2D extends InputControlBase {
   #isPanPointer(event: PointerEvent) {
     if (event.isPrimary) {
       if (event.type !== POINTERUP && event.pointerType === MOUSE) {
-        return event.buttons & this.mouseButton;
+        return event.buttons & this.#mouseButton;
       }
       return true;
     }
@@ -719,7 +742,7 @@ export class PanControl2D extends InputControlBase {
     // another button stays down, where the browser reports a pointermove. It ends the pan where
     // it was let go, so the position of this move does not count. The cursor goes back with the
     // pan, as it does for a pointerup — and the case of no button at all runs through here too
-    if (event.pointerType === MOUSE && (event.buttons & this.mouseButton) === 0) {
+    if (event.pointerType === MOUSE && (event.buttons & this.#mouseButton) === 0) {
       this.#endPointer(event.pointerId, true);
       this.#restoreCursorUnlessMouseDown();
     }

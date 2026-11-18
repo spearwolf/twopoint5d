@@ -50,7 +50,13 @@ the `data-engine` attribute three marks it with. One thing stays changed under t
 backend, the context: the display gives up the one WebGL context of the canvas as it
 releases the renderer, and leaves that context lost but restorable. Only a `Display`
 built on the canvas afterwards brings it back; a `WebGPURenderer` or a
-`getContext('webgl2')` of the caller's own on that canvas gets the lost context. A
+`getContext('webgl2')` of the caller's own on that canvas, without a display around it,
+gets the lost context. The `domElement` of an adopted `WebGPURenderer` is not taken over
+either, but it keeps what the display wrote on it: its classes, the `touch-action`
+attribute and the inline size do not go back. The renderer goes with the display, its
+canvas stays where the caller put it and carries the next display in the same way — a
+`Display` around a new
+`WebGPURenderer({canvas})` on it waits for the release and brings the WebGL context back. A
 `Display` constructor that throws after it has built or taken over its renderer leaves
 nothing behind — it releases the renderer, gives a canvas handed in back and takes its own
 container out, as `dispose()` would. The constructors of `VOBufferGeometry`,

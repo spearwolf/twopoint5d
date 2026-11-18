@@ -96,4 +96,31 @@ describe('FramePacer on the hot path', () => {
     expect(calls, 'every step ran in every frame').toBe(pacer.frames * 3);
     expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
+
+  test('shouldDraw() that runs the steps of its frame itself allocates nothing', async () => {
+    const {pacer, runSteps} = makePacer();
+    let calls = 0;
+    const step: FrameStep = () => {
+      calls += 1;
+      return true;
+    };
+    pacer.onFrame(step);
+    pacer.onFrame(step, ROOM);
+    pacer.onFrame(step, {name: 'behind the overlay'});
+    // one props object for every frame, told apart by a frameNo that counts in whole numbers
+    const frame = {rawDeltaTime: 1 / 60, deltaTime: 1 / 60, frameNo: 0} as DisplayEventProps;
+
+    const bytes = await bytesPerCall(() => {
+      for (let i = 0; i < CALLS; i++) {
+        frame.frameNo += 1;
+        // the frame handler asks before the subscription of the pacer runs
+        pacer.shouldDraw(frame);
+        runSteps(frame);
+      }
+    });
+
+    expect(calls, 'every step ran once in every frame').toBe(pacer.frames * 3);
+    expect(pacer.draws, 'every frame drew what its steps moved').toBe(pacer.frames);
+    expect(bytes, `${bytes.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
 });

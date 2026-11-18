@@ -757,7 +757,7 @@ A step answers a `Motion`:
 | answer | meaning | drawn |
 | --- | --- | --- |
 | `false`, `undefined`, no `return` | nothing it shows has changed | nothing |
-| `true` | it moved something visible | the next frame |
+| `true` | it moved something visible | the frame it ran in |
 | `'steady'` | it animates on and on | 30 frames a second, see [below](#an-animation-that-never-ends) |
 
 The answers of a frame add up to the highest of them: one step that moved draws the frame.
@@ -769,8 +769,13 @@ a hair short of open until something else moves. `untilSettled()` hands out a fu
 remembers one frame: `true` while its argument is `true`, and once more in the frame it turns
 `false`. Every motion gets one of its own.
 
+The steps of a frame run before `shouldDraw()` answers for it, whichever came first — the pacer or
+your `onRenderFrame()` handler: what a step moves in a frame, that frame draws. Where the handler
+subscribed first, `shouldDraw()` runs the steps itself, once.
+
 `onFrame()` returns the unsubscribe of the step. Steps run in the order they were registered, and
-what one of them throws reaches the frame loop after all of them have run.
+what one of them throws comes out after all of them have run: out of the frame loop, or out of
+`shouldDraw()` where it ran them.
 
 ### A camera that moves
 
@@ -931,7 +936,7 @@ the next measurement — at the start of the next frame, or right away with a `r
 | `resolutionScale` | property | `1` | a factor on the pixel ratio; above `1` supersampling | does not apply | set by the controller | `1`–`1.5` |
 | `adaptiveResolution` | option | off | a controller that sets `resolutionScale` by the cost of every frame | holds still; not with `pixelSnap` | `true` | `{minScale: 0.75, maxScale: 1.5}` |
 | `antialias` | option | `false` | four samples per pixel in the renderer and the scene pass of a `RenderPipeline` | off | off | on for geometry |
-| `maxFps` | option | none | the frames per second at most, and the target of the controller below 60 | — | `30` saves power | — |
+| `maxFps` | option | none | the frames per second at most, and the target of the controller below 60; `0` is no limit, a value that is no finite number of 0 or more throws a `RangeError` | — | `30` saves power | — |
 | `pauseOutsideViewport` | option | `false` | no frames while the canvas is out of view | — | `true` | — |
 | `styleImageRendering` | property | follows `pixelZoom` | pins `image-rendering` to `'pixelated'` or `'auto'` | — | — | — |
 | `Display.MaxResolution` | static | `8192` | the buffer per axis at most | — | — | raise before the first display, if the GPU allows |
@@ -968,7 +973,7 @@ A `FramePacer` beside a renderer drawn from a frame handler:
 | call or read | what it does |
 | --- | --- |
 | `new FramePacer(display, {steadyFps?, live?})` | subscribes to the frames, the resize and the restart of the display; `steadyFps` defaults to `30` (`FramePacer.DefaultSteadyFps`), `live(stage)` tells which stages are drawn live |
-| `shouldDraw(frame, busy?)` | asked once per frame, before the draw: `true` when a report is pending or `busy` is `true`. A draw takes every pending report |
+| `shouldDraw(frame, busy?)` | asked once per frame, before the draw: `true` when a report is pending or `busy` is `true`. The steps of the frame have run when it answers. A draw takes every pending report |
 | `onFrame(step, stage?)` | runs `step(frame)` every frame and takes its answer as a report; with a `stage`, only while `live(stage)`. Returns the unsubscribe |
 | `report(motion)` | a report from outside a step: `true`, `'steady'`, or nothing |
 | `invalidate()` | the next frame draws; the same as `report(true)` |
@@ -1097,6 +1102,9 @@ const display = new Display(document.querySelector('canvas')!, {
 export {display};
 ```
 
+Each of the three is a finite number above 0; anything else throws a `RangeError` before the
+controller takes the display over, and a value left out, or `undefined`, is the default.
+
 The controller reads the cost of a frame in one of two ways, see `adaptive.method`:
 
 - **`gpu-time`**: the time the GPU spent on the frame, through the timestamp queries of three —
@@ -1138,8 +1146,10 @@ What to know about it:
   renderer handed to the constructor measures the GPU time where it was built with
   `trackTimestamp: true`, as in the example below. A renderer built without it, a WebGPU adapter
   without `timestamp-query` and a WebGL 2 without the timer extension — Android Chrome often hides
-  it — leave `frame-pacing`. So does a renderer that resolves no GPU time for 60 frames in a row:
-  the controller goes over to `frame-pacing` then, and `gpuTime` answers `undefined`.
+  it — leave `frame-pacing`. So does a renderer that resolves no GPU time for 60 frames in a row —
+  a loading screen that draws nothing: the controller goes over to `frame-pacing` then, and
+  `gpuTime` answers `undefined`. It goes on asking that renderer for the GPU time, and the first
+  valid measurement brings it back to `gpu-time`; both changes let 30 frames settle.
 
   A renderer the display built with `trackTimestamp: true` measures timestamps for its whole life:
   while the controller holds still under a `pixelZoom`, after `adaptive.enabled = false` and after
@@ -1212,6 +1222,36 @@ until the first gap is measured `'steady'` draws every frame.
 A `'steady'` that comes in after a still stretch draws with the next frame, and one that was
 answered once and never again still draws once: the last state of an animation that stopped
 reaches the canvas.
+
+### The canvas after `dispose()`
+
+`display.dispose()` releases the renderer a moment after it returns: the one the display built,
+and a `WebGPURenderer` handed to its constructor, which the display adopts. The canvas stays
+where you put it — a canvas you handed in, and the `domElement` of a renderer you handed in — and
+carries a new display. A `Display` built on it, or around a new `WebGPURenderer({canvas})`,
+waits for the release and then starts the init of its renderer, the moment the old display is
+disposed or any time after:
+
+```ts check
+import {Display} from '@spearwolf/twopoint5d';
+import {WebGPURenderer} from 'three/webgpu';
+
+const canvas = document.querySelector('canvas')!;
+
+const first = new Display(new WebGPURenderer({canvas}));
+await first.start();
+first.dispose();
+
+// waits for the release of the first renderer, and brings the WebGL context of the canvas back
+const second = new Display(new WebGPURenderer({canvas}));
+await second.start();
+
+export {second};
+```
+
+Under WebGL a canvas has one context for good, and the release leaves it lost but restorable.
+Only a `Display` brings it back: a `WebGPURenderer` or a `getContext('webgl2')` of your own on
+that canvas, without a display around it, gets the lost context.
 
 ### Pipelines
 

@@ -1,5 +1,6 @@
 import {on, once, Priority, type UnsubscribeFunc} from '@spearwolf/eventize';
 import {OnDisplayDispose, OnDisplayRenderFrame, OnDisplayResize, OnDisplayRestart, OnDisplayStart} from '../events.js';
+import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import type {Display} from './Display.js';
 import type {DisplayEventProps} from './types.js';
@@ -7,21 +8,23 @@ import type {DisplayEventProps} from './types.js';
 export interface AdaptiveResolutionOptions {
   /**
    * The frames per second the display is to hold, `60` by default — or the `maxFps` of the
-   * display where that is lower, when the display builds the controller itself. Anything but a
-   * positive finite number is the default.
+   * display where that is lower, when the display builds the controller itself. A finite number
+   * above 0; anything else makes the constructor throw a `RangeError`.
    */
   targetFps?: number;
 
   /**
    * The lowest {@link Display.resolutionScale} the controller goes down to, `0.5` by default: a
-   * quarter of the pixels. Rounded up to a step of an eighth, at least one eighth, at most
+   * quarter of the pixels. A finite number above 0, else the constructor throws a `RangeError`.
+   * Rounded up to a step of an eighth, at least one eighth, at most
    * {@link AdaptiveResolutionOptions.maxScale}.
    */
   minScale?: number;
 
   /**
-   * The highest {@link Display.resolutionScale} the controller goes up to, `1` by default.
-   * Rounded down to a step of an eighth, at least one eighth. Above `1` the controller goes
+   * The highest {@link Display.resolutionScale} the controller goes up to, `1` by default. A
+   * finite number above 0, else the constructor throws a `RangeError`. Rounded down to a step of
+   * an eighth, at least one eighth. Above `1` the controller goes
    * beyond {@link Display.maxPixelRatio}, within {@link Display.maxPixels}: a step that the budget
    * holds to the same pixel ratio is skipped.
    */
@@ -132,6 +135,10 @@ export function adaptiveResolutionOf(display: Display): AdaptiveResolution | und
  *   and a window of 30 —, 240 frames at a lower resolution, eight seconds at 30 frames per
  *   second. Once the frames come sooner again, the target counts again.
  *
+ * A renderer that measures timestamps but resolves no GPU time for 60 frames in a row takes the
+ * controller over to `frame-pacing`, and the first valid measurement after that brings it back to
+ * `gpu-time`.
+ *
  * A step is an eighth of the scale, between {@link AdaptiveResolution.minScale} and
  * {@link AdaptiveResolution.maxScale}. A step that leaves the pixel ratio of the display as it is
  * — under {@link Display.maxPixels}, or through the rounding of the ratio to an eighth — is
@@ -219,6 +226,8 @@ export class AdaptiveResolution {
    * @throws when `display` is disposed, and when another controller holds it that is not
    * disposed, enabled or not. The message names the class and the state; no controller comes into
    * being, and the display keeps its scale and its listeners.
+   * @throws {RangeError} for a `targetFps`, `minScale` or `maxScale` that is given and no finite
+   * number above 0, with the display left as it was in the same way.
    */
   constructor(display: Display, options?: AdaptiveResolutionOptions) {
     // before anything is written: a controller that cannot hold the display never comes into
@@ -237,13 +246,16 @@ export class AdaptiveResolution {
       );
     }
 
+    // the options as well, before anything is written; undefined and null are the defaults
+    const targetFps = assertPositiveFinite(options?.targetFps ?? 60, 'new AdaptiveResolution()', 'targetFps');
+    const minScale = assertPositiveFinite(options?.minScale ?? 0.5, 'new AdaptiveResolution()', 'minScale');
+    const maxScale = assertPositiveFinite(options?.maxScale ?? 1, 'new AdaptiveResolution()', 'maxScale');
+
     this.display = display;
-    this.targetFps = isPositiveFinite(options?.targetFps) ? options.targetFps : 60;
+    this.targetFps = targetFps;
     this.#pacingCadenceMs = 1000 / this.targetFps;
 
-    const maxScale = isPositiveFinite(options?.maxScale) ? options.maxScale : 1;
     this.maxScale = Math.max(SCALE_STEP, Math.floor(maxScale / SCALE_STEP + 1e-6) * SCALE_STEP);
-    const minScale = isPositiveFinite(options?.minScale) ? options.minScale : 0.5;
     this.minScale = Math.min(this.maxScale, Math.max(SCALE_STEP, Math.ceil(minScale / SCALE_STEP - 1e-6) * SCALE_STEP));
 
     this.#levels = [];
@@ -276,6 +288,12 @@ export class AdaptiveResolution {
    * that settle after a start count, a frame it holds still in, disabled or under a
    * {@link Display.pixelZoom}, does not. `undefined` until then, after
    * {@link AdaptiveResolution.dispose}, and once the display is disposed.
+   *
+   * A renderer that measures GPU time starts on `gpu-time`. One that resolves no GPU time for 60
+   * frames in a row — a loading screen that draws nothing — takes the controller over to
+   * `frame-pacing`, and the controller goes on asking it for the GPU time: the next valid
+   * measurement brings it back to `gpu-time`. Both changes let 30 frames settle before the
+   * controller judges again.
    */
   get method(): AdaptiveResolutionMethod | undefined {
     return this.#disposed ? undefined : this.#method;
@@ -344,19 +362,24 @@ export class AdaptiveResolution {
   }
 
   // The highest step at or below the scale the display has — one that is no positive finite
-  // number counts as 1, as it does for the display. A takeover starts every try afresh — a descent,
-  // a step up and the windows counted toward the next one —, and keeps what the tries have taught:
-  // the pace a descent found and the waits that failed steps up doubled
+  // number counts as 1, as it does for the display. A takeover starts every try afresh
   #takeOverScale(): void {
     const scale = isPositiveFinite(this.display.resolutionScale) ? this.display.resolutionScale : 1;
     this.#scaleBefore = scale;
+    this.#resetTries();
+    const level = this.#levels.findIndex((step) => step <= scale + 1e-6);
+    this.#setLevel(level === -1 ? this.#levels.length - 1 : level);
+  }
+
+  // Every try starts afresh — a descent, a step up and the windows counted toward the next one —,
+  // and what the tries have taught stays: the pace a descent found and the waits that failed steps
+  // up doubled
+  #resetTries(): void {
     this.#pacingDescentFrom = -1;
     this.#gpuStepUpPending = false;
     this.#gpuGoodWindows = 0;
     this.#pacingCleanFrames = 0;
     this.#pacingProbeWindows = 0;
-    const level = this.#levels.findIndex((step) => step <= scale + 1e-6);
-    this.#setLevel(level === -1 ? this.#levels.length - 1 : level);
   }
 
   #setLevel(level: number): void {
@@ -422,7 +445,13 @@ export class AdaptiveResolution {
 
     if (this.#method === 'gpu-time') {
       this.#sampleGpuTime();
-    } else if (this.display.isRunning) {
+      return;
+    }
+
+    // a renderer that measured nothing for a while — one that drew nothing, a loading screen —
+    // may measure later: the first valid measurement brings the controller back to gpu-time
+    if (this.#tracksGpuTime()) this.#probeGpuTime();
+    if (this.display.isRunning) {
       // a frame a display renders while it is not running — paused, or not started yet — lies
       // between no two animation frames of the page and says nothing about the pace; paused, its
       // rawDeltaTime is 0
@@ -441,18 +470,24 @@ export class AdaptiveResolution {
   // --- gpu-time ---
 
   #sampleGpuTime(): void {
-    const renderer = this.display.renderer;
-    if (renderer != null && !this.#gpuResolving) {
-      this.#gpuResolving = true;
-      this.#gpuResolvingEpoch = this.#epoch;
-      renderer.resolveTimestampsAsync('render').then(this.#onGpuTime, this.#onGpuTimeFailed);
-    }
+    this.#probeGpuTime();
 
     this.#gpuSilentFrames += 1;
     if (this.#gpuSilentFrames > GPU_SILENT_FRAMES) {
       this.#method = 'frame-pacing';
       this.#gpuTime = undefined;
+      this.#resetTries();
       this.#settle();
+    }
+  }
+
+  // asks the renderer for the GPU time of its frames, one measurement in flight at a time
+  #probeGpuTime(): void {
+    const renderer = this.display.renderer;
+    if (renderer != null && !this.#gpuResolving) {
+      this.#gpuResolving = true;
+      this.#gpuResolvingEpoch = this.#epoch;
+      renderer.resolveTimestampsAsync('render').then(this.#onGpuTime, this.#onGpuTimeFailed);
     }
   }
 
@@ -467,6 +502,13 @@ export class AdaptiveResolution {
       this.#gpuResolvingEpoch !== this.#epoch ||
       !isPositiveFinite(ms)
     ) {
+      return;
+    }
+    if (this.#method === 'frame-pacing') {
+      // the renderer measures again: the measurement counts in no window, the frames after it settle
+      this.#method = 'gpu-time';
+      this.#resetTries();
+      this.#settle();
       return;
     }
     this.#gpuSilentFrames = 0;

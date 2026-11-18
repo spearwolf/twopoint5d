@@ -196,41 +196,57 @@ describe('FixedFrameLoop', () => {
     expect(ticks).toHaveLength(1);
   });
 
-  it('fps setter ignores non-positive and non-finite values', () => {
-    sim.fps = -10;
+  it.each([-10, 0, NaN, Infinity, '30'])('fps refuses %s with a RangeError, and the loop keeps its rate', (value) => {
+    expect(() => {
+      sim.fps = value as number;
+    }).toThrow(
+      new RangeError(
+        `FixedFrameLoop: fps must be a finite number above 0, got ${typeof value === 'string' ? `"${value}"` : value}`,
+      ),
+    );
     expect(sim.fps).toBe(60);
-    sim.fps = 0;
-    expect(sim.fps).toBe(60);
-    sim.fps = NaN;
-    expect(sim.fps).toBe(60);
-    sim.fps = Infinity;
-    expect(sim.fps).toBe(60);
+    expect(sim.fixedDelta).toBeCloseTo(1 / 60);
   });
 
-  it.each([0, -60, NaN, Infinity])('the constructor keeps DefaultFps for an fps of %s', (fps) => {
-    const loop = new FixedFrameLoop(makeFakeDisplay(), {fps});
-    const loopTicks: FixedFrameLoopTickProps[] = [];
-    loop.onTick((p) => loopTicks.push(p));
+  it.each([0, -60, NaN, Infinity])('the constructor refuses an fps of %s and builds no loop', (fps) => {
+    const ownDisplay = makeFakeDisplay();
+
+    expect(() => new FixedFrameLoop(ownDisplay, {fps})).toThrow(
+      new RangeError(`new FixedFrameLoop(): fps must be a finite number above 0, got ${fps}`),
+    );
+    expect(getSubscriptionCount(ownDisplay), 'the listeners of the display').toBe(0);
+  });
+
+  it.each([undefined, null])('the constructor takes DefaultFps and DefaultMaxStepsPerFrame for options of %s', (value) => {
+    const loop = new FixedFrameLoop(makeFakeDisplay(), {
+      fps: value as number | undefined,
+      maxStepsPerFrame: value as number | undefined,
+    });
 
     expect(loop.fps).toBe(60);
-    expect(loop.fixedDelta).toBeCloseTo(1 / 60);
-
-    emit(loop.display, OnDisplayRenderFrame, makeFrame(1 / 60));
-    expect(loopTicks).toHaveLength(1);
-  });
-
-  it.each([0, -1, 0.5, 2.5, NaN, Infinity])('maxStepsPerFrame refuses %s', (value) => {
-    sim.maxStepsPerFrame = value;
-    expect(sim.maxStepsPerFrame).toBe(5);
-
-    emit(display, OnDisplayRenderFrame, makeFrame(0.05));
-    expect(ticks).toHaveLength(3);
-  });
-
-  it('the constructor keeps DefaultMaxStepsPerFrame for a maxStepsPerFrame of 0', () => {
-    const loop = new FixedFrameLoop(makeFakeDisplay(), {maxStepsPerFrame: 0});
-
     expect(loop.maxStepsPerFrame).toBe(5);
+  });
+
+  it.each([0, -1, 0.5, 2.5, NaN, Infinity])(
+    'maxStepsPerFrame refuses %s with a RangeError, and the loop keeps its bound',
+    (value) => {
+      expect(() => {
+        sim.maxStepsPerFrame = value;
+      }).toThrow(new RangeError(`FixedFrameLoop: maxStepsPerFrame must be a whole number of 1 or more, got ${value}`));
+      expect(sim.maxStepsPerFrame).toBe(5);
+
+      emit(display, OnDisplayRenderFrame, makeFrame(0.05));
+      expect(ticks).toHaveLength(3);
+    },
+  );
+
+  it.each([0, 2.5])('the constructor refuses a maxStepsPerFrame of %s and builds no loop', (value) => {
+    const ownDisplay = makeFakeDisplay();
+
+    expect(() => new FixedFrameLoop(ownDisplay, {maxStepsPerFrame: value})).toThrow(
+      new RangeError(`new FixedFrameLoop(): maxStepsPerFrame must be a whole number of 1 or more, got ${value}`),
+    );
+    expect(getSubscriptionCount(ownDisplay), 'the listeners of the display').toBe(0);
   });
 
   it('maxStepsPerFrame takes 1 and above', () => {
@@ -240,7 +256,9 @@ describe('FixedFrameLoop', () => {
 
   it('keeps the whole number it has when it is handed a fraction, and runs no tick above it', () => {
     sim.maxStepsPerFrame = 2;
-    sim.maxStepsPerFrame = 2.5;
+    expect(() => {
+      sim.maxStepsPerFrame = 2.5;
+    }).toThrow(RangeError);
 
     expect(sim.maxStepsPerFrame).toBe(2);
 
@@ -270,45 +288,33 @@ describe('FixedFrameLoop', () => {
       FixedFrameLoop.DefaultMaxStepsPerFrame = shippedMaxStepsPerFrame;
     });
 
-    it.each([0, -60, NaN, Infinity])('ignores a DefaultFps of %s and runs at 60', (fps) => {
-      FixedFrameLoop.DefaultFps = fps;
-      const loop = new FixedFrameLoop(makeFakeDisplay());
-      const loopTicks: FixedFrameLoopTickProps[] = [];
-      loop.onTick((p) => loopTicks.push(p));
+    it.each([0, -60, NaN, Infinity])(
+      'a DefaultFps of %s makes the constructor throw, when no fps option stands in for it',
+      (fps) => {
+        FixedFrameLoop.DefaultFps = fps;
+        const ownDisplay = makeFakeDisplay();
 
-      expect(loop.fps).toBe(60);
-      expect(loop.fixedDelta).toBeCloseTo(1 / 60);
+        expect(() => new FixedFrameLoop(ownDisplay)).toThrow(
+          new RangeError(`new FixedFrameLoop(): FixedFrameLoop.DefaultFps must be a finite number above 0, got ${fps}`),
+        );
+        expect(getSubscriptionCount(ownDisplay), 'the listeners of the display').toBe(0);
+        expect(new FixedFrameLoop(makeFakeDisplay(), {fps: 30}).fps, 'with an fps option').toBe(30);
+      },
+    );
 
-      emit(loop.display, OnDisplayRenderFrame, makeFrame(1 / 60));
-      expect(loopTicks).toHaveLength(1);
-    });
+    it.each([0, -1, 0.5, 2.5, NaN, Infinity])(
+      'a DefaultMaxStepsPerFrame of %s makes the constructor throw, when no maxStepsPerFrame option stands in for it',
+      (value) => {
+        FixedFrameLoop.DefaultMaxStepsPerFrame = value;
 
-    it.each([0, -60, NaN, Infinity])('falls back past a DefaultFps of %s to 60 for an fps option it refuses', (fps) => {
-      FixedFrameLoop.DefaultFps = fps;
-      const loop = new FixedFrameLoop(makeFakeDisplay(), {fps: 0});
-
-      expect(loop.fps).toBe(60);
-      expect(loop.fixedDelta).toBeCloseTo(1 / 60);
-    });
-
-    it.each([0, -1, 0.5, 2.5, NaN, Infinity])('ignores a DefaultMaxStepsPerFrame of %s and takes 5', (value) => {
-      FixedFrameLoop.DefaultMaxStepsPerFrame = value;
-      const loop = new FixedFrameLoop(makeFakeDisplay());
-      const loopTicks: FixedFrameLoopTickProps[] = [];
-      loop.onTick((p) => loopTicks.push(p));
-
-      expect(loop.maxStepsPerFrame).toBe(5);
-
-      emit(loop.display, OnDisplayRenderFrame, makeFrame(1.0));
-      expect(loopTicks).toHaveLength(5);
-    });
-
-    it('falls back past a DefaultMaxStepsPerFrame of 0 to 5 for a maxStepsPerFrame option it refuses', () => {
-      FixedFrameLoop.DefaultMaxStepsPerFrame = 0;
-      const loop = new FixedFrameLoop(makeFakeDisplay(), {maxStepsPerFrame: 0});
-
-      expect(loop.maxStepsPerFrame).toBe(5);
-    });
+        expect(() => new FixedFrameLoop(makeFakeDisplay())).toThrow(
+          new RangeError(
+            `new FixedFrameLoop(): FixedFrameLoop.DefaultMaxStepsPerFrame must be a whole number of 1 or more, got ${value}`,
+          ),
+        );
+        expect(new FixedFrameLoop(makeFakeDisplay(), {maxStepsPerFrame: 3}).maxStepsPerFrame, 'with the option').toBe(3);
+      },
+    );
 
     it('starts from a DefaultFps and DefaultMaxStepsPerFrame it can run with', () => {
       FixedFrameLoop.DefaultFps = 30;
@@ -319,10 +325,10 @@ describe('FixedFrameLoop', () => {
       expect(loop.fixedDelta).toBeCloseTo(1 / 30);
       expect(loop.maxStepsPerFrame).toBe(2);
 
-      // the option wins; an option the setter refuses leaves the default standing
-      const optioned = new FixedFrameLoop(makeFakeDisplay(), {fps: 120, maxStepsPerFrame: 0});
+      // the option wins
+      const optioned = new FixedFrameLoop(makeFakeDisplay(), {fps: 120, maxStepsPerFrame: 4});
       expect(optioned.fps).toBe(120);
-      expect(optioned.maxStepsPerFrame).toBe(2);
+      expect(optioned.maxStepsPerFrame).toBe(4);
     });
   });
 

@@ -166,6 +166,9 @@ describe('Chronometer', () => {
 
     it('stop()/start() with the same timestamp is a zero-length pause', () => {
       const chronus = new Chronometer(1000);
+      // the update() at the time of the stop: the span between the last time seen and stop()
+      // counts as lost, and this pause starts with none
+      chronus.update(1500);
       chronus.stop(1500);
       chronus.start(1500);
       chronus.update(2000);
@@ -191,12 +194,53 @@ describe('Chronometer', () => {
     });
   });
 
+  describe('the span between the last update() and stop()', () => {
+    it('ends at the same time and lostTime whether or not update() ran in the pause', () => {
+      const quiet = new Chronometer(0);
+      quiet.update(10);
+      quiet.stop(12);
+      quiet.start(15);
+
+      const ticking = new Chronometer(0);
+      ticking.update(10);
+      ticking.stop(12);
+      ticking.update(15);
+      ticking.start(15);
+
+      for (const [name, chronus] of [
+        ['without an update() in the pause', quiet],
+        ['with an update() in the pause', ticking],
+      ] as const) {
+        expect(chronus.time, `time ${name}`).toBe(10);
+        expect(chronus.lostTime, `lostTime ${name}`).toBe(5);
+        expect(chronus.deltaTime, `deltaTime ${name}`).toBe(0);
+      }
+    });
+
+    it('stop() and start() leave time where the last update() put it', () => {
+      const chronus = new Chronometer(0);
+      chronus.update(10);
+      expect(chronus.time, 'after the update()').toBe(10);
+
+      chronus.stop(12);
+      expect(chronus.time, 'after stop()').toBe(10);
+
+      chronus.start(15);
+      expect(chronus.time, 'after start()').toBe(10);
+
+      chronus.update(16);
+      expect(chronus.time, 'after the next update()').toBe(11);
+      expect(chronus.deltaTime).toBe(1);
+      expect(chronus.lostTime).toBe(5);
+    });
+  });
+
   describe('idempotency', () => {
-    it('stop() while already stopped does not overwrite pausedAt', () => {
+    it('stop() while already stopped does not move the start of the pause', () => {
       const chronus = new Chronometer(0);
       chronus.update(1);
       chronus.stop(1);
-      chronus.stop(5); // no-op: pausedAt stays at 1
+      chronus.stop(5); // no-op: the pause started at 1
       chronus.start(10);
       chronus.update(11);
 
@@ -417,9 +461,14 @@ describe('Chronometer', () => {
     it.each([Infinity, -Infinity, NaN])('stop() reads the clock for %s', (value) => {
       const chronus = new Chronometer(1);
       chronus.stop(value);
+
+      // the span from the constructor to the clock counts as lost
+      expect(chronus.lostTime).toBe(4);
+
       chronus.start(7);
 
-      expect(chronus.time).toBe(4);
+      expect(chronus.lostTime).toBe(6);
+      expect(chronus.time).toBe(0);
       expect(Number.isFinite(chronus.time)).toBe(true);
     });
 
@@ -428,8 +477,8 @@ describe('Chronometer', () => {
       chronus.stop(2);
       chronus.start(value);
 
-      expect(chronus.time).toBe(1);
-      expect(chronus.lostTime).toBe(3);
+      expect(chronus.time).toBe(0);
+      expect(chronus.lostTime).toBe(4);
     });
 
     it.each([Infinity, -Infinity, NaN])('reset() reads the clock for %s', (value) => {

@@ -87,17 +87,26 @@ export class RepeatingTilesProvider implements IMap2DTileDataProvider {
     this.#cols = cols;
   }
 
+  /**
+   * @param tileIds - the pattern: a tile id, a row of tile ids or an array of such rows. No pattern
+   *   and an empty array are a pattern without cells, which every lookup answers with `0`. The
+   *   pattern goes through the checks of the {@link tileIds} setter; a value of any other kind
+   *   throws a `TypeError`.
+   */
   constructor(tileIds?: RepeatingTilesPatternType, limitToAxis: LimitToAxisType = 'none') {
-    if (typeof tileIds === 'number') {
-      this.tileIds = [[tileIds]];
-    } else if (Array.isArray(tileIds) && typeof tileIds[0] === 'number') {
-      this.tileIds = [tileIds as number[]];
-    } else if (Array.isArray(tileIds) && Array.isArray(tileIds[0]) && typeof tileIds[0][0] === 'number') {
-      this.tileIds = tileIds as number[][];
-    } else {
-      // anything else — no argument, an empty array, a shape of another kind — is a pattern
-      // without cells, which every lookup answers with 0
+    if (tileIds == null || (Array.isArray(tileIds) && tileIds.length === 0)) {
+      // no pattern is a pattern without cells, which every lookup answers with 0
       this.tileIds = [[]];
+    } else if (typeof tileIds === 'number') {
+      this.tileIds = [[tileIds]];
+    } else if (Array.isArray(tileIds)) {
+      // an array of rows when every element is one, and one row otherwise: the setter refuses a
+      // row of another length and an element that is no tile id, naming row and column
+      this.tileIds = (tileIds as unknown[]).every((row) => Array.isArray(row)) ? (tileIds as number[][]) : [tileIds as number[]];
+    } else {
+      throw new TypeError(
+        `RepeatingTilesProvider: a tile id pattern is a tile id, a row of tile ids or an array of such rows, got ${describeValue(tileIds)}`,
+      );
     }
     this.limitToAxis = limitToAxis;
   }

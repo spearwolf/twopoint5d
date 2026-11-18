@@ -135,12 +135,24 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
    * A `RegExp` is tested against every name from the start of that name, whatever its flags —
    * with `y` the match has to begin there. The `RegExp` handed in stays as it was, its
    * `lastIndex` included.
+   *
+   * A string is compiled into a `RegExp`; one that is no valid regular expression throws a
+   * `SyntaxError` naming the pattern, with the error of the `RegExp` as its `cause`.
    */
   frameNames(match?: string | RegExp): TextureAtlasFrameName[] {
     if (match != null) {
       // a copy with the same flags, so that every name is tested from its start: a RegExp with `g`
       // or `y` goes on from its `lastIndex`, and the RegExp handed in keeps the `lastIndex` it had
-      const regex = new RegExp(match);
+      let regex: RegExp;
+      try {
+        regex = new RegExp(match);
+      } catch (cause) {
+        // only a string can fail here: a copy of a RegExp is valid as the original is
+        throw new SyntaxError(
+          `TextureAtlas#frameNames(): the pattern ${describeValue(match)} is no valid regular expression: ${(cause as Error).message}`,
+          {cause},
+        );
+      }
       return this.#frameNameList.filter((name) => {
         if (typeof name !== 'string') return false;
         regex.lastIndex = 0;

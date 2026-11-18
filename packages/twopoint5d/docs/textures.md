@@ -271,8 +271,9 @@ reach a sprite is in [the sprite guide](sprites.md#aseprite-sheets);
 **Timing of an animation.** Each entry of `frameBasedAnimations` gives exactly one of `duration`
 (seconds for the whole animation), `frameRate` (frames per second) and `durations` (seconds per
 frame), and optionally a `playback`: `'loop'` — the default —, `'once'`, which holds the last
-frame, or `'pingpong'`. An entry that cannot be built — no timing, two timings, a query that matches
-no frame — is skipped and reported; the other entries are built all the same.
+frame, or `'pingpong'`. An entry that cannot be built — no timing, two timings, a query that is no
+valid regular expression or matches no frame — is skipped and reported; the other entries are built
+all the same.
 
 A `frameNameQuery` is compiled into a `RegExp`. A pattern that backtracks catastrophically stalls
 the page: take a catalog only from a source you trust.

@@ -73,7 +73,7 @@ What a piece of code says about the picture after it ran:
 | answer | meaning | the pacer |
 | --- | --- | --- |
 | `false`, `undefined`, nothing | nothing it shows has changed | draws nothing for it |
-| `true` | it moved something visible | draws the next frame |
+| `true` | it moved something visible | draws the next frame that asks — for a step, the frame it ran in (§3.3) |
 | `'steady'` | it animates on and on | draws at the steady rate (§5.3) while nothing asks for more |
 
 The three form an order — nothing, steady, full — and several answers in one frame add up to the
@@ -103,14 +103,18 @@ guide has it under "A camera that moves" in [`display.md`](../display.md); a Vit
 ### 3.3 A report draws the next frame that asks
 
 A report — the answer of a step, `report()`, `invalidate()` — stays pending until the next
-`shouldDraw()` that answers `true`, and that draw takes every pending report with it. The pacer
-does not care where in a frame a report comes in: one that comes in before the frame handler asks
-draws this frame, one that comes in after it draws the next.
+`shouldDraw()` that answers `true`, and that draw takes every pending report with it. A report
+that comes in before the frame handler asks draws this frame, one that comes in after it draws
+the next.
 
-The second case is the common one, and it is the one-frame offset of the contract: a renderer
-draws early in a frame, steps run after it, so what a step moves in frame N is on the canvas with
-frame N+1. Continuous rendering has the same offset — the draw of frame N+1 shows what the steps
-of frame N left —, which is why a paced display shows the same picture at the same moment.
+The steps of a frame always come in before the ask: `shouldDraw(frame)` runs them itself where
+the subscription of the pacer has not run them for that frame yet, and the subscription leaves
+them out for a frame `shouldDraw()` has run them for. So what a step moves in frame N is on the
+canvas with frame N, whichever of the pacer and the frame handler subscribed first. Only a
+`report()` or an `invalidate()` after the ask — from an event handler, a promise — draws with the
+next frame. The pacer tells frames apart by their props object and its `frameNo`: a `Display`
+hands every event props of its own, and a host that hands one object again counts `frameNo` in
+it.
 
 ### 3.4 The end of a motion: `untilSettled()`
 
@@ -207,8 +211,8 @@ its constructor and gives every subscription back in `dispose()`:
   tab, a canvas out of the viewport — may have lost the picture of its canvas.
 
 The pacer takes no order among the listeners of a frame for granted (§3.3). On a `Display` a pacer
-built before the frame handler subscribes runs its steps before the draw of that handler, one
-built after it runs them after the draw; both are correct, and the second is the wiring of §6.
+built before the frame handler subscribes runs its steps from its subscription, one built after
+it runs them from `shouldDraw()`; either way they have run before the handler draws.
 
 ### 4.3 The options
 
@@ -264,7 +268,7 @@ The consumer of issue #52 migrates onto this API (phase B); what differs from it
 | reference | here | why |
 | --- | --- | --- |
 | `shouldDraw(busy, now)`, `now` from `display.frameLoop.now` in milliseconds | `shouldDraw(frame, busy?)` | the frame handler has the props of the frame already; `rawDeltaTime` is the gap of the frames the loop emits, so the stride is right under `maxFps` without a rule of its own (§8), and a host that is no `Display` needs no `frameLoop` |
-| steps run "after the draw", by the order of the subscriptions | no order assumed | §3.3 |
+| steps run "after the draw", by the order of the subscriptions | the steps of a frame run before `shouldDraw()` answers for it, whatever the order of the subscriptions | §3.3 |
 | `STEADY_FPS` | `FramePacer.DefaultSteadyFps` | the defaults of the module are statics of their class, as `Display.DefaultMaxPixelRatio` |
 | the frame handler invalidates on resize and restart | the pacer does, on a source that has the two | §4.2 |
 | a stride that follows the average of the frame gaps directly | the same stride, moved only by a pick that lasts 30 frames | §5.3: at 144 Hz the ratio lies 1 % from the edge between two strides |
@@ -289,6 +293,7 @@ Two flags and a handful of numbers, no object per frame:
 ### 5.2 `shouldDraw()`
 
 ```text
+if the steps have not run for this frame: run them, and mark the frame (§3.3)
 frames += 1
 measure the gap of this frame (§5.3)
 sinceDraw += 1
@@ -488,7 +493,11 @@ The counters of phase A are the part of it that exists.
 - the answers of a step with a stage that is not live draw nothing, the step runs all the same;
   `live` is asked only for a step that reports; a step without a stage always counts;
 - a step that throws: every step runs, the frame invalidates, one error unchanged, two as an
-  `AggregateError`;
+  `AggregateError`; a step that throws in a run `shouldDraw()` started makes `shouldDraw()`
+  throw, and the next frame draws;
+- the steps of a frame run before `shouldDraw()` answers, also for a pacer built after the frame
+  handler subscribed; they run once a frame, whichever asks first; a source that hands one props
+  object with a new `frameNo` runs them in every frame;
 - a source with `onResize` and `onRestart` invalidates through them; one without them is taken;
 - the refusals of §4.4; a source that throws while the pacer subscribes holds nothing of it;
 - the type of a stage: `onFrame()` takes nothing but the stage type `live` names;
@@ -498,8 +507,9 @@ The counters of phase A are the part of it that exists.
 
 ### 11.2 Allocations (`src/display/hot-path-allocations.frame-pacer.spec.ts`)
 
-`shouldDraw()` on a pacer that is idle, steady and busy, and the run of the steps with steps that
-report nothing, `true` and `'steady'`, with and without a stage: nothing per call.
+`shouldDraw()` on a pacer that is idle, steady and busy, the run of the steps with steps that
+report nothing, `true` and `'steady'`, with and without a stage, and a `shouldDraw()` that runs
+the steps of its frame itself: nothing per call.
 
 ### 11.3 Browser (`packages/twopoint5d-testing/test/display-drawing-on-demand.test.js`)
 

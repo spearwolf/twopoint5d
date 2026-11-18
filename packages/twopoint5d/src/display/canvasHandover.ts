@@ -376,9 +376,10 @@ export function waitForCanvas(canvas: HTMLCanvasElement): Promise<void> | undefi
  * dispose() can fall in the middle of the init (a mount and unmount under React StrictMode).
  * The release waits for the init — a failed one leaves nothing to release but a listener, see
  * below —, then for the GPU, and under WebGPU for two animation frames of the page — see
- * waitForTwoAnimationFrames(). A canvas handed to the constructor goes back to
- * its caller at the end of it, with its WebGL context lost but restorable, so the next display
- * on it can bring the context back
+ * waitForTwoAnimationFrames(). A canvas that stays with the caller — one handed to the
+ * constructor, or the domElement of an adopted renderer — goes back to its caller at the end of
+ * it, with its WebGL context lost but restorable, so the next display on it can bring the context
+ * back
  */
 export function releaseRenderer(renderer: WebGPURenderer, {init, handBack}: {init: Promise<unknown>; handBack: boolean}): void {
   const canvas = renderer.domElement;

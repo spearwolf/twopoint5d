@@ -270,6 +270,13 @@ export class SpriteResources {
     );
   }
 
+  #componentError(name: string, size: number, x: unknown, y: unknown, z: unknown, w: unknown): TypeError {
+    const got = size === 1 ? describeValue(x) : describeValue([x, y, z, w].slice(0, size));
+    return new TypeError(
+      `${this.#where}: the uniform ${describeValue(name)} is a ${VECTOR_TYPES[size - 1]} and takes ${size === 1 ? 'a finite number' : `${size} finite numbers`}, got ${got}`,
+    );
+  }
+
   #slot(name: string): TextureSlot {
     const slot = this.#textures.get(name);
     if (slot == null) {
@@ -295,11 +302,25 @@ export class SpriteResources {
   /**
    * Writes a uniform: one number for a `float`, two to four for a `vec2` to `vec4`. Allocates
    * nothing — call it every frame. Keeps working after `dispose()`; it reaches nothing that still renders.
+   *
+   * @throws an `Error` for a name no feature declares, and a `TypeError` for another count of values
+   *   than the uniform takes and for a value that is no finite number — the uniform keeps the value
+   *   it holds.
    */
   setUniform(name: string, x: number, y?: number, z?: number, w?: number): void {
     const size = this.#assertUniform(name);
     const given = w !== undefined ? 4 : z !== undefined ? 3 : y !== undefined ? 2 : 1;
     if (given !== size) throw this.#shapeError(name, size);
+    // inline and without a helper: this runs every frame and allocates nothing — the list of the
+    // components for the message is built in the error case alone
+    if (
+      !Number.isFinite(x) ||
+      (size > 1 && !Number.isFinite(y)) ||
+      (size > 2 && !Number.isFinite(z)) ||
+      (size > 3 && !Number.isFinite(w))
+    ) {
+      throw this.#componentError(name, size, x, y, z, w);
+    }
     const node = this.uniforms[name]!;
     if (size === 1) {
       (node as UniformNode<'float', number>).value = x;

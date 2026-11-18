@@ -175,11 +175,40 @@ describe('AdaptiveResolution', () => {
       expect(adaptive.minScale).toBe(0.5);
     });
 
-    it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('takes %s as the default of every option', (value) => {
-      const adaptive = new AdaptiveResolution(makeDisplay().display, {targetFps: value, minScale: value, maxScale: value});
+    it('takes undefined and null as the default of every option', () => {
+      const unset = new AdaptiveResolution(makeDisplay().display, {
+        targetFps: undefined,
+        minScale: undefined,
+        maxScale: undefined,
+      });
+      const nulled = new AdaptiveResolution(makeDisplay().display, {
+        targetFps: null as unknown as number,
+        minScale: null as unknown as number,
+        maxScale: null as unknown as number,
+      });
 
-      expect([adaptive.targetFps, adaptive.minScale, adaptive.maxScale]).toEqual([60, 0.5, 1]);
+      expect([unset.targetFps, unset.minScale, unset.maxScale]).toEqual([60, 0.5, 1]);
+      expect([nulled.targetFps, nulled.minScale, nulled.maxScale]).toEqual([60, 0.5, 1]);
     });
+
+    it.each(['targetFps', 'minScale', 'maxScale'] as const)(
+      'refuses a %s that is no positive finite number, and leaves the display as it was',
+      (option) => {
+        for (const value of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, '30']) {
+          const {display} = makeDisplay({resolutionScale: 0.8});
+
+          expect(() => new AdaptiveResolution(display, {[option]: value}), String(value)).toThrow(
+            new RangeError(
+              `new AdaptiveResolution(): ${option} must be a finite number above 0, got ${typeof value === 'string' ? `"${value}"` : value}`,
+            ),
+          );
+          expect(display.resolutionScale, 'the scale of the display').toBe(0.8);
+          expect(getSubscriptionCount(display), 'the listeners of the display').toBe(0);
+          // no controller holds the display, so the next one may
+          expect(() => new AdaptiveResolution(display), 'a controller after the refusal').not.toThrow();
+        }
+      },
+    );
 
     it('takes over at the highest step at or below the scale the display has', () => {
       const {display} = makeDisplay({resolutionScale: 0.8});
@@ -266,6 +295,35 @@ describe('AdaptiveResolution', () => {
 
       expect(adaptive.method).toBe('frame-pacing');
       expect(adaptive.gpuTime).toBeUndefined();
+    });
+
+    it('goes back to gpu-time once a renderer that measured nothing for its first 120 frames measures', async () => {
+      const {display, renderer, frames} = makeDisplay({timestamps: true});
+      // a loading screen: the renderer draws nothing, and three resolves no time, for 120 frames
+      renderer.resolveTimestampsAsync.mockImplementation(() =>
+        Promise.resolve(display.frameLoop.frameNo <= 120 ? (undefined as unknown as number) : 5),
+      );
+      const adaptive = new AdaptiveResolution(display);
+      await frames(120);
+
+      expect(adaptive.method, 'after 120 frames without a measurement').toBe('frame-pacing');
+
+      // the first measurement brings it back, 30 frames settle, and a window of 12 is judged
+      await frames(1 + SETTLE + 12 + 2);
+
+      expect(adaptive.method, 'once the renderer measures').toBe('gpu-time');
+      expect(adaptive.gpuTime, 'the median of the first window').toBe(5);
+    });
+
+    it('asks a renderer without timestamps for no GPU time', async () => {
+      const {display, renderer, frames} = makeDisplay();
+      // three asked for timestamps, and an adapter without timestamp-query that leaves them out
+      (renderer.backend as {trackTimestamp: boolean}).trackTimestamp = true;
+      const adaptive = new AdaptiveResolution(display);
+      await frames(SETTLE + 200);
+
+      expect(adaptive.method).toBe('frame-pacing');
+      expect(renderer.resolveTimestampsAsync).not.toHaveBeenCalled();
     });
   });
 

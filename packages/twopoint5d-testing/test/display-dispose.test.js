@@ -508,6 +508,55 @@ describe('Display — the contract after dispose()', function () {
         }
       });
     });
+
+    describe('the canvas of an adopted renderer, for the display after it', function () {
+      // the renderer goes with the display, its canvas stays where the caller put it and carries
+      // the next display after the release, as a canvas that was handed in does. The renderers are
+      // built without parameters: the harness sets the backend (pinBackend() in
+      // web-test-runner.config.js)
+
+      it('the canvas of an adopted renderer carries a second display built while the first one is being released', async () => {
+        host = makeContainer();
+        const canvas = document.createElement('canvas');
+        host.appendChild(canvas);
+
+        previous = new Display(new WebGPURenderer({canvas}));
+        await previous.start();
+        await previous.nextFrame();
+
+        const released = whenReleased(previous.renderer);
+        previous.dispose();
+
+        display = new Display(new WebGPURenderer({canvas}));
+        await display.start();
+        await released;
+        await display.nextFrame();
+
+        await expectLiveBackend(display);
+      });
+
+      it('the canvas of an adopted renderer carries a second display built after the first one has been released', async () => {
+        host = makeContainer();
+        const canvas = document.createElement('canvas');
+        host.appendChild(canvas);
+
+        previous = new Display(new WebGPURenderer({canvas}));
+        await previous.start();
+        await previous.nextFrame();
+
+        const released = whenReleased(previous.renderer);
+        previous.dispose();
+        await released;
+        // the release settles a few microtasks after renderer.dispose(); a task later it is through
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        display = new Display(new WebGPURenderer({canvas}));
+        await display.start();
+        await display.nextFrame();
+
+        await expectLiveBackend(display);
+      });
+    });
   });
 
   describe('(b) does not touch what was handed in', function () {

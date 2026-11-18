@@ -736,6 +736,46 @@ describe('TextureResource', () => {
       fetchMock.mockRestore();
     });
 
+    test('an atlas resource skips an animation entry whose frameNameQuery is no valid regular expression, and reports it with the name of the animation', async () => {
+      const atlasJson = {
+        frames: {'idle.1': {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'atlas.png', size: {w: 16, h: 16}},
+      };
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(atlasJson)));
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
+        async () => ({width: 16, height: 16, tag: 'atlas'}) as unknown as HTMLImageElement,
+      );
+      const {factory} = makeTextureFactory();
+
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json', undefined, undefined, {
+        walk: {duration: 1, frameNameQuery: 'walk['},
+        idle: {duration: 1, frameNameQuery: 'idle.*'},
+      });
+      resource.activate();
+
+      const errors: Array<{source: string; id?: string; animation?: string; error: Error}> = [];
+      on(resource, 'error', (payload: {source: string; id?: string; animation?: string; error: Error}) => {
+        errors.push(payload);
+      });
+
+      resource.textureFactory = factory;
+      await flushMicrotasks();
+      await flushMicrotasks();
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toMatchObject({source: 'frameBasedAnimations', id: 'sprites', animation: 'walk'});
+      expect(errors[0]!.error).toBeInstanceOf(SyntaxError);
+      expect(errors[0]!.error.message).toMatch(
+        /^FrameBasedAnimations: add\(\) got a frameNameQuery of "walk\[" for the animation "walk" — it is no valid regular expression: /,
+      );
+
+      expect(resource.frameBasedAnimations!.hasAnimation('idle')).toBe(true);
+      expect(resource.frameBasedAnimations!.hasAnimation('walk')).toBe(false);
+
+      resource.dispose();
+      fetchMock.mockRestore();
+    });
+
     test('an animation entry without a duration and without a frameRate is skipped and reported with the error FrameBasedAnimations#add() throws for it', async () => {
       vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(
         async () => ({width: 64, height: 64, tag: 'tiles'}) as unknown as HTMLImageElement,
