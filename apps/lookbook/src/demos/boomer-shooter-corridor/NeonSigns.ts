@@ -72,9 +72,10 @@ interface SignState {
   flicker: boolean;
 }
 
-/** The neon signs on the walls of the corridor; one of them flickers. */
+// the seed of the flicker: the faulty sign stutters to the same beat on every run
 const FLICKER_SEED = 17;
 
+/** The neon signs on the walls of the corridor; one of them flickers. */
 export class NeonSigns {
   readonly #random = new SeededRandom(FLICKER_SEED);
 

@@ -74,9 +74,9 @@ import {description, title} from './_instanced-quads.json';
     size: number,
     offset: number,
   ) {
+    const random = new SeededRandom(QUADS_SEED);
     // the pool holds rows * columns instances and the two loops run exactly that many
     // times, so every createVO() finds room
-    const random = new SeededRandom(QUADS_SEED);
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < columns; x++) {
         const quad = vertexObjectPool.createVO()!;
