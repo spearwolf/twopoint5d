@@ -245,7 +245,13 @@ binds a stage as the mask of a slot or of an effect, by the coverage of its pict
 `StageMask.inWorldOf()` draws a scene through the camera of a `Stage2D` as such a mask, and
 `createMaskNode()` multiplies a picture by the coverage of a mask in a `buildOutputNode` of
 one's own. The guide of the layer, including render-target ownership, is
-[`docs/stages.md`](./stages.md).
+[`docs/stages.md`](./stages.md). Building, holding and compiling the shapes of the stack — the
+graphs, their pipelines and placeholders, the 16 drawn last beside those `precompile()` pinned
+— is the internal class `DirectorShapeCache` in `src/stage/DirectorShapeCache.ts`. The masks of
+the slots and running transitions — their checks, the uses of their stages, the watch on their
+`dispose()` — are the internal class `DirectorMasks` in `src/stage/DirectorMasks.ts`, both
+over the records in `src/stage/directorSlots.ts`, while the director keeps the stack, the
+layers and the transitions.
 
 ### `sprites/`
 

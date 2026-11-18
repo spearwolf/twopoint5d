@@ -1,19 +1,5 @@
 import {emitStrict, isEventized, on} from '@spearwolf/eventize';
-import {float, texture, uniform, uv} from 'three/tsl';
-import {
-  Color,
-  ColorManagement,
-  type Node,
-  NoToneMapping,
-  RenderTarget,
-  type RenderPipeline,
-  type Texture,
-  type TextureNode,
-  type UniformNode,
-  Vector2,
-  Vector4,
-  type WebGPURenderer,
-} from 'three/webgpu';
+import {RenderTarget, type RenderPipeline, type WebGPURenderer} from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
 import {
   OnStageAfterPostProcessChanged,
@@ -28,11 +14,12 @@ import {describeValue} from '../utils/describeValue.js';
 import {easingOf} from '../utils/easing.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {ClearStage} from './ClearStage.js';
+import {DirectorMasks} from './DirectorMasks.js';
+import {DirectorShapeCache, parseShapes, withTarget} from './DirectorShapeCache.js';
+import {holdRefusal, type Layer, layerOwners, maskOwners, masksOf, type OrderRef, type Run, type Slot} from './directorSlots.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
-import {RootRenderPipeline} from './RootRenderPipeline.js';
-import {maskCoverage, maskSource} from './maskNodes.js';
-import {StageMask, type StageMaskCoverageSource, StageMaskInternals} from './StageMask.js';
+import {StageMask, StageMaskInternals} from './StageMask.js';
 import {type StageItem, StageRenderer, type StageRendererBuildOutputNode, type StageRendererParentType} from './StageRenderer.js';
 import {StageRendererInternals} from './StageRendererTargets.js';
 import {
@@ -42,7 +29,7 @@ import {
   type StageTransitionHost,
   StageTransitionInternals,
 } from './StageTransition.js';
-import {crossfade, type StageTransitionEffect, textureSource} from './transitionEffects.js';
+import {crossfade, type StageTransitionEffect} from './transitionEffects.js';
 
 /** A stage a `StageDirector` takes as a layer: a `Stage2D`, a `StageRenderer`, or a stage of your own. */
 export type StageDirectorLayer = IStage & IRenderable;
@@ -112,114 +99,7 @@ export interface StagePrecompileOptions {
   nested?: boolean;
 }
 
-interface Layer {
-  /** The stage the caller handed in. */
-  readonly stage: StageDirectorLayer;
-  /** A layer of the stack, or the stage of a mask; a stage is never both. */
-  readonly role: 'layer' | 'mask';
-  /**
-   * How many slot masks and running transitions use a mask stage — a transition once per stage its
-   * effect names, however many of its masks lie on it; 0 for a layer.
-   */
-  uses: number;
-  /**
-   * The share of the full size the pass target of a mask stage has, from the `scale` of the masks
-   * on it — one stage, one target, one scale; `1` for a layer.
-   */
-  readonly scale: number;
-  /** The stage itself, or the renderer the director wrapped it in. */
-  readonly renderer: StageRenderer;
-  readonly wrapped: boolean;
-  frozen: boolean;
-  /** A frozen layer that has no picture in its pass target yet: drawn once, without an update. */
-  needsPicture: boolean;
-  unsubscribe?: () => void;
-}
-
-interface Run {
-  readonly transition: StageTransition;
-  readonly from: Layer | undefined;
-  readonly to: Layer | undefined;
-  readonly fromWasFrozen: boolean;
-  /**
-   * Whether a `freeze()` or `run()` reached `from` while the transition ran: its state is then the
-   * caller's, and the end of the transition leaves it as it is.
-   */
-  fromByHand: boolean;
-  /**
-   * Whether a `freeze()` or `run()` reached `to` while the transition ran: its state is then the
-   * caller's, and the end of the transition leaves it as it is.
-   */
-  toByHand: boolean;
-  /** The masks the effect names, as they stood when the transition began; each one is driven by it. */
-  readonly masks: readonly StageMask[];
-}
-
-interface Slot {
-  /** What the slot shows while no transition runs in it. */
-  layer?: Layer;
-  run?: Run;
-  /** The layer a push() froze below this one, which runs again when this slot goes. */
-  frozeBelow?: Layer;
-  /** The mask of the slot: it stays through replace() and goes with the slot. */
-  mask?: StageMask;
-}
-
-interface ShapeSlot {
-  readonly layer?: TextureNode;
-  readonly from?: TextureNode;
-  readonly to?: TextureNode;
-  readonly progress?: UniformNode<'float', number>;
-  readonly effect?: StageTransitionEffect;
-  readonly effectNode?: Node<'vec4'>;
-}
-
-interface Shape {
-  readonly pipeline: RootRenderPipeline;
-  readonly slots: readonly ShapeSlot[];
-  /** One texture node per distinct mask stage of the shape, counted by first appearance from the bottom. */
-  readonly maskNodes: readonly TextureNode[];
-  readonly outputNode: Node;
-  /** Every texture node of the shape, and the placeholder each one samples while it has no pass. */
-  readonly textureNodes: readonly TextureNode[];
-  readonly placeholders: readonly Texture[];
-}
-
-interface CachedShape {
-  readonly shape: Shape;
-  /**
-   * Compiled by `precompile()`: it stays until `dispose()`, or until the director draws or
-   * precompiles with another renderer.
-   */
-  pinned: boolean;
-  /**
-   * The compile `precompile()` runs for the shape: another `precompile()` that finds the shape waits
-   * for it. An entry without one is compiled — drawn, or through a compile that went through.
-   */
-  compiling?: Promise<void>;
-}
-
-/**
- * Which slot and which of its sources an entry of `orderedStages` is — or, after every layer, which
- * of the distinct mask stages, counted by first appearance: the stages of the slot masks bottom-up,
- * then those of the running effects slot by slot, as `distinctMasks()` counts them.
- */
-type OrderRef =
-  | {readonly side: 'layer' | 'from' | 'to'; readonly slot: number}
-  | {readonly side: 'mask'; readonly maskStage: number};
-
-/**
- * Every stage a director draws as a mask, and that director: a stage is the mask stage of one
- * director at a time, since that director draws and updates it.
- */
-const maskOwners = new WeakMap<IStage, StageDirector>();
-
-/** Every stage a director holds as a layer, and the directors that hold it so. */
-const layerOwners = new WeakMap<IStage, Set<StageDirector>>();
-
 const NO_STAGES: ReadonlyArray<StageItem> = Object.freeze([]);
-
-const NO_MASKS: readonly StageMask[] = Object.freeze([]);
 
 /**
  * The text of the errors a change of the stack collects: its transitions start and end, layers and
@@ -230,156 +110,6 @@ const changeThrew = (subject: string): string =>
 
 /** The effect of every transition without an `effect` of its own: one object, so that their shapes are one. */
 const DEFAULT_EFFECT: StageTransitionEffect = Object.freeze(crossfade());
-
-/**
- * How many shapes the stack built itself a director keeps beside those `precompile()` compiled; the
- * one used last stays longest.
- */
-const KEPT_SHAPES = 16;
-
-/** The masks `effect` names, checked; a snapshot, so a list changed later changes no running transition. */
-function masksOf(subject: string, effect: StageTransitionEffect): readonly StageMask[] {
-  const masks: unknown = effect.masks;
-  if (masks === undefined) return NO_MASKS;
-  if (!Array.isArray(masks) || !masks.every((mask) => mask instanceof StageMask)) {
-    throw new TypeError(
-      `${subject}: the masks of the effect ${describeValue(effect.name)} must be an array of StageMask, got ${describeValue(masks)}`,
-    );
-  }
-  return masks.length === 0 ? NO_MASKS : Object.freeze([...(masks as StageMask[])]);
-}
-
-/** Whether `masks[index]` is the first mask of the list on its stage: a stage counts once per transition. */
-function firstOnItsStage(masks: readonly StageMask[], index: number): boolean {
-  const stage = masks[index]!.stage;
-  for (let i = 0; i < index; i++) if (masks[i]!.stage === stage) return false;
-  return true;
-}
-
-const effectIds = new WeakMap<StageTransitionEffect, number>();
-let nextEffectId = 1;
-
-function effectId(effect: StageTransitionEffect): number {
-  let id = effectIds.get(effect);
-  if (id === undefined) {
-    id = nextEffectId++;
-    effectIds.set(effect, id);
-  }
-  return id;
-}
-
-/**
- * What a slot of a shape holds: a layer (no effect) or a transition through an effect, masked or
- * not, and the masks the effect names. Of a mask only its stage, `source` and `invert` count.
- */
-interface ShapeKind {
-  readonly effect: StageTransitionEffect | undefined;
-  readonly mask: StageMask | undefined;
-  readonly effectMasks: readonly StageMask[];
-}
-
-const LAYER_KIND: ShapeKind = Object.freeze({effect: undefined, mask: undefined, effectMasks: NO_MASKS});
-
-/** A distinct mask of a shape: the index of its stage among the distinct mask stages, and its options. */
-interface ShapeMask {
-  readonly stage: number;
-  readonly source: StageMaskCoverageSource;
-  readonly invert: boolean;
-}
-
-/**
- * Walks the masks of `kinds` and calls `visit` per masked slot, bottom-up, then `visitEffect` per
- * mask an effect names, slot by slot and each effect's masks in the order of its list, with its
- * position in that list. Both get the index of the distinct mask — a stage with a source and an
- * invert — and that mask, whose `stage` is the index of its stage among the distinct mask stages;
- * both count by first appearance in this walk, as the mask stages stand in `orderedStages`.
- * Answers the distinct masks.
- */
-function distinctMasks(
-  kinds: readonly ShapeKind[],
-  visit: (slot: number, index: number, mask: ShapeMask) => void,
-  visitEffect: (slot: number, position: number, index: number, mask: ShapeMask) => void,
-): ShapeMask[] {
-  const stages: IStage[] = [];
-  const masks: ShapeMask[] = [];
-  const indexOf = (mask: StageMask): number => {
-    let stage = stages.indexOf(mask.stage);
-    if (stage === -1) stage = stages.push(mask.stage) - 1;
-    const index = masks.findIndex((m) => m.stage === stage && m.source === mask.source && m.invert === mask.invert);
-    return index === -1 ? masks.push({stage, source: mask.source, invert: mask.invert}) - 1 : index;
-  };
-  kinds.forEach(({mask}, slot) => {
-    if (!mask) return;
-    const index = indexOf(mask);
-    visit(slot, index, masks[index]!);
-  });
-  kinds.forEach(({effectMasks}, slot) => {
-    effectMasks.forEach((mask, position) => {
-      const index = indexOf(mask);
-      visitEffect(slot, position, index, masks[index]!);
-    });
-  });
-  return masks;
-}
-
-/**
- * The key of a shape: per slot `l` or `t<effect id>`, with `m<mask index>` for a masked one and
- * `e<mask index>.<mask index>…` for the masks its effect names, and after a `|` per distinct mask
- * `<source><invert>@<stage index>`. The stage index tells one texture node for two masks from two:
- * a red and a green mask on one stage and on two stages differ in it alone. The indices of the
- * effect's masks tell which texture node the graph of the effect samples: two slot masks that swap
- * their stages leave the list of distinct masks as it was, but not the place of the effect's mask
- * in it.
- */
-function shapeKey(kinds: readonly ShapeKind[]): string {
-  const slots = kinds.map(({effect}) => (effect ? `t${effectId(effect)}` : 'l'));
-  const masks = distinctMasks(
-    kinds,
-    (slot, index) => {
-      slots[slot] += `m${index}`;
-    },
-    (slot, position, index) => {
-      slots[slot] += `${position === 0 ? 'e' : '.'}${index}`;
-    },
-  );
-  if (masks.length === 0) return slots.join(',');
-  return `${slots.join(',')}|${masks.map((m) => `${m.source}${m.invert ? 1 : 0}@${m.stage}`).join(',')}`;
-}
-
-const isEffect = (value: unknown): value is StageTransitionEffect =>
-  typeof (value as Partial<StageTransitionEffect> | undefined)?.build === 'function';
-
-function parseShapes(subject: string, shapes: unknown): ShapeKind[][] {
-  if (!Array.isArray(shapes)) {
-    throw new TypeError(`${subject}: shapes must be an array of shapes, got ${describeValue(shapes)}`);
-  }
-  return shapes.map((shape: unknown, i) => {
-    if (!Array.isArray(shape) || shape.length === 0) {
-      throw new TypeError(
-        `${subject}: shapes[${i}] must be a non-empty array of 'layer', StageTransitionEffect and {effect?, mask}, got ${describeValue(shape)}`,
-      );
-    }
-    return shape.map((slot: unknown, j): ShapeKind => {
-      if (slot === 'layer') return LAYER_KIND;
-      if (isEffect(slot)) return {effect: slot, mask: undefined, effectMasks: masksOf(subject, slot)};
-      if (slot !== null && typeof slot === 'object' && !Array.isArray(slot) && 'mask' in slot) {
-        const {effect, mask} = slot as {effect?: unknown; mask?: unknown};
-        if (!(mask instanceof StageMask)) {
-          throw new TypeError(`${subject}: shapes[${i}][${j}].mask must be a StageMask, got ${describeValue(mask)}`);
-        }
-        if (effect !== undefined && !isEffect(effect)) {
-          throw new TypeError(
-            `${subject}: shapes[${i}][${j}].effect must be a StageTransitionEffect, got ${describeValue(effect)}`,
-          );
-        }
-        return {effect, mask, effectMasks: effect ? masksOf(subject, effect) : NO_MASKS};
-      }
-      throw new TypeError(
-        `${subject}: shapes[${i}][${j}] must be 'layer', a StageTransitionEffect or {effect?, mask}, got ${describeValue(slot)}`,
-      );
-    });
-  });
-}
 
 function parsePrecompileOptions(
   subject: string,
@@ -409,11 +139,6 @@ function parsePrecompileOptions(
   return {layers, nested};
 }
 
-/** `top` over `bottom`, both premultiplied. */
-function over(top: Node<'vec4'>, bottom: Node<'vec4'>): Node<'vec4'> {
-  return top.add(bottom.mul(float(1).sub(top.a)));
-}
-
 function modeOption(subject: string, name: string, value: unknown): StageLayerMode {
   if (value === undefined) return 'run';
   if (value !== 'run' && value !== 'freeze') {
@@ -434,7 +159,7 @@ function atOption(subject: string, at: unknown): void {
   if (at !== undefined) assertWholeNumber(at, subject, 'at', 0);
 }
 
-/** Refuses a `mask` that is neither `undefined` nor a `StageMask`; `#checkMask()` checks the rest. */
+/** Refuses a `mask` that is neither `undefined` nor a `StageMask`; `DirectorMasks#check()` checks the rest. */
 function maskOption(subject: string, mask: unknown): void {
   if (mask !== undefined && !(mask instanceof StageMask)) {
     throw new TypeError(`${subject}: mask must be a StageMask, got ${describeValue(mask)}`);
@@ -501,11 +226,6 @@ export class StageDirector extends StageRenderer {
   #slots: Slot[] = [];
   readonly #layers = new Map<IStage, Layer>();
   readonly #byRenderer = new Map<IStage, Layer>();
-  /**
-   * Every `StageMask` a slot or a running transition holds, and the function that ends the watch
-   * on its dispose; kept in step with the slots by `#slotsChanged()`.
-   */
-  readonly #maskWatches = new Map<StageMask, () => void>();
 
   /** > 0 while the director calls `add()` or `remove()` of its base itself. */
   #internalCall = 0;
@@ -530,25 +250,22 @@ export class StageDirector extends StageRenderer {
   readonly #advancing: (Slot | undefined)[] = [];
   readonly #advancingRuns: (Run | undefined)[] = [];
 
-  // the order of insertion is the order of use: the shape unused longest comes first
-  readonly #shapes = new Map<string, CachedShape>();
-  #shapeKey?: string;
-  #shape?: Shape;
-  /** The renderer the shapes and the placeholders are built for. */
-  #shapesRenderer?: WebGPURenderer;
-  /**
-   * Errors from `dispose()` of effects while a draw lets go of shapes; made only when one is let
-   * go of, so that a frame without a change of shape allocates nothing.
-   */
-  #lettingGoErrors?: unknown[];
-
-  // 1×1 transparent black targets, one per texture node of the largest shape: three.js shares one
-  // uniform among the texture nodes of a graph that sample the same texture, so no two texture
-  // nodes of a shape ever stand on the same placeholder while it builds
-  readonly #placeholders: RenderTarget[] = [];
-  readonly #clearUniform = uniform(new Vector4(0, 0, 0, 0));
-  readonly #resolution = uniform(new Vector2(1, 1));
-  readonly #clearColorOfRenderer = new Color();
+  // the shapes of the stack: their graphs, pipelines and placeholders, built, kept and compiled
+  readonly #shapeCache = new DirectorShapeCache(this, {
+    rendererChanged: () => {
+      // the targets of the layers hold no picture under the new renderer: a frozen one draws once
+      for (const layer of this.#layers.values()) layer.needsPicture = true;
+    },
+  });
+  // the masks of the slots and of the running transitions: their checks, uses and watches
+  readonly #masks = new DirectorMasks(this, {
+    slots: () => this.#slots,
+    layerOf: (stage) => this.#layers.get(stage),
+    joinMask: (subject, stage, errors, scale) => this.#join(subject, stage, errors, 'mask', scale),
+    release: (layer) => this.#release(layer),
+    endRun: (slot, keep, state, errors) => this.#endRun(slot, keep, state, errors),
+    slotsChanged: () => this.#slotsChanged(),
+  });
 
   readonly #host: StageTransitionHost = {
     end: (transition, keep, state) => {
@@ -563,7 +280,7 @@ export class StageDirector extends StageRenderer {
     isFrozen: (stage) => this.#layers.get(stage)?.frozen === true,
   };
 
-  readonly #compose: StageRendererBuildOutputNode = (passes) => this.#fillShape(passes);
+  readonly #compose: StageRendererBuildOutputNode = (passes) => this.#shapeCache.fill(passes, this.#orderRefs);
 
   /**
    * @param parent Optional host (e.g. a `Display`) or parent `StageRenderer`, as for every
@@ -694,9 +411,9 @@ export class StageDirector extends StageRenderer {
     if (this.#slotWithEnd(stage))
       throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage is in the stack already`);
     this.#refuseMaskStageAsLayer(subject, stage);
-    const mask = this.#checkMask(subject, opts?.mask, stage);
-    const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => t.from === stage || t.to === stage);
-    this.#checkScales(subject, [mask, ...effectMasks]);
+    const mask = this.#masks.check(subject, opts?.mask, stage);
+    const effectMasks = this.#masks.checkEffectMasks(subject, options, stage, (t) => t.from === stage || t.to === stage);
+    this.#masks.checkScales(subject, [mask, ...effectMasks]);
     this.#slotIndexAt(subject, opts?.at);
     const errors: unknown[] = [];
     const transition = this.#show(subject, stage, opts, options, mask, effectMasks, false, errors);
@@ -724,11 +441,11 @@ export class StageDirector extends StageRenderer {
     const slot: Slot = {};
     if (mask) {
       try {
-        this.#maskSlot(subject, slot, mask, errors);
+        this.#masks.maskSlot(subject, slot, mask, errors);
       } catch (error) {
         // the uses a caller took are given back
         const collected = [error, ...errors];
-        if (usesHeld) this.#unuseMasks(effectMasks, collected);
+        if (usesHeld) this.#masks.unuse(effectMasks, collected);
         throwCollected(collected, `${subject}: more than one error on the way back from a mask stage that refused to join`);
       }
     }
@@ -737,7 +454,7 @@ export class StageDirector extends StageRenderer {
     let layer: Layer | undefined;
     try {
       if (!usesHeld) {
-        this.#useMasks(subject, effectMasks, errors);
+        this.#masks.use(subject, effectMasks, errors);
         usesMasks = true;
       }
       this.#finishRunsWith(stage, errors);
@@ -746,7 +463,7 @@ export class StageDirector extends StageRenderer {
         if (this.#slotWithEnd(stage)) {
           throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage is in the stack already`);
         }
-        this.#refuseDrivenMasks(subject, effectMasks);
+        this.#masks.refuseDriven(subject, effectMasks);
         // only now: a run that ended with nothing has taken its slot out, and `at` counts the stack
         // as it stands after the runs this call ended
         at = this.#slotIndexAt(subject, opts?.at);
@@ -755,14 +472,14 @@ export class StageDirector extends StageRenderer {
     } catch (error) {
       // the original error stays the first of what is thrown: the listeners that threw on the way back are not lost
       const collected = [error, ...errors];
-      this.#unmaskSlot(slot, collected);
-      if (usesMasks) this.#unuseMasks(effectMasks, collected);
+      this.#masks.unmaskSlot(slot, collected);
+      if (usesMasks) this.#masks.unuse(effectMasks, collected);
       throwCollected(collected, `${subject}: more than one error on the way back from a change that was refused`);
     }
     if (!layer) {
       // the call ends as one that met a disposed director: what it held goes back
-      this.#unmaskSlot(slot, errors);
-      if (usesMasks) this.#unuseMasks(effectMasks, errors);
+      this.#masks.unmaskSlot(slot, errors);
+      if (usesMasks) this.#masks.unuse(effectMasks, errors);
       return this.#cancelledHandle(undefined, stage);
     }
     this.#slots.splice(Math.min(at, this.#slots.length), 0, slot);
@@ -797,11 +514,11 @@ export class StageDirector extends StageRenderer {
     const slot = this.#slotWithEnd(stage);
     if (!slot) throw new Error(`${subject} cannot hide the stage ${describeValue(stage.name)}: that stage is not in the stack`);
     const running = slot.run?.transition;
-    const effectMasks = this.#checkEffectMasks(subject, options, undefined, (t) => t === running);
-    this.#checkScales(subject, effectMasks);
+    const effectMasks = this.#masks.checkEffectMasks(subject, options, undefined, (t) => t === running);
+    this.#masks.checkScales(subject, effectMasks);
 
     const errors: unknown[] = [];
-    this.#useMasks(subject, effectMasks, errors);
+    this.#masks.use(subject, effectMasks, errors);
     let ignored = false;
     try {
       if (slot.run) this.#endRun(slot, 'to', 'finished', errors);
@@ -812,14 +529,14 @@ export class StageDirector extends StageRenderer {
           `${subject} cannot hide the stage ${describeValue(stage.name)}: a listener of OnStageTransitionEnd changed its slot`,
         );
       }
-      if (!ignored) this.#refuseDrivenMasks(subject, effectMasks);
+      if (!ignored) this.#masks.refuseDriven(subject, effectMasks);
     } catch (error) {
       const collected = [error, ...errors];
-      this.#unuseMasks(effectMasks, collected);
+      this.#masks.unuse(effectMasks, collected);
       throwCollected(collected, `${subject}: more than one error on the way back from a stack a listener changed`);
     }
     if (ignored) {
-      this.#unuseMasks(effectMasks, errors);
+      this.#masks.unuse(effectMasks, errors);
       throwCollected(errors, changeThrew(subject));
       return this.#cancelledHandle(stage, undefined);
     }
@@ -857,12 +574,12 @@ export class StageDirector extends StageRenderer {
     this.#refuseMaskStageAsLayer(subject, to);
     // a mask is busy only after the runs this call ends anyway: the run of the slot and those with `to`
     const running = slot.run?.transition;
-    const effectMasks = this.#checkEffectMasks(subject, options, to, (t) => t === running || t.from === to || t.to === to);
-    this.#checkScales(subject, effectMasks);
+    const effectMasks = this.#masks.checkEffectMasks(subject, options, to, (t) => t === running || t.from === to || t.to === to);
+    this.#masks.checkScales(subject, effectMasks);
 
     // the mask stages join first, so a mask the ending run used stays and is not joined again
     const errors: unknown[] = [];
-    this.#useMasks(subject, effectMasks, errors);
+    this.#masks.use(subject, effectMasks, errors);
     let toLayer: Layer | undefined;
     try {
       if (slot.run) this.#endRun(slot, 'to', 'finished', errors);
@@ -877,16 +594,16 @@ export class StageDirector extends StageRenderer {
         if (this.#slotWithEnd(to)) {
           throw new Error(`${subject} cannot take the stage ${describeValue(to.name)}: that stage is in the stack already`);
         }
-        this.#refuseDrivenMasks(subject, effectMasks);
+        this.#masks.refuseDriven(subject, effectMasks);
         toLayer = this.#join(subject, to, errors);
       }
     } catch (error) {
       const collected = [error, ...errors];
-      this.#unuseMasks(effectMasks, collected);
+      this.#masks.unuse(effectMasks, collected);
       throwCollected(collected, `${subject}: more than one error on the way back from a change that was refused`);
     }
     if (!toLayer) {
-      this.#unuseMasks(effectMasks, errors);
+      this.#masks.unuse(effectMasks, errors);
       throwCollected(errors, changeThrew(subject));
       return this.#cancelledHandle(from, to);
     }
@@ -916,18 +633,18 @@ export class StageDirector extends StageRenderer {
     if (this.#slotWithEnd(stage))
       throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: that stage is in the stack already`);
     this.#refuseMaskStageAsLayer(subject, stage);
-    const mask = this.#checkMask(subject, opts?.mask, stage);
+    const mask = this.#masks.check(subject, opts?.mask, stage);
     this.#slotIndexAt(subject, opts?.at);
     const ended = this.#runsPushEnds(stage, opts?.at, below);
-    const effectMasks = this.#checkEffectMasks(subject, options, stage, (t) => ended.has(t));
-    this.#checkScales(subject, [mask, ...effectMasks]);
+    const effectMasks = this.#masks.checkEffectMasks(subject, options, stage, (t) => ended.has(t));
+    this.#masks.checkScales(subject, [mask, ...effectMasks]);
 
     // the mask stages join first, so a mask a run that ends here used stays and is not joined again;
     // the runs end before the slot below is known: a run with the stage — the stage pushed back while
     // a pop() still takes it out — and a run below that ends with nothing each take their slot out,
     // and the slot below is the one that stays
     const errors: unknown[] = [];
-    this.#useMasks(subject, effectMasks, errors);
+    this.#masks.use(subject, effectMasks, errors);
     let belowSlot: Slot | undefined;
     try {
       this.#finishRunsWith(stage, errors);
@@ -943,12 +660,12 @@ export class StageDirector extends StageRenderer {
       }
     } catch (error) {
       const collected = [error, ...errors];
-      this.#unuseMasks(effectMasks, collected);
+      this.#masks.unuse(effectMasks, collected);
       throwCollected(collected, `${subject}: more than one error on the way back from a stack a listener changed`);
     }
     if (this.#ignoresChanges()) {
       // a listener of an end that disposed the director leaves nothing to change
-      this.#unuseMasks(effectMasks, errors);
+      this.#masks.unuse(effectMasks, errors);
       throwCollected(errors, changeThrew(subject));
       return this.#cancelledHandle(undefined, stage);
     }
@@ -1081,7 +798,7 @@ export class StageDirector extends StageRenderer {
       // new slots, without masks: the masks of the stages that stay are not carried over
       const previous = this.#slots;
       this.#slots = kept.map((layer) => ({layer}));
-      for (const slot of previous) this.#unmaskSlot(slot, errors);
+      for (const slot of previous) this.#masks.unmaskSlot(slot, errors);
       for (const layer of [...this.#layers.values()]) {
         if (layer.role !== 'layer' || kept.includes(layer)) continue;
         try {
@@ -1115,10 +832,10 @@ export class StageDirector extends StageRenderer {
     if (this.#ignoresChanges()) return this;
     const slot = this.#slotWithEnd(stage);
     if (!slot) throw new Error(`${subject} cannot mask the stage ${describeValue(stage.name)}: that stage is not in the stack`);
-    this.#checkMask(subject, mask);
-    this.#checkScales(subject, [mask]);
+    this.#masks.check(subject, mask);
+    this.#masks.checkScales(subject, [mask]);
     const errors: unknown[] = [];
-    this.#maskSlot(subject, slot, mask, errors);
+    this.#masks.maskSlot(subject, slot, mask, errors);
     throwCollected(
       errors,
       `${subject}: more than one listener of OnStageAdded, OnStageRemoved, OnAddToParent and OnRemoveFromParent threw`,
@@ -1201,7 +918,7 @@ export class StageDirector extends StageRenderer {
     const layer = this.#layers.get(stage) ?? this.#byRenderer.get(stage);
     if (!layer) return super.remove(stage);
     const errors: unknown[] = [];
-    if (layer.role === 'mask') this.#dropMask(layer, errors);
+    if (layer.role === 'mask') this.#masks.drop(layer, errors);
     else this.#dropLayer(layer, errors);
     throwCollected(
       errors,
@@ -1218,7 +935,7 @@ export class StageDirector extends StageRenderer {
     try {
       super.resize(width, height, pixelRatio);
     } finally {
-      this.#resolution.value.set(
+      this.#shapeCache.setResolution(
         Math.max(1, Math.floor(this.width * this.pixelRatio)),
         Math.max(1, Math.floor(this.height * this.pixelRatio)),
       );
@@ -1277,15 +994,7 @@ export class StageDirector extends StageRenderer {
       }
     }
 
-    // the masks of the running effects carry the progress their transitions reached in this frame
-    // to their stages, before those update; the slots as they stand now, after the ends of this frame
-    const current = this.#slots;
-    for (let i = 0; i < current.length; i++) {
-      const run = current[i]!.run;
-      if (!run) continue;
-      const masks = run.masks;
-      for (let j = 0; j < masks.length; j++) StageMaskInternals.followProgress(masks[j]!, run.transition);
-    }
+    this.#masks.followProgress();
 
     const stages = this.orderedStages;
     for (let i = 0; i < stages.length; i++) {
@@ -1308,25 +1017,12 @@ export class StageDirector extends StageRenderer {
    * a director at the top, and from a parent that composes a director as one of its layers.
    */
   protected override renderToCurrentTarget(renderer: WebGPURenderer): void {
-    const shape = this.#currentShape(renderer);
+    const shape = this.#shapeCache.current(renderer, this.#slots);
     if (super.pipeline !== shape.pipeline) super.pipeline = shape.pipeline;
 
-    for (let i = 0; i < shape.slots.length; i++) {
-      const progress = shape.slots[i]!.progress;
-      const run = this.#slots[i]?.run;
-      // written only when it changed: a double stored again is boxed again, 16 bytes per draw
-      if (progress && run && progress.value !== run.transition.progress) progress.value = run.transition.progress;
-    }
-    // again for the masks of the running effects: a manual progress set after updateFrame() reaches
-    // the GPU in this draw, while their `progress` keeps the value of the frame
-    const slots = this.#slots;
-    for (let i = 0; i < slots.length; i++) {
-      const run = slots[i]!.run;
-      if (!run) continue;
-      const masks = run.masks;
-      for (let j = 0; j < masks.length; j++) StageMaskInternals.followProgressNode(masks[j]!, run.transition);
-    }
-    this.#updateClearUniform(renderer);
+    this.#shapeCache.writeProgress(shape, this.#slots);
+    this.#masks.followProgressNodes();
+    this.#shapeCache.updateClear(renderer);
     try {
       super.renderToCurrentTarget(renderer);
     } catch (error) {
@@ -1339,9 +1035,8 @@ export class StageDirector extends StageRenderer {
     // their shapes comes after it. Under a parent that composes, this is the parent's preparation of
     // its layers: the error ends the draw of the parent there, and the layers behind the director
     // are not drawn in that frame
-    const errors = this.#lettingGoErrors;
+    const errors = this.#shapeCache.takeLettingGoErrors();
     if (errors) {
-      this.#lettingGoErrors = undefined;
       throwCollected(errors, 'StageDirector: more than one effect threw from dispose() as the director let go of its shapes');
     }
   }
@@ -1417,35 +1112,14 @@ export class StageDirector extends StageRenderer {
       }
       for (const kinds of parsed) {
         if (this.isDisposed) break;
-        this.#shapesFor(renderer, errors);
-        const key = shapeKey(kinds);
-        const cached = this.#shapes.get(key);
-        if (cached) {
-          cached.pinned = true;
-          if (cached.compiling !== undefined) {
-            // the compile another call runs: its outcome is this call's, a failure included
-            try {
-              await cached.compiling;
-            } catch (error) {
-              if (this.isDisposed) break;
-              throw error;
-            }
-          }
-          continue;
-        }
-        const entry: CachedShape = {shape: this.#buildShape(renderer, kinds), pinned: true};
-        this.#shapes.set(key, entry);
-        const compiling = this.#compileShape(renderer, entry.shape, asLayer ? (this.outputRenderTarget ?? target()) : undefined);
-        entry.compiling = compiling;
-        try {
-          await compiling;
-          entry.compiling = undefined;
-        } catch (error) {
-          this.#forgetFailedShape(key, entry, errors);
-          // the shape has gone with the director, and the failure has nothing left to be about
-          if (this.isDisposed) break;
-          throw error;
-        }
+        const goOn = await this.#shapeCache.precompile(
+          renderer,
+          kinds,
+          () => (asLayer ? (this.outputRenderTarget ?? target()) : undefined),
+          errors,
+          () => this.isDisposed,
+        );
+        if (!goOn) break;
       }
     } catch (error) {
       // the error of the build or the compile stays the first of what is thrown, and the effects
@@ -1495,18 +1169,7 @@ export class StageDirector extends StageRenderer {
       errors.push(error);
     }
     for (const layer of [...this.#layers.values()]) this.#release(layer);
-    for (const entry of this.#shapes.values()) this.#disposeShape(entry.shape, errors);
-    this.#shapes.clear();
-    this.#shape = undefined;
-    this.#shapeKey = undefined;
-    this.#shapesRenderer = undefined;
-    for (const placeholder of this.#placeholders) placeholder.dispose();
-    this.#placeholders.length = 0;
-    // what effects threw as a draw let go of shapes, that no draw has thrown yet
-    if (this.#lettingGoErrors) {
-      errors.push(...this.#lettingGoErrors);
-      this.#lettingGoErrors = undefined;
-    }
+    this.#shapeCache.dispose(errors);
     throwCollected(
       errors,
       'StageDirector#dispose(): more than one listener of OnStageTransitionEnd, OnStageRemoved, OnRemoveFromParent and OnStageDispose or dispose() of an effect threw',
@@ -1578,172 +1241,8 @@ export class StageDirector extends StageRenderer {
         `${subject} cannot take the stage ${describeValue(stage)}: a layer needs resize(), updateFrame() and renderTo()`,
       );
     }
-    const hold = this.#holdRefusal(stage);
+    const hold = holdRefusal(this, stage);
     if (hold) throw new Error(`${subject} cannot take the stage ${describeValue(stage.name)}: ${hold}`);
-  }
-
-  /**
-   * Refuses a mask of `masks` that drives a transition, called once the call has ended the runs it
-   * meant to end: a driver that still stands belongs to a transition a listener started.
-   */
-  #refuseDrivenMasks(subject: string, masks: readonly StageMask[]): void {
-    for (const mask of masks) {
-      if (StageMaskInternals.drivenBy(mask) !== undefined) {
-        throw new Error(`${subject}: the mask ${describeValue(mask.stage.name)} drives a transition already`);
-      }
-    }
-  }
-
-  /** Why `stage` cannot be drawn by this director — it is the director or holds it —, or `undefined`. */
-  #holdRefusal(stage: IStage): string | undefined {
-    if (!(stage instanceof StageRenderer)) return undefined;
-    for (let holder: StageRendererParentType | undefined = this; holder instanceof StageRenderer; holder = holder.parent) {
-      if (holder === stage) return holder === this ? 'that stage is this director' : 'that stage holds this director';
-    }
-    return undefined;
-  }
-
-  /**
-   * Refuses `mask` before anything changes; `layer` is the stage the call puts into the new slot.
-   * Answers the mask, `undefined` for none.
-   */
-  #checkMask(subject: string, mask: unknown, layer?: IStage): StageMask | undefined {
-    if (mask === undefined) return undefined;
-    if (!(mask instanceof StageMask)) {
-      throw new TypeError(`${subject}: mask must be a StageMask, got ${describeValue(mask)}`);
-    }
-    const stage = mask.stage;
-    const refusal = (reason: string) => new Error(`${subject} cannot take the mask on ${describeValue(stage.name)}: ${reason}`);
-    if (mask.isDisposed) throw refusal('that mask has been disposed');
-    if ((stage as {isDisposed?: unknown}).isDisposed === true) throw refusal('that stage has been disposed');
-    const hold = this.#holdRefusal(stage);
-    if (hold) throw refusal(hold);
-    if (stage === layer || this.#layers.get(stage)?.role === 'layer') {
-      throw refusal('that stage is a layer of this director');
-    }
-    const owner = maskOwners.get(stage);
-    if (owner !== undefined && owner !== this) throw refusal('that stage is a mask of another director');
-    // this director holds the stage as no layer, so every holder is another director
-    if (layerOwners.get(stage)?.size) throw refusal('that stage is a layer of another director');
-    return mask;
-  }
-
-  /**
-   * Refuses the masks `options.effect` names before anything changes, as `#checkMask()` refuses the
-   * mask of a slot, and a mask that drives a transition already — unless that transition is one
-   * the call ends anyway, as `ends` tells. Answers the masks the transition will use: none for a
-   * change without a transition, which draws no effect.
-   */
-  #checkEffectMasks(
-    subject: string,
-    options: ParsedOptions,
-    layer: IStage | undefined,
-    ends: (transition: StageTransition) => boolean,
-  ): readonly StageMask[] {
-    const masks = masksOf(subject, options.effect);
-    for (const mask of masks) this.#checkMask(subject, mask, layer);
-    if (options.instant) return NO_MASKS;
-    for (const mask of masks) {
-      const driver = StageMaskInternals.drivenBy(mask);
-      if (driver !== undefined && !ends(driver)) {
-        throw new Error(`${subject}: the mask ${describeValue(mask.stage.name)} drives a transition already`);
-      }
-    }
-    return masks;
-  }
-
-  /**
-   * Refuses, before anything changes, a mask of the call whose `scale` differs from that of its
-   * stage: a mask stage has one pass target, so every mask on it has the scale the stage is drawn at
-   * — the scale of the masks that use it now, or else of the first mask of this call on it. A stage
-   * takes another scale once it has left the director.
-   */
-  #checkScales(subject: string, masks: readonly (StageMask | undefined)[]): void {
-    for (let i = 0; i < masks.length; i++) {
-      const mask = masks[i];
-      if (!mask) continue;
-      const refusal = (reason: string) =>
-        new Error(`${subject} cannot take the mask on ${describeValue(mask.stage.name)}: ${reason}, and a stage has one target`);
-      const known = this.#layers.get(mask.stage);
-      if (known?.role === 'mask' && known.scale !== mask.scale) {
-        throw refusal(`that stage is drawn as a mask at a scale of ${known.scale} already`);
-      }
-      for (let j = 0; j < i; j++) {
-        const other = masks[j];
-        if (other && other.stage === mask.stage && other.scale !== mask.scale) {
-          throw refusal(`another mask of this call on that stage has a scale of ${other.scale}`);
-        }
-      }
-    }
-  }
-
-  /**
-   * One use for every stage among `masks`, each stage once: a stage that is no mask of the
-   * director yet joins. A stage that refuses to join gives back the uses taken before it, and the
-   * errors of listeners this call put into `errors` are thrown behind the refusal. A listener of a
-   * join that disposes the director ends the call; the caller finds the director disposed.
-   */
-  #useMasks(subject: string, masks: readonly StageMask[], errors: unknown[]): void {
-    const before = errors.length;
-    let i = 0;
-    try {
-      for (; i < masks.length; i++) {
-        if (!firstOnItsStage(masks, i)) continue;
-        const layer = this.#join(subject, masks[i]!.stage, errors, 'mask', masks[i]!.scale);
-        if (!layer) return;
-        layer.uses++;
-      }
-    } catch (error) {
-      const collected = [error, ...errors.splice(before)];
-      this.#unuseMasks(masks.slice(0, i), collected);
-      throwCollected(collected, `${subject}: more than one error on the way back from a mask stage that refused to join`);
-    }
-  }
-
-  /** Gives back the uses `#useMasks()` took for `masks`. */
-  #unuseMasks(masks: readonly StageMask[], errors: unknown[]): void {
-    for (let i = 0; i < masks.length; i++) {
-      if (firstOnItsStage(masks, i)) this.#unuseMask(masks[i]!, errors);
-    }
-  }
-
-  /**
-   * Puts `mask` on `slot`: the stage of the new mask joins first, then the stage of the old one leaves
-   * if nothing uses it any more. A listener of the join that disposes the director leaves the slot as
-   * it was; the caller finds the director disposed.
-   */
-  #maskSlot(subject: string, slot: Slot, mask: StageMask | undefined, errors: unknown[]): void {
-    const old = slot.mask;
-    if (old === mask) return;
-    if (mask) {
-      const layer = this.#join(subject, mask.stage, errors, 'mask', mask.scale);
-      if (!layer) return;
-      layer.uses++;
-    }
-    slot.mask = mask;
-    if (old) this.#unuseMask(old, errors);
-    this.#slotsChanged();
-  }
-
-  /** Takes the mask off `slot`, a slot that goes or makes way for a new one. */
-  #unmaskSlot(slot: Slot, errors: unknown[]): void {
-    const mask = slot.mask;
-    if (!mask) return;
-    slot.mask = undefined;
-    this.#unuseMask(mask, errors);
-  }
-
-  /** One use of the stage of `mask` less; with the last one the stage leaves the director. */
-  #unuseMask(mask: StageMask, errors: unknown[]): void {
-    const layer = this.#layers.get(mask.stage);
-    if (layer?.role !== 'mask') return;
-    layer.uses--;
-    if (layer.uses > 0) return;
-    try {
-      this.#release(layer);
-    } catch (error) {
-      errors.push(error);
-    }
   }
 
   /** The index in #slots before which a stage shown at position `at` of the stack goes. */
@@ -1768,9 +1267,9 @@ export class StageDirector extends StageRenderer {
   /**
    * The layer of `stage` in `role`, made and added to the base if it is none yet. A mask stage
    * draws into a pass target of the share `scale` of the full size; the callers have checked the
-   * scale against the stage with `#checkScales()`. The errors of listeners of the add go into
-   * `errors`; the layer joins all the same — unless one of them disposed the director: then no
-   * layer joins, and the answer is `undefined`. A director that is disposed when the call comes
+   * scale against the stage with `DirectorMasks#checkScales()`. The errors of listeners of the add
+   * go into `errors`; the layer joins all the same — unless one of them disposed the director: then
+   * no layer joins, and the answer is `undefined`. A director that is disposed when the call comes
    * answers `undefined` as well.
    */
   #join(
@@ -1781,7 +1280,8 @@ export class StageDirector extends StageRenderer {
     scale = 1,
   ): Layer | undefined {
     // a listener of an earlier join of the same call — of the slot mask in #show(), of a mask stage
-    // in #useMasks() — has disposed the director: nothing is checked or built on a director that is gone
+    // in `DirectorMasks#use()` — has disposed the director: nothing is checked or built on a
+    // director that is gone
     if (this.isDisposed) return undefined;
     const known = this.#layers.get(stage);
     if (known) {
@@ -1927,30 +1427,6 @@ export class StageDirector extends StageRenderer {
     this.#slotsChanged();
   }
 
-  /**
-   * Takes the mask stage `layer` off every slot it masks, ends every transition whose effect names
-   * it as cancelled, and takes it out of the director.
-   */
-  #dropMask(layer: Layer, errors: unknown[]): void {
-    // over a copy, as every loop here that may hand control to a listener
-    for (const slot of this.#slots.slice()) {
-      if (slot.mask?.stage === layer.stage) {
-        slot.mask = undefined;
-        layer.uses--;
-      }
-    }
-    // the end of each run gives its use back, and the last one lets the stage go
-    for (const slot of this.#slots.slice()) {
-      if (slot.run?.masks.some((mask) => mask.stage === layer.stage)) this.#endRun(slot, 'from', 'cancelled', errors);
-    }
-    try {
-      this.#release(layer);
-    } catch (error) {
-      errors.push(error);
-    }
-    this.#slotsChanged();
-  }
-
   #removeSlot(slot: Slot, errors: unknown[]): void {
     const index = this.#slots.indexOf(slot);
     if (index !== -1) this.#slots.splice(index, 1);
@@ -1958,7 +1434,7 @@ export class StageDirector extends StageRenderer {
       slot.frozeBelow.frozen = false;
       slot.frozeBelow = undefined;
     }
-    this.#unmaskSlot(slot, errors);
+    this.#masks.unmaskSlot(slot, errors);
     this.#slotsChanged();
   }
 
@@ -1966,67 +1442,10 @@ export class StageDirector extends StageRenderer {
     this.#orderDirty = true;
     this.#stack = undefined;
     this.#transitions = undefined;
-    this.#shapeKey = undefined;
+    this.#shapeCache.invalidate();
     this.invalidateOutputNode();
-    this.#watchMasks();
+    this.#masks.watch();
   }
-
-  /**
-   * Watches the dispose of every mask a slot or a running transition holds, and of no other: a
-   * mask the director let go of keeps no reference to it. Runs with every change of the slots, never
-   * in a frame that changes none.
-   */
-  #watchMasks(): void {
-    const watches = this.#maskWatches;
-    const held = (mask: StageMask): boolean => {
-      for (const slot of this.#slots) {
-        if (slot.mask === mask || slot.run?.masks.includes(mask)) return true;
-      }
-      return false;
-    };
-    for (const [mask, unwatch] of watches) {
-      if (!held(mask)) {
-        watches.delete(mask);
-        unwatch();
-      }
-    }
-    // a mask disposed before the change that put it in place — by a listener between the checks of a
-    // call and its change — hears no dispose any more: it leaves as soon as the change stands
-    let disposed: StageMask | undefined;
-    const watch = (mask: StageMask): void => {
-      if (watches.has(mask)) return;
-      if (mask.isDisposed) disposed ??= mask;
-      else watches.set(mask, StageMaskInternals.onDispose(mask, this.#maskDisposed));
-    };
-    for (const slot of this.#slots) {
-      if (slot.mask) watch(slot.mask);
-      slot.run?.masks.forEach(watch);
-    }
-    // one at a time: the leave changes the slots and comes back here for the next one. An error of a
-    // listener of that leave reaches the caller of the call that made the change
-    if (disposed) this.#maskDisposed(disposed);
-  }
-
-  /**
-   * A disposed mask leaves every slot it lies on, and every transition whose effect names it ends
-   * as cancelled, as for a disposed mask stage; its stage leaves the director when nothing else
-   * uses it. Another mask on the same stage stays where it is.
-   */
-  #maskDisposed = (mask: StageMask): void => {
-    const errors: unknown[] = [];
-    // over a copy: a listener of OnStageRemoved, when the mask stage leaves, may change the slots
-    for (const slot of this.#slots.slice()) {
-      if (slot.mask === mask) this.#unmaskSlot(slot, errors);
-    }
-    for (const slot of this.#slots.slice()) {
-      if (slot.run?.masks.includes(mask)) this.#endRun(slot, 'from', 'cancelled', errors);
-    }
-    this.#slotsChanged();
-    throwCollected(
-      errors,
-      'StageDirector: more than one listener of OnStageTransitionEnd, OnStageRemoved and OnRemoveFromParent threw while a disposed mask left',
-    );
-  };
 
   // ---------------------------------------------------------------------------
   // transitions
@@ -2129,7 +1548,7 @@ export class StageDirector extends StageRenderer {
         errors.push(error);
       }
     }
-    this.#unuseMasks(run.masks, errors);
+    this.#masks.unuse(run.masks, errors);
     this.#slotsChanged();
 
     StageTransitionInternals.settle(run.transition, state, keep);
@@ -2210,196 +1629,6 @@ export class StageDirector extends StageRenderer {
     this.#orderDirty = false;
   }
 
-  /** The `index`th 1×1 transparent black target, which stands in for nothing. */
-  #placeholder(renderer: WebGPURenderer, index: number): Texture {
-    while (this.#placeholders.length <= index) {
-      const placeholder = new RenderTarget(1, 1, {type: renderer.getOutputBufferType()});
-      const prev = renderer.getRenderTarget();
-      const prevAlpha = renderer.getClearAlpha();
-      renderer.getClearColor(this.#clearColorOfRenderer);
-      renderer.setRenderTarget(placeholder);
-      try {
-        renderer.setClearColor(new Color(0x000000), 0);
-        renderer.clear(true, true, false);
-      } finally {
-        renderer.setClearColor(this.#clearColorOfRenderer, prevAlpha);
-        renderer.setRenderTarget(prev);
-      }
-      this.#placeholders.push(placeholder);
-    }
-    return this.#placeholders[index]!.texture;
-  }
-
-  #currentShape(renderer: WebGPURenderer): Shape {
-    if (renderer !== this.#shapesRenderer) {
-      // the first renderer has nothing to let go of
-      if (this.#shapesRenderer === undefined) this.#shapesRenderer = renderer;
-      else this.#shapesFor(renderer, (this.#lettingGoErrors ??= []));
-    }
-    if (this.#shapeKey === undefined || this.#shape === undefined) {
-      const kinds = this.#slots.map(
-        (slot): ShapeKind =>
-          slot.run || slot.mask
-            ? {effect: slot.run?.transition.effect, mask: slot.mask, effectMasks: slot.run?.masks ?? NO_MASKS}
-            : LAYER_KIND,
-      );
-      const key = shapeKey(kinds);
-      let entry = this.#shapes.get(key);
-      if (entry) {
-        // the one used last goes to the end
-        this.#shapes.delete(key);
-        this.#shapes.set(key, entry);
-      } else {
-        entry = {shape: this.#buildShape(renderer, kinds), pinned: false};
-        this.#shapes.set(key, entry);
-        this.#evictShapes(entry);
-      }
-      this.#shapeKey = key;
-      this.#shape = entry.shape;
-    }
-    return this.#shape;
-  }
-
-  /**
-   * Lets go of the shapes the stack built itself, the one unused longest first, while more than
-   * `KEPT_SHAPES` of them are left; never of `newest`, nor of a shape `precompile()` compiled.
-   */
-  #evictShapes(newest: CachedShape): void {
-    let unpinned = 0;
-    for (const entry of this.#shapes.values()) if (!entry.pinned) unpinned++;
-    for (const [key, entry] of this.#shapes) {
-      if (unpinned <= KEPT_SHAPES) break;
-      if (entry.pinned || entry === newest) continue;
-      this.#shapes.delete(key);
-      unpinned--;
-      this.#disposeShape(entry.shape, (this.#lettingGoErrors ??= []));
-    }
-  }
-
-  /**
-   * Lets go of the shape under `key` whose compile failed, so that the next `precompile()` builds and
-   * compiles it anew — unless a draw since has made it the shape of the stack: then it stays, as one
-   * the stack built itself.
-   */
-  #forgetFailedShape(key: string, entry: CachedShape, errors: unknown[]): void {
-    entry.compiling = undefined;
-    // a dispose() or a draw with another renderer has let go of it already
-    if (this.#shapes.get(key) !== entry) return;
-    if (this.#shape === entry.shape) {
-      entry.pinned = false;
-      return;
-    }
-    this.#shapes.delete(key);
-    this.#disposeShape(entry.shape, errors);
-  }
-
-  /** Disposes the pipeline of `shape` and the nodes its effects built; a call that throws holds up none of the others. */
-  #disposeShape(shape: Shape, errors: unknown[]): void {
-    try {
-      shape.pipeline.dispose();
-    } catch (error) {
-      errors.push(error);
-    }
-    for (const slot of shape.slots) {
-      if (!slot.effect?.dispose || !slot.effectNode) continue;
-      try {
-        slot.effect.dispose(slot.effectNode);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-  }
-
-  /**
-   * Binds the shapes and the placeholders to `renderer`: they belong to the renderer they are built
-   * for, and another one lets go of every shape and every placeholder, which build again for it.
-   */
-  #shapesFor(renderer: WebGPURenderer, errors: unknown[]): void {
-    if (renderer === this.#shapesRenderer) return;
-    if (this.#shapesRenderer !== undefined) {
-      for (const entry of this.#shapes.values()) this.#disposeShape(entry.shape, errors);
-      this.#shapes.clear();
-      this.#shape = undefined;
-      this.#shapeKey = undefined;
-      for (const placeholder of this.#placeholders) placeholder.dispose();
-      this.#placeholders.length = 0;
-      // the targets of the layers hold no picture under the new renderer: a frozen one draws once
-      for (const layer of this.#layers.values()) layer.needsPicture = true;
-    }
-    this.#shapesRenderer = renderer;
-  }
-
-  #buildShape(renderer: WebGPURenderer, kinds: readonly ShapeKind[]): Shape {
-    const at = uv();
-    const slots: ShapeSlot[] = [];
-    const textureNodes: TextureNode[] = [];
-    const placeholders: Texture[] = [];
-    const textureNode = (): TextureNode => {
-      const placeholder = this.#placeholder(renderer, textureNodes.length);
-      const node = texture(placeholder);
-      textureNodes.push(node);
-      placeholders.push(placeholder);
-      return node;
-    };
-    // one texture node per distinct mask stage, in the order of the stage indices, and one coverage
-    // per distinct mask, shared by every slot it masks
-    const maskNodes: TextureNode[] = [];
-    const coverages: Node<'float'>[] = [];
-    const coverageOf: (Node<'float'> | undefined)[] = [];
-    // per slot, the index of the mask stage of each mask its effect names, by its place in the list
-    const effectMaskStages: number[][] = [];
-    distinctMasks(
-      kinds,
-      (slot, index, {stage, source, invert}) => {
-        const maskNode = (maskNodes[stage] ??= textureNode());
-        coverageOf[slot] = coverages[index] ??= maskCoverage(maskNode.sample(at), source, invert);
-      },
-      (slot, position, _index, {stage}) => {
-        maskNodes[stage] ??= textureNode();
-        (effectMaskStages[slot] ??= [])[position] = stage;
-      },
-    );
-    const masked = (slot: number, color: Node<'vec4'>): Node<'vec4'> => {
-      const coverage = coverageOf[slot];
-      return coverage ? (color.mul(coverage) as Node<'vec4'>) : color;
-    };
-
-    let out: Node<'vec4'> = this.#clearUniform;
-    for (let index = 0; index < kinds.length; index++) {
-      const {effect, effectMasks} = kinds[index]!;
-      if (effect) {
-        const from = textureNode();
-        const to = textureNode();
-        const progress = uniform(0);
-        const stages = effectMaskStages[index];
-        const effectNode = effect.build({
-          from: textureSource(from),
-          to: textureSource(to),
-          progress,
-          uv: at,
-          resolution: this.#resolution,
-          mask: (mask) => {
-            const position = effectMasks.indexOf(mask);
-            if (position === -1 || !stages) {
-              const named = mask instanceof StageMask ? `the mask on ${describeValue(mask.stage.name)}` : describeValue(mask);
-              throw new Error(
-                `StageTransitionInput#mask(): the effect ${describeValue(effect.name)} did not name ${named} in its masks`,
-              );
-            }
-            return maskSource(maskNodes[stages[position]!]!, mask);
-          },
-        });
-        slots.push({from, to, progress, effect, effectNode});
-        out = over(masked(index, effectNode), out);
-      } else {
-        const layer = textureNode();
-        slots.push({layer});
-        out = over(masked(index, layer), out);
-      }
-    }
-    return {pipeline: new RootRenderPipeline(renderer), slots, maskNodes, outputNode: out, textureNodes, placeholders};
-  }
-
   /** Whether a renderer that composes holds this director: it draws into a pass target, on linear output. */
   #isNested(): boolean {
     for (let holder = this.parent; holder instanceof StageRenderer; holder = holder.parent) {
@@ -2414,97 +1643,6 @@ export class StageDirector extends StageRenderer {
     if (!this.#layers.has(stage) && this.width > 0 && this.height > 0) {
       stage.resize(this.width, this.height, this.pixelRatio);
     }
-    this.#withTarget(renderer, target, true, () => stage.renderTo(renderer));
-  }
-
-  /**
-   * Compiles the material of `shape` through `RenderPipeline#render()` itself, with the one draw it
-   * makes turned into a `compileAsync()`: the pipeline sets up the renderer and its quad as for a
-   * frame — the output transform, no XR, the vertex node of the quad —, and the node build of the
-   * compile sees what the draw of a frame would see. `nestedTarget` stands for the pass target of a
-   * parent, which the director draws into on linear output; without it the director's own target
-   * applies. Every texture node of the shape samples a placeholder of its own; the pass textures
-   * that take their places later have their type, so they change a binding and no shader. The
-   * pipeline keeps the output node, and the first frame of the shape finds it in place and builds
-   * nothing.
-   */
-  async #compileShape(renderer: WebGPURenderer, shape: Shape, nestedTarget: RenderTarget | undefined): Promise<void> {
-    const pipeline = shape.pipeline;
-    pipeline.outputNode = shape.outputNode;
-    pipeline.needsUpdate = true;
-
-    let compiled: Promise<void> | undefined;
-    const ownRender = Object.hasOwn(renderer, 'render');
-    const render = renderer.render;
-    renderer.render = ((scene, camera) => {
-      compiled = renderer.compileAsync(scene, camera);
-    }) as WebGPURenderer['render'];
-    try {
-      const target = nestedTarget ?? this.outputRenderTarget ?? renderer.getRenderTarget();
-      this.#withTarget(renderer, target, nestedTarget !== undefined, () => pipeline.render());
-    } finally {
-      if (ownRender) renderer.render = render;
-      else delete (renderer as Partial<WebGPURenderer>).render;
-    }
-    // three.js draws the quad of a RenderPipeline through renderer.render(); a draw that went another
-    // way compiled nothing, and the first frame of the shape would build what precompile() promised
-    if (compiled === undefined) {
-      throw new Error(
-        'StageDirector#precompile(): the render pipeline drew without calling renderer.render(), and nothing was compiled',
-      );
-    }
-    await compiled;
-  }
-
-  /** Runs `draw` with `target` set — and linear output, if asked —, and gives the renderer back as it was. */
-  #withTarget(renderer: WebGPURenderer, target: RenderTarget | null, linear: boolean, draw: () => void): void {
-    const prevTarget = renderer.getRenderTarget();
-    const toneMapping = renderer.toneMapping;
-    const outputColorSpace = renderer.outputColorSpace;
-    renderer.setRenderTarget(target);
-    if (linear) {
-      renderer.toneMapping = NoToneMapping;
-      renderer.outputColorSpace = ColorManagement.workingColorSpace;
-    }
-    try {
-      draw();
-    } finally {
-      renderer.toneMapping = toneMapping;
-      renderer.outputColorSpace = outputColorSpace;
-      renderer.setRenderTarget(prevTarget);
-    }
-  }
-
-  /** Points the texture nodes of the current shape at the pass textures of the layers. */
-  #fillShape(passes: Node[]): Node {
-    const shape = this.#shape;
-    if (!shape) throw new Error('StageDirector: the shape of the stack is built before the composition');
-    const {textureNodes, placeholders} = shape;
-    for (let i = 0; i < textureNodes.length; i++) textureNodes[i]!.value = placeholders[i]!;
-    const refs = this.#orderRefs;
-    for (let i = 0; i < refs.length; i++) {
-      const ref = refs[i]!;
-      const pass = passes[i] as Partial<TextureNode> | undefined;
-      if (ref.side === 'mask') {
-        const node = shape.maskNodes[ref.maskStage];
-        if (node && pass?.value) node.value = pass.value;
-        continue;
-      }
-      const slot = shape.slots[ref.slot];
-      const node = ref.side === 'layer' ? slot?.layer : ref.side === 'from' ? slot?.from : slot?.to;
-      if (node && pass?.value) node.value = pass.value;
-    }
-    return shape.outputNode;
-  }
-
-  #updateClearUniform(renderer: WebGPURenderer): void {
-    const value = this.#clearUniform.value;
-    if (!this.clear) {
-      value.set(0, 0, 0, 0);
-      return;
-    }
-    const color = this.clearColor ?? renderer.getClearColor(this.#clearColorOfRenderer);
-    const alpha = this.clearAlpha;
-    value.set(color.r * alpha, color.g * alpha, color.b * alpha, alpha);
+    withTarget(renderer, target, true, () => stage.renderTo(renderer));
   }
 }
