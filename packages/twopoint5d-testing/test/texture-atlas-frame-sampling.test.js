@@ -245,4 +245,39 @@ describe('texture — sampleAtlasFrame() draws atlas frames on meshes of one’s
     expect(countMixed(barePixels), 'mixed pixels of the bare fract(), the seam the test has to see').to.be.greaterThan(0);
     expect(countMixed(pixels), 'mixed pixels of sampleAtlasFrame()').to.equal(0);
   });
+
+  it('a table of AtlasFrameTable.MaxFrames frames takes a uniform buffer of its own and draws its last frame', async function () {
+    const {texture, json} = makeSheetWithTurnedCopy(IMAGE, IMAGE_WIDTH, IMAGE_HEIGHT);
+    keep(texture);
+    const [atlas] = TexturePackerJson.parse(json);
+    const turned = atlas.frame('turned');
+    const upright = atlas.frame('upright');
+    const entries = Array.from({length: AtlasFrameTable.MaxFrames}, (_, index) =>
+      index === AtlasFrameTable.MaxFrames - 1 ? upright : turned,
+    );
+    const table = new AtlasFrameTable(entries);
+
+    const scene = new Scene();
+    const mesh = makePlane(
+      scene,
+      3,
+      2,
+      0,
+      sampleAtlasFrame(texture, table, AtlasFrameTable.MaxFrames - 1, uv(), {origin: 'bottom-left'}),
+    );
+    const camera = makeCamera();
+
+    const topDown = await readsTopDown(display.renderer, target);
+    const pixels = await renderToPixels(display.renderer, scene, camera, target);
+    expectModel({pixels, topDown}, imageOnPlane(0, 3, 2));
+
+    // the block that holds the array holds nothing else: 1023 vec4 are 341 frames of three
+    const {fragmentShader} = await display.renderer.debug.getShaderAsync(scene, camera, mesh);
+    // the flag is not part of the typed Backend, but both backends of three carry it
+    const isWebGL = /** @type {{isWebGLBackend?: boolean}} */ (display.renderer.backend).isWebGLBackend === true;
+    const block = isWebGL
+      ? /uniform\s+NodeBuffer_\w+\s*\{\s*vec4\s+\w+\[1023\];\s*\};/
+      : /struct\s+\w+Struct\s*\{\s*value\s*:\s*array<\s*vec4<f32>,\s*1023\s*>\s*\};/;
+    expect(fragmentShader).to.match(block);
+  });
 });

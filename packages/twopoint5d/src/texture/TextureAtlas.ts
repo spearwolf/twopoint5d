@@ -35,6 +35,20 @@ export type NamedTextureAtlasArgs<D = TextureAtlasFrameData> = [name: TextureAtl
 const isNamedTextureAtlasArgs = <D>(args: TextureAtlasArgs<D> | NamedTextureAtlasArgs<D>): args is NamedTextureAtlasArgs<D> =>
   typeof args[0] === 'string' || typeof args[0] === 'symbol';
 
+// the index of the item whose id is `id` in a list sorted ascending by id, or -1
+const indexOfAscending = <T>(sorted: readonly T[], id: number, idOf: (item: T) => number): number => {
+  let low = 0;
+  let high = sorted.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >>> 1;
+    const found = idOf(sorted[middle]!);
+    if (found === id) return middle;
+    if (found < id) low = middle + 1;
+    else high = middle - 1;
+  }
+  return -1;
+};
+
 /**
  * Frames of a texture, each with its `TextureCoords`, reachable by id and, if it has one, by name.
  *
@@ -46,10 +60,12 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
   #frames: TextureAtlasFrame<D>[] = [];
   #frameNames: Map<TextureAtlasFrameName, number> = new Map();
   // the names in the order they were added, beside the map: a name is drawn at random by its
-  // index, and frameNames() hands out a copy
+  // index, and frameNames() hands out a copy. The list is ascending by frame id, because add() enters
+  // a name with the id it hands out just now, which is greater than every id before it — a name taken
+  // again lands at the end as well. So a binary search finds a name through its id
   #frameNameList: TextureAtlasFrameName[] = [];
   // the ids of the frames whose name was not let go of, ascending: a frame is drawn at random by its
-  // index here
+  // index here, and forgetFrameName() searches it binary
   #liveIds: number[] = [];
 
   /**
@@ -95,9 +111,15 @@ export class TextureAtlas<D = TextureAtlasFrameData> {
   [forgetFrameName](name: TextureAtlasFrameName): boolean {
     const id = this.#frameNames.get(name);
     if (id === undefined) return false;
+    // searched before the name leaves the map: the list is looked up through the id of the name
+    const nameIndex = indexOfAscending(this.#frameNameList, id, (frameName) => this.#frameNames.get(frameName)!);
     this.#frameNames.delete(name);
-    this.#frameNameList.splice(this.#frameNameList.indexOf(name), 1);
-    this.#liveIds.splice(this.#liveIds.indexOf(id), 1);
+    // the splices move natively; no comparison per element is left
+    this.#frameNameList.splice(nameIndex, 1);
+    this.#liveIds.splice(
+      indexOfAscending(this.#liveIds, id, (liveId) => liveId),
+      1,
+    );
     return true;
   }
 

@@ -487,5 +487,43 @@ describe('TextureAtlas', () => {
       expect(atlas[forgetFrameName](Bar)).toBe(false);
       expect(atlas[forgetFrameName]('nope')).toBe(false);
     });
+
+    test('lets go of names in any order and keeps frameNames() in the order of add(), a name taken again at its end', () => {
+      const atlas = new TextureAtlas();
+      const coords = () => new TextureCoords(0, 0, 4, 4);
+      const ids = {a: atlas.add('a', coords()), b: atlas.add('b', coords()), c: atlas.add('c', coords())};
+      const unnamed = atlas.add(coords());
+      const d = atlas.add('d', coords());
+      expect(d).toBe(4);
+
+      expect(atlas[forgetFrameName]('d')).toBe(true);
+      expect(atlas[forgetFrameName]('a')).toBe(true);
+      expect(atlas[forgetFrameName]('b')).toBe(true);
+      const newB = atlas.add('b', coords());
+
+      expect(atlas.frameNames()).toEqual(['c', 'b']);
+      expect(atlas[liveFrameIds]()).toEqual([ids.c, unnamed, newB]);
+      expect(atlas.frameId('b')).toBe(newB);
+
+      // a name that is not known, and one that is let go of already, change nothing
+      expect(atlas[forgetFrameName]('nope')).toBe(false);
+      expect(atlas[forgetFrameName]('a')).toBe(false);
+      expect(atlas.frameNames()).toEqual(['c', 'b']);
+      expect(atlas[liveFrameIds]()).toEqual([ids.c, unnamed, newB]);
+    });
+
+    test('lets go of every second of a thousand names, the last first', () => {
+      const atlas = new TextureAtlas();
+      const names = Array.from({length: 1000}, (_, index) => `frame-${index}`);
+      for (const name of names) atlas.add(name, new TextureCoords(0, 0, 4, 4));
+
+      for (let index = names.length - 2; index >= 0; index -= 2) {
+        expect(atlas[forgetFrameName](names[index]!)).toBe(true);
+      }
+
+      const kept = names.filter((_, index) => index % 2 === 1);
+      expect(atlas.frameNames()).toEqual(kept);
+      expect(atlas[liveFrameIds]()).toEqual(kept.map((name) => atlas.frameId(name)));
+    });
   });
 });

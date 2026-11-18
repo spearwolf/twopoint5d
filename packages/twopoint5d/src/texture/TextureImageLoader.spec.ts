@@ -1,8 +1,8 @@
 import {Texture} from 'three/webgpu';
-import {describe, expect, test, vi} from 'vitest';
+import {afterEach, describe, expect, test, vi} from 'vitest';
 import type {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
 import {TextureCoords} from './TextureCoords.js';
-import type {TextureFactory} from './TextureFactory.js';
+import {TextureFactory} from './TextureFactory.js';
 import {TextureImageLoader} from './TextureImageLoader.js';
 
 describe('TextureImageLoader', () => {
@@ -98,5 +98,51 @@ describe('TextureImageLoader', () => {
     await expect(new TextureImageLoader(textureFactory, imageLoader).loadAsync('missing.png')).rejects.toBe(failure);
 
     expect(update).not.toHaveBeenCalled();
+  });
+
+  describe('a texture it could not build', () => {
+    const failure = new Error('boom');
+
+    const failingLoader = () => {
+      const imageLoader = {
+        load(_url: string, onLoad: (image: unknown) => void) {
+          onLoad({imgEl: {} as HTMLImageElement, texCoords: new TextureCoords(0, 0, 16, 16)});
+        },
+      } as unknown as PowerOf2ImageLoader;
+      const textureFactory = new TextureFactory();
+      vi.spyOn(textureFactory, 'update').mockImplementation(() => {
+        throw failure;
+      });
+      return new TextureImageLoader(textureFactory, imageLoader);
+    };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    test('reports a texture it could not build on the console when load() was given no onErrorCallback, and calls no onLoadCallback', () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onLoad = vi.fn();
+
+      failingLoader().load('image.png', [], onLoad);
+
+      expect(consoleError).toHaveBeenCalledExactlyOnceWith(
+        'TextureImageLoader: the texture of "image.png" could not be built, and load() was given no onErrorCallback',
+        failure,
+      );
+      expect(onLoad).not.toHaveBeenCalled();
+    });
+
+    test('hands a texture it could not build to onErrorCallback, and writes nothing to the console', () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const onLoad = vi.fn();
+      const onError = vi.fn();
+
+      failingLoader().load('image.png', [], onLoad, onError);
+
+      expect(onError).toHaveBeenCalledExactlyOnceWith(failure);
+      expect(consoleError).not.toHaveBeenCalled();
+      expect(onLoad).not.toHaveBeenCalled();
+    });
   });
 });

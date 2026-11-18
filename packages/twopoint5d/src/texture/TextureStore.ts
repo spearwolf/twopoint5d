@@ -301,11 +301,12 @@ export interface TextureStoreParseOptions {
    * Dispose and remove every resource that the parsed data no longer names and whose
    * `refCount` is 0.
    *
-   * `refCount` counts the live {@link TextureStore.on} subscriptions of a resource. A
-   * value fetched through {@link TextureStore.getAsync} does not raise it: that promise
-   * gives its subscription up as it settles, so a texture sitting in a material counts for
-   * nothing here. A caller who wants to keep such a value holds it with
-   * {@link TextureStore.acquireAsync}, or holds a subscription.
+   * `refCount` counts what holds a resource, as `TextureResource#refCount` says: its live
+   * {@link TextureStore.on} subscriptions, every {@link TextureStore.getAsync} still pending and
+   * every lease of {@link TextureStore.acquireAsync} not released yet. A value a settled
+   * `getAsync()` handed out does not raise it: that promise gives its subscription up as it
+   * settles, so a texture sitting in a material counts for nothing here. A caller who wants to
+   * keep such a value holds it with {@link TextureStore.acquireAsync}, or holds a subscription.
    *
    * Defaults to `false`, which keeps every resource until
    * {@link TextureStore.clearUnused} is called.
@@ -380,7 +381,7 @@ export class TextureStore {
    * takes its place, as in the instance method.
    *
    * The store it hands out has no renderer: it loads the images and builds coordinates, atlases,
-   * tile sets and animations, and a `getAsync(id, 'texture')` waits until `store.renderer` is set.
+   * tile sets and animations, and a `getAsync(id, 'texture')` waits until `store.renderer` is set — once per store, the first subscription that waits for a texture warns on the console.
    */
   static async loadAsync(url: string | URL, options?: TextureStoreLoadOptions): Promise<TextureStore> {
     const store = new TextureStore();
@@ -413,16 +414,6 @@ export class TextureStore {
   }
 
   /**
-   * Build a store around the catalog at `url`, as {@link TextureStore.loadAsync} does.
-   *
-   * @deprecated Use {@link TextureStore.loadAsync}. It stays as an alias until a breaking
-   *   release removes it.
-   */
-  static load(url: string | URL): Promise<TextureStore> {
-    return TextureStore.loadAsync(url);
-  }
-
-  /**
    * The texture classes every resource of this store starts from, merged with whatever an
    * item names for itself.
    *
@@ -444,7 +435,8 @@ export class TextureStore {
    * The renderer this store builds its textures with, or `undefined` while none is set.
    *
    * Without a renderer the store loads its images and builds the coordinates, atlases, tile sets
-   * and animations of its resources all the same; only `texture` waits until one is set.
+   * and animations of its resources all the same; only `texture` waits until one is set — once per store, the first subscription that waits for a
+   * texture warns on the console.
    *
    * Answers `undefined` once {@link TextureStore.dispose} has run, whatever is written
    * to the setter afterwards.
@@ -533,6 +525,9 @@ export class TextureStore {
 
   #disposed = false;
 
+  // whether a subscription that waits for a renderer has said so on the console already
+  #warnedAboutRenderer = false;
+
   // aborted by dispose(): every loadAsync() under way listens to it, cuts its fetch short and
   // rejects
   #disposal = new AbortController();
@@ -612,6 +607,11 @@ export class TextureStore {
    * before an input of that shape is written — after `resource.type === 'atlas'` it is an
    * `AtlasTextureResource`.
    *
+   * The resource is handed out as the store holds it, not started: until
+   * {@link TextureResource.activate} runs — the first {@link TextureStore.on},
+   * {@link TextureStore.getAsync} or {@link TextureStore.acquireAsync} of its id runs it — it loads
+   * nothing, and a listener of its own events or a read of `resource.texture` waits without an error.
+   *
    * On a disposed store this does nothing: the callback is never called, and the returned
    * unsubscribe function has nothing to take back.
    */
@@ -661,6 +661,11 @@ export class TextureStore {
    * The resource is an {@link AnyTextureResource}: its `type` narrows it to the class of its shape
    * before an input of that shape is written — after `resource.type === 'atlas'` it is an
    * `AtlasTextureResource`.
+   *
+   * The resource is handed out as the store holds it, not started: until
+   * {@link TextureResource.activate} runs — the first {@link TextureStore.on},
+   * {@link TextureStore.getAsync} or {@link TextureStore.acquireAsync} of its id runs it — it loads
+   * nothing, and a listener of its own events or a read of `resource.texture` waits without an error.
    *
    * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
    * call on a store that is already disposed is rejected right away.
@@ -731,8 +736,7 @@ export class TextureStore {
    *
    * A later `loadAsync()` on this store cuts short one that is still under way: its fetch is
    * aborted, nothing of it is parsed, no `error` event goes out, and its promise rejects with an
-   * `AbortError`. The catalogs are parsed in the order of the calls. The deprecated
-   * {@link TextureStore.load} inherits this and resolves with the store all the same.
+   * `AbortError`. The catalogs are parsed in the order of the calls.
    *
    * With `{evictMissing: true}` the parse step also disposes and removes every resource
    * the new data no longer names and whose `refCount` is 0 — see
@@ -856,22 +860,6 @@ export class TextureStore {
         reject(error);
       });
     });
-  }
-
-  /**
-   * Fetch the catalog at `url` into this store, as {@link TextureStore.loadAsync} does, and
-   * resolve with this store however the attempt ends. On a disposed store it resolves right
-   * away and fetches nothing.
-   *
-   * @deprecated Use {@link TextureStore.loadAsync}, which rejects when the load fails; this
-   *   name resolves with the store all the same and leaves the failure to the error event. It
-   *   stays as an alias until a breaking release removes it.
-   */
-  load(url: string | URL, options?: TextureStoreParseOptions): Promise<TextureStore> {
-    return this.loadAsync(url, options).then(
-      () => this,
-      () => this,
-    );
   }
 
   /**
@@ -1295,7 +1283,7 @@ export class TextureStore {
    *
    * A resource that is disposed directly leaves the store, and the subscription follows the
    * resource the next `parse()` builds under the id. A subtype the type of the resource never
-   * builds is reported once on the console.
+   * builds is reported once on the console. On a store without a renderer, `texture` waits until one is set, and the first call of this store that waits so writes a warning to the console.
    *
    * On a disposed store this does nothing: the callback is never called, and the returned
    * unsubscribe function has nothing to take back.
@@ -1305,18 +1293,19 @@ export class TextureStore {
     type: T,
     callback: (val: MapSubTypes<T>) => void,
   ): () => void {
-    return this.#subscribe(id, type, (value) => callback(value), true);
+    return this.#subscribe(id, type, (value) => callback(value), true, `on(${describeValue(id)}, ${describeValue(type)})`);
   }
 
   // The body of on(), which getAsync() and acquireAsync() subscribe through as well: `callback` is
   // handed the resource the value came from beside it, so that acquireAsync() holds exactly that
   // one. Only on() warns about a subtype the type of its resource never builds — the promises
-  // reject on it instead
+  // reject on it instead. `what` is the call as the messages write it
   #subscribe<const T extends TextureResourceSubType | readonly TextureResourceSubType[]>(
     id: string,
     type: T,
     callback: (value: MapSubTypes<T>, resource: TextureResource) => void,
     warnOutOfReach: boolean,
+    what: string,
   ): () => void {
     if (this.#disposed) return () => {};
 
@@ -1325,7 +1314,7 @@ export class TextureStore {
     // the follower starts with the first ready: the values of a subscription come while ready goes
     // out, ahead of the resource:<id> events
     const unsubscribeFromReady = this.#onReadyOnce(() => {
-      follower.follow((resource, hold) => this.#subscribeToResource(id, type, callback, warnOutOfReach, resource, hold));
+      follower.follow((resource, hold) => this.#subscribeToResource(id, type, callback, warnOutOfReach, what, resource, hold));
     });
 
     const unsubscribe = (): void => {
@@ -1349,6 +1338,7 @@ export class TextureStore {
     type: T,
     callback: (value: MapSubTypes<T>, resource: TextureResource) => void,
     warnOutOfReach: boolean,
+    what: string,
     resource: AnyTextureResource,
     hold: (release: () => void) => void,
   ): void {
@@ -1361,6 +1351,17 @@ export class TextureStore {
 
     const subTypes = (Array.isArray(type) ? type : [type]) as readonly TextureResourceSubType[];
 
+    // here and not at the call: only now is there a resource, and the subscription begins to wait.
+    // A resource with a `textureFactory` of its own does not wait for the renderer of the store.
+    // Once per store, whichever call it was
+    if (!this.#warnedAboutRenderer && subTypes.includes('texture') && !resource.textureFactory) {
+      this.#warnedAboutRenderer = true;
+      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+      console.warn(
+        `TextureStore: ${what} waits for a renderer: the store has none, and builds no texture until store.renderer is set`,
+      );
+    }
+
     // by the type alone: a later parse() may still bring the animation data, and on() lives that
     // long. The follower hands over each instance once, so each is named once — and a resource of
     // another type that takes the place of this one is asked again
@@ -1369,7 +1370,7 @@ export class TextureStore {
       if (never.length) {
         // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
         console.warn(
-          `TextureStore: on(${describeValue(id)}, ${describeValue(type)}) is never called for ${describeValue(id)}: it is ${articleOf(resource.type)} ${describeValue(resource.type)} resource, which never builds ${never.join(', ')}`,
+          `TextureStore: ${what} is never called for ${describeValue(id)}: it is ${articleOf(resource.type)} ${describeValue(resource.type)} resource, which never builds ${never.join(', ')}`,
         );
       }
     }
@@ -1420,7 +1421,7 @@ export class TextureStore {
 
   /**
    * Resolve with the value (or tuple of values) of the given subtype(s) as soon as the
-   * resource `id` has them. On a store without a renderer, `texture` waits until one is set.
+   * resource `id` has them. On a store without a renderer, `texture` waits until one is set, and the first call of this store that waits so writes a warning to the console.
    *
    * A promise still pending when {@link TextureStore.dispose} runs is rejected, and a
    * call on a store that is already disposed is rejected right away. An id that is
@@ -1462,7 +1463,9 @@ export class TextureStore {
    * Resolve as {@link TextureStore.getAsync} does, with a {@link TextureStoreLease}: the value
    * (or tuple of values) of the given subtype(s), and a hold on the resource it came from until
    * `release()` is called. While it is held, {@link TextureStore.clearUnused} and
-   * `parse({evictMissing: true})` leave the resource standing.
+   * `parse({evictMissing: true})` leave the resource standing. On a store without a renderer,
+   * `texture` waits until one is set, and the first call of this store that waits so writes a
+   * warning to the console.
    *
    * The resource is held, not the value: a new renderer, other texture classes or another image
    * make it build a new texture and release the old one. Whoever wants to follow that subscribes
@@ -1545,6 +1548,7 @@ export class TextureStore {
             resolve(lease as never);
           },
           false,
+          what,
         ),
       );
 
@@ -1651,8 +1655,7 @@ export class TextureStore {
    *
    * The dispose event is the last event this store emits. Afterwards
    * {@link TextureStore.renderer} and {@link TextureStore.textureFactory} answer
-   * `undefined`, {@link TextureStore.loadAsync} rejects right away and fetches nothing — the
-   * deprecated {@link TextureStore.load} resolves right away instead —, and
+   * `undefined`, {@link TextureStore.loadAsync} rejects right away and fetches nothing, and
    * {@link TextureStore.parse}, {@link TextureStore.on}, {@link TextureStore.onResource},
    * {@link TextureStore.registerAtlasAdapter} and a write to `renderer` do nothing, and
    * {@link TextureStore.clearUnused} answers 0. {@link TextureStore.defaultTextureClasses} keeps its

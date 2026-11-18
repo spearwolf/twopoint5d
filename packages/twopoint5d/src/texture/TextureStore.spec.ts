@@ -15,13 +15,7 @@ import {
   TextureResourceSubtypes,
 } from './TextureResource.js';
 import {TextureFactory} from './TextureFactory.js';
-import {
-  TextureStore,
-  type TextureStoreErrorEvent,
-  TextureStoreEvents,
-  type TextureStoreLease,
-  type TextureStoreLoadOptions,
-} from './TextureStore.js';
+import {TextureStore, type TextureStoreErrorEvent, TextureStoreEvents, type TextureStoreLease} from './TextureStore.js';
 import type {TileSet} from './TileSet.js';
 import type {TextureStoreData} from './types.js';
 
@@ -1018,75 +1012,6 @@ describe('TextureStore', () => {
 
         store.dispose();
       });
-    });
-  });
-
-  describe('the deprecated instance load() resolves with the store however the attempt ends', () => {
-    test('resolves with the store once the attempt is over', async () => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"a":{"imageUrl":"a.png"}}}'));
-      try {
-        const store = new TextureStore();
-
-        const resolved = await store.load('http://example.test/data.json');
-
-        expect(resolved).toBe(store);
-        expect(await store.whenResource('a')).toBeInstanceOf(TextureResource);
-      } finally {
-        fetchMock.mockRestore();
-      }
-    });
-
-    test('an attempt that failed resolves as well, and the reason arrives as an error event', async () => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
-      try {
-        const store = new TextureStore();
-        const errorHandler = vi.fn();
-        on(store, 'error', errorHandler);
-
-        const settled = await settleWithin(store.load('http://example.test/bad.json'));
-
-        expect(settled).toBe(store);
-        expect(errorHandler).toHaveBeenCalledTimes(1);
-      } finally {
-        fetchMock.mockRestore();
-      }
-    });
-
-    test('an attempt that was aborted resolves with the store', async () => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch');
-      const store = new TextureStore();
-      const ac = new AbortController();
-      ac.abort();
-      const options: TextureStoreLoadOptions = {signal: ac.signal};
-
-      expect(await settleWithin(store.load('http://example.test/data.json', options))).toBe(store);
-      expect(fetchMock).not.toHaveBeenCalled();
-
-      store.dispose();
-    });
-
-    test('an attempt cut short by dispose() resolves with the store', async () => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => {}));
-      const store = new TextureStore();
-
-      const loading = settleWithin(store.load('http://example.test/data.json'));
-      store.dispose();
-
-      expect(await loading).toBe(store);
-      expect(fetchMock.mock.calls[0]![1]!.signal!.aborted).toBe(true);
-    });
-
-    test('on a disposed store it resolves right away and fetches nothing', async () => {
-      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{}}'));
-      try {
-        const store = new TextureStore();
-        store.dispose();
-
-        expect(await store.load('http://example.test/data.json')).toBe(store);
-        expect(fetchMock).not.toHaveBeenCalled();
-      } finally {
-        fetchMock.mockRestore();
-      }
     });
   });
 
@@ -2484,25 +2409,6 @@ describe('TextureStore', () => {
 
       store.dispose();
     });
-
-    test('the deprecated static load() resolves as loadAsync() does', async () => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"items":{"tex":{"imageUrl":"img.png"}}}'));
-
-      const store = await TextureStore.load('http://example.test/data.json');
-
-      expect(store).toBeInstanceOf(TextureStore);
-      expect((await store.whenResource('tex')).imageUrl).toBe('http://example.test/img.png');
-
-      store.dispose();
-    });
-
-    test('the deprecated static load() rejects as loadAsync() does', async () => {
-      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('boom'));
-
-      await expect(TextureStore.load('http://example.test/data.json')).rejects.toThrow(
-        'TextureStore: load failed at the fetch step: "http://example.test/data.json"',
-      );
-    });
   });
 
   describe('item texture classes beat the store defaults', () => {
@@ -3014,6 +2920,47 @@ describe('TextureStore', () => {
 
       expect(warn).not.toHaveBeenCalled();
       store.dispose();
+    });
+  });
+
+  describe('a subscription that waits for a renderer to build a texture', () => {
+    // an image that never arrives: the subscriptions of the test are asked for, not answered
+    const holdImages = () => {
+      vi.spyOn(ImageLoader.prototype, 'loadAsync').mockImplementation(() => new Promise<HTMLImageElement>(() => {}));
+    };
+
+    test('warns once when a subscription waits for a renderer to build a texture, naming the call', async () => {
+      holdImages();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = new TextureStore();
+      store.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      const pending = store.getAsync('a', 'texture');
+      pending.catch(() => {});
+      store.on('a', 'texture', () => {});
+      await flushMicrotasks();
+
+      expect(warn).toHaveBeenCalledExactlyOnceWith(
+        'TextureStore: getAsync("a", "texture") waits for a renderer: the store has none, and builds no texture until store.renderer is set',
+      );
+      store.dispose();
+    });
+
+    test('does not warn for a subtype that needs no renderer, nor on a store with a renderer', async () => {
+      holdImages();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const withoutRenderer = new TextureStore();
+      withoutRenderer.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+      const withRenderer = new TextureStore(makeRendererStub());
+      withRenderer.parse({defaultTextureClasses: [], items: {a: {imageUrl: 'a.png'}}});
+
+      withoutRenderer.getAsync('a', 'imageCoords').catch(() => {});
+      withRenderer.getAsync('a', 'texture').catch(() => {});
+      await flushMicrotasks();
+
+      expect(warn).not.toHaveBeenCalled();
+      withoutRenderer.dispose();
+      withRenderer.dispose();
     });
   });
 

@@ -1,4 +1,5 @@
 import {Texture} from 'three/webgpu';
+import {describeValue} from '../utils/describeValue.js';
 import {PowerOf2ImageLoader} from './PowerOf2ImageLoader.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
@@ -67,7 +68,15 @@ export class TextureImageLoader {
           this.textureFactory.update(texture, ...(textureClasses ?? []));
         } catch (error) {
           texture?.dispose();
-          onErrorCallback?.(error);
+          if (onErrorCallback) {
+            onErrorCallback(error);
+          } else {
+            // biome-ignore lint/suspicious/noConsole: load() was given no onErrorCallback, and the failure must not vanish
+            console.error(
+              `TextureImageLoader: the texture of ${describeValue(url)} could not be built, and load() was given no onErrorCallback`,
+              error,
+            );
+          }
           return;
         }
 

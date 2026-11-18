@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add `IProjection#needsPlacement?(camera)`, optional: `Stage2D#updateFrame()` asks it in every frame with a camera and a view, and places the camera through `updateCamera()` when it answers `true` — for a projection that follows something that moves —, without `updateViewRect()` and `getViewRect()`
 - add `ParallaxProjection.framing(box, {side, margin})` and `OrthographicProjection.framing(…)`, a projection that frames a `Box3` from one of its six sides (`FramingSide`: `'front'` from `+z`, `'back'`, `'right'`, `'left'`, `'top'` from `+y` looking down, `'bottom'`): the projection plane lies in the face toward the camera with its origin in the middle of that face, and the view is the face grown by `margin` (a share of its extent on every edge, default `0`), fitted `'contain'`, so the whole box lies in the view; the other specs (`pixelSnap`, `distanceToProjectionPlane`, `near`, `far`) pass through. An empty box, a face without area, an unknown side and a negative `margin` are refused. And the types `FramingSide` and `FramingOptions` (see "Framing a box" in `docs/stages.md`)
 - add `CameraRig.across(transition, {to, anchors, easing, focus})`, a camera flight through a transition of a `StageDirector`, between the `CameraRig`s of its two stages: one blended shot in the world of `from`, from the shot the rig of `from` shows when the flight starts to the target `to` — any target of `jump()`, by default the shot the rig of `to` holds —, at the progress of the transition, read in the frame of each stage and eased once more by `easing` (default `'linear'`); the camera of `from` shows it, the camera of `to` shows it carried through `anchors`, two `Object3D`s whose world frames are the same place, read in every frame, whose translation, rotation and even scale carry position, near, far, the focus and the height of an orthographic view. At progress 0 `from` shows its own picture, at 1 `to` stands exactly on its target; a manual transition flies the camera by the progress it is given, `reverse()` flies it back, and a lens change across the flight runs as the dolly zoom on both rigs alike, its focus the projection plane of each side or `focus`. `across()` ends a running `moveTo()` of either rig where it stands, its promise resolved, and keeps a lock-on, a track and a damped `lerp()` with their clocks stopped; during the flight `look()` turns the shared view of both rigs, `cancel()` does nothing, and `jump()`, `moveTo()`, `track()` and `lerp()` are refused. The rigs notice the end by the state of the transition in their step and in the frame of their stage: finished, or cancelled with `to` in its slot, the rig of `to` holds its target — a projection assigned to its stage, the look of the flight added — and the rig of `from` goes back to the state it had; cancelled with `from` in its slot, both go back; a rig disposed during the flight ends it and the other goes back. It answers a `CameraFlight` (`{transition, finished}`), whose `finished` resolves when the flight is over and never rejects; a flight whose end no frame and no call notices — a transition after which no stage of the flight is drawn, a director disposed — ends through `transition.finished`, and what a rig throws there goes out as an unhandled rejection. A refusal of `to` names it `to` (`to must be …`, `to.position[0] must be …`). A frozen layer of the flight warns once, naming the stage. Refused: what is no `StageTransition` (`TypeError`), a transition that is over or from or to nothing, a stage without a rig, a rig in a flight already, and a lens change without a focus where a side has no plane (`Error`), anchors that are not a pair of `Object3D` (`TypeError`), scaled unevenly or mirrored, and a `focus` that is not a finite number above 0 (`RangeError`). `step()` and the write in the frame of the stage of both rigs during a flight allocate nothing. And the types `CameraFlight` and `CameraFlightOptions` (see "A flight across a transition" in `docs/stages.md`)
+- a `TextureStore` without a renderer warns once on the console when an `on()`, `getAsync()` or `acquireAsync()` waits for a texture, naming the call (see "The renderer" in `docs/textures.md`)
 
 ### Changed
 
@@ -51,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TextureAtlas#frameNames()` throws a `SyntaxError` that names the pattern for a string that is no valid regular expression, and `FrameBasedAnimations#add()` one that names the animation for such a `frameNameQuery`, both with the error of the `RegExp` as `cause`; a texture resource skips that entry of its catalog and reports it as an `error` event with `source: 'frameBasedAnimations'` (**BREAKING**). See the Migration Guide
 - `StageRenderer#width`, `#height` and `#pixelRatio` are read-only: `resize()` sets them, and a write throws a `TypeError` (**BREAKING**). See the Migration Guide
 - `StageRenderer#outputRenderTarget` is a get/set accessor pair: a subclass overrides it as an accessor, not as a field
+- `TextureFactory` sorts its default classes together with the classes of each call, as `TextureStore` sorts its defaults with the classes of an item: a class of the call overrules a default of the same breadth, and a narrower default keeps the last word against a broader class of the call — `new TextureFactory(renderer, ['mag-linear']).create(image, 'nearest')` builds a texture with a linear `magFilter` (**BREAKING**). See the Migration Guide
+
+### Removed
+
+- `TextureStore.load(url)` and `TextureStore#load(url, options)`, the deprecated names of `loadAsync()` (**BREAKING**). See the Migration Guide
 
 ### Fixed
 
@@ -63,6 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StageDirector` throws every error it meets as it lets go of a layer: when a listener throws as the stage leaves the director and another one as the director disposes the renderer it wrapped the stage in, both reach the caller, as an `AggregateError`
 - `StageDirector#precompile()` rejects with an `Error` when the render pipeline draws a shape without going through `renderer.render()`, which compiles nothing, and the next call builds that shape again (see "No hitch on the first transition" in `docs/stages.md`)
 - `new Stage2D()` takes its scene before its projection: a subclass that reads `scene` or `name` while the projection is set finds them
+- an `atlasJson` written to an `AtlasTextureResource` after its fetch answered and before the resource read the answer stays in place: the fetched json does not replace it, and the aborted fetch reports no error
+- `TextureImageLoader#load()` without an `onErrorCallback` reports a texture it could not build with `console.error`, as `PowerOf2ImageLoader#load()` does for its failures, and calls no `onLoadCallback`
+- `TextureAtlas` lets go of a frame name by binary search, so `DynamicAtlas#remove()` of many frames compares no element of the name list one by one
 
 ### Migration Guide
 
@@ -147,6 +156,42 @@ renderer.width = 800;
 ```ts
 renderer.resize(800, renderer.height, renderer.pixelRatio);
 ```
+
+#### `TextureStore.load()` and `TextureStore#load()` are gone
+
+**Before**
+
+```ts
+const store = await TextureStore.load(url);
+await store.load(url);
+```
+
+**After**
+
+```ts
+const store = await TextureStore.loadAsync(url); // rejects on every reported error, as the static load() did
+await store.loadAsync(url).catch(() => {}); // for a caller that listens to the `error` event and expects no rejection
+```
+
+Otherwise `await store.loadAsync(url)` with a handling of its own.
+
+#### A narrower default class of a `TextureFactory` stands against a broader class of the call
+
+**Before**
+
+```ts
+const factory = new TextureFactory(renderer, ['mag-linear']);
+factory.create(image, 'nearest'); // magFilter: NearestFilter
+```
+
+**After**
+
+```ts
+factory.create(image, 'nearest'); // magFilter: LinearFilter, the narrower default stands
+factory.create(image, 'nearest', 'mag-nearest'); // name the narrow class in the call to override it
+```
+
+Or build the factory without the narrow default.
 
 ## [0.25.0] - 2026-11-01
 

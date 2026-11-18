@@ -165,10 +165,10 @@ const TextureClasses = {
  * beats `linear`, and `clamp-t` beats `repeat`, whoever named them. Between two classes of the same
  * breadth the order in which they were named decides, and the one named last wins.
  *
- * A {@link TextureStore} lines the classes of an item up behind its own defaults, so an item
- * overrules the store default it collides with on equal breadth. A narrower default keeps the
- * last word against a broader item class: a `mag-linear` default stands, even when the item
- * asks for `nearest`.
+ * A {@link TextureFactory} lines the classes of each call up behind its own default classes, and a
+ * {@link TextureStore} the classes of an item behind its defaults: the later one overrules the one it
+ * collides with on equal breadth, and a narrower default keeps the last word against a broader
+ * class — a `mag-linear` default stands, even when the call or the item asks for `nearest`.
  *
  * `anisotrophy`, `anisotrophy-2`, `anisotrophy-4` and `no-anisotrophy` are deprecated aliases
  * of `anisotropy`, `anisotropy-2`, `anisotropy-4` and `no-anisotropy`, and stay in this union
@@ -250,7 +250,9 @@ export class TextureFactory {
   readonly #maxAnisotropy: () => number;
   // the options the classes are applied on top of, with the raw value of the anisotropy
   // classes under `anisotropy`; getOptions() turns it into the two counts it answers with
-  #defaultOptions: Partial<TextureOptions>;
+  readonly #seedOptions: Partial<TextureOptions>;
+  // a copy, so an array the caller changes later leaves this factory as it was
+  readonly #defaultClassNames: readonly TextureOptionClasses[];
 
   textureLoader: TextureLoader;
 
@@ -260,8 +262,10 @@ export class TextureFactory {
    *   `load()` or `loadAsync()` arrives; the factory caps against the maximum it names at that
    *   moment. While it names none — a WebGL backend before `init()` — the texture gets no
    *   anisotropic filtering, and a texture keeps what it was built with.
-   * @param defaultClassNames The texture classes every texture of this factory gets before the
-   *   classes of the call.
+   * @param defaultClassNames The texture classes every texture of this factory gets, lined up ahead
+   *   of the classes of each call and sorted with them: a class of the call overrules a default of
+   *   the same breadth, and a narrower default keeps the last word against a broader class of the
+   *   call.
    * @param defaultOptions Options laid over the seed `{anisotropy: 0, flipY: false}`: a key they
    *   leave out or give as `undefined` keeps the value of the seed, and the classes lie over both.
    */
@@ -284,15 +288,14 @@ export class TextureFactory {
       Object.entries(given).filter(([, value]) => value !== undefined),
     ) as Partial<TextureOptions>;
     // the deprecated key stands in for the one it names while that one is missing
-    this.#defaultOptions = {flipY: false, ...defined, anisotropy: defined.anisotropy ?? anisotrophy ?? 0};
-    // resolve defaults against the supplied class names; the seed assignment
-    // above acts as the "no classes" fallback inside #mergeOptions().
-    this.#defaultOptions = this.#mergeOptions(defaultClassNames);
+    this.#seedOptions = {flipY: false, ...defined, anisotropy: defined.anisotropy ?? anisotrophy ?? 0};
+    this.#defaultClassNames = defaultClassNames.slice();
     this.textureLoader = new TextureLoader();
   }
 
   /**
-   * The texture options the given classes add up to, on top of the defaults of this factory.
+   * The texture options the given classes add up to, sorted together with the default classes of
+   * this factory, on top of its default options.
    * The anisotropy comes in both counts: `anisotropy` as three.js counts it and as
    * {@link TextureFactory.update} gives it to the texture, the deprecated `anisotrophy` from 0.
    *
@@ -309,12 +312,17 @@ export class TextureFactory {
     return options;
   }
 
-  // the defaults of this factory with the given classes on top, the anisotropy still raw
+  // the seed with the default classes and the given classes on top, the anisotropy still raw. The
+  // default classes are lined up ahead of the given ones and sorted along with them, not melted into
+  // the options beforehand: this is the rule of TextureStore, which joins the defaults and the classes
+  // of an item into one list. sort() is stable, so on equal breadth every default stays ahead of every
+  // given class and the given class wins, while a narrower default is applied after a broader given
+  // class and keeps the last word
   #mergeOptions(classNames: readonly TextureOptionClasses[]): Partial<TextureOptions> {
     return Object.assign(
       {},
-      this.#defaultOptions,
-      ...classNames
+      this.#seedOptions,
+      ...[...this.#defaultClassNames, ...classNames]
         // a name this factory does not know carries neither options nor a priority, and its
         // `undefined` priority would make the order of every other class undetermined
         .filter(isTextureOptionClass)

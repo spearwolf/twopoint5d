@@ -120,7 +120,7 @@ and applies texture classes to them.
 - `maxAnisotropyOrRenderer` is the anisotropy maximum, or the renderer that names it. A renderer is
   asked at the moment each texture is built; a WebGL backend names none before `init()`, and a
   texture built then gets no anisotropic filtering. Without it the maximum is 0: no anisotropy.
-- `defaultClassNames` are applied before the classes of each call — `['nearest']` without them.
+- `defaultClassNames` line up ahead of the classes of each call and are sorted with them: a class of the call overrules a default of the same breadth, and a narrower default keeps the last word against a broader class of the call. Without them the default is `['nearest']`.
 - `defaultOptions` are raw `TextureOptions` laid under the classes, for the rare option no class
   names.
 
@@ -282,7 +282,8 @@ the page: take a catalog only from a source you trust.
 
 The classes of an item line up behind the `defaultTextureClasses` of the catalog, so an item
 overrules a default of the same breadth; a narrower default keeps the last word against a broader
-class of an item — a `mag-linear` default stands, even when the item asks for `nearest`.
+class of an item — a `mag-linear` default stands, even when the item asks for `nearest`. A
+`TextureFactory` sorts its `defaultClassNames` with the classes of each call by the same rule.
 
 **A store starts from no texture class.** A `TextureFactory` of your own starts from `nearest`, the
 factory of a store from nothing: an item without classes gets the filters of three.js — `linear`,
@@ -372,7 +373,8 @@ calls. Once the parse has begun the load is done, and an abort changes nothing.
 
 `new TextureStore(renderer)` or `store.renderer = renderer` gives the store the renderer it builds
 its textures for. Without one, the store loads its images and builds everything but the textures;
-a `getAsync(id, 'texture')` waits until a renderer is set.
+a `getAsync(id, 'texture')` waits until a renderer is set, and the first request of a store that
+waits so warns once on the console.
 
 ### Preloading
 
@@ -404,7 +406,7 @@ await preloading;
 export const floor = await store.getAsync('floor', 'texture');
 ```
 
-A `whenResource(id)` hands out the resource without starting it; `resource.activate()` starts it
+A `whenResource(id)` or `onResource(id, callback)` hands out the resource without starting it; `resource.activate()` starts it
 by hand.
 
 A new renderer makes every resource build its texture anew and release the old one. The renderer
@@ -751,8 +753,6 @@ there is no image cache, no `getAsync()` and no `refCount` to hold it by — `di
 
 | deprecated | use |
 | --- | --- |
-| `TextureStore.load(url)`, static | `TextureStore.loadAsync(url)` |
-| `store.load(url)` | `store.loadAsync(url)`, which rejects when the load fails |
 | `store.get(id, subtypes)` | `store.getAsync(id, subtypes)` |
 | `resource.load()` | `resource.activate()` |
 | `MapSubTypes`, `MapTuple` | `TextureResourceSubTypeMap['atlas']`, or a tuple of them |

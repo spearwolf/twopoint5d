@@ -817,7 +817,10 @@ export abstract class TextureResource {
    * `atlasUrl` is fetched unless an `atlasJson` was written after it.
    *
    * It fetches nothing by itself: the effects do that, once the resource has what they
-   * read. `TextureStore#loadAsync()` fetches a catalog and builds its resources.
+   * read. `TextureStore#loadAsync()` fetches a catalog and builds its resources without starting
+   * them: the store calls this the first time an `on()`, a `getAsync()` or an `acquireAsync()` asks
+   * for a value of a resource, and a resource out of `whenResource()` or `onResource()` stays
+   * inactive until then, or until this is called.
    *
    * On a disposed resource this does nothing — no effect and no signal is created — and
    * returns `this`.
@@ -1592,8 +1595,11 @@ export class AtlasTextureResource extends TextureResource {
           } finally {
             if (this.#atlasFetch === ac) this.#atlasFetch = undefined;
           }
-          // cut short: by the cleanup of this run, by an `atlasJson` written meanwhile, or by dispose()
-          if (!result) return;
+          // cut short: by the cleanup of this run, by an `atlasJson` written meanwhile, or by dispose().
+          // fetchAtlasJson() looks at the signal last before its own return, and this continuation runs
+          // at least one microtask later: an `atlasJson` written in that window aborts the fetch after
+          // its answer has arrived, so the signal is read again here
+          if (!result || ac.signal.aborted) return;
           if ('failure' in result) {
             context.fail('atlasFetch', result.failure);
             return;

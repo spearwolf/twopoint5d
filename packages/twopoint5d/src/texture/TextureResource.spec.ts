@@ -1378,6 +1378,45 @@ describe('TextureResource', () => {
       resource.dispose();
     });
 
+    test('an atlasJson written after the fetch answered and before the resource read the answer keeps its place', async () => {
+      holdImages();
+      const external = {
+        frames: {own: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'own.png', size: {w: 16, h: 16}},
+      };
+      const fetched = {
+        frames: {fetched: {frame: {x: 0, y: 0, w: 8, h: 8}}},
+        meta: {image: 'fetched.png', size: {w: 16, h: 16}},
+      };
+      const resource = TextureResource.fromAtlas('sprites', 'atlas.json');
+      // the write goes in behind the continuation of fetchAtlasJson(), where its signal still reads
+      // as not aborted, and ahead of the continuation inside the effect of the resource
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: () =>
+          Promise.resolve(fetched).then((json) => {
+            queueMicrotask(() =>
+              queueMicrotask(() => {
+                resource.atlasJson = external as never;
+              }),
+            );
+            return json;
+          }),
+      } as unknown as Response);
+      const errors: {source: string}[] = [];
+      on(resource, 'error', (payload: {source: string}) => errors.push(payload));
+
+      resource.activate();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(resource.atlasJson).toBe(external);
+      expect(errors.filter((error) => error.source === 'atlas')).toEqual([]);
+
+      resource.dispose();
+    });
+
     test('a fetch that fails after an atlasJson was written reports nothing', async () => {
       const answer = stubDeafFetch();
       holdImages();

@@ -38,7 +38,8 @@ export class AtlasFrameTable {
   /**
    * The most frames a table holds: 341 frames of three `vec4` fill the 16 KiB of a uniform block that
    * WebGL 2 promises at least. WebGPU promises 64 KiB, but a table does not know the backend it is
-   * drawn with.
+   * drawn with. The array takes a uniform block of its own, which no other uniform of the material
+   * shares: three declares a `uniformArray()` as a buffer of its own in both backends.
    */
   static readonly MaxFrames = 341;
 

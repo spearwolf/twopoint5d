@@ -292,11 +292,44 @@ describe('TextureFactory', () => {
       expect(texture.wrapT).toBe(RepeatWrapping);
     });
 
-    test('a default class of the factory repeats every texture it builds', () => {
+    test('a default class of the factory repeats every texture it builds, and a narrower one stands against a broader class of the call', () => {
       const factory = new TextureFactory(16, ['nearest', 'repeat-s']);
 
       expect(factory.update(new Texture()).wrapS).toBe(RepeatWrapping);
-      expect(factory.update(new Texture(), 'clamp').wrapS).toBe(ClampToEdgeWrapping);
+
+      const clamped = factory.update(new Texture(), 'clamp');
+      expect(clamped.wrapS).toBe(RepeatWrapping);
+      expect(clamped.wrapT).toBe(ClampToEdgeWrapping);
+    });
+  });
+
+  describe('the default classes of a factory are sorted together with the classes of each call', () => {
+    // no image is read: the factory hands the source to new Texture() and nothing more
+    const source = {} as HTMLImageElement;
+
+    test('a narrower default class keeps the last word against a broader class of the call', () => {
+      const factory = new TextureFactory(16, ['mag-linear']);
+
+      const texture = factory.create(source, 'nearest');
+      expect(texture.magFilter).toBe(LinearFilter);
+      expect(texture.minFilter).toBe(NearestFilter);
+
+      expect(factory.getOptions(['nearest']).magFilter).toBe(LinearFilter);
+    });
+
+    test('a class of the call overrules a default of the same breadth', () => {
+      const texture = new TextureFactory(16, ['nearest']).create(source, 'linear');
+
+      expect(texture.magFilter).toBe(LinearFilter);
+      expect(texture.minFilter).toBe(LinearFilter);
+    });
+
+    test('an array of default classes the caller changes afterwards leaves the factory as it was', () => {
+      const defaults: TextureOptionClasses[] = ['mag-linear'];
+      const factory = new TextureFactory(16, defaults);
+      defaults[0] = 'mag-nearest';
+
+      expect(factory.create(source, 'nearest').magFilter).toBe(LinearFilter);
     });
   });
 
