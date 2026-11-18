@@ -2,6 +2,7 @@ import {
   AtlasFrame,
   defineSprite,
   FeatureSprites,
+  type FeatureSpritesOf,
   flatPlacement,
   InstancePosition,
   QuadBase,
@@ -11,7 +12,6 @@ import {
   TextureColor,
   Tint,
   Yaw,
-  type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Texture} from 'three/webgpu';
 import {atlasFrame} from '~demos/utils/atlasFrame';

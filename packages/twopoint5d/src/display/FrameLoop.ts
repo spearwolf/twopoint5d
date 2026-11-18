@@ -90,7 +90,7 @@ class RAF {
     }
   }
 
-  #onAnimationFrame = (now: number) => {
+  readonly #onAnimationFrame = (now: number) => {
     if (this.#renderer == null) {
       this.#rafID = requestAnimationFrame(this.#onAnimationFrame);
     }

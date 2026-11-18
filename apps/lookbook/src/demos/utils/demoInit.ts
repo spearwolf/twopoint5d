@@ -12,13 +12,32 @@ import type {Display, DisplayEventProps} from '@spearwolf/twopoint5d';
  * @returns what `display.onInit()` answers
  */
 export function onDemoInit(display: Display, demo: string, init: (props: DisplayEventProps) => Promise<void>): () => void {
-  return display.onInit(async (props: DisplayEventProps) => {
+  return display.onInit(guardInit(demo, init));
+}
+
+/**
+ * Starts `display` with `init` as the callback that `start()` awaits before the first frame,
+ * and shows a failure of it as {@link onDemoInit} does: logged under the name of the demo and
+ * written over the canvas. The rejection of `start()` would name no demo and write no line.
+ * After a failed init the display starts all the same, as it does beside a failed
+ * `onDemoInit()`.
+ *
+ * @param demo the name of the demo, its route, for the console and the line over the canvas
+ * @returns what `display.start()` answers; it still rejects where `start()` fails on its own —
+ *   a display disposed while `init` ran, a renderer that does not come up
+ */
+export function startDemo(display: Display, demo: string, init: (props: DisplayEventProps) => Promise<void>): Promise<Display> {
+  return display.start(guardInit(demo, init));
+}
+
+function guardInit(demo: string, init: (props: DisplayEventProps) => Promise<void>): (props: DisplayEventProps) => Promise<void> {
+  return async (props: DisplayEventProps) => {
     try {
       await init(props);
     } catch (error) {
       showDemoFailure(demo, error);
     }
-  });
+  };
 }
 
 function showDemoFailure(demo: string, error: unknown): void {

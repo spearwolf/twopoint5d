@@ -32,6 +32,7 @@ import {description, title} from './_cardboard-parade.json';
   import {on} from '@spearwolf/eventize';
   import {OnDisplayRenderFrame} from '@spearwolf/twopoint5d';
   import {CardboardParade} from '~demos/cardboard-parade/CardboardParade';
+  import {startDemo} from '~demos/utils/demoInit';
   import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -43,7 +44,7 @@ import {description, title} from './_cardboard-parade.json';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {antialias: true});
 
-  await demo.start(async ({renderer}) => {
+  await startDemo(demo, 'cardboard-parade', async ({renderer}) => {
     demo.camera.fov = 45;
     demo.camera.updateProjectionMatrix();
     demo.camera.position.set(0, 8.5, 15.5);

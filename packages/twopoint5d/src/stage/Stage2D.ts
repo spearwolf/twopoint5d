@@ -409,7 +409,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
 
   // what the projection throws leaves this call with the state it found; what a listener throws
   // goes into `errors`, after the state stands
-  #updateProjection = (width: number, height: number, pixelRatio: number, errors: unknown[]): void => {
+  readonly #updateProjection = (width: number, height: number, pixelRatio: number, errors: unknown[]): void => {
     // a container whose width or height is not a finite number above 0 has no aspect ratio to fit
     // a view into: the stage keeps the camera and the size it has, and creates neither before the
     // first resize() with an area

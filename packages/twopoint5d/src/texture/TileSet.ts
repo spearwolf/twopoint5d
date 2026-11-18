@@ -289,7 +289,7 @@ export class TileSet<D = TextureAtlasFrameData> {
     return Math.max(count, 1);
   }
 
-  #createTextureCoords = (): void => {
+  readonly #createTextureCoords = (): void => {
     const {width: baseWidth, height: baseHeight} = this.baseCoords;
 
     const {padding, margin, spacing, tileCountLimit} = this;

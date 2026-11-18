@@ -1,4 +1,5 @@
 // biome-ignore-all lint/suspicious/noConsole: the demo logs to the devtools on purpose
+import {on} from '@spearwolf/eventize';
 import {
   CameraBasedVisibility,
   Map2D,
@@ -11,13 +12,13 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {Fog} from 'three/webgpu';
+import {startDemo} from '../utils/demoInit';
 import {DemoParts} from '../utils/demoParts';
 import {loadTextureCatalog} from '../utils/loadTextureCatalog';
 import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
-import {on} from '@spearwolf/eventize';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
-  demo.start(async ({renderer}) => {
+  startDemo(demo, 'map2d-cam-visi', async ({renderer}) => {
     // the display lives here, and what is built before the await goes with it as well when the load fails
     const parts = new DemoParts(demo);
     const {scene, camera} = demo;

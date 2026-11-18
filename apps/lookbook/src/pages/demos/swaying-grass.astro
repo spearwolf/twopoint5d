@@ -20,6 +20,7 @@ import {description, title} from './_swaying-grass.json';
   import GUI from 'lil-gui';
   import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
   import {Color, PerspectiveCamera, RenderPipeline} from 'three/webgpu';
+  import {startDemo} from '~demos/utils/demoInit';
   import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
@@ -78,7 +79,7 @@ import {description, title} from './_swaying-grass.json';
     stage.dispose();
   });
 
-  await display.start(async ({renderer}) => {
+  await startDemo(display, 'swaying-grass', async ({renderer}) => {
     const store = await loadTextureCatalog(renderer);
     // meadow.json is free-tex-packer's "JSON (hash)": the store reads it with TexturePackerJson,
     // picked by meta.app, unchanged

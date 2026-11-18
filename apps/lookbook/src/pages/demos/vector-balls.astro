@@ -35,6 +35,7 @@ import {description, title} from './_vector-balls.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {OnDisplayRenderFrame, SpritePicker} from '@spearwolf/twopoint5d';
+  import {startDemo} from '~demos/utils/demoInit';
   import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -56,7 +57,7 @@ import {description, title} from './_vector-balls.json';
   demo.onDispose(() => resizing.abort());
   window.addEventListener('resize', fitPixelZoom, {signal: resizing.signal});
 
-  await demo.start(async ({renderer}) => {
+  await startDemo(demo, 'vector-balls', async ({renderer}) => {
     demo.camera.fov = 40;
     demo.camera.updateProjectionMatrix();
     demo.camera.position.set(0, 2.5, 9.2);

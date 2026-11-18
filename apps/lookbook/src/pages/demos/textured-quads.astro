@@ -24,6 +24,7 @@ import {description, title} from './_textured-quads.json';
   import {AgXToneMapping, NodeMaterial} from 'three/webgpu';
   import {InstancedQuadsGeometry, setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {startDemo} from '~demos/utils/demoInit';
   import {DemoParts} from '~demos/utils/demoParts';
   import {disposeMaterial} from '~demos/utils/disposeMaterial';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -99,7 +100,7 @@ import {description, title} from './_textured-quads.json';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
-  await demo.start(async ({renderer}) => {
+  await startDemo(demo, 'textured-quads', async ({renderer}) => {
     renderer.toneMapping = AgXToneMapping;
     renderer.toneMappingExposure = 1.1;
 

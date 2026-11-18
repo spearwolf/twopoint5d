@@ -302,7 +302,7 @@ export class DirectorMasks {
    * as cancelled, as for a disposed mask stage; its stage leaves the director when nothing else
    * uses it. Another mask on the same stage stays where it is.
    */
-  #maskDisposed = (mask: StageMask): void => {
+  readonly #maskDisposed = (mask: StageMask): void => {
     const errors: unknown[] = [];
     // over a copy: a listener of OnStageRemoved, when the mask stage leaves, may change the slots
     for (const slot of this.#host.slots().slice()) {

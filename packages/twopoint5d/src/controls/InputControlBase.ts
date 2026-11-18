@@ -6,7 +6,7 @@ export class InputControlBase {
 
   // the DOM tells listeners apart by type, callback and capture; this class never asks for capture,
   // so `passive` is no part of what a listener is
-  #findListenerIndex = (host: EventTarget, eventName: string, callback: EventListenerOrEventListenerObject) => {
+  readonly #findListenerIndex = (host: EventTarget, eventName: string, callback: EventListenerOrEventListenerObject) => {
     return this.#listeners.findIndex((listener) => listener[0] === host && listener[1] === eventName && listener[2] === callback);
   };
 

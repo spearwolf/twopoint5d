@@ -73,7 +73,7 @@ export class DisplayStateMachine {
     }
   }
 
-  #pausedByUserChanged = (): void => {
+  readonly #pausedByUserChanged = (): void => {
     switch (this.#state) {
       case DisplayStateMachine.RUNNING:
         if (this.#pausedByUser) {
@@ -89,7 +89,7 @@ export class DisplayStateMachine {
     }
   };
 
-  #documentIsVisibleChanged = (): void => {
+  readonly #documentIsVisibleChanged = (): void => {
     switch (this.#state) {
       case DisplayStateMachine.RUNNING:
       case DisplayStateMachine.PAUSED:
@@ -102,7 +102,7 @@ export class DisplayStateMachine {
     }
   };
 
-  #elementIsInsideViewportChanged = (): void => {
+  readonly #elementIsInsideViewportChanged = (): void => {
     switch (this.#state) {
       case DisplayStateMachine.RUNNING:
       case DisplayStateMachine.PAUSED:
@@ -115,7 +115,7 @@ export class DisplayStateMachine {
     }
   };
 
-  #pause = (): void => {
+  readonly #pause = (): void => {
     if (this.#state !== DisplayStateMachine.PAUSED) {
       this.#state = DisplayStateMachine.PAUSED;
       // every listener hears pause, even behind one that throws
@@ -172,7 +172,7 @@ export class DisplayStateMachine {
 
   #initMustBeCalled = true;
 
-  #initOrRestart = (): void => {
+  readonly #initOrRestart = (): void => {
     if (this.#initMustBeCalled) {
       emit(this, DisplayStateMachine.Init);
       // cleared once every listener is through: a listener that throws leaves the init to the next

@@ -46,13 +46,14 @@ import {description, title} from './_animated-billboards.json';
   import {DirectionalLight, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {startDemo} from '~demos/utils/demoInit';
   import {DemoParts} from '~demos/utils/demoParts';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
-  await demo.start(async ({renderer}) => {
+  await startDemo(demo, 'animated-billboards', async ({renderer}) => {
     demo.camera.position.set(0, 70, -220);
 
     const CAPACITY = 400;

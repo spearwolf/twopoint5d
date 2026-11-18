@@ -33,6 +33,7 @@ import {description, title} from './_atlas-frames-on-meshes.json';
 
 <script>
   import {disposeNightCity, makeNightCity} from '~demos/atlas-frames-on-meshes/NightCity';
+  import {startDemo} from '~demos/utils/demoInit';
   import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -44,7 +45,7 @@ import {description, title} from './_atlas-frames-on-meshes.json';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
-  await demo.start(async ({renderer}) => {
+  await startDemo(demo, 'atlas-frames-on-meshes', async ({renderer}) => {
     // above the roofs, so that the skyline rings show over the city
     demo.camera.position.set(8, 56, 34);
     demo.controls.target.set(0, 6, -90);

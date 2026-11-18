@@ -617,7 +617,7 @@ export class PanControl2D extends InputControlBase {
     return false;
   }
 
-  #onPointerDown = (event: PointerEvent): void => {
+  readonly #onPointerDown = (event: PointerEvent): void => {
     if (this.#startsOnInteractiveTarget(event)) return;
     if (this.#isPanPointer(event)) {
       // an id that is still down missed its end: its old position is no anchor, and
@@ -647,7 +647,7 @@ export class PanControl2D extends InputControlBase {
     emit(this, OnPanControl2DHideCursor, this);
   }
 
-  #onPointerUp = (event: PointerEvent): void => {
+  readonly #onPointerUp = (event: PointerEvent): void => {
     if (this.#isPanPointer(event)) {
       const state = this.#pointersDown.get(event.pointerId);
       if (state) {
@@ -662,7 +662,7 @@ export class PanControl2D extends InputControlBase {
 
   // the browser took the pointer away (a scroll or zoom gesture, a dialog): nobody let go, so
   // what the drag collected is dropped rather than delivered
-  #onPointerCancel = (event: PointerEvent): void => {
+  readonly #onPointerCancel = (event: PointerEvent): void => {
     this.#endPointer(event.pointerId, false);
     if (event.pointerType === MOUSE) {
       this.#restoreCursorUnlessMouseDown();
@@ -720,7 +720,7 @@ export class PanControl2D extends InputControlBase {
     emitStrict(this, OnPanControl2DRestoreCursor, this);
   }
 
-  #onPointerMove = (event: PointerEvent): void => {
+  readonly #onPointerMove = (event: PointerEvent): void => {
     if (this.#isPanPointer(event)) {
       const state = this.#pointersDown.get(event.pointerId);
       if (state) {
@@ -766,7 +766,7 @@ export class PanControl2D extends InputControlBase {
     this.#keyedSpeeds.clear();
   }
 
-  #onKeyDown = (event: KeyboardEvent): void => {
+  readonly #onKeyDown = (event: KeyboardEvent): void => {
     // a key pressed with Ctrl, Meta or Alt is meant for a shortcut of the browser or the app, and
     // one typed into an editable element is meant for that element. composedPath()[0] and not
     // event.target: the listener sits on document, where the browser retargets event.target onto
@@ -780,7 +780,7 @@ export class PanControl2D extends InputControlBase {
     this.#keyedSpeeds.add(field);
   };
 
-  #onKeyUp = (event: KeyboardEvent): void => {
+  readonly #onKeyUp = (event: KeyboardEvent): void => {
     // a keyup lets go only of a speed its key raised: one the control refused on its keydown, or
     // one set by hand, stays
     const field = this.#speedFieldFor(event);
@@ -792,7 +792,7 @@ export class PanControl2D extends InputControlBase {
   // switch of window or tab, a dialog a shortcut opened. Becoming visible again lets go as well:
   // no keydown arrived while the page was hidden, and a key still held sets its field again with
   // the next repeated keydown
-  #onKeyboardLost = (): void => {
+  readonly #onKeyboardLost = (): void => {
     this.#releaseKeyedSpeeds();
   };
 

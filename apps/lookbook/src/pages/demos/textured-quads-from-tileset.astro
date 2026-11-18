@@ -24,6 +24,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {startDemo} from '~demos/utils/demoInit';
   import {DemoParts} from '~demos/utils/demoParts';
   import {disposeMaterial} from '~demos/utils/disposeMaterial';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -82,7 +83,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
 
-  await demo.start(async ({renderer}) => {
+  await startDemo(demo, 'textured-quads-from-tileset', async ({renderer}) => {
     renderer.toneMapping = NeutralToneMapping;
 
     const store = await loadTextureCatalog(renderer);

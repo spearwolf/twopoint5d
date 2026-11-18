@@ -454,7 +454,8 @@ export class TextureStore {
   #atlasAdapters: AtlasAdapterEntry[] = builtInAtlasAdapters();
 
   // what every resource of this store picks an adapter by, while its item names none
-  #pickAtlasAdapter = (json: Parameters<typeof pickAtlasAdapter>[1]): AtlasAdapter => pickAtlasAdapter(this.#atlasAdapters, json);
+  readonly #pickAtlasAdapter = (json: Parameters<typeof pickAtlasAdapter>[1]): AtlasAdapter =>
+    pickAtlasAdapter(this.#atlasAdapters, json);
 
   // the images every resource of this store fetches through: one fetch per url, shared, see
   // SharedImageCache

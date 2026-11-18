@@ -10,12 +10,13 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {BoxGeometry, EdgesGeometry, Fog, LineBasicMaterial, LineSegments, Vector3} from 'three/webgpu';
+import {startDemo} from '../utils/demoInit';
 import {DemoParts} from '../utils/demoParts';
 import {loadTextureCatalog} from '../utils/loadTextureCatalog';
 import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
-  demo.start(async ({renderer}) => {
+  startDemo(demo, 'map2d-tile-sprites', async ({renderer}) => {
     // the display lives here, and what is built before the await goes with it as well when the load fails
     const parts = new DemoParts(demo);
     const {scene, camera} = demo;
