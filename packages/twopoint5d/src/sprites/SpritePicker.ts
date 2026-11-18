@@ -100,11 +100,18 @@ const REVERSE_DEPTH_WEBGL = new Matrix4().set(
 
 /** The mirror of a ClippingGroup above the sprites, in the scene of the pick. */
 interface ClippingMirror {
-  readonly source: ClippingGroup;
+  /**
+   * The ClippingGroup it mirrors, held weakly: the group holds the sprites as long as they lie below
+   * it, and a strong hold here would keep a mesh dropped along with its group.
+   */
+  readonly source: WeakRef<ClippingGroup>;
   readonly mirror: ClippingGroup;
 }
 
+/** What the picker builds for a mesh it has drawn. It holds the mesh weakly, and nothing in it holds the mesh. */
 interface PickEntry {
+  /** The mesh the entry was built for. */
+  readonly sprites: WeakRef<FeatureSprites>;
   readonly mesh: Mesh;
   /**
    * The group the pick mesh lies in; it carries the group order three takes from the nearest group
@@ -118,7 +125,7 @@ interface PickEntry {
   readonly geometry: FeatureSpritesGeometry;
   /** The place of the mesh in the list of a pick, from 1: what the green of the target says. */
   readonly meshNumber: UniformNode<'float', number>;
-  /** Releases the entry; it listens to the sprites and to {@link geometry}. */
+  /** Releases the entry; it listens to the sprites and to {@link geometry}, and reads none of the two. */
   readonly onDispose: () => void;
 }
 
@@ -191,15 +198,21 @@ function makeChainLink<T extends Group>(group: T): T {
  * The renderer stays the caller's; the picker owns its render target, and a pick material and a pick
  * mesh per mesh it has drawn, which go when that mesh is disposed, when the geometry they draw is
  * disposed — a growth does that —, or with {@link dispose}; the next pick of the mesh builds them
- * anew. Until then the picker holds the mesh, and with it its geometry, its pool and its textures,
- * whether a later pick lists it or not: a mesh taken out of the scene and never disposed lives as
- * long as the picker. Dispose a mesh that is done with, or the picker.
+ * anew. The picker holds a mesh it has drawn weakly: a mesh its owner drops without `dispose()` is
+ * collected, and once the engine reports that, the picker releases its pick mesh and pick material —
+ * at a time the engine chooses, and up to then the pick mesh holds the geometry, the uniforms and the
+ * textures it reads. Dispose a mesh that is done with to have them back at once.
  */
 export class SpritePicker {
   /** The renderer it draws with; it stays the caller's. */
   readonly renderer: Renderer;
 
-  readonly #entries = new Map<FeatureSprites, PickEntry>();
+  // the look-up of #sync(), by the mesh, which it holds weakly
+  readonly #entries = new WeakMap<FeatureSprites, PickEntry>();
+  // every entry not yet released, for dispose(); an entry holds no mesh, so neither does this set
+  readonly #live = new Set<PickEntry>();
+  // releases the entry of a mesh dropped without dispose(), once the engine has collected the mesh
+  readonly #collected = new FinalizationRegistry<PickEntry>((entry) => this.#release(entry));
   readonly #scene = new Scene();
   readonly #camera = new PickCamera();
   readonly #pixel = new Matrix4();
@@ -208,7 +221,7 @@ export class SpritePicker {
   readonly #pending = new Set<(error: Error) => void>();
   // the arrays of handles of the picks that have resolved, for the next ones to fill
   readonly #spareHandles: ((object & VO) | undefined)[][] = [];
-  // filled by readAncestry() for each mesh of a pick
+  // filled by readAncestry() for each mesh of a pick, and emptied by #place() once it has read it
   readonly #clippingScratch: ClippingGroup[] = [];
   #target: RenderTarget | undefined;
   #disposed = false;
@@ -244,8 +257,9 @@ export class SpritePicker {
    * on the screen, and at one depth the mesh drawn later wins — by the `renderOrder` of the nearest
    * group above it, then by its own, as three sorts them. A mesh that is disposed, not visible (or
    * under a parent that is not), whose material is not visible, or that holds no sprite is left out;
-   * a mesh listed twice is drawn once, at its first place. A mesh drawn once is held until it or the
-   * picker is disposed, also when no later pick lists it. A pointer outside the view answers
+   * a mesh listed twice is drawn once, at its first place. A mesh drawn once is held weakly: dropped
+   * without `dispose()`, it is collected, and the picker releases its pick mesh and pick material
+   * once the engine reports that, at a time the engine chooses. A pointer outside the view answers
    * `undefined` without a draw. The state of the renderer the pick changes — render target, MRT,
    * clear color, the `autoClear` flags — is restored before it returns.
    *
@@ -350,7 +364,7 @@ export class SpritePicker {
     // a material swapped on the mesh reads other uniforms and textures, a geometry put into the slot is
     // another to draw: for either the pick mesh is built anew
     if (entry !== undefined && (entry.material.resources !== material.resources || entry.geometry !== sprites.geometry)) {
-      this.#release(sprites, entry);
+      this.#release(entry);
       entry = undefined;
     }
     entry ??= this.#build(sprites, material);
@@ -381,15 +395,18 @@ export class SpritePicker {
     // a mirror of a ClippingGroup that no longer clips the sprites leaves the chain, so that it hangs
     // empty under none of the mirrors kept
     for (let i = 0; i < applied.length; i++) {
-      if (clipping[i]?.source === applied[i]) continue;
+      if (clipping[i]?.source.deref() === applied[i]) continue;
       clipping[i]?.mirror.removeFromParent();
-      clipping[i] = {source: applied[i]!, mirror: makeChainLink(new ClippingGroup())};
+      clipping[i] = {source: new WeakRef(applied[i]!), mirror: makeChainLink(new ClippingGroup())};
     }
     for (let i = applied.length; i < clipping.length; i++) clipping[i]!.mirror.removeFromParent();
     clipping.length = applied.length;
 
     let parent: Object3D = this.#scene;
-    for (const {source, mirror} of clipping) {
+    for (let i = 0; i < clipping.length; i++) {
+      // the group is alive: it lies above the sprites, readAncestry() has just found it there
+      const source = applied[i]!;
+      const {mirror} = clipping[i]!;
       // the planes are shared, not copied — three reads them at every draw
       mirror.clippingPlanes = source.clippingPlanes;
       mirror.clipIntersection = source.clipIntersection;
@@ -398,6 +415,9 @@ export class SpritePicker {
     }
     if (entry.holder.parent !== parent) parent.add(entry.holder);
     entry.holder.renderOrder = groupOrder;
+    // the scratch lets go of the groups it was filled with: a group holds the sprites below it, and
+    // up to the next pick the scratch would hold a mesh dropped along with its group
+    applied.length = 0;
   }
 
   #build(sprites: FeatureSprites, material: FeatureSpritesMaterial): PickEntry {
@@ -425,14 +445,17 @@ export class SpritePicker {
     holder.add(mesh);
 
     const entry: PickEntry = {
+      sprites: new WeakRef(sprites),
       mesh,
       holder,
       clipping: [],
       material: pickMaterial,
       geometry,
       meshNumber,
-      // three's dispose event comes before the sprites release their resources: the pick material goes first
-      onDispose: () => this.#release(sprites, entry),
+      // three's dispose event comes before the sprites release their resources: the pick material goes
+      // first. No closure of this method reads `sprites`: V8 keeps a variable that any closure of a
+      // function reads in a context all of them share, and the entry would hold the mesh through it
+      onDispose: () => this.#release(entry),
     };
     sprites.addEventListener('dispose', entry.onDispose);
     // a growth disposes the geometry the pick mesh draws; three's render object of the pick mesh would
@@ -440,13 +463,28 @@ export class SpritePicker {
     // material go with it, and the next pick builds both on the new one
     geometry.addEventListener('dispose', entry.onDispose);
     this.#entries.set(sprites, entry);
+    this.#live.add(entry);
+    // the entry is the held value and the token to unregister it with
+    this.#collected.register(sprites, entry, entry);
     return entry;
   }
 
-  #release(sprites: FeatureSprites, entry: PickEntry): void {
-    sprites.removeEventListener('dispose', entry.onDispose);
+  // runs once per entry: for the dispose of the mesh, of its geometry, of the picker, for a rebuild in
+  // #sync() and for the collection of the mesh, whichever comes first. three calls a listener taken
+  // off during a dispatch in that dispatch all the same, so a listener of the mesh that disposes its
+  // geometry ahead of this one brings it here twice
+  #release(entry: PickEntry): void {
+    if (!this.#live.has(entry)) return;
+    this.#live.delete(entry);
+    this.#collected.unregister(entry);
+    const sprites = entry.sprites.deref();
+    if (sprites !== undefined) {
+      sprites.removeEventListener('dispose', entry.onDispose);
+      // a mesh has one live entry at most — #sync() releases the one before it builds the next —,
+      // so the entry the map holds for it is this one
+      this.#entries.delete(sprites);
+    }
     entry.geometry.removeEventListener('dispose', entry.onDispose);
-    this.#entries.delete(sprites);
     // the chain stays linked; only its top lies in the scene
     (entry.clipping[0]?.mirror ?? entry.holder).removeFromParent();
     // three's dispose event for the pick mesh, so the renderer drops its render objects
@@ -551,7 +589,7 @@ export class SpritePicker {
     for (const reject of this.#pending) reject(error);
     this.#pending.clear();
 
-    for (const [sprites, entry] of [...this.#entries]) this.#release(sprites, entry);
+    for (const entry of [...this.#live]) this.#release(entry);
     this.#scene.clear();
     this.#target?.dispose();
     this.#target = undefined;

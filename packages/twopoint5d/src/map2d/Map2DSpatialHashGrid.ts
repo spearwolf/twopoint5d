@@ -8,14 +8,7 @@ import type {AABB2} from './AABB2.js';
 import {createTilesWithinCoords} from './createTilesWithinCoords.js';
 import type {IMap2DRenderableArea} from './types.js';
 import {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
-import {tileKey} from './tileKeys.js';
 import {TileSlotTable, type TileSlotTableEntry} from './TileSlotTable.js';
-
-/**
- * @deprecated The return type of the deprecated {@link Map2DSpatialHashGrid.getKey}; `tileKey()`
- * answers a `string`.
- */
-export type Map2DSpatialHashGridKeyType = string;
 
 // A cell of the grid: its tile coordinate and the renderables in it; `nextInBucket` belongs to the
 // table that finds the cell
@@ -69,21 +62,16 @@ function assertCellsInRange(within: TilesWithinCoords, aabb: AABB2, what: string
   );
 }
 
+// The renderables of add() and remove(): one argument that is an array is the list itself, read
+// and neither copied nor kept; any other arguments are the renderables
+const listOf = <R>(args: readonly unknown[]): readonly R[] =>
+  (args.length === 1 && Array.isArray(args[0]) ? args[0] : args) as readonly R[];
+
 /**
  * A spatial index over a grid of tiles: every renderable lies in the cells its `aabb` reaches
  * into when it is added, in one cell at the very least.
  */
 export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
-  /**
-   * The textual key of the tile at these coordinates, the string `tileKey()` builds and the
-   * `id` of a `Map2DTileCoords` carries. The grid finds its cells by coordinate and takes no key.
-   *
-   * @deprecated Use `tileKey()`.
-   */
-  static getKey(x: number, y: number): Map2DSpatialHashGridKeyType {
-    return tileKey(x, y);
-  }
-
   readonly #cells = new TileSlotTable<GridCell<Renderable>>();
 
   // The cells that hold a renderable, in no order, so that a query over more cells than these
@@ -135,14 +123,23 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * Puts the renderables into the cells their `aabb` reaches into right now — at least the cell
    * the upper left corner lies in.
    *
+   * Takes the renderables as arguments, `grid.add(a, b)`, or as one list, `grid.add(list)`: one
+   * argument that is an array counts as the list. The list form is the one for large sets — a
+   * spread, `grid.add(...list)`, runs into the argument limit of the engine at a few hundred
+   * thousand renderables. The list is read, neither copied nor kept.
+   *
    * The grid remembers those cells. Changing an `aabb` afterwards leaves the renderable where it
    * lies, until it is added again (it then moves to the cells of its current `aabb`) or removed.
    *
    * Throws a `RangeError` for an `aabb` whose left, top, width or height is not a finite number,
    * for one that reaches into cells beyond ±`Number.MAX_SAFE_INTEGER` and for one that reaches into
-   * more than {@link maxCellsPerRenderable} cells, and then adds none of the renderables.
+   * more than {@link maxCellsPerRenderable} cells, and then adds none of the renderables, in either
+   * form.
    */
-  add(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
+  add(renderables: readonly Renderable[]): Map2DSpatialHashGrid<Renderable>;
+  add(...renderables: Renderable[]): Map2DSpatialHashGrid<Renderable>;
+  add(...args: unknown[]): Map2DSpatialHashGrid<Renderable> {
+    const renderables = listOf<Renderable>(args);
     // every aabb is checked before the first renderable moves, so that an add() that throws leaves
     // the grid as it was — a renderable the grid holds stays in its cells as well
     // the cells of each renderable, worked out once by the check and read again to place it
@@ -188,8 +185,15 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
   /**
    * Takes the renderables out of the cells {@link add} put them into, whatever their `aabb` says
    * by now. A renderable the grid does not hold is passed over.
+   *
+   * Takes the renderables as arguments or as one list, as {@link add} does: one argument that is an
+   * array counts as the list, which is the form for large sets, since a spread runs into the
+   * argument limit of the engine. The list is read, neither copied nor kept.
    */
-  remove(...renderables: Array<Renderable>): Map2DSpatialHashGrid<Renderable> {
+  remove(renderables: readonly Renderable[]): Map2DSpatialHashGrid<Renderable>;
+  remove(...renderables: Renderable[]): Map2DSpatialHashGrid<Renderable>;
+  remove(...args: unknown[]): Map2DSpatialHashGrid<Renderable> {
+    const renderables = listOf<Renderable>(args);
     for (const renderable of renderables) {
       this.#takeOut(renderable);
     }
@@ -207,16 +211,15 @@ export class Map2DSpatialHashGrid<Renderable extends IMap2DRenderableArea> {
    * Takes every renderable out of every cell and leaves the grid empty, as a new one with the same
    * cells and the same {@link maxCellsPerRenderable} — for a change of map or the reset of a level;
    * up to then the grid holds on to its renderables. A cell leaves the grid with its set emptied,
-   * as on {@link remove}.
+   * as on {@link remove}, and the table of its cells goes back to the size it started with.
    */
   clear(): void {
     const occupied = this.#occupied;
     for (let i = 0; i < occupied.length; i++) {
       // The loop bound is `occupied.length`.
-      const cell = occupied[i]!;
-      cell.renderables.clear();
-      this.#cells.remove(cell);
+      occupied[i]!.renderables.clear();
     }
+    this.#cells.reset();
     truncateArray(occupied);
     this.#placements.clear();
   }

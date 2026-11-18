@@ -6,7 +6,7 @@ export {CameraBasedVisibilityHelpers} from './CameraBasedVisibilityHelpers.js';
 export * from './chunk-quad-tree/public-api.js';
 export {noTileCapacity} from './constants.js';
 export {Map2D} from './Map2D.js';
-export {Map2DSpatialHashGrid, type Map2DSpatialHashGridKeyType} from './Map2DSpatialHashGrid.js';
+export {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';
 export {Map2DTileCoords} from './Map2DTileCoords.js';
 export {Map2DTileCoordsUtil, type TilesWithinCoords} from './Map2DTileCoordsUtil.js';
 export {Map2DTileRenderer} from './Map2DTileRenderer.js';

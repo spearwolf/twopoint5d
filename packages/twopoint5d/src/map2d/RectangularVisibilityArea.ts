@@ -17,14 +17,21 @@ interface AreaDependencies {
   matrixWorld: Matrix4;
 }
 
+/**
+ * A visibilitor that sees a rectangle of `width` × `height` in _world space_ around the center the
+ * streamer hands over, and lays out every tile of the grid it covers. `CameraBasedVisibility`
+ * instead sees what a camera sees on the plane of the map, nearest tiles first.
+ */
 export class RectangularVisibilityArea implements IMap2DVisibilitor {
   #width = 0;
   #height = 0;
   #maxVisibleTiles = 10_000;
+  #atLimit: 'throw' | 'cap' = 'throw';
+  #warnedCapped = false;
 
   /**
    * Forces the next {@link computeVisibleTiles} to compute a fresh tile set instead of handing
-   * back the previous one. The `width`, `height` and `maxVisibleTiles` setters raise it, a call
+   * back the previous one. The `width`, `height`, `maxVisibleTiles` and `atLimit` setters raise it, a call
    * the limit refuses leaves it raised, and anyone who changed something this area cannot see may
    * raise it too. `computeVisibleTiles()` puts it back to `false` as it recomputes, so one `true`
    * buys exactly one recomputation.
@@ -125,11 +132,12 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
   }
 
   /**
-   * The most tiles the rectangle may cover on the grid of a call. A call whose rectangle covers
-   * more throws a `RangeError` before it builds a tile, and the next call computes again: the
-   * limit catches an area too wide for its tiles before one frame builds tens of thousands of
-   * them. Defaults to 10 000, as `CameraBasedVisibility#maxVisibleTiles`; `Infinity` turns it
-   * off.
+   * The most tiles the rectangle may cover on the grid of a call: the limit catches an area too
+   * wide for its tiles before one frame builds tens of thousands of them. Under
+   * {@link atLimit} `'throw'` a call whose rectangle covers more throws a `RangeError` before it
+   * builds a tile, and the next call computes again; under `'cap'` it keeps the tiles of a
+   * rectangle in the middle of the area, no more than this many. Defaults to 10 000, as
+   * `CameraBasedVisibility#maxVisibleTiles`; `Infinity` turns it off.
    *
    * Takes a whole number above 0 or `Infinity` and throws a `RangeError` for anything else,
    * keeping the value it had. A new value recomputes on the next call.
@@ -142,6 +150,32 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     assertWholeNumberOrInfinity(value, 'RectangularVisibilityArea', 'maxVisibleTiles', 1);
     if (this.#maxVisibleTiles !== value) {
       this.#maxVisibleTiles = value;
+      this.needsUpdate = true;
+    }
+  }
+
+  /**
+   * What a call does whose rectangle covers more than {@link maxVisibleTiles} tiles of the grid.
+   *
+   * - `'throw'`, the default: it throws a `RangeError` before it builds a tile, and the next call
+   *   computes again.
+   * - `'cap'`: it keeps the tiles of a rectangle in the middle of the area, as close to the
+   *   proportions of the area as whole tiles allow and no more than `maxVisibleTiles`, and goes on
+   *   as a call under the limit does. The first such call says so once on the console.
+   *
+   * Throws a `TypeError` for anything else, keeping the value it had. A new value recomputes on
+   * the next call.
+   */
+  get atLimit(): 'throw' | 'cap' {
+    return this.#atLimit;
+  }
+
+  set atLimit(value: 'throw' | 'cap') {
+    if (value !== 'throw' && value !== 'cap') {
+      throw new TypeError(`RectangularVisibilityArea: atLimit must be "throw" or "cap", got ${describeValue(value)}`);
+    }
+    if (this.#atLimit !== value) {
+      this.#atLimit = value;
       this.needsUpdate = true;
     }
   }
@@ -160,8 +194,10 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
    * `previousTiles` back in `removeTiles` and lays out none, and a call that is given no tile
    * answers `undefined`.
    *
-   * Throws a `RangeError` when the rectangle covers more than {@link maxVisibleTiles} tiles of the
-   * grid, before anything of the result is written; the next call computes again. A `centerPoint`
+   * Under {@link atLimit} `'throw'` it throws a `RangeError` when the rectangle covers more than
+   * {@link maxVisibleTiles} tiles of the grid, before anything of the result is written; the next
+   * call computes again. Under `'cap'` it lays out the tiles of a rectangle in the middle of the
+   * area instead, no more than `maxVisibleTiles`, and warns once. A `centerPoint`
    * that is not two finite numbers throws a `RangeError` before anything changes.
    */
   computeVisibleTiles(
@@ -225,16 +261,39 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
     area.height = height;
     const tileCoords = map2dTileCoords.computeTilesWithinArea(area, this.#tileCoords);
 
-    const tilesLength = tileCoords.rows * tileCoords.columns;
+    let tilesLength = tileCoords.rows * tileCoords.columns;
     if (tilesLength > this.#maxVisibleTiles) {
-      // the gate has taken the new center and objects in already: a refused call must not leave
-      // the next one the cached result of an earlier call, nor let it compare against the grid
-      // it refused
-      this.needsUpdate = true;
-      this.#gridChangeRefused = tileGridChanged;
-      throw new RangeError(
-        `RectangularVisibilityArea: the area covers ${tilesLength} tiles of the grid, more than maxVisibleTiles (${this.#maxVisibleTiles}) — make the area smaller or the tiles larger, or raise maxVisibleTiles`,
-      );
+      if (this.#atLimit === 'throw') {
+        // the gate has taken the new center and objects in already: a refused call must not leave
+        // the next one the cached result of an earlier call, nor let it compare against the grid
+        // it refused
+        this.needsUpdate = true;
+        this.#gridChangeRefused = tileGridChanged;
+        throw new RangeError(
+          `RectangularVisibilityArea: the area covers ${tilesLength} tiles of the grid, more than maxVisibleTiles (${this.#maxVisibleTiles}) — make the area smaller or the tiles larger, or raise maxVisibleTiles`,
+        );
+      }
+      // 'cap': the scratch rectangle shrinks in place to one in its middle, with the proportions of
+      // the area as far as whole tiles allow; the occupancy below counts columns × rows, so what is
+      // kept stays a rectangle
+      const {columns, rows} = tileCoords;
+      const max = this.#maxVisibleTiles; // finite here: the rectangle covers more
+      const keptColumns = Math.min(columns, max, Math.max(1, Math.floor(Math.sqrt((max * columns) / rows))));
+      const keptRows = Math.min(rows, Math.floor(max / keptColumns));
+      tileCoords.tileLeft += Math.floor((columns - keptColumns) / 2);
+      tileCoords.tileTop += Math.floor((rows - keptRows) / 2);
+      tileCoords.columns = keptColumns;
+      tileCoords.rows = keptRows;
+      // the edges in world units follow, as computeTilesWithinArea() writes them: the place of the
+      // first tile less the offset of the grid — adding and taking off the offset is not a no-op but
+      // rounds as that method rounds, so the two lines stay as they are
+      const offset = map2dTileCoords.readOffset(this.#offset);
+      tileCoords.left = tileCoords.tileLeft * tileCoords.tileWidth + offset.x - offset.x;
+      tileCoords.top = tileCoords.tileTop * tileCoords.tileHeight + offset.y - offset.y;
+      tileCoords.width = keptColumns * tileCoords.tileWidth;
+      tileCoords.height = keptRows * tileCoords.tileHeight;
+      if (!this.#warnedCapped) this.#warnCapped(tilesLength, keptColumns * keptRows);
+      tilesLength = keptColumns * keptRows;
     }
 
     this.needsUpdate = false;
@@ -318,6 +377,15 @@ export class RectangularVisibilityArea implements IMap2DVisibilitor {
 
     this.#visibleTiles = result;
     return result;
+  }
+
+  #warnCapped(covered: number, kept: number): void {
+    this.#warnedCapped = true;
+    const limit = this.#maxVisibleTiles;
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+    console.warn(
+      `RectangularVisibilityArea: the area covers ${covered} tiles of the grid, more than maxVisibleTiles (${limit}), so only the ${kept} in its middle are kept. Raise maxVisibleTiles, make the area smaller or the tiles larger, if the tiles further out should be drawn. This warning is shown once per area.`,
+    );
   }
 
   // The way out of a switched-off area. The snapshots of the gate are not asked here: switching

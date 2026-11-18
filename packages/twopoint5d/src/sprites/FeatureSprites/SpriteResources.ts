@@ -23,10 +23,10 @@ import {
 } from 'three/webgpu';
 import {describeThreeValue} from '../../utils/describeThreeValue.js';
 import {describeValue} from '../../utils/describeValue.js';
-import {isObject} from '../../utils/isObject.js';
+import {isRecord} from '../../utils/isRecord.js';
 import {checkFeature} from '../checkFeature.js';
 import {textureShapeKey} from '../textureShapeKey.js';
-import {collectSpriteDeclarations, isUniformValue} from '../spriteDeclarations.js';
+import {collectSpriteDeclarations, isUniformValue, sizeOfUniformValue, VECTOR_TYPES} from '../spriteDeclarations.js';
 import type {SpriteFeature, SpriteUniformValue} from '../SpriteFeature.js';
 
 export type SpriteUniformNode =
@@ -45,8 +45,6 @@ export interface SpriteResourcesOptions {
    */
   uniforms?: Readonly<Record<string, SpriteUniformValue | undefined>>;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
 
 // three tells a texture by its flag: a texture of another copy of three passes as well
 const isTextureOrNone = (value: unknown): value is Texture | null | undefined =>
@@ -72,9 +70,6 @@ const FILTER_NAMES: Readonly<Record<number, string>> = {
   [LinearMipmapLinearFilter]: 'LinearMipmapLinearFilter',
 };
 const filterName = (filter: number): string => FILTER_NAMES[filter] ?? describeValue(filter);
-
-const VECTOR_TYPES = ['float', 'vec2', 'vec3', 'vec4'] as const;
-const sizeOfValue = (value: SpriteUniformValue): number => (typeof value === 'number' ? 1 : value.length);
 
 const makeUniform = (value: SpriteUniformValue): SpriteUniformNode => {
   if (typeof value === 'number') return uniform(value) as SpriteUniformNode;
@@ -155,12 +150,13 @@ export class SpriteResources {
     for (const feature of features) checkFeature(feature, where);
     const declarations = collectSpriteDeclarations(features, where);
 
-    const uniforms: Record<string, SpriteUniformNode> = {};
+    const uniforms: [string, SpriteUniformNode][] = [];
     for (const [name, {value}] of declarations.uniforms) {
-      uniforms[name] = makeUniform(value);
-      this.#uniformSizes.set(name, sizeOfValue(value));
+      uniforms.push([name, makeUniform(value)]);
+      this.#uniformSizes.set(name, sizeOfUniformValue(value));
     }
-    this.uniforms = Object.freeze(uniforms);
+    // Object.fromEntries() writes every name, __proto__ included, as a property of its own
+    this.uniforms = Object.freeze(Object.fromEntries(uniforms));
 
     for (const [name, value] of Object.entries(options.uniforms ?? {})) {
       // undefined and null keep the start value the feature declares
@@ -168,7 +164,7 @@ export class SpriteResources {
       const size = this.#assertUniform(name);
       // the rule of a declared start value: a string or a list of anything but finite numbers has a
       // length as well, and would reach the vector as it is
-      if (!isUniformValue(value) || sizeOfValue(value) !== size) {
+      if (!isUniformValue(value) || sizeOfUniformValue(value) !== size) {
         throw new TypeError(
           `${where}: the uniform ${describeValue(name)} is a ${VECTOR_TYPES[size - 1]} and takes ${size === 1 ? 'a finite number' : `${size} finite numbers`} as its start value, got ${describeValue(value)}`,
         );

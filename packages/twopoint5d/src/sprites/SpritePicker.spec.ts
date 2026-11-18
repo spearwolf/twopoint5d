@@ -1317,4 +1317,158 @@ describe('SpritePicker', () => {
       sprites.dispose();
     });
   });
+
+  describe('the meshes it has drawn', () => {
+    const needsGc = () => {
+      // the Vitest config starts every worker with --expose-gc
+      const {gc} = globalThis;
+      if (typeof gc !== 'function') throw new Error('SpritePicker.spec.ts needs --expose-gc');
+      return gc;
+    };
+    const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    // a WeakRef keeps its target to the end of the job that made or read it: each round ends the job first
+    const collect = async (ref: WeakRef<object>) => {
+      const gc = needsGc();
+      for (let round = 0; round < 10 && ref.deref() !== undefined; round++) {
+        await nextTask();
+        gc();
+      }
+    };
+
+    // counts the calls of dispose() on a pick material alone: the material of the sprites is named otherwise
+    const spyOnPickMaterialDispose = () => {
+      const spy = vi.spyOn(FeatureSpritesMaterial.prototype, 'dispose');
+      const count = () =>
+        (spy.mock.contexts as unknown as FeatureSpritesMaterial[]).filter(({name}) => name === 'twopoint5d.SpritePicker').length;
+      return {spy, count};
+    };
+
+    test('lets go of a mesh its owner dropped without dispose(), and releases its pick mesh and pick material once the mesh is collected', async () => {
+      const {renderer} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {spy, count} = spyOnPickMaterialDispose();
+      try {
+        // in a function of its own, so that no variable of the test reaches the mesh
+        const drawOnce = async () => {
+          const {sprites} = makeSprites(1);
+          await picker.pick(makeCamera(), center, [sprites]);
+          return new WeakRef(sprites);
+        };
+        const ref = await drawOnce();
+
+        await collect(ref);
+        expect(ref.deref()).toBeUndefined();
+
+        // the engine calls a FinalizationRegistry back in a later task at the earliest
+        for (let round = 0; round < 20 && count() === 0; round++) await nextTask();
+        expect(count()).toBe(1);
+        picker.dispose();
+        expect(count()).toBe(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    test('lets go of a mesh dropped along with the ClippingGroup above it, and releases its pick material once', async () => {
+      const {renderer} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {spy, count} = spyOnPickMaterialDispose();
+      try {
+        // the group holds the mesh as its child, and the picker mirrors the group: nothing of the
+        // mirror may hold the group
+        const drawUnderGroup = async () => {
+          const {sprites} = makeSprites(1);
+          const group = new ClippingGroup();
+          group.clippingPlanes = [new Plane(new Vector3(1, 0, 0), 0)];
+          group.add(sprites);
+          await picker.pick(makeCamera(), center, [sprites]);
+          return new WeakRef(sprites);
+        };
+        const ref = await drawUnderGroup();
+
+        await collect(ref);
+        expect(ref.deref()).toBeUndefined();
+
+        for (let round = 0; round < 20 && count() === 0; round++) await nextTask();
+        expect(count()).toBe(1);
+        picker.dispose();
+        expect(count()).toBe(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    test('releases the pick material of a mesh disposed by its owner once, also after the mesh is collected', async () => {
+      const {renderer} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {spy, count} = spyOnPickMaterialDispose();
+      try {
+        const drawAndDispose = async () => {
+          const {sprites} = makeSprites(1);
+          await picker.pick(makeCamera(), center, [sprites]);
+          sprites.dispose();
+          return new WeakRef(sprites);
+        };
+        const ref = await drawAndDispose();
+        expect(count()).toBe(1);
+
+        await collect(ref);
+        expect(ref.deref()).toBeUndefined();
+        for (let round = 0; round < 20; round++) await nextTask();
+        picker.dispose();
+
+        expect(count()).toBe(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    test('releases the pick material once when a listener of the mesh disposes its geometry ahead of the picker', async () => {
+      const {renderer} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      // ahead of the listener the first pick adds
+      sprites.addEventListener('dispose', () => sprites.geometry?.dispose());
+      await picker.pick(makeCamera(), center, [sprites]);
+      const {spy, count} = spyOnPickMaterialDispose();
+      try {
+        sprites.dispose();
+        picker.dispose();
+
+        expect(count()).toBe(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    test('keeps the pick mesh of a mesh the caller still holds across a collection', async () => {
+      const gc = needsGc();
+      const {renderer, state, rendered} = makeRenderer();
+      const picker = new SpritePicker(renderer);
+      const {sprites} = makeSprites(1);
+      state.pixel = [1, 1, 0, 1];
+      const {spy, count} = spyOnPickMaterialDispose();
+      try {
+        const first = await picker.pick(makeCamera(), center, [sprites]);
+        for (let round = 0; round < 5; round++) {
+          await nextTask();
+          gc();
+        }
+        for (let round = 0; round < 5; round++) await nextTask();
+
+        const second = await picker.pick(makeCamera(), center, [sprites]);
+
+        expect(count()).toBe(0);
+        expect(rendered[1]!.children[0]).toBe(rendered[0]!.children[0]);
+        expect(first).toBeDefined();
+        expect(second?.sprites).toBe(sprites);
+        expect(second?.sprite).toBe(first?.sprite);
+      } finally {
+        spy.mockRestore();
+        sprites.dispose();
+        picker.dispose();
+      }
+    });
+  });
 });

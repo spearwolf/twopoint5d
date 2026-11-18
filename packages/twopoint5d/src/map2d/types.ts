@@ -249,6 +249,12 @@ export interface IMap2DVisibilitor {
    *
    * `centerPoint` is read during the call: `Map2DTileStreamer` hands over a tuple it reuses, so a
    * visibilitor that wants the values afterwards copies them.
+   *
+   * A visibilitor limits the tiles of a call itself. `CameraBasedVisibility` keeps those nearest
+   * to the camera and warns once; `RectangularVisibilityArea` throws a `RangeError`, or keeps those
+   * in the middle of its area and warns once under `atLimit = 'cap'`. `Map2D#update()` and
+   * `Map2DTileStreamer#update()` catch nothing this method throws: a visibilitor that throws
+   * throws out of the frame loop.
    */
   computeVisibleTiles(
     previousTiles: IMap2DTileCoords[],

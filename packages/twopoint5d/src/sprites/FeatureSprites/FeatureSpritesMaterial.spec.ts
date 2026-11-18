@@ -341,6 +341,24 @@ describe('FeatureSpritesMaterial', () => {
       ).toThrow('FeatureSpritesMaterial: feature "sampler" reads the texture "colorMap", which it does not declare');
       expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
     });
+
+    test('refuses a read of a texture named like a member of Object.prototype that the feature does not declare', () => {
+      // the feature declares a texture of its own, set below, so that it is active and its stage runs
+      const sampler = defineFeature({
+        name: 'sampler',
+        textures: {ownMap: {}},
+        color: {order: 250, transform: (_color, {sample, attribute}) => sample('toString', attribute<'vec2'>('uv'))},
+      });
+      const kind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, sampler]});
+      const ownMap = new Texture();
+      const baseline = [getSignalsCount(), getEffectsCount()];
+
+      expect(() => new FeatureSpritesMaterial(kind, {textures: {ownMap}})).toThrow(
+        'FeatureSpritesMaterial: feature "sampler" reads the texture "toString", which it does not declare',
+      );
+      expect([getSignalsCount(), getEffectsCount()]).toEqual(baseline);
+      ownMap.dispose();
+    });
   });
 
   describe('the placement', () => {

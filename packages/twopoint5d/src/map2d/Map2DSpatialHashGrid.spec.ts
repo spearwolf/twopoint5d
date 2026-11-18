@@ -3,6 +3,7 @@ import {AABB2} from './AABB2.js';
 import type {IMap2DRenderableArea} from './types.js';
 import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
+import {TileSlotTable} from './TileSlotTable.js';
 
 describe('Map2DSpatialHashGrid', () => {
   test('construction', () => {
@@ -297,6 +298,48 @@ describe('Map2DSpatialHashGrid', () => {
     expect(grid.getTile(3, 5)?.has(b)).toBe(true);
   });
 
+  test('add() and remove() take the renderables as one list', () => {
+    const grid = new Map2DSpatialHashGrid<IMap2DRenderableArea>(10, 10);
+    // far more than a spread could hand over in every engine
+    const count = 100_000;
+    const list: IMap2DRenderableArea[] = Array.from({length: count}, (_, i) => ({
+      aabb: new AABB2((i % 1000) * 10, Math.floor(i / 1000) * 10, 5, 5),
+    }));
+
+    expect(grid.add(list)).toBe(grid);
+
+    expect(grid.size).toBe(count);
+    for (const i of [0, 1, 999, 1000, 54_321, count - 1]) {
+      const {aabb} = list[i]!;
+      expect(grid.findWithin(new AABB2(aabb.left, aabb.top, 1, 1), []), `renderable ${i}`).toEqual([list[i]]);
+    }
+
+    expect(grid.remove(list)).toBe(grid);
+
+    expect(grid.size).toBe(0);
+    expect(grid.findWithin(new AABB2(0, 0, 10_000, 1_000))).toBeUndefined();
+  });
+
+  test('add() with a list adds none of it when one aabb is refused', () => {
+    const grid = new Map2DSpatialHashGrid<IMap2DRenderableArea>(10, 10);
+    const held: IMap2DRenderableArea = {aabb: new AABB2(0, 0, 5, 5)};
+    grid.add(held);
+    held.aabb.set(50, 50, 5, 5);
+    const other: IMap2DRenderableArea = {aabb: new AABB2(20, 20, 5, 5)};
+    const refused: IMap2DRenderableArea = {aabb: new AABB2(0, 0, Infinity, 5)};
+
+    expect(() => grid.add([held, other, refused])).toThrow(
+      new RangeError(
+        'Map2DSpatialHashGrid: the aabb of a renderable must have a finite left, top, width and height, got left 0, top 0, width Infinity, height 5',
+      ),
+    );
+
+    expect(grid.size).toBe(1);
+    expect(grid.getTile(0, 0)?.has(held)).toBe(true);
+    expect(grid.getTile(5, 5)).toBeUndefined();
+    expect(grid.getTile(2, 2)).toBeUndefined();
+  });
+
   describe('clear() and size', () => {
     // a grid of 10 × 10 cells with a renderable over four cells and one in a single cell
     const filledGrid = () => {
@@ -398,6 +441,28 @@ describe('Map2DSpatialHashGrid', () => {
 
       expect(grid.size).toBe(0);
       expect(grid.findWithin(new AABB2(0, 0, 10, 10))).toBeUndefined();
+    });
+
+    test('clear() takes the table of its cells back to the size it started with', () => {
+      const grid = new Map2DSpatialHashGrid<IMap2DRenderableArea>(10, 10);
+      // more cells than the table has buckets to start with, so that it grows
+      grid.add({aabb: new AABB2(0, 0, 200, 200)});
+      const reset = vi.spyOn(TileSlotTable.prototype, 'reset');
+      try {
+        grid.clear();
+
+        expect(reset).toHaveBeenCalledOnce();
+      } finally {
+        reset.mockRestore();
+      }
+
+      const small: IMap2DRenderableArea = {aabb: new AABB2(55, 55, 5, 5)};
+      grid.add(small);
+      expect(grid.size).toBe(1);
+      expect(grid.getTile(5, 5)?.has(small)).toBe(true);
+      expect(grid.getTile(0, 0)).toBeUndefined();
+      expect(grid.findWithin(new AABB2(0, 0, 200, 200), [])).toEqual([small]);
+      expect([...(grid.findWithin(new AABB2(50, 50, 1, 1)) ?? [])]).toEqual([small]);
     });
 
     test('clear() keeps maxCellsPerRenderable', () => {

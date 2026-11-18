@@ -1,6 +1,7 @@
 import {deepFreeze} from '../utils/deepFreeze.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
+import {isRecord} from '../utils/isRecord.js';
 import {cloneVertexObjectDescription} from '../vertex-objects/cloneVertexObjectDescription.js';
 import {voInitialize} from '../vertex-objects/constants.js';
 import {sharedVertexObjectDescriptor} from '../vertex-objects/sharedVertexObjectDescriptor.js';
@@ -126,14 +127,17 @@ function assertFeatureNames(base: SpriteBase, features: readonly SpriteFeature[]
 }
 
 function mergeAttributes(features: readonly SpriteFeature[], base: SpriteBase) {
-  const attributes: VertexAttributesType = {};
+  // without a prototype: Object.assign() below writes an attribute named __proto__ as a key of its
+  // own here, where on {} it would set the prototype
+  const attributes: VertexAttributesType = Object.create(null);
   const attributeOwners = new Map<string, string>();
   const propertyOwners = new Map<string, string>();
 
   for (const feature of features) {
     const own = feature.attributes ?? {};
     for (const name of Object.keys(own)) {
-      if (name in base.description.attributes) {
+      // an own key only: a name such as "toString" is no attribute of the base
+      if (Object.hasOwn(base.description.attributes, name)) {
         throw new Error(
           `${WHERE}: feature ${describeValue(feature.name)} declares the attribute ${describeValue(name)}, which the base ${describeValue(base.name)} holds already`,
         );
@@ -168,7 +172,8 @@ function mergeAttributes(features: readonly SpriteFeature[], base: SpriteBase) {
 }
 
 function mergeUsageAliases(features: readonly SpriteFeature[], attributeOwners: ReadonlyMap<string, string>) {
-  const aliases: Record<string, readonly string[]> = {};
+  // a Map: a word such as "constructor" or "__proto__" is a word like any other
+  const aliases = new Map<string, string[]>();
   const owners = new Map<string, string>();
   const declaresWord = (name: string, word: string) =>
     features.some(
@@ -192,17 +197,18 @@ function mergeUsageAliases(features: readonly SpriteFeature[], attributeOwners: 
           `${WHERE}: features ${describeValue(owner)} and ${describeValue(feature.name)} both declare the usage alias ${describeValue(word)}`,
         );
       for (const target of targets) {
-        if (feature.attributes?.[target] == null) {
+        if (!Object.hasOwn(feature.attributes ?? {}, target)) {
           throw new Error(
             `${WHERE}: feature ${describeValue(feature.name)} aliases ${describeValue(word)} to ${describeValue(target)}, which it does not declare`,
           );
         }
       }
       owners.set(word, feature.name);
-      aliases[word] = Object.freeze([...(aliases[word] ?? []), ...targets]);
+      aliases.set(word, [...(aliases.get(word) ?? []), ...targets]);
     }
   }
-  return Object.freeze(aliases);
+  // Object.fromEntries() writes every word, __proto__ included, as a property of its own
+  return Object.freeze(Object.fromEntries([...aliases].map(([word, targets]) => [word, Object.freeze(targets)])));
 }
 
 // `createVertexObjectPrototype` copies `Object.entries(methods)`, which skips symbol keys, so the
@@ -260,7 +266,7 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
   readonly base: SpriteBase;
   readonly features: F;
 }): SpriteKind<SpriteApiOf<F>> {
-  if (!isObject(options) || Array.isArray(options)) {
+  if (!isRecord(options)) {
     throw new TypeError(`${WHERE}: takes {base, features}, got ${describeValue(options)}`);
   }
   const {base} = options;
@@ -294,7 +300,12 @@ export function defineSprite<const F extends readonly SpriteFeature[]>(options: 
 
   const {attributes, attributeOwners} = mergeAttributes(features, base);
   const usageAliases = mergeUsageAliases(features, attributeOwners);
-  const methods = Object.assign({}, ...features.map((feature) => feature.methods ?? {})) as Record<string, unknown>;
+  // Object.fromEntries() writes every name, __proto__ included, as a property of its own, where
+  // Object.assign() onto {} would set the prototype; mergeAttributes() has refused a name two
+  // features give
+  const methods: Record<string, unknown> = Object.fromEntries(
+    features.flatMap((feature) => Object.entries(feature.methods ?? {})),
+  );
 
   // a copy of its own, frozen down to the components of every attribute: the attribute descriptions
   // a feature brings stay that feature's, and nothing written to them afterwards reaches the kind

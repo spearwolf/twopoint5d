@@ -297,6 +297,11 @@ export class CameraBasedVisibility implements IMap2DVisibilitor {
     this.#depth = assertFiniteAtLeast(value, 'CameraBasedVisibility', 'depth', 0);
   }
 
+  /**
+   * The camera whose view decides which tiles are visible; it stays the caller's and is read at
+   * every call, its world matrix brought up to date there. Without one, `computeVisibleTiles()`
+   * answers `undefined`, and the streamer keeps the tiles it holds.
+   */
   camera?: PerspectiveCamera | OrthographicCamera;
 
   readonly #cameraWorldPosition = new Vector3();

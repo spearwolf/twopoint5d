@@ -1,5 +1,4 @@
 import {describe, expect, test} from 'vitest';
-import {Map2DSpatialHashGrid} from './Map2DSpatialHashGrid.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {packTileCoords, tileKey} from './tileKeys.js';
 
@@ -11,7 +10,7 @@ describe('tile keys', () => {
     expect(tileKey(-3, 4)).toBe('-3,4');
   });
 
-  test('the tile id and the hash grid key are the same key', () => {
+  test('the tile id is the tile key', () => {
     const coords: Array<[number, number]> = [
       [0, 0],
       [1, 0],
@@ -22,7 +21,6 @@ describe('tile keys', () => {
     for (const [x, y] of coords) {
       const expected = tileKey(x, y);
       expect(new Map2DTileCoords(x, y).id, `tile id of ${expected}`).toBe(expected);
-      expect(Map2DSpatialHashGrid.getKey(x, y), `hash grid key of ${expected}`).toBe(expected);
     }
   });
 

@@ -2,7 +2,7 @@ import type {WebGPURenderer} from 'three/webgpu';
 import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
-import {isObject} from '../utils/isObject.js';
+import {isRecord} from '../utils/isRecord.js';
 import {isAnimationPlayback} from './animationPlayback.js';
 import {writeFrameTexels} from './frameTexels.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
@@ -194,7 +194,7 @@ const resolveTiming = (
   // a catalog is json: timing of null, a string or a list would otherwise fail below with a raw
   // TypeError that names neither the timing nor the animation
   const value: unknown = timing;
-  if (!isObject(value) || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error(
       `FrameBasedAnimations: add() got timing of ${describeValue(value)} for the animation ${animNameInError(name)} — timing is a duration in seconds or an object {duration | frameRate | durations, playback?}`,
     );

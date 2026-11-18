@@ -1527,6 +1527,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     return this.#stages.findIndex((item) => item.stage === stage);
   }
 
+  /**
+   * Whether `stage` is one of the stages added to this renderer itself, compared by identity: a
+   * stage of a nested `StageRenderer` among them does not count.
+   */
   hasStage(stage: IStage): boolean {
     return this.#getIndex(stage) !== -1;
   }

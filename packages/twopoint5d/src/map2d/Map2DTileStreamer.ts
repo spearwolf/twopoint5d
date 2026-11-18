@@ -104,6 +104,12 @@ export class Map2DTileStreamer {
   // directly is not held here either.
   #laidOutSerials = new WeakMap<IMap2DTileRenderer, number>();
 
+  /**
+   * The width of a cell of the tile grid, in the units of the map; `1` unless the constructor is
+   * handed another. A finite number above 0; writing anything else throws a `RangeError`, leaves
+   * the grid as it was and clears nothing. Another value clears the tiles, as every grid change
+   * does: the next {@link update} lays out the whole tile set again.
+   */
   get tileWidth(): number {
     return this.#tileCoords.tileWidth;
   }
@@ -120,6 +126,12 @@ export class Map2DTileStreamer {
     this.clearTiles();
   }
 
+  /**
+   * The height of a cell of the tile grid, in the units of the map; `1` unless the constructor is
+   * handed another. A finite number above 0; writing anything else throws a `RangeError`, leaves
+   * the grid as it was and clears nothing. Another value clears the tiles, as every grid change
+   * does: the next {@link update} lays out the whole tile set again.
+   */
   get tileHeight(): number {
     return this.#tileCoords.tileHeight;
   }
@@ -184,6 +196,12 @@ export class Map2DTileStreamer {
     return this.#tiles;
   }
 
+  /**
+   * The tile renderers the next {@link update} lays tiles out in; they stay the caller's. Prefer
+   * {@link addTileRenderer} and {@link removeTileRenderer}: the set is public, and a renderer taken
+   * out of it directly keeps the tiles laid out in it, which nobody gives back. An update with an
+   * empty set does nothing at all, a pending clear included.
+   */
   renderers: Set<IMap2DTileRenderer> = new Set();
 
   // Per-frame scratch — handed to beginUpdatingTiles(), which reads it during the call.
@@ -192,6 +210,13 @@ export class Map2DTileStreamer {
   // Per-frame scratch — handed to computeVisibleTiles(), which reads it during the call.
   readonly #viewCenter: [number, number] = [0, 0];
 
+  /**
+   * A streamer over a grid of `tileWidth` × `tileHeight` cells that starts at `(xOffset, yOffset)`,
+   * without a visibilitor and without a tile renderer.
+   *
+   * @throws a `RangeError` for a `tileWidth` or `tileHeight` that is no finite number above 0, or an
+   *   `xOffset` or `yOffset` that is no finite number.
+   */
   constructor(tileWidth = 1, tileHeight = 1, xOffset = 0, yOffset = 0) {
     // checked here as well as in the util underneath, so the message names the class the caller
     // holds in its hands
@@ -203,6 +228,12 @@ export class Map2DTileStreamer {
     this.#tileCoords = new Map2DTileCoordsUtil(tileWidth, tileHeight, xOffset, yOffset);
   }
 
+  /**
+   * Adds a tile renderer to the ones the next {@link update} lays tiles out in; it goes through that
+   * update cycle whatever the visibilitor answers. The renderer stays the caller's, and its node is
+   * placed nowhere — `Map2D#addTileRenderer()` puts it under the map. A renderer this streamer holds
+   * already is left as it is.
+   */
   addTileRenderer(renderer: IMap2DTileRenderer): void {
     this.renderers.add(renderer);
   }
@@ -322,6 +353,12 @@ export class Map2DTileStreamer {
     }
   }
 
+  /**
+   * Has the next {@link update} empty every tile renderer — each gives back its tiles through
+   * {@link IMap2DTileRenderer.clearTiles} — and lay out the whole tile set again, if there is a
+   * visibilitor. Nothing is cleared before that update, and a second call before it changes
+   * nothing; the grid setters and a change of the visibilitor call it.
+   */
   clearTiles(): void {
     this.#clearTilesOnNextUpdate = true;
   }

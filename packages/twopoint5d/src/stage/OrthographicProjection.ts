@@ -44,8 +44,28 @@ export type OrthographicProjectionSpecs = ProjectionFitSpecs & {
   far?: number;
 };
 
+/**
+ * A projection with one scale at every depth: it fits a view of its `OrthographicProjectionSpecs`
+ * into the container and places an `OrthographicCamera` in front of the projection plane, looking
+ * at its origin. It holds the specs and the plane it is handed; the camera `createCamera()` builds
+ * belongs to the caller — on a `Stage2D`, to the stage.
+ */
 export class OrthographicProjection implements IProjection {
+  /**
+   * How the view fits into the container, and where the camera sits. The object handed to the
+   * constructor is held, not copied: a write to it, or a new object here, applies at the next
+   * `updateViewRect()` — on a `Stage2D`, once `needsUpdate` is set or `updateProjection(true)` is
+   * called, or with the next `resize()` that brings a new container size. How a value no view can
+   * be fitted with is read, `ProjectionFitSpecs` says.
+   */
   viewSpecs: Partial<OrthographicProjectionSpecs>;
+
+  /**
+   * The plane the camera looks at, held as it is handed: a `ProjectionPlane` stays the caller's
+   * object, a description builds one of its own. A change to it applies when the camera is placed
+   * next. `undefined` leaves the projection without a camera: `createCamera()` and `updateCamera()`
+   * throw then.
+   */
   projectionPlane: ProjectionPlane | undefined;
 
   #viewRect = new Vector2();

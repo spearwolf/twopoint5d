@@ -1997,9 +1997,11 @@ renderer.domElement.addEventListener('pointerdown', async (event) => {
   are taken as they are at the call. The picker builds a pick mesh and a pick material per mesh on
   the geometry, the uniforms and the textures of that mesh — a `setUniform()` or `setTexture()`
   reaches the pick as it reaches the sprites —, follows a swapped placement, releases them when the
-  mesh is disposed, and builds them anew after a growth or a geometry put into the slot. Until then
-  the picker holds the mesh, listed again or not: a mesh taken out of the scene and never disposed
-  lives as long as the picker — dispose it, or the picker. `dispose()`
+  mesh is disposed, and builds them anew after a growth or a geometry put into the slot. The picker
+  holds a mesh it has drawn weakly: a mesh dropped without `dispose()` is collected, and once the
+  engine reports that, the picker releases its pick mesh and pick material — at a time the engine
+  chooses, and up to then the pick mesh holds the geometry, the uniforms and the textures it reads.
+  Dispose a mesh that is done with to have them back at once. `dispose()`
   releases the target and every pick material and rejects every pick still in flight; a `pick()`
   after it answers `undefined`. A camera, a pointer or a list of the wrong shape is refused with a
   `TypeError` that names the fix, and so is a mesh whose material slot holds a material the picker

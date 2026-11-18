@@ -11,7 +11,7 @@ import {
 import {add, attribute, float, mul, sub, texture, textureSize as textureSizeOf, vec2, vec3, vec4} from 'three/tsl';
 import {type Node, NodeMaterial, type NodeMaterialParameters, type Texture} from 'three/webgpu';
 import {describeValue} from '../../utils/describeValue.js';
-import {isObject} from '../../utils/isObject.js';
+import {isRecord} from '../../utils/isRecord.js';
 import {checkFeature} from '../checkFeature.js';
 import {checkSpriteKind, type SpriteKind} from '../defineSprite.js';
 import type {SpritePass} from '../passes/definePass.js';
@@ -184,7 +184,7 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
     // the kind and the form of the options before anything is built; null is refused, only
     // undefined counts as no options
     checkSpriteKind(kind, WHERE);
-    if (options !== undefined && (!isObject(options as unknown) || Array.isArray(options))) {
+    if (options !== undefined && !isRecord(options as unknown)) {
       throw new TypeError(`${WHERE}: the options must be an object, got ${describeValue(options)}`);
     }
 
@@ -345,7 +345,8 @@ export class FeatureSpritesMaterial<Api extends object = object> extends NodeMat
   #frameContext(feature: SpriteFeature, scope: GraphScope): SpriteFrameContext {
     const where = `${WHERE}: feature ${describeValue(feature.name)}`;
     const ownTexture = (textureName: string) => {
-      if (feature.textures?.[textureName] == null) {
+      // an own key only: a name such as "toString" is no texture of the feature
+      if (!Object.hasOwn(feature.textures ?? {}, textureName)) {
         throw new Error(`${where} reads the texture ${describeValue(textureName)}, which it does not declare`);
       }
     };

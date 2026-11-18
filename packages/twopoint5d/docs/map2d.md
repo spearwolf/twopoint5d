@@ -20,7 +20,7 @@ renderables.
 | `CameraBasedVisibilityHelpers`, `RectangularVisibilityAreaHelpers` | a debug view of what the visibilitor decided |
 | `ChunkQuadTreeNode` | a quad tree over the chunks of a map: `subdivide()` once after filling it, `findChunks()`/`findChunksAt()` per query |
 | `DataIdsChunk2D`, `NumberDataChunk2D`, `StringDataChunk2D`, `DataChunk2D` | a rectangle of the map with its data: tile ids out of a `Uint32Array` or base64, a number, a string, nothing |
-| `Map2DSpatialHashGrid` | a spatial index of renderables over a grid of cells: `add()`, `findWithin()`, `remove()`, `clear()` |
+| `Map2DSpatialHashGrid` | a spatial index of renderables over a grid of cells: `add()` and `remove()`, each with renderables or one list of them, `findWithin()`, `clear()` |
 | `AABB2` | the rectangle all of them take: `left`, `top`, `width`, `height` |
 
 ## A map under a camera
@@ -126,7 +126,33 @@ map2d.update();
 A width or a height of `0` switches the area off and takes its tiles down on the next `update()`.
 A rectangle that covers more than `maxVisibleTiles` tiles of the grid, 10 000 unless set, throws a
 `RangeError` on the next `update()` before it builds a tile: make the area smaller or the tiles
-larger, or raise the limit.
+larger, or raise the limit. Or set `atLimit = 'cap'`: the area then keeps the tiles of a rectangle
+in its middle, no more than `maxVisibleTiles`, and warns once.
+
+The two visibilitors meet their limit in different ways. `CameraBasedVisibility` keeps the tiles
+nearest to the camera and warns once; `RectangularVisibilityArea` throws by default, and
+`update()` catches nothing a visibilitor throws, so the throw leaves the frame loop of the caller.
+Swapping one visibilitor for the other changes what happens at the limit. `atLimit = 'cap'` brings
+the two together: the rectangle then keeps a part as well — its middle, where the camera keeps its
+nearest tiles — and warns once.
+
+```ts check
+import {type IMap2DTileRenderer, Map2D, RectangularVisibilityArea} from '@spearwolf/twopoint5d';
+
+declare const tiles: IMap2DTileRenderer; // a Map2DTileRenderer over a factory, as above
+
+const map2d = new Map2D();
+map2d.addTileRenderer(tiles);
+
+// tiles of 1 under an area of 320 × 240 cover 76 800 tiles, more than the 10 000 of the limit
+const area = new RectangularVisibilityArea(320, 240);
+area.atLimit = 'cap';
+map2d.visibilitor = area;
+
+// lays out the 115 × 86 = 9 890 tiles in the middle of the area — at most 10 000, in the
+// proportions of the area as far as whole tiles allow — and warns once, instead of throwing
+map2d.update();
+```
 
 ## Chunks of a map, found by a quad tree
 
@@ -204,6 +230,13 @@ const coin: Pickup = {kind: 'coin', aabb: new AABB2(100, 40, 16, 16)};
 const key: Pickup = {kind: 'key', aabb: new AABB2(300, 200, 16, 16)};
 grid.add(coin, key);
 
+// a whole level at once goes in as one list: a spread of a large one runs into the argument limit
+// of the engine
+declare const levelPickups: Pickup[];
+export function loadLevel() {
+  grid.add(levelPickups);
+}
+
 // kept across frames, as for the quad tree
 const view = new AABB2();
 const inView: Pickup[] = [];
@@ -223,12 +256,18 @@ export function collect(pickup: Pickup) {
   grid.remove(pickup);
 }
 
-// a new level: the grid lets go of every pickup, and size counts 0
+// a new level: the grid lets go of every pickup, size counts 0, and the table of its cells goes
+// back to the size it started with
 export function nextLevel(): number {
   grid.clear();
   return grid.size;
 }
 ```
+
+`add()` and `remove()` take the renderables as arguments or as one list — one argument that is an
+array counts as the list. The list is the form for large sets: a spread, `grid.add(...list)`, runs
+into the argument limit of the engine at a few hundred thousand renderables. `clear()` takes the
+table of the cells back to the size it started with, so a large level leaves no large table behind.
 
 The grid remembers the cells of a renderable when it is added: a changed `aabb` leaves the
 renderable where it lies until it is added again. An `aabb` that reaches into more than
@@ -255,7 +294,8 @@ Every default works on its own; a few of them have to fit one another.
 | `Map2D#xOffset`, `#yOffset` | `0` | where the grid starts, a finite number. The grid is anchored at the corner of a tile: tile `(0, 0)` spans `[xOffset, xOffset + tileWidth)`, and `-tileWidth / 2` centres the grid on the origin |
 | camera `far` | the camera's own | bounds how far out the ground is searched; tilted towards the horizon, the ground in view grows with `far²` |
 | `RectangularVisibilityArea` | `320 × 240` | the size of the rectangle, in world units |
-| `RectangularVisibilityArea#maxVisibleTiles` | `10 000` | the most tiles the rectangle may cover on the grid; a larger one throws a `RangeError` on the next `update()`. 320 × 240 on the default grid of 1 covers 76 800 — set the tile size or the area |
+| `RectangularVisibilityArea#maxVisibleTiles` | `10 000` | the most tiles the rectangle may cover on the grid; a larger one throws a `RangeError` on the next `update()`, or under `atLimit = 'cap'` keeps the tiles in its middle. 320 × 240 on the default grid of 1 covers 76 800 — set the tile size or the area |
+| `RectangularVisibilityArea#atLimit` | `'throw'` | what a rectangle over `maxVisibleTiles` does: `'throw'` a `RangeError`, `'cap'` keeps the tiles in its middle and warns once, as `CameraBasedVisibility` keeps the nearest |
 | `ChunkQuadTreeNode#subdivide()` `maxChunkNodes` | `2` | the most chunks a leaf keeps while an axis separates them — chunks that none separates stay in one leaf; a query tests every chunk of each node on its way down, so a higher value gives a flatter tree with longer lists |
 | `Map2DSpatialHashGrid` cell size and offset | `1 × 1`, `(0, 0)` | the grid a renderable is placed on, in the units of its `aabb`; cells about the size of the renderables keep each of them in a few cells |
 | `Map2DSpatialHashGrid#maxCellsPerRenderable` | `65 536` | the most cells one `aabb` may reach into; on the default cells of 1 × 1 that is a renderable of 256 × 256, and a larger one throws in `add()` — size the cells to the renderables |

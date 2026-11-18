@@ -6,9 +6,10 @@ const HOST_IS_LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] ===
  * bytes becomes one value, read little-endian by default or big-endian with `isLittleEndian` set to
  * `false`. A trailing byte group shorter than 4 has no value to make and is left out.
  *
- * @deprecated A helper of {@link DataIdsChunk2D}, not a name to use outside the library: a subclass that
- *   overrides `prepareData()` decodes the ids through `super.prepareData(base64)`. It stays exported until a
- *   breaking release.
+ * The helper of {@link DataIdsChunk2D}, which the library does not export: a subclass that overrides
+ * `prepareData()` decodes the ids through `super.prepareData(base64)`.
+ *
+ * @internal
  */
 export function base64toUint32Arr(base64: string, isLittleEndian = true): Uint32Array {
   const binary = atob(base64);

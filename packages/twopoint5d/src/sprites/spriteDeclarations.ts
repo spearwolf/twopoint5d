@@ -1,4 +1,5 @@
 import {describeValue} from '../utils/describeValue.js';
+import {isRecord} from '../utils/isRecord.js';
 import {originOf, sourceNameOf} from './passes/passUniformNames.js';
 import type {SpriteFeature, SpriteUniformDeclaration, SpriteUniformValue} from './SpriteFeature.js';
 
@@ -10,7 +11,8 @@ export interface SpriteDeclarations {
   readonly textures: ReadonlyMap<string, {readonly feature: SpriteFeature; readonly needsImage: boolean}>;
 }
 
-const VECTOR_TYPES = ['float', 'vec2', 'vec3', 'vec4'] as const;
+/** The type names of a uniform, indexed by its count of values less one: `float` for 1, `vec2` to `vec4` for 2 to 4. @internal */
+export const VECTOR_TYPES = ['float', 'vec2', 'vec3', 'vec4'] as const;
 
 /** Whether `value` is a start value of a uniform: a finite number, or a list of 2 to 4 finite numbers. @internal */
 export const isUniformValue = (value: unknown): value is SpriteUniformValue =>
@@ -25,14 +27,15 @@ const DECLARATION_KEYS: ReadonlySet<string> = new Set(['value', 'shared']);
 // a declaration as {value, shared}, or undefined for one that is neither a value nor {value, shared?}
 const declarationOf = (declared: unknown): {value: SpriteUniformValue; shared: boolean} | undefined => {
   if (isUniformValue(declared)) return {value: declared, shared: false};
-  if (declared == null || typeof declared !== 'object' || Array.isArray(declared)) return undefined;
+  if (!isRecord(declared)) return undefined;
   const {value, shared} = declared as Partial<SpriteUniformDeclaration>;
   if (!isUniformValue(value) || (shared !== undefined && typeof shared !== 'boolean')) return undefined;
   if (Object.keys(declared).some((key) => !DECLARATION_KEYS.has(key))) return undefined;
   return {value, shared: shared === true};
 };
 
-const sizeOf = (value: SpriteUniformValue): number => (typeof value === 'number' ? 1 : value.length);
+/** The count of values of a uniform start value: 1 for a number, the length for a list. @internal */
+export const sizeOfUniformValue = (value: SpriteUniformValue): number => (typeof value === 'number' ? 1 : value.length);
 
 const sameValue = (a: SpriteUniformValue, b: SpriteUniformValue): boolean =>
   typeof a === 'number' || typeof b === 'number'
@@ -59,7 +62,7 @@ function conflictOf(
       : [feature, known.feature, declaration.value];
     return `${head}, and only ${describeValue(sharing.name)} shares it — declare it as {value: ${describeValue(value)}, shared: true} in ${describeValue(other.name)} as well, or rename one of them`;
   }
-  const [a, b] = [sizeOf(known.value), sizeOf(declaration.value)];
+  const [a, b] = [sizeOfUniformValue(known.value), sizeOfUniformValue(declaration.value)];
   if (a !== b) {
     return `${head}, shared, as a ${VECTOR_TYPES[a - 1]} and as a ${VECTOR_TYPES[b - 1]} — ${SHARED_RULE}; rename one of them`;
   }

@@ -1,5 +1,5 @@
 import {Matrix4} from 'three/webgpu';
-import {beforeEach, describe, expect, test} from 'vitest';
+import {beforeEach, describe, expect, test, vi} from 'vitest';
 import {AABB2} from './AABB2.js';
 import {Map2DTileCoords} from './Map2DTileCoords.js';
 import {Map2DTileCoordsUtil} from './Map2DTileCoordsUtil.js';
@@ -477,6 +477,117 @@ describe('RectangularVisibilityArea', () => {
       area.maxVisibleTiles = Infinity;
 
       expect(area.maxVisibleTiles).toBe(Infinity);
+    });
+  });
+
+  describe('atLimit', () => {
+    let tileCoords: Map2DTileCoordsUtil;
+    let matrixWorld: Matrix4;
+
+    beforeEach(() => {
+      tileCoords = new Map2DTileCoordsUtil(100, 100);
+      matrixWorld = new Matrix4();
+    });
+
+    const tileIds = (left: number, top: number, columns: number, rows: number): string[] => {
+      const all: string[] = [];
+      for (let y = top; y < top + rows; y++) for (let x = left; x < left + columns; x++) all.push(`${x},${y}`);
+      return all.sort();
+    };
+
+    test('atLimit takes "throw" and "cap", and refuses anything else, keeping the value it had', () => {
+      const area = new RectangularVisibilityArea();
+      expect(area.atLimit).toBe('throw');
+
+      area.atLimit = 'cap';
+      expect(area.atLimit).toBe('cap');
+      area.atLimit = 'throw';
+      expect(area.atLimit).toBe('throw');
+
+      // a new value recomputes on the next call, the value it holds does not
+      area.needsUpdate = false;
+      area.atLimit = 'throw';
+      expect(area.needsUpdate).toBe(false);
+      area.atLimit = 'cap';
+      expect(area.needsUpdate).toBe(true);
+      area.atLimit = 'throw';
+
+      for (const [value, got] of [
+        ['clip', '"clip"'],
+        [undefined, 'undefined'],
+        [1, '1'],
+      ] as const) {
+        expect(() => {
+          area.atLimit = value as unknown as 'cap';
+        }).toThrow(new TypeError(`RectangularVisibilityArea: atLimit must be "throw" or "cap", got ${got}`));
+        expect(area.atLimit).toBe('throw');
+      }
+    });
+
+    test('under atLimit "cap" an area over maxVisibleTiles keeps the tiles of a rectangle in its middle, no more than maxVisibleTiles, and warns once', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        // 20 × 10 tiles of 100, from (0, 0)
+        const area = new RectangularVisibilityArea(2000, 1000);
+        area.maxVisibleTiles = 50;
+        area.atLimit = 'cap';
+
+        const result = area.computeVisibleTiles([], [1000, 500], tileCoords, matrixWorld)!;
+
+        // 10 × 5 tiles: (20 - 10) / 2 columns and floor((10 - 5) / 2) rows in
+        expect(ids(result.tiles)).toEqual(tileIds(5, 2, 10, 5));
+        expect(result.createTiles).toHaveLength(50);
+        expect(views(result.tiles)).toContain('5,2 500 200 100 100');
+        expect(warn).toHaveBeenCalledOnce();
+        expect(warn).toHaveBeenCalledWith(
+          'RectangularVisibilityArea: the area covers 200 tiles of the grid, more than maxVisibleTiles (50), so only the 50 in its middle are kept. Raise maxVisibleTiles, make the area smaller or the tiles larger, if the tiles further out should be drawn. This warning is shown once per area.',
+        );
+
+        // another call over the limit warns no more
+        const moved = area.computeVisibleTiles(result.tiles, [1100, 500], tileCoords, matrixWorld)!;
+        expect(ids(moved.tiles)).toEqual(tileIds(6, 2, 10, 5));
+        expect(warn).toHaveBeenCalledOnce();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test('under atLimit "cap" a capped area hands its result back while nothing changes', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const area = new RectangularVisibilityArea(2000, 1000);
+        area.maxVisibleTiles = 50;
+        area.atLimit = 'cap';
+        const first = area.computeVisibleTiles([], [1000, 500], tileCoords, matrixWorld)!;
+        const serial = first.serial;
+
+        const second = area.computeVisibleTiles(first.tiles, [1000, 500], tileCoords, matrixWorld)!;
+
+        expect(second.changed).toBe(false);
+        expect(second.createTiles).toBeUndefined();
+        expect(second.removeTiles).toBeUndefined();
+        expect(second.reuseTiles).toBe(second.tiles);
+        expect(second.serial).toBe(serial);
+        expect(ids(second.tiles)).toEqual(tileIds(5, 2, 10, 5));
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test('under atLimit "cap" a narrow area keeps a strip of at most maxVisibleTiles', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        // 200 × 1 tiles of 100, from (0, 0)
+        const area = new RectangularVisibilityArea(20_000, 100);
+        area.maxVisibleTiles = 50;
+        area.atLimit = 'cap';
+
+        const result = area.computeVisibleTiles([], [10_000, 50], tileCoords, matrixWorld)!;
+
+        expect(ids(result.tiles)).toEqual(tileIds(75, 0, 50, 1));
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 

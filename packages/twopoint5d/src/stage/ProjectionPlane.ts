@@ -11,10 +11,15 @@ export type ProjectionPlaneDescription = 'xy|bottom-left' | 'xy|top-left' | 'xz|
  * and thus also decisive for the direction of the coordinate system on the projection plane.
  */
 export class ProjectionPlane {
+  /** The plane itself; its normal points to the side the camera stands on. Held by this object alone. */
   plane: THREE_Plane;
+  /** The up vector on the plane: the y axis of the coordinate system on it. Held by this object alone. */
   up: Vector3;
 
   /**
+   * Builds the plane and its up vector from a description, or copies a `THREE.Plane` and `up` of
+   * the caller's, which stay as they are.
+   *
    * @param planeDescription - One of the four descriptions, or a `THREE.Plane` of your own.
    * @param up - The up vector on the plane; mandatory for a `THREE.Plane`.
    * @throws {TypeError} for a description that is neither one of the four nor a `THREE.Plane`.
@@ -46,20 +51,38 @@ export class ProjectionPlane {
     }
   }
 
+  /**
+   * `plane` itself when it is a `ProjectionPlane`, not a copy; a new one built from it when it is
+   * a description.
+   *
+   * @throws {TypeError} for a description that is none of the four.
+   */
   static get(plane: ProjectionPlane | ProjectionPlaneDescription): ProjectionPlane {
     return plane instanceof ProjectionPlane ? plane : new ProjectionPlane(plane);
   }
 
+  /** A new projection plane with copies of the plane and the up vector of this one. */
   clone(): ProjectionPlane {
     return new ProjectionPlane(this.plane.clone(), this.up.clone());
   }
 
+  /**
+   * Whether `projectionPlane` is this one, or has the same plane — normal and constant — and the
+   * same up vector, each compared component by component with `===`. `null` and `undefined` from
+   * JavaScript answer `false`.
+   */
   equals(projectionPlane: ProjectionPlane): boolean {
     if (projectionPlane === this) return true;
     if (projectionPlane == null) return false;
     return this.plane.equals(projectionPlane.plane) && this.up.equals(projectionPlane.up);
   }
 
+  /**
+   * Turns `obj3d` to face the plane: the rotation that makes an object look along the negated
+   * normal, with `up` as its up, is multiplied onto the orientation the object has already —
+   * `applyQuaternion()` —, so it gives the facing only to an object without a rotation of its own,
+   * and two calls turn it twice. A projection resets the rotation of a camera before it calls it.
+   */
   applyRotation(obj3d: Object3D): void {
     obj3d.applyQuaternion(
       new Quaternion().setFromRotationMatrix(
@@ -68,10 +91,20 @@ export class ProjectionPlane {
     );
   }
 
+  /**
+   * The point `distanceToPlane` away from the origin of the plane along its normal — on the side
+   * the camera stands on for a value above 0 —, written into `target` and answered, or a new
+   * vector without one.
+   */
   getPointByDistance(distanceToPlane: number, target?: Vector3): Vector3 {
     return this.getOrigin(target).add(this.plane.normal.clone().multiplyScalar(distanceToPlane));
   }
 
+  /**
+   * The origin of the coordinate system on the plane: the point of the plane nearest to the origin
+   * of the world (`THREE.Plane#coplanarPoint()`), written into `target` and answered, or a new
+   * vector without one.
+   */
   getOrigin(target?: Vector3): Vector3 {
     return this.plane.coplanarPoint(target ?? new Vector3());
   }
@@ -91,6 +124,10 @@ export class ProjectionPlane {
     return this.getForward(target).cross(this.up);
   }
 
+  /**
+   * The point `x` along {@link getRight} and `y` along `up` from the origin of the plane, written
+   * into `target` and answered, or a new vector without one.
+   */
   getPoint(x: number, y: number, target?: Vector3): Vector3 {
     target = this.getOrigin(target);
     target.add(this.getRight().setLength(x));

@@ -4,6 +4,7 @@
 
 import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
+import {isRecord} from '../utils/isRecord.js';
 import {isAnimationPlayback} from './animationPlayback.js';
 import {isTextureOptionClass, type TextureOptionClasses} from './TextureFactory.js';
 import type {TextureStoreData} from './types.js';
@@ -13,21 +14,19 @@ import type {TextureStoreData} from './types.js';
 const describeCatalogValue = (value: unknown): string =>
   Array.isArray(value) ? 'an array' : isObject(value) ? 'an object' : describeValue(value);
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
-
 /**
  * Throws a `TypeError` for data whose shape `parse()` cannot even start on: no object, an
  * `items` that is no object, or a `defaultTextureClasses` that is there and no array. The
  * fields of a single item are left to {@link textureResourceDataProblems}.
  */
 export function assertTextureStoreData(data: unknown): asserts data is TextureStoreData {
-  if (!isPlainObject(data)) {
+  if (!isRecord(data)) {
     throw new TypeError(
       `TextureStore: parse() got ${describeCatalogValue(data)} instead of texture store data, an object with an items object`,
     );
   }
   const {items, defaultTextureClasses} = data;
-  if (!isPlainObject(items)) {
+  if (!isRecord(items)) {
     throw new TypeError(
       `TextureStore: parse() got texture store data whose items is ${describeCatalogValue(items)} — items is an object of resource items by id`,
     );
@@ -50,7 +49,7 @@ export function assertTextureStoreData(data: unknown): asserts data is TextureSt
  * report what they refuse.
  */
 export const textureResourceDataProblems = (item: unknown): string[] => {
-  if (!isPlainObject(item)) return [`it is ${describeCatalogValue(item)}, not an object`];
+  if (!isRecord(item)) return [`it is ${describeCatalogValue(item)}, not an object`];
 
   const problems: string[] = [];
   for (const key of ['imageUrl', 'atlasUrl', 'overrideImageUrl', 'atlasAdapter'] as const) {
@@ -60,17 +59,17 @@ export const textureResourceDataProblems = (item: unknown): string[] => {
     }
   }
   const {tileSet, texture, frameBasedAnimations, playback} = item;
-  if (tileSet !== undefined && !isPlainObject(tileSet)) {
+  if (tileSet !== undefined && !isRecord(tileSet)) {
     problems.push(`tileSet is ${describeCatalogValue(tileSet)}, not an object`);
   }
   if (texture !== undefined && !Array.isArray(texture)) {
     problems.push(`texture is ${describeCatalogValue(texture)}, not an array`);
   }
-  if (frameBasedAnimations !== undefined && !isPlainObject(frameBasedAnimations)) {
+  if (frameBasedAnimations !== undefined && !isRecord(frameBasedAnimations)) {
     problems.push(`frameBasedAnimations is ${describeCatalogValue(frameBasedAnimations)}, not an object`);
   }
   if (playback !== undefined) {
-    if (!isPlainObject(playback)) {
+    if (!isRecord(playback)) {
       problems.push(`playback is ${describeCatalogValue(playback)}, not an object`);
     } else {
       for (const [name, value] of Object.entries(playback)) {

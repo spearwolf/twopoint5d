@@ -1,14 +1,10 @@
 import {describeValue} from '../utils/describeValue.js';
-import {isObject} from '../utils/isObject.js';
+import {isRecord} from '../utils/isRecord.js';
+import {isStringList} from '../utils/isStringList.js';
 import type {SpriteFeature} from './SpriteFeature.js';
 
 const STAGE_SLOTS = ['frameStage', 'local', 'mesh', 'uv', 'color'] as const;
 const FUNCTION_SLOTS = ['frame', 'placement', 'colorSource'] as const;
-
-const isRecord = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
-
-const isStringList = (value: unknown): value is readonly string[] =>
-  Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 
 /**
  * Checks a feature on its own, in the words of `where`: that it is an object with a name, and

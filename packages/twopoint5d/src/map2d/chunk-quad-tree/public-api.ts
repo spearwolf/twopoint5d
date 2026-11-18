@@ -11,4 +11,3 @@ export {
 export type {IDataChunk2D} from './IDataChunk2D.js';
 export {NumberDataChunk2D, type NumberDataChunk2DParams} from './NumberDataChunk2D.js';
 export {StringDataChunk2D, type StringDataChunk2DParams} from './StringDataChunk2D.js';
-export {base64toUint32Arr} from './base64toUint32Arr.js';

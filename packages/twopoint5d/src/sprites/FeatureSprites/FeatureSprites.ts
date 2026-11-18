@@ -3,7 +3,7 @@ import type {VO, VOSortKey, VOSortKeyName, VOSortOptions} from '../../vertex-obj
 import type {VertexObjectPool} from '../../vertex-objects/VertexObjectPool.js';
 import {describeThreeValue} from '../../utils/describeThreeValue.js';
 import {describeValue} from '../../utils/describeValue.js';
-import {isObject} from '../../utils/isObject.js';
+import {isRecord} from '../../utils/isRecord.js';
 import {throwCollected} from '../../utils/throwCollected.js';
 import {VertexObjects} from '../../vertex-objects/VertexObjects.js';
 import type {SpriteUniformSource} from '../bindings/SpriteUniformSource.js';
@@ -172,7 +172,7 @@ function resolveParts<Api extends object>(kind: SpriteKind<Api>, options: Featur
   // the kind is the first argument, so it is checked first
   checkSpriteKind(kind, WHERE);
   // the default of the constructor holds for `undefined` alone
-  if (!isObject(options as unknown) || Array.isArray(options)) {
+  if (!isRecord(options as unknown)) {
     throw new TypeError(`${WHERE}: the options must be an object, got ${describeValue(options)}`);
   }
   const {geometry, material, passes = [], capacity, attributeUsage, baseArgs, grow, ...materialParameters} = options;

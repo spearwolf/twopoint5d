@@ -60,6 +60,52 @@ describe('defineSprite()', () => {
     expect(kind.usageAliases).toEqual({position: ['instancePosition']});
   });
 
+  test('takes a usage word named like a member of Object.prototype, and hands it out as a word of its own', () => {
+    const words = defineFeature({
+      name: 'words',
+      attributes: {spin: {size: 1}},
+      // a computed key: a literal __proto__ would set the prototype and test nothing
+      usageAliases: {constructor: ['spin'], toString: ['spin'], ['__proto__']: ['spin']},
+    });
+
+    const kind = defineSprite({base: QuadBase, features: [position, flat, words]});
+
+    expect(Object.hasOwn(kind.usageAliases, 'constructor')).toBe(true);
+    expect(kind.usageAliases.constructor).toEqual(['spin']);
+    expect(Object.hasOwn(kind.usageAliases, 'toString')).toBe(true);
+    expect(kind.usageAliases.toString).toEqual(['spin']);
+    expect(Object.hasOwn(kind.usageAliases, '__proto__')).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(kind.usageAliases, '__proto__')?.value).toEqual(['spin']);
+    expect(Object.getPrototypeOf(kind.usageAliases)).toBe(Object.prototype);
+  });
+
+  test('takes an attribute named like a member of Object.prototype that the base does not hold', () => {
+    const named = defineFeature({name: 'named', attributes: {toString: {size: 1}, ['__proto__']: {size: 1}}});
+
+    const kind = defineSprite({base: QuadBase, features: [position, flat, named]});
+
+    expect(Object.hasOwn(kind.description.attributes, 'toString')).toBe(true);
+    expect(Object.hasOwn(kind.description.attributes, '__proto__')).toBe(true);
+  });
+
+  test('takes a method named __proto__ as a method of its own, which the sprite handle carries', () => {
+    const odd = function odd(this: object) {
+      return 42;
+    };
+    // a computed key: a literal __proto__ would set the prototype and test nothing
+    const named = defineFeature({name: 'named', methods: {['__proto__']: odd}});
+
+    const kind = defineSprite({base: QuadBase, features: [position, flat, named]});
+
+    const methods = kind.description.methods!;
+    expect(Object.hasOwn(methods, '__proto__')).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(methods, '__proto__')?.value).toBe(odd);
+    expect(Object.getPrototypeOf(methods)).toBe(Object.prototype);
+    const pool = new VertexObjectPool<SpriteOf<typeof kind>>(kind.description, 1);
+    expect(Reflect.get(pool.createVO()!, '__proto__')).toBe(odd);
+    pool.dispose();
+  });
+
   test('runs the initialize() of every feature, in feature-list order, for every slot createVO() hands out', () => {
     const calls: string[] = [];
     const first = defineFeature({name: 'first', initialize: () => void calls.push('first')});
@@ -305,6 +351,22 @@ describe('defineSprite()', () => {
 
       expect(() => defineSprite({base: QuadBase, features: [position, flat, stray]})).toThrow(
         'defineSprite: feature "stray" aliases "turn" to "spinn", which it does not declare',
+      );
+    });
+
+    test('a usage alias of a feature that declares no attributes', () => {
+      const bare = defineFeature({name: 'bare', usageAliases: {turn: ['spin']}});
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, bare]})).toThrow(
+        'defineSprite: feature "bare" aliases "turn" to "spin", which it does not declare',
+      );
+    });
+
+    test('refuses an alias to a name of Object.prototype the feature declares no attribute for', () => {
+      const stray = defineFeature({name: 'stray', attributes: {spin: {size: 1}}, usageAliases: {w: ['toString']}});
+
+      expect(() => defineSprite({base: QuadBase, features: [position, flat, stray]})).toThrow(
+        'defineSprite: feature "stray" aliases "w" to "toString", which it does not declare',
       );
     });
 

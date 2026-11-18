@@ -202,6 +202,22 @@ describe('AABB2', () => {
     expect(new AABB2(0, 0, 10, 10).isInside(11, 10)).toBeFalsy();
   });
 
+  it('isInside() counts the left and the top edge and neither the right nor the bottom one, so two boxes of a grid share no point', () => {
+    const west = new AABB2(0, 0, 10, 10);
+    const east = new AABB2(10, 0, 10, 10);
+    const south = new AABB2(0, 10, 10, 10);
+
+    expect(west.isInside(0, 5)).toBe(true);
+    expect(west.isInside(5, 0)).toBe(true);
+    expect(west.isInside(10, 5)).toBe(false);
+    expect(west.isInside(5, 10)).toBe(false);
+    expect(east.isInside(10, 5)).toBe(true);
+    expect(south.isInside(5, 10)).toBe(true);
+    // a box of width or height 0 holds no point, not even its corner
+    expect(new AABB2(3, 3, 0, 10).isInside(3, 5)).toBe(false);
+    expect(new AABB2(3, 3, 10, 0).isInside(5, 3)).toBe(false);
+  });
+
   it('isInsideAABB', () => {
     expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(2, 2, 4, 4))).toBeTruthy();
     expect(new AABB2(0, 0, 10, 10).isInsideAABB(new AABB2(0, 0, 4, 4))).toBeTruthy();
@@ -358,5 +374,28 @@ describe('AABB2', () => {
     it('v', () => assert(aabb.isIntersecting(new AABB2(-100, -48, 200, 50))));
     it('w', () => assert(aabb.isIntersecting(new AABB2(-48, -100, 50, 200))));
     it('x', () => assert(aabb.isIntersecting(new AABB2(2, -100, 50, 200))));
+  });
+
+  describe('isIntersecting() with a box of width or height 0', () => {
+    const aabb = new AABB2(-10, -10, 20, 20);
+
+    it('intersects where it lies strictly between the edges of the other, either way round', () => {
+      expect(aabb.isIntersecting(new AABB2(0, -5, 0, 10))).toBe(true);
+      expect(new AABB2(0, -5, 0, 10).isIntersecting(aabb)).toBe(true);
+      expect(aabb.isIntersecting(new AABB2(-5, 0, 10, 0))).toBe(true);
+      expect(aabb.isIntersecting(new AABB2(0, 0, 0, 0))).toBe(true);
+    });
+
+    it('does not intersect where it lies on an edge of the other', () => {
+      expect(aabb.isIntersecting(new AABB2(-10, -5, 0, 10))).toBe(false);
+      expect(aabb.isIntersecting(new AABB2(10, -5, 0, 10))).toBe(false);
+      expect(aabb.isIntersecting(new AABB2(-5, -10, 10, 0))).toBe(false);
+      expect(aabb.isIntersecting(new AABB2(-5, 10, 10, 0))).toBe(false);
+    });
+
+    it('does not intersect another of width 0 at the same place', () => {
+      expect(new AABB2(0, -5, 0, 10).isIntersecting(new AABB2(0, -5, 0, 10))).toBe(false);
+      expect(new AABB2(0, 0, 0, 0).isIntersecting(new AABB2(0, 0, 0, 0))).toBe(false);
+    });
   });
 });

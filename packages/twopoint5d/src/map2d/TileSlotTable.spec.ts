@@ -78,6 +78,33 @@ describe('TileSlotTable', () => {
     expect(table.get(-33554431, 0)).toBeUndefined();
   });
 
+  test('reset() forgets every entry, unlinks it and goes back to the buckets it started with', () => {
+    const table = new TileSlotTable<Entry>(4);
+    const entries: Entry[] = [];
+    for (let y = 0; y < 8; ++y) {
+      for (let x = 0; x < 8; ++x) {
+        const e = entry(x, y);
+        entries.push(e);
+        table.add(e);
+      }
+    }
+    expect(table.bucketCount).toBeGreaterThan(4);
+
+    table.reset();
+
+    expect(table.size).toBe(0);
+    expect(table.bucketCount).toBe(4);
+    for (const e of entries) {
+      expect(table.get(e.x, e.y), `entry ${e.name}`).toBeUndefined();
+      expect(e.nextInBucket, `link of ${e.name}`).toBeUndefined();
+    }
+
+    const again = entries[9]!;
+    table.add(again);
+    expect(table.get(again.x, again.y)).toBe(again);
+    expect(table.size).toBe(1);
+  });
+
   test('remove() of an entry that is not in it changes nothing', () => {
     const table = new TileSlotTable<Entry>();
     const a = entry(1, 2);

@@ -1,6 +1,7 @@
 import {describeValue} from '../../utils/describeValue.js';
 import {expectDefined} from '../../utils/expectDefined.js';
-import {isObject} from '../../utils/isObject.js';
+import {isRecord} from '../../utils/isRecord.js';
+import {isStringList} from '../../utils/isStringList.js';
 import {
   cloneVertexObjectDescription,
   type VertexAttributeUsageOverrides,
@@ -38,8 +39,6 @@ interface GrowthParameters extends FeatureSpritesGeometryParameters {
   readonly [growthDescriptor]?: VertexObjectDescriptor;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
-
 // the form of the parameters, before anything is built: what the pool and the base would read of
 // them otherwise throws without a subject, or builds with a part of them left out unseen
 function checkParameters(parameters: unknown): GrowthParameters {
@@ -57,7 +56,7 @@ function checkParameters(parameters: unknown): GrowthParameters {
     }
     for (const usage of ['dynamic', 'stream', 'static'] as const) {
       const names = attributeUsage[usage];
-      if (names != null && !(Array.isArray(names) && names.every((name) => typeof name === 'string'))) {
+      if (names != null && !isStringList(names)) {
         throw new TypeError(`${WHERE}: attributeUsage.${usage} is a list of names, got ${describeValue(names)}`);
       }
     }

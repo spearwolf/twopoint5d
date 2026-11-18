@@ -2,9 +2,13 @@ import type {WebGPURenderer} from 'three/webgpu';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
 
+/** The buffers a {@link ClearStage} clears; a field left out takes its default. */
 export interface ClearStageOptions {
+  /** Whether the color buffer is cleared; `false` unless given. */
   color?: boolean;
+  /** Whether the depth buffer is cleared; `true` unless given. */
   depth?: boolean;
+  /** Whether the stencil buffer is cleared; `false` unless given. */
   stencil?: boolean;
 }
 
@@ -29,8 +33,11 @@ export interface ClearStageOptions {
 export class ClearStage implements IStage, IRenderable {
   name: string;
 
+  /** Whether the color buffer is cleared; `false` by default. Read at every draw. */
   color: boolean;
+  /** Whether the depth buffer is cleared; `true` by default. Read at every draw. */
   depth: boolean;
+  /** Whether the stencil buffer is cleared; `false` by default. Read at every draw. */
   stencil: boolean;
 
   constructor(opts: ClearStageOptions = {}, name = 'clear') {

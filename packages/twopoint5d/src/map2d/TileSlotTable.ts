@@ -33,8 +33,13 @@ function bucketOf(x: number, y: number, mask: number): number {
  * The hash is a bucket index and not a key: `get()` compares `x` and `y` exactly, so two
  * coordinates that share a bucket stay apart. The only allocation is the bucket list, which
  * doubles as soon as the table holds more entries than it has buckets.
+ *
+ * The bucket list does not shrink by itself; {@link reset} takes it back to the size it started
+ * with. The tile slots of the camera based visibility (`TileSlotPool`) never call it: their table
+ * follows the largest view, and shrinking it between two views would build it anew on every change.
  */
 export class TileSlotTable<T extends TileSlotTableEntry<T>> {
+  readonly #capacity: number;
   #buckets: (T | undefined)[];
   #size = 0;
 
@@ -42,12 +47,18 @@ export class TileSlotTable<T extends TileSlotTableEntry<T>> {
    * @param capacity - the number of buckets to start with, a power of two
    */
   constructor(capacity = 64) {
+    this.#capacity = capacity;
     this.#buckets = new Array<T | undefined>(capacity).fill(undefined);
   }
 
   /** How many entries the table holds. */
   get size(): number {
     return this.#size;
+  }
+
+  /** The length of the bucket list: the capacity it started with, doubled with every growth. */
+  get bucketCount(): number {
+    return this.#buckets.length;
   }
 
   /** The entry of the tile coordinate `(x, y)`, or `undefined` if the table holds none. */
@@ -93,6 +104,25 @@ export class TileSlotTable<T extends TileSlotTableEntry<T>> {
       previous = current;
       current = current.nextInBucket;
     }
+  }
+
+  /**
+   * Forgets every entry and goes back to the bucket list it started with — for a table whose
+   * entries all go at once. Every entry it held comes out unlinked, as `remove()` leaves one.
+   */
+  reset(): void {
+    const buckets = this.#buckets;
+    for (let i = 0; i < buckets.length; ++i) {
+      // The loop bound is the length of the bucket list.
+      let entry = buckets[i];
+      while (entry !== undefined) {
+        const next = entry.nextInBucket;
+        entry.nextInBucket = undefined;
+        entry = next;
+      }
+    }
+    this.#buckets = new Array<T | undefined>(this.#capacity).fill(undefined);
+    this.#size = 0;
   }
 
   #link(entry: T): void {

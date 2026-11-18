@@ -126,9 +126,11 @@ mesh; the renderer, the camera and the meshes stay the caller's. It listens to t
 `dispose` event of each mesh and of the geometry it draws, and releases the pick mesh and
 the pick material then — the event of the mesh comes before the mesh releases the
 resources the pick material reads, and the one of the geometry comes with a growth; the
-next pick builds them anew. Up to one of those events it holds each mesh it has drawn,
-whether a later pick lists it or not: a mesh its owner drops without `dispose()` lives as
-long as the picker. Its `dispose()` releases the target and every pick material, stops
+next pick builds them anew. It holds a mesh it has drawn weakly: a mesh its owner drops
+without `dispose()` is collected, and once the engine reports that, the picker releases its
+pick mesh and pick material — at a time the engine chooses, and up to then the pick mesh
+holds the geometry, the uniforms and the textures it reads. Whoever wants them back at once
+disposes the mesh. Its `dispose()` releases the target and every pick material, stops
 listening, and rejects every pick still in flight (section 3).
 
 **A stage handed in stays the caller's, whoever draws it.**

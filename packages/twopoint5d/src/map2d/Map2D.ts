@@ -4,6 +4,14 @@ import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {Map2DTileStreamer} from './Map2DTileStreamer.js';
 import type {IMap2DTileRenderer, IMap2DVisibilitor} from './types.js';
 
+/**
+ * A tile map in the scene graph: a `Group` the nodes of its tile renderers hang under, which lays
+ * out the tiles of the current view in them on every {@link update}. The grid, the view center and
+ * the visibilitor are held by the tile streamer underneath, and this class passes them through.
+ * Moved onto another {@link tileStreamer}, the map takes the view center along, and the visibilitor
+ * when it has one; the grid stays with the streamer that carries it. The tile renderers, the
+ * visibilitor and a streamer handed to the constructor stay the caller's — see {@link dispose}.
+ */
 export class Map2D extends Group {
   #renderers: Set<IMap2DTileRenderer> = new Set();
   #tileStreamer: Map2DTileStreamer;
@@ -197,11 +205,21 @@ export class Map2D extends Group {
     this.#tileStreamer.yOffset = offset;
   }
 
+  /**
+   * A map over `tileStreamer`, or over a streamer of its own on a grid of 1 × 1 from `(0, 0)`. The
+   * map takes the streamer as it is — its grid, its view center and its visibilitor —, and places
+   * no tile renderer under itself until {@link addTileRenderer}.
+   */
   constructor(tileStreamer: Map2DTileStreamer = new Map2DTileStreamer()) {
     super();
     this.#tileStreamer = tileStreamer;
   }
 
+  /**
+   * Puts a tile renderer on this map: its node goes under the map, and the tile streamer lays out
+   * the tiles in it from the next {@link update} on. The renderer stays the caller's. A renderer the
+   * map holds already is left as it is.
+   */
   addTileRenderer(renderer: IMap2DTileRenderer): void {
     if (!this.#renderers.has(renderer)) {
       this.#renderers.add(renderer);
@@ -226,6 +244,13 @@ export class Map2D extends Group {
     }
   }
 
+  /**
+   * Lays out the tiles of the current view in every tile renderer, through the tile streamer;
+   * call it once per frame, after the center or the camera moved. What the visibilitor throws in
+   * `computeVisibleTiles()` comes out of this call unchanged — `RectangularVisibilityArea` throws a
+   * `RangeError` over `maxVisibleTiles` unless its `atLimit` is `'cap'` —, and so does what a
+   * renderer or its factory throws, after which the next call lays out the whole set again.
+   */
   update(): void {
     // this node's `matrixWorld` is left to the streamer, which brings it in order with
     // `updateWorldMatrix(true, false)` — walking the parent chain up first — on every update in
@@ -236,6 +261,11 @@ export class Map2D extends Group {
     this.#tileStreamer.update(this);
   }
 
+  /**
+   * Has every tile renderer give back its tiles on the next {@link update}, which then lays out the
+   * whole set again — for data that changed under the tiles the renderers hold. Nothing is cleared
+   * before that update.
+   */
   clearTiles(): void {
     this.#tileStreamer.clearTiles();
   }

@@ -106,8 +106,10 @@ canvas.addEventListener('pointerdown', async (event) => {
 
 ### 3.1 The pick material
 
-One per listed mesh, built at its first pick and kept until the mesh or the picker is disposed — and
-the mesh with it, whether a later pick lists it or not:
+One per listed mesh, built at its first pick and kept until the mesh is disposed or collected, or
+the picker is disposed. The picker holds the mesh weakly — a `WeakRef` in its entry, a `WeakMap`
+for the look-up by mesh, a `FinalizationRegistry` that releases the entry once the engine has
+collected the mesh (§5):
 
 - a `FeatureSpritesMaterial` of the kind of the mesh, **on the `SpriteResources` of the mesh's
   material** — the same uniforms and textures, so a `setUniform()`, `setTexture()` or bound uniform
@@ -148,10 +150,11 @@ every pick it takes from the sprites the world matrix (after `updateWorldMatrix(
 sprites), `layers` and `renderOrder`. Each pick mesh lies in a `Group` of its own, which carries the
 `renderOrder` of the nearest group above the sprites that the camera sees — three's group order —,
 under a mirror of every enabled `ClippingGroup` above the sprites that the camera sees, root first,
-which shares its `clippingPlanes` and `clipIntersection`: the pick clips and orders as the screen
-does. The planes lie in world space, and the camera of the pick has the view of the caller's camera.
-`matrixAutoUpdate` and `matrixWorldAutoUpdate` are off on the mesh, the scene and the groups, so
-three does not compute the matrix a second time.
+which shares its `clippingPlanes` and `clipIntersection` and holds the group it mirrors weakly — the
+group holds the sprites below it: the pick clips and orders as the screen does. The planes lie in
+world space, and the camera of the pick has the view of the caller's camera. `matrixAutoUpdate`
+and `matrixWorldAutoUpdate` are off on the mesh, the scene and the groups, so three does not
+compute the matrix a second time.
 
 A listed mesh is **left out** when it is disposed, when it or one of its ancestors is not `visible`,
 when its material is not `visible` — three draws none of these —, and when its pool holds no sprite.
@@ -295,6 +298,15 @@ resolves).
   go with it, so neither the picker nor three's render object of the pick mesh holds the geometry
   until the next pick. (three's render list of the pick scene still names it until a render finds
   that list unused for more than 10 frames of the animation loop, or the next pick fills it anew.)
+- **A mesh dropped**: the picker holds a mesh it has drawn weakly. Its entry carries a `WeakRef` to
+  the mesh, a `WeakMap` by mesh finds the entry for a pick, and a `Set` of the entries, which hold
+  no mesh, serves `dispose()`. A `FinalizationRegistry` on the mesh, with the entry as held value
+  and token, releases the pick mesh and the pick material once the engine has collected the mesh —
+  at a time the engine chooses; up to then the pick mesh holds the geometry, the uniforms and the
+  textures it reads, and disposing the mesh has them back at once. Every way to the release runs
+  once per entry. No closure built along with an entry reads the mesh: V8 keeps a variable that any
+  closure of a function reads in a context every closure of that function shares, and the listener
+  of the entry would hold the mesh through it.
 - **`dispose()`**: releases the target, every pick mesh (three's `dispose` event, so the renderer
   drops its render objects) and every pick material, stops listening to the meshes, and rejects
   every pick still in flight with
@@ -320,10 +332,12 @@ resolves).
   `instanceIndex` and the mesh number, blending and depth, the copied parameters — cached, given a
   swapped placement, rebuilt for other resources; the world matrix, layers and render order of the
   pick mesh follow the sprites; a growth and a geometry put into the slot release the pick mesh and
-  build it anew; a mesh disposed releases its pick material; `dispose()` releases the target and
-  every material, rejects a pick in flight, and a later `pick()` answers `undefined`; an
-  uninitialized renderer is awaited; the type of the result over a list of two kinds
-  (`expectTypeOf`).
+  build it anew; a mesh disposed releases its pick material; a mesh dropped without `dispose()` is
+  collected (`gc()`) and its pick material released once, as is the one of a mesh disposed and then
+  collected and the one of a mesh dropped along with the `ClippingGroup` above it; a mesh still held
+  keeps its pick mesh across a collection; `dispose()` releases the target and every material,
+  rejects a pick in flight, and a later `pick()` answers `undefined`; an uninitialized renderer is
+  awaited; the type of the result over a list of two kinds (`expectTypeOf`).
 - Browser test `packages/twopoint5d-testing/test/sprites-picking.test.js`, under WebGPU and WebGL 2,
   through a `Display`: two overlapping sprites — the front one wins in the overlap, the back one
   where it shows alone; the transparent corner of the front sprite's frame picks the sprite behind

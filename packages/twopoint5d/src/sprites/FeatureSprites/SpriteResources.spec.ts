@@ -28,6 +28,18 @@ describe('SpriteResources', () => {
     resources.dispose();
   });
 
+  test('keeps a uniform named __proto__ as a uniform of its own', () => {
+    // a computed key: a literal __proto__ would set the prototype and test nothing
+    const odd = defineFeature({name: 'odd', uniforms: {['__proto__']: 1}});
+
+    const resources = new SpriteResources([odd]);
+
+    expect(Object.hasOwn(resources.uniforms, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(resources.uniforms)).toBe(Object.prototype);
+    expect(() => resources.setUniform('__proto__', 2)).not.toThrow();
+    resources.dispose();
+  });
+
   test('skips a start value of undefined', () => {
     const resources = new SpriteResources([anim], {uniforms: {time: undefined}});
 

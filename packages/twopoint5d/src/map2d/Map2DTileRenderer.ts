@@ -3,6 +3,13 @@ import {Object3D} from 'three/webgpu';
 import {noTileCapacity} from './constants.js';
 import type {IMap2DTileCoords, IMap2DTileRenderer, IMapTileFactory} from './types.js';
 
+/**
+ * The tile renderer of a `Map2D`: it asks its tile factory for a tile at every coordinate that
+ * comes into view, moves the ones that stay and gives back the ones that leave, and places
+ * {@link node} — the node the factory puts its content into — where the streamer says. The factory
+ * stays the caller's; a coordinate the factory has no tile for is asked about again only after the
+ * tile left the view or the renderer was cleared.
+ */
 export class Map2DTileRenderer implements IMap2DTileRenderer {
   readonly #tiles = new Map<string, unknown>();
 

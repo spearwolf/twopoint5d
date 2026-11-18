@@ -1,6 +1,7 @@
 import {assertFinite} from '../../utils/assertFinite.js';
 import {describeValue} from '../../utils/describeValue.js';
-import {isObject} from '../../utils/isObject.js';
+import {isRecord} from '../../utils/isRecord.js';
+import {isStringList} from '../../utils/isStringList.js';
 import {checkFeature} from '../checkFeature.js';
 import type {SpriteKind} from '../defineSprite.js';
 import {runCheckKind} from '../runCheckKind.js';
@@ -16,11 +17,6 @@ const DATA_FIELDS = ['attributes', 'methods', 'initialize', 'usageAliases'] as c
  */
 export const placementOfPass = (pass: SpritePass): SpriteFeature | undefined =>
   pass.features.find((feature) => feature.placement != null);
-
-const isRecord = (value: unknown): value is Record<string, unknown> => isObject(value) && !Array.isArray(value);
-
-const isStringList = (value: unknown): value is readonly string[] =>
-  Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 
 /**
  * Checks what a pass can be checked for on its own, in the words of `where`: that it is an object

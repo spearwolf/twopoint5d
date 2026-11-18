@@ -90,6 +90,7 @@ export interface Stage2D extends EventizedObject {}
  * stage by calling the resize() method.
  */
 export class Stage2D implements IStage, IRenderable, IPassProvider {
+  /** Marks a `Stage2D`, as the `is…` flags of three do: `true` on every instance. */
   isStage2D = true;
 
   static {
@@ -482,6 +483,20 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
   }
 
+  /**
+   * Computes the view and the camera anew from the projection, for the container of the last
+   * `resize()` — only while {@link needsUpdate} is set or `forceUpdate` is `true`, and only with a
+   * projection; otherwise, and after {@link dispose}, it does nothing. A container without area
+   * leaves the stage as it is. `updateFrame()` calls it in every frame.
+   *
+   * What the projection throws comes out of this call with the stage as it was, `needsUpdate`
+   * included. A listener of `OnStageAfterCameraChanged`, `OnStageCameraPlaced` or `OnStageResize`
+   * that throws, or the `CameraRig` of the stage, leaves the camera and the size standing; every
+   * listener hears the event, and the errors reach the caller afterwards — one unchanged, several
+   * as an `AggregateError` with the message "Stage2D#updateProjection(): more than one of the
+   * listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize and the CameraRig
+   * of the stage threw".
+   */
   updateProjection(forceUpdate = false): void {
     if (this.#disposed) return;
 
