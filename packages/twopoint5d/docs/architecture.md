@@ -234,6 +234,18 @@ buffers between sibling stages, the depth buffer unless told otherwise, and a
 renderers that share it. `Canvas2DStage` shows a 2D canvas on a sprite through a
 `StageRenderer` of its own.
 
+A `StageRenderer` draws through internal classes beside it. `StageRendererHostLink` holds it to
+its holder — a host whose frame and resize it subscribes to, or a parent `StageRenderer` that
+drives it. `StageRendererDraw` draws the plain mode and holds what every mode draws with: the
+clears, the linear output into a target a pipeline samples, the draw of the stages and the
+warning about a stage that runs a pipeline of its own beside others. `StageRendererWholePicture`
+draws the whole-picture mode through the internal target of `StageRendererTargets`, and
+`StageRendererComposition` the composed mode: the nested renderers into their pass targets, then
+the output node built from the pass node of every stage. The camera of a `Stage2D` — the one it
+draws with, every announcement of a change or a placement of it, and the driver of a
+`CameraRig` that takes it over — is the internal class `Stage2DCamera`, while the stage keeps
+its projection, its view and its pass node.
+
 `StageDirector` is a `StageRenderer` that holds a stack of layers and changes it through
 transitions: `show()`, `hide()`, `replace()`, `push()` and `pop()` each answer a
 `StageTransition` handle, `setStack()` sets the stack at once. It draws every layer into a

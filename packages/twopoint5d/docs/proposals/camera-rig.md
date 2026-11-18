@@ -437,9 +437,9 @@ class CameraProjection implements IProjection {
   through one camera take a projection each; the guide names it in its pitfalls.
 - **A source of the other kind** — `projection.source = otherCamera` — makes the projection build
   the other kind. A `Stage2D` without a rig builds its own camera anew when the projection no
-  longer builds the kind of it (`#outgrown()`), and announces it; a camera assigned to
-  `stage.camera` is refused by the projection, as the planar projections refuse one. A rig swaps
-  its camera (§4.1).
+  longer builds the kind of it (`Stage2DCamera#outgrown()`), and announces it; a camera assigned
+  to `stage.camera` is refused by the projection, as the planar projections refuse one. A rig
+  swaps its camera (§4.1).
 - `getViewRect()` answers the container — one view unit per container unit, offset 0 — since there
   is no plane whose units it could count, as a new object per call. `getScaleFactor(d)` answers
   `focus / d` with `focus` the `focus` of a perspective source (three's default `10`; glTF carries
@@ -668,9 +668,9 @@ is fine on a resize. It happens in every frame only under a `CameraProjection` w
 source, whose `updateCamera()` allocates nothing.
 
 **Detach.** On detach the stage takes back the camera assigned to `stage.camera` if its projection
-builds that kind (`#buildsKindOf()`, which knows the three projections of the library and accepts
-any camera under one of another class), drops it with one warning otherwise, and places what it
-takes back (§6).
+builds that kind (`Stage2DCamera.#buildsKindOf()`, which knows the three projections of the
+library and accepts any camera under one of another class), drops it with one warning otherwise,
+and places what it takes back (§6).
 
 ### 4.2 Resolving a shot
 

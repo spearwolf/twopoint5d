@@ -1,42 +1,27 @@
 import {emit, emitStrict, type EventizedObject, eventize, off, retain} from '@spearwolf/eventize';
 import {pass} from 'three/tsl';
+import {type Camera, type Node, type PassNode, Scene, type WebGPURenderer} from 'three/webgpu';
 import {
-  type Camera,
-  type Node,
-  type OrthographicCamera,
-  type PassNode,
-  type PerspectiveCamera,
-  Scene,
-  type WebGPURenderer,
-} from 'three/webgpu';
-import {
-  OnStageAfterCameraChanged,
   OnStageAfterPostProcessChanged,
   OnStageAfterSceneChanged,
-  OnStageCameraPlaced,
   OnStageDispose,
   OnStageFirstFrame,
   OnStageResize,
   OnStageUpdateFrame,
-  type StageAfterCameraChangedArgs,
   type StageAfterPostProcessChangedArgs,
   type StageAfterSceneChangedArgs,
-  type StageCameraPlacedProps,
   type StageResizeProps,
   type StageUpdateFrameProps,
 } from '../events.js';
-import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {throwCollected} from '../utils/throwCollected.js';
 import {unfilledInternal} from '../utils/unfilledInternal.js';
-import {CameraProjection} from './CameraProjection.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IProjection} from './IProjection.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
-import {OrthographicProjection} from './OrthographicProjection.js';
-import {ParallaxProjection} from './ParallaxProjection.js';
+import {Stage2DCamera} from './Stage2DCamera.js';
 import type {StageCameraDriver} from './StageCameraDriver.js';
 import {type StagePostProcess, StagePostProcessRun} from './StagePostProcess.js';
 
@@ -94,10 +79,10 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
   isStage2D = true;
 
   static {
-    Stage2DInternals.attachDriver = (stage, driver) => stage.#attachDriver(driver);
-    Stage2DInternals.detachDriver = (stage) => stage.#detachDriver();
-    Stage2DInternals.announceCamera = (stage) => stage.#announceDriverCamera();
-    Stage2DInternals.driverOf = (stage) => stage.#driver;
+    Stage2DInternals.attachDriver = (stage, driver) => stage.#camera.attachDriver(driver);
+    Stage2DInternals.detachDriver = (stage) => stage.#camera.detachDriver();
+    Stage2DInternals.announceCamera = (stage) => stage.#camera.announceDriverCamera();
+    Stage2DInternals.driverOf = (stage) => stage.#camera.driver;
     Stage2DInternals.scenePassesOf = (stage) => {
       const passes: PassNode[] = [];
       if (stage.#passNode != null) passes.push(stage.#passNode);
@@ -218,9 +203,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       this.#width = 0;
       this.#height = 0;
       const errors: unknown[] = [];
-      this.#updateCamera(() => {
-        this.#cameraFromProjection = undefined;
-      }, errors);
+      this.#camera.setProjectionCamera(undefined, errors);
       // a listener of the drop that throws does not keep the stage from the camera of the new
       // projection; one that disposes the stage, or takes the projection away, does
       if (this.projection != null && !this.#disposed) {
@@ -237,13 +220,20 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
   }
 
-  #cameraFromProjection?: Camera;
-  #cameraUserOverride?: Camera;
-
-  #driver?: StageCameraDriver;
-  // the camera of the driver as the stage last took and announced it: a driver that swaps its
-  // camera says so through announceCamera(), and the stage announces the swap with the one it had
-  #driverCamera?: Camera;
+  /** The camera this stage draws with, its announcements and the driver of a `CameraRig`. */
+  readonly #camera = new Stage2DCamera(this, {
+    // a PassNode reads its camera as a plain field when it draws, and nothing of its graph
+    // depends on the camera: the node takes the new one as it is, and is drawn through it from
+    // its next frame on. A camera that goes away leaves it the one it had — without a camera
+    // the node is not drawn — and the next one goes into it
+    takeCamera: (camera) => {
+      if (this.#passNode != null) this.#passNode.camera = camera;
+      this.#postProcessRun?.setCamera(camera);
+    },
+    updateProjection: (errors) => {
+      this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
+    },
+  });
 
   /**
    * The camera this stage renders with. The projection creates one on the first `resize()`
@@ -281,14 +271,14 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
    * `AggregateError`.
    */
   get camera(): Camera | undefined {
-    return this.#driverCamera ?? this.#cameraUserOverride ?? this.#cameraFromProjection;
+    return this.#camera.current;
   }
 
   set camera(camera: Camera | undefined) {
     if (this.#disposed) return;
 
     const errors: unknown[] = [];
-    this.#updateCamera(() => void (this.#cameraUserOverride = camera), errors);
+    this.#camera.assign(camera, errors);
     // without an override the projection's camera takes over, created now if there is none yet
     if (this.camera == null && this.projection != null && !this.#disposed) {
       try {
@@ -301,126 +291,6 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       errors,
       'Stage2D#camera: more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the CameraRig of the stage and the projection threw',
     );
-  }
-
-  // the change is made before anyone hears of it, and every listener hears it: what they throw
-  // goes into `errors` for the public call to throw once its state stands
-  #updateCamera = (updateCallback: () => void, errors: unknown[]) => {
-    const prevCamera = this.camera;
-    updateCallback();
-    if (prevCamera !== this.camera) {
-      // a PassNode reads its camera as a plain field when it draws, and nothing of its graph
-      // depends on the camera: the node takes the new one as it is, and is drawn through it from
-      // its next frame on. A camera that goes away leaves it the one it had — without a camera
-      // the node is not drawn — and the next one goes into it
-      const camera = this.camera;
-      if (camera != null) {
-        if (this.#passNode != null) this.#passNode.camera = camera;
-        this.#postProcessRun?.setCamera(camera);
-      }
-      const args: StageAfterCameraChangedArgs = [this, prevCamera];
-      try {
-        emitStrict(this, OnStageAfterCameraChanged, ...args);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-  };
-
-  #attachDriver(driver: StageCameraDriver): void {
-    if (this.#disposed) throw new Error('Stage2DInternals.attachDriver(): the stage has been disposed');
-    if (this.#driver != null) throw new Error('Stage2DInternals.attachDriver(): the stage has a CameraRig already');
-
-    const errors: unknown[] = [];
-    this.#updateCamera(() => {
-      this.#driver = driver;
-      this.#driverCamera = driver.camera;
-    }, errors);
-    // the driver composes over a base the projection places for the view the stage has; a listener
-    // of the camera change that let go of the driver, or disposed the stage, leaves nothing to place
-    if (this.#driver === driver && this.projection != null && !this.#disposed) {
-      try {
-        this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    throwCollected(
-      errors,
-      'Stage2DInternals.attachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the CameraRig of the stage and the projection threw',
-    );
-  }
-
-  #detachDriver(): void {
-    if (this.#driver == null) return;
-    // a disposed stage lets go of the driver and keeps the camera it was left with
-    if (this.#disposed) {
-      this.#driver = undefined;
-      return;
-    }
-
-    // the projection places the camera the stage takes back, and refuses one of a kind it does not
-    // build: such a camera is dropped here, not at the next resize()
-    const assigned = this.#cameraUserOverride;
-    if (assigned != null && !Stage2D.#buildsKindOf(this.#projection, assigned)) {
-      this.#cameraUserOverride = undefined;
-      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
-      console.warn(
-        `Stage2D ${describeValue(this.name)}: the camera assigned to stage.camera, a ${describeThreeValue(assigned, 'isObject3D')}, is of another kind than its projection builds; the stage drops it as its CameraRig lets go, and draws with a camera of the projection`,
-      );
-    }
-
-    const errors: unknown[] = [];
-    this.#updateCamera(() => {
-      this.#driver = undefined;
-      this.#driverCamera = undefined;
-    }, errors);
-    // the camera taken back was not placed while the driver was attached, and a stage without one
-    // gets the camera of its projection
-    if (this.projection != null && !this.#disposed) {
-      try {
-        this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    throwCollected(
-      errors,
-      'Stage2DInternals.detachDriver(): more than one of the listeners of OnStageAfterCameraChanged, OnStageCameraPlaced and OnStageResize, the CameraRig of the stage and the projection threw',
-    );
-  }
-
-  #announceDriverCamera(): void {
-    const driver = this.#driver;
-    if (driver == null || this.#disposed) return;
-    const errors: unknown[] = [];
-    this.#updateCamera(() => {
-      this.#driverCamera = driver.camera;
-    }, errors);
-    throwCollected(errors, 'Stage2DInternals.announceCamera(): more than one listener of OnStageAfterCameraChanged threw');
-  }
-
-  // whether `projection` places `camera`: each planar projection places the kind it builds, a
-  // CameraProjection the kind of its source, and a projection of another class is trusted with any
-  // camera
-  static #buildsKindOf(projection: IProjection | undefined, camera: Camera): boolean {
-    if (projection instanceof ParallaxProjection) return (camera as Partial<PerspectiveCamera>).isPerspectiveCamera === true;
-    if (projection instanceof OrthographicProjection) {
-      return (camera as Partial<OrthographicCamera>).isOrthographicCamera === true;
-    }
-    if (projection instanceof CameraProjection) {
-      return (projection.source as Partial<PerspectiveCamera>).isPerspectiveCamera === true
-        ? (camera as Partial<PerspectiveCamera>).isPerspectiveCamera === true
-        : (camera as Partial<OrthographicCamera>).isOrthographicCamera === true;
-    }
-    return true;
-  }
-
-  // whether `camera` is the camera of the projection, built for a kind the projection no longer
-  // builds — the source of a CameraProjection that changed its kind: the projection builds a new one.
-  // A camera assigned to stage.camera is the caller's, and the projection refuses it instead
-  #outgrown(projection: IProjection, camera: Camera): boolean {
-    return camera === this.#cameraFromProjection && !Stage2D.#buildsKindOf(projection, camera);
   }
 
   constructor(projection?: IProjection, scene?: Scene) {
@@ -543,7 +413,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     this.#height = h;
 
     const projection = this.projection!;
-    const driver = this.#driver;
+    const driver = this.#camera.driver;
     let placed: Camera;
     let created: Camera | undefined;
 
@@ -552,7 +422,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       const camera = this.camera;
       if (driver != null) {
         placed = driver.placeBase(projection);
-      } else if (camera != null && !this.#outgrown(projection, camera)) {
+      } else if (camera != null && !this.#camera.outgrown(projection, camera)) {
         placed = camera;
         projection.updateCamera(placed);
       } else {
@@ -570,13 +440,9 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     // the announcements come after the state stands, outside the rollback above: a listener that
     // throws undoes nothing the stage has taken. The camera goes first, then its placement, which
     // the driver composes, then the size
-    if (created != null) {
-      this.#updateCamera(() => {
-        this.#cameraFromProjection = created;
-      }, errors);
-    }
+    if (created != null) this.#camera.setProjectionCamera(created, errors);
 
-    this.#announcePlacement(placed, projection, driver, errors);
+    this.#camera.announcePlacement(placed, projection, driver, errors);
 
     if (prevWidth !== w || prevHeight !== h) {
       const props: StageResizeProps = {
@@ -592,51 +458,13 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     }
   };
 
-  #cameraPlacedProps?: StageCameraPlacedProps;
-
-  // emits OnStageCameraPlaced with the camera `projection` placed, then lets `driver` compose over
-  // what the listeners made of it, also behind one that threw. What the listeners and compose()
-  // throw goes into `errors` — an array made on the first error where the caller hands none — and
-  // the array comes back: the placement happens after the state stands, so neither undoes it. One
-  // props object per stage, rewritten: the code of the placement allocates nothing on a path without
-  // an error, and the emit costs what every eventize emit costs, as OnStageUpdateFrame does
-  #announcePlacement(
-    camera: Camera,
-    projection: IProjection,
-    driver: StageCameraDriver | undefined,
-    errors: unknown[] | undefined,
-  ): unknown[] | undefined {
-    let props = this.#cameraPlacedProps;
-    if (props === undefined) {
-      props = this.#cameraPlacedProps = {stage: this, camera, projection};
-    } else {
-      props.camera = camera;
-      props.projection = projection;
-    }
-
-    try {
-      emitStrict(this, OnStageCameraPlaced, props);
-    } catch (error) {
-      (errors ??= []).push(error);
-    }
-    // a listener that let go of the driver leaves it nothing to compose
-    if (driver != null && driver === this.#driver) {
-      try {
-        driver.compose();
-      } catch (error) {
-        (errors ??= []).push(error);
-      }
-    }
-    return errors;
-  }
-
   // the placement of IProjection#needsPlacement(): the container and the specs are as they were,
   // so neither updateViewRect() nor getViewRect() — which answers a new object — is called; but for
   // a camera of the kind the projection no longer builds, which is built and placed anew through
   // #updateProjection(), as on a resize
   #placeWithoutView(projection: IProjection, camera: Camera): void {
-    const driver = this.#driver;
-    if (driver == null && this.#outgrown(projection, camera)) {
+    const driver = this.#camera.driver;
+    if (driver == null && this.#camera.outgrown(projection, camera)) {
       // a camera of the other kind is a new camera, built, announced and placed as on a resize
       const errors: unknown[] = [];
       this.#updateProjection(this.#containerWidth, this.#containerHeight, this.#containerPixelRatio, errors);
@@ -652,7 +480,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     } else {
       projection.updateCamera(camera);
     }
-    const errors = this.#announcePlacement(placed, projection, driver, undefined);
+    const errors = this.#camera.announcePlacement(placed, projection, driver, undefined);
     if (errors !== undefined) {
       throwCollected(
         errors,
@@ -716,7 +544,7 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
       if (projection?.needsPlacement != null && this.#width > 0 && projection.needsPlacement(camera)) {
         this.#placeWithoutView(projection, camera);
       }
-      this.#driver?.write();
+      this.#camera.driver?.write();
     }
 
     const props = this.#updateFrameProps;

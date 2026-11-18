@@ -1,16 +1,7 @@
 import {describeValue} from '../utils/describeValue.js';
 import {emitStrict, type EventizedObject, eventize, isEventized, off, on} from '@spearwolf/eventize';
 import {texture} from 'three/tsl';
-import {
-  Color,
-  ColorManagement,
-  type Node,
-  NoToneMapping,
-  type RenderPipeline,
-  type RenderTarget,
-  type Texture,
-  type WebGPURenderer,
-} from 'three/webgpu';
+import type {Color, Node, RenderPipeline, RenderTarget, WebGPURenderer} from 'three/webgpu';
 import {isWebGLRenderer} from '../display/isWebGLRenderer.js';
 import {
   OnAddToParent,
@@ -30,44 +21,27 @@ import {throwCollected} from '../utils/throwCollected.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IRenderable} from './IRenderable.js';
 import type {IStage} from './IStage.js';
-import type {IStageRendererHost, StageRendererHostUnsubscribe} from './IStageRendererHost.js';
+import type {IStageRendererHost} from './IStageRendererHost.js';
 import type {OutputNodeBuilder} from './outputNodeBuilders.js';
-import {RootRenderPipeline} from './RootRenderPipeline.js';
 import type {Stage2D} from './Stage2D.js';
+import {canCompose, StageRendererComposition} from './StageRendererComposition.js';
+import {
+  hasAsPassNode,
+  modeOf,
+  NO_PASS_NODE,
+  StageRendererDraw,
+  StageRendererDrawInternals,
+  type StageRendererMode,
+} from './StageRendererDraw.js';
+import {StageRendererHostLink} from './StageRendererHostLink.js';
 import {StageRendererInternals, StageRendererTargets} from './StageRendererTargets.js';
+import {StageRendererWholePicture} from './StageRendererWholePicture.js';
 import type {StageRenderTargetPool} from './StageRenderTargetPool.js';
 import {StageRenderOrder} from './StageRenderOrder.js';
 
 export type StageRendererBuildOutputNode = (stagePasses: Node[]) => Node;
 
-// never written: setClearColor() copies it
-const TRANSPARENT_BLACK = new Color(0x000000);
-
-const hasAsPassNode = (s: unknown): s is IPassProvider => typeof (s as IPassProvider)?.asPassNode === 'function';
-
-// recognized by its `isStage2D` flag, so this module needs no runtime import of Stage2D
-const isStage2DWithoutCamera = (s: IStage): boolean =>
-  (s as Partial<Stage2D>).isStage2D === true && (s as Stage2D).camera == null;
-
-// a Stage2D that draws through a pipeline of its own, by the same flag
-const isStage2DWithPostProcess = (s: IStage): boolean =>
-  (s as Partial<Stage2D>).isStage2D === true && (s as Stage2D).postProcess !== undefined;
-
 export type StageRendererParentType = IStageRendererHost | StageRenderer;
-
-type StageRendererMode = 'plain' | 'whole-picture' | 'composed';
-
-const NO_PASS_NODE =
-  'has no asPassNode(), and a pipeline with buildOutputNode or a RootRenderPipeline composes the pass node of every stage';
-
-// a mode is a function of the two inputs alone, so a write can ask for the mode it would bring about
-function modeOf(
-  pipeline: RenderPipeline | undefined,
-  buildOutputNode: StageRendererBuildOutputNode | undefined,
-): StageRendererMode {
-  if (pipeline == null) return 'plain';
-  return buildOutputNode != null || pipeline instanceof RootRenderPipeline ? 'composed' : 'whole-picture';
-}
 
 // one message for every member that refuses to answer once the renderer is gone, so the class
 // and the state are always in the text a caller reads out of a foreign stack
@@ -159,14 +133,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   name = 'StageRenderer';
 
-  #parent?: StageRendererParentType;
-
-  // the subscriptions #addToHost() took at the host that drives this renderer. When the
-  // host refuses one of them, #addToHost() gives back at once what the host handed out;
-  // otherwise #removeFromParent() gives them up before OnRemoveFromParent goes out, and
-  // no listener of OnRemoveFromParent does: a listener that disposes this renderer takes
-  // every listener with it that the event has not reached yet
-  #hostSubscriptions: StageRendererHostUnsubscribe[] = [];
+  /** The holder of this renderer and the subscriptions at a host that holds it. */
+  readonly #hostLink = new StageRendererHostLink(this);
 
   #width = 0;
   #height = 0;
@@ -251,8 +219,6 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     return this;
   }
 
-  #oldClearColor = new Color(0x000000);
-
   readonly #stages: StageItemRecord[] = [];
 
   /**
@@ -269,8 +235,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   // a renamed stage that moves the snapshot moves the pass nodes with it, and can move a stage
   // with a pipeline of its own beside another one
   readonly #order = new StageRenderOrder(() => {
-    this.#outputDirty = true;
-    this.#pipelineChildCheckDue = true;
+    this.#composition.markOutputDirty();
+    this.#draw.pipelineChildrenChanged();
   });
 
   /**
@@ -285,8 +251,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   set renderOrder(order: string | undefined) {
     if (this.#order.set(order)) {
-      this.#outputDirty = true;
-      this.#pipelineChildCheckDue = true;
+      this.#composition.markOutputDirty();
+      this.#draw.pipelineChildrenChanged();
       this.#order.warnAboutSharedNames(
         this.#stages,
         this.#stages.map((item) => item.stage.name),
@@ -351,12 +317,12 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * unsubscribe that throws while the renderer gives back.
    */
   get parent(): StageRendererParentType | undefined {
-    return this.#parent;
+    return this.#hostLink.holder;
   }
 
   set parent(parent: StageRendererParentType | undefined) {
     if (this.#disposed) return;
-    if (this.#parent === parent) return;
+    if (this.#hostLink.holder === parent) return;
 
     // a disposed holder never drives this renderer again: taken, the renderer would look attached
     // and never draw
@@ -378,21 +344,17 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#removeFromParent(errors);
     // a listener of the move out can have disposed this renderer or given it another holder: the
     // move ends here then
-    if (!this.#disposed && this.#parent === undefined && parent) {
-      this.#parent = parent;
-      if (this.#addToHost(parent, errors)) {
+    if (!this.#disposed && this.#hostLink.holder === undefined && parent) {
+      if (this.#hostLink.joinHost(parent, errors)) {
         // a listener of the size the host handed in can have disposed this renderer or given it
         // another holder: the join ends there, and OnAddToParent is that holder's to send
-        if (!this.#disposed && this.#parent === parent) {
+        if (!this.#disposed && this.#hostLink.holder === parent) {
           try {
             emitStrict(this, OnAddToParent);
           } catch (error) {
             errors.push(error);
           }
         }
-      } else {
-        // a host that refused a subscription does not hold this renderer
-        this.#parent = undefined;
       }
     }
     throwCollected(
@@ -402,17 +364,10 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   #removeFromParent(errors: unknown[]): void {
-    const parent = this.#parent;
+    // leave() clears the holder first, so the recursion between the two halves — this one and the
+    // remove() of a renderer that held this one — stops after one pass
+    const parent = this.#hostLink.leave(errors);
     if (parent == null) return;
-
-    // cleared before the event goes out and before the parent hears about it: a remove()
-    // coming back in from the other side finds nothing left to detach, and the recursion
-    // between the two halves stops after one pass
-    this.#parent = undefined;
-
-    // the host lets go before anyone hears of the move, so a listener that disposes this
-    // renderer or gives it another holder finds it off the old host already
-    this.#unsubscribeFromHost(errors);
 
     // every listener hears it, even behind one that throws. The error goes to the caller
     // once its call has run to its end
@@ -429,73 +384,6 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         errors.push(error);
       }
     }
-  }
-
-  // gives up every subscription booked at the host. Each handle is asked on its own,
-  // and what one throws waits for the caller like the error of a listener
-  #unsubscribeFromHost(errors: unknown[]): void {
-    const hostSubscriptions = this.#hostSubscriptions;
-    this.#hostSubscriptions = [];
-    for (const unsubscribe of hostSubscriptions) {
-      try {
-        unsubscribe();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-  }
-
-  // each handle is booked as soon as the host hands it out. A host that throws on
-  // either subscription gets back what it handed out and holds nothing of this
-  // renderer; its error waits for the caller, and so does the error of a stage that refuses
-  // the size the host handed in while it subscribed. Answers whether the host took both
-  #addToHost(host: IStageRendererHost, errors: unknown[]): boolean {
-    // plain locals, no object: nothing is allocated per resize of the host
-    let joining = true;
-    let replayed = false;
-    let replayedWidth = 0;
-    let replayedHeight = 0;
-    let replayedPixelRatio = 1;
-    try {
-      // a host that hands its last size to a new subscriber — a Display retains its resize event —
-      // hands it in during onResize(), and eventize catches what a listener throws there. Held
-      // until both subscriptions are booked, the size reaches resize() outside of the subscription:
-      // a stage that refuses it reaches the caller, and a listener of this resize that disposes the
-      // renderer or attaches it elsewhere finds every subscription booked
-      this.#hostSubscriptions.push(
-        host.onResize(({width, height, pixelRatio}) => {
-          if (joining) {
-            replayed = true;
-            replayedWidth = width;
-            replayedHeight = height;
-            replayedPixelRatio = pixelRatio;
-            return;
-          }
-          this.resize(width, height, pixelRatio);
-        }),
-      );
-      this.#hostSubscriptions.push(
-        host.onRenderFrame(({renderer, now, deltaTime, frameNo}) => {
-          this.updateFrame(now, deltaTime, frameNo);
-          this.renderTo(renderer);
-        }),
-      );
-    } catch (error) {
-      // the size a host handed in goes with the handles: the renderer holds nothing of that host
-      errors.push(error);
-      this.#unsubscribeFromHost(errors);
-      return false;
-    } finally {
-      joining = false;
-    }
-    if (replayed) {
-      try {
-        this.resize(replayedWidth, replayedHeight, replayedPixelRatio);
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    return true;
   }
 
   /**
@@ -850,9 +738,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * node of every `Stage2D` among the stages, which nothing samples any more.
    */
   #modeInputChanged(previousMode: StageRendererMode): void {
-    this.#outputDirty = true;
+    this.#composition.markOutputDirty();
     // another mode decides whether this renderer warns about its stages at all
-    this.#pipelineChildCheckDue = true;
+    this.#draw.pipelineChildrenChanged();
     const mode = this.#renderMode();
     if (previousMode === 'whole-picture' && mode !== 'whole-picture') this.#targets.releaseInternalTarget();
     if (previousMode === 'composed' && mode !== 'composed') {
@@ -863,8 +751,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /** A parent that draws this renderer beside other stages checks again for a pipeline of its own. */
   #pipelineChildChanged(): void {
-    const parent = this.#parent;
-    if (parent instanceof StageRenderer) parent.#pipelineChildCheckDue = true;
+    const parent = this.#hostLink.holder;
+    if (parent instanceof StageRenderer) parent.#draw.pipelineChildrenChanged();
   }
 
   /**
@@ -884,36 +772,31 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
 
   /** The two render targets this renderer builds for itself. */
   readonly #targets = new StageRendererTargets();
+  /** The plain mode, and what every mode draws with. */
+  readonly #draw = new StageRendererDraw(this);
+  /** The whole-picture mode, through the internal target of `#targets`. */
+  readonly #wholePicture = new StageRendererWholePicture(this, this.#draw, this.#targets);
+  /** The composed mode, from the pass node of every stage. */
+  readonly #composition = new StageRendererComposition(this, this.#draw);
 
   static {
     StageRendererInternals.setPassTargetScale = (renderer, scale) => {
       renderer.#targets.scale = scale;
     };
+    StageRendererDrawInternals.renderStage = (owner, stageItem, renderer) => owner.renderStage(stageItem, renderer);
+    StageRendererDrawInternals.shouldRenderPass = (owner, child) => owner.shouldRenderPass(child);
+    StageRendererDrawInternals.renderToCurrentTarget = (child, renderer) => child.renderToCurrentTarget(renderer);
+    StageRendererDrawInternals.isStageRenderer = (stage): stage is StageRenderer => stage instanceof StageRenderer;
+    StageRendererDrawInternals.renderModeOf = (renderer) => renderer.#renderMode();
+    StageRendererDrawInternals.clearsWholeTarget = (renderer) => renderer.#clearsWholeTarget();
+    StageRendererDrawInternals.passTargetOf = (child, renderer) => child.#ensurePassTarget(renderer);
+    StageRendererDrawInternals.clearColorOf = (owner) => owner.#clearColor;
   }
-  /** The `texture()` node the whole-picture mode gives its pipeline as `outputNode`, and the texture it samples. */
-  #internalOutputNode?: Node;
-  #internalOutputTexture?: Texture;
-  /**
-   * Marks `pipeline.outputNode` of the composed mode as needing a rebuild: the stages, their order
-   * or names, the pipeline, `buildOutputNode` changed, or a stage handed a new pass node after a
-   * change of its camera or scene (see `#composedPassesChanged()`). Only the composed mode reads
-   * it; the whole-picture mode keeps its own node, see `#wireInternalOutputNode()`.
-   */
-  #outputDirty = true;
-
-  /**
-   * Set when a stage announced a new camera or scene: the next composing frame asks the stages
-   * for their pass nodes and compares them with `#composedPasses`.
-   */
-  #passesToCheck = false;
-
-  /** The pass nodes the output node of the composed mode was last built from, one per stage. */
-  #composedPasses: Node[] = [];
 
   /** Invalidate the cached `pipeline.outputNode`; the next render rebuilds it, in either pipeline mode. */
   invalidateOutputNode(): void {
-    this.#outputDirty = true;
-    this.#internalOutputNode = undefined;
+    this.#composition.markOutputDirty();
+    this.#wholePicture.forgetOutputNode();
   }
 
   /**
@@ -957,13 +840,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const stages = this.orderedStages;
     switch (this.#renderMode()) {
       case 'composed':
-        this.#renderPipelineComposed(renderer, stages);
+        this.#composition.draw(renderer, stages);
         break;
       case 'whole-picture':
-        this.#renderPipelineSimple(renderer, stages);
+        this.#wholePicture.draw(renderer, stages, this.#pipeline!);
         break;
       case 'plain':
-        this.#renderStagesInline(renderer, stages);
+        this.#draw.drawPlain(renderer, stages);
         break;
     }
   }
@@ -988,23 +871,6 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   }
 
   /**
-   * The stages take their camera from the first resize() with an area whose specs give a view, and
-   * a Stage2D has no pass node to give before that: while this renderer has no area, or a Stage2D
-   * of the composition has no camera, there is nothing to compose. A user-defined buildOutputNode
-   * expects one pass per stage, so no stage is left out, and the output node stays dirty until the
-   * first frame in which every Stage2D has a camera. An empty list passes:
-   * #renderPipelineComposed() then draws the own clear alone.
-   */
-  #canCompose(stages: ReadonlyArray<StageItem>): boolean {
-    if (!isPositiveFinite(this.width) || !isPositiveFinite(this.height)) return false;
-    // indexed: an iterator over the frozen array of a StageDirector is allocated on every frame
-    for (let i = 0; i < stages.length; i++) {
-      if (isStage2DWithoutCamera(stages[i]!.stage)) return false;
-    }
-    return true;
-  }
-
-  /**
    * The own clear of this renderer overwrites color and depth of its target in full, and it
    * reaches the target in this frame — a composing renderer without an area or without a camera
    * returns before its clear.
@@ -1014,301 +880,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.clear &&
       this.clearColorBuffer &&
       this.clearDepthBuffer &&
-      (this.#renderMode() !== 'composed' || this.#canCompose(this.orderedStages))
+      (this.#renderMode() !== 'composed' || canCompose(this, this.orderedStages))
     );
-  }
-
-  /** Plain mode: clear (if requested), then render stages into the current target. */
-  #renderStagesInline(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
-    // a child with a pipeline, or a stage with a post-process, alone is the one writer of the
-    // target; beside a second stage its quad covers what the others drew
-    if (this.#pipelineChildCheckDue && !this.#warnedAboutPipelineChild) {
-      // cleared before the check: a stage a listener brings in while the stages draw is checked next frame
-      this.#pipelineChildCheckDue = false;
-      if (stages.length > 1) this.#warnAboutPipelineChild(stages, true);
-    }
-    if (this.clear) this.#applyClear(renderer);
-    this.#drawStages(renderer, stages);
-  }
-
-  #warnedAboutPipelineChild = false;
-
-  // set by every change that can bring a stage with a pipeline of its own beside another one — a
-  // stage that joins or leaves, the render order, a mode of this renderer or of a nested one, a
-  // post-process; the next frame of the plain or the whole-picture mode clears it as it checks
-  #pipelineChildCheckDue = true;
-
-  /**
-   * Warns once, for the first stage among `stages` that draws through a pipeline of its own into
-   * the target of this renderer: a `Stage2D` with a `postProcess`, and with `nestedRenderers` a
-   * nested renderer with a pipeline and without an `outputRenderTarget`. An `outputRenderTarget`
-   * of this renderer changes nothing: the quad covers whatever target this renderer draws into.
-   */
-  #warnAboutPipelineChild(stages: ReadonlyArray<StageItem>, nestedRenderers: boolean): void {
-    // indexed, as in #canCompose(): this runs in the first frame after a change that can bring such a stage in
-    for (let i = 0; i < stages.length; i++) {
-      const child = stages[i]!.stage;
-      if (
-        nestedRenderers &&
-        child instanceof StageRenderer &&
-        child.#renderMode() !== 'plain' &&
-        child.outputRenderTarget == null
-      ) {
-        this.#warnedAboutPipelineChild = true;
-        // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
-        console.warn(
-          `StageRenderer ${describeValue(this.name)} has no pipeline and draws the renderer ${describeValue(child.name)}, which runs a pipeline of its own, into one target with other stages: the quad of that pipeline covers every pixel of the target without blending, and what the stages before it drew there is lost. Give the outer renderer the pipeline — a RootRenderPipeline composes every child —, or give ${describeValue(child.name)} an outputRenderTarget of its own.`,
-        );
-        return;
-      }
-      if (isStage2DWithPostProcess(child)) {
-        this.#warnedAboutPipelineChild = true;
-        // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
-        console.warn(
-          `StageRenderer ${describeValue(this.name)} draws the stage ${describeValue(child.name)}, which runs a post-process, into one target with other stages: the pipeline of that stage clears the target and covers every pixel of it, and what the stages before it drew there is lost. Compose the stages — a RootRenderPipeline as the pipeline of the renderer does —, or show them as layers of a StageDirector.`,
-        );
-        return;
-      }
-    }
-  }
-
-  /** Draws the stages into the current target, with renderer.autoClear off while they draw and restored afterwards. */
-  #drawStages(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
-    const wasPreviouslyAutoClear = renderer.autoClear;
-    renderer.autoClear = false;
-    try {
-      for (let i = 0; i < stages.length; i++) this.renderStage(stages[i]!, renderer);
-    } finally {
-      renderer.autoClear = wasPreviouslyAutoClear;
-    }
-  }
-
-  #callerToneMapping: WebGPURenderer['toneMapping'] = NoToneMapping;
-  #callerOutputColorSpace: WebGPURenderer['outputColorSpace'] = ColorManagement.workingColorSpace;
-
-  /**
-   * Switches the renderer to linear output until `#endLinearOutput()`. three.js'
-   * RenderPipeline bakes tone mapping and the encoding to renderer.outputColorSpace into its quad
-   * whatever target it draws into, and rebuilds the quad when either value changes: as long as
-   * both are linear, a nested pipeline writes linear values into the target this pipeline
-   * samples, and the transform applies once, in the outermost pipeline.
-   * pipeline.outputColorTransform is no way to get there — the pipeline reads it only when it
-   * rebuilds, and the field belongs to the caller. A plain renderer.render() into a RenderTarget
-   * writes linear anyway.
-   *
-   * The values of the caller wait in fields of this renderer, so that no frame allocates
-   * anything; a nested renderer holds its own, so a child that draws during the draw of its
-   * parent leaves the values of the parent alone.
-   */
-  #beginLinearOutput(renderer: WebGPURenderer): void {
-    this.#callerToneMapping = renderer.toneMapping;
-    this.#callerOutputColorSpace = renderer.outputColorSpace;
-    renderer.toneMapping = NoToneMapping;
-    renderer.outputColorSpace = ColorManagement.workingColorSpace;
-  }
-
-  /** Gives the renderer back the tone mapping and output color space `#beginLinearOutput()` took from it. */
-  #endLinearOutput(renderer: WebGPURenderer): void {
-    renderer.toneMapping = this.#callerToneMapping;
-    renderer.outputColorSpace = this.#callerOutputColorSpace;
-  }
-
-  /**
-   * The whole-picture mode: borrow the internal target — from {@link internalTargetPool} if
-   * set, otherwise the renderer's own —, render the stages into it, run the
-   * pipeline sampling that target as `texture()`, and give it back, also when
-   * a stage or the pipeline throws. The internal target is cleared in full to
-   * transparent black every frame before the user's `clear` applies; the
-   * stages draw into it with linear output. The user's `clear` additionally
-   * clears the final output target before the pipeline writes, unless the
-   * pipeline's draw clears it anyway (see `#clearBeforePipeline()`), and the
-   * pipeline applies the output transform of the caller.
-   */
-  #renderPipelineSimple(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
-    const pipeline = this.#pipeline!;
-    // the stages share the internal target: a stage with a post-process clears what the stages
-    // before it drew there, as under a renderer without a pipeline
-    if (this.#pipelineChildCheckDue && !this.#warnedAboutPipelineChild) {
-      // cleared before the check: a stage a listener brings in while the stages draw is checked next frame
-      this.#pipelineChildCheckDue = false;
-      if (stages.length > 1) this.#warnAboutPipelineChild(stages, false);
-    }
-    // borrowed before the try: an acquire() that throws has lent nothing
-    const rt = this.#targets.acquireInternalTarget(renderer, this.width, this.height);
-    try {
-      this.#drawIntoInternalTarget(renderer, rt, stages);
-      this.#wireInternalOutputNode(pipeline, rt);
-      this.#clearBeforePipeline(renderer);
-      pipeline.render();
-    } finally {
-      this.#targets.returnInternalTarget();
-    }
-  }
-
-  /**
-   * Draws the stages into the internal target with linear output, after the clear it gets every
-   * frame, and gives the renderer back the target of the caller afterwards.
-   */
-  #drawIntoInternalTarget(renderer: WebGPURenderer, rt: RenderTarget, stages: ReadonlyArray<StageItem>): void {
-    const prev = renderer.getRenderTarget();
-    renderer.setRenderTarget(rt);
-    this.#beginLinearOutput(renderer);
-    try {
-      this.#clearForInternalRT(renderer);
-      this.#drawStages(renderer, stages);
-    } finally {
-      this.#endLinearOutput(renderer);
-      renderer.setRenderTarget(prev);
-    }
-  }
-
-  /** Gives the pipeline the `texture()` node that samples the internal target as its `outputNode`. */
-  #wireInternalOutputNode(pipeline: RenderPipeline, rt: RenderTarget): void {
-    // the node depends on the internal target alone: stages, their order and names, their scenes
-    // and their cameras leave it standing. Comparing with pipeline.outputNode catches a new
-    // pipeline, the return from the composed mode and a node written into the pipeline from
-    // outside.
-    if (this.#internalOutputNode == null || this.#internalOutputTexture !== rt.texture) {
-      this.#internalOutputNode = texture(rt.texture);
-      this.#internalOutputTexture = rt.texture;
-    }
-    if (pipeline.outputNode !== this.#internalOutputNode) {
-      pipeline.outputNode = this.#internalOutputNode;
-      pipeline.needsUpdate = true;
-    }
-  }
-
-  /**
-   * Nobody else clears the internal target — neither the renderer's own nor one borrowed from a
-   * pool, which still holds what its previous borrower drew. It is cleared in full to
-   * transparent black every frame, color and depth, so that neither the clear color of the
-   * renderer nor a rest of the previous frame stays in it; the own `clear` then applies as it
-   * does for a nested child, and an own clear that covers color and depth replaces the black one.
-   */
-  #clearForInternalRT(renderer: WebGPURenderer): void {
-    if (!this.#clearsWholeTarget()) this.#clearToTransparentBlack(renderer);
-    if (this.clear) this.#applyClear(renderer);
-  }
-
-  /**
-   * The composed mode, nested renderers with pipelines of their own included: for each stage, get
-   * its pass node; pre-render nested `StageRenderer` children into their pass-targets first, with
-   * linear output (see `#beginLinearOutput()`). Then run the pipeline with
-   * `buildOutputNode(passes)` as `outputNode`; it applies the output transform of the caller.
-   * Without a stage it draws its own clear and neither builds an output node nor runs the pipeline.
-   */
-  #renderPipelineComposed(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
-    if (!this.#canCompose(stages)) return;
-    // without a stage there is no pass to compose: the own clear is all this renderer draws, and
-    // the output node waits for the first stage that joins
-    if (stages.length === 0) {
-      if (this.clear) this.#applyClear(renderer);
-      return;
-    }
-    this.#prerenderNestedRenderers(renderer, stages);
-    if (!this.#outputDirty && this.#passesToCheck) {
-      // the flag goes once every stage has answered: a stage that throws from asPassNode() — a
-      // post-process whose build() fails — is asked again by the next frame
-      const changed = this.#composedPassesChanged(renderer, stages);
-      this.#passesToCheck = false;
-      if (changed) this.#outputDirty = true;
-    }
-    if (this.#outputDirty) this.#rebuildComposedOutputNode(renderer, stages);
-    this.#clearBeforePipeline(renderer);
-    this.pipeline!.render();
-  }
-
-  /**
-   * The own clear of the target the pipeline writes to, unless the pipeline's draw leaves that
-   * target as the clear would: three.js clears it first under `renderer.autoClear` — with the
-   * buffers of `autoClearColor`, `autoClearDepth` and `autoClearStencil` —, and the quad of the
-   * pipeline covers every pixel, color and depth, without blending. Where those flags cover every
-   * buffer of the own clear, the clear is left out. On the canvas it would cost a full-screen draw
-   * of its own: three.js clears through its frame buffer target and copies that onto the canvas.
-   */
-  #clearBeforePipeline(renderer: WebGPURenderer): void {
-    if (!this.clear) return;
-    const clearedByPipeline =
-      renderer.autoClear === true &&
-      (!this.clearColorBuffer || renderer.autoClearColor === true) &&
-      (!this.clearDepthBuffer || renderer.autoClearDepth === true) &&
-      (!this.clearStencilBuffer || renderer.autoClearStencil === true);
-    if (!clearedByPipeline) this.#applyClear(renderer);
-  }
-
-  /**
-   * Renders every nested `StageRenderer` among the stages into its pass target, with linear output —
-   * every one for which {@link shouldRenderPass} answers `true`.
-   */
-  #prerenderNestedRenderers(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
-    this.#beginLinearOutput(renderer);
-    try {
-      // indexed, as in #canCompose()
-      for (let i = 0; i < stages.length; i++) {
-        const stage = stages[i]!.stage;
-        if (stage instanceof StageRenderer && this.shouldRenderPass(stage)) this.#prerenderChild(renderer, stage);
-      }
-    } finally {
-      this.#endLinearOutput(renderer);
-    }
-  }
-
-  /** Clears the pass target of the child where the child does not, and renders the child into it. */
-  #prerenderChild(renderer: WebGPURenderer, child: StageRenderer): void {
-    const childRT = child.#ensurePassTarget(renderer);
-    const prev = renderer.getRenderTarget();
-    renderer.setRenderTarget(childRT);
-    try {
-      // the pass target of the child belongs to nobody else who would clear it: a child
-      // without clear draws its stages straight into it, and a child with clear but
-      // clearColorBuffer/clearDepthBuffer off clears only part of it — the previous frame
-      // would stay underneath. A child whose own clear covers color and depth and reaches
-      // the target in this frame overwrites it itself.
-      if (!child.#clearsWholeTarget()) this.#clearToTransparentBlack(renderer);
-      child.renderToCurrentTarget(renderer);
-    } finally {
-      renderer.setRenderTarget(prev);
-    }
-  }
-
-  /**
-   * Builds `pipeline.outputNode` anew from the pass node of every stage. A composition that answers
-   * the node the pipeline has already leaves the pipeline as it is: three.js builds its shader again
-   * for every `needsUpdate`, and a composer that keeps its graph — a `StageDirector` does — costs no
-   * shader build where nothing in the graph changed.
-   */
-  #rebuildComposedOutputNode(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
-    const passes = stages.map((s) => this.#getStagePass(s, renderer));
-    // a copy of its own, taken once per rebuild: a builder may keep the array it is handed and
-    // reorder or shorten it, and #composedPassesChanged() compares with what was composed
-    const composed = passes.slice();
-    const compose = this.buildOutputNode ?? RootRenderPipeline.buildOutputNode;
-    const pipeline = this.pipeline!;
-    const outputNode = compose(passes);
-    if (pipeline.outputNode !== outputNode) {
-      pipeline.outputNode = outputNode;
-      pipeline.needsUpdate = true;
-    }
-    this.#composedPasses = composed;
-    this.#outputDirty = false;
-    this.#passesToCheck = false;
-  }
-
-  /**
-   * Whether a stage hands a pass node other than the one the output node was built from. A nested
-   * `StageRenderer` is left out: its `asPassNode()` builds a new `texture()` node over the same pass
-   * target on every call, and it announces neither a camera nor a scene. Indexed and without a
-   * closure, as every loop of a frame: a `Stage2D` hands its node, and nothing is allocated.
-   */
-  #composedPassesChanged(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): boolean {
-    const composed = this.#composedPasses;
-    if (stages.length !== composed.length) return true;
-    for (let i = 0; i < stages.length; i++) {
-      const item = stages[i]!;
-      if (item.stage instanceof StageRenderer) continue;
-      if (this.#getStagePass(item, renderer) !== composed[i]) return true;
-    }
-    return false;
   }
 
   /**
@@ -1319,29 +892,6 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   protected shouldRenderPass(_child: StageRenderer): boolean {
     return true;
-  }
-
-  /**
-   * Clears color and depth of the current target to transparent black. The color is set
-   * along with the alpha: with `renderer.alpha === false` a WebGPU clear keeps the RGB of the
-   * clear color at alpha 0, and an additive composition would add that tint once per child.
-   */
-  #clearToTransparentBlack(renderer: WebGPURenderer): void {
-    const oldClearAlpha = renderer.getClearAlpha();
-    renderer.getClearColor(this.#oldClearColor);
-    renderer.setClearColor(TRANSPARENT_BLACK, 0);
-    renderer.clear(true, true, false);
-    renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
-  }
-
-  #getStagePass(stageItem: StageItem, renderer: WebGPURenderer): Node {
-    const stage = stageItem.stage;
-    if (!hasAsPassNode(stage)) {
-      throw new TypeError(
-        `StageRenderer#renderTo() cannot compose the stage ${describeValue(stage.name)}: that stage ${NO_PASS_NODE}`,
-      );
-    }
-    return stage.asPassNode(renderer);
   }
 
   /**
@@ -1369,24 +919,6 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       throw disposedError('asPassNode()');
     }
     return this.#targets.passTarget(renderer, this.width, this.height);
-  }
-
-  #applyClear(renderer: WebGPURenderer): void {
-    const oldClearAlpha = renderer.getClearAlpha();
-    let colorWasOverridden = false;
-    if (this.#clearColor != null) {
-      renderer.getClearColor(this.#oldClearColor);
-      renderer.setClearColor(this.#clearColor, this.clearAlpha);
-      colorWasOverridden = true;
-    } else {
-      renderer.setClearAlpha(this.clearAlpha);
-    }
-    renderer.clear(this.clearColorBuffer, this.clearDepthBuffer, this.clearStencilBuffer);
-    if (colorWasOverridden) {
-      renderer.setClearColor(this.#oldClearColor, oldClearAlpha);
-    } else {
-      renderer.setClearAlpha(oldClearAlpha);
-    }
   }
 
   #disposed = false;
@@ -1458,14 +990,13 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // released before the parent lets go: its remove() releases the pass target of a child it
     // held, and finds none left here — each target is released once
     this.#targets.dispose();
-    this.#internalOutputNode = undefined;
-    this.#internalOutputTexture = undefined;
+    this.#wholePicture.dispose();
     // the pass nodes belong to the stages, which this renderer has let go of
-    this.#composedPasses = [];
+    this.#composition.forgetPasses();
 
     // the parent setter refuses a disposed renderer, so the detach runs on the field itself.
-    // #removeFromParent() gives up the host subscriptions from #addToHost() and emits
-    // OnRemoveFromParent
+    // #removeFromParent() gives up the host subscriptions from StageRendererHostLink#joinHost() and
+    // emits OnRemoveFromParent
     this.#removeFromParent(errors);
 
     this.#pipeline = undefined;
@@ -1597,7 +1128,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     // a renderer that is this one, or holds it further up, would draw itself without end: every
     // resize(), updateFrame() and renderTo() would go round in a circle
     if (stage instanceof StageRenderer) {
-      for (let holder: StageRendererParentType | undefined = this; holder instanceof StageRenderer; holder = holder.#parent) {
+      for (
+        let holder: StageRendererParentType | undefined = this;
+        holder instanceof StageRenderer;
+        holder = holder.#hostLink.holder
+      ) {
         if (holder === stage) {
           throw new Error(
             holder === this
@@ -1628,7 +1163,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       child.#removeFromParent(errors);
       // a listener of the move out can have disposed either renderer or given the child another
       // holder: this renderer does not take the child in then
-      if (this.#disposed || child.#disposed || child.#parent !== undefined) {
+      if (this.#disposed || child.#disposed || child.#hostLink.holder !== undefined) {
         throwCollected(errors, ADD_THREW);
         return this;
       }
@@ -1637,8 +1172,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#stages.push(item);
     this.#order.warnAboutSharedNames(this.#stages, [stage.name]);
     this.#order.invalidate();
-    this.#outputDirty = true;
-    this.#pipelineChildCheckDue = true;
+    this.#composition.markOutputDirty();
+    this.#draw.pipelineChildrenChanged();
 
     if (isEventized(stage)) {
       // a stage that announces a new camera or scene can hand a new pass node — a Stage2D keeps
@@ -1649,9 +1184,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         stage,
         [OnStageAfterCameraChanged, OnStageAfterSceneChanged, OnStageAfterPostProcessChanged],
         () => {
-          this.#passesToCheck = true;
+          this.#composition.checkPasses();
           // a new post-process of a Stage2D comes through here; a new camera or scene checks once as well
-          this.#pipelineChildCheckDue = true;
+          this.#draw.pipelineChildrenChanged();
         },
       );
       // a disposed stage has no pass node left to give: the renderer lets go of it on the spot
@@ -1664,7 +1199,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       });
     }
 
-    if (child) child.#parent = this;
+    if (child) child.#hostLink.joinRenderer(this);
 
     try {
       emitStrict(this, OnStageAdded, {stage, renderer: this} satisfies StageAddedProps);
@@ -1711,8 +1246,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#stageSubscriptions.get(stage)?.();
       this.#stageSubscriptions.delete(stage);
       this.#order.invalidate();
-      this.#outputDirty = true;
-      this.#pipelineChildCheckDue = true;
+      this.#composition.markOutputDirty();
+      this.#draw.pipelineChildrenChanged();
       const errors: unknown[] = [];
       try {
         emitStrict(this, OnStageRemoved, {stage, renderer: this} satisfies StageRemovedProps);

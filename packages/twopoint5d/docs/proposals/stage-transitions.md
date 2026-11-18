@@ -548,21 +548,24 @@ transition that had it as a source ends as `cancelled` with the other source in 
 
 ## 9. The seams in `StageRenderer`
 
-The director is a subclass and needs four changes in `src/stage/StageRenderer.ts`, none of which
-a user of `StageRenderer` sees:
+The director is a subclass and needs four seams in `StageRenderer` and in the internal classes it
+draws through (`src/stage/StageRendererComposition.ts`, `src/stage/StageRendererWholePicture.ts`),
+none of which a user of `StageRenderer` sees:
 
 1. **`orderedStages` from the subclass.** The director overrides the getter with its stack order;
    `updateFrame()`, the composed draw and the rebuild of the output node already read it through
    `this`. Its `renderOrder` setter throws, so the two orders never meet.
-2. **A pass that is not drawn this frame.** `#prerenderNestedRenderers()` asks a protected
-   `shouldRenderPass(child)` (default `true`) before it clears and draws a child, so a frozen
-   layer keeps its picture. The director's `updateFrame()` leaves frozen layers out by itself.
-3. **The output node only when it is another one.** `#rebuildComposedOutputNode()` sets
-   `pipeline.outputNode` and `needsUpdate` only when the composer answers a node other than the
-   one the pipeline has, as `#wireInternalOutputNode()` already does for the whole-picture mode.
-   The director's composer answers the cached graph of a shape, and an unchanged shape costs no
-   shader build. A `buildOutputNode` of one's own that answers the same node after changing the
-   graph behind it sets `pipeline.needsUpdate` itself.
+2. **A pass that is not drawn this frame.** `StageRendererComposition#prerenderNestedRenderers()`
+   asks the protected `shouldRenderPass(child)` of its renderer (default `true`) before it clears
+   and draws a child, so a frozen layer keeps its picture. The director's `updateFrame()` leaves
+   frozen layers out by itself.
+3. **The output node only when it is another one.**
+   `StageRendererComposition#rebuildComposedOutputNode()` sets `pipeline.outputNode` and
+   `needsUpdate` only when the composer answers a node other than the one the pipeline has, as
+   `StageRendererWholePicture#wireInternalOutputNode()` does for the whole-picture mode. The
+   director's composer answers the cached graph of a shape, and an unchanged shape costs no shader
+   build. A `buildOutputNode` of one's own that answers the same node after changing the graph
+   behind it sets `pipeline.needsUpdate` itself.
 4. **One draw for both ways in.** `renderTo()` and a parent that composes a renderer into its pass
    target both call the protected `renderToCurrentTarget()`. The director picks the shape of its
    stack and fills its uniforms there, so a director that is a layer of another one draws its own

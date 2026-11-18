@@ -1659,7 +1659,7 @@ describe('StageRenderer', () => {
 
     describe('a host that hands its current size to a new subscriber', () => {
       // a host on real eventize, as a Display is: the resize is retained, so onResize() plays the
-      // last size to the listener while it subscribes. The props carry the fields #addToHost() reads
+      // last size to the listener while it subscribes. The props carry the fields StageRendererHostLink#joinHost() reads
       function makeRetainingHost() {
         const host = eventize({
           onResize: ((listener) => on(host, 'resize', listener)) as IStageRendererHost['onResize'],
