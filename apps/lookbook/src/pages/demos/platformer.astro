@@ -47,6 +47,7 @@ import {description, title} from './_platformer.json';
   import {loadPlatformerAssets} from '~demos/platformer/assets';
   import {Platformer} from '~demos/platformer/Platformer';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {bindFullscreenButton} from '~demos/utils/fullscreenButton';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -65,13 +66,18 @@ import {description, title} from './_platformer.json';
       return;
     }
 
-    const game = new Platformer(assets);
+    const parts = new DemoParts(display);
+    parts.keep(assets);
+
+    const game = parts.keep(new Platformer(assets));
 
     display.onResize(({width, height, pixelRatio}) => game.resize(width, height, pixelRatio));
 
     // the keys of the page; the autoplay takes over again after a few seconds without one
-    window.addEventListener('keydown', game.onKeyDown);
-    window.addEventListener('keyup', game.onKeyUp);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', game.onKeyDown, {signal: listening.signal});
+    window.addEventListener('keyup', game.onKeyUp, {signal: listening.signal});
 
     const mode = document.querySelector('.keys .mode')!;
     let autoplay = game.autoplay;
@@ -88,7 +94,6 @@ import {description, title} from './_platformer.json';
     });
 
     // the buttons are written by the markup of this page
-    const listening = new AbortController();
     const toggle = (selector: string, label: string, values: [string, string], apply: (on: boolean) => void) => {
       const button = document.querySelector(selector)!;
       let on = true;
@@ -120,15 +125,7 @@ import {description, title} from './_platformer.json';
       clearTimeout(timeout);
       preview.ready(display);
     };
-
-    display.onDispose(() => {
-      listening.abort();
-      clearTimeout(timeout);
-      window.removeEventListener('keydown', game.onKeyDown);
-      window.removeEventListener('keyup', game.onKeyUp);
-      game.dispose();
-      assets.dispose();
-    });
+    parts.onDispose(() => clearTimeout(timeout));
   });
 
   await display.start();

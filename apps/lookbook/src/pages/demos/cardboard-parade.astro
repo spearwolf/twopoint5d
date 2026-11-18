@@ -32,6 +32,7 @@ import {description, title} from './_cardboard-parade.json';
   import {on} from '@spearwolf/eventize';
   import {OnDisplayRenderFrame} from '@spearwolf/twopoint5d';
   import {CardboardParade} from '~demos/cardboard-parade/CardboardParade';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
@@ -66,7 +67,11 @@ import {description, title} from './_cardboard-parade.json';
       return;
     }
 
-    const parade = new CardboardParade({atlas, texture}, turntable);
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
+    // the parade releases what it built, the store what it lent
+    const parade = parts.keep(new CardboardParade({atlas, texture}, turntable));
     demo.scene.add(parade);
 
     // the buttons and the readout are written by the markup of this very page
@@ -74,6 +79,7 @@ import {description, title} from './_cardboard-parade.json';
     const facingButton = document.querySelector('.toggleFacing')!;
     const drawCalls = document.querySelector('.drawCalls')!;
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     spinButton.addEventListener(
       'click',
       () => {
@@ -97,14 +103,7 @@ import {description, title} from './_cardboard-parade.json';
     const readout = setInterval(() => {
       drawCalls.textContent = `draw calls: ${renderer.info.render.drawCalls}`;
     }, 250);
-
-    demo.onDispose(() => {
-      listening.abort();
-      clearInterval(readout);
-      // the parade releases what it built, the store what it lent
-      parade.dispose();
-      store.dispose();
-    });
+    parts.onDispose(() => clearInterval(readout));
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('cardboard parade', parade);

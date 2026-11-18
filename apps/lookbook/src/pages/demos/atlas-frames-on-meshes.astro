@@ -33,6 +33,7 @@ import {description, title} from './_atlas-frames-on-meshes.json';
 
 <script>
   import {disposeNightCity, makeNightCity} from '~demos/atlas-frames-on-meshes/NightCity';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
@@ -77,14 +78,13 @@ import {description, title} from './_atlas-frames-on-meshes.json';
       return;
     }
 
-    const city = makeNightCity({track, facades, skyline});
-    demo.scene.add(city);
+    const parts = new DemoParts(demo);
+    // the atlases are the store's, the meshes of the city this page's
+    parts.keep(store);
 
-    demo.onDispose(() => {
-      // the meshes of the city are this page's, the atlases the store's
-      disposeNightCity(city);
-      store.dispose();
-    });
+    const city = makeNightCity({track, facades, skyline});
+    parts.onDispose(() => disposeNightCity(city));
+    demo.scene.add(city);
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('night city', city);

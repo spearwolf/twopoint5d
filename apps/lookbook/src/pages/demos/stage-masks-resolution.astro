@@ -57,6 +57,7 @@ import {description, title} from './_stage-masks-resolution.json';
   } from '~demos/stage-masks/SeancePhotographs';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -97,16 +98,26 @@ import {description, title} from './_stage-masks-resolution.json';
       assets.store.dispose();
       return;
     }
+
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
     const {layout} = assets;
 
-    const room = new SeanceRoom(assets);
+    const room = parts.keep(new SeanceRoom(assets));
     const clock = new FogClock();
     // one slot per frame, so one mask per frame — and three fog stages, not one: a pass target
     // belongs to its stage, so one stage has one scale, and two masks on one stage that ask for
     // different scales are refused. The three draw the same fog from the same clock
-    const plates = layout.panels.map((_, i) => new SpiritPlate(assets, i));
-    const fogs = layout.panels.map((_, i) => new EctoplasmFog(layout, i, clock));
-    const masks = fogs.map((fog, i) => new StageMask(fog.stage, {scale: settings.scales[i]}));
+    const plates = layout.panels.map((_, i) => parts.keep(new SpiritPlate(assets, i)));
+    const fogs = layout.panels.map((_, i) => parts.keep(new EctoplasmFog(layout, i, clock)));
+    // a mask of a panel is replaced when its scale changes, and the replacement disposes the old one:
+    // the release reads whichever masks the array holds when the display goes
+    const masks: StageMask[] = [];
+    parts.onDispose(() => {
+      for (const mask of masks) mask.dispose();
+    });
+    for (let i = 0; i < fogs.length; i++) masks.push(new StageMask(fogs[i]!.stage, {scale: settings.scales[i]}));
     fogs.forEach((fog, i) => {
       fog.scale = masks[i]!.scale;
     });
@@ -120,6 +131,9 @@ import {description, title} from './_stage-masks-resolution.json';
       el.className = 'seance-plaque';
       document.body.appendChild(el);
       return el;
+    });
+    parts.onDispose(() => {
+      for (const el of plaques) el.remove();
     });
     // the panels by name, for the read-outs: lil-gui reads a property of an object
     const NAMES = ['left', 'middle', 'right'] as const;
@@ -211,6 +225,7 @@ import {description, title} from './_stage-masks-resolution.json';
     });
 
     const gui = new GUI({container: getDemoUi(), title: 'Séance Photographs'});
+    parts.onDispose(() => gui.destroy());
     gui.add(settings, 'preset', Object.keys(PRESETS)).name('scales (left → right)').onChange(applyPreset);
     for (let i = 0; i < masks.length; i++) {
       const proxy = {
@@ -246,7 +261,9 @@ import {description, title} from './_stage-masks-resolution.json';
         settings.drift = !settings.drift;
       }
     };
-    window.addEventListener('keydown', onKeyDown);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', onKeyDown, {signal: listening.signal});
 
     // the one shape of the stack: the room and three masked slots. A new scale is a new mask with
     // the same source and invert, so it finds this shape compiled; the soft/hard switch is a
@@ -269,17 +286,7 @@ import {description, title} from './_stage-masks-resolution.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      window.removeEventListener('keydown', onKeyDown);
-      gui.destroy();
-      for (const el of plaques) el.remove();
-      for (const mask of masks) mask.dispose();
-      for (const fog of fogs) fog.dispose();
-      for (const plate of plates) plate.dispose();
-      room.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

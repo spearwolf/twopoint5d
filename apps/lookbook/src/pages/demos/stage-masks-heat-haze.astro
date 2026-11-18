@@ -21,6 +21,7 @@ import {description, title} from './_stage-masks-heat-haze.json';
   import {heatHaze} from '~demos/stage-masks/heatHaze';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -55,28 +56,33 @@ import {description, title} from './_stage-masks-heat-haze.json';
       return;
     }
 
-    const snow = new CrematoriumView('snow', assets);
-    const ash = new CrematoriumView('ash', assets);
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
+    const snow = parts.keep(new CrematoriumView('snow', assets));
+    const ash = parts.keep(new CrematoriumView('ash', assets));
 
     // the heat: a living mask stage, never in the stack. The effect names its mask, so the director
     // draws the column only while a transition runs. Made once and reused, as every effect
-    const heat = new HeatColumn(assets.layout);
+    const heat = parts.keep(new HeatColumn(assets.layout));
     const haze = heatHaze({mask: heat.mask, strength: settings.strength});
 
     director.setStack([snow.stage]);
 
     // the slot between snow and ash: played, scrubbed by hand or cycled, with Space, Enter and S
-    const cycler = new TransitionCycler({
-      display,
-      director,
-      stages: [snow.stage, ash.stage],
-      names: ['snow', 'ash'],
-      settings,
-      hold: HOLD,
-      effect: () => haze,
-      progress: () => heat.mask.progress,
-      progressName: 'heat.progress',
-    });
+    const cycler = parts.keep(
+      new TransitionCycler({
+        display,
+        director,
+        stages: [snow.stage, ash.stage],
+        names: ['snow', 'ash'],
+        settings,
+        hold: HOLD,
+        effect: () => haze,
+        progress: () => heat.mask.progress,
+        progressName: 'heat.progress',
+      }),
+    );
 
     // how far the heat bends the picture during a run, in thousandths, written only when it changes
     const readout = {bend: '0.000'};
@@ -91,6 +97,7 @@ import {description, title} from './_stage-masks-heat-haze.json';
     });
 
     const gui = new GUI({container: getDemoUi(), title: 'Crematorium Window'});
+    parts.onDispose(() => gui.destroy());
     // the strength is a uniform of the effect: it changes mid-transition and needs no new shader
     gui
       .add(settings, 'strength', 0, 3, 0.01)
@@ -114,15 +121,7 @@ import {description, title} from './_stage-masks-heat-haze.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      cycler.dispose();
-      gui.destroy();
-      heat.dispose();
-      snow.dispose();
-      ash.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

@@ -23,6 +23,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import {atlasFrame} from '~demos/utils/atlasFrame';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {disposeMaterial} from '~demos/utils/disposeMaterial';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
@@ -94,6 +95,9 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
       return;
     }
 
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loaded texture-atlas', {atlas, texture});
 
@@ -101,17 +105,15 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
     showTexturePreview(texture);
 
     const mesh = makeMesh(16, 32, 3.5, 1, atlas, texture);
+    // createTexturedQuads() built the geometry and the one material, the store lent the texture
+    parts.onDispose(() => {
+      mesh.geometry?.dispose();
+      disposeMaterial(mesh.material);
+    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('TexturedQuadsMesh', mesh);
 
     demo.scene.add(mesh);
-
-    demo.onDispose(() => {
-      // createTexturedQuads() built the geometry and the one material, the store lent the texture
-      mesh.geometry?.dispose();
-      disposeMaterial(mesh.material);
-      store.dispose();
-    });
   });
 </script>

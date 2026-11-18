@@ -46,6 +46,7 @@ import {description, title} from './_sprite-reflection.json';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
@@ -88,7 +89,10 @@ import {description, title} from './_sprite-reflection.json';
       return;
     }
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
+    const geometry = parts.keep(new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY));
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, 500, HEIGHT, SPRITE_SIZE);
     // the sprites fly to the edges of the window at any aspect; set before the first sprites are made
     const fitWidth = (width: number, height: number) => {
@@ -103,16 +107,20 @@ import {description, title} from './_sprite-reflection.json';
     renderSpriteCount(INITIAL_SPRITE_COUNT);
 
     // bakeDataTexture() hands its texture over to this page
-    const animsMap = frameBasedAnimations.bakeDataTexture({renderer});
-    const sprites = new FeatureSprites(AnimatedSpriteKind, {
-      geometry,
-      textures: {colorMap: texture, animsMap},
-      depthTest: false,
-      depthWrite: false,
-      passes: [ReflectionPass],
-      // darker, a little cool, half transparent
-      uniforms: {reflectionColor: [0.35, 0.38, 0.45, 0.55]},
-    });
+    const animsMap = parts.keep(frameBasedAnimations.bakeDataTexture({renderer}));
+    // the sprites release the material they built and leave the geometry they were handed to the
+    // page; the store takes its error listener and what it lent along
+    const sprites = parts.keep(
+      new FeatureSprites(AnimatedSpriteKind, {
+        geometry,
+        textures: {colorMap: texture, animsMap},
+        depthTest: false,
+        depthWrite: false,
+        passes: [ReflectionPass],
+        // darker, a little cool, half transparent
+        uniforms: {reflectionColor: [0.35, 0.38, 0.45, 0.55]},
+      }),
+    );
     // the container is centred on 0 and bounces at -HEIGHT / 2: lifted, the sprites touch the mirror
     sprites.position.y = HEIGHT / 2 + SPRITE_SIZE / 2;
     scene.add(sprites);
@@ -130,6 +138,10 @@ import {description, title} from './_sprite-reflection.json';
       new LineBasicMaterial({color: 0x1a1f2e}),
     );
     scene.add(horizon);
+    parts.onDispose(() => {
+      horizon.geometry.dispose();
+      horizon.material.dispose();
+    });
 
     on(demo, OnDisplayRenderFrame, ({deltaTime, now}) => {
       bouncingSprites.animate(deltaTime);
@@ -142,6 +154,7 @@ import {description, title} from './_sprite-reflection.json';
 
     // the .moreSprites and .lessSprites buttons are written by the markup of this very page
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     document.querySelector('.moreSprites')!.addEventListener(
       'click',
       () => {
@@ -158,18 +171,6 @@ import {description, title} from './_sprite-reflection.json';
       },
       {signal: listening.signal},
     );
-
-    demo.onDispose(() => {
-      listening.abort();
-      // the sprites release the material they built and leave the geometry they were handed to the
-      // page; the store takes its error listener and what it lent along
-      sprites.dispose();
-      geometry.dispose();
-      animsMap.dispose();
-      horizon.geometry.dispose();
-      horizon.material.dispose();
-      store.dispose();
-    });
   });
 
   demo.start();

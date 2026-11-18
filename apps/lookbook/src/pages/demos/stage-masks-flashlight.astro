@@ -30,6 +30,7 @@ import {description, title} from './_stage-masks-flashlight.json';
   } from '~demos/stage-masks/Crawlspace';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -64,17 +65,21 @@ import {description, title} from './_stage-masks-flashlight.json';
       return;
     }
 
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
     const rig = new CrawlRig(assets.layout);
     const nodes = makeLightNodes();
-    const dark = new CrawlDark(assets, rig, settings.projection);
-    const level = new CrawlLevel(assets, rig, nodes, settings.projection);
-    const flashlight = new CrawlFlashlight(rig, nodes);
+    const dark = parts.keep(new CrawlDark(assets, rig, settings.projection));
+    const level = parts.keep(new CrawlLevel(assets, rig, nodes, settings.projection));
+    const flashlight = parts.keep(new CrawlFlashlight(rig, nodes));
     // the cone follows the lens after the level moved the rig's camera and wrote the light
     on(level.stage, OnStageUpdateFrame, () => flashlight.update());
 
     // the mask lies in the world of the level: its scene is drawn through the level's camera,
     // whatever projection the level has at the moment of the draw
-    const mask = StageMask.inWorldOf(level.stage, flashlight.scene);
+    // the mask owns the stage it built, the scene stays the flashlight's
+    const mask = parts.keep(StageMask.inWorldOf(level.stage, flashlight.scene));
     director.setStack([dark.stage, level.stage]);
     director.setMask(level.stage, mask);
 
@@ -87,6 +92,7 @@ import {description, title} from './_stage-masks-flashlight.json';
     describe();
     // the read-outs a few times a second, not every frame: each one is a new string
     const readoutInterval = setInterval(describe, 200);
+    parts.onDispose(() => clearInterval(readoutInterval));
 
     const applyCone = () => {
       rig.halfAngle = (settings.coneAngle / 2) * (Math.PI / 180);
@@ -145,9 +151,11 @@ import {description, title} from './_stage-masks-flashlight.json';
       rig.input.left = rig.input.right = rig.input.up = rig.input.down = false;
       rig.input.pressed = false;
     };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', onKeyDown, {signal: listening.signal});
+    window.addEventListener('keyup', onKeyUp, {signal: listening.signal});
+    window.addEventListener('blur', onBlur, {signal: listening.signal});
 
     // the pointer aims the light; held down, the player crawls towards it
     const pointer = new Vector2();
@@ -164,12 +172,13 @@ import {description, title} from './_stage-masks-flashlight.json';
     const onPointerUp = () => {
       rig.input.pressed = false;
     };
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerdown', onPointerDown);
-    canvas.addEventListener('pointerup', onPointerUp);
-    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('pointermove', onPointerMove, {signal: listening.signal});
+    canvas.addEventListener('pointerdown', onPointerDown, {signal: listening.signal});
+    canvas.addEventListener('pointerup', onPointerUp, {signal: listening.signal});
+    canvas.addEventListener('pointercancel', onPointerUp, {signal: listening.signal});
 
     const gui = new GUI({container: getDemoUi(), title: 'The Crawlspace'});
+    parts.onDispose(() => gui.destroy());
     gui.add(settings, 'projection', ['parallax', 'orthographic']).name('projection (p)').onChange(applyProjection).listen();
     gui.add(settings, 'coneAngle', 16, 100, 1).name('cone angle °').onChange(applyCone);
     gui.add(settings, 'reach', 240, 800, 10).name('cone reach').onChange(applyCone);
@@ -193,24 +202,7 @@ import {description, title} from './_stage-masks-flashlight.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      clearInterval(readoutInterval);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
-      gui.destroy();
-      // the mask owns the stage it built, the scene stays the flashlight's
-      mask.dispose();
-      flashlight.dispose();
-      level.dispose();
-      dark.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

@@ -28,6 +28,7 @@ import {description, title} from './_stage-masks-matte-ink.json';
   import {InkBlotLayout, InkBlots, WetEdge} from '~demos/stage-masks/InkWell';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -63,17 +64,20 @@ import {description, title} from './_stage-masks-matte-ink.json';
       return;
     }
 
-    const title = new TitleCard(assets);
-    const hall = new DrownedHall(assets);
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
+    const title = parts.keep(new TitleCard(assets));
+    const hall = parts.keep(new DrownedHall(assets));
 
     // the ink: one layout of blots, read by the mask stage and by the wet edge above the slot.
     // The mask stage is never in the stack: matte() names its mask, and the director draws the ink
     // only while a transition through it runs
     const layout = new InkBlotLayout(1931);
-    const blots = new InkBlots(layout);
-    const ink = new StageMask(blots.stage, {source: 'alpha'});
+    const blots = parts.keep(new InkBlots(layout));
+    const ink = parts.keep(new StageMask(blots.stage, {source: 'alpha'}));
     blots.bind(ink);
-    const edge = new WetEdge(layout);
+    const edge = parts.keep(new WetEdge(layout));
     edge.bind(ink);
     // 'coverage' mode: the picture of the ink is the share of `to` — made once and reused
     const inkIn = matte({mask: ink});
@@ -85,28 +89,31 @@ import {description, title} from './_stage-masks-matte-ink.json';
 
     // the slot between the title card and the hall: played, scrubbed by hand or cycled, with Space,
     // Enter and S
-    const cycler = new TransitionCycler({
-      display,
-      director,
-      stages: [title.stage, hall.stage],
-      names: ['title card', 'the drowned hall'],
-      settings,
-      hold: HOLD,
-      effect: () => inkIn,
-      progress: () => ink.progress,
-      progressName: 'ink.progress',
-      onBegin: (_from, to) => {
-        // a new run, new blots — but the card of the lookbook is the same every time
-        if (!isPreview) layout.scatter();
-        edge.running = true;
-        if (to === title.stage) hall.pointer = undefined;
-      },
-      onEnd: () => {
-        edge.running = false;
-      },
-    });
+    const cycler = parts.keep(
+      new TransitionCycler({
+        display,
+        director,
+        stages: [title.stage, hall.stage],
+        names: ['title card', 'the drowned hall'],
+        settings,
+        hold: HOLD,
+        effect: () => inkIn,
+        progress: () => ink.progress,
+        progressName: 'ink.progress',
+        onBegin: (_from, to) => {
+          // a new run, new blots — but the card of the lookbook is the same every time
+          if (!isPreview) layout.scatter();
+          edge.running = true;
+          if (to === title.stage) hall.pointer = undefined;
+        },
+        onEnd: () => {
+          edge.running = false;
+        },
+      }),
+    );
 
     const gui = new GUI({container: getDemoUi(), title: 'The Inkwell Séance'});
+    parts.onDispose(() => gui.destroy());
     gui
       .add(settings, 'wetEdge')
       .name('wet edge (a layer above)')
@@ -127,9 +134,11 @@ import {description, title} from './_stage-masks-matte-ink.json';
     const onPointerLeave = () => {
       hall.pointer = undefined;
     };
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerleave', onPointerLeave);
-    window.addEventListener('blur', onPointerLeave);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    canvas.addEventListener('pointermove', onPointerMove, {signal: listening.signal});
+    canvas.addEventListener('pointerleave', onPointerLeave, {signal: listening.signal});
+    window.addEventListener('blur', onPointerLeave, {signal: listening.signal});
 
     // both shapes the slot takes — a scene alone, and the ink between two — with the ink and both
     // scenes drawn once ahead. One source and invert, so one shader of the matte
@@ -147,20 +156,7 @@ import {description, title} from './_stage-masks-matte-ink.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      cycler.dispose();
-      window.removeEventListener('blur', onPointerLeave);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerleave', onPointerLeave);
-      gui.destroy();
-      ink.dispose();
-      blots.dispose();
-      edge.dispose();
-      title.dispose();
-      hall.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

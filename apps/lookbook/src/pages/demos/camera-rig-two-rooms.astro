@@ -77,6 +77,7 @@ import {description, title} from './_camera-rig-two-rooms.json';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -103,17 +104,6 @@ import {description, title} from './_camera-rig-two-rooms.json';
 
   onDemoInit(display, 'camera-rig-two-rooms', async () => {
     const gltf = await new GLTFLoader().loadAsync(assetsUrl('camera-rig-two-rooms/two-rooms.glb'));
-    const camera = (name: string) => {
-      const found = gltf.scene.getObjectByName(name);
-      if (!(found instanceof PerspectiveCamera)) throw new Error(`two-rooms.glb has no perspective camera named ${name}`);
-      return found;
-    };
-    const controlRoom = camera('camera_control_room');
-    const dome = camera('camera_dome');
-    const flyCamera = camera('camera_flight');
-    const clip = gltf.animations.find(({name}) => name === 'through_the_door');
-    if (clip === undefined) throw new Error('two-rooms.glb has no clip named through_the_door');
-
     // the light of the rooms is baked into their texture: the material is unlit, and the scene needs
     // no light of its own
     const freeAsset = () =>
@@ -130,18 +120,36 @@ import {description, title} from './_camera-rig-two-rooms.json';
       return;
     }
 
+    const parts = new DemoParts(display);
+    parts.onDispose(freeAsset);
+
+    const camera = (name: string) => {
+      const found = gltf.scene.getObjectByName(name);
+      if (!(found instanceof PerspectiveCamera)) throw new Error(`two-rooms.glb has no perspective camera named ${name}`);
+      return found;
+    };
+    const controlRoom = camera('camera_control_room');
+    const dome = camera('camera_dome');
+    const flyCamera = camera('camera_flight');
+    const clip = gltf.animations.find(({name}) => name === 'through_the_door');
+    if (clip === undefined) throw new Error('two-rooms.glb has no clip named through_the_door');
+
     // the stage looks through the camera of the control room, fitted as Blender framed it: all of
     // its frame, with more above and below on a narrow screen
-    const stage = new Stage2D(new CameraProjection(controlRoom));
+    const stage = parts.keep(new Stage2D(new CameraProjection(controlRoom)));
     stage.scene.add(gltf.scene);
-    const stageRenderer = new StageRenderer(display).setClearColor(new Color('#05070d'), 1).add(stage);
-    const rig = new CameraRig(stage);
+    parts.keep(new StageRenderer(display).setClearColor(new Color('#05070d'), 1).add(stage));
+    const rig = parts.keep(new CameraRig(stage));
     display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
 
     // the flight through the door: playing and paused, the wheel sets its time, not the clock
     const mixer = new AnimationMixer(gltf.scene);
     const flight = mixer.clipAction(clip);
     flight.play().paused = true;
+    parts.onDispose(() => {
+      mixer.stopAllAction();
+      mixer.uncacheRoot(gltf.scene);
+    });
 
     const rooms = [controlRoom, dome];
     const keys: CameraTrackKey[] = [
@@ -193,6 +201,7 @@ import {description, title} from './_camera-rig-two-rooms.json';
     };
 
     const listeners = new AbortController();
+    parts.onDispose(() => listeners.abort());
     const {signal} = listeners;
 
     let down: {x: number; y: number; moved: boolean} | undefined;
@@ -251,6 +260,7 @@ import {description, title} from './_camera-rig-two-rooms.json';
     );
 
     const gui = new GUI({container: getDemoUi(), title: 'camera rig: two rooms'});
+    parts.onDispose(() => gui.destroy());
     gui.add({travel}, 'travel').name('the other room (click, space)');
     const liftController = gui.add(settings, 'lift').name('lift for the log (L)').onChange(setLift);
     const flightController = gui
@@ -258,17 +268,6 @@ import {description, title} from './_camera-rig-two-rooms.json';
       .name('through the door (wheel)')
       .decimals(3)
       .onChange((t: number) => fly(t, SMOOTH));
-
-    display.onDispose(() => {
-      listeners.abort();
-      gui.destroy();
-      rig.dispose();
-      stageRenderer.dispose();
-      stage.dispose();
-      mixer.stopAllAction();
-      mixer.uncacheRoot(gltf.scene);
-      freeAsset();
-    });
 
     preview.ready(display);
   });

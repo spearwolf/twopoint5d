@@ -29,6 +29,7 @@ import {description, title} from './_stage-post-process-etching.json';
   import {etching, nightVision} from '~demos/stage-post-process/looks';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -41,7 +42,7 @@ import {description, title} from './_stage-post-process-etching.json';
   // the director is the one renderer of the display: it draws every layer into a target of its own
   // and composes the stack in one pipeline, bottom to top, over its clear color
   const director = new StageDirector(display).setClearColor(new Color('#07060a'), 1);
-  // the director lets go of its layers; each layer goes in the onDispose() of the init
+  // the director lets go of its layers; each layer goes with the parts of the init
   display.onDispose(() => director.dispose());
 
   // one object per look, made once: a post-process is a description and keeps nothing of a build,
@@ -67,9 +68,12 @@ import {description, title} from './_stage-post-process-etching.json';
       return;
     }
 
-    const bathroom = new InkedRoom(assets, 'bathroom');
-    const reflection = new InkedRoom(assets, 'reflection');
-    const caption = new Caption();
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
+    const bathroom = parts.keep(new InkedRoom(assets, 'bathroom'));
+    const reflection = parts.keep(new InkedRoom(assets, 'reflection'));
+    const caption = parts.keep(new Caption());
     let shown = bathroom;
 
     // the look is a property of the stage: the director, the iris and the caption above know
@@ -107,6 +111,7 @@ import {description, title} from './_stage-post-process-etching.json';
     };
 
     const listeners = new AbortController();
+    parts.onDispose(() => listeners.abort());
     const {signal} = listeners;
     // a key in a field or on a button of the gui stays there
     window.addEventListener(
@@ -137,18 +142,10 @@ import {description, title} from './_stage-post-process-etching.json';
     );
 
     const gui = new GUI({container: getDemoUi(), title: 'an effect on one stage'});
+    parts.onDispose(() => gui.destroy());
     const lookController = gui.add(settings, 'look', lookNames).name('look (1, 2, 3)').onChange(applyLook);
     gui.add(settings, 'duration', 0.3, 4, 0.1).name('iris duration');
     gui.add({turn}, 'turn').name('through the glass (space)');
-
-    display.onDispose(() => {
-      listeners.abort();
-      gui.destroy();
-      bathroom.dispose();
-      reflection.dispose();
-      caption.dispose();
-      assets.store.dispose();
-    });
 
     await precompiled;
     if (display.isDisposed) return;

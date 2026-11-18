@@ -29,6 +29,7 @@ import {description, title} from './_stage-masks-rift.json';
   import {RiftMembrane, RiftRim, type RiftInput, RiftState} from '~demos/stage-masks/RiftMembrane';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -58,13 +59,16 @@ import {description, title} from './_stage-masks-rift.json';
       return;
     }
 
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
     const rift = new RiftState();
     rift.size = settings.size;
-    const membrane = new RiftMembrane(rift);
-    const snow = new TvSnow();
-    const world = new ListeningRoom(assets, rift);
-    const other = new DrownedRoom(assets, rift);
-    const rim = new RiftRim(rift);
+    const membrane = parts.keep(new RiftMembrane(rift));
+    const snow = parts.keep(new TvSnow());
+    const world = parts.keep(new ListeningRoom(assets, rift));
+    const other = parts.keep(new DrownedRoom(assets, rift));
+    const rim = parts.keep(new RiftRim(rift));
 
     // from the bottom up: the static, the world, the other world, the glowing rim of the rift. The
     // membrane is never in the stack: it is the mask stage, drawn once a frame for both its masks
@@ -72,9 +76,12 @@ import {description, title} from './_stage-masks-rift.json';
 
     // the rift: where the membrane covers 1 the other world shows, where it covers 0 the world
     let riftMask = new StageMask(membrane.stage, {source: settings.source});
+    // remakeMasks() replaces the mask and disposes the old one itself: the release reads the current one
+    parts.onDispose(() => riftMask.dispose());
     // the cut: the same membrane, inverted, on the world's slot — the world is cut out where the rift
     // is open, and wherever the drowned room's reception fades the static below shows instead of it
     let cutMask = new StageMask(membrane.stage, {source: settings.source, invert: true});
+    parts.onDispose(() => cutMask.dispose());
     director.setMask(other.stage, riftMask);
 
     const describe = (mask: StageMask | undefined) =>
@@ -148,9 +155,11 @@ import {description, title} from './_stage-masks-rift.json';
       rift.input.left = rift.input.right = rift.input.up = rift.input.down = false;
       rift.input.target = undefined;
     };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', onKeyDown, {signal: listening.signal});
+    window.addEventListener('keyup', onKeyUp, {signal: listening.signal});
+    window.addEventListener('blur', onBlur, {signal: listening.signal});
 
     // a pointer drag leads the rift: into units of the view, from its middle
     let dragging = false;
@@ -173,12 +182,13 @@ import {description, title} from './_stage-masks-rift.json';
       dragging = false;
       rift.input.target = undefined;
     };
-    canvas.addEventListener('pointerdown', onPointerDown);
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerup', onPointerUp);
-    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('pointerdown', onPointerDown, {signal: listening.signal});
+    canvas.addEventListener('pointermove', onPointerMove, {signal: listening.signal});
+    canvas.addEventListener('pointerup', onPointerUp, {signal: listening.signal});
+    canvas.addEventListener('pointercancel', onPointerUp, {signal: listening.signal});
 
     const gui = new GUI({container: getDemoUi(), title: 'Deep Listening'});
+    parts.onDispose(() => gui.destroy());
     gui
       .add(settings, 'size', 80, 320, 1)
       .name('rift size')
@@ -202,25 +212,7 @@ import {description, title} from './_stage-masks-rift.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
-      gui.destroy();
-      riftMask.dispose();
-      cutMask.dispose();
-      membrane.dispose();
-      snow.dispose();
-      world.dispose();
-      other.dispose();
-      rim.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

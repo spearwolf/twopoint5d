@@ -60,6 +60,7 @@ import {description, title} from './_boomer-shooter-corridor.json';
   import {NeonSigns} from '~demos/boomer-shooter-corridor/NeonSigns';
   import {Stalkers} from '~demos/boomer-shooter-corridor/Stalkers';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {bindFullscreenButton} from '~demos/utils/fullscreenButton';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -126,9 +127,12 @@ import {description, title} from './_boomer-shooter-corridor.json';
       return;
     }
 
-    const corridor = new Corridor({wall, floor, ceiling, door});
-    const stalkers = new Stalkers({atlas: stalkerAtlas, texture: stalkerTexture}, STALKER_COUNT);
-    const signs = new NeonSigns({atlas: signsAtlas, texture: signsTexture});
+    const parts = new DemoParts(display);
+    parts.keep(store);
+
+    const corridor = parts.keep(new Corridor({wall, floor, ceiling, door}));
+    const stalkers = parts.keep(new Stalkers({atlas: stalkerAtlas, texture: stalkerTexture}, STALKER_COUNT));
+    const signs = parts.keep(new NeonSigns({atlas: signsAtlas, texture: signsTexture}));
     stage.scene.add(corridor, stalkers.sprites, signs.sprites);
 
     // the shadows fall on the floor, thrown from the lamp that glides along the ceiling: both
@@ -138,7 +142,7 @@ import {description, title} from './_boomer-shooter-corridor.json';
 
     // a click asks the gpu which stalker is drawn under the pointer — pixel-perfect: a click into the
     // clear pixels beside its body lands on nothing
-    const picker = new SpritePicker(renderer);
+    const picker = parts.keep(new SpritePicker(renderer));
     const score = document.querySelector('.score')!;
     let hits = 0;
     let downs = 0;
@@ -175,6 +179,7 @@ import {description, title} from './_boomer-shooter-corridor.json';
       autoplayButton.textContent = `autoplay: ${on ? 'on' : 'off'}`;
     };
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     const {signal} = listening;
     autoplayButton.addEventListener(
       'click',
@@ -201,15 +206,6 @@ import {description, title} from './_boomer-shooter-corridor.json';
       },
       {signal},
     );
-
-    display.onDispose(() => {
-      listening.abort();
-      picker.dispose();
-      stalkers.dispose();
-      signs.dispose();
-      corridor.dispose();
-      store.dispose();
-    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('boomer shooter corridor', {stalkers, signs, corridor, stage});

@@ -25,6 +25,7 @@ import {description, title} from './_stage-transitions-game-menu.json';
   import {TitleMenu} from '~demos/stage-transitions/TitleMenu';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -37,7 +38,7 @@ import {description, title} from './_stage-transitions-game-menu.json';
   // the director is the one renderer of the display: it draws every layer into a target of its own
   // and composes the stack in one pipeline, bottom to top, over its clear color
   const director = new StageDirector(display).setClearColor(new Color('#05060d'), 1);
-  // the director lets go of its layers; each layer goes in the onDispose() of the init
+  // the director lets go of its layers; each layer goes with the parts of the init
   display.onDispose(() => director.dispose());
 
   const effects = makeEffects();
@@ -59,10 +60,15 @@ import {description, title} from './_stage-transitions-game-menu.json';
       return;
     }
 
-    const stars = new Starfield(assets.dot);
-    const title = new TitleMenu(assets);
-    const level = new GameLevel(renderer, assets, input);
-    const pause = new PauseMenu(assets);
+    const parts = new DemoParts(display);
+    parts.keep(store);
+    // drawn on a canvas, not lent by the store: the dot is the page's to free
+    parts.keep(assets.dot);
+
+    const stars = parts.keep(new Starfield(assets.dot));
+    const title = parts.keep(new TitleMenu(assets));
+    const level = parts.keep(new GameLevel(renderer, assets, input));
+    const pause = parts.keep(new PauseMenu(assets));
 
     // the stars stay in the bottom slot from the start to the end: every transition runs above them
     director.setStack([stars.stage, title.stage]);
@@ -144,9 +150,11 @@ import {description, title} from './_stage-transitions-game-menu.json';
       if (key) input[key] = false;
     };
     const onClick = start;
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    canvas.addEventListener('click', onClick);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', onKeyDown, {signal: listening.signal});
+    window.addEventListener('keyup', onKeyUp, {signal: listening.signal});
+    canvas.addEventListener('click', onClick, {signal: listening.signal});
 
     const menuEffects = [...effects.keys()].filter((name) => !name.startsWith('luma'));
 
@@ -170,6 +178,7 @@ import {description, title} from './_stage-transitions-game-menu.json';
     );
 
     const gui = new GUI({container: getDemoUi(), title: 'transition'});
+    parts.onDispose(() => gui.destroy());
     gui.add(settings, 'effect', menuEffects).onChange(showInfo);
     gui.add(settings, 'duration', 0.1, 3, 0.1).onChange(showInfo);
     gui.add(settings, 'easing', ['linear', 'ease-in', 'ease-out', 'ease-in-out']).onChange(showInfo);
@@ -177,19 +186,6 @@ import {description, title} from './_stage-transitions-game-menu.json';
     gui.add({start}, 'start').name('start (enter)');
     gui.add({pause: togglePause}, 'pause').name('pause / resume (esc)');
     gui.add({quit}, 'quit').name('quit to title (q)');
-
-    display.onDispose(() => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      canvas.removeEventListener('click', onClick);
-      gui.destroy();
-      stars.dispose();
-      title.dispose();
-      level.dispose();
-      pause.dispose();
-      assets.dot.dispose();
-      store.dispose();
-    });
 
     await precompiled;
     if (display.isDisposed) return;

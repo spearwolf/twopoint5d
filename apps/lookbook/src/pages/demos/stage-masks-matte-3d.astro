@@ -28,6 +28,7 @@ import {description, title} from './_stage-masks-matte-3d.json';
   import {type MirrorMaskScene, MirrorShatter} from '~demos/stage-masks/MirrorShatter';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -68,17 +69,20 @@ import {description, title} from './_stage-masks-matte-3d.json';
       return;
     }
 
-    const bathroom = new MirrorScene(assets, 'bathroom');
-    const reflection = new MirrorScene(assets, 'reflection');
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
+    const bathroom = parts.keep(new MirrorScene(assets, 'bathroom'));
+    const reflection = parts.keep(new MirrorScene(assets, 'reflection'));
 
     // the mask stage: a 3D scene under its own perspective camera, with a bloom in its own pipeline.
     // It is never in the stack: the director draws it only while a transition through it runs
-    const shatter = new MirrorShatter(assets.layout);
+    const shatter = parts.keep(new MirrorShatter(assets.layout));
     shatter.attachPipeline(renderer);
     // two masks on the one stage, read two ways: the alpha is the coverage of the geometry, the
     // luminance is its look — the bloom included. Each makes its own matte, compiled once
-    const byCoverage = new StageMask(shatter.stage, {source: 'alpha'});
-    const byLook = new StageMask(shatter.stage, {source: 'luminance'});
+    const byCoverage = parts.keep(new StageMask(shatter.stage, {source: 'alpha'}));
+    const byLook = parts.keep(new StageMask(shatter.stage, {source: 'luminance'}));
     const throughCoverage = matte({mask: byCoverage});
     const throughLook = matte({mask: byLook});
 
@@ -89,23 +93,25 @@ import {description, title} from './_stage-masks-matte-3d.json';
 
     // the slot between the bathroom and its reflection: played, scrubbed by hand or cycled, with
     // Space, Enter and S
-    const cycler = new TransitionCycler({
-      display,
-      director,
-      stages: [bathroom.stage, reflection.stage],
-      names: ['the bathroom', 'the reflection'],
-      settings,
-      hold: HOLD,
-      // the mask scene and the source the UI picked take effect with a new run, never in the middle of one
-      onBegin: () => {
-        shatter.setScene(settings.scene);
-        runningMask = settings.reads === 'look (luminance)' ? byLook : byCoverage;
-        shatter.follow(runningMask);
-      },
-      effect: () => (runningMask === byLook ? throughLook : throughCoverage),
-      progress: () => runningMask.progress,
-      progressName: 'mask.progress',
-    });
+    const cycler = parts.keep(
+      new TransitionCycler({
+        display,
+        director,
+        stages: [bathroom.stage, reflection.stage],
+        names: ['the bathroom', 'the reflection'],
+        settings,
+        hold: HOLD,
+        // the mask scene and the source the UI picked take effect with a new run, never in the middle of one
+        onBegin: () => {
+          shatter.setScene(settings.scene);
+          runningMask = settings.reads === 'look (luminance)' ? byLook : byCoverage;
+          shatter.follow(runningMask);
+        },
+        effect: () => (runningMask === byLook ? throughLook : throughCoverage),
+        progress: () => runningMask.progress,
+        progressName: 'mask.progress',
+      }),
+    );
 
     // the readouts of the mask scene and of the source of the run, written only when they change
     const readout = {mask: maskName(settings.scene), reads: settings.reads};
@@ -124,6 +130,7 @@ import {description, title} from './_stage-masks-matte-3d.json';
     });
 
     const gui = new GUI({container: getDemoUi(), title: 'Mirror, Mirror'});
+    parts.onDispose(() => gui.destroy());
     // a change of the mask scene or of the source while scrubbing restarts the scrub with it, from
     // where the slider stands; in a run it waits for the next one
     gui
@@ -159,17 +166,7 @@ import {description, title} from './_stage-masks-matte-3d.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      cycler.dispose();
-      gui.destroy();
-      byCoverage.dispose();
-      byLook.dispose();
-      shatter.dispose();
-      bathroom.dispose();
-      reflection.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

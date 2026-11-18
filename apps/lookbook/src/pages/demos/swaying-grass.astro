@@ -20,6 +20,7 @@ import {description, title} from './_swaying-grass.json';
   import GUI from 'lil-gui';
   import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
   import {Color, PerspectiveCamera, RenderPipeline} from 'three/webgpu';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -96,7 +97,10 @@ import {description, title} from './_swaying-grass.json';
       return;
     }
 
-    const meadow = new SwayingMeadow({atlas, texture}, {back, ground});
+    const parts = new DemoParts(display);
+    parts.keep(store);
+
+    const meadow = parts.keep(new SwayingMeadow({atlas, texture}, {back, ground}));
     stage.scene.add(meadow);
 
     // the meadow moves and the camera turns before the stage renderer draws the frame
@@ -106,6 +110,7 @@ import {description, title} from './_swaying-grass.json';
     });
 
     const gui = new GUI({title: 'swaying grass', container: getDemoUi()});
+    parts.onDispose(() => gui.destroy());
     const settings = {
       base: meadow.baseName,
       placement: meadow.placementName,
@@ -181,12 +186,6 @@ import {description, title} from './_swaying-grass.json';
     output.add(adaptiveStatus, 'scale').name('resolutionScale').disable().listen();
     output.add(adaptiveStatus, 'method').name('method').disable().listen();
     output.add(adaptiveStatus, 'gpuTime').name('GPU time').disable().listen();
-
-    display.onDispose(() => {
-      gui.destroy();
-      meadow.dispose();
-      store.dispose();
-    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('swaying meadow', meadow);

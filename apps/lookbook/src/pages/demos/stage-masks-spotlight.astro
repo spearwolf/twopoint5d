@@ -38,6 +38,7 @@ import {description, title} from './_stage-masks-spotlight.json';
   import {type RigInput, WardRig} from '~demos/stage-masks/WardRig';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -68,13 +69,16 @@ import {description, title} from './_stage-masks-spotlight.json';
       return;
     }
 
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
     const rig = new WardRig();
     const nodes = makeLightNodes(rig);
-    const deep = new WardDeep(assets, rig);
-    const ward = new WardLevel(assets, rig, nodes, WARD_C);
-    const laundromat = new WardLevel(assets, rig, nodes, LAUNDROMAT);
-    const player = new WardPlayer(assets, rig);
-    const fog = new WardFog(rig);
+    const deep = parts.keep(new WardDeep(assets, rig));
+    const ward = parts.keep(new WardLevel(assets, rig, nodes, WARD_C));
+    const laundromat = parts.keep(new WardLevel(assets, rig, nodes, LAUNDROMAT));
+    const player = parts.keep(new WardPlayer(assets, rig));
+    const fog = parts.keep(new WardFog(rig));
 
     // `level` is the level of the slot's end state, the one setMask() and maskOf() take; `shown` is the
     // level the player walks in, which changes only once a crossfade into the next one has ended
@@ -93,6 +97,8 @@ import {description, title} from './_stage-masks-spotlight.json';
     // the fog is never in the stack: it is the mask of the level's slot
     director.setStack([deep.stage, ward.stage, player.stage]);
     let mask = new StageMask(fog.stage, {source: settings.source, invert: settings.invert});
+    // the mask is replaced by remakeMask(), which disposes the old one: whichever is current goes with the display
+    parts.onDispose(() => mask.dispose());
     director.setMask(ward.stage, mask);
 
     const readout = {level: level.config.name, maskOf: ''};
@@ -177,9 +183,11 @@ import {description, title} from './_stage-masks-spotlight.json';
       rig.input.left = rig.input.right = rig.input.up = rig.input.down = false;
       rig.input.target = undefined;
     };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', onKeyDown, {signal: listening.signal});
+    window.addEventListener('keyup', onKeyUp, {signal: listening.signal});
+    window.addEventListener('blur', onBlur, {signal: listening.signal});
 
     // a pointer drag leads the player: into units of the view, from its middle
     let dragging = false;
@@ -202,12 +210,13 @@ import {description, title} from './_stage-masks-spotlight.json';
       dragging = false;
       rig.input.target = undefined;
     };
-    canvas.addEventListener('pointerdown', onPointerDown);
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerup', onPointerUp);
-    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('pointerdown', onPointerDown, {signal: listening.signal});
+    canvas.addEventListener('pointermove', onPointerMove, {signal: listening.signal});
+    canvas.addEventListener('pointerup', onPointerUp, {signal: listening.signal});
+    canvas.addEventListener('pointercancel', onPointerUp, {signal: listening.signal});
 
     const gui = new GUI({container: getDemoUi(), title: 'Ward C, 3:07 a.m.'});
+    parts.onDispose(() => gui.destroy());
     gui.add(settings, 'source', ['alpha', 'luminance', 'red', 'green', 'blue']).onChange(remakeMask);
     gui.add(settings, 'invert').name('invert (i)').onChange(remakeMask).listen();
     gui.add(settings, 'mask').name('mask on the slot (m)').onChange(toggleMask).listen();
@@ -231,25 +240,7 @@ import {description, title} from './_stage-masks-spotlight.json';
     );
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
-      gui.destroy();
-      mask.dispose();
-      deep.dispose();
-      ward.dispose();
-      laundromat.dispose();
-      player.dispose();
-      fog.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

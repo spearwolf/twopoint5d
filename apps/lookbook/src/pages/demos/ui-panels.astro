@@ -47,6 +47,7 @@ import {description, title} from './_ui-panels.json';
   import {PARTY} from '~demos/ui-panels/party';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {fetchText} from '~demos/utils/fetchAsset';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -116,19 +117,25 @@ import {description, title} from './_ui-panels.json';
       return;
     }
 
+    const parts = new DemoParts(display);
+    parts.keep(store);
+
     // the text spelling of BMFont; the json next to it reads the same
     const [font] = BitmapFont.parse(fnt);
 
-    const screen = new DungeonScreen({
-      kit,
-      kitTexture,
-      icons,
-      iconsTexture,
-      font,
-      fontTexture,
-      fontImage,
-      portraits: new Map(portraits),
-    });
+    // the screen releases its meshes and its DynamicAtlas, the store the textures it loaded
+    const screen = parts.keep(
+      new DungeonScreen({
+        kit,
+        kitTexture,
+        icons,
+        iconsTexture,
+        font,
+        fontTexture,
+        fontImage,
+        portraits: new Map(portraits),
+      }),
+    );
     stage.scene.add(screen);
     screen.onComposed = () => preview.ready(display);
 
@@ -142,6 +149,7 @@ import {description, title} from './_ui-panels.json';
       return [event.clientX - rect.left, event.clientY - rect.top, topInset()] as const;
     };
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     const {signal} = listening;
     canvas.addEventListener(
       'pointermove',
@@ -179,17 +187,10 @@ import {description, title} from './_ui-panels.json';
     const readout = setInterval(() => {
       drawCalls.textContent = `draw calls: ${renderer.info.render.drawCalls}`;
     }, 250);
+    parts.onDispose(() => clearInterval(readout));
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('ui panels', screen);
-
-    display.onDispose(() => {
-      listening.abort();
-      clearInterval(readout);
-      // the screen releases its meshes and its DynamicAtlas, the store the textures it loaded
-      screen.dispose();
-      store.dispose();
-    });
   });
 
   await display.start();

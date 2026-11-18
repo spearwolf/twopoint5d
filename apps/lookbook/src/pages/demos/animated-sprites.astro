@@ -43,6 +43,7 @@ import {description, title} from './_animated-sprites.json';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas());
@@ -83,7 +84,10 @@ import {description, title} from './_animated-sprites.json';
       return;
     }
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
+    const geometry = parts.keep(new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY));
 
     const bouncingSprites = new BouncingSprites(geometry.instancedPool, 500, 75, 7);
 
@@ -97,14 +101,18 @@ import {description, title} from './_animated-sprites.json';
     renderSpriteCount(INITIAL_SPRITE_COUNT);
 
     // bakeDataTexture() hands its texture over to this page
-    const animsMap = frameBasedAnimations.bakeDataTexture({renderer});
-    const material = new FeatureSpritesMaterial(AnimatedSpriteKind, {
-      textures: {colorMap: texture, animsMap},
-      depthTest: false,
-      depthWrite: false,
-    });
+    const animsMap = parts.keep(frameBasedAnimations.bakeDataTexture({renderer}));
+    const material = parts.keep(
+      new FeatureSpritesMaterial(AnimatedSpriteKind, {
+        textures: {colorMap: texture, animsMap},
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
 
-    const mesh = new FeatureSprites(AnimatedSpriteKind, {geometry, material});
+    // the sprites leave the geometry and the material they were handed to the page; the store
+    // takes its error listener and what it lent along
+    const mesh = parts.keep(new FeatureSprites(AnimatedSpriteKind, {geometry, material}));
 
     scene.add(mesh);
 
@@ -121,6 +129,7 @@ import {description, title} from './_animated-sprites.json';
 
     // the .moreSprites and .lessSprites buttons are written by the markup of this very page
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     document.querySelector('.moreSprites')!.addEventListener(
       'click',
       () => {
@@ -138,17 +147,6 @@ import {description, title} from './_animated-sprites.json';
       },
       {signal: listening.signal},
     );
-
-    demo.onDispose(() => {
-      listening.abort();
-      // the sprites leave the geometry and the material they were handed to the page; the store
-      // takes its error listener and what it lent along
-      mesh.dispose();
-      material.dispose();
-      geometry.dispose();
-      animsMap.dispose();
-      store.dispose();
-    });
   });
 
   demo.start();

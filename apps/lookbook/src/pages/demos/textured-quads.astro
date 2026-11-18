@@ -24,6 +24,7 @@ import {description, title} from './_textured-quads.json';
   import {AgXToneMapping, NodeMaterial} from 'three/webgpu';
   import {InstancedQuadsGeometry, setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {disposeMaterial} from '~demos/utils/disposeMaterial';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
@@ -114,6 +115,9 @@ import {description, title} from './_textured-quads.json';
       return;
     }
 
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('loaded texture-image', {texCoords, texture});
 
@@ -121,14 +125,12 @@ import {description, title} from './_textured-quads.json';
     showTexturePreview(texture);
 
     const mesh = createMesh(16, 32, 3.7, 1, texCoords, texture);
-    demo.scene.add(mesh);
-
-    demo.onDispose(() => {
-      // createMesh() built the geometry and the one material, the store lent the texture
+    // createMesh() built the geometry and the one material, the store lent the texture
+    parts.onDispose(() => {
       mesh.geometry?.dispose();
       disposeMaterial(mesh.material);
-      store.dispose();
     });
+    demo.scene.add(mesh);
   });
 
   // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose

@@ -38,6 +38,7 @@ import {description, title} from './_sine-scroller.json';
   import {FONT_PALETTES, SineScroller, TUNNEL_PALETTES} from '~demos/sine-scroller/SineScroller';
   import assetsUrl from '~demos/utils/assetsUrl';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {fetchText} from '~demos/utils/fetchAsset';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -145,19 +146,25 @@ import {description, title} from './_sine-scroller.json';
       return;
     }
 
-    const scroller = new SineScroller({
-      chromeFont,
-      chromePage,
-      chromePalette,
-      pixelFont,
-      pixelPage,
-      copperBars,
-      copperTexture,
-      sabers,
-      saberTexture,
-      tunnel,
-      tunnelPalette,
-    });
+    const parts = new DemoParts(display);
+    parts.keep(store);
+
+    // the meshes release the materials they built, the store its textures
+    const scroller = parts.keep(
+      new SineScroller({
+        chromeFont,
+        chromePage,
+        chromePalette,
+        pixelFont,
+        pixelPage,
+        copperBars,
+        copperTexture,
+        sabers,
+        saberTexture,
+        tunnel,
+        tunnelPalette,
+      }),
+    );
     stage.scene.add(scroller);
 
     // the stage measures its view in pixels of the art; the scroller lays itself out in it
@@ -171,6 +178,7 @@ import {description, title} from './_sine-scroller.json';
     const fontButton = document.querySelector('.nextFontPalette')!;
     const tunnelButton = document.querySelector('.nextTunnelPalette')!;
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     const {signal} = listening;
     bloomButton.addEventListener(
       'click',
@@ -207,13 +215,6 @@ import {description, title} from './_sine-scroller.json';
       },
       {signal},
     );
-
-    display.onDispose(() => {
-      listening.abort();
-      // the meshes release the materials they built, the store its textures
-      scroller.dispose();
-      store.dispose();
-    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('sine scroller', scroller);

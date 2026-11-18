@@ -1,10 +1,8 @@
 // biome-ignore-all lint/suspicious/noConsole: the demo logs to the devtools on purpose
-import {once} from '@spearwolf/eventize';
 import {
   AABB2,
   Map2DTileCoords,
   Map2DTileRenderer,
-  OnDisplayDispose,
   RepeatingTilesProvider,
   TileSprites,
   TileSpritesFactory,
@@ -12,11 +10,14 @@ import {
   TileSpritesMaterial,
 } from '@spearwolf/twopoint5d';
 import {BoxGeometry, EdgesGeometry, Fog, LineBasicMaterial, LineSegments, Vector3} from 'three/webgpu';
+import {DemoParts} from '../utils/demoParts';
 import {loadTextureCatalog} from '../utils/loadTextureCatalog';
 import type {PerspectiveOrbitDemo} from '../utils/PerspectiveOrbitDemo';
 
 export const run = (demo: PerspectiveOrbitDemo) =>
   demo.start(async ({renderer}) => {
+    // the display lives here, and what is built before the await goes with it as well when the load fails
+    const parts = new DemoParts(demo);
     const {scene, camera} = demo;
 
     camera.position.set(0, 350, 500);
@@ -24,9 +25,11 @@ export const run = (demo: PerspectiveOrbitDemo) =>
 
     scene.fog = new Fog(0x458497, 300, 1500);
 
-    const geometry = new BoxGeometry(512, 20, 512);
-    const edges = new EdgesGeometry(geometry);
+    // the frame around the map
+    const geometry = parts.keep(new BoxGeometry(512, 20, 512));
+    const edges = parts.keep(new EdgesGeometry(geometry));
     const line = new LineSegments(edges, new LineBasicMaterial({color: 0xf0f0f0}));
+    parts.onDispose(() => line.material.dispose());
 
     scene.add(line);
 
@@ -38,14 +41,15 @@ export const run = (demo: PerspectiveOrbitDemo) =>
       store.dispose();
       throw error;
     });
-    // a dispose() while the tiles loaded has gone out already: the frame built before goes as well
+    // a dispose() while the tiles loaded has gone out already, and with it everything built before the
+    // await: only the store is left
     if (demo.isDisposed) {
-      edges.dispose();
-      geometry.dispose();
-      line.material.dispose();
       store.dispose();
       return;
     }
+
+    // the texture belongs to the store, which releases it with its resource
+    parts.keep(store);
 
     const tileDataProvider = new RepeatingTilesProvider([
       [1, 2],
@@ -58,10 +62,16 @@ export const run = (demo: PerspectiveOrbitDemo) =>
         colorMap: texture,
       }),
     );
+    parts.onDispose(() => {
+      tileSprites.geometry?.dispose();
+      tileSprites.material?.dispose();
+    });
 
     // ------------------------------------------------------
 
-    const tiles = new Map2DTileRenderer(new TileSpritesFactory(tileSprites, tileSet, tileDataProvider));
+    // the renderer gives its tile slots back to the factory before the geometry and the material behind
+    // those slots fall: kept after them
+    const tiles = parts.keep(new Map2DTileRenderer(new TileSpritesFactory(tileSprites, tileSet, tileDataProvider)));
 
     scene.add(tiles.node);
 
@@ -77,19 +87,4 @@ export const run = (demo: PerspectiveOrbitDemo) =>
     // ------------------------------------------------------
 
     console.log('tileRenderer', tiles);
-
-    // the display carries the lifetime of everything this demo built, so its end is where they go
-    once(demo, OnDisplayDispose, () => {
-      // in this order: the renderer gives its tile slots back to the factory, and only then do the
-      // geometry and the material behind those slots fall
-      tiles.dispose();
-      tileSprites.geometry?.dispose();
-      tileSprites.material?.dispose();
-      // the texture belongs to the store, which releases it with its resource
-      store.dispose();
-      // the frame around the map
-      edges.dispose();
-      geometry.dispose();
-      line.material.dispose();
-    });
   });

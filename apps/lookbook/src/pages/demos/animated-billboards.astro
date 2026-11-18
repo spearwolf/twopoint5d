@@ -46,6 +46,7 @@ import {description, title} from './_animated-billboards.json';
   import {DirectionalLight, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
   import {BouncingSprites} from '~demos/animated-billboards/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
@@ -71,7 +72,11 @@ import {description, title} from './_animated-billboards.json';
       return;
     }
 
-    const geometry = new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY);
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
+    // the geometry is handed to the sprites, which leave it to the page
+    const geometry = parts.keep(new FeatureSpritesGeometry(AnimatedSpriteKind, CAPACITY));
 
     const anims = new FrameBasedAnimations();
     const animId = anims.add('anim0', 0.66, tileSet, [1, 2, 3, 4, 5, 4, 3, 2]);
@@ -81,16 +86,18 @@ import {description, title} from './_animated-billboards.json';
     bouncingSprites.createSprites(CAPACITY, animId);
 
     // bakeDataTexture() hands its texture over to this page
-    const animsMap = anims.bakeDataTexture({renderer});
-    const mesh = new FeatureSprites(AnimatedSpriteKind, {
-      geometry,
-      textures: {colorMap: texture, animsMap},
-      placement: BillboardPlacement,
-      depthTest: true,
-      depthWrite: true,
-      passes: [ShadowPass],
-      uniforms: {shadowColor: [0, 0, 0, 0.45]},
-    });
+    const animsMap = parts.keep(anims.bakeDataTexture({renderer}));
+    const mesh = parts.keep(
+      new FeatureSprites(AnimatedSpriteKind, {
+        geometry,
+        textures: {colorMap: texture, animsMap},
+        placement: BillboardPlacement,
+        depthTest: true,
+        depthWrite: true,
+        passes: [ShadowPass],
+        uniforms: {shadowColor: [0, 0, 0, 0.45]},
+      }),
+    );
 
     demo.scene.add(mesh);
 
@@ -110,11 +117,13 @@ import {description, title} from './_animated-billboards.json';
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('BouncingSprites', bouncingSprites);
 
-    const planeGeometry = new PlaneGeometry(400, 400);
-    const planeMaterial = new MeshBasicMaterial({
-      transparent: true,
-      map: blueGroundTexture,
-    });
+    const planeGeometry = parts.keep(new PlaneGeometry(400, 400));
+    const planeMaterial = parts.keep(
+      new MeshBasicMaterial({
+        transparent: true,
+        map: blueGroundTexture,
+      }),
+    );
 
     const plane = new Mesh(planeGeometry, planeMaterial);
     plane.rotation.x = -Math.PI / 2;
@@ -128,17 +137,6 @@ import {description, title} from './_animated-billboards.json';
     // the front face of the ground looks up: rotation.x = -π/2 turns its normal +Z to +Y
     mesh.bindUniform('groundPlane', planeOf(plane));
     mesh.bindUniform('shadowLight', lightOf(sun));
-
-    demo.onDispose(() => {
-      // what this init built; the geometry was handed to the sprites, which leave it to the page,
-      // and what the store lent goes with the store
-      mesh.dispose();
-      geometry.dispose();
-      animsMap.dispose();
-      planeGeometry.dispose();
-      planeMaterial.dispose();
-      store.dispose();
-    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('FeatureSprites', mesh);

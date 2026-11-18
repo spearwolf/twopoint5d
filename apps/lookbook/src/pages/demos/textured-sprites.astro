@@ -29,6 +29,7 @@ import {description, title} from './_textured-sprites.json';
   import {BouncingSprites} from '~demos/textured-sprites/BouncingSprites';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
 
@@ -49,9 +50,13 @@ import {description, title} from './_textured-sprites.json';
       return;
     }
 
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
     const CAPACITY = 256;
 
-    const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: CAPACITY, textures: {colorMap: texture}});
+    // the sprites release the geometry and the material they built; the store lent the texture
+    const sprites = parts.keep(new FeatureSprites(TexturedSpriteKind, {capacity: CAPACITY, textures: {colorMap: texture}}));
 
     // the constructor always creates a FeatureSpritesMaterial; only dispose() takes it away again
     const material = sprites.material!;
@@ -62,6 +67,7 @@ import {description, title} from './_textured-sprites.json';
 
     // the .render-as-billboards element is written by the markup of this very page
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     document.querySelector(`.${RENDER_AS_BILLBOARDS}`)!.addEventListener(
       'pointerdown',
       (e) => {
@@ -93,13 +99,6 @@ import {description, title} from './_textured-sprites.json';
     demo.onRenderFrame(({deltaTime}) => {
       bouncingSprites.animate(deltaTime);
       sprites.update();
-    });
-
-    demo.onDispose(() => {
-      listening.abort();
-      // the sprites release the geometry and the material they built; the store lent the texture
-      sprites.dispose();
-      store.dispose();
     });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose

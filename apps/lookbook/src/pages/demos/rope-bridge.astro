@@ -50,6 +50,7 @@ import {description, title} from './_rope-bridge.json';
   import {Color, RenderPipeline} from 'three/webgpu';
   import {CAVE_HEIGHT, RopeBridge} from '~demos/rope-bridge/RopeBridge';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
@@ -105,7 +106,10 @@ import {description, title} from './_rope-bridge.json';
       return;
     }
 
-    bridge = new RopeBridge(stage.scene, {atlas, texture, caveBack, caveMid, caveFront});
+    const parts = new DemoParts(display);
+    parts.keep(store);
+
+    bridge = parts.keep(new RopeBridge(stage.scene, {atlas, texture, caveBack, caveMid, caveFront}));
     const view = projection.getViewRect();
     if (view.height > 0) bridge.resizeView(view.width, view.height);
 
@@ -126,6 +130,7 @@ import {description, title} from './_rope-bridge.json';
       ];
     };
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     const {signal} = listening;
     canvas.addEventListener(
       'pointerdown',
@@ -167,12 +172,6 @@ import {description, title} from './_rope-bridge.json';
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('rope bridge', bridge);
-
-    display.onDispose(() => {
-      listening.abort();
-      bridge?.dispose();
-      store.dispose();
-    });
   });
 
   display.onDispose(() => {

@@ -95,6 +95,7 @@ import {description, title} from './_camera-rig-into-the-map.json';
   import {jsonList, jsonNumber, jsonObject, jsonTuple} from '~demos/utils/checkJson';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {fetchJson} from '~demos/utils/fetchAsset';
@@ -132,6 +133,10 @@ import {description, title} from './_camera-rig-into-the-map.json';
   const director = new StageDirector(display).setClearColor(new Color(VOID), 1);
   // made once: the director keeps one graph for it, both ways
   const fade = crossfade();
+  // here, before the init: the director goes even when the display is disposed before the init
+  // or while it loads, and before the rigs that fly through it; it only lets go of what it shows,
+  // which the init frees
+  display.onDispose(() => director.dispose());
 
   const settings = {follow: false};
 
@@ -158,28 +163,29 @@ import {description, title} from './_camera-rig-into-the-map.json';
       freeAsset();
       return;
     }
+    const parts = new DemoParts(display);
+    parts.onDispose(freeAsset);
     const stationCamera = gltf.scene.getObjectByName('camera_station');
     const lampAnchor = gltf.scene.getObjectByName('mast_lamp');
     if (!(stationCamera instanceof PerspectiveCamera) || lampAnchor === undefined) {
-      freeAsset();
       throw new Error(`${DEMO}: station.glb has no perspective camera camera_station or no node mast_lamp`);
     }
     const {station} = layout;
 
     // --- the map: an orthographic stage, the whole sheet in view --------------------------------
-    const map = new Stage2D(
-      new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: layout.width, height: layout.height}),
+    const map = parts.keep(
+      new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: layout.width, height: layout.height})),
     );
     map.name = 'map';
     sheet.colorSpace = SRGBColorSpace;
     sheet.anisotropy = 8;
-    const sheetGeometry = new PlaneGeometry(layout.width, layout.height);
-    const sheetMaterial = new MeshBasicMaterial({map: sheet});
+    const sheetGeometry = parts.keep(new PlaneGeometry(layout.width, layout.height));
+    const sheetMaterial = parts.keep(new MeshBasicMaterial({map: sheet}));
     map.scene.add(new Mesh(sheetGeometry, sheetMaterial));
 
     // the marker over station 4: a red ring that breathes
-    const markerGeometry = new RingGeometry(MARKER_RADIUS - 6, MARKER_RADIUS - 2, 72);
-    const markerMaterial = new MeshBasicMaterial({color: '#d0301f', transparent: true});
+    const markerGeometry = parts.keep(new RingGeometry(MARKER_RADIUS - 6, MARKER_RADIUS - 2, 72));
+    const markerMaterial = parts.keep(new MeshBasicMaterial({color: '#d0301f', transparent: true}));
     const marker = new Mesh(markerGeometry, markerMaterial);
     marker.position.set(station.x, station.y, 1);
     map.scene.add(marker);
@@ -193,6 +199,9 @@ import {description, title} from './_camera-rig-into-the-map.json';
       red: new MeshBasicMaterial({color: '#b1281d'}),
       ink: new MeshBasicMaterial({color: '#1d1a17'}),
     };
+    parts.onDispose(() => {
+      for (const part of Object.values(tokenParts)) part.dispose();
+    });
     const token = new Group();
     const rim = new Mesh(tokenParts.rim, tokenParts.ink);
     const disc = new Mesh(tokenParts.disc, tokenParts.red);
@@ -204,7 +213,7 @@ import {description, title} from './_camera-rig-into-the-map.json';
     map.scene.add(token);
 
     // --- the place: a perspective stage that looks through the camera of the .glb ---------------
-    const room = new Stage2D(new CameraProjection(stationCamera));
+    const room = parts.keep(new Stage2D(new CameraProjection(stationCamera)));
     room.name = 'station 4';
     room.scene.add(gltf.scene);
 
@@ -218,15 +227,17 @@ import {description, title} from './_camera-rig-into-the-map.json';
     gradient.addColorStop(1, 'rgba(255 40 20 / 0%)');
     g.fillStyle = gradient;
     g.fillRect(0, 0, 64, 64);
-    const glowTexture = new CanvasTexture(glowCanvas);
+    const glowTexture = parts.keep(new CanvasTexture(glowCanvas));
     glowTexture.colorSpace = SRGBColorSpace;
-    const glowMaterial = new SpriteMaterial({
-      map: glowTexture,
-      color: '#ff3a24',
-      blending: AdditiveBlending,
-      transparent: true,
-      depthWrite: false,
-    });
+    const glowMaterial = parts.keep(
+      new SpriteMaterial({
+        map: glowTexture,
+        color: '#ff3a24',
+        blending: AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+      }),
+    );
     const glow = new Sprite(glowMaterial);
     glow.scale.setScalar(0.9);
     lampAnchor.add(glow);
@@ -247,8 +258,8 @@ import {description, title} from './_camera-rig-into-the-map.json';
     stationCamera.updateWorldMatrix(true, false);
     const focus = stationCamera.getWorldPosition(new Vector3()).length();
 
-    const mapRig = new CameraRig(map);
-    const roomRig = new CameraRig(room);
+    const mapRig = parts.keep(new CameraRig(map));
+    const roomRig = parts.keep(new CameraRig(room));
     director.setStack([map]);
 
     // --- the walk ----------------------------------------------------------------------------------
@@ -372,6 +383,7 @@ import {description, title} from './_camera-rig-into-the-map.json';
     };
 
     const listeners = new AbortController();
+    parts.onDispose(() => listeners.abort());
     const {signal} = listeners;
     let down: {x: number; y: number} | undefined;
     canvas.addEventListener(
@@ -416,6 +428,7 @@ import {description, title} from './_camera-rig-into-the-map.json';
     );
 
     const gui = new GUI({container: getDemoUi(), title: 'camera rig: into the map'});
+    parts.onDispose(() => gui.destroy());
     const enterController = gui.add({enter}, 'enter').name('into station 4 (click, enter)');
     const leaveController = gui.add({leave}, 'leave').name('back to the map (esc)');
     const followController = gui
@@ -423,24 +436,6 @@ import {description, title} from './_camera-rig-into-the-map.json';
       .name('follow the field party (F)')
       .onChange(() => void follow());
     showUi();
-
-    display.onDispose(() => {
-      listeners.abort();
-      gui.destroy();
-      mapRig.dispose();
-      roomRig.dispose();
-      director.dispose();
-      map.dispose();
-      room.dispose();
-      sheetGeometry.dispose();
-      sheetMaterial.dispose();
-      markerGeometry.dispose();
-      markerMaterial.dispose();
-      for (const part of Object.values(tokenParts)) part.dispose();
-      glowMaterial.dispose();
-      glowTexture.dispose();
-      freeAsset();
-    });
 
     // the shapes of the stack and the diorama, drawn once off screen; then each scene with the
     // camera of the other kind, so that neither the first crossfade nor the swap of a lens change

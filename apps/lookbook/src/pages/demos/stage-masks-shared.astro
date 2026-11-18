@@ -23,6 +23,7 @@ import {description, title} from './_stage-masks-shared.json';
   import {InkVignette} from '~demos/stage-masks/InkVignette';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
   import {ignoredKey} from '~demos/utils/demoKeys';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -52,12 +53,15 @@ import {description, title} from './_stage-masks-shared.json';
       return;
     }
 
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
     const clock = new FootageClock();
-    const rot = new RotLayer(clock);
-    const forest = new ForestLevel(assets, clock);
-    const vhs = new VhsNoise(clock);
-    const hud = new CamcorderHud(clock);
-    const ink = new InkVignette(clock);
+    const rot = parts.keep(new RotLayer(clock));
+    const forest = parts.keep(new ForestLevel(assets, clock));
+    const vhs = parts.keep(new VhsNoise(clock));
+    const hud = parts.keep(new CamcorderHud(clock));
+    const ink = parts.keep(new InkVignette(clock));
     ink.strength = settings.strength;
 
     // the bottom layer is updated first in every frame: the clock moves there, before any stage reads it
@@ -67,7 +71,7 @@ import {description, title} from './_stage-masks-shared.json';
     // never in the stack: it is the mask stage, and one StageMask lies on two slots
     const layers = [rot.stage, forest.stage, vhs.stage, hud.stage];
     director.setStack(layers);
-    const inkMask = new StageMask(ink.stage, {invert: true});
+    const inkMask = parts.keep(new StageMask(ink.stage, {invert: true}));
 
     const readout = {level: '', hud: '', drawn: '', sampled: ''};
     const describe = (stage: (typeof layers)[number]) => (director.maskOf(stage) ? 'StageMask(ink, alpha, invert)' : 'undefined');
@@ -105,9 +109,12 @@ import {description, title} from './_stage-masks-shared.json';
       else return;
       apply();
     };
-    window.addEventListener('keydown', onKeyDown);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    window.addEventListener('keydown', onKeyDown, {signal: listening.signal});
 
     const gui = new GUI({container: getDemoUi(), title: 'Found Footage'});
+    parts.onDispose(() => gui.destroy());
     gui.add(settings, 'level').name('mask on the level (l)').onChange(apply).listen();
     gui.add(settings, 'hud').name('mask on the HUD (h)').onChange(apply).listen();
     gui
@@ -134,19 +141,7 @@ import {description, title} from './_stage-masks-shared.json';
       .finally(() => ink.takeDraws());
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      window.removeEventListener('keydown', onKeyDown);
-      gui.destroy();
-      inkMask.dispose();
-      ink.dispose();
-      rot.dispose();
-      forest.dispose();
-      vhs.dispose();
-      hud.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

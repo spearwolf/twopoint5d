@@ -55,6 +55,7 @@ import {description, title} from './_stage-masks-matte-threshold.json';
   import {TransitionCycler} from '~demos/stage-masks/TransitionCycler';
   import {loadTrenchAssets, ThingView, TrenchView} from '~demos/stage-masks/Trench';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -96,16 +97,19 @@ import {description, title} from './_stage-masks-matte-threshold.json';
       return;
     }
 
-    const survey = new TrenchView('survey', assets.survey, assets.layout);
-    const thing = new ThingView(assets);
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
+    const survey = parts.keep(new TrenchView('survey', assets.survey, assets.layout));
+    const thing = parts.keep(new ThingView(assets));
 
     // the sonar: one field, read by the mask stage, the display above the slot and the scope. The
     // mask stage is never in the stack: matte() names its mask, the director draws it only while a
     // transition runs
     const field = new SonarField(assets.layout.NOSE);
-    const sonar = new SonarMaskStage(field);
-    const ping = new StageMask(sonar.stage, {source: 'luminance'});
-    const hud = new SonarHud(canvas);
+    const sonar = parts.keep(new SonarMaskStage(field));
+    const ping = parts.keep(new StageMask(sonar.stage, {source: 'luminance'}));
+    const hud = parts.keep(new SonarHud(canvas));
     hud.bind(field, ping);
 
     // 'threshold' mode: the gray of the field is when a pixel switches. One effect per softness,
@@ -127,29 +131,32 @@ import {description, title} from './_stage-masks-matte-threshold.json';
 
     // the slot between the survey and the thing: played, scrubbed by hand or cycled, with Space,
     // Enter and S
-    const cycler = new TransitionCycler({
-      display,
-      director,
-      stages: [survey.stage, thing.stage],
-      names: ['survey', 'the thing'],
-      settings,
-      hold: HOLD,
-      onBegin: (_from, to) => {
-        if (to === thing.stage) thing.wake();
-        runningSoftness = settings.softness;
-        hud.softness.value = runningSoftness;
-        hud.running = true;
-      },
-      onEnd: () => {
-        hud.running = false;
-      },
-      effect: () => effects.get(runningSoftness)!,
-      progress: () => ping.progress,
-      progressName: 'ping.progress',
-      keys: {KeyK: nextKind},
-    });
+    const cycler = parts.keep(
+      new TransitionCycler({
+        display,
+        director,
+        stages: [survey.stage, thing.stage],
+        names: ['survey', 'the thing'],
+        settings,
+        hold: HOLD,
+        onBegin: (_from, to) => {
+          if (to === thing.stage) thing.wake();
+          runningSoftness = settings.softness;
+          hud.softness.value = runningSoftness;
+          hud.running = true;
+        },
+        onEnd: () => {
+          hud.running = false;
+        },
+        effect: () => effects.get(runningSoftness)!,
+        progress: () => ping.progress,
+        progressName: 'ping.progress',
+        keys: {KeyK: nextKind},
+      }),
+    );
 
     const gui = new GUI({container: getDemoUi(), title: 'Sonar'});
+    parts.onDispose(() => gui.destroy());
     // a new softness is a new effect: a run by hand starts again with it, at the same progress, in
     // the same direction; a run by the clock keeps its own and the next one takes the new value
     gui
@@ -220,17 +227,7 @@ import {description, title} from './_stage-masks-matte-threshold.json';
 
     let previewTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      cycler.dispose();
-      gui.destroy();
-      ping.dispose();
-      sonar.dispose();
-      hud.dispose();
-      survey.dispose();
-      thing.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
 
     await precompiled;
     if (display.isDisposed) return;

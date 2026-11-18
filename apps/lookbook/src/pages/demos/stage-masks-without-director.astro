@@ -19,6 +19,7 @@ import {description, title} from './_stage-masks-without-director.json';
   import {Color, RenderPipeline} from 'three/webgpu';
   import {loadWallpaperAssets, WatchingWallpaper} from '~demos/stage-masks/WatchingWallpaper';
   import {onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -42,13 +43,17 @@ import {description, title} from './_stage-masks-without-director.json';
       return;
     }
 
-    const wall = new WatchingWallpaper(assets);
+    const parts = new DemoParts(display);
+    parts.keep(assets.store);
+
+    const wall = parts.keep(new WatchingWallpaper(assets));
 
     // a plain composing StageRenderer, no director: three stages, one output node of our own.
     // The mask stage clears to transparent black, so the clear alpha is 0
-    const sr = new StageRenderer(display).setClearColor(new Color('#000'), 0);
+    // the pipeline is built first: it goes after the renderer that draws through it
+    const pipeline = parts.keep(new RenderPipeline(renderer));
+    const sr = parts.keep(new StageRenderer(display).setClearColor(new Color('#000'), 0));
     sr.add(wall.room).add(wall.haunted).add(wall.glows);
-    const pipeline = new RenderPipeline(renderer);
     sr.pipeline = pipeline;
     sr.buildOutputNode = wall.createOutputNodeBuilder(() => settings);
 
@@ -60,27 +65,20 @@ import {description, title} from './_stage-masks-without-director.json';
         (0.5 - event.offsetY / canvas.clientHeight) * view.height + view.offsetY,
       );
     };
-    canvas.addEventListener('pointermove', onPointer);
-    canvas.addEventListener('pointerdown', onPointer);
+    const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
+    canvas.addEventListener('pointermove', onPointer, {signal: listening.signal});
+    canvas.addEventListener('pointerdown', onPointer, {signal: listening.signal});
 
     // every switch builds the output node again: the source and invert are part of the shader
     const rebuild = () => sr.invalidateOutputNode();
     const gui = new GUI({container: getDemoUi(), title: 'mask'});
+    parts.onDispose(() => gui.destroy());
     gui.add(settings, 'source', ['alpha', 'luminance', 'red', 'green', 'blue']).onChange(rebuild);
     gui.add(settings, 'invert').onChange(rebuild);
 
     const previewTimeout = setTimeout(() => preview.ready(display), PREVIEW_SETTLE);
-
-    display.onDispose(() => {
-      clearTimeout(previewTimeout);
-      canvas.removeEventListener('pointermove', onPointer);
-      canvas.removeEventListener('pointerdown', onPointer);
-      gui.destroy();
-      sr.dispose();
-      pipeline.dispose();
-      wall.dispose();
-      assets.store.dispose();
-    });
+    parts.onDispose(() => clearTimeout(previewTimeout));
   });
 
   await display.start();

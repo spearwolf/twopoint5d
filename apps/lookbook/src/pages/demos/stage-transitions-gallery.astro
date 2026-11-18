@@ -34,6 +34,7 @@ import {description, title} from './_stage-transitions-gallery.json';
   import {COLD, GalleryScene, WARM} from '~demos/stage-transitions/GalleryScene';
   import {GalleryMattes} from '~demos/stage-transitions/matteMasks';
   import {catchPrecompile, onDemoInit} from '~demos/utils/demoInit';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getDemoUi} from '~demos/utils/demoUi';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
@@ -77,19 +78,26 @@ import {description, title} from './_stage-transitions-gallery.json';
       return;
     }
 
-    const a = new GalleryScene(assets, WARM);
-    const b = new GalleryScene(assets, COLD);
+    const parts = new DemoParts(display);
+    parts.keep(store);
+    // drawn on a canvas, not lent by the store: the dot is the page's to free
+    parts.keep(assets.dot);
+
+    const a = parts.keep(new GalleryScene(assets, WARM));
+    const b = parts.keep(new GalleryScene(assets, COLD));
 
     // the label: a third layer on top that no transition touches
-    const label = new Stage2D(
-      new OrthographicProjection('xy|bottom-left', {width: VIEW_WIDTH, height: VIEW_HEIGHT, fit: 'contain'}),
+    const label = parts.keep(
+      new Stage2D(new OrthographicProjection('xy|bottom-left', {width: VIEW_WIDTH, height: VIEW_HEIGHT, fit: 'contain'})),
     );
     label.name = 'label';
-    const text = new FeatureSprites(TexturedSpriteKind, {
-      capacity: 64,
-      textures: {colorMap: assets.pixelPage},
-      transparent: true,
-    });
+    const text = parts.keep(
+      new FeatureSprites(TexturedSpriteKind, {
+        capacity: 64,
+        textures: {colorMap: assets.pixelPage},
+        transparent: true,
+      }),
+    );
     label.scene.add(text);
     let glyphs: TexturedSprite[] = [];
     const writeLabel = (line: string) => {
@@ -166,6 +174,7 @@ import {description, title} from './_stage-transitions-gallery.json';
     };
 
     const gui = new GUI({container: getDemoUi(), title: 'transitions'});
+    parts.onDispose(() => gui.destroy());
     const effectController = gui
       .add(settings, 'effect', names)
       .onChange(() => {
@@ -203,16 +212,6 @@ import {description, title} from './_stage-transitions-gallery.json';
       settings.scrub = true;
       restartScrub();
     }
-
-    display.onDispose(() => {
-      gui.destroy();
-      a.dispose();
-      b.dispose();
-      text.dispose();
-      label.dispose();
-      assets.dot.dispose();
-      store.dispose();
-    });
 
     await precompiled;
     if (display.isDisposed) return;

@@ -35,6 +35,7 @@ import {description, title} from './_vector-balls.json';
 <script>
   import {on} from '@spearwolf/eventize';
   import {OnDisplayRenderFrame, SpritePicker} from '@spearwolf/twopoint5d';
+  import {DemoParts} from '~demos/utils/demoParts';
   import {deferPreview} from '~demos/utils/demoPreview';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
@@ -51,8 +52,9 @@ import {description, title} from './_vector-balls.json';
     demo.pixelZoom = Math.max(2, Math.round(window.innerHeight / 240));
   };
   fitPixelZoom();
-  window.addEventListener('resize', fitPixelZoom);
-  demo.onDispose(() => window.removeEventListener('resize', fitPixelZoom));
+  const resizing = new AbortController();
+  demo.onDispose(() => resizing.abort());
+  window.addEventListener('resize', fitPixelZoom, {signal: resizing.signal});
 
   await demo.start(async ({renderer}) => {
     demo.camera.fov = 40;
@@ -75,7 +77,10 @@ import {description, title} from './_vector-balls.json';
       return;
     }
 
-    const vectorBalls = new VectorBalls({atlas, texture}, MIN_BALLS);
+    const parts = new DemoParts(demo);
+    parts.keep(store);
+
+    const vectorBalls = parts.keep(new VectorBalls({atlas, texture}, MIN_BALLS));
     demo.scene.add(vectorBalls);
 
     on(demo, OnDisplayRenderFrame, ({deltaTime}) => vectorBalls.update(deltaTime, demo.camera));
@@ -85,6 +90,7 @@ import {description, title} from './_vector-balls.json';
     const mirrorButton = document.querySelector('.toggleMirror')!;
     const readout = document.querySelector('.readout')!;
     const listening = new AbortController();
+    parts.onDispose(() => listening.abort());
     const {signal} = listening;
     sortButton.addEventListener(
       'click',
@@ -122,10 +128,12 @@ import {description, title} from './_vector-balls.json';
       const sort = vectorBalls.sorting ? `${vectorBalls.sortMillis.toFixed(2)} ms` : 'off';
       readout.textContent = `balls ${vectorBalls.ballCount}  capacity ${vectorBalls.capacity}\nsortByViewDepth() ${sort}`;
     }, 250);
+    parts.onDispose(() => clearInterval(readoutTimer));
 
     // a click on a ball lights it up: the picker asks the gpu which ball lies under the pointer —
     // sorted and grown as the mesh is. A drag of the orbit controls is no click
-    const picker = new SpritePicker(renderer);
+    // kept after the balls: the picker goes first and turns down a pick still under way before the balls go
+    const picker = parts.keep(new SpritePicker(renderer));
     const canvas = renderer.domElement;
     let down: {x: number; y: number} | undefined;
     canvas.addEventListener(
@@ -154,15 +162,6 @@ import {description, title} from './_vector-balls.json';
       },
       {signal},
     );
-
-    demo.onDispose(() => {
-      listening.abort();
-      clearInterval(readoutTimer);
-      // the picker first: it turns down a pick still under way before the balls go
-      picker.dispose();
-      vectorBalls.dispose();
-      store.dispose();
-    });
 
     // biome-ignore lint/suspicious/noConsole: the demo logs to the devtools on purpose
     console.log('vector balls', vectorBalls);
