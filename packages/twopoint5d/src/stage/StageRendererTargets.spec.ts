@@ -1,6 +1,7 @@
 import {FloatType, type WebGPURenderer} from 'three/webgpu';
 import {describe, expect, it, vi} from 'vitest';
-import {StageRendererTargets} from './StageRendererTargets.js';
+import type {StageRenderer} from './StageRenderer.js';
+import {StageRendererInternals, StageRendererTargets} from './StageRendererTargets.js';
 
 // the parts of a WebGPURenderer the targets read
 function createRendererMock(pixelRatio = 1) {
@@ -70,5 +71,16 @@ describe('StageRendererTargets', () => {
       targets.releasePassTarget();
       expect(sizeOf(targets.passTarget(createRendererMock(), 40, 40))).toEqual([20, 20]);
     });
+  });
+});
+
+// this file imports StageRenderer as a type alone: its static block, which fills the bridge in, never runs here
+describe('StageRendererInternals', () => {
+  it('StageRendererInternals names the function while StageRenderer has not been evaluated', () => {
+    expect(() => StageRendererInternals.setPassTargetScale({} as StageRenderer, 0.5)).toThrow(
+      new Error(
+        'expected StageRendererInternals.setPassTargetScale() to be defined: the class that fills it in has not been evaluated yet',
+      ),
+    );
   });
 });

@@ -389,6 +389,9 @@ describe('StageDirector masks', () => {
       }
       expect(thrown).toBeInstanceOf(AggregateError);
       expect((thrown as AggregateError).errors).toEqual([refusal, listener]);
+      expect((thrown as AggregateError).message).toBe(
+        'StageDirector#show(): more than one error on the way back from a change that was refused',
+      );
       expect(ordered()).toEqual([]);
     });
 

@@ -1,5 +1,6 @@
 import {describeValue} from '../utils/describeValue.js';
 import {applyEasingInPlace, type Easing, type EasingSpec} from '../utils/easing.js';
+import {unfilledInternal} from '../utils/unfilledInternal.js';
 import type {IStage} from './IStage.js';
 import type {StageTransitionEffect} from './transitionEffects.js';
 
@@ -53,7 +54,7 @@ const easedProgress = new Float64Array(1);
  * the public API.
  * @internal
  */
-export const StageTransitionInternals = {} as {
+export const StageTransitionInternals: {
   create(init: StageTransitionInit, host: StageTransitionHost | undefined): StageTransition;
   advance(transition: StageTransition, deltaTime: number): StageTransitionStep;
   /** Ends `transition` as `state`, with the source `keep` in its slot. */
@@ -68,6 +69,13 @@ export const StageTransitionInternals = {} as {
    * reaches 0 or 1 early, this does not.
    */
   isUnderWay(transition: StageTransition): boolean;
+} = {
+  create: unfilledInternal('StageTransitionInternals.create()'),
+  advance: unfilledInternal('StageTransitionInternals.advance()'),
+  settle: unfilledInternal('StageTransitionInternals.settle()'),
+  keptOf: unfilledInternal('StageTransitionInternals.keptOf()'),
+  isFrozen: unfilledInternal('StageTransitionInternals.isFrozen()'),
+  isUnderWay: unfilledInternal('StageTransitionInternals.isUnderWay()'),
 };
 
 /**

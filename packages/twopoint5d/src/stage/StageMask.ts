@@ -4,6 +4,7 @@ import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isFiniteNumber} from '../utils/isFiniteNumber.js';
 import {throwCollected} from '../utils/throwCollected.js';
+import {unfilledInternal} from '../utils/unfilledInternal.js';
 import {ClearStage} from './ClearStage.js';
 import type {IRenderable} from './IRenderable.js';
 import {Stage2D} from './Stage2D.js';
@@ -100,7 +101,7 @@ function describeStage(value: unknown): string {
  * they are not part of the public API.
  * @internal
  */
-export const StageMaskInternals = {} as {
+export const StageMaskInternals: {
   /** The running transition whose effect names the mask, `undefined` while none does. */
   drivenBy(mask: StageMask): StageTransition | undefined;
   setDrivenBy(mask: StageMask, transition: StageTransition | undefined): void;
@@ -121,6 +122,13 @@ export const StageMaskInternals = {} as {
    * `dispose()` after every listener has heard it.
    */
   onDispose(mask: StageMask, listener: (mask: StageMask) => void): () => void;
+} = {
+  drivenBy: unfilledInternal('StageMaskInternals.drivenBy()'),
+  setDrivenBy: unfilledInternal('StageMaskInternals.setDrivenBy()'),
+  setProgress: unfilledInternal('StageMaskInternals.setProgress()'),
+  followProgress: unfilledInternal('StageMaskInternals.followProgress()'),
+  followProgressNode: unfilledInternal('StageMaskInternals.followProgressNode()'),
+  onDispose: unfilledInternal('StageMaskInternals.onDispose()'),
 };
 
 /**

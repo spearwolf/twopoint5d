@@ -29,6 +29,7 @@ import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isPositiveFinite} from '../utils/isPositiveFinite.js';
 import {throwCollected} from '../utils/throwCollected.js';
+import {unfilledInternal} from '../utils/unfilledInternal.js';
 import {CameraProjection} from './CameraProjection.js';
 import type {IPassProvider} from './IPassProvider.js';
 import type {IProjection} from './IProjection.js';
@@ -62,12 +63,18 @@ function disposedError(member: string): Error {
  *   its post-process —, so that a driver compiles them with a camera of the other kind.
  * @internal
  */
-export const Stage2DInternals = {} as {
+export const Stage2DInternals: {
   attachDriver(stage: Stage2D, driver: StageCameraDriver): void;
   detachDriver(stage: Stage2D): void;
   announceCamera(stage: Stage2D): void;
   driverOf(stage: Stage2D): StageCameraDriver | undefined;
   scenePassesOf(stage: Stage2D): PassNode[];
+} = {
+  attachDriver: unfilledInternal('Stage2DInternals.attachDriver()'),
+  detachDriver: unfilledInternal('Stage2DInternals.detachDriver()'),
+  announceCamera: unfilledInternal('Stage2DInternals.announceCamera()'),
+  driverOf: unfilledInternal('Stage2DInternals.driverOf()'),
+  scenePassesOf: unfilledInternal('Stage2DInternals.scenePassesOf()'),
 };
 
 export interface Stage2D extends EventizedObject {}
@@ -419,14 +426,15 @@ export class Stage2D implements IStage, IRenderable, IPassProvider {
     eventize(this);
     retain(this, OnStageFirstFrame);
 
-    this.projection = projection;
-
+    // the scene first: the projection setter goes through the camera and its events, and a path there may read scene or name
     if (scene) {
       this.#scene = scene;
     } else {
       this.#scene = new Scene();
       this.#scene.name = 'Stage2D';
     }
+
+    this.projection = projection;
   }
 
   /**

@@ -38,6 +38,29 @@ describe('Stage2D', () => {
     expect(stage.scene).toBeDefined();
   });
 
+  it('takes its scene before its projection: a subclass reads the name while the projection is set', () => {
+    const seen: string[] = [];
+    class Probe extends Stage2D {
+      override get projection(): IProjection | undefined {
+        return super.projection;
+      }
+
+      override set projection(projection: IProjection | undefined) {
+        super.projection = projection;
+        seen.push(this.name);
+      }
+    }
+    const projection = new ParallaxProjection('xz|top-left', {fit: 'contain', width: 600});
+    new Probe(projection);
+    expect(seen).toEqual(['Stage2D']);
+
+    seen.length = 0;
+    const scene = new Scene();
+    scene.name = 'level';
+    new Probe(projection, scene);
+    expect(seen).toEqual(['level']);
+  });
+
   it('after call to resize() a camera is created (by projection)', () => {
     const stage = new Stage2D(new ParallaxProjection('xz|top-left', {pixelZoom: 2}));
     stage.resize(320, 240);

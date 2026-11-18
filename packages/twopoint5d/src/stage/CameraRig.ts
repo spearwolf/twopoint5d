@@ -17,6 +17,7 @@ import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import {applyEasingInPlace, type Easing, type EasingSpec, easingOf} from '../utils/easing.js';
 import {throwCollected} from '../utils/throwCollected.js';
+import {unfilledInternal} from '../utils/unfilledInternal.js';
 import {
   type CameraFlight,
   type CameraFlightOptions,
@@ -215,8 +216,10 @@ const rigOfDriver = new WeakMap<StageCameraDriver, CameraRig>();
  * The camera driver a `CameraRig` hands its stage; not part of the public API.
  * @internal
  */
-export const CameraRigInternals = {} as {
+export const CameraRigInternals: {
   driverOf(rig: CameraRig): StageCameraDriver;
+} = {
+  driverOf: unfilledInternal('CameraRigInternals.driverOf()'),
 };
 
 /**

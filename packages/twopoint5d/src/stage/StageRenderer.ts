@@ -168,13 +168,33 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   // every listener with it that the event has not reached yet
   #hostSubscriptions: StageRendererHostUnsubscribe[] = [];
 
-  width: number = 0;
-  height: number = 0;
+  #width = 0;
+  #height = 0;
+  #pixelRatio = 1;
+
+  /**
+   * The width this renderer carries, as the last {@link resize} that every stage took handed it
+   * in; `0` until then. Read-only: `resize()` is the one way to change it.
+   */
+  get width(): number {
+    return this.#width;
+  }
+
+  /**
+   * The height this renderer carries, as the last {@link resize} that every stage took handed it
+   * in; `0` until then. Read-only: `resize()` is the one way to change it.
+   */
+  get height(): number {
+    return this.#height;
+  }
+
   /**
    * The pixels of the drawing buffer per unit of {@link width} and {@link height}, as the last
    * {@link resize} handed it in — `Display#pixelRatio` from a host —, `1` until then.
    */
-  pixelRatio: number = 1;
+  get pixelRatio(): number {
+    return this.#pixelRatio;
+  }
 
   /**
    * When `true`, the active render target is cleared before drawing the
@@ -246,9 +266,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     return this.#stages;
   }
 
-  // a renamed stage that moves the snapshot moves the pass nodes with it
+  // a renamed stage that moves the snapshot moves the pass nodes with it, and can move a stage
+  // with a pipeline of its own beside another one
   readonly #order = new StageRenderOrder(() => {
     this.#outputDirty = true;
+    this.#pipelineChildCheckDue = true;
   });
 
   /**
@@ -264,6 +286,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   set renderOrder(order: string | undefined) {
     if (this.#order.set(order)) {
       this.#outputDirty = true;
+      this.#pipelineChildCheckDue = true;
       this.#order.warnAboutSharedNames(
         this.#stages,
         this.#stages.map((item) => item.stage.name),
@@ -555,9 +578,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const prevHeight = this.height;
     const prevPixelRatio = this.pixelRatio;
 
-    this.width = width;
-    this.height = height;
-    this.pixelRatio = ratio;
+    this.#width = width;
+    this.#height = height;
+    this.#pixelRatio = ratio;
 
     const refusedByRenderTarget: unknown[] = [];
 
@@ -588,9 +611,9 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       // while a stage refuses the size, this renderer keeps the one it carried into the call, so
       // the very same call goes through again as soon as that stage fits — written through, it
       // would fall out of the size guard above and never reach the stage a second time
-      this.width = prevWidth;
-      this.height = prevHeight;
-      this.pixelRatio = prevPixelRatio;
+      this.#width = prevWidth;
+      this.#height = prevHeight;
+      this.#pixelRatio = prevPixelRatio;
 
       if (refused.length === 1) throw refused[0];
 
@@ -715,7 +738,17 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * `outputRenderTarget` as well: the parent switches to linear output for all
    * of its stage draws, whichever target they write to.
    */
-  outputRenderTarget?: RenderTarget;
+  get outputRenderTarget(): RenderTarget | undefined {
+    return this.#outputRenderTarget;
+  }
+
+  set outputRenderTarget(target: RenderTarget | undefined) {
+    this.#outputRenderTarget = target;
+    // a nested renderer with a pipeline and without a target of its own covers what its parent drew
+    this.#pipelineChildChanged();
+  }
+
+  #outputRenderTarget?: RenderTarget;
 
   #buildOutputNode?: StageRendererBuildOutputNode;
 
@@ -818,11 +851,20 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    */
   #modeInputChanged(previousMode: StageRendererMode): void {
     this.#outputDirty = true;
+    // another mode decides whether this renderer warns about its stages at all
+    this.#pipelineChildCheckDue = true;
     const mode = this.#renderMode();
     if (previousMode === 'whole-picture' && mode !== 'whole-picture') this.#targets.releaseInternalTarget();
     if (previousMode === 'composed' && mode !== 'composed') {
       for (const {stage} of this.#stages) this.#releasePassMemoryOf(stage);
     }
+    this.#pipelineChildChanged();
+  }
+
+  /** A parent that draws this renderer beside other stages checks again for a pipeline of its own. */
+  #pipelineChildChanged(): void {
+    const parent = this.#parent;
+    if (parent instanceof StageRenderer) parent.#pipelineChildCheckDue = true;
   }
 
   /**
@@ -980,12 +1022,21 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
   #renderStagesInline(renderer: WebGPURenderer, stages: ReadonlyArray<StageItem>): void {
     // a child with a pipeline, or a stage with a post-process, alone is the one writer of the
     // target; beside a second stage its quad covers what the others drew
-    if (!this.#warnedAboutPipelineChild && stages.length > 1) this.#warnAboutPipelineChild(stages, true);
+    if (this.#pipelineChildCheckDue && !this.#warnedAboutPipelineChild) {
+      // cleared before the check: a stage a listener brings in while the stages draw is checked next frame
+      this.#pipelineChildCheckDue = false;
+      if (stages.length > 1) this.#warnAboutPipelineChild(stages, true);
+    }
     if (this.clear) this.#applyClear(renderer);
     this.#drawStages(renderer, stages);
   }
 
   #warnedAboutPipelineChild = false;
+
+  // set by every change that can bring a stage with a pipeline of its own beside another one — a
+  // stage that joins or leaves, the render order, a mode of this renderer or of a nested one, a
+  // post-process; the next frame of the plain or the whole-picture mode clears it as it checks
+  #pipelineChildCheckDue = true;
 
   /**
    * Warns once, for the first stage among `stages` that draws through a pipeline of its own into
@@ -994,7 +1045,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
    * of this renderer changes nothing: the quad covers whatever target this renderer draws into.
    */
   #warnAboutPipelineChild(stages: ReadonlyArray<StageItem>, nestedRenderers: boolean): void {
-    // indexed, as in #canCompose(): this runs in every frame until it has warned
+    // indexed, as in #canCompose(): this runs in the first frame after a change that can bring such a stage in
     for (let i = 0; i < stages.length; i++) {
       const child = stages[i]!.stage;
       if (
@@ -1077,7 +1128,11 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     const pipeline = this.#pipeline!;
     // the stages share the internal target: a stage with a post-process clears what the stages
     // before it drew there, as under a renderer without a pipeline
-    if (!this.#warnedAboutPipelineChild && stages.length > 1) this.#warnAboutPipelineChild(stages, false);
+    if (this.#pipelineChildCheckDue && !this.#warnedAboutPipelineChild) {
+      // cleared before the check: a stage a listener brings in while the stages draw is checked next frame
+      this.#pipelineChildCheckDue = false;
+      if (stages.length > 1) this.#warnAboutPipelineChild(stages, false);
+    }
     // borrowed before the try: an acquire() that throws has lent nothing
     const rt = this.#targets.acquireInternalTarget(renderer, this.width, this.height);
     try {
@@ -1579,6 +1634,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
     this.#order.warnAboutSharedNames(this.#stages, [stage.name]);
     this.#order.invalidate();
     this.#outputDirty = true;
+    this.#pipelineChildCheckDue = true;
 
     if (isEventized(stage)) {
       // a stage that announces a new camera or scene can hand a new pass node — a Stage2D keeps
@@ -1590,6 +1646,8 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
         [OnStageAfterCameraChanged, OnStageAfterSceneChanged, OnStageAfterPostProcessChanged],
         () => {
           this.#passesToCheck = true;
+          // a new post-process of a Stage2D comes through here; a new camera or scene checks once as well
+          this.#pipelineChildCheckDue = true;
         },
       );
       // a disposed stage has no pass node left to give: the renderer lets go of it on the spot
@@ -1650,6 +1708,7 @@ export class StageRenderer implements IStage, IRenderable, IPassProvider {
       this.#stageSubscriptions.delete(stage);
       this.#order.invalidate();
       this.#outputDirty = true;
+      this.#pipelineChildCheckDue = true;
       const errors: unknown[] = [];
       try {
         emitStrict(this, OnStageRemoved, {stage, renderer: this} satisfies StageRemovedProps);

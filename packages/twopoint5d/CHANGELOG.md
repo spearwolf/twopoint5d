@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `parseAnchorPosition()` and `calculateAnchorOffset()` throw a `TypeError` for an `anchorPosition` that is none of the ten values of `AnchorPosition`, `''` included; `undefined` means `'center'` (**BREAKING**). See the Migration Guide
 - `SpriteResources#setUniform()` — and with it `setUniform()` of `FeatureSpritesMaterial` and `FeatureSprites` — throws a `TypeError` for a component that is no finite number, and the uniform keeps the value it holds (**BREAKING**). See the Migration Guide
 - `TextureAtlas#frameNames()` throws a `SyntaxError` that names the pattern for a string that is no valid regular expression, and `FrameBasedAnimations#add()` one that names the animation for such a `frameNameQuery`, both with the error of the `RegExp` as `cause`; a texture resource skips that entry of its catalog and reports it as an `error` event with `source: 'frameBasedAnimations'` (**BREAKING**). See the Migration Guide
+- `StageRenderer#width`, `#height` and `#pixelRatio` are read-only: `resize()` sets them, and a write throws a `TypeError` (**BREAKING**). See the Migration Guide
+- `StageRenderer#outputRenderTarget` is a get/set accessor pair: a subclass overrides it as an accessor, not as a field
 
 ### Fixed
 
@@ -58,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - the canvas of a `WebGPURenderer` handed to `new Display()` carries a new `Display` after `display.dispose()`, as a canvas handed in does: a `Display` around a new `WebGPURenderer({canvas})` on it waits for the release of the old renderer and brings the WebGL context of the canvas back (see "The canvas after `dispose()`" in `docs/display.md`)
 - an `AdaptiveResolution` that went over to `frame-pacing` because its renderer resolved no GPU time for 60 frames — a loading screen that draws nothing — goes on asking for it and goes back to `gpu-time` with the first valid measurement (see "Adaptive resolution in detail" in `docs/display.md`)
 - `Chronometer#time` moves only by the `deltaTime` of `update()`: the span from the last time seen to `stop()` counts as lost, as the pause after it does, so `stop()` and `start()` leave `time` where the last `update()` put it, whether or not `update()` ran in the pause
+- `StageDirector` throws every error it meets as it lets go of a layer: when a listener throws as the stage leaves the director and another one as the director disposes the renderer it wrapped the stage in, both reach the caller, as an `AggregateError`
+- `StageDirector#precompile()` rejects with an `Error` when the render pipeline draws a shape without going through `renderer.render()`, which compiles nothing, and the next call builds that shape again (see "No hitch on the first transition" in `docs/stages.md`)
+- `new Stage2D()` takes its scene before its projection: a subclass that reads `scene` or `name` while the projection is set finds them
 
 ### Migration Guide
 
@@ -125,6 +130,22 @@ sprites.setUniform('offset', 1, undefined, 3); // undefined landed in the vec3
 
 ```ts
 sprites.setUniform('offset', 1, 0, 3);
+```
+
+#### `StageRenderer#width`, `height` and `pixelRatio` are read-only
+
+The renderer carries the size that `resize()` gave every stage; a size goes in through `resize()`.
+
+**Before**
+
+```ts
+renderer.width = 800;
+```
+
+**After**
+
+```ts
+renderer.resize(800, renderer.height, renderer.pixelRatio);
 ```
 
 ## [0.25.0] - 2026-11-01

@@ -1,4 +1,4 @@
-import type {RenderTarget} from 'three/webgpu';
+import {RenderPipeline, type RenderTarget} from 'three/webgpu';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createRendererMock, type FakeStage, fakeStage} from '../testing/stageFixtures.js';
 import {RootRenderPipeline} from './RootRenderPipeline.js';
@@ -178,6 +178,25 @@ describe('StageDirector shapes', () => {
     }
     expect(thrown).toBeInstanceOf(AggregateError);
     expect((thrown as AggregateError).errors).toEqual([compileError, disposeError]);
+    expect((thrown as AggregateError).message).toBe(
+      'StageDirector#precompile(): more than one error on the way back from a build that failed',
+    );
+  });
+
+  it('precompile() rejects when the render pipeline draws without renderer.render(), and builds that shape again next time', async () => {
+    const effect = spiedEffect('fadeIn');
+    const pipelineRender = vi.spyOn(RenderPipeline.prototype, 'render').mockImplementation(() => {});
+    await expect(director.precompile(renderer as any, [[effect]])).rejects.toThrow(
+      new Error(
+        'StageDirector#precompile(): the render pipeline drew without calling renderer.render(), and nothing was compiled',
+      ),
+    );
+    expect(renderer.compileAsync).not.toHaveBeenCalled();
+
+    pipelineRender.mockRestore();
+    await expect(director.precompile(renderer as any, [[effect]])).resolves.toBeUndefined();
+    expect(renderer.compileAsync).toHaveBeenCalledTimes(1);
+    expect(effect.build).toHaveBeenCalledTimes(2);
   });
 
   it('dispose() goes on past an effect whose dispose() throws, and throws its error afterwards', () => {

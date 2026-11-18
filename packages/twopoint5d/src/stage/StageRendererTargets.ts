@@ -7,7 +7,7 @@
 // classes of the stage module.
 
 import {RenderTarget, type WebGPURenderer} from 'three/webgpu';
-import {isFiniteNumber} from '../utils/isFiniteNumber.js';
+import {unfilledInternal} from '../utils/unfilledInternal.js';
 import type {StageRenderer} from './StageRenderer.js';
 import type {StageRenderTargetPool} from './StageRenderTargetPool.js';
 
@@ -16,9 +16,11 @@ import type {StageRenderTargetPool} from './StageRenderTargetPool.js';
  * not part of the public API. `StageRenderer` fills them in when its class is defined.
  * @internal
  */
-export const StageRendererInternals = {} as {
+export const StageRendererInternals: {
   /** Sets the {@link StageRendererTargets.scale} of the pass target of `renderer`; the caller checks the value. */
   setPassTargetScale(renderer: StageRenderer, scale: number): void;
+} = {
+  setPassTargetScale: unfilledInternal('StageRendererInternals.setPassTargetScale()'),
 };
 
 export class StageRendererTargets {
@@ -184,11 +186,10 @@ export class StageRendererTargets {
 
   /**
    * Width or height a `RenderTarget` has to have, in device pixels, for the logical `size` at
-   * `scale`. A size that is not a finite number — written into the public `width` or `height` of a
-   * `StageRenderer` past its `resize()` — gives the minimum as well.
+   * `scale`.
    */
   #deviceSize(size: number, scale: number): number {
-    return isFiniteNumber(size) ? Math.max(1, Math.floor(size * this.#pixelRatio * scale)) : 1;
+    return Math.max(1, Math.floor(size * this.#pixelRatio * scale));
   }
 
   #resize(rt: RenderTarget, width: number, height: number, scale: number): void {

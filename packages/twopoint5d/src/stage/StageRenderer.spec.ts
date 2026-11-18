@@ -1935,15 +1935,21 @@ describe('StageRenderer', () => {
       expect(stage.resize).not.toHaveBeenCalled();
     });
 
-    it('gives a render target at least one pixel for a width written past resize()', () => {
+    it('width, height and pixelRatio are read-only: a write throws a TypeError and the size stays', () => {
       const sr = new StageRenderer();
-      sr.resize(10, 10);
-      sr.width = NaN;
+      sr.resize(10, 20, 2);
 
-      const passTarget = (sr.asPassNode(renderer as any) as any).value.renderTarget;
+      expect(() => {
+        (sr as unknown as {width: number}).width = 5;
+      }).toThrow(TypeError);
+      expect(() => {
+        (sr as unknown as {height: number}).height = 5;
+      }).toThrow(TypeError);
+      expect(() => {
+        (sr as unknown as {pixelRatio: number}).pixelRatio = 5;
+      }).toThrow(TypeError);
 
-      expect(passTarget.width).toBe(1);
-      expect(passTarget.height).toBe(10);
+      expect([sr.width, sr.height, sr.pixelRatio]).toEqual([10, 20, 2]);
     });
   });
 
@@ -2054,6 +2060,52 @@ describe('StageRenderer', () => {
       drawTwice(root);
       expect(warn).not.toHaveBeenCalled();
     });
+
+    it('warns for a child that gets a pipeline after the first frames', () => {
+      const {root, child} = makeTree({childPipeline: false});
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+
+      child.pipeline = makePipelineMock() as any;
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('warns for a child whose outputRenderTarget is taken away after the first frames', () => {
+      const {root, child} = makeTree();
+      child.outputRenderTarget = new RenderTarget(100, 50);
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+
+      child.outputRenderTarget = undefined;
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('warns for a stage that joins after the first frames', () => {
+      const {root} = makeTree({withSibling: false});
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+
+      root.add(passStage('bg'));
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
+
+    it('warns for a stage that renderOrder brings into the order after the first frames', () => {
+      const {root} = makeTree();
+      root.renderOrder = 'bloom';
+      drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+
+      root.renderOrder = 'bg,bloom';
+      drawTwice(root);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(WARNING);
+    });
   });
 
   describe('a stage with a post-process beside other stages in one target', () => {
@@ -2132,6 +2184,31 @@ describe('StageRenderer', () => {
       const {root} = makeTree({withSibling: false});
       root.pipeline = makePipelineMock() as any;
       drawTwice(root);
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('asks its stages about a pipeline of their own in the first frame after a change, not in every frame', () => {
+      let reads = 0;
+      const room = Object.defineProperty(Object.assign(fakeStage('room'), {isStage2D: true}), 'postProcess', {
+        get() {
+          reads++;
+          return undefined;
+        },
+      });
+      const root = new StageRenderer();
+      root.name = 'root';
+      root.add(fakeStage('bg'));
+      root.add(room);
+      root.resize(100, 50);
+
+      root.renderTo(renderer as any);
+      root.renderTo(renderer as any);
+      root.renderTo(renderer as any);
+      expect(reads).toBe(1);
+
+      root.add(fakeStage('third'));
+      root.renderTo(renderer as any);
+      expect(reads).toBe(2);
       expect(warn).not.toHaveBeenCalled();
     });
   });

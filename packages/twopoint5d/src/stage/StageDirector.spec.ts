@@ -3,8 +3,10 @@ import {ACESFilmicToneMapping, Color, FloatType, NoToneMapping, RenderPipeline, 
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {
   OnAddToParent,
+  OnRemoveFromParent,
   OnStageAdded,
   OnStageAfterPostProcessChanged,
+  OnStageDispose,
   OnStageRemoved,
   OnStageTransitionEnd,
   OnStageTransitionStart,
@@ -12,6 +14,7 @@ import {
 } from '../events.js';
 import {createRendererMock, type FakeStage, fakeStage, names} from '../testing/stageFixtures.js';
 import {ClearStage} from './ClearStage.js';
+import {Stage2D} from './Stage2D.js';
 import {StageDirector} from './StageDirector.js';
 import {StageMask} from './StageMask.js';
 import {StageRenderer} from './StageRenderer.js';
@@ -1151,6 +1154,33 @@ describe('StageDirector', () => {
       expect(() => director.hide(a)).toThrow(error);
       expect(names(director.stack)).toEqual([]);
       expect(seen).toEqual(['finished']);
+    });
+
+    it('keeps both errors when listeners throw as the director lets go of a stage it wrapped and disposes the wrapper', () => {
+      const stage = new Stage2D();
+      stage.name = 'world';
+      director.setStack([stage]);
+      const wrapper = director.stages[0]!.stage;
+      const first = new Error('removeFromParent');
+      const second = new Error('dispose');
+      on(wrapper, OnRemoveFromParent, () => {
+        throw first;
+      });
+      on(wrapper, OnStageDispose, () => {
+        throw second;
+      });
+      let thrown: unknown;
+      try {
+        director.remove(stage);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(AggregateError);
+      expect((thrown as AggregateError).errors).toEqual([first, second]);
+      expect((thrown as AggregateError).message).toBe(
+        'StageDirector: more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose threw as the director let go of the stage "world"',
+      );
+      expect(director.stack).toEqual([]);
     });
   });
 

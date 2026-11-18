@@ -729,11 +729,7 @@ export class StageDirector extends StageRenderer {
         // the uses a caller took are given back
         const collected = [error, ...errors];
         if (usesHeld) this.#unuseMasks(effectMasks, collected);
-        if (collected.length === 1) throw error;
-        throw new AggregateError(
-          collected,
-          `${subject}: more than one error on the way back from a mask stage that refused to join`,
-        );
+        throwCollected(collected, `${subject}: more than one error on the way back from a mask stage that refused to join`);
       }
     }
     let usesMasks = usesHeld;
@@ -761,8 +757,7 @@ export class StageDirector extends StageRenderer {
       const collected = [error, ...errors];
       this.#unmaskSlot(slot, collected);
       if (usesMasks) this.#unuseMasks(effectMasks, collected);
-      if (collected.length === 1) throw error;
-      throw new AggregateError(collected, `${subject}: more than one error on the way back from a change that was refused`);
+      throwCollected(collected, `${subject}: more than one error on the way back from a change that was refused`);
     }
     if (!layer) {
       // the call ends as one that met a disposed director: what it held goes back
@@ -821,8 +816,7 @@ export class StageDirector extends StageRenderer {
     } catch (error) {
       const collected = [error, ...errors];
       this.#unuseMasks(effectMasks, collected);
-      if (collected.length === 1) throw error;
-      throw new AggregateError(collected, `${subject}: more than one error on the way back from a stack a listener changed`);
+      throwCollected(collected, `${subject}: more than one error on the way back from a stack a listener changed`);
     }
     if (ignored) {
       this.#unuseMasks(effectMasks, errors);
@@ -889,8 +883,7 @@ export class StageDirector extends StageRenderer {
     } catch (error) {
       const collected = [error, ...errors];
       this.#unuseMasks(effectMasks, collected);
-      if (collected.length === 1) throw error;
-      throw new AggregateError(collected, `${subject}: more than one error on the way back from a change that was refused`);
+      throwCollected(collected, `${subject}: more than one error on the way back from a change that was refused`);
     }
     if (!toLayer) {
       this.#unuseMasks(effectMasks, errors);
@@ -951,8 +944,7 @@ export class StageDirector extends StageRenderer {
     } catch (error) {
       const collected = [error, ...errors];
       this.#unuseMasks(effectMasks, collected);
-      if (collected.length === 1) throw error;
-      throw new AggregateError(collected, `${subject}: more than one error on the way back from a stack a listener changed`);
+      throwCollected(collected, `${subject}: more than one error on the way back from a stack a listener changed`);
     }
     if (this.#ignoresChanges()) {
       // a listener of an end that disposed the director leaves nothing to change
@@ -1070,9 +1062,7 @@ export class StageDirector extends StageRenderer {
         }
       }
       // the original error stays the first of what is thrown
-      const collected = [error, ...errors];
-      if (collected.length === 1) throw error;
-      throw new AggregateError(collected, `${subject}: more than one error on the way back from a stage that refused to join`);
+      throwCollected([error, ...errors], `${subject}: more than one error on the way back from a stage that refused to join`);
     }
     if (this.isDisposed) {
       throwCollected(errors, threw);
@@ -1383,6 +1373,8 @@ export class StageDirector extends StageRenderer {
    * A shape the director holds is skipped — once its compile is through, when another
    * `precompile()` still compiles it —, and a shape whose compile failed is built and compiled again
    * by the next call; the shapes compile one after the other, and the frames between them go on.
+   * A render pipeline that draws without going through `renderer.render()` compiles nothing: the
+   * call rejects with an `Error` that says so, and the next call builds that shape again.
    * What `precompile()` compiles stays until `dispose()`, or until the director draws or precompiles
    * with another renderer. A transition without an `effect` cannot be named ahead of time: to
    * compile it ahead, give it an effect of its own. A disposed director checks the arguments and
@@ -1458,9 +1450,7 @@ export class StageDirector extends StageRenderer {
     } catch (error) {
       // the error of the build or the compile stays the first of what is thrown, and the effects
       // that threw as the director let go of shapes are not lost
-      const collected = [error, ...errors];
-      if (collected.length === 1) throw error;
-      throw new AggregateError(collected, `${subject}: more than one error on the way back from a build that failed`);
+      throwCollected([error, ...errors], `${subject}: more than one error on the way back from a build that failed`);
     } finally {
       passTarget?.dispose();
     }
@@ -1706,11 +1696,7 @@ export class StageDirector extends StageRenderer {
     } catch (error) {
       const collected = [error, ...errors.splice(before)];
       this.#unuseMasks(masks.slice(0, i), collected);
-      if (collected.length === 1) throw error;
-      throw new AggregateError(
-        collected,
-        `${subject}: more than one error on the way back from a mask stage that refused to join`,
-      );
+      throwCollected(collected, `${subject}: more than one error on the way back from a mask stage that refused to join`);
     }
   }
 
@@ -1878,7 +1864,11 @@ export class StageDirector extends StageRenderer {
     return layer;
   }
 
-  /** Takes the layer out of the base and forgets it; a wrapper the director made is disposed. */
+  /**
+   * Takes the layer out of the base and forgets it; a wrapper the director made is disposed.
+   * What listeners throw on the way comes out afterwards — one unchanged, several as an
+   * `AggregateError`.
+   */
   #release(layer: Layer): void {
     if (this.#layers.get(layer.stage) !== layer) return;
     this.#layers.delete(layer.stage);
@@ -1892,18 +1882,31 @@ export class StageDirector extends StageRenderer {
     }
     this.#orderDirty = true;
     layer.unsubscribe?.();
+    // what listeners throw as the layer leaves — on the remove from the base, on the dispose of a
+    // wrapper — comes out once the layer is gone, the error of the remove first
+    const errors: unknown[] = [];
     this.#internalCall++;
     try {
       super.remove(layer.renderer);
+    } catch (error) {
+      errors.push(error);
     } finally {
       this.#internalCall--;
-      if (layer.wrapped) {
-        layer.renderer.dispose();
-      } else if (layer.scale !== 1) {
-        // a StageRenderer of the caller leaves with the full size of its pass target it came with
-        StageRendererInternals.setPassTargetScale(layer.renderer, 1);
-      }
     }
+    if (layer.wrapped) {
+      try {
+        layer.renderer.dispose();
+      } catch (error) {
+        errors.push(error);
+      }
+    } else if (layer.scale !== 1) {
+      // a StageRenderer of the caller leaves with the full size of its pass target it came with
+      StageRendererInternals.setPassTargetScale(layer.renderer, 1);
+    }
+    throwCollected(
+      errors,
+      `StageDirector: more than one listener of OnStageRemoved, OnRemoveFromParent and OnStageDispose threw as the director let go of the stage ${describeValue(layer.stage.name)}`,
+    );
   }
 
   /** Takes `layer` out of every slot; a transition that has it as a source ends as cancelled. */
@@ -2442,6 +2445,13 @@ export class StageDirector extends StageRenderer {
     } finally {
       if (ownRender) renderer.render = render;
       else delete (renderer as Partial<WebGPURenderer>).render;
+    }
+    // three.js draws the quad of a RenderPipeline through renderer.render(); a draw that went another
+    // way compiled nothing, and the first frame of the shape would build what precompile() promised
+    if (compiled === undefined) {
+      throw new Error(
+        'StageDirector#precompile(): the render pipeline drew without calling renderer.render(), and nothing was compiled',
+      );
     }
     await compiled;
   }
