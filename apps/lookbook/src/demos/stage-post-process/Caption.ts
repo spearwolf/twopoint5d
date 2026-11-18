@@ -16,7 +16,7 @@ export class Caption {
   readonly stage: Stage2D;
   readonly #canvas: HTMLCanvasElement;
   readonly #texture: CanvasTexture;
-  readonly #mesh: Mesh;
+  readonly #mesh: Mesh<PlaneGeometry, MeshBasicMaterial>;
 
   constructor() {
     // contain: the plate keeps its place at the bottom of the view on every screen
@@ -74,7 +74,7 @@ export class Caption {
 
   dispose(): void {
     this.#mesh.geometry.dispose();
-    (this.#mesh.material as MeshBasicMaterial).dispose();
+    this.#mesh.material.dispose();
     this.#texture.dispose();
     this.stage.dispose();
   }

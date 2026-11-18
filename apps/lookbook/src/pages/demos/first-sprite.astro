@@ -15,6 +15,7 @@ import {description, title} from './_first-sprite.json';
   import {Display, FeatureSprites, TexturedSpriteKind, TextureStore} from '@spearwolf/twopoint5d';
   import {PerspectiveCamera, Scene} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {atlasFrame} from '~demos/utils/atlasFrame';
   import {onDemoInit} from '~demos/utils/demoInit';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {deferPreview} from '~demos/utils/demoPreview';
@@ -64,8 +65,8 @@ import {description, title} from './_first-sprite.json';
       return;
     }
 
-    // splotchs-256x.json names the frame splotch0, 256 × 296 pixels, so frame() finds it
-    const frame = atlas.frame('splotch0')!;
+    // splotchs-256x.json names the frame splotch0, 256 × 296 pixels
+    const frame = atlasFrame(atlas, 'first-sprite', 'splotch0');
 
     // a mesh with room for one sprite, drawn with the texture of the atlas
     const sprites = new FeatureSprites(TexturedSpriteKind, {capacity: 1, textures: {colorMap: texture}});

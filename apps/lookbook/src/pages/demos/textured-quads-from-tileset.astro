@@ -24,9 +24,13 @@ import {description, title} from './_textured-quads-from-tileset.json';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {disposeMaterial} from '~demos/utils/disposeMaterial';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {SeededRandom} from '~demos/utils/seededRandom';
   import {showTexturePreview} from '~demos/utils/showTexturePreview';
+
+  const QUADS_SEED = 47;
 
   // +================================================================================+
   //
@@ -35,6 +39,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
   // +================================================================================+
 
   function makeMesh(rows: number, columns: number, size: number, offset: number, tileset: TileSet, texture: Texture) {
+    const random = new SeededRandom(QUADS_SEED);
     const capacity = rows * columns;
 
     const material = new MeshBasicNodeMaterial({
@@ -50,7 +55,7 @@ import {description, title} from './_textured-quads-from-tileset.json';
         for (let x = 0; x < columns; x++) {
           const quad = vertexObjectPool.createVO()!;
 
-          quad.width = 1.0 + Math.random() * (size - 1.0);
+          quad.width = 1.0 + random.next() * (size - 1.0);
           quad.height = quad.width;
 
           quad.setInstancePosition([
@@ -102,9 +107,9 @@ import {description, title} from './_textured-quads-from-tileset.json';
 
     demo.onDispose(() => {
       // createTexturedQuads() built the geometry, makeMesh() the one material it handed over, the
-      // store lent the texture; VertexObjects types its material as a list or none as well
+      // store lent the texture
       mesh.geometry?.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      disposeMaterial(mesh.material);
       store.dispose();
     });
   });

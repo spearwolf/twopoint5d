@@ -35,6 +35,7 @@ import {
 } from 'three/webgpu';
 import {crossing, duelAngles} from './SaberDuel';
 import {VerletRopes} from './VerletRopes';
+import {SeededRandom} from '~demos/utils/seededRandom';
 
 /** The textures out of the catalog: the atlas `rope-bridge/bridge.json` and the three cave layers. */
 export interface RopeBridgeAssets {
@@ -154,6 +155,8 @@ const BLADE_THICKNESS = 10;
 const MAX_WEIGHTS = 6;
 const WEIGHT_RADIUS = 20;
 const WEIGHT_LIFE = 8;
+const SPARK_SEED = 23;
+
 const SPARKS = 48;
 const SPARK_LIFE = 0.45;
 const MOTES = 26;
@@ -228,6 +231,8 @@ interface Spark {
  * light sabers on the deck. The pointer drags any point; a click into the air drops a lantern.
  */
 export class RopeBridge {
+  readonly #random = new SeededRandom(SPARK_SEED);
+
   readonly world = new Group();
 
   readonly #sim = new VerletRopes(256, 256);
@@ -851,13 +856,13 @@ export class RopeBridge {
     for (let i = 0; i < count; i++) {
       const spark = this.#sparks[this.#nextSpark]!;
       this.#nextSpark = (this.#nextSpark + 1) % this.#sparks.length;
-      const angle = Math.random() * Math.PI * 2;
-      const v = speed * (0.4 + Math.random() * 0.6);
+      const angle = this.#random.next() * Math.PI * 2;
+      const v = speed * (0.4 + this.#random.next() * 0.6);
       spark.x = this.#clash.x;
       spark.y = this.#clash.y;
       spark.vx = Math.cos(angle) * v;
       spark.vy = Math.sin(angle) * v + 40;
-      spark.life = SPARK_LIFE * (0.6 + Math.random() * 0.4);
+      spark.life = SPARK_LIFE * (0.6 + this.#random.next() * 0.4);
     }
   }
 

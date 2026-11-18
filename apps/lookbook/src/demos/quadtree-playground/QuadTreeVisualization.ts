@@ -1,7 +1,12 @@
 import {Canvas2DStage, ChunkQuadTreeNode, NumberDataChunk2D} from '@spearwolf/twopoint5d';
 import type {WebGPURenderer} from 'three/webgpu';
+import {SeededRandom} from '~demos/utils/seededRandom';
+
+const CHUNKS_SEED = 19;
 
 export class QuadTreeVisualization {
+  readonly #random = new SeededRandom(CHUNKS_SEED);
+
   readonly canvasStage: Canvas2DStage;
 
   readonly ctx: CanvasRenderingContext2D;
@@ -130,10 +135,10 @@ export class QuadTreeVisualization {
     const chunks: NumberDataChunk2D[] = [];
 
     for (let i = 0; i < randomCount; i++) {
-      const w = Math.ceil(Math.max(MIN_SIZE, Math.random() * MAX_SIZE));
-      const h = Math.ceil(Math.max(MIN_SIZE, Math.random() * MAX_SIZE));
-      const x = Math.round(Math.random() * (WIDTH - MARGIN * 2) + MARGIN) - w / 2;
-      const y = Math.round(Math.random() * (HEIGHT - MARGIN * 2) + MARGIN) - h / 2;
+      const w = Math.ceil(Math.max(MIN_SIZE, this.#random.next() * MAX_SIZE));
+      const h = Math.ceil(Math.max(MIN_SIZE, this.#random.next() * MAX_SIZE));
+      const x = Math.round(this.#random.next() * (WIDTH - MARGIN * 2) + MARGIN) - w / 2;
+      const y = Math.round(this.#random.next() * (HEIGHT - MARGIN * 2) + MARGIN) - h / 2;
       chunks.push(
         new NumberDataChunk2D({
           x,
@@ -152,10 +157,10 @@ export class QuadTreeVisualization {
     const centerY = (HEIGHT - rows * cellSize) * -0.5;
 
     for (let i = 0; i < sortedCount; i++) {
-      const w = Math.ceil(cellSize + (Math.random() - 1) * cellSize * 0.25);
-      const h = Math.ceil(cellSize + (Math.random() - 1) * cellSize * 0.25);
-      const y = Math.floor(i / rows) * cellSize - centerY + (Math.random() - 1) * cellSize * 0.25;
-      const x = (i % rows) * cellSize - centerX + (Math.random() - 1) * cellSize * 0.25;
+      const w = Math.ceil(cellSize + (this.#random.next() - 1) * cellSize * 0.25);
+      const h = Math.ceil(cellSize + (this.#random.next() - 1) * cellSize * 0.25);
+      const y = Math.floor(i / rows) * cellSize - centerY + (this.#random.next() - 1) * cellSize * 0.25;
+      const x = (i % rows) * cellSize - centerX + (this.#random.next() - 1) * cellSize * 0.25;
       chunks.push(
         new NumberDataChunk2D({
           x,

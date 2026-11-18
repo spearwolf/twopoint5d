@@ -21,6 +21,8 @@ import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type UniformNode,
 import {SeededRandom} from '~demos/utils/seededRandom';
 import {SoftBlobs} from './SoftBlobs';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 /** the view of both scenes and of the ink, in units, shown with `fit: 'cover'` */
 export const VIEW_WIDTH = 960;
 export const VIEW_HEIGHT = 540;
@@ -187,7 +189,7 @@ export class InkBlotLayout {
 export class InkBlots {
   readonly stage = makeInkStage('ink');
   readonly layout: InkBlotLayout;
-  #plane: Mesh | undefined;
+  #plane: PlaneMesh | undefined;
   readonly #drops = new SoftBlobs({
     capacity: DROPS,
     name: 'ink drops',
@@ -243,7 +245,7 @@ export class InkBlots {
 
   dispose(): void {
     this.#plane?.geometry.dispose();
-    (this.#plane?.material as MeshBasicNodeMaterial | undefined)?.dispose();
+    this.#plane?.material.dispose();
     this.#drops.dispose();
     this.stage.dispose();
   }
@@ -262,7 +264,7 @@ export class WetEdge {
   /** whether a transition through the ink runs: the page sets it */
   running = false;
   readonly #layout: InkBlotLayout;
-  #plane: Mesh | undefined;
+  #plane: PlaneMesh | undefined;
   readonly #rings = new SoftBlobs({
     capacity: DROPS,
     name: 'ink drop rims',
@@ -342,7 +344,7 @@ export class WetEdge {
 
   dispose(): void {
     this.#plane?.geometry.dispose();
-    (this.#plane?.material as MeshBasicNodeMaterial | undefined)?.dispose();
+    this.#plane?.material.dispose();
     this.#rings.dispose();
     this.stage.dispose();
   }

@@ -16,6 +16,8 @@ import {SeededRandom} from '~demos/utils/seededRandom';
 import {additive, smoothstepCpu} from './helpers';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/heat-haze';
 
 /** the view of both pictures and of the heat, in units, shown with `fit: 'cover'` */
@@ -127,7 +129,7 @@ export class CrematoriumView {
   readonly stage: Stage2D;
   readonly variant: CrematoriumVariant;
   readonly #time = uniform(0);
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #flakes = new SoftBlobs({capacity: FLAKES + EMBERS, name: 'weather'});
   readonly #glows = new SoftBlobs({capacity: 2, name: 'sodium lamp'});
   readonly #list: Flake[] = [];
@@ -273,7 +275,7 @@ export class CrematoriumView {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.#flakes.dispose();
     this.#glows.dispose();

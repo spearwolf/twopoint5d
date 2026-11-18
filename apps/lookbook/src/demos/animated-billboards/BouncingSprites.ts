@@ -1,4 +1,5 @@
 import type {AnimatedSprite, TextureAtlas, VertexObjectPool} from '@spearwolf/twopoint5d';
+import {SeededRandom} from '~demos/utils/seededRandom';
 
 interface Sprite extends AnimatedSprite {
   speedX: number;
@@ -8,7 +9,11 @@ interface Sprite extends AnimatedSprite {
   z0: number;
 }
 
+const BILLBOARDS_SEED = 9;
+
 export class BouncingSprites {
+  readonly #random = new SeededRandom(BILLBOARDS_SEED);
+
   gravity = -130;
   startSpeedX = 25;
   startSpeedY = 40;
@@ -61,17 +66,17 @@ export class BouncingSprites {
       sprite.setQuadSize([this.spriteSize, this.spriteSize]);
 
       sprite.animId = animId;
-      sprite.animOffset = Math.random();
+      sprite.animOffset = this.#random.next();
 
-      sprite.x0 = Math.random() * this.containerWidth - halfWidth;
-      sprite.y = Math.random() * this.containerHeight + this.ground;
-      sprite.z0 = Math.random() * this.containerDepth - halfDepth;
+      sprite.x0 = this.#random.next() * this.containerWidth - halfWidth;
+      sprite.y = this.#random.next() * this.containerHeight + this.ground;
+      sprite.z0 = this.#random.next() * this.containerDepth - halfDepth;
 
-      sprite.speedX = -Math.abs(Math.random() * this.startSpeedX + this.startSpeedBaseX);
-      sprite.speedY = Math.random() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;
+      sprite.speedX = -Math.abs(this.#random.next() * this.startSpeedX + this.startSpeedBaseX);
+      sprite.speedY = this.#random.next() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;
 
-      sprite.rotation = Math.random() * Math.PI * 1.75 + Math.PI * 0.25;
-      sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
+      sprite.rotation = this.#random.next() * Math.PI * 1.75 + Math.PI * 0.25;
+      sprite.speedRotate = this.#random.next() * Math.PI * this.speedRotateFactor;
 
       this.sprites.push(sprite);
     }
@@ -102,7 +107,7 @@ export class BouncingSprites {
 
       if (y < this.ground) {
         // on the bottom edge
-        speedY = Math.random() * this.upwindSpeed + this.upwindBaseSpeed;
+        speedY = this.#random.next() * this.upwindSpeed + this.upwindBaseSpeed;
         y = this.ground;
       }
 

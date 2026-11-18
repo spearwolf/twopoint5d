@@ -146,8 +146,8 @@ export class CardboardParade extends Group {
   /** Whether the turntable turns. */
   spinning = true;
 
-  readonly #disc: Mesh;
-  readonly #rim: Mesh;
+  readonly #disc: Mesh<CircleGeometry, MeshBasicNodeMaterial>;
+  readonly #rim: Mesh<CylinderGeometry, MeshBasicNodeMaterial>;
   readonly #walkers: WalkerState[] = [];
   readonly #prints: Print[] = [];
   readonly #frames: Record<string, TextureAtlasFrame>;
@@ -430,9 +430,9 @@ export class CardboardParade extends Group {
     this.walkers.dispose();
     this.ground.dispose();
     this.#disc.geometry.dispose();
-    (this.#disc.material as MeshBasicNodeMaterial).dispose();
+    this.#disc.material.dispose();
     this.#rim.geometry.dispose();
-    (this.#rim.material as MeshBasicNodeMaterial).dispose();
+    this.#rim.material.dispose();
     this.removeFromParent();
   }
 }

@@ -91,7 +91,7 @@ export class VectorBalls extends Group {
   /** The time the last sorts took, in milliseconds, averaged over a few frames. */
   sortMillis = 0;
 
-  readonly #floor: Mesh;
+  readonly #floor: Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
   readonly #grid: GridHelper;
   readonly #frames: PreparedSpriteFrame[];
   readonly #handles: Ball[] = [];
@@ -340,7 +340,7 @@ export class VectorBalls extends Group {
   override dispose() {
     this.balls.dispose();
     this.#floor.geometry.dispose();
-    (this.#floor.material as MeshBasicNodeMaterial).dispose();
+    this.#floor.material.dispose();
     this.#grid.dispose();
     this.removeFromParent();
   }

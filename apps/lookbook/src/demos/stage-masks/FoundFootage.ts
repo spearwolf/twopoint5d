@@ -42,6 +42,8 @@ import {atlasFrame} from '~demos/utils/atlasFrame';
 import {randomAt, SeededRandom} from '~demos/utils/seededRandom';
 import {additive, hash21, multiply, setMirroredFrame} from './helpers';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/found-footage';
 /** the atlas and the ground have 2 texels per unit */
 const TEXELS_PER_UNIT = 2;
@@ -291,7 +293,7 @@ export class ForestLevel {
   readonly #eyes: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #eyesSprite: TexturedSprite;
   readonly #figureH: number;
-  readonly #planes: Mesh[] = [];
+  readonly #planes: PlaneMesh[] = [];
   #blink = 0;
 
   constructor(assets: FootageAssets, clock: FootageClock) {
@@ -502,7 +504,7 @@ export class ForestLevel {
     this.#eyes.dispose();
     for (const mesh of this.#planes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.stage.dispose();
   }
@@ -515,7 +517,7 @@ export class ForestLevel {
  */
 export class RotLayer {
   readonly stage = makeFootageStage('rot');
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
 
   constructor(clock: FootageClock) {
     const p = positionWorld.xy;
@@ -539,7 +541,7 @@ export class RotLayer {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.stage.dispose();
   }
 }

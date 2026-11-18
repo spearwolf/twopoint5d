@@ -1,4 +1,5 @@
 import type {AnimatedSprite, VertexObjectPool} from '@spearwolf/twopoint5d';
+import {SeededRandom} from '~demos/utils/seededRandom';
 
 interface Sprite extends AnimatedSprite {
   speedX: number;
@@ -6,7 +7,11 @@ interface Sprite extends AnimatedSprite {
   speedRotate: number;
 }
 
+const SPRITES_SEED = 7;
+
 export class BouncingSprites {
+  readonly #random = new SeededRandom(SPRITES_SEED);
+
   gravity = -45;
   startSpeedX = 20;
   startSpeedY = 40;
@@ -50,19 +55,19 @@ export class BouncingSprites {
       sprite.setQuadSize([this.spriteSize, this.spriteSize]);
 
       sprite.animId = animId;
-      sprite.animOffset = Math.random();
+      sprite.animOffset = this.#random.next();
 
       sprite.setInstancePosition([
-        Math.random() * this.containerWidth - halfWidth,
-        Math.random() * this.containerHeight - halfHeight,
+        this.#random.next() * this.containerWidth - halfWidth,
+        this.#random.next() * this.containerHeight - halfHeight,
         0,
       ]);
 
-      sprite.speedX = -Math.abs(Math.random() * this.startSpeedX + this.startSpeedBaseX);
-      sprite.speedY = Math.random() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;
+      sprite.speedX = -Math.abs(this.#random.next() * this.startSpeedX + this.startSpeedBaseX);
+      sprite.speedY = this.#random.next() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;
 
-      sprite.rotation = Math.random() * Math.PI * 1.75 + Math.PI * 0.25;
-      sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
+      sprite.rotation = this.#random.next() * Math.PI * 1.75 + Math.PI * 0.25;
+      sprite.speedRotate = this.#random.next() * Math.PI * this.speedRotateFactor;
 
       this.sprites.push(sprite);
     }
@@ -72,7 +77,7 @@ export class BouncingSprites {
     count = Math.min(count, this.sprites.length);
 
     for (let i = 0; i < count; i++) {
-      const spriteIndex = Math.floor(Math.random() * this.sprites.length);
+      const spriteIndex = Math.floor(this.#random.next() * this.sprites.length);
       // the index comes from the array's own length, so it points at a sprite
       this.spritePool.freeVO(this.sprites[spriteIndex]!);
       this.sprites.splice(spriteIndex, 1);
@@ -107,7 +112,7 @@ export class BouncingSprites {
 
       if (y < -halfHeight) {
         // on the bottom edge
-        speedY = Math.random() * this.upwindSpeed + this.upwindBaseSpeed;
+        speedY = this.#random.next() * this.upwindSpeed + this.upwindBaseSpeed;
         y = -halfHeight;
       }
 

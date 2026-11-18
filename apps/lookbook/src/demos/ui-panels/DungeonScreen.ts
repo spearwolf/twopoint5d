@@ -12,6 +12,8 @@ import {
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {Color, Group, type Texture, type WebGPURenderer} from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
+import {SeededRandom} from '~demos/utils/seededRandom';
 
 import {type Panel, PanelKind, type Picture, PictureKind} from './kinds.js';
 import {DIALOG, INVENTORY, INVENTORY_COLUMNS, INVENTORY_ROWS, PARTY, type PartyMemberData, QUEST, TITLE} from './party.js';
@@ -79,6 +81,7 @@ const LINE_PAUSE = 3.2; // seconds a typed line stays before the next one
 const OPEN_INVENTORY_SECONDS = 0.45;
 const OPEN_DIALOG_SECONDS = 0.5;
 const COMBAT_TICK = 1.5;
+const COMBAT_SEED = 29;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 // overshoots by 5 % and settles
@@ -172,6 +175,7 @@ export class DungeonScreen extends Group {
   onComposed?: () => void;
 
   readonly #assets: DungeonScreenAssets;
+  readonly #random = new SeededRandom(COMBAT_SEED);
   readonly #kitFrame: TextureAtlasFrame;
   readonly #atlas: DynamicAtlas;
   readonly #labels: PixelLabels;
@@ -250,7 +254,7 @@ export class DungeonScreen extends Group {
   constructor(assets: DungeonScreenAssets) {
     super();
     this.#assets = assets;
-    this.#kitFrame = assets.kit.frame('panels 0.aseprite')!;
+    this.#kitFrame = atlasFrame(assets.kit, 'DungeonScreen', 'panels 0.aseprite');
     this.#labels = new PixelLabels(assets.font, assets.fontImage);
 
     // portraits, names and counters, packed at run time into one texture. Nearest: the labels are
@@ -284,7 +288,7 @@ export class DungeonScreen extends Group {
     this.#items = INVENTORY.map((item) => {
       if (item == null) return undefined;
       const icon = this.#icons.createSprite()!;
-      icon.setFrame(assets.icons.frame(item.icon)!);
+      icon.setFrame(atlasFrame(assets.icons, 'DungeonScreen', item.icon));
       return icon;
     });
     // the dialog box opens upwards from its bottom left corner
@@ -915,8 +919,8 @@ export class DungeonScreen extends Group {
   }
 
   #combatRound(): void {
-    const roll = Math.random();
-    const member = this.#members[Math.floor(Math.random() * this.#members.length)]!;
+    const roll = this.#random.next();
+    const member = this.#members[Math.floor(this.#random.next() * this.#members.length)]!;
     // the most wounded drinks a potion once it is down to half
     const wounded = this.#members.reduce((a, b) => (b.hp / b.data.maxHp < a.hp / a.data.maxHp ? b : a));
     if (roll < 0.3 && wounded.hp / wounded.data.maxHp < 0.5) {
@@ -924,10 +928,10 @@ export class DungeonScreen extends Group {
       wounded.flash = 0.7;
       wounded.flashColor.set('#7dff9a');
     } else if (roll < 0.75) {
-      this.#damage(member, 2 + Math.floor(Math.random() * member.data.maxHp * 0.2));
+      this.#damage(member, 2 + Math.floor(this.#random.next() * member.data.maxHp * 0.2));
     } else {
       // a spell, or a mana tonic once the spell costs more than is left
-      const cost = 2 + Math.floor(Math.random() * 6);
+      const cost = 2 + Math.floor(this.#random.next() * 6);
       member.mp = member.mp >= cost ? member.mp - cost : member.data.maxMp;
     }
   }

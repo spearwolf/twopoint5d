@@ -14,6 +14,7 @@ import {
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import type {Texture} from 'three/webgpu';
+import {SeededRandom} from '~demos/utils/seededRandom';
 import {CORRIDOR_HEIGHT, CORRIDOR_LENGTH, CORRIDOR_WIDTH, TILE} from './Corridor';
 
 // signs flat on the walls, turned by their yaw to face into the corridor; Tint above 1 makes them glow
@@ -71,7 +72,11 @@ interface SignState {
 }
 
 /** The neon signs on the walls of the corridor; one of them flickers. */
+const FLICKER_SEED = 17;
+
 export class NeonSigns {
+  readonly #random = new SeededRandom(FLICKER_SEED);
+
   readonly sprites: FeatureSpritesOf<typeof SignKind>;
   readonly #signs: SignState[] = [];
   #flickerUntil = 0;
@@ -117,8 +122,8 @@ export class NeonSigns {
   /** Lets the faulty sign stutter now and then; `time` in seconds. */
   update(time: number) {
     if (time > this.#nextFlicker) {
-      this.#flickerUntil = time + 0.4 + Math.random() * 0.8;
-      this.#nextFlicker = this.#flickerUntil + 2 + Math.random() * 5;
+      this.#flickerUntil = time + 0.4 + this.#random.next() * 0.8;
+      this.#nextFlicker = this.#flickerUntil + 2 + this.#random.next() * 5;
     }
     const stutter = time < this.#flickerUntil && Math.sin(time * 90) * Math.sin(time * 37) > -0.1;
     for (const sign of this.#signs) {

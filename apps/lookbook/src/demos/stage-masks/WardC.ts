@@ -40,6 +40,8 @@ import {
   type WardRig,
 } from './WardRig';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/spotlight';
 /** the level images and the atlas have 2 texels per unit */
 const TEXELS_PER_UNIT = 2;
@@ -230,8 +232,8 @@ export class WardLevel {
 
   readonly #rig: WardRig;
   readonly #nodes: WardLightNodes;
-  readonly #floor: Mesh;
-  readonly #water: Mesh;
+  readonly #floor: PlaneMesh;
+  readonly #water: PlaneMesh;
   readonly #debris: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #fixtures: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #emissive: FeatureSpritesOf<typeof TexturedSpriteKind>;
@@ -398,9 +400,9 @@ export class WardLevel {
 
   dispose(): void {
     this.#floor.geometry.dispose();
-    (this.#floor.material as MeshBasicNodeMaterial).dispose();
+    this.#floor.material.dispose();
     this.#water.geometry.dispose();
-    (this.#water.material as MeshBasicNodeMaterial).dispose();
+    this.#water.material.dispose();
     this.#debris.dispose();
     this.#fixtures.dispose();
     this.#emissive.dispose();
@@ -475,7 +477,7 @@ interface Watcher {
 export class WardDeep {
   readonly stage = makeStage('the deep');
   readonly #rig: WardRig;
-  readonly #water: Mesh;
+  readonly #water: PlaneMesh;
   readonly #hand: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #handSprite: TexturedSprite;
   readonly #eyes: FeatureSpritesOf<typeof TexturedSpriteKind>;
@@ -596,7 +598,7 @@ export class WardDeep {
 
   dispose(): void {
     this.#water.geometry.dispose();
-    (this.#water.material as MeshBasicNodeMaterial).dispose();
+    this.#water.material.dispose();
     this.#hand.dispose();
     this.#eyes.dispose();
     this.stage.dispose();

@@ -53,7 +53,7 @@ export class Corridor extends Group {
   /** The point the shadows are thrown from (`lightOf(light)`); it hangs inside the lamp. */
   readonly light: PointLight;
 
-  readonly #lamp: Mesh;
+  readonly #lamp: Mesh<OctahedronGeometry, MeshBasicNodeMaterial>;
   readonly #materials: MeshBasicNodeMaterial[] = [];
   readonly #geometries: (PlaneGeometry | OctahedronGeometry)[] = [];
 
@@ -93,8 +93,8 @@ export class Corridor extends Group {
 
     // a warm lamp against the cold neon: above white, so it blooms
     this.#lamp = new Mesh(new OctahedronGeometry(0.16), new MeshBasicNodeMaterial({color: new Color(5, 3.2, 1.6)}));
-    this.#geometries.push(this.#lamp.geometry as OctahedronGeometry);
-    this.#materials.push(this.#lamp.material as MeshBasicNodeMaterial);
+    this.#geometries.push(this.#lamp.geometry);
+    this.#materials.push(this.#lamp.material);
     // the sprites are unlit; the light is a marker that lightOf() reads, not a light three shades with
     this.light = new PointLight(0xffc080, 0);
     this.#lamp.add(this.light);

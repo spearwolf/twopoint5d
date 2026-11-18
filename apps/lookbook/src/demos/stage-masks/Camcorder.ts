@@ -43,7 +43,7 @@ const OSD_FONT = '"DejaVu Sans Mono", "Liberation Mono", Menlo, Consolas, monosp
  * texture is uploaded seldom and small.
  */
 class HudLabel {
-  readonly mesh: Mesh;
+  readonly mesh: Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
   readonly #texture: CanvasTexture;
@@ -85,7 +85,7 @@ class HudLabel {
 
   dispose(): void {
     this.mesh.geometry.dispose();
-    (this.mesh.material as MeshBasicNodeMaterial).dispose();
+    this.mesh.material.dispose();
     this.#texture.dispose();
   }
 }
@@ -327,7 +327,7 @@ export class CamcorderHud {
  */
 export class VhsNoise {
   readonly stage = makeFootageStage('vhs');
-  readonly #plane: Mesh;
+  readonly #plane: Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 
   constructor(clock: FootageClock) {
     const p = positionWorld.xy;
@@ -381,7 +381,7 @@ export class VhsNoise {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.stage.dispose();
   }
 }

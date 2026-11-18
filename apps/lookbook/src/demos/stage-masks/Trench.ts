@@ -31,6 +31,8 @@ import {SeededRandom} from '~demos/utils/seededRandom';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 import {makeSonarStage} from './Sonar';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/matte-threshold';
 /** the two scene images cover x in ±600, y in ±320 units, 2 texels per unit */
 const WORLD = {left: -600, right: 600, bottom: -320, top: 320};
@@ -128,7 +130,7 @@ export class TrenchView {
   readonly stage: ReturnType<typeof makeSonarStage>;
   protected readonly time = uniform(0);
   readonly #gain = uniform(1);
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #snow = new SoftBlobs({capacity: SNOW, name: 'marine snow'});
   readonly #specks: Speck[] = [];
   readonly #glows = new SoftBlobs({capacity: 3, name: 'sub lamps'});
@@ -253,7 +255,7 @@ export class TrenchView {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.#snow.dispose();
     this.#glows.dispose();

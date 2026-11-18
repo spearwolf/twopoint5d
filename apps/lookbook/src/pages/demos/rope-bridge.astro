@@ -158,6 +158,7 @@ import {description, title} from './_rope-bridge.json';
     document.querySelector('.dropLantern')!.addEventListener(
       'click',
       () => {
+        // only a click drops this lantern, which no preview sees: its place may differ on every run
         bridge?.dropLantern((Math.random() - 0.5) * 240, 150);
       },
       {signal},

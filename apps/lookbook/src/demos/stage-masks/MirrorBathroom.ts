@@ -7,6 +7,8 @@ import {jsonList, jsonNumber, jsonObject, jsonTuple} from '~demos/utils/checkJso
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {hash21} from './helpers';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/matte-3d';
 
 /** the view of both scenes and of the mask, in units, shown with `fit: 'cover'` */
@@ -95,7 +97,7 @@ export class MirrorScene {
   readonly kind: 'bathroom' | 'reflection';
   readonly #time = uniform(0);
   readonly #lamps = uniform(1);
-  readonly #mesh: Mesh;
+  readonly #mesh: PlaneMesh;
 
   constructor(assets: MirrorAssets, kind: 'bathroom' | 'reflection') {
     this.kind = kind;
@@ -163,7 +165,7 @@ export class MirrorScene {
 
   dispose(): void {
     this.#mesh.geometry.dispose();
-    (this.#mesh.material as MeshBasicNodeMaterial).dispose();
+    this.#mesh.material.dispose();
     this.stage.dispose();
   }
 }

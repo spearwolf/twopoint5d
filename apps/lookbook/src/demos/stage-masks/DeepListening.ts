@@ -52,6 +52,8 @@ import {SeededRandom} from '~demos/utils/seededRandom';
 import {additive, setPlaneUvToFrame} from './helpers';
 import {makeRiftStage, type RiftState, WORLD} from './RiftMembrane';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/rift';
 /** the room images and the atlas have 2 texels per unit */
 const TEXELS_PER_UNIT = 2;
@@ -152,7 +154,7 @@ const spritePool = (assets: DeepAssets, capacity: number, name: string, blending
 };
 
 /** A plane over a rectangle of the world (in units), showing a texture. */
-function texturedPlane(map: Texture, rect: {left: number; right: number; bottom: number; top: number}, name: string): Mesh {
+function texturedPlane(map: Texture, rect: {left: number; right: number; bottom: number; top: number}, name: string): PlaneMesh {
   const material = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
   material.colorNode = texture(map);
   const mesh = new Mesh(new PlaneGeometry(rect.right - rect.left, rect.top - rect.bottom), material);
@@ -176,7 +178,7 @@ function swayingPlane(
     time: FloatNode;
     tint: [number, number, number];
   },
-): Mesh {
+): PlaneMesh {
   const {coords} = atlasFrame(assets.atlas, 'DeepListening', frame);
   const scale = opts.height / (coords.height / TEXELS_PER_UNIT);
   const w = (coords.width / TEXELS_PER_UNIT) * scale;
@@ -270,7 +272,7 @@ function scopeTrace(
   color: [number, number, number],
   time: FloatNode,
   agitation: FloatNode,
-): Mesh {
+): PlaneMesh {
   const u = uv().x;
   const v = uv().y;
   const t = time.add(index * 1.7);
@@ -331,7 +333,7 @@ export class ListeningRoom {
   readonly time = uniform(0);
 
   readonly #rift: RiftState;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #reels: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #glows: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #reelSprites: TexturedSprite[] = [];
@@ -458,7 +460,7 @@ export class ListeningRoom {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.#reels.dispose();
     this.#glows.dispose();
@@ -481,7 +483,7 @@ export class DrownedRoom {
   readonly time = uniform(0);
 
   readonly #rift: RiftState;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #pools: FeatureSpritesOf<typeof TexturedSpriteKind>[] = [];
   readonly #agitation = SCOPES.map(() => uniform(0));
   readonly #reelSprites: TexturedSprite[] = [];
@@ -490,7 +492,7 @@ export class DrownedRoom {
   readonly #bubbles: Mote[] = [];
   readonly #leviathan: TexturedSprite;
   readonly #bell: TexturedSprite;
-  readonly #arms: Mesh;
+  readonly #arms: PlaneMesh;
   readonly #bellSize: {w: number; h: number};
 
   constructor(assets: DeepAssets, rift: RiftState) {
@@ -693,7 +695,7 @@ export class DrownedRoom {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     for (const pool of this.#pools) pool.dispose();
     this.stage.dispose();
@@ -711,7 +713,7 @@ const VIEW_ROLL = 540 * 1.4;
 export class TvSnow {
   readonly stage = makeRiftStage('static');
   readonly time = uniform(0);
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
 
   constructor() {
     // a hash without sine (Dave Hoskins' hash12): white noise that holds up at large pixel coordinates
@@ -740,7 +742,7 @@ export class TvSnow {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.stage.dispose();
   }
 }

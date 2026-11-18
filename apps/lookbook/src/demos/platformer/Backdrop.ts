@@ -12,6 +12,7 @@ import {
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {Group, type Texture} from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 
 // no frame feature: a layer sprite shows its whole texture
 const LayerKind = defineSprite({base: QuadBase, features: [InstancePosition, FlatPlacement, QuadSize, TextureColor]});
@@ -85,7 +86,7 @@ export class Backdrop extends Group {
     tiles.position.z = -10;
 
     const put = (frameName: string, left: number, bottom: number, shade = 1) => {
-      const frame = atlas.frame(frameName)!;
+      const frame = atlasFrame(atlas, 'Backdrop', frameName);
       const {width, height} = frame.coords;
       const tile = tiles.createSprite()!;
       tile.setSize(width, height);

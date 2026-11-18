@@ -45,6 +45,8 @@ import {
   spritePool,
 } from './PaintingHallway';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 type FloatNode = Node<'float'>;
 
 /**
@@ -110,7 +112,7 @@ export class Moor {
   readonly stage = makePortalStage('the moor');
 
   readonly #state: PortalState;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #bands: FeatureSpritesOf<typeof TexturedSpriteKind>[] = [];
   readonly #walkerPool: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #walker: TexturedSprite;
@@ -343,7 +345,7 @@ export class Moor {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     for (const pool of this.#bands) pool.dispose();
     this.#walkerPool.dispose();
@@ -361,7 +363,7 @@ export class Moor {
 export class PortalCanvas {
   readonly scene = new Scene();
   readonly mask: StageMask;
-  readonly #mesh: Mesh;
+  readonly #mesh: PlaneMesh;
 
   constructor(hallway: Hallway) {
     const material = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
@@ -380,7 +382,7 @@ export class PortalCanvas {
   dispose(): void {
     this.mask.dispose();
     this.#mesh.geometry.dispose();
-    (this.#mesh.material as MeshBasicNodeMaterial).dispose();
+    this.#mesh.material.dispose();
   }
 }
 
@@ -396,7 +398,7 @@ export class Glaze {
   readonly stage = makePortalStage('the glaze');
 
   readonly #state: PortalState;
-  readonly #oval: Mesh;
+  readonly #oval: PlaneMesh;
   readonly #motes: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #moteState: {sprite: TexturedSprite; x: number; y: number; z: number; phase: number; size: number}[] = [];
 
@@ -472,7 +474,7 @@ export class Glaze {
 
   dispose(): void {
     this.#oval.geometry.dispose();
-    (this.#oval.material as MeshBasicNodeMaterial).dispose();
+    this.#oval.material.dispose();
     this.#motes.dispose();
     this.stage.dispose();
   }

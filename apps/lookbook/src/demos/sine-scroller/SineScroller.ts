@@ -22,6 +22,7 @@ import {
   type FeatureSpritesOf,
 } from '@spearwolf/twopoint5d';
 import {Group, type Texture} from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
 
 /** What the page loaded: two bitmap fonts, the copper bars, the saber strips and the tunnel. */
 export interface SineScrollerAssets {
@@ -197,7 +198,7 @@ export class SineScroller extends Group {
     this.sabers.name = 'light sabers';
     for (const [name, [r, g, b]] of Object.entries(SABER_TINTS)) {
       const saber = this.sabers.createSprite()!;
-      saber.setFrame(assets.sabers.frame(name)!);
+      saber.setFrame(atlasFrame(assets.sabers, 'SineScroller', name));
       saber.setColorValues(r, g, b, 1);
       this.#saberBars.push(saber);
     }

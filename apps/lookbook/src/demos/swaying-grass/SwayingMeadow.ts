@@ -180,7 +180,7 @@ export class SwayingMeadow extends Group {
   readonly #texture: Texture;
   readonly #layout: Plant[];
   readonly #fireflies: Firefly[] = [];
-  readonly #scenery: Mesh[];
+  readonly #scenery: Mesh<BufferGeometry, MeshBasicNodeMaterial>[];
   #baseName: MeadowBaseName = 'gridBase({columns: 1, rows: 8})';
   #placementName: MeadowPlacementName = 'axisBillboardPlacement()';
   #shadows = true;
@@ -240,7 +240,7 @@ export class SwayingMeadow extends Group {
   }
 
   // the floor, the rim of soil around it, the rock beneath and the night behind
-  #buildScenery(back: Texture, ground: Texture): Mesh[] {
+  #buildScenery(back: Texture, ground: Texture): Mesh<BufferGeometry, MeshBasicNodeMaterial>[] {
     const floor = new Mesh(new CircleGeometry(ISLAND_RADIUS, 112), new MeshBasicNodeMaterial({color: new Color('#22423a')}));
     floor.rotation.x = -Math.PI / 2;
     floor.name = 'floor';
@@ -436,7 +436,7 @@ export class SwayingMeadow extends Group {
     this.fireflies.dispose();
     for (const mesh of this.#scenery) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.removeFromParent();
   }

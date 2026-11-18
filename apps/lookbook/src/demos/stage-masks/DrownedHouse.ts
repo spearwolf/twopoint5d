@@ -32,6 +32,8 @@ import {hash21} from './helpers';
 import {makeInkStage} from './InkWell';
 import {SoftBlobs} from './SoftBlobs';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/matte-ink';
 /** the two scene images cover x in ±600, y in ±320 units, 2 texels per unit */
 const WORLD = {left: -600, right: 600, bottom: -320, top: 320};
@@ -132,7 +134,7 @@ export async function loadDrownedHouseAssets(renderer: WebGPURenderer): Promise<
 const worldUv = (p: Node<'vec2'>) => vec2(p.x.sub(WORLD.left).div(WORLD_W), p.y.sub(WORLD.bottom).div(WORLD_H));
 
 /** A plane of `w` × `h` units drawing `material`, at (x, y). */
-function plane(name: string, material: MeshBasicNodeMaterial, w: number, h: number, x = 0, y = 0, order = 0): Mesh {
+function plane(name: string, material: MeshBasicNodeMaterial, w: number, h: number, x = 0, y = 0, order = 0): PlaneMesh {
   const mesh = new Mesh(new PlaneGeometry(w, h), material);
   mesh.name = name;
   mesh.position.set(x, y, 0);
@@ -140,9 +142,9 @@ function plane(name: string, material: MeshBasicNodeMaterial, w: number, h: numb
   return mesh;
 }
 
-const disposeMesh = (mesh: Mesh) => {
+const disposeMesh = (mesh: PlaneMesh) => {
   mesh.geometry.dispose();
-  (mesh.material as MeshBasicNodeMaterial).dispose();
+  mesh.material.dispose();
 };
 
 /**
@@ -154,7 +156,7 @@ export class TitleCard {
   readonly stage = makeInkStage('title card');
   readonly #time = uniform(0);
   readonly #flicker = uniform(1);
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #window = new SoftBlobs({capacity: 1, name: 'lit window'});
 
   constructor(assets: DrownedHouseAssets) {
@@ -249,7 +251,7 @@ export class DrownedHall {
   readonly #time = uniform(0);
   readonly #lantern = uniform(new Vector2(-200, -40));
   readonly #lanternGain = uniform(1);
-  readonly #wall: Mesh;
+  readonly #wall: PlaneMesh;
   readonly #eyes: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #eyeSprites: {eye: Eye; sclera: TexturedSprite; iris: TexturedSprite; ox: number; oy: number}[] = [];
   readonly #halo = new SoftBlobs({capacity: 3, name: 'lantern halo'});

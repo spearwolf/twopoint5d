@@ -30,6 +30,8 @@ import {
   PlaneGeometry,
   type Texture,
 } from 'three/webgpu';
+import {atlasFrame} from '~demos/utils/atlasFrame';
+import {disposeMaterial} from '~demos/utils/disposeMaterial';
 
 /** An atlas of the texture catalog and the texture of its image. */
 export interface NightCityAtlas {
@@ -180,7 +182,7 @@ function makeSkyline({atlas, texture}: NightCityAtlas): Group {
   const group = new Group();
 
   for (const layer of SKYLINE_LAYERS) {
-    const coords = atlas.frame(layer.frame)!.coords;
+    const coords = atlasFrame(atlas, 'NightCity', layer.frame).coords;
     const tileWidth = (2 * Math.PI * layer.radius) / layer.repeats;
     const height = (tileWidth * coords.height) / coords.width;
     const geometry = new CylinderGeometry(layer.radius, layer.radius, height, 96, 1, true).translate(0, height / 2 - 4, 0);
@@ -244,8 +246,7 @@ export function disposeNightCity(city: Group): void {
   city.traverse((object) => {
     if (!(object instanceof Mesh)) return;
     object.geometry.dispose();
-    // every mesh of the city is built with one material of its own, none with a list
-    (object.material as MeshBasicNodeMaterial).dispose();
+    disposeMaterial(object.material);
     if (object instanceof InstancedMesh) object.dispose();
   });
 }

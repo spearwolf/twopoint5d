@@ -5,6 +5,8 @@ import {Mesh, MeshBasicNodeMaterial, PlaneGeometry, Vector2} from 'three/webgpu'
 import {type FootageClock, makeFootageStage, VIEW_HEIGHT} from './FoundFootage';
 import {SoftBlobs} from './SoftBlobs';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 /** how many ink drops crawl in from the edges at once */
 const DROPS = 12;
 /** how long the ink takes to creep in when the tape starts, in seconds */
@@ -39,7 +41,7 @@ export class InkVignette {
   readonly #clock: FootageClock;
   readonly #halfSize = uniform(new Vector2(480, VIEW_HEIGHT / 2));
   readonly #reach = uniform(0);
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
   readonly #blobs = new SoftBlobs({capacity: DROPS + 4, name: 'ink drops', falloff: (t) => (1 - t * t) ** 1.6});
   readonly #drops: Drop[] = [];
   #creep = 0;
@@ -172,7 +174,7 @@ export class InkVignette {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.#blobs.dispose();
     this.stage.dispose();
   }

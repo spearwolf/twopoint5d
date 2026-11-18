@@ -24,9 +24,13 @@ import {description, title} from './_textured-quads.json';
   import {AgXToneMapping, NodeMaterial} from 'three/webgpu';
   import {InstancedQuadsGeometry, setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {disposeMaterial} from '~demos/utils/disposeMaterial';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {SeededRandom} from '~demos/utils/seededRandom';
   import {showTexturePreview} from '~demos/utils/showTexturePreview';
+
+  const QUADS_SEED = 41;
 
   // +================================================================================+
   //
@@ -35,6 +39,7 @@ import {description, title} from './_textured-quads.json';
   // +================================================================================+
 
   function createMesh(rows: number, columns: number, size: number, offset: number, texCoords: TextureCoords, texture: Texture) {
+    const random = new SeededRandom(QUADS_SEED);
     const geometry = new InstancedQuadsGeometry(rows * columns);
 
     // the geometry was built with a capacity, so it has its base pool, and the first
@@ -47,7 +52,7 @@ import {description, title} from './_textured-quads.json';
       for (let x = 0; x < columns; x++) {
         const quad = geometry.instancedPool.createVO()!;
 
-        quad.width = 1.0 + Math.random() * (size - 1.0);
+        quad.width = 1.0 + random.next() * (size - 1.0);
         quad.height = quad.width;
 
         quad.setInstancePosition([
@@ -119,10 +124,9 @@ import {description, title} from './_textured-quads.json';
     demo.scene.add(mesh);
 
     demo.onDispose(() => {
-      // createMesh() built the geometry and the one material, the store lent the texture;
-      // VertexObjects types its material as a list or none as well
+      // createMesh() built the geometry and the one material, the store lent the texture
       mesh.geometry?.dispose();
-      (mesh.material as NodeMaterial).dispose();
+      disposeMaterial(mesh.material);
       store.dispose();
     });
   });

@@ -19,6 +19,9 @@ import {description, title} from './_instanced-quads.json';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {printSceneGraphToConsole} from '~demos/utils/printSceneGraphToConsole';
+  import {SeededRandom} from '~demos/utils/seededRandom';
+
+  const QUADS_SEED = 31;
 
   const demo = new PerspectiveOrbitDemo(getFullscreenCanvas(), {forceWebGL: true});
 
@@ -73,12 +76,13 @@ import {description, title} from './_instanced-quads.json';
   ) {
     // the pool holds rows * columns instances and the two loops run exactly that many
     // times, so every createVO() finds room
+    const random = new SeededRandom(QUADS_SEED);
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < columns; x++) {
         const quad = vertexObjectPool.createVO()!;
 
-        quad.width = 1.0 + Math.random() * (size - 1.0);
-        quad.height = 1.0 + Math.random() * (size - 1.0);
+        quad.width = 1.0 + random.next() * (size - 1.0);
+        quad.height = 1.0 + random.next() * (size - 1.0);
 
         quad.setInstancePosition([
           x * size * offset - ((columns - 1) * size * offset) / 2,

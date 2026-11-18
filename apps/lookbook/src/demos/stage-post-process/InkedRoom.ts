@@ -79,7 +79,7 @@ export class InkedRoom {
   readonly stage: Stage2D;
   readonly kind: 'bathroom' | 'reflection';
   readonly #lamps = uniform(1);
-  readonly #mesh: Mesh;
+  readonly #mesh: Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
   #time = 0;
 
   constructor(assets: RoomAssets, kind: 'bathroom' | 'reflection') {
@@ -117,7 +117,7 @@ export class InkedRoom {
 
   dispose(): void {
     this.#mesh.geometry.dispose();
-    (this.#mesh.material as MeshBasicNodeMaterial).dispose();
+    this.#mesh.material.dispose();
     this.stage.dispose();
   }
 }

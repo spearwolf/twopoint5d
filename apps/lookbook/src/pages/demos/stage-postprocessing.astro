@@ -21,6 +21,9 @@ import {description, title} from './_stage-postprocessing.json';
   } from '@spearwolf/twopoint5d';
   import {Color, RenderPipeline, Sprite, SpriteMaterial} from 'three/webgpu';
   import assetsUrl from '~demos/utils/assetsUrl';
+  import {SeededRandom} from '~demos/utils/seededRandom';
+
+  const SPRITES_SEED = 37;
 
   const canvas = document.getElementById('twopoint5d')!;
   const display = new Display(canvas);
@@ -42,11 +45,12 @@ import {description, title} from './_stage-postprocessing.json';
   // A few bright sprites — bloom will smear them across the screen
   const sprites: Sprite[] = [];
   const colors = ['#ffd166', '#ef476f', '#06d6a0', '#118ab2', '#ffe0b3'];
+  const random = new SeededRandom(SPRITES_SEED);
 
   for (let i = 0; i < 80; i++) {
     const sprite = new Sprite(new SpriteMaterial({map: texture, color: new Color(colors[i % colors.length])}));
     sprite.scale.set(40, 40, 1);
-    sprite.position.set(Math.random() * 800, Math.random() * 600, 0);
+    sprite.position.set(random.next() * 800, random.next() * 600, 0);
     stage.scene.add(sprite);
     sprites.push(sprite);
   }

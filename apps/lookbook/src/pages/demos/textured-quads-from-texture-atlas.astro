@@ -18,17 +18,22 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
 
 <script>
   import type {TextureAtlas} from '@spearwolf/twopoint5d';
-  import type {NodeMaterial, Texture} from 'three/webgpu';
+  import type {Texture} from 'three/webgpu';
   import {createTexturedQuads} from '~demos/instanced-quads/createTexturedQuads';
   import {setQuadTexCoords} from '~demos/instanced-quads/InstancedQuadsGeometry';
   import {PerspectiveOrbitDemo} from '~demos/utils/PerspectiveOrbitDemo';
+  import {atlasFrame} from '~demos/utils/atlasFrame';
+  import {disposeMaterial} from '~demos/utils/disposeMaterial';
   import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
   import {loadTextureCatalog} from '~demos/utils/loadTextureCatalog';
+  import {SeededRandom} from '~demos/utils/seededRandom';
   import {showTexturePreview} from '~demos/utils/showTexturePreview';
 
-  // Math.random() stays below 1, so the index is inside a non-empty array
-  function sample<T>(arr: T[]): T {
-    return arr[Math.floor(Math.random() * arr.length)]!;
+  const QUADS_SEED = 43;
+
+  // next() stays below 1, so the index is inside a non-empty array
+  function sample<T>(arr: T[], random: SeededRandom): T {
+    return arr[Math.floor(random.next() * arr.length)]!;
   }
 
   // +================================================================================+
@@ -38,8 +43,12 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
   // +================================================================================+
 
   function makeMesh(rows: number, columns: number, size: number, offset: number, atlas: TextureAtlas, texture: Texture) {
-    // the names come out of frameNames() of this very atlas, so frame() finds each of them
-    const frames = atlas.frameNames(/numbers32/).map((name) => atlas.frame(name)!.coords);
+    const random = new SeededRandom(QUADS_SEED);
+    const frames = atlas
+      .frameNames(/numbers32/)
+      // a pattern matches strings only, which the type of frameNames() does not say
+      .filter((name): name is string => typeof name === 'string')
+      .map((name) => atlasFrame(atlas, 'textured-quads-from-texture-atlas', name).coords);
 
     return createTexturedQuads({capacity: rows * columns, texture}, (vertexObjectPool) => {
       // the pool was built with a capacity of rows * columns and the two loops run exactly
@@ -48,7 +57,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
         for (let x = 0; x < columns; x++) {
           const quad = vertexObjectPool.createVO()!;
 
-          quad.width = 1.0 + Math.random() * (size - 1.0);
+          quad.width = 1.0 + random.next() * (size - 1.0);
           quad.height = quad.width;
 
           quad.setInstancePosition([
@@ -57,7 +66,7 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
             0,
           ]);
 
-          const texCoords = sample(frames);
+          const texCoords = sample(frames, random);
           setQuadTexCoords(quad, texCoords);
         }
       }
@@ -99,10 +108,9 @@ import {description, title} from './_textured-quads-from-texture-atlas.json';
     demo.scene.add(mesh);
 
     demo.onDispose(() => {
-      // createTexturedQuads() built the geometry and the one material, the store lent the texture;
-      // VertexObjects types its material as a list or none as well
+      // createTexturedQuads() built the geometry and the one material, the store lent the texture
       mesh.geometry?.dispose();
-      (mesh.material as NodeMaterial).dispose();
+      disposeMaterial(mesh.material);
       store.dispose();
     });
   });

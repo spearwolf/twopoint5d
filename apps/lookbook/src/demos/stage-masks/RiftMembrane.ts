@@ -6,6 +6,8 @@ import {SeededRandom} from '~demos/utils/seededRandom';
 import {additive} from './helpers';
 import {SoftBlobs} from './SoftBlobs';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 /** The view every stage of the demo lays itself out in, in units; `cover` fills any window. */
 export const VIEW_WIDTH = 960;
 export const VIEW_HEIGHT = 540;
@@ -164,7 +166,7 @@ export class RiftMembrane {
   #draws = 0;
 
   readonly #rift: RiftState;
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
   readonly #spores = new SoftBlobs({capacity: SPORES, name: 'rift spores', falloff: (t) => (1 - t * t) ** 2});
   readonly #sporeState: {angle: number; life: number; span: number; size: number; drift: number}[] = [];
 
@@ -233,7 +235,7 @@ export class RiftMembrane {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.#spores.dispose();
     this.stage.dispose();
   }
@@ -245,7 +247,7 @@ export class RiftMembrane {
  */
 export class RiftRim {
   readonly stage = makeRiftStage('rift rim');
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
 
   constructor(rift: RiftState) {
     const p = positionWorld.xy;
@@ -269,7 +271,7 @@ export class RiftRim {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.stage.dispose();
   }
 }

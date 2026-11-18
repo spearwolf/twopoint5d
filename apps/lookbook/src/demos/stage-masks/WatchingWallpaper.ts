@@ -21,6 +21,8 @@ import {jsonList, jsonNumber, jsonObject, jsonOneOf, jsonTuple} from '~demos/uti
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {type SoftBlob, SoftBlobs} from './SoftBlobs';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicMaterial>;
+
 /** The view every stage of the demo lays itself out in, in units; `cover` fills any window. */
 export const VIEW_WIDTH = 960;
 export const VIEW_HEIGHT = 540;
@@ -124,7 +126,7 @@ const makeStage = (name: string) => {
 };
 
 /** A plane of the wall: the wallpaper from the dado up, or the wainscot below it. */
-function wallPlane(map: Texture, part: 'paper' | 'wainscot', renderOrder: number, transparent = false): Mesh {
+function wallPlane(map: Texture, part: 'paper' | 'wainscot', renderOrder: number, transparent = false): PlaneMesh {
   const width = RIGHT - LEFT;
   const [bottom, top, tile] = part === 'paper' ? [DADO, TOP, TILE] : [FLOOR, DADO, WAINSCOT_TILE];
   const height = top - bottom;
@@ -202,7 +204,7 @@ export class WatchingWallpaper {
   readonly #eyes: Eye[] = [];
   readonly #candles: Candle[] = [];
   readonly #hand: SoftBlob;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
 
   // where the pointer is in units of the view, and when it last moved (seconds of the demo)
   readonly #pointer = {x: 0, y: 0, lastMoved: -Infinity};
@@ -249,7 +251,7 @@ export class WatchingWallpaper {
     on(this.haunted, OnStageUpdateFrame, ({deltaTime}: StageUpdateFrameProps) => this.#updateEyes(deltaTime));
   }
 
-  #addMesh(stage: Stage2D, mesh: Mesh): void {
+  #addMesh(stage: Stage2D, mesh: PlaneMesh): void {
     stage.scene.add(mesh);
     this.#meshes.push(mesh);
   }
@@ -399,7 +401,7 @@ export class WatchingWallpaper {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
       // the textures are the assets', released with their store
-      (mesh.material as MeshBasicMaterial).dispose();
+      mesh.material.dispose();
     }
     this.#eyeSprites.dispose();
     this.blobs.dispose();

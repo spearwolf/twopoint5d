@@ -51,6 +51,8 @@ import {jsonNumber, jsonObject, jsonRecord} from '~demos/utils/checkJson';
 import {fetchJson} from '~demos/utils/fetchAsset';
 import {setMirroredFrame} from './helpers';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/portal';
 
 /**
@@ -395,7 +397,7 @@ export class Hallway {
   readonly stage = makePortalStage('the hallway');
 
   readonly #state: PortalState;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   /** what hangs at the portal depth and moves with it: the far wall, the frame, its shadow, the lamp */
   readonly #end = new Group();
   readonly #doors: Mesh[] = [];
@@ -405,7 +407,7 @@ export class Hallway {
   readonly #glowSprites: TexturedSprite[] = [];
   readonly #haloSprites: TexturedSprite[] = [];
   readonly #lampGlow: TexturedSprite;
-  readonly #underDoor: Mesh;
+  readonly #underDoor: PlaneMesh;
 
   constructor(assets: PortalAssets, state: PortalState) {
     this.#state = state;
@@ -614,7 +616,7 @@ export class Hallway {
   dispose(): void {
     for (const mesh of this.#meshes) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.#sconces.dispose();
     this.#glows.dispose();

@@ -25,6 +25,8 @@ import {
 } from 'three/tsl';
 import {Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, Vector3, Vector4} from 'three/webgpu';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 /** the view of both scenes, of the mask stage and of the HUD, in units, shown with `fit: 'cover'` */
 export const VIEW_WIDTH = 960;
 export const VIEW_HEIGHT = 540;
@@ -126,7 +128,7 @@ export class SonarField {
  */
 export class SonarMaskStage {
   readonly stage = makeSonarStage('sonar mask');
-  readonly #plane: Mesh;
+  readonly #plane: PlaneMesh;
 
   constructor(field: SonarField) {
     const material = new MeshBasicNodeMaterial({depthTest: false, depthWrite: false});
@@ -138,7 +140,7 @@ export class SonarMaskStage {
 
   dispose(): void {
     this.#plane.geometry.dispose();
-    (this.#plane.material as MeshBasicNodeMaterial).dispose();
+    this.#plane.material.dispose();
     this.stage.dispose();
   }
 }
@@ -171,8 +173,8 @@ export class SonarHud {
   readonly #active = uniform(0);
   readonly #view = uniform(new Vector4(0, 0, VIEW_WIDTH, VIEW_HEIGHT));
   readonly #canvas: HTMLCanvasElement;
-  #overlay: Mesh | undefined;
-  #inset: Mesh | undefined;
+  #overlay: PlaneMesh | undefined;
+  #inset: PlaneMesh | undefined;
 
   constructor(canvas: HTMLCanvasElement) {
     this.#canvas = canvas;
@@ -292,7 +294,7 @@ export class SonarHud {
     for (const mesh of [this.#overlay, this.#inset]) {
       if (!mesh) continue;
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
     this.stage.dispose();
   }

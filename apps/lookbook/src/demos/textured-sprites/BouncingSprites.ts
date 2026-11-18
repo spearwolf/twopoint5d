@@ -1,4 +1,5 @@
 import type {TextureAtlas, TexturedSprite, VertexObjectPool} from '@spearwolf/twopoint5d';
+import {SeededRandom} from '~demos/utils/seededRandom';
 
 interface BounceSprite extends TexturedSprite {
   speedX: number;
@@ -6,7 +7,11 @@ interface BounceSprite extends TexturedSprite {
   speedRotate: number;
 }
 
+const SPRITES_SEED = 13;
+
 export class BouncingSprites {
+  readonly #random = new SeededRandom(SPRITES_SEED);
+
   name = 'textured-sprites.BouncingSprites';
 
   gravity = -45;
@@ -59,18 +64,21 @@ export class BouncingSprites {
 
       sprite.setSize(this.spriteSize, this.spriteSize);
 
-      sprite.setPosition(Math.random() * this.containerWidth - halfWidth, Math.random() * this.containerHeight - halfHeight);
+      sprite.setPosition(
+        this.#random.next() * this.containerWidth - halfWidth,
+        this.#random.next() * this.containerHeight - halfHeight,
+      );
 
       // the atlas is loaded before any sprite is created, so both lookups answer a frame
       const frame = (frameId != null ? this.textureAtlas.get(frameId) : this.textureAtlas.randomFrame())!;
       sprite.setFrame(frame);
 
-      sprite.speedX = Math.random() * this.startSpeedX + this.startSpeedBaseX;
-      sprite.speedY = Math.random() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;
+      sprite.speedX = this.#random.next() * this.startSpeedX + this.startSpeedBaseX;
+      sprite.speedY = this.#random.next() * this.startSpeedY - this.startSpeedY / 2 + this.startSpeedBaseY;
 
       if (this.shouldRotate) {
-        sprite.rotation = Math.random() * Math.PI * 2;
-        sprite.speedRotate = Math.random() * Math.PI * this.speedRotateFactor;
+        sprite.rotation = this.#random.next() * Math.PI * 2;
+        sprite.speedRotate = this.#random.next() * Math.PI * this.speedRotateFactor;
       } else {
         sprite.rotation = 0;
         sprite.speedRotate = 0;
@@ -113,12 +121,12 @@ export class BouncingSprites {
         // on the top edge
         speedY = -this.fallBaseSpeed;
         y = halfHeight;
-        if (Math.random() > 0.5) {
-          speedY -= Math.random() * this.fallSpeed;
+        if (this.#random.next() > 0.5) {
+          speedY -= this.#random.next() * this.fallSpeed;
         }
       } else if (y < -halfHeight) {
         // on the bottom edge
-        speedY = Math.random() * this.upwindSpeed * this.containerHeight + this.upwindBaseSpeed * this.containerHeight;
+        speedY = this.#random.next() * this.upwindSpeed * this.containerHeight + this.upwindBaseSpeed * this.containerHeight;
         y = -halfHeight;
       }
 

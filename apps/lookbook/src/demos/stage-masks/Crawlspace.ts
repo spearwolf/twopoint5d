@@ -60,6 +60,8 @@ import {
 } from './CrawlRig';
 import {setPlaneUvToFrame} from './helpers';
 
+type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
+
 const DIR = 'stage-masks/flashlight';
 
 /** The view of both stages, in units of the projection plane; `cover` fills any window. */
@@ -251,15 +253,15 @@ export class CrawlLevel {
   readonly stage: Stage2D;
   readonly #rig: CrawlRig;
   readonly #nodes: CrawlLightNodes;
-  readonly #meshes: Mesh[] = [];
+  readonly #meshes: PlaneMesh[] = [];
   readonly #materials: MeshBasicNodeMaterial[] = [];
-  readonly #player: Mesh;
+  readonly #player: PlaneMesh;
   readonly #playerFrames: PlaneGeometry[] = [];
-  readonly #drip: Mesh;
-  readonly #splash: Mesh;
-  readonly #flutter: Mesh;
+  readonly #drip: PlaneMesh;
+  readonly #splash: PlaneMesh;
+  readonly #flutter: PlaneMesh;
   readonly #flutterTilt: number;
-  readonly #haze: Mesh;
+  readonly #haze: PlaneMesh;
   #dripY = 0;
   #dripV = 0;
   #splashAge = 1;
@@ -272,7 +274,7 @@ export class CrawlLevel {
     const scene = this.stage.scene;
     const vent = layout.vent;
 
-    const add = (mesh: Mesh, order: number) => {
+    const add = (mesh: PlaneMesh, order: number) => {
       mesh.renderOrder = order;
       scene.add(mesh);
       this.#meshes.push(mesh);
@@ -310,7 +312,7 @@ export class CrawlLevel {
     this.#dripY = layout.drain.y - 10;
 
     // the drawings on the post; the last one is loose at a corner and stirs in the draught
-    let flutter: Mesh | undefined;
+    let flutter: PlaneMesh | undefined;
     let flutterTilt = 0;
     for (const d of layout.drawings) {
       const mesh = frameMesh(d.name, 21);
@@ -401,7 +403,7 @@ export class CrawlLevel {
   }
 
   dispose(): void {
-    for (const mesh of this.#meshes) if (!this.#playerFrames.includes(mesh.geometry as PlaneGeometry)) mesh.geometry.dispose();
+    for (const mesh of this.#meshes) if (!this.#playerFrames.includes(mesh.geometry)) mesh.geometry.dispose();
     for (const g of this.#playerFrames) g.dispose();
     for (const m of this.#materials) m.dispose();
     this.stage.dispose();
@@ -416,8 +418,8 @@ export class CrawlLevel {
  */
 export class CrawlFlashlight {
   readonly scene = new Scene();
-  readonly #cone: Mesh;
-  readonly #shaft: Mesh;
+  readonly #cone: PlaneMesh;
+  readonly #shaft: PlaneMesh;
   readonly #rig: CrawlRig;
 
   constructor(rig: CrawlRig, nodes: CrawlLightNodes) {
@@ -450,7 +452,7 @@ export class CrawlFlashlight {
   dispose(): void {
     for (const mesh of [this.#cone, this.#shaft]) {
       mesh.geometry.dispose();
-      (mesh.material as MeshBasicNodeMaterial).dispose();
+      mesh.material.dispose();
     }
   }
 }
@@ -483,7 +485,7 @@ interface Watcher {
 export class CrawlDark {
   readonly stage: Stage2D;
   readonly #rig: CrawlRig;
-  readonly #fog: Mesh;
+  readonly #fog: PlaneMesh;
   readonly #eyes: FeatureSpritesOf<typeof TexturedSpriteKind>;
   readonly #watchers: Watcher[] = [];
   readonly #time = uniform(0);
@@ -581,7 +583,7 @@ export class CrawlDark {
 
   dispose(): void {
     this.#fog.geometry.dispose();
-    (this.#fog.material as MeshBasicNodeMaterial).dispose();
+    this.#fog.material.dispose();
     this.#eyes.dispose();
     this.stage.dispose();
   }
