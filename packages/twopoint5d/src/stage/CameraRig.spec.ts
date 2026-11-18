@@ -2,8 +2,13 @@ import {on} from '@spearwolf/eventize';
 import {
   AnimationClip,
   AnimationMixer,
+  BoxGeometry,
   Camera,
+  Frustum,
   Group,
+  Matrix4,
+  Mesh,
+  MeshBasicMaterial,
   Object3D,
   OrthographicCamera,
   PerspectiveCamera,
@@ -17,7 +22,7 @@ import {FramePacer, type FramePacerSource} from '../display/FramePacer.js';
 import type {DisplayEventProps} from '../display/types.js';
 import {OnStageAfterCameraChanged, OnStageCameraPlaced, OnStageUpdateFrame} from '../events.js';
 import {CameraProjection} from './CameraProjection.js';
-import {CameraRig, type CameraTrackKey} from './CameraRig.js';
+import {CameraRig, CameraRigInternals, type CameraTrackKey} from './CameraRig.js';
 import type {IProjection} from './IProjection.js';
 import type {ProjectionPlaneDescription} from './ProjectionPlane.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
@@ -209,6 +214,37 @@ const expectShowsAs = (camera: Camera, reference: Camera) => {
     expect(camera.matrixWorld.elements[i], `matrixWorld[${i}]`).toBeCloseTo(reference.matrixWorld.elements[i]!, 9);
     expect(camera.projectionMatrix.elements[i], `projectionMatrix[${i}]`).toBeCloseTo(reference.projectionMatrix.elements[i]!, 9);
   }
+};
+
+/** A perspective camera as a `.glb` would bring it: up at (0, 6, 10), looking down at the origin. */
+const lookingDown = () => {
+  const source = new PerspectiveCamera(50, 4 / 3, 0.1, 1000);
+  source.position.set(0, 6, 10);
+  source.lookAt(0, 0, 0);
+  source.updateMatrixWorld();
+  return source;
+};
+
+/**
+ * A stage under a `CameraProjection` of `source` — a projection without a plane — with a view, a rig,
+ * and a box at (3, 0, -2) in its scene, which three.js culls by its frustum.
+ */
+const makePlanelessRig = (source: PerspectiveCamera | OrthographicCamera = lookingDown()) => {
+  const stage = new Stage2D(new CameraProjection(source));
+  stage.resize(800, 600);
+  const mesh = new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial());
+  mesh.position.set(3, 0, -2);
+  stage.scene.add(mesh);
+  return {stage, rig: new CameraRig(stage), mesh};
+};
+
+/** Whether three.js would draw `object` with `camera`: it lies inside the frustum of the camera. */
+const insideFrustum = (camera: Camera, object: Object3D) => {
+  camera.updateMatrixWorld();
+  object.updateMatrixWorld();
+  return new Frustum()
+    .setFromProjectionMatrix(new Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse))
+    .intersectsObject(object);
 };
 
 describe('CameraRig', () => {
@@ -496,6 +532,24 @@ describe('CameraRig', () => {
       expect(rig.camera.position.x).toBeCloseTo(expected, 10);
     });
 
+    it('counts an easing that answers no number as 0 and still arrives on the target', async () => {
+      const {stage, rig} = makeRig();
+      frame(stage);
+      const start = rig.camera.position.toArray();
+      const moved = rig.moveTo({position: [100, 0]}, 1, {easing: (() => Number.NaN) as (t: number) => number});
+      for (let i = 0; i < 3; i++) {
+        rig.step(0.25);
+        frame(stage);
+        const position = rig.camera.position.toArray();
+        for (const value of position) expect(Number.isFinite(value), `${position}`).toBe(true);
+        expect(position).toEqual(start);
+      }
+      rig.step(0.25);
+      frame(stage);
+      expect(rig.camera.position.toArray()).toEqual([100, 0, start[2]]);
+      expect(await hasSettled(moved)).toBe(true);
+    });
+
     it('eases by the easing of the rig where the call names none', () => {
       const stage = makeStage();
       const rig = new CameraRig(stage, {easing: 'linear'});
@@ -775,8 +829,15 @@ describe('CameraRig', () => {
       rig.dispose();
       const next = new CameraRig(stage);
       rig.dispose();
-      expect(Stage2DInternals.driverOf(stage)).toBe(next);
+      expect(Stage2DInternals.driverOf(stage)).toBe(CameraRigInternals.driverOf(next));
       expect(stage.camera).toBe(next.camera);
+    });
+
+    it('keeps the calls of the stage off the rig: they reach it through its driver alone', () => {
+      const {rig} = makeRig();
+      expect('placeBase' in rig).toBe(false);
+      expect('compose' in rig).toBe(false);
+      expect('write' in rig).toBe(false);
     });
 
     it('makes every call but dispose() throw, and keeps stage, camera and busy readable', () => {
@@ -808,8 +869,8 @@ describe('CameraRig', () => {
 
       stage.dispose();
       expect(rig.step(0.5)).toBe(false);
-      rig.write();
-      rig.compose();
+      CameraRigInternals.driverOf(rig).write();
+      CameraRigInternals.driverOf(rig).compose();
       expect(rig.camera.position.x).toBe(10);
 
       // the clocks still run: the move arrives, and its promise resolves
@@ -817,7 +878,7 @@ describe('CameraRig', () => {
       expect(await hasSettled(moved)).toBe(true);
 
       rig.jump({position: [99, 0]});
-      rig.write();
+      CameraRigInternals.driverOf(rig).write();
       expect(rig.camera.position.x).toBe(10);
 
       expect(() => rig.dispose()).not.toThrow();
@@ -834,7 +895,7 @@ describe('CameraRig', () => {
       stage.needsUpdate = true;
       frame(stage);
       expect(stage.isDisposed).toBe(true);
-      rig.write();
+      CameraRigInternals.driverOf(rig).write();
       expect(rig.step(1 / 60)).toBe(false);
       expect(() => rig.dispose()).not.toThrow();
     });
@@ -1493,6 +1554,145 @@ describe('CameraRig', () => {
     });
   });
 
+  describe('an Object3D under a projection without a plane', () => {
+    /** Expects `object` in the middle of the picture of the rig's camera. */
+    const expectInTheMiddle = (rig: CameraRig, object: Object3D) => {
+      rig.camera.updateMatrixWorld();
+      const ndc = object.getWorldPosition(new Vector3()).project(rig.camera);
+      expect(ndc.x, 'x in the picture').toBeCloseTo(0, 6);
+      expect(ndc.y, 'y in the picture').toBeCloseTo(0, 6);
+    };
+
+    /** Steps the rig and draws frames of `stage` until the rig is no longer busy. */
+    const settle = (rig: CameraRig, stage: Stage2D) => {
+      for (let i = 0; i < 2000 && rig.busy; i++) {
+        rig.step(1 / 60);
+        frame(stage);
+      }
+      expect(rig.busy).toBe(false);
+    };
+
+    it('jump() puts the object in the middle, and keeps it there when it moves', () => {
+      const {stage, rig, mesh} = makePlanelessRig();
+      rig.jump(mesh);
+      frame(stage);
+      expectInTheMiddle(rig, mesh);
+
+      mesh.position.set(-4, 1, 3);
+      frame(stage);
+      expectInTheMiddle(rig, mesh);
+    });
+
+    it('moveTo() arrives with the object in the middle, and a lock-on with smooth trails it there', () => {
+      const {stage, rig, mesh} = makePlanelessRig();
+      void rig.moveTo(mesh, 0.5);
+      settle(rig, stage);
+      expectInTheMiddle(rig, mesh);
+
+      void rig.moveTo(mesh, 0, {smooth: 0.2});
+      frame(stage);
+      mesh.position.set(-4, 1, 3);
+      rig.step(1 / 60);
+      expect(rig.busy).toBe(true);
+      settle(rig, stage);
+      expectInTheMiddle(rig, mesh);
+    });
+
+    it('moves the camera by the offset along its own right axis', () => {
+      const {stage, rig, mesh} = makePlanelessRig();
+      void rig.moveTo(mesh, 0, {offset: [1, 0]});
+      frame(stage);
+      rig.camera.updateMatrixWorld();
+      const ndc = mesh.getWorldPosition(new Vector3()).project(rig.camera);
+      expect(ndc.y).toBeCloseTo(0, 6);
+      expect(ndc.x).toBeLessThan(0);
+    });
+
+    it('shows the object of a track key in the middle', () => {
+      const {stage, rig, mesh} = makePlanelessRig();
+      rig.track(mesh, {});
+      rig.lerp(0);
+      frame(stage);
+      expectInTheMiddle(rig, mesh);
+    });
+
+    it('puts the object in the middle under an orthographic camera that looks down at a slant', () => {
+      const source = new OrthographicCamera(-4, 4, 3, -3, 0.1, 1000);
+      source.position.set(0, 6, 10);
+      source.lookAt(0, 0, 0);
+      source.updateMatrixWorld();
+      const {stage, rig, mesh} = makePlanelessRig(source);
+      expect(rig.camera).toBeInstanceOf(OrthographicCamera);
+      rig.jump(mesh);
+      frame(stage);
+      expectInTheMiddle(rig, mesh);
+    });
+
+    it('keeps the distance from the plane that faces the base through moves and jumps from one object to the next', () => {
+      const source = lookingDown();
+      const {stage, rig, mesh} = makePlanelessRig(source);
+      const normal = new Vector3(0, 0, 1).applyQuaternion(source.getWorldQuaternion(new Quaternion()));
+      const other = new Object3D();
+      other.position.set(-2, 1, 1);
+      stage.scene.add(other);
+      rig.jump(mesh);
+      frame(stage);
+      const distance = rig.camera.position.dot(normal);
+      for (const [what, call] of [
+        ['moveTo() of the same object', () => rig.moveTo(mesh, 0)],
+        ['moveTo() of it once more', () => rig.moveTo(mesh, 0)],
+        ['jump() to it', () => rig.jump(mesh)],
+        ['moveTo() of another object', () => rig.moveTo(other, 0)],
+        ['jump() back', () => rig.jump(mesh)],
+      ] as const) {
+        void call();
+        frame(stage);
+        expect(rig.camera.position.dot(normal), what).toBeCloseTo(distance, 9);
+      }
+      expectInTheMiddle(rig, mesh);
+    });
+
+    it('keeps the distance an offset named when the rig moves on to another object', () => {
+      const source = lookingDown();
+      const {stage, rig, mesh} = makePlanelessRig(source);
+      const normal = new Vector3(0, 0, 1).applyQuaternion(source.getWorldQuaternion(new Quaternion()));
+      const other = new Object3D();
+      other.position.set(-2, 1, 1);
+      stage.scene.add(other);
+      void rig.moveTo(mesh, 0, {offset: [0, 0, 4]});
+      frame(stage);
+      expect(rig.camera.position.dot(normal)).toBeCloseTo(4, 9);
+      void rig.moveTo(other, 0);
+      frame(stage);
+      expect(rig.camera.position.dot(normal)).toBeCloseTo(4, 9);
+      expectInTheMiddle(rig, other);
+      // and in the middle of a move from one object to the other, which ends on the same distance
+      void rig.moveTo(mesh, 1, {smooth: 0.2});
+      settle(rig, stage);
+      expect(rig.camera.position.dot(normal)).toBeCloseTo(4, 9);
+      expectInTheMiddle(rig, mesh);
+    });
+
+    it('keeps the distance the camera had from the plane that faces the base, where the offset names none', () => {
+      const source = lookingDown();
+      const {stage, rig, mesh} = makePlanelessRig(source);
+      // the plane through the world origin that faces the base: its normal the backward axis of the base
+      const normal = new Vector3(0, 0, 1).applyQuaternion(source.getWorldQuaternion(new Quaternion()));
+      const restDistance = source.getWorldPosition(new Vector3()).dot(normal);
+      rig.jump({});
+      frame(stage);
+      void rig.moveTo(mesh, 0);
+      frame(stage);
+      expectInTheMiddle(rig, mesh);
+      expect(rig.camera.position.dot(normal)).toBeCloseTo(restDistance, 9);
+
+      void rig.moveTo(mesh, 0, {offset: [0, 0, 4]});
+      frame(stage);
+      expectInTheMiddle(rig, mesh);
+      expect(rig.camera.position.dot(normal)).toBeCloseTo(4, 9);
+    });
+  });
+
   describe('a lock-on', () => {
     const targets: [string, () => {target: Object3D; move: () => void}][] = [
       [
@@ -1997,8 +2197,8 @@ describe('CameraRig', () => {
         ]);
         stage.dispose();
         rig.lerp(0.25);
-        rig.write();
-        rig.compose();
+        CameraRigInternals.driverOf(rig).write();
+        CameraRigInternals.driverOf(rig).compose();
         expect(update).not.toHaveBeenCalled();
         expect(action.time).toBeCloseTo(1, 12);
       });
@@ -2375,6 +2575,29 @@ describe('CameraRig', () => {
         }
       });
     }
+
+    it('compiles a stage without a projection plane over the middle of what three.js culls in its scene', async () => {
+      const {rig, mesh} = makePlanelessRig();
+      expect(rig.camera).toBeInstanceOf(PerspectiveCamera);
+      const {renderer, calls} = makeRenderer();
+      await rig.precompile(renderer);
+      expect(calls).toHaveLength(1);
+      const camera = calls[0]!.camera;
+      expect(camera).toBeInstanceOf(OrthographicCamera);
+      expect(insideFrustum(camera, mesh)).toBe(true);
+    });
+
+    it('compiles a stage without a projection plane at the focus a move named', async () => {
+      const {stage, rig} = makePlanelessRig();
+      void rig.moveTo({}, 0, {focus: 2});
+      frame(stage);
+      const {renderer, calls} = makeRenderer();
+      await rig.precompile(renderer);
+      const camera = calls[0]!.camera as OrthographicCamera;
+      expect(camera).toBeInstanceOf(OrthographicCamera);
+      // the height of the view at the focus: 2 · focus · tan(fov / 2)
+      expect((camera.top - camera.bottom) / camera.zoom).toBeCloseTo(2 * 2 * lensOf(rig.camera as PerspectiveCamera), 9);
+    });
 
     it('compiles the pass of a post-process with the camera of the other kind, into the target of the pass', async () => {
       const {stage, rig} = makeRig('parallax');

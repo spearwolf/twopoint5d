@@ -1205,6 +1205,20 @@ describe('StageDirector masks', () => {
         expect(ink.progress).toBe(0.625);
       });
 
+      it('progress stays inside [0, 1] under an easing that overshoots', () => {
+        director.setStack([stars, level]);
+        director.replace(level, nextLevel, {effect: inkIn, duration: 1, easing: (t) => t * 2 - 0.5});
+        frame(0);
+        for (let step = 0; step < 8; step++) {
+          frame(0.125);
+          draw();
+          for (const value of [ink.progress, ink.progressNode.value]) {
+            expect(value, `in frame ${step}`).toBeGreaterThanOrEqual(0);
+            expect(value, `in frame ${step}`).toBeLessThanOrEqual(1);
+          }
+        }
+      });
+
       it('progress holds the last value between transitions and a new one starts at 0', () => {
         const third = fakeStage('third');
         director.setStack([stars, level]);

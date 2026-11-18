@@ -234,6 +234,29 @@ describe('PanControl2D', () => {
 
       expect(control.speedNorth).toBe(0);
     });
+
+    it('leaves a speed set by hand alone at the keyup of a key typed into an input', () => {
+      const control = makeControl();
+      control.speedEast = 40;
+      key('keydown', {code: 'KeyD', origin: {localName: 'input'}});
+      key('keyup', {code: 'KeyD', origin: {localName: 'input'}});
+      expect(control.speedEast).toBe(40);
+    });
+
+    it('leaves a speed set by hand alone at the keyup of a key pressed with Ctrl', () => {
+      const control = makeControl();
+      control.speedEast = 40;
+      key('keydown', {code: 'KeyD', ctrlKey: true});
+      key('keyup', {code: 'KeyD'});
+      expect(control.speedEast).toBe(40);
+    });
+
+    it('leaves a speed set by hand alone at a keyup without its keydown', () => {
+      const control = makeControl();
+      control.speedEast = 40;
+      key('keyup', {code: 'KeyD'});
+      expect(control.speedEast).toBe(40);
+    });
   });
 
   describe('options', () => {

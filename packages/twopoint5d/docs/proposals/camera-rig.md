@@ -137,7 +137,7 @@ A target is one of three things:
 | a `CameraPose` (§3.2) | the rest of the projection of the stage, with the pose applied in its frame |
 | a `Camera` — of three.js or of a loaded `.glb` | its world pose (`matrixWorld`) and its lens, fitted into the container as a `CameraProjection` with the default fit fits it (§3.6) |
 | an `IProjection` | the rest of that projection for the container of the stage; on arrival the rig assigns it to `stage.projection` |
-| any other `Object3D` — a player, a point of interest | a position only: the world position of the object, carried into the frame, plus the `offset` of the move; look, zoom and the distance stay those of the current pose (§4.5) |
+| any other `Object3D` — a player, a point of interest | a position only: the world position of the object, carried into the follow frame — the plane, or without one the plane through the world origin that faces the base —, plus the `offset` of the move; look, zoom and the distance stay those of the current pose (§4.5) |
 
 The rig tells them apart in the order camera, other `Object3D`, projection — anything with an
 `updateViewRect()` function —, pose (`kindOfTarget()` in `src/stage/cameraTarget.ts`), so an
@@ -612,6 +612,15 @@ projection:
   camera from its first frame; detaching places the camera the stage takes back.
 - The stage asks the rig to write its camera in every `updateFrame()`, after a pending placement
   and before `OnStageUpdateFrame` (§3.4).
+- The stage sees the rig as a `StageCameraDriver` (`src/stage/StageCameraDriver.ts`) and imports no
+  `CameraRig`. The rig hands it an adapter it builds once, over private methods: `placeBase()`,
+  `compose()` and `write()` are the names of that interface, not methods of the rig, so no call
+  from outside reaches the rest of the rig without its stage. The adapter holds the private methods
+  bound to the rig rather than wrapped in arrows or in a class of its own: V8 reduces the call of a
+  bound function to its target, and one more call on the path of a frame left the frame of a page
+  that scrolls a heap number per frame in the allocation spec. `CameraRigInternals.driverOf(rig)`
+  answers the adapter for the specs, and `CameraRig.across()` finds the rig of a stage's driver
+  through a `WeakMap` of the module.
 
 #### 4.1.1 Hooks before and after the rig
 
@@ -689,6 +698,28 @@ takes back (§6).
 - A target that is refused — a projection that throws in its placement, a lens change without a
   focus — refuses the move before the rig changed anything: the target rest is placed into a fresh
   rest first.
+
+#### 4.2.1 The state of the rig
+
+What the rig resolves its shot from is one object, `CameraRigState` (`src/stage/cameraRigState.ts`):
+its mode, the kind of its target, the pose and the look, the shot `cancel()` holds, the track, the
+projection of the target with its rest and the container it was placed for, the `Object3D` it
+follows, and the focus and depth of a lens change. The clock of a move, the lift, the cameras, the
+rest of the stage and the scratch shots stay fields of the rig. The modes exclude each other:
+
+| mode | what the camera shows | in | out |
+| --- | --- | --- | --- |
+| `'pose'` | the pose over the rest of the stage | `jump()` to a pose or a projection, the arrival at one, `cancel()` without a view | any other call that sets a target |
+| `'held'` | the shot `cancel()` held, its lens as a zoom | `cancel()` of a move or a lock-on | `jump()`, `moveTo()`, `track()` |
+| `'move'` | the blend from the start of the move to its target | `moveTo()` with `seconds` above 0 | the arrival, `cancel()`, `jump()`, an overtaking `moveTo()`, `track()`, `dispose()` |
+| `'locked'` | a camera or an `Object3D`, resolved where it stands in each frame | `jump()` to one, the arrival of a move to one | `cancel()`, `jump()`, `moveTo()`, `track()`, `dispose()` |
+| `'track'` | the shot of the track at its shown progress | `track()` | `jump()`, `moveTo()`, `dispose()` |
+
+A flight across a transition (§4.7) is a layer above the mode: the rig keeps its state under it.
+Where the flight brings the rig of `to` a target of its own, that rig saves its state whole — a
+copy of every value, the track, the projection and its rest by reference — and the end of the
+flight gives it back whole where the rig goes back. A target with a projection gets a rest of its
+own, so the saved rest stays as it was.
 
 ### 4.3 Blending
 
@@ -798,8 +829,15 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
 ```
 
 - The world position of the object (`updateWorldMatrix(true, false)`, then the translation of
-  `matrixWorld`) is carried into the frame: under a planar projection its foot on the projection
-  plane gives x and y, and the distance stays the current pose's unless `offset` names one. Its
+  `matrixWorld`) is carried into the follow frame of the rest (`followRight`, `followUp`,
+  `followNormal` of `Rest`): under a planar projection its foot on the projection plane gives x
+  and y, and the distance stays the current pose's unless `offset` names one. Without a plane — a
+  `CameraProjection` — the frame is the plane through the world origin that faces the base: its
+  right and up axes those of the base, its normal the base's backward axis. The foot of the object
+  on it lies on the line of sight of the rest, so the object is in the middle of the picture,
+  `offset` moves the camera along its own axes, and the distance of a pose given in world axes is
+  carried into that frame (`readObjectPose()`). The 2D machinery — the goal, the trailing — stays
+  as it is, and under a plane both frames are the same. Its
   orientation and scale are ignored — the camera follows where the object is, not how it turns.
 - `look`, `zoom` and the lift stay the rig's; a drag-look works while following. An object brings
   no look of its own, so a drag-look holds across `moveTo(chest)` and back to the player, where a
@@ -875,7 +913,7 @@ await rig.moveTo(player, 0.6, {offset: [0, 40], smooth: 0.2});   // back to wher
   `moveTo()` of either ends there as a `cancel()` ends it — held where it stands —, and its promise
   resolves. A lock-on, a track and a damped lerp are kept, with their clocks stopped, as the state
   the rig goes back to. The rig of `to`, given a target of its own, places it first — so a refused
-  target changes nothing — and keeps its state (`SavedState`) to go back to.
+  target changes nothing — and keeps its state (`CameraRigState`, §4.2.1) to go back to.
 - **During the flight** `look()` works and lies on top of the flight, so a drag still turns the
   view: one flight look, clamped by the `pitchLimit` of the rig that takes it, laid on a
   perspective blend alone — an orthographic shot of the flight shows no look, and a rig on an
@@ -952,14 +990,17 @@ its own once its hidden class holds a non-number, so the spec writes a `Vector3`
 
 ### 4.9 The shared easings
 
-The easing names, the type and `easingOf()` moved from `src/stage/StageTransition.ts` into
-`src/utils/easing.ts`. The public type is `Easing`, exported through `src/utils/public-api.ts`;
-`StageTransitionEasing` stays as an alias, so nothing a user wrote breaks. The evaluation moved
-along: `applyEasing(spec, t)` serves `StageTransition#advance()`, held free of allocations by
-`hot-path-allocations.director.spec.ts`, and `applyEasingInPlace(spec, slot)` works the same curves
-out on a `Float64Array` slot for the rig, where a fraction handed across the call would be boxed.
-`easing.spec.ts` holds the two equal for every easing. `easingOf()` takes the name of an option
-for its message (`keys[0].ease must be …`). The named curves are products, without `**`.
+The easing names, the type and `easingOf()` live in `src/utils/easing.ts`, shared by the
+transitions and the rig. The public type is `Easing`, exported through `src/utils/public-api.ts`;
+`StageTransitionEasing` is its alias. There is one evaluation, `applyEasingInPlace(spec, slot)`,
+which works the curve out on a `Float64Array` slot, where a fraction handed across the call would
+be boxed, and clamps the answer there: `e > 0 ? (e < 1 ? e : 1) : 0`, so a curve that overshoots
+stops at the ends and an answer that is no number — `NaN`, the `undefined` of a function without
+`return` — falls on 0, which `Math.min()` and `Math.max()` would carry through. The rig eases its
+moves, its lift and the stretches of a track through it, and `StageTransition#advance()` eases its
+progress through a slot of its module, held free of allocations by
+`hot-path-allocations.director.spec.ts`. `easingOf()` takes the name of an option for its message
+(`keys[0].ease must be …`). The named curves are products, without `**`.
 
 ## 5. Pixel exactness
 
@@ -1092,8 +1133,8 @@ All under `packages/twopoint5d/`:
   blend, `shotsEqual()`, the exact write over the base and the lift.
 - `src/stage/lensChange.spec.ts`: the exact ends, the height kept, the log-space strength, the
   swap distance and its step, the cap, a flat scene, the way back, an aliased output.
-- `src/utils/easing.spec.ts`: the curves, `applyEasingInPlace()` equal to `applyEasing()`, the
-  refusals, the alias.
+- `src/utils/easing.spec.ts`: the curves through `applyEasingInPlace()` against references of the
+  spec, clamped to `[0, 1]`, an answer that is no number written as 0, the refusals, the alias.
 - `src/stage/animationMixer.spec.ts`: three's `AnimationMixer` applies a paused, enabled action at
   `update(0)` (§4.6).
 

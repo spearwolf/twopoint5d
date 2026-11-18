@@ -1248,7 +1248,8 @@ export class StageDirector extends StageRenderer {
   /**
    * Advances every transition by `deltaTime`, then updates every layer that is not frozen, slot by
    * slot. A transition that reaches its end shows `to` alone from this frame on; its
-   * `OnStageTransitionEnd` goes out and its `finished` resolves. After `dispose()` it does nothing.
+   * `OnStageTransitionEnd` goes out and its `finished` resolves. A `deltaTime` that is no finite
+   * number above 0 counts as 0 for the transitions. After `dispose()` it does nothing.
    */
   override updateFrame(now: number, deltaTime: number, frameNo: number): void {
     const advancing = this.#advancing;

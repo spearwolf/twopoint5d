@@ -1,5 +1,5 @@
 import {on} from '@spearwolf/eventize';
-import {Matrix4, Object3D, OrthographicCamera, PerspectiveCamera, Quaternion, Vector3} from 'three/webgpu';
+import {Camera, Matrix4, Object3D, OrthographicCamera, PerspectiveCamera, Quaternion, Vector3} from 'three/webgpu';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {OnStageAfterCameraChanged, OnStageCameraPlaced, OnStageTransitionEnd} from '../events.js';
 import {Flight, type FlightSide} from './CameraFlight.js';
@@ -290,19 +290,20 @@ describe('CameraRig.across()', () => {
     });
 
     it('swaps the kind once, at the end, under a transition whose easing overshoots', () => {
-      // back-out: past 1 from about 0.41 of the duration on, back at 1 at its end
+      // back-out: past 1 from about 0.41 of the duration on, back at 1 at its end; the transition
+      // stops its progress at 1 from there on, long before its end
       const backOut = (t: number) => 1 + 2.70158 * (t - 1) ** 3 + 1.70158 * (t - 1) ** 2;
       const s = setup({to: 'orthographic', duration: 1, easing: backOut});
       CameraRig.across(s.transition);
       const kinds: string[] = [];
-      let overshot = false;
+      let atEndEarly = false;
       for (let i = 0; i < 20; i++) {
         s.frame(0.1);
         if (s.transition.state !== 'running') break;
-        overshot ||= s.transition.progress > 1;
+        atEndEarly ||= s.transition.progress === 1;
         kinds.push(s.rigB.camera.type);
       }
-      expect(overshot).toBe(true);
+      expect(atEndEarly).toBe(true);
       expect(kinds).not.toContain('OrthographicCamera');
       s.frame();
       expect(s.rigB.camera.type).toBe('OrthographicCamera');
@@ -430,6 +431,43 @@ describe('CameraRig.across()', () => {
       s.transition.cancel('end');
       s.a.updateFrame(0, 0, 0);
       expect(stateOf(s.rigA.camera)).toEqual(own);
+    });
+  });
+
+  describe('an Object3D as the target under a projection without a plane', () => {
+    it('keeps the distance the rig of to had from the plane that faces its base, where it followed an object', () => {
+      const director = new StageDirector();
+      director.resize(800, 600);
+      const {stage: a} = makeRig('a');
+      const source = new PerspectiveCamera(50, 4 / 3, 0.1, 1000);
+      source.position.set(0, 6, 10);
+      source.lookAt(0, 0, 0);
+      source.updateMatrixWorld();
+      const b = new Stage2D(new CameraProjection(source));
+      b.name = 'b';
+      b.resize(800, 600);
+      const rigB = new CameraRig(b);
+      const first = new Object3D();
+      first.position.set(3, 0, -2);
+      const second = new Object3D();
+      second.position.set(-2, 1, 1);
+      b.scene.add(first, second);
+      const normal = new Vector3(0, 0, 1).applyQuaternion(source.getWorldQuaternion(new Quaternion()));
+
+      rigB.jump(first);
+      b.updateFrame(frameNo, 0, frameNo++);
+      const distance = rigB.camera.position.dot(normal);
+
+      director.show(a);
+      const transition = director.replace(a, b, {manual: true});
+      CameraRig.across(transition, {to: second});
+      transition.complete();
+      director.updateFrame(frameNo, 0, frameNo++);
+      expect(rigB.camera.position.dot(normal)).toBeCloseTo(distance, 9);
+      rigB.camera.updateMatrixWorld();
+      const ndc = second.getWorldPosition(new Vector3()).project(rigB.camera);
+      expect(ndc.x).toBeCloseTo(0, 6);
+      expect(ndc.y).toBeCloseTo(0, 6);
     });
   });
 
@@ -784,11 +822,26 @@ describe('CameraRig.across()', () => {
       expect(() => CameraRig.across(s.transition, {focus: -1})).toThrow(RangeError);
       expect(() => CameraRig.across(s.transition, {easing: 'bounce' as any})).toThrow(/CameraRig.across\(\): easing must be/);
       expect(() => CameraRig.across(s.transition, {to: {zoom: 0}})).toThrow(
-        'CameraRig.across(): zoom must be a finite number above 0, got 0',
+        'CameraRig.across(): to.zoom must be a finite number above 0, got 0',
       );
       CameraRig.across(s.transition);
       expect(() => CameraRig.across(s.transition)).toThrow(
         'CameraRig.across(): the CameraRig of the stage "a" takes part in a flight already',
+      );
+    });
+
+    it('names the target of the flight to in its refusals', () => {
+      const s = setup();
+      expect(() => CameraRig.across(s.transition, {to: 5 as never})).toThrow(
+        new TypeError('CameraRig.across(): to must be a CameraPose, a camera, a projection or an Object3D, got 5'),
+      );
+      expect(() => CameraRig.across(s.transition, {to: {position: [Number.NaN, 0]}})).toThrow(
+        new RangeError('CameraRig.across(): to.position[0] must be a finite number, got NaN'),
+      );
+      expect(() => CameraRig.across(s.transition, {to: new Camera() as never})).toThrow(
+        new TypeError(
+          'CameraRig.across(): to must be a PerspectiveCamera or an OrthographicCamera where it is a camera, got Camera',
+        ),
       );
     });
 

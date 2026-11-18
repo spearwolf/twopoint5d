@@ -15,7 +15,7 @@ import {OnStageAfterCameraChanged} from '../events.js';
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import type {Easing} from '../utils/easing.js';
 import {CameraProjection} from './CameraProjection.js';
-import {CameraRig} from './CameraRig.js';
+import {CameraRig, CameraRigInternals} from './CameraRig.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D} from './Stage2D.js';
@@ -62,11 +62,12 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     void rig.moveTo({position: [400, -300, 150], look: {yaw: 1, pitch: 0}, zoom: 2}, LONG_MOVE, {easing});
     let moved = 0;
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         if (rig.step(1)) moved++;
-        rig.write();
-        rig.compose();
+        driver.write();
+        driver.compose();
       }
     });
 
@@ -90,11 +91,12 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     void rig.moveTo(makeProjection(to), LONG_MOVE, {depth: 40, easing: 'linear'});
     let moved = 0;
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         if (rig.step(1)) moved++;
-        rig.write();
-        rig.compose();
+        driver.write();
+        driver.compose();
       }
     });
 
@@ -111,10 +113,11 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     const rig = makeRig('orthographic');
     void rig.moveTo({position: [400, -300], zoom: 2}, LONG_MOVE);
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         rig.step(1);
-        rig.write();
+        driver.write();
       }
     });
 
@@ -139,6 +142,7 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     const look = {yaw: 0.5, pitch: 0.5};
     const pose = {position, look, zoom: 1.5};
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         const k = i & 7;
@@ -150,7 +154,7 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
         pose.zoom = ZOOMS[k]!;
         rig.jump(pose);
         rig.step(1);
-        rig.write();
+        driver.write();
       }
     });
 
@@ -167,6 +171,7 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     const position = new Vector3(0.5, 0.5, 300.5);
     const pose = {position, zoom: 1.5};
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         const k = i & 7;
@@ -176,7 +181,7 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
         pose.zoom = ZOOMS[k]!;
         rig.jump(pose);
         rig.step(1);
-        rig.write();
+        driver.write();
       }
     });
 
@@ -189,6 +194,7 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     void rig.moveTo({position: [400, -300]}, LONG_MOVE);
     const look = {yaw: 0.5, pitch: 0.5};
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         const k = i & 7;
@@ -196,7 +202,7 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
         look.pitch = PITCHES[k]!;
         rig.look(look);
         rig.step(1);
-        rig.write();
+        driver.write();
       }
     });
 
@@ -301,12 +307,13 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     else rig.jump(source);
     let moved = 0;
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         moveSource(parent, source, i);
         if (rig.step(1)) moved++;
-        rig.write();
-        rig.compose();
+        driver.write();
+        driver.compose();
       }
     });
 
@@ -354,6 +361,7 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     else void rig.moveTo(player, 0, {offset: [0.5, 40.25, 150.75], smooth: what.endsWith('smooth') ? 0.25 : 0});
     let moved = 0;
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         const k = i & 7;
@@ -361,8 +369,8 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
         player.position.y = YS[k]!;
         parent.position.x = DISTANCES[k]!;
         if (rig.step(1)) moved++;
-        rig.write();
-        rig.compose();
+        driver.write();
+        driver.compose();
       }
     });
 
@@ -380,15 +388,16 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     void rig.moveTo({position: [3, -2], zoom: 2}, LONG_MOVE);
     let moved = 0;
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         moveSource(parent, source, i);
         if (projection.needsPlacement(rig.camera)) {
-          rig.placeBase(projection);
-          rig.compose();
+          driver.placeBase(projection);
+          driver.compose();
         }
         if (rig.step(1)) moved++;
-        rig.write();
+        driver.write();
       }
     });
 
@@ -439,12 +448,13 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     ]);
     let moved = 0;
 
+    const driver = CameraRigInternals.driverOf(rig);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         rig.lerp(PROGRESSES[i & 7]!, SMOOTH);
         if (rig.step(1)) moved++;
-        rig.write();
-        rig.compose();
+        driver.write();
+        driver.compose();
       }
     });
 
@@ -499,6 +509,8 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
     from.look({yaw: 0.125, pitch: 0.0625});
     let moved = 0;
 
+    const fromDriver = CameraRigInternals.driverOf(from);
+    const toDriver = CameraRigInternals.driverOf(to);
     const bytes = await bytesPerCall(() => {
       for (let i = 0; i < CALLS; i++) {
         const k = i & 7;
@@ -506,10 +518,10 @@ describe('CameraRig on the hot path, in the order of its cases: later cases run 
         origin.position.x = ANCHOR_XS[k]!;
         if (from.step(1)) moved++;
         to.step(1);
-        from.write();
-        to.write();
-        from.compose();
-        to.compose();
+        fromDriver.write();
+        toDriver.write();
+        fromDriver.compose();
+        toDriver.compose();
       }
     });
 

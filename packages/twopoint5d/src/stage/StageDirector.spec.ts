@@ -221,6 +221,62 @@ describe('StageDirector', () => {
       expect(t.progress).toBe(0.25);
     });
 
+    it('stops an easing that overshoots at the ends of the progress', () => {
+      const t = director.show(a, {duration: 1, easing: (x) => x * 2 - 0.5});
+      frame();
+      for (let step = 1; step < 8; step++) {
+        frame(0.125);
+        expect(t.progress, `at ${t.elapsed}`).toBeGreaterThanOrEqual(0);
+        expect(t.progress, `at ${t.elapsed}`).toBeLessThanOrEqual(1);
+        if (step === 1) expect(t.progress).toBe(0);
+        if (step === 7) expect(t.progress).toBe(1);
+      }
+      expect(t.elapsed).toBe(0.875);
+    });
+
+    it('counts an easing that answers no number as 0, and still ends after its duration', () => {
+      const t = director.show(a, {duration: 1, easing: (() => undefined) as unknown as (t: number) => number});
+      frame();
+      for (let step = 1; step < 8; step++) {
+        frame(0.125);
+        expect(t.state).toBe('running');
+        expect(t.progress, `at ${t.elapsed}`).toBe(0);
+      }
+      frame(0.125);
+      expect(t.state).toBe('finished');
+      expect(t.progress).toBe(1);
+    });
+
+    it.each([
+      ['NaN', Number.NaN, 0],
+      ['-0.5', -0.5, 0],
+      ['Infinity', Number.POSITIVE_INFINITY, 0],
+      ['NaN while it waits for its delay', Number.NaN, 0.3],
+    ])('counts a delta time of %s as no time and still ends after its duration', async (_what, deltaTime, delay) => {
+      director.show(a);
+      const t = director.replace(a, b, {duration: 1, delay, easing: 'linear'});
+      director.updateFrame(0, deltaTime, 0);
+      let frames = 0;
+      while (!t.isOver && frames < 30) {
+        frame(0.1);
+        frames++;
+        // a bad delta time in the middle of the run counts as no time as well
+        if (frames === 2) {
+          director.updateFrame(0, deltaTime, 0);
+          // 0.2 of a delay of 0.3 waited: the bad delta time adds nothing to it
+          if (delay > 0) expect(t.state).toBe('pending');
+        }
+        expect(Number.isFinite(t.elapsed), `elapsed in frame ${frames}`).toBe(true);
+        expect(Number.isFinite(t.progress), `progress in frame ${frames}`).toBe(true);
+      }
+      expect(t.state).toBe('finished');
+      expect(t.progress).toBe(1);
+      // the delay, then the duration: a frame of 0.1 at a time, a fraction left over to rounding
+      expect(frames).toBeGreaterThanOrEqual(Math.round((delay + 1) / 0.1));
+      expect(frames).toBeLessThanOrEqual(Math.round((delay + 1) / 0.1) + 1);
+      await expect(t.finished).resolves.toBe(t);
+    });
+
     it('reverse() runs back and ends as cancelled at the start', async () => {
       director.show(a);
       const t = director.replace(a, b, {duration: 1, easing: 'linear'});

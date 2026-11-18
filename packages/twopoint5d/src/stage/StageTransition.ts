@@ -1,5 +1,5 @@
 import {describeValue} from '../utils/describeValue.js';
-import {applyEasing, type Easing, type EasingSpec} from '../utils/easing.js';
+import {applyEasingInPlace, type Easing, type EasingSpec} from '../utils/easing.js';
 import type {IStage} from './IStage.js';
 import type {StageTransitionEffect} from './transitionEffects.js';
 
@@ -43,6 +43,10 @@ export interface StageTransitionInit {
 // declaration of the class names no type that is internal to the library
 let pendingInit: StageTransitionInit | undefined;
 let pendingHost: StageTransitionHost | undefined;
+
+// the progress a transition eases, in a slot: a fraction in a typed array is not boxed, one handed to
+// or answered by a call that V8 does not inline is — the camera rig eases its blends the same way
+const easedProgress = new Float64Array(1);
 
 /**
  * The functions through which a `StageDirector` drives the transitions it made; they are not part of
@@ -156,8 +160,9 @@ export class StageTransition {
   }
 
   /**
-   * The eased progress, 0 to 1. Writable while the transition is {@link manual}: the value is
-   * clamped to `[0, 1]` and drawn from the next frame on. A write to a transition that is not manual
+   * The eased progress, 0 to 1: an easing that overshoots stops at the ends, and an answer of the
+   * easing that is no number counts as 0. Writable while the transition is {@link manual}: the value
+   * is clamped to `[0, 1]` and drawn from the next frame on. A write to a transition that is not manual
    * throws; a write to one that is over does nothing.
    */
   get progress(): number {
@@ -217,10 +222,14 @@ export class StageTransition {
   }
 
   #advance(deltaTime: number): StageTransitionStep {
+    // a delta time the first frame of a loop may lack, or one that runs backwards, counts as no
+    // time; inline, not through a call, since a fraction handed to a call that V8 does not inline is
+    // boxed
+    const dt = deltaTime > 0 && deltaTime < Number.POSITIVE_INFINITY ? deltaTime : 0;
     if (this.isOver) return 'none';
     if (this.#state === 'pending') {
       // the first frame after the call counts no time: the transition starts there at 0
-      if (this.#seenFrame) this.#waited += deltaTime;
+      if (this.#seenFrame) this.#waited += dt;
       this.#seenFrame = true;
       if (this.#waited < this.delay) return 'none';
       this.#state = 'running';
@@ -229,7 +238,7 @@ export class StageTransition {
     }
     if (this.manual) return 'none';
 
-    const elapsed = this.#elapsed + deltaTime * this.#direction;
+    const elapsed = this.#elapsed + dt * this.#direction;
     if (this.#direction > 0 && elapsed >= this.duration) {
       this.#elapsed = this.duration;
       this.#progress = 1;
@@ -241,7 +250,9 @@ export class StageTransition {
       return 'reached-start';
     }
     this.#elapsed = elapsed;
-    this.#progress = applyEasing(this.#easing, elapsed / this.duration);
+    easedProgress[0] = elapsed / this.duration;
+    applyEasingInPlace(this.#easing, easedProgress);
+    this.#progress = easedProgress[0]!;
     return 'none';
   }
 

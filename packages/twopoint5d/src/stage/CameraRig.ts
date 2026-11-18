@@ -4,6 +4,7 @@ import {
   type Object3D,
   OrthographicCamera,
   PerspectiveCamera,
+  Sphere,
   Vector3,
   type WebGPURenderer,
 } from 'three/webgpu';
@@ -41,25 +42,28 @@ import {
 } from './cameraShot.js';
 import {
   createLook,
-  createObjectFollow,
   kindOf,
   type Look,
-  type ObjectFollow,
   kindOfTarget,
   readObjectGoal,
   readObjectPose,
+  resolveFollowShot,
   resolvePoseShot,
   type TargetKind,
   trailObject,
+  writeFollowPosition,
   writePosePosition,
   writeTurn,
 } from './cameraTarget.js';
+import {CameraRigState, isFollowed} from './cameraRigState.js';
+import {cullingSphereOf} from './cullingSphere.js';
 import {advanceTrack, type CameraTrack, locateTrack, readTrack, scrubTrackClips, type TrackKey} from './cameraTrack.js';
 import type {IProjection} from './IProjection.js';
 import {blendLensChangeAtProgress, createLensChange} from './lensChange.js';
 import {OrthographicProjection} from './OrthographicProjection.js';
 import {ParallaxProjection} from './ParallaxProjection.js';
 import {Stage2D, Stage2DInternals} from './Stage2D.js';
+import type {StageCameraDriver} from './StageCameraDriver.js';
 import type {StageTransition} from './StageTransition.js';
 
 /**
@@ -69,7 +73,9 @@ import type {StageTransition} from './StageTransition.js';
  *   its world pose and its lens, fitted into the container as a `CameraProjection` with the default
  *   fit fits it. The rig locks on to it on arrival and follows it;
  * - any other `Object3D` — a player, a point of interest: its world position alone, carried into
- *   the frame, plus the `offset` of the move; the rig locks on to it on arrival and follows it;
+ *   the frame, plus the `offset` of the move; the rig locks on to it on arrival and follows it.
+ *   Under a projection without a plane — a `CameraProjection` — it lies in the middle of the
+ *   picture: the frame is the plane through the world origin that faces the camera of the rest;
  * - an `IProjection`, whose rest the rig moves to and which it assigns to the stage on arrival;
  * - a {@link CameraPose} in the frame of the projection of the stage.
  */
@@ -95,7 +101,10 @@ export interface CameraMoveOptions {
   /**
    * For an `Object3D` target: where the camera stands relative to the object, on the axes of the
    * frame — x and y, and optionally a distance from the plane, which an orthographic camera ignores.
-   * Default `[0, 0]`, at the distance of the current pose. Checked, and ignored by other targets.
+   * Under a projection without a plane — a `CameraProjection` — x and y run along the right and the
+   * up axis of the camera of the rest, and the distance counts from the plane through the world
+   * origin that faces it. Default `[0, 0]`, at the distance of the current pose. Checked, and ignored
+   * by other targets.
    */
   offset?: readonly [number, number] | readonly [number, number, number];
   /**
@@ -130,8 +139,10 @@ export interface CameraTrackKey {
   /**
    * The shot of the key, resolved anew in every frame: a pose in the frame of the projection of the
    * stage, a camera — fitted as a `CameraProjection` with the default fit fits it —, any other
-   * `Object3D` — its foot on the plane, at the distance and the zoom of the rest —, or a projection,
-   * whose rest the camera shows without the rig assigning it to the stage.
+   * `Object3D` — its foot on the plane, at the distance and the zoom of the rest; under a projection
+   * without a plane in the middle of the picture, on the plane through the world origin that faces
+   * the camera of the rest —, or a projection, whose rest the camera shows without the rig assigning
+   * it to the stage.
    */
   shot: CameraTarget;
   /**
@@ -195,28 +206,18 @@ const noop = (): void => {};
 
 const FLIGHT_REFUSAL = 'the rig takes part in a flight across a transition (CameraRig.across()) until the transition is over';
 
-// the state the rig of `to` goes back to where a flight that brought a target of its own ends with
-// `from` in the slot
-interface SavedState {
-  pose: PoseValues;
-  yaw: number;
-  pitch: number;
-  holding: boolean;
-  holdingTurn: boolean;
-  held: CameraShot;
-  track: CameraTrack | undefined;
-  targetProjection: IProjection | undefined;
-  assigns: boolean;
-  targetRest: Rest;
-  targetPlaced: boolean;
-  follows: boolean;
-  follow: ObjectFollow;
-  focus: number;
-  depth: number;
-}
+// the rig hands its stage a driver adapter over private methods; it does not name StageCameraDriver in
+// its published declarations, where neither private members nor what is internal appear. The rig of
+// an adapter, for CameraRig.across(), which finds a stage's driver alone
+const rigOfDriver = new WeakMap<StageCameraDriver, CameraRig>();
 
-// the rig is the camera driver of its stage; it does not name StageCameraDriver, which stays out of
-// the published declarations, and Stage2DInternals.attachDriver(stage, this) holds it to that contract
+/**
+ * The camera driver a `CameraRig` hands its stage; not part of the public API.
+ * @internal
+ */
+export const CameraRigInternals = {} as {
+  driverOf(rig: CameraRig): StageCameraDriver;
+};
 
 /**
  * Moves the camera of a `Stage2D`: it resolves targets — poses in the frame of the projection,
@@ -237,7 +238,13 @@ interface SavedState {
  * See "Moving the camera" in `docs/stages.md`.
  */
 export class CameraRig {
+  static {
+    CameraRigInternals.driverOf = (rig) => rig.#driver;
+  }
+
   readonly #stage: Stage2D;
+  // what the stage places and writes the camera through, made once
+  readonly #driver: StageCameraDriver;
   readonly #pitchLimit: number;
   readonly #easing: EasingSpec;
 
@@ -256,48 +263,30 @@ export class CameraRig {
   readonly #probedKinds = new WeakMap<IProjection, CameraShotKind>();
   #probe?: {projection: IProjection; camera: PerspectiveCamera | OrthographicCamera};
 
-  // the projection whose rest the target resolves on, placed for the container of the stage: the
-  // one a move travels to, which the arrival assigns to the stage, or the CameraProjection of a
-  // camera target, which it does not
-  #targetProjection?: IProjection;
-  #assigns = false;
-  #targetRest = createRest();
-  #targetPlaced = false;
-  #targetWidth = 0;
-  #targetHeight = 0;
-  #targetPixelRatio = 0;
+  // the target state — the mode, the target and everything the shot resolves from —, which a flight
+  // saves whole and gives back whole
+  readonly #state = new CameraRigState();
 
-  // a camera or an Object3D as the target: the rig locks on to it once the move arrives, and resolves
-  // it in every frame; `#followMoved` holds whether the last step() moved the camera after it
-  #follows = false;
+  // whether the last step() moved the camera after a camera or an Object3D it is locked on to, or
+  // along a track whose progress stood
   #followMoved = false;
-  readonly #follow = createObjectFollow();
 
-  // a lens change: the focus and the depth the move names, NaN where it names none
+  // the scratch of a lens change, its focus and depth from the state
   readonly #lensChange = createLensChange();
-  #focus = Number.NaN;
-  #depth = Number.NaN;
 
-  // the target: a pose, or after cancel() the shot a move stood at, its lens kept as a zoom
-  readonly #pose = createPoseValues();
+  // the pose a call reads, before it becomes the one of the state
   readonly #nextPose = createPoseValues();
-  #holding = false;
-  #holdingTurn = false;
-  readonly #held = createShot();
   // the shot a track, a camera or a move to a projection shows, as an object that follows them
   // takes it (#shownShot())
   readonly #shown = createShot();
-  // the look the rig shows: the one of the target, or of look() since
-  readonly #look = createLook();
 
-  // a track: its keys and its progress; a key resolves with its own look plus the one of the rig, and
-  // a shot that one key alone gives is written over the base of that key
-  #track?: CameraTrack;
+  // a key of a track resolves with its own look plus the one of the rig, and a shot that one key
+  // alone gives is written over the base of that key
   readonly #keyLook = createLook();
   #writeBase?: Camera;
 
-  // the move: from the shot the camera showed at its start, its lens kept as a zoom on the base
-  #moving = false;
+  // the clock of a move (mode 'move'): from the shot the camera showed at its start, its lens kept as
+  // a zoom on the base
   #elapsed = 0;
   #duration = 0;
   #moveEasing: EasingSpec;
@@ -324,7 +313,7 @@ export class CameraRig {
   #flight?: Flight;
   #flightRole: FlightRole = 'from';
   #side?: FlightSide;
-  #saved?: SavedState;
+  #saved?: CameraRigState;
 
   #disposed = false;
 
@@ -369,14 +358,29 @@ export class CameraRig {
     this.#stage = stage;
     this.#camera = this.#kindOfProjection(stage.projection) === 'orthographic' ? this.#orthographic : this.#perspective;
 
+    // the private methods bound to the rig rather than wrapped in arrows or in methods of a class of
+    // their own: V8 reduces the call of a bound function to its target, so the driver puts no call
+    // more on the path of a frame — one more costs the frame of a page that scrolls a heap number
+    // (the allocation spec)
+    const rig = this;
+    this.#driver = {
+      get camera() {
+        return rig.#camera;
+      },
+      placeBase: this.#placeBase.bind(this),
+      compose: this.#compose.bind(this),
+      write: this.#write.bind(this),
+    };
+    rigOfDriver.set(this.#driver, this);
+
     try {
-      Stage2DInternals.attachDriver(stage, this);
+      Stage2DInternals.attachDriver(stage, this.#driver);
     } catch (error) {
       // the stage has the rig attached by the time a listener throws: it goes back to the camera it
       // had, and the caller, who gets no rig, has nothing to dispose
       this.#disposed = true;
       const errors: unknown[] = [error];
-      if (Stage2DInternals.driverOf(stage) === this) {
+      if (Stage2DInternals.driverOf(stage) === this.#driver) {
         try {
           Stage2DInternals.detachDriver(stage);
         } catch (detachError) {
@@ -415,11 +419,12 @@ export class CameraRig {
    */
   get busy(): boolean {
     const flight = this.#flight;
-    const track = this.#track;
+    const state = this.#state;
+    const track = state.track;
     return (
       (flight !== undefined && !flight.transition.isOver) ||
-      this.#moving ||
-      this.#follow.trailing ||
+      state.mode === 'move' ||
+      this.#state.follow.trailing ||
       this.#followMoved ||
       (track !== undefined && track.shown !== track.asked)
     );
@@ -462,8 +467,7 @@ export class CameraRig {
     }
     this.#endMove();
     this.#release();
-    this.#holding = false;
-    copyPoseValues(this.#nextPose, this.#pose);
+    copyPoseValues(this.#nextPose, this.#state.pose);
     if (kind !== 'object') this.#takeLookOfPose();
     this.#takeTarget(kind, target, camera, targetRest, undefined);
     if (kind === 'projection') this.#stage.projection = target as IProjection;
@@ -492,7 +496,10 @@ export class CameraRig {
    * kind is a lens change, which needs `focus`, since a camera has no projection plane.
    *
    * Any other `Object3D` as the target: the camera moves to the world position of the object,
-   * carried into the frame — under a plane, its foot on the plane —, plus `offset`; the look, the
+   * carried into the frame — under a plane, its foot on the plane —, plus `offset`. Under a
+   * projection without a plane — a `CameraProjection` — the object lies in the middle of the
+   * picture: `offset` runs along the right and the up axis of the camera of the rest, and a
+   * distance counts from the plane through the world origin that faces it. The look, the
    * zoom and the distance stay those of the current pose, unless `offset` names a distance — after
    * a track, a camera or on the way to a projection those of the shot it shows, its look the
    * rest's turned by {@link look}. The object is met where it stands in each frame, and on arrival
@@ -561,11 +568,10 @@ export class CameraRig {
     if (fromReady) this.#resolveRelative(this.#from);
     this.#endMove();
     this.#release();
-    copyPoseValues(this.#nextPose, this.#pose);
-    this.#holding = false;
+    copyPoseValues(this.#nextPose, this.#state.pose);
     if (kind !== 'object') this.#takeLookOfPose();
-    this.#focus = options?.focus ?? Number.NaN;
-    this.#depth = options?.depth ?? Number.NaN;
+    this.#state.focus = options?.focus ?? Number.NaN;
+    this.#state.depth = options?.depth ?? Number.NaN;
     this.#takeTarget(kind, target, projection, targetRest, options);
 
     if (seconds === 0) {
@@ -573,7 +579,7 @@ export class CameraRig {
       return Promise.resolve();
     }
 
-    this.#moving = true;
+    this.#state.mode = 'move';
     this.#elapsed = 0;
     this.#duration = seconds;
     this.#moveEasing = easing;
@@ -616,11 +622,11 @@ export class CameraRig {
       flight.look(flightLook);
       return;
     }
-    this.#look.yaw = values.yaw;
-    this.#look.pitch = values.pitch;
+    this.#state.look.yaw = values.yaw;
+    this.#state.look.pitch = values.pitch;
     this.#clampPitch();
     // a shot held by cancel() takes the look from here on, about its rest
-    this.#holdingTurn = false;
+    this.#state.holdingTurn = false;
   }
 
   /**
@@ -666,19 +672,23 @@ export class CameraRig {
   cancel(): void {
     this.#assertAlive('CameraRig#cancel()');
     this.#flight?.check();
-    if ((!this.#moving && !this.#follows) || this.#flight !== undefined) return;
+    const mode = this.#state.mode;
+    if ((mode !== 'move' && mode !== 'locked') || this.#flight !== undefined) return;
     this.#hold();
   }
 
-  // ends a move where it stands and lets go of its target: the camera holds that shot
+  // ends a move where it stands and lets go of its target: the camera holds that shot — without a
+  // view there is none, and it stands on the pose
   #hold(): void {
-    if (this.#hasRest) {
-      this.#resolveRelative(this.#held);
-      this.#holding = true;
-      this.#holdingTurn = true;
+    const state = this.#state;
+    const hasRest = this.#hasRest;
+    if (hasRest) {
+      this.#resolveRelative(state.held);
+      state.holdingTurn = true;
     }
     this.#release();
     this.#endMove();
+    state.mode = hasRest ? 'held' : 'pose';
   }
 
   /**
@@ -731,12 +741,13 @@ export class CameraRig {
 
     this.#endMove();
     this.#release();
-    this.#holding = false;
-    copyPoseValues(EMPTY_POSE, this.#pose);
+    copyPoseValues(EMPTY_POSE, this.#state.pose);
     this.#takeLookOfPose();
-    this.#focus = Number.NaN;
-    this.#depth = Number.NaN;
-    this.#track = track;
+    const state = this.#state;
+    state.focus = Number.NaN;
+    state.depth = Number.NaN;
+    state.track = track;
+    state.mode = 'track';
   }
 
   /**
@@ -759,7 +770,7 @@ export class CameraRig {
     // the check of a flight inline, its refusal alone a call: one call more on its way keeps V8 from
     // inlining lerp(), and the progress its caller hands it is boxed (the allocation spec)
     if (this.#flight !== undefined) this.#assertGrounded(subject);
-    const track = this.#track;
+    const track = this.#state.track;
     if (track === undefined) throw new Error(`${subject}: the rig has no track; set one with track() first`);
     // the checks inline rather than through assertFinite(): a progress is a fraction, and a fraction
     // handed to a call that V8 does not inline is boxed
@@ -824,13 +835,14 @@ export class CameraRig {
         this.#lift = this.#liftTo;
       }
     }
-    if (this.#moving) {
+    const state = this.#state;
+    if (state.mode === 'move') {
       this.#elapsed += deltaSeconds;
       if (this.#elapsed >= this.#duration) this.#arrive();
     }
     // whether the step moved the progress of a track
     let progressed = false;
-    const track = this.#track;
+    const track = state.track;
     if (track !== undefined && !flying) {
       // a field rather than an argument: a fraction handed to a call that V8 does not inline is boxed
       track.delta = deltaSeconds;
@@ -845,8 +857,8 @@ export class CameraRig {
       this.#followMoved = false;
       return false;
     }
-    const follow = this.#follow;
-    if (follow.object !== undefined && !this.#moving && follow.smooth > 0 && !flying) {
+    const follow = state.follow;
+    if (follow.object !== undefined && state.mode !== 'move' && follow.smooth > 0 && !flying) {
       // a field rather than an argument: a fraction handed to a call that V8 does not inline is boxed
       follow.delta = deltaSeconds;
       trailObject(follow, this.#rest);
@@ -857,7 +869,7 @@ export class CameraRig {
       return false;
     }
     copyShot(this.#current, this.#stepped);
-    this.#followMoved = !flying && ((this.#follows && !this.#moving) || (track !== undefined && !progressed));
+    this.#followMoved = !flying && (state.mode === 'locked' || (track !== undefined && !progressed));
     return true;
   }
 
@@ -868,8 +880,11 @@ export class CameraRig {
    * scene is compiled for the current target of `renderer`, as `Stage2D#renderTo()` draws it, and
    * for each scene pass the stage has built — the pass node of `asPassNode()`, and the pass of its
    * `postProcess`, which this call builds as its first draw would. That camera is placed over the
-   * view the rig shows now. The compile with the camera the stage has is the job of the first draw,
-   * or of `StageDirector#precompile()`.
+   * view the rig shows now, as a lens change meets it at the projection plane. Without a plane — a
+   * `CameraProjection` — it meets it at the `focus` of the last {@link moveTo}, where that move
+   * named one, and otherwise at the middle of the objects of the scene that three.js culls by its
+   * frustum, so that they are compiled. The compile with the camera the stage has is the job of the
+   * first draw, or of `StageDirector#precompile()`.
    *
    * Calls on one renderer — of this rig or of another — run one after the other, each with its own
    * result: a call waits until the ones before it on that renderer have settled, resolved or
@@ -957,7 +972,7 @@ export class CameraRig {
     this.#endMove();
     this.#lifting = false;
     // a stage that went on to another rig keeps it
-    if (Stage2DInternals.driverOf(this.#stage) === this) {
+    if (Stage2DInternals.driverOf(this.#stage) === this.#driver) {
       try {
         Stage2DInternals.detachDriver(this.#stage);
       } catch (error) {
@@ -970,14 +985,11 @@ export class CameraRig {
     );
   }
 
-  /**
-   * Lets `projection` place the base camera of the rig and answers it; called by the stage. The base
-   * is of the kind the projection builds and is never drawn with. The rest of a projection a move
-   * runs to follows the container here, and the placement of the stage where it is that very
-   * projection. Not for use outside the stage.
-   * @internal
-   */
-  placeBase(projection: IProjection): Camera {
+  // lets `projection` place the base camera of the rig and answers it; called by the stage through
+  // the driver. The base is of the kind the projection builds and is never drawn with. The rest of a
+  // projection a move runs to follows the container here, and the placement of the stage where it is
+  // that very projection
+  #placeBase(projection: IProjection): Camera {
     const rest = this.#rest;
     this.#placeRest(projection, rest);
 
@@ -987,29 +999,26 @@ export class CameraRig {
     const pixelRatio = stage.containerPixelRatio;
     this.#containerSize = Math.max(width, height);
 
-    const target = this.#targetProjection;
+    const target = this.#state.projection;
     if (
       target !== undefined &&
       (target === projection ||
-        !this.#targetPlaced ||
-        width !== this.#targetWidth ||
-        height !== this.#targetHeight ||
-        pixelRatio !== this.#targetPixelRatio)
+        !this.#state.placed ||
+        width !== this.#state.width ||
+        height !== this.#state.height ||
+        pixelRatio !== this.#state.pixelRatio)
     ) {
-      this.#placeTarget(target, this.#targetRest);
-      this.#targetPlaced = true;
+      this.#placeTarget(target, this.#state.rest);
+      this.#state.placed = true;
     }
     return rest.base!;
   }
 
-  /**
-   * Reads the rest from the base the projection placed and the listeners of `OnStageCameraPlaced`
-   * changed, and writes the camera; called by the stage after every placement. Writes with a camera
-   * of the kind of the shot it resolves and has the stage announce a swap. Does nothing on a
-   * disposed stage. Allocates nothing without a swap. Not for use outside the stage.
-   * @internal
-   */
-  compose(): void {
+  // reads the rest from the base the projection placed and the listeners of `OnStageCameraPlaced`
+  // changed, and writes the camera; called by the stage through the driver after every placement.
+  // Writes with a camera of the kind of the shot it resolves and has the stage announce a swap. Does
+  // nothing on a disposed stage. Allocates nothing without a swap
+  #compose(): void {
     const rest = this.#rest;
     if (rest.base === undefined || this.#disposed || this.#stage.isDisposed) return;
     readRest(rest);
@@ -1017,13 +1026,10 @@ export class CameraRig {
     this.#writeNow();
   }
 
-  /**
-   * Writes the camera for the frame from the state of the rig; called by the stage in every
-   * `updateFrame()`, before `OnStageUpdateFrame`. Does nothing on a disposed stage or before the
-   * first placement. Allocates nothing but in the frame of a swap. Not for use outside the stage.
-   * @internal
-   */
-  write(): void {
+  // writes the camera for the frame from the state of the rig; called by the stage through the driver
+  // in every `updateFrame()`, before `OnStageUpdateFrame`. Does nothing on a disposed stage or before
+  // the first placement. Allocates nothing but in the frame of a swap
+  #write(): void {
     if (this.#disposed) return;
     this.#flight?.check();
     if (!this.#hasRest || this.#stage.isDisposed) return;
@@ -1036,7 +1042,7 @@ export class CameraRig {
     // the clips of a track at the shown progress, which the first lerp() sets without a step; a clip
     // whose time stands is skipped, so the scrub of the step costs nothing more. A flight stops the
     // clocks of the track
-    const track = this.#track;
+    const track = this.#state.track;
     if (track !== undefined && this.#flight === undefined) scrubTrackClips(track);
     const shot = this.#current;
     this.#resolve(shot);
@@ -1056,10 +1062,15 @@ export class CameraRig {
     this.#resolve(shot);
     const rest = this.#rest;
     const forward = new Vector3(0, 0, -1).applyQuaternion(shot.quaternion);
-    // to the plane, or the focus of the move, a number above 0 or NaN for none
+    // to the plane, the focus of the move, or the middle of what three.js culls in the scene — so
+    // that a stage without a plane compiles the meshes of its scene before a move names a focus
     let distance = 0;
     if (rest.hasPlane) distance = new Vector3().subVectors(shot.position, rest.origin).dot(rest.normal);
-    else if (!Number.isNaN(this.#focus)) distance = this.#focus;
+    else if (!Number.isNaN(this.#state.focus)) distance = this.#state.focus;
+    else {
+      const sphere = cullingSphereOf(this.#stage.scene, new Sphere());
+      if (!sphere.isEmpty()) distance = new Vector3().subVectors(sphere.center, shot.position).dot(forward);
+    }
     if (shot.kind === 'perspective') {
       shot.lens = 2 * Math.max(distance, rest.near) * shot.lens;
       shot.kind = 'orthographic';
@@ -1094,7 +1105,7 @@ export class CameraRig {
       return;
     }
     this.#writeBase = undefined;
-    const track = this.#track;
+    const track = this.#state.track;
     if (track !== undefined) {
       this.#resolveTrack(track, out);
       this.#updateLift();
@@ -1103,7 +1114,8 @@ export class CameraRig {
     }
     const to = this.#to;
     this.#resolveTarget(to);
-    if (this.#moving) {
+    const state = this.#state;
+    if (state.mode === 'move') {
       const from = this.#from;
       if (this.#fromPending) {
         copyShot(to, from);
@@ -1123,7 +1135,7 @@ export class CameraRig {
           from,
           to,
           this.#rest,
-          this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest,
+          this.#state.projection !== undefined && this.#state.placed ? this.#state.rest : this.#rest,
         );
         // the camera of the other kind at the start and on arrival alone, wherever the easing stands
         this.#lensChange.underWay = t > 0 && t < 1;
@@ -1160,7 +1172,7 @@ export class CameraRig {
   // answers
   #prepareLensChange(from: CameraShot, to: CameraShot, restA: Rest, restB: Rest): void {
     const change = this.#lensChange;
-    const focus = this.#focus;
+    const focus = this.#state.focus;
 
     let p = from.position;
     let o = restA.origin;
@@ -1177,7 +1189,7 @@ export class CameraRig {
     if (to.kind === 'perspective' ? !(distance > 0) : Number.isNaN(distance)) distance = focus > 0 ? focus : 1;
     change.focusB = distance;
 
-    change.depth = this.#depth;
+    change.depth = this.#state.depth;
     change.containerSize = this.#containerSize;
   }
 
@@ -1185,12 +1197,13 @@ export class CameraRig {
   // the rest of the projection a move runs to or the camera the rig follows, where it stands now
   #resolveTarget(out: CameraShot): void {
     this.#followTarget();
-    const rest = this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest;
-    const pose = this.#pose;
-    const follow = this.#follow;
+    const state = this.#state;
+    const rest = state.projection !== undefined && state.placed ? state.rest : this.#rest;
+    const pose = state.pose;
+    const follow = state.follow;
     if (follow.object !== undefined) {
       // the place the trailing has reached once locked on with smooth, otherwise the object's own
-      if (follow.started && follow.smooth > 0 && !this.#moving) {
+      if (follow.started && follow.smooth > 0 && state.mode !== 'move') {
         pose.x = follow.x;
         pose.y = follow.y;
       } else {
@@ -1199,17 +1212,19 @@ export class CameraRig {
         pose.y = follow.goalY;
       }
     }
-    const held = this.#held;
-    const holding = this.#holding;
+    const held = state.held;
+    const holding = state.mode === 'held';
 
     if (holding) out.position.copy(held.position);
+    // an object is followed in the follow frame of the rest, which keeps it on the line of sight
+    else if (follow.object !== undefined) writeFollowPosition(rest, pose, out.position);
     else writePosePosition(rest, pose, out.position);
 
-    if (holding && this.#holdingTurn) out.quaternion.copy(held.quaternion);
+    if (holding && state.holdingTurn) out.quaternion.copy(held.quaternion);
     // an orthographic camera takes no look other than 0, also one the rig kept from a projection of
     // the other kind assigned to the stage since
     else if (rest.kind === 'orthographic') out.quaternion.copy(rest.quaternion);
-    else writeTurn(rest, this.#look, out.quaternion);
+    else writeTurn(rest, state.look, out.quaternion);
 
     if (holding) {
       // a held shot of the other kind — a lens change cancelled on its way — keeps its own lens
@@ -1274,8 +1289,8 @@ export class CameraRig {
       look.yaw = 0;
       look.pitch = 0;
     } else {
-      look.yaw = this.#look.yaw;
-      look.pitch = this.#look.pitch;
+      look.yaw = this.#state.look.yaw;
+      look.pitch = this.#state.look.pitch;
       if (pose.hasLook) {
         look.yaw += pose.yaw;
         look.pitch += pose.pitch;
@@ -1284,7 +1299,8 @@ export class CameraRig {
         else if (look.pitch < -limit) look.pitch = -limit;
       }
     }
-    resolvePoseShot(rest, pose, look, key.shot);
+    if (follow !== undefined) resolveFollowShot(rest, pose, look, key.shot);
+    else resolvePoseShot(rest, pose, look, key.shot);
     return rest;
   }
 
@@ -1325,23 +1341,26 @@ export class CameraRig {
   }
 
   #takeLookOfPose(): void {
-    const pose = this.#pose;
-    this.#look.yaw = pose.hasLook ? pose.yaw : 0;
-    this.#look.pitch = pose.hasLook ? pose.pitch : 0;
+    const pose = this.#state.pose;
+    this.#state.look.yaw = pose.hasLook ? pose.yaw : 0;
+    this.#state.look.pitch = pose.hasLook ? pose.pitch : 0;
     this.#clampPitch();
   }
 
   // in place, on the field: a fraction handed across a call or answered by one may be boxed
   #clampPitch(): void {
     const limit = this.#pitchLimit;
-    const look = this.#look;
+    const look = this.#state.look;
     const pitch = look.pitch;
     if (pitch > limit) look.pitch = limit;
     else if (pitch < -limit) look.pitch = -limit;
   }
 
+  // ends the clock of a move: the mode turns to what its target leaves — locked on to a camera or an
+  // object, otherwise the pose
   #endMove(): void {
-    this.#moving = false;
+    const state = this.#state;
+    if (state.mode === 'move') state.mode = isFollowed(state.targetKind) ? 'locked' : 'pose';
     this.#fromPending = false;
     const settle = this.#settle;
     this.#settle = undefined;
@@ -1352,10 +1371,10 @@ export class CameraRig {
   // camera stands on — the same pose, `{}` with the look, over a base placed alike. A camera or an
   // object the move ran to stays the target: the rig is locked on to it from here on
   #arrive(): void {
-    const projection = this.#assigns ? this.#targetProjection : undefined;
+    const projection = this.#state.assigns ? this.#state.projection : undefined;
     if (projection !== undefined) {
-      this.#targetProjection = undefined;
-      this.#assigns = false;
+      this.#state.projection = undefined;
+      this.#state.assigns = false;
     }
     this.#endMove();
     if (projection !== undefined && this.#stage.projection !== projection) this.#stage.projection = projection;
@@ -1371,13 +1390,15 @@ export class CameraRig {
     targetRest: Rest | undefined,
     options: CameraMoveOptions | undefined,
   ): void {
-    this.#targetProjection = projection;
-    this.#assigns = kind === 'projection' && projection !== undefined;
-    if (targetRest !== undefined) this.#targetRest = targetRest;
-    this.#targetPlaced = targetRest !== undefined;
-    this.#follows = kind === 'camera' || kind === 'object';
+    this.#state.projection = projection;
+    this.#state.assigns = kind === 'projection' && projection !== undefined;
+    if (targetRest !== undefined) this.#state.rest = targetRest;
+    this.#state.placed = targetRest !== undefined;
+    // the rig stands on the target from here on — a move sets its own mode afterwards
+    this.#state.targetKind = kind;
+    this.#state.mode = isFollowed(kind) ? 'locked' : 'pose';
     if (kind === 'object') {
-      const follow = this.#follow;
+      const follow = this.#state.follow;
       const offset = options?.offset;
       follow.object = target as Object3D;
       follow.offsetX = offset === undefined ? 0 : offset[0];
@@ -1391,13 +1412,15 @@ export class CameraRig {
   // lets go of the target a move ran to or the rig followed, and of a track; the rig keeps no
   // reference to either
   #release(): void {
-    this.#track = undefined;
+    this.#state.track = undefined;
     this.#writeBase = undefined;
-    this.#targetProjection = undefined;
-    this.#assigns = false;
-    this.#follows = false;
+    this.#state.projection = undefined;
+    this.#state.assigns = false;
+    this.#state.targetKind = 'pose';
+    // a track and a lock-on are let go; a move and a held shot are for the caller to end
+    if (this.#state.mode === 'track' || this.#state.mode === 'locked') this.#state.mode = 'pose';
     this.#followMoved = false;
-    const follow = this.#follow;
+    const follow = this.#state.follow;
     follow.object = undefined;
     follow.trailing = false;
   }
@@ -1410,10 +1433,10 @@ export class CameraRig {
   // the allocation spec, under V8's inlining of the moment —, and the placement costs none. The
   // projection of the stage is the stage's to place
   #followTarget(): void {
-    const target = this.#targetProjection;
-    if (target === undefined || !this.#targetPlaced || target === this.#stage.projection) return;
+    const target = this.#state.projection;
+    if (target === undefined || !this.#state.placed || target === this.#stage.projection) return;
     if (target.needsPlacement === undefined) return;
-    const rest = this.#targetRest;
+    const rest = this.#state.rest;
     this.#placeRest(target, rest);
     readRest(rest);
   }
@@ -1442,9 +1465,9 @@ export class CameraRig {
     projection.updateViewRect(width, height, pixelRatio);
     this.#placeRest(projection, rest);
     readRest(rest);
-    this.#targetWidth = width;
-    this.#targetHeight = height;
-    this.#targetPixelRatio = pixelRatio;
+    this.#state.width = width;
+    this.#state.height = height;
+    this.#state.pixelRatio = pixelRatio;
   }
 
   // the kind of camera `projection` builds: known for the planar projections, the kind of the source
@@ -1483,12 +1506,12 @@ export class CameraRig {
   // kind, or the perspective camera of a lens change between them —, otherwise by the projection
   // of the target or of the stage
   #refusesLook(): boolean {
-    if (this.#track !== undefined && this.#flight === undefined && this.#hasRest) {
+    if (this.#state.mode === 'track' && this.#flight === undefined && this.#hasRest) {
       const shown = this.#shown;
       this.#resolve(shown);
       return shown.kind === 'orthographic';
     }
-    return this.#isOrthographic(this.#targetProjection ?? this.#stage.projection);
+    return this.#isOrthographic(this.#state.projection ?? this.#stage.projection);
   }
 
   #isOrthographic(projection: IProjection | undefined): boolean {
@@ -1501,12 +1524,22 @@ export class CameraRig {
   }
 
   // the kind of the target, and its pose into `out`: a pose as it reads, the pose an object keeps of
-  // the current one, and the empty pose of a camera and a projection. Changes nothing of the rig
-  #readTarget(subject: string, target: unknown, out: PoseValues, options: CameraMoveOptions | undefined): TargetKind {
-    const kind = kindOfTarget(subject, target);
-    if (kind === 'pose') readPose(subject, target, this.#isOrthographic(this.#stage.projection), out);
-    else if (kind === 'object') readObjectPose(this.#pose, this.#shownShot(), this.#rest, options?.offset, out);
-    else copyPoseValues(EMPTY_POSE, out);
+  // the current one, and the empty pose of a camera and a projection. A refusal names the target by
+  // `path` where the call names it so (`to`), as `target` otherwise. Changes nothing of the rig
+  #readTarget(
+    subject: string,
+    target: unknown,
+    out: PoseValues,
+    options: CameraMoveOptions | undefined,
+    path?: string,
+  ): TargetKind {
+    const kind = kindOfTarget(subject, target, path);
+    if (kind === 'pose') readPose(subject, target, this.#isOrthographic(this.#stage.projection), out, path);
+    else if (kind === 'object') {
+      // the pose of an object the rig follows, or moves to, is in the follow frame already
+      const state = this.#state;
+      readObjectPose(state.pose, this.#shownShot(), this.#rest, options?.offset, out, state.follow.object !== undefined);
+    } else copyPoseValues(EMPTY_POSE, out);
     return kind;
   }
 
@@ -1515,8 +1548,8 @@ export class CameraRig {
   // projection shows — the pose of the rig is the empty one there. Undefined where the pose holds
   // them, and without a view
   #shownShot(): CameraShot | undefined {
-    if (this.#holding) return this.#held;
-    if (!this.#hasRest || (this.#track === undefined && this.#targetProjection === undefined)) {
+    if (this.#state.mode === 'held') return this.#state.held;
+    if (!this.#hasRest || (this.#state.mode !== 'track' && this.#state.projection === undefined)) {
       return undefined;
     }
     const shown = this.#shown;
@@ -1582,9 +1615,13 @@ export class CameraRig {
    * back. A rig disposed during the flight ends it, and the other goes back to its state. A frozen
    * layer of the flight shows a still picture: the flight warns once.
    *
+   * A flight whose end no frame and no call notices — a transition after which no stage of the
+   * flight is drawn, a director that was disposed — ends through `transition.finished`, and what a
+   * rig throws there goes out as an unhandled rejection; there is no error event.
+   *
    * @throws {TypeError} for a `transition` that is not a `StageTransition`, `options` that are not an
    * object, `anchors` that are not a pair of `Object3D`, an `easing` that is not one, and a target
-   * as {@link jump} refuses it.
+   * as {@link jump} refuses it, named `to`.
    * @throws {RangeError} for a `focus` that is not a finite number above 0, anchors scaled unevenly
    * or mirrored against each other, and the numbers of a target pose as {@link jump} refuses them.
    * @throws {Error} for a transition that is over, from or to nothing, a stage without a rig or
@@ -1594,7 +1631,8 @@ export class CameraRig {
   static across(transition: StageTransition, options?: CameraFlightOptions): CameraFlight {
     return startFlight(transition, options, (stage) => {
       const driver = stage instanceof Stage2D ? Stage2DInternals.driverOf(stage) : undefined;
-      return driver instanceof CameraRig && !driver.#disposed ? driver.#flightSide() : undefined;
+      const rig = driver === undefined ? undefined : rigOfDriver.get(driver);
+      return rig !== undefined && !rig.#disposed ? rig.#flightSide() : undefined;
     });
   }
 
@@ -1608,7 +1646,7 @@ export class CameraRig {
         return this.#flight !== undefined;
       },
       hasRest: () => this.#hasRest,
-      targetRest: () => (this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest),
+      targetRest: () => (this.#state.projection !== undefined && this.#state.placed ? this.#state.rest : this.#rest),
       resolveOwn: (out) => this.#resolveOwn(out),
       resolveStart: (out) => {
         this.#resolveOwn(out);
@@ -1620,7 +1658,7 @@ export class CameraRig {
       readEnd: (subject, target) => this.#readFlightEnd(subject, target),
       join: (flight, role, target) => {
         if (target !== undefined) this.#takeFlightTarget(target);
-        else if (this.#moving) this.#hold();
+        else if (this.#state.mode === 'move') this.#hold();
         this.#flight = flight;
         this.#flightRole = role;
       },
@@ -1639,10 +1677,10 @@ export class CameraRig {
       }
       const shot = createShot();
       this.#resolveOwn(shot);
-      const rest = this.#targetProjection !== undefined && this.#targetPlaced ? this.#targetRest : this.#rest;
+      const rest = this.#state.projection !== undefined && this.#state.placed ? this.#state.rest : this.#rest;
       return {kind: shot.kind, hasPlane: rest.hasPlane, camera: false};
     }
-    const kind = this.#readTarget(subject, target, this.#nextPose, undefined);
+    const kind = this.#readTarget(subject, target, this.#nextPose, undefined, 'to');
     if (kind === 'camera') return {kind: kindOf(target as Camera)!, hasPlane: false, camera: true};
     if (kind === 'projection') {
       const own = target as IProjection;
@@ -1656,7 +1694,7 @@ export class CameraRig {
   // once the rig takes over —, the state it had kept to go back to
   #takeFlightTarget(target: CameraTarget): void {
     const subject = 'CameraRig.across()';
-    const kind = this.#readTarget(subject, target, this.#nextPose, undefined);
+    const kind = this.#readTarget(subject, target, this.#nextPose, undefined, 'to');
     const projection =
       kind === 'projection'
         ? (target as IProjection)
@@ -1670,33 +1708,16 @@ export class CameraRig {
     }
     // a running move ends where it stands once what may throw has passed; an object then keeps the
     // zoom and the distance of the shot the move stood at
-    if (this.#moving) {
+    if (this.#state.mode === 'move') {
       this.#hold();
-      if (kind === 'object') this.#readTarget(subject, target, this.#nextPose, undefined);
+      if (kind === 'object') this.#readTarget(subject, target, this.#nextPose, undefined, 'to');
     }
-    const saved: SavedState = {
-      pose: copyPoseValues(this.#pose, createPoseValues()),
-      yaw: this.#look.yaw,
-      pitch: this.#look.pitch,
-      holding: this.#holding,
-      holdingTurn: this.#holdingTurn,
-      held: copyShot(this.#held, createShot()),
-      track: this.#track,
-      targetProjection: this.#targetProjection,
-      assigns: this.#assigns,
-      targetRest: this.#targetRest,
-      targetPlaced: this.#targetPlaced,
-      follows: this.#follows,
-      follow: Object.assign(createObjectFollow(), this.#follow),
-      focus: this.#focus,
-      depth: this.#depth,
-    };
+    const saved = new CameraRigState().copy(this.#state);
     this.#release();
-    copyPoseValues(this.#nextPose, this.#pose);
-    this.#holding = false;
+    copyPoseValues(this.#nextPose, this.#state.pose);
     if (kind !== 'object') this.#takeLookOfPose();
-    this.#focus = Number.NaN;
-    this.#depth = Number.NaN;
+    this.#state.focus = Number.NaN;
+    this.#state.depth = Number.NaN;
     this.#takeTarget(kind, target, projection, targetRest, undefined);
     this.#saved = saved;
   }
@@ -1710,35 +1731,21 @@ export class CameraRig {
     if (take) {
       // the look of the flight goes on with the target, but not onto an orthographic camera, which
       // takes no look other than 0
-      if ((look.yaw !== 0 || look.pitch !== 0) && !this.#isOrthographic(this.#targetProjection ?? this.#stage.projection)) {
-        this.#look.yaw += look.yaw;
-        this.#look.pitch += look.pitch;
+      if ((look.yaw !== 0 || look.pitch !== 0) && !this.#isOrthographic(this.#state.projection ?? this.#stage.projection)) {
+        this.#state.look.yaw += look.yaw;
+        this.#state.look.pitch += look.pitch;
         this.#clampPitch();
-        this.#holdingTurn = false;
+        this.#state.holdingTurn = false;
       }
       this.#arrive();
       return;
     }
     if (saved === undefined) return;
-    copyPoseValues(saved.pose, this.#pose);
-    this.#look.yaw = saved.yaw;
-    this.#look.pitch = saved.pitch;
-    this.#holding = saved.holding;
-    this.#holdingTurn = saved.holdingTurn;
-    copyShot(saved.held, this.#held);
-    this.#track = saved.track;
-    this.#targetProjection = saved.targetProjection;
-    this.#assigns = saved.assigns;
-    this.#targetRest = saved.targetRest;
-    this.#targetPlaced = saved.targetPlaced;
-    this.#follows = saved.follows;
-    Object.assign(this.#follow, saved.follow);
-    this.#focus = saved.focus;
-    this.#depth = saved.depth;
+    this.#state.copy(saved);
     // the container may have changed while the flight ran
-    if (saved.targetProjection !== undefined && this.#hasRest && !this.#stage.isDisposed) {
-      this.#placeTarget(saved.targetProjection, this.#targetRest);
-      this.#targetPlaced = true;
+    if (saved.projection !== undefined && this.#hasRest && !this.#stage.isDisposed) {
+      this.#placeTarget(saved.projection, this.#state.rest);
+      this.#state.placed = true;
     }
   }
 }

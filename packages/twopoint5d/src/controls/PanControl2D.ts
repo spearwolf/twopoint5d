@@ -258,8 +258,9 @@ export class PanControl2D extends InputControlBase {
 
   /**
    * Pixels per second towards the north. A key sets it to {@link pixelsPerSecond} and back to 0
-   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
-   * no finite number throws a `RangeError` and leaves the one it holds.
+   * when it is released; set by hand, it moves the view in every {@link update}, and a keyup of a
+   * key the control did not take leaves the value alone. A value that is no finite number throws a
+   * `RangeError` and leaves the one it holds.
    */
   get speedNorth(): number {
     return this.#speedNorth;
@@ -271,8 +272,9 @@ export class PanControl2D extends InputControlBase {
 
   /**
    * Pixels per second towards the east. A key sets it to {@link pixelsPerSecond} and back to 0
-   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
-   * no finite number throws a `RangeError` and leaves the one it holds.
+   * when it is released; set by hand, it moves the view in every {@link update}, and a keyup of a
+   * key the control did not take leaves the value alone. A value that is no finite number throws a
+   * `RangeError` and leaves the one it holds.
    */
   get speedEast(): number {
     return this.#speedEast;
@@ -284,8 +286,9 @@ export class PanControl2D extends InputControlBase {
 
   /**
    * Pixels per second towards the south. A key sets it to {@link pixelsPerSecond} and back to 0
-   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
-   * no finite number throws a `RangeError` and leaves the one it holds.
+   * when it is released; set by hand, it moves the view in every {@link update}, and a keyup of a
+   * key the control did not take leaves the value alone. A value that is no finite number throws a
+   * `RangeError` and leaves the one it holds.
    */
   get speedSouth(): number {
     return this.#speedSouth;
@@ -297,8 +300,9 @@ export class PanControl2D extends InputControlBase {
 
   /**
    * Pixels per second towards the west. A key sets it to {@link pixelsPerSecond} and back to 0
-   * when it is released; set by hand, it moves the view in every {@link update}. A value that is
-   * no finite number throws a `RangeError` and leaves the one it holds.
+   * when it is released; set by hand, it moves the view in every {@link update}, and a keyup of a
+   * key the control did not take leaves the value alone. A value that is no finite number throws a
+   * `RangeError` and leaves the one it holds.
    */
   get speedWest(): number {
     return this.#speedWest;
@@ -796,10 +800,11 @@ export class PanControl2D extends InputControlBase {
   };
 
   #onKeyUp = (event: KeyboardEvent): void => {
+    // a keyup lets go only of a speed its key raised: one the control refused on its keydown, or
+    // one set by hand, stays
     const field = this.#speedFieldFor(event);
-    if (field == null) return;
+    if (field == null || !this.#keyedSpeeds.delete(field)) return;
     this[field] = 0;
-    this.#keyedSpeeds.delete(field);
   };
 
   // a window without focus or a hidden page sends the keyup of a released key somewhere else — a

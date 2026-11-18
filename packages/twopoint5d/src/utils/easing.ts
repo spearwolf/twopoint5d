@@ -1,6 +1,9 @@
 import {describeValue} from './describeValue.js';
 
-/** A named easing, or a function from the linear progress `0…1` to the eased one. */
+/**
+ * A named easing, or a function from the linear progress `0…1` to the eased one. Its answer is
+ * clamped to `[0, 1]`, and an answer that is no number counts as 0.
+ */
 export type Easing = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | ((t: number) => number);
 
 const EASING_NAMES = ['linear', 'ease-in', 'ease-out', 'ease-in-out'] as const;
@@ -29,32 +32,12 @@ export function easingOf(subject: string, easing: unknown, name = 'easing'): Eas
 }
 
 /**
- * The eased progress of `t` (`0…1`) under `spec`. The named easings are cubic and worked out in
- * place, as products: a double handed to a call that V8 does not inline is boxed, and so is one
- * that `**` hands to the runtime. A function of the caller is called as it is.
- * @internal
- */
-export function applyEasing(spec: EasingSpec, t: number): number {
-  if (typeof spec === 'function') return spec(t);
-  if (spec === 1) return t * t * t;
-  if (spec === 2) {
-    const u = 1 - t;
-    return 1 - u * u * u;
-  }
-  if (spec === 3) {
-    const u = 2 - 2 * t;
-    return t < 0.5 ? 4 * t * t * t : 1 - (u * u * u) / 2;
-  }
-  return t;
-}
-
-/**
- * {@link applyEasing} of the progress in `slot[0]`, clamped to `[0, 1]` and written back into the
- * slot: the eased progress of a blend of the camera rig, which an easing that overshoots — a back
- * or an elastic curve of the caller — must not carry past the ends of the blend. For a hot path that
- * keeps its fractions out of the arguments and the answers of calls: V8 boxes a fraction it hands to
- * a call it does not inline, and one such a call answers, while a typed array holds one as it is.
- * The named easings are worked out on the slot, as {@link applyEasing} works them out; a function of
+ * The eased progress in `slot[0]`, written back into the slot and clamped to `[0, 1]`: an easing
+ * that overshoots — a back or an elastic curve of the caller — stops at the ends, and an answer that
+ * is no number — `NaN`, `undefined` — counts as 0. For a hot path that keeps its fractions out of
+ * the arguments and the answers of calls: V8 boxes a fraction it hands to a call it does not inline,
+ * and one such a call answers, while a typed array holds one as it is. The named easings are cubic
+ * and worked out on the slot, as products, since `**` hands its double to the runtime; a function of
  * the caller is called with the progress.
  * @internal
  */
@@ -72,5 +55,7 @@ export function applyEasingInPlace(spec: EasingSpec, slot: Float64Array): void {
     const u = 2 - 2 * t;
     e = t < 0.5 ? 4 * t * t * t : 1 - (u * u * u) / 2;
   }
-  slot[0] = Math.min(1, Math.max(0, e));
+  // a comparison is false for NaN and for anything that is no number, so those fall on 0
+  // biome-ignore lint/complexity/useMathMinMax: Math.min() and Math.max() carry NaN through, which the comparison drops
+  slot[0] = e > 0 ? (e < 1 ? e : 1) : 0;
 }

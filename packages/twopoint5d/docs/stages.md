@@ -524,7 +524,8 @@ display.start();
 - `rig.jump(pose)` puts the camera there at once; `rig.moveTo(pose, seconds)` moves it there in
   `seconds`, eased by `'ease-in-out'` — or by `{easing: 'linear' | 'ease-in' | 'ease-out' | fn}`
   as the third argument, or by the `easing` option of the rig. The answer of an easing is clamped
-  to `[0, 1]`, for every easing of the rig: a curve that overshoots stops at the ends.
+  to `[0, 1]`, for every easing of the rig: a curve that overshoots stops at the ends, and an answer
+  that is no number — `NaN`, `undefined` — counts as 0.
 - `position` is a tuple — `[x, y]` keeps the distance of the rest, `[x, y, distance]` sets it — or
   anything with `x`, `y` and an optional `z`, such as a `Vector3`.
 - `zoom` is a factor on the field of view of the fit: `2` shows half the height. It stays a factor
@@ -661,7 +662,10 @@ document.querySelector('#map')!.addEventListener('click', async () => {
 first frame after a swap may build shaders. `rig.precompile(renderer)` compiles the scene with the
 camera of the other kind ahead — for the current target of the renderer, as `renderTo()` draws into
 it, and for the scene pass of its
-`postProcess`, which it builds as its first draw would. The kind the stage draws with now is the job
+`postProcess`, which it builds as its first draw would. That camera shows the view at the
+projection plane; without a plane — a `CameraProjection` — at the `focus` of the last `moveTo()`
+that named one, and otherwise at the middle of the objects of the scene that three.js culls by its
+frustum, so that those are compiled too. The kind the stage draws with now is the job
 of its first draw, or of [`StageDirector#precompile()`](#no-hitch-on-the-first-transition) with the
 stage in `layers`. It takes a `WebGPURenderer` under either backend and rejects a `WebGLRenderer`.
 Calls on one renderer run one after the other, of one rig or of several, each with its own result,
@@ -722,6 +726,9 @@ display.start();
   distance to the plane that is to keep its size —, since a `CameraProjection` has no plane.
 - A pose under a `CameraProjection` is given in world axes, relative to the source:
   `{position: [x, y]}` moves the camera along the world's x and y from where the source stands.
+- An `Object3D` as the target lies in the middle of the picture, also under a source that looks
+  down at a slant: `offset` moves the camera along its own right and up axes, and a distance counts
+  from the plane through the world origin that faces the camera.
 - A move to the camera itself, `rig.moveTo(cameras[room]!, 1.2)`, goes to the same picture but keeps
   the projection of the stage and locks on to the camera — see
   [a camera animated in Blender](#a-camera-animated-in-blender).
@@ -958,7 +965,9 @@ export async function enterCity() {
   resolves then, and never rejects. What a rig throws as it leaves — a listener of the stage of `to`
   as it takes a projection — comes out of the call or the frame that noticed the end, after both
   rigs have left; `busy` answers `false` once the transition is over and leaves the end to them, so
-  it throws nothing.
+  it throws nothing. An end that no frame and no call notices — a transition after which no stage
+  of the flight is drawn, a director disposed — comes through `transition.finished`, and what a
+  rig throws there goes out as an unhandled rejection: there is no error event.
 - A frozen layer shows a still picture, not the flight: the flight warns once, naming the stage.
 
 A scroll drives picture and camera with one number. A manual transition takes its progress by hand,
@@ -1054,10 +1063,13 @@ export async function showChest() {
 
 - The camera follows where the object is, not how it turns: the world position of the object —
   its parents included —, carried into the frame of the projection. Under a plane that is its foot
-  on the plane; orientation and scale are left out.
+  on the plane; without one — a `CameraProjection` — its foot on the plane through the world origin
+  that faces the camera of the projection, so the object lies in the middle of the picture.
+  Orientation and scale are left out.
 - `offset` places the camera relative to the object on the axes of the plane, `[x, y]`, or
-  `[x, y, distance]` with a distance from the plane, which an orthographic camera ignores. Without
-  a distance the camera keeps the one it had.
+  `[x, y, distance]` with a distance from the plane, which an orthographic camera ignores; without a
+  plane on the right and up axes of the camera of the projection, the distance from the plane that
+  faces it. Without a distance the camera keeps the one it had.
 - The look, the zoom and the lift stay as they are: an object brings no viewpoint of its own, and a
   drag-look works while following. After a track or a camera, and on the way to a projection, the
   zoom and the distance are those of the shot it shows, and the look goes back to the rest's,
@@ -2016,7 +2028,7 @@ The options of every change:
 | --- | --- | --- |
 | `effect` | one shared `crossfade()` | |
 | `duration` | `0.5` with an `effect`, `0` without | seconds |
-| `easing` | `'ease-in-out'` | `'linear'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'` — cubic — or a function of your own |
+| `easing` | `'ease-in-out'` | `'linear'`, `'ease-in'`, `'ease-out'`, `'ease-in-out'` — cubic — or a function of your own; its answer is clamped to `[0, 1]`, one that is no number counts as 0 |
 | `delay` | `0` | seconds before it starts |
 | `manual` | `false` | |
 | `outgoing`, `incoming` | `'run'` | see [run and freeze](#run-and-freeze) |
@@ -2027,8 +2039,12 @@ The options of every change:
 **Time.** A transition runs on the `updateFrame()` of the director, by its `deltaTime`: a paused
 display pauses it, a slowed one slows it. The frame after the call is its first one, at progress
 0 — a transition started in a click handler has drawn its first picture in the frame after the
-click —, and the frame in which `elapsed` reaches `duration` shows `to` alone. A named easing costs
-no allocation per frame; a function of your own is called once per frame.
+click —, and the frame in which `elapsed` reaches `duration` shows `to` alone. A `deltaTime` that is
+no finite number above 0 — the `NaN` of the first frame of a loop of your own — counts as no time.
+The answer of the easing is clamped to `[0, 1]`: a curve that overshoots stops at the ends, and an
+answer that is no number — `NaN`, `undefined` — counts as 0, so `progress` and the effect never run
+past `from` or `to`. A named easing costs no allocation per frame; a function of your own is called
+once per frame.
 
 **Events.** `OnStageTransitionStart` goes out on the director in the first frame of a transition,
 after its delay; `OnStageTransitionEnd` in the frame or the call that ends it. Both carry

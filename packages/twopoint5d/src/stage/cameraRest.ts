@@ -21,6 +21,17 @@ export interface Rest {
   readonly quaternion: Quaternion;
   /** The distance of the base from the plane, along its normal. */
   distance: number;
+  /**
+   * The frame an `Object3D` the rig follows is carried into: under a plane the plane's own axes;
+   * without one the plane through the world origin that faces the base — its right and up axes those
+   * of the base, its normal the base's backward axis —, so that the foot of the object on it lies on
+   * the line of sight of the base.
+   */
+  readonly followRight: Vector3;
+  readonly followUp: Vector3;
+  readonly followNormal: Vector3;
+  /** The distance of the base from the plane of the follow frame, along `followNormal`, from `origin`. */
+  followDistance: number;
   /** `tan(fov / 2)` after the zoom, or the height of the view. */
   lens: number;
   near: number;
@@ -39,8 +50,12 @@ export const createRest = (): Rest => ({
   normal: new Vector3(0, 0, 1),
   position: new Vector3(),
   quaternion: new Quaternion(),
+  followRight: new Vector3(1, 0, 0),
+  followUp: new Vector3(0, 1, 0),
+  followNormal: new Vector3(0, 0, 1),
   // fractions from the start, so that V8 keeps the fields as doubles
   distance: 0.5,
+  followDistance: 0.5,
   lens: 0.5,
   near: 0.1,
   far: 100000.5,
@@ -65,14 +80,31 @@ export const readFrame = (projection: IProjection, rest: Rest): void => {
   }
 };
 
-/** The placement and the lens of the base of `rest` into `rest`. Allocates nothing. @internal */
+/**
+ * The placement and the lens of the base of `rest` into `rest`, and the frame an `Object3D` is
+ * followed in. Allocates nothing.
+ * @internal
+ */
 export const readRest = (rest: Rest): void => {
   const base = rest.base!;
   const p = rest.position.copy(base.position);
-  rest.quaternion.copy(base.quaternion);
+  const q = rest.quaternion.copy(base.quaternion);
   const o = rest.origin;
   const n = rest.normal;
-  rest.distance = (p.x - o.x) * n.x + (p.y - o.y) * n.y + (p.z - o.z) * n.z;
+  const distance = (p.x - o.x) * n.x + (p.y - o.y) * n.y + (p.z - o.z) * n.z;
+  rest.distance = distance;
+  if (rest.hasPlane) {
+    rest.followRight.copy(rest.right);
+    rest.followUp.copy(rest.up);
+    rest.followNormal.copy(n);
+    rest.followDistance = distance;
+  } else {
+    rest.followRight.set(1, 0, 0).applyQuaternion(q);
+    rest.followUp.set(0, 1, 0).applyQuaternion(q);
+    const f = rest.followNormal.set(0, 0, 1).applyQuaternion(q);
+    // inline, as the distance above: a call that V8 does not inline boxes the fraction it answers
+    rest.followDistance = (p.x - o.x) * f.x + (p.y - o.y) * f.y + (p.z - o.z) * f.z;
+  }
   // the lens — tan(fov / 2) after the zoom, or the height of the view —, inline: a call that V8
   // does not inline boxes the fraction it answers
   if (rest.kind === 'perspective') {
