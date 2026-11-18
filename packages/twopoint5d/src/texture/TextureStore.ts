@@ -1,16 +1,14 @@
 import {emitSafe, emitStrict, type EventizedObject, off, on, once, Priority, retain} from '@spearwolf/eventize';
 import {batch, createSignal, SignalGroup} from '@spearwolf/signalize';
-import {ImageLoader, type Texture, type WebGPURenderer} from 'three/webgpu';
+import type {Texture, WebGPURenderer} from 'three/webgpu';
 import {type AtlasAdapter, type AtlasAdapterEntry, builtInAtlasAdapters, pickAtlasAdapter} from './atlasAdapters.js';
 import type {FrameBasedAnimations} from './FrameBasedAnimations.js';
 import {
   atlasAdapterPicker,
   changeRefCount,
-  type ImageLease,
   imageSource,
   loadFailureFor,
   subTypesOutOfReach,
-  type TextureImageSource,
   type TextureResourceLoadFailure,
 } from './internals.js';
 import {
@@ -19,11 +17,13 @@ import {
   partitionTextureClasses,
   textureResourceDataProblems,
 } from './checkTextureStoreData.js';
+import {hrefOf, loadCatalog, loadFailedError} from './loadCatalog.js';
 import {resolveRelativeUrl} from './resolveRelativeUrl.js';
 import type {TextureAtlas} from './TextureAtlas.js';
 import type {TextureCoords} from './TextureCoords.js';
 import {TextureFactory, type TextureOptionClasses} from './TextureFactory.js';
 import {ResourceFollower} from './ResourceFollower.js';
+import {SharedImageCache} from './SharedImageCache.js';
 import {
   type AnyTextureResource,
   TextureResource,
@@ -206,15 +206,6 @@ const disposedError = (what: string): Error => new Error(`TextureStore: ${what} 
 // one message for a promise whose resource was disposed directly while it waited on it
 const resourceDisposedError = (what: string, id: string): Error =>
   new Error(`TextureStore: ${what} was cancelled: the resource ${describeValue(id)} has been disposed`);
-
-const hrefOf = (url: string | URL): string => (typeof url === 'string' ? url : url.href);
-
-// one message for a load that never got as far as a parse, naming the step that failed and
-// whatever the failure can be pinned to — the url that was being fetched, the id of the item
-// that is at fault — an item without a source has no url of its own —, or the url of the catalog
-// for what belongs to it as a whole
-const loadFailedError = (source: string, what: string | URL | undefined, cause: unknown): Error =>
-  new Error(`TextureStore: load failed at the ${source} step${what != null ? `: ${describeValue(hrefOf(what))}` : ''}`, {cause});
 
 // one message for a getAsync() whose resource reported a failure that keeps a value it asks for
 // from arriving, naming the step that failed and the url it failed on, if there is one
@@ -480,48 +471,9 @@ export class TextureStore {
   // what every resource of this store picks an adapter by, while its item names none
   #pickAtlasAdapter = (json: Parameters<typeof pickAtlasAdapter>[1]): AtlasAdapter => pickAtlasAdapter(this.#atlasAdapters, json);
 
-  #images = new Map<string, {image: Promise<HTMLImageElement>; refCount: number}>();
-
-  // One fetch per url for as long as at least one resource wants it. What is shared is the
-  // image and not the texture: each resource applies its own texture classes to it and
-  // disposes the texture it built, and a shared Texture would belong to nobody.
-  //
-  // An image is given up one microtask after its last lease comes back, not at once:
-  // signalize calls the cleanup of an effect right before its next run, and that run asks
-  // for the same url straight away. A change of texture classes or of the renderer would
-  // otherwise find an empty cache and fetch again, an image that is still loading among
-  // them. And a lease knows its entry instead of looking it up by url: a failed entry has
-  // already been replaced by the time the resource that held it lets go, and a release by
-  // url would hit the successor.
-  #imageSource: TextureImageSource = {
-    acquire: (url: string): ImageLease => {
-      let entry = this.#images.get(url);
-      if (!entry) {
-        const created = {image: new ImageLoader().loadAsync(url), refCount: 0};
-        // a failed load is not kept: the next resource asking for this url gets a fresh
-        // attempt instead of the old rejection
-        created.image.catch(() => {
-          if (this.#images.get(url) === created) this.#images.delete(url);
-        });
-        this.#images.set(url, created);
-        entry = created;
-      }
-      const leased = entry;
-      leased.refCount++;
-      let released = false;
-      return {
-        image: leased.image,
-        release: () => {
-          if (released) return;
-          released = true;
-          queueMicrotask(() => {
-            leased.refCount--;
-            if (leased.refCount <= 0 && this.#images.get(url) === leased) this.#images.delete(url);
-          });
-        },
-      };
-    },
-  };
+  // the images every resource of this store fetches through: one fetch per url, shared, see
+  // SharedImageCache
+  #imageSource = new SharedImageCache();
 
   #disposed = false;
 
@@ -752,113 +704,25 @@ export class TextureStore {
 
     // the signal belongs to this call and not to the parse
     const {signal, ...parseOptions} = options ?? {};
-    if (signal?.aborted) return Promise.reject(new DOMException(`TextureStore: ${what} aborted`, 'AbortError'));
 
-    const disposal = this.#disposal.signal;
-
-    return new Promise<this>((resolve, reject) => {
-      // the fetch listens to one signal, and two sides pull it: the caller and dispose()
-      const fetchAbort = new AbortController();
-      let settled = false;
-
-      // once the attempt is over, nothing of it stays on the caller's signal or on the store
-      const settle = () => {
-        settled = true;
-        signal?.removeEventListener('abort', onAbort);
-        disposal.removeEventListener('abort', onDispose);
-        if (this.#loadUnderWay === onSuperseded) this.#loadUnderWay = undefined;
-      };
-
-      const cutShort = (error: Error) => {
-        if (settled) return;
-        settle();
-        fetchAbort.abort();
-        reject(error);
-      };
-      const onAbort = () => cutShort(new DOMException(`TextureStore: ${what} aborted`, 'AbortError'));
-      const onDispose = () => cutShort(disposedError(what));
-      // a load whose parse has begun is settled and cut short by nothing, a loadAsync() that a
-      // listener inside that parse starts included; so is a load whose step has failed, a loadAsync()
-      // that a listener of its `error` event starts included; one that is cut short reports nothing,
-      // as one whose signal aborts
-      const onSuperseded = () =>
-        cutShort(
-          new DOMException(`TextureStore: ${what} aborted: a later loadAsync() on this store took its place`, 'AbortError'),
-        );
-
-      signal?.addEventListener('abort', onAbort, {once: true});
-      disposal.addEventListener('abort', onDispose, {once: true});
-
-      this.#loadUnderWay?.();
-      this.#loadUnderWay = onSuperseded;
-
-      // A step that fails is reported twice: to whoever listens to the store, and to this caller.
-      // emitSafe(): every listener hears it, and one that throws is reported on the console by
-      // eventize instead of taking the place of the rejection this caller is owed
-      const failed = (source: 'fetch' | 'parse', error: unknown, status?: number): Error => {
-        reportError(this, status === undefined ? {source, url, error} : {source, url, status, error});
-        return loadFailedError(source, url, error);
-      };
-
-      // A step before the parse that fails ends the attempt before it is reported: a listener of the
-      // `error` event that starts another loadAsync(), aborts the signal or disposes the store finds
-      // this load over, and the promise rejects with the failure the event told of
-      const fail = (source: 'fetch' | 'parse', error: unknown, status?: number): void => {
-        settle();
-        reject(failed(source, error, status));
-      };
-
-      // An attempt that was cut short ends at the next check: what arrives after it is dropped
-      // and reports nothing. The check follows every await, because a body that is already
-      // there — a mocked `Response#json()` among them — resolves without asking the signal.
-      const attempt = async (): Promise<void> => {
-        let response: Response;
-        try {
-          response = await fetch(url, {signal: fetchAbort.signal});
-        } catch (error) {
-          if (!settled) fail('fetch', error);
-          return;
-        }
-        if (settled) return;
-        if (!response.ok) {
-          // a status is a failure of the request, not of the parsing — an error response with
-          // a JSON body would otherwise pass for a catalog
-          fail(
-            'fetch',
-            new Error(`TextureStore: fetch(${describeValue(hrefOf(url))}) answered ${response.status} ${response.statusText}`),
-            response.status,
-          );
-          return;
-        }
-        let data: TextureStoreData;
-        try {
-          data = await response.json();
-        } catch (error) {
-          if (!settled) fail('parse', error);
-          return;
-        }
-        if (settled) return;
-        // Once the parse begins, the load is done: parse() runs through in one go, and a listener
-        // inside it — of `ready`, of a resource, of `error` — that aborts the signal or disposes the
-        // store finds the data parsed. So the promise settles here, before the parse, and not a
-        // microtask after it, by when such an abort would already have rejected it
-        settle();
-        try {
-          this.parse(data, {...parseOptions, baseUrl: parseOptions.baseUrl ?? url});
-        } catch (error) {
-          reject(failed('parse', error));
-          return;
-        }
-        resolve(this);
-      };
-
-      // attempt() settles every failure it reports itself; a throw it does not foresee still rejects
-      // the promise instead of leaving it pending
-      attempt().catch((error: unknown) => {
-        if (settled) return;
-        settle();
-        reject(error);
-      });
+    return loadCatalog<this>({
+      url,
+      what,
+      signal,
+      disposal: this.#disposal.signal,
+      disposedError: () => disposedError(what),
+      supersede: (cutShort) => {
+        this.#loadUnderWay?.();
+        this.#loadUnderWay = cutShort;
+      },
+      withdraw: (cutShort) => {
+        if (this.#loadUnderWay === cutShort) this.#loadUnderWay = undefined;
+      },
+      report: (event) => reportError(this, event),
+      parse: (data) => {
+        this.parse(data, {...parseOptions, baseUrl: parseOptions.baseUrl ?? url});
+        return this;
+      },
     });
   }
 
@@ -1695,7 +1559,7 @@ export class TextureStore {
       }
     }
     this.#resources.clear();
-    this.#images.clear();
+    this.#imageSource.clear();
     this.#refusedItems.clear();
 
     this.#renderer.set(undefined);

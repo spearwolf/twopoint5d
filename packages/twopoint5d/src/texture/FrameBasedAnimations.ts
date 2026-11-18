@@ -352,6 +352,183 @@ const renderFloatsBuffer = (
   return floatsBuffer;
 };
 
+// the frames an add() picked, in the order they are played: their coords, the trim margins of
+// each, and the frames animation() hands out
+interface PickedFrames {
+  frames: TextureCoords[];
+  trims: FrameTrimMargins[];
+  atlasFrames: TextureAtlasFrame<unknown>[];
+}
+
+// the arguments of add(), one tuple per form
+type AddArguments = Parameters<FrameBasedAnimations['add']>;
+
+// only the frames of an atlas carry data to read margins from
+const untrimmed = (frames: readonly TextureCoords[]): FrameTrimMargins[] => frames.map((): FrameTrimMargins => [0, 0, 0, 0]);
+
+// the frames of a list of coords, copied; refused when one of them is no TextureCoords
+const framesOfList = (list: TextureCoords[], name: AnimName | undefined): PickedFrames => {
+  // a frame that is no TextureCoords would be taken here and fail only at the bake, without the
+  // animation or the index named
+  (list as readonly unknown[]).forEach((frame, index) => {
+    if (!(frame instanceof TextureCoords)) {
+      throw new Error(
+        `FrameBasedAnimations: add() got a frame of ${describeValue(frame)} at index ${index} for the animation ${animNameInError(name)} — a frame of a list is a TextureCoords`,
+      );
+    }
+  });
+  // the caller keeps its array and may change it later; the checks in add() and the bake see what
+  // was registered, so the animation gets a copy
+  const frames = list.slice();
+  // a list of coords names no frame of an atlas: each becomes a frame without data
+  return {frames, trims: untrimmed(frames), atlasFrames: frames.map((coords) => ({coords}))};
+};
+
+// the frames of an atlas by a list of their names, in the order of the list
+const framesOfNamedAtlasFrames = (
+  atlas: TextureAtlas<unknown>,
+  frameNames: readonly unknown[],
+  name: AnimName | undefined,
+): PickedFrames => {
+  // a list of names picks the frames in its order, a name as often as it is named: the frames
+  // of an Aseprite tag are a range of frames, not a pattern of names, and a reversed tag runs
+  // the range backwards
+  const picked = frameNames.map((frameName, index) => {
+    if (typeof frameName !== 'string') {
+      throw new Error(
+        `FrameBasedAnimations: add() got a frame name of ${describeValue(frameName)} at index ${index} for the animation ${animNameInError(name)} — a frame name is a string`,
+      );
+    }
+    const frame = atlas.frame(frameName);
+    if (frame == null) {
+      throw new Error(
+        `FrameBasedAnimations: add() got the frame name ${describeValue(frameName)} at index ${index} for the animation ${animNameInError(name)}, which the atlas does not carry`,
+      );
+    }
+    return frame;
+  });
+  return {
+    frames: picked.map(({coords}) => coords),
+    trims: picked.map(({data}) => frameTrimMargins(data)),
+    atlasFrames: picked,
+  };
+};
+
+// the frames of an atlas whose names match the query, or all of them without one, in the order a
+// numeric collation puts their names in
+const framesOfAtlasQuery = (atlas: TextureAtlas<unknown>, query: unknown, name: AnimName | undefined): PickedFrames => {
+  // a query of any other kind is refused rather than dropped: without a query the atlas hands
+  // out every frame it has
+  if (query !== undefined && typeof query !== 'string' && !(query instanceof RegExp)) {
+    throw new Error(
+      `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation ${animNameInError(name)} — a frameNameQuery is a string or a RegExp`,
+    );
+  }
+  // a string is compiled here before the atlas compiles it again, so that the error names the
+  // animation it belongs to — the one a catalog entry reports
+  if (typeof query === 'string') {
+    try {
+      new RegExp(query);
+    } catch (cause) {
+      throw new SyntaxError(
+        `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation ${animNameInError(name)} — it is no valid regular expression: ${(cause as Error).message}`,
+        {cause},
+      );
+    }
+  }
+  // from here the query is a pattern as a string, a RegExp or no query at all — both forms
+  // of a pattern reach the atlas, whose `frameNames()` takes either
+  const frameNameQuery = query;
+  // Only string names go into an animation: a frame registered under a symbol has no
+  // place in an ordered sequence, and the default comparator of Array#sort() converts
+  // every value to a string, which throws on a symbol.
+  // The collator orders "walk.2" before "walk.10"; the frames of an animation are a
+  // sequence, and a plain lexicographic order breaks it for every name that carries an
+  // unpadded number. Names it ranks equal keep the order the atlas registered them in,
+  // because Array#sort() is stable.
+  const frameNames = atlas
+    .frameNames(frameNameQuery)
+    .filter((frameName) => typeof frameName === 'string')
+    .sort(FRAME_NAME_ORDER.compare);
+  // every name here came out of `frameNames()` of this very atlas, so it is registered there
+  const picked = frameNames.map((frameName) => atlas.frame(frameName)!);
+  return {
+    frames: picked.map(({coords}) => coords),
+    trims: picked.map(({data}) => frameTrimMargins(data)),
+    atlasFrames: picked,
+  };
+};
+
+// the frames of a tile set by a list of tile ids, in the order of the list
+const framesOfTileIds = (tileSet: TileSet<unknown>, tileIds: readonly unknown[], name: AnimName | undefined): PickedFrames => {
+  // a tile id that is no whole number finds no frame, and a string is concatenated, not added
+  tileIds.forEach((tileId: unknown, index) => {
+    if (!Number.isInteger(tileId)) {
+      throw new Error(
+        `FrameBasedAnimations: add() got a tileId of ${describeValue(tileId)} at index ${index} for the animation ${animNameInError(name)} — a tileId is a whole number`,
+      );
+    }
+  });
+  const atlasFrames = tileIds.map((tileId) => tileSet.frame(tileId as number));
+  const frames = atlasFrames.map(({coords}) => coords);
+  return {frames, trims: untrimmed(frames), atlasFrames};
+};
+
+// the frames of a tile set from `firstTileId` on, `tileCount` of them; the tile set's own first
+// tile and tile count where one is not passed
+const framesOfTileRange = (
+  tileSet: TileSet<unknown>,
+  firstTileId: number | undefined,
+  tileCount: number | undefined,
+  name: AnimName | undefined,
+): PickedFrames => {
+  // only what was passed is checked: the defaults come from the tile set, which may hold
+  // more tiles than a data texture can, and an add() that is never baked is legitimate
+  if (firstTileId !== undefined && !Number.isInteger(firstTileId)) {
+    throw new Error(
+      `FrameBasedAnimations: add() got a firstTileId of ${describeValue(firstTileId)} for the animation ${animNameInError(name)} — a firstTileId is a whole number`,
+    );
+  }
+  // the upper bound keeps the loop below finite: more frames than this fit into no data
+  // texture, and the exact capacity is left to bakeDataTexture()
+  const maxTileCount = FrameBasedAnimations.MaxTextureSize;
+  if (tileCount !== undefined && (!Number.isInteger(tileCount) || tileCount < 1 || tileCount > maxTileCount)) {
+    throw new Error(
+      `FrameBasedAnimations: add() got a tileCount of ${describeValue(tileCount)} for the animation ${animNameInError(name)} — a tileCount is a whole number from 1 to ${maxTileCount}`,
+    );
+  }
+  const first = firstTileId ?? tileSet.firstId;
+  const count: number = tileCount ?? tileSet.tileCount;
+  const atlasFrames: TextureAtlasFrame<unknown>[] = [];
+  for (let tileId = first; tileId < first + count; tileId++) {
+    atlasFrames.push(tileSet.frame(tileId));
+  }
+  const frames = atlasFrames.map(({coords}) => coords);
+  return {frames, trims: untrimmed(frames), atlasFrames};
+};
+
+// the frames the arguments of add() name, by the kind of its third argument
+const pickFrames = (args: AddArguments, name: AnimName | undefined): PickedFrames => {
+  if (Array.isArray(args[2])) {
+    return framesOfList(args[2], name);
+  }
+  if (args[2] instanceof TextureAtlas && Array.isArray(args[3])) {
+    return framesOfNamedAtlasFrames(args[2], args[3], name);
+  }
+  if (args[2] instanceof TextureAtlas) {
+    return framesOfAtlasQuery(args[2], args[3], name);
+  }
+  if (args[2] instanceof TileSet) {
+    if (Array.isArray(args[3])) {
+      return framesOfTileIds(args[2], args[3], name);
+    }
+    return framesOfTileRange(args[2], args[3] as number | undefined, args[4], name);
+  }
+  throw new Error(
+    `FrameBasedAnimations: add() got a third argument of ${describeValue(args[2])} for the animation ${animNameInError(name)} — the third argument is a TextureAtlas, a TileSet or an array of frames`,
+  );
+};
+
 /**
  * Registers animations over the frames of a {@link TextureAtlas}, of a {@link TileSet} or of a list of
  * {@link TextureCoords}, and bakes them into a data texture that `AnimatedFrames` reads.
@@ -456,141 +633,13 @@ export class FrameBasedAnimations {
       );
     }
 
-    let frames: TextureCoords[];
-    let trims: FrameTrimMargins[] | undefined;
-    let atlasFrames: TextureAtlasFrame<unknown>[] | undefined;
-
-    if (Array.isArray(args[2])) {
-      const list = args[2];
-      // a frame that is no TextureCoords would be taken here and fail only at the bake, without the
-      // animation or the index named
-      (list as readonly unknown[]).forEach((frame, index) => {
-        if (!(frame instanceof TextureCoords)) {
-          throw new Error(
-            `FrameBasedAnimations: add() got a frame of ${describeValue(frame)} at index ${index} for the animation ${animNameInError(name)} — a frame of a list is a TextureCoords`,
-          );
-        }
-      });
-      // the caller keeps its array and may change it later; the checks below and the bake see what
-      // was registered, so the animation gets a copy
-      frames = list.slice();
-    } else if (args[2] instanceof TextureAtlas && Array.isArray(args[3])) {
-      // a list of names picks the frames in its order, a name as often as it is named: the frames
-      // of an Aseprite tag are a range of frames, not a pattern of names, and a reversed tag runs
-      // the range backwards
-      const atlas = args[2];
-      const picked = (args[3] as readonly unknown[]).map((frameName, index) => {
-        if (typeof frameName !== 'string') {
-          throw new Error(
-            `FrameBasedAnimations: add() got a frame name of ${describeValue(frameName)} at index ${index} for the animation ${animNameInError(name)} — a frame name is a string`,
-          );
-        }
-        const frame = atlas.frame(frameName);
-        if (frame == null) {
-          throw new Error(
-            `FrameBasedAnimations: add() got the frame name ${describeValue(frameName)} at index ${index} for the animation ${animNameInError(name)}, which the atlas does not carry`,
-          );
-        }
-        return frame;
-      });
-      frames = picked.map(({coords}) => coords);
-      trims = picked.map(({data}) => frameTrimMargins(data));
-      atlasFrames = picked;
-    } else if (args[2] instanceof TextureAtlas) {
-      const atlas = args[2];
-      const query: unknown = args[3];
-      // a query of any other kind is refused rather than dropped: without a query the atlas hands
-      // out every frame it has
-      if (query !== undefined && typeof query !== 'string' && !(query instanceof RegExp)) {
-        throw new Error(
-          `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation ${animNameInError(name)} — a frameNameQuery is a string or a RegExp`,
-        );
-      }
-      // a string is compiled here before the atlas compiles it again, so that the error names the
-      // animation it belongs to — the one a catalog entry reports
-      if (typeof query === 'string') {
-        try {
-          new RegExp(query);
-        } catch (cause) {
-          throw new SyntaxError(
-            `FrameBasedAnimations: add() got a frameNameQuery of ${describeValue(query)} for the animation ${animNameInError(name)} — it is no valid regular expression: ${(cause as Error).message}`,
-            {cause},
-          );
-        }
-      }
-      // from here the query is a pattern as a string, a RegExp or no query at all — both forms
-      // of a pattern reach the atlas, whose `frameNames()` takes either
-      const frameNameQuery = query;
-      // Only string names go into an animation: a frame registered under a symbol has no
-      // place in an ordered sequence, and the default comparator of Array#sort() converts
-      // every value to a string, which throws on a symbol.
-      // The collator orders "walk.2" before "walk.10"; the frames of an animation are a
-      // sequence, and a plain lexicographic order breaks it for every name that carries an
-      // unpadded number. Names it ranks equal keep the order the atlas registered them in,
-      // because Array#sort() is stable.
-      const frameNames = atlas
-        .frameNames(frameNameQuery)
-        .filter((frameName) => typeof frameName === 'string')
-        .sort(FRAME_NAME_ORDER.compare);
-      // every name here came out of `frameNames()` of this very atlas, so it is registered there
-      const picked = frameNames.map((frameName) => atlas.frame(frameName)!);
-      frames = picked.map(({coords}) => coords);
-      trims = picked.map(({data}) => frameTrimMargins(data));
-      atlasFrames = picked;
-    } else if (args[2] instanceof TileSet) {
-      const tileSet = args[2];
-      if (Array.isArray(args[3])) {
-        const tileIds = args[3];
-        // a tile id that is no whole number finds no frame, and a string is concatenated, not added
-        tileIds.forEach((tileId: unknown, index) => {
-          if (!Number.isInteger(tileId)) {
-            throw new Error(
-              `FrameBasedAnimations: add() got a tileId of ${describeValue(tileId)} at index ${index} for the animation ${animNameInError(name)} — a tileId is a whole number`,
-            );
-          }
-        });
-        atlasFrames = tileIds.map((tileId) => tileSet.frame(tileId));
-        frames = atlasFrames.map(({coords}) => coords);
-      } else {
-        // only what was passed is checked: the defaults come from the tile set, which may hold
-        // more tiles than a data texture can, and an add() that is never baked is legitimate
-        if (args[3] !== undefined && !Number.isInteger(args[3])) {
-          throw new Error(
-            `FrameBasedAnimations: add() got a firstTileId of ${describeValue(args[3])} for the animation ${animNameInError(name)} — a firstTileId is a whole number`,
-          );
-        }
-        // the upper bound keeps the loop below finite: more frames than this fit into no data
-        // texture, and the exact capacity is left to bakeDataTexture()
-        const maxTileCount = FrameBasedAnimations.MaxTextureSize;
-        if (args[4] !== undefined && (!Number.isInteger(args[4]) || args[4] < 1 || args[4] > maxTileCount)) {
-          throw new Error(
-            `FrameBasedAnimations: add() got a tileCount of ${describeValue(args[4])} for the animation ${animNameInError(name)} — a tileCount is a whole number from 1 to ${maxTileCount}`,
-          );
-        }
-        const firstTileId = (args[3] as number | undefined) ?? tileSet.firstId;
-        const tileCount: number = args[4] ?? tileSet.tileCount;
-        atlasFrames = [];
-        for (let tileId = firstTileId; tileId < firstTileId + tileCount; tileId++) {
-          atlasFrames.push(tileSet.frame(tileId));
-        }
-        frames = atlasFrames.map(({coords}) => coords);
-      }
-    } else {
-      throw new Error(
-        `FrameBasedAnimations: add() got a third argument of ${describeValue(args[2])} for the animation ${animNameInError(name)} — the third argument is a TextureAtlas, a TileSet or an array of frames`,
-      );
-    }
-
-    // only the frames of an atlas carry data to read margins from
-    trims ??= frames.map((): FrameTrimMargins => [0, 0, 0, 0]);
-    // a list of coords names no frame of an atlas: each becomes a frame without data
-    atlasFrames ??= frames.map((coords) => ({coords}));
+    const {frames, trims, atlasFrames} = pickFrames(args, name);
 
     const id = this.#names.length;
 
     // an animation of no frames writes a frame count of 0 into the data texture, which no shader
-    // can read a frame out of. The guard sits behind the branches, because all four of them can
-    // arrive here empty
+    // can read a frame out of. The guard sits behind pickFrames(), because a list, an atlas and a
+    // tile set can each arrive here empty
     if (frames.length === 0) {
       throw new Error(
         `FrameBasedAnimations: add() got no frames for the animation ${animNameInError(name)} — an atlas query without a match, an empty tile range or an empty frame list registers nothing`,
