@@ -376,34 +376,53 @@ export class DirectorShapeCache {
   }
 
   /**
-   * One shape of `precompile()`: binds the cache to `renderer`, then pins the shape of `kinds` —
-   * waiting for a compile another call runs for it —, or builds, pins and compiles it. `nestedTarget`
-   * answers the pass target of a parent to compile for, called only for a shape that is built here.
-   * Answers whether the call goes on: `false` once a compile failed after `stopped()` turned true.
+   * One shape of `precompile()`: binds the cache to `renderer` and pins the shape of `kinds`. A shape
+   * that is compiled already answers `true` at once, so that the director pins the next one in the
+   * same task, before a draw can let go of it. Otherwise the answer is a promise: it waits for a
+   * compile another call runs for the shape, or builds, pins and compiles it. `nestedTarget` answers
+   * the pass target of a parent to compile for, called only for a shape that is built here.
+   * The promise answers whether the call goes on: `false` once a compile failed after `stopped()`
+   * turned true.
    */
-  async precompile(
+  precompile(
     renderer: WebGPURenderer,
     kinds: readonly ShapeKind[],
     nestedTarget: () => RenderTarget | undefined,
     errors: unknown[],
     stopped: () => boolean,
-  ): Promise<boolean> {
+  ): true | Promise<boolean> {
     this.bindTo(renderer, errors);
     const key = shapeKey(kinds);
     const cached = this.#shapes.get(key);
     if (cached) {
       cached.pinned = true;
-      if (cached.compiling !== undefined) {
-        // the compile another call runs: its outcome is this call's, a failure included
-        try {
-          await cached.compiling;
-        } catch (error) {
-          if (stopped()) return false;
-          throw error;
-        }
-      }
-      return true;
+      if (cached.compiling === undefined) return true;
+      return this.#joinCompile(cached.compiling, stopped);
     }
+    return this.#buildAndCompile(renderer, kinds, key, nestedTarget, errors, stopped);
+  }
+
+  /** Waits for the compile of a shape that another `precompile()` runs. */
+  async #joinCompile(compiling: Promise<void>, stopped: () => boolean): Promise<boolean> {
+    // the compile another call runs: its outcome is this call's, a failure included
+    try {
+      await compiling;
+    } catch (error) {
+      if (stopped()) return false;
+      throw error;
+    }
+    return true;
+  }
+
+  /** Builds the shape of `kinds`, pins it under `key` and compiles it. */
+  async #buildAndCompile(
+    renderer: WebGPURenderer,
+    kinds: readonly ShapeKind[],
+    key: string,
+    nestedTarget: () => RenderTarget | undefined,
+    errors: unknown[],
+    stopped: () => boolean,
+  ): Promise<boolean> {
     const entry: CachedShape = {shape: this.#buildShape(renderer, kinds), pinned: true};
     this.#shapes.set(key, entry);
     const compiling = this.#compileShape(renderer, entry.shape, nestedTarget());

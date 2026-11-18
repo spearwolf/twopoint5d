@@ -120,6 +120,24 @@ describe('StageDirector shapes', () => {
     expect(pinned.build).toHaveBeenCalledTimes(1);
   });
 
+  it('precompile() pins every shape it holds within the call, so that draws right after it let go of none of them', async () => {
+    // 15 shapes of a transition and the one of the layer: 16 the director drew itself, none let go of yet
+    const effects = Array.from({length: 15}, (_, i) => spiedEffect(`effect ${i}`));
+    director.setStack([a]);
+    for (const effect of effects) drawThrough(effect);
+    renderer.compileAsync.mockClear();
+
+    // not awaited: the two draws below run before any microtask of the call
+    const done = director.precompile(renderer as any, [[effects[1]!], [effects[0]!]]);
+    drawThrough(spiedEffect('x'));
+    drawThrough(spiedEffect('y'));
+    await done;
+
+    expect(effects[0]!.dispose).not.toHaveBeenCalled();
+    expect(effects[0]!.build).toHaveBeenCalledTimes(1);
+    expect(renderer.compileAsync).not.toHaveBeenCalled();
+  });
+
   it('builds its shapes again for another renderer and lets go of those of the first', () => {
     const second = createRendererMock();
     const cleared: unknown[] = [];

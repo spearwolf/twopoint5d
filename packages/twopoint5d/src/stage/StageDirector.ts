@@ -1112,14 +1112,17 @@ export class StageDirector extends StageRenderer {
       }
       for (const kinds of parsed) {
         if (this.isDisposed) break;
-        const goOn = await this.#shapeCache.precompile(
+        const answer = this.#shapeCache.precompile(
           renderer,
           kinds,
           () => (asLayer ? (this.outputRenderTarget ?? target()) : undefined),
           errors,
           () => this.isDisposed,
         );
-        if (!goOn) break;
+        // a shape compiled before is pinned now, and the next one in the same task: an await here
+        // would leave room for a draw to let go of a shape the call has not pinned yet
+        if (answer === true) continue;
+        if (!(await answer)) break;
       }
     } catch (error) {
       // the error of the build or the compile stays the first of what is thrown, and the effects
