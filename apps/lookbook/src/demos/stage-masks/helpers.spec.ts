@@ -1,7 +1,7 @@
 import {TextureCoords} from '@spearwolf/twopoint5d';
-import {BufferAttribute, PlaneGeometry} from 'three/webgpu';
+import {BufferAttribute, Group, Mesh, MeshBasicMaterial, PlaneGeometry} from 'three/webgpu';
 import {describe, expect, it} from 'vitest';
-import {setPlaneUvToFrame, smoothstepCpu} from './helpers';
+import {MeshBundle, setPlaneUvToFrame, smoothstepCpu} from './helpers';
 
 const texture = new TextureCoords(0, 0, 256, 256);
 const frameA = new TextureCoords(texture, 0, 0, 64, 32);
@@ -54,5 +54,53 @@ describe('smoothstepCpu', () => {
     expect(smoothstepCpu(2, 4, 3)).toBe(0.5);
     expect(smoothstepCpu(2, 4, 4)).toBe(1);
     expect(smoothstepCpu(2, 4, 9)).toBe(1);
+  });
+});
+
+describe('MeshBundle', () => {
+  /** a mesh that counts the dispose events of its geometry and its material */
+  function countedMesh() {
+    const mesh = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial());
+    const disposed = {geometry: 0, material: 0};
+    mesh.geometry.addEventListener('dispose', () => disposed.geometry++);
+    mesh.material.addEventListener('dispose', () => disposed.material++);
+    return {mesh, disposed};
+  }
+
+  it('adds a mesh to its parent under its name, at x and y on the plane, in its render order', () => {
+    const parent = new Group();
+    const {mesh} = countedMesh();
+
+    expect(new MeshBundle(parent).add(mesh, 'moth', 3, -4, 2)).toBe(mesh);
+
+    expect(parent.children).toContain(mesh);
+    expect(mesh.name).toBe('moth');
+    expect(mesh.position.toArray()).toEqual([3, -4, 0]);
+    expect(mesh.renderOrder).toBe(2);
+  });
+
+  it('puts a mesh at the origin in render order 0 when no place is given', () => {
+    const {mesh} = countedMesh();
+    mesh.position.set(5, 6, 7);
+    mesh.renderOrder = 9;
+
+    new MeshBundle(new Group()).add(mesh, 'void');
+
+    expect(mesh.position.toArray()).toEqual([0, 0, 0]);
+    expect(mesh.renderOrder).toBe(0);
+  });
+
+  it('disposes the geometry and the material of every mesh it added, once', () => {
+    const bundle = new MeshBundle(new Group());
+    const first = countedMesh();
+    const second = countedMesh();
+    bundle.add(first.mesh, 'first');
+    bundle.add(second.mesh, 'second');
+
+    bundle.dispose();
+    bundle.dispose();
+
+    expect(first.disposed).toEqual({geometry: 1, material: 1});
+    expect(second.disposed).toEqual({geometry: 1, material: 1});
   });
 });

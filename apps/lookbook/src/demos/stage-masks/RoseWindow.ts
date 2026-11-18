@@ -1,6 +1,8 @@
 import {abs, attribute, float, step, texture, uv, vec4} from 'three/tsl';
 import {BufferAttribute, BufferGeometry, Mesh, MeshBasicNodeMaterial} from 'three/webgpu';
-import {type ChapelAssets, makeChapelStage, type PaneInfo, type SeanceClock} from './MothChapel';
+import type {ChapelAssets, PaneInfo} from './chapelAssets.js';
+import {makeChapelStage} from './MothChapel.js';
+import type {SeanceClock} from './SeanceClock.js';
 
 /** What a pane does: rests in its lead, flies out to a place of its own and floats there, or comes back. */
 interface Pane {

@@ -26,13 +26,14 @@ export default defineConfig({
         'src/demos/utils/seededRandom.ts',
         'src/demos/stage-masks/CrawlRig.ts',
         'src/demos/stage-masks/helpers.ts',
+        'src/demos/stage-masks/SeanceClock.ts',
         'src/demos/stage-masks/TransitionCycler.ts',
       ],
       reporter: ['text-summary'],
       // two points under the level measured when they were set — the measured percentage rounded
       // down, minus two —, as in packages/twopoint5d/vite.config.ts: a regression turns the gate
       // red, a line that moves does not
-      thresholds: {statements: 69, branches: 60, functions: 73, lines: 70},
+      thresholds: {statements: 75, branches: 66, functions: 74, lines: 76},
     },
   },
 });

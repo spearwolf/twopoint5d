@@ -1,12 +1,5 @@
 import {on} from '@spearwolf/eventize';
-import {
-  OnStageUpdateFrame,
-  OrthographicProjection,
-  Stage2D,
-  type TextureAtlas,
-  TextureStore,
-  type TextureStoreData,
-} from '@spearwolf/twopoint5d';
+import {OnStageUpdateFrame, OrthographicProjection, Stage2D} from '@spearwolf/twopoint5d';
 import {
   abs,
   asin,
@@ -38,25 +31,11 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import {
-  AdditiveBlending,
-  Mesh,
-  MeshBasicNodeMaterial,
-  type Node,
-  PlaneGeometry,
-  type Texture,
-  type UniformNode,
-  Vector3,
-  type WebGPURenderer,
-} from 'three/webgpu';
-import assetsUrl from '~demos/utils/assetsUrl';
+import {AdditiveBlending, Mesh, MeshBasicNodeMaterial, type Node, PlaneGeometry, type UniformNode, Vector3} from 'three/webgpu';
 import {atlasFrame} from '~demos/utils/atlasFrame';
-import {jsonList, jsonNumber, jsonObject, jsonOneOf, jsonRecord, jsonString, jsonTuple} from '~demos/utils/checkJson';
-import {fetchJson} from '~demos/utils/fetchAsset';
-import {SeededRandom} from '~demos/utils/seededRandom';
-import {smoothstepCpu} from './helpers';
-
-const DIR = 'stage-masks/frozen';
+import type {ChapelAssets, HeadJson} from './chapelAssets.js';
+import {frameSample, MeshBundle} from './helpers.js';
+import type {SeanceClock} from './SeanceClock.js';
 
 /** Every stage of the demo shows at least this square of units, the rose in the middle. */
 export const VIEW = 860;
@@ -76,335 +55,16 @@ type PlaneMesh = Mesh<PlaneGeometry, MeshBasicNodeMaterial>;
 const uprightUv = (): Vec2Node => vec2(uv().x, float(1).sub(uv().y));
 
 // ---------------------------------------------------------------------------------------------
-// the assets
-// ---------------------------------------------------------------------------------------------
-
-export interface PaneInfo {
-  id: number;
-  ring: 'eye' | 'petal' | 'lancet';
-  sector: number;
-  part: string;
-  kind: string;
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-  cx: number;
-  cy: number;
-  area: number;
-}
-
-interface RoseWindowJson {
-  texelsPerUnit: number;
-  extent: number;
-  stoneRadius: number;
-  panes: PaneInfo[];
-}
-
-export interface HeadJson {
-  name: string;
-  x: number;
-  y: number;
-  r: number;
-  face: string;
-  yaw: number;
-  pitch: number;
-}
-
-export interface RoomJson {
-  extent: number;
-  board: {x: number; y: number; w: number; h: number; marks: Record<string, [number, number]>};
-  lens: {x: number; y: number};
-  candles: {x: number; y: number; size: number}[];
-  stands: {x: number; y: number; size: number}[];
-  heads: HeadJson[];
-  lights: {x: number; y: number; z: number; power: number}[];
-}
-
-const checkPaneInfo = jsonObject<PaneInfo>({
-  id: jsonNumber,
-  ring: jsonOneOf('eye', 'petal', 'lancet'),
-  sector: jsonNumber,
-  part: jsonString,
-  kind: jsonString,
-  x0: jsonNumber,
-  y0: jsonNumber,
-  x1: jsonNumber,
-  y1: jsonNumber,
-  cx: jsonNumber,
-  cy: jsonNumber,
-  area: jsonNumber,
-});
-const checkRoseWindowJson = jsonObject<RoseWindowJson>({
-  texelsPerUnit: jsonNumber,
-  extent: jsonNumber,
-  stoneRadius: jsonNumber,
-  panes: jsonList(checkPaneInfo),
-});
-const checkPoint = jsonObject({x: jsonNumber, y: jsonNumber});
-const checkSizedPoint = jsonObject({x: jsonNumber, y: jsonNumber, size: jsonNumber});
-const checkHeadJson = jsonObject<HeadJson>({
-  name: jsonString,
-  x: jsonNumber,
-  y: jsonNumber,
-  r: jsonNumber,
-  face: jsonString,
-  yaw: jsonNumber,
-  pitch: jsonNumber,
-});
-const checkRoomJson = jsonObject<RoomJson>({
-  extent: jsonNumber,
-  board: jsonObject({
-    x: jsonNumber,
-    y: jsonNumber,
-    w: jsonNumber,
-    h: jsonNumber,
-    marks: jsonRecord(jsonTuple(jsonNumber, jsonNumber)),
-  }),
-  lens: checkPoint,
-  candles: jsonList(checkSizedPoint),
-  stands: jsonList(checkSizedPoint),
-  heads: jsonList(checkHeadJson),
-  lights: jsonList(jsonObject({x: jsonNumber, y: jsonNumber, z: jsonNumber, power: jsonNumber})),
-});
-
-/** How the face maps lie in the atlas: what `assets-src/stage-masks/frozen/` writes beside the frames of `sprites.json`. */
-interface FaceMap {
-  width: number;
-  height: number;
-  wrap: number;
-}
-
-export interface ChapelAssets {
-  /** holds the textures; dispose it with the demo */
-  store: TextureStore;
-  glass: Texture;
-  panes: Texture;
-  frame: Texture;
-  room: Texture;
-  sprites: Texture;
-  rose: RoseWindowJson;
-  layout: RoomJson;
-  atlas: TextureAtlas;
-  faceMap: FaceMap;
-}
-
-// every image of the demo is read upright, t from the top, as the library reads its atlases: the
-// seed of the texture factory has flipY false, so the catalog names no default classes. Without a
-// colour class an image keeps the NoColorSpace of a new texture: the glass and the ids of the panes
-// are data, not colours
-const catalog: TextureStoreData = {
-  items: {
-    glass: {imageUrl: 'glass.webp', texture: ['anisotropy']},
-    // the ids of the panes are numbers, not colours: never blended, and without an anisotropy
-    // class the texture has none. With both filters NearestFilter three reads level 0 alone, so
-    // mip levels of the ids would only take memory
-    panes: {imageUrl: 'panes.png', texture: ['nearest', 'no-mipmaps']},
-    frame: {imageUrl: 'frame.webp', texture: ['srgb', 'anisotropy']},
-    room: {imageUrl: 'room.webp', texture: ['srgb', 'anisotropy']},
-    sprites: {atlasUrl: 'sprites.json', texture: ['srgb', 'anisotropy']},
-  },
-};
-
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-
-/** The `faceMap` of the json of the atlas, refused unless it carries a width, a height and a wrap. */
-function readFaceMap(json: unknown): FaceMap {
-  if (typeof json === 'object' && json !== null && 'faceMap' in json) {
-    const {faceMap} = json;
-    if (typeof faceMap === 'object' && faceMap !== null && 'width' in faceMap && 'height' in faceMap && 'wrap' in faceMap) {
-      const {width, height, wrap} = faceMap;
-      if (isFiniteNumber(width) && isFiniteNumber(height) && isFiniteNumber(wrap)) return {width, height, wrap};
-    }
-  }
-  throw new Error('MothChapel: sprites.json carries no faceMap with a width, a height and a wrap');
-}
-
-/**
- * Loads the generated art of the demo (`assets-src/stage-masks/frozen/`). The store of the answer
- * holds the textures; a load that fails disposes the store it built.
- */
-export async function loadChapelAssets(renderer: WebGPURenderer): Promise<ChapelAssets> {
-  const store = new TextureStore(renderer);
-  try {
-    store.parse(catalog, {baseUrl: assetsUrl(`${DIR}/`)});
-    const [glass, panes, frame, room, [atlas, sprites], rose, layout] = await Promise.all([
-      store.getAsync('glass', 'texture'),
-      store.getAsync('panes', 'texture'),
-      store.getAsync('frame', 'texture'),
-      store.getAsync('room', 'texture'),
-      store.getAsync('sprites', ['atlas', 'texture']),
-      fetchJson('MothChapel', assetsUrl(`${DIR}/window.json`), checkRoseWindowJson),
-      fetchJson('MothChapel', assetsUrl(`${DIR}/room.json`), checkRoomJson),
-    ]);
-    // the face maps lie beside the frames in the json of the atlas
-    const resource = await store.whenResource('sprites');
-    const faceMap = readFaceMap('atlasJson' in resource ? resource.atlasJson : undefined);
-    return {store, glass, panes, frame, room, sprites, rose, layout, atlas, faceMap};
-  } catch (error) {
-    store.dispose();
-    throw error;
-  }
-}
-
-// ---------------------------------------------------------------------------------------------
-// the clock of the séance
-// ---------------------------------------------------------------------------------------------
-
-/** One round of the séance, in seconds. */
-const ROUND = 46;
-/** What the planchette spells, letter by letter, and when. */
-const SPELL = ['I', 'S', 'E', 'E', 'Y', 'O', 'U'];
-const SPELL_START = 2;
-const SPELL_STEP = 1.9;
-const SPELL_END = SPELL_START + SPELL.length * SPELL_STEP;
-/** when each head starts to turn to the window, how long it takes, when it turns back */
-const TURNS = [
-  {start: 17.2, take: 6.5},
-  {start: 15.6, take: 5},
-  {start: 16.4, take: 5.5},
-  {start: 15, take: 9},
-];
-const TURN_BACK = 37;
-
-const ease = (t: number) => smoothstepCpu(0, 1, t);
-
-/**
- * The clock of the séance, shared by every stage: the time, the flicker of each candle, how far
- * each head has turned to the window, where the planchette is, and how strong the ectoplasm is.
- * {@link update} once per frame, before anything reads it.
- */
-export class SeanceClock {
-  readonly time = uniform(0);
-  /** 0 … 1 per candle and stand, a flicker that every stage reads alike */
-  readonly flicker: UniformNode<'float', number>[] = [];
-  /** the mean of the flickers */
-  readonly glow = uniform(1);
-  /** 0 … 1, how much ectoplasm rises from the board */
-  readonly ecto = uniform(0);
-  /** 0 … 1 per head, how far it has turned to the window */
-  readonly turn = TURNS.map(() => 0);
-  /** the planchette, in room units, and its turn */
-  planchetteX = 0;
-  planchetteY = 0;
-  planchetteRot = 0;
-  /** the seconds into the round */
-  round = 0;
-
-  /** the mark of each letter of `SPELL`, in its order */
-  readonly #spell: readonly (readonly [number, number])[];
-  readonly #bye: readonly [number, number];
-  readonly #rest: [number, number];
-  readonly #lens: {x: number; y: number};
-  readonly #random = new SeededRandom(17);
-
-  constructor(layout: RoomJson) {
-    if (layout.heads.length !== TURNS.length) {
-      throw new Error(`new SeanceClock(): room.json has ${layout.heads.length} heads, and the séance turns ${TURNS.length}`);
-    }
-    const markOf = (name: string): readonly [number, number] => {
-      const mark = layout.board.marks[name];
-      if (!mark) throw new Error(`new SeanceClock(): the board of room.json has no mark ${JSON.stringify(name)}`);
-      return mark;
-    };
-    this.#spell = SPELL.map(markOf);
-    this.#bye = markOf('GOOD BYE');
-    // one flicker per lamp, the candles first and then the stands: the order SeanceRoom lights them in
-    const lamps = layout.candles.length + layout.stands.length;
-    for (let i = 0; i < lamps; i++) this.flicker.push(uniform(1));
-    this.#rest = [layout.board.x, layout.board.y - 4];
-    this.#lens = layout.lens;
-    // the room starts as the planchette reaches its last letters: something happens at once
-    this.round = 12;
-    this.time.value = 12;
-  }
-
-  random(): number {
-    return this.#random.next();
-  }
-
-  update(dt: number): void {
-    const t = (this.time.value += dt);
-    this.round = (this.round + dt) % ROUND;
-    const r = this.round;
-
-    // the candles gutter while the heads stare
-    const gutter = r > 31 && r < 35.5 ? Math.sin(((r - 31) / 4.5) * Math.PI) : 0;
-    let sum = 0;
-    for (let i = 0; i < this.flicker.length; i++) {
-      const k = i * 1.7;
-      const f =
-        0.86 +
-        0.07 * Math.sin(t * 9.1 + k) +
-        0.05 * Math.sin(t * 23.3 + k * 2.3) +
-        0.04 * Math.sin(t * 4.1 + k * 0.7) -
-        gutter * (0.35 + 0.15 * Math.sin(t * 31 + k));
-      this.flicker[i]!.value = f;
-      sum += f;
-    }
-    this.glow.value = sum / Math.max(1, this.flicker.length);
-
-    for (let i = 0; i < TURNS.length; i++) {
-      const turn = TURNS[i]!;
-      const toWindow = ease((r - turn.start) / turn.take);
-      const back = ease((r - TURN_BACK - i * 0.4) / 2.6);
-      this.turn[i] = toWindow * (1 - back);
-    }
-
-    this.ecto.value = ease((r - SPELL_END + 2) / 8) * (1 - ease((r - 33) / 6));
-
-    this.#movePlanchette(r, t);
-  }
-
-  #movePlanchette(r: number, t: number): void {
-    let x: number;
-    let y: number;
-    if (r < SPELL_START || r >= TURN_BACK + 4) {
-      x = this.#rest[0];
-      y = this.#rest[1];
-    } else if (r < SPELL_END) {
-      const step = Math.floor((r - SPELL_START) / SPELL_STEP);
-      const f = (r - SPELL_START) / SPELL_STEP - step;
-      const from = step === 0 ? this.#rest : this.#spell[step - 1]!;
-      const to = this.#spell[step]!;
-      // it glides in the first part of the step and rests on its letter in the second
-      const k = ease(f / 0.55);
-      // the second E: the planchette circles off its letter and back
-      const loop = step > 0 && SPELL[step] === SPELL[step - 1] ? Math.sin(k * Math.PI) * 9 : 0;
-      x = from[0] + (to[0] - from[0]) * k + loop * 0.6;
-      y = from[1] + (to[1] - from[1]) * k + loop;
-    } else if (r < TURN_BACK) {
-      // it stays on the last letter while they look at you
-      const last = this.#spell[SPELL.length - 1]!;
-      x = last[0];
-      y = last[1];
-    } else {
-      const k = ease((r - TURN_BACK) / 3);
-      const from = this.#spell[SPELL.length - 1]!;
-      const bye = this.#bye;
-      const to = k < 0.5 ? bye : this.#rest;
-      const kk = k < 0.5 ? k * 2 : (k - 0.5) * 2;
-      const start = k < 0.5 ? from : bye;
-      x = start[0] + (to[0] - start[0]) * ease(kk);
-      y = start[1] + (to[1] - start[1]) * ease(kk);
-    }
-    // the sprite's middle, with its lens over the mark, and a tremor nobody's fingers make
-    this.planchetteX = x - this.#lens.x + Math.sin(t * 7.3) * 0.25;
-    this.planchetteY = y - this.#lens.y + Math.sin(t * 5.9) * 0.25;
-    this.planchetteRot = Math.sin(t * 0.7) * 0.06 + (x - this.#rest[0]) * -0.0018;
-  }
-}
-
-// ---------------------------------------------------------------------------------------------
 // the stages
 // ---------------------------------------------------------------------------------------------
 
 /** The bottom layer: the dark where no glass is — a cold violet void with a fog that drifts. */
 export class ChapelVoid {
   readonly stage = makeChapelStage('void');
-  readonly #plane: PlaneMesh;
+  readonly #meshes: MeshBundle;
 
   constructor(clock: SeanceClock) {
+    this.#meshes = new MeshBundle(this.stage.scene);
     const p = positionWorld.xy;
     const t = clock.time;
     const fog = mx_noise_float(vec3(p.mul(0.006), t.mul(0.05)))
@@ -415,14 +75,11 @@ export class ChapelVoid {
     const mist = vec3(0.0045, 0.0035, 0.0075);
     const material = new MeshBasicNodeMaterial({depthTest: false, depthWrite: false});
     material.colorNode = vec4(mix(deep, mist, saturate(fog).mul(fog)), 1);
-    this.#plane = new Mesh(new PlaneGeometry(8000, 8000), material);
-    this.#plane.name = 'void';
-    this.stage.scene.add(this.#plane);
+    this.#meshes.add(new Mesh(new PlaneGeometry(8000, 8000), material), 'void');
   }
 
   dispose(): void {
-    this.#plane.geometry.dispose();
-    this.#plane.material.dispose();
+    this.#meshes.dispose();
     this.stage.dispose();
   }
 }
@@ -528,19 +185,12 @@ class Head {
     const material = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
     material.colorNode = vec4(lit, edge.mul(neck));
     this.mesh = new Mesh(new PlaneGeometry(spec.r * 2 * HEAD_ASPECT, spec.r * 2), material);
-    this.mesh.name = `head ${spec.name}`;
-    this.mesh.position.set(spec.x, spec.y, 0);
   }
 
   /** 0 at rest, 1 looking at the window */
   set(turn: number): void {
     this.yaw.value = this.#rest.yaw + (this.#look.yaw - this.#rest.yaw) * turn;
     this.pitch.value = this.#rest.pitch + (this.#look.pitch - this.#rest.pitch) * turn;
-  }
-
-  dispose(): void {
-    this.mesh.geometry.dispose();
-    this.mesh.material.dispose();
   }
 }
 
@@ -552,11 +202,12 @@ class Head {
 export class SeanceRoom {
   readonly stage = makeChapelStage('seance');
   readonly #clock: SeanceClock;
-  readonly #meshes: PlaneMesh[] = [];
+  readonly #meshes: MeshBundle;
   readonly #heads: Head[] = [];
   readonly #planchette: PlaneMesh;
 
   constructor(assets: ChapelAssets, clock: SeanceClock) {
+    this.#meshes = new MeshBundle(this.stage.scene);
     this.#clock = clock;
     const {layout} = assets;
     const e = layout.extent;
@@ -573,7 +224,7 @@ export class SeanceRoom {
     const roomMaterial = new MeshBasicNodeMaterial({depthTest: false, depthWrite: false});
     const room = texture(assets.room, uprightUv());
     roomMaterial.colorNode = vec4(room.rgb.mul(clock.glow.mul(0.36).add(1.7).add(flick.mul(3.2))), 1);
-    this.#add(new Mesh(new PlaneGeometry(e * 2, e * 2), roomMaterial), 'room', 0, 0, 0);
+    this.#meshes.add(new Mesh(new PlaneGeometry(e * 2, e * 2), roomMaterial), 'room', 0, 0, 0);
 
     // the glow of every flame over the room, then the flames
     lamps.forEach((lamp, i) => {
@@ -583,22 +234,22 @@ export class SeanceRoom {
         new PlaneGeometry(r * 2, r * 2),
         glowMaterial(vec3(1, 0.55, 0.22), clock.flicker[i]!.mul(table ? 0.32 : 0.22)),
       );
-      this.#add(glow, 'glow', lamp.x, lamp.y + 4, 1);
+      this.#meshes.add(glow, 'glow', lamp.x, lamp.y + 4, 1);
       const w = lamp.size * 1.6;
       const h = lamp.size * 4.4;
       const flame = new Mesh(new PlaneGeometry(w, h), flameMaterial(clock, clock.flicker[i]!, i * 3.7));
       flame.geometry.translate(0, h / 2 - h * 0.06, 0);
-      this.#add(flame, 'flame', lamp.x, lamp.y, 2);
+      this.#meshes.add(flame, 'flame', lamp.x, lamp.y, 2);
     });
 
     // the planchette
     const f = atlasFrame(assets.atlas, 'MothChapel', 'planchette').coords;
     const plMaterial = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
-    const pl = texture(assets.sprites, vec2(float(f.s).add(uv().x.mul(f.u)), float(f.t).add(float(1).sub(uv().y).mul(f.v))));
+    const pl = frameSample(assets.sprites, f);
     // lit by the candles round the board, and by the ectoplasm above it
     plMaterial.colorNode = vec4(pl.rgb.mul(clock.glow.mul(0.6).add(0.55).add(clock.ecto.mul(0.25))), pl.a);
     this.#planchette = new Mesh(new PlaneGeometry(f.width / 2, f.height / 2), plMaterial);
-    this.#add(this.#planchette, 'planchette', clock.planchetteX, clock.planchetteY, 3);
+    this.#meshes.add(this.#planchette, 'planchette', clock.planchetteX, clock.planchetteY, 3);
 
     // the heads, lit from the middle of the candles on the table
     const centre = new Vector3();
@@ -608,13 +259,12 @@ export class SeanceRoom {
       const light = new Vector3(centre.x - spec.x, centre.y - spec.y, spec.name === 'nephew' ? 40 : 90).normalize();
       const head = new Head(spec, assets, clock, light);
       this.#heads.push(head);
-      head.mesh.renderOrder = 4;
-      this.stage.scene.add(head.mesh);
+      this.#meshes.add(head.mesh, `head ${spec.name}`, spec.x, spec.y, 4);
     }
 
     // ectoplasm: pale threads rising from under the planchette towards the medium
     const ecto = new Mesh(new PlaneGeometry(240, 300), this.#ectoplasm(clock));
-    this.#add(ecto, 'ectoplasm', layout.board.x, layout.board.y + 150 - 20, 5);
+    this.#meshes.add(ecto, 'ectoplasm', layout.board.x, layout.board.y + 150 - 20, 5);
 
     on(this.stage, OnStageUpdateFrame, () => this.#update());
     this.#update();
@@ -648,14 +298,6 @@ export class SeanceRoom {
     return material;
   }
 
-  #add(mesh: PlaneMesh, name: string, x: number, y: number, order: number): void {
-    mesh.name = name;
-    mesh.position.set(x, y, 0);
-    mesh.renderOrder = order;
-    this.#meshes.push(mesh);
-    this.stage.scene.add(mesh);
-  }
-
   #update(): void {
     const clock = this.#clock;
     this.#planchette.position.set(clock.planchetteX, clock.planchetteY, 0);
@@ -665,11 +307,7 @@ export class SeanceRoom {
   }
 
   dispose(): void {
-    for (const mesh of this.#meshes) {
-      mesh.geometry.dispose();
-      mesh.material.dispose();
-    }
-    for (const head of this.#heads) head.dispose();
+    this.#meshes.dispose();
     this.stage.dispose();
   }
 }
@@ -680,10 +318,11 @@ export class SeanceRoom {
  */
 export class GlassTint {
   readonly stage: Stage2D;
-  readonly #plane: PlaneMesh;
+  readonly #meshes: MeshBundle;
 
   constructor(name: string, colour: [number, number, number], strength: number, seed: number) {
     this.stage = makeChapelStage(name);
+    this.#meshes = new MeshBundle(this.stage.scene);
     const p = positionWorld.xy;
     const mottle = mx_noise_float(vec3(p.mul(0.021), seed))
       .mul(0.5)
@@ -691,14 +330,11 @@ export class GlassTint {
       .add(0.5);
     const material = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
     material.colorNode = vec4(vec3(...colour).mul(mottle.mul(0.3).add(0.85)), saturate(mottle.mul(0.35).add(0.75)).mul(strength));
-    this.#plane = new Mesh(new PlaneGeometry(8000, 8000), material);
-    this.#plane.name = name;
-    this.stage.scene.add(this.#plane);
+    this.#meshes.add(new Mesh(new PlaneGeometry(8000, 8000), material), name);
   }
 
   dispose(): void {
-    this.#plane.geometry.dispose();
-    this.#plane.material.dispose();
+    this.#meshes.dispose();
     this.stage.dispose();
   }
 }
@@ -738,10 +374,11 @@ interface Moth {
 export class ChapelWall {
   readonly stage = makeChapelStage('wall');
   readonly #clock: SeanceClock;
-  readonly #meshes: PlaneMesh[] = [];
+  readonly #meshes: MeshBundle;
   readonly #moths: Moth[] = [];
 
   constructor(assets: ChapelAssets, clock: SeanceClock) {
+    this.#meshes = new MeshBundle(this.stage.scene);
     this.#clock = clock;
     const stoneR = assets.rose.stoneRadius;
     const p = positionWorld.xy;
@@ -780,7 +417,7 @@ export class ChapelWall {
     const wallColour = mix(stone, vec3(0.004, 0.0038, 0.004), mortar).add(vec3(1, 0.55, 0.22).mul(spill));
     const wallMaterial = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
     wallMaterial.colorNode = vec4(wallColour, smoothstep(stoneR - 2.5, stoneR - 0.5, r));
-    this.#add(new Mesh(new PlaneGeometry(8000, 8000), wallMaterial), 'ashlar', 0, 0, 0);
+    this.#meshes.add(new Mesh(new PlaneGeometry(8000, 8000), wallMaterial), 'ashlar', 0, 0, 0);
 
     // the rose's stone and lead, warmed near the glass as the candles flicker
     const extent = 400;
@@ -791,14 +428,14 @@ export class ChapelWall {
       .mul(1.4);
     const frameMaterial = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
     frameMaterial.colorNode = vec4(frame.rgb.mul(vec3(1, 0.82, 0.62).mul(warm).add(1)), frame.a);
-    this.#add(new Mesh(new PlaneGeometry(extent * 2, extent * 2), frameMaterial), 'rose stone', 0, 0, 1);
+    this.#meshes.add(new Mesh(new PlaneGeometry(extent * 2, extent * 2), frameMaterial), 'rose stone', 0, 0, 1);
 
     // moths
     for (let i = 0; i < MOTHS; i++) {
       const f = atlasFrame(assets.atlas, 'MothChapel', i % 3 === 0 ? 'moth-dusk' : 'moth-pale').coords;
       const tint = uniform(new Vector3(1, 1, 1));
       const material = new MeshBasicNodeMaterial({transparent: true, depthTest: false, depthWrite: false});
-      const m = texture(assets.sprites, vec2(float(f.s).add(uv().x.mul(f.u)), float(f.t).add(float(1).sub(uv().y).mul(f.v))));
+      const m = frameSample(assets.sprites, f);
       material.colorNode = vec4(m.rgb.mul(tint), m.a);
       const size = 0.42 + clock.random() * 0.18;
       const mesh = new Mesh(new PlaneGeometry(f.width * size, f.height * size), material);
@@ -817,21 +454,13 @@ export class ChapelWall {
         flight: 0,
       };
       this.#moths.push(moth);
-      this.#add(mesh, 'moth', moth.cx, moth.cy, 2);
+      this.#meshes.add(mesh, 'moth', moth.cx, moth.cy, 2);
     }
     // drawn after every moth is placed: the flights take no draw from the layout
     for (const moth of this.#moths) moth.flight = flightOf(clock);
 
     on(this.stage, OnStageUpdateFrame, ({deltaTime}) => this.#update(deltaTime));
     this.#update(0);
-  }
-
-  #add(mesh: PlaneMesh, name: string, x: number, y: number, order: number): void {
-    mesh.name = name;
-    mesh.position.set(x, y, 0);
-    mesh.renderOrder = order;
-    this.#meshes.push(mesh);
-    this.stage.scene.add(mesh);
   }
 
   #update(dt: number): void {
@@ -869,10 +498,7 @@ export class ChapelWall {
   }
 
   dispose(): void {
-    for (const mesh of this.#meshes) {
-      mesh.geometry.dispose();
-      mesh.material.dispose();
-    }
+    this.#meshes.dispose();
     this.stage.dispose();
   }
 }

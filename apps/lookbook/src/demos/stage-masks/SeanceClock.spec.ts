@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {type HeadJson, type RoomJson, SeanceClock} from './MothChapel';
+import type {HeadJson, RoomJson} from './chapelAssets.js';
+import {SeanceClock} from './SeanceClock.js';
 
 /** `marks` without the mark `name` */
 const without = (marks: Record<string, [number, number]>, name: string): Record<string, [number, number]> =>

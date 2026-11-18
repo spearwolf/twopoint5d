@@ -1,14 +1,18 @@
 import type {TextureAtlasFrame, TextureCoords, TexturedSprite} from '@spearwolf/twopoint5d';
-import {dot, fract, vec3} from 'three/tsl';
+import {dot, float, fract, texture, uv, vec2, vec3} from 'three/tsl';
 import {
   type BufferAttribute,
   type BufferGeometry,
   CustomBlending,
   DstColorFactor,
   type InterleavedBufferAttribute,
+  type Material,
+  type Mesh,
   type MeshBasicNodeMaterial,
   type Node,
+  type Object3D,
   OneFactor,
+  type Texture,
   ZeroFactor,
 } from 'three/webgpu';
 
@@ -92,4 +96,45 @@ export function setPlaneUvToFrame(geometry: BufferGeometry, coords: TextureCoord
   }
   for (let i = 0; i < uv.count; i++) uv.setXY(i, s + built[2 * i]! * u, t + (1 - built[2 * i + 1]!) * v);
   uv.needsUpdate = true;
+}
+
+/**
+ * Reads the frame `coords` of the atlas `map` over a plane, upright: the uv of the plane, 0 … 1,
+ * runs over the frame, and the top edge of the plane shows the top of the frame (the atlas is
+ * read with `flipY = false`, t counts down from the top of the image).
+ */
+export const frameSample = (map: Texture, coords: TextureCoords): Node<'vec4'> =>
+  texture(map, vec2(float(coords.s).add(uv().x.mul(coords.u)), float(coords.t).add(float(1).sub(uv().y).mul(coords.v))));
+
+/**
+ * The meshes of a scene that each own their geometry and their material: {@link add} names and
+ * places a mesh and puts it into the parent, {@link dispose} disposes the geometry and the
+ * material of every mesh it added, once. It leaves the meshes in their parent — the stage that
+ * holds them goes with them.
+ */
+export class MeshBundle {
+  readonly #parent: Object3D;
+  readonly #meshes: Mesh<BufferGeometry, Material>[] = [];
+
+  constructor(parent: Object3D) {
+    this.#parent = parent;
+  }
+
+  /** Names `mesh`, puts it at (`x`, `y`, 0) in the render order `order`, and adds it to the parent. */
+  add<M extends Mesh<BufferGeometry, Material>>(mesh: M, name: string, x = 0, y = 0, order = 0): M {
+    mesh.name = name;
+    mesh.position.set(x, y, 0);
+    mesh.renderOrder = order;
+    this.#meshes.push(mesh);
+    this.#parent.add(mesh);
+    return mesh;
+  }
+
+  dispose(): void {
+    for (const mesh of this.#meshes) {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+    this.#meshes.length = 0;
+  }
 }
