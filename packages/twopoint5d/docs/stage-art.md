@@ -180,7 +180,8 @@ art.reset(); // every layer
 export {follow};
 ```
 
-Call `art.update()` once per frame before the render: it puts the layers back to front where a
+Call `art.update()` once per frame, after the stage's `updateFrame()` and before the render (see
+[the distance in force](#a-painted-scene-made-deep)): it puts the layers back to front where a
 depth or an `order` changed, and uploads what was written. The poses you set are checked as the
 library checks input: a field that is no finite number, an `opacity` outside 0 … 1, a `frame` that
 is no index into the frames of the layer, an `order` outside −1024 … 1023 and a key that is no
@@ -336,7 +337,17 @@ it into a multiplane camera: at its rest the camera sees the scene exactly as pa
 moves the layers part — the far ones drift slowly, the near ones pass fast in front.
 
 ```ts check
-import {CameraRig, Display, ParallaxProjection, Stage2D, StageArt, StageRenderer, TextureStore} from '@spearwolf/twopoint5d';
+import {on} from '@spearwolf/eventize';
+import {
+  CameraRig,
+  Display,
+  OnStageUpdateFrame,
+  ParallaxProjection,
+  Stage2D,
+  StageArt,
+  StageRenderer,
+  TextureStore,
+} from '@spearwolf/twopoint5d';
 
 const canvas = document.querySelector('canvas')!;
 const display = new Display(canvas);
@@ -356,10 +367,10 @@ stage.scene.add(art);
 art.set('steam', {depth: -80}); // in front of the plane
 
 const rig = new CameraRig(stage);
-display.onRenderFrame(({deltaTime}) => {
-  rig.step(deltaTime);
-  art.update(); // reads the distance of the camera, then sorts and uploads
-});
+display.onRenderFrame(({deltaTime}) => rig.step(deltaTime));
+// in the frame of the stage, after its projection placed the camera and before the draw: reads
+// the distance of the camera, then sorts and uploads
+on(stage, OnStageUpdateFrame, () => art.update());
 new StageRenderer(display).add(stage);
 
 // the camera walks along the plane: the wall drifts, the steam passes in front
@@ -382,7 +393,11 @@ behind the plane is drawn twice as large and seen at its painted size.
   in `focus`, in artwork pixels of the canvas.
 - **The distance in force** is the one of the last `art.update()`: a resize or a change of the specs
   that changes `D` lays the layers at a depth out anew there, and `takeChanged()` answers `true` for
-  it. Before the projection has given its first view, `D` is `NaN` and the layers are drawn
+  it. The projection works `D` out in the stage's `updateFrame()`, so `update()` belongs after it
+  and before the draw: in a listener of `OnStageUpdateFrame` where a `StageRenderer` runs on the
+  display, after `sr.updateFrame()` in a frame loop of your own. An `update()` in a handler of the
+  display that runs before the stage's frame lays a new `D` out a frame late — and under a
+  `FramePacer`, at the draw after that. Before the projection has given its first view, `D` is `NaN` and the layers are drawn
   uncompensated; the first `update()` after the view lays them out. A move of a `CameraRig`, a
   look, a zoom leave `D` alone: they move the camera away from the rest the scene was composed for,
   and that is what parts the layers.
@@ -401,6 +416,12 @@ behind the plane is drawn twice as large and seen at its painted size.
 - **Pixels.** Only the plane is pixel-exact under `pixelSnap`; a layer at a depth is scaled by `k`
   and lands between the pixels.
 
+To change `D` while the scene runs, write it into the specs of the projection and let the stage
+take it in its next frame — `projection.viewSpecs.distanceToProjectionPlane = 900` and
+`stage.needsUpdate = true` (and a `frames.invalidate()` under a `FramePacer`). At rest the picture
+stays the painting; once the camera moves, the planes part more for a camera close to the plane and
+less for one far from it.
+
 A projection the stage swaps is not followed by the art, which does not know the stage: hand it the
 new one — `art.projection = stage.projection` —, after a `rig.moveTo(projection, …)` once the move
 has arrived. It takes effect in the next `update()`; a `set()` before that checks a depth against the
@@ -414,7 +435,16 @@ and unmirrored, turns clockwise for a positive `deg` and faces the camera withou
 `side: DoubleSide`:
 
 ```ts check
-import {Display, OrthographicProjection, Stage2D, StageArt, StageRenderer, TextureStore} from '@spearwolf/twopoint5d';
+import {on} from '@spearwolf/eventize';
+import {
+  Display,
+  OnStageUpdateFrame,
+  OrthographicProjection,
+  Stage2D,
+  StageArt,
+  StageRenderer,
+  TextureStore,
+} from '@spearwolf/twopoint5d';
 
 const display = new Display(document.querySelector('canvas')!);
 const projection = new OrthographicProjection('xy|top-left', {fit: 'contain', width: 320, height: 180});
@@ -427,7 +457,7 @@ const art = new StageArt({store, id: 'kitchen'}, {projection});
 stage.scene.add(art);
 art.plane === projection.projectionPlane; // true: the art lies in the plane of its projection
 
-display.onRenderFrame(() => art.update());
+on(stage, OnStageUpdateFrame, () => art.update()); // after the stage's frame, before the draw
 display.start();
 ```
 
@@ -629,7 +659,7 @@ it as any object. It holds one `FeatureSprites`, `art.mesh`, the layers drawn in
 | `layerOf(sprite)` | the layer of a sprite of the mesh, `undefined` for another |
 | `set(name, pose)`, `apply(name, track, seconds)`, `reset()` | pose a layer, sample a track into it, every layer back to its rest |
 | `takeChanged()` | whether the picture changed since the last call |
-| `update()` | once per frame before the render: the plane, the distance of a parallax camera, the stack, then the upload |
+| `update()` | once per frame, after the stage's `updateFrame()` and before the render: the plane, the distance of a parallax camera, the stack, then the upload |
 | `dispose()`, `isDisposed` | releases the mesh and the lease on a store item |
 
 `art.layer(name)` answers an `ArtLayer`, the same object for the life of the art: `name`,

@@ -94,7 +94,10 @@ import {description, title} from './_stage-art-depth.json';
   const DISTANCES = [260, 1600] as const;
   // the depth of the end wall, for the read-out of its scale (the user data of its group)
   const END_WALL_DEPTH = 1200;
-  // how far the pointer at the edge of the picture moves the camera from its rest, in units of the plane
+  // how far the pointer at the edge of the picture moves the camera from its rest, in units of the
+  // plane, at the starting D and beyond. Below it the reach shrinks with D, so the camera turns by
+  // no more than there: a close camera has a wide field of view, and the same move with its look
+  // back at the middle would turn the view past the painted canvas
   const REACH = {x: 56, y: 22};
   // how long the camera takes to catch up with the pointer, in seconds
   const FOLLOW = 0.7;
@@ -146,6 +149,8 @@ import {description, title} from './_stage-art-depth.json';
   }
 
   let art = makeArt(true);
+  // whether the art in use compensates: the toggle flips before the new art has loaded
+  let artCompensates = true;
   stage.scene.add(art);
   let incoming: StageArt | undefined;
   parts.onDispose(() => {
@@ -217,7 +222,7 @@ import {description, title} from './_stage-art-depth.json';
     distanceOut.textContent = isParallax && Number.isFinite(d) ? String(Math.round(d)) : '—';
     // k = (D + δ) / D, the share the art enlarges a layer at the depth δ by, so that it shows as painted
     scaleOut.textContent =
-      isParallax && settings.compensate && Number.isFinite(d) ? `×${((d + END_WALL_DEPTH) / d).toFixed(2)}` : '×1.00';
+      isParallax && artCompensates && Number.isFinite(d) ? `×${((d + END_WALL_DEPTH) / d).toFixed(2)}` : '×1.00';
   }
 
   display.onRenderFrame((frame) => {
@@ -242,14 +247,17 @@ import {description, title} from './_stage-art-depth.json';
   const aim = {x: 0, y: 0};
 
   function follow(seconds = FOLLOW): void {
-    const x = aim.x * REACH.x;
-    const y = aim.y * REACH.y;
+    // the D of the slider: the projection takes it in the stage's next frame, the move starts now
+    const d = settings.distance;
+    const isParallax = stage.projection === parallax;
+    const reach = isParallax ? Math.min(1, d / START_DISTANCE) : 1;
+    const x = aim.x * REACH.x * reach;
+    const y = aim.y * REACH.y * reach;
     // a small move along the plane, a new viewpoint …
     void rig.moveTo({position: [x, y]}, seconds);
     // … and a look back at the middle of the picture: the plane stays put, the far planes drift with
     // the camera and the near ones against it. An orthographic camera takes no look
-    const d = parallax.distanceToProjectionPlane;
-    if (stage.projection === parallax && Number.isFinite(d)) rig.look({yaw: Math.atan2(x, d), pitch: -Math.atan2(y, d)});
+    if (isParallax) rig.look({yaw: Math.atan2(x, d), pitch: -Math.atan2(y, d)});
   }
 
   const listeners = new AbortController();
@@ -294,6 +302,7 @@ import {description, title} from './_stage-art-depth.json';
         incoming = undefined;
         art.dispose(); // leaves the scene and lets go of its lease; the texture stays with the other one
         art = next;
+        artCompensates = compensate;
         stage.scene.add(art);
         posed = adopt(art);
         frames.invalidate();
@@ -338,6 +347,8 @@ import {description, title} from './_stage-art-depth.json';
 
   await display.start();
 
-  Object.assign(window, {display, rig, stage, pacer: frames});
-  Object.defineProperty(window, 'art', {get: () => art, configurable: true});
+  if (!display.isDisposed) {
+    Object.assign(window, {display, rig, stage, pacer: frames});
+    Object.defineProperty(window, 'art', {get: () => art, configurable: true});
+  }
 </script>
