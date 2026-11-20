@@ -1002,7 +1002,7 @@ write goes past the change detection of the art: `takeChanged()` does not see it
 a layer overwrites what it shares with it. A feature that takes a slot the art already fills — a
 second frame source such as `AtlasFrame`, another placement — is refused by `new StageArt()` naming
 the feature, and so is an entry that is no feature. The kind is built once per list of feature
-objects and kept as long as the first of them lives: arts with the same feature objects share it,
+objects and kept as long as every one of them lives: arts with the same feature objects share it,
 and a factory called anew for each art — `paletteSwap({…})` inline — builds a kind each time, so call
 it once and hand the feature in.
 
