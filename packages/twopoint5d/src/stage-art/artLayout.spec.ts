@@ -1,7 +1,6 @@
 import {Mesh, Object3D, Vector3} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
-import {OrthographicProjection} from '../stage/OrthographicProjection.js';
 import {ParallaxProjection} from '../stage/ParallaxProjection.js';
 import type {ProjectionPlaneDescription} from '../stage/ProjectionPlane.js';
 import {ProjectionPlane} from '../stage/ProjectionPlane.js';
@@ -208,18 +207,16 @@ describe('the compensation of depth', () => {
       const compensated = cornersNdc(projection, frame, depthPx, k[0]!, shift);
       for (let i = 0; i < flat.length; i++) expect(compensated[i]).toBeCloseTo(flat[i]!, 6);
     }
+
+    // negative control: without the compensation a layer at 600 px does not cover the flat box
+    const uncompensated = cornersNdc(projection, frame, 600, 1, shift);
+    expect(flat.some((value, i) => Math.abs(uncompensated[i]! - value) > 1e-3)).toBe(true);
   });
 
-  test('k is 1 for a D of NaN: no view yet, an orthographic projection or compensateDepth: false', () => {
-    const frame = frameOf(undefined);
+  test('k is 1 for a D of NaN', () => {
     const k = new Float64Array(1);
-    depthScaleInto(Number.NaN, 600, frame, k);
+    depthScaleInto(Number.NaN, 600, frameOf(undefined), k);
     expect(k[0]).toBe(1);
-
-    const ortho = new OrthographicProjection('xy|bottom-left');
-    ortho.updateViewRect(800, 600);
-    // an orthographic projection has no distanceToProjectionPlane getter to give a D: the art asks for none
-    expect('distanceToProjectionPlane' in ortho).toBe(false);
   });
 
   test('a depth of 0 is k = 1', () => {

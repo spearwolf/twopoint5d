@@ -62,8 +62,10 @@ export function artFrameOf(
 }
 
 /**
- * Writes `k = (D + δ) / D` into `out[0]`, with `δ = depthPx / pxPerUnit`; 1 for a `D` that is
- * `NaN` — no view yet, or no compensation — and for a depth of 0.
+ * Writes `k = (D + δ) / D` into `out[0]`, with `δ = depthPx / pxPerUnit`; 1 for a depth of 0.
+ * A `D` of `NaN` means "draw uncompensated" and gives 1; the caller tells "no view yet" (lay out
+ * again once a view gives a `D`) from "never compensated" (an orthographic projection, no
+ * projection, `compensateDepth: false`). The caller has checked `D + δ > 0`: this does not guard it.
  */
 export function depthScaleInto(D: number, depthPx: number, frame: ArtFrame, out: Float64Array): void {
   out[0] = Number.isNaN(D) ? 1 : (D + depthPx / frame.pxPerUnit) / D;
