@@ -483,7 +483,7 @@ const pour = artTrack([
   {at: 0, deg: 0},
   {at: 1.2, deg: 95, ease: 'ease-out'},
 ]);
-let pouredAt = Number.NEGATIVE_INFINITY;
+let pouredAt: number | undefined; // no pour before the first click
 document.querySelector('canvas')!.addEventListener('click', () => {
   pouredAt = display.now;
 });
@@ -491,7 +491,8 @@ document.querySelector('canvas')!.addEventListener('click', () => {
 const frames = new FramePacer(display);
 const steam = {frame: 0};
 frames.onFrame(({now}) => {
-  art.apply('carafe5', pour, Math.max(0, now - pouredAt));
+  // a track takes a finite time: 0, the first key, until the click
+  art.apply('carafe5', pour, pouredAt === undefined ? 0 : now - pouredAt);
   steam.frame = art.layer('steam').frameAt('puff', now);
   art.set('steam', steam);
   return art.takeChanged();
