@@ -8,3 +8,4 @@ export * from './text/public-api.js';
 export * from './map2d/public-api.js';
 export * from './utils/public-api.js';
 export * from './vertex-objects/public-api.js';
+export * from './stage-art/public-api.js';
