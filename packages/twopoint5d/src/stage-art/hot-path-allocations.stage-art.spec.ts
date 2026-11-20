@@ -1,14 +1,26 @@
+import {readFileSync} from 'node:fs';
+import {Texture} from 'three/webgpu';
 import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
+import {AsepriteJson, type AsepriteJsonData} from '../texture/AsepriteJson.js';
 import {anchorOf, artFrameOf, depthScaleInto, layoutLayerInto, type LayerBox} from './artLayout.js';
 import {type ArtPose, POSE_DEG, POSE_DEPTH, POSE_SIZE, POSE_X, POSE_Y, POSE_SCALE_X, POSE_SCALE_Y} from './artPose.js';
 import {artTrack, rampAt} from './artTrack.js';
+import {StageArt} from './StageArt.js';
 
 // see hot-path-allocations.spec.ts of the sprites: a call that allocates anything costs 16 B at least
 const BYTES_PER_CALL_LIMIT = 1;
 
 const CALLS = 1000;
+
+// the kitchen of the fixtures, an Aseprite sheet of six layers of four frames each, laid out and sorted once
+const kitchen = (): StageArt => {
+  const json: AsepriteJsonData = JSON.parse(readFileSync(new URL('./fixtures/kitchen-aseprite.json', import.meta.url), 'utf8'));
+  const art = new StageArt({atlas: AsepriteJson.parse(json)[0], texture: new Texture()}, {pxPerUnit: 2});
+  art.update();
+  return art;
+};
 
 describe('stage art on the hot path', () => {
   test('sampling a track of three eased keys allocates nothing per call', async () => {
@@ -84,5 +96,67 @@ describe('stage art on the hot path', () => {
 
     expect(Number.isFinite(sum[0])).toBe(true);
     expect(bytesPerRound / (CALLS * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  test('setting a pose, sampling a track into a layer and taking the change allocate nothing per call', async () => {
+    const art = kitchen();
+    const carafe = art.layer('carafe5');
+    // the poses a caller keeps and writes again: whole numbers alone, see the first test of the sprites' spec
+    const move: ArtPose = {x: 0, y: 0, deg: 0};
+    const look: ArtPose = {opacity: 1, frame: 0, scaleX: 1, depth: 0, order: 0};
+    const tilt = artTrack(
+      [
+        {at: 0, x: 109, y: 121, deg: 0, opacity: 1, frame: 0},
+        {at: 1, deg: 35, ease: 'ease-out'},
+        {at: 2, deg: 95, frame: 2, opacity: 0},
+      ],
+      {playback: 'pingpong'},
+    );
+    const changes = new Uint32Array(1);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS; i++) {
+        move.x = i;
+        move.y = i & 7;
+        move.deg = i % 360;
+        art.set('steam', move);
+        look.opacity = i & 1;
+        look.frame = i & 3;
+        look.scaleX = (i & 3) + 1;
+        look.depth = i & 1;
+        look.order = (i & 3) - 2;
+        carafe.set(look);
+        art.apply('ladle', tilt, i % 3);
+        carafe.apply(tilt, i % 3);
+        if (art.takeChanged()) changes[0]!++;
+      }
+    });
+
+    expect(changes[0]).toBeGreaterThan(0);
+    expect(bytesPerRound / (CALLS * 5)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    art.dispose();
+  });
+
+  test('an update() without a sort and the frame of a tag allocate nothing per call', async () => {
+    const art = kitchen();
+    const steam = art.layer('steam');
+    const move: ArtPose = {x: 0, deg: 0, opacity: 1, frame: 0};
+    const frames = new Uint32Array(1);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS; i++) {
+        move.x = i;
+        move.deg = i % 360;
+        move.opacity = i & 1;
+        move.frame = steam.frameAt('puff', i % 3);
+        frames[0]! += move.frame;
+        steam.set(move);
+        art.update();
+      }
+    });
+
+    expect(frames[0]).toBeGreaterThan(0);
+    expect(bytesPerRound / (CALLS * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    art.dispose();
   });
 });

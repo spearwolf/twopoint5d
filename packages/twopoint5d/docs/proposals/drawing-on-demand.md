@@ -100,6 +100,15 @@ the frame a move arrives in included, so it needs no `untilSettled()`; the write
 guide has it under "A camera that moves" in [`display.md`](../display.md); a Vitest case of
 `src/stage/CameraRig.spec.ts` holds it against a real `FramePacer`.
 
+`StageArt` is the second (`src/stage-art/StageArt.ts`, proposal
+[`stage-art-layers.md`](stage-art-layers.md) §3.6): `pacer.onFrame(() => { …pose the layers…;
+return art.takeChanged(); }, stage)`. `takeChanged()` answers `true` when a shown layer changed a
+field of its pose to another value, turned from shown to hidden or back, or changed its place in the
+stack, and starts over; the art writes in the step itself, so the step reports what it writes
+(§3.5). A pose that leaves a layer as it was, and a hidden layer that moves, answer `false`. The
+guide has it under "Painted layers that move" in [`display.md`](../display.md) and "Drawing on
+demand" in [`stage-art.md`](../stage-art.md).
+
 ### 3.3 A report draws the next frame that asks
 
 A report — the answer of a step, `report()`, `invalidate()` — stays pending until the next

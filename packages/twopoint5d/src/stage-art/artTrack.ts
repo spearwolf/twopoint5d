@@ -56,6 +56,16 @@ export interface ArtTrack {
 
 const bit = (slot: number): number => 1 << slot;
 
+// the fields of each track artTrack() built, as the bits of their pose slots
+const trackFields = new WeakMap<ArtTrack, number>();
+
+/**
+ * The fields a track of {@link artTrack} writes, as a mask of the bits `1 << slot` of their pose
+ * slots; `undefined` for a track of another making. An art reads exactly these out of a pose it
+ * samples into, and so one pose of a fixed shape serves every track. @internal
+ */
+export const fieldsOfTrack = (track: ArtTrack): number | undefined => trackFields.get(track);
+
 // the discrete fields change at their key; the rest blend
 const DISCRETE_BITS = bit(POSE_FRAME) | bit(POSE_VISIBLE) | bit(POSE_ORDER);
 
@@ -156,7 +166,7 @@ export function artTrack(keys: readonly ArtKey[], options?: ArtTrackOptions): Ar
   const last = count - 1;
   const duration = times[last]!;
 
-  return {
+  const track: ArtTrack = {
     duration,
 
     sample(seconds: number, target: ArtPose): ArtPose {
@@ -223,6 +233,8 @@ export function artTrack(keys: readonly ArtKey[], options?: ArtTrackOptions): Ar
       return seconds >= first && seconds < duration;
     },
   };
+  trackFields.set(track, mask);
+  return track;
 }
 
 /**

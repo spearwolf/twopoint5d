@@ -819,6 +819,28 @@ The camera is written in the frame of the stage, so it does not matter whether `
 or after `updateFrame()`. Register the step with its `stage` when the pacer knows which stages are
 [live](#a-layer-behind-an-overlay): the camera of a frozen layer then asks for no frames.
 
+### Painted layers that move
+
+The `takeChanged()` of a [`StageArt`](stage-art.md) is a frame step as it stands: a step poses the
+layers — sets, tracks, the frame of a tag — and answers whether the picture of the art changed. A
+pose set to the value a layer has already, a frame a strip keeps and a hidden layer that moves
+answer `false`, so a still scene costs no draw and a strip of steam at 8 frames a second draws 8
+frames a second.
+
+```ts
+frames.onFrame(({now}) => {
+  art.apply('carafe5', pour, now - pouredAt);
+  steam.frame = art.layer('steam').frameAt('puff', now);
+  art.set('steam', steam);
+  return art.takeChanged();
+}, stage);
+```
+
+Call `art.update()` before the render of a frame that is drawn. The art writes in the step itself,
+so the step reports what it writes; a write through `layer.sprite` goes past the art and is yours
+to report. [Drawing on demand](stage-art.md#drawing-on-demand) in the guide of stage art has the
+whole page.
+
 ### An animation that never ends
 
 A fire, a pendulum, a meadow that sways: there is no frame in which nothing changes. Such a step
