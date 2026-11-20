@@ -7,9 +7,8 @@ tests that hold it.
 ## Proposals and guides
 
 The guides of the library are [`sprites.md`](../sprites.md), [`text.md`](../text.md),
-[`map2d.md`](../map2d.md), [`display.md`](../display.md), [`textures.md`](../textures.md) and
-[`stages.md`](../stages.md) in
-`packages/twopoint5d/docs/`.
+[`map2d.md`](../map2d.md), [`display.md`](../display.md), [`textures.md`](../textures.md),
+[`stages.md`](../stages.md) and [`stage-art.md`](../stage-art.md) in `packages/twopoint5d/docs/`.
 ([`architecture.md`](../architecture.md), [`resource-lifecycle.md`](../resource-lifecycle.md) and
 the READMEs under `src/*/` are not guides in this sense.)
 

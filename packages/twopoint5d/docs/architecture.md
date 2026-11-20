@@ -16,8 +16,8 @@ of `public-api.ts` files _is_ the package's API contract:
 
 - Anything not re-exported through a `public-api.ts` is internal. Consumers get no deep
   imports, so internal files can be renamed and reshaped freely.
-- `display/`, `texture/`, `map2d/` (with `chunk-quad-tree/`) and `sprites/` name their
-  exports one by one, because their files export for their neighbours as well: a new
+- `display/`, `texture/`, `map2d/` (with `chunk-quad-tree/`), `sprites/` and `stage-art/`
+  name their exports one by one, because their files export for their neighbours as well: a new
   export of such a file stays internal until it is listed. `stage/` and `text/` do the
   same for those of their files that export internals — `Stage2D.ts`, `CameraFlight.ts`,
   `CameraProjection.ts`, `cameraPose.ts`, `framing.ts`, `StageDirector.ts`,
@@ -41,6 +41,7 @@ The stack is strictly bottom-up. A lower layer never imports from a higher one.
 ```
 controls/         input: the pan control
 map2d/            Tiled-style streaming maps
+stage-art/        the layers of a painted scene as sprites, posed in artwork pixels
 text/             bitmap fonts, text laid out into sprites
 sprites/          sprite kinds built from features
 stage/            scenes, projections, render pipeline
@@ -310,6 +311,29 @@ sprites of any kind with `InstancePosition`, `QuadSize` and `AtlasFrame`: it cre
 hands them to the caller, who frees them. `rewriteText()` writes another text into the sprites of
 one and reuses them, creating and freeing only the glyphs the new text has more or fewer. It is a
 function over sprites, not a mesh of its own. The guide is [`docs/text.md`](./text.md).
+
+### `stage-art/`
+
+The layers of a painted scene, as sprites of the layer below — a facade like `text/`, but one that
+owns its mesh. `StageArt` is a `Group` around one `FeatureSprites` of an internal kind
+(`stageArtKind.ts`): `InstancePosition`, `FlatPlacement`, `QuadSize`, `Anchor`, `Rotation`,
+`AtlasFrame`, `TextureColor`, `Fade`, `Visible` and `artOrder`, an attribute without a shader stage
+that the sort reads, then the `features` of the caller; one sprite per layer, so a scene is one draw
+call. `artSources.ts` reads the layers out of an atlas — a split-layer Aseprite sheet through the
+`meta` that `AsepriteJson.parse()` keeps for the atlas it fills (`asepriteMetaOf()`, internal to
+`texture/`), a trimmed atlas by the names of its frames, or a list of loose layers —, with the box,
+pivot, depth, frames and tags of each. `artLayout.ts` maps artwork pixels into the frame of the
+mesh, works out the depth compensation `k = (D + δ) / D` under a `ParallaxProjection`, and turns
+the mesh into the plane through `ProjectionPlane#applyRotation()`. `StageArt` keeps the pose of
+every layer in a `Float64Array`, writes a sprite only where a field changed — the rotation and the
+fade straight into their buffers —, and sorts the stack in two stable passes of `sortBy()`,
+`artOrder` and then `z`. `ArtLayer` is the handle of a layer; `artTrack()` and `rampAt()` are pure
+functions of time over the shared easing of `utils/`, and `animationFrameAt()`, which
+`ArtLayer#frameAt()` calls, lives in `texture/` beside `FrameBasedAnimations`. The module imports
+`sprites/`, `texture/`, `vertex-objects/` and `utils/`, and from `stage/` only `ProjectionPlane`,
+`IProjection` and `ParallaxProjection`; nothing else in the library imports it.
+`src/stage-art/hot-path-allocations.stage-art.spec.ts` holds its hot paths free of allocations. The
+guide is [`docs/stage-art.md`](./stage-art.md).
 
 ### `map2d/`
 

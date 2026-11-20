@@ -278,11 +278,12 @@ hits is how wrong assumptions get in. Whole does not mean the whole directory, t
 `controls`, `text` and `utils` hold about 1k lines each or less, and
 `cat src/<module>/*.ts` is one cheap call. The others are far larger — `stage` about 14k
 lines, `texture` about 9k, `display`, `map2d` and `sprites` about 7k each with their
-subdirectories, `vertex-objects` about 6k — and a `cat` over one of them buries the part
-you need. Read those one area at a time: a class together with the files beside it that it
-imports — in `stage` the camera rig, the director, the renderer, or `Stage2D` with its
-projections; in `texture` the store, a resource, the atlas loaders, or the frame-based
-animations.
+subdirectories, `vertex-objects` about 6k, `stage-art` about 3k — and a `cat` over one of
+them buries the part you need. Read those one area at a time: a class together with the
+files beside it that it imports — in `stage` the camera rig, the director, the renderer, or
+`Stage2D` with its projections; in `texture` the store, a resource, the atlas loaders, or
+the frame-based animations; in `stage-art` `StageArt` with its layout and its poses, or the
+readers of its sources.
 
 `@spearwolf/eventize` and `@spearwolf/signalize` are used heavily. The `using-eventize`
 and `using-signalize` skills carry the semantics that differ from other event and signal
@@ -301,7 +302,8 @@ libraries.
   maps](packages/twopoint5d/docs/map2d.md),
   [display](packages/twopoint5d/docs/display.md),
   [textures](packages/twopoint5d/docs/textures.md),
-  [stages](packages/twopoint5d/docs/stages.md) — written for the users of the library;
+  [stages](packages/twopoint5d/docs/stages.md), [stage
+  art](packages/twopoint5d/docs/stage-art.md) — written for the users of the library;
   they describe the code as it is, with no internals and no history, and a new or changed
   feature changes its guide section in the same commit
 - [Proposals](packages/twopoint5d/docs/proposals/README.md) — written for the developers
