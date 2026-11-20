@@ -4,7 +4,7 @@ import {afterEach, beforeEach, describe, expect, test, vi} from 'vitest';
 import {prepareSpriteFrame} from '../sprites/features/AtlasFrame.js';
 import {asCanvas, FakeCanvas} from '../testing/fakeCanvas.js';
 import {AtlasFrameTable} from './AtlasFrameTable.js';
-import {DynamicAtlas, type DynamicAtlasImage} from './DynamicAtlas.js';
+import {DynamicAtlas, type DynamicAtlasImage, packsInto} from './DynamicAtlas.js';
 import {frameTable} from './FrameTable.js';
 
 const atlasOn = (
@@ -1175,5 +1175,51 @@ describe('DynamicAtlas', () => {
     const {atlas, context} = atlasOn(64, 32);
     expect(atlas.context).toBe(context);
     expect(atlas.canvas).toBeInstanceOf(FakeCanvas);
+  });
+});
+
+describe('packsInto()', () => {
+  // whether add() takes every frame of `sizes`, in this order, into a fresh atlas of the size
+  const addsAll = (size: number, padding: number, extrude: number, sizes: {width: number; height: number}[]) => {
+    const {atlas} = atlasOn(size, size, {padding, extrude});
+    try {
+      sizes.forEach((frame, index) => atlas.add(`f${index}`, noop, frame));
+      return true;
+    } catch (error) {
+      if (error instanceof RangeError) return false;
+      throw error;
+    }
+  };
+
+  test('answers what add() does with the same frames, in the same order, for every size of a power of two', () => {
+    // a deterministic mix of wide, tall and small frames
+    let seed = 7;
+    const next = (limit: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return 1 + (seed % limit);
+    };
+    for (let round = 0; round < 40; round++) {
+      const sizes = Array.from({length: 1 + (round % 9)}, () => ({width: next(90), height: next(70)}));
+      const padding = round % 3;
+      const extrude = round % 2;
+      for (const size of [16, 32, 64, 128, 256]) {
+        expect(packsInto(size, size, padding, extrude, sizes), `round ${round} at ${size}`).toBe(
+          addsAll(size, padding, extrude, sizes),
+        );
+      }
+    }
+  });
+
+  test('a frame wider than the atlas does not fit, and no frames fit always; a size is rounded up', () => {
+    expect(packsInto(16, 16, 1, 0, [{width: 15, height: 2}])).toBe(false);
+    expect(packsInto(16, 16, 1, 0, [{width: 14, height: 2}])).toBe(true);
+    expect(
+      packsInto(16, 16, 1, 0, [
+        {width: 13.5, height: 2},
+        {width: 1, height: 1},
+      ]),
+    ).toBe(true);
+    expect(packsInto(16, 16, 1, 0, [{width: 14.01, height: 2}])).toBe(false);
+    expect(packsInto(1, 1, 0, 0, [])).toBe(true);
   });
 });

@@ -119,6 +119,102 @@ const buildCanvas = (width: number, height: number): HTMLCanvasElement | Offscre
   );
 };
 
+// a cell taken on a shelf: its top left corner, its extruded edges included, and the way to give it back
+interface Cell {
+  readonly x: number;
+  readonly y: number;
+  readonly shelf: Shelf;
+  readonly undo: () => void;
+}
+
+// Takes a cell of `cellWidth` × `cellHeight` on `shelves` of an area of `width` × `height` — the leftmost
+// freed cell it fits into on the lowest shelf that has room, else the tail of that shelf, else a new
+// shelf — and answers it; undefined, changing nothing, where none of these has room. The caller has
+// checked that the cell fits into the area at all
+function takeCell(
+  shelves: Shelf[],
+  width: number,
+  height: number,
+  padding: number,
+  cellWidth: number,
+  cellHeight: number,
+): Cell | undefined {
+  const room = cellWidth + padding;
+  // the lowest shelf the cell fits onto — into a freed cell or onto its tail —, the first of equal ones
+  let best: Shelf | undefined;
+  for (const shelf of shelves) {
+    if (shelf.height < cellHeight || (best !== undefined && shelf.height >= best.height)) continue;
+    if (shelf.x + room <= width || shelf.free.some((span) => span.end - span.start >= room)) best = shelf;
+  }
+  if (best !== undefined) {
+    const shelf = best;
+    const index = shelf.free.findIndex((span) => span.end - span.start >= room);
+    if (index >= 0) {
+      const span = shelf.free[index]!;
+      const x = span.start;
+      span.start += room;
+      if (span.start === span.end) shelf.free.splice(index, 1);
+      return {
+        x,
+        y: shelf.y,
+        shelf,
+        undo: () => {
+          span.start = x;
+          if (!shelf.free.includes(span)) shelf.free.splice(index, 0, span);
+        },
+      };
+    }
+    const x = shelf.x;
+    shelf.x += room;
+    return {
+      x,
+      y: shelf.y,
+      shelf,
+      undo: () => {
+        shelf.x = x;
+      },
+    };
+  }
+
+  const last = shelves.at(-1);
+  const y = last === undefined ? padding : last.y + last.height + padding;
+  if (y + cellHeight + padding > height) return undefined;
+  const shelf: Shelf = {y, height: cellHeight, x: padding + room, free: []};
+  shelves.push(shelf);
+  return {
+    x: padding,
+    y,
+    shelf,
+    undo: () => {
+      shelves.pop();
+    },
+  };
+}
+
+/**
+ * Whether frames of `sizes`, added in this order to a new `DynamicAtlas` of `width` × `height` with
+ * `padding` and `extrude`, all fit — packed by the shelves `add()` packs onto, with nothing drawn. A
+ * size is rounded up to whole texels, as `add()` rounds it.
+ *
+ * @internal
+ */
+export function packsInto(
+  width: number,
+  height: number,
+  padding: number,
+  extrude: number,
+  sizes: readonly DynamicAtlasSize[],
+): boolean {
+  const shelves: Shelf[] = [];
+  for (const size of sizes) {
+    const cellWidth = Math.ceil(size.width) + 2 * extrude;
+    const cellHeight = Math.ceil(size.height) + 2 * extrude;
+    if (cellWidth + 2 * padding > width || cellHeight + 2 * padding > height) return false;
+    if (takeCell(shelves, width, height, padding, cellWidth, cellHeight) === undefined) return false;
+  }
+  return true;
+}
+
 /**
  * An atlas packed at run time: frames drawn into a canvas — by a callback, or from an image — on
  * shelves, one `CanvasTexture` for all of them, and an ordinary {@link TextureAtlas} of their frames,
@@ -571,10 +667,10 @@ export class DynamicAtlas {
     return {width: check(given.width, 'width'), height: check(given.height, 'height')};
   }
 
-  // Takes a cell for a frame of `width` × `height` — the leftmost freed cell it fits into on the lowest
-  // shelf that has room, else the tail of that shelf, else a new shelf — and answers its top left corner,
-  // its shelf and the way to give it back. Throws, changing nothing, for a frame that does not fit
-  #pack(name: TextureAtlasFrameName, width: number, height: number): {x: number; y: number; shelf: Shelf; undo: () => void} {
+  // Takes a cell for a frame of `width` × `height` on the shelves of the atlas — see takeCell() — and
+  // answers its top left corner, its shelf and the way to give it back. Throws, changing nothing, for a
+  // frame that does not fit
+  #pack(name: TextureAtlasFrameName, width: number, height: number): Cell {
     const {padding, extrude} = this;
     const cellWidth = width + 2 * extrude;
     const cellHeight = height + 2 * extrude;
@@ -585,61 +681,14 @@ export class DynamicAtlas {
       );
     }
 
-    const room = cellWidth + padding;
-    // the lowest shelf the cell fits onto — into a freed cell or onto its tail —, the first of equal ones
-    let best: Shelf | undefined;
-    for (const shelf of this.#shelves) {
-      if (shelf.height < cellHeight || (best !== undefined && shelf.height >= best.height)) continue;
-      if (shelf.x + room <= this.width || shelf.free.some((span) => span.end - span.start >= room)) best = shelf;
-    }
-    if (best !== undefined) {
-      const shelf = best;
-      const index = shelf.free.findIndex((span) => span.end - span.start >= room);
-      if (index >= 0) {
-        const span = shelf.free[index]!;
-        const x = span.start;
-        span.start += room;
-        if (span.start === span.end) shelf.free.splice(index, 1);
-        return {
-          x,
-          y: shelf.y,
-          shelf,
-          undo: () => {
-            span.start = x;
-            if (!shelf.free.includes(span)) shelf.free.splice(index, 0, span);
-          },
-        };
-      }
-      const x = shelf.x;
-      shelf.x += room;
-      return {
-        x,
-        y: shelf.y,
-        shelf,
-        undo: () => {
-          shelf.x = x;
-        },
-      };
-    }
-
-    const last = this.#shelves.at(-1);
-    const y = last === undefined ? padding : last.y + last.height + padding;
-    if (y + cellHeight + padding > this.height) {
+    const cell = takeCell(this.#shelves, this.width, this.height, padding, cellWidth, cellHeight);
+    if (cell === undefined) {
       const count = this.#cells.size;
       throw new RangeError(
         `${WHERE}: the atlas of ${this.width} × ${this.height} is full — the frame ${describeValue(name)} of ${width} × ${height} does not fit beside ${count === 1 ? 'the 1 frame' : `the ${count} frames`} packed into it; build a larger one — new DynamicAtlas({width: ${2 * this.width}, height: ${2 * this.height}}) — or clear() it`,
       );
     }
-    const shelf: Shelf = {y, height: cellHeight, x: padding + room, free: []};
-    this.#shelves.push(shelf);
-    return {
-      x: padding,
-      y,
-      shelf,
-      undo: () => {
-        this.#shelves.pop();
-      },
-    };
+    return cell;
   }
 
   // Gives the cell of `rect` back to its shelf: a free span, merged with the free spans it touches, fallen
