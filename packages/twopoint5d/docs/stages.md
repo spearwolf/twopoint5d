@@ -322,6 +322,11 @@ after the fallbacks of the specs: `300` for specs that name no `distanceToProjec
 no camera can be placed at. A change to the specs takes effect with the next `updateViewRect()`, so
 until then the getter still answers the old `D`. It is `NaN` before the first view.
 
+A painted scene whose layers lie at different depths needs none of this by hand: a `StageArt` on a
+`ParallaxProjection` reads `D` in its `update()` and draws each layer so that the camera at rest
+sees the scene as painted — see "A painted scene made deep" in [the art layers
+guide](stage-art.md#a-painted-scene-made-deep).
+
 ### From the pointer to the plane
 
 The view is centred on the point the camera looks at. A pointer position on the canvas maps

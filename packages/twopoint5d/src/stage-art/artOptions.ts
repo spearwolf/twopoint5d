@@ -32,7 +32,11 @@ export interface StageArtOptions {
   origin?: readonly [number, number];
   /** The point of the canvas the camera looks at in its rest, in artwork pixels. Default `origin`. */
   focus?: readonly [number, number];
-  /** The projection of the stage — `stage.projection` —: its plane is the plane of the art. */
+  /**
+   * The projection of the stage — `stage.projection` —: its plane is the plane of the art, and the
+   * distance of the camera of a `ParallaxProjection` compensates the layers at a depth. `art.projection`
+   * swaps it.
+   */
   projection?: IProjection;
   /** The plane of the art where the projection has none, or without a projection. Default `'xy|bottom-left'`. */
   plane?: ProjectionPlane | ProjectionPlaneDescription;
@@ -95,6 +99,24 @@ const isProjection = (value: unknown): value is IProjection =>
   typeof value['getScaleFactor'] === 'function' &&
   typeof value['createCamera'] === 'function' &&
   typeof value['updateCamera'] === 'function';
+
+/** Throws a `TypeError` under `subject` for a projection that is no `IProjection`; the option and the setter of an art. */
+export function checkProjection(subject: string, projection: unknown): asserts projection is IProjection {
+  if (!isProjection(projection)) {
+    throw new TypeError(
+      `${subject}: projection must be an IProjection — stage.projection —, got ${describeThreeValue(projection, 'isObject3D')}`,
+    );
+  }
+}
+
+/** Throws a `TypeError` under `subject` for a plane that is neither a `ProjectionPlane` nor one of its four descriptions. */
+export function checkPlane(subject: string, plane: unknown): asserts plane is ProjectionPlane | ProjectionPlaneDescription {
+  if (!(plane instanceof ProjectionPlane) && !PLANE_DESCRIPTIONS.includes(plane as ProjectionPlaneDescription)) {
+    throw new TypeError(
+      `${subject}: plane must be a ProjectionPlane or one of ${PLANE_DESCRIPTIONS.map((description) => describeValue(description)).join(', ')}, got ${describeThreeValue(plane, 'isPlane')}`,
+    );
+  }
+}
 
 const isTexture = (value: unknown): value is Texture => isObject(value) && value['isTexture'] === true;
 
@@ -159,17 +181,8 @@ export function checkStageArt(
   if (opts.compensateDepth !== undefined && typeof opts.compensateDepth !== 'boolean') {
     throw new TypeError(`${where}: compensateDepth must be true or false, got ${describeValue(opts.compensateDepth)}`);
   }
-  if (opts.projection !== undefined && !isProjection(opts.projection)) {
-    throw new TypeError(
-      `${where}: projection must be an IProjection — stage.projection —, got ${describeThreeValue(opts.projection, 'isObject3D')}`,
-    );
-  }
-  const {plane} = opts;
-  if (plane !== undefined && !(plane instanceof ProjectionPlane) && !PLANE_DESCRIPTIONS.includes(plane)) {
-    throw new TypeError(
-      `${where}: plane must be a ProjectionPlane or one of ${PLANE_DESCRIPTIONS.map((description) => describeValue(description)).join(', ')}, got ${describeThreeValue(plane, 'isPlane')}`,
-    );
-  }
+  if (opts.projection !== undefined) checkProjection(where, opts.projection);
+  if (opts.plane !== undefined) checkPlane(where, opts.plane);
   checkArtSourceOptions(where, {only: opts.only, layers: opts.layers});
   if (opts.only !== undefined && opts.only.length > MAX_LAYERS) {
     throw new RangeError(`${where}: only names ${opts.only.length} layers, and an art holds at most ${MAX_LAYERS}`);

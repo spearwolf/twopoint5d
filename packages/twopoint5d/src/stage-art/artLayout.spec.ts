@@ -224,4 +224,15 @@ describe('the compensation of depth', () => {
     depthScaleInto(D, 0, frameOf(undefined), k);
     expect(k[0]).toBe(1);
   });
+
+  test('k is 0 for a layer on the camera and below 0 behind it, which the caller turns away or hides', () => {
+    const k = new Float64Array(1);
+    // pxPerUnit 2: the camera stands 300 units, 600 artwork pixels, in front of the plane
+    depthScaleInto(D, -600, frameOf(undefined), k);
+    expect(k[0]).toBe(0);
+    depthScaleInto(D, -602, frameOf(undefined), k);
+    expect(k[0]).toBeLessThan(0);
+    depthScaleInto(D, -598, frameOf(undefined), k);
+    expect(k[0]).toBeGreaterThan(0);
+  });
 });

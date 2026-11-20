@@ -300,7 +300,123 @@ have throws and lists the tags it has.
 
 ### A painted scene made deep
 
+Give the layers of a scene depths, put it on a stage with a `ParallaxProjection`, and the art turns
+it into a multiplane camera: at its rest the camera sees the scene exactly as painted, and once it
+moves the layers part — the far ones drift slowly, the near ones pass fast in front.
+
+```ts check
+import {CameraRig, Display, ParallaxProjection, Stage2D, StageArt, StageRenderer, TextureStore} from '@spearwolf/twopoint5d';
+
+const canvas = document.querySelector('canvas')!;
+const display = new Display(canvas);
+const stage = new Stage2D(new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, height: 360}));
+const store = new TextureStore(display.renderer);
+store.parse({items: {kitchen: {atlasUrl: '/assets/kitchen.json', atlasAdapter: 'aseprite'}}});
+const art = new StageArt(
+  {store, id: 'kitchen'},
+  {
+    projection: stage.projection,
+    only: ['wall', 'window', 'table', 'carafe5', 'ladle', 'steam'],
+    // far behind the plane, still where it was painted at rest; the table stays on the plane
+    layers: {wall: {depth: 900}, window: {depth: 600}},
+  },
+);
+stage.scene.add(art);
+art.set('steam', {depth: -80}); // in front of the plane
+
+const rig = new CameraRig(stage);
+display.onRenderFrame(({deltaTime}) => {
+  rig.step(deltaTime);
+  art.update(); // reads the distance of the camera, then sorts and uploads
+});
+new StageRenderer(display).add(stage);
+
+// the camera walks along the plane: the wall drifts, the steam passes in front
+canvas.addEventListener('click', () => void rig.moveTo({position: [120, 0]}, 1.5));
+
+display.start();
+```
+
+`depth` is in artwork pixels behind the plane, below 0 in front of it — `depth=600` in the user
+data of an Aseprite layer, `@600` in the frame name of a packed atlas, `layers: {window: {depth:
+600}}` in code, or `set({depth})` at any time. The art draws a layer at `z = −depth / pxPerUnit`
+and enlarges it about the **focus** by exactly what the perspective takes away: with `D` the
+distance of the camera to the plane at rest — `projection.distanceToProjectionPlane`, in units —
+and `δ` the depth in units, the layer is scaled by `k = (D + δ) / D`. A layer at a depth of `D`
+behind the plane is drawn twice as large and seen at its painted size.
+
+- **The focus** is the point of the canvas the camera looks at in its rest, by default the origin of
+  the art: an art at the origin of the plane, under a camera that rests on the axis of the plane.
+  Move the art elsewhere on the plane, or let the stage rest its camera elsewhere, and name the point
+  in `focus`, in artwork pixels of the canvas.
+- **The distance in force** is the one of the last `art.update()`: a resize or a change of the specs
+  that changes `D` lays the layers at a depth out anew there, and `takeChanged()` answers `true` for
+  it. Before the projection has given its first view, `D` is `NaN` and the layers are drawn
+  uncompensated; the first `update()` after the view lays them out. A move of a `CameraRig`, a
+  look, a zoom leave `D` alone: they move the camera away from the rest the scene was composed for,
+  and that is what parts the layers.
+- **Uncompensated.** Under an `OrthographicProjection` a depth changes the stacking order and, under
+  a camera that turns, the place of a layer in space — never its size. A `CameraProjection`, a
+  projection of your own and an art without one draw depth as it is, and so does
+  `compensateDepth: false`, for a scene that wants its far layers small.
+- **Behind the camera.** A depth at or in front of the camera — `depth ≤ −D · pxPerUnit` — cannot
+  be drawn: `set()` and `apply()` refuse it where `D` is known
+  (`ArtLayer "steam": depth must be a number above -300 — the camera stands 300 artwork pixels in
+  front of the plane —, got -320`), and the layer keeps its pose. A layer that a new `D` leaves
+  there — a smaller view, a camera brought closer — is hidden and said once on the console, until
+  its depth or the distance brings it in front of the camera again.
+- **Pixels.** Only the plane is pixel-exact under `pixelSnap`; a layer at a depth is scaled by `k`
+  and lands between the pixels.
+
+A projection the stage swaps is not followed by the art, which does not know the stage: hand it the
+new one — `art.projection = stage.projection` —, after a `rig.moveTo(projection, …)` once the move
+has arrived. It takes effect in the next `update()`.
+
 ### Art on a `top-left` stage
+
+A stage of canvas coordinates — `'xy|top-left'`, `y` down as in the paint tool — takes a painted
+scene as it is. The art turns its mesh into the plane of the projection, so the scene shows upright
+and unmirrored, turns clockwise for a positive `deg` and faces the camera without `Flip` or
+`side: DoubleSide`:
+
+```ts check
+import {Display, OrthographicProjection, Stage2D, StageArt, StageRenderer, TextureStore} from '@spearwolf/twopoint5d';
+
+const display = new Display(document.querySelector('canvas')!);
+const projection = new OrthographicProjection('xy|top-left', {fit: 'contain', width: 320, height: 180});
+const stage = new Stage2D(projection);
+new StageRenderer(display).add(stage);
+
+const store = new TextureStore(display.renderer);
+store.parse({items: {kitchen: {atlasUrl: '/assets/kitchen.json', atlasAdapter: 'aseprite'}}});
+const art = new StageArt({store, id: 'kitchen'}, {projection});
+stage.scene.add(art);
+art.plane === projection.projectionPlane; // true: the art lies in the plane of its projection
+
+display.onRenderFrame(() => art.update());
+display.start();
+```
+
+Poses stay in artwork pixels on every plane: `x` and `y` are where the pivot stands on the canvas,
+`y` down, and `depth` points away from the camera. The plane changes nothing of them, only where
+the art frame lies in the world — `+z` of the art towards the camera, `y` up on the screen:
+
+| plane | `+z` of the art | up on the screen |
+| --- | --- | --- |
+| `'xy|bottom-left'` | world `+z` | world `+y` |
+| `'xy|top-left'` | world `−z` | world `−y` |
+| `'xz|bottom-left'` | world `−y` | world `+z` |
+| `'xz|top-left'` | world `+y` | world `−z` |
+| a `ProjectionPlane` of your own | its normal | its `up` |
+
+The art takes the plane of its projection; without a projection, or under one without a plane — a
+`CameraProjection` —, it lies in `plane`, `'xy|bottom-left'` by default. Both can be swapped:
+`art.projection = stage.projection` or `art.plane = 'xy|top-left'` turn the mesh in the next
+`update()`, which writes no sprite — the layers keep their places in the art — and answers
+`takeChanged()` with `true`; a plane equal to the one the mesh faces changes nothing. An art handed
+both a projection with a plane and a `plane` lies in the plane of the projection and says so once
+on the console. Move, turn or scale the art itself as any object: the turn of the mesh inside it is
+the art's own.
 
 ### Drawing on demand
 
@@ -363,7 +479,8 @@ export {frames};
 
 `takeChanged()` answers `true` when a shown layer changed a field of its pose to another value,
 turned from shown to hidden or back — by `visible`, by an `opacity` from or to 0, by its picture
-arriving — or changed its place in the stack. A value set again, a frame a strip keeps and a hidden
+arriving — or changed its place in the stack, and after an `update()` that turned the art to
+another plane or laid it out for a new distance of the camera. A value set again, a frame a strip keeps and a hidden
 layer that moves answer `false`. A write through `layer.sprite` goes past the art; report it to the
 pacer yourself (`frames.report(true)`).
 
@@ -418,12 +535,12 @@ it as any object. It holds one `FeatureSprites`, `art.mesh`, the layers drawn in
 | `canvas` | `{width, height}` of the canvas in artwork pixels; `undefined` for loose layers and before the load |
 | `loaded` | resolves once every picture loaded or failed — at once for `{atlas, texture}`; never rejects |
 | `problems` | what the art could not load or read |
-| `projection`, `plane` | the projection handed in, and the plane the art lies in |
+| `projection`, `plane` | the projection, and the plane the art lies in; both can be set, and take effect in the next `update()` |
 | `layer(name)` | the handle of a layer; throws for a name it does not know, listing the names |
 | `layerOf(sprite)` | the layer of a sprite of the mesh, `undefined` for another |
 | `set(name, pose)`, `apply(name, track, seconds)`, `reset()` | pose a layer, sample a track into it, every layer back to its rest |
 | `takeChanged()` | whether the picture changed since the last call |
-| `update()` | once per frame before the render: the stack, then the upload |
+| `update()` | once per frame before the render: the plane, the distance of a parallax camera, the stack, then the upload |
 | `dispose()`, `isDisposed` | releases the mesh and the lease on a store item |
 
 `art.layer(name)` answers an `ArtLayer`, the same object for the life of the art: `name`,
@@ -433,9 +550,13 @@ about the layer — `rest`, `box` (where its picture lies on the canvas), `pivot
 sprite in the mesh: a write through it goes past the art, and the next pose overwrites what the two
 share.
 
-The plane is fixed when the art is made: that of the projection, else `plane`, else
-`'xy|bottom-left'`. An art handed a projection with a plane and a `plane` lies in the plane of the
-projection and says so once on the console.
+The plane is that of the projection, else `plane`, else `'xy|bottom-left'`. An art handed a
+projection with a plane and a `plane` lies in the plane of the projection and says so once on the
+console. `art.projection = …` and `art.plane = …` swap them; the mesh turns to another plane in the
+next `update()`, and under a new `ParallaxProjection` the layers at a depth are laid out for its
+distance there (see [a painted scene made deep](#a-painted-scene-made-deep) and [art on a `top-left`
+stage](#art-on-a-top-left-stage)). A value that is no `IProjection`, or neither a `ProjectionPlane`
+nor one of its four descriptions, throws a `TypeError`, and the art keeps what it held.
 
 ### Sources
 
@@ -460,7 +581,9 @@ a canvas of 1920 × 1080 does not shade thirty full screens.
 the field in the message (`ArtLayer "carafe5": opacity must be a number from 0 to 1, got 1.5`); the
 layer keeps what it had. Before the frames are known, a `frame` is checked as a whole number of 0
 or more; a frame beyond the frames of the layer at the load becomes a problem, and the layer shows
-frame 0.
+frame 0. A `depth` at or behind the camera of a `ParallaxProjection` whose distance is known throws
+as well, from `set()` and from `apply()` alike; a layer at a depth is written with the `k` of the
+distance of the last `update()`, so a move of a far layer needs no second pass.
 
 `set()`, `apply()`, `takeChanged()`, `update()` without a change of the stack and `layer.frameAt()`
 allocate nothing. Two costs are the caller's: a pose object built per call (`{x, y}` in the frame
@@ -485,8 +608,11 @@ over. It answers `true` when, since the last call,
 
 - a shown layer changed a field of its pose to another value;
 - a layer turned from shown to hidden or back: through `visible`, an `opacity` from or to 0, an
-  empty cel as its frame, or its picture arriving;
-- a shown layer changed its `depth` or `order`.
+  empty cel as its frame, its picture arriving, or a camera distance that leaves it behind the
+  camera or brings it back;
+- a shown layer changed its `depth` or `order`;
+- `update()` turned the mesh to another plane, or laid the layers at a depth out for a new distance
+  of the camera.
 
 A layer is shown while it is `visible`, its picture is there, its `opacity` is above 0 and its frame
 is no empty cel. A camera that moves is the business of its rig; the parallax of the layers needs

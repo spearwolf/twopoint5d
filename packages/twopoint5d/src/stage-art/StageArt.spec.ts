@@ -1,8 +1,10 @@
 import {readFileSync} from 'node:fs';
-import {Group, ImageLoader, Plane, Quaternion, Texture, Vector3, type WebGPURenderer} from 'three/webgpu';
+import {Group, ImageLoader, PerspectiveCamera, Plane, Quaternion, Texture, Vector3, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
+import {CameraProjection} from '../stage/CameraProjection.js';
 import {OrthographicProjection} from '../stage/OrthographicProjection.js';
+import {ParallaxProjection} from '../stage/ParallaxProjection.js';
 import {ProjectionPlane} from '../stage/ProjectionPlane.js';
 import {AsepriteJson, type AsepriteJsonData} from '../texture/AsepriteJson.js';
 import type {TextureAtlas} from '../texture/TextureAtlas.js';
@@ -773,5 +775,294 @@ describe('dispose()', () => {
 
     art.dispose();
     expect(geometryDispose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('planes, projections and depth', () => {
+  // a parallax projection over a view of 100 × 100 whose camera stands `distance` units in front of
+  // the plane; without a view its distance is NaN
+  const parallax = (distance: number, {viewed = true} = {}): ParallaxProjection => {
+    const projection = new ParallaxProjection('xy|bottom-left', {fit: 'fill', distanceToProjectionPlane: distance});
+    if (viewed) projection.updateViewRect(100, 100);
+    return projection;
+  };
+  const moveCamera = (projection: ParallaxProjection, distance: number): void => {
+    projection.viewSpecs.distanceToProjectionPlane = distance;
+    projection.updateViewRect(100, 100);
+  };
+  // the warnings that a layer lies at or behind the camera, among the others of the art
+  const behindTheCamera = (warn: ReturnType<typeof silenceWarnings>): unknown[] =>
+    warn.mock.calls.map(([message]) => message).filter((message) => / lies at or behind the camera, /.test(String(message)));
+  const facing = (description: 'xy|top-left' | 'xz|bottom-left' | 'xz|top-left'): Quaternion => {
+    const turned = new Group();
+    ProjectionPlane.get(description).applyRotation(turned);
+    return turned.quaternion;
+  };
+
+  test('lays a layer at a depth out at k = (D + δ) / D about the focus, so the camera at rest sees it as painted', () => {
+    const art = new StageArt(sceneSource(), {projection: parallax(100)});
+    // back lies 50 behind the plane: k = 1.5, about its pivot on the focus
+    const back = art.layer('back').sprite;
+    expect([back.x, back.y, back.z, back.width, back.height]).toEqual([0, 0, -50, 150, 150]);
+
+    // the box, its pivot at (-10, 15) units, 100 behind the plane: k = 2
+    const box = art.layer('box').sprite;
+    art.set('box', {depth: 100});
+    expect([box.x, box.y, box.z, box.width, box.height]).toEqual([-20, 30, -100, 80, 60]);
+    // a move of a layer at a depth carries the k in force
+    art.set('box', {x: 45, y: 40});
+    expect([box.x, box.y]).toEqual([-10, 20]);
+
+    // a focus on the pivot of the box leaves it where it stands, only larger
+    const focused = new StageArt(sceneSource(), {projection: parallax(100), focus: [40, 35]});
+    focused.set('box', {depth: 100});
+    const sprite = focused.layer('box').sprite;
+    expect([sprite.x, sprite.y, sprite.width, sprite.height]).toEqual([-10, 15, 80, 60]);
+  });
+
+  test('draws depth uncompensated without a projection, under an OrthographicProjection or a CameraProjection, and with compensateDepth: false', () => {
+    const projection = parallax(100);
+    const arts = [
+      new StageArt(sceneSource()),
+      new StageArt(sceneSource(), {projection: new OrthographicProjection('xy|bottom-left')}),
+      new StageArt(sceneSource(), {projection: new CameraProjection(new PerspectiveCamera())}),
+      new StageArt(sceneSource(), {projection, compensateDepth: false}),
+    ];
+    for (const art of arts) {
+      art.set('box', {depth: 100});
+      art.update();
+      expect([art.layer('back').sprite.width, art.layer('box').sprite.x, art.layer('box').sprite.width]).toEqual([100, -10, 40]);
+      art.takeChanged();
+    }
+    // never compensated: a new distance of the camera lays nothing out anew
+    moveCamera(projection, 40);
+    arts[3]!.update();
+    expect(arts[3]!.takeChanged()).toBe(false);
+    expect(arts[3]!.layer('back').sprite.width).toBe(100);
+  });
+
+  test('a CameraProjection leaves the art in its plane, without a word', () => {
+    const warn = silenceWarnings();
+    const art = new StageArt(sceneSource(), {plane: 'xy|top-left', projection: new CameraProjection(new PerspectiveCamera())});
+    expect(art.plane.equals(ProjectionPlane.get('xy|top-left'))).toBe(true);
+    expect(art.mesh.quaternion.angleTo(facing('xy|top-left'))).toBeCloseTo(0, 6);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test('a new distance of the camera lays the depth layers out anew in update(), and takeChanged() answers true once', () => {
+    const projection = parallax(100);
+    const art = new StageArt(sceneSource(), {projection});
+    const back = art.layer('back').sprite;
+    art.update();
+    art.takeChanged();
+
+    moveCamera(projection, 200);
+    // the distance in force is the one of the last update()
+    expect(back.width).toBe(150);
+    art.update();
+    expect(back.width).toBe(125);
+    expect(art.layer('box').sprite.width).toBe(40);
+    expect(art.takeChanged()).toBe(true);
+    expect(art.takeChanged()).toBe(false);
+    art.update();
+    expect(art.takeChanged()).toBe(false);
+
+    // another projection of the same distance and plane changes nothing; one without a distance draws depth as it is
+    art.projection = parallax(200);
+    art.update();
+    expect(art.takeChanged()).toBe(false);
+    art.projection = new OrthographicProjection('xy|bottom-left');
+    expect(back.width).toBe(125);
+    art.update();
+    expect(back.width).toBe(100);
+    expect(art.takeChanged()).toBe(true);
+  });
+
+  test('before the first view of a parallax projection depth is drawn uncompensated, and the first update() after it lays it out', () => {
+    const projection = parallax(100, {viewed: false});
+    expect(projection.distanceToProjectionPlane).toBeNaN();
+    const art = new StageArt(sceneSource(), {projection});
+    // no distance known, nothing to stand behind
+    art.set('box', {depth: -400});
+    art.set('box', {depth: 100});
+    art.update();
+    expect(art.layer('back').sprite.width).toBe(100);
+    expect(art.layer('box').sprite.width).toBe(40);
+    art.takeChanged();
+
+    projection.updateViewRect(100, 100);
+    art.update();
+    expect(art.layer('back').sprite.width).toBe(150);
+    expect([art.layer('box').sprite.x, art.layer('box').sprite.width]).toEqual([-20, 80]);
+    expect(art.takeChanged()).toBe(true);
+  });
+
+  test('set() refuses a depth at or behind the camera where its distance is known, naming the layer and the field, and the layer keeps what it held', () => {
+    const art = new StageArt(sceneSource(), {name: 'kitchen', pxPerUnit: 2, projection: parallax(100)});
+    const box = art.layer('box').sprite;
+    const held = [box.x, box.y, box.z, box.width];
+
+    // 100 units are 200 artwork pixels
+    expect(() => art.set('box', {x: 10, depth: -200})).toThrow(
+      new RangeError(
+        'ArtLayer "box": depth must be a number above -200 — the camera stands 200 artwork pixels in front of the plane —, got -200',
+      ),
+    );
+    expect(() => art.layer('box').set({depth: -300})).toThrow(/^ArtLayer "box": depth must be a number above -200 /);
+    expect([box.x, box.y, box.z, box.width]).toEqual(held);
+
+    art.set('box', {depth: -100});
+    expect([box.z, box.width]).toEqual([50, 10]);
+  });
+
+  test('a layer a new distance leaves at or behind the camera is hidden, said once, and shown again once it lies in front of the camera', () => {
+    const warn = silenceWarnings();
+    const projection = parallax(100);
+    const art = new StageArt(sceneSource(), {name: 'kitchen', projection});
+    const box = art.layer('box').sprite;
+    art.set('box', {depth: -80});
+    art.update();
+    art.takeChanged();
+    expect(box.visible).toBe(1);
+
+    // the box brought in front of the lamp, painted above it, has been said as well
+    expect(behindTheCamera(warn)).toEqual([]);
+
+    moveCamera(projection, 50);
+    art.update();
+    expect(box.visible).toBe(0);
+    expect(art.takeChanged()).toBe(true);
+    expect(behindTheCamera(warn)).toEqual([
+      'StageArt "kitchen": the layer "box", at a depth of -80, lies at or behind the camera, which stands 50 artwork pixels in front of the plane — it is hidden until its depth or the distance of the camera brings it in front of the camera again. This warning is shown once until then.',
+    ]);
+
+    // still behind: no second word; moved while hidden: no change
+    moveCamera(projection, 40);
+    art.update();
+    expect(behindTheCamera(warn)).toHaveLength(1);
+    // back, at a depth as well, was laid out for the new distance
+    expect(art.takeChanged()).toBe(true);
+    art.set('box', {x: 41});
+    expect(art.takeChanged()).toBe(false);
+
+    moveCamera(projection, 200);
+    art.update();
+    expect(box.visible).toBe(1);
+    expect(box.width).toBeCloseTo(40 * 0.6, 5);
+    expect(art.takeChanged()).toBe(true);
+
+    // left behind once more, it is said once more; a depth brings it back
+    moveCamera(projection, 80);
+    art.update();
+    expect(box.visible).toBe(0);
+    expect(behindTheCamera(warn)).toHaveLength(2);
+    art.set('box', {depth: 0});
+    expect(box.visible).toBe(1);
+    expect(art.takeChanged()).toBe(true);
+  });
+
+  test('apply() of a dolly track refuses a key at or behind a camera that came closer, keeps the pose, and takes the next time in front of it', () => {
+    const warn = silenceWarnings();
+    const projection = parallax(300);
+    const art = new StageArt(sceneSource(), {projection});
+    const box = art.layer('box').sprite;
+    const dolly = artTrack([
+      {at: 0, depth: 0},
+      {at: 1, depth: -250},
+    ]);
+    art.apply('box', dolly, 0.5);
+    expect(box.z).toBe(125);
+
+    moveCamera(projection, 200);
+    art.update();
+    expect(box.visible).toBe(1);
+    expect(() => art.apply('box', dolly, 1)).toThrow(
+      new RangeError(
+        'ArtLayer "box": depth must be a number above -200 — the camera stands 200 artwork pixels in front of the plane —, got -250',
+      ),
+    );
+    expect(() => art.layer('box').apply(dolly, 0.9)).toThrow(/^ArtLayer "box": depth must be a number above -200 /);
+    expect(box.z).toBe(125);
+    expect(box.visible).toBe(1);
+
+    art.apply('box', dolly, 0.6);
+    expect(box.z).toBe(150);
+    expect(behindTheCamera(warn)).toEqual([]);
+  });
+
+  test('the plane setter turns the mesh in the next update(), writes no sprite, and an equal plane is no change', () => {
+    const art = new StageArt(sceneSource());
+    art.update();
+    art.takeChanged();
+    const box = art.layer('box').sprite;
+    const held = [box.x, box.y, box.z, box.width, box.height];
+
+    art.plane = 'xy|top-left';
+    expect(art.plane.equals(ProjectionPlane.get('xy|top-left'))).toBe(true);
+    expect(art.mesh.quaternion.equals(new Quaternion())).toBe(true);
+    art.update();
+    expect(art.mesh.quaternion.angleTo(facing('xy|top-left'))).toBeCloseTo(0, 6);
+    expect(art.takeChanged()).toBe(true);
+    expect([box.x, box.y, box.z, box.width, box.height]).toEqual(held);
+
+    const turned = art.mesh.quaternion.clone();
+    art.plane = new ProjectionPlane('xy|top-left');
+    art.update();
+    expect(art.takeChanged()).toBe(false);
+    expect(art.mesh.quaternion.equals(turned)).toBe(true);
+
+    art.plane = 'xy|bottom-left';
+    art.update();
+    expect(art.mesh.quaternion.equals(new Quaternion())).toBe(true);
+    expect(art.takeChanged()).toBe(true);
+  });
+
+  test('the projection and plane setters refuse what they cannot use, and keep what they held', () => {
+    const projection = new OrthographicProjection('xy|top-left');
+    const art = new StageArt(sceneSource(), {name: 'kitchen', projection});
+
+    expect(() => {
+      art.plane = 'xy' as never;
+    }).toThrow(
+      new TypeError(
+        'StageArt "kitchen": plane must be a ProjectionPlane or one of "xy|bottom-left", "xy|top-left", "xz|bottom-left", "xz|top-left", got "xy"',
+      ),
+    );
+    expect(() => {
+      art.plane = undefined as never;
+    }).toThrow(/^StageArt "kitchen": plane must be a ProjectionPlane .*, got undefined$/);
+    expect(() => {
+      art.projection = {} as never;
+    }).toThrow(new TypeError('StageArt "kitchen": projection must be an IProjection — stage.projection —, got {}'));
+    expect(() => {
+      art.projection = new Group() as never;
+    }).toThrow(/^StageArt "kitchen": projection must be an IProjection — stage\.projection —, got Group$/);
+    expect(art.projection).toBe(projection);
+    expect(art.plane.equals(ProjectionPlane.get('xy|top-left'))).toBe(true);
+
+    art.projection = undefined;
+    expect(art.projection).toBeUndefined();
+    expect(art.plane.equals(ProjectionPlane.get('xy|bottom-left'))).toBe(true);
+  });
+
+  test('an art handed a projection with a plane and a plane, by the options or the setters, says so once', () => {
+    const warn = silenceWarnings();
+    const art = new StageArt(sceneSource(), {plane: 'xz|bottom-left'});
+    expect(warn).not.toHaveBeenCalled();
+
+    art.projection = new OrthographicProjection('xy|top-left');
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]![0]).toMatch(/^StageArt: .*projection.*plane.*This warning is shown once per art\.$/);
+    art.update();
+    expect(art.mesh.quaternion.angleTo(facing('xy|top-left'))).toBeCloseTo(0, 6);
+
+    art.plane = 'xz|top-left';
+    art.projection = new OrthographicProjection('xy|bottom-left');
+    expect(warn).toHaveBeenCalledOnce();
+
+    // without the projection the art lies in its plane
+    art.projection = undefined;
+    art.update();
+    expect(art.mesh.quaternion.angleTo(facing('xz|top-left'))).toBeCloseTo(0, 6);
   });
 });

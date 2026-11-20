@@ -4,7 +4,9 @@ import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
 import {AsepriteJson, type AsepriteJsonData} from '../texture/AsepriteJson.js';
+import {ParallaxProjection} from '../stage/ParallaxProjection.js';
 import {anchorOf, artFrameOf, depthScaleInto, layoutLayerInto, type LayerBox} from './artLayout.js';
+import type {StageArtOptions} from './artOptions.js';
 import {type ArtPose, POSE_DEG, POSE_DEPTH, POSE_SIZE, POSE_X, POSE_Y, POSE_SCALE_X, POSE_SCALE_Y} from './artPose.js';
 import {artTrack, rampAt} from './artTrack.js';
 import {StageArt} from './StageArt.js';
@@ -15,9 +17,9 @@ const BYTES_PER_CALL_LIMIT = 1;
 const CALLS = 1000;
 
 // the kitchen of the fixtures, an Aseprite sheet of six layers of four frames each, laid out and sorted once
-const kitchen = (): StageArt => {
+const kitchen = (options: StageArtOptions = {}): StageArt => {
   const json: AsepriteJsonData = JSON.parse(readFileSync(new URL('./fixtures/kitchen-aseprite.json', import.meta.url), 'utf8'));
-  const art = new StageArt({atlas: AsepriteJson.parse(json)[0], texture: new Texture()}, {pxPerUnit: 2});
+  const art = new StageArt({atlas: AsepriteJson.parse(json)[0], texture: new Texture()}, {pxPerUnit: 2, ...options});
   art.update();
   return art;
 };
@@ -156,6 +158,36 @@ describe('stage art on the hot path', () => {
     });
 
     expect(frames[0]).toBeGreaterThan(0);
+    expect(bytesPerRound / (CALLS * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+    art.dispose();
+  });
+
+  test('set() of a depth layer under a ParallaxProjection, and an update() at the same distance, allocate nothing per call', async () => {
+    const projection = new ParallaxProjection('xy|bottom-left', {fit: 'fill', distanceToProjectionPlane: 300});
+    projection.updateViewRect(800, 600);
+    const art = kitchen({projection});
+    const window = art.layer('window');
+    // whole numbers handed in; the k of the depth, (300 + 41 / 2) / 300, is a fraction the art works
+    // out. The depth is checked against the camera at every call and stays, so update() does not sort
+    const move: ArtPose = {x: 0, y: 0, depth: 41};
+    const look: ArtPose = {depth: 41, scaleX: 1};
+    art.set('window', move);
+    art.update();
+    const shown = new Uint32Array(1);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS; i++) {
+        move.x = i;
+        move.y = i & 7;
+        art.set('window', move);
+        look.scaleX = (i & 1) + 1;
+        window.set(look);
+        art.update();
+        shown[0]! += window.sprite.visible;
+      }
+    });
+
+    expect(shown[0]).toBeGreaterThan(0);
     expect(bytesPerRound / (CALLS * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
     art.dispose();
   });

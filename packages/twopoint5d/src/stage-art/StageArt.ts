@@ -4,7 +4,8 @@ import {FeatureSprites} from '../sprites/FeatureSprites/FeatureSprites.js';
 import {FeatureSpritesGeometry} from '../sprites/FeatureSprites/FeatureSpritesGeometry.js';
 import type {PreparedSpriteFrame} from '../sprites/features/AtlasFrame.js';
 import type {IProjection} from '../stage/IProjection.js';
-import {ProjectionPlane} from '../stage/ProjectionPlane.js';
+import {ParallaxProjection} from '../stage/ParallaxProjection.js';
+import {ProjectionPlane, type ProjectionPlaneDescription} from '../stage/ProjectionPlane.js';
 import type {TextureAtlas} from '../texture/TextureAtlas.js';
 import type {TextureStore, TextureStoreLease} from '../texture/TextureStore.js';
 import {describeValue} from '../utils/describeValue.js';
@@ -13,8 +14,17 @@ import type {AttributeBuffer} from '../vertex-objects/VertexObjectBuffer.js';
 import type {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import {VOUtils} from '../vertex-objects/VOUtils.js';
 import {type ArtLayerInfo, type ArtLayer, ArtLayerInternals} from './ArtLayer.js';
-import {type ArtFrame, anchorOf, artFrameOf, type LayerBox, layoutLayerInto, turnToPlane} from './artLayout.js';
-import {checkStageArt, MAX_LAYERS, SHAPES, type StageArtOptions, type StageArtSource, shapeOf} from './artOptions.js';
+import {type ArtFrame, anchorOf, artFrameOf, depthScaleInto, type LayerBox, layoutLayerInto, turnToPlane} from './artLayout.js';
+import {
+  checkPlane,
+  checkProjection,
+  checkStageArt,
+  MAX_LAYERS,
+  SHAPES,
+  type StageArtOptions,
+  type StageArtSource,
+  shapeOf,
+} from './artOptions.js';
 import {
   type ArtPose,
   checkPoseField,
@@ -52,8 +62,10 @@ import {type StageArtSpriteApi, stageArtKind} from './stageArtKind.js';
 const LOADED = 1;
 // the load settled without a picture of the layer: a failed source, a layer the source lacks
 const FAILED = 2;
-// a depth at or in front of the camera leaves the layer undrawable
+// a depth at or behind the camera leaves the layer undrawable
 const BEHIND = 4;
+// the art said that the layer lies at or behind the camera; cleared once it lies in front of it again
+const WARNED_BEHIND = 8;
 // the art said that the layer, painted above another, lies behind it
 const WARNED_ORDER = 16;
 // the sprite of the layer is drawn: what its visible attribute holds
@@ -67,10 +79,14 @@ const MOVE = bit(POSE_X) | bit(POSE_Y) | bit(POSE_DEPTH);
 const SCALE = bit(POSE_SCALE_X) | bit(POSE_SCALE_Y);
 const LAYOUT = MOVE | SCALE | bit(POSE_DEG);
 const STACK = bit(POSE_DEPTH) | bit(POSE_ORDER);
+// what a new camera distance writes anew of a layer at a depth: its place and its size — x stands for
+// the whole position, which #write() writes as one; the depth itself, and so the stack, stay
+const RELAYOUT = bit(POSE_X) | SCALE;
 
 // the scratch of a layout: what layoutLayerInto() writes, and the tuples the sprite setters copy from —
 // a fraction in a typed array or a tuple stays unboxed, one handed to a call V8 leaves un-inlined is boxed
 const layoutOut = new Float64Array(6);
+const depthScaleOut = new Float64Array(1);
 const anchorOut = new Float64Array(2);
 const positionTuple: [x: number, y: number, z: number] = [0, 0, 0];
 const sizeTuple: [width: number, height: number] = [0, 0];
@@ -142,8 +158,20 @@ export class StageArt extends Group {
 
   readonly #subject: string;
   readonly #options: StageArtOptions;
-  readonly #projection: IProjection | undefined;
-  readonly #plane: ProjectionPlane;
+  readonly #pxPerUnit: number;
+  #projection: IProjection | undefined;
+  // the projection whose camera distance compensates depth: a ParallaxProjection under compensateDepth
+  #parallax: ParallaxProjection | undefined;
+  // the plane handed in — through the options or the setter — or the default, and whether one was handed in
+  #planeOption: ProjectionPlane;
+  #planeGiven: boolean;
+  #warnedBoth = false;
+  // a copy of the plane the mesh is turned to, compared with the plane in force in update(): a plane
+  // changed in place — its normal, its up — is a plane changed as well
+  #turnedTo: ProjectionPlane;
+  // D, the distance of the camera to the plane in units the layers at a depth are laid out with; NaN
+  // draws them uncompensated — no parallax camera, compensateDepth: false, or no view yet
+  #distance = Number.NaN;
   #frame: ArtFrame | undefined;
   #canvas: {readonly width: number; readonly height: number} | undefined;
   #names: readonly string[] = Object.freeze([]);
@@ -220,15 +248,15 @@ export class StageArt extends Group {
     const {plane, material} = opts;
 
     this.#options = opts;
-    this.#projection = opts.projection;
-    const planeOfProjection = opts.projection?.projectionPlane;
-    if (planeOfProjection !== undefined && plane !== undefined) {
-      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
-      console.warn(
-        `${this.#subject}: it was handed both a projection with a plane and a plane — it lies in the plane of the projection; leave out plane, or the projection. This warning is shown once per art.`,
-      );
-    }
-    this.#plane = ProjectionPlane.get(planeOfProjection ?? plane ?? 'xy|bottom-left');
+    this.#pxPerUnit = opts.pxPerUnit ?? 1;
+    this.#planeOption = ProjectionPlane.get(plane ?? 'xy|bottom-left');
+    this.#planeGiven = plane !== undefined;
+    this.#takeProjection(opts.projection);
+    // the distance of a view the projection has given already; before its first view the layers are
+    // drawn uncompensated until an update() reads one
+    this.#distance = this.#parallax?.distanceToProjectionPlane ?? Number.NaN;
+    const turnedTo = this.plane;
+    this.#turnedTo = turnedTo.clone();
 
     // the layers known now: those of a source handed in, else those only names. A source loaded later
     // without only builds the geometry of its layers once they are known
@@ -244,7 +272,7 @@ export class StageArt extends Group {
     });
     this.mesh.name = 'twopoint5d.StageArt.mesh';
     this.#bindScalars();
-    turnToPlane(this.mesh, this.#plane);
+    turnToPlane(this.mesh, turnedTo);
     this.add(this.mesh);
 
     this.loaded = new Promise<void>((resolve) => {
@@ -277,14 +305,45 @@ export class StageArt extends Group {
     return this.#problems;
   }
 
-  /** The projection handed in. */
+  /**
+   * The projection of the stage — `stage.projection` —, handed in through the options or here: the
+   * art lies in its plane, and under a `ParallaxProjection` it draws a layer at a depth as painted
+   * at the rest of the camera (`compensateDepth`). A projection without a plane — a
+   * `CameraProjection` — leaves the art in {@link plane}, and a projection that places no camera at
+   * a distance draws depth uncompensated. A new one takes effect in the next {@link update}: the
+   * art does not follow a stage whose projection is swapped; hand it the new one. An art handed a
+   * projection with a plane and a plane says so once on the console. It stays the caller's.
+   *
+   * @throws a `TypeError` for a value that is no `IProjection`, and keeps the projection it holds
+   */
   get projection(): IProjection | undefined {
     return this.#projection;
   }
 
-  /** The plane the art lies in: that of the projection, else the one handed in, else `'xy|bottom-left'`. */
+  set projection(projection: IProjection | undefined) {
+    if (projection !== undefined) checkProjection(this.#subject, projection);
+    this.#takeProjection(projection);
+  }
+
+  /**
+   * The plane the art lies in: that of the {@link projection}, else the one handed in, else
+   * `'xy|bottom-left'`. A plane handed in here is a `ProjectionPlane` — it stays the caller's — or
+   * one of the four descriptions; it counts where the projection has no plane, and the mesh turns
+   * to a plane other than the one it faces (`ProjectionPlane#equals()`) in the next
+   * {@link update}. A turn writes no sprite: the layers keep their places in the art frame.
+   *
+   * @throws a `TypeError` for a value that is neither a `ProjectionPlane` nor one of its four
+   *   descriptions, and keeps the plane it holds
+   */
   get plane(): ProjectionPlane {
-    return this.#plane;
+    return this.#projection?.projectionPlane ?? this.#planeOption;
+  }
+
+  set plane(plane: ProjectionPlane | ProjectionPlaneDescription) {
+    checkPlane(this.#subject, plane);
+    this.#planeOption = ProjectionPlane.get(plane);
+    this.#planeGiven = true;
+    this.#warnBoth();
   }
 
   /** Whether {@link dispose} has run. */
@@ -316,9 +375,12 @@ export class StageArt extends Group {
    * picture of the layer has arrived is kept and shown once it is there. Each field is checked
    * before any is written: a field that is no finite number, an `opacity` outside 0 … 1, a `frame`
    * that is no whole number of 0 or more — or, once the frames are known, no index into them —, an
-   * `order` that is no whole number from -1024 to 1023, a `visible` that is no boolean and a key that
-   * is no field of a pose throw, naming the layer and the field, and the layer keeps what it held.
-   * Allocates nothing. Once disposed it writes nothing, and still turns away what it cannot use.
+   * `order` that is no whole number from -1024 to 1023, a `depth` at or behind the camera of a
+   * `ParallaxProjection` whose distance is known, a `visible` that is no boolean and a key that is
+   * no field of a pose throw, naming the layer and the field, and the layer keeps what it held. A
+   * layer at a depth is written with the depth compensation of the distance in force — that of the
+   * last {@link update}. Allocates nothing. Once disposed it writes nothing, and still turns away
+   * what it cannot use.
    *
    * @throws an `Error` for a name the art does not know, listing the names
    */
@@ -351,8 +413,10 @@ export class StageArt extends Group {
   /**
    * Whether the picture changed since the last call, and starts over: `true` when a shown layer
    * changed a field of its pose to another value, turned from shown to hidden or back — by
-   * `visible`, an `opacity` from or to 0, or its picture arriving — or changed its place in the
-   * stack. A hidden layer that moves, and a value set again, answer `false`. A write through
+   * `visible`, an `opacity` from or to 0, its picture arriving, or a camera distance that leaves
+   * it behind the camera or brings it back — or changed its place in the stack, and when an
+   * {@link update} turned the mesh to another plane or laid the layers at a depth out for a new
+   * distance. A hidden layer that moves, and a value set again, answer `false`. A write through
    * `layer.sprite` is the caller's to report. `false` once disposed. Allocates nothing.
    */
   takeChanged(): boolean {
@@ -362,13 +426,25 @@ export class StageArt extends Group {
   }
 
   /**
-   * Once per frame, before the render: sorts the layers back to front where a depth or an order
-   * changed — by depth, the farthest first, then by order, then as painted — and updates the mesh.
-   * The first update that finds a layer painted above another lying behind it says so on the
-   * console, once per layer. Allocates nothing without a sort. Does nothing once disposed.
+   * Once per frame, before the render: turns the mesh to the {@link plane} where it changed; under
+   * a `ParallaxProjection` reads the distance of its camera to the plane, and where it differs from
+   * the one of the last update lays the layers at a depth out anew — a layer it leaves at or behind
+   * the camera is hidden and said once on the console, until a depth or a distance brings it in
+   * front of the camera again —; sorts the layers back to front where a depth or an order changed
+   * — by depth, the farthest first, then by order, then as painted —; and updates the mesh. The
+   * first update that finds a layer painted above another lying behind it says so on the console,
+   * once per layer. Allocates nothing without a sort, a turn or a new distance. Does nothing once
+   * disposed.
    */
   update(): void {
     if (this.#disposed) return;
+    const plane = this.plane;
+    if (!plane.equals(this.#turnedTo)) this.#turnTo(plane);
+    const distance = this.#parallax === undefined ? Number.NaN : this.#parallax.distanceToProjectionPlane;
+    // NaN against NaN is no new distance: the layers are laid out uncompensated already
+    if (distance !== this.#distance && !(Number.isNaN(distance) && Number.isNaN(this.#distance))) {
+      this.#relayout(distance);
+    }
     if (this.#stackDirty) {
       this.#stackDirty = false;
       // two stable passes: the second keeps the order of the first among layers of one depth, so the
@@ -405,6 +481,46 @@ export class StageArt extends Group {
     this.#bySprite.clear();
     this.#settled = true;
     this.#resolveLoaded();
+  }
+
+  // --- the plane and the camera ---------------------------------------------------------------
+
+  #takeProjection(projection: IProjection | undefined): void {
+    this.#projection = projection;
+    this.#parallax = this.#options.compensateDepth !== false && projection instanceof ParallaxProjection ? projection : undefined;
+    this.#warnBoth();
+  }
+
+  #warnBoth(): void {
+    if (this.#warnedBoth || !this.#planeGiven || this.#projection?.projectionPlane === undefined) return;
+    this.#warnedBoth = true;
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+    console.warn(
+      `${this.#subject}: it was handed both a projection with a plane and a plane — it lies in the plane of the projection; leave out plane, or the projection. This warning is shown once per art.`,
+    );
+  }
+
+  // turns the mesh to `plane`; the layers keep their places in the art frame, so no sprite is written
+  #turnTo(plane: ProjectionPlane): void {
+    this.#turnedTo = plane.clone();
+    turnToPlane(this.mesh, plane);
+    for (let i = 0; i < this.#layers.length; i++) {
+      if (this.#flags[i]! & SHOWN) {
+        this.#changed = true;
+        break;
+      }
+    }
+  }
+
+  // lays the layers at a depth out for the distance `distance` — NaN draws them uncompensated —; the
+  // layers on the plane have k = 1 under every distance, and set() writes them alone
+  #relayout(distance: number): void {
+    this.#distance = distance;
+    const poses = this.#poses;
+    const flags = this.#flags;
+    for (let i = 0; i < this.#layers.length; i++) {
+      if (flags[i]! & LOADED && poses[i * POSE_SIZE + POSE_DEPTH] !== 0) this.#write(i, RELAYOUT);
+    }
   }
 
   // --- loading --------------------------------------------------------------------------------
@@ -661,7 +777,11 @@ export class StageArt extends Group {
     const {x, y, depth, deg, scaleX, scaleY, opacity, frame, visible, order} = pose;
     if (x !== undefined && !(typeof x === 'number' && Number.isFinite(x))) checkPoseField(subject, 'x', x);
     if (y !== undefined && !(typeof y === 'number' && Number.isFinite(y))) checkPoseField(subject, 'y', y);
-    if (depth !== undefined && !(typeof depth === 'number' && Number.isFinite(depth))) checkPoseField(subject, 'depth', depth);
+    if (depth !== undefined) {
+      if (!(typeof depth === 'number' && Number.isFinite(depth))) checkPoseField(subject, 'depth', depth);
+      // at or behind the camera, where its distance is known: D + δ ≤ 0. NaN, no distance, compares false
+      if (this.#distance + depth / this.#pxPerUnit <= 0) this.#refuseDepth(index, depth);
+    }
     if (deg !== undefined && !(typeof deg === 'number' && Number.isFinite(deg))) checkPoseField(subject, 'deg', deg);
     if (scaleX !== undefined && !(typeof scaleX === 'number' && Number.isFinite(scaleX)))
       checkPoseField(subject, 'scaleX', scaleX);
@@ -753,7 +873,11 @@ export class StageArt extends Group {
     const row = this.#row;
     if (fields & bit(POSE_X)) row[POSE_X] = pose.x!;
     if (fields & bit(POSE_Y)) row[POSE_Y] = pose.y!;
-    if (fields & bit(POSE_DEPTH)) row[POSE_DEPTH] = pose.depth!;
+    if (fields & bit(POSE_DEPTH)) {
+      // a key of a dolly that a camera come closer leaves at or behind it, before any field is written
+      if (this.#distance + pose.depth! / this.#pxPerUnit <= 0) this.#refuseDepth(index, pose.depth!);
+      row[POSE_DEPTH] = pose.depth!;
+    }
     if (fields & bit(POSE_DEG)) row[POSE_DEG] = pose.deg!;
     if (fields & bit(POSE_SCALE_X)) row[POSE_SCALE_X] = pose.scaleX!;
     if (fields & bit(POSE_SCALE_Y)) row[POSE_SCALE_Y] = pose.scaleY!;
@@ -825,15 +949,28 @@ export class StageArt extends Group {
   // them: its visibility, its place in the stack, the changed flag
   #write(index: number, changed: number): void {
     if (changed === 0) return;
+    // under a camera distance a depth is a k, which scales the size as well as the place
+    if (changed & bit(POSE_DEPTH) && !Number.isNaN(this.#distance)) changed |= SCALE;
     const sprite = this.#sprites[index]!;
     const pool = this.mesh.spritePool!;
     const poses = this.#poses;
     const at = index * POSE_SIZE;
 
     if (changed & LAYOUT) {
-      // the depth compensation of a parallax camera scales a layer at a depth by k about the focus;
-      // without a camera distance in force the layers are drawn as they are, k = 1
-      layoutLayerInto(this.#frame!, poses, index, this.#boxes[index]!, 1, layoutOut);
+      // the depth compensation of a parallax camera scales a layer at a depth by k = (D + δ) / D about
+      // the focus; without a camera distance in force the layers are drawn as they are, k = 1
+      const frame = this.#frame!;
+      depthScaleInto(this.#distance, poses[at + POSE_DEPTH]!, frame, depthScaleOut);
+      // a k of 0 or less: the layer lies at or behind the camera, which cannot draw it. set() turns
+      // such a depth away; a new distance, a rest or a pose set before the load leave a layer there
+      if (depthScaleOut[0]! > 0) {
+        this.#flags[index]! &= ~(BEHIND | WARNED_BEHIND);
+      } else {
+        if (!(this.#flags[index]! & WARNED_BEHIND)) this.#warnBehind(index);
+        this.#flags[index]! |= BEHIND | WARNED_BEHIND;
+        depthScaleOut[0] = 1;
+      }
+      layoutLayerInto(frame, poses, index, this.#boxes[index]!, depthScaleOut[0]!, layoutOut);
       if (changed & MOVE) {
         positionTuple[0] = layoutOut[0]!;
         positionTuple[1] = layoutOut[1]!;
@@ -881,6 +1018,25 @@ export class StageArt extends Group {
     } else if (shown) {
       this.#changed = true;
     }
+  }
+
+  #warnBehind(index: number): void {
+    const depth = this.#poses[index * POSE_SIZE + POSE_DEPTH]!;
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+    console.warn(
+      `${this.#subject}: the layer ${describeValue(this.#names[index]!)}, at a depth of ${depth}, lies at or behind the camera, which stands ${this.#distance * this.#pxPerUnit} artwork pixels in front of the plane — it is hidden until its depth or the distance of the camera brings it in front of the camera again. This warning is shown once until then.`,
+    );
+  }
+
+  // turns away a depth at or behind the camera in force, where its distance is known
+  #refuseDepth(index: number, depth: number): never {
+    const camera = this.#distance * this.#pxPerUnit;
+    refusePoseField(
+      this.#subjects[index]!,
+      'depth',
+      depth,
+      `a number above ${-camera} — the camera stands ${camera} artwork pixels in front of the plane —`,
+    );
   }
 
   // --- the stack ------------------------------------------------------------------------------
