@@ -797,7 +797,8 @@ describe('AsepriteJson', () => {
 
       const [atlas] = AsepriteJson.parse(data);
 
-      expect(atlas.size).toBe(24);
+      // six layers of four frames, the empty cel of the ladle at frame 3 left out by --ignore-empty
+      expect(atlas.size).toBe(23);
       expect(atlas.frameNames().slice(0, 5)).toEqual(['wall#0', 'wall#1', 'wall#2', 'wall#3', 'window#0']);
       expect(asepriteMetaOf(atlas)?.layers?.slice(0, 3)).toEqual([
         {name: 'backdrop', color: '#d95763ff', data: 'depth=600'},

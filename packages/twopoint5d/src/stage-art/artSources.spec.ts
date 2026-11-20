@@ -17,10 +17,12 @@ import {
 const SUBJECT = 'StageArt "kitchen"';
 
 // a fresh copy of a fixture per call: a test that changes it leaves the others as they were
-const asepriteJson = (): AsepriteJsonData =>
-  JSON.parse(readFileSync(new URL('./fixtures/kitchen-aseprite.json', import.meta.url), 'utf8'));
-const ftpJson = (): TexturePackerJsonData =>
-  JSON.parse(readFileSync(new URL('./fixtures/kitchen-ftp.json', import.meta.url), 'utf8'));
+const fixture = <T>(name: string): T => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'));
+// the export the guide tells a user to make, --ignore-empty included
+const asepriteJson = (): AsepriteJsonData => fixture('kitchen-aseprite.json');
+// the same export without --ignore-empty: a cel without a pixel is an entry of 1 × 1
+const asepriteEmptyCelsJson = (): AsepriteJsonData => fixture('kitchen-aseprite-empty-cels.json');
+const ftpJson = (): TexturePackerJsonData => fixture('kitchen-ftp.json');
 
 const asepriteAtlas = (data: AsepriteJsonData = asepriteJson()): TextureAtlas<unknown> => AsepriteJson.parse(data)[0];
 const ftpAtlas = (data: TexturePackerJsonData = ftpJson()): TextureAtlas<unknown> => TexturePackerJson.parse(data)[0];
@@ -65,18 +67,8 @@ describe('readAtlasSource() of an Aseprite split-layer sheet', () => {
     expect(steam.frames.map((frame) => frame?.frame)).toEqual([0, 1, 2, 3].map((n) => atlas.frame(`steam#${n}`)));
   });
 
-  test('an empty cel — the 1 × 1 entry of --trim — is undefined and joins no box', () => {
-    const ladle = layerOf(readAtlasSource(SUBJECT, asepriteAtlas(), {}).layers, 'ladle');
-
-    expect(ladle.frames).toHaveLength(4);
-    expect(ladle.frames[3]).toBeUndefined();
-    expect(ladle.box).toEqual({x: 150, y: 84, w: 18, h: 40});
-  });
-
-  test('an empty cel left out of the sheet — --ignore-empty — is undefined as well', () => {
-    const data = asepriteJson();
-    data.frames = arrayFrames(data).filter(({filename}) => filename !== 'ladle#3');
-    const {layers, problems} = readAtlasSource(SUBJECT, asepriteAtlas(data), {});
+  test('an empty cel left out of the sheet by --ignore-empty is undefined and joins no box', () => {
+    const {layers, problems} = readAtlasSource(SUBJECT, asepriteAtlas(), {});
 
     const ladle = layerOf(layers, 'ladle');
     expect(ladle.frames).toHaveLength(4);
@@ -85,8 +77,19 @@ describe('readAtlasSource() of an Aseprite split-layer sheet', () => {
     expect(problems).toEqual([]);
   });
 
+  test('an empty cel exported without --ignore-empty — the 1 × 1 entry of --trim — is undefined as well', () => {
+    const {layers, problems} = readAtlasSource(SUBJECT, asepriteAtlas(asepriteEmptyCelsJson()), {});
+
+    expect(layers.map(({name}) => name)).toEqual(['wall', 'window', 'table', 'carafe5', 'ladle', 'steam']);
+    const ladle = layerOf(layers, 'ladle');
+    expect(ladle.frames).toHaveLength(4);
+    expect(ladle.frames[3]).toBeUndefined();
+    expect(ladle.box).toEqual({x: 150, y: 84, w: 18, h: 40});
+    expect(problems).toEqual([]);
+  });
+
   test('a single pixel at the top left corner that Aseprite did not trim from an empty cel is a frame', () => {
-    const data = asepriteJson();
+    const data = asepriteEmptyCelsJson();
     const entry = arrayFrames(data).find(({filename}) => filename === 'ladle#3')!;
     entry.trimmed = false;
     const ladle = layerOf(readAtlasSource(SUBJECT, asepriteAtlas(data), {}).layers, 'ladle');
