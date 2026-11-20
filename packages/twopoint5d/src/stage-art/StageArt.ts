@@ -2,23 +2,19 @@ import {Group, type Texture} from 'three/webgpu';
 
 import {FeatureSprites} from '../sprites/FeatureSprites/FeatureSprites.js';
 import {FeatureSpritesGeometry} from '../sprites/FeatureSprites/FeatureSpritesGeometry.js';
-import type {FeatureSpritesMaterialParameters} from '../sprites/FeatureSprites/FeatureSpritesMaterial.js';
 import type {PreparedSpriteFrame} from '../sprites/features/AtlasFrame.js';
 import type {IProjection} from '../stage/IProjection.js';
-import {ProjectionPlane, type ProjectionPlaneDescription} from '../stage/ProjectionPlane.js';
-import {TextureAtlas} from '../texture/TextureAtlas.js';
-import type {TextureStoreLease} from '../texture/TextureStore.js';
-import {TextureStore} from '../texture/TextureStore.js';
-import {describeThreeValue} from '../utils/describeThreeValue.js';
+import {ProjectionPlane} from '../stage/ProjectionPlane.js';
+import type {TextureAtlas} from '../texture/TextureAtlas.js';
+import type {TextureStore, TextureStoreLease} from '../texture/TextureStore.js';
 import {describeValue} from '../utils/describeValue.js';
-import {isObject} from '../utils/isObject.js';
-import {isRecord} from '../utils/isRecord.js';
 import type {VO} from '../vertex-objects/types.js';
 import type {AttributeBuffer} from '../vertex-objects/VertexObjectBuffer.js';
 import type {VertexObjectPool} from '../vertex-objects/VertexObjectPool.js';
 import {VOUtils} from '../vertex-objects/VOUtils.js';
 import {type ArtLayerInfo, type ArtLayer, ArtLayerInternals} from './ArtLayer.js';
 import {type ArtFrame, anchorOf, artFrameOf, type LayerBox, layoutLayerInto, turnToPlane} from './artLayout.js';
+import {checkStageArt, MAX_LAYERS, SHAPES, type StageArtOptions, type StageArtSource, shapeOf} from './artOptions.js';
 import {
   type ArtPose,
   checkPoseField,
@@ -41,10 +37,7 @@ import {
 } from './artPose.js';
 import {
   type ArtLayerDef,
-  type ArtLayerOptions,
   type ArtLayerSpec,
-  checkArtSourceOptions,
-  checkLayerDefs,
   prepareLayerFrame,
   readAtlasSource,
   readLooseLayers,
@@ -52,43 +45,6 @@ import {
 } from './artSources.js';
 import {type ArtTrack, fieldsOfTrack} from './artTrack.js';
 import {type StageArtSpriteApi, stageArtKind} from './stageArtKind.js';
-
-/**
- * Where an art takes its layers from (§3.2 of the proposal): an atlas item of a `TextureStore` —
- * an Aseprite sheet with split layers or a trimmed atlas —, or the same, already loaded, as an
- * atlas and its texture. With `layers` the layers are loose: each takes the frames and the place
- * its definition gives it. The art may be handed a promise of a source as well.
- */
-export type StageArtSource =
-  | {readonly store: TextureStore; readonly id: string; readonly layers?: readonly ArtLayerDef[]}
-  | {readonly atlas: TextureAtlas<unknown>; readonly texture: Texture; readonly layers?: readonly ArtLayerDef[]};
-
-/** The options of a {@link StageArt}. Every field is optional. */
-export interface StageArtOptions {
-  /** The name the messages of the art give it: `StageArt "kitchen": …`. */
-  name?: string;
-  /** Artwork pixels per unit of the stage. Default 1. */
-  pxPerUnit?: number;
-  /** The point of the canvas that lands on the origin of the art. Default the middle of the canvas, `[0, 0]` without one. */
-  origin?: readonly [number, number];
-  /** The point of the canvas the camera looks at in its rest, in artwork pixels. Default `origin`. */
-  focus?: readonly [number, number];
-  /** The projection of the stage — `stage.projection` —: its plane is the plane of the art. */
-  projection?: IProjection;
-  /** The plane of the art where the projection has none, or without a projection. Default `'xy|bottom-left'`. */
-  plane?: ProjectionPlane | ProjectionPlaneDescription;
-  /** Whether a layer at a depth is drawn as painted at the rest of a parallax camera. Default `true`. */
-  compensateDepth?: boolean;
-  /** The layers to take, in this stacking order, bottom first; a name the source lacks stays hidden. */
-  only?: readonly string[];
-  /** What code says about a layer that the picture cannot, by name. */
-  layers?: Readonly<Record<string, ArtLayerOptions>>;
-  /**
-   * The parameters of the material of the mesh — `transparent` (default `true`), `depthWrite`
-   * (default `false`), `depthTest`, `alphaTest`, … The textures and the placement are the art's own.
-   */
-  material?: Omit<FeatureSpritesMaterialParameters, 'textures' | 'placement' | 'resources' | 'pass'>;
-}
 
 // --- flags of a layer --------------------------------------------------------------------------
 
@@ -111,29 +67,6 @@ const MOVE = bit(POSE_X) | bit(POSE_Y) | bit(POSE_DEPTH);
 const SCALE = bit(POSE_SCALE_X) | bit(POSE_SCALE_Y);
 const LAYOUT = MOVE | SCALE | bit(POSE_DEG);
 const STACK = bit(POSE_DEPTH) | bit(POSE_ORDER);
-
-// an art holds at most this many layers: the index is the low part of artOrder, below 2^24 and so exact in a float32
-const MAX_LAYERS = 8192;
-
-const OPTION_KEYS: readonly (keyof StageArtOptions)[] = [
-  'name',
-  'pxPerUnit',
-  'origin',
-  'focus',
-  'projection',
-  'plane',
-  'compensateDepth',
-  'only',
-  'layers',
-  'material',
-];
-const OWN_MATERIAL_KEYS = ['textures', 'placement', 'resources', 'pass'] as const;
-const PLANE_DESCRIPTIONS: readonly ProjectionPlaneDescription[] = [
-  'xy|bottom-left',
-  'xy|top-left',
-  'xz|bottom-left',
-  'xz|top-left',
-];
 
 // the scratch of a layout: what layoutLayerInto() writes, and the tuples the sprite setters copy from —
 // a fraction in a typed array or a tuple stays unboxed, one handed to a call V8 leaves un-inlined is boxed
@@ -181,43 +114,6 @@ const isPoseKey = (key: string): boolean => {
       return false;
   }
 };
-
-const isProjection = (value: unknown): value is IProjection =>
-  isObject(value) &&
-  typeof value['updateViewRect'] === 'function' &&
-  typeof value['getViewRect'] === 'function' &&
-  typeof value['getScaleFactor'] === 'function' &&
-  typeof value['createCamera'] === 'function' &&
-  typeof value['updateCamera'] === 'function';
-
-const isTexture = (value: unknown): value is Texture => isObject(value) && value['isTexture'] === true;
-
-type SourceShape = 'store' | 'atlas' | 'promise';
-
-const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
-  Object.keys(value).every((key) => keys.includes(key));
-
-function shapeOf(source: unknown): SourceShape | undefined {
-  if (isObject(source) && typeof source['then'] === 'function') return 'promise';
-  if (!isRecord(source)) return undefined;
-  if (
-    source['store'] instanceof TextureStore &&
-    typeof source['id'] === 'string' &&
-    hasOnlyKeys(source, ['store', 'id', 'layers'])
-  ) {
-    return 'store';
-  }
-  if (
-    source['atlas'] instanceof TextureAtlas &&
-    isTexture(source['texture']) &&
-    hasOnlyKeys(source, ['atlas', 'texture', 'layers'])
-  ) {
-    return 'atlas';
-  }
-  return undefined;
-}
-
-const SHAPES = '{store, id} or {atlas, texture} — each with layers for loose layers —, or a promise of one';
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : describeValue(error));
 
@@ -319,62 +215,9 @@ export class StageArt extends Group {
   constructor(source: StageArtSource | Promise<StageArtSource>, options?: StageArtOptions) {
     super();
     this.name = 'twopoint5d.StageArt';
-    if (options !== undefined && !isRecord(options)) {
-      throw new TypeError(`new StageArt(): the options must be an object, got ${describeValue(options)}`);
-    }
-    const opts: StageArtOptions = options ?? {};
-    const {name} = opts;
-    if (name !== undefined && typeof name !== 'string') {
-      throw new TypeError(`new StageArt(): name must be a string, got ${describeValue(name)}`);
-    }
-    this.#subject = name === undefined ? 'StageArt' : `StageArt ${describeValue(name)}`;
-    const where = name === undefined ? 'new StageArt()' : this.#subject;
-    for (const key of Object.keys(opts)) {
-      if (!OPTION_KEYS.includes(key as keyof StageArtOptions)) {
-        const known = OPTION_KEYS.map((option) => describeValue(option)).join(', ');
-        throw new TypeError(`${where}: the options have no key ${describeValue(key)}; their keys are ${known}`);
-      }
-    }
-    // checked here, worked out once the canvas is known
-    artFrameOf(where, opts.pxPerUnit, opts.origin, opts.focus, undefined);
-    if (opts.compensateDepth !== undefined && typeof opts.compensateDepth !== 'boolean') {
-      throw new TypeError(`${where}: compensateDepth must be true or false, got ${describeValue(opts.compensateDepth)}`);
-    }
-    if (opts.projection !== undefined && !isProjection(opts.projection)) {
-      throw new TypeError(
-        `${where}: projection must be an IProjection — stage.projection —, got ${describeThreeValue(opts.projection, 'isObject3D')}`,
-      );
-    }
-    const {plane} = opts;
-    if (plane !== undefined && !(plane instanceof ProjectionPlane) && !PLANE_DESCRIPTIONS.includes(plane)) {
-      throw new TypeError(
-        `${where}: plane must be a ProjectionPlane or one of ${PLANE_DESCRIPTIONS.map((description) => describeValue(description)).join(', ')}, got ${describeThreeValue(plane, 'isPlane')}`,
-      );
-    }
-    checkArtSourceOptions(where, {only: opts.only, layers: opts.layers});
-    const material = opts.material;
-    if (material !== undefined) {
-      if (!isRecord(material)) throw new TypeError(`${where}: material must be an object, got ${describeValue(material)}`);
-      for (const key of OWN_MATERIAL_KEYS) {
-        if ((material as Record<string, unknown>)[key] !== undefined) {
-          throw new TypeError(
-            `${where}: material.${key} is the art's own — the art draws the frames of its source in the plane of the stage`,
-          );
-        }
-      }
-    }
-
-    const shape = shapeOf(source);
-    if (shape === undefined) throw new TypeError(`${where}: the source must be ${SHAPES}, got ${describeValue(source)}`);
-    const loose = shape !== 'promise' ? (source as {layers?: unknown}).layers : undefined;
-    if (loose !== undefined) {
-      if (opts.only !== undefined || opts.layers !== undefined) {
-        throw new TypeError(
-          `${where}: a source of loose layers names its layers itself — give each its options in the layers list of the source, and leave out only and layers`,
-        );
-      }
-      checkLayerDefs(where, loose);
-    }
+    const {options: opts, shape, subject} = checkStageArt(source, options);
+    this.#subject = subject;
+    const {plane, material} = opts;
 
     this.#options = opts;
     this.#projection = opts.projection;
@@ -392,9 +235,6 @@ export class StageArt extends Group {
     let read: {canvas: StageArt['canvas']; layers: ArtLayerSpec[]; problems: StageArtProblem[]} | undefined;
     if (shape === 'atlas') read = this.#read(source as Extract<StageArtSource, {atlas: unknown}>);
     const names = read?.layers.map((layer) => layer.name) ?? opts.only ?? [];
-    if (opts.only !== undefined && opts.only.length > MAX_LAYERS) {
-      throw new RangeError(`${where}: only names ${opts.only.length} layers, and an art holds at most ${MAX_LAYERS}`);
-    }
 
     this.mesh = new FeatureSprites(stageArtKind([]), {
       capacity: Math.min(names.length, MAX_LAYERS),
@@ -478,12 +318,11 @@ export class StageArt extends Group {
    * that is no whole number of 0 or more — or, once the frames are known, no index into them —, an
    * `order` that is no whole number from -1024 to 1023, a `visible` that is no boolean and a key that
    * is no field of a pose throw, naming the layer and the field, and the layer keeps what it held.
-   * Allocates nothing; does nothing once disposed.
+   * Allocates nothing. Once disposed it writes nothing, and still turns away what it cannot use.
    *
    * @throws an `Error` for a name the art does not know, listing the names
    */
   set(name: string, pose: ArtPose): void {
-    if (this.#disposed) return;
     const index = this.#byName.get(name);
     if (index === undefined) this.#refuseName(name);
     this.#set(index, pose);
@@ -492,13 +331,13 @@ export class StageArt extends Group {
   /**
    * Samples `track` at `seconds` into the layer `name`: `set()` with the pose the track shows then,
    * through a pose of the art's own, so a caller needs none. The fields the track does not have stay
-   * as they are. Allocates nothing; does nothing once disposed.
+   * as they are. Allocates nothing. Once disposed it writes nothing, and still turns away what it
+   * cannot use.
    *
    * @throws an `Error` for a name the art does not know, a `TypeError` for a track that is no
    *   `ArtTrack`, what `ArtTrack#sample()` refuses of `seconds` and what `set()` refuses of the pose
    */
   apply(name: string, track: ArtTrack, seconds: number): void {
-    if (this.#disposed) return;
     const index = this.#byName.get(name);
     if (index === undefined) this.#refuseName(name);
     this.#apply(index, track, seconds);
@@ -545,7 +384,8 @@ export class StageArt extends Group {
    * Leaves the parent, disposes the mesh — its geometry and material — and lets go of the lease of
    * a store item; a texture, an atlas, a store and a projection handed in stay the caller's. A load
    * still on its way is dropped when it lands, and {@link loaded} resolves. Afterwards `set()`,
-   * `apply()`, `reset()` and `update()` do nothing, `takeChanged()` answers `false`, `layer()`
+   * `apply()`, `reset()` and `update()` write nothing — `set()` and `apply()` still refuse what they
+   * cannot use —, `takeChanged()` answers `false`, `layer()`
    * throws, `layerOf()` answers `undefined`; the getters answer what they held. A second call does
    * nothing.
    */
@@ -562,7 +402,6 @@ export class StageArt extends Group {
     this.#geometry = undefined;
     this.#lease?.release();
     this.#lease = undefined;
-    this.#byName.clear();
     this.#bySprite.clear();
     this.#settled = true;
     this.#resolveLoaded();
@@ -814,7 +653,6 @@ export class StageArt extends Group {
   // the checks stay inline — a value handed to a call V8 leaves un-inlined is boxed —, and a refusal
   // builds its message in checkPoseField() and refusePoseField(), which only a refusal calls
   #set(index: number, pose: ArtPose): void {
-    if (this.#disposed) return;
     const subject = this.#subjects[index]!;
     if (typeof pose !== 'object' || pose === null) {
       throw new TypeError(`${subject}: the pose must be an object of the fields of an ArtPose, got ${describeValue(pose)}`);
@@ -888,11 +726,12 @@ export class StageArt extends Group {
       row[POSE_ORDER] = order;
       given |= bit(POSE_ORDER);
     }
+    // a disposed art still turns away what it cannot use, and writes nothing
+    if (this.#disposed) return;
     this.#commit(index, given);
   }
 
   #apply(index: number, track: ArtTrack, seconds: number): void {
-    if (this.#disposed) return;
     if (typeof track !== 'object' || track === null || typeof track.sample !== 'function') {
       throw new TypeError(
         `${this.#subjects[index]}: apply() takes an ArtTrack — artTrack(keys) builds one —, got ${describeValue(track)}`,
@@ -927,6 +766,7 @@ export class StageArt extends Group {
       if (count > 0 && frame >= count) this.#refuseFrame(index, frame, count);
       row[POSE_FRAME] = frame;
     }
+    if (this.#disposed) return;
     this.#commit(index, fields);
   }
 

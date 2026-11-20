@@ -10,7 +10,8 @@ import {TexturePackerJson, type TexturePackerJsonData} from '../texture/TextureP
 import {TextureStore} from '../texture/TextureStore.js';
 import type {ArtLayerDef} from './artSources.js';
 import {artTrack} from './artTrack.js';
-import {StageArt, type StageArtSource} from './StageArt.js';
+import type {StageArtSource} from './artOptions.js';
+import {StageArt} from './StageArt.js';
 
 // A canvas of 100 × 100, three layers bottom first: `back` at a depth of 50, the canvas whole; `box`,
 // two frames — closed, trimmed to 20, 30, 40 × 20, and open, 20, 20, 40 × 30 —; `lamp`, 60, 10, 10 × 10
@@ -227,10 +228,17 @@ describe('new StageArt()', () => {
       expect(() => new StageArt(source)).toThrow(/two layers are named "a"/);
     });
 
-    test('material parameters the art sets itself', () => {
-      expect(() => new StageArt(sceneSource(), {material: {textures: {}}} as never)).toThrow(
-        /material\.textures is the art's own/,
-      );
+    test('a key of material that is no material parameter, or one the art sets itself', () => {
+      const keys = ['capacity', 'geometry', 'material', 'grow', 'passes', 'attributeUsage', 'baseArgs'];
+      for (const key of [...keys, 'textures', 'placement', 'resources', 'pass']) {
+        expect(() => new StageArt(sceneSource(), {material: {[key]: 1}} as never), key).toThrow(
+          new TypeError(
+            `new StageArt(): material.${key} is the art's own — the art builds its mesh for its layers and draws the frames of its source with it; material takes the parameters of the material alone`,
+          ),
+        );
+      }
+      // the capacity of the mesh is the count of the layers, whatever the material says
+      expect(new StageArt(sceneSource(), {material: {depthTest: false}}).mesh.spritePool!.capacity).toBe(3);
       expect(() => new StageArt(sceneSource(), {material: 5 as never})).toThrow(/material must be an object/);
     });
   });
@@ -585,7 +593,7 @@ describe('loading', () => {
     expect(art.names).toEqual([]);
   });
 
-  test('a frame set before the load beyond the frames of the layer is kept, a problem, and frame 0 shows (Review Focus 2)', async () => {
+  test('a frame set before the load beyond the frames of the layer is kept, a problem, and frame 0 shows', async () => {
     const warn = silenceWarnings();
     const {promise, resolve} = heldBack();
     const art = new StageArt(promise, {only: ['box']});
@@ -606,7 +614,7 @@ describe('loading', () => {
     expect(sprite.trimTop).toBe(0);
   });
 
-  test('a layer only names that the source lacks is posed and hidden, with its problem (Review Focus 3)', async () => {
+  test('a layer only names that the source lacks is posed and hidden, with its problem', async () => {
     silenceWarnings();
     const art = new StageArt(sceneSource(), {only: ['ghost', 'box']});
     const ghost = art.layer('ghost');
@@ -649,7 +657,7 @@ describe('loading', () => {
     store.dispose();
   });
 
-  test('two arts on one store item, one disposed: the other keeps its texture and its lease (Review Focus 4)', async () => {
+  test('two arts on one store item, one disposed: the other keeps its texture and its lease', async () => {
     const store = makeStore();
     const first = new StageArt({store, id: 'scene'});
     const second = new StageArt({store, id: 'scene'});
@@ -699,6 +707,13 @@ describe('dispose()', () => {
     expect(() => art.reset()).not.toThrow();
     expect(() => art.update()).not.toThrow();
     expect(art.takeChanged()).toBe(false);
+    // what it cannot use it still turns away
+    expect(() => art.set('box', {opacity: 2})).toThrow(/^ArtLayer "box": opacity must be a number from 0 to 1, got 2$/);
+    expect(() => box.set({rotation: 1} as never)).toThrow(/^ArtLayer "box": the pose has no field "rotation"/);
+    expect(() => box.set({frame: 2})).toThrow(/^ArtLayer "box": frame must be a whole number from 0 to 1/);
+    expect(() => art.set('boxx', {x: 1})).toThrow(/^StageArt: no layer "boxx" — its layers are /);
+    expect(() => art.apply('box', {} as never, 0)).toThrow(/^ArtLayer "box": apply\(\) takes an ArtTrack/);
+    expect(() => box.apply(artTrack([{at: 0, x: 1}]), Number.NaN)).toThrow(/seconds must be a finite number/);
     expect(() => art.layer('box')).toThrow(/^StageArt: layer\(\) is not available: this art has been disposed$/);
     expect(art.layerOf(sprite)).toBeUndefined();
 
@@ -727,11 +742,22 @@ describe('dispose()', () => {
 
   test('a store lease that lands after it is released at once', async () => {
     const store = makeStore();
+    const acquire = store.acquireAsync.bind(store);
+    const releases: ReturnType<typeof vi.fn>[] = [];
+    const acquireSpy = vi.spyOn(store, 'acquireAsync').mockImplementation(async (id, type) => {
+      const lease = await acquire(id, type);
+      releases.push(vi.spyOn(lease, 'release') as unknown as ReturnType<typeof vi.fn>);
+      return lease;
+    });
     const art = new StageArt({store, id: 'scene'});
     art.dispose();
     await flush();
     await flush();
     const resource = await store.whenResource('scene');
+
+    expect(acquireSpy).toHaveBeenCalledExactlyOnceWith('scene', ['atlas', 'texture']);
+    expect(releases).toHaveLength(1);
+    expect(releases[0]).toHaveBeenCalledOnce();
     expect(resource.refCount).toBe(0);
     expect(art.mesh.getTexture('colorMap')).toBeUndefined();
     store.dispose();

@@ -223,7 +223,7 @@ describe('readAtlasSource() of an Aseprite split-layer sheet', () => {
     expect(problems).toEqual([{layer: 'ladle', reason: expect.stringContaining('no picture of the layer "ladle"')}]);
   });
 
-  test('Review Focus 1: a sheet with the default frame names of Aseprite is one problem of the source naming the filename format, not an art of empty layers', () => {
+  test('a sheet with the default frame names of Aseprite is one problem of the source naming the filename format, not an art of empty layers', () => {
     const data = asepriteJson();
     for (const entry of arrayFrames(data)) {
       const [layer, n] = entry.filename.split('#');

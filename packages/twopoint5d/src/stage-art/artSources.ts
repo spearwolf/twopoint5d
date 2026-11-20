@@ -542,7 +542,7 @@ function readAseprite(
     for (const name of framesByLayer.keys()) metaLayers.push({name});
   }
 
-  // Review Focus 1: a sheet whose frames name no layer was exported without split layers or with
+  // a sheet whose frames name no layer was exported without split layers or with
   // another filename format — one problem of the source, not an art of empty layers
   if (!metaLayers.some(({name}) => framesByLayer.has(name))) {
     problems.push({
@@ -882,7 +882,7 @@ export function readLooseLayers(
 /**
  * What the sprite of a layer writes for one of its frames: the tex coords and the diagonal flip of the
  * atlas frame, and the margins of the frame's box inside the box of the layer as fractions of it —
- * the quad of the layer is its box, never the canvas (Decision 3).
+ * the quad of the layer is its box, never the canvas.
  */
 export function prepareLayerFrame(spec: ArtFrameSpec, layerBox: LayerBox): PreparedSpriteFrame {
   const {box} = spec;

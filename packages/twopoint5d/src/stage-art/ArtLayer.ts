@@ -50,7 +50,8 @@ let pending: {art: StageArt; index: number; name: string; sprite: StageArtSprite
  *
  * `rest`, `box` and `pivot` are `undefined`, `frameCount` is 0 and `tags` is empty until the source
  * of the art has loaded; a layer the source lacks keeps them so. Once the art is disposed, `set()`,
- * `apply()` and `reset()` do nothing; the rest answers what it held.
+ * `apply()` and `reset()` write nothing — `set()` and `apply()` still refuse what they cannot use —;
+ * the rest answers what it held.
  */
 export class ArtLayer {
   /** The name of the layer, as the source or `only` names it. */

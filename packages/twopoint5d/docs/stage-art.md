@@ -66,8 +66,11 @@ The art lies in the plane of the projection of the stage, the canvas origin — 
 default — on the origin of the art. One artwork pixel is one unit of the stage; `pxPerUnit: 2`
 draws two artwork pixels per unit.
 
-A layer is hidden until its picture is there: no grey quad flashes up while the sheet loads, and a
-pose set before shows once it has arrived. What the art cannot read — a name in `only` the sheet
+A layer is hidden until its picture is there: no grey quad flashes up while the sheet loads. A
+`{store, id}` source and a promise of one know their layers only once they have loaded — until
+then `art.names` is empty and `art.layer()` throws. Name the layers in `only`, and they are there at
+once: you can pose them right away, and a pose set before the picture arrives shows when it does.
+What the art cannot read — a name in `only` the sheet
 lacks, a depth that is no number, a pivot slice that names no layer, a sheet exported without
 `{layer}#{frame}` names — is no error: it hides that one layer, goes into `art.problems` and is
 said once on the console.
@@ -511,5 +514,6 @@ art and the count:
 
 What the art cannot load or read out of a file is no error; what code hands in wrong is. After
 `dispose()` — which leaves the parent, disposes the mesh and lets go of a store lease — `set()`,
-`apply()`, `reset()` and `update()` do nothing, `layer()` throws, `layerOf()` answers `undefined`,
+`apply()`, `reset()` and `update()` write nothing — `set()` and `apply()` still refuse what they
+cannot use —, `layer()` throws, `layerOf()` answers `undefined`,
 and a load still on its way is dropped when it lands.
