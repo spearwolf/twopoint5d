@@ -115,7 +115,7 @@ describe('turnToPlane()', () => {
     return mesh.localToWorld(new Vector3(x, y, z));
   };
 
-  // §2.2: +z of the art frame, and y up on the screen, for each plane
+  // stage-art-layers.md §2.2: +z of the art frame, and y up on the screen, for each plane
   const table: [ProjectionPlaneDescription, [number, number, number], [number, number, number]][] = [
     ['xy|bottom-left', [0, 0, 1], [0, 1, 0]],
     ['xy|top-left', [0, 0, -1], [0, -1, 0]],

@@ -14,9 +14,9 @@ import type {LayerBox} from './artLayout.js';
 import {type ArtPose, checkPoseField, POSE_FIELDS, refuseUnknownPoseField} from './artPose.js';
 
 /**
- * What code says about a layer that the picture cannot (§4.4): an override of what the source says,
- * or — for loose layers (§4.5) — all there is. Pixels are artwork pixels on the canvas, save `pivot`
- * of a loose layer, which is in pixels of its frame.
+ * What code says about a layer that the picture cannot: an override of what the source says, or —
+ * for loose layers, which take their frames and their place from code — all there is. Pixels are
+ * artwork pixels on the canvas, save `pivot` of a loose layer, which is in pixels of its frame.
  */
 export interface ArtLayerOptions {
   /** The point the layer stands on and turns about. */
@@ -35,12 +35,18 @@ export interface ArtLayerOptions {
   pxPerUnit?: number;
 }
 
-/** A loose layer (§4.5): its name and what code says about it. */
+/**
+ * A loose layer — a prop out of an atlas, placed by code instead of a painted canvas —: its name and
+ * what code says about it.
+ */
 export interface ArtLayerDef extends ArtLayerOptions {
   name: string;
 }
 
-/** What an art could not load or read out of its source (§3.8). */
+/**
+ * What an art could not load or read out of its source — no error, but an entry of `art.problems`,
+ * said once on the console.
+ */
 export interface StageArtProblem {
   /** The layer it hides, `undefined` for the source as a whole. */
   layer: string | undefined;
@@ -53,9 +59,12 @@ export interface StageArtProblem {
 export interface ArtFrameSpec {
   frame: TextureAtlasFrame<unknown>;
   box: LayerBox;
-  /** The texels of the atlas frame on every side of its picture — an inner padding —, which the tex coords leave out. */
+  /**
+   * The texels of the atlas frame on every side of its picture — an inner padding —, which the tex
+   * coords leave out.
+   */
   inset?: number;
-  /** The atlas frame is larger than its picture, but not by one whole number of texels on every side: drawn as it is. */
+  /** The atlas frame is larger than its picture, but not by one whole number of texels on every side. */
   unevenInset?: true;
 }
 
@@ -150,11 +159,12 @@ function checkLayerOptions(subject: string, layer: string, options: unknown, loo
 }
 
 /**
- * Throws what an art refuses in `only` and `layers` (§8): `only` that is no list of names or names a
- * layer twice; `layers` that is no object; options of a layer that are no object, have a key no
- * option has, give `at` or `pxPerUnit` — which only a loose layer takes (§4.4) —, or a value it cannot take — a `depth` that is no finite number, a `rest` field as
- * `set()` refuses it. `undefined` is not given. To be called when the art is made, before its source
- * has loaded; `readAtlasSource()` calls it too.
+ * Throws what an art refuses in `only` and `layers` (stage-art-layers.md §8): `only` that is no list
+ * of names or names a layer twice; `layers` that is no object; options of a layer that are no object,
+ * have a key no option has, give `at` or `pxPerUnit` — which only a loose layer takes —, or a value
+ * it cannot take — a `depth` that is no finite number, a `rest` field as `set()` refuses it.
+ * `undefined` is not given. To be called when the art is made, before its source has loaded;
+ * `readAtlasSource()` calls it too.
  */
 export function checkArtSourceOptions(subject: string, options: {only?: unknown; layers?: unknown}): void {
   const {only, layers} = options;
@@ -407,7 +417,8 @@ function pickLayers(
 
 /**
  * The frames of a source, by name: the frames of an atlas, or the files of a files source by their
- * frame names. The readers of the names of §4.2 and of the `frames` overrides read them through it.
+ * frame names. The readers of the names of layer files and of the `frames` overrides read them
+ * through it.
  */
 interface NamedFrames {
   /** The string names, in the order of the source. */
@@ -472,7 +483,7 @@ function overrideFrames(
   return {names, frames: specs};
 }
 
-// --- Aseprite (§4.1) -------------------------------------------------------------------------------
+// --- Aseprite (stage-art-layers.md §4.1) ----------------------------------------------------------
 
 // the token depth=… of a user data text: its number, or the text that is none
 function depthTokenOf(data: unknown): {depth: number} | {bad: string} | undefined {
@@ -701,14 +712,14 @@ function readAseprite(
   return {canvas: canvasOf(atlas, frameNames), found, failed: false};
 }
 
-// --- names after §4.2: a trimmed atlas (§4.3), a list of layer files ------------------------------
+// --- names of layer files (stage-art-layers.md §4.2): a trimmed atlas, a list of layer files ------
 
 // `<layer>@<depth>`: the depth right after the name of the layer, before a `#n`, a `-suffix` or `.pivot`
 const DEPTH_IN_NAME = /^(.+?)@([+-]?(?:\d+(?:\.\d*)?|\.\d+))(?=$|[#-]|\.pivot$)(.*)$/;
 
 const PIVOT_SUFFIX = '.pivot';
 
-/** What the name of a frame or a file says by itself after §4.2 of the proposal. */
+/** What the name of a frame or a file says by itself, after the names of layer files. */
 export interface LayerFileName {
   /**
    * The name without its depth: a layer, or a frame `<layer>-<suffix>` of one — which of the two
@@ -725,8 +736,8 @@ export interface LayerFileName {
 }
 
 /**
- * Reads the name of a frame of a trimmed atlas or of a layer file — without its extension — after
- * §4.2: `window@600` is `window` at a depth of 600, `wall@-120` one in front of the plane, `steam#3`
+ * Reads the name of a frame of a trimmed atlas or of a layer file — without its extension —:
+ * `window@600` is `window` at a depth of 600, `wall@-120` one in front of the plane, `steam#3`
  * the frame 3 of `steam`, `carafe5.pivot` the pivot marker of `carafe5`. A mark with no name before
  * it, and an `@` without a number, are part of the name.
  */
@@ -773,8 +784,8 @@ interface NamedFoundLayer extends FoundLayer {
   taken: readonly string[];
 }
 
-// the layers the names of §4.2 make of the frames of `source`, in the order of their first frames, the
-// `frames` overrides applied; what the names cannot give is a problem
+// the layers the names of layer files make of the frames of `source`, in the order of their first
+// frames, the `frames` overrides applied; what the names cannot give is a problem
 function readNamedFrames(source: NamedFrames, options: ArtSourceOptions, problems: StageArtProblem[]): NamedFoundLayer[] {
   const frameNames = source.names;
   const positionOf = new Map<string, number>();
@@ -930,8 +941,8 @@ function readNamedFrames(source: NamedFrames, options: ArtSourceOptions, problem
   return found;
 }
 
-// a trimmed atlas: the names of §4.2 over the frames of the atlas; the canvas is the sourceSize of its
-// first frame that tells one, and a frame on another canvas is a problem of its layer
+// a trimmed atlas: the names of layer files over the frames of the atlas; the canvas is the
+// sourceSize of its first frame that tells one, and a frame on another canvas is a problem of its layer
 function readTrimmedAtlas(
   atlas: TextureAtlas<unknown>,
   options: ArtSourceOptions,
@@ -958,10 +969,10 @@ function readTrimmedAtlas(
 }
 
 /**
- * Reads the layers of an atlas source: an Aseprite sheet with split layers (§4.1) where
- * `asepriteMetaOf()` answers its `meta`, else a trimmed atlas with names after §4.2 (§4.3). The
- * overrides of `options.layers` beat what the source says; `options.only` picks the layers and their
- * order. What the source cannot give is a problem (§3.8); what the options cannot take is refused
+ * Reads the layers of an atlas source (stage-art-layers.md §4.1, §4.3): an Aseprite sheet with split
+ * layers where `asepriteMetaOf()` answers its `meta`, else a trimmed atlas with the names of layer
+ * files. The overrides of `options.layers` beat what the source says; `options.only` picks the layers
+ * and their order. What the source cannot give is a problem; what the options cannot take is refused
  * first, by {@link checkArtSourceOptions}.
  */
 export function readAtlasSource(
@@ -980,7 +991,7 @@ export function readAtlasSource(
   return {canvas, layers: pickLayers(found, options, problems, false), problems};
 }
 
-// --- layer files (§4.2) ----------------------------------------------------------------------------
+// --- layer files (stage-art-layers.md §4.2) -------------------------------------------------------
 
 /**
  * What became of one file of a files source: its trimmed `box` on the canvas and, for a file that is
@@ -993,15 +1004,16 @@ export type LayerFileResult =
   | {readonly url: string; readonly problem: string};
 
 /**
- * Reads the layers of a files source (§4.2): the order of `files` is the stacking order, bottom
- * first; each file is a layer or a frame of one by its name without the extension, read after
- * {@link parseLayerFileName} — a file `<layer>-<suffix>` is a frame of `<layer>` only where it stands
- * after the file of the layer, else a layer of its own; a pivot marker is not drawn, the middle of its box is the pivot of its
- * layer. `results` holds what the load made of each file, in the order of `files`, and before the
- * load is `undefined`: the list alone names the layers then. A file that failed is a problem of its
- * layer with its url, in the order of the list, and so is a layer whose files hold no pixel; the
- * overrides of `options` work as on an atlas, a `frames` override naming files by their frame names.
- * What the options cannot take is refused first, by {@link checkArtSourceOptions}.
+ * Reads the layers of a files source (stage-art-layers.md §4.2): the order of `files` is the
+ * stacking order, bottom first; each file is a layer or a frame of one by its name without the
+ * extension, read after {@link parseLayerFileName} — a file `<layer>-<suffix>` is a frame of
+ * `<layer>` only where it stands after the file of the layer, else a layer of its own; a pivot
+ * marker is not drawn, the middle of its box is the pivot of its layer. `results` holds what the
+ * load made of each file, in the order of `files`, and before the load is `undefined`: the list
+ * alone names the layers then. A file that failed is a problem of its layer with its url, in the
+ * order of the list, and so is a layer whose files hold no pixel; the overrides of `options` work
+ * as on an atlas, a `frames` override naming files by their frame names. What the options cannot
+ * take is refused first, by {@link checkArtSourceOptions}.
  */
 export function readLayerFiles(
   subject: string,
@@ -1098,14 +1110,14 @@ export function readLayerFiles(
   return {canvas, layers: pickLayers(found, options, problems, false), problems};
 }
 
-// --- loose layers (§4.5) ---------------------------------------------------------------------------
+// --- loose layers (stage-art-layers.md §4.5) ------------------------------------------------------
 
 /**
- * Reads loose layers (§4.5): each takes the frames its `frames` names — the frame of its name without
- * them —, its `pivot` in pixels of its first frame — the middle of the frame without one — stands at
- * its `at`, `[0, 0]` without one, and every frame lies where it lies in its untrimmed sprite. A frame
- * the atlas lacks is a problem of its layer; what the definitions cannot take is refused first, by
- * {@link checkLayerDefs}.
+ * Reads loose layers (stage-art-layers.md §4.5): each takes the frames its `frames` names — the
+ * frame of its name without them —, its `pivot` in pixels of its first frame — the middle of the
+ * frame without one — stands at its `at`, `[0, 0]` without one, and every frame lies where it lies
+ * in its untrimmed sprite. A frame the atlas lacks is a problem of its layer; what the definitions
+ * cannot take is refused first, by {@link checkLayerDefs}.
  */
 export function readLooseLayers(
   subject: string,

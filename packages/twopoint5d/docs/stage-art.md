@@ -145,11 +145,11 @@ from the list, and show their pictures once every file has arrived or failed.
 
 A file that does not load, is no image or has a size other than the first file that loaded leaves
 its layer without that picture — a layer of that file alone stays hidden, one of more frames shows
-the others — and goes into `art.problems` with its `url`; the rest of the scene goes on. Pictures that do
-not fit into the largest atlas allowed are one problem of the source that names the size: split the
-files between two arts, each with a `renderOrder` of its own (`docs/sprites.md`, "Across meshes").
-`only` and `layers` work on the layers of the files as on those of an atlas, and a `frames` override
-names files by their names without the extension.
+the others — and goes into `art.problems` with its `url`; the rest of the scene goes on. Pictures
+that do not fit into the largest atlas allowed are one problem of the source that names the size:
+split the files between two arts, each with a `renderOrder` of its own (`docs/sprites.md`, "Across
+meshes"). `only` and `layers` work on the layers of the files as on those of an atlas, and a
+`frames` override names files by their names without the extension.
 
 ### A scene out of a packed atlas
 
@@ -1012,9 +1012,9 @@ it once and hand the feature in.
 
 A layer is drawn hidden until its picture is there. `loaded` resolves once every picture loaded or
 failed; it never rejects. What failed is in `problems`, each `{layer, reason}` — `layer` is
-`undefined` for the source as a whole, and a file that failed adds its `url` —, and on the console once per art, after the load, naming the
-art and the count. A reload of a store item puts its own list in the place of `problems` and says it
-once on the console:
+`undefined` for the source as a whole, and a file that failed adds its `url` —, and on the console
+once per art, after the load, naming the art and the count. A reload of a store item puts its own
+list in the place of `problems` and says it once on the console:
 
 | problem | the art |
 | --- | --- |
@@ -1043,7 +1043,7 @@ once on the console:
 
 What the art cannot load or read out of a file is no error; what code hands in wrong is. After
 `dispose()` — which leaves the parent, disposes the mesh and the atlas of layer files and ends the
-following of a store item, which lets go of it — `set()`,
-`apply()`, `reset()` and `update()` write nothing — `set()` and `apply()` still refuse what they
-cannot use —, `layer()` throws, `layerOf()` answers `undefined`, and a load still on its way is
-dropped when it lands: the requests of layer files are aborted, and every decoded picture is closed.
+following of a store item, which lets go of it — `set()`, `apply()`, `reset()` and `update()` write
+nothing — `set()` and `apply()` still refuse what they cannot use —, `layer()` throws, `layerOf()`
+answers `undefined`, and a load still on its way is dropped when it lands: the requests of layer
+files are aborted, and every decoded picture is closed.

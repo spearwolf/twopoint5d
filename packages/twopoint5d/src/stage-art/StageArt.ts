@@ -427,8 +427,8 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
    * `ParallaxProjection` whose distance is known — compensated or not, since the camera stands
    * there either way —, a `visible` that is no boolean and a key that is no field of a pose throw,
    * naming the layer and the field, and the layer keeps what it held. The distance is that of the
-   * last {@link update}, and a layer at a depth is written with its depth compensation. Allocates nothing. Once disposed it writes nothing, and still turns away
-   * what it cannot use.
+   * last {@link update}, and a layer at a depth is written with its depth compensation. Allocates
+   * nothing. Once disposed it writes nothing, and still turns away what it cannot use.
    *
    * @throws an `Error` for a name the art does not know, listing the names
    */
@@ -477,13 +477,13 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   /**
    * Once per frame, before the render: turns the mesh to the {@link plane} where it changed; under
    * a `ParallaxProjection` reads the distance of its camera to the plane, and where it differs from
-   * the one of the last update lays the layers at a depth out anew under `compensateDepth` — a layer
-   * it leaves at or behind the camera, compensated or not, is hidden and, where it would be shown,
-   * said once on the console, until a depth or a distance brings it in front of the camera again —; sorts the layers back to front where a depth or an order changed
-   * — by depth, the farthest first, then by order, then as painted —; and updates the mesh. The
-   * first update that finds a layer painted above another lying behind it says so on the console,
-   * once per layer. Allocates nothing without a sort, a turn or a new distance. Does nothing once
-   * disposed.
+   * the one of the last update lays the layers at a depth out anew under `compensateDepth` — a
+   * layer it leaves at or behind the camera, compensated or not, is hidden and, where it would be
+   * shown, said once on the console, until a depth or a distance brings it in front of the camera
+   * again —; sorts the layers back to front where a depth or an order changed — by depth, the
+   * farthest first, then by order, then as painted —; and updates the mesh. The first update that
+   * finds a layer painted above another lying behind it says so on the console, once per layer.
+   * Allocates nothing without a sort, a turn or a new distance. Does nothing once disposed.
    */
   update(): void {
     if (this.#disposed) return;
@@ -648,10 +648,10 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     this.#adopt(this.#read({atlas, layers}), texture);
   }
 
-  // follows the store item the art loaded from (§5.5): a new atlas — a sheet exported anew and parsed
-  // again — or a new texture reaches the running art. The subscription holds the item as the lease
-  // did, which goes once it is in place; on() hands over the values it has at once, which the art
-  // has already
+  // follows the store item the art loaded from (stage-art-layers.md §5.5): a new atlas — a sheet
+  // exported anew and parsed again — or a new texture reaches the running art. The subscription holds
+  // the item as the lease did, which goes once it is in place; on() hands over the values it has at
+  // once, which the art has already
   #follow(
     store: TextureStore,
     id: string,
@@ -743,9 +743,10 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     return false;
   }
 
-  // the files of a files source, loaded, trimmed and packed into an atlas of the art's own (§4.2, §5.1).
-  // A set of pictures too large for one atlas fails the source as a whole: the load cannot refuse it
-  // to the caller, so it is the problem of the source the refusal would have been
+  // the files of a files source, loaded, trimmed and packed into an atlas of the art's own
+  // (stage-art-layers.md §4.2, §5.1). A set of pictures too large for one atlas fails the source as a
+  // whole: the load cannot refuse it to the caller, so it is the problem of the source the refusal
+  // would have been
   async #loadFiles({files, baseUrl}: Extract<StageArtSource, {files: unknown}>): Promise<void> {
     const load = new LayerFilesLoad();
     this.#filesLoad = load;

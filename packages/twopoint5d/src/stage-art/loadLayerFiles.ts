@@ -8,9 +8,9 @@ import type {LayerBox} from './artLayout.js';
 import {frameNameOfFile, type LayerFileResult, parseLayerFileName} from './artSources.js';
 import {trimLayerImage} from './trimLayerImage.js';
 
-/** The clear texels around each picture in the atlas of a files source (§5.1). */
+/** The clear texels around each picture in the atlas of a files source (stage-art-layers.md §5.1). */
 export const FILES_ATLAS_PADDING = 2;
-/** How far the edge of each picture is repeated outwards there, for linear filtering (§5.1). */
+/** How far the edge of each picture is repeated outwards there, for linear filtering. */
 export const FILES_ATLAS_EXTRUDE = 1;
 /** The largest size of that atlas while the limit of the renderer is not known. */
 export const FILES_ATLAS_MAX_SIZE = 4096;
@@ -43,10 +43,11 @@ interface Decoded {
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : describeValue(error));
 
 /**
- * One load of the files of a files source (§4.2): each file fetched — one request per file, side by
- * side —, decoded through `createImageBitmap()` and trimmed to its alpha box as it lands; once every
- * file has landed or failed, the pictures to draw are packed into a `DynamicAtlas` of the next power
- * of two that holds them (§5.1) and every bitmap is closed. {@link drop} gives the load up.
+ * One load of the files of a files source (stage-art-layers.md §4.2): each file fetched — one
+ * request per file, side by side —, decoded through `createImageBitmap()` and trimmed to its alpha
+ * box as it lands; once every file has landed or failed, the pictures to draw are packed into a
+ * `DynamicAtlas` of the next power of two that holds them and every bitmap is closed. {@link drop}
+ * gives the load up.
  */
 export class LayerFilesLoad {
   readonly #abort = new AbortController();

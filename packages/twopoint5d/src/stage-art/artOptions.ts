@@ -16,13 +16,12 @@ import {ART_FEATURE_NAMES, stageArtKind} from './stageArtKind.js';
 import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLayerDefs} from './artSources.js';
 
 /**
- * Where an art takes its layers from (§3.2 of the proposal): an atlas item of a `TextureStore` —
- * an Aseprite sheet with split layers or a trimmed atlas —, or the same, already loaded, as an
- * atlas and its texture. An art of a store item follows it: a sheet parsed again under the id
- * reaches the running art. With `layers` the layers are loose: each takes the frames and the place
- * its definition gives it. `files` lists full-canvas PNGs of a paint tool, one per layer, bottom
- * first, under `baseUrl`: the art loads, trims and packs them itself. The art may be handed a
- * promise of a source as well.
+ * Where an art takes its layers from: an atlas item of a `TextureStore` — an Aseprite sheet with
+ * split layers or a trimmed atlas —, or the same, already loaded, as an atlas and its texture. An
+ * art of a store item follows it: a sheet parsed again under the id reaches the running art. With
+ * `layers` the layers are loose: each takes the frames and the place its definition gives it.
+ * `files` lists full-canvas PNGs of a paint tool, one per layer, bottom first, under `baseUrl`: the
+ * art loads, trims and packs them itself. The art may be handed a promise of a source as well.
  */
 export type StageArtSource =
   | {readonly store: TextureStore; readonly id: string; readonly layers?: readonly ArtLayerDef[]}
@@ -182,10 +181,10 @@ export const SHAPES =
   '{store, id} or {atlas, texture} — each with layers for loose layers —, {files, baseUrl} — baseUrl optional —, or a promise of one';
 
 /**
- * Throws what `new StageArt()` refuses of its source and its options (§8), each before anything is
- * built, and answers the options, the shape of the source and the subjects: `subject` for the art's
- * messages — `StageArt`, or `StageArt "<name>"` —, `where` for the refusals of the constructor —
- * `new StageArt()` until a name is given.
+ * Throws what `new StageArt()` refuses of its source and its options (stage-art-layers.md §8), each
+ * before anything is built, and answers the options, the shape of the source and the subjects:
+ * `subject` for the art's messages — `StageArt`, or `StageArt "<name>"` —, `where` for the refusals
+ * of the constructor — `new StageArt()` until a name is given.
  */
 export function checkStageArt(
   source: unknown,

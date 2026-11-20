@@ -91,9 +91,10 @@ const refuseSeconds = (subject: string, name: string, value: unknown): never => 
  * `'loop'` and `'pingpong'`.
  *
  * Throws, before anything is built: keys that are no non-empty array of objects, an `at` that is no
- * finite number of 0 or more or smaller than the one before, a field a later key sets that the first leaves out, a field as `StageArt#set()` refuses it
- * (the depth limit, which needs a camera, apart), a key that is no field of a pose, an `ease`
- * `easingOf()` refuses and a `playback` that is none of the three.
+ * finite number of 0 or more or smaller than the one before, a field a later key sets that the
+ * first leaves out, a field as `StageArt#set()` refuses it (the depth limit, which needs a camera,
+ * apart), a key that is no field of a pose, an `ease` `easingOf()` refuses and a `playback` that is
+ * none of the three.
  */
 export function artTrack(keys: readonly ArtKey[], options?: ArtTrackOptions): ArtTrack {
   const subject = 'artTrack';
@@ -207,7 +208,9 @@ export function artTrack(keys: readonly ArtKey[], options?: ArtTrackOptions): Ar
       if (mask & bit(POSE_DEPTH)) {
         target.depth = rows[from + POSE_DEPTH]! + (rows[to + POSE_DEPTH]! - rows[from + POSE_DEPTH]!) * share;
       }
-      if (mask & bit(POSE_DEG)) target.deg = rows[from + POSE_DEG]! + (rows[to + POSE_DEG]! - rows[from + POSE_DEG]!) * share;
+      if (mask & bit(POSE_DEG)) {
+        target.deg = rows[from + POSE_DEG]! + (rows[to + POSE_DEG]! - rows[from + POSE_DEG]!) * share;
+      }
       if (mask & bit(POSE_SCALE_X)) {
         target.scaleX = rows[from + POSE_SCALE_X]! + (rows[to + POSE_SCALE_X]! - rows[from + POSE_SCALE_X]!) * share;
       }
