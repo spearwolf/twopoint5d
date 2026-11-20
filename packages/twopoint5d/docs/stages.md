@@ -316,6 +316,12 @@ The view, its fit and `pixelSnap` all refer to the projection plane: only the pl
 the zoom the specs ask for. `getScaleFactor()` answers `NaN` until the projection has given its
 first view, since it reads the distance from the specs there.
 
+The distance `d` is measured from the camera, and the distance `D` the projection placed its camera
+at is `projection.distanceToProjectionPlane`. It is read-only and holds the value of the last view
+after the fallbacks of the specs: `300` for specs that name no `distanceToProjectionPlane`, or one
+no camera can be placed at. A change to the specs takes effect with the next `updateViewRect()`, so
+until then the getter still answers the old `D`. It is `NaN` before the first view.
+
 ### From the pointer to the plane
 
 The view is centred on the point the camera looks at. A pointer position on the canvas maps

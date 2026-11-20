@@ -107,6 +107,53 @@ describe('ParallaxProjection', () => {
     expect(Number.isNaN(new ParallaxProjection('xy|bottom-left').getScaleFactor(150))).toBe(true);
   });
 
+  describe('distanceToProjectionPlane', () => {
+    it('is NaN before the first view', () => {
+      expect(
+        new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, distanceToProjectionPlane: 150})
+          .distanceToProjectionPlane,
+      ).toBeNaN();
+      expect(new ParallaxProjection().distanceToProjectionPlane).toBeNaN();
+    });
+
+    it('is the distance of the specs once the projection has given its first view', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640, distanceToProjectionPlane: 150});
+      projection.updateViewRect(800, 600);
+
+      expect(projection.distanceToProjectionPlane).toBe(150);
+    });
+
+    it('is 300 for specs that name no distance', () => {
+      const projection = new ParallaxProjection('xy|bottom-left', {fit: 'contain', width: 640});
+      projection.updateViewRect(800, 600);
+
+      expect(projection.distanceToProjectionPlane).toBe(300);
+    });
+
+    it.each([0, -150, NaN, Infinity, -Infinity])('is 300 for a distance of %s, which no camera can be placed at', (distance) => {
+      const projection = new ParallaxProjection('xy|bottom-left', {
+        fit: 'contain',
+        width: 640,
+        distanceToProjectionPlane: distance,
+      });
+      projection.updateViewRect(800, 600);
+
+      expect(projection.distanceToProjectionPlane).toBe(300);
+    });
+
+    it('answers the distance of the last view, a change of the specs applying at the next one', () => {
+      const specs: Partial<ParallaxProjectionSpecs> = {fit: 'contain', width: 640, distanceToProjectionPlane: 150};
+      const projection = new ParallaxProjection('xy|bottom-left', specs);
+      projection.updateViewRect(800, 600);
+
+      specs.distanceToProjectionPlane = 500;
+      expect(projection.distanceToProjectionPlane).toBe(150);
+
+      projection.updateViewRect(800, 600);
+      expect(projection.distanceToProjectionPlane).toBe(500);
+    });
+  });
+
   it('createCamera', () => {
     const projection = new ParallaxProjection(ProjectionPlane.get('xy|bottom-left'), {
       fit: 'contain',

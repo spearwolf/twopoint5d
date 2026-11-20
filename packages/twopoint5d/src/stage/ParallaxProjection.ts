@@ -150,6 +150,18 @@ export class ParallaxProjection implements IProjection {
   }
 
   /**
+   * The distance from the camera to the projection plane that this projection placed the camera at
+   * for the last {@link updateViewRect} that gave a view with an area. It is the
+   * `distanceToProjectionPlane` of the specs after their fallbacks, so `300` for specs that name no
+   * distance or one no camera can be placed at. The spec of that name is the value the next view
+   * takes; this getter answers the value in force. `NaN` until the first such view, as
+   * {@link getScaleFactor} answers.
+   */
+  get distanceToProjectionPlane(): number {
+    return this.#distanceToProjectionPlane ?? NaN;
+  }
+
+  /**
    * Builds a camera with the setup of the last {@link updateViewRect}, aimed at the projection plane
    * and placed at its distance.
    *
