@@ -990,6 +990,65 @@ describe('planes, projections and depth', () => {
     expect(behindTheCamera(warn)).toEqual([]);
   });
 
+  test('with compensateDepth: false the camera of a parallax projection still stands at its distance: a depth at or behind it is refused, and a layer a new distance leaves there hidden', () => {
+    const warn = silenceWarnings();
+    const projection = parallax(100);
+    const art = new StageArt(sceneSource(), {name: 'kitchen', projection, compensateDepth: false});
+    const box = art.layer('box').sprite;
+
+    expect(() => art.set('box', {depth: -100})).toThrow(
+      new RangeError(
+        'ArtLayer "box": depth must be a number above -100 — the camera stands 100 artwork pixels in front of the plane —, got -100',
+      ),
+    );
+    art.set('box', {depth: -80});
+    // drawn as it is: k = 1
+    expect([box.x, box.z, box.width]).toEqual([-10, 80, 40]);
+    art.update();
+    art.takeChanged();
+
+    moveCamera(projection, 50);
+    art.update();
+    expect(box.visible).toBe(0);
+    expect(art.takeChanged()).toBe(true);
+    expect(behindTheCamera(warn)).toHaveLength(1);
+    // nothing laid out anew
+    expect([box.x, box.z, box.width, art.layer('back').sprite.width]).toEqual([-10, 80, 40, 100]);
+
+    // a new distance that leaves it behind is no change
+    moveCamera(projection, 60);
+    art.update();
+    expect(art.takeChanged()).toBe(false);
+    moveCamera(projection, 100);
+    art.update();
+    expect(box.visible).toBe(1);
+    expect(art.takeChanged()).toBe(true);
+  });
+
+  test('a layer the caller has hidden that a new distance leaves behind the camera is said once it would be shown', () => {
+    const warn = silenceWarnings();
+    const projection = parallax(100);
+    const art = new StageArt(sceneSource(), {name: 'kitchen', projection});
+    art.set('box', {depth: -80, visible: false});
+    art.set('lamp', {depth: -80, opacity: 0});
+    art.update();
+
+    moveCamera(projection, 50);
+    art.update();
+    expect(behindTheCamera(warn)).toEqual([]);
+
+    art.set('lamp', {opacity: 0.5});
+    expect(art.layer('lamp').sprite.visible).toBe(0);
+    expect(behindTheCamera(warn)).toHaveLength(1);
+    expect(behindTheCamera(warn)[0]).toMatch(/^StageArt "kitchen": the layer "lamp", at a depth of -80, lies at or behind/);
+    art.set('box', {visible: true});
+    expect(art.layer('box').sprite.visible).toBe(0);
+    expect(behindTheCamera(warn)).toHaveLength(2);
+    art.set('box', {visible: false});
+    art.set('box', {visible: true});
+    expect(behindTheCamera(warn)).toHaveLength(2);
+  });
+
   test('the plane setter turns the mesh in the next update(), writes no sprite, and an equal plane is no change', () => {
     const art = new StageArt(sceneSource());
     art.update();

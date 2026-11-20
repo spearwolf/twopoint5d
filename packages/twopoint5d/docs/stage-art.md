@@ -360,17 +360,20 @@ behind the plane is drawn twice as large and seen at its painted size.
   projection of your own and an art without one draw depth as it is, and so does
   `compensateDepth: false`, for a scene that wants its far layers small.
 - **Behind the camera.** A depth at or in front of the camera — `depth ≤ −D · pxPerUnit` — cannot
-  be drawn: `set()` and `apply()` refuse it where `D` is known
+  be drawn: `set()` and `apply()` refuse it where `D` is known, with `compensateDepth: false` as
+  well, since the camera of the `ParallaxProjection` stands there either way
   (`ArtLayer "steam": depth must be a number above -300 — the camera stands 300 artwork pixels in
   front of the plane —, got -320`), and the layer keeps its pose. A layer that a new `D` leaves
-  there — a smaller view, a camera brought closer — is hidden and said once on the console, until
-  its depth or the distance brings it in front of the camera again.
+  there — a smaller view, a camera brought closer — is hidden, and said once on the console where it
+  would be shown — a layer you have hidden yourself is said when you show it —, until its depth or
+  the distance brings it in front of the camera again.
 - **Pixels.** Only the plane is pixel-exact under `pixelSnap`; a layer at a depth is scaled by `k`
   and lands between the pixels.
 
 A projection the stage swaps is not followed by the art, which does not know the stage: hand it the
 new one — `art.projection = stage.projection` —, after a `rig.moveTo(projection, …)` once the move
-has arrived. It takes effect in the next `update()`.
+has arrived. It takes effect in the next `update()`; a `set()` before that checks a depth against the
+`D` of the last `update()`.
 
 ### Art on a `top-left` stage
 

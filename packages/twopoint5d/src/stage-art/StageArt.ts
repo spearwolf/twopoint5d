@@ -82,6 +82,8 @@ const STACK = bit(POSE_DEPTH) | bit(POSE_ORDER);
 // what a new camera distance writes anew of a layer at a depth: its place and its size — x stands for
 // the whole position, which #write() writes as one; the depth itself, and so the stack, stay
 const RELAYOUT = bit(POSE_X) | SCALE;
+// no field of a pose: the distance of the camera changed, and with it whether a layer lies behind it
+const CAMERA = 1 << POSE_SIZE;
 
 // the scratch of a layout: what layoutLayerInto() writes, and the tuples the sprite setters copy from —
 // a fraction in a typed array or a tuple stays unboxed, one handed to a call V8 leaves un-inlined is boxed
@@ -160,8 +162,10 @@ export class StageArt extends Group {
   readonly #options: StageArtOptions;
   readonly #pxPerUnit: number;
   #projection: IProjection | undefined;
-  // the projection whose camera distance compensates depth: a ParallaxProjection under compensateDepth
+  // the projection that places its camera at a distance from the plane: a ParallaxProjection
   #parallax: ParallaxProjection | undefined;
+  // whether that distance compensates the layers at a depth: compensateDepth, true by default
+  readonly #compensate: boolean;
   // the plane handed in — through the options or the setter — or the default, and whether one was handed in
   #planeOption: ProjectionPlane;
   #planeGiven: boolean;
@@ -169,8 +173,11 @@ export class StageArt extends Group {
   // a copy of the plane the mesh is turned to, compared with the plane in force in update(): a plane
   // changed in place — its normal, its up — is a plane changed as well
   #turnedTo: ProjectionPlane;
-  // D, the distance of the camera to the plane in units the layers at a depth are laid out with; NaN
-  // draws them uncompensated — no parallax camera, compensateDepth: false, or no view yet
+  // D, the distance of the camera of a parallax projection to the plane in units, as the last update()
+  // read it: what a depth must stay in front of. NaN without a parallax camera, or before its first view
+  #cameraDistance = Number.NaN;
+  // the D the layers at a depth are laid out with: #cameraDistance under compensateDepth, else NaN,
+  // which draws them uncompensated
   #distance = Number.NaN;
   #frame: ArtFrame | undefined;
   #canvas: {readonly width: number; readonly height: number} | undefined;
@@ -251,10 +258,12 @@ export class StageArt extends Group {
     this.#pxPerUnit = opts.pxPerUnit ?? 1;
     this.#planeOption = ProjectionPlane.get(plane ?? 'xy|bottom-left');
     this.#planeGiven = plane !== undefined;
+    this.#compensate = opts.compensateDepth !== false;
     this.#takeProjection(opts.projection);
     // the distance of a view the projection has given already; before its first view the layers are
-    // drawn uncompensated until an update() reads one
-    this.#distance = this.#parallax?.distanceToProjectionPlane ?? Number.NaN;
+    // drawn uncompensated, and no depth is refused, until an update() reads one
+    this.#cameraDistance = this.#parallax?.distanceToProjectionPlane ?? Number.NaN;
+    this.#distance = this.#compensate ? this.#cameraDistance : Number.NaN;
     const turnedTo = this.plane;
     this.#turnedTo = turnedTo.clone();
 
@@ -376,10 +385,10 @@ export class StageArt extends Group {
    * before any is written: a field that is no finite number, an `opacity` outside 0 … 1, a `frame`
    * that is no whole number of 0 or more — or, once the frames are known, no index into them —, an
    * `order` that is no whole number from -1024 to 1023, a `depth` at or behind the camera of a
-   * `ParallaxProjection` whose distance is known, a `visible` that is no boolean and a key that is
-   * no field of a pose throw, naming the layer and the field, and the layer keeps what it held. A
-   * layer at a depth is written with the depth compensation of the distance in force — that of the
-   * last {@link update}. Allocates nothing. Once disposed it writes nothing, and still turns away
+   * `ParallaxProjection` whose distance is known — compensated or not, since the camera stands
+   * there either way —, a `visible` that is no boolean and a key that is no field of a pose throw,
+   * naming the layer and the field, and the layer keeps what it held. The distance is that of the
+   * last {@link update}, and a layer at a depth is written with its depth compensation. Allocates nothing. Once disposed it writes nothing, and still turns away
    * what it cannot use.
    *
    * @throws an `Error` for a name the art does not know, listing the names
@@ -428,9 +437,9 @@ export class StageArt extends Group {
   /**
    * Once per frame, before the render: turns the mesh to the {@link plane} where it changed; under
    * a `ParallaxProjection` reads the distance of its camera to the plane, and where it differs from
-   * the one of the last update lays the layers at a depth out anew — a layer it leaves at or behind
-   * the camera is hidden and said once on the console, until a depth or a distance brings it in
-   * front of the camera again —; sorts the layers back to front where a depth or an order changed
+   * the one of the last update lays the layers at a depth out anew under `compensateDepth` — a layer
+   * it leaves at or behind the camera, compensated or not, is hidden and, where it would be shown,
+   * said once on the console, until a depth or a distance brings it in front of the camera again —; sorts the layers back to front where a depth or an order changed
    * — by depth, the farthest first, then by order, then as painted —; and updates the mesh. The
    * first update that finds a layer painted above another lying behind it says so on the console,
    * once per layer. Allocates nothing without a sort, a turn or a new distance. Does nothing once
@@ -441,9 +450,9 @@ export class StageArt extends Group {
     const plane = this.plane;
     if (!plane.equals(this.#turnedTo)) this.#turnTo(plane);
     const distance = this.#parallax === undefined ? Number.NaN : this.#parallax.distanceToProjectionPlane;
-    // NaN against NaN is no new distance: the layers are laid out uncompensated already
-    if (distance !== this.#distance && !(Number.isNaN(distance) && Number.isNaN(this.#distance))) {
-      this.#relayout(distance);
+    // NaN against NaN is no new distance: there is no camera to stand behind, and nothing to compensate
+    if (distance !== this.#cameraDistance && !(Number.isNaN(distance) && Number.isNaN(this.#cameraDistance))) {
+      this.#takeCameraDistance(distance);
     }
     if (this.#stackDirty) {
       this.#stackDirty = false;
@@ -487,7 +496,7 @@ export class StageArt extends Group {
 
   #takeProjection(projection: IProjection | undefined): void {
     this.#projection = projection;
-    this.#parallax = this.#options.compensateDepth !== false && projection instanceof ParallaxProjection ? projection : undefined;
+    this.#parallax = projection instanceof ParallaxProjection ? projection : undefined;
     this.#warnBoth();
   }
 
@@ -512,14 +521,21 @@ export class StageArt extends Group {
     }
   }
 
-  // lays the layers at a depth out for the distance `distance` — NaN draws them uncompensated —; the
-  // layers on the plane have k = 1 under every distance, and set() writes them alone
-  #relayout(distance: number): void {
-    this.#distance = distance;
+  // takes the camera distance `distance` — NaN for none —: under compensateDepth it lays the layers at a
+  // depth out anew for it, whose place and size follow k; without, a depth is drawn as it is and only a
+  // layer in front of the plane can come to lie behind the camera, or come back. The layers on the plane
+  // have k = 1 under every distance, and set() writes them alone
+  #takeCameraDistance(distance: number): void {
+    this.#cameraDistance = distance;
+    const compensate = this.#compensate;
+    if (compensate) this.#distance = distance;
+    const mask = compensate ? RELAYOUT | CAMERA : CAMERA;
     const poses = this.#poses;
     const flags = this.#flags;
     for (let i = 0; i < this.#layers.length; i++) {
-      if (flags[i]! & LOADED && poses[i * POSE_SIZE + POSE_DEPTH] !== 0) this.#write(i, RELAYOUT);
+      if (!(flags[i]! & LOADED)) continue;
+      const depth = poses[i * POSE_SIZE + POSE_DEPTH]!;
+      if (compensate ? depth !== 0 : depth < 0) this.#write(i, mask);
     }
   }
 
@@ -780,7 +796,7 @@ export class StageArt extends Group {
     if (depth !== undefined) {
       if (!(typeof depth === 'number' && Number.isFinite(depth))) checkPoseField(subject, 'depth', depth);
       // at or behind the camera, where its distance is known: D + δ ≤ 0. NaN, no distance, compares false
-      if (this.#distance + depth / this.#pxPerUnit <= 0) this.#refuseDepth(index, depth);
+      if (this.#cameraDistance + depth / this.#pxPerUnit <= 0) this.#refuseDepth(index, depth);
     }
     if (deg !== undefined && !(typeof deg === 'number' && Number.isFinite(deg))) checkPoseField(subject, 'deg', deg);
     if (scaleX !== undefined && !(typeof scaleX === 'number' && Number.isFinite(scaleX)))
@@ -875,7 +891,7 @@ export class StageArt extends Group {
     if (fields & bit(POSE_Y)) row[POSE_Y] = pose.y!;
     if (fields & bit(POSE_DEPTH)) {
       // a key of a dolly that a camera come closer leaves at or behind it, before any field is written
-      if (this.#distance + pose.depth! / this.#pxPerUnit <= 0) this.#refuseDepth(index, pose.depth!);
+      if (this.#cameraDistance + pose.depth! / this.#pxPerUnit <= 0) this.#refuseDepth(index, pose.depth!);
       row[POSE_DEPTH] = pose.depth!;
     }
     if (fields & bit(POSE_DEG)) row[POSE_DEG] = pose.deg!;
@@ -956,20 +972,21 @@ export class StageArt extends Group {
     const poses = this.#poses;
     const at = index * POSE_SIZE;
 
+    if (changed & (bit(POSE_DEPTH) | CAMERA)) {
+      // at or behind the camera of a parallax projection — D + δ ≤ 0, compensated or not — the layer
+      // cannot be drawn. set() turns such a depth away; a new distance, a rest or a pose set before the
+      // load leave a layer there. NaN, no camera distance, compares false
+      if (this.#cameraDistance + poses[at + POSE_DEPTH]! / this.#pxPerUnit <= 0) this.#flags[index]! |= BEHIND;
+      else this.#flags[index]! &= ~(BEHIND | WARNED_BEHIND);
+    }
+
     if (changed & LAYOUT) {
       // the depth compensation of a parallax camera scales a layer at a depth by k = (D + δ) / D about
-      // the focus; without a camera distance in force the layers are drawn as they are, k = 1
+      // the focus; without a camera distance in force the layers are drawn as they are, k = 1 — and so
+      // is a layer behind the camera, hidden until it comes back
       const frame = this.#frame!;
-      depthScaleInto(this.#distance, poses[at + POSE_DEPTH]!, frame, depthScaleOut);
-      // a k of 0 or less: the layer lies at or behind the camera, which cannot draw it. set() turns
-      // such a depth away; a new distance, a rest or a pose set before the load leave a layer there
-      if (depthScaleOut[0]! > 0) {
-        this.#flags[index]! &= ~(BEHIND | WARNED_BEHIND);
-      } else {
-        if (!(this.#flags[index]! & WARNED_BEHIND)) this.#warnBehind(index);
-        this.#flags[index]! |= BEHIND | WARNED_BEHIND;
-        depthScaleOut[0] = 1;
-      }
+      if (this.#flags[index]! & BEHIND) depthScaleOut[0] = 1;
+      else depthScaleInto(this.#distance, poses[at + POSE_DEPTH]!, frame, depthScaleOut);
       layoutLayerInto(frame, poses, index, this.#boxes[index]!, depthScaleOut[0]!, layoutOut);
       if (changed & MOVE) {
         positionTuple[0] = layoutOut[0]!;
@@ -1003,19 +1020,27 @@ export class StageArt extends Group {
     if (changed & bit(POSE_ORDER)) sprite.artOrder = (poses[at + POSE_ORDER]! - ORDER_MIN) * MAX_LAYERS + index;
     if (changed & STACK) this.#stackDirty = true;
 
-    const flags = this.#flags[index]!;
+    let flags = this.#flags[index]!;
     const wasShown = (flags & SHOWN) !== 0;
-    const shown =
-      (flags & BEHIND) === 0 &&
+    const showable =
       poses[at + POSE_VISIBLE] !== 0 &&
       poses[at + POSE_OPACITY]! > 0 &&
       this.#prepared[index]![poses[at + POSE_FRAME]!] !== undefined;
+    // the warning is for a layer the camera holds back, not for one the caller has hidden: it comes once
+    // the layer would be shown, and once until the layer lies in front of the camera again
+    if (showable && (flags & (BEHIND | WARNED_BEHIND)) === BEHIND) {
+      flags |= WARNED_BEHIND;
+      this.#flags[index] = flags;
+      this.#warnBehind(index);
+    }
+    const shown = showable && (flags & BEHIND) === 0;
     if (shown !== wasShown) {
       this.#flags[index] = shown ? flags | SHOWN : flags & ~SHOWN;
       sprite.visible = shown ? 1 : 0;
       pool.touchVO(sprite, 'visible');
       this.#changed = true;
-    } else if (shown) {
+    } else if (shown && changed & ~CAMERA) {
+      // a new camera distance alone, without a layout, changes nothing a shown layer shows
       this.#changed = true;
     }
   }
@@ -1024,13 +1049,13 @@ export class StageArt extends Group {
     const depth = this.#poses[index * POSE_SIZE + POSE_DEPTH]!;
     // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
     console.warn(
-      `${this.#subject}: the layer ${describeValue(this.#names[index]!)}, at a depth of ${depth}, lies at or behind the camera, which stands ${this.#distance * this.#pxPerUnit} artwork pixels in front of the plane — it is hidden until its depth or the distance of the camera brings it in front of the camera again. This warning is shown once until then.`,
+      `${this.#subject}: the layer ${describeValue(this.#names[index]!)}, at a depth of ${depth}, lies at or behind the camera, which stands ${this.#cameraDistance * this.#pxPerUnit} artwork pixels in front of the plane — it is hidden until its depth or the distance of the camera brings it in front of the camera again. This warning is shown once until then.`,
     );
   }
 
   // turns away a depth at or behind the camera in force, where its distance is known
   #refuseDepth(index: number, depth: number): never {
-    const camera = this.#distance * this.#pxPerUnit;
+    const camera = this.#cameraDistance * this.#pxPerUnit;
     refusePoseField(
       this.#subjects[index]!,
       'depth',
