@@ -90,7 +90,7 @@ describe('stage art on the hot path', () => {
       for (let i = 0; i < CALLS; i++) {
         // whole numbers: a fraction handed in is boxed at the call
         depthScaleInto(300, i % 7, frame, k);
-        layoutLayerInto(frame, pose, 1, box, k[0]!, out);
+        layoutLayerInto(frame, pose, 1, box, k, out);
         anchorOf(box, 500, 250, anchor);
         sum[0]! += out[0]! + out[5]! + anchor[1]!;
       }

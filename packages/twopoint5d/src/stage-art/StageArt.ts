@@ -1187,7 +1187,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
       const frame = this.#frame!;
       if (this.#flags[index]! & BEHIND) depthScaleOut[0] = 1;
       else depthScaleInto(this.#distance, poses[at + POSE_DEPTH]!, frame, depthScaleOut);
-      layoutLayerInto(frame, poses, index, this.#boxes[index]!, depthScaleOut[0]!, layoutOut);
+      layoutLayerInto(frame, poses, index, this.#boxes[index]!, depthScaleOut, layoutOut);
       if (changed & MOVE) {
         positionTuple[0] = layoutOut[0]!;
         positionTuple[1] = layoutOut[1]!;

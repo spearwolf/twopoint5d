@@ -61,13 +61,16 @@ describe('artFrameOf()', () => {
   });
 });
 
+// the depth scale k as depthScaleInto() writes it, which layoutLayerInto() reads
+const kOf = (k: number): Float64Array => Float64Array.of(k);
+
 describe('layoutLayerInto()', () => {
   const out = new Float64Array(6);
   const box: LayerBox = {x: 700, y: 100, w: 200, h: 80};
 
   test('a pivot at the canvas middle lands on the origin of the art', () => {
     const frame = artFrameOf(SUBJECT, 1, undefined, undefined, {width: 800, height: 600});
-    layoutLayerInto(frame, poseRow(1, 0, {[POSE_X]: 400, [POSE_Y]: 300}), 0, box, 1, out);
+    layoutLayerInto(frame, poseRow(1, 0, {[POSE_X]: 400, [POSE_Y]: 300}), 0, box, kOf(1), out);
     expect(out[0]).toBe(0);
     expect(out[1]).toBe(0);
     expect(out[2]).toBe(-0);
@@ -76,15 +79,15 @@ describe('layoutLayerInto()', () => {
   test('maps pixels to units with y turned up, depth to −z, and the box times the scale to the size', () => {
     const frame = artFrameOf(SUBJECT, 4, [400, 300], undefined, undefined);
     const pose = poseRow(2, 1, {[POSE_X]: 480, [POSE_Y]: 220, [POSE_DEPTH]: 40, [POSE_SCALE_X]: 2, [POSE_SCALE_Y]: 0.5});
-    layoutLayerInto(frame, pose, 1, box, 1, out);
+    layoutLayerInto(frame, pose, 1, box, kOf(1), out);
     expect(Array.from(out.subarray(0, 5))).toEqual([20, 20, -10, 100, 10]);
   });
 
   test('90 degrees clockwise is −π/2', () => {
     const frame = artFrameOf(SUBJECT, 1, [0, 0], undefined, undefined);
-    layoutLayerInto(frame, poseRow(1, 0, {[POSE_DEG]: 90}), 0, box, 1, out);
+    layoutLayerInto(frame, poseRow(1, 0, {[POSE_DEG]: 90}), 0, box, kOf(1), out);
     expect(out[5]).toBeCloseTo(-Math.PI / 2, 12);
-    layoutLayerInto(frame, poseRow(1, 0, {[POSE_DEG]: -45}), 0, box, 1, out);
+    layoutLayerInto(frame, poseRow(1, 0, {[POSE_DEG]: -45}), 0, box, kOf(1), out);
     expect(out[5]).toBeCloseTo(Math.PI / 4, 12);
   });
 
@@ -93,7 +96,7 @@ describe('layoutLayerInto()', () => {
     expect(frame.focusX).toBe(10);
     expect(frame.focusY).toBe(20);
     const pose = poseRow(1, 0, {[POSE_X]: 30, [POSE_Y]: -20, [POSE_DEPTH]: 100});
-    layoutLayerInto(frame, pose, 0, box, 2, out);
+    layoutLayerInto(frame, pose, 0, box, kOf(2), out);
     // unit position (30, 20): focus + ((30, 20) − focus) · 2 = (50, 20)
     expect(Array.from(out.subarray(0, 5))).toEqual([50, 20, -100, 400, 160]);
   });
@@ -174,7 +177,7 @@ describe('the compensation of depth', () => {
     // a layer of 120 × 80 px with its pivot at its middle, at (500, 250) on the canvas
     const box: LayerBox = {x: 440, y: 210, w: 120, h: 80};
     const out = new Float64Array(6);
-    layoutLayerInto(frame, poseRow(1, 0, {[POSE_X]: 500, [POSE_Y]: 250, [POSE_DEPTH]: depthPx}), 0, box, k, out);
+    layoutLayerInto(frame, poseRow(1, 0, {[POSE_X]: 500, [POSE_Y]: 250, [POSE_DEPTH]: depthPx}), 0, box, kOf(k), out);
 
     const result: number[] = [];
     for (const [sx, sy] of [

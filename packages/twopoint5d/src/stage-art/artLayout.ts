@@ -75,18 +75,20 @@ export function depthScaleInto(D: number, depthPx: number, frame: ArtFrame, out:
  * Writes the sprite of a layer into `out[0…5]`: `x`, `y`, `z` — the place of the pivot in the art
  * frame, scaled about the focus by `k` —, the `width` and `height` of the box times the scale and
  * `k`, in units, and the `rotation` in radians (clockwise degrees are negative about +z).
- * The pose is the row `row` of `pose`.
+ * The pose is the row `row` of `pose`; `k` is `depthScale[0]`, as {@link depthScaleInto} writes it —
+ * read from the array, since a fraction handed to a call V8 leaves un-inlined is boxed.
  */
 export function layoutLayerInto(
   frame: ArtFrame,
   pose: Float64Array,
   row: number,
   box: LayerBox,
-  k: number,
+  depthScale: Float64Array,
   out: Float64Array,
 ): void {
   const at = row * POSE_SIZE;
   const ppu = frame.pxPerUnit;
+  const k = depthScale[0]!;
   const ux = (pose[at + POSE_X]! - frame.originX) / ppu;
   const uy = (frame.originY - pose[at + POSE_Y]!) / ppu;
   out[0] = frame.focusX + (ux - frame.focusX) * k;
