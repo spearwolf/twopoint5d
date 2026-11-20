@@ -447,11 +447,11 @@ describe('readAtlasSource() with overrides', () => {
     expect(problems).toEqual([]);
   });
 
-  test('the layer options pass at and pxPerUnit on', () => {
-    const {layers} = readAtlasSource(SUBJECT, ftpAtlas(), {layers: {table: {at: [1, 2], pxPerUnit: 3}}});
+  test('an override passes neither at nor pxPerUnit on: they are loose options', () => {
+    const {layers} = readAtlasSource(SUBJECT, ftpAtlas(), {layers: {table: {depth: 5}}});
 
-    expect(layerOf(layers, 'table')).toMatchObject({at: [1, 2], pxPerUnit: 3});
-    expect(layerOf(layers, 'wall').at).toBeUndefined();
+    expect(layerOf(layers, 'table').at).toBeUndefined();
+    expect(layerOf(layers, 'table').pxPerUnit).toBeUndefined();
   });
 });
 
@@ -496,15 +496,27 @@ describe('checkArtSourceOptions()', () => {
     }
   });
 
-  test('refuses an order, a pivot, an at, a pxPerUnit and frames the options cannot take', () => {
+  test('refuses at and pxPerUnit in the overrides of an atlas source, naming the layer, the key and the way out', () => {
+    expect(() => checkArtSourceOptions(SUBJECT, {layers: {table: {at: [1, 2]}}})).toThrow(
+      'StageArt "kitchen": the options of the layer "table" have at, which only a loose layer takes — give a loose layer its at and pxPerUnit in the layers list of the source',
+    );
+    expect(() => checkArtSourceOptions(SUBJECT, {layers: {table: {pxPerUnit: 2}}})).toThrow(
+      /^StageArt "kitchen": the options of the layer "table" have pxPerUnit, which only a loose layer takes/,
+    );
+    expect(() => readAtlasSource(SUBJECT, ftpAtlas(), {layers: {table: {at: [1, 2]}}})).toThrow(
+      /have at, which only a loose layer takes/,
+    );
+    expect(() => checkArtSourceOptions(SUBJECT, {layers: {table: {at: undefined, pxPerUnit: undefined}}})).not.toThrow();
+    expect(() => checkLayerDefs(SUBJECT, [{name: 'table', at: [1, 2], pxPerUnit: 2}])).not.toThrow();
+  });
+
+  test('refuses an order, a pivot and frames the options cannot take', () => {
     const refused = (options: unknown, message: RegExp) =>
       expect(() => checkArtSourceOptions(SUBJECT, {layers: {steam: options}})).toThrow(message);
 
     refused({order: 1.5}, /the order of the layer "steam" must be a whole number from -1024 to 1023, got 1.5/);
     refused({order: 1024}, /the order of the layer "steam" must be a whole number from -1024 to 1023/);
     refused({pivot: [1]}, /the pivot of the layer "steam" must be a pair of finite numbers, got \[1\]/);
-    refused({at: [1, Number.NaN]}, /the at of the layer "steam" must be a pair of finite numbers/);
-    refused({pxPerUnit: 0}, /the pxPerUnit of the layer "steam" must be a finite number above 0, got 0/);
     refused({frames: 'steam#0'}, /the frames of the layer "steam" must be a list of frame names or a RegExp, got "steam#0"/);
     refused({frames: [1]}, /the frames of the layer "steam" must be a list of frame names or a RegExp/);
   });
@@ -616,6 +628,12 @@ describe('readLooseLayers()', () => {
     );
     expect(() => checkLayerDefs(SUBJECT, [{name: 'jug', depth: '4'}])).toThrow(
       /the depth of the layer "jug" must be a finite number, got "4"/,
+    );
+    expect(() => checkLayerDefs(SUBJECT, [{name: 'jug', at: [1, Number.NaN]}])).toThrow(
+      /the at of the layer "jug" must be a pair of finite numbers/,
+    );
+    expect(() => checkLayerDefs(SUBJECT, [{name: 'jug', pxPerUnit: 0}])).toThrow(
+      /the pxPerUnit of the layer "jug" must be a finite number above 0, got 0/,
     );
     expect(() => readLooseLayers(SUBJECT, propsAtlas(), [{name: 'jug'}, {name: 'jug'}])).toThrow(/two layers are named "jug"/);
   });

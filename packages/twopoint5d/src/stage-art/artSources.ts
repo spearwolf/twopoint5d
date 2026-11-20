@@ -28,9 +28,9 @@ export interface ArtLayerOptions {
   frames?: readonly string[] | RegExp;
   /** A pose the layer starts in instead of the layout. */
   rest?: ArtPose;
-  /** Where the pivot of a loose layer stands at rest. */
+  /** Where the pivot of a loose layer stands at rest; refused in the overrides of an atlas source. */
   at?: readonly [number, number];
-  /** Artwork pixels per unit of the stage, for a loose layer. */
+  /** Artwork pixels per unit of the stage, for a loose layer; refused in the overrides of an atlas source. */
   pxPerUnit?: number;
 }
 
@@ -113,14 +113,23 @@ function checkRest(subject: string, layer: string, rest: unknown): void {
   }
 }
 
-// throws for options of a layer that are no object, a key no option has, and a value an option cannot take
-function checkLayerOptions(subject: string, layer: string, options: unknown): void {
+// keys only a loose layer takes: an atlas source places its layers by the picture
+const LOOSE_ONLY_KEYS: readonly (keyof ArtLayerOptions)[] = ['at', 'pxPerUnit'];
+
+// throws for options of a layer that are no object, a key no option has — `at` and `pxPerUnit` outside
+// a loose layer among them — and a value an option cannot take
+function checkLayerOptions(subject: string, layer: string, options: unknown, loose: boolean): void {
   const of = `of the layer ${describeValue(layer)}`;
   if (!isRecord(options)) throw new TypeError(`${subject}: the options ${of} must be an object, got ${describeValue(options)}`);
   for (const key of Object.keys(options)) {
     if (!LAYER_OPTION_KEYS.includes(key as keyof ArtLayerOptions)) {
       const known = LAYER_OPTION_KEYS.map((name) => describeValue(name)).join(', ');
       throw new TypeError(`${subject}: the options ${of} have no key ${describeValue(key)}; their keys are ${known}`);
+    }
+    if (!loose && LOOSE_ONLY_KEYS.includes(key as keyof ArtLayerOptions) && options[key] !== undefined) {
+      throw new TypeError(
+        `${subject}: the options ${of} have ${key}, which only a loose layer takes — give a loose layer its at and pxPerUnit in the layers list of the source`,
+      );
     }
   }
   const {pivot, depth, order, frames, rest, at, pxPerUnit} = options;
@@ -138,7 +147,7 @@ function checkLayerOptions(subject: string, layer: string, options: unknown): vo
 /**
  * Throws what an art refuses in `only` and `layers` (§8): `only` that is no list of names or names a
  * layer twice; `layers` that is no object; options of a layer that are no object, have a key no
- * option has, or a value it cannot take — a `depth` that is no finite number, a `rest` field as
+ * option has, give `at` or `pxPerUnit` — which only a loose layer takes (§4.4) —, or a value it cannot take — a `depth` that is no finite number, a `rest` field as
  * `set()` refuses it. `undefined` is not given. To be called when the art is made, before its source
  * has loaded; `readAtlasSource()` calls it too.
  */
@@ -156,7 +165,7 @@ export function checkArtSourceOptions(subject: string, options: {only?: unknown;
     if (!isRecord(layers)) {
       throw new TypeError(`${subject}: layers must be an object of layer options by name, got ${describeValue(layers)}`);
     }
-    for (const [name, layerOptions] of Object.entries(layers)) checkLayerOptions(subject, name, layerOptions);
+    for (const [name, layerOptions] of Object.entries(layers)) checkLayerOptions(subject, name, layerOptions, false);
   }
 }
 
@@ -178,7 +187,7 @@ export function checkLayerDefs(subject: string, defs: unknown): void {
     }
     if (seen.has(name)) throw new Error(`${subject}: two layers are named ${describeValue(name)}`);
     seen.add(name);
-    checkLayerOptions(subject, name, options);
+    checkLayerOptions(subject, name, options, true);
   }
 }
 
