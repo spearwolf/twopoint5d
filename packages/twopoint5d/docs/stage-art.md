@@ -714,12 +714,15 @@ is no sprite of the art, and once the art is disposed.
 
 `features` is a list of sprite features — `Flash`, `Tint`, `PaletteSwap`, a feature of your own — that
 join the kind of the art after the features it brings itself. Their values are written through
-`layer.sprite`, which `StageArt` types by the features you hand in: `new StageArt(source, {features: [Flash]})` is a `StageArt<typeof Flash>`, its layers an `ArtLayer<FlashApi>`. Such a write goes past the change
-detection of the art: `takeChanged()` does not see it, and the next pose of a layer overwrites what
+`layer.sprite`, which `StageArt` types by the features you hand in: `new StageArt(source,
+{features: [Flash]})` is a `StageArt<typeof Flash>`, its layers an `ArtLayer<FlashApi>`. The type follows
+the element type of the list, so a list that may be empty types an api a sprite may lack. Such a
+write goes past the change detection of the art: `takeChanged()` does not see it, and the next pose of a layer overwrites what
 it shares with it. A feature that takes a slot the art already fills — a second frame source such as
-`AtlasFrame`, another placement — is refused by `new StageArt()` with the message of `defineSprite()`,
-which names the feature, and so is an entry that is no feature. The kind is built once per list of
-feature objects, so arts with the same `features` share it.
+`AtlasFrame`, another placement — is refused by `new StageArt()` naming the feature, and so is an entry that is no feature. The kind
+is built once per list of feature objects and kept as long as the first of them lives: arts with
+the same feature objects share it, and a factory called anew for each art — `paletteSwap({…})` inline
+— builds a kind each time, so call it once and hand the feature in.
 
 ### `loaded` and `problems`
 

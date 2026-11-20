@@ -358,6 +358,12 @@ describe('stage art', function () {
       art.set('ghost', {opacity: 1});
       expect((await pick(4, 0)).name, 'the wall ordered above the ghost').to.equal('wall');
       expect((await pick(0, -2)).name, 'the carafe under the wall now').to.equal('wall');
+
+      // of layers at different depths the nearer wins, whatever the order of the painting
+      art.set('wall', {order: 0, depth: -10});
+      expect((await pick(0, -2)).name, 'the wall in front of the carafe').to.equal('wall');
+      art.set('wall', {depth: 10});
+      expect((await pick(0, -2)).name, 'the wall behind the carafe').to.equal('carafe');
     } finally {
       picker.dispose();
     }

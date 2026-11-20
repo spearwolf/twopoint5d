@@ -11,7 +11,7 @@ import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
 import {isRecord} from '../utils/isRecord.js';
 import {artFrameOf} from './artLayout.js';
-import {stageArtKind} from './stageArtKind.js';
+import {ART_FEATURE_NAMES, stageArtKind} from './stageArtKind.js';
 import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLayerDefs} from './artSources.js';
 
 /**
@@ -203,13 +203,20 @@ export function checkStageArt(
     if (!Array.isArray(features)) {
       throw new TypeError(`${where}: features must be a list of sprite features, got ${describeValue(features)}`);
     }
+    for (const feature of features) {
+      const name = isRecord(feature) ? feature['name'] : undefined;
+      if (typeof name === 'string' && ART_FEATURE_NAMES.includes(name)) {
+        throw new Error(`${where}: features holds ${describeValue(name)}, which the art brings itself`);
+      }
+    }
     try {
       stageArtKind(features as readonly SpriteFeature[]);
     } catch (error) {
-      // the kind is built here once, before anything else is: the refusal of defineSprite() goes on in its words
-      throw new (error instanceof TypeError ? TypeError : Error)(`${where}: features: ${(error as Error).message}`, {
-        cause: error,
-      });
+      // the kind is built here once, before anything else is: what defineSprite() refuses is passed on in its words
+      throw new (error instanceof Error ? (error.constructor as ErrorConstructor) : Error)(
+        `${where}: features cannot join the features of the art — ${(error as Error).message}`,
+        {cause: error},
+      );
     }
   }
   const material: unknown = opts.material;

@@ -54,8 +54,13 @@ const FEATURES: readonly SpriteFeature[] = [
 ];
 
 let defaultKind: SpriteKind<StageArtSpriteApi> | undefined;
-// the kinds built for a list of further features, by the feature objects of the list, in order
-const extraKinds: {features: readonly SpriteFeature[]; kind: SpriteKind<StageArtSpriteApi>}[] = [];
+// the kinds built for a list of further features, by the first of them: an entry lives as long as
+// that feature object does, so an art made with a fresh factory call (paletteSwap({…})) leaves nothing
+// behind once it and its feature are gone
+const extraKinds = new WeakMap<object, {features: readonly SpriteFeature[]; kind: SpriteKind<StageArtSpriteApi>}[]>();
+
+/** The names of the features every layer of an art has; a feature of `features` may not take one. */
+export const ART_FEATURE_NAMES: readonly string[] = FEATURES.map((feature) => feature.name);
 
 const sameFeatures = (a: readonly SpriteFeature[], b: readonly SpriteFeature[]): boolean =>
   a.length === b.length && a.every((feature, i) => feature === b[i]);
@@ -63,16 +68,22 @@ const sameFeatures = (a: readonly SpriteFeature[], b: readonly SpriteFeature[]):
 /**
  * The sprite kind of an art: the features every layer needs, then `features`. The kind without
  * further features is built once and shared by every art, and a kind with them is built once per
- * distinct list of feature objects; a feature `defineSprite()` refuses throws in its words.
+ * distinct list of feature objects, kept as long as the first of them lives — hoist the call of a
+ * feature factory to share the kind; a feature `defineSprite()` refuses throws in its words.
  */
 export function stageArtKind(features: readonly SpriteFeature[]): SpriteKind<StageArtSpriteApi> {
   if (features.length === 0) {
     defaultKind ??= defineSprite({base: QuadBase, features: FEATURES}) as SpriteKind<StageArtSpriteApi>;
     return defaultKind;
   }
-  const known = extraKinds.find((entry) => sameFeatures(entry.features, features));
+  const first = features[0]!;
+  // a first entry that is no object is no key: it is no feature, and defineSprite() refuses it below
+  const entries = typeof first === 'object' && first !== null ? extraKinds.get(first) : undefined;
+  const known = entries?.find((entry) => sameFeatures(entry.features, features));
   if (known !== undefined) return known.kind;
   const kind = defineSprite({base: QuadBase, features: [...FEATURES, ...features]}) as SpriteKind<StageArtSpriteApi>;
-  extraKinds.push({features: Object.freeze([...features]), kind});
+  const entry = {features: Object.freeze([...features]), kind};
+  if (entries === undefined) extraKinds.set(first, [entry]);
+  else entries.push(entry);
   return kind;
 }

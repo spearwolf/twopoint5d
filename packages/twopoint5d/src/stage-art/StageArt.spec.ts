@@ -454,14 +454,21 @@ describe('features', () => {
     expect(new StageArt(sceneSource(), {features: [Flash]}).mesh.kind).toBe(first.mesh.kind);
     expect(new StageArt(sceneSource(), {features: [Tint]}).mesh.kind).not.toBe(first.mesh.kind);
     expect(first.mesh.kind).not.toBe(plain.mesh.kind);
+
+    // a feature object of its own — what a factory call makes anew — gets a kind of its own, and the same list its kind again
+    const fresh = {...Flash};
+    const own = new StageArt(sceneSource(), {features: [fresh]});
+    expect(own.mesh.kind).not.toBe(first.mesh.kind);
+    expect(new StageArt(sceneSource(), {features: [fresh]}).mesh.kind).toBe(own.mesh.kind);
+    expect(new StageArt(sceneSource(), {features: [{...Flash}]}).mesh.kind).not.toBe(own.mesh.kind);
   });
 
   test('refuses a second frame source and a second placement, naming the feature', () => {
     expect(() => new StageArt(sceneSource(), {features: [AtlasFrame]})).toThrow(
-      /^new StageArt\(\): features: defineSprite: .*"atlasFrame"/,
+      /^new StageArt\(\): features holds "atlasFrame", which the art brings itself$/,
     );
     expect(() => new StageArt(sceneSource(), {name: 'kitchen', features: [BillboardPlacement]})).toThrow(
-      /^StageArt "kitchen": features: defineSprite: /,
+      /^StageArt "kitchen": features cannot join the features of the art — defineSprite: /,
     );
   });
 
@@ -470,7 +477,7 @@ describe('features', () => {
       /^new StageArt\(\): features must be a list of sprite features, got /,
     );
     expect(() => new StageArt(sceneSource(), {features: [Flash, {}] as never})).toThrow(
-      /^new StageArt\(\): features: defineSprite: a feature needs a name, got undefined/,
+      /^new StageArt\(\): features cannot join the features of the art — defineSprite: a feature needs a name, got undefined/,
     );
   });
 });
