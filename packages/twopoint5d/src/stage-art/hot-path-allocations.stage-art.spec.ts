@@ -1,7 +1,8 @@
 import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
-import type {ArtPose} from './artPose.js';
+import {anchorOf, artFrameOf, depthScaleInto, layoutLayerInto, type LayerBox} from './artLayout.js';
+import {type ArtPose, POSE_DEG, POSE_DEPTH, POSE_SIZE, POSE_X, POSE_Y, POSE_SCALE_X, POSE_SCALE_Y} from './artPose.js';
 import {artTrack, rampAt} from './artTrack.js';
 
 // see hot-path-allocations.spec.ts of the sprites: a call that allocates anything costs 16 B at least
@@ -53,5 +54,35 @@ describe('stage art on the hot path', () => {
 
     expect(sum[0]).toBeGreaterThan(0);
     expect(bytesPerRound / (CALLS * 2)).toBeLessThan(BYTES_PER_CALL_LIMIT);
+  });
+
+  test('laying a layer out allocates nothing per call', async () => {
+    const frame = artFrameOf('StageArt', 2, [400, 300], [440, 340], {width: 800, height: 600});
+    const box: LayerBox = {x: 440, y: 210, w: 120, h: 80};
+    const pose = new Float64Array(POSE_SIZE * 2);
+    pose[POSE_SIZE + POSE_X] = 500;
+    pose[POSE_SIZE + POSE_Y] = 250;
+    pose[POSE_SIZE + POSE_DEPTH] = 600;
+    pose[POSE_SIZE + POSE_DEG] = 35;
+    pose[POSE_SIZE + POSE_SCALE_X] = 1;
+    pose[POSE_SIZE + POSE_SCALE_Y] = 1;
+    const out = new Float64Array(6);
+    const k = new Float64Array(1);
+    const anchor = new Float64Array(2);
+    // keep the sums in a typed array: a double in a closure variable is a heap number of its own
+    const sum = new Float64Array(1);
+
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS; i++) {
+        // whole numbers: a fraction handed in is boxed at the call
+        depthScaleInto(300, i % 7, frame, k);
+        layoutLayerInto(frame, pose, 1, box, k[0]!, out);
+        anchorOf(box, 500, 250, anchor);
+        sum[0]! += out[0]! + out[5]! + anchor[1]!;
+      }
+    });
+
+    expect(Number.isFinite(sum[0])).toBe(true);
+    expect(bytesPerRound / (CALLS * 3)).toBeLessThan(BYTES_PER_CALL_LIMIT);
   });
 });
