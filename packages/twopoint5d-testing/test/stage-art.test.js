@@ -1,4 +1,4 @@
-import {Display, StageArt, TexturePackerJson} from '@spearwolf/twopoint5d';
+import {Display, OrthographicProjection, ParallaxProjection, StageArt, TexturePackerJson} from '@spearwolf/twopoint5d';
 import {expect} from 'chai';
 import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
 import {
@@ -44,6 +44,29 @@ const trimmedAtlas = (frames, width, height) =>
     meta: {image: 'sheet.png', size: {w: width, h: height}},
   })[0];
 
+/**
+ * The box of the pixels of the color `rgb` in a read-back target, in pixels of the target as the
+ * backend reads it back; `undefined` where no pixel has it.
+ *
+ * @param {Uint8Array} pixels
+ * @param {number[]} rgb
+ * @returns {{minX: number, maxX: number, minY: number, maxY: number} | undefined}
+ */
+function boxOfColor(pixels, rgb) {
+  let box;
+  for (let y = 0; y < TARGET_SIZE; y++) {
+    for (let x = 0; x < TARGET_SIZE; x++) {
+      if (!isNearColor(rgbAt(pixels, TARGET_SIZE, x, y), rgb)) continue;
+      if (box === undefined) box = {minX: x, maxX: x, minY: y, maxY: y};
+      box.minX = Math.min(box.minX, x);
+      box.maxX = Math.max(box.maxX, x);
+      box.minY = Math.min(box.minY, y);
+      box.maxY = Math.max(box.maxY, y);
+    }
+  }
+  return box;
+}
+
 describe('stage art', function () {
   let display;
   let host;
@@ -67,12 +90,15 @@ describe('stage art', function () {
   });
 
   // draws the art on black and answers the color at the point (x, y) of the art frame, in units from
-  // its origin, y up, and the pixels
-  async function render(art) {
+  // its origin, y up on the screen, and the pixels. The camera looks at the 'xy|bottom-left' plane
+  // unless one is handed in
+  async function render(art, camera = undefined) {
     const topDown = await readsTopDown(display.renderer, target);
-    const half = TARGET_SIZE / PPU / 2;
-    const camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
-    camera.position.z = 50;
+    if (camera === undefined) {
+      const half = TARGET_SIZE / PPU / 2;
+      camera = new OrthographicCamera(-half, half, half, -half, 0.1, 100);
+      camera.position.z = 50;
+    }
     const scene = new Scene();
     scene.add(art);
     art.update();
@@ -88,32 +114,109 @@ describe('stage art', function () {
   const expectColor = (colorAt, x, y, rgb, what) =>
     expect(colorAt(x, y), `${what} at (${x}, ${y})`).to.satisfy((c) => isNearColor(c, rgb));
 
-  it('turns a layer 90° clockwise about a pivot off its middle', async function () {
-    // a bar of 4 × 2 artwork pixels at 8, 6 — red on its left half, green on its right — whose pivot is
-    // its bottom left corner, the middle of the canvas: the origin of the art
+  for (const plane of /** @type {const} */ (['xy|bottom-left', 'xy|top-left'])) {
+    it(`turns a layer 90° clockwise about a pivot off its middle, on a stage of the plane ${plane}`, async function () {
+      // a bar of 4 × 2 artwork pixels at 8, 6 — red on its left half, green on its right — whose pivot is
+      // its bottom left corner, the middle of the canvas: the origin of the art. The art takes the plane
+      // of the projection, whose camera looks at it: upright and unmirrored under either plane
+      const projection = new OrthographicProjection(plane, {fit: 'contain', width: TARGET_SIZE / PPU, height: TARGET_SIZE / PPU});
+      projection.updateViewRect(TARGET_SIZE, TARGET_SIZE);
+      const camera = projection.createCamera();
+      const texture = keep(
+        makeColorTexture(
+          [RED, RED, GREEN, GREEN, RED, RED, GREEN, GREEN].map((c) => [...c, 255]),
+          4,
+          2,
+        ),
+      );
+      const atlas = trimmedAtlas({bar: {frame: {x: 0, y: 0, w: 4, h: 2}, box: {x: 8, y: 6, w: 4, h: 2}}}, 4, 2);
+      const art = keep(new StageArt({atlas, texture}, {projection, layers: {bar: {pivot: [8, 8]}}}));
+
+      const atRest = await render(art, camera);
+      expectColor(atRest.colorAt, 1, 1, RED, 'the left half, at rest');
+      expectColor(atRest.colorAt, 3, 1, GREEN, 'the right half, at rest');
+      expectColor(atRest.colorAt, 1, -1, BLACK, 'below the bar, at rest');
+
+      art.set('bar', {deg: 90});
+      const turned = await render(art, camera);
+      // clockwise on the screen about the origin: (x, y) goes to (y, −x)
+      expectColor(turned.colorAt, 1, -1, RED, 'the left half, turned down');
+      expectColor(turned.colorAt, 1, -3, GREEN, 'the right half, turned down');
+      expectColor(turned.colorAt, 1, 1, BLACK, 'where the bar stood');
+      expectColor(turned.colorAt, 3, 1, BLACK, 'where the bar stood');
+      expectColor(turned.colorAt, -1, -1, BLACK, 'left of the turned bar');
+    });
+  }
+
+  it('under a parallax camera at rest draws layers at three depths as painted, and parts them once the camera moves', async function () {
+    // three squares of 4 × 4 artwork pixels side by side: red far behind the plane, green behind it,
+    // blue in front of it. The camera stands 16 units — 16 artwork pixels — in front of the plane
     const texture = keep(
       makeColorTexture(
-        [RED, RED, GREEN, GREEN, RED, RED, GREEN, GREEN].map((c) => [...c, 255]),
-        4,
-        2,
+        [
+          [...RED, 255],
+          [...GREEN, 255],
+          [...BLUE, 255],
+        ],
+        3,
+        1,
       ),
     );
-    const atlas = trimmedAtlas({bar: {frame: {x: 0, y: 0, w: 4, h: 2}, box: {x: 8, y: 6, w: 4, h: 2}}}, 4, 2);
-    const art = keep(new StageArt({atlas, texture}, {layers: {bar: {pivot: [8, 8]}}}));
+    const atlas = trimmedAtlas(
+      {
+        red: {frame: {x: 0, y: 0, w: 1, h: 1}, box: {x: 1, y: 6, w: 4, h: 4}},
+        green: {frame: {x: 1, y: 0, w: 1, h: 1}, box: {x: 6, y: 6, w: 4, h: 4}},
+        blue: {frame: {x: 2, y: 0, w: 1, h: 1}, box: {x: 11, y: 6, w: 4, h: 4}},
+      },
+      3,
+      1,
+    );
+    const projection = new ParallaxProjection('xy|bottom-left', {
+      fit: 'contain',
+      width: TARGET_SIZE / PPU,
+      height: TARGET_SIZE / PPU,
+      distanceToProjectionPlane: 16,
+    });
+    projection.updateViewRect(TARGET_SIZE, TARGET_SIZE);
+    const camera = projection.createCamera();
 
-    const atRest = await render(art);
-    expectColor(atRest.colorAt, 1, 1, RED, 'the left half, at rest');
-    expectColor(atRest.colorAt, 3, 1, GREEN, 'the right half, at rest');
-    expectColor(atRest.colorAt, 1, -1, BLACK, 'below the bar, at rest');
+    const flat = keep(new StageArt({atlas, texture}, {projection}));
+    const painted = await render(flat, camera);
+    flat.removeFromParent();
+    const deep = keep(
+      new StageArt({atlas, texture}, {projection, layers: {red: {depth: 32}, green: {depth: 4}, blue: {depth: -8}}}),
+    );
+    const atRest = await render(deep, camera);
 
-    art.set('bar', {deg: 90});
-    const turned = await render(art);
-    // clockwise on the screen about the origin: (x, y) goes to (y, −x)
-    expectColor(turned.colorAt, 1, -1, RED, 'the left half, turned down');
-    expectColor(turned.colorAt, 1, -3, GREEN, 'the right half, turned down');
-    expectColor(turned.colorAt, 1, 1, BLACK, 'where the bar stood');
-    expectColor(turned.colorAt, 3, 1, BLACK, 'where the bar stood');
-    expectColor(turned.colorAt, -1, -1, BLACK, 'left of the turned bar');
+    const colors = {red: RED, green: GREEN, blue: BLUE};
+    const rest = {};
+    for (const [name, rgb] of Object.entries(colors)) {
+      const want = boxOfColor(painted.pixels, rgb);
+      const have = boxOfColor(atRest.pixels, rgb);
+      expect(want, `${name} on the plane`).to.not.equal(undefined);
+      expect(have, `${name} at its depth`).to.not.equal(undefined);
+      // the square of 4 artwork pixels is 16 pixels of the target
+      expect(want.maxX - want.minX + 1, `${name} on the plane, its width`).to.be.within(15, 17);
+      for (const edge of ['minX', 'maxX', 'minY', 'maxY']) {
+        expect(Math.abs(have[edge] - want[edge]), `${name} at its depth, ${edge}`).to.be.at.most(1);
+      }
+      rest[name] = have;
+    }
+
+    // the camera moved 1 unit right: the plane slides 4 pixels left, a layer behind it less — red 1⅓,
+    // green 3.2 —, one in front of it more — blue 8. Each shift is counted twice, at both edges
+    camera.position.x += 1;
+    camera.updateMatrixWorld();
+    const moved = await render(deep, camera);
+    const shift = {};
+    for (const [name, rgb] of Object.entries(colors)) {
+      const box = boxOfColor(moved.pixels, rgb);
+      expect(box, `${name} after the move`).to.not.equal(undefined);
+      shift[name] = rest[name].minX + rest[name].maxX - (box.minX + box.maxX);
+      expect(shift[name], `${name} slides left`).to.be.above(0);
+    }
+    expect(shift.red, 'the far layer moves less than the one behind the plane').to.be.below(shift.green);
+    expect(shift.green, 'the layer behind the plane moves less than the near one').to.be.below(shift.blue);
   });
 
   it('stacks two layers of one depth by their order, and a deeper layer under a nearer one', async function () {
