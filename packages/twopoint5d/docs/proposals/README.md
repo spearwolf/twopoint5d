@@ -121,5 +121,6 @@ scheduled, and each item would get a proposal of its own before it is built.
 | [`drawing-on-demand.md`](drawing-on-demand.md) | `FramePacer` — a frame is drawn only when the picture changed: the frame-step contract, the steady stride, the director option, the verify mode |
 | [`stage-post-process.md`](stage-post-process.md) | `Stage2D#postProcess` — an effect on one stage, drawn with the stage as a layer of a director, under a composing renderer or alone |
 | [`camera-rig.md`](camera-rig.md) | `CameraRig` and `CameraProjection` — eased camera moves on a stage, the cameras of glTF assets, tracks for a scroll, framing a box, a flight across a transition |
+| [`stage-art-layers.md`](stage-art-layers.md) | `StageArt` — named, pivoted art layers read from a paint file and drawn in one mesh in the plane of the stage, posed in artwork pixels, at a depth of their own that keeps the composition under a parallax projection; `artTrack()` and `animationFrameAt()` as pure functions of time |
 
 A new proposal is a file of its own here, named after its subject, with a row in this table.
