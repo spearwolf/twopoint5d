@@ -53,7 +53,7 @@
         "x": 1160,
         "y": 808,
         "w": 536,
-        "h": 448
+        "h": 440
       },
       "rotated": false,
       "trimmed": true,
@@ -61,7 +61,7 @@
         "x": 568,
         "y": 0,
         "w": 536,
-        "h": 448
+        "h": 440
       },
       "sourceSize": {
         "w": 1280,
@@ -168,7 +168,7 @@
         "y": 0.5
       }
     },
-    "steam#11": {
+    "steam#9": {
       "frame": {
         "x": 568,
         "y": 1532,
@@ -192,11 +192,11 @@
         "y": 0.5
       }
     },
-    "steam#6": {
+    "steam#1": {
       "frame": {
         "x": 804,
         "y": 1532,
-        "w": 232,
+        "w": 224,
         "h": 192
       },
       "rotated": false,
@@ -204,7 +204,7 @@
       "spriteSourceSize": {
         "x": 552,
         "y": 0,
-        "w": 232,
+        "w": 224,
         "h": 192
       },
       "sourceSize": {
@@ -216,81 +216,9 @@
         "y": 0.5
       }
     },
-    "steam#7": {
+    "steam#11": {
       "frame": {
-        "x": 1040,
-        "y": 1532,
-        "w": 232,
-        "h": 192
-      },
-      "rotated": false,
-      "trimmed": true,
-      "spriteSourceSize": {
-        "x": 552,
-        "y": 0,
-        "w": 232,
-        "h": 192
-      },
-      "sourceSize": {
-        "w": 1280,
-        "h": 800
-      },
-      "pivot": {
-        "x": 0.5,
-        "y": 0.5
-      }
-    },
-    "steam#8": {
-      "frame": {
-        "x": 1276,
-        "y": 1532,
-        "w": 232,
-        "h": 192
-      },
-      "rotated": false,
-      "trimmed": true,
-      "spriteSourceSize": {
-        "x": 552,
-        "y": 0,
-        "w": 232,
-        "h": 192
-      },
-      "sourceSize": {
-        "w": 1280,
-        "h": 800
-      },
-      "pivot": {
-        "x": 0.5,
-        "y": 0.5
-      }
-    },
-    "steam#9": {
-      "frame": {
-        "x": 1512,
-        "y": 1532,
-        "w": 232,
-        "h": 192
-      },
-      "rotated": false,
-      "trimmed": true,
-      "spriteSourceSize": {
-        "x": 552,
-        "y": 0,
-        "w": 232,
-        "h": 192
-      },
-      "sourceSize": {
-        "w": 1280,
-        "h": 800
-      },
-      "pivot": {
-        "x": 0.5,
-        "y": 0.5
-      }
-    },
-    "steam#1": {
-      "frame": {
-        "x": 1748,
+        "x": 1032,
         "y": 1532,
         "w": 224,
         "h": 192
@@ -314,6 +242,78 @@
     },
     "steam#2": {
       "frame": {
+        "x": 1260,
+        "y": 1532,
+        "w": 224,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 552,
+        "y": 0,
+        "w": 224,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 1280,
+        "h": 800
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "steam#3": {
+      "frame": {
+        "x": 1488,
+        "y": 1532,
+        "w": 224,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 552,
+        "y": 0,
+        "w": 224,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 1280,
+        "h": 800
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "steam#4": {
+      "frame": {
+        "x": 1716,
+        "y": 1532,
+        "w": 224,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 552,
+        "y": 0,
+        "w": 224,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 1280,
+        "h": 800
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "steam#5": {
+      "frame": {
         "x": 4,
         "y": 1736,
         "w": 224,
@@ -336,7 +336,7 @@
         "y": 0.5
       }
     },
-    "steam#3": {
+    "steam#6": {
       "frame": {
         "x": 232,
         "y": 1736,
@@ -360,7 +360,7 @@
         "y": 0.5
       }
     },
-    "steam#4": {
+    "steam#7": {
       "frame": {
         "x": 460,
         "y": 1736,
@@ -384,7 +384,7 @@
         "y": 0.5
       }
     },
-    "steam#5": {
+    "steam#8": {
       "frame": {
         "x": 688,
         "y": 1736,

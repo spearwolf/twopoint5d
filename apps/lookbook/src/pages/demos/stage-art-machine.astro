@@ -149,18 +149,19 @@ import {description, title} from './_stage-art-machine.json';
       ease: 'ease-in-out' as const,
     })),
   ]);
-  // the needle hunts for the echo and back again, as long as the timeline runs
+  // the needle hunts for the echo and back again, as long as the timeline runs: there and back in
+  // 8 seconds, three times in the timeline, so that the needle does not jump where the timeline wraps
   const NEEDLE = artTrack(
     [
       {at: 0, deg: -95},
-      {at: 1.4, deg: -20, ease: 'ease-in-out'},
-      {at: 1.9, deg: -38, ease: 'ease-in-out'},
-      {at: 3.1, deg: 72, ease: 'ease-in-out'},
-      {at: 3.5, deg: 60, ease: 'ease-out'},
+      {at: 1.6, deg: -20, ease: 'ease-in-out'},
+      {at: 2.2, deg: -38, ease: 'ease-in-out'},
+      {at: 3.5, deg: 72, ease: 'ease-in-out'},
+      {at: 4, deg: 60, ease: 'ease-out'},
     ],
     {playback: 'pingpong'},
   );
-  // the flywheel turns once in three seconds
+  // the flywheel turns once in three seconds, eight times in the timeline
   const FLYWHEEL = artTrack(
     [
       {at: 0, deg: 0},
@@ -236,16 +237,21 @@ import {description, title} from './_stage-art-machine.json';
   });
   stage.scene.add(pivots);
 
+  // the handles of the layers, kept: `only` names them, so they are there before the atlas
+  const pivotedLayers = PIVOTED.map((name) => art.layer(name));
+  const strip = art.layer('strip');
+
   function placePivots(): void {
-    PIVOTED.forEach((name, i) => {
-      const layer = art.layer(name);
+    if (!pivots.visible) return;
+    for (let i = 0; i < pivotedLayers.length; i++) {
+      const layer = pivotedLayers[i]!;
       const pivot = layer.pivot;
-      if (pivot === undefined) return;
+      if (pivot === undefined) continue;
       // the pivot stands where the pose puts it: the strip moves, the others turn on the spot
-      const x = name === 'strip' ? (stripPose.x ?? pivot[0]) : pivot[0];
-      const y = name === 'strip' ? (stripPose.y ?? pivot[1]) : pivot[1];
+      const x = layer === strip ? (stripPose.x ?? pivot[0]) : pivot[0];
+      const y = layer === strip ? (stripPose.y ?? pivot[1]) : pivot[1];
       marks[i]!.position.set(x - CANVAS.width / 2, CANVAS.height / 2 - y, 1);
-    });
+    }
   }
 
   // --- the frame loop: pose, then draw only what changed -------------------------------------
@@ -311,6 +317,7 @@ import {description, title} from './_stage-art-machine.json';
     .name('draw the pivots')
     .onChange((on: boolean) => {
       pivots.visible = on;
+      placePivots();
       // the marks are no layer of the art: their change is told to the pacer here
       frames.invalidate();
     });

@@ -29,13 +29,16 @@ const PIVOTED = ['flywheel', 'needle', 'lever'];
 const GLOW_REACH = [130, 320];
 /**
  * The alpha below which a pixel is cut: the faint edge of the shadow the body throws onto the deck,
- * of the light of the lamp, of the steam — and the noise of the shadow catcher.
+ * of the light of the lamp, of the steam — and the noise of the shadow catcher. Cut with a soft
+ * knee — every alpha is lowered by the floor and stretched back to 255 —, so that a part that fades
+ * out, the light of the lamp most of all, shows no step where it crosses the floor.
  */
 const ALPHA_FLOOR = 8;
 /**
  * The trim of a part is rounded out to this grid: a GPU render is not the same byte for byte on
  * every run, and the box of a part found pixel by pixel would move with its noise, the layout of
- * the atlas with it.
+ * the atlas with it. The grid makes such a move unlikely, not impossible: a `machine.json` that
+ * changes after a render of an unchanged scene asks for a look at the boxes.
  */
 const TRIM_GRID = 8;
 /** How many pixels the colour of a part is carried out into its clear surroundings. */
@@ -82,7 +85,7 @@ function lightToLayer(img, [lx, ly]) {
       const reach = 1 - t * t * (3 - 2 * t);
       const peak = Math.max(d[i], d[i + 1], d[i + 2]);
       const alpha = Math.round(peak * reach);
-      if (alpha < ALPHA_FLOOR) {
+      if (alpha === 0) {
         d.fill(0, i, i + 4);
         continue;
       }
@@ -174,12 +177,16 @@ function bleed(img) {
 }
 
 /**
- * Cuts the faint pixels of a part, carries its colour out, and answers its trim rounded out to
+ * Cuts the faint pixels of a part by the soft knee of `ALPHA_FLOOR`, carries its colour out, and answers its trim rounded out to
  * `TRIM_GRID`.
  * @param {Img} img
  */
 function trimOf(img) {
-  for (let i = 3; i < img.data.length; i += 4) if (img.data[i] < ALPHA_FLOOR) img.data.fill(0, i - 3, i + 1);
+  for (let i = 3; i < img.data.length; i += 4) {
+    const alpha = Math.round((Math.max(0, img.data[i] - ALPHA_FLOOR) * 255) / (255 - ALPHA_FLOOR));
+    if (alpha === 0) img.data.fill(0, i - 3, i + 1);
+    else img.data[i] = alpha;
+  }
   bleed(img);
   const found = img.opaqueBounds();
   check(found !== undefined, 'every part has a picture');

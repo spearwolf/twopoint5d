@@ -19,7 +19,10 @@ pnpm lookbook:assets --skip-render                # reuse Blender's render cache
 wrote with Biome (the repo's lint holds every JSON file to it). The outputs are committed; no
 build or check of the repo runs the generators, so a change to an asset is a commit of the
 generator and its output together. The output is the same, byte for byte, on every run with the
-same versions of Node, sharp and Blender.
+same versions of Node, sharp and Blender — save where Cycles renders or bakes on a GPU, which
+schedules its samples a little differently each time: `matte-3d` of `stage-masks`, the two
+`camera-rig-*` scenes and `stage-art-machine` come out the same picture, not the same bytes, and
+their sections say by how much.
 
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
 committed raw images and to resize, and for `boomer-shooter-corridor`, `stage-masks` (its
@@ -596,7 +599,7 @@ glass of the mirror is an exact rectangle in the picture and the mirror shows th
 viewer by a real reflection. Cycles renders on a GPU when it finds one (OptiX, CUDA, HIP, oneAPI,
 Metal) and on the CPU otherwise, with a fixed seed and OpenImageDenoise. The picture is the same on
 every run, the bytes are not: a GPU schedules its samples a little differently each time, and two
-renders differ by a few levels in a few pixels (a mean of 0.004 of 255) — the one exception to the
+renders differ by a few levels in a few pixels (a mean of 0.004 of 255) — an exception to the
 byte-for-byte rule above. The PNGs land in `stage-masks/matte-3d/.render-cache/` (ignored by git),
 and `--skip-render` reuses them. Units of the stage throughout: origin in the middle of the picture,
 y up, 2 texels per unit, both images loaded with the default `flipY`. The shards, the panes and the
@@ -794,16 +797,22 @@ Cycles through one orthographic camera — from the front and 10° from above, 1
 pixel 5 mm on the plane of the camera —, on a transparent film (the fog opaque), AgX (Medium High
 Contrast), denoised by OpenImageDenoise. The renders are the full canvas each, transparent around
 their part, so the place of a part on the canvas is the place it was rendered at. The generator
-cuts every pixel of an alpha below 8, trims each part to its pixels and rounds the trim out to a
+cuts the faint pixels by a soft knee — every alpha lowered by 8 and stretched back to 255, so that
+a part that fades out shows no step —, trims each part to its pixels and rounds the trim out to a
 grid of 8 pixels, then packs the parts into one atlas (`lib/pack.mjs`, 4 pixels apart) in the
 layout of free-tex-packer's "JSON (hash)" exporter (`lib/formats.mjs`): `sourceSize` the canvas,
 `spriteSourceSize` the trim — §4.3 of the proposal *stage-art-layers*, read by `StageArt` as a
 trimmed atlas. Cycles renders on a GPU when it finds one and on the CPU otherwise (`--cpu` in the
 arguments of `blender_machine.py` forces it), with a fixed seed. As with `matte-3d`, a GPU render is
-not the same byte for byte on every run: two runs differ by a mean of 0.14 of 255 in the atlas, and
-the grid of the trims keeps that noise out of the boxes, so `machine.json` comes out the same. The
-renders land in `stage-art-machine/.render-cache/` (ignored by git) with a `layout.json` of the
-canvas and the pivots, and `--skip-render` reuses them.
+not the same byte for byte on every run: two runs differ by a mean of 0.14 of 255 in the atlas. The
+grid of the trims makes it unlikely that this noise moves a box — two runs gave the same
+`machine.json` —, but it cannot rule it out: a `machine.json` that changes after a render of an
+unchanged scene is worth a look at the boxes before it is committed. The renders land in
+`stage-art-machine/.render-cache/` (ignored by git) with a `layout.json` of the canvas and the
+pivots, and `--skip-render` reuses them. To take the GPU out of it — at many times the cost, and
+not checked here for whether two such runs agree byte for byte —, render into the cache with
+`blender -b --factory-startup --python blender_machine.py -- .render-cache --cpu` in
+`stage-art-machine/`, then pack it with `pnpm lookbook:assets --only=stage-art-machine --skip-render`.
 
 | file | size | what |
 | --- | --- | --- |
