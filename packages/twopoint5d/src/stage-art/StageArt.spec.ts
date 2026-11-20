@@ -2,6 +2,10 @@ import {readFileSync} from 'node:fs';
 import {Group, ImageLoader, PerspectiveCamera, Plane, Quaternion, Texture, Vector3, type WebGPURenderer} from 'three/webgpu';
 import {afterEach, describe, expect, test, vi} from 'vitest';
 
+import {BillboardPlacement} from '../sprites/features/BillboardPlacement.js';
+import {AtlasFrame} from '../sprites/features/AtlasFrame.js';
+import {Flash, type FlashApi} from '../sprites/features/Flash.js';
+import {Tint} from '../sprites/features/Tint.js';
 import {CameraProjection} from '../stage/CameraProjection.js';
 import {OrthographicProjection} from '../stage/OrthographicProjection.js';
 import {ParallaxProjection} from '../stage/ParallaxProjection.js';
@@ -14,6 +18,7 @@ import type {ArtLayerDef} from './artSources.js';
 import {artTrack} from './artTrack.js';
 import type {StageArtSource} from './artOptions.js';
 import {StageArt} from './StageArt.js';
+import type {StageArtSpriteApi} from './stageArtKind.js';
 
 // A canvas of 100 × 100, three layers bottom first: `back` at a depth of 50, the canvas whole; `box`,
 // two frames — closed, trimmed to 20, 30, 40 × 20, and open, 20, 20, 40 × 30 —; `lamp`, 60, 10, 10 × 10
@@ -393,6 +398,69 @@ describe('poses', () => {
     expect(art.layerOf(lamp.sprite)).toBe(lamp);
     expect(art.layerOf({})).toBeUndefined();
     expect(art.layerOf(new StageArt(sceneSource()).layer('lamp').sprite)).toBeUndefined();
+  });
+
+  test('layerOf() keeps naming the layer of a sprite through a sort of the stack', () => {
+    const warn = silenceWarnings();
+    const art = new StageArt(sceneSource());
+    const pool = art.mesh.spritePool!;
+    const handles = art.names.map((name) => art.layer(name).sprite);
+    art.set('back', {order: 1});
+    art.set('lamp', {depth: 50});
+    art.update();
+
+    expect(stackOf(art)).toEqual(['lamp', 'back', 'box']);
+    // the sprite at each slot of the pool is the one of the layer drawn there
+    for (let i = 0; i < pool.usedCount; i++) expect(art.layerOf(pool.getVO(i)!)?.sprite).toBe(pool.getVO(i));
+    for (const [i, name] of art.names.entries()) expect(art.layerOf(handles[i]!)?.name).toBe(name);
+    warn.mockRestore();
+  });
+});
+
+describe('features', () => {
+  test('a feature folds into the kind, and its values are written through layer.sprite', () => {
+    const art = new StageArt(sceneSource(), {features: [Flash, Tint]});
+    const sprite = art.layer('box').sprite as unknown as StageArtSpriteApi & FlashApi;
+
+    sprite.setFlash(1, 0.5, 0.25, 0.6);
+    expect(sprite.flashAmount).toBeCloseTo(0.6);
+    expect(art.layerOf(sprite)?.name).toBe('box');
+    // the art's own features are all still there
+    expect(art.layer('box').sprite.width).toBeGreaterThan(0);
+  });
+
+  test('a write through layer.sprite is outside the change detection', () => {
+    const art = new StageArt(sceneSource(), {features: [Flash]});
+    art.takeChanged();
+    (art.layer('lamp').sprite as unknown as FlashApi).setFlash(1, 1, 1, 0.6);
+    expect(art.takeChanged()).toBe(false);
+  });
+
+  test('the kind of an art without features is shared, and one with the same features is built once', () => {
+    const plain = new StageArt(sceneSource());
+    expect(new StageArt(sceneSource(), {features: []}).mesh.kind).toBe(plain.mesh.kind);
+    const first = new StageArt(sceneSource(), {features: [Flash]});
+    expect(new StageArt(sceneSource(), {features: [Flash]}).mesh.kind).toBe(first.mesh.kind);
+    expect(new StageArt(sceneSource(), {features: [Tint]}).mesh.kind).not.toBe(first.mesh.kind);
+    expect(first.mesh.kind).not.toBe(plain.mesh.kind);
+  });
+
+  test('refuses a second frame source and a second placement, naming the feature', () => {
+    expect(() => new StageArt(sceneSource(), {features: [AtlasFrame]})).toThrow(
+      /^new StageArt\(\): features: defineSprite: .*"atlasFrame"/,
+    );
+    expect(() => new StageArt(sceneSource(), {name: 'kitchen', features: [BillboardPlacement]})).toThrow(
+      /^StageArt "kitchen": features: defineSprite: /,
+    );
+  });
+
+  test('refuses features that are no list, and an entry that is no feature', () => {
+    expect(() => new StageArt(sceneSource(), {features: Flash as never})).toThrow(
+      /^new StageArt\(\): features must be a list of sprite features, got /,
+    );
+    expect(() => new StageArt(sceneSource(), {features: [Flash, {}] as never})).toThrow(
+      /^new StageArt\(\): features: defineSprite: a feature needs a name, got undefined/,
+    );
   });
 });
 

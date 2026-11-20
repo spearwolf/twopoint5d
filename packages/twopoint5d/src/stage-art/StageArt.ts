@@ -243,7 +243,8 @@ export class StageArt extends Group {
    *   boolean, a `projection` that is no `IProjection`, a `plane` that is neither a
    *   `ProjectionPlane` nor one of its four descriptions, `only` that names a layer twice, `layers`
    *   that is no object or holds options a layer cannot take, `only` or `layers` beside loose
-   *   layers, loose layers that cannot be read, and `material` that is no object or sets what is
+   *   layers, loose layers that cannot be read, `features` that is no list or holds a feature
+   *   `defineSprite()` refuses — in its words —, and `material` that is no object or sets what is
    *   the art's own. What the art cannot load or read out of its source is no refusal but a
    *   problem.
    */
@@ -273,7 +274,7 @@ export class StageArt extends Group {
     if (shape === 'atlas') read = this.#read(source as Extract<StageArtSource, {atlas: unknown}>);
     const names = read?.layers.map((layer) => layer.name) ?? opts.only ?? [];
 
-    this.mesh = new FeatureSprites(stageArtKind([]), {
+    this.mesh = new FeatureSprites(stageArtKind(opts.features ?? []), {
       capacity: Math.min(names.length, MAX_LAYERS),
       ...material,
       transparent: material?.transparent ?? true,

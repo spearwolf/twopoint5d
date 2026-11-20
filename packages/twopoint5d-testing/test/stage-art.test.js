@@ -1,6 +1,13 @@
-import {Display, OrthographicProjection, ParallaxProjection, StageArt, TexturePackerJson} from '@spearwolf/twopoint5d';
+import {
+  Display,
+  OrthographicProjection,
+  ParallaxProjection,
+  SpritePicker,
+  StageArt,
+  TexturePackerJson,
+} from '@spearwolf/twopoint5d';
 import {expect} from 'chai';
-import {OrthographicCamera, RenderTarget, Scene} from 'three/webgpu';
+import {OrthographicCamera, RenderTarget, Scene, Vector3} from 'three/webgpu';
 import {
   countColor,
   disposeDisplay,
@@ -286,5 +293,73 @@ describe('stage art', function () {
     const after = await render(art);
     expect(countColor(after.pixels, BLACK), 'the lamp drawn').to.be.below(TARGET_SIZE * TARGET_SIZE);
     expect(art.layer('lamp').loaded).to.be.true;
+  });
+
+  it('answers the layer behind through the transparent part of a front layer, and never a hidden one', async function () {
+    // a wall of 12 × 12 artwork pixels, a carafe of 4 × 8 in front whose upper half is transparent, and a
+    // ghost over the wall's right edge. The art frame is 16 × 16, its origin the middle
+    const texture = keep(
+      makeColorTexture(
+        [
+          [...RED, 255],
+          [0, 0, 0, 0],
+          [...GREEN, 255],
+          [...RED, 255],
+          [...BLUE, 255],
+          [...GREEN, 255],
+        ],
+        3,
+        2,
+      ),
+    );
+    const atlas = trimmedAtlas(
+      {
+        wall: {frame: {x: 0, y: 0, w: 1, h: 1}, box: {x: 2, y: 2, w: 12, h: 12}},
+        carafe: {frame: {x: 1, y: 0, w: 1, h: 2}, box: {x: 6, y: 4, w: 4, h: 8}},
+        ghost: {frame: {x: 2, y: 0, w: 1, h: 1}, box: {x: 10, y: 6, w: 4, h: 4}},
+      },
+      3,
+      2,
+    );
+    const art = keep(new StageArt({atlas, texture}));
+    expect(art.names).to.deep.equal(['wall', 'carafe', 'ghost']);
+    const camera = new OrthographicCamera(-8, 8, 8, -8, 0.1, 100);
+    camera.position.z = 50;
+    const scene = new Scene();
+    scene.add(art);
+    const picker = new SpritePicker(display.renderer);
+    // the pointer at the point (x, y) of the art frame, in units from its origin, y up
+    const pick = async (x, y) => {
+      art.update();
+      scene.updateMatrixWorld();
+      camera.updateMatrixWorld();
+      const ndc = new Vector3(x, y, 0).project(camera);
+      const hit = await picker.pick(camera, {x: ndc.x, y: ndc.y}, [art.mesh]);
+      return {hit, name: hit && art.layerOf(hit.sprite)?.name};
+    };
+
+    try {
+      expect((await pick(0, 2)).name, 'the transparent upper half of the carafe').to.equal('wall');
+      const lower = await pick(0, -2);
+      expect(lower.name, 'the opaque lower half of the carafe').to.equal('carafe');
+      expect(lower.hit.sprites === art.mesh).to.be.true;
+      expect(lower.hit.sprite === art.layer('carafe').sprite).to.be.true;
+      expect((await pick(-6, 0)).name, 'the wall alone').to.equal('wall');
+      expect((await pick(0, 7.5)).name, 'beyond the wall').to.equal(undefined);
+      expect((await pick(4, 0)).name, 'the ghost over the wall').to.equal('ghost');
+
+      art.set('ghost', {visible: false});
+      expect((await pick(4, 0)).name, 'a hidden layer is never hit').to.equal('wall');
+      art.set('ghost', {visible: true, opacity: 0});
+      expect((await pick(4, 0)).name, 'a layer faded out is never hit').to.equal('wall');
+
+      // a sort of the stack changes no handle
+      art.set('wall', {order: 1});
+      art.set('ghost', {opacity: 1});
+      expect((await pick(4, 0)).name, 'the wall ordered above the ghost').to.equal('wall');
+      expect((await pick(0, -2)).name, 'the carafe under the wall now').to.equal('wall');
+    } finally {
+      picker.dispose();
+    }
   });
 });

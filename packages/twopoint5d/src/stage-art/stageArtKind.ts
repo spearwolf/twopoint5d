@@ -46,16 +46,25 @@ const FEATURES: readonly SpriteFeature[] = [
 ];
 
 let defaultKind: SpriteKind<StageArtSpriteApi> | undefined;
+// the kinds built for a list of further features, by the feature objects of the list, in order
+const extraKinds: {features: readonly SpriteFeature[]; kind: SpriteKind<StageArtSpriteApi>}[] = [];
+
+const sameFeatures = (a: readonly SpriteFeature[], b: readonly SpriteFeature[]): boolean =>
+  a.length === b.length && a.every((feature, i) => feature === b[i]);
 
 /**
  * The sprite kind of an art: the features every layer needs, then `features`. The kind without
- * further features is built once and shared by every art; a feature `defineSprite()` refuses
- * throws in its words.
+ * further features is built once and shared by every art, and a kind with them is built once per
+ * distinct list of feature objects; a feature `defineSprite()` refuses throws in its words.
  */
 export function stageArtKind(features: readonly SpriteFeature[]): SpriteKind<StageArtSpriteApi> {
   if (features.length === 0) {
     defaultKind ??= defineSprite({base: QuadBase, features: FEATURES}) as SpriteKind<StageArtSpriteApi>;
     return defaultKind;
   }
-  return defineSprite({base: QuadBase, features: [...FEATURES, ...features]}) as SpriteKind<StageArtSpriteApi>;
+  const known = extraKinds.find((entry) => sameFeatures(entry.features, features));
+  if (known !== undefined) return known.kind;
+  const kind = defineSprite({base: QuadBase, features: [...FEATURES, ...features]}) as SpriteKind<StageArtSpriteApi>;
+  extraKinds.push({features: Object.freeze([...features]), kind});
+  return kind;
 }

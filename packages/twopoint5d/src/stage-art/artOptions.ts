@@ -1,5 +1,6 @@
 import type {Texture} from 'three/webgpu';
 
+import type {SpriteFeature} from '../sprites/SpriteFeature.js';
 import type {FeatureSpritesMaterialParameters} from '../sprites/FeatureSprites/FeatureSpritesMaterial.js';
 import type {IProjection} from '../stage/IProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from '../stage/ProjectionPlane.js';
@@ -10,6 +11,7 @@ import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
 import {isRecord} from '../utils/isRecord.js';
 import {artFrameOf} from './artLayout.js';
+import {stageArtKind} from './stageArtKind.js';
 import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLayerDefs} from './artSources.js';
 
 /**
@@ -47,6 +49,14 @@ export interface StageArtOptions {
   /** What code says about a layer that the picture cannot, by name. */
   layers?: Readonly<Record<string, ArtLayerOptions>>;
   /**
+   * Further sprite features for the kind of the art — `Flash` for a hover glow, `Tint` for a night
+   * version, `PaletteSwap` —, after the features of the art itself. Their values are written through
+   * `layer.sprite`, which goes past the change detection: report such a write to a `FramePacer`
+   * yourself. A feature that takes a slot the art fills — a second frame source, another placement —
+   * is refused, and the message names it.
+   */
+  features?: readonly SpriteFeature[];
+  /**
    * The parameters of the material of the mesh — `transparent` (default `true`), `depthWrite`
    * (default `false`), `depthTest`, `alphaTest`, … The textures, the placement and the mesh around
    * the material — its capacity, geometry and passes — are the art's own.
@@ -67,6 +77,7 @@ const OPTION_KEYS: readonly (keyof StageArtOptions)[] = [
   'compensateDepth',
   'only',
   'layers',
+  'features',
   'material',
 ];
 
@@ -186,6 +197,20 @@ export function checkStageArt(
   checkArtSourceOptions(where, {only: opts.only, layers: opts.layers});
   if (opts.only !== undefined && opts.only.length > MAX_LAYERS) {
     throw new RangeError(`${where}: only names ${opts.only.length} layers, and an art holds at most ${MAX_LAYERS}`);
+  }
+  const features: unknown = opts.features;
+  if (features !== undefined) {
+    if (!Array.isArray(features)) {
+      throw new TypeError(`${where}: features must be a list of sprite features, got ${describeValue(features)}`);
+    }
+    try {
+      stageArtKind(features as readonly SpriteFeature[]);
+    } catch (error) {
+      // the kind is built here once, before anything else is: the refusal of defineSprite() goes on in its words
+      throw new (error instanceof TypeError ? TypeError : Error)(`${where}: features: ${(error as Error).message}`, {
+        cause: error,
+      });
+    }
   }
   const material: unknown = opts.material;
   if (material !== undefined) {

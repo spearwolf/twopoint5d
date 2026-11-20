@@ -195,6 +195,36 @@ one depth, then as painted. `order: 1` puts a layer above the others of its dept
 above another but given a greater `depth` goes under it, and the art says so on the console once
 per layer, since the picture at rest then differs from the painting.
 
+### A pestle in a circle
+
+A layer that goes round in a circle needs no helper of the library: three lines of trigonometry feed
+`x` and `y` of a pose, and the pose is one you keep, so the frame loop allocates nothing. `y` counts
+down in artwork pixels, so a sine that grows goes down the screen and the circle runs clockwise.
+
+```ts check
+import {type ArtPose, StageArt} from '@spearwolf/twopoint5d';
+
+declare const art: StageArt;
+
+const pestle = art.layer('pestle');
+const center = {x: 410, y: 300}; // the middle of the bowl, artwork pixels
+const radius = 24;
+
+const pose: ArtPose = {};
+function stir(seconds: number): void {
+  const angle = seconds * Math.PI * 2; // one turn per second
+  pose.x = center.x + radius * Math.cos(angle);
+  pose.y = center.y + radius * Math.sin(angle);
+  pestle.set(pose);
+}
+
+export {stir};
+```
+
+Another field of the same layer — `deg` to tilt the pestle with its stroke — goes into the same
+pose. A track of `art.apply()` writes the fields it keys, and a `set()` after it writes the ones it
+names over them, so the circle and a track of `opacity` run side by side.
+
 ### A timeline with a scrubber
 
 A track is a timeline of poses: `artTrack(keys, options?)` takes keys with an `at` in seconds and
@@ -490,6 +520,60 @@ pacer yourself (`frames.report(true)`).
 
 ### A click on a layer
 
+`art.mesh` is a `FeatureSprites`, so a [`SpritePicker`](sprites.md#picking-which-sprite-is-under-the-pointer)
+takes it as it is, and `art.layerOf(hit.sprite)` turns the sprite of the answer into the layer. The pick
+is pixel-exact: a click into the transparent part of a carafe lands on the table behind it, and a
+layer that is hidden or faded out to `opacity: 0` is never hit. Of layers at different depths the
+nearest wins, as on the screen.
+
+A feature the art does not bring itself goes in through `features`: `Flash` lights the layer under
+the pointer. Its values are written through `layer.sprite`; the library cannot know the features of
+an art in the type of its layers, so you say them with a cast, `StageArtSpriteApi` plus the `FlashApi`
+of the feature.
+
+```ts check
+import {
+  Flash,
+  type FlashApi,
+  type FramePacer,
+  SpritePicker,
+  StageArt,
+  type StageArtSpriteApi,
+  type TextureStore,
+} from '@spearwolf/twopoint5d';
+import type {Camera, WebGPURenderer} from 'three/webgpu';
+
+declare const renderer: WebGPURenderer;
+declare const camera: Camera;
+declare const store: TextureStore;
+declare const frames: FramePacer;
+
+const art = new StageArt({store, id: 'kitchen'}, {features: [Flash]});
+const picker = new SpritePicker(renderer);
+
+let glowing: (StageArtSpriteApi & FlashApi) | undefined;
+
+// the pointer in normalized device coordinates of the view of the camera: x and y from -1 to 1, y up
+async function hover(pointer: {x: number; y: number}): Promise<string | undefined> {
+  const hit = await picker.pick(camera, pointer, [art.mesh]);
+  const layer = hit && art.layerOf(hit.sprite); // the layer, or undefined: nothing under the pointer
+  const sprite = layer && (layer.sprite as unknown as StageArtSpriteApi & FlashApi);
+  if (sprite !== glowing) {
+    glowing?.setFlash(1, 1, 1, 0);
+    sprite?.setFlash(1, 1, 1, 0.6);
+    glowing = sprite;
+    frames.report(true); // a write through layer.sprite goes past the art: tell the pacer
+  }
+  return layer?.name; // 'carafe5', say
+}
+
+export {hover};
+```
+
+`layerOf()` answers `undefined` for a sprite of another mesh and once the art is disposed. The handle
+of a sprite stays right through the sorts of the stack. A `pick()` answers asynchronously, from the
+gpu, so it is a tool for a click or a hover, not for every layer in every frame.
+
 ## Cheat sheet
 
 ### The fields of a pose
@@ -520,6 +604,7 @@ Every field is optional; a pose writes what it is given. The rest is the pose of
 | `compensateDepth` | `true` | whether layers at a depth are drawn as painted at the rest of a parallax camera |
 | `only` | every layer, in the order of the source | the layers to take, bottom first |
 | `layers` | — | by name: `pivot`, `depth`, `order`, `frames`, `rest` |
+| `features` | — | further sprite features for the kind: `Flash`, `Tint`, … — written through `layer.sprite` |
 | `material` | `transparent: true`, `depthWrite: false` | the material parameters of the mesh: `depthTest`, `alphaTest`, … |
 
 A source is `{store, id}` — an atlas item of a `TextureStore` —, `{atlas, texture}`, either with
@@ -623,6 +708,19 @@ is no empty cel. A camera that moves is the business of its rig; the parallax of
 no report of the art. After `dispose()` it answers `false`.
 
 ### Picking and more features
+
+`art.layerOf(sprite)` answers the `ArtLayer` of a sprite of `art.mesh` — the `sprite` a `SpritePicker`
+answers, or the `sprite` of a layer —, and `undefined` for a sprite of another mesh, for anything that
+is no sprite of the art, and once the art is disposed.
+
+`features` is a list of sprite features — `Flash`, `Tint`, `PaletteSwap`, a feature of your own — that
+join the kind of the art after the features it brings itself. Their values are written through
+`layer.sprite`, which you type by the features you hand in. Such a write goes past the change
+detection of the art: `takeChanged()` does not see it, and the next pose of a layer overwrites what
+it shares with it. A feature that takes a slot the art already fills — a second frame source such as
+`AtlasFrame`, another placement — is refused by `new StageArt()` with the message of `defineSprite()`,
+which names the feature, and so is an entry that is no feature. The kind is built once per list of
+feature objects, so arts with the same `features` share it.
 
 ### `loaded` and `problems`
 
