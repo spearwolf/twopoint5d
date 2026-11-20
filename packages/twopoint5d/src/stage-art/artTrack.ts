@@ -47,7 +47,10 @@ export interface ArtTrack {
    * does not have stays as it is. A pure function of `seconds`, which may be any finite number.
    */
   sample(seconds: number, target: ArtPose): ArtPose;
-  /** Whether the pose at `seconds` is still on its way: within the keys, or always for `'loop'` and `'pingpong'`. */
+  /**
+   * Whether the pose at `seconds` is still on its way: within the keys, and always under `'loop'` and
+   * `'pingpong'` for a track with a duration above 0; a track of duration 0 never changes.
+   */
   isMoving(seconds: number): boolean;
 }
 

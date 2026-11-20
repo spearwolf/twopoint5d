@@ -36,7 +36,7 @@ import {type ArtPose, artTrack} from '@spearwolf/twopoint5d';
 
 const tilt = artTrack(
   [
-    {at: 0, x: 412, y: 380, deg: 0},
+    {at: 0, x: 412, y: 380, deg: 0, frame: 0},
     {at: 0.6, deg: 35, ease: 'ease-out'}, // x and y hold
     {at: 1.4, deg: 95, frame: 1}, // the carafe empties as it pours
     {at: 2.2, deg: 0, frame: 1},
@@ -73,7 +73,7 @@ What a track does with its keys:
 - Before the first key the track shows the first, after the last the last. `playback: 'loop'` and
   `'pingpong'` run on over the duration, the playbacks of the atlas animations.
 - `isMoving(seconds)` tells whether the pose is still on its way: within the keys, and always for
-  a loop and a pingpong.
+  a loop and a pingpong with a duration above 0; a track of duration 0 never changes.
 
 For a value that eases once and needs no track, `rampAt(seconds, start, duration, ease?)` answers
 the share of a ramp, from 0 to 1:
@@ -95,10 +95,10 @@ export {opacityAt};
 
 `artTrack()` and `rampAt()` refuse what cannot be used and name the field: keys that are no list
 or empty, an `at` that is not a finite number of 0 or more or is smaller than the one before, a
-field that a later key sets and the first leaves out, a
-field outside what a pose takes (an `opacity` of 1.5, a `frame` of 0.5, an `order` of 1024), a key
-that is no field of a pose (`rotation` for `deg`), an `ease` that is none, a `playback` other than
-`'once'`, `'loop'` and `'pingpong'`, and a `duration` of 0 for `rampAt()`.
+field that a later key sets and the first leaves out, a field outside what a pose takes (an
+`opacity` of 1.5, a `frame` of 0.5, an `order` of 1024), a key that is no field of a pose
+(`rotation` for `deg`), an `ease` that is none, a `playback` other than `'once'`, `'loop'` and
+`'pingpong'`, and a `duration` of 0 for `rampAt()`.
 
 ### A strip of steam
 
