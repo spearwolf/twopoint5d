@@ -35,19 +35,24 @@ export interface LayerFilesOutcome {
 }
 
 interface Decoded {
-  bitmap: ImageBitmap;
+  // the size of the file, the canvas it was painted on
+  width: number;
+  height: number;
   // its trimmed box, undefined for a file without a pixel
   box: LayerBox | undefined;
+  // the picture in the box, cropped out of the file; undefined for a file without a pixel and a pivot marker
+  picture: ImageBitmap | undefined;
 }
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : describeValue(error));
 
 /**
- * One load of the files of a files source (stage-art-layers.md §4.2): each file fetched — one
- * request per file, side by side —, decoded through `createImageBitmap()` and trimmed to its alpha
- * box as it lands; once every file has landed or failed, the pictures to draw are packed into a
- * `DynamicAtlas` of the next power of two that holds them and every bitmap is closed. {@link drop}
- * gives the load up.
+ * One load of the files of a files source (stage-art-layers.md §4.2): each file fetched — one request
+ * per file, side by side —, decoded through `createImageBitmap()` and trimmed to its alpha box as it
+ * lands, the picture in the box cropped out and the bitmap of the whole file closed at once — a file
+ * without a pixel and a pivot marker keep nothing but their box —; once every file has landed or
+ * failed, the pictures are packed into a `DynamicAtlas` of the next power of two that holds them and
+ * closed. {@link drop} gives the load up.
  */
 export class LayerFilesLoad {
   readonly #abort = new AbortController();
@@ -84,12 +89,12 @@ export class LayerFilesLoad {
     try {
       return this.#pack(files, urls, decoded, renderer);
     } finally {
-      for (const entry of decoded) if (typeof entry !== 'string') entry.bitmap.close();
+      for (const entry of decoded) if (typeof entry !== 'string') entry.picture?.close();
       this.#open.clear();
     }
   }
 
-  // the file fetched, decoded and trimmed, or the problem that kept it out
+  // the file fetched, decoded, trimmed and its picture cropped out, or the problem that kept it out
   async #decode(file: string, url: string): Promise<Decoded | string> {
     let blob: Blob;
     try {
@@ -110,13 +115,30 @@ export class LayerFilesLoad {
       return 'the load was dropped';
     }
     this.#open.add(bitmap);
+    const {width, height} = bitmap;
+    let box: LayerBox | undefined;
+    let picture: ImageBitmap | undefined;
     try {
-      return {bitmap, box: trimLayerImage(bitmap)};
+      box = trimLayerImage(bitmap);
+      // a full-canvas file of 1920 × 1080 holds 8 MiB: of a file to draw only its box is kept, of an
+      // empty file and a pivot marker nothing but the box
+      if (box !== undefined && parseLayerFileName(frameNameOfFile(file)).pivotOf === undefined) {
+        picture = await createImageBitmap(bitmap, box.x, box.y, box.w, box.h);
+      }
     } catch (error) {
+      return `the pixels of the file ${describeValue(file)} could not be read: ${messageOf(error)}`;
+    } finally {
       bitmap.close();
       this.#open.delete(bitmap);
-      return `the pixels of the file ${describeValue(file)} could not be read: ${messageOf(error)}`;
     }
+    if (picture !== undefined) {
+      if (this.#dropped) {
+        picture.close();
+        return 'the load was dropped';
+      }
+      this.#open.add(picture);
+    }
+    return {width, height, box, picture};
   }
 
   #pack(
@@ -129,7 +151,7 @@ export class LayerFilesLoad {
     let canvas: {width: number; height: number} | undefined;
     let canvasFile = '';
     // the pictures to draw: a file of a name taken before stays out, as the reader takes the first
-    const toPack: {index: number; name: string; bitmap: ImageBitmap; box: LayerBox}[] = [];
+    const toPack: {index: number; name: string; picture: ImageBitmap; box: LayerBox}[] = [];
     const names = new Set<string>();
     decoded.forEach((entry, index) => {
       const url = urls[index]!;
@@ -138,23 +160,23 @@ export class LayerFilesLoad {
         results.push({url, problem: entry});
         return;
       }
-      const {bitmap, box} = entry;
+      const {width, height, box, picture} = entry;
       if (canvas === undefined) {
-        canvas = {width: bitmap.width, height: bitmap.height};
+        canvas = {width, height};
         canvasFile = file;
-      } else if (bitmap.width !== canvas.width || bitmap.height !== canvas.height) {
+      } else if (width !== canvas.width || height !== canvas.height) {
         results.push({
           url,
-          problem: `the file ${describeValue(file)} is ${bitmap.width} × ${bitmap.height}, and the canvas — the size of ${describeValue(canvasFile)}, the first file that loaded — is ${canvas.width} × ${canvas.height}`,
+          problem: `the file ${describeValue(file)} is ${width} × ${height}, and the canvas — the size of ${describeValue(canvasFile)}, the first file that loaded — is ${canvas.width} × ${canvas.height}`,
         });
         return;
       }
       // the frame of a picture to draw follows once it is packed
       results.push(box === undefined ? {url, box: undefined} : {url, box});
       const name = frameNameOfFile(file);
-      if (box === undefined || parseLayerFileName(name).pivotOf !== undefined || names.has(name)) return;
+      if (box === undefined || picture === undefined || names.has(name)) return;
       names.add(name);
-      toPack.push({index, name, bitmap, box});
+      toPack.push({index, name, picture, box});
     });
     if (toPack.length === 0) return {canvas, results};
 
@@ -187,11 +209,11 @@ export class LayerFilesLoad {
 
     const atlas = new DynamicAtlas({width: size, height: size, padding: FILES_ATLAS_PADDING, extrude: FILES_ATLAS_EXTRUDE});
     try {
-      for (const {index, name, bitmap, box} of toPack) {
+      for (const {index, name, picture, box} of toPack) {
         const frame = atlas.add(
           name,
           (context) => {
-            context.drawImage(bitmap, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+            context.drawImage(picture, 0, 0);
           },
           {width: box.w, height: box.h},
         );

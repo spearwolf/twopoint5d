@@ -1562,6 +1562,8 @@ describe('a files source', () => {
     data: Uint8ClampedArray;
     close: ReturnType<typeof vi.fn>;
     file: string;
+    // the box of the bitmap of the file this one was cropped out of; undefined for a decoded file
+    crop?: {x: number; y: number; w: number; h: number};
   }
 
   // the scene of the atlas specs above, as full-canvas files of 100 × 100: `back` at a depth of 50 the
@@ -1591,8 +1593,22 @@ describe('a files source', () => {
       if (file.status !== undefined) return new Response(null, {status: file.status});
       return new Response(new Blob([name]));
     });
-    vi.stubGlobal('createImageBitmap', async (blob: Blob) => {
-      const name = await blob.text();
+    vi.stubGlobal('createImageBitmap', async (source: Blob | FakeBitmap, x?: number, y?: number, w?: number, h?: number) => {
+      if (!(source instanceof Blob)) {
+        // a crop out of a decoded bitmap, which has to be open still
+        await Promise.resolve();
+        if (source.close.mock.calls.length > 0) throw new DOMException('The image source is detached.', 'InvalidStateError');
+        const box = {x: x!, y: y!, w: w!, h: h!};
+        const data = new Uint8ClampedArray(box.w * box.h * 4);
+        for (let row = 0; row < box.h; row++) {
+          const from = ((box.y + row) * source.width + box.x) * 4;
+          data.set(source.data.subarray(from, from + box.w * 4), row * box.w * 4);
+        }
+        const crop: FakeBitmap = {width: box.w, height: box.h, data, close: vi.fn(), file: source.file, crop: box};
+        bitmaps.push(crop);
+        return crop;
+      }
+      const name = await source.text();
       const file = files[name]!;
       await file.decodeGate;
       if (file.undecodable !== undefined) throw file.undecodable;
@@ -1685,17 +1701,49 @@ describe('a files source', () => {
     // 128 cannot hold the canvas-wide back beside the rest
     expect([canvas.width, canvas.height]).toEqual([256, 256]);
     expect(canvases).toEqual([canvas]);
-    // each picture is drawn out of its file by its trimmed box, the marker not at all
+    // each picture is drawn as it was cropped out of its file by its trimmed box, the marker not at all
     const drawn = canvas.context.callsOf('drawImage').filter(({args}) => bitmaps.includes(args[0] as FakeBitmap));
-    expect(drawn.map(({args}) => [(args[0] as FakeBitmap).file, ...args.slice(1)])).toEqual([
-      ['back@50.png', 0, 0, 100, 100, 0, 0, 100, 100],
-      ['box.png', 20, 30, 40, 20, 0, 0, 40, 20],
-      ['box-open.png', 20, 20, 40, 30, 0, 0, 40, 30],
-      ['lamp.png', 60, 10, 10, 10, 0, 0, 10, 10],
+    expect(drawn.map(({args}) => [(args[0] as FakeBitmap).file, (args[0] as FakeBitmap).crop, ...args.slice(1)])).toEqual([
+      ['back@50.png', {x: 0, y: 0, w: 100, h: 100}, 0, 0],
+      ['box.png', {x: 20, y: 30, w: 40, h: 20}, 0, 0],
+      ['box-open.png', {x: 20, y: 20, w: 40, h: 30}, 0, 0],
+      ['lamp.png', {x: 60, y: 10, w: 10, h: 10}, 0, 0],
     ]);
     // the first frame lies at padding 2 plus extrude 1
     expect(drawn[0]!.translation).toEqual([3, 3]);
-    expect(bitmaps).toHaveLength(5);
+    // five files decoded, four pictures cropped out of them
+    expect(bitmaps).toHaveLength(9);
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  });
+
+  test('keeps of a file only the picture in its trimmed box: the bitmap of the file closed once it is cropped, nothing of an empty file or a pivot marker', async () => {
+    const files = sceneFiles();
+    files['empty.png'] = {width: 100, height: 100, boxes: []};
+    const {gate, open} = held();
+    files['lamp.png']!.decodeGate = gate;
+    const {bitmaps} = serve(files);
+    const art = new StageArt({files: [...SCENE_FILES, 'empty.png'], baseUrl: BASE});
+    for (let i = 0; i < 10; i++) await flush();
+
+    // while the lamp is on its way, the files that landed hold their pictures alone
+    const holding = bitmaps.filter((bitmap) => bitmap.close.mock.calls.length === 0);
+    expect(holding.map(({file, width, height}) => [file, width, height]).sort()).toEqual([
+      ['back@50.png', 100, 100],
+      ['box-open.png', 40, 30],
+      ['box.png', 40, 20],
+    ]);
+    expect(bitmaps.filter(({file}) => file === 'empty.png' || file === 'lamp.pivot.png')).toHaveLength(2);
+
+    open();
+    await art.loaded;
+    expect(art.problems).toEqual([
+      {
+        layer: 'empty',
+        reason: 'the file "empty.png" of the layer "empty" holds no pixel with an alpha above 0',
+        url: `${BASE}empty.png`,
+      },
+    ]);
+    expect(art.layer('lamp').pivot).toEqual([64.5, 18.5]);
     for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
   });
 
@@ -1811,7 +1859,8 @@ describe('a files source', () => {
     const {requests, bitmaps, canvases} = serve(files);
     const art = new StageArt({files: SCENE_FILES, baseUrl: BASE});
     for (let i = 0; i < 5; i++) await flush();
-    expect(bitmaps).toHaveLength(4);
+    const decoded = () => bitmaps.filter(({crop}) => crop === undefined);
+    expect(decoded()).toHaveLength(4);
 
     art.dispose();
     await expect(art.loaded).resolves.toBeUndefined();
@@ -1820,8 +1869,8 @@ describe('a files source', () => {
 
     open();
     for (let i = 0; i < 5; i++) await flush();
-    expect(bitmaps).toHaveLength(5);
-    expect(bitmaps[4]!.close).toHaveBeenCalledOnce();
+    expect(decoded()).toHaveLength(5);
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
     expect(canvases).toEqual([]);
     expect(art.problems).toEqual([]);
     expect(art.mesh.getTexture('colorMap')).toBeUndefined();
