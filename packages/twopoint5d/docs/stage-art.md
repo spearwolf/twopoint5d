@@ -19,6 +19,7 @@ to a cheat sheet of the sources, the fields and the options, and ends with the r
   - [Drawing on demand](#drawing-on-demand)
   - [A click on a layer](#a-click-on-a-layer)
   - [A pestle in a circle](#a-pestle-in-a-circle)
+  - [Reloading a sheet while the page runs](#reloading-a-sheet-while-the-page-runs)
 - [Cheat sheet](#cheat-sheet)
 - [Reference](#reference)
 
@@ -648,6 +649,53 @@ Another field of the same layer — `deg` to tilt the pestle with its stroke —
 pose. A track of `art.apply()` writes the fields it keys, and a `set()` after it writes the ones it
 names over them, so the circle and a track of `opacity` run side by side.
 
+### Reloading a sheet while the page runs
+
+An art of a `{store, id}` source follows its store item: parse the item again with a sheet the
+artist has just exported, and the running art takes it — no new art, no lost pose. A catalog parsed
+again with the same urls changes nothing, so give the new export urls of its own, the json and the
+image both:
+
+```ts check
+import {StageArt, TextureStore} from '@spearwolf/twopoint5d';
+
+declare const store: TextureStore; // with the renderer, as above
+
+const item = (version: number) => ({
+  atlasUrl: `/assets/kitchen.json?v=${version}`,
+  overrideImageUrl: `/assets/kitchen.png?v=${version}`,
+  atlasAdapter: 'aseprite',
+});
+
+store.parse({items: {kitchen: item(1)}});
+const art = new StageArt({store, id: 'kitchen'}, {name: 'kitchen'});
+
+// the artist saved and exported the sheet again: a watcher of the dev server calls this
+export function reloadKitchen(version: number) {
+  store.parse({items: {kitchen: item(version)}});
+}
+
+export {art};
+```
+
+The sheet is read again with the options the art was made with — `only`, `layers` —, and the
+layers take what it says:
+
+- **A layer the new sheet has** gets its new frames, box, pivot, tags and rest — an override of
+  `layers` still beats the file. It keeps its handle, its sprite and every field of its pose you set
+  off its rest: a carafe you poured stays poured. A field at its rest takes the new rest, so a lamp
+  the artist moved in the file moves on the page. A `frame` beyond its new frames is a problem, and
+  the layer shows frame 0.
+- **A layer the new sheet lacks** stays in the art, posed and hidden, with a problem; an export that
+  brings it back shows it again at its pose.
+- **A layer new in the sheet** does not join the running art: the layers stay those of the first
+  load, and one problem names the new layer. A new `StageArt` takes it.
+
+`art.problems` is then the list of the reload — a list you read before stays as it was —, and a
+reload with problems says them once on the console. An image of its own swaps the texture of the
+mesh. `takeChanged()` answers `true` once for the swap, so a [`FramePacer`](#drawing-on-demand)
+draws it. `loaded` has resolved with the first load and stays so. `dispose()` ends the following.
+
 ## Cheat sheet
 
 ### Which source
@@ -730,20 +778,21 @@ it as any object. It holds one `FeatureSprites`, `art.mesh`, the layers drawn in
 | `names` | the layers, bottom first; a list of files names them at once, another source without `only` once it has loaded |
 | `canvas` | `{width, height}` of the canvas in artwork pixels; `undefined` for loose layers and before the load |
 | `loaded` | resolves once every picture loaded or failed — at once for `{atlas, texture}` —, or the art is disposed; never rejects |
-| `problems` | what the art could not load or read |
+| `problems` | what the art could not load or read; after a reload of a store item, what the reload could not |
 | `projection`, `plane` | the projection, and the plane the art lies in; both can be set, and take effect in the next `update()` |
 | `layer(name)` | the handle of a layer; throws for a name it does not know, listing the names |
 | `layerOf(sprite)` | the layer of a sprite of the mesh, `undefined` for another |
 | `set(name, pose)`, `apply(name, track, seconds)`, `reset()` | pose a layer, sample a track into it, every layer back to its rest |
 | `takeChanged()` | whether the picture changed since the last call |
 | `update()` | once per frame, after the stage's `updateFrame()` and before the render: the plane, the distance of a parallax camera, the stack, then the upload |
-| `dispose()`, `isDisposed` | releases the mesh, the atlas the art packed layer files into, and the lease on a store item |
+| `dispose()`, `isDisposed` | releases the mesh and the atlas the art packed layer files into, and ends the following of a store item, which lets go of it |
 
 `art.layer(name)` answers an `ArtLayer`, the same object for the life of the art: `name`,
 `set(pose)`, `apply(track, seconds)`, `reset()`, `frameAt(tag, seconds)`, and what the source says
 about the layer — `rest`, `box` (where its picture lies on the canvas, the box around all its
 frames), `pivot`, `frameCount` (an empty cel counts), `tags` and `loaded`; until the load `rest`,
-`box` and `pivot` are `undefined`, `frameCount` is 0 and `tags` is empty. `layer.sprite` is its
+`box` and `pivot` are `undefined`, `frameCount` is 0 and `tags` is empty. A reload of a store item
+answers them anew. `layer.sprite` is its
 sprite in the mesh: a write through it goes past the art, and the next pose overwrites what the two
 share.
 
@@ -778,7 +827,7 @@ its anchor in its box, so a turn and a scale act about it.
 
 | source | the art |
 | --- | --- |
-| `{store, id}` | holds the atlas and the texture of the item through `store.acquireAsync(id, ['atlas', 'texture'])` until it is disposed: `clearUnused()` leaves the item standing while an art draws it. Two arts on one item hold one lease each |
+| `{store, id}` | loads the atlas and the texture of the item through `store.acquireAsync(id, ['atlas', 'texture'])`, then follows the item with `store.on()` until it is disposed: a sheet parsed again under the id reaches the running art ([reloading a sheet](#reloading-a-sheet-while-the-page-runs)), and `clearUnused()` leaves the item standing while an art draws it. Two arts on one item hold it once each |
 | `{atlas, texture}` | reads the atlas at once; both stay yours |
 | either with `layers: [...]` | reads loose layers: each `{name, frames?, pivot?, at?, depth?, order?, rest?, pxPerUnit?}` |
 | `{files, baseUrl?}` | fetches each file under `baseUrl` — a `#` in its name sent as `%23` —, trims it and packs it into a `DynamicAtlas` of its own, with padding 2 and extrude 1, which it owns and disposes |
@@ -922,11 +971,12 @@ over. It answers `true` when, since the last call,
 
 - a shown layer changed a field of its pose to another value;
 - a layer turned from shown to hidden or back: through `visible`, an `opacity` from or to 0, an
-  empty cel as its frame, its picture arriving, or a camera distance that leaves it behind the
-  camera or brings it back;
+  empty cel as its frame, its picture arriving or going with a reload, or a camera distance that
+  leaves it behind the camera or brings it back;
 - a shown layer changed its `depth` or `order`;
 - `update()` turned the mesh to another plane, or laid the layers at a depth out for a new distance
-  of the camera.
+  of the camera;
+- a store item the art follows brought a new atlas or texture while a layer is shown.
 
 A layer is shown while it is `visible`, its picture is there, its `opacity` is above 0 and its frame
 is no empty cel. A camera that moves is the business of its rig; the parallax of the layers needs
@@ -958,7 +1008,8 @@ it once and hand the feature in.
 A layer is drawn hidden until its picture is there. `loaded` resolves once every picture loaded or
 failed; it never rejects. What failed is in `problems`, each `{layer, reason}` — `layer` is
 `undefined` for the source as a whole, and a file that failed adds its `url` —, and on the console once per art, after the load, naming the
-art and the count:
+art and the count. A reload of a store item puts its own list in the place of `problems` and says it
+once on the console:
 
 | problem | the art |
 | --- | --- |
@@ -978,6 +1029,9 @@ art and the count:
 | a tag that steps through a frame the `frames` of an override leave out | the tag left out for that layer |
 | a frame of a `rest`, or set before the load, beyond the frames of the layer | frame 0 |
 | more than 8192 layers in the source | the first 8192 taken |
+| a layer a reloaded sheet lacks | the layer hidden, its poses kept |
+| a layer new in a reloaded sheet | the layer left out of the running art |
+| a frame shown before a reload beyond the frames of the reloaded layer | frame 0 |
 | a file that does not load, is no image or is not of the size of the first file that loaded | its layer without that picture; the problem carries the `url` |
 | a file without a pixel with an alpha above 0 | an empty frame; a layer of such files alone, or such a pivot marker, a problem |
 | pictures of files too large for one atlas of the largest size allowed | every layer hidden, one problem of the source naming the size |

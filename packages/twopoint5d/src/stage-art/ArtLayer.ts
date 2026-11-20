@@ -8,7 +8,7 @@ import type {ArtTrack} from './artTrack.js';
 import type {StageArt} from './StageArt.js';
 import type {StageArtSpriteApi} from './stageArtKind.js';
 
-/** What a layer read out of its source: set once, when its art loads. @internal */
+/** What a layer read out of its source: set when its art loads, and anew with each reload of a store item. @internal */
 export interface ArtLayerInfo {
   readonly box: Readonly<{x: number; y: number; w: number; h: number}>;
   readonly pivot: readonly [number, number];
@@ -49,7 +49,9 @@ let pending: {art: StageArt<never>; index: number; name: string; sprite: StageAr
  * it, the same object for the life of the art. A handle is made by its art, not by `new ArtLayer()`.
  *
  * `rest`, `box` and `pivot` are `undefined`, `frameCount` is 0 and `tags` is empty until the source
- * of the art has loaded; a layer the source lacks keeps them so. Once the art is disposed, `set()`,
+ * of the art has loaded; a layer the source lacks keeps them so. A store item the art follows
+ * answers them anew with each reload; a layer the reloaded source lacks has no frames and no tags,
+ * and `loaded` answers `false`. Once the art is disposed, `set()`,
  * `apply()` and `reset()` write nothing — `set()` and `apply()` still refuse what they cannot use —;
  * the rest answers what it held.
  */

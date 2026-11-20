@@ -18,7 +18,8 @@ import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLaye
 /**
  * Where an art takes its layers from (§3.2 of the proposal): an atlas item of a `TextureStore` —
  * an Aseprite sheet with split layers or a trimmed atlas —, or the same, already loaded, as an
- * atlas and its texture. With `layers` the layers are loose: each takes the frames and the place
+ * atlas and its texture. An art of a store item follows it: a sheet parsed again under the id
+ * reaches the running art. With `layers` the layers are loose: each takes the frames and the place
  * its definition gives it. `files` lists full-canvas PNGs of a paint tool, one per layer, bottom
  * first, under `baseUrl`: the art loads, trims and packs them itself. The art may be handed a
  * promise of a source as well.

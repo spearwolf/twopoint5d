@@ -150,8 +150,14 @@ const problemLine = ({layer, reason}: StageArtProblem): string =>
  * call {@link update} once per frame before the render; {@link takeChanged} answers a frame step of
  * a `FramePacer`.
  *
+ * An art of a store item follows it: a sheet exported anew and parsed again replaces the frames,
+ * boxes, pivots, tags and rests of the layers while the page runs. Each layer keeps its handle, its
+ * sprite and the fields of its pose set off its rest; the layers stay those of the first load — a
+ * layer the new sheet lacks stays posed and hidden, one new in it stays out —, and {@link problems}
+ * says what the reload could not give.
+ *
  * The art owns its mesh — the geometry and material it builds — and the `DynamicAtlas` it packs
- * layer files into, with its texture; it lets go of the lease it holds on a store item in
+ * layer files into, with its texture; it holds a store item while it follows it and lets go of it in
  * {@link dispose}. A store, an atlas, a texture, a renderer, a projection and a plane handed in stay
  * the caller's.
  */
@@ -160,7 +166,8 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   readonly mesh: FeatureSprites<StageArtSpriteApi & StageArtExtraApi<Features>>;
   /**
    * Resolves once every picture loaded or failed — at once for an atlas handed in —, and when the
-   * art is disposed before. It never rejects: {@link problems} says what failed.
+   * art is disposed before. It never rejects: {@link problems} says what failed. A reload of a store
+   * item comes after it and leaves it as it is.
    */
   readonly loaded: Promise<void>;
 
@@ -190,11 +197,18 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   #frame: ArtFrame | undefined;
   #canvas: {readonly width: number; readonly height: number} | undefined;
   #names: readonly string[] = Object.freeze([]);
-  readonly #problems: StageArtProblem[] = [];
+  // a reload of a store item puts a list of its own in its place
+  #problems: StageArtProblem[] = [];
   #resolveLoaded!: () => void;
   #settled = false;
   #disposed = false;
+  // the lease of a store item from its first value until the following of the item holds it
   #lease: TextureStoreLease<unknown> | undefined;
+  // the end of the following of a store item, and the atlas, loose layers and texture it delivered last
+  #unfollow: (() => void) | undefined;
+  #followedAtlas: TextureAtlas<unknown> | undefined;
+  #followedLoose: readonly ArtLayerDef[] | undefined;
+  #followedTexture: Texture | undefined;
   // the load of the files of a files source while it is on its way, and the atlas it packed them into
   #filesLoad: LayerFilesLoad | undefined;
   #filesAtlas: DynamicAtlas | undefined;
@@ -330,7 +344,11 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     return this.#canvas;
   }
 
-  /** What the art could not load or read out of its source; it says so on the console once, after the load. */
+  /**
+   * What the art could not load or read out of its source; it says so on the console once, after the
+   * load. A store item that brings a new atlas puts the list of that reload in its place — a list
+   * read before stays as it was — and says it on the console once per reload.
+   */
   get problems(): readonly StageArtProblem[] {
     return this.#problems;
   }
@@ -443,10 +461,11 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   /**
    * Whether the picture changed since the last call, and starts over: `true` when a shown layer
    * changed a field of its pose to another value, turned from shown to hidden or back — by
-   * `visible`, an `opacity` from or to 0, its picture arriving, or a camera distance that leaves
-   * it behind the camera or brings it back — or changed its place in the stack, and when an
-   * {@link update} turned the mesh to another plane or laid the layers at a depth out for a new
-   * distance. A hidden layer that moves, and a value set again, answer `false`. A write through
+   * `visible`, an `opacity` from or to 0, its picture arriving or going with a reload, or a camera
+   * distance that leaves it behind the camera or brings it back — or changed its place in the
+   * stack, when an {@link update} turned the mesh to another plane or laid the layers at a depth out
+   * for a new distance, and when a store item it follows brought a new atlas or texture while a
+   * layer is shown. A hidden layer that moves, and a value set again, answer `false`. A write through
    * `layer.sprite` is the caller's to report. `false` once disposed. Allocates nothing.
    */
   takeChanged(): boolean {
@@ -488,10 +507,11 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
 
   /**
    * Leaves the parent, disposes the mesh — its geometry and material — and the atlas it packed
-   * layer files into, with its texture, and lets go of the lease of a store item; a texture, an
-   * atlas, a store, a renderer and a projection handed in stay the caller's. A load still on its way
-   * is dropped when it lands — the requests of layer files are aborted, and each decoded picture is
-   * closed, at once or the moment it lands —, and {@link loaded} resolves. Afterwards `set()`,
+   * layer files into, with its texture, and ends the following of a store item, which lets go of it;
+   * a texture, an atlas, a store, a renderer and a projection handed in stay the caller's. A load
+   * still on its way is dropped when it lands — the requests of layer files are aborted, and each
+   * decoded picture is closed, at once or the moment it lands —, and {@link loaded} resolves; so is
+   * a value of a followed store item that still comes. Afterwards `set()`,
    * `apply()`, `reset()` and `update()` write nothing — `set()` and `apply()` still refuse what they
    * cannot use —, `takeChanged()` answers `false`, `layer()`
    * throws, `layerOf()` answers `undefined`; the getters answer what they held. A second call does
@@ -508,6 +528,8 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     this.#core.dispose();
     this.#geometry?.dispose();
     this.#geometry = undefined;
+    this.#unfollow?.();
+    this.#unfollow = undefined;
     this.#lease?.release();
     this.#lease = undefined;
     this.#filesLoad?.drop();
@@ -540,12 +562,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   #turnTo(plane: ProjectionPlane): void {
     this.#turnedTo = plane.clone();
     turnToPlane(this.#core, plane);
-    for (let i = 0; i < this.#layers.length; i++) {
-      if (this.#flags[i]! & SHOWN) {
-        this.#changed = true;
-        break;
-      }
-    }
+    if (this.#anyShown()) this.#changed = true;
   }
 
   // takes the camera distance `distance` — NaN for none —: under compensateDepth it lays the layers at a
@@ -621,11 +638,109 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
       }
       this.#lease = lease;
       [atlas, texture] = lease.value;
-    } else {
-      ({atlas, texture} = resolved as {atlas: TextureAtlas<unknown>; texture: Texture});
+      const layers = (resolved as {layers?: readonly ArtLayerDef[]}).layers;
+      this.#adopt(this.#read({atlas, layers}), texture);
+      this.#follow(store, id, atlas, layers, texture);
+      return;
     }
+    ({atlas, texture} = resolved as {atlas: TextureAtlas<unknown>; texture: Texture});
     const layers = (resolved as {layers?: readonly ArtLayerDef[]}).layers;
     this.#adopt(this.#read({atlas, layers}), texture);
+  }
+
+  // follows the store item the art loaded from (§5.5): a new atlas — a sheet exported anew and parsed
+  // again — or a new texture reaches the running art. The subscription holds the item as the lease
+  // did, which goes once it is in place; on() hands over the values it has at once, which the art
+  // has already
+  #follow(
+    store: TextureStore,
+    id: string,
+    atlas: TextureAtlas<unknown>,
+    loose: readonly ArtLayerDef[] | undefined,
+    texture: Texture,
+  ): void {
+    this.#followedAtlas = atlas;
+    this.#followedLoose = loose;
+    this.#followedTexture = texture;
+    this.#unfollow = store.on(id, ['atlas', 'texture'], ([nextAtlas, nextTexture]) => this.#reload(nextAtlas, nextTexture));
+    this.#lease?.release();
+    this.#lease = undefined;
+  }
+
+  // a value of the store item the art follows: a new atlas is read again with the options of the art,
+  // and the layers of the first load take what it says of them; a new texture alone is swapped in
+  #reload(atlas: TextureAtlas<unknown>, texture: Texture): void {
+    // dispose() ended the following; a value that still comes is dropped
+    if (this.#disposed) return;
+    if (atlas !== this.#followedAtlas) {
+      this.#followedAtlas = atlas;
+      this.#reread(this.#read({atlas, layers: this.#followedLoose}));
+    }
+    if (texture !== this.#followedTexture) {
+      this.#followedTexture = texture;
+      this.#core.setTexture('colorMap', texture);
+      if (this.#anyShown()) this.#changed = true;
+    }
+  }
+
+  // the layer set stays the one of the first load: a layer the reloaded source has gets its frames,
+  // box, pivot, tags and rest anew and keeps the fields of its pose set off its rest; a layer it lacks
+  // stays posed and hidden; a layer new in it stays out. The problems of the reload replace the list
+  #reread(read: {canvas: StageArt['canvas']; layers: ArtLayerSpec[]; problems: StageArtProblem[]}): void {
+    this.#problems = read.problems;
+    this.#canvas = read.canvas === undefined ? undefined : Object.freeze({width: read.canvas.width, height: read.canvas.height});
+    const {pxPerUnit, origin, focus} = this.#options;
+    this.#frame = artFrameOf(this.#subject, pxPerUnit, origin, focus, read.canvas);
+
+    const specs = new Map<string, ArtLayerSpec>();
+    for (const spec of read.layers) if (!specs.has(spec.name)) specs.set(spec.name, spec);
+    for (let i = 0; i < this.#layers.length; i++) {
+      const name = this.#names[i]!;
+      let spec = specs.get(name);
+      if (spec === undefined) {
+        this.#problems.push({
+          layer: name,
+          reason: `the reloaded source has no layer ${describeValue(name)} — the layer stays hidden`,
+        });
+        spec = this.#lackingSpec(i);
+      }
+      this.#settleLayer(i, spec, true);
+    }
+    for (const name of specs.keys()) {
+      if (!this.#byName.has(name)) {
+        this.#problems.push({
+          layer: name,
+          reason: `the reloaded source has a layer ${describeValue(name)} the art did not load with — it stays out of this art; a new StageArt takes it`,
+        });
+      }
+    }
+    this.#stackDirty = true;
+    this.#warnProblems('its source reloaded with');
+  }
+
+  // a layer the reloaded source lacks: no frames, a box of no size at its pivot, and the rest it had,
+  // so that the fields of its pose stay as they are
+  #lackingSpec(index: number): ArtLayerSpec {
+    const layer = this.#layers[index]!;
+    const at = index * POSE_SIZE;
+    const pivotX = layer.pivot?.[0] ?? this.#rests[at + POSE_X]!;
+    const pivotY = layer.pivot?.[1] ?? this.#rests[at + POSE_Y]!;
+    return {
+      name: layer.name,
+      box: {x: pivotX, y: pivotY, w: 0, h: 0},
+      pivotX,
+      pivotY,
+      depth: this.#rests[at + POSE_DEPTH]!,
+      frames: [],
+      tags: new Map(),
+      rest: layer.rest,
+      order: this.#rests[at + POSE_ORDER]!,
+    };
+  }
+
+  #anyShown(): boolean {
+    for (let i = 0; i < this.#layers.length; i++) if (this.#flags[i]! & SHOWN) return true;
+    return false;
   }
 
   // the files of a files source, loaded, trimmed and packed into an atlas of the art's own (§4.2, §5.1).
@@ -689,7 +804,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
       }
       this.#createLayers(layers.map((layer) => layer.name));
     }
-    for (let i = 0; i < layers.length; i++) this.#settleLayer(i, layers[i]!);
+    for (let i = 0; i < layers.length; i++) this.#settleLayer(i, layers[i]!, false);
 
     if (texture !== undefined) this.#core.setTexture('colorMap', texture);
     this.#stackDirty = true;
@@ -699,15 +814,19 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   #finish(): void {
     if (this.#settled) return;
     this.#settled = true;
-    const problems = this.#problems;
-    if (problems.length > 0) {
-      const one = problems.length === 1;
-      // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
-      console.warn(
-        `${this.#subject}: ${problems.length} problem${one ? '' : 's'} — art.problems lists ${one ? 'it' : 'them'}: ${problems.map(problemLine).join('; ')}`,
-      );
-    }
+    this.#warnProblems(undefined);
     this.#resolveLoaded();
+  }
+
+  // the problems on the console, once per load and once per reload; `lead` goes before the count
+  #warnProblems(lead: string | undefined): void {
+    const problems = this.#problems;
+    if (problems.length === 0) return;
+    const one = problems.length === 1;
+    // biome-ignore lint/suspicious/noConsole: the warning to the developer is the point
+    console.warn(
+      `${this.#subject}: ${lead === undefined ? '' : `${lead} `}${problems.length} problem${one ? '' : 's'} — art.problems lists ${one ? 'it' : 'them'}: ${problems.map(problemLine).join('; ')}`,
+    );
   }
 
   #bindScalars(): void {
@@ -749,9 +868,19 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   }
 
   // what the source says about the layer `index`: its frames, its box and its rest, under the fields
-  // set before the load; then the whole sprite is written
-  #settleLayer(index: number, spec: ArtLayerSpec): void {
+  // set before the load — or, on a `reload`, the fields of its pose set off its rest —; then the
+  // whole sprite is written, or hidden where the layer has no picture
+  #settleLayer(index: number, spec: ArtLayerSpec, reload: boolean): void {
     const frame = this.#frame!;
+    const at = index * POSE_SIZE;
+    const rests = this.#rests;
+    const poses = this.#poses;
+    if (reload) {
+      // a field at its rest follows the rest the reloaded source gives; one set off it stays
+      let kept = 0;
+      for (let slot = 0; slot < POSE_SIZE; slot++) if (poses[at + slot] !== rests[at + slot]) kept |= bit(slot);
+      this.#preset[index] = kept;
+    }
     const {box} = spec;
     const prepared = spec.frames.map((frameSpec) => (frameSpec === undefined ? undefined : prepareLayerFrame(frameSpec, box)));
     const frameCount = spec.frames.length;
@@ -761,8 +890,6 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     this.#boxes[index] = box;
     this.#sizeScales[index] = spec.pxPerUnit === undefined ? 1 : frame.pxPerUnit / spec.pxPerUnit;
 
-    const at = index * POSE_SIZE;
-    const rests = this.#rests;
     rests[at + POSE_X] = spec.pivotX;
     rests[at + POSE_Y] = spec.pivotY;
     rests[at + POSE_DEPTH] = spec.depth;
@@ -788,16 +915,18 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
       }
     }
 
-    const poses = this.#poses;
     const preset = this.#preset[index]!;
     for (let slot = 0; slot < POSE_SIZE; slot++) {
       if (!(preset & bit(slot))) poses[at + slot] = rests[at + slot]!;
     }
     this.#preset[index] = 0;
     if (frameCount > 0 && poses[at + POSE_FRAME]! >= frameCount) {
+      const frames = `its ${frameCount} frame${frameCount === 1 ? '' : 's'}`;
       this.#problems.push({
         layer: name,
-        reason: `the frame ${poses[at + POSE_FRAME]} set before the layer loaded lies beyond its ${frameCount} frames — the layer shows frame 0`,
+        reason: reload
+          ? `the frame ${poses[at + POSE_FRAME]} it showed lies beyond ${frames} in the reloaded source — the layer shows frame 0`
+          : `the frame ${poses[at + POSE_FRAME]} set before the layer loaded lies beyond ${frames} — the layer shows frame 0`,
       });
       poses[at + POSE_FRAME] = 0;
     }
@@ -826,7 +955,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     });
     ArtLayerInternals.adopt(this.#layers[index]!, info);
 
-    this.#flags[index]! |= loaded ? LOADED : FAILED;
+    this.#flags[index] = (this.#flags[index]! & ~(LOADED | FAILED)) | (loaded ? LOADED : FAILED);
     const sprite = this.#sprites[index]!;
     // a box of no size — a layer without a picture — has no anchor in it
     if (box.w > 0 && box.h > 0) {
@@ -836,8 +965,18 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
       sprite.setAnchor(anchorTuple);
     }
     if (loaded) this.#write(index, ALL_FIELDS);
+    else this.#hide(index);
     // every attribute of the sprite, the static ones too: the mesh may have been updated before
     this.#core.spritePool?.touchVO(sprite);
+  }
+
+  // a layer whose picture a reload took away: its sprite hidden, a change where it was shown
+  #hide(index: number): void {
+    const flags = this.#flags[index]!;
+    if (!(flags & SHOWN)) return;
+    this.#flags[index] = flags & ~SHOWN;
+    this.#sprites[index]!.visible = 0;
+    this.#changed = true;
   }
 
   // --- poses ----------------------------------------------------------------------------------

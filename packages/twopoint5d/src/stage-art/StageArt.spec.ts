@@ -22,7 +22,7 @@ import {ParallaxProjection} from '../stage/ParallaxProjection.js';
 import {ProjectionPlane} from '../stage/ProjectionPlane.js';
 import {AsepriteJson, type AsepriteJsonData} from '../texture/AsepriteJson.js';
 import type {TextureAtlas} from '../texture/TextureAtlas.js';
-import {TexturePackerJson, type TexturePackerJsonData} from '../texture/TexturePackerJson.js';
+import {type TexturePackerFrameData, TexturePackerJson, type TexturePackerJsonData} from '../texture/TexturePackerJson.js';
 import {TextureStore} from '../texture/TextureStore.js';
 import {FakeCanvas} from '../testing/fakeCanvas.js';
 import type {ArtLayerDef} from './artSources.js';
@@ -79,13 +79,55 @@ const heldBack = () => {
 
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
+const fakeRenderer = () => ({getMaxAnisotropy: () => 16, dispose() {}}) as unknown as WebGPURenderer;
+
+// the sheets the fetch of makeStore() answers, by the name of their url; `scene.json` is the scene above
+let sheets = new Map<string, TexturePackerJsonData>();
+
 // a store whose item `scene` is the scene above, its json and its image answered at once
 const makeStore = () => {
-  vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify(sceneJson())));
+  sheets = new Map([['scene.json', sceneJson()]]);
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const url = String(input instanceof Request ? input.url : input);
+    const name = url.slice(url.lastIndexOf('/') + 1);
+    const sheet = sheets.get(name);
+    return sheet === undefined ? new Response('', {status: 404}) : new Response(JSON.stringify(sheet));
+  });
   vi.spyOn(ImageLoader.prototype, 'loadAsync').mockResolvedValue({width: 256, height: 128} as unknown as HTMLImageElement);
-  const store = new TextureStore({getMaxAnisotropy: () => 16, dispose() {}} as unknown as WebGPURenderer);
+  const store = new TextureStore(fakeRenderer());
   store.parse({items: {scene: {atlasUrl: 'scene.json'}}});
   return store;
+};
+
+// the scene exported anew: `box` one frame, moved to 30, 40, 20 × 20; `lamp` gone; `cat` new, at 10, 80
+const reexportedJson = (image = 'scene.png'): TexturePackerJsonData => {
+  const frames = sceneJson().frames as Record<string, TexturePackerFrameData>;
+  return {
+    frames: {
+      'back@50': frames['back@50']!,
+      box: {
+        frame: {x: 100, y: 0, w: 20, h: 20},
+        trimmed: true,
+        spriteSourceSize: {x: 30, y: 40, w: 20, h: 20},
+        sourceSize: CANVAS,
+      },
+      cat: {
+        frame: {x: 140, y: 0, w: 10, h: 10},
+        trimmed: true,
+        spriteSourceSize: {x: 10, y: 80, w: 10, h: 10},
+        sourceSize: CANVAS,
+      },
+    },
+    meta: {image, size: {w: 256, h: 128}},
+  };
+};
+
+// the item `scene` of the store parsed anew with `sheet` under a new url, as a re-export brings it
+let exports = 0;
+const reexport = (store: TextureStore, sheet: TexturePackerJsonData) => {
+  const name = `scene-${++exports}.json`;
+  sheets.set(name, sheet);
+  store.parse({items: {scene: {atlasUrl: name}}});
 };
 
 const silenceWarnings = () => vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -795,6 +837,249 @@ describe('loading', () => {
   });
 });
 
+describe('following a store item', () => {
+  // a store with its art on `scene`, loaded; the warnings silenced
+  const loadedArt = async (options?: ConstructorParameters<typeof StageArt>[1]) => {
+    const warn = silenceWarnings();
+    const store = makeStore();
+    const art = new StageArt({store, id: 'scene'}, options);
+    await art.loaded;
+    const resource = await store.whenResource('scene');
+    return {warn, store, art, resource};
+  };
+
+  test('a re-exported sheet replaces the frames and the box of a layer, which keeps its handle, its sprite and the fields of its pose set off its rest', async () => {
+    const {store, art, resource} = await loadedArt();
+    const box = art.layer('box');
+    const {sprite} = box;
+    art.set('box', {x: 60, deg: 90});
+    expect(box.frameCount).toBe(2);
+    const atlasBefore = resource.atlas;
+
+    reexport(store, reexportedJson());
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+
+    expect(art.names).toEqual(['back', 'box', 'lamp']);
+    expect(art.layer('box')).toBe(box);
+    expect(box.sprite).toBe(sprite);
+    expect(art.layerOf(sprite)).toBe(box);
+    expect(box.frameCount).toBe(1);
+    expect(box.box).toEqual({x: 30, y: 40, w: 20, h: 20});
+    expect(box.pivot).toEqual([40, 50]);
+    expect(box.rest).toMatchObject({x: 40, y: 50, deg: 0});
+    // x and deg were set off the rest and stay; y stood at its rest and takes the new one
+    expect([sprite.x, sprite.y]).toEqual([10, 0]);
+    expect(sprite.rotation).toBeCloseTo(-Math.PI / 2, 6);
+    expect(sprite.visible).toBe(1);
+    expect(sprite.trimTop).toBe(0);
+    expect(() => art.set('box', {frame: 1})).toThrow(/^ArtLayer "box": frame must be a whole number from 0 to 0/);
+    store.dispose();
+  });
+
+  test('a frame the reloaded sheet does not have any more is a problem, and frame 0 shows', async () => {
+    const {store, art, resource} = await loadedArt();
+    art.set('box', {frame: 1});
+    const atlasBefore = resource.atlas;
+
+    reexport(store, reexportedJson());
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+
+    expect(art.problems).toContainEqual({
+      layer: 'box',
+      reason: 'the frame 1 it showed lies beyond its 1 frame in the reloaded source — the layer shows frame 0',
+    });
+    expect(art.layer('box').sprite.visible).toBe(1);
+    expect(() => art.set('box', {frame: 0})).not.toThrow();
+    store.dispose();
+  });
+
+  test('a layer the reloaded sheet lacks stays posed and hidden, with its problem', async () => {
+    const {store, art, resource} = await loadedArt();
+    const lamp = art.layer('lamp');
+    art.set('lamp', {x: 12});
+    expect(lamp.sprite.visible).toBe(1);
+    const atlasBefore = resource.atlas;
+
+    reexport(store, reexportedJson());
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+
+    expect(art.layer('lamp')).toBe(lamp);
+    expect(lamp.sprite.visible).toBe(0);
+    expect(lamp.loaded).toBe(false);
+    expect(lamp.frameCount).toBe(0);
+    expect(art.problems).toContainEqual({
+      layer: 'lamp',
+      reason: 'the reloaded source has no layer "lamp" — the layer stays hidden',
+    });
+    expect(() => art.set('lamp', {x: 3, frame: 4})).not.toThrow();
+
+    // the next export brings it back, at the pose it was given
+    const atlasBetween = resource.atlas;
+    reexport(store, sceneJson());
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBetween));
+    expect(lamp.loaded).toBe(true);
+    expect(lamp.sprite.visible).toBe(1);
+    expect(lamp.sprite.x).toBe(3 - 50);
+    expect(art.problems).toEqual([
+      {layer: 'lamp', reason: 'the frame 4 it showed lies beyond its 1 frame in the reloaded source — the layer shows frame 0'},
+    ]);
+    store.dispose();
+  });
+
+  test('a layer new in the reloaded sheet does not join the running art: one problem names it', async () => {
+    const {store, art, resource} = await loadedArt();
+    const atlasBefore = resource.atlas;
+
+    reexport(store, reexportedJson());
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+
+    expect(art.names).toEqual(['back', 'box', 'lamp']);
+    expect(art.mesh.spritePool!.usedCount).toBe(3);
+    expect(() => art.layer('cat')).toThrow(/^StageArt: no layer "cat" — its layers are "back", "box", "lamp"$/);
+    expect(art.problems).toContainEqual({
+      layer: 'cat',
+      reason:
+        'the reloaded source has a layer "cat" the art did not load with — it stays out of this art; a new StageArt takes it',
+    });
+    store.dispose();
+  });
+
+  test('the problems of a reload take the place of those before, and are said once on the console per reload', async () => {
+    const {warn, store, art, resource} = await loadedArt({name: 'scene', only: ['box', 'ghost']});
+    expect(art.problems).toEqual([
+      {layer: 'ghost', reason: 'the source has no layer "ghost", which only names — the layer stays hidden'},
+    ]);
+    const problemsBefore = art.problems;
+    expect(warn).toHaveBeenCalledOnce();
+    let atlasBefore = resource.atlas;
+
+    reexport(store, reexportedJson());
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+
+    // only names the layers: a layer of the sheet only leaves out is no new layer
+    expect(art.problems).toEqual([
+      {layer: 'ghost', reason: 'the source has no layer "ghost", which only names — the layer stays hidden'},
+    ]);
+    expect(art.problems).not.toBe(problemsBefore);
+    expect(problemsBefore).toHaveLength(1);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[1]![0]).toMatch(
+      /^StageArt "scene": its source reloaded with 1 problem — art\.problems lists it: the layer "ghost": /,
+    );
+
+    // a reload without problems empties the list, and says nothing
+    const clean = reexportedJson();
+    (clean.frames as Record<string, TexturePackerFrameData>)['ghost'] = (clean.frames as Record<string, TexturePackerFrameData>)[
+      'cat'
+    ]!;
+    atlasBefore = resource.atlas;
+    reexport(store, clean);
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+    expect(art.problems).toEqual([]);
+    expect(art.layer('ghost').loaded).toBe(true);
+    expect(art.layer('ghost').sprite.visible).toBe(1);
+    expect(warn).toHaveBeenCalledTimes(2);
+    store.dispose();
+  });
+
+  test('takeChanged() answers true once after the swap', async () => {
+    const {store, art, resource} = await loadedArt();
+    art.takeChanged();
+    const atlasBefore = resource.atlas;
+
+    reexport(store, reexportedJson());
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+
+    expect(art.takeChanged()).toBe(true);
+    expect(art.takeChanged()).toBe(false);
+    store.dispose();
+  });
+
+  test('a sheet with another image swaps the texture of the mesh', async () => {
+    const {store, art, resource} = await loadedArt();
+    const textureBefore = resource.texture;
+    expect(art.mesh.getTexture('colorMap')).toBe(textureBefore);
+
+    reexport(store, reexportedJson('scene-2.png'));
+    await vi.waitFor(() => expect(art.mesh.getTexture('colorMap')).not.toBe(textureBefore));
+
+    expect(art.mesh.getTexture('colorMap')).toBe(resource.texture);
+    expect(art.layer('box').frameCount).toBe(1);
+    store.dispose();
+  });
+
+  test('a new texture of the same sheet — a new renderer — swaps the texture alone, and reads the sheet no more', async () => {
+    const {warn, store, art, resource} = await loadedArt({only: ['box', 'ghost']});
+    const textureBefore = resource.texture;
+    art.set('box', {frame: 1});
+    art.takeChanged();
+
+    store.renderer = fakeRenderer();
+    await vi.waitFor(() => expect(art.mesh.getTexture('colorMap')).not.toBe(textureBefore));
+
+    expect(art.mesh.getTexture('colorMap')).toBe(resource.texture);
+    expect(art.layer('box').frameCount).toBe(2);
+    expect(art.problems).toHaveLength(1);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(art.takeChanged()).toBe(true);
+    store.dispose();
+  });
+
+  test('holds the store item through the following alone: one hold per art', async () => {
+    const {store, art, resource} = await loadedArt();
+    expect(resource.refCount).toBe(1);
+    const second = new StageArt({store, id: 'scene'});
+    await second.loaded;
+    expect(resource.refCount).toBe(2);
+    second.dispose();
+    expect(resource.refCount).toBe(1);
+    art.dispose();
+    expect(resource.refCount).toBe(0);
+    store.dispose();
+  });
+
+  test('dispose() ends the following: a sheet exported afterwards reaches the art no more', async () => {
+    const {store, art, resource} = await loadedArt();
+    const box = art.layer('box');
+    const problems = art.problems;
+    art.dispose();
+    expect(resource.refCount).toBe(0);
+    const atlasBefore = resource.atlas;
+
+    // the resource is held by nobody now; a store that keeps it answers the new sheet
+    const follower = vi.fn();
+    const unfollow = store.on('scene', ['atlas', 'texture'], follower);
+    reexport(store, reexportedJson('scene-2.png'));
+    await vi.waitFor(() => expect(resource.atlas).not.toBe(atlasBefore));
+
+    expect(box.frameCount).toBe(2);
+    expect(art.problems).toBe(problems);
+    expect(art.problems).toEqual([]);
+    unfollow();
+    store.dispose();
+  });
+
+  test('a delivery of the store that lands after dispose() is dropped', async () => {
+    const store = makeStore();
+    const on = store.on.bind(store);
+    let deliver: ((value: [TextureAtlas<unknown>, Texture]) => void) | undefined;
+    vi.spyOn(store, 'on').mockImplementation(((id: string, type: never, callback: never) => {
+      deliver = callback;
+      return on(id, type, callback);
+    }) as typeof store.on);
+    const art = new StageArt({store, id: 'scene'});
+    await art.loaded;
+    expect(deliver).toBeDefined();
+    const box = art.layer('box');
+    art.dispose();
+
+    expect(() => deliver!([TexturePackerJson.parse(reexportedJson())[0], new Texture()])).not.toThrow();
+    expect(box.frameCount).toBe(2);
+    expect(art.problems).toEqual([]);
+    store.dispose();
+  });
+});
+
 describe('dispose()', () => {
   test('leaves the parent, releases the mesh, and every member behaves as its TSDoc says', () => {
     const art = new StageArt(sceneSource());
@@ -858,6 +1143,7 @@ describe('dispose()', () => {
       releases.push(vi.spyOn(lease, 'release') as unknown as ReturnType<typeof vi.fn>);
       return lease;
     });
+    const onSpy = vi.spyOn(store, 'on');
     const art = new StageArt({store, id: 'scene'});
     art.dispose();
     await flush();
@@ -865,6 +1151,7 @@ describe('dispose()', () => {
     const resource = await store.whenResource('scene');
 
     expect(acquireSpy).toHaveBeenCalledExactlyOnceWith('scene', ['atlas', 'texture']);
+    expect(onSpy).not.toHaveBeenCalled();
     expect(releases).toHaveLength(1);
     expect(releases[0]).toHaveBeenCalledOnce();
     expect(resource.refCount).toBe(0);
