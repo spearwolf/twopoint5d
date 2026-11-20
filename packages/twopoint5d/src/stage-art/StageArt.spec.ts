@@ -1,5 +1,15 @@
 import {readFileSync} from 'node:fs';
-import {Group, ImageLoader, PerspectiveCamera, Plane, Quaternion, Texture, Vector3, type WebGPURenderer} from 'three/webgpu';
+import {
+  CanvasTexture,
+  Group,
+  ImageLoader,
+  PerspectiveCamera,
+  Plane,
+  Quaternion,
+  Texture,
+  Vector3,
+  type WebGPURenderer,
+} from 'three/webgpu';
 import {afterEach, describe, expect, expectTypeOf, test, vi} from 'vitest';
 
 import {BillboardPlacement} from '../sprites/features/BillboardPlacement.js';
@@ -14,6 +24,7 @@ import {AsepriteJson, type AsepriteJsonData} from '../texture/AsepriteJson.js';
 import type {TextureAtlas} from '../texture/TextureAtlas.js';
 import {TexturePackerJson, type TexturePackerJsonData} from '../texture/TexturePackerJson.js';
 import {TextureStore} from '../texture/TextureStore.js';
+import {FakeCanvas} from '../testing/fakeCanvas.js';
 import type {ArtLayerDef} from './artSources.js';
 import {artTrack} from './artTrack.js';
 import type {StageArtSource} from './artOptions.js';
@@ -167,7 +178,17 @@ describe('new StageArt()', () => {
 
   describe('refuses', () => {
     test('a source of none of the shapes', () => {
-      for (const source of [undefined, null, 5, {}, {store: {}, id: 'a'}, {atlas: sceneAtlas()}, {files: ['a.png']}]) {
+      for (const source of [
+        undefined,
+        null,
+        5,
+        {},
+        {store: {}, id: 'a'},
+        {atlas: sceneAtlas()},
+        {files: 'a.png'},
+        {files: ['a.png'], baseUrl: 5},
+        {files: ['a.png'], layers: []},
+      ]) {
         expect(() => new StageArt(source as never)).toThrow(TypeError);
       }
       expect(() => new StageArt({} as never)).toThrow(/^new StageArt\(\): the source must be /);
@@ -674,7 +695,7 @@ describe('loading', () => {
 
   test('a promise that resolves with none of the shapes is a problem of the source', async () => {
     silenceWarnings();
-    const art = new StageArt(Promise.resolve({files: []} as never));
+    const art = new StageArt(Promise.resolve({files: 'a.png'} as never));
     await art.loaded;
     expect(art.problems).toHaveLength(1);
     expect(art.problems[0]!.reason).toMatch(/^the source the promise resolved with is none of the shapes/);
@@ -1209,5 +1230,316 @@ describe('planes, projections and depth', () => {
     art.projection = undefined;
     art.update();
     expect(art.mesh.quaternion.angleTo(facing('xz|top-left'))).toBeCloseTo(0, 6);
+  });
+});
+
+describe('a files source', () => {
+  const BASE = 'https://example.test/kitchen/';
+
+  interface ServedFile {
+    width: number;
+    height: number;
+    // the pictures of the file, each a box of opaque pixels on the canvas
+    boxes: {x: number; y: number; w: number; h: number}[];
+    // the answer waits for it: a file the test holds back
+    gate?: Promise<void>;
+    // answered with this status instead
+    status?: number;
+    // the request fails with this error instead
+    fail?: Error;
+    // the decoding fails with this error instead
+    undecodable?: Error;
+    // the decoding waits for it: a bitmap the test holds back
+    decodeGate?: Promise<void>;
+  }
+
+  interface FakeBitmap {
+    width: number;
+    height: number;
+    data: Uint8ClampedArray;
+    close: ReturnType<typeof vi.fn>;
+    file: string;
+  }
+
+  // the scene of the atlas specs above, as full-canvas files of 100 × 100: `back` at a depth of 50 the
+  // canvas whole; `box`, closed and open; `lamp`, its pivot marker a dot at 64, 18
+  const sceneFiles = (): Record<string, ServedFile> => ({
+    'back@50.png': {width: 100, height: 100, boxes: [{x: 0, y: 0, w: 100, h: 100}]},
+    'box.png': {width: 100, height: 100, boxes: [{x: 20, y: 30, w: 40, h: 20}]},
+    'box-open.png': {width: 100, height: 100, boxes: [{x: 20, y: 20, w: 40, h: 30}]},
+    'lamp.png': {width: 100, height: 100, boxes: [{x: 60, y: 10, w: 10, h: 10}]},
+    'lamp.pivot.png': {width: 100, height: 100, boxes: [{x: 64, y: 18, w: 1, h: 1}]},
+  });
+  const SCENE_FILES = ['back@50.png', 'box.png', 'box-open.png', 'lamp.png', 'lamp.pivot.png'];
+
+  // serves `files` under BASE through fetch() and createImageBitmap(), and builds canvases that record
+  // what is drawn on them: a bitmap carries its pixels, which trimLayerImage() reads as they are
+  const serve = (files: Record<string, ServedFile>) => {
+    const requests: {url: string; signal: AbortSignal | undefined}[] = [];
+    const bitmaps: FakeBitmap[] = [];
+    const canvases: FakeCanvas[] = [];
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      requests.push({url, signal: init?.signal ?? undefined});
+      const name = decodeURIComponent(url.slice(BASE.length));
+      const file = url.startsWith(BASE) ? files[name] : undefined;
+      if (file === undefined) return new Response(null, {status: 404});
+      await file.gate;
+      if (file.fail !== undefined) throw file.fail;
+      if (file.status !== undefined) return new Response(null, {status: file.status});
+      return new Response(new Blob([name]));
+    });
+    vi.stubGlobal('createImageBitmap', async (blob: Blob) => {
+      const name = await blob.text();
+      const file = files[name]!;
+      await file.decodeGate;
+      if (file.undecodable !== undefined) throw file.undecodable;
+      const data = new Uint8ClampedArray(file.width * file.height * 4);
+      for (const {x, y, w, h} of file.boxes) {
+        for (let row = y; row < y + h; row++) data.fill(255, (row * file.width + x) * 4, (row * file.width + x + w) * 4);
+      }
+      const bitmap: FakeBitmap = {width: file.width, height: file.height, data, close: vi.fn(), file: name};
+      bitmaps.push(bitmap);
+      return bitmap;
+    });
+    vi.stubGlobal(
+      'OffscreenCanvas',
+      class extends FakeCanvas {
+        constructor(width: number, height: number) {
+          super(width, height);
+          canvases.push(this);
+        }
+      },
+    );
+    return {requests, bitmaps, canvases};
+  };
+
+  const held = () => {
+    let open!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    return {gate, open};
+  };
+
+  // a renderer whose device allows textures up to `limit` texels across
+  const rendererOf = (limit: number) =>
+    ({backend: {device: {limits: {maxTextureDimension2D: limit}}}, render() {}}) as unknown as WebGPURenderer;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  test('knows its layers from the list at once, in its order, and draws each where its file put it once loaded', async () => {
+    serve(sceneFiles());
+    const art = new StageArt({files: SCENE_FILES, baseUrl: BASE}, {pxPerUnit: 2});
+    expect(art.names).toEqual(['back', 'box', 'lamp']);
+    expect(art.layer('box').sprite.visible).toBe(0);
+    art.set('lamp', {deg: 90});
+
+    await art.loaded;
+    expect(art.problems).toEqual([]);
+    expect(art.canvas).toEqual({width: 100, height: 100});
+    const box = art.layer('box');
+    expect(box.box).toEqual({x: 20, y: 20, w: 40, h: 30});
+    expect(box.frameCount).toBe(2);
+    expect([box.sprite.x, box.sprite.y, box.sprite.z]).toEqual([-5, 7.5, -0]);
+    expect([box.sprite.width, box.sprite.height]).toEqual([20, 15]);
+    expect(box.sprite.visible).toBe(1);
+    expect(art.layer('back').sprite.z).toBe(-25);
+    // the middle of the dot of the marker
+    expect(art.layer('lamp').pivot).toEqual([64.5, 18.5]);
+    expect(art.layer('lamp').sprite.rotation).toBeCloseTo(-Math.PI / 2, 6);
+    expect(art.takeChanged()).toBe(true);
+  });
+
+  test('one request per file, side by side, each url the file under baseUrl with a # written %23', async () => {
+    const files: Record<string, ServedFile> = {
+      ...sceneFiles(),
+      'steam#0.png': {width: 100, height: 100, boxes: [{x: 1, y: 1, w: 2, h: 2}]},
+    };
+    const {gate, open} = held();
+    for (const file of Object.values(files)) file.gate = gate;
+    const {requests} = serve(files);
+    const art = new StageArt({files: [...SCENE_FILES, 'steam#0.png'], baseUrl: BASE});
+    await flush();
+
+    // every request is out before the first answer
+    expect(requests.map(({url}) => url)).toEqual([...SCENE_FILES, 'steam%230.png'].map((file) => `${BASE}${file}`));
+    open();
+    await art.loaded;
+    expect(art.names).toEqual(['back', 'box', 'lamp', 'steam']);
+    expect(art.problems).toEqual([]);
+  });
+
+  test('packs the trimmed boxes into a DynamicAtlas of its own — the next power of two with padding 2 and extrude 1 — and closes every bitmap', async () => {
+    const {bitmaps, canvases} = serve(sceneFiles());
+    const art = new StageArt({files: SCENE_FILES, baseUrl: BASE});
+    await art.loaded;
+
+    const texture = art.mesh.getTexture('colorMap') as CanvasTexture;
+    expect(texture).toBeInstanceOf(CanvasTexture);
+    const canvas = texture.image as unknown as FakeCanvas;
+    // 128 cannot hold the canvas-wide back beside the rest
+    expect([canvas.width, canvas.height]).toEqual([256, 256]);
+    expect(canvases).toEqual([canvas]);
+    // each picture is drawn out of its file by its trimmed box, the marker not at all
+    const drawn = canvas.context.callsOf('drawImage').filter(({args}) => bitmaps.includes(args[0] as FakeBitmap));
+    expect(drawn.map(({args}) => [(args[0] as FakeBitmap).file, ...args.slice(1)])).toEqual([
+      ['back@50.png', 0, 0, 100, 100, 0, 0, 100, 100],
+      ['box.png', 20, 30, 40, 20, 0, 0, 40, 20],
+      ['box-open.png', 20, 20, 40, 30, 0, 0, 40, 30],
+      ['lamp.png', 60, 10, 10, 10, 0, 0, 10, 10],
+    ]);
+    // the first frame lies at padding 2 plus extrude 1
+    expect(drawn[0]!.translation).toEqual([3, 3]);
+    expect(bitmaps).toHaveLength(5);
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  });
+
+  test('sizes the atlas up to the limit of options.renderer; a set that does not fit is one problem of the source naming the size and two arts', async () => {
+    const warn = silenceWarnings();
+    const {bitmaps} = serve(sceneFiles());
+    const art = new StageArt({files: SCENE_FILES, baseUrl: BASE}, {renderer: rendererOf(128)});
+    await art.loaded;
+
+    expect(art.problems).toEqual([
+      {
+        layer: undefined,
+        reason:
+          'the trimmed pictures of the 4 files to draw do not fit into an atlas of 128 × 128 with padding 2 and extrude 1, the largest the renderer allows — split the files between two arts, each with a renderOrder of its own',
+      },
+    ]);
+    expect(art.names).toEqual(['back', 'box', 'lamp']);
+    expect(art.layer('box').sprite.visible).toBe(0);
+    expect(art.layer('box').loaded).toBe(false);
+    expect(art.mesh.getTexture('colorMap')).toBeUndefined();
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledOnce();
+
+    serve(sceneFiles());
+    const roomy = new StageArt({files: SCENE_FILES, baseUrl: BASE}, {renderer: rendererOf(16384)});
+    await roomy.loaded;
+    expect(roomy.problems).toEqual([]);
+    expect((roomy.mesh.getTexture('colorMap')!.image as {width: number}).width).toBe(256);
+  });
+
+  test('before a renderer is known the atlas goes up to 4096, and the refusal names the renderer as well', async () => {
+    silenceWarnings();
+    serve({wide: {width: 5000, height: 10, boxes: [{x: 0, y: 0, w: 4100, h: 2}]}});
+    const art = new StageArt({files: ['wide'], baseUrl: BASE});
+    await art.loaded;
+
+    expect(art.problems).toEqual([
+      {
+        layer: undefined,
+        reason:
+          'the trimmed pictures of the 1 file to draw do not fit into an atlas of 4096 × 4096 with padding 2 and extrude 1, the largest before a renderer is known — hand the art its renderer (options.renderer) for the limit of its device, or split the files between two arts, each with a renderOrder of its own',
+      },
+    ]);
+  });
+
+  test('a file that fails is a problem of its layer, one per failing url; its layer stays hidden and the rest goes on', async () => {
+    silenceWarnings();
+    const files = sceneFiles();
+    files['lamp.png']!.status = 404;
+    files['box-open.png']!.fail = new TypeError('Failed to fetch');
+    files['back@50.png']!.undecodable = new Error('The source image could not be decoded.');
+    serve(files);
+    const art = new StageArt({files: SCENE_FILES, baseUrl: BASE});
+    await art.loaded;
+
+    expect(art.problems).toEqual([
+      {
+        layer: 'back',
+        reason: 'the file "back@50.png" could not be decoded as an image: The source image could not be decoded.',
+        url: `${BASE}back@50.png`,
+      },
+      {layer: 'box', reason: 'the file "box-open.png" did not load: Failed to fetch', url: `${BASE}box-open.png`},
+      {layer: 'lamp', reason: 'the file "lamp.png" did not load: the server answered 404', url: `${BASE}lamp.png`},
+    ]);
+    expect(art.layer('back').sprite.visible).toBe(0);
+    expect(art.layer('lamp').sprite.visible).toBe(0);
+    expect(art.layer('lamp').loaded).toBe(false);
+    expect(art.layer('box').sprite.visible).toBe(1);
+    expect(art.layer('box').frameCount).toBe(2);
+    expect(art.layer('box').box).toEqual({x: 20, y: 30, w: 40, h: 20});
+  });
+
+  test('a file of another canvas size is a problem of its layer; the canvas is the size of the first file that loaded', async () => {
+    silenceWarnings();
+    const files = sceneFiles();
+    files['back@50.png']!.status = 500;
+    files['lamp.png'] = {width: 200, height: 100, boxes: [{x: 60, y: 10, w: 10, h: 10}]};
+    const {bitmaps} = serve(files);
+    const art = new StageArt({files: SCENE_FILES, baseUrl: BASE});
+    await art.loaded;
+
+    expect(art.canvas).toEqual({width: 100, height: 100});
+    expect(art.problems).toEqual([
+      {layer: 'back', reason: 'the file "back@50.png" did not load: the server answered 500', url: `${BASE}back@50.png`},
+      {
+        layer: 'lamp',
+        reason:
+          'the file "lamp.png" is 200 × 100, and the canvas — the size of "box.png", the first file that loaded — is 100 × 100',
+        url: `${BASE}lamp.png`,
+      },
+    ]);
+    expect(art.layer('lamp').sprite.visible).toBe(0);
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  });
+
+  test('a promise of a files source is read once it is there', async () => {
+    serve(sceneFiles());
+    const {promise, resolve} = heldBack();
+    const art = new StageArt(promise);
+    expect(art.names).toEqual([]);
+
+    resolve({files: SCENE_FILES, baseUrl: BASE});
+    await art.loaded;
+    expect(art.names).toEqual(['back', 'box', 'lamp']);
+    expect(art.layer('lamp').sprite.visible).toBe(1);
+  });
+
+  test('dispose() during the load drops it: the requests are aborted, the bitmaps that arrived are closed at once, one that lands later when it lands, and no atlas is built', async () => {
+    const files = sceneFiles();
+    const {gate, open} = held();
+    // the request of the lamp is answered, its decoding held back: aborting the request cannot stop it
+    files['lamp.png']!.decodeGate = gate;
+    const {requests, bitmaps, canvases} = serve(files);
+    const art = new StageArt({files: SCENE_FILES, baseUrl: BASE});
+    for (let i = 0; i < 5; i++) await flush();
+    expect(bitmaps).toHaveLength(4);
+
+    art.dispose();
+    await expect(art.loaded).resolves.toBeUndefined();
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(requests.every(({signal}) => signal?.aborted === true)).toBe(true);
+
+    open();
+    for (let i = 0; i < 5; i++) await flush();
+    expect(bitmaps).toHaveLength(5);
+    expect(bitmaps[4]!.close).toHaveBeenCalledOnce();
+    expect(canvases).toEqual([]);
+    expect(art.problems).toEqual([]);
+    expect(art.mesh.getTexture('colorMap')).toBeUndefined();
+  });
+
+  test('dispose() releases the DynamicAtlas the art packed its files into, and its texture', async () => {
+    serve(sceneFiles());
+    const art = new StageArt({files: SCENE_FILES, baseUrl: BASE});
+    await art.loaded;
+    const texture = art.mesh.getTexture('colorMap')!;
+    const canvas = texture.image as unknown as FakeCanvas;
+    const textureDispose = vi.spyOn(texture, 'dispose');
+
+    art.dispose();
+    expect(textureDispose).toHaveBeenCalledOnce();
+    expect([canvas.width, canvas.height]).toEqual([0, 0]);
+  });
+
+  test('refuses a renderer that is no renderer', () => {
+    expect(() => new StageArt(sceneSource(), {renderer: 5 as never})).toThrow(
+      new TypeError('new StageArt(): renderer must be the WebGPURenderer the art is drawn with, got 5'),
+    );
   });
 });

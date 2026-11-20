@@ -2,15 +2,20 @@ import {readFileSync} from 'node:fs';
 import {describe, expect, test} from 'vitest';
 
 import {AsepriteJson, type AsepriteJsonArrayFrameData, type AsepriteJsonData} from '../texture/AsepriteJson.js';
-import type {TextureAtlas} from '../texture/TextureAtlas.js';
+import {TextureAtlas} from '../texture/TextureAtlas.js';
+import {TextureCoords} from '../texture/TextureCoords.js';
 import {TexturePackerJson, type TexturePackerJsonData} from '../texture/TexturePackerJson.js';
 import type {LayerBox} from './artLayout.js';
 import {
   type ArtLayerSpec,
   checkArtSourceOptions,
   checkLayerDefs,
+  frameNameOfFile,
+  type LayerFileResult,
+  parseLayerFileName,
   prepareLayerFrame,
   readAtlasSource,
+  readLayerFiles,
   readLooseLayers,
 } from './artSources.js';
 
@@ -382,6 +387,234 @@ describe('readAtlasSource() of a trimmed atlas', () => {
     const {layers} = readAtlasSource(SUBJECT, ftpAtlas(), {});
 
     for (const layer of layers) expect(layer.tags.size).toBe(0);
+  });
+});
+
+describe('parseLayerFileName()', () => {
+  test('a plain name is a layer, or a frame -suffix of one: the name alone cannot tell', () => {
+    expect(parseLayerFileName('table')).toEqual({name: 'table'});
+    expect(parseLayerFileName('carafe5-empty')).toEqual({name: 'carafe5-empty'});
+  });
+
+  test('@depth is the depth, no part of the name; a negative one is written @-120', () => {
+    expect(parseLayerFileName('window@600')).toEqual({name: 'window', depth: 600});
+    expect(parseLayerFileName('wall@-120')).toEqual({name: 'wall', depth: -120});
+    expect(parseLayerFileName('haze@12.5')).toEqual({name: 'haze', depth: 12.5});
+  });
+
+  test('#n is the frame n of the layer before it', () => {
+    expect(parseLayerFileName('steam#3')).toEqual({name: 'steam#3', frameOf: 'steam', frame: 3});
+    expect(parseLayerFileName('steam@40#0')).toEqual({name: 'steam#0', frameOf: 'steam', frame: 0, depth: 40});
+  });
+
+  test('.pivot marks the pivot of the layer before it', () => {
+    expect(parseLayerFileName('carafe5.pivot')).toEqual({name: 'carafe5.pivot', pivotOf: 'carafe5'});
+    expect(parseLayerFileName('carafe5@20.pivot')).toEqual({name: 'carafe5.pivot', pivotOf: 'carafe5', depth: 20});
+  });
+
+  test('a mark without a layer before it, and an @ without a number, are part of the name', () => {
+    expect(parseLayerFileName('#3')).toEqual({name: '#3'});
+    expect(parseLayerFileName('.pivot')).toEqual({name: '.pivot'});
+    expect(parseLayerFileName('mail@home')).toEqual({name: 'mail@home'});
+    expect(parseLayerFileName('steam#x')).toEqual({name: 'steam#x'});
+  });
+});
+
+describe('frameNameOfFile()', () => {
+  test('the file name without its directory and its extension', () => {
+    expect(frameNameOfFile('window@600.png')).toEqual('window@600');
+    expect(frameNameOfFile('props/carafe5.pivot.png')).toEqual('carafe5.pivot');
+    expect(frameNameOfFile('https://example.test/kitchen/steam#0.webp')).toEqual('steam#0');
+    expect(frameNameOfFile('table')).toEqual('table');
+  });
+});
+
+// the frame a packed file takes in the atlas of the art: what readLayerFiles() hands on
+const packedFrame = (name: string) => {
+  const packed = new TextureAtlas();
+  packed.add(name, new TextureCoords(0, 0, 4, 4));
+  return packed.frame(name)!;
+};
+
+const URL_BASE = 'https://example.test/kitchen/';
+const KITCHEN_FILES = ['window@600.png', 'table.png', 'carafe5.png', 'carafe5.pivot.png', 'carafe5-empty.png', 'steam.png'];
+const KITCHEN_CANVAS = {width: 320, height: 180};
+
+// what the load made of each file of the kitchen: its trimmed box, and its frame where it is drawn
+const kitchenResults = (): LayerFileResult[] => [
+  {url: `${URL_BASE}window@600.png`, box: {x: 196, y: 22, w: 84, h: 64}, frame: packedFrame('window@600')},
+  {url: `${URL_BASE}table.png`, box: {x: 40, y: 118, w: 240, h: 62}, frame: packedFrame('table')},
+  {url: `${URL_BASE}carafe5.png`, box: {x: 100, y: 80, w: 20, h: 42}, frame: packedFrame('carafe5')},
+  {url: `${URL_BASE}carafe5.pivot.png`, box: {x: 109, y: 121, w: 1, h: 1}},
+  {url: `${URL_BASE}carafe5-empty.png`, box: {x: 101, y: 84, w: 18, h: 38}, frame: packedFrame('carafe5-empty')},
+  {url: `${URL_BASE}steam.png`, box: {x: 96, y: 28, w: 22, h: 38}, frame: packedFrame('steam')},
+];
+
+describe('readLayerFiles()', () => {
+  test('the order of the list is the stacking order, bottom first; a layer is named after its file without the extension and the depth', () => {
+    const {canvas, layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, kitchenResults(), KITCHEN_CANVAS);
+
+    expect(layers.map(({name}) => name)).toEqual(['window', 'table', 'carafe5', 'steam']);
+    expect(canvas).toEqual(KITCHEN_CANVAS);
+    expect(problems).toEqual([]);
+  });
+
+  test('before the load the list alone names the layers, in its order', () => {
+    const {layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, undefined, undefined);
+
+    expect(layers.map(({name}) => name)).toEqual(['window', 'table', 'carafe5', 'steam']);
+    expect(layers.every(({frames}) => frames.every((frame) => frame === undefined))).toBe(true);
+    expect(problems).toEqual([]);
+  });
+
+  test('the place of the trimmed box on the canvas is the place of the layer', () => {
+    const results = kitchenResults();
+    const {layers} = readLayerFiles(SUBJECT, KITCHEN_FILES, results, KITCHEN_CANVAS);
+
+    const table = layerOf(layers, 'table');
+    expect(table.box).toEqual({x: 40, y: 118, w: 240, h: 62});
+    expect(table.frames).toEqual([{frame: (results[1] as {frame: unknown}).frame, box: {x: 40, y: 118, w: 240, h: 62}}]);
+    expect([table.pivotX, table.pivotY]).toEqual([160, 149]);
+  });
+
+  test('@600 and @-120 are the depths of their layers', () => {
+    const files = ['window@600.png', 'ladle@-120.png'];
+    const results: LayerFileResult[] = [
+      {url: `${URL_BASE}window@600.png`, box: {x: 0, y: 0, w: 4, h: 4}, frame: packedFrame('w600')},
+      {url: `${URL_BASE}ladle@-120.png`, box: {x: 4, y: 4, w: 4, h: 4}, frame: packedFrame('l120')},
+    ];
+    const {layers} = readLayerFiles(SUBJECT, files, results, {width: 8, height: 8});
+
+    expect(layers.map(({name, depth}) => [name, depth])).toEqual([
+      ['window', 600],
+      ['ladle', -120],
+    ]);
+  });
+
+  test('a file <layer>-empty is a further frame of <layer>, its box joins the box of the layer', () => {
+    const {layers} = readLayerFiles(SUBJECT, KITCHEN_FILES, kitchenResults(), KITCHEN_CANVAS);
+
+    const carafe5 = layerOf(layers, 'carafe5');
+    expect(boxesOf(carafe5)).toEqual([
+      {x: 100, y: 80, w: 20, h: 42},
+      {x: 101, y: 84, w: 18, h: 38},
+    ]);
+    expect(carafe5.box).toEqual({x: 100, y: 80, w: 20, h: 42});
+  });
+
+  test('a numbered strip steam#0 … steam#3 is the frames of steam, by their numbers', () => {
+    const files = ['steam#2.png', 'steam#0.png', 'steam#3.png', 'steam#1.png'];
+    const results: LayerFileResult[] = files.map((file, index) => ({
+      url: `${URL_BASE}${file.replace('#', '%23')}`,
+      box: {x: index, y: 0, w: 2, h: 2},
+      frame: packedFrame(`strip-${file}`),
+    }));
+    const {layers} = readLayerFiles(SUBJECT, files, results, {width: 8, height: 8});
+
+    expect(layers.map(({name}) => name)).toEqual(['steam']);
+    expect(boxesOf(layers[0]!).map((box) => box?.x)).toEqual([1, 3, 0, 2]);
+  });
+
+  test('a .pivot file is not drawn: the middle of its box is the pivot of its layer', () => {
+    const {layers} = readLayerFiles(SUBJECT, KITCHEN_FILES, kitchenResults(), KITCHEN_CANVAS);
+
+    const carafe5 = layerOf(layers, 'carafe5');
+    expect([carafe5.pivotX, carafe5.pivotY]).toEqual([109.5, 121.5]);
+    expect(carafe5.frames).toHaveLength(2);
+  });
+
+  test('a file that failed is one problem of its layer with its url; the layer stays, without a picture, and the rest goes on', () => {
+    const results = kitchenResults();
+    results[1] = {url: `${URL_BASE}table.png`, problem: 'the file "table.png" did not load: the server answered 404'};
+    results[4] = {url: `${URL_BASE}carafe5-empty.png`, problem: 'the file "carafe5-empty.png" did not load: offline'};
+    const {layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, results, KITCHEN_CANVAS);
+
+    expect(layers.map(({name}) => name)).toEqual(['window', 'table', 'carafe5', 'steam']);
+    expect(layerOf(layers, 'table').frames).toEqual([undefined]);
+    expect(layerOf(layers, 'carafe5').frames.map((frame) => frame?.box)).toEqual([{x: 100, y: 80, w: 20, h: 42}, undefined]);
+    expect(problems).toEqual([
+      {layer: 'table', reason: 'the file "table.png" did not load: the server answered 404', url: `${URL_BASE}table.png`},
+      {layer: 'carafe5', reason: 'the file "carafe5-empty.png" did not load: offline', url: `${URL_BASE}carafe5-empty.png`},
+    ]);
+  });
+
+  test('a pivot marker that failed is a problem of its layer, which turns about the middle of its box', () => {
+    const results = kitchenResults();
+    results[3] = {url: `${URL_BASE}carafe5.pivot.png`, problem: 'the file "carafe5.pivot.png" did not load: offline'};
+    const {layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, results, KITCHEN_CANVAS);
+
+    expect([layerOf(layers, 'carafe5').pivotX, layerOf(layers, 'carafe5').pivotY]).toEqual([110, 101]);
+    expect(problems).toEqual([
+      {layer: 'carafe5', reason: 'the file "carafe5.pivot.png" did not load: offline', url: `${URL_BASE}carafe5.pivot.png`},
+    ]);
+  });
+
+  test('an empty file is an empty frame; a layer whose files are all empty is a problem of its layer', () => {
+    const results = kitchenResults();
+    results[4] = {url: `${URL_BASE}carafe5-empty.png`, box: undefined};
+    results[5] = {url: `${URL_BASE}steam.png`, box: undefined};
+    const {layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, results, KITCHEN_CANVAS);
+
+    expect(layerOf(layers, 'carafe5').frames.map((frame) => frame?.box)).toEqual([{x: 100, y: 80, w: 20, h: 42}, undefined]);
+    expect(layerOf(layers, 'steam').frames).toEqual([undefined]);
+    expect(problems).toEqual([
+      {
+        layer: 'steam',
+        reason: 'the file "steam.png" of the layer "steam" holds no pixel with an alpha above 0',
+        url: `${URL_BASE}steam.png`,
+      },
+    ]);
+  });
+
+  test('an empty pivot marker is a problem of its layer, which turns about the middle of its box', () => {
+    const results = kitchenResults();
+    results[3] = {url: `${URL_BASE}carafe5.pivot.png`, box: undefined};
+    const {layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, results, KITCHEN_CANVAS);
+
+    expect([layerOf(layers, 'carafe5').pivotX, layerOf(layers, 'carafe5').pivotY]).toEqual([110, 101]);
+    expect(problems).toEqual([
+      {
+        layer: 'carafe5',
+        reason:
+          'the pivot marker "carafe5.pivot.png" holds no pixel with an alpha above 0 — the layer turns about the middle of its box',
+        url: `${URL_BASE}carafe5.pivot.png`,
+      },
+    ]);
+  });
+
+  test('a pivot marker that names no layer is a problem of the source', () => {
+    const files = ['table.png', 'jug.pivot.png'];
+    const results: LayerFileResult[] = [
+      {url: `${URL_BASE}table.png`, box: {x: 0, y: 0, w: 4, h: 4}, frame: packedFrame('t-jug')},
+      {url: `${URL_BASE}jug.pivot.png`, box: {x: 1, y: 1, w: 1, h: 1}},
+    ];
+    const {problems} = readLayerFiles(SUBJECT, files, results, {width: 8, height: 8});
+
+    expect(problems).toEqual([{layer: undefined, reason: 'the pivot marker "jug.pivot" names no layer'}]);
+  });
+
+  test('only and the overrides work on the layers of the files as on those of an atlas', () => {
+    const {layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, kitchenResults(), KITCHEN_CANVAS, {
+      only: ['table', 'carafe5', 'window'],
+      layers: {window: {depth: 100}, carafe5: {pivot: [90, 100]}, jug: {depth: 1}},
+    });
+
+    expect(layers.map(({name}) => name)).toEqual(['table', 'carafe5', 'window']);
+    expect(layerOf(layers, 'window').depth).toBe(100);
+    expect([layerOf(layers, 'carafe5').pivotX, layerOf(layers, 'carafe5').pivotY]).toEqual([90, 100]);
+    expect(problems).toEqual([{layer: 'jug', reason: expect.stringContaining('the source has no layer "jug"')}]);
+  });
+
+  test('a frames override names files by their frame names', () => {
+    const {layers, problems} = readLayerFiles(SUBJECT, KITCHEN_FILES, kitchenResults(), KITCHEN_CANVAS, {
+      layers: {carafe5: {frames: ['carafe5-empty', 'carafe5']}, jug: {frames: ['jug']}},
+    });
+
+    expect(boxesOf(layerOf(layers, 'carafe5')).map((box) => box?.x)).toEqual([101, 100]);
+    expect(problems).toEqual([
+      {layer: 'jug', reason: 'the frame "jug" of the layer "jug" is not in the list of files'},
+      {layer: 'jug', reason: expect.stringContaining('the source has no layer "jug"')},
+    ]);
   });
 });
 

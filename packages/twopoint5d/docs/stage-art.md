@@ -8,6 +8,7 @@ to a cheat sheet of the sources, the fields and the options, and ends with the r
 
 - [Scenarios](#scenarios)
   - [A scene out of an Aseprite file](#a-scene-out-of-an-aseprite-file)
+  - [A scene out of layer PNGs](#a-scene-out-of-layer-pngs)
   - [A scene out of a packed atlas](#a-scene-out-of-a-packed-atlas)
   - [Loose props](#loose-props)
   - [Moving a layer](#moving-a-layer)
@@ -86,6 +87,67 @@ out, goes into `art.problems` and is said once on the console ([the list](#loade
 
 The lookbook demo *stage art: one Aseprite file* is a vending machine of 26 layers read this way,
 with no layer named in its code.
+
+### A scene out of layer PNGs
+
+Photoshop ("Export Layers to Files"), Krita ("Export Layers"), GIMP, Affinity and Procreate export
+each layer as one PNG of the whole canvas, transparent around its picture. That is the layout
+already; hand the art the list of the files, bottom first:
+
+```ts check
+import {OrthographicProjection, Stage2D, StageArt} from '@spearwolf/twopoint5d';
+import {WebGPURenderer} from 'three/webgpu';
+
+const renderer = new WebGPURenderer();
+await renderer.init();
+
+const stage = new Stage2D(new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: 320, height: 180}));
+const art = new StageArt(
+  {
+    baseUrl: '/assets/kitchen/',
+    files: ['window@600.png', 'table.png', 'carafe5.png', 'carafe5.pivot.png', 'carafe5-empty.png', 'steam.png'],
+  },
+  {name: 'kitchen', projection: stage.projection, renderer},
+);
+stage.scene.add(art);
+
+art.names; // ['window', 'table', 'carafe5', 'steam'] — at once, out of the list
+art.set('carafe5', {deg: -8}); // posed before its picture is there; it shows so once it is
+
+await art.loaded;
+art.layer('carafe5').box; // {x, y, w, h}: where its picture lies on the canvas
+
+export {art};
+```
+
+The order of the list is the stacking order — the one thing a folder of PNGs does not keep. A layer
+is named after its file without the extension, and the rest of the name says what the file is:
+
+| file | is |
+| --- | --- |
+| `table.png`, `carafe5.png` | a layer of that name |
+| `carafe5-empty.png` | another frame of `carafe5`; frames follow in the order of the list |
+| `steam#0.png` … `steam#7.png` | the frames of `steam`, by number |
+| `window@600.png`, `wall@-40.png` | the layer `window` at a depth of 600, `wall` 40 in front of the plane |
+| `carafe5.pivot.png` | no picture: one dot on a layer of its own, exported with the others — the middle of the dot is the pivot of `carafe5` |
+
+A pivot painted into the picture moves with the picture: shift the carafe in the paint tool, export
+again, and it still turns about the same point of its glass. A layer renamed in the paint tool keeps
+its depth with its name.
+
+The art fetches every file at once, one request each, decodes it and trims it to the box of its
+pixels with an alpha above 0 — the place of that box on the canvas is the place of the layer. It
+packs the boxes into an atlas of its own, the next power of two that holds them with room for linear
+filtering, up to the largest texture the device of `renderer` allows; without a `renderer` the atlas
+goes up to 4096 × 4096. The canvas is the size of the files. The layers know their names at once,
+from the list, and show their pictures once every file has arrived or failed.
+
+A file that does not load, is no image or has a size other than the first file that loaded hides its
+layer and goes into `art.problems` with its `url`; the rest of the scene goes on. Pictures that do
+not fit into the largest atlas allowed are one problem of the source that names the size: split the
+files between two arts, each with a `renderOrder` of its own (`docs/sprites.md`, "Across meshes").
+`only` and `layers` work on the layers of the files as on those of an atlas, and a `frames` override
+names files by their names without the extension.
 
 ### A scene out of a packed atlas
 
@@ -593,6 +655,7 @@ names over them, so the circle and a track of `opacity` run side by side.
 | the artist delivers | the source | code writes |
 | --- | --- | --- |
 | one Aseprite file, exported split by layers | `{store, id}` of an item with `atlasAdapter: 'aseprite'` | nothing |
+| the layers of any paint tool, one full-canvas PNG each | `{files, baseUrl}` | the file names, bottom first |
 | the layers of any paint tool, packed into a trimmed atlas | `{store, id}` | the stacking order in `only` |
 | props out of any atlas, never painted together | `{store, id, layers: [...]}` or `{atlas, texture, layers: [...]}` | a pivot and a place per layer |
 | an atlas you loaded yourself | `{atlas, texture}`, read as one of the above | as above |
@@ -628,6 +691,7 @@ Every field is optional; a pose writes what it is given. The rest is the pose of
 | `layers` | — | by name: what the picture cannot say ([the options of a layer](#the-options-of-a-layer)). Not with loose layers |
 | `features` | — | further sprite features for the kind: `Flash`, `Tint`, … — written through `layer.sprite` |
 | `material` | `transparent: true`, `depthWrite: false` | the material parameters of the mesh: `depthTest`, `alphaTest`, … |
+| `renderer` | — | the renderer of the stage: a `files` source packs its pictures up to the largest texture its device allows, 4096 × 4096 without one |
 
 ### The options of a layer
 
@@ -663,7 +727,7 @@ it as any object. It holds one `FeatureSprites`, `art.mesh`, the layers drawn in
 | member | |
 | --- | --- |
 | `mesh` | the `FeatureSprites` of the layers; the art owns it. Hand it to a `SpritePicker` |
-| `names` | the layers, bottom first; empty until a source without `only` has loaded |
+| `names` | the layers, bottom first; a list of files names them at once, another source without `only` once it has loaded |
 | `canvas` | `{width, height}` of the canvas in artwork pixels; `undefined` for loose layers and before the load |
 | `loaded` | resolves once every picture loaded or failed — at once for `{atlas, texture}` —, or the art is disposed; never rejects |
 | `problems` | what the art could not load or read |
@@ -673,7 +737,7 @@ it as any object. It holds one `FeatureSprites`, `art.mesh`, the layers drawn in
 | `set(name, pose)`, `apply(name, track, seconds)`, `reset()` | pose a layer, sample a track into it, every layer back to its rest |
 | `takeChanged()` | whether the picture changed since the last call |
 | `update()` | once per frame, after the stage's `updateFrame()` and before the render: the plane, the distance of a parallax camera, the stack, then the upload |
-| `dispose()`, `isDisposed` | releases the mesh and the lease on a store item |
+| `dispose()`, `isDisposed` | releases the mesh, the atlas the art packed layer files into, and the lease on a store item |
 
 `art.layer(name)` answers an `ArtLayer`, the same object for the life of the art: `name`,
 `set(pose)`, `apply(track, seconds)`, `reset()`, `frameAt(tag, seconds)`, and what the source says
@@ -689,8 +753,8 @@ options that are no object or have a key no option has, a `pxPerUnit` that is no
 boolean, a `projection` or a `plane` of the wrong kind, `only` naming a layer twice or more than
 8192 layers, options of a layer they cannot take — `at` or `pxPerUnit` beside an atlas among
 them —, `only` or `layers` beside loose layers, a `features` entry that is no feature or takes a
-slot the art fills, and a `material` that sets what is the art's own (`capacity`, `geometry`,
-`passes`, the textures, …).
+slot the art fills, a `material` that sets what is the art's own (`capacity`, `geometry`,
+`passes`, the textures, …), and a `renderer` that is no renderer.
 
 ### From artwork pixels to units
 
@@ -717,6 +781,7 @@ its anchor in its box, so a turn and a scale act about it.
 | `{store, id}` | holds the atlas and the texture of the item through `store.acquireAsync(id, ['atlas', 'texture'])` until it is disposed: `clearUnused()` leaves the item standing while an art draws it. Two arts on one item hold one lease each |
 | `{atlas, texture}` | reads the atlas at once; both stay yours |
 | either with `layers: [...]` | reads loose layers: each `{name, frames?, pivot?, at?, depth?, order?, rest?, pxPerUnit?}` |
+| `{files, baseUrl?}` | fetches each file under `baseUrl` — a `#` in its name sent as `%23` —, trims it and packs it into a `DynamicAtlas` of its own, with padding 2 and extrude 1, which it owns and disposes |
 | a promise of one | waits for it; a promise that rejects is a problem of the source |
 
 An atlas that `AsepriteJson.parse()` filled — the store's `'aseprite'` adapter calls it — is read as
@@ -724,7 +789,10 @@ an Aseprite sheet, after [the rules of its scenario](#a-scene-out-of-an-aseprite
 a trimmed atlas named after [the rules of a packed atlas](#a-scene-out-of-a-packed-atlas). The
 canvas is the `sourceSize` of the frames; the box of a frame is its `spriteSourceSize`. In a packed
 atlas a name `<layer>-<suffix>` is a frame of the longest layer name before a hyphen, and a layer
-whose frames are numbered takes the numbered ones alone. An art holds at most 8192 layers.
+whose frames are numbered takes the numbered ones alone. A list of files is read by [the rules of
+layer PNGs](#a-scene-out-of-layer-pngs): the same names, in the order of the list; the canvas is
+the size of the first file that loaded, and the box of a file the box of its pixels with an alpha
+above 0. An art holds at most 8192 layers.
 
 The art draws the trimmed box of a layer as its quad, never the canvas: a scene of thirty layers on
 a canvas of 1920 × 1080 does not shade thirty full screens.
@@ -889,7 +957,7 @@ it once and hand the feature in.
 
 A layer is drawn hidden until its picture is there. `loaded` resolves once every picture loaded or
 failed; it never rejects. What failed is in `problems`, each `{layer, reason}` — `layer` is
-`undefined` for the source as a whole —, and on the console once per art, after the load, naming the
+`undefined` for the source as a whole, and a file that failed adds its `url` —, and on the console once per art, after the load, naming the
 art and the count:
 
 | problem | the art |
@@ -910,9 +978,13 @@ art and the count:
 | a tag that steps through a frame the `frames` of an override leave out | the tag left out for that layer |
 | a frame of a `rest`, or set before the load, beyond the frames of the layer | frame 0 |
 | more than 8192 layers in the source | the first 8192 taken |
+| a file that does not load, is no image or is not of the size of the first file that loaded | its layer without that picture; the problem carries the `url` |
+| a file without a pixel with an alpha above 0 | an empty frame; a layer of such files alone, or such a pivot marker, a problem |
+| pictures of files too large for one atlas of the largest size allowed | every layer hidden, one problem of the source naming the size |
 
 What the art cannot load or read out of a file is no error; what code hands in wrong is. After
-`dispose()` — which leaves the parent, disposes the mesh and lets go of a store lease — `set()`,
+`dispose()` — which leaves the parent, disposes the mesh and the atlas of layer files and lets go
+of a store lease — `set()`,
 `apply()`, `reset()` and `update()` write nothing — `set()` and `apply()` still refuse what they
 cannot use —, `layer()` throws, `layerOf()` answers `undefined`, and a load still on its way is
-dropped when it lands.
+dropped when it lands: the requests of layer files are aborted, and every decoded picture is closed.

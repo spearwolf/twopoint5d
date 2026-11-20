@@ -1,4 +1,4 @@
-import type {Texture} from 'three/webgpu';
+import type {Texture, WebGPURenderer} from 'three/webgpu';
 
 import type {SpriteFeature} from '../sprites/SpriteFeature.js';
 import type {FeatureSpritesMaterialParameters} from '../sprites/FeatureSprites/FeatureSpritesMaterial.js';
@@ -10,6 +10,7 @@ import {describeThreeValue} from '../utils/describeThreeValue.js';
 import {describeValue} from '../utils/describeValue.js';
 import {isObject} from '../utils/isObject.js';
 import {isRecord} from '../utils/isRecord.js';
+import {isStringList} from '../utils/isStringList.js';
 import {artFrameOf} from './artLayout.js';
 import {ART_FEATURE_NAMES, stageArtKind} from './stageArtKind.js';
 import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLayerDefs} from './artSources.js';
@@ -18,11 +19,14 @@ import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLaye
  * Where an art takes its layers from (§3.2 of the proposal): an atlas item of a `TextureStore` —
  * an Aseprite sheet with split layers or a trimmed atlas —, or the same, already loaded, as an
  * atlas and its texture. With `layers` the layers are loose: each takes the frames and the place
- * its definition gives it. The art may be handed a promise of a source as well.
+ * its definition gives it. `files` lists full-canvas PNGs of a paint tool, one per layer, bottom
+ * first, under `baseUrl`: the art loads, trims and packs them itself. The art may be handed a
+ * promise of a source as well.
  */
 export type StageArtSource =
   | {readonly store: TextureStore; readonly id: string; readonly layers?: readonly ArtLayerDef[]}
-  | {readonly atlas: TextureAtlas<unknown>; readonly texture: Texture; readonly layers?: readonly ArtLayerDef[]};
+  | {readonly atlas: TextureAtlas<unknown>; readonly texture: Texture; readonly layers?: readonly ArtLayerDef[]}
+  | {readonly files: readonly string[]; readonly baseUrl?: string};
 
 /** The options of a `StageArt`. Every field is optional. */
 export interface StageArtOptions<Features extends SpriteFeature = SpriteFeature> {
@@ -62,6 +66,12 @@ export interface StageArtOptions<Features extends SpriteFeature = SpriteFeature>
    * the material — its capacity, geometry and passes — are the art's own.
    */
   material?: Omit<FeatureSpritesMaterialParameters, 'textures' | 'placement' | 'resources' | 'pass'>;
+  /**
+   * The renderer the art is drawn with. A `files` source packs its pictures into an atlas of the next
+   * power of two that holds them, up to the largest texture the device of the renderer allows once
+   * it is initialised — 4096 without one. The other sources do not read it. It stays the caller's.
+   */
+  renderer?: WebGPURenderer;
 }
 
 /** An art holds at most this many layers: the index is the low part of `artOrder`, below 2^24 and so exact in a float32. */
@@ -79,6 +89,7 @@ const OPTION_KEYS: readonly (keyof StageArtOptions)[] = [
   'layers',
   'features',
   'material',
+  'renderer',
 ];
 
 // the keys of FeatureSprites that are no material parameter, and the material parameters the art sets itself
@@ -134,8 +145,8 @@ const isTexture = (value: unknown): value is Texture => isObject(value) && value
 const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
   Object.keys(value).every((key) => keys.includes(key));
 
-/** The shape of a source: an atlas item of a store, an atlas and its texture, or a promise of one. */
-export type SourceShape = 'store' | 'atlas' | 'promise';
+/** The shape of a source: an atlas item of a store, an atlas and its texture, a list of files, or a promise of one. */
+export type SourceShape = 'store' | 'atlas' | 'files' | 'promise';
 
 /** The shape of `source`, `undefined` for none — an object with a key no shape has among them. */
 export function shapeOf(source: unknown): SourceShape | undefined {
@@ -155,11 +166,19 @@ export function shapeOf(source: unknown): SourceShape | undefined {
   ) {
     return 'atlas';
   }
+  if (
+    isStringList(source['files']) &&
+    (source['baseUrl'] === undefined || typeof source['baseUrl'] === 'string') &&
+    hasOnlyKeys(source, ['files', 'baseUrl'])
+  ) {
+    return 'files';
+  }
   return undefined;
 }
 
 /** The shapes of a source, as a message writes them. */
-export const SHAPES = '{store, id} or {atlas, texture} — each with layers for loose layers —, or a promise of one';
+export const SHAPES =
+  '{store, id} or {atlas, texture} — each with layers for loose layers —, {files, baseUrl} — baseUrl optional —, or a promise of one';
 
 /**
  * Throws what `new StageArt()` refuses of its source and its options (§8), each before anything is
@@ -229,6 +248,11 @@ export function checkStageArt(
         );
       }
     }
+  }
+
+  const renderer: unknown = opts.renderer;
+  if (renderer !== undefined && !(isObject(renderer) && 'backend' in renderer)) {
+    throw new TypeError(`${where}: renderer must be the WebGPURenderer the art is drawn with, got ${describeValue(renderer)}`);
   }
 
   const shape = shapeOf(source);

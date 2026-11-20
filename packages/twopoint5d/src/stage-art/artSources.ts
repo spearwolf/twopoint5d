@@ -382,25 +382,63 @@ function pickLayers(
   return picked;
 }
 
-// the frames a `frames` option names, each on the canvas; a name the atlas lacks is a problem of the layer
+/**
+ * The frames of a source, by name: the frames of an atlas, or the files of a files source by their
+ * frame names. The readers of the names of §4.2 and of the `frames` overrides read them through it.
+ */
+interface NamedFrames {
+  /** The string names, in the order of the source. */
+  readonly names: readonly string[];
+  /** What a message calls the source of the frames: `the atlas`, `the list of files`. */
+  readonly what: string;
+  has(name: string): boolean;
+  /** The names a `frames` option picks: a list as it is, a `RegExp` over the names in their natural order. */
+  pick(frames: readonly string[] | RegExp): string[];
+  /** The frame on the canvas; `undefined` for one without a picture. */
+  frameOf(name: string): ArtFrameSpec | undefined;
+  /** The box of a pivot marker, as it lies; `undefined` where it has none. */
+  markerBoxOf(name: string): LayerBox | undefined;
+}
+
+function atlasFrames(atlas: TextureAtlas<unknown>): NamedFrames {
+  return {
+    names: atlas.frameNames().filter((name): name is string => typeof name === 'string'),
+    what: 'the atlas',
+    has: (name) => atlas.frame(name) !== undefined,
+    pick: (frames) => frameNamesOf(atlas, frames),
+    frameOf: (name) => canvasFrameOf(atlas, name),
+    markerBoxOf: (name) => {
+      // read as it lies, not as a cel: a dot at the top left pixel is a pivot, not an empty picture
+      const marker = atlas.frame(name);
+      if (marker === undefined) return undefined;
+      const [w, h] = drawnSizeOf(marker);
+      return placementOf(marker.data)?.box ?? {x: 0, y: 0, w, h};
+    },
+  };
+}
+
+// the frames a `frames` option names, each on the canvas; a name the source lacks is a problem of the layer
 function overrideFrames(
-  atlas: TextureAtlas<unknown>,
+  source: NamedFrames,
   layer: string,
   frames: readonly string[] | RegExp,
   problems: StageArtProblem[],
 ): {names: string[]; frames: (ArtFrameSpec | undefined)[]} {
   const names: string[] = [];
   const specs: (ArtFrameSpec | undefined)[] = [];
-  for (const name of frameNamesOf(atlas, frames)) {
-    if (atlas.frame(name) === undefined) {
-      problems.push({layer, reason: `the frame ${describeValue(name)} of the layer ${describeValue(layer)} is not in the atlas`});
+  for (const name of source.pick(frames)) {
+    if (!source.has(name)) {
+      problems.push({
+        layer,
+        reason: `the frame ${describeValue(name)} of the layer ${describeValue(layer)} is not in ${source.what}`,
+      });
       continue;
     }
     names.push(name);
-    specs.push(canvasFrameOf(atlas, name));
+    specs.push(source.frameOf(name));
   }
   if (names.length === 0 && frames instanceof RegExp) {
-    problems.push({layer, reason: `the frames of the layer ${describeValue(layer)} match no frame of the atlas`});
+    problems.push({layer, reason: `the frames of the layer ${describeValue(layer)} match no frame of ${source.what}`});
   }
   return {names, frames: specs};
 }
@@ -511,7 +549,8 @@ function readAseprite(
   options: ArtSourceOptions,
   problems: StageArtProblem[],
 ): {canvas: {width: number; height: number} | undefined; found: FoundLayer[]; failed: boolean} {
-  const frameNames = atlas.frameNames().filter((name): name is string => typeof name === 'string');
+  const named = atlasFrames(atlas);
+  const frameNames = named.names;
 
   // the frames `{layer}#{frame}` of each layer, and the duration of each frame of the sprite. A name
   // `#<n>` names no layer: Aseprite writes it where --split-layers stood after the file and split nothing
@@ -580,7 +619,7 @@ function readAseprite(
     const layer: FoundLayer = {name, frames: [], tags};
     const override = optionsOf(options.layers, name)?.frames;
     if (override !== undefined) {
-      const picked = overrideFrames(atlas, name, override, problems);
+      const picked = overrideFrames(named, name, override, problems);
       layer.frames = picked.frames;
       layer.tagProblems = [];
       layer.tags = remappedTags(name, tags, picked.names, layer.tagProblems);
@@ -618,7 +657,7 @@ function readAseprite(
   // a layer the overrides make of frames of their own stands above the layers of the sheet
   for (const [name, layerOptions] of Object.entries(options.layers ?? {})) {
     if (layerOptions.frames === undefined || metaLayers.some((layer) => layer.name === name)) continue;
-    const picked = overrideFrames(atlas, name, layerOptions.frames, problems);
+    const picked = overrideFrames(named, name, layerOptions.frames, problems);
     const tagProblems: string[] = [];
     found.push({name, frames: picked.frames, tags: remappedTags(name, tags, picked.names, tagProblems), tagProblems});
   }
@@ -633,14 +672,63 @@ function readAseprite(
   return {canvas: canvasOf(atlas, frameNames), found, failed: false};
 }
 
-// --- a trimmed atlas (§4.3) ------------------------------------------------------------------------
+// --- names after §4.2: a trimmed atlas (§4.3), a list of layer files ------------------------------
 
 // `<layer>@<depth>`: the depth right after the name of the layer, before a `#n`, a `-suffix` or `.pivot`
 const DEPTH_IN_NAME = /^(.+?)@([+-]?(?:\d+(?:\.\d*)?|\.\d+))(?=$|[#-]|\.pivot$)(.*)$/;
 
-interface TrimmedLayer {
+const PIVOT_SUFFIX = '.pivot';
+
+/** What the name of a frame or a file says by itself after §4.2 of the proposal. */
+export interface LayerFileName {
+  /**
+   * The name without its depth: a layer, or a frame `<layer>-<suffix>` of one — which of the two
+   * only the other names of the source can tell —, a numbered frame or a pivot marker.
+   */
   name: string;
-  // the index in the atlas of its first frame: its place in the stack
+  /** The depth of `<layer>@<depth>`, in artwork pixels. */
+  depth?: number;
+  /** The layer whose pivot a marker `<layer>.pivot` marks. */
+  pivotOf?: string;
+  /** The layer whose frame `frame` a numbered name `<layer>#<n>` is. */
+  frameOf?: string;
+  frame?: number;
+}
+
+/**
+ * Reads the name of a frame of a trimmed atlas or of a layer file — without its extension — after
+ * §4.2: `window@600` is `window` at a depth of 600, `wall@-120` one in front of the plane, `steam#3`
+ * the frame 3 of `steam`, `carafe5.pivot` the pivot marker of `carafe5`. A mark with no name before
+ * it, and an `@` without a number, are part of the name.
+ */
+export function parseLayerFileName(name: string): LayerFileName {
+  const match = DEPTH_IN_NAME.exec(name);
+  const plain = match === null ? name : match[1]! + match[3]!;
+  const parsed: LayerFileName = {name: plain};
+  if (match !== null) parsed.depth = Number(match[2]);
+  if (plain.endsWith(PIVOT_SUFFIX) && plain.length > PIVOT_SUFFIX.length) {
+    parsed.pivotOf = plain.slice(0, -PIVOT_SUFFIX.length);
+    return parsed;
+  }
+  const n = frameNumberOf(plain);
+  const hash = plain.lastIndexOf('#');
+  if (n !== undefined && hash > 0) {
+    parsed.frameOf = plain.slice(0, hash);
+    parsed.frame = n;
+  }
+  return parsed;
+}
+
+/** The frame name of a layer file: its name without the directory and the extension — `carafe5.pivot` of `art/carafe5.pivot.png`. */
+export function frameNameOfFile(file: string): string {
+  const base = file.slice(file.lastIndexOf('/') + 1);
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(0, dot) : base;
+}
+
+interface NamedLayer {
+  name: string;
+  // the index in the source of its first frame: its place in the stack
   position: number;
   base?: string;
   suffixed: string[];
@@ -648,34 +736,35 @@ interface TrimmedLayer {
   override?: {names: string[]; frames: (ArtFrameSpec | undefined)[]};
   depth?: number;
   pivot?: readonly [number, number];
+  marker?: string;
 }
 
-function readTrimmedAtlas(
-  atlas: TextureAtlas<unknown>,
-  options: ArtSourceOptions,
-  problems: StageArtProblem[],
-): {canvas: {width: number; height: number} | undefined; found: FoundLayer[]} {
-  const frameNames = atlas.frameNames().filter((name): name is string => typeof name === 'string');
-  const positionOf = new Map(frameNames.map((name, index) => [name, index]));
+/** A layer of {@link readNamedFrames}, with the names of the frames and the marker it took. */
+interface NamedFoundLayer extends FoundLayer {
+  taken: readonly string[];
+}
 
-  const layers = new Map<string, TrimmedLayer>();
-  const layerOf = (name: string, position: number): TrimmedLayer => {
+// the layers the names of §4.2 make of the frames of `source`, in the order of their first frames, the
+// `frames` overrides applied; what the names cannot give is a problem
+function readNamedFrames(source: NamedFrames, options: ArtSourceOptions, problems: StageArtProblem[]): NamedFoundLayer[] {
+  const frameNames = source.names;
+  const positionOf = new Map<string, number>();
+  frameNames.forEach((name, index) => {
+    if (!positionOf.has(name)) positionOf.set(name, index);
+  });
+
+  const layers = new Map<string, NamedLayer>();
+  const layerOf = (name: string, position: number): NamedLayer => {
     let layer = layers.get(name);
     if (layer === undefined) layers.set(name, (layer = {name, position, suffixed: [], numbered: new Map()}));
     layer.position = Math.min(layer.position, position);
     return layer;
   };
 
-  // the depth of a frame name, and the name without it
-  const depthOf = new Map<string, number>();
-  const plainNameOf = new Map<string, string>();
-  for (const name of frameNames) {
-    const match = DEPTH_IN_NAME.exec(name);
-    plainNameOf.set(name, match === null ? name : match[1]! + match[3]!);
-    if (match !== null) depthOf.set(name, Number(match[2]));
-  }
-  const giveDepth = (layer: TrimmedLayer, frameName: string) => {
-    const depth = depthOf.get(frameName);
+  // what each name says by itself
+  const parsedOf = new Map(frameNames.map((name) => [name, parseLayerFileName(name)]));
+  const giveDepth = (layer: NamedLayer, frameName: string) => {
+    const depth = parsedOf.get(frameName)?.depth;
     if (depth === undefined) return;
     if (layer.depth === undefined) layer.depth = depth;
     else if (layer.depth !== depth) {
@@ -690,7 +779,7 @@ function readTrimmedAtlas(
   const claimed = new Set<string>();
   for (const [name, layerOptions] of Object.entries(options.layers ?? {})) {
     if (layerOptions.frames === undefined) continue;
-    const picked = overrideFrames(atlas, name, layerOptions.frames, problems);
+    const picked = overrideFrames(source, name, layerOptions.frames, problems);
     if (picked.names.length === 0) continue;
     const layer = layerOf(name, Math.min(...picked.names.map((frameName) => positionOf.get(frameName) ?? frameNames.length)));
     layer.override = picked;
@@ -700,20 +789,19 @@ function readTrimmedAtlas(
     }
   }
 
-  // the names of §4.2: `<layer>.pivot`, `<layer>#<n>`, and plain names, which are layers or `-suffix` frames
+  // `<layer>.pivot`, `<layer>#<n>`, and plain names, which are layers or `-suffix` frames
   const markers: [frameName: string, layer: string][] = [];
   const plain: string[] = [];
   for (const frameName of frameNames) {
     if (claimed.has(frameName)) continue;
-    const name = plainNameOf.get(frameName)!;
-    if (name.endsWith('.pivot') && name.length > '.pivot'.length) {
-      markers.push([frameName, name.slice(0, -'.pivot'.length)]);
+    const parsed = parsedOf.get(frameName)!;
+    if (parsed.pivotOf !== undefined) {
+      markers.push([frameName, parsed.pivotOf]);
       continue;
     }
-    const n = frameNumberOf(name);
-    if (n !== undefined && name.lastIndexOf('#') > 0) {
-      const layer = layerOf(name.slice(0, name.lastIndexOf('#')), positionOf.get(frameName)!);
-      layer.numbered.set(n, frameName);
+    if (parsed.frameOf !== undefined) {
+      const layer = layerOf(parsed.frameOf, positionOf.get(frameName)!);
+      layer.numbered.set(parsed.frame!, frameName);
       giveDepth(layer, frameName);
       continue;
     }
@@ -722,14 +810,14 @@ function readTrimmedAtlas(
 
   // a plain name `<layer>-<suffix>` is a frame of the longest layer before a hyphen; shorter names are
   // decided first, so the layers before a hyphen are known when a name is
-  const sorted = [...plain].sort((a, b) => plainNameOf.get(a)!.length - plainNameOf.get(b)!.length);
+  const plainNameOf = (frameName: string) => parsedOf.get(frameName)!.name;
+  const sorted = [...plain].sort((a, b) => plainNameOf(a).length - plainNameOf(b).length);
   const suffixOf = new Map<string, string>();
-  const isLayer = (name: string) => layers.has(name);
   for (const frameName of sorted) {
-    const name = plainNameOf.get(frameName)!;
+    const name = plainNameOf(frameName);
     for (let hyphen = name.lastIndexOf('-'); hyphen > 0; hyphen = name.lastIndexOf('-', hyphen - 1)) {
       const prefix = name.slice(0, hyphen);
-      if (isLayer(prefix) && layers.get(prefix)!.override === undefined) {
+      if (layers.has(prefix) && layers.get(prefix)!.override === undefined) {
         suffixOf.set(frameName, prefix);
         break;
       }
@@ -749,7 +837,7 @@ function readTrimmedAtlas(
       giveDepth(created, frameName);
     }
   }
-  // the suffixed frames of a layer in the order of the atlas
+  // the suffixed frames of a layer in the order of the source
   for (const frameName of plain) {
     const prefix = suffixOf.get(frameName);
     if (prefix === undefined) continue;
@@ -764,18 +852,17 @@ function readTrimmedAtlas(
       problems.push({layer: undefined, reason: `the pivot marker ${describeValue(frameName)} names no layer`});
       continue;
     }
-    // read as it lies, not as a cel: a dot at the top left pixel is a pivot, not an empty picture
-    const marker = atlas.frame(frameName)!;
-    const [w, h] = drawnSizeOf(marker);
-    const box = placementOf(marker.data)?.box ?? {x: 0, y: 0, w, h};
-    layer.pivot = [box.x + box.w / 2, box.y + box.h / 2];
+    layer.marker = frameName;
+    const box = source.markerBoxOf(frameName);
+    if (box !== undefined) layer.pivot = [box.x + box.w / 2, box.y + box.h / 2];
   }
 
-  const canvas = canvasOf(atlas, frameNames);
-  const found: FoundLayer[] = [];
+  const found: NamedFoundLayer[] = [];
   for (const layer of [...layers.values()].sort((a, b) => a.position - b.position)) {
+    let names: string[];
     let frames: (ArtFrameSpec | undefined)[];
     if (layer.override !== undefined) {
+      names = layer.override.names;
       frames = layer.override.frames;
     } else if (layer.numbered.size > 0) {
       const named = [layer.base, ...layer.suffixed].filter((name) => name !== undefined);
@@ -786,15 +873,41 @@ function readTrimmedAtlas(
         });
       }
       const count = Math.max(...layer.numbered.keys()) + 1;
+      names = [...layer.numbered.values()];
       frames = Array.from({length: count}, (_, n) => {
         const frameName = layer.numbered.get(n);
-        return frameName === undefined ? undefined : canvasFrameOf(atlas, frameName);
+        return frameName === undefined ? undefined : source.frameOf(frameName);
       });
     } else {
-      frames = [layer.base, ...layer.suffixed].filter((name) => name !== undefined).map((name) => canvasFrameOf(atlas, name));
+      names = [layer.base, ...layer.suffixed].filter((name) => name !== undefined);
+      frames = names.map((name) => source.frameOf(name));
     }
-    if (canvas !== undefined) {
-      for (const spec of frames) {
+    const spec: NamedFoundLayer = {
+      name: layer.name,
+      frames,
+      tags: NO_TAGS,
+      taken: layer.marker === undefined ? names : [...names, layer.marker],
+    };
+    if (layer.depth !== undefined) spec.depth = layer.depth;
+    if (layer.pivot !== undefined) spec.pivot = layer.pivot;
+    found.push(spec);
+  }
+  return found;
+}
+
+// a trimmed atlas: the names of §4.2 over the frames of the atlas; the canvas is the sourceSize of its
+// first frame that tells one, and a frame on another canvas is a problem of its layer
+function readTrimmedAtlas(
+  atlas: TextureAtlas<unknown>,
+  options: ArtSourceOptions,
+  problems: StageArtProblem[],
+): {canvas: {width: number; height: number} | undefined; found: FoundLayer[]} {
+  const source = atlasFrames(atlas);
+  const found = readNamedFrames(source, options, problems);
+  const canvas = canvasOf(atlas, source.names);
+  if (canvas !== undefined) {
+    for (const layer of found) {
+      for (const spec of layer.frames) {
         const placement = spec === undefined ? undefined : placementOf(spec.frame.data);
         if (placement !== undefined && (placement.canvasW !== canvas.width || placement.canvasH !== canvas.height)) {
           problems.push({
@@ -805,10 +918,6 @@ function readTrimmedAtlas(
         }
       }
     }
-    const spec: FoundLayer = {name: layer.name, frames, tags: NO_TAGS};
-    if (layer.depth !== undefined) spec.depth = layer.depth;
-    if (layer.pivot !== undefined) spec.pivot = layer.pivot;
-    found.push(spec);
   }
   return {canvas, found};
 }
@@ -833,6 +942,122 @@ export function readAtlasSource(
     return {canvas, layers: pickLayers(found, options, problems, failed), problems};
   }
   const {canvas, found} = readTrimmedAtlas(atlas, options, problems);
+  return {canvas, layers: pickLayers(found, options, problems, false), problems};
+}
+
+// --- layer files (§4.2) ----------------------------------------------------------------------------
+
+/**
+ * What became of one file of a files source: its trimmed `box` on the canvas and, for a file that is
+ * drawn, its `frame` in the atlas of the art; a `box` of `undefined` for a file without a pixel; or
+ * the `problem` that kept it out — it did not load, it is no image, it lies on another canvas.
+ */
+export type LayerFileResult =
+  | {readonly url: string; readonly box: LayerBox; readonly frame?: TextureAtlasFrame<unknown>}
+  | {readonly url: string; readonly box: undefined}
+  | {readonly url: string; readonly problem: string};
+
+/**
+ * Reads the layers of a files source (§4.2): the order of `files` is the stacking order, bottom
+ * first; each file is a layer or a frame of one by its name without the extension, read after
+ * {@link parseLayerFileName}; a pivot marker is not drawn, the middle of its box is the pivot of its
+ * layer. `results` holds what the load made of each file, in the order of `files`, and before the
+ * load is `undefined`: the list alone names the layers then. A file that failed is a problem of its
+ * layer with its url, in the order of the list, and so is a layer whose files hold no pixel; the
+ * overrides of `options` work as on an atlas, a `frames` override naming files by their frame names.
+ * What the options cannot take is refused first, by {@link checkArtSourceOptions}.
+ */
+export function readLayerFiles(
+  subject: string,
+  files: readonly string[],
+  results: readonly LayerFileResult[] | undefined,
+  canvas: {width: number; height: number} | undefined,
+  options: ArtSourceOptions = {},
+): {canvas: {width: number; height: number} | undefined; layers: ArtLayerSpec[]; problems: StageArtProblem[]} {
+  checkArtSourceOptions(subject, options);
+  const problems: StageArtProblem[] = [];
+  const names = files.map(frameNameOfFile);
+  // the result of the first file of each frame name: a second file of the name is a layer of the name twice
+  const resultOf = new Map<string, LayerFileResult>();
+  const fileOf = new Map<string, string>();
+  names.forEach((name, index) => {
+    if (fileOf.has(name)) return;
+    fileOf.set(name, files[index]!);
+    const result = results?.[index];
+    if (result !== undefined) resultOf.set(name, result);
+  });
+  const boxOf = (name: string): LayerBox | undefined => {
+    const result = resultOf.get(name);
+    return result !== undefined && 'box' in result ? result.box : undefined;
+  };
+
+  const source: NamedFrames = {
+    names,
+    what: 'the list of files',
+    has: (name) => fileOf.has(name),
+    pick: (frames) => {
+      if (!(frames instanceof RegExp)) return [...frames];
+      // a copy, so that every name is tested from its start whatever the flags of the RegExp
+      const regex = new RegExp(frames);
+      return [...fileOf.keys()]
+        .filter((name) => {
+          regex.lastIndex = 0;
+          return regex.test(name);
+        })
+        .sort(numericOrder.compare);
+    },
+    frameOf: (name) => {
+      const result = resultOf.get(name);
+      return result !== undefined && 'frame' in result && result.frame !== undefined
+        ? {frame: result.frame, box: result.box}
+        : undefined;
+    },
+    markerBoxOf: boxOf,
+  };
+  const found = readNamedFrames(source, options, problems);
+
+  if (results !== undefined) {
+    // the problems of the files, in the order of the list, each for the layer that took the file
+    const ownerOf = new Map<string, string>();
+    for (const layer of found) for (const name of layer.taken) ownerOf.set(name, layer.name);
+    names.forEach((name, index) => {
+      const result = results[index];
+      if (result === undefined) return;
+      const layer = ownerOf.get(name);
+      if ('problem' in result) {
+        problems.push({layer, reason: result.problem, url: result.url});
+      } else if (result.box === undefined && layer !== undefined && parseLayerFileName(name).pivotOf !== undefined) {
+        problems.push({
+          layer,
+          reason: `the pivot marker ${describeValue(files[index]!)} holds no pixel with an alpha above 0 — the layer turns about the middle of its box`,
+          url: result.url,
+        });
+      }
+    });
+    // a layer whose files all loaded and hold no pixel is left without a picture: said once for the layer
+    const isEmpty = (name: string) => {
+      const result = resultOf.get(name);
+      return result !== undefined && 'box' in result && result.box === undefined;
+    };
+    for (const layer of found) {
+      const drawn = layer.taken.filter((name) => parseLayerFileName(name).pivotOf === undefined);
+      if (drawn.length === 0 || !drawn.every(isEmpty)) continue;
+      const which = drawn.map((name) => describeValue(fileOf.get(name)!));
+      const problem: StageArtProblem =
+        which.length === 1
+          ? {
+              layer: layer.name,
+              reason: `the file ${which[0]} of the layer ${describeValue(layer.name)} holds no pixel with an alpha above 0`,
+            }
+          : {
+              layer: layer.name,
+              reason: `the files ${which.join(', ')} of the layer ${describeValue(layer.name)} hold no pixel with an alpha above 0`,
+            };
+      const url = which.length === 1 ? resultOf.get(drawn[0]!)?.url : undefined;
+      if (url !== undefined) problem.url = url;
+      problems.push(problem);
+    }
+  }
   return {canvas, layers: pickLayers(found, options, problems, false), problems};
 }
 

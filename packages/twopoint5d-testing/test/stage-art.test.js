@@ -368,4 +368,76 @@ describe('stage art', function () {
       picker.dispose();
     }
   });
+
+  it('draws the layers of full-canvas PNG files where the files put them, and turns a layer about the dot of its pivot marker', async function () {
+    // the PNGs of a paint tool, made here: a canvas of 16 × 16 artwork pixels each, transparent around
+    // its picture — a red wall at 2, 2 of 12 × 12, a green lamp at 10, 10 of 4 × 4, and the marker of
+    // the lamp's pivot, one black dot at its top left pixel
+    /** @param {(context: OffscreenCanvasRenderingContext2D) => void} paint */
+    const png = async (paint) => {
+      const canvas = new OffscreenCanvas(16, 16);
+      paint(/** @type {OffscreenCanvasRenderingContext2D} */ (canvas.getContext('2d')));
+      return canvas.convertToBlob({type: 'image/png'});
+    };
+    /** @type {Record<string, string>} */
+    const urls = {
+      'wall.png': URL.createObjectURL(
+        await png((context) => {
+          context.fillStyle = 'rgb(255, 0, 0)';
+          context.fillRect(2, 2, 12, 12);
+        }),
+      ),
+      'lamp.png': URL.createObjectURL(
+        await png((context) => {
+          context.fillStyle = 'rgb(0, 255, 0)';
+          context.fillRect(10, 10, 4, 4);
+        }),
+      ),
+      'lamp.pivot.png': URL.createObjectURL(
+        await png((context) => {
+          context.fillStyle = 'rgb(0, 0, 0)';
+          context.fillRect(10, 10, 1, 1);
+        }),
+      ),
+    };
+    // the art fetches each file by its name under baseUrl; the page answers it with the PNG made above,
+    // and a name it has no PNG for with a 404
+    const BASE = 'https://art.test/scene/';
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (input, init) => {
+      const url = String(input);
+      const name = url.startsWith(BASE) ? decodeURIComponent(url.slice(BASE.length)) : '';
+      return name in urls ? realFetch(urls[name], init) : Promise.resolve(new Response(null, {status: 404}));
+    };
+
+    try {
+      const art = keep(new StageArt({files: ['wall.png', 'lamp.png', 'lamp.pivot.png', 'missing.png'], baseUrl: BASE}));
+      expect(art.names).to.deep.equal(['wall', 'lamp', 'missing']);
+      await art.loaded;
+      expect(art.problems).to.deep.equal([
+        {layer: 'missing', reason: 'the file "missing.png" did not load: the server answered 404', url: `${BASE}missing.png`},
+      ]);
+      expect(art.canvas).to.deep.equal({width: 16, height: 16});
+      expect(art.layer('lamp').box).to.deep.equal({x: 10, y: 10, w: 4, h: 4});
+      expect(art.layer('lamp').pivot).to.deep.equal([10.5, 10.5]);
+
+      // the art frame has its origin at the middle of the canvas, 8, 8: a point of the canvas at px, py
+      // lies at (px − 8, 8 − py)
+      let {colorAt} = await render(art);
+      expectColor(colorAt, -3.5, 3.5, RED, 'the wall, at 4.5, 4.5 of the canvas');
+      expectColor(colorAt, 4, -4, GREEN, 'the lamp, at 12, 12');
+      expectColor(colorAt, 0, -4, RED, 'the wall left of the lamp, at 8, 12');
+      expectColor(colorAt, -7.5, 7.5, BLACK, 'outside the wall, at 0.5, 0.5');
+      expectColor(colorAt, 2.5, -2.5, GREEN, 'the lamp over the dot of its marker, which is not drawn, at 10.5, 10.5');
+
+      // 90° clockwise about the dot, 10.5, 10.5: the lamp now covers 7 … 11 across, 10 … 14 down
+      art.set('lamp', {deg: 90});
+      ({colorAt} = await render(art));
+      expectColor(colorAt, 0, -4, GREEN, 'the lamp turned left of its dot, at 8, 12');
+      expectColor(colorAt, 4, -4, RED, 'the wall where the lamp was, at 12, 12');
+    } finally {
+      globalThis.fetch = realFetch;
+      for (const url of Object.values(urls)) URL.revokeObjectURL(url);
+    }
+  });
 });

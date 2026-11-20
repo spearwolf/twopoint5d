@@ -7,6 +7,7 @@ import type {SpriteFeature} from '../sprites/SpriteFeature.js';
 import type {IProjection} from '../stage/IProjection.js';
 import {ParallaxProjection} from '../stage/ParallaxProjection.js';
 import {ProjectionPlane, type ProjectionPlaneDescription} from '../stage/ProjectionPlane.js';
+import type {DynamicAtlas} from '../texture/DynamicAtlas.js';
 import type {TextureAtlas} from '../texture/TextureAtlas.js';
 import type {TextureStore, TextureStoreLease} from '../texture/TextureStore.js';
 import {describeValue} from '../utils/describeValue.js';
@@ -51,10 +52,12 @@ import {
   type ArtLayerSpec,
   prepareLayerFrame,
   readAtlasSource,
+  readLayerFiles,
   readLooseLayers,
   type StageArtProblem,
 } from './artSources.js';
 import {type ArtTrack, fieldsOfTrack} from './artTrack.js';
+import {LayerFilesLoad} from './loadLayerFiles.js';
 import {type StageArtExtraApi, type StageArtSpriteApi, stageArtKind} from './stageArtKind.js';
 
 // --- flags of a layer --------------------------------------------------------------------------
@@ -141,14 +144,16 @@ const problemLine = ({layer, reason}: StageArtProblem): string =>
 
 /**
  * Art layers on a stage: the layers of a painted scene — read out of an Aseprite sheet, a trimmed
- * atlas or a list of loose props — drawn as one `FeatureSprites` in the plane of the stage, each at
- * the place it was painted at, posed in the units of the paint tool: artwork pixels and degrees
- * clockwise. Add it to the scene, set poses, and call {@link update} once per frame before the
- * render; {@link takeChanged} answers a frame step of a `FramePacer`.
+ * atlas, the full-canvas layer files of a paint tool or a list of loose props — drawn as one
+ * `FeatureSprites` in the plane of the stage, each at the place it was painted at, posed in the
+ * units of the paint tool: artwork pixels and degrees clockwise. Add it to the scene, set poses, and
+ * call {@link update} once per frame before the render; {@link takeChanged} answers a frame step of
+ * a `FramePacer`.
  *
- * The art owns its mesh — the geometry and material it builds — and lets go of the lease it holds
- * on a store item in {@link dispose}; a store, an atlas, a texture, a projection and a plane handed
- * in stay the caller's.
+ * The art owns its mesh — the geometry and material it builds — and the `DynamicAtlas` it packs
+ * layer files into, with its texture; it lets go of the lease it holds on a store item in
+ * {@link dispose}. A store, an atlas, a texture, a renderer, a projection and a plane handed in stay
+ * the caller's.
  */
 export class StageArt<Features extends SpriteFeature = never> extends Group {
   /** The mesh the layers are drawn with; the art owns and disposes it. Hand it to a `SpritePicker`. */
@@ -190,6 +195,9 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   #settled = false;
   #disposed = false;
   #lease: TextureStoreLease<unknown> | undefined;
+  // the load of the files of a files source while it is on its way, and the atlas it packed them into
+  #filesLoad: LayerFilesLoad | undefined;
+  #filesAtlas: DynamicAtlas | undefined;
   // the geometry the art put into the slot of its mesh for a source whose layers it did not know
   #geometry: FeatureSpritesGeometry<StageArtSpriteApi> | undefined;
   // the buffers of the rotation and the fade of the pool of the mesh, bound anew with its geometry
@@ -238,7 +246,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
 
   /**
    * @param source - an atlas item of a store, an atlas and its texture, either with `layers` for
-   *   loose layers, or a promise of one
+   *   loose layers, a list of full-canvas layer files, or a promise of one
    * @throws a `TypeError` or a `RangeError` — under `new StageArt()`, or `StageArt "<name>"` once the
    *   options name the art — for a source of none of the shapes, options that are no object or have
    *   a key no option has, a `name` that is no string, a `pxPerUnit` that is no finite number above
@@ -247,9 +255,9 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
    *   `ProjectionPlane` nor one of its four descriptions, `only` that names a layer twice, `layers`
    *   that is no object or holds options a layer cannot take, `only` or `layers` beside loose
    *   layers, loose layers that cannot be read, `features` that is no list or holds a feature
-   *   `defineSprite()` refuses — in its words —, and `material` that is no object or sets what is
-   *   the art's own. What the art cannot load or read out of its source is no refusal but a
-   *   problem.
+   *   `defineSprite()` refuses — in its words —, a `material` that is no object or sets what is
+   *   the art's own, and a `renderer` that is no renderer. What the art cannot load or read out of
+   *   its source is no refusal but a problem.
    */
   constructor(source: StageArtSource | Promise<StageArtSource>, options?: StageArtOptions<Features>) {
     super();
@@ -271,11 +279,19 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     const turnedTo = this.plane;
     this.#turnedTo = turnedTo.clone();
 
-    // the layers known now: those of a source handed in, else those only names. A source loaded later
-    // without only builds the geometry of its layers once they are known
+    // the layers known now: those of a source handed in — of a list of files the list names them —,
+    // else those only names. A source loaded later without only builds the geometry of its layers once
+    // they are known
     let read: {canvas: StageArt['canvas']; layers: ArtLayerSpec[]; problems: StageArtProblem[]} | undefined;
     if (shape === 'atlas') read = this.#read(source as Extract<StageArtSource, {atlas: unknown}>);
-    const names = read?.layers.map((layer) => layer.name) ?? opts.only ?? [];
+    const listed =
+      shape === 'files'
+        ? readLayerFiles(subject, (source as {files: readonly string[]}).files, undefined, undefined, {
+            only: opts.only,
+            layers: opts.layers,
+          })
+        : undefined;
+    const names = (read ?? listed)?.layers.map((layer) => layer.name) ?? opts.only ?? [];
 
     this.#core = new FeatureSprites(stageArtKind(opts.features ?? []), {
       capacity: Math.min(names.length, MAX_LAYERS),
@@ -298,7 +314,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     } else {
       this.#createLayers(names);
       // loaded never rejects: what goes wrong past the checks of #load() is a problem of the source as well
-      void this.#load(source as Promise<StageArtSource> | Extract<StageArtSource, {store: unknown}>).catch((error: unknown) =>
+      void this.#load(source as Promise<StageArtSource> | Exclude<StageArtSource, {atlas: unknown}>).catch((error: unknown) =>
         this.#fail(`the art could not read its source: ${messageOf(error)}`),
       );
     }
@@ -471,9 +487,11 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   }
 
   /**
-   * Leaves the parent, disposes the mesh — its geometry and material — and lets go of the lease of
-   * a store item; a texture, an atlas, a store and a projection handed in stay the caller's. A load
-   * still on its way is dropped when it lands, and {@link loaded} resolves. Afterwards `set()`,
+   * Leaves the parent, disposes the mesh — its geometry and material — and the atlas it packed
+   * layer files into, with its texture, and lets go of the lease of a store item; a texture, an
+   * atlas, a store, a renderer and a projection handed in stay the caller's. A load still on its way
+   * is dropped when it lands — the requests of layer files are aborted, and each decoded picture is
+   * closed, at once or the moment it lands —, and {@link loaded} resolves. Afterwards `set()`,
    * `apply()`, `reset()` and `update()` write nothing — `set()` and `apply()` still refuse what they
    * cannot use —, `takeChanged()` answers `false`, `layer()`
    * throws, `layerOf()` answers `undefined`; the getters answer what they held. A second call does
@@ -492,6 +510,10 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     this.#geometry = undefined;
     this.#lease?.release();
     this.#lease = undefined;
+    this.#filesLoad?.drop();
+    this.#filesLoad = undefined;
+    this.#filesAtlas?.dispose();
+    this.#filesAtlas = undefined;
     this.#bySprite.clear();
     this.#settled = true;
     this.#resolveLoaded();
@@ -556,7 +578,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     return readAtlasSource(this.#subject, source.atlas, {only, layers});
   }
 
-  async #load(source: Promise<StageArtSource> | Extract<StageArtSource, {store: unknown}>): Promise<void> {
+  async #load(source: Promise<StageArtSource> | Exclude<StageArtSource, {atlas: unknown}>): Promise<void> {
     let resolved: unknown = source;
     if (shapeOf(source) === 'promise') {
       try {
@@ -578,6 +600,10 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
       }
     }
 
+    if (shapeOf(resolved) === 'files') {
+      await this.#loadFiles(resolved as Extract<StageArtSource, {files: unknown}>);
+      return;
+    }
     let atlas: TextureAtlas<unknown>;
     let texture: Texture;
     if (shapeOf(resolved) === 'store') {
@@ -602,6 +628,31 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     this.#adopt(this.#read({atlas, layers}), texture);
   }
 
+  // the files of a files source, loaded, trimmed and packed into an atlas of the art's own (§4.2, §5.1).
+  // A set of pictures too large for one atlas fails the source as a whole: the load cannot refuse it
+  // to the caller, so it is the problem of the source the refusal would have been
+  async #loadFiles({files, baseUrl}: Extract<StageArtSource, {files: unknown}>): Promise<void> {
+    const load = new LayerFilesLoad();
+    this.#filesLoad = load;
+    const outcome = await load.run(files, baseUrl, this.#options.renderer);
+    this.#filesLoad = undefined;
+    // dropped by dispose(), which closed its bitmaps
+    if (outcome === undefined) return;
+    if (this.#disposed) {
+      outcome.atlas?.dispose();
+      return;
+    }
+    const {only, layers} = this.#options;
+    const read = readLayerFiles(this.#subject, files, outcome.results, outcome.canvas, {only, layers});
+    if (outcome.refusal !== undefined) {
+      this.#problems.push(...read.problems);
+      this.#fail(outcome.refusal);
+      return;
+    }
+    this.#filesAtlas = outcome.atlas;
+    this.#adopt(read, outcome.atlas?.texture);
+  }
+
   // the source failed as a whole: every layer stays hidden, and one problem says why
   #fail(reason: string): void {
     if (this.#settled) return;
@@ -610,7 +661,11 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     this.#finish();
   }
 
-  #adopt(read: {canvas: StageArt['canvas']; layers: ArtLayerSpec[]; problems: StageArtProblem[]}, texture: Texture): void {
+  // `texture` is undefined for files of which none is drawn: no layer shows a picture
+  #adopt(
+    read: {canvas: StageArt['canvas']; layers: ArtLayerSpec[]; problems: StageArtProblem[]},
+    texture: Texture | undefined,
+  ): void {
     let {layers} = read;
     this.#problems.push(...read.problems);
     if (layers.length > MAX_LAYERS) {
@@ -636,7 +691,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     }
     for (let i = 0; i < layers.length; i++) this.#settleLayer(i, layers[i]!);
 
-    this.#core.setTexture('colorMap', texture);
+    if (texture !== undefined) this.#core.setTexture('colorMap', texture);
     this.#stackDirty = true;
     this.#finish();
   }
