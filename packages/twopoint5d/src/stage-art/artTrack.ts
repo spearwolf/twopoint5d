@@ -78,7 +78,7 @@ const refuseSeconds = (subject: string, name: string, value: unknown): never => 
  * `'loop'` and `'pingpong'`.
  *
  * Throws, before anything is built: keys that are no non-empty array of objects, an `at` that is no
- * finite number of 0 or more or smaller than the one before, a field as `StageArt#set()` refuses it
+ * finite number of 0 or more or smaller than the one before, a field a later key sets that the first leaves out, a field as `StageArt#set()` refuses it
  * (the depth limit, which needs a camera, apart), a key that is no field of a pose, an `ease`
  * `easingOf()` refuses and a `playback` that is none of the three.
  */
@@ -134,7 +134,13 @@ export function artTrack(keys: readonly ArtKey[], options?: ArtTrackOptions): Ar
       // a field a key leaves out, or sets undefined, is held
       if (value === undefined) continue;
       checkPoseField(subject, field, value, `${name}.${field}`);
-      if (i === 0) mask |= bit(slot);
+      if (i === 0) {
+        mask |= bit(slot);
+      } else if (!(mask & bit(slot))) {
+        throw new RangeError(
+          `${subject}: ${name}.${field} is set, but keys[0] leaves ${field} out, so the track has no value to start from: give ${field} a value in keys[0]`,
+        );
+      }
       current[slot] = value === true ? 1 : value === false ? 0 : (value as number);
     }
     rows.set(current, i * POSE_SIZE);

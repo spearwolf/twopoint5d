@@ -61,7 +61,7 @@ export {onScrub};
 What a track does with its keys:
 
 - A key holds what it leaves out. `{at: 0.6, deg: 35}` turns the carafe and keeps it where it
-  stands. A field the first key leaves out is not part of the track, and `sample()` leaves it
+  stands. A field the first key leaves out is not part of the track — a later key that sets one is refused —, and `sample()` leaves it
   alone on the pose, so two tracks that write different fields — one moves, one fades — run on one
   pose.
 - `x`, `y`, `depth`, `deg`, `scaleX`, `scaleY` and `opacity` blend between two keys at the eased
@@ -95,6 +95,7 @@ export {opacityAt};
 
 `artTrack()` and `rampAt()` refuse what cannot be used and name the field: keys that are no list
 or empty, an `at` that is not a finite number of 0 or more or is smaller than the one before, a
+field that a later key sets and the first leaves out, a
 field outside what a pose takes (an `opacity` of 1.5, a `frame` of 0.5, an `order` of 1024), a key
 that is no field of a pose (`rotation` for `deg`), an `ease` that is none, a `playback` other than
 `'once'`, `'loop'` and `'pingpong'`, and a `duration` of 0 for `rampAt()`.

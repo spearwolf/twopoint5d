@@ -40,12 +40,7 @@ describe('artTrack()', () => {
   });
 
   test('a key holds what it leaves out, and a field the first key leaves out is not part of the track', () => {
-    const track = artTrack([
-      {at: 0, x: 0, y: 7},
-      {at: 1, deg: 35},
-      {at: 2, x: 20},
-    ]);
-    // the deg of the second key is no field of the track: the first key leaves it out
+    const track = artTrack([{at: 0, x: 0, y: 7}, {at: 1}, {at: 2, x: 20}]);
     expect(at(track, 0.5)).toEqual({x: 0, y: 7});
     expect(at(track, 1)).toEqual({x: 0, y: 7});
     expect(at(track, 1.5)).toEqual({x: 10, y: 7});
@@ -131,7 +126,7 @@ describe('artTrack()', () => {
   test('an ease is a function from the share to the eased share, clamped', () => {
     const track = artTrack([
       {at: 0, x: 0},
-      {at: 1, x: 10, ease: (t) => t * 3},
+      {at: 1, x: 10, ease: (t: number) => t * 3},
     ]);
     expect(at(track, 0.2).x).toBeCloseTo(6, 9);
     expect(at(track, 0.5).x).toBe(10);
@@ -262,6 +257,17 @@ describe('artTrack()', () => {
       expect(() => artTrack([{at: 0}, {at: 1, rotation: 5} as ArtKey])).toThrow(TypeError);
     });
 
+    test('a field a later key sets that the first key leaves out', () => {
+      expect(() =>
+        artTrack([
+          {at: 0, x: 0},
+          {at: 1, opacity: 0},
+        ]),
+      ).toThrow(
+        /^artTrack: keys\[1\]\.opacity is set, but keys\[0\] leaves opacity out, so the track has no value to start from: give opacity a value in keys\[0\]$/,
+      );
+    });
+
     test('a field as set() refuses it', () => {
       expect(() => artTrack([{at: 0, opacity: 1.5}])).toThrow(
         /^artTrack: keys\[0\]\.opacity must be a number from 0 to 1, got 1\.5$/,
@@ -283,7 +289,7 @@ describe('artTrack()', () => {
     test('takes the whole range of order and a depth in front of the plane', () => {
       expect(() =>
         artTrack([
-          {at: 0, order: -1024},
+          {at: 0, order: -1024, depth: 0},
           {at: 1, order: 1023},
           {at: 2, depth: -4000},
         ]),
@@ -337,8 +343,8 @@ describe('rampAt()', () => {
     expect(rampAt(0.5, 0, 1, 'ease-in')).toBeCloseTo(0.125, 9);
     expect(rampAt(0.5, 0, 1, 'ease-out')).toBeCloseTo(0.875, 9);
     expect(rampAt(0.5, 0, 1, 'ease-in-out')).toBeCloseTo(0.5, 9);
-    expect(rampAt(0.25, 0, 1, (t) => t * 2)).toBe(0.5);
-    expect(rampAt(0.9, 0, 1, (t) => t * 2)).toBe(1);
+    expect(rampAt(0.25, 0, 1, (t: number) => t * 2)).toBe(0.5);
+    expect(rampAt(0.9, 0, 1, (t: number) => t * 2)).toBe(1);
   });
 
   test('refuses a duration that is no finite number above 0', () => {
