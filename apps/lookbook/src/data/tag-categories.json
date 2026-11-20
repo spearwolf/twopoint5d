@@ -116,7 +116,8 @@
         "CameraRig",
         "Stage2D",
         "StageRenderer",
-        "Canvas2DStage"
+        "Canvas2DStage",
+        "FramePacer"
       ]
     },
     {
@@ -151,6 +152,11 @@
       "name": "Stage masks",
       "tagId": "stage-masks",
       "includeTags": ["StageMask", "createMaskNode", "matte", "masks"]
+    },
+    {
+      "name": "Stage art",
+      "tagId": "stage-art",
+      "includeTags": ["StageArt", "artTrack", "rampAt", "animationFrameAt"]
     },
     {
       "name": "Vertex Objects",

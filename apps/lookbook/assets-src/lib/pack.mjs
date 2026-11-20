@@ -6,6 +6,8 @@ import {Img} from './image.mjs';
  * @property {string} name
  * @property {Img} img the full (untrimmed) frame
  * @property {boolean} [trim] cut away the transparent margin before packing
+ * @property {{x: number, y: number, w: number, h: number}} [box] the rect of `img` to pack, given
+ *   instead of found by `trim`
  */
 
 /**
@@ -37,7 +39,8 @@ export function pack(inputs, opts = {}) {
   const {padding = 2, powerOfTwo = true, keepOrder = false} = opts;
   const items = inputs.map((input, index) => {
     const full = input.img;
-    const box = input.trim ? (full.opaqueBounds() ?? {x: 0, y: 0, w: 1, h: 1}) : {x: 0, y: 0, w: full.width, h: full.height};
+    const box =
+      input.box ?? (input.trim ? (full.opaqueBounds() ?? {x: 0, y: 0, w: 1, h: 1}) : {x: 0, y: 0, w: full.width, h: full.height});
     return {index, input, box};
   });
   const order = keepOrder

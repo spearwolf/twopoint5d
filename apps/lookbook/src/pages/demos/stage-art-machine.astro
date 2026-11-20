@@ -1,0 +1,326 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-art-machine.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <div class="hud fixed bottom-4 left-4">
+      <p class="help">click: pull the lever · drag <em>time</em>: run the machine back and forth</p>
+      <p class="pacer" aria-live="off">
+        <span>FramePacer</span>
+        frames <b data-frames>0</b> · draws <b data-draws>0</b>
+        <i data-drawing>drawing</i>
+      </p>
+    </div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #0b1115;
+    color: #c8d6d8;
+  }
+  canvas {
+    cursor: pointer;
+  }
+  .hud {
+    font-family: monospace;
+    font-size: 95%;
+    pointer-events: none;
+  }
+  .hud p {
+    width: fit-content;
+    padding: 0.35em 0.7em;
+    margin-top: 0.4em;
+    background: rgba(8 13 16 / 72%);
+    border: 1px solid rgba(214 168 92 / 35%);
+    border-radius: 4px;
+  }
+  .pacer span {
+    color: #d6a85c;
+    margin-right: 0.6em;
+  }
+  .pacer b {
+    color: #eef3f2;
+    font-weight: normal;
+    display: inline-block;
+    min-width: 5ch;
+    text-align: right;
+  }
+  .pacer i {
+    margin-left: 0.6em;
+    font-style: normal;
+    color: #ffb45a;
+  }
+  .pacer i.idle {
+    color: #5d7378;
+  }
+</style>
+
+<script>
+  import {
+    type AnimationTiming,
+    animationFrameAt,
+    type ArtPose,
+    artTrack,
+    Display,
+    FramePacer,
+    OrthographicProjection,
+    rampAt,
+    Stage2D,
+    StageArt,
+    StageRenderer,
+    TextureStore,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {BufferGeometry, Color, Float32BufferAttribute, Group, LineBasicMaterial, LineSegments} from 'three/webgpu';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {DemoParts} from '~demos/utils/demoParts';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the canvas of the painting, in artwork pixels (apps/lookbook/assets-src/README.md, stage-art-machine)
+  const CANVAS = {width: 1280, height: 800};
+  // the timeline the scrubber runs over, in seconds; at its end the run starts over, the lever up
+  const TIMELINE = 24;
+  // the lamp warms up after the lever has dropped
+  const LAMP_DELAY = 0.55;
+  const LAMP_WARMUP = 1.4;
+  // where the punched strip leaves the cabinet: no marker in the atlas says so, so the code does
+  const STRIP_PIVOT: [number, number] = [715, 545];
+  // how far the strip is drawn in behind the cabinet before the lever is pulled
+  const STRIP_HIDDEN = 140;
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+  const parts = new DemoParts(display);
+
+  // the painting fills the window as far as it can, and is never drawn at more than twice its size
+  const stage = parts.keep(
+    new Stage2D(
+      new OrthographicProjection('xy|bottom-left', {fit: 'contain', width: CANVAS.width, height: CANVAS.height, maxPixelZoom: 2}),
+    ),
+  );
+  // no host: the frame handler below drives the renderer, and draws only when the pacer says so
+  const sr = parts.keep(new StageRenderer().setClearColor(new Color('#0b1115'), 1).add(stage));
+
+  const store = parts.keep(new TextureStore(display.renderer));
+  store.parse({
+    items: {machine: {atlasUrl: assetsUrl('stage-art-machine/machine.json'), texture: ['linear', 'srgb']}},
+  });
+
+  // a packed atlas keeps no stacking order: `only` names it, bottom first. The strip hangs behind the
+  // cabinet, so it feeds out from under it; the pivots of the flywheel, the needle and the lever are
+  // marker frames of the atlas, the pivot of the strip is said here
+  const art = parts.keep(
+    new StageArt(
+      {store, id: 'machine'},
+      {
+        name: 'machine',
+        projection: stage.projection,
+        only: ['fog', 'strip', 'body', 'flywheel', 'needle', 'glass', 'lever', 'lamp', 'glow', 'steam'],
+        layers: {strip: {pivot: STRIP_PIVOT}},
+      },
+    ),
+  );
+  stage.scene.add(art);
+
+  // --- the timeline: every pose is a function of the time on it -------------------------------
+
+  // the lever, pulled once by a click: a little lift, the throw, a bounce in its notch
+  const LEVER = artTrack([
+    {at: 0, deg: 0},
+    {at: 0.12, deg: -6, ease: 'ease-out'},
+    {at: 0.5, deg: 100, ease: 'ease-in'},
+    {at: 0.62, deg: 92, ease: 'ease-out'},
+    {at: 0.76, deg: 96, ease: 'ease-in-out'},
+  ]);
+  // the strip is punched and fed out a row at a time once the lever is down
+  const STRIP = artTrack([
+    {at: 0, x: STRIP_PIVOT[0], y: STRIP_PIVOT[1] - STRIP_HIDDEN},
+    {at: 0.9, y: STRIP_PIVOT[1] - STRIP_HIDDEN},
+    ...Array.from({length: 10}, (_, i) => ({
+      at: 1.25 + i * 0.36,
+      y: STRIP_PIVOT[1] - STRIP_HIDDEN + (i + 1) * (STRIP_HIDDEN / 10),
+      ease: 'ease-in-out' as const,
+    })),
+  ]);
+  // the needle hunts for the echo and back again, as long as the timeline runs
+  const NEEDLE = artTrack(
+    [
+      {at: 0, deg: -95},
+      {at: 1.4, deg: -20, ease: 'ease-in-out'},
+      {at: 1.9, deg: -38, ease: 'ease-in-out'},
+      {at: 3.1, deg: 72, ease: 'ease-in-out'},
+      {at: 3.5, deg: 60, ease: 'ease-out'},
+    ],
+    {playback: 'pingpong'},
+  );
+  // the flywheel turns once in three seconds
+  const FLYWHEEL = artTrack(
+    [
+      {at: 0, deg: 0},
+      {at: 3, deg: 360},
+    ],
+    {playback: 'loop'},
+  );
+  // the steam: twelve frames a second, round and round; a packed atlas has no tags, so the timing is here
+  const STEAM: AnimationTiming = {frameCount: 12, duration: 1, durations: undefined, playback: 'loop'};
+
+  const settings = {time: 0, playing: true, pivots: false};
+  // the time on the timeline the lever was pulled at, none before the first click
+  let pulledAt: number | undefined;
+
+  if (isPreview) {
+    // the preview shows the machine at work: the lever down, the lamp lit, the strip half out
+    pulledAt = 0.4;
+    settings.time = 3.3;
+    settings.playing = false;
+  }
+
+  // one pose per layer, written again in every frame: no object per frame
+  const stripPose: ArtPose = {};
+  const lampPose: ArtPose = {frame: 0};
+  const glowPose: ArtPose = {opacity: 0};
+  const steamPose: ArtPose = {frame: 0};
+
+  function pose(t: number): void {
+    // before a click the tracks of the pull stand at their start
+    const sinceThePull = pulledAt === undefined ? 0 : t - pulledAt;
+    art.apply('lever', LEVER, sinceThePull);
+    art.set('strip', STRIP.sample(sinceThePull, stripPose));
+    art.apply('needle', NEEDLE, t);
+    art.apply('flywheel', FLYWHEEL, t);
+
+    const warm = pulledAt === undefined ? 0 : rampAt(t, pulledAt + LAMP_DELAY, LAMP_WARMUP, 'ease-in');
+    lampPose.frame = warm > 0.2 ? 1 : 0; // `lamp-on`, the second frame of the lamp
+    art.set('lamp', lampPose);
+    // the filament settles as it warms: a flicker that fades out, a function of the time as well
+    const flicker = 1 - (1 - warm) * 0.5 * (1 + Math.sin(t * 41) * Math.sin(t * 13));
+    glowPose.opacity = warm * flicker;
+    art.set('glow', glowPose);
+
+    steamPose.frame = animationFrameAt(STEAM, t);
+    art.set('steam', steamPose);
+  }
+
+  // --- the pivots, drawn on demand -----------------------------------------------------------
+
+  // a ring and a cross at each pivot, in artwork pixels; the art's origin is the middle of the canvas
+  const PIVOTED = ['flywheel', 'needle', 'lever', 'strip'] as const;
+  const pivotMaterial = parts.keep(new LineBasicMaterial({color: '#7ff6ff', transparent: true, depthTest: false}));
+  const pivotGeometry = parts.keep(
+    (() => {
+      const points: number[] = [];
+      const r = 9;
+      for (let i = 0; i < 24; i++) {
+        const a0 = (i / 24) * Math.PI * 2;
+        const a1 = ((i + 1) / 24) * Math.PI * 2;
+        points.push(Math.cos(a0) * r, Math.sin(a0) * r, 0, Math.cos(a1) * r, Math.sin(a1) * r, 0);
+      }
+      points.push(-16, 0, 0, 16, 0, 0, 0, -16, 0, 0, 16, 0);
+      return new BufferGeometry().setAttribute('position', new Float32BufferAttribute(points, 3));
+    })(),
+  );
+  const pivots = new Group();
+  pivots.visible = settings.pivots;
+  const marks = PIVOTED.map(() => {
+    const mark = new LineSegments(pivotGeometry, pivotMaterial);
+    mark.renderOrder = 1;
+    pivots.add(mark);
+    return mark;
+  });
+  stage.scene.add(pivots);
+
+  function placePivots(): void {
+    PIVOTED.forEach((name, i) => {
+      const layer = art.layer(name);
+      const pivot = layer.pivot;
+      if (pivot === undefined) return;
+      // the pivot stands where the pose puts it: the strip moves, the others turn on the spot
+      const x = name === 'strip' ? (stripPose.x ?? pivot[0]) : pivot[0];
+      const y = name === 'strip' ? (stripPose.y ?? pivot[1]) : pivot[1];
+      marks[i]!.position.set(x - CANVAS.width / 2, CANVAS.height / 2 - y, 1);
+    });
+  }
+
+  // --- the frame loop: pose, then draw only what changed -------------------------------------
+
+  const frames = parts.keep(new FramePacer(display));
+  frames.onFrame(({deltaTime}) => {
+    if (settings.playing) {
+      settings.time += deltaTime;
+      if (settings.time >= TIMELINE) {
+        settings.time -= TIMELINE;
+        pulledAt = undefined;
+      }
+    }
+    pose(settings.time);
+    placePivots();
+    // the art answers whether its picture changed: a timeline that stands draws nothing
+    return art.takeChanged();
+  }, stage);
+
+  const framesOut = document.querySelector('[data-frames]')!;
+  const drawsOut = document.querySelector('[data-draws]')!;
+  const drawingOut = document.querySelector('[data-drawing]')!;
+
+  display.onRenderFrame((frame) => {
+    sr.resize(frame.width, frame.height, frame.pixelRatio);
+    sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+    const draw = frames.shouldDraw(frame);
+    if (draw) {
+      art.update();
+      sr.renderTo(frame.renderer);
+    }
+    framesOut.textContent = String(frames.frames);
+    drawsOut.textContent = String(frames.draws);
+    drawingOut.textContent = draw ? 'drawing' : 'idle';
+    drawingOut.classList.toggle('idle', !draw);
+  });
+
+  // --- the controls ---------------------------------------------------------------------------
+
+  const pull = () => {
+    pulledAt = settings.time;
+  };
+
+  const listeners = new AbortController();
+  parts.onDispose(() => listeners.abort());
+  canvas.addEventListener('click', pull, {signal: listeners.signal});
+
+  const gui = new GUI({container: getDemoUi(), title: 'stage art: the listening machine'});
+  parts.onDispose(() => gui.destroy());
+  gui
+    .add(settings, 'time', 0, TIMELINE, 0.01)
+    .name('time (s)')
+    .decimals(2)
+    .listen()
+    .onChange(() => {
+      // a drag on the timeline holds the clock: the poses follow the scrubber, forward and back
+      settings.playing = false;
+    });
+  gui.add(settings, 'playing').name('play').listen();
+  gui.add({pull}, 'pull').name('pull the lever (click)');
+  gui
+    .add(settings, 'pivots')
+    .name('draw the pivots')
+    .onChange((on: boolean) => {
+      pivots.visible = on;
+      // the marks are no layer of the art: their change is told to the pacer here
+      frames.invalidate();
+    });
+
+  void art.loaded.then(() => {
+    // the art says its problems on the console itself, once, after the load
+    if (!display.isDisposed) preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, art, pacer: frames});
+</script>

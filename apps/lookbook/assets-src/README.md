@@ -23,7 +23,7 @@ same versions of Node, sharp and Blender.
 
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
 committed raw images and to resize, and for `boomer-shooter-corridor`, `stage-masks` (its
-`matte-3d`), `camera-rig-two-rooms` and `camera-rig-into-the-map` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
+`matte-3d`), `camera-rig-two-rooms`, `camera-rig-into-the-map` and `stage-art-machine` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
 back to `/usr/bin/blender`), run headless with `-b --factory-startup`. No
 network, no ComfyUI: images painted with ComfyUI are curated sources committed under
 `<demo>/raw/` next to a `source.json` that records prompt, seed, workflow and settings.
@@ -38,7 +38,7 @@ the lookbook's `assets:check`), and `pnpm lint` formats and lints them like ever
 | `build.mjs` | the entry point of `pnpm lookbook:assets` |
 | `lib/png.mjs` | PNG encoder (exact pixels, no colour profile) and a decoder via sharp |
 | `lib/image.mjs` | `Img`, the RGBA canvas; colours, ramps, seeded `Rng`, value noise, Bayer dithering, ASCII pixel art |
-| `lib/pack.mjs` | shelf packer, with optional trimming |
+| `lib/pack.mjs` | shelf packer, with optional trimming or a box given per frame |
 | `lib/formats.mjs` | the JSON and text layouts: TexturePacker hash, free-tex-packer hash, Aseprite hash, BMFont text and JSON |
 | `lib/ttf.mjs` | a TrueType reader and rasterizer without anti-aliasing, for pixel fonts |
 | `lib/bmfont.mjs` | builds a BMFont from a pixel font |
@@ -784,3 +784,51 @@ of the stage shows round the plug.
 | `camera_station` | perspective, 16:9 (`aspectRatio` 1.778), `yfov` 42.6°, `znear` 0.05, `zfar` 80; 21 m from the origin in the south-east, looking down onto the plug, all of it in the frame with the mast |
 | `mast_lamp` | an empty in the red lamp on top of the mast, at (−4.1, 6.58, 0.7), for a glow of the demo's own |
 
+## stage-art-machine
+
+"The listening machine", the art of the demo `stage-art-machine`, from `stage-art-machine/generate.mjs`
+and `blender_machine.py`: a brass contraption on a foggy pier that listens to the fog through two
+horns, **rendered in Blender part by part** and packed as the layers of one painting. Blender builds
+the machine and the pier from primitives and procedural materials and renders each part alone with
+Cycles through one orthographic camera — from the front and 10° from above, 1280 × 800 pixels, one
+pixel 5 mm on the plane of the camera —, on a transparent film (the fog opaque), AgX (Medium High
+Contrast), denoised by OpenImageDenoise. The renders are the full canvas each, transparent around
+their part, so the place of a part on the canvas is the place it was rendered at. The generator
+cuts every pixel of an alpha below 8, trims each part to its pixels and rounds the trim out to a
+grid of 8 pixels, then packs the parts into one atlas (`lib/pack.mjs`, 4 pixels apart) in the
+layout of free-tex-packer's "JSON (hash)" exporter (`lib/formats.mjs`): `sourceSize` the canvas,
+`spriteSourceSize` the trim — §4.3 of the proposal *stage-art-layers*, read by `StageArt` as a
+trimmed atlas. Cycles renders on a GPU when it finds one and on the CPU otherwise (`--cpu` in the
+arguments of `blender_machine.py` forces it), with a fixed seed. As with `matte-3d`, a GPU render is
+not the same byte for byte on every run: two runs differ by a mean of 0.14 of 255 in the atlas, and
+the grid of the trims keeps that noise out of the boxes, so `machine.json` comes out the same. The
+renders land in `stage-art-machine/.render-cache/` (ignored by git) with a `layout.json` of the
+canvas and the pivots, and `--skip-render` reuses them.
+
+| file | size | what |
+| --- | --- | --- |
+| `machine.webp` | 2048 × 2048 | the atlas: lossy colour (quality 90), lossless alpha, the colour of each part carried 4 pixels out into the clear pixels around it (`exact`), so that `linear` filtering darkens no edge |
+| `machine.json` | | free-tex-packer "JSON (hash)", trimmed, the frames in packing order |
+
+Load it with `["linear", "srgb"]`. The atlas keeps no stacking order; bottom first it is `fog`,
+`strip`, `body`, `flywheel`, `needle`, `glass`, `lever`, `lamp`, `glow`, `steam` — the strip hangs
+**behind** the cabinet, so that a strip moved up hides under it.
+
+| frame | layer | what |
+| --- | --- | --- |
+| `fog` | `fog` | opaque, the whole canvas, untrimmed: wet planks of a pier running into fog, a bollard and a red channel lamp on the left, a cold pier lamp and a coil of rope on the right, the shadows of the legs of the machine on the planks |
+| `body` | `body` | everything that does not move: a cabinet of dark green enamel worn to iron on its edges, brass trim and rivets, on four splayed iron legs; two brass horns turned to the fog on the left; the dial (bezel, cream face 0 … 16, "ECHO — fathoms of fog", a red band from 12), a small "HUMIDITY" gauge, three knobs, louvres, a plate "FOG LISTENING APPARATUS · No. 7"; the notched quadrant of the lever; the chimney; the arm the lamp stands on; the pedestal and the shaft of the flywheel; the shadow the cabinet throws onto the deck, semi-transparent |
+| `strip` | `strip` | a punched paper strip, 56 × 184 with its trim, hanging from under the cabinet, its foot curling forward at y = 685, about 130 pixels below the bottom of the cabinet; 140 pixels up it is hidden behind it |
+| `flywheel` | `flywheel` | a spoked iron flywheel, 298 pixels across, with brass rings and a red mark on the rim |
+| `needle` | `needle` | the needle of the dial, blued steel with a red tip and a counterweight, pointing straight up (8 on the scale); a turn of ±120° covers the scale |
+| `glass` | `glass` | the reflections of the domed glass over the dial alone, see-through |
+| `lever` | `lever` | a steel lever with a bakelite grip and knob, pointing up and 18° to the left |
+| `lamp`, `lamp-on` | `lamp` | a caged lamp on top of the cabinet, its glass dark (frame 0) and lit amber (frame 1) |
+| `glow` | `glow` | the light of the lit lamp in the fog: rendered on black, light alone, then made a layer — the brightest channel the alpha, the colour lifted by it — and faded out between 130 and 320 pixels from the lamp |
+| `steam#0` … `steam#11` | `steam` | a plume of steam rising from the chimney and drifting left, a loop of 12 frames: frame 12 would be frame 0 (two drifting noises crossfaded); the alpha blurred by the kernel 1 4 6 4 1, since the denoiser leaves the alpha of a volume grainy. The atlas carries no timing — the demo plays it at 12 frames a second |
+| `flywheel.pivot`, `needle.pivot`, `lever.pivot` | — | pivot markers, a dot of 2 × 2 white pixels: the middle of each, a corner between pixels, is the pivot of its layer |
+
+**Pivots**, in canvas pixels, y down: `flywheel` (985, 430) — its hub; `needle` (580, 420) — the
+middle of the dial; `lever` (790, 470) — its hub on the quadrant. The strip has no marker: the
+demo gives it the pivot (715, 545), the middle of its width where it leaves the cabinet. The middle
+of the lamp is at (835, 178).

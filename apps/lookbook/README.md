@@ -1,6 +1,6 @@
 # twopoint5d lookbook
 
-The living documentation of `@spearwolf/twopoint5d`: 45 runnable demos, each linked to its
+The living documentation of `@spearwolf/twopoint5d`: 46 runnable demos, each linked to its
 own source, searchable by tags.
 
 ## Running it
@@ -14,8 +14,8 @@ repo-root `README.md`.
 ## What's in `src/`
 
 - `pages/index.astro` — the overview page, the only page using `Layout.astro`
-- `pages/demos/<name>.astro` — 45 demo pages, all built on `VanillaDemo.astro`
-- `pages/demos/_<name>.json` — 45 metadata files, one per demo page
+- `pages/demos/<name>.astro` — 46 demo pages, all built on `VanillaDemo.astro`
+- `pages/demos/_<name>.json` — 46 metadata files, one per demo page
 - `demos/` — the demo code itself, TypeScript, grouped by demo; the three map2d demos
   share `map2d/`
 - `components/` — the lookbook UI: the card grid, the tag cloud, search, and
@@ -26,7 +26,7 @@ repo-root `README.md`.
 - `styles/`
 
 Three path aliases resolve into `src/`: `~components/*`, `~layouts/*` and `~demos/*`,
-declared in `tsconfig.json`. All 45 demo pages import through them.
+declared in `tsconfig.json`. All 46 demo pages import through them.
 
 ## Generated assets
 
@@ -39,7 +39,8 @@ together.
   Aseprite sheets, palettes, bitmap fonts, nine-slice panels, a free-tex-packer atlas, textures,
   an enemy Blender renders headless from eight directions, a `.glb` of two rooms whose light
   Blender bakes, with its cameras and a camera animation, and a survey map Blender renders with
-  the diorama of the place it marks. `assets-src/README.md` documents every
+  the diorama of the place it marks, and a brass machine Blender renders part by part into a
+  trimmed atlas. `assets-src/README.md` documents every
   output — formats, frame names, palette rows, insets, font metrics, cameras and clips — and is
   the reference a demo is built from.
 - The cut-outs of the demo `cardboard-parade`: `assets-src/cardboard/` builds them in Blender and

@@ -1,0 +1,20 @@
+{
+  "title": "stage art: the listening machine",
+  "shortDescription": "A brass machine that listens to the fog, rendered in Blender part by part and packed into one trimmed atlas: a click pulls the lever, a scrubber runs its timeline forward and back, and a FramePacer draws only the frames in which its picture changes",
+  "description": "A brass contraption on a foggy pier that listens to the fog through two horns — a lever, a flywheel, a needle on a dial, a punched paper strip, a lamp and steam —, rendered in Blender one part at a time through one camera and packed into a trimmed atlas in free-tex-packer's layout. `new StageArt({store, id: 'machine'}, {only: [...]})` lays every part back where it was rendered: the canvas of the atlas is the frame, the trim of each picture its place on it ([A scene out of a packed atlas](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#a-scene-out-of-a-packed-atlas)). A packer keeps no stacking order, so `only` names it — the strip hangs *behind* the cabinet and feeds out from under it. The flywheel, the needle and the lever turn about the `.pivot` marker frames of the atlas; the pivot of the strip is given in code, `layers: {strip: {pivot: [715, 545]}}`.\n\n**Every pose is a function of time** on one timeline ([A timeline with a scrubber](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#a-timeline-with-a-scrubber)): **a click** pulls the lever, an `artTrack()` played `'once'` from the time of the click, and the strip and the lamp follow it; the needle hunts on a `'pingpong'` track, the flywheel turns on a `'loop'`; the lamp warms up through `rampAt()`; the steam steps through its twelve frames by `animationFrameAt()`. **Drag the time slider** back and the machine runs backwards, steam included.\n\nThe page draws on demand: the art's `takeChanged()` is the frame step of a `FramePacer` ([Drawing on demand](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#drawing-on-demand)), and the panel counts the frames it was asked about and the frames it drew — pause the timeline and the draws stand still. **Draw the pivots** marks where the parts turn.",
+  "url": "/demos/stage-art-machine",
+  "tags": [
+    "StageArt",
+    "artTrack",
+    "rampAt",
+    "animationFrameAt",
+    "FramePacer",
+    "TextureStore",
+    "OrthographicProjection",
+    "Stage2D",
+    "StageRenderer",
+    "Display",
+    "vanilla",
+    "demo"
+  ]
+}
