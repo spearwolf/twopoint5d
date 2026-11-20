@@ -1,0 +1,343 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-art-depth.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <div class="hud fixed bottom-4 left-4">
+      <p class="help">move the pointer over the picture: the camera leaves its rest, and the planes part</p>
+      <p class="depth" aria-live="off">
+        <span data-projection>ParallaxProjection</span>
+        D <b data-distance>—</b> · the end wall drawn <b data-scale>—</b>
+      </p>
+      <p class="pacer" aria-live="off">
+        <span>FramePacer</span>
+        frames <b data-frames>0</b> · draws <b data-draws>0</b>
+        <i data-drawing>drawing</i>
+      </p>
+    </div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #040607;
+    color: #c4d0d2;
+  }
+  .hud {
+    font-family: monospace;
+    font-size: 95%;
+    pointer-events: none;
+  }
+  .hud p {
+    width: fit-content;
+    padding: 0.35em 0.7em;
+    margin-top: 0.4em;
+    background: rgba(4 6 7 / 76%);
+    border: 1px solid rgba(255 140 60 / 32%);
+    border-radius: 4px;
+  }
+  .hud span {
+    color: #ff9a4a;
+    margin-right: 0.6em;
+  }
+  .hud b {
+    color: #eef3f2;
+    font-weight: normal;
+    display: inline-block;
+    min-width: 5ch;
+    text-align: right;
+  }
+  .pacer i {
+    margin-left: 0.6em;
+    font-style: normal;
+    color: #8fd8ff;
+  }
+  .pacer i.idle {
+    color: #4f6266;
+  }
+</style>
+
+<script>
+  import {
+    type ArtLayer,
+    type ArtPose,
+    type ArtTrack,
+    artTrack,
+    CameraRig,
+    Display,
+    FramePacer,
+    OrthographicProjection,
+    ParallaxProjection,
+    Stage2D,
+    StageArt,
+    StageRenderer,
+    TextureStore,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {DemoParts} from '~demos/utils/demoParts';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the view of both projections, in artwork pixels: the middle of the canvas of 960 × 540; the rest
+  // of the canvas is painted round it, for wide windows and for the moves of the camera
+  // (apps/lookbook/assets-src/README.md, stage-art-depth)
+  const VIEW = {width: 768, height: 432};
+  const NIGHT = '#040607';
+  // the distance Blender rendered the planes through: any other D shows the same picture at rest
+  const START_DISTANCE = 600;
+  // the cables hang 180 artwork pixels in front of the plane: a camera nearer than that would stand behind them
+  const DISTANCES = [260, 1600] as const;
+  // the depth of the end wall, for the read-out of its scale (the user data of its group)
+  const END_WALL_DEPTH = 1200;
+  // how far the pointer at the edge of the picture moves the camera from its rest, in units of the plane
+  const REACH = {x: 56, y: 22};
+  // how long the camera takes to catch up with the pointer, in seconds
+  const FOLLOW = 0.7;
+  // the light of the train comes round every TRAIN_LOOP seconds
+  const TRAIN_LOOP = 15;
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+  const parts = new DemoParts(display);
+
+  // painted art: the view fills the window as far as it can, never at more than twice its size
+  const parallax = new ParallaxProjection('xy|bottom-left', {
+    fit: 'contain',
+    ...VIEW,
+    maxPixelZoom: 2,
+    distanceToProjectionPlane: START_DISTANCE,
+  });
+  const orthographic = new OrthographicProjection('xy|bottom-left', {fit: 'contain', ...VIEW, maxPixelZoom: 2});
+  const stage = parts.keep(new Stage2D(parallax));
+  // no host: the frame handler below drives the renderer, and draws only when the pacer says so
+  const sr = parts.keep(new StageRenderer().setClearColor(new Color(NIGHT), 1).add(stage));
+  const rig = parts.keep(new CameraRig(stage));
+
+  // one Aseprite file, a group per plane, each with its depth in its user data: the art reads them all
+  const store = parts.keep(new TextureStore(display.renderer));
+  store.parse({
+    items: {
+      'drowned-platform': {
+        atlasUrl: assetsUrl('stage-art-depth/drowned-platform.json'),
+        atlasAdapter: 'aseprite',
+        texture: ['linear', 'srgb'],
+      },
+    },
+  });
+
+  // compensateDepth is an option of the constructor: the toggle builds a second art on the same
+  // store item — its own lease, the texture loaded once — and swaps it in once it has loaded
+  function makeArt(compensateDepth: boolean): StageArt {
+    return new StageArt(
+      {store, id: 'drowned-platform'},
+      {
+        name: compensateDepth ? 'drowned platform' : 'drowned platform, uncompensated',
+        projection: stage.projection,
+        compensateDepth,
+      },
+    );
+  }
+
+  let art = makeArt(true);
+  stage.scene.add(art);
+  let incoming: StageArt | undefined;
+  parts.onDispose(() => {
+    incoming?.dispose();
+    art.dispose();
+  });
+
+  // --- the train and the ripples --------------------------------------------------------------
+
+  // the light of a train far down the tunnel, dollied through depth towards the mouth: it grows,
+  // sweeps across the bore, and dies out before it reaches the station. At
+  // rest the art keeps a layer at any depth where it was painted, so the scale carries the
+  // approach there; once the camera moves, the depth shows in how far the light drifts against
+  // the bore. Its keys stay far behind the camera, at any D of the slider
+  function trainTrack([px, py]: readonly [number, number]): ArtTrack {
+    return artTrack(
+      [
+        {at: 0, depth: 3700, x: px - 16, y: py + 3, deg: -10, scaleX: 0.4, scaleY: 0.4, opacity: 0},
+        {at: 5, opacity: 0},
+        {at: 6.5, opacity: 0.5, ease: 'ease-out'},
+        {at: 11.5, depth: 1400, x: px + 7, y: py, deg: 4, scaleX: 1.3, scaleY: 1.3, opacity: 1, ease: 'ease-in'},
+        {at: 12.6, opacity: 0, ease: 'ease-in'},
+        {at: TRAIN_LOOP, opacity: 0},
+      ],
+      {playback: 'loop'},
+    );
+  }
+
+  type Posed = {ripples: ArtLayer; train: ArtLayer; track: ArtTrack};
+  // the handles of the art in place, once it has loaded: a source without `only` knows its layers then
+  let posed: Posed | undefined;
+  const ripplePose: ArtPose = {frame: 0};
+  // the preview holds the light of the train on its way down the tunnel
+  const PREVIEW_TRAIN_TIME = 10.4;
+
+  function adopt(next: StageArt): Posed | undefined {
+    // a sheet that failed to load has no layers: the art has said so on the console, the page stands
+    if (!next.names.includes('train-light') || !next.names.includes('ripples')) return undefined;
+    const train = next.layer('train-light');
+    if (train.pivot === undefined) return undefined;
+    return {ripples: next.layer('ripples'), train, track: trainTrack(train.pivot)};
+  }
+
+  // --- the frame loop: the camera and the art are the two steps of the pacer ------------------
+
+  const frames = parts.keep(new FramePacer(display));
+  frames.onFrame(({deltaTime}) => rig.step(deltaTime), stage);
+  frames.onFrame(({now}) => {
+    if (posed !== undefined) {
+      ripplePose.frame = posed.ripples.frameAt('ripples', now);
+      posed.ripples.set(ripplePose);
+      posed.train.apply(posed.track, isPreview ? PREVIEW_TRAIN_TIME : now);
+    }
+    // the art answers whether its picture changed: the ripples step 9 times a second
+    return art.takeChanged();
+  }, stage);
+
+  const framesOut = document.querySelector('[data-frames]')!;
+  const drawsOut = document.querySelector('[data-draws]')!;
+  const drawingOut = document.querySelector('[data-drawing]')!;
+  const projectionOut = document.querySelector('[data-projection]')!;
+  const distanceOut = document.querySelector('[data-distance]')!;
+  const scaleOut = document.querySelector('[data-scale]')!;
+
+  function readOut(): void {
+    const isParallax = stage.projection === parallax;
+    const d = parallax.distanceToProjectionPlane;
+    projectionOut.textContent = isParallax ? 'ParallaxProjection' : 'OrthographicProjection';
+    distanceOut.textContent = isParallax && Number.isFinite(d) ? String(Math.round(d)) : '—';
+    // k = (D + δ) / D, the share the art enlarges a layer at the depth δ by, so that it shows as painted
+    scaleOut.textContent =
+      isParallax && settings.compensate && Number.isFinite(d) ? `×${((d + END_WALL_DEPTH) / d).toFixed(2)}` : '×1.00';
+  }
+
+  display.onRenderFrame((frame) => {
+    sr.resize(frame.width, frame.height, frame.pixelRatio);
+    sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+    const draw = frames.shouldDraw(frame);
+    if (draw) {
+      // after the stage's frame: a new D of the projection is in force, and the art lays its depths out for it
+      art.update();
+      sr.renderTo(frame.renderer);
+      readOut();
+    }
+    framesOut.textContent = String(frames.frames);
+    drawsOut.textContent = String(frames.draws);
+    drawingOut.textContent = draw ? 'drawing' : 'idle';
+    drawingOut.classList.toggle('idle', !draw);
+  });
+
+  // --- the pointer moves the camera ------------------------------------------------------------
+
+  // where the pointer asks the camera to be, as a share of REACH, y up
+  const aim = {x: 0, y: 0};
+
+  function follow(seconds = FOLLOW): void {
+    const x = aim.x * REACH.x;
+    const y = aim.y * REACH.y;
+    // a small move along the plane, a new viewpoint …
+    void rig.moveTo({position: [x, y]}, seconds);
+    // … and a look back at the middle of the picture: the plane stays put, the far planes drift with
+    // the camera and the near ones against it. An orthographic camera takes no look
+    const d = parallax.distanceToProjectionPlane;
+    if (stage.projection === parallax && Number.isFinite(d)) rig.look({yaw: Math.atan2(x, d), pitch: -Math.atan2(y, d)});
+  }
+
+  const listeners = new AbortController();
+  parts.onDispose(() => listeners.abort());
+  const {signal} = listeners;
+  canvas.addEventListener(
+    'pointermove',
+    (event) => {
+      const rect = canvas.getBoundingClientRect();
+      aim.x = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width) * 2 - 1));
+      aim.y = Math.max(-1, Math.min(1, -(((event.clientY - rect.top) / rect.height) * 2 - 1)));
+      follow();
+    },
+    {signal},
+  );
+  canvas.addEventListener(
+    'pointerleave',
+    () => {
+      aim.x = 0;
+      aim.y = 0;
+      // back to the rest, where the picture is the painting
+      follow(1.4);
+    },
+    {signal},
+  );
+
+  // --- the toggles ----------------------------------------------------------------------------
+
+  const settings = {compensate: true, projection: 'parallax' as 'parallax' | 'orthographic', distance: START_DISTANCE};
+  const gui = new GUI({container: getDemoUi(), title: 'stage art: the drowned platform'});
+  parts.onDispose(() => gui.destroy());
+
+  gui
+    .add(settings, 'compensate')
+    .name('compensate depth')
+    .onChange((compensate: boolean) => {
+      incoming?.dispose();
+      const next = makeArt(compensate);
+      incoming = next;
+      void next.loaded.then(() => {
+        if (display.isDisposed || incoming !== next) return;
+        incoming = undefined;
+        art.dispose(); // leaves the scene and lets go of its lease; the texture stays with the other one
+        art = next;
+        stage.scene.add(art);
+        posed = adopt(art);
+        frames.invalidate();
+      });
+    });
+
+  const distanceController = gui
+    .add(settings, 'distance', DISTANCES[0], DISTANCES[1], 10)
+    .name('distance D')
+    .onChange((d: number) => {
+      // the projection reads its specs anew at the next update of the stage; the art follows the new
+      // D in its next update(), so at rest the picture stays the painting
+      parallax.viewSpecs.distanceToProjectionPlane = d;
+      if (stage.projection === parallax) {
+        stage.needsUpdate = true;
+        follow(0);
+      }
+      frames.invalidate();
+    });
+
+  gui
+    .add(settings, 'projection', ['parallax', 'orthographic'])
+    .name('projection')
+    .onChange((kind: 'parallax' | 'orthographic') => {
+      const projection = kind === 'parallax' ? parallax : orthographic;
+      // the rig assigns the projection to the stage at once; the art does not know the stage and is
+      // handed it. Under the orthographic one the depths keep the stack and nothing else
+      rig.jump(projection);
+      art.projection = projection;
+      if (incoming) incoming.projection = projection;
+      distanceController.enable(kind === 'parallax');
+      follow(0);
+      frames.invalidate();
+    });
+
+  void art.loaded.then(() => {
+    if (display.isDisposed) return;
+    posed = adopt(art);
+    frames.invalidate();
+    preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, rig, stage, pacer: frames});
+  Object.defineProperty(window, 'art', {get: () => art, configurable: true});
+</script>

@@ -27,6 +27,7 @@ const DEMOS = [
   'camera-rig-into-the-map',
   'stage-art-machine',
   'stage-art-aseprite',
+  'stage-art-depth',
 ];
 
 function parseArgs() {

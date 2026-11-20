@@ -1,0 +1,21 @@
+{
+  "title": "stage art: the drowned platform",
+  "shortDescription": "A flooded underground station at night, painted in planes in one Aseprite file: at rest the picture is the painting, and when the pointer moves the camera the planes part — a multiplane camera out of a flat picture, with a train's light dollied through depth and ripples on the water",
+  "description": "An underground station at night whose track bed has flooded — the tunnel mouth at the far end, cast-iron pillars, the platform edge, someone waiting under a red umbrella, torn cables hanging in front —, rendered in Blender plane by plane through one camera and laid out in **one Aseprite file**: each group a plane, its depth in its user data (`depth=1200` on `mouth`, `depth=-180` on `foreground`), read by `new StageArt({store, id: 'drowned-platform'})` with nothing said in code ([A painted scene made deep](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#a-painted-scene-made-deep)).\n\n**At rest the picture is the painting.** Under a `ParallaxProjection` the art draws each layer at its depth and enlarges it by `k = (D + δ) / D` about the focus, so the camera at its rest sees every plane at its painted size. **Move the pointer** and a `CameraRig` follows it — a small `moveTo()` along the plane and a `look()` back at its middle —: the far planes drift with the camera, the near ones pass against it, and the end wall shows what the pillars hid.\n\nThe light of a train comes down the tunnel on an `artTrack()` that dollies its layer through `depth`, from 3700 to 1400 artwork pixels, always far behind the camera; the ripples step through a tag of the sheet by `layer.frameAt()`, `animationFrameAt()` over the tag. **compensate depth** off builds a second art with `compensateDepth: false` on the same store item and swaps it in once loaded: the far planes shrink to the middle. **projection** switches to an `OrthographicProjection`: the parallax is gone, the stack stays. **distance D** sets `distanceToProjectionPlane` of the projection: at rest the picture stays as it is — the art lays its depths out for the new `D` —, and the planes part more or less once the camera moves. A `FramePacer` takes the rig's `step()` and the art's `takeChanged()` as its frame steps.",
+  "url": "/demos/stage-art-depth",
+  "tags": [
+    "StageArt",
+    "artTrack",
+    "animationFrameAt",
+    "ParallaxProjection",
+    "OrthographicProjection",
+    "CameraRig",
+    "FramePacer",
+    "TextureStore",
+    "Stage2D",
+    "StageRenderer",
+    "Display",
+    "vanilla",
+    "demo"
+  ]
+}

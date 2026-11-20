@@ -21,14 +21,14 @@ build or check of the repo runs the generators, so a change to an asset is a com
 generator and its output together. The output is the same, byte for byte, on every run with the
 same versions of Node, sharp, Blender and Aseprite — save where Cycles renders or bakes on a GPU, which
 schedules its samples a little differently each time: `matte-3d` of `stage-masks`, the two
-`camera-rig-*` scenes and `stage-art-machine` come out the same picture, not the same bytes, and
-their sections say by how much.
+`camera-rig-*` scenes, `stage-art-machine` and `stage-art-depth` come out the same picture, not the
+same bytes, and their sections say by how much.
 
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
 committed raw images and to resize, and for `boomer-shooter-corridor`, `stage-masks` (its
-`matte-3d`), `camera-rig-two-rooms`, `camera-rig-into-the-map` and `stage-art-machine` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
-back to `/usr/bin/blender`), run headless with `-b --factory-startup`; for `stage-art-aseprite`
-Aseprite — the binary `ASEPRITE` names, else `aseprite` on the PATH (tested with 1.3.17.2), run
+`matte-3d`), `camera-rig-two-rooms`, `camera-rig-into-the-map`, `stage-art-machine` and `stage-art-depth` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
+back to `/usr/bin/blender`), run headless with `-b --factory-startup`; for `stage-art-aseprite` and
+`stage-art-depth` Aseprite — the binary `ASEPRITE` names, else `aseprite` on the PATH (tested with 1.3.17.2), run
 headless with `-b`. No
 network, no ComfyUI: images painted with ComfyUI are curated sources committed under
 `<demo>/raw/` next to a `source.json` that records prompt, seed, workflow and settings.
@@ -918,3 +918,87 @@ frames of its tag; at every other frame its cel is empty.
 
 Each pivot is the pivot of a slice named like its layer, a corner between pixels: the bottom left
 corner of the pixel the slice's pivot marks.
+
+## stage-art-depth
+
+"The drowned platform", the art of the demo `stage-art-depth`, from `stage-art-depth/generate.mjs`,
+`blender_platform.py` and `drowned-platform.lua`: an underground station at night whose track bed
+has flooded — the mouth of a tunnel at the far end of the hall, cast-iron pillars down the platform,
+someone waiting at its edge under a red umbrella, torn cables hanging in front —, **rendered in
+Blender plane by plane and laid out as the planes of a multiplane camera in one Aseprite file**.
+Blender builds the station from primitives and procedural materials and renders it through one
+perspective camera that looks straight down the hall, level, with Cycles, 384 samples a layer (512
+for the light of the train), AgX (Medium High Contrast), denoised by OpenImageDenoise. Its field of
+view is the one of a `ParallaxProjection` whose camera stands 600 canvas pixels in front of its
+plane, and that plane lies 8 m in front of the camera, through the figure: one metre there is 75
+canvas pixels, and a thing `L` metres from the camera lies `(L − 8) · 75` canvas pixels behind it —
+the depth of its plane. Each layer is rendered alone on a transparent film, the others invisible to
+the camera but there for the light, the shadows and the reflections, so a far plane is whole behind
+the near ones: a camera that moves sees what they hid. Where one thing runs through two planes the
+near one fades out over the far one — the near part of the platform over its last 3 m —, and the end
+wall is lit beyond the hall as well, so that a moved camera finds no hole and no unlit wall at the
+edge of a plane.
+
+The generator turns the renders into pictures of layers — the light of the train, rendered on black,
+becomes a layer of light (the brightest channel the alpha, the colour lifted by it); every alpha
+below 4 is cut with a soft knee; within 40 pixels of the edge of the canvas each colour sinks
+towards the night `#040607`, by the same share in every layer, so the stack does too; the colour of
+each layer is carried 2 pixels out into its clear pixels — and `drowned-platform.lua` builds the
+Aseprite file out of them through Aseprite's Lua API: the frames and their durations, a group per
+plane with its depth in its user data, the layers bottom first in their groups, one cel per picture
+cut to its pixels, the tag of the ripples and the pivot slice of the light of the train. The
+generator then exports the file as the guide `packages/twopoint5d/docs/stage-art.md` tells a user
+to, with `--extrude` added for the linear filtering of a painted sheet:
+
+```sh
+aseprite -b --split-layers --trim --ignore-empty drowned-platform.aseprite \
+  --sheet drowned-platform.png --sheet-type packed --shape-padding 2 --extrude --merge-duplicates \
+  --data drowned-platform.json --format json-array \
+  --filename-format '{layer}#{frame}' --list-layers --list-tags --list-slices
+```
+
+Aseprite keeps the colour of a clear pixel inside a cel, and `--extrude` repeats the edge of each
+picture into its padding: sampled with `linear` filtering, no edge of a layer darkens. Cycles renders
+on a GPU when it finds one and on the CPU otherwise (`--cpu` in the arguments of
+`blender_platform.py` forces it), with a fixed seed. Two GPU runs give the same
+`drowned-platform.json` and sheets that differ by a mean of 0.02 of 255 (1.9 % of the bytes); the
+trims are found pixel by pixel, so a `drowned-platform.json` that changes after a render of an
+unchanged scene is worth a look at the boxes before it is committed. The renders land in
+`stage-art-depth/.render-cache/` (ignored by git) with a `layout.json` of the canvas, the depths of
+the planes and the canvas pixel of the train's lamps, and `--skip-render` reuses them: from the same
+cache the file, the sheet and the json come out the same byte for byte. `--composite` in the
+arguments of `blender_platform.py` also renders the whole scene in one picture, `composite.png`, for
+a look at the composition; the build does not use it.
+
+| file | size | what |
+| --- | --- | --- |
+| `drowned-platform.aseprite` | | the Aseprite file, the layout: open it in Aseprite to see the planes, their depths, the tag and the slice |
+| `drowned-platform.png` | 2868 × 772 | the sheet: straight alpha, the colour carried into the clear pixels round each picture |
+| `drowned-platform.json` | | Aseprite's json-array, split by layers, trimmed, empty cels left out, every picture named `{layer}#{frame}`, with `meta.layers`, `meta.frameTags` and `meta.slices` |
+
+Load it with `atlasAdapter: 'aseprite'` and `["linear", "srgb"]`, at `maxPixelZoom` 2. The canvas is
+960 × 540: the view of the demo is the middle 768 × 432 of it, the rest painted round it for wide
+windows and for the moves of the camera. The night round the canvas is `#040607`.
+
+**Frames and tags.** Frame 0, 100 ms, is the rest of every layer. Frames 1–8, 110 ms each, are the
+loop of the ripples under the tag `ripples` (`forward`); only the layer `ripples` has cels there, and
+its frame 0 is the picture of frame 1.
+
+**Planes**, back to front: each group is one plane, its depth in artwork pixels in its user data,
+taken by the layers in it.
+
+| group | user data | layer | box (x, y, w × h) | what |
+| --- | --- | --- | --- | --- |
+| `tunnel` | `depth=3900` | `bore` | 359, 194, 159 × 136 | the brick bore beyond the mouth over black water, its far end lost in the dark, two cold work lamps; a collar of brick round the mouth, behind the end wall, that fills the edge of the mouth when the bore drifts against it |
+| | | `train-light` | 436, 256, 47 × 37 | the two lamps of a train far down the bore in a halo of haze, light alone; pivot (460, 278), between the lamps, from the slice `train-light` |
+| `mouth` | `depth=1200` | `end-wall` | the canvas, opaque but for the mouth | the tiled wall at the end of the hall, wider and higher than the hall: the mouth of the tunnel under a concrete arch, a red signal, a caged cold lamp over it |
+| `hall` | `depth=540` | `vault` | the canvas, clear where the end wall shows | the walls of white tiles with a green band and the tide marks of the flood, the ceiling and its iron beams, the far part of the platform from 8.6 m on, a bench, "WEIR LANE" on both walls, cold tubes on the left wall and the lamps over the far platform |
+| | | `pillars` | 565, 159, 92 × 160 | three cast-iron columns down the far platform |
+| `flood` | `depth=240` | `water` | 0, 314, 736 × 226 | the black water over the track bed, the station mirrored in it, a plank and a sheet of paper on it |
+| | | `ripples` | 296, 365, 246 × 87 | a patch of the water with rings spreading from two drips, its alpha falling to 0 at its rim where the rings have died out, so it lies on `water` without a seam |
+| `edge` | `depth=0` | `platform` | 530, 0, 430 × 540 | the near part of the platform — coping, yellow line, wet concrete — fading out from 9 m to 12 m over the far part, two columns, a lit lamp and a dead one |
+| | | `figure` | 578, 185, 91 × 167 | someone in a long coat under a red umbrella the lamp glows through, a suitcase at their feet, turned towards the tunnel |
+| `foreground` | `depth=-180` | `cables` | 0, 0, 960 × 192 | torn cables sagging across the top of the picture, a loose end with its copper showing, a dead pendant lamp |
+
+The pivot of the slice is a corner between pixels: the bottom left corner of the pixel the slice's
+pivot marks.
