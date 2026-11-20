@@ -266,9 +266,10 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
    *   a key no option has, a `name` that is no string, a `pxPerUnit` that is no finite number above
    *   0, an `origin` or `focus` that is no pair of finite numbers, a `compensateDepth` that is no
    *   boolean, a `projection` that is no `IProjection`, a `plane` that is neither a
-   *   `ProjectionPlane` nor one of its four descriptions, `only` that names a layer twice, `layers`
-   *   that is no object or holds options a layer cannot take, `only` or `layers` beside loose
-   *   layers, loose layers that cannot be read, `features` that is no list or holds a feature
+   *   `ProjectionPlane` nor one of its four descriptions, `only` that names a layer twice, `only`
+   *   or a list of files that names more than 8192 layers, `layers` that is no object or holds
+   *   options a layer cannot take, `only` or `layers` beside loose layers, loose layers that
+   *   cannot be read, `features` that is no list or holds a feature
    *   `defineSprite()` refuses — in its words —, a `material` that is no object or sets what is
    *   the art's own, and a `renderer` that is no renderer. What the art cannot load or read out of
    *   its source is no refusal but a problem.
@@ -276,7 +277,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
   constructor(source: StageArtSource | Promise<StageArtSource>, options?: StageArtOptions<Features>) {
     super();
     this.name = 'twopoint5d.StageArt';
-    const {options: opts, shape, subject} = checkStageArt(source, options);
+    const {options: opts, shape, subject, listed} = checkStageArt(source, options);
     this.#subject = subject;
     const {plane, material} = opts;
 
@@ -298,14 +299,7 @@ export class StageArt<Features extends SpriteFeature = never> extends Group {
     // they are known
     let read: {canvas: StageArt['canvas']; layers: ArtLayerSpec[]; problems: StageArtProblem[]} | undefined;
     if (shape === 'atlas') read = this.#read(source as Extract<StageArtSource, {atlas: unknown}>);
-    const listed =
-      shape === 'files'
-        ? readLayerFiles(subject, (source as {files: readonly string[]}).files, undefined, undefined, {
-            only: opts.only,
-            layers: opts.layers,
-          })
-        : undefined;
-    const names = (read ?? listed)?.layers.map((layer) => layer.name) ?? opts.only ?? [];
+    const names = read?.layers.map((layer) => layer.name) ?? listed ?? opts.only ?? [];
 
     this.#core = new FeatureSprites(stageArtKind(opts.features ?? []), {
       capacity: Math.min(names.length, MAX_LAYERS),

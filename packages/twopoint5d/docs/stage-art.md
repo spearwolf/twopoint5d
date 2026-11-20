@@ -801,10 +801,10 @@ share.
 options that are no object or have a key no option has, a `pxPerUnit` that is no finite number above
 0, an `origin` or a `focus` that is no pair of finite numbers, a `compensateDepth` that is no
 boolean, a `projection` or a `plane` of the wrong kind, `only` naming a layer twice or more than
-8192 layers, options of a layer they cannot take — `at` or `pxPerUnit` beside an atlas among
-them —, `only` or `layers` beside loose layers, a `features` entry that is no feature or takes a
-slot the art fills, a `material` that sets what is the art's own (`capacity`, `geometry`,
-`passes`, the textures, …), and a `renderer` that is no renderer.
+8192 layers, a list of files naming more than 8192, options of a layer they cannot take — `at` or
+`pxPerUnit` beside an atlas among them —, `only` or `layers` beside loose layers, a `features` entry
+that is no feature or takes a slot the art fills, a `material` that sets what is the art's own
+(`capacity`, `geometry`, `passes`, the textures, …), and a `renderer` that is no renderer.
 
 ### From artwork pixels to units
 

@@ -13,7 +13,7 @@ import {isRecord} from '../utils/isRecord.js';
 import {isStringList} from '../utils/isStringList.js';
 import {artFrameOf} from './artLayout.js';
 import {ART_FEATURE_NAMES, stageArtKind} from './stageArtKind.js';
-import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLayerDefs} from './artSources.js';
+import {type ArtLayerDef, type ArtLayerOptions, checkArtSourceOptions, checkLayerDefs, readLayerFiles} from './artSources.js';
 
 /**
  * Where an art takes its layers from: an atlas item of a `TextureStore` — an Aseprite sheet with
@@ -184,12 +184,13 @@ export const SHAPES =
  * Throws what `new StageArt()` refuses of its source and its options (stage-art-layers.md §8), each
  * before anything is built, and answers the options, the shape of the source and the subjects:
  * `subject` for the art's messages — `StageArt`, or `StageArt "<name>"` —, `where` for the refusals
- * of the constructor — `new StageArt()` until a name is given.
+ * of the constructor — `new StageArt()` until a name is given —, and for a list of files the names
+ * of the layers it lists.
  */
 export function checkStageArt(
   source: unknown,
   options: unknown,
-): {options: StageArtOptions; shape: SourceShape; subject: string; where: string} {
+): {options: StageArtOptions; shape: SourceShape; subject: string; where: string; listed?: readonly string[]} {
   if (options !== undefined && !isRecord(options)) {
     throw new TypeError(`new StageArt(): the options must be an object, got ${describeValue(options)}`);
   }
@@ -265,6 +266,19 @@ export function checkStageArt(
       );
     }
     checkLayerDefs(where, loose);
+  }
+  if (shape === 'files') {
+    // the list names the layers before a file has loaded, and the mesh is built for them
+    const files = (source as {files: readonly string[]}).files;
+    const listed = readLayerFiles(where, files, undefined, undefined, {only: opts.only, layers: opts.layers}).layers.map(
+      (layer) => layer.name,
+    );
+    if (listed.length > MAX_LAYERS) {
+      throw new RangeError(
+        `${where}: the files name ${listed.length} layers, and an art holds at most ${MAX_LAYERS} — split the files between two arts`,
+      );
+    }
+    return {options: opts, shape, subject, where, listed};
   }
   return {options: opts, shape, subject, where};
 }

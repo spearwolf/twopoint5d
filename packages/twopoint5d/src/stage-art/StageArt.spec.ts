@@ -286,6 +286,22 @@ describe('new StageArt()', () => {
       expect(() => new StageArt(promise, {layers: {a: {depth: Number.NaN}}})).toThrow(/depth of the layer "a"/);
     });
 
+    test('more than 8192 layers in only or in a list of files, which an art cannot hold', () => {
+      const names = Array.from({length: 8193}, (_, i) => `layer${i}`);
+      expect(() => new StageArt(heldBack().promise, {only: names})).toThrow(
+        new RangeError('new StageArt(): only names 8193 layers, and an art holds at most 8192'),
+      );
+      const files = names.map((name) => `${name}.png`);
+      expect(() => new StageArt({files}, {name: 'crowd'})).toThrow(
+        new RangeError(
+          'StageArt "crowd": the files name 8193 layers, and an art holds at most 8192 — split the files between two arts',
+        ),
+      );
+      // the frames of a layer are no layers of their own
+      const frames = ['strip.png', ...names.map((name) => `strip-${name}.png`)];
+      expect(new StageArt({files: frames}).names).toEqual(['strip']);
+    });
+
     test('only and layers beside a source of loose layers, which names its layers itself', () => {
       const source = {atlas: sceneAtlas(), texture: new Texture(), layers: [{name: 'lamp'}]};
       expect(() => new StageArt(source, {only: ['lamp']})).toThrow(/a source of loose layers names its layers itself/);
