@@ -358,6 +358,29 @@ the key frame of a strike — reads it there instead of spelling out frame names
 and the same at every call. Its `data` is typed `unknown`, since one `FrameBasedAnimations` holds the
 frames of any atlas; the data of an Aseprite frame is read through `isAsepriteFrameData()`, below.
 
+**On the CPU.** A sprite that is not drawn through `AnimatedFrames` — a layer of art, a hit box, an
+icon on a canvas — asks `animationFrameAt(animation, seconds)` for the frame the shader would show
+at `t = time + animOffset`: the index into `animation(id).frames`, for `'loop'`, `'once'` and
+`'pingpong'` alike, at one duration or at `durations`. It takes a `FrameBasedAnimationInfo` as
+`animation()` answers it — or any object with `frameCount`, `duration`, `durations` and `playback`
+— and allocates nothing, so it can run in every frame. A `duration` of 0 answers 0, and a
+`frameCount` that is not a whole number of 1 or more, or seconds that are no finite number, is
+refused with a `RangeError`.
+
+```ts check
+import {animationFrameAt, FrameBasedAnimations, TextureCoords} from '@spearwolf/twopoint5d';
+
+const sheet = new TextureCoords(0, 0, 128, 32);
+const frames = [0, 1, 2, 3].map((i) => new TextureCoords(sheet, i * 32, 0, 32, 32));
+
+const anims = new FrameBasedAnimations();
+const attack = anims.add('attack', {durations: [0.05, 0.05, 0.3, 0.1], playback: 'once'}, frames);
+const info = anims.animation(attack);
+
+// the frame a sprite shows 0.2 s after its animation started: the third one, held for 0.3 s
+export const hit = info.frames[animationFrameAt(info, 0.2)]!;
+```
+
 `time` is a uniform: set it with `setUniform('time', seconds)` or the `uniforms` option, a write
 builds nothing. The animsMap itself is a texture with `needsImage`: until it has an image the
 sprite shows the whole `colorMap`, untrimmed. A `TextureLoader` or a `DataTexture` filled later

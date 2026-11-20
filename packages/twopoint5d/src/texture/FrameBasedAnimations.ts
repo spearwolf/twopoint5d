@@ -3,6 +3,7 @@ import {DataTexture, FloatType, RGBAFormat} from 'three/webgpu';
 import {describeValue} from '../utils/describeValue.js';
 import {findNextPowerOf2} from '../utils/findNextPowerOf2.js';
 import {isRecord} from '../utils/isRecord.js';
+import type {AnimationTiming} from './animationFrameAt.js';
 import {isAnimationPlayback} from './animationPlayback.js';
 import {writeFrameTexels} from './frameTexels.js';
 import {frameTrimMargins, type FrameTrimMargins} from './frameTrimMargins.js';
@@ -273,10 +274,9 @@ const resolveDurations = (durations: unknown, frameCount: number, name: AnimName
 
 /**
  * The seconds of one cycle of an animation: its duration, except for a ping-pong, whose way back
- * shows every frame but the two ends once more.
+ * shows every frame but the two ends once more. @internal
  */
-const cycleDurationOf = ({playback, duration, durations, frames}: FrameBasedAnimDef): number => {
-  const frameCount = frames.length;
+export const cycleDurationOf = ({playback, duration, durations, frameCount}: AnimationTiming): number => {
   if (playback !== 'pingpong' || frameCount < 2) return duration;
   if (durations) return 2 * duration - durations[0]! - durations[frameCount - 1]!;
   return ((2 * frameCount - 2) / frameCount) * duration;
@@ -345,7 +345,15 @@ const renderFloatsBuffer = (
       offset += texelsPerFrame * 4;
     });
 
-    floatsBuffer.set([PLAYBACK_CODE[anim.playback], durations ? 1 : 0, cycleDurationOf(anim), SECOND_HEADER_MARK], offset);
+    floatsBuffer.set(
+      [
+        PLAYBACK_CODE[anim.playback],
+        durations ? 1 : 0,
+        cycleDurationOf({...anim, frameCount: frames.length}),
+        SECOND_HEADER_MARK,
+      ],
+      offset,
+    );
     offset += 4;
   }
 
@@ -749,7 +757,7 @@ export class FrameBasedAnimations {
       playback: anim.playback,
       durations: anim.durations,
       frames: anim.atlasFrames,
-      cycleDuration: cycleDurationOf(anim),
+      cycleDuration: cycleDurationOf({...anim, frameCount: anim.frames.length}),
     });
   }
 

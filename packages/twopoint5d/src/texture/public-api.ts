@@ -35,6 +35,7 @@ export {
   type DynamicAtlasSize,
   type DynamicAtlasSource,
 } from './DynamicAtlas.js';
+export {animationFrameAt, type AnimationTiming} from './animationFrameAt.js';
 export {
   type AnimationPlayback,
   type AnimationTimingOptions,

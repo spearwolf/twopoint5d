@@ -1,6 +1,7 @@
 import {describe, expect, test} from 'vitest';
 
 import {measureSettledBytes} from '../testing/measureSettledBytes.js';
+import {animationFrameAt, type AnimationTiming} from './animationFrameAt.js';
 import {AtlasFrameTable} from './AtlasFrameTable.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
 
@@ -32,5 +33,26 @@ describe('texture on the hot path', () => {
     const bytesPerFrame = bytesPerRound / table.size;
 
     expect(bytesPerFrame, `${bytesPerFrame.toFixed(2)} bytes per frame`).toBeLessThan(BYTES_PER_FRAME_LIMIT);
+  });
+
+  test('animationFrameAt() allocates nothing for an animation with durations', async () => {
+    const attack: AnimationTiming = {
+      playback: 'pingpong',
+      frameCount: 8,
+      duration: 1.2,
+      durations: [0.1, 0.2, 0.1, 0.3, 0.1, 0.1, 0.2, 0.1],
+    };
+    const CALLS = 1000;
+    // whole seconds and fractions of a constant table, never a fractional value worked out by the round
+    const seconds = [0, 1, 2, 3, 4, 5, 6, 7, -1, -2];
+
+    let sum = 0;
+    const bytesPerRound = await measureSettledBytes(() => {
+      for (let i = 0; i < CALLS; i++) sum += animationFrameAt(attack, seconds[i % seconds.length]!);
+    });
+    const bytesPerCall = bytesPerRound / CALLS;
+
+    expect(sum).toBeGreaterThanOrEqual(0);
+    expect(bytesPerCall, `${bytesPerCall.toFixed(2)} bytes per call`).toBeLessThan(BYTES_PER_FRAME_LIMIT);
   });
 });
