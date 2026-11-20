@@ -307,6 +307,8 @@ interface FoundLayer {
   // a depth in the file that is no number: a problem unless an override gives the depth
   depthProblem?: string;
   tags: ReadonlyMap<string, ArtTagSpec>;
+  // the tags an override of the frames left out: problems of the layer where the art takes it
+  tagProblems?: string[];
 }
 
 function specOf(found: FoundLayer, options: ArtLayerOptions | undefined, problems: StageArtProblem[]): ArtLayerSpec {
@@ -316,6 +318,7 @@ function specOf(found: FoundLayer, options: ArtLayerOptions | undefined, problem
   if (options?.depth === undefined && found.depthProblem !== undefined) {
     problems.push({layer: found.name, reason: found.depthProblem});
   }
+  for (const reason of found.tagProblems ?? []) problems.push({layer: found.name, reason});
   const spec: ArtLayerSpec = {
     name: found.name,
     box,
@@ -469,8 +472,14 @@ function asepriteTags(
 }
 
 // the tags of a layer whose frames an override names: a step of a tag shows the frame named `…#<n>`
-// for the frame n of the sprite; a tag with a step no such frame shows is left out
-function remappedTags(tags: ReadonlyMap<string, ArtTagSpec>, names: readonly string[]): Map<string, ArtTagSpec> {
+// for the frame n of the sprite; a tag with a step no such frame shows is left out, and the reason why
+// goes into `reasons`
+function remappedTags(
+  layer: string,
+  tags: ReadonlyMap<string, ArtTagSpec>,
+  names: readonly string[],
+  reasons: string[],
+): Map<string, ArtTagSpec> {
   const indexOfNumber = new Map<number, number>();
   names.forEach((name, index) => {
     const n = frameNumberOf(name);
@@ -478,10 +487,14 @@ function remappedTags(tags: ReadonlyMap<string, ArtTagSpec>, names: readonly str
   });
   const remapped = new Map<string, ArtTagSpec>();
   for (const [name, tag] of tags) {
-    const frames = tag.frames.map((n) => indexOfNumber.get(n));
-    if (frames.every((index) => index !== undefined)) {
-      remapped.set(name, Object.freeze({...tag, frames: Object.freeze(frames as number[])}));
+    const missing = tag.frames.find((n) => !indexOfNumber.has(n));
+    if (missing !== undefined) {
+      reasons.push(
+        `the frames of the layer ${describeValue(layer)} show no frame ${missing} of the sprite, which the tag ${describeValue(name)} steps through — the layer leaves the tag out`,
+      );
+      continue;
     }
+    remapped.set(name, Object.freeze({...tag, frames: Object.freeze(tag.frames.map((n) => indexOfNumber.get(n)!))}));
   }
   return remapped;
 }
@@ -500,13 +513,15 @@ function readAseprite(
 ): {canvas: {width: number; height: number} | undefined; found: FoundLayer[]; failed: boolean} {
   const frameNames = atlas.frameNames().filter((name): name is string => typeof name === 'string');
 
-  // the frames `{layer}#{frame}` of each layer, and the duration of each frame of the sprite
+  // the frames `{layer}#{frame}` of each layer, and the duration of each frame of the sprite. A name
+  // `#<n>` names no layer: Aseprite writes it where --split-layers stood after the file and split nothing
   const framesByLayer = new Map<string, Map<number, string>>();
   const durations = new Map<number, number>();
   for (const name of frameNames) {
     const n = frameNumberOf(name);
     if (n === undefined) continue;
     const layer = name.slice(0, name.lastIndexOf('#'));
+    if (layer === '') continue;
     let frames = framesByLayer.get(layer);
     if (frames === undefined) framesByLayer.set(layer, (frames = new Map()));
     frames.set(n, name);
@@ -547,7 +562,7 @@ function readAseprite(
   if (!metaLayers.some(({name}) => framesByLayer.has(name))) {
     problems.push({
       layer: undefined,
-      reason: `no frame of the sheet is named after one of its layers — export it with --split-layers and --filename-format '{layer}#{frame}'`,
+      reason: `no frame of the sheet is named after one of its layers — export it with --split-layers before the file and --filename-format '{layer}#{frame}'`,
     });
     return {canvas: canvasOf(atlas, frameNames), found: [], failed: true};
   }
@@ -567,7 +582,8 @@ function readAseprite(
     if (override !== undefined) {
       const picked = overrideFrames(atlas, name, override, problems);
       layer.frames = picked.frames;
-      layer.tags = remappedTags(tags, picked.names);
+      layer.tagProblems = [];
+      layer.tags = remappedTags(name, tags, picked.names, layer.tagProblems);
     } else {
       const byNumber = framesByLayer.get(name);
       layer.frames = Array.from({length: frameCount}, (_, n) => {
@@ -603,7 +619,8 @@ function readAseprite(
   for (const [name, layerOptions] of Object.entries(options.layers ?? {})) {
     if (layerOptions.frames === undefined || metaLayers.some((layer) => layer.name === name)) continue;
     const picked = overrideFrames(atlas, name, layerOptions.frames, problems);
-    found.push({name, frames: picked.frames, tags: remappedTags(tags, picked.names)});
+    const tagProblems: string[] = [];
+    found.push({name, frames: picked.frames, tags: remappedTags(name, tags, picked.names, tagProblems), tagProblems});
   }
 
   const layerNames = new Set(found.map(({name}) => name));

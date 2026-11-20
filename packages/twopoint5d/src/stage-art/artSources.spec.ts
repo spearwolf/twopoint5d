@@ -240,6 +240,28 @@ describe('readAtlasSource() of an Aseprite split-layer sheet', () => {
     expect(problems[0]!.reason).toContain("--filename-format '{layer}#{frame}'");
   });
 
+  test('a sheet exported with --split-layers after the file is one problem of the source naming the filename format, with or without meta.layers', () => {
+    // Aseprite splits nothing then: one picture of the whole canvas per frame, named "#0" … "#3"
+    const unsplit = (): AsepriteJsonData => {
+      const data = asepriteJson();
+      data.frames = arrayFrames(data)
+        .filter(({filename}) => filename.startsWith('wall#'))
+        .map((entry) => ({...entry, filename: entry.filename.slice('wall'.length)}));
+      return data;
+    };
+    const withoutLayers = unsplit();
+    delete withoutLayers.meta.layers;
+
+    for (const data of [unsplit(), withoutLayers]) {
+      const {layers, problems} = readAtlasSource(SUBJECT, asepriteAtlas(data), {});
+
+      expect(layers).toEqual([]);
+      expect(problems).toHaveLength(1);
+      expect(problems[0]!.layer).toBeUndefined();
+      expect(problems[0]!.reason).toContain("--filename-format '{layer}#{frame}'");
+    }
+  });
+
   test('without meta.layers the names come from the frames, in the order of the sheet', () => {
     const data = asepriteJson();
     delete data.meta.layers;
@@ -422,6 +444,25 @@ describe('readAtlasSource() with overrides', () => {
     const steam = layerOf(layers, 'steam');
     expect(steam.frames.map((frame) => frame?.frame)).toEqual([0, 1, 2, 3].map((n) => atlas.frame(`steam#${n}`)));
     expect(steam.tags.get('puff')?.frames).toEqual([1, 2, 3]);
+  });
+
+  test('in an Aseprite sheet a frames override that shows no frame a tag steps through is a problem of the layer, which leaves the tag out', () => {
+    // --ignore-empty left the empty cel ladle#3 out, and the tag puff steps through frame 3
+    const atlas = asepriteAtlas();
+    const {layers, problems} = readAtlasSource(SUBJECT, atlas, {layers: {ladle: {frames: /^ladle#/}}});
+
+    const ladle = layerOf(layers, 'ladle');
+    expect(ladle.frames.map((frame) => frame?.frame)).toEqual([0, 1, 2].map((n) => atlas.frame(`ladle#${n}`)));
+    expect(ladle.tags.has('puff')).toBe(false);
+    expect(problems).toEqual([
+      {
+        layer: 'ladle',
+        reason:
+          'the frames of the layer "ladle" show no frame 3 of the sprite, which the tag "puff" steps through — the layer leaves the tag out',
+      },
+    ]);
+    // a layer only leaves out has no problems
+    expect(readAtlasSource(SUBJECT, atlas, {only: ['wall'], layers: {ladle: {frames: /^ladle#/}}}).problems).toEqual([]);
   });
 
   test('an override for a layer the source lacks is a problem of that layer', () => {

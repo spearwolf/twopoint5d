@@ -72,8 +72,9 @@ then `art.names` is empty and `art.layer()` throws. Name the layers in `only`, a
 once: you can pose them right away, and a pose set before the picture arrives shows when it does.
 What the art cannot read — a name in `only` the sheet
 lacks, a depth that is no number, a pivot slice that names no layer, a sheet exported without
-`{layer}#{frame}` names — is no error: it hides that one layer, goes into `art.problems` and is
-said once on the console.
+`{layer}#{frame}` names or with `--split-layers` after the file, a tag that steps through a frame
+the `frames` of an override leave out — is no error: it hides that one layer or that one tag, goes
+into `art.problems` and is said once on the console.
 
 ### A scene out of layer PNGs
 
