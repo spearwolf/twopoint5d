@@ -19,7 +19,7 @@ pnpm lookbook:assets --skip-render                # reuse Blender's render cache
 wrote with Biome (the repo's lint holds every JSON file to it). The outputs are committed; no
 build or check of the repo runs the generators, so a change to an asset is a commit of the
 generator and its output together. The output is the same, byte for byte, on every run with the
-same versions of Node, sharp and Blender — save where Cycles renders or bakes on a GPU, which
+same versions of Node, sharp, Blender and Aseprite — save where Cycles renders or bakes on a GPU, which
 schedules its samples a little differently each time: `matte-3d` of `stage-masks`, the two
 `camera-rig-*` scenes and `stage-art-machine` come out the same picture, not the same bytes, and
 their sections say by how much.
@@ -27,7 +27,9 @@ their sections say by how much.
 Requirements: Node (the repo's), `sharp` (a devDependency of the lookbook) to decode the
 committed raw images and to resize, and for `boomer-shooter-corridor`, `stage-masks` (its
 `matte-3d`), `camera-rig-two-rooms`, `camera-rig-into-the-map` and `stage-art-machine` Blender on the PATH (tested with 5.2 LTS and 5.3, falls
-back to `/usr/bin/blender`), run headless with `-b --factory-startup`. No
+back to `/usr/bin/blender`), run headless with `-b --factory-startup`; for `stage-art-aseprite`
+Aseprite — the binary `ASEPRITE` names, else `aseprite` on the PATH (tested with 1.3.17.2), run
+headless with `-b`. No
 network, no ComfyUI: images painted with ComfyUI are curated sources committed under
 `<demo>/raw/` next to a `source.json` that records prompt, seed, workflow and settings.
 
@@ -841,3 +843,78 @@ Load it with `["linear", "srgb"]`. The atlas keeps no stacking order; bottom fir
 middle of the dial; `lever` (790, 470) — its hub on the quadrant. The strip has no marker: the
 demo gives it the pivot (715, 545), the middle of its width where it leaves the cabinet. The middle
 of the lamp is at (835, 178).
+
+## stage-art-aseprite
+
+"The night-shift machine", the art of the demo `stage-art-aseprite`, from
+`stage-art-aseprite/generate.mjs`, `paint.mjs` and `vending-machine.lua`: a vending machine on a
+street at night with odd goods behind its glass, a black cat beside it and a moth at its neon sign,
+**pixel art in one Aseprite file**. `paint.mjs` paints every picture by code at its size — the
+lights of the street worked out per pixel and dithered with a 4 × 4 Bayer matrix, the goods, the
+cabinet and the visitors from shapes and short pixel art written as text, the sign in *Press
+Start 2P* — as one full canvas of 480 × 300 per layer and frame. `vending-machine.lua` builds the
+Aseprite file out of them through Aseprite's Lua API: the frames and their durations, the layers
+bottom first in their groups, their user data, one cel per picture cut to its pixels, a tag per
+loop and a slice with a pivot per moving part. The generator then exports the file as the guide
+`packages/twopoint5d/docs/stage-art.md` tells a user to:
+
+```sh
+aseprite -b --split-layers --trim --ignore-empty vending-machine.aseprite \
+  --sheet vending-machine.png --sheet-type packed --shape-padding 2 --merge-duplicates \
+  --data vending-machine.json --format json-array \
+  --filename-format '{layer}#{frame}' --list-layers --list-tags --list-slices
+```
+
+`--sheet-type packed`, `--shape-padding 2` and `--merge-duplicates` keep the sheet small and its
+pictures two pixels apart; a picture that repeats in a loop — the tube on, the light at full — is
+one picture in the sheet, which several frames name. The output is the same byte for byte on every
+run with the same Aseprite: the file, the sheet and the json.
+
+| file | size | what |
+| --- | --- | --- |
+| `vending-machine.aseprite` | | the Aseprite file, the layout: open it in Aseprite to see the layers, the groups, the slices and the tags |
+| `vending-machine.png` | 1437 × 361 | the sheet: straight alpha, the pixel art opaque or clear, the glows, the light, the glass and the water see-through |
+| `vending-machine.json` | | Aseprite's json-array, split by layers, trimmed, empty cels left out, every picture named `{layer}#{frame}`, with `meta.layers`, `meta.frameTags` and `meta.slices` |
+
+Load it with `atlasAdapter: 'aseprite'` and `["nearest", "srgb"]`, at `maxPixelZoom` 2. The canvas
+is 480 × 300; the clear colour of the night around it is `#070912`.
+
+**Frames and tags.** Frame 0 is the rest of every layer. Each loop has frames of its own after it,
+and a tag over them named like the layer it loops; `light` and `tube` are two tags over the same
+frames, so the light on the street flickers with the tube. A layer has a cel at frame 0 and in the
+frames of its tag; at every other frame its cel is empty.
+
+| tag | frames | direction | durations (ms) | loops |
+| --- | --- | --- | --- | --- |
+| `sign` | 1–8 | `forward` | 2000, 70, 90, 420, 1600, 60, 110, 80 | the F of "SHIFT" stutters out twice, then the whole sign dims twice |
+| `coil` | 9–16 | `forward` | 90 each | the coil of the cassette turns, its gap stepping 45° a frame |
+| `tube`, `light` | 17–24 | `forward` | 2600, 60, 90, 50, 140, 1800, 70, 120 | the tube and its light: on, off, on, dim, off, on, dim, on |
+| `display` | 25–28 | `forward` | 900, 500, 700, 1200 | `OPEN`, `ALL`, `NITE`, `0.50` |
+| `moth` | 29–32 | `forward` | 50 each | wings up, out, down, out |
+| `cat` | 33–38 | `pingpong` | 400, 140, 120, 120, 140, 300 | the tail swings out and back; the cat blinks at frame 38 |
+| `goldfish` | 39–44 | `forward` | 180 each | the fish swims right, turns, swims left, a bubble rises |
+
+**Layers**, bottom first; a depth comes from the user data `depth=<n>` of a layer or its group.
+
+| layer | group | user data | pivot (canvas, y down) | what |
+| --- | --- | --- | --- | --- |
+| `wall` | `street` | `depth=40` (the group's) | — | brick lit cold by the window and pink by the sign, dissolving into the night where the light ends; a drainpipe, a torn poster of a lost cat |
+| `pavement` | `street` | | — | slabs, the curb and the road, a puddle with the lights in it; the shadows of the machine, the bin and the cat |
+| `light` | `street` | | — | the cold light of the window on the wall and on the pavement, see-through in steps of alpha; frames at full, half and a sixth of its strength |
+| `cabinet` | `machine` | | (238, 256) — between its feet | the red cabinet: the sign box, the window with its lit compartments, shelves and price labels, the panel (display window, keypad, coin slot with its warm ring, bill slot, a moon sticker, the coin return), the bay, a grille, the plinth and the feet |
+| `tube` | `machine` | | — | the fluorescent tube at the top of the window: on, dim, off |
+| `canned-rain`, `spare-moon`, `lost-key`, `night-light` | `goods` | | (183, 100), (209, 100), (235, 100), (261, 100) | the top shelf, each pivot the middle of its foot on the shelf |
+| `goldfish`, `cassette`, `sardines`, `rubber-duck` | `goods` | | (183, 146), (209, 146), (235, 146), (261, 146) | the middle shelf; the goldfish swims |
+| `cactus`, `batteries`, `instant-noodles`, `lonely-sock` | `goods` | | (183, 192), (209, 192), (235, 192), (261, 192) | the bottom shelf |
+| `coils` | `machine` | | — | the wire coils round the goods, seen end on, but the one of the cassette; their far loops only beside the goods |
+| `coil` | `machine` | | (209, 136) | the coil of the cassette, which turns |
+| `glass` | `machine` | | — | two thin streaks and a glint on the glass, see-through, so that a click between them lands on the goods |
+| `display` | `machine` | | — | the red LED word of the display and its glow |
+| `flap` | `machine` | | (222, 208) — on its hinge | the smoked flap of the bay, "PUSH" |
+| `sign` | `machine` | | (234, 40) — where it stands on the cabinet | "NIGHT SHIFT" in pink neon between a crescent moon and a star, glowing; each letter on, dim or off |
+| `bin` | — | | (128, 258) | a ribbed steel bin left of the machine, a crumpled can on its lid |
+| `cat` | — | | (350, 268) — under its paws | a black cat, rim-lit by the window, yellow-green eyes |
+| `moth` | — | `depth=-12` | (150, 30) | a moth at the sign |
+
+Each pivot is the pivot of a slice named like its layer, a corner between pixels: the bottom left
+corner of the pixel the slice's pivot marks.

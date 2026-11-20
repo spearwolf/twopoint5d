@@ -1,0 +1,22 @@
+{
+  "title": "stage art: one Aseprite file",
+  "shortDescription": "A vending machine on a night street, painted in one Aseprite file with layers, pivot slices and a tag per loop: the page names no layer, a hover lights the layer under the pointer, a click wobbles it, and a toggle turns the stage to top-left",
+  "description": "A night-shift vending machine with odd goods — canned rain, a spare moon, a lost key, a goldfish in a bag, a lonely sock —, a cat beside it and a moth at its neon sign, painted as pixel art in **one Aseprite file**: 26 layers in groups, a slice with a pivot for every part that moves, named like its layer, and a tag for every loop. The sheet is exported as the guide says ([A scene out of an Aseprite file](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#a-scene-out-of-an-aseprite-file)), split by layers, trimmed, `{layer}#{frame}`, and `new StageArt({store, id: 'vending-machine'})` reads the rest out of it.\n\n**The page has no layer list.** The panel shows what the art read out of the sheet: the names and the stack bottom first, the box of each layer on the canvas, its pivot, its depth — `depth=40` in the user data of the group `street`, `depth=-12` on the moth — and the tags. A tag named like a layer is its loop, stepped by `layer.frameAt(name, now)`: the sign stutters, the coil turns, the tube flickers and its light with it, the display, the moth, the cat's tail, the goldfish.\n\n**Hover** a layer and `Flash`, handed in through `features`, lights it ([A click on a layer](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#a-click-on-a-layer)) — pixel-exact, a click between the goods lands on the machine. **Click** it and a `SpritePicker` names it through `art.layerOf()`: an `artTrack()` rocks it about its pivot from the time of the click; click again while it rocks and the new track starts from where the layer stands. **Stage plane** switches the stage between `'xy|bottom-left'` and `'xy|top-left'` ([Art on a top-left stage](https://github.com/spearwolf/twopoint5d/blob/main/packages/twopoint5d/docs/stage-art.md#art-on-a-top-left-stage)): the picture, the turns and the picks stay the same. A `FramePacer` draws only when `art.takeChanged()` says the picture changed.",
+  "url": "/demos/stage-art-aseprite",
+  "tags": [
+    "StageArt",
+    "artTrack",
+    "SpritePicker",
+    "Flash",
+    "FramePacer",
+    "TextureStore",
+    "OrthographicProjection",
+    "Stage2D",
+    "StageRenderer",
+    "Display",
+    "pixel-art",
+    "picking",
+    "vanilla",
+    "demo"
+  ]
+}

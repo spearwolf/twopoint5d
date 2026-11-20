@@ -26,6 +26,7 @@ const DEMOS = [
   'camera-rig-two-rooms',
   'camera-rig-into-the-map',
   'stage-art-machine',
+  'stage-art-aseprite',
 ];
 
 function parseArgs() {

@@ -1,0 +1,428 @@
+---
+import Layout from '~layouts/VanillaDemo.astro';
+import {description, title} from './_stage-art-aseprite.json';
+---
+
+<Layout title={title} description={description} fullscreenCanvas>
+  <demo-ui>
+    <details class="readout fixed" open>
+      <summary>what the art read out of <code>vending-machine.json</code></summary>
+      <p data-sheet>loading …</p>
+      <table>
+        <thead>
+          <tr>
+            <th title="the place in the stack, bottom first">#</th>
+            <th>layer</th>
+            <th title="where its picture lies on the canvas: x, y, w × h">box</th>
+            <th title="the point it stands on and turns about, from the slice named like it">pivot</th>
+            <th title="from the user data of the layer or its group">depth</th>
+            <th>order</th>
+            <th title="the tag named like the layer">loop</th>
+          </tr>
+        </thead>
+        <tbody data-layers></tbody>
+      </table>
+      <p data-tags></p>
+      <p data-problems></p>
+    </details>
+    <div class="hud fixed bottom-4 left-4">
+      <p class="help">hover: light a layer · click: wobble it · click again: it wobbles on from where it stands</p>
+      <p class="pacer" aria-live="off">
+        <span>FramePacer</span>
+        frames <b data-frames>0</b> · draws <b data-draws>0</b>
+        <i data-drawing>drawing</i>
+      </p>
+    </div>
+  </demo-ui>
+</Layout>
+
+<style>
+  body {
+    background: #070912;
+    color: #c8d2e4;
+  }
+  canvas {
+    cursor: pointer;
+  }
+  .readout,
+  .hud p {
+    font-family: monospace;
+    font-size: 10.5px;
+    background: rgba(7 9 18 / 80%);
+    border: 1px solid rgba(255 79 168 / 35%);
+    border-radius: 4px;
+  }
+  .readout {
+    top: calc(var(--demo-nav-bar-height) + 0.75rem);
+    left: 1rem;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - var(--demo-nav-bar-height) - 7rem);
+    overflow: auto;
+    padding: 0.35em 0.7em;
+  }
+  .readout summary {
+    cursor: pointer;
+    color: #ff7ab8;
+  }
+  .readout code {
+    color: #eef3ff;
+  }
+  .readout p {
+    margin: 0.4em 0;
+  }
+  .readout table {
+    border-collapse: collapse;
+    white-space: nowrap;
+  }
+  .readout th {
+    text-align: left;
+    color: #86ecff;
+    font-weight: normal;
+    padding: 0 0.6em 0.2em 0;
+  }
+  /* the rows are built at runtime, out of reach of the scoped styles */
+  .readout :global(td) {
+    padding: 0 0.6em 0 0;
+    color: #a8b4cc;
+  }
+  .readout :global(td:nth-child(2)) {
+    color: #eef3ff;
+  }
+  .readout :global(tr.lit td) {
+    background: rgba(134 236 255 / 18%);
+    color: #ffffff;
+  }
+  .hud {
+    pointer-events: none;
+  }
+  .hud p {
+    width: fit-content;
+    padding: 0.35em 0.7em;
+    margin-top: 0.4em;
+    font-size: 95%;
+  }
+  .pacer span {
+    color: #ff7ab8;
+    margin-right: 0.6em;
+  }
+  .pacer b {
+    color: #eef3ff;
+    font-weight: normal;
+    display: inline-block;
+    min-width: 5ch;
+    text-align: right;
+  }
+  .pacer i {
+    margin-left: 0.6em;
+    font-style: normal;
+    color: #86ecff;
+  }
+  .pacer i.idle {
+    color: #4a5670;
+  }
+</style>
+
+<script>
+  import {
+    type ArtLayer,
+    type ArtPose,
+    type ArtTrack,
+    artTrack,
+    Display,
+    Flash,
+    type FlashApi,
+    FramePacer,
+    OrthographicProjection,
+    SpritePicker,
+    Stage2D,
+    StageArt,
+    StageRenderer,
+    TextureStore,
+  } from '@spearwolf/twopoint5d';
+  import GUI from 'lil-gui';
+  import {Color} from 'three/webgpu';
+  import assetsUrl from '~demos/utils/assetsUrl';
+  import {DemoParts} from '~demos/utils/demoParts';
+  import {deferPreview} from '~demos/utils/demoPreview';
+  import {getDemoUi} from '~demos/utils/demoUi';
+  import {getFullscreenCanvas} from '~demos/utils/fullscreenCanvas';
+
+  // the canvas of the painting, in artwork pixels (apps/lookbook/assets-src/README.md, stage-art-aseprite)
+  const CANVAS = {width: 480, height: 300};
+  const NIGHT = '#070912';
+  // the two planes the toggle switches between: the picture, the turns and the picks stay the same
+  const PLANES = ['xy|bottom-left', 'xy|top-left'] as const;
+  type Plane = (typeof PLANES)[number];
+  // the colour a layer under the pointer is mixed towards, and how far
+  const FLASH = [0.55, 0.95, 1, 0.45] as const;
+
+  const isPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const preview = deferPreview();
+  const canvas = getFullscreenCanvas();
+  const display = new Display(canvas);
+  const parts = new DemoParts(display);
+
+  // pixel art: the painting fills the window as far as it can, never at more than twice its size
+  const projections: Record<Plane, OrthographicProjection> = {
+    'xy|bottom-left': new OrthographicProjection('xy|bottom-left', {fit: 'contain', ...CANVAS, maxPixelZoom: 2}),
+    'xy|top-left': new OrthographicProjection('xy|top-left', {fit: 'contain', ...CANVAS, maxPixelZoom: 2}),
+  };
+  const stage = parts.keep(new Stage2D(projections['xy|bottom-left']));
+  // no host: the frame handler below drives the renderer, and draws only when the pacer says so
+  const sr = parts.keep(new StageRenderer().setClearColor(new Color(NIGHT), 1).add(stage));
+
+  // the Aseprite sheet, split by layers: the store's 'aseprite' adapter reads it, the art its layers
+  const store = parts.keep(new TextureStore(display.renderer));
+  store.parse({
+    items: {
+      'vending-machine': {
+        atlasUrl: assetsUrl('stage-art-aseprite/vending-machine.json'),
+        atlasAdapter: 'aseprite',
+        texture: ['nearest', 'srgb'],
+      },
+    },
+  });
+
+  // no layer list: the names, the stack, the boxes, the pivots, the depths and the tags all come out
+  // of the sheet. Flash joins the kind of the art, for the layer under the pointer
+  const art = parts.keep(
+    new StageArt({store, id: 'vending-machine'}, {name: 'vending machine', projection: stage.projection, features: [Flash]}),
+  );
+  stage.scene.add(art);
+  type Layer = ArtLayer<FlashApi>;
+
+  // --- a wobble per click ----------------------------------------------------------------------
+
+  // a damped rock about the pivot with a squash in it; small things rock far, the cabinet a little
+  function wobble(layer: Layer, from: Readonly<ArtPose>): ArtTrack {
+    const h = layer.box?.h ?? 24;
+    const a = Math.min(14, Math.max(1.5, 280 / h));
+    const s = Math.min(0.12, Math.max(0.015, 2.6 / h));
+    const key = (at: number, k: number) => ({at, deg: a * k, scaleX: 1 - s * k, scaleY: 1 + s * k});
+    return artTrack(
+      [
+        {at: 0, deg: from.deg ?? 0, scaleX: from.scaleX ?? 1, scaleY: from.scaleY ?? 1},
+        {...key(0.07, 1), ease: 'ease-out'},
+        key(0.2, -0.7),
+        key(0.36, 0.45),
+        key(0.54, -0.25),
+        key(0.74, 0.1),
+        key(1, 0),
+      ],
+      {ease: 'ease-in-out'},
+    );
+  }
+
+  // the wobbles under way, each started at the time of its click on the display's clock
+  const wobbles = new Map<Layer, {track: ArtTrack; startedAt: number}>();
+  const standing: ArtPose = {};
+
+  function startWobble(layer: Layer, at: number): void {
+    const running = wobbles.get(layer);
+    // a second click overtakes the first: the new track starts where the first has the layer now
+    if (running !== undefined) running.track.sample(at - running.startedAt, standing);
+    else Object.assign(standing, {deg: layer.rest?.deg, scaleX: layer.rest?.scaleX, scaleY: layer.rest?.scaleY});
+    wobbles.set(layer, {track: wobble(layer, standing), startedAt: at});
+  }
+
+  // --- the loops: a tag named like a layer is its loop ------------------------------------------
+
+  let loops: {layer: Layer; pose: ArtPose}[] = [];
+
+  // --- the frame loop: pose, then draw only what changed -----------------------------------------
+
+  const frames = parts.keep(new FramePacer(display));
+  frames.onFrame(({now}) => {
+    for (const {layer, pose} of loops) {
+      pose.frame = layer.frameAt(layer.name, now);
+      layer.set(pose);
+    }
+    for (const [layer, {track, startedAt}] of wobbles) {
+      const t = now - startedAt;
+      layer.apply(track, t);
+      if (t >= track.duration) wobbles.delete(layer);
+    }
+    // the art answers whether its picture changed: a still machine draws only when a loop steps
+    return art.takeChanged();
+  }, stage);
+
+  const framesOut = document.querySelector('[data-frames]')!;
+  const drawsOut = document.querySelector('[data-draws]')!;
+  const drawingOut = document.querySelector('[data-drawing]')!;
+
+  display.onRenderFrame((frame) => {
+    sr.resize(frame.width, frame.height, frame.pixelRatio);
+    sr.updateFrame(frame.now, frame.deltaTime, frame.frameNo);
+    const draw = frames.shouldDraw(frame);
+    if (draw) {
+      art.update();
+      sr.renderTo(frame.renderer);
+    }
+    framesOut.textContent = String(frames.frames);
+    drawsOut.textContent = String(frames.draws);
+    drawingOut.textContent = draw ? 'drawing' : 'idle';
+    drawingOut.classList.toggle('idle', !draw);
+  });
+
+  // --- picking: a hover lights a layer, a click wobbles it ---------------------------------------
+
+  // made at the first pick, once the display has its renderer
+  let picker: SpritePicker | undefined;
+  const rowOf = new Map<Layer, HTMLTableRowElement>();
+  let lit: Layer | undefined;
+
+  function light(layer: Layer | undefined): void {
+    if (layer === lit) return;
+    lit?.sprite.setFlash(FLASH[0], FLASH[1], FLASH[2], 0);
+    layer?.sprite.setFlash(...FLASH);
+    if (lit) rowOf.get(lit)?.classList.remove('lit');
+    if (layer) rowOf.get(layer)?.classList.add('lit');
+    lit = layer;
+    // a write through layer.sprite goes past the art: the pacer is told here
+    frames.report(true);
+  }
+
+  function pointerOf(event: PointerEvent | MouseEvent): {x: number; y: number} {
+    const rect = canvas.getBoundingClientRect();
+    return {x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: -((event.clientY - rect.top) / rect.height) * 2 + 1};
+  }
+
+  async function layerAt(pointer: {x: number; y: number}): Promise<Layer | undefined> {
+    const camera = stage.camera;
+    const renderer = display.renderer;
+    if (camera === undefined || renderer === undefined) return undefined;
+    picker ??= parts.keep(new SpritePicker(renderer));
+    // picker.dispose() turns a pick down that is still under way: after the dispose that is no error
+    const hit = await picker.pick(camera, pointer, [art.mesh]).catch((error: unknown) => {
+      if (display.isDisposed) return undefined;
+      throw error;
+    });
+    return hit && art.layerOf(hit.sprite);
+  }
+
+  // one hover pick at a time; a pointer that moved on while it ran is picked again
+  let hoverAt: {x: number; y: number} | undefined;
+  let hovering = false;
+  async function hover(): Promise<void> {
+    if (hovering) return;
+    hovering = true;
+    try {
+      while (hoverAt !== undefined) {
+        const at = hoverAt;
+        const layer = await layerAt(at);
+        if (display.isDisposed) return;
+        if (hoverAt === at) {
+          light(layer);
+          break;
+        }
+      }
+    } finally {
+      hovering = false;
+    }
+  }
+
+  const listeners = new AbortController();
+  parts.onDispose(() => listeners.abort());
+  const {signal} = listeners;
+  canvas.addEventListener(
+    'pointermove',
+    (event) => {
+      hoverAt = pointerOf(event);
+      void hover();
+    },
+    {signal},
+  );
+  canvas.addEventListener(
+    'pointerleave',
+    () => {
+      hoverAt = undefined;
+      light(undefined);
+    },
+    {signal},
+  );
+  canvas.addEventListener(
+    'click',
+    async (event) => {
+      // the track starts at the time of the click, not when the gpu has answered the pick
+      const at = display.now;
+      const layer = await layerAt(pointerOf(event));
+      if (display.isDisposed || layer === undefined) return;
+      startWobble(layer, at);
+    },
+    {signal},
+  );
+
+  // --- the plane --------------------------------------------------------------------------------
+
+  const settings: {plane: Plane} = {plane: 'xy|bottom-left'};
+  const gui = new GUI({container: getDemoUi(), title: 'stage art: one Aseprite file'});
+  parts.onDispose(() => gui.destroy());
+  gui
+    .add(settings, 'plane', PLANES)
+    .name('stage plane')
+    .onChange((plane: Plane) => {
+      stage.projection = projections[plane];
+      // the art does not follow the stage: it is handed the projection, and turns in its next update()
+      art.projection = stage.projection;
+      frames.invalidate();
+    });
+
+  // --- the read-out: what the art read out of the sheet -----------------------------------------
+
+  const fmt = (n: number) => String(Math.round(n * 100) / 100);
+
+  function readOut(): void {
+    const sheet = document.querySelector('[data-sheet]')!;
+    const body = document.querySelector('[data-layers]')!;
+    const tagsOut = document.querySelector('[data-tags]')!;
+    const problemsOut = document.querySelector('[data-problems]')!;
+    const {width, height} = art.canvas ?? {width: 0, height: 0};
+    sheet.textContent = `canvas ${width} × ${height} · ${art.names.length} layers, bottom first`;
+    for (const [index, name] of art.names.entries()) {
+      const layer = art.layer(name);
+      const box = layer.box;
+      const pivot = layer.pivot;
+      const row = document.createElement('tr');
+      for (const text of [
+        String(index),
+        name,
+        box ? `${box.x}, ${box.y}  ${box.w} × ${box.h}` : '—',
+        pivot ? `${fmt(pivot[0])}, ${fmt(pivot[1])}` : '—',
+        fmt(layer.rest?.depth ?? 0),
+        String(layer.rest?.order ?? 0),
+        layer.tags.includes(name) ? name : '—',
+      ]) {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        row.append(cell);
+      }
+      row.addEventListener('pointerenter', () => light(layer), {signal});
+      row.addEventListener('pointerleave', () => light(undefined), {signal});
+      rowOf.set(layer, row);
+      body.append(row);
+    }
+    const tags = art.names.length > 0 ? art.layer(art.names[0]!).tags : [];
+    tagsOut.textContent = `tags of the sheet, every layer has them: ${tags.join(', ') || '—'}`;
+    problemsOut.textContent = `problems: ${art.problems.length === 0 ? 'none' : art.problems.map((p) => p.reason).join('; ')}`;
+  }
+
+  void art.loaded.then(() => {
+    if (display.isDisposed) return;
+    readOut();
+    loops = art.names
+      .map((name) => art.layer(name))
+      .filter((layer) => layer.tags.includes(layer.name))
+      .map((layer) => ({layer, pose: {frame: 0}}));
+
+    if (isPreview && art.names.includes('rubber-duck') && art.names.includes('goldfish')) {
+      // the preview: a duck caught mid-wobble, the goldfish under the pointer
+      startWobble(art.layer('rubber-duck'), display.now - 0.07);
+      light(art.layer('goldfish'));
+    }
+    preview.ready(display);
+  });
+
+  await display.start();
+
+  Object.assign(window, {display, art, pacer: frames});
+</script>
