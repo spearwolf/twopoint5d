@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="436" viewBox="0 0 760 436" role="img" aria-labelledby="title">
+<title id="title">From the canvas to the art frame: artwork pixels with y down become units with y up</title>
+<style>
+  .bg { fill: #ffffff; }
+  .ink { fill: #1f2328; }
+  .muted { fill: #59636e; }
+  .line { stroke: #1f2328; }
+  .panel { fill: #f6f8fa; stroke: #d0d7de; }
+  .blue { fill: #0969da; } .s-blue { stroke: #0969da; }
+  .green { fill: #1a7f37; } .s-green { stroke: #1a7f37; }
+  .purple { fill: #8250df; } .s-purple { stroke: #8250df; }
+  .red { fill: #cf222e; } .s-red { stroke: #cf222e; }
+  .t { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 13px; }
+  .small { font-size: 11.5px; }
+  .b { font-weight: 600; }
+  .h { font-size: 15px; font-weight: 600; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .ink { fill: #e6edf3; }
+    .muted { fill: #9198a1; }
+    .line { stroke: #e6edf3; }
+    .panel { fill: #151b23; stroke: #3d444d; }
+    .blue { fill: #4493f8; } .s-blue { stroke: #4493f8; }
+    .green { fill: #3fb950; } .s-green { stroke: #3fb950; }
+    .purple { fill: #ab7df8; } .s-purple { stroke: #ab7df8; }
+    .red { fill: #f85149; } .s-red { stroke: #f85149; }
+  }
+</style>
+<rect class="bg" width="760" height="436" rx="8"/>
+<text x="20" y="30" class="t ink h">From artwork pixels to units</text>
+<text x="20" y="50" class="t muted small">a layer posed at x 220, y 60, deg 30 on a canvas of 320 × 180, with pxPerUnit: 2 and the origin in the middle of the canvas</text>
+
+<!-- left: the canvas, artwork pixels, y down; 1 artwork pixel = 1 px of the figure -->
+<text x="40" y="98" class="t ink b">the canvas: artwork pixels, y down</text>
+<rect class="panel" x="40" y="110" width="320" height="180"/>
+<line class="s-blue" x1="40" y1="110" x2="96" y2="110" stroke-width="2.5"/>
+<polygon class="blue" points="96,105.5 106,110 96,114.5"/>
+<text x="108" y="126" class="t blue b">x</text>
+<line class="s-blue" x1="40" y1="110" x2="40" y2="166" stroke-width="2.5"/>
+<polygon class="blue" points="35.5,166 40,176 44.5,166"/>
+<text x="48" y="178" class="t blue b">y</text>
+<circle class="ink" cx="40" cy="110" r="3"/>
+<text x="48" y="126" class="t muted small">(0, 0)</text>
+<line class="line" x1="192" y1="200" x2="208" y2="200" stroke-width="1.5"/>
+<line class="line" x1="200" y1="192" x2="200" y2="208" stroke-width="1.5"/>
+<text x="200" y="224" class="t muted small" text-anchor="middle">origin: the middle (160, 90)</text>
+<rect class="purple s-purple" x="240" y="140" width="40" height="40" fill-opacity="0.35" stroke-width="1.5"/>
+<rect class="s-purple" x="240" y="140" width="40" height="40" fill="none" stroke-width="1.2" stroke-dasharray="4 3" transform="rotate(30 260 170)"/>
+<path class="s-red" d="M254.1 136.5 A34 34 0 0 1 286.0 148.1" fill="none" stroke-width="1.5"/>
+<polygon class="red" points="289.9,152.7 282.9,150.7 289.1,145.5"/>
+<text x="296" y="142" class="t red small">deg: 30</text>
+<circle class="red" cx="260" cy="170" r="3.5"/>
+<text x="292" y="176" class="t ink small">pivot</text>
+<text x="292" y="190" class="t ink small">(220, 60)</text>
+
+<!-- right: the art frame, units, y up; 1 unit = 2 px of the figure -->
+<text x="400" y="98" class="t ink b">the art frame: units, y up</text>
+<rect class="panel" x="400" y="110" width="320" height="180"/>
+<line class="s-green" x1="560" y1="200" x2="616" y2="200" stroke-width="2.5"/>
+<polygon class="green" points="616,195.5 626,200 616,204.5"/>
+<text x="630" y="204" class="t green b">x</text>
+<line class="s-green" x1="560" y1="200" x2="560" y2="144" stroke-width="2.5"/>
+<polygon class="green" points="555.5,144 560,134 564.5,144"/>
+<text x="552" y="140" class="t green b" text-anchor="end">y</text>
+<circle class="s-green" cx="560" cy="200" r="6" fill="none" stroke-width="1.5"/>
+<circle class="green" cx="560" cy="200" r="2"/>
+<text x="552" y="218" class="t muted small" text-anchor="end">(0, 0)</text>
+<text x="568" y="222" class="t muted small">+z towards the camera</text>
+<rect class="purple s-purple" x="600" y="140" width="40" height="40" fill-opacity="0.35" stroke-width="1.5"/>
+<rect class="s-purple" x="600" y="140" width="40" height="40" fill="none" stroke-width="1.2" stroke-dasharray="4 3" transform="rotate(30 620 170)"/>
+<path class="s-red" d="M614.1 136.5 A34 34 0 0 1 646.0 148.1" fill="none" stroke-width="1.5"/>
+<polygon class="red" points="649.9,152.7 642.9,150.7 649.1,145.5"/>
+<text x="656" y="138" class="t red small">rotation</text>
+<text x="656" y="152" class="t red small">−π/6 about +z</text>
+<circle class="red" cx="620" cy="170" r="3.5"/>
+<text x="652" y="176" class="t ink small">pivot</text>
+<text x="652" y="190" class="t ink small">(30, 15)</text>
+
+<!-- the mapping -->
+<text x="40" y="324" class="code ink">unit x = (px − origin x) / pxPerUnit</text>
+<text x="380" y="324" class="code muted">(220 − 160) / 2 = 30</text>
+<text x="40" y="346" class="code ink">unit y = (origin y − py) / pxPerUnit</text>
+<text x="380" y="346" class="code muted">(90 − 60) / 2 = 15</text>
+<text x="40" y="368" class="code ink">unit z = −depth / pxPerUnit</text>
+<text x="380" y="368" class="code muted">depth 0: on the plane</text>
+<text x="40" y="390" class="code ink">rotation = −deg · π / 180</text>
+<text x="380" y="390" class="code muted">30° clockwise on the screen: −π/6</text>
+<text x="40" y="412" class="code ink">size = box px · scale / pxPerUnit</text>
+<text x="380" y="412" class="code muted">a box of 40 × 40 pixels: 20 × 20 units</text>
+</svg>

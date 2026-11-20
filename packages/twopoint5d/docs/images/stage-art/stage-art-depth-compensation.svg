@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420" role="img" aria-labelledby="title">
+<title id="title">Depth compensation seen from the side: a layer at a depth is scaled about the focus so the camera at rest sees it as painted</title>
+<style>
+  .bg { fill: #ffffff; }
+  .ink { fill: #1f2328; }
+  .muted { fill: #59636e; }
+  .line { stroke: #1f2328; }
+  .grid { stroke: #8c959f; }
+  .blue { fill: #0969da; } .s-blue { stroke: #0969da; }
+  .amber { fill: #9a6700; } .s-amber { stroke: #9a6700; }
+  .green { fill: #1a7f37; } .s-green { stroke: #1a7f37; }
+  .red { fill: #cf222e; } .s-red { stroke: #cf222e; }
+  .t { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 13px; }
+  .small { font-size: 11.5px; }
+  .b { font-weight: 600; }
+  .h { font-size: 15px; font-weight: 600; }
+  .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+  @media (prefers-color-scheme: dark) {
+    .bg { fill: #0d1117; }
+    .ink { fill: #e6edf3; }
+    .muted { fill: #9198a1; }
+    .line { stroke: #e6edf3; }
+    .grid { stroke: #656c76; }
+    .blue { fill: #4493f8; } .s-blue { stroke: #4493f8; }
+    .amber { fill: #d29922; } .s-amber { stroke: #d29922; }
+    .green { fill: #3fb950; } .s-green { stroke: #3fb950; }
+    .red { fill: #f85149; } .s-red { stroke: #f85149; }
+  }
+</style>
+<rect class="bg" width="760" height="420" rx="8"/>
+<text x="20" y="30" class="t ink h">Depth compensation, seen from the side</text>
+<text x="20" y="50" class="t muted small">D = 250, pxPerUnit 1; the camera at rest sees each layer at a depth exactly where, and as large as, it was painted</text>
+
+<!-- the axis through the focus -->
+<line class="grid" x1="90" y1="230" x2="720" y2="230" stroke-width="1" stroke-dasharray="2 4"/>
+
+<!-- the camera, and the limit of the depth -->
+<line class="s-red" x1="90" y1="96" x2="90" y2="330" stroke-width="1" stroke-dasharray="3 3"/>
+<text x="84" y="110" class="t red small" text-anchor="end">δ ≤ −D:</text>
+<text x="84" y="124" class="t red small" text-anchor="end">refused</text>
+<rect class="ink" x="62" y="221" width="20" height="18" rx="2"/>
+<polygon class="ink" points="82,230 92,223 92,237"/>
+<text x="80" y="262" class="t ink small" text-anchor="middle">camera</text>
+<text x="80" y="276" class="t ink small" text-anchor="middle">at rest</text>
+
+<!-- the plane -->
+<line class="line" x1="340" y1="96" x2="340" y2="330" stroke-width="1.5"/>
+<text x="340" y="88" class="t ink b" text-anchor="middle">the plane, depth 0</text>
+<circle class="ink" cx="340" cy="230" r="3.5"/>
+<text x="347" y="226" class="t ink small">focus</text>
+
+<!-- a far layer: δ = 125, k = 1.5 -->
+<line class="s-blue" x1="90" y1="230" x2="465" y2="125" stroke-width="1" stroke-opacity="0.55"/>
+<line class="s-blue" x1="90" y1="230" x2="465" y2="185" stroke-width="1" stroke-opacity="0.55"/>
+<line class="s-blue" x1="340" y1="160" x2="340" y2="200" stroke-width="5" stroke-opacity="0.35"/>
+<text x="334" y="156" class="t blue small" text-anchor="end">as painted</text>
+<line class="s-blue" x1="465" y1="125" x2="465" y2="185" stroke-width="5"/>
+<text x="475" y="146" class="t blue small b">depth 125: k = (250 + 125) / 250 = 1.5</text>
+<text x="475" y="162" class="t blue small">drawn 1.5 × as large and as far from the focus</text>
+<line class="grid" x1="90" y1="230" x2="465" y2="160" stroke-width="0.8" stroke-dasharray="3 3"/>
+<line class="grid" x1="90" y1="230" x2="465" y2="200" stroke-width="0.8" stroke-dasharray="3 3"/>
+<line class="grid" x1="471" y1="160" x2="471" y2="200" stroke-width="2" stroke-dasharray="3 2"/>
+<text x="480" y="196" class="t muted small">compensateDepth: false — the painted size,</text>
+<text x="480" y="210" class="t muted small">seen smaller and nearer the focus</text>
+
+<!-- a near layer: δ = −100, k = 0.6 -->
+<line class="s-amber" x1="90" y1="230" x2="340" y2="250" stroke-width="1" stroke-opacity="0.55"/>
+<line class="s-amber" x1="90" y1="230" x2="340" y2="290" stroke-width="1" stroke-opacity="0.55"/>
+<line class="s-amber" x1="340" y1="250" x2="340" y2="290" stroke-width="5" stroke-opacity="0.35"/>
+<text x="347" y="274" class="t amber small">as painted</text>
+<line class="s-amber" x1="240" y1="242" x2="240" y2="266" stroke-width="5"/>
+<text x="240" y="288" class="t amber small b" text-anchor="middle">depth −100: k = 0.6</text>
+
+<!-- D and δ -->
+<line class="line" x1="90" y1="350" x2="340" y2="350" stroke-width="1"/>
+<line class="line" x1="90" y1="344" x2="90" y2="356" stroke-width="1"/>
+<line class="line" x1="340" y1="344" x2="340" y2="356" stroke-width="1"/>
+<text x="215" y="370" class="t ink small" text-anchor="middle">D: projection.distanceToProjectionPlane</text>
+<line class="s-blue" x1="340" y1="110" x2="465" y2="110" stroke-width="1"/>
+<line class="s-blue" x1="465" y1="104" x2="465" y2="116" stroke-width="1"/>
+<text x="402" y="104" class="t blue small" text-anchor="middle">δ = 125</text>
+
+<text x="20" y="402" class="code ink">k = (D + δ) / D</text>
+<text x="190" y="402" class="code ink">position: focus + (p − focus) · k</text>
+<text x="470" y="402" class="code ink">size: size · k</text>
+</svg>
