@@ -35,8 +35,10 @@ const flooredMod = (x: number, y: number): number => x - y * Math.floor(x / y);
  */
 export function animationFrameAt(animation: AnimationTiming, seconds: number): number {
   const {frameCount, duration, durations, playback} = animation;
-  assertWholeNumber(frameCount, 'animationFrameAt', 'frameCount', 1);
-  assertFinite(seconds, 'animationFrameAt', 'seconds');
+  // the checks stay inline: this runs per sprite and frame, and a fraction handed to a call V8 leaves
+  // un-inlined is boxed — the helpers build the message of a refusal, and only a refusal calls them
+  if (!(Number.isInteger(frameCount) && frameCount >= 1)) assertWholeNumber(frameCount, 'animationFrameAt', 'frameCount', 1);
+  if (!Number.isFinite(seconds)) assertFinite(seconds, 'animationFrameAt', 'seconds');
 
   if (!(duration > 0)) return 0;
   const lastFrame = frameCount - 1;
