@@ -23,6 +23,8 @@
       "!packages/twopoint5d/src/texture/fixtures/aseprite/*.json",
       // a texture packer export kept byte for byte as the packer wrote it, with its generator
       "!packages/twopoint5d/src/texture/fixtures/free-tex-packer",
+      // the exports of Aseprite and free-tex-packer in the formatting each tool writes, see its README
+      "!packages/twopoint5d/src/stage-art/fixtures/*.json",
       "!.vscode"
     ]
   },

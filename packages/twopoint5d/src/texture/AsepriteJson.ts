@@ -164,10 +164,12 @@ const playbackOf = (options: AsepriteParseOptions | undefined, tagName: string):
   return playback != null && Object.hasOwn(playback, tagName) ? playback[tagName] : undefined;
 };
 
-// The indices of the frames a tag shows, and the playback they are played with. A repeat of r ≥ 1 is
-// a one-shot over the frames played r times; a ping-pong counts each direction as one pass, and each
-// pass after the first leaves out the frame it turns on
-const framesOfTag = (tag: AsepriteFrameTag, playbackOverride: AnimationPlayback | undefined) => {
+/**
+ * @internal The indices of the frames a tag shows, and the playback they are played with. A repeat of
+ * r ≥ 1 is a one-shot over the frames played r times; a ping-pong counts each direction as one pass,
+ * and each pass after the first leaves out the frame it turns on.
+ */
+export const framesOfTag = (tag: AsepriteFrameTag, playbackOverride: AnimationPlayback | undefined) => {
   const forward = Array.from({length: tag.to - tag.from + 1}, (_, i) => tag.from + i);
   const reversed = tag.direction === 'reverse' || tag.direction === 'pingpong_reverse';
   const pass = reversed ? forward.reverse() : forward;
@@ -516,6 +518,17 @@ const framesWithSlices = (
   return frames;
 };
 
+// the meta of the json each atlas was built from, written by parse() for the atlas it fills
+const metaOfAtlas = new WeakMap<TextureAtlas<unknown>, AsepriteMetaData>();
+
+/**
+ * @internal The `meta` of the Aseprite json `AsepriteJson.parse()` last filled `atlas` from — the
+ * object `parse()` answers —, or `undefined` for an atlas it did not fill. Reaches the `meta` of an
+ * atlas of a `TextureStore` as well, whose `'aseprite'` adapter calls `parse()` and hands out only
+ * the atlas.
+ */
+export const asepriteMetaOf = (atlas: TextureAtlas<unknown>): AsepriteMetaData | undefined => metaOfAtlas.get(atlas);
+
 /**
  * Reads the json of Aseprite's "Export Sprite Sheet" — the layout "Hash" or "Array".
  */
@@ -590,6 +603,7 @@ export class AsepriteJson {
       animations.add(name, timing, atlas, names);
     }
 
+    metaOfAtlas.set(atlas, data.meta);
     return [atlas, data.meta, animations];
   }
 }

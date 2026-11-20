@@ -1,8 +1,14 @@
 import {readFileSync} from 'node:fs';
 import {describe, expect, expectTypeOf, test} from 'vitest';
 
-import {type AsepriteFrameData, AsepriteJson, type AsepriteJsonData, isAsepriteFrameData} from './AsepriteJson.js';
-import {asepriteAtlasAdapter} from './atlasAdapters.js';
+import {
+  type AsepriteFrameData,
+  AsepriteJson,
+  type AsepriteJsonData,
+  asepriteMetaOf,
+  isAsepriteFrameData,
+} from './AsepriteJson.js';
+import {asepriteAtlasAdapter, texturePackerAtlasAdapter} from './atlasAdapters.js';
 import {TextureAtlas} from './TextureAtlas.js';
 import {TextureCoords} from './TextureCoords.js';
 import {TexturePackerJson} from './TexturePackerJson.js';
@@ -754,6 +760,65 @@ describe('AsepriteJson', () => {
         AsepriteJson.parse(sheet(2, {frameTags: [{name: 'a', from: 0, to: 9, direction: 'forward'}]}), {target: target as never}),
       ).toThrow();
       expect(target.size).toBe(0);
+    });
+  });
+
+  describe('asepriteMetaOf()', () => {
+    test('answers the meta of the json for the atlas parse() builds', () => {
+      const data = fixture('fighter-array.json');
+
+      const [atlas, meta] = AsepriteJson.parse(data);
+
+      expect(asepriteMetaOf(atlas)).toBe(meta);
+      expect(asepriteMetaOf(atlas)?.layers).toEqual([{name: 'Layer 1', opacity: 255, blendMode: 'normal'}]);
+    });
+
+    test('answers the meta for the atlas of the store adapter "aseprite"', () => {
+      const data = fixture('fighter-hash.json');
+
+      const {atlas} = asepriteAtlasAdapter(data, new TextureCoords(0, 0, 64, 64));
+
+      expect(asepriteMetaOf(atlas)).toEqual(data.meta);
+      expect(asepriteMetaOf(atlas)?.frameTags?.map(({name}) => name)).toEqual(['idle', 'walk', 'kick', 'block', 'spin']);
+    });
+
+    test('answers the meta for a target atlas parse() added the frames to', () => {
+      const target = new TextureAtlas<AsepriteFrameData>();
+
+      const [, meta] = AsepriteJson.parse(sheet(2), {target});
+
+      expect(asepriteMetaOf(target)).toBe(meta);
+    });
+
+    test('answers the meta of a split-layer sheet, its groups and user data included', () => {
+      const data = JSON.parse(
+        readFileSync(new URL('../stage-art/fixtures/kitchen-aseprite.json', import.meta.url), 'utf8'),
+      ) as AsepriteJsonData;
+
+      const [atlas] = AsepriteJson.parse(data);
+
+      expect(atlas.size).toBe(24);
+      expect(atlas.frameNames().slice(0, 5)).toEqual(['wall#0', 'wall#1', 'wall#2', 'wall#3', 'window#0']);
+      expect(asepriteMetaOf(atlas)?.layers?.slice(0, 3)).toEqual([
+        {name: 'backdrop', color: '#d95763ff', data: 'depth=600'},
+        {name: 'wall', group: 'backdrop', opacity: 255, blendMode: 'normal'},
+        {name: 'window', group: 'backdrop', opacity: 255, blendMode: 'normal', color: '#5fcde4ff', data: 'depth=600'},
+      ]);
+    });
+
+    test('answers undefined for an atlas of a TexturePacker json, a new atlas and one a refused sheet was to fill', () => {
+      const {atlas} = texturePackerAtlasAdapter(
+        {frames: {a: {frame: {x: 0, y: 0, w: 4, h: 4}}}, meta: {image: 'a.png', size: {w: 4, h: 4}}},
+        new TextureCoords(0, 0, 4, 4),
+      );
+      const refused = new TextureAtlas<AsepriteFrameData>();
+      expect(() =>
+        AsepriteJson.parse(sheet(2, {frameTags: [{name: 'a', from: 0, to: 9, direction: 'forward'}]}), {target: refused}),
+      ).toThrow();
+
+      expect(asepriteMetaOf(atlas)).toBeUndefined();
+      expect(asepriteMetaOf(new TextureAtlas())).toBeUndefined();
+      expect(asepriteMetaOf(refused)).toBeUndefined();
     });
   });
 

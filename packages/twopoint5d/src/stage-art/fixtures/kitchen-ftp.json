@@ -1,0 +1,279 @@
+{
+  "frames": {
+    "wall@600": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 180
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 320,
+        "h": 180
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "table": {
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 240,
+        "h": 62
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 40,
+        "y": 118,
+        "w": 240,
+        "h": 62
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "window@600": {
+      "frame": {
+        "x": 560,
+        "y": 0,
+        "w": 84,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 196,
+        "y": 22,
+        "w": 84,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "carafe5-empty": {
+      "frame": {
+        "x": 320,
+        "y": 62,
+        "w": 34,
+        "h": 52
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 92,
+        "y": 70,
+        "w": 34,
+        "h": 52
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "carafe5": {
+      "frame": {
+        "x": 354,
+        "y": 62,
+        "w": 34,
+        "h": 52
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 92,
+        "y": 70,
+        "w": 34,
+        "h": 52
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "steam#2": {
+      "frame": {
+        "x": 388,
+        "y": 62,
+        "w": 22,
+        "h": 38
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 96,
+        "y": 28,
+        "w": 22,
+        "h": 38
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "steam#3": {
+      "frame": {
+        "x": 410,
+        "y": 62,
+        "w": 20,
+        "h": 35
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 97,
+        "y": 31,
+        "w": 20,
+        "h": 35
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "ladle": {
+      "frame": {
+        "x": 430,
+        "y": 62,
+        "w": 18,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 150,
+        "y": 84,
+        "w": 18,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "steam#1": {
+      "frame": {
+        "x": 410,
+        "y": 97,
+        "w": 18,
+        "h": 32
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 98,
+        "y": 34,
+        "w": 18,
+        "h": 32
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "carafe5.pivot": {
+      "frame": {
+        "x": 428,
+        "y": 97,
+        "w": 1,
+        "h": 1
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 109,
+        "y": 121,
+        "w": 1,
+        "h": 1
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    },
+    "steam#0": {
+      "frame": {
+        "x": 388,
+        "y": 100,
+        "w": 14,
+        "h": 26
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 100,
+        "y": 40,
+        "w": 14,
+        "h": 26
+      },
+      "sourceSize": {
+        "w": 320,
+        "h": 180
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 0.5
+      }
+    }
+  },
+  "meta": {
+    "app": "https://github.com/odrick/free-tex-packer-core",
+    "version": "0.3.9",
+    "image": "kitchen.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 644,
+      "h": 180
+    },
+    "scale": 1
+  }
+}
