@@ -837,13 +837,15 @@ its anchor in its box, so a turn and a scale act about it.
 An atlas that `AsepriteJson.parse()` filled — the store's `'aseprite'` adapter calls it — is read as
 an Aseprite sheet, after [the rules of its scenario](#a-scene-out-of-an-aseprite-file); any other as
 a trimmed atlas named after [the rules of a packed atlas](#a-scene-out-of-a-packed-atlas). The
-canvas is the `sourceSize` of the frames; the box of a frame is its `spriteSourceSize`. In a packed
-atlas a name `<layer>-<suffix>` is a frame of the longest layer name before a hyphen, wherever the
-packer wrote it — the order of a packed atlas is the packer's —, and a layer whose frames are
-numbered takes the numbered ones alone. A list of files is read by [the rules of layer
-PNGs](#a-scene-out-of-layer-pngs): the same names, in the order of the list, and a `-suffix` file
-is a frame only after the file of its layer — before it, a layer of its own; the canvas is
-the size of the first file that loaded, and the box of a file the box of its pixels with an alpha
+canvas is the `sourceSize` of the frames; the box of a frame is its `spriteSourceSize`, and a frame
+larger than that in the sheet — an export with `--inner-padding` — is drawn from its picture alone,
+which a padding of one whole number of texels on every side tells; any other is a problem of its
+layer. In a packed atlas a name `<layer>-<suffix>` is a frame of the longest layer name before a
+hyphen, wherever the packer wrote it — the order of a packed atlas is the packer's —, and a layer
+whose frames are numbered takes the numbered ones alone. A list of files is read by [the rules of
+layer PNGs](#a-scene-out-of-layer-pngs): the same names, in the order of the list, and a `-suffix`
+file is a frame only after the file of its layer — before it, a layer of its own; the canvas is the
+size of the first file that loaded, and the box of a file the box of its pixels with an alpha
 above 0. An art holds at most 8192 layers.
 
 The art draws the trimmed box of a layer as its quad, never the canvas: a scene of thirty layers on

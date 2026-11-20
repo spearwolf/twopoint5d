@@ -2,6 +2,7 @@ import type {PreparedSpriteFrame} from '../sprites/features/AtlasFrame.js';
 import type {AnimationTiming} from '../texture/animationFrameAt.js';
 import {type AsepriteFrameTag, type AsepriteMetaData, asepriteMetaOf, framesOfTag} from '../texture/AsepriteJson.js';
 import type {TextureAtlas, TextureAtlasFrame} from '../texture/TextureAtlas.js';
+import {TextureCoords} from '../texture/TextureCoords.js';
 import {assertFinite} from '../utils/assertFinite.js';
 import {assertPositiveFinite} from '../utils/assertPositiveFinite.js';
 import {describeValue} from '../utils/describeValue.js';
@@ -52,6 +53,10 @@ export interface StageArtProblem {
 export interface ArtFrameSpec {
   frame: TextureAtlasFrame<unknown>;
   box: LayerBox;
+  /** The texels of the atlas frame on every side of its picture — an inner padding —, which the tex coords leave out. */
+  inset?: number;
+  /** The atlas frame is larger than its picture, but not by one whole number of texels on every side: drawn as it is. */
+  unevenInset?: true;
 }
 
 /** A tag of a layer: the layer frame of each step, and the timing `animationFrameAt()` reads. */
@@ -243,13 +248,25 @@ function isEmptyCel(frame: TextureAtlasFrame<unknown>, placement: FramePlacement
   return box.x === 0 && box.y === 0 && box.w === 1 && box.h === 1 && canvasW * canvasH > 1;
 }
 
+// the frame `frame` at `box`, whose picture is `picture` large: an atlas frame larger than its picture —
+// what an export with an inner padding writes, the frame grown by as many texels on every side — is
+// drawn from the picture alone where it is grown by one whole number of texels on every side
+function placedFrame(frame: TextureAtlasFrame<unknown>, box: LayerBox, picture: LayerBox): ArtFrameSpec {
+  const [w, h] = drawnSizeOf(frame);
+  const dw = w - picture.w;
+  const dh = h - picture.h;
+  if (dw === 0 && dh === 0) return {frame, box};
+  if (dw === dh && dw > 0 && dw % 2 === 0) return {frame, box, inset: dw / 2};
+  return {frame, box, unevenInset: true};
+}
+
 // the frame of `name` on the canvas: undefined for a name the atlas lacks and for an empty cel
 function canvasFrameOf(atlas: TextureAtlas<unknown>, name: string): ArtFrameSpec | undefined {
   const frame = atlas.frame(name);
   if (frame === undefined) return undefined;
   const placement = placementOf(frame.data);
   if (isEmptyCel(frame, placement)) return undefined;
-  if (placement !== undefined) return {frame, box: placement.box};
+  if (placement !== undefined) return placedFrame(frame, placement.box, placement.box);
   const [w, h] = drawnSizeOf(frame);
   return {frame, box: {x: 0, y: 0, w, h}};
 }
@@ -319,6 +336,12 @@ function specOf(found: FoundLayer, options: ArtLayerOptions | undefined, problem
     problems.push({layer: found.name, reason: found.depthProblem});
   }
   for (const reason of found.tagProblems ?? []) problems.push({layer: found.name, reason});
+  if (found.frames.some((frame) => frame?.unevenInset === true)) {
+    problems.push({
+      layer: found.name,
+      reason: `a frame of the layer ${describeValue(found.name)} is larger in the atlas than its spriteSourceSize, but not by one whole number of texels on every side, and is drawn shrunk — export the sheet without --inner-padding, or with a padding of whole texels`,
+    });
+  }
   const spec: ArtLayerSpec = {
     name: found.name,
     box,
@@ -1123,7 +1146,7 @@ export function readLooseLayers(
       const placement = placementOf(frame.data);
       if (placement !== undefined) {
         const {x, y, w, h} = placement.box;
-        return {frame, box: {x: left + x, y: top + y, w, h}};
+        return placedFrame(frame, {x: left + x, y: top + y, w, h}, placement.box);
       }
       const [w, h] = drawnSizeOf(frame);
       return {frame, box: {x: left, y: top, w, h}};
@@ -1135,16 +1158,25 @@ export function readLooseLayers(
 
 // --- frames for the mesh ---------------------------------------------------------------------------
 
+// the coords of the picture inside an atlas frame grown by `inset` texels on every side, flipped as the frame
+function insetCoords(coords: TextureCoords, inset: number): TextureCoords {
+  const inner = new TextureCoords(coords, inset, inset, coords.width - 2 * inset, coords.height - 2 * inset);
+  inner.flip = coords.flip;
+  return inner;
+}
+
 /**
- * What the sprite of a layer writes for one of its frames: the tex coords and the diagonal flip of the
- * atlas frame, and the margins of the frame's box inside the box of the layer as fractions of it —
- * the quad of the layer is its box, never the canvas.
+ * What the sprite of a layer writes for one of its frames: the tex coords — of the picture alone in
+ * an atlas frame with an inner padding — and the diagonal flip of the atlas frame, and the margins of
+ * the frame's box inside the box of the layer as fractions of it — the quad of the layer is its box,
+ * never the canvas.
  */
 export function prepareLayerFrame(spec: ArtFrameSpec, layerBox: LayerBox): PreparedSpriteFrame {
   const {box} = spec;
+  const {coords} = spec.frame;
   return {
-    texCoords: spec.frame.coords.getTexCoords(),
-    texFlipDiagonal: spec.frame.coords.flipD ? 1 : 0,
+    texCoords: (spec.inset === undefined ? coords : insetCoords(coords, spec.inset)).getTexCoords(),
+    texFlipDiagonal: coords.flipD ? 1 : 0,
     texTrim: [
       (box.x - layerBox.x) / layerBox.w,
       (box.y - layerBox.y) / layerBox.h,

@@ -978,6 +978,47 @@ describe('prepareLayerFrame()', () => {
     expect(prepareLayerFrame(window.frames[0]!, window.box).texTrim).toEqual([0, 0, 0, 0]);
   });
 
+  // the sheet as `--inner-padding <n>` exports it: each frame of `window` grown by `n` on every side of its picture
+  const innerPadded = (grow: (frame: {w: number; h: number}) => void): AsepriteJsonData => {
+    const data = asepriteJson();
+    for (const entry of arrayFrames(data)) if (entry.filename.startsWith('window#')) grow(entry.frame);
+    return data;
+  };
+
+  test('a frame grown by an inner padding on every side is drawn from its picture alone: the tex coords inset by it', () => {
+    const atlas = asepriteAtlas(
+      innerPadded((frame) => {
+        frame.w += 4;
+        frame.h += 4;
+      }),
+    );
+    const {layers, problems} = readAtlasSource(SUBJECT, atlas, {});
+    const window = layerOf(layers, 'window');
+    const coords = atlas.frame('window#0')!.coords;
+
+    expect(window.box).toEqual({x: 196, y: 22, w: 84, h: 64});
+    expect(prepareLayerFrame(window.frames[0]!, window.box)).toEqual({
+      texCoords: new TextureCoords(coords, 2, 2, 84, 64).getTexCoords(),
+      texFlipDiagonal: 0,
+      texTrim: [0, 0, 0, 0],
+    });
+    expect(problems).toEqual([]);
+  });
+
+  test('a frame grown otherwise than by a whole number of texels on every side is a problem of its layer naming --inner-padding', () => {
+    const atlas = asepriteAtlas(
+      innerPadded((frame) => {
+        frame.w += 3;
+        frame.h += 3;
+      }),
+    );
+    const {layers, problems} = readAtlasSource(SUBJECT, atlas, {});
+    const window = layerOf(layers, 'window');
+
+    expect(prepareLayerFrame(window.frames[0]!, window.box).texCoords).toEqual(atlas.frame('window#0')!.coords.getTexCoords());
+    expect(problems).toEqual([{layer: 'window', reason: expect.stringContaining('--inner-padding')}]);
+  });
+
   test('a frame drawn turned answers its diagonal flip', () => {
     const [atlas] = TexturePackerJson.parse({
       frames: {turned: {frame: {x: 0, y: 0, w: 10, h: 20}, rotated: true}},

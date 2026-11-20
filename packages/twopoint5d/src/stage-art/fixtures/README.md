@@ -135,8 +135,8 @@ the place in Aseprite's source (`aseprite/aseprite` at the tag `v1.3.18.6`) that
   is the whole canvas (`wall`). `frame` is the place of the box in the sheet, the size of the box
   — with `--extrude` too, which puts the extruded pixels around it — but grown by `--inner-padding`
   on every side: with `--inner-padding 2` the `window` is a `frame` of 88 × 68 with the
-  `spriteSourceSize` 84 × 64. The art takes `frame` as the picture of `spriteSourceSize`, so a sheet
-  for it is exported without `--inner-padding`.
+  `spriteSourceSize` 84 × 64. The art draws such a frame from its picture alone, its tex coords
+  inset by the padding; a frame grown otherwise is a problem of its layer.
 - **An empty cel is an entry of 1 × 1**, unless `--ignore-empty` is given. With `--trim` alone a
   layer without a cel at a frame keeps its entry: `spriteSourceSize` `0, 0, 1 × 1`, `trimmed`
   `true`, a `frame` of 1 × 1 in the sheet — `ladle#3` in `kitchen-aseprite-empty-cels.json`.
